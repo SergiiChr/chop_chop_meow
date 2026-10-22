@@ -1,6 +1,9 @@
 """Offline packaging checks; run with python3 -m unittest discover -s tests -p test_bake_animations.py."""
+
 import unittest
+
 from PIL import Image
+
 from tools.bake_animations import pack
 
 
@@ -11,7 +14,10 @@ class BakeChecks(unittest.TestCase):
         image.paste((30, 80, 150, 255), (6, 2, 12, 19))
         image.putpixel((18, 5), (190, 195, 200, 255))
         image.putpixel((1, 7), (250, 180, 10, 64))
-        spec = {"body_height": 150, "frames": [{"rect": [0, 0, 20, 20], "foot": [9, 19]} for _ in range(32)]}
+        spec = {
+            "body_height": 150,
+            "frames": [{"rect": [0, 0, 20, 20], "foot": [9, 19]} for _ in range(32)],
+        }
         return image, spec
 
     def test_disconnected_parts_and_partial_alpha_are_preserved(self):
