@@ -441,12 +441,11 @@ public partial class Game : Node
                 else { world.Gather(gathering, dt); if (world.GatherBlock(gathering) is string blocked) { Notify(blocked); gathering = null; } }
             }
             else { world.ResetGather(); if (!right) gathering = null; }
-            world.MovePlayer(direction * dt * 4.2f); view.MoveDirection = direction; view.Gathering = gathering != null && right && world.Near(gathering, 2.5f);
+            world.MovePlayer(direction * dt * 4.2f); view.Gathering = gathering != null && right && world.Near(gathering, 2.5f);
             view.GatheringTarget = view.Gathering ? gathering : null;
             world.Tick(dt); ShowEndingOnce(); autosave += dt;
             if (autosave >= 90) { Save(); autosave = 0; }
         }
-        else view.MoveDirection = Vector2.Zero;
         view.Paused = paused; view.SelectedTool = ActiveHotbarItem();
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;

@@ -15,7 +15,6 @@ public partial class WorldView : Node2D
     public string BuildMode = "";
     public Vector2 Mouse;
     public float Zoom = 1;
-    public Vector2 MoveDirection;
     public bool Gathering;
     public Thing? GatheringTarget;
     public string? SelectedTool;
