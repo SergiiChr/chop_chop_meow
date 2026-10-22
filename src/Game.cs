@@ -48,6 +48,12 @@ public partial class Game : Node
             if (OS.GetCmdlineUserArgs().Contains("--showcase")) Showcase();
             Notify("Welcome. WASD to move; hold right mouse to approach and gather. Tab shows the field guide.");
             if (OS.GetCmdlineUserArgs().Contains("--ui-test")) RunUIChecks();
+            if (OS.GetCmdlineUserArgs().Contains("--animation-review"))
+            {
+                ClosePanel(); ui.Visible = false; view.AnimationReview = true;
+                var reviewArgs = OS.GetCmdlineUserArgs(); int capture = Array.IndexOf(reviewArgs, "--animation-capture");
+                if (capture >= 0 && capture + 1 < reviewArgs.Length) CaptureAnimations(reviewArgs[capture + 1]);
+            }
         }
         catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
@@ -243,7 +249,7 @@ public partial class Game : Node
             var row = Row(); row.AddChild(Button("Load 1 batch", () => world.LoadBatch(t))); row.AddChild(Button("Load 5", () => world.LoadBatch(t, 5)));
             AddButton("Collect finished goods", () => world.Collect(t));
         }
-        if (t.Kind == "reinforced") { Dynamic(() => $"TEMPERATURE   {t.Heat:0}° / 80° required", 17, new Color("edc17c")); AddButton("Pump bellows · Space", () => world.Pump(t)); }
+        if (t.Kind == "reinforced") { Dynamic(() => $"TEMPERATURE   {t.Heat:0}° / 80° required", 17, new Color("edc17c")); AddButton("Pump bellows · Space", () => { if (paused) Notify("Resume before operating the bellows."); else world.Pump(t); }); }
         AddLabel("INSIDE", 14);
         AddInventoryGrid(() => t.Inventory, id => MoveStack(t.Inventory, world.S.Backpack, id, t), "Click: take a stack · Shift: take all");
         Assignment(t);
@@ -372,6 +378,7 @@ public partial class Game : Node
                     if (t == null || !world.Near(t)) t = world.S.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
                     if (t != null) Select(t); break;
                 case Key.Space:
+                    if (paused) { Notify("Resume before using tools."); break; }
                     var station = world.Find(selected);
                     if (station != null && station.Kind == "reinforced" && world.Near(station)) world.Pump(station); else world.Attack(); break;
             }
@@ -434,11 +441,12 @@ public partial class Game : Node
                 else { world.Gather(gathering, dt); if (world.GatherBlock(gathering) is string blocked) { Notify(blocked); gathering = null; } }
             }
             else { world.ResetGather(); if (!right) gathering = null; }
-            world.MovePlayer(direction * dt * 4.2f); view.MoveDirection = direction; view.Gathering = gathering != null && right && world.Near(gathering);
+            world.MovePlayer(direction * dt * 4.2f); view.Gathering = gathering != null && right && world.Near(gathering, 2.5f);
+            view.GatheringTarget = view.Gathering ? gathering : null;
             world.Tick(dt); ShowEndingOnce(); autosave += dt;
             if (autosave >= 90) { Save(); autosave = 0; }
         }
-        else view.MoveDirection = Vector2.Zero;
+        view.Paused = paused; view.SelectedTool = ActiveHotbarItem();
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }
