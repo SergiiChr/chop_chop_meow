@@ -276,7 +276,9 @@ public partial class WorldView : Node2D
             Diamond(Screen(pos), Zoom * 1.4f, valid ? new Color(.7f, .9f, .5f, .5f) : new Color(.9f, .3f, .2f, .5f));
             DrawThing(new Thing { Kind = BuildMode, Pos = pos }, valid ? new Color(1, 1, 1, .65f) : new Color(1, .5f, .5f, .6f));
         }
-        float darkness = World.Night ? .65f : World.DayPhase > .6f ? (World.DayPhase - .6f) * 2.3f : .02f;
+        // Dusk deepens into full night and dawn fades out, so neither boundary jumps in brightness.
+        float dayPhase = World.DayPhase, dusk = World.Data.NightStarts - .1f;
+        float darkness = World.Night ? .65f : dayPhase > dusk ? .02f + (dayPhase - dusk) / .1f * .63f : dayPhase < .05f ? .65f - dayPhase / .05f * .63f : .02f;
         if (darkness > 0)
         {
             DrawRect(GetViewportRect(), new Color(.05f, .10f, .22f, darkness));

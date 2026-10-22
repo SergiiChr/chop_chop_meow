@@ -17,6 +17,9 @@ public static class SimulationChecks
         CheckCampfireWorkerFuel(data);
         CheckWorkerFurnaceCrew(data);
         CheckTradeAndWages(data);
+        CheckMarketRoundTrip(data);
+        CheckRecoveryBoxesStayPrivate(data);
+        CheckRecipeSwitchLeftovers(data);
         CheckDeathAndSaveState(data);
         CheckFuelAndHeatGates(data);
         CheckProcessingOutputCapacity(data);
@@ -236,12 +239,9 @@ public static class SimulationChecks
         Require(world.Trade(sign, "wood", 1, true), "market should accept an affordable buy order");
         Require(world.S.Coins < coinsBeforeBuy && world.S.Orders.Count == 1 && world.S.Backpack["wood"] == 0,
                 "buy order should reserve coins immediately while goods remain in transit");
-        float raisedDemand = world.S.Demand["wood"];
         SafeTick(world, 29.9f);
         Require(world.S.Orders.Count == 1 && world.S.Backpack["wood"] == 0,
                 "cart must not deliver before the full 30-second trip");
-        Require(world.S.Demand["wood"] < raisedDemand && world.S.Demand["wood"] >= 1,
-                "market demand should gradually recover toward its baseline during the trip");
         SafeTick(world, .2f);
         Require(world.S.Orders.Count == 0 && world.S.Backpack["wood"] == 1,
                 "cart should deliver the purchased item after its trip");
@@ -251,9 +251,13 @@ public static class SimulationChecks
         Require(world.Trade(sign, "wood", 3, false), "market should accept items held by the player");
         Require(world.S.Backpack["wood"] == 0 && world.S.Coins == coinsBeforeSale,
                 "sale removes goods at dispatch but does not pay before the cart returns");
+        float loweredDemand = world.S.Demand["wood"];
+        Require(loweredDemand < 1, "selling should lower demand");
         SafeTick(world, 30.1f);
         Require(world.S.Orders.Count == 0 && world.S.Coins > coinsBeforeSale,
                 "sale proceeds should arrive only when the cart returns");
+        Require(world.S.Demand["wood"] > loweredDemand && world.S.Demand["wood"] < 1,
+                "market demand should gradually recover toward its baseline");
 
         var worker = world.Hire(sign);
         Require(worker != null, "player should be able to hire an individually tracked worker");
@@ -270,6 +274,74 @@ public static class SimulationChecks
         world.S.Coins = data.DailyWage;
         world.SettleDebt(worker);
         Require(worker.WageDebt == 0, "paying the full owed wage should clear the strike debt");
+    }
+
+    private static void CheckMarketRoundTrip(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var sign = world.Add("signpost", new Vector2(10, 10));
+        world.Player = sign.Pos;
+        world.S.Coins = 20000;
+        Require(world.Trade(sign, "steel_tools", 100, true), "market should accept a large affordable purchase");
+        SafeTick(world, data.TradeSeconds + .1f);
+        Require(world.Trade(sign, "steel_tools", 100, false), "market should accept the purchased goods back");
+        SafeTick(world, data.TradeSeconds + .1f);
+        Require(world.S.Coins < 20000, "buying goods and selling them straight back must lose coins");
+        float price = data.Items["steel_tools"].Price;
+        Require(world.S.Coins < 20000 - 100 * price * 1.25f + 100 * price,
+                "a bulk sale must be paid less than its full pre-sale price for every unit");
+    }
+
+    private static void CheckRecoveryBoxesStayPrivate(GameData data)
+    {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(12, 10);
+        world.S.Backpack.Add("wood", 5);
+        world.Die();
+        var box = world.S.Things.Last(t => t.Kind == "grave");
+        world.S.Milestones.Add("pick");
+        var tree = world.Add("tree", new Vector2(13, 10), 30);
+        var chest = world.Add("chest", new Vector2(20, 10));
+        var worker = AddWorker(world, new Vector2(14, 10));
+        world.Assign(worker, tree);
+        SafeTick(world, 25);
+        Require(box.Inventory["wood"] == 5 && chest.Inventory["wood"] > 0,
+                "workers must store gathered goods in chests, not in the player's recovery box");
+
+        var furnace = world.Add("furnace", new Vector2(13, 13));
+        world.Player = box.Pos;
+        world.S.Backpack.Add("iron_ore", 4);
+        world.Die();
+        var oreBox = world.S.Things.Last(t => t.Kind == "grave");
+        world.Assign(worker, furnace);
+        SafeTick(world, 15);
+        Require(oreBox.Inventory["iron_ore"] == 4, "workers must not haul inputs out of a recovery box");
+
+        world.Player = box.Pos;
+        foreach (var id in box.Inventory.Items.Keys.ToArray()) box.Inventory.TransferTo(world.S.Backpack, id, 999);
+        SafeTick(world, .1f);
+        Require(world.S.Things.All(t => t.Id != box.Id), "an emptied recovery box should disappear");
+    }
+
+    private static void CheckRecipeSwitchLeftovers(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var anvil = world.Add("anvil", new Vector2(10, 10));
+        world.Player = anvil.Pos + Vector2.One;
+        world.SetRecipe(anvil, "iron_axe");
+        anvil.Inventory.Add("iron_axe", 1);
+        world.SetRecipe(anvil, "iron_pick");
+        world.Collect(anvil);
+        Require(world.S.Backpack["iron_axe"] == 1 && anvil.Inventory["iron_axe"] == 0,
+                "collecting should also return goods made by a previous recipe");
+
+        anvil.Inventory.Add("iron_axe", 1);
+        var chest = world.Add("chest", new Vector2(14, 10));
+        var worker = AddWorker(world, new Vector2(11, 11));
+        world.Player = new Vector2(30, 30);
+        world.Assign(worker, anvil);
+        SafeTick(world, 10);
+        Require(chest.Inventory["iron_axe"] == 1, "station workers should haul leftovers from a previous recipe to storage");
     }
 
     private static void CheckDeathAndSaveState(GameData data)

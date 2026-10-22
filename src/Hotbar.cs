@@ -106,26 +106,10 @@ public partial class Game
         }
     }
 
-    private string HotbarId(int slot)
-    {
-        var slots = world.S.HotbarSlots ??= new System.Collections.Generic.List<string>();
-        while (slots.Count < 9) slots.Add("");
-        if (slots.Count > 9) slots.RemoveRange(9, slots.Count - 9);
-        for (int i = 0; i < slots.Count; i++)
-        {
-            var id = slots[i];
-            if (string.IsNullOrEmpty(id) || (!world.Data.Items.ContainsKey(id) && !world.Data.Buildings.ContainsKey(id))) slots[i] = "";
-        }
-        world.S.ActiveHotbar = Math.Clamp(world.S.ActiveHotbar, 0, 8);
-        return slots[slot] ?? "";
-    }
+    // World.Deserialize keeps nine known entries, so reads need no repair here.
+    private string HotbarId(int slot) => world.S.HotbarSlots[slot];
 
-    private string? ActiveHotbarItem()
-    {
-        int slot = Math.Clamp(world.S.ActiveHotbar, 0, 8);
-        string id = HotbarId(slot);
-        return world.Data.Items.ContainsKey(id) ? id : null;
-    }
+    private string? ActiveHotbarItem() => world.Data.Items.ContainsKey(HotbarId(world.S.ActiveHotbar)) ? HotbarId(world.S.ActiveHotbar) : null;
 
     private bool IsTransferableHotbarItem(string id) => id is not "iron_axe" and not "iron_pick" and not "steel_tools" and not "berries" and not "water";
 
@@ -182,7 +166,6 @@ public partial class Game
 
     private void SetHotbar(int slot, string id)
     {
-        HotbarId(slot);
         world.S.HotbarSlots[slot] = id;
         world.S.ActiveHotbar = slot;
         Notify(id == "" ? $"Cleared hotbar slot {slot + 1}." : $"Slot {slot + 1}: {world.Data.Name(id)}.");
