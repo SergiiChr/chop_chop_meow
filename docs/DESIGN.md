@@ -6,20 +6,21 @@ The prototype is a single-player, isometric woodland survival and production gam
 
 The intended fresh-start loop is to gather loose iron and nearby wood, build storage and a basic furnace, smelt iron and forge a pickaxe, mine iron and coal, then build and operate a reinforced furnace to make steel tools. Sell a steel tool through the village signpost and use the proceeds to hire and assign a worker. The 10–15 minute duration is a pacing target, subject to hands-on UI and exported-build review.
 
-Food, water, the day/night cycle, shelter, wages, and wolf encounters support the production loop. Campfire light repels wolves within its radius; sleeping in a hut advances time toward dawn. Death moves carried items to a recovery box and respawns the player.
+Food, water, the day/night cycle, shelter, wages, and wolf encounters support the production loop. Campfire light repels wolves within its radius; sleeping in a hut advances time toward dawn. Death moves carried items to a recovery box and respawns the player at the clearing after a 30-second timer. Recovery boxes are never automation storage and disappear once empty.
 
 ## Implemented rules
 
 - The basic furnace accepts wood or mined coal for fuel. The reinforced furnace uses coal only, and steel production needs the furnace to stay hot through bellows pumping.
 - Steel recipes consume iron bars and mined coal. Charcoal production is not implemented.
-- Market prices react to trade and recover over time. A cart trip takes 30 seconds; purchases and sale proceeds settle on return.
+- Inventories are slot grids with stacks of 64; a worker carries one stack of up to 5.
+- Selling lowers prices unit by unit and they recover over time; buying costs a fixed 1.25× the base price. A cart trip takes 30 seconds; purchases and sale proceeds settle on return.
 - Workers are tracked individually. Resource assignments gather and deliver materials; building assignments haul recipe inputs and outputs and can operate furnace bellows. Two workers assigned to a reinforced furnace split bellows and hauling work.
 - Chests have separate item allowlists for input and output. Empty lists allow all items. Automated deposits prefer a chest with a matching input filter, then a nearby unrestricted chest. Automated withdrawals respect output filters. Manual transfers ignore those filters.
 - Pollution, vampires, multiplayer, and technology beyond steel are outside this POC.
 
 ## Code and data
 
-The project targets Godot 4.7.2 .NET with C#. The `World` simulation and `SaveState` are in `src/World.cs`; inventories and their filter-aware transfers are in `src/Inventory.cs`; tunable items, buildings, recipes, trade values, and time values are loaded from `data/game.json` by `src/GameData.cs`. `src/Game.cs` owns UI, input, save/load, and the main game loop. `src/Hotbar.cs` implements nine saved item/plan references, assignment, icons and use. Global player stats appear only in the inventory panel. `src/WorldView.cs` draws the isometric map, sprite sheets, actors, work feedback, and world interactions. `scenes/Main.tscn` is the project entry point and references `src/Game.cs`.
+The project targets Godot 4.7.2 .NET with C#. The `World` simulation and `SaveState` are in `src/World.cs`; inventories and their filter-aware transfers are in `src/Inventory.cs`; tunable items, buildings, recipes, trade values, and time values are loaded from `data/game.json` by `src/GameData.cs`. `src/Game.cs` owns UI, input, save/load, and the main game loop. `src/Grid.cs` draws the icon-cell grids, `src/Ending.cs` the one-time ending screen, and `src/Hotbar.cs` implements nine saved item/plan references, assignment, icons and use. Global player stats appear only in the inventory panel. `src/WorldView.cs` draws the isometric map, sprite sheets, actors, work feedback, and world interactions. `scenes/Main.tscn` is the project entry point and references `src/Game.cs`.
 
 Keep balance and recipe values in `data/game.json` so they can be adjusted without changing simulation code. Keep rendering and input separate from state transitions so headless checks can exercise gameplay rules without relying on screenshots. Simulation checks live in `tests/SimulationChecks.cs` and cover filters, worker routing, furnace work, trade, wages, recovery after death, saves, and a material-driven progression run.
 

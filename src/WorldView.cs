@@ -11,6 +11,7 @@ public partial class WorldView : Node2D
     public int Selected;
     public int Hover;
     public int SelectedWorker;
+    public int HoverWorker;
     public string BuildMode = "";
     public Vector2 Mouse;
     public float Zoom = 1;
@@ -35,8 +36,9 @@ public partial class WorldView : Node2D
     private Image? detailImage;
     private Image atlasImage = null!;
     private Texture2D? extras;
+    private NoiseTexture2D ground = null!;
     private Font font = ThemeDB.FallbackFont;
-
+    private (Vector2 At, string Text)? tag;
     private static readonly Color Ink = new("283d34");
     private readonly Dictionary<string, int> cells = new() { ["tree"] = 0, ["stone"] = 1, ["iron"] = 2, ["loose_iron"] = 2, ["coal"] = 3, ["berries"] = 4, ["furnace"] = 5, ["reinforced"] = 6, ["hut"] = 7, ["chest"] = 8, ["grave"] = 8, ["anvil"] = 9, ["signpost"] = 10, ["campfire"] = 11 };
     public override void _Ready()
@@ -57,6 +59,19 @@ public partial class WorldView : Node2D
         if (atlasImage.IsCompressed()) atlasImage.Decompress();
         if (ResourceLoader.Exists("res://assets/travel-atlas.png")) extras = GD.Load<Texture2D>("res://assets/travel-atlas.png");
         TextureFilter = TextureFilterEnum.Linear;
+        // Fine grass grain with occasional bare-earth flecks at the top of the ramp.
+        var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
+        var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
+        ground = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
+    }
+    /// <summary>Tiles a seamless grass-and-earth noise anchored to the world origin, so it scrolls and zooms with the map.</summary>
+    private void DrawGround()
+    {
+        float size = 512 * Zoom;
+        var origin = Screen(Vector2.Zero); var screen = GetViewportRect().Size;
+        for (float x = Mathf.PosMod(origin.X, size) - size; x < screen.X; x += size)
+            for (float y = Mathf.PosMod(origin.Y, size) - size; y < screen.Y; y += size)
+                DrawTextureRect(ground, new Rect2(x, y, size, size), false);
     }
     public Vector2 Center => GetViewportRect().Size * new Vector2(PanelOpen ? .38f : .5f, .52f);
     public static Vector2 Iso(Vector2 p) => new((p.X - p.Y) * 44, (p.X + p.Y) * 22);
@@ -66,10 +81,11 @@ public partial class WorldView : Node2D
         var q = (p - Center) / Zoom + Iso(World.Player);
         return new Vector2(q.X / 88 + q.Y / 44, q.Y / 44 - q.X / 88);
     }
-    // Adult actors are 85 px; trees and the hut are landmark-scale, with the hut tallest.
+    // One scale anchor: an adult actor is 85 px; trees stand roughly four people tall. Small props stay below waist height,
+    // the hut has an adult-sized doorway, and tree crowns rise well above the roof.
     private static float Height(Thing t) => t.Kind switch
     {
-        "tree" => 210 + t.Id % 5 * 7,
+        "tree" => 320 + t.Id % 5 * 14,
         "hut" => 270,
         "reinforced" => 98,
         "furnace" => 86,
@@ -78,7 +94,7 @@ public partial class WorldView : Node2D
         "berries" => 51,
         "signpost" => 87,
         "anvil" => 53,
-        "water" => 24,
+        "water" => 110,
         "campfire" => 48,
         _ => 46
     };
@@ -201,7 +217,7 @@ public partial class WorldView : Node2D
         var tint = overrideTint ?? Colors.White;
         if (t.Kind == "water")
         {
-            DrawCircle(p, 11 * Zoom, new Color("a4d7e2")); Text(p + new Vector2(-15, -18), "Water", 15, Ink); return;
+            return; // The pond art is the drinking spot; this object only provides the hit area.
         }
         if (t.IsResource && t.Remaining == 0 && t.Kind != "berries")
         {
@@ -230,18 +246,12 @@ public partial class WorldView : Node2D
                 DrawCircle(p + new Vector2(MathF.Sin(age * 8 + i) * 9, -h * .36f - age * 40 * Zoom), (2 - age) * Zoom, new Color(1, .65f, .2f, (1 - age) * .8f));
             }
         }
-        if (selected || t.Processing)
+        // Only the hovered object is named; the side panel already names the selection.
+        if (t.Id == Hover && overrideTint == null) tag = (p + new Vector2(0, -h - 8), t.Kind == "loose_iron" ? "Loose iron" : World.Data.Name(t.Kind));
+        if (t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var r))
         {
-            string name = t.Kind == "loose_iron" ? "Loose iron · pick up by hand" : t.Kind == "iron" ? "Iron deposit" : t.Kind == "coal" ? "Mined coal" : World.Data.Name(t.Kind);
-            if (t.Kind == "grave") name = "Recovery box";
-            var label = p + new Vector2(-Math.Min(100, name.Length * 4), -h - 8);
-            DrawStyleBox(new StyleBoxFlat { BgColor = new Color(.12f, .18f, .15f, .86f), CornerRadiusTopLeft = 5, CornerRadiusTopRight = 5, CornerRadiusBottomLeft = 5, CornerRadiusBottomRight = 5 }, new Rect2(label + new Vector2(-5, -17), new Vector2(name.Length * 7.2f + 10, 24)));
-            Text(label, name, 14, new Color("f5ecd1"));
-            if (t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var r))
-            {
-                DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), new Color("2b4135"));
-                DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * t.Progress / r.Seconds, 5)), new Color("e5bf68"));
-            }
+            DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), new Color("2b4135"));
+            DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * t.Progress / r.Seconds, 5)), new Color("e5bf68"));
         }
     }
     private void DrawClip(ActorClip clip, Vector2 feet, int direction, int frame, float height)
@@ -285,6 +295,7 @@ public partial class WorldView : Node2D
         if (World == null || atlas == null) return;
         if (AnimationReview) { DrawAnimationReview(); return; }
         DrawRect(GetViewportRect(), new Color("879c69"));
+        DrawGround();
         var viewport = GetViewportRect().Grow(260);
         // Broad, quiet grass patches replace the checkerboard of individually colored tiles.
         for (int x = 0; x < World.MapSize; x += 2) for (int y = 0; y < World.MapSize; y += 2)
@@ -313,16 +324,19 @@ public partial class WorldView : Node2D
             DrawColoredPolygon(edges.ToArray(), new Color(.67f, .60f, .43f, layer == 1 ? .28f : .14f));
         }
         var pond = Screen(ChopChopMeow.World.Pond);
+        // The pond art was sized for a 2.7-tile radius; scale it with the walkable boundary.
+        float pondScale = ChopChopMeow.World.PondRadius / 2.7f * Zoom;
         if (details != null)
         {
             float cell = details.GetWidth() / 2f;
-            DrawTextureRectRegion(details, new Rect2(pond - new Vector2(170, 170) * Zoom, new Vector2(340, 340) * Zoom), new Rect2(0, 0, cell, details.GetHeight()));
+            DrawTextureRectRegion(details, new Rect2(pond - new Vector2(170, 170) * pondScale, new Vector2(340, 340) * pondScale), new Rect2(0, 0, cell, details.GetHeight()));
         }
         else
         {
-            Ellipse(pond, new Vector2(150, 73) * Zoom, new Color("b1ae79"));
-            Ellipse(pond, new Vector2(130, 63) * Zoom, new Color("6e9b9b"));
+            Ellipse(pond, new Vector2(150, 73) * pondScale, new Color("b1ae79"));
+            Ellipse(pond, new Vector2(130, 63) * pondScale, new Color("6e9b9b"));
         }
+        tag = null;
         var list = new List<(float Depth, Action Draw)>();
         foreach (var t in World.S.Things)
         {
@@ -330,7 +344,7 @@ public partial class WorldView : Node2D
             if (!viewport.HasPoint(Screen(t.Pos))) continue;
             list.Add((t.X + t.Y, () => DrawThing(captured)));
         }
-        list.Add((World.Player.X + World.Player.Y, () => DrawActor(World.Player, player)));
+        if (!World.Dead) list.Add((World.Player.X + World.Player.Y, () => DrawActor(World.Player, player)));
         foreach (var w in World.S.Workers)
         {
             var worker = w;
@@ -339,7 +353,7 @@ public partial class WorldView : Node2D
                 if (crew.TryGetValue(worker.Id, out var state)) DrawActor(worker.Pos, state, true);
                 var p = Screen(worker.Pos);
                 if (worker.Id == SelectedWorker) Ellipse(p, new Vector2(22, 10) * Zoom, new Color(1, .8f, .3f, .35f));
-                Text(p + new Vector2(-20, -80) * Zoom, worker.Name, 13, Ink);
+                if (worker.Id == HoverWorker || worker.Id == SelectedWorker) tag = (p + new Vector2(0, -88) * Zoom, worker.Name);
             }
             ));
         }
@@ -367,7 +381,6 @@ public partial class WorldView : Node2D
                 bool cash = !order.Buying && phase >= .5f;
                 if (extras != null) Sprite(extras, cash ? 2 : 1, 3, 1, p, new Vector2(108, 72) * Zoom, Colors.White);
                 else { DrawRect(new Rect2(p - new Vector2(22, 25), new Vector2(44, 24)), new Color("947342")); DrawCircle(p + new Vector2(-16, 1), 8, Ink); DrawCircle(p + new Vector2(16, 1), 8, Ink); }
-                Text(p + new Vector2(-40, -88) * Zoom, cash ? "Payment returning" : order.Buying ? "Village purchase" : "Goods to village", 12, Ink);
             }
             ));
         }
@@ -378,7 +391,9 @@ public partial class WorldView : Node2D
             Diamond(Screen(pos), Zoom * 1.4f, valid ? new Color(.7f, .9f, .5f, .5f) : new Color(.9f, .3f, .2f, .5f));
             DrawThing(new Thing { Kind = BuildMode, Pos = pos }, valid ? new Color(1, 1, 1, .65f) : new Color(1, .5f, .5f, .6f));
         }
-        float darkness = World.Night ? .65f : World.DayPhase > .6f ? (World.DayPhase - .6f) * 2.3f : .02f;
+        // Dusk deepens into full night and dawn fades out, so neither boundary jumps in brightness.
+        float dayPhase = World.DayPhase, dusk = World.Data.NightStarts - .1f;
+        float darkness = World.Night ? .65f : dayPhase > dusk ? .02f + (dayPhase - dusk) / .1f * .63f : dayPhase < .05f ? .65f - dayPhase / .05f * .63f : .02f;
         if (darkness > 0)
         {
             DrawRect(GetViewportRect(), new Color(.05f, .10f, .22f, darkness));
@@ -397,6 +412,15 @@ public partial class WorldView : Node2D
             if (Math.Abs(d.Y) > Math.Abs(d.X) * 2) return d.Y > 0 ? "↓" : "↑";
             return d.Y > 0 ? d.X > 0 ? "↘" : "↙" : d.X > 0 ? "↗" : "↖";
         }
-        Text(new Vector2(25, GetViewportRect().Size.Y - 210), $"POND {Direction(World.Pond)}    IRON {Direction(new Vector2(30, 18))}    COAL {Direction(new Vector2(37, 20))}", 13, new Color("f4ecd3"));
+        // Point only toward what the current objective sends the player to find.
+        string? guide = World.S.Goal switch { 2 => $"IRON {Direction(new Vector2(30, 18))}", 5 => $"COAL {Direction(new Vector2(37, 20))}", _ => null };
+        if (guide != null) Text(new Vector2(25, GetViewportRect().Size.Y - 210), guide, 13, new Color("f4ecd3"));
+        // Drawn last so no sprite or night shading covers it.
+        if (tag is var (at, text))
+        {
+            var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, 14);
+            DrawStyleBox(new StyleBoxFlat { BgColor = new Color(.12f, .18f, .15f, .86f), CornerRadiusTopLeft = 5, CornerRadiusTopRight = 5, CornerRadiusBottomLeft = 5, CornerRadiusBottomRight = 5 }, new Rect2(at - new Vector2(size.X / 2 + 6, 18), size + new Vector2(12, 6)));
+            DrawString(font, at - new Vector2(size.X / 2, 0), text, HorizontalAlignment.Left, -1, 14, new Color("f5ecd1"));
+        }
     }
 }

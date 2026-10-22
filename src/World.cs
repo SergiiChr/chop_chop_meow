@@ -37,7 +37,7 @@ public sealed class Worker
     public int Assignment { get; set; }
     public string Job { get; set; } = "idle";
     public string Status { get; set; } = "Available";
-    public Inventory Bag { get; set; } = new() { Capacity = 6 };
+    public Inventory Bag { get; set; } = new() { Slots = 1, StackSize = 5 };
     public int Destination { get; set; }
     public float Timer { get; set; }
     public float WageDebt { get; set; }
@@ -65,12 +65,12 @@ public sealed class Wolf
 }
 public sealed class SaveState
 {
-    public int Version { get; set; } = 1;
+    public int Version { get; set; } = 2;
     public List<Thing> Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
     public List<Wolf> Wolves { get; set; } = new();
-    public Inventory Backpack { get; set; } = new() { Capacity = 240 };
+    public Inventory Backpack { get; set; } = new() { Slots = 24 };
     public Dictionary<string, float> Demand { get; set; } = new();
     public HashSet<string> Milestones { get; set; } = new();
     public float PlayerX { get; set; } = 23;
@@ -85,6 +85,9 @@ public sealed class SaveState
     public int WageDay { get; set; } = 1;
     public List<string> HotbarSlots { get; set; } = new() { "iron_axe", "iron_pick", "chest", "campfire", "furnace", "anvil", "reinforced", "berries", "water" };
     public int ActiveHotbar { get; set; }
+    public float RespawnIn { get; set; }
+    public float PlaySeconds { get; set; }
+    public bool EndingShown { get; set; }
 }
 
 /// <summary>Authoritative single-player simulation, independent of rendering and UI.</summary>
@@ -96,7 +99,8 @@ public sealed class World
     public Action<ActorAction, Vector2>? PlayerActed;
     public const int MapSize = 48;
     public static readonly Vector2 Spawn = new(23, 24);
-    public static readonly Vector2 Pond = new(16, 22);
+    public static readonly Vector2 Pond = new(14, 22);
+    public const float PondRadius = 4.5f;
     private float gatherClock;
     private float attackClock;
     private float nightSpawn;
@@ -105,7 +109,8 @@ public sealed class World
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
     public float DayPhase => S.Time % Data.DaySeconds / Data.DaySeconds;
     public bool Night => DayPhase >= Data.NightStarts;
-    public bool Near(Thing t, float radius = 3.2f) => Player.DistanceTo(t.Pos) <= radius;
+    public bool Dead => S.RespawnIn > 0;
+    public bool Near(Thing t, float radius = 3.2f) => !Dead && Player.DistanceTo(t.Pos) <= radius;
     public Thing? Find(int id) => S.Things.FirstOrDefault(t => t.Id == id);
     public void Say(string message) => Notify?.Invoke(message);
     public Thing Add(string kind, Vector2 pos, int remaining = 0)
@@ -123,11 +128,12 @@ public sealed class World
         for (int i = 0; i < 110; i++)
         {
             var p = new Vector2(rng.Next(3, 45), rng.Next(3, 45));
-            if (p.DistanceTo(Spawn) < 5 || p.DistanceTo(Pond) < 4.3f || p.DistanceTo(new Vector2(30, 18)) < 6 || Math.Abs(p.Y - 24) < 1.5f) continue;
-            if (S.Things.Any(t => t.Pos.DistanceTo(p) < 2.3f)) continue;
+            if (p.DistanceTo(Spawn) < 8 || p.DistanceTo(Pond) < PondRadius + 3.5f || p.DistanceTo(new Vector2(30, 18)) < 6 || Math.Abs(p.Y - 24) < 1.5f) continue;
+            // Full-size trees need room for their crowns, so the woods stay walkable and readable.
+            if (S.Things.Any(t => t.Pos.DistanceTo(p) < 3.6f)) continue;
             Add("tree", p, 42);
         }
-        Add("tree", new(20, 27), 42); Add("tree", new(25, 28), 42); Add("tree", new(28, 24), 42);
+        Add("tree", new(28, 24), 42);
         Vector2[] stones = { new(19, 28), new(22, 30), new(26, 30), new(24, 33), new(18, 32), new(29, 33), new(21, 35) };
         foreach (var p in stones) Add("stone", p, 64);
         Vector2[] loose = { new(28, 19), new(30, 21), new(33, 20), new(29, 17), new(32, 17) };
@@ -135,18 +141,19 @@ public sealed class World
         foreach (var p in new Vector2[] { new(32, 13), new(35, 15), new(34, 11) }) Add("iron", p, 400);
         foreach (var p in new Vector2[] { new(37, 19), new(40, 21), new(37, 23) }) Add("coal", p, 400);
         foreach (var p in new Vector2[] { new(13, 28), new(16, 30), new(12, 32), new(15, 34), new(10, 29) }) Add("berries", p, 34);
-        Add("water", new(18.4f, 23), 9999);
+        Add("water", Pond + (Spawn - Pond).Normalized() * (PondRadius + .2f), 9999);
         S.Things.RemoveAll(t => t.Kind == "tree" && S.Things.Any(other => other.Id != t.Id && other.IsResource && other.Kind != "tree" && other.Pos.DistanceTo(t.Pos) < 1.3f));
         Say("Welcome to Bramblewick. Gather wood and stone; build a sheltered workshop.");
     }
     public bool CanStand(Vector2 p)
     {
-        if (p.X < 1 || p.Y < 1 || p.X > 46 || p.Y > 46 || p.DistanceTo(Pond) < 2.7f) return false;
+        if (p.X < 1 || p.Y < 1 || p.X > 46 || p.Y > 46 || p.DistanceTo(Pond) < PondRadius) return false;
         return !S.Things.Any(t => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" && t.Pos.DistanceTo(p) < Footprint(t.Kind));
     }
     public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "chest" or "anvil" => .45f, _ => .35f };
     public void MovePlayer(Vector2 delta)
     {
+        if (Dead) return;
         var p = Player + delta;
         if (CanStand(p)) Player = p;
         else { if (CanStand(Player + new Vector2(delta.X, 0))) Player += new Vector2(delta.X, 0); if (CanStand(Player + new Vector2(0, delta.Y))) Player += new Vector2(0, delta.Y); }
@@ -169,7 +176,7 @@ public sealed class World
         float seconds = Data.GatherSeconds * (S.Backpack["steel_tools"] > 0 ? .55f : 1);
         if (gatherClock < seconds) return;
         gatherClock = 0;
-        int amount = Math.Min(t.Remaining, t.Kind == "stone" && S.Backpack["iron_pick"] == 0 && S.Backpack["steel_tools"] == 0 ? 2 : t.Kind == "water" ? 4 : 4);
+        int amount = Math.Min(t.Remaining, t.Kind == "stone" && S.Backpack["iron_pick"] == 0 && S.Backpack["steel_tools"] == 0 ? 2 : 4);
         amount = S.Backpack.Add(ResourceItem(t), amount); t.Remaining -= amount;
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
         else Say($"+{amount} {Data.Name(ResourceItem(t))} · {t.Remaining} left here.");
@@ -180,9 +187,10 @@ public sealed class World
     public string? PlacementBlock(string kind, Vector2 p)
     {
         if (!Data.Buildings.ContainsKey(kind)) return "Unknown building.";
+        if (Dead) return "You are still recovering.";
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
         if (Player.DistanceTo(p) < 1.2f || Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
-        if (!CanStand(p) || p.DistanceTo(Pond) < 3.5f) return "Choose dry, open ground.";
+        if (!CanStand(p) || p.DistanceTo(Pond) < PondRadius + .8f) return "Choose dry, open ground.";
         if (S.Things.Any(t => t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + .65f : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource))) return "Leave room around resources and buildings.";
         if (!S.Backpack.Has(Data.Buildings[kind].Cost)) return "Missing materials in your backpack.";
         return null;
@@ -237,14 +245,20 @@ public sealed class World
         for (int i = 0; i < batches; i++)
         {
             if (!S.Backpack.Has(cost)) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
-            if (t.Inventory.Free < cost.Values.Sum()) { Say("Building inventory is full."); break; }
+            if (!t.Inventory.Fits(cost)) { Say("Building inventory is full."); break; }
             foreach (var pair in cost) S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
         }
     }
     public void Collect(Thing t)
     {
         if (!Near(t)) { Say("Walk closer to collect items."); return; }
-        if (Data.Recipes.TryGetValue(t.Recipe, out var r)) t.Inventory.TransferTo(S.Backpack, r.Output, 999);
+        foreach (var item in Leftovers(t).ToArray()) t.Inventory.TransferTo(S.Backpack, item, 999);
+    }
+    /// <summary>Finished goods plus anything a previous recipe or fuel choice left behind.</summary>
+    public IEnumerable<string> Leftovers(Thing t)
+    {
+        var cost = BatchCost(t);
+        return t.Inventory.Items.Keys.Where(item => !cost.ContainsKey(item));
     }
     public void Sleep(Thing hut)
     {
@@ -258,7 +272,7 @@ public sealed class World
     public bool Protected(Vector2 p) => S.Things.Any(t => (t.Kind == "campfire" && t.Burn > 0 && t.Pos.DistanceTo(p) < 5.3f) || (t.Kind == "hut" && t.Pos.DistanceTo(p) < 2.7f));
     public void Attack()
     {
-        if (attackClock > 0) return;
+        if (attackClock > 0 || Dead) return;
         attackClock = .6f;
         var wolf = S.Wolves.OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         ActorAction action = S.Backpack["steel_tools"] > 0 ? ActorAction.SteelChop : S.Backpack["iron_axe"] > 0 ? ActorAction.Chop : ActorAction.Attack;
@@ -274,20 +288,28 @@ public sealed class World
     public void Die()
     {
         var box = Add("grave", Player); box.Inventory = S.Backpack;
-        S.Backpack = new Inventory { Capacity = 240 }; S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = Spawn;
-        S.Wolves.Clear(); Say("You collapsed. Your belongings are in a recovery box where you fell.");
+        S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Wolves.Clear();
+        Say($"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
     }
-    public float UnitPrice(string item, bool buying) => Data.Items[item].Price * S.Demand.GetValueOrDefault(item, 1) * (buying ? 1.25f : 1);
+    private void Respawn()
+    {
+        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = Spawn;
+        Say("You wake in the clearing. Recover your belongings from the box.");
+    }
+    // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.
+    public float UnitPrice(string item, bool buying) => Data.Items[item].Price * (buying ? 1.25f : S.Demand.GetValueOrDefault(item, 1));
     public bool Trade(Thing sign, string item, int quantity, bool buying)
     {
         if (!Near(sign) || sign.Kind != "signpost" || !Data.Items.ContainsKey(item) || quantity <= 0) return false;
         if (S.Orders.Count >= 3) { Say("All three village carts are busy."); return false; }
-        float price = UnitPrice(item, buying) * quantity;
+        float demand = Math.Min(1, S.Demand.GetValueOrDefault(item, 1)), price = buying ? UnitPrice(item, true) * quantity : 0;
+        // A sale lowers demand unit by unit, so a bulk sale is not paid entirely at the pre-sale price.
+        for (int i = 0; !buying && i < quantity; i++) { price += Data.Items[item].Price * demand; demand = Math.Max(.25f, demand - .045f); }
         if (buying && S.Coins < price) { Say("Not enough coins."); return false; }
         if (!buying && S.Backpack[item] < quantity) { Say("Not enough items in your backpack."); return false; }
         if (buying) S.Coins -= price; else S.Backpack.Remove(item, quantity);
         S.Orders.Add(new TradeOrder { Item = item, Quantity = quantity, Buying = buying, Value = price, Signpost = sign.Id });
-        S.Demand[item] = Math.Clamp(S.Demand.GetValueOrDefault(item, 1) + (buying ? .025f : -.045f) * quantity, .25f, 2);
+        if (!buying) S.Demand[item] = demand;
         Say($"Cart dispatched: {(buying ? "buying" : "selling")} {quantity} {Data.Name(item)}. Returns in 30 seconds."); return true;
     }
     public Worker? Hire(Thing sign)
@@ -312,11 +334,12 @@ public sealed class World
         if (w.Bag.Count > 0) { var box = Add("grave", w.Pos); box.Inventory = w.Bag; }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
+    // Only chests take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
     public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) => S.Things
-        .Where(t => t.IsStorage && t.Id != exclude && t.Inventory.Free > 0 && t.Inventory.Accepts(item))
+        .Where(t => t.Kind == "chest" && t.Id != exclude && t.Inventory.Room(item) > 0 && t.Inventory.Accepts(item))
         .OrderBy(t => t.Inventory.InputFilter.Contains(item) ? 0 : 1).ThenBy(t => t.Pos.DistanceSquaredTo(origin)).FirstOrDefault();
     public Thing? SourceFor(string item, Vector2 origin, int exclude = 0) => S.Things
-        .Where(t => t.IsStorage && t.Id != exclude && t.Inventory[item] > 0 && t.Inventory.AllowsWithdrawal(item))
+        .Where(t => t.Kind == "chest" && t.Id != exclude && t.Inventory[item] > 0 && t.Inventory.AllowsWithdrawal(item))
         .OrderBy(t => t.Pos.DistanceSquaredTo(origin)).FirstOrDefault();
     private List<Vector2> FindRoute(Vector2 from, Vector2 destination)
     {
@@ -366,7 +389,7 @@ public sealed class World
             string item = w.Bag.Items.Keys.First();
             var dest = Find(w.Destination);
             // Re-evaluate rules every tick, including filters changed while a worker is carrying goods.
-            if (dest == null || dest.Inventory.Free == 0 || !dest.Inventory.Accepts(item) || (dest.Id == target?.Id && w.Job != "building")) dest = DepositFor(item, w.Pos);
+            if (dest == null || dest.Inventory.Room(item) == 0 || !dest.Inventory.Accepts(item) || (dest.Id == target?.Id && w.Job != "building")) dest = DepositFor(item, w.Pos);
             if (dest == null) { w.Status = $"Holding {Data.Name(item)} · no accepting storage"; return; }
             w.Destination = dest.Id; w.Status = $"Carrying {Data.Name(item)} → {Data.Name(dest.Kind)}";
             if (Walk(w, dest.Pos, dt)) { w.Bag.TransferTo(dest.Inventory, item, 99, true); w.Destination = 0; }
@@ -385,7 +408,7 @@ public sealed class World
             w.Timer += dt;
             if (w.Timer >= Data.GatherSeconds * 1.6f)
             {
-                w.Timer = 0; int n = Math.Min(6, target.Remaining); target.Remaining -= w.Bag.Add(item, n);
+                w.Timer = 0; target.Remaining -= w.Bag.Add(item, target.Remaining);
                 if (target.Kind == "water") target.Remaining = 9999;
             }
             return;
@@ -404,13 +427,13 @@ public sealed class World
             if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, "wood", 3, true); w.Destination = target.Id; }
             w.Status = "Fetching firewood"; return;
         }
-        if (!Data.Recipes.TryGetValue(target.Recipe, out var recipe)) { w.Status = "Choose a building recipe"; return; }
-        if (target.Inventory[recipe.Output] > 0)
+        if (!Data.Recipes.ContainsKey(target.Recipe)) { w.Status = "Choose a building recipe"; return; }
+        if (Leftovers(target).FirstOrDefault() is string leftover)
         {
-            var dest = DepositFor(recipe.Output, target.Pos);
+            var dest = DepositFor(leftover, target.Pos);
             if (dest == null) { w.Status = "Output blocked · needs accepting storage"; return; }
             w.Status = "Collecting finished goods";
-            if (Walk(w, target.Pos, dt)) { target.Inventory.TransferTo(w.Bag, recipe.Output, 6, true); w.Destination = dest.Id; }
+            if (Walk(w, target.Pos, dt)) { target.Inventory.TransferTo(w.Bag, leftover, w.Bag.StackSize, true); w.Destination = dest.Id; }
             return;
         }
         var costs = BatchCost(target);
@@ -420,7 +443,7 @@ public sealed class World
             var source = SourceFor(pair.Key, w.Pos);
             if (source == null) continue;
             w.Status = $"Fetching {Data.Name(pair.Key)}";
-            if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, pair.Key, Math.Min(6, pair.Value * 2 - target.Inventory[pair.Key]), true); w.Destination = target.Id; }
+            if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, pair.Key, pair.Value * 2 - target.Inventory[pair.Key], true); w.Destination = target.Id; }
             return;
         }
         w.Status = target.Kind == "reinforced" ? "Pumping bellows between loads" : "Working at station";
@@ -434,9 +457,10 @@ public sealed class World
     {
         foreach (var w in S.Workers)
         {
-            float due = Data.DailyWage + w.WageDebt;
-            if (S.Coins >= due) { S.Coins -= due; w.WageDebt = 0; }
-            else { w.WageDebt = due; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the signpost."); }
+            // A striking worker does not work, so no further wages are added until the strike is settled.
+            if (w.WageDebt > 0) continue;
+            if (S.Coins >= Data.DailyWage) S.Coins -= Data.DailyWage;
+            else { float due = w.WageDebt = Data.DailyWage; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the signpost."); }
         }
     }
     public void SettleDebt(Worker w)
@@ -447,9 +471,14 @@ public sealed class World
     public void Tick(float dt, bool sleeping = false)
     {
         S.Time += dt; attackClock = Math.Max(0, attackClock - dt);
-        S.Hunger = Math.Max(0, S.Hunger - dt * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * Data.ThirstPerSecond);
-        if (S.Hunger <= 0 || S.Thirst <= 0) S.Health -= dt * 1.4f;
-        else if (S.Hunger > 45 && S.Thirst > 45) S.Health = Math.Min(100, S.Health + dt * .12f);
+        if (!sleeping) S.PlaySeconds += dt;
+        if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); }
+        else
+        {
+            S.Hunger = Math.Max(0, S.Hunger - dt * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * Data.ThirstPerSecond);
+            if (S.Hunger <= 0 || S.Thirst <= 0) S.Health -= dt * 1.4f;
+            else if (S.Hunger > 45 && S.Thirst > 45) S.Health = Math.Min(100, S.Health + dt * .12f);
+        }
         if (Day > S.WageDay) { PayWages(); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow."); }
         foreach (var item in S.Demand.Keys.ToArray()) S.Demand[item] = Mathf.MoveToward(S.Demand[item], 1, dt * .0009f);
         foreach (var order in S.Orders.ToArray())
@@ -461,13 +490,14 @@ public sealed class World
                 if (overflow > 0)
                 {
                     var delivery = Add("grave", Find(order.Signpost)?.Pos + Vector2.One ?? Spawn);
-                    delivery.Inventory.Capacity = Math.Max(160, overflow);
+                    delivery.Inventory.Slots = overflow / delivery.Inventory.StackSize + 1;
                     delivery.Inventory.Add(order.Item, overflow);
                 }
             }
             else { S.Coins += order.Value; if (order.Item == "steel_tools") S.Milestones.Add("sold_steel"); }
             S.Orders.Remove(order); Say(order.Buying ? $"Cart returned with {order.Quantity} {Data.Name(order.Item)}." : $"Cart returned with {order.Value:0.0} coins.");
         }
+        S.Things.RemoveAll(t => t.Kind == "grave" && t.Inventory.Count == 0);
         foreach (var t in S.Things.ToArray())
         {
             if (t.Kind == "berries" && t.Remaining == 0) { t.Regrow += dt; if (t.Regrow >= 90) { t.Remaining = 24; t.Regrow = 0; } }
@@ -480,7 +510,7 @@ public sealed class World
             if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) continue;
             bool hot = t.Kind != "reinforced" || t.Heat >= 80;
             bool atAnvil = t.Kind != "anvil" || Near(t) || S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt == 0 && w.Pos.DistanceTo(t.Pos) < 1.8f);
-            if (!t.Processing && hot && atAnvil && t.Inventory.Free >= recipe.Amount && t.Inventory.Has(BatchCost(t)))
+            if (!t.Processing && hot && atAnvil && t.Inventory.Has(BatchCost(t)))
             {
                 t.Inventory.Spend(BatchCost(t)); t.Processing = true; t.Progress = 0;
             }
@@ -491,7 +521,7 @@ public sealed class World
                 {
                     // Manual loading or another hauler can fill the station while a batch cooks.
                     // Retain the completed batch until there is room rather than discarding output.
-                    if (t.Inventory.Free < recipe.Amount) continue;
+                    if (t.Inventory.Room(recipe.Output) < recipe.Amount) continue;
                     t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Progress = 0;
                     S.Milestones.Add(recipe.Output); if (recipe.Output == "iron_pick") S.Milestones.Add("pick");
                 }
@@ -509,7 +539,7 @@ public sealed class World
             }
         }
         if (!Night) { S.Wolves.Clear(); nightSpawn = 0; }
-        else if (!sleeping)
+        else if (!sleeping && !Dead)
         {
             nightSpawn -= dt;
             if (nightSpawn <= 0 && S.Wolves.Count < Math.Min(5, 2 + Day))
@@ -527,15 +557,18 @@ public sealed class World
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1.1f; S.Health -= 9 + Day; }
             }
         }
-        if (S.Health <= 0) Die();
+        if (!Dead && S.Health <= 0) Die();
         UpdateGoal();
     }
+    private static readonly string[] Milestones = { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools", "sold_steel", "hired", "assigned" };
+    public bool GoalComplete => S.Goal >= Milestones.Length;
     private void UpdateGoal()
     {
-        string[] milestones = { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools", "sold_steel", "hired", "assigned" };
-        while (S.Goal < milestones.Length && S.Milestones.Contains(milestones[S.Goal])) S.Goal++;
+        while (!GoalComplete && S.Milestones.Contains(Milestones[S.Goal])) S.Goal++;
     }
-    public (string Title, string Hint) Objective => S.Goal switch
+    public static int GoalCount => Milestones.Length;
+    public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
+    public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch
     {
         0 => ("A place to begin", "Hold right mouse near trees and stones. You carry an iron axe. B opens building plans."),
         1 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A hut and campfire make nights safer."),
@@ -554,7 +587,11 @@ public sealed class World
     public void Deserialize(string json)
     {
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
-        if (loaded.Version != 1 || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Version != 2 || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
+        // Edited or older saves may hold missing, extra or unknown hotbar entries.
+        var slots = loaded.HotbarSlots ?? new();
+        loaded.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.Buildings.ContainsKey(id)) ? id : "").ToList();
+        loaded.ActiveHotbar = Math.Clamp(loaded.ActiveHotbar, 0, 8);
         S = loaded; gatherClock = 0; Say("Settlement loaded.");
     }
 }
