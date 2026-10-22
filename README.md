@@ -28,6 +28,14 @@ Play accepts Godot arguments after `--`. `--showcase` loads a populated review f
 ./build.py play -- --showcase --screenshot /tmp/chop-chop-meow.png
 ```
 
+For animation review, `--animation-review` loads a developer fixture and `--animation-capture /tmp/directory` captures its animation frames for visual inspection:
+
+```sh
+./build.py play -- --animation-review --animation-capture /tmp/chop-chop-meow-animation
+```
+
+These options are developer review tools; they do not represent a normal fresh-start playthrough.
+
 The launcher keeps its Godot user-data directory under `.tools/xdg-data`; a launcher-managed save is at `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/settlement.json`. A manually exported or otherwise normally launched Godot build uses Godot's standard per-user application-data location instead.
 
 ## Controls
@@ -58,6 +66,6 @@ The opening progression covers hand gathering, construction, food and water, day
 
 Market orders settle after a visible 30-second cart trip. Prices respond to supply and demand. Workers are individual entities with assignments, wages, cargo, and visible work status. Storage input filters govern automated deposits; output filters govern worker withdrawals. Empty filters allow all items. Workers prefer explicitly accepting chests and reroute cargo when filters change. Manual inventory transfers ignore these automation filters.
 
-The world is a fixed, compact map. Workers use simple grid detours around water and buildings; this is not a full navigation system. The player and workers use a small set of directional walk frames, not a full animation set. Worker automation is limited to gathering and station/furnace tasks, with at most eight workers. There is no charcoal system, pollution, vampire threat, multiplayer, or technology beyond steel in this POC.
+The world is a fixed, compact map. Workers use simple grid detours around water and buildings; this is not a full navigation system. Player and worker actions use dedicated four-direction, eight-frame animations for walking and available tools and work: axe, pickaxe, hammer, bellows, and crate carrying. Tool animations follow the actual equipped or selected tool; work animations follow movement and job state, pause cleanly when the game is paused, and attacks or manual bellows pumping trigger their own cycle. Worker automation is limited to gathering and station/furnace tasks, with at most eight workers. There is no charcoal system, pollution, vampire threat, multiplayer, or technology beyond steel in this POC.
 
 The environment uses a shared human scale, a natural shoreline, a quiet grass field and worn trail, and less densely repeated resource clusters. Workers have a separate illustrated skin with blue overalls and cream shirts.

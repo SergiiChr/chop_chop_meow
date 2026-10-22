@@ -16,24 +16,37 @@ public partial class WorldView : Node2D
     public float Zoom = 1;
     public Vector2 MoveDirection;
     public bool Gathering;
+    public Thing? GatheringTarget;
+    public string? SelectedTool;
+    public bool Paused;
+    public bool AnimationReview;
     public float Elapsed;
     public bool PanelOpen;
     private Texture2D atlas = null!;
-    private Texture2D actors = null!;
-    private Texture2D workers = null!;
+    private ActorClips clips = null!;
+    private Texture2D idlePlayer = null!;
+    private Texture2D idleWorker = null!;
+    private readonly ActorState player = new();
+    private readonly Dictionary<int, ActorState> crew = new();
+    private float pulseRemaining;
+    private ActorAction pulseAction;
+    private Vector2 pulseTarget;
     private Texture2D? details;
     private Image? detailImage;
     private Image atlasImage = null!;
     private Texture2D? extras;
     private Font font = ThemeDB.FallbackFont;
-    private int facing;
+
     private static readonly Color Ink = new("283d34");
     private readonly Dictionary<string, int> cells = new() { ["tree"] = 0, ["stone"] = 1, ["iron"] = 2, ["loose_iron"] = 2, ["coal"] = 3, ["berries"] = 4, ["furnace"] = 5, ["reinforced"] = 6, ["hut"] = 7, ["chest"] = 8, ["grave"] = 8, ["anvil"] = 9, ["signpost"] = 10, ["campfire"] = 11 };
     public override void _Ready()
     {
         atlas = GD.Load<Texture2D>("res://assets/world-atlas.png");
-        actors = GD.Load<Texture2D>("res://assets/player-atlas.png");
-        workers = GD.Load<Texture2D>("res://assets/worker-atlas.png");
+        clips = ActorClips.Load();
+        idlePlayer = GD.Load<Texture2D>("res://assets/player-atlas.png");
+        idleWorker = GD.Load<Texture2D>("res://assets/worker-atlas.png");
+        player.Position = World.Player;
+        World.PlayerActed += PlayerActed;
         if (ResourceLoader.Exists("res://assets/environment-details.png"))
         {
             details = GD.Load<Texture2D>("res://assets/environment-details.png");
@@ -53,8 +66,7 @@ public partial class WorldView : Node2D
         var q = (p - Center) / Zoom + Iso(World.Player);
         return new Vector2(q.X / 88 + q.Y / 44, q.Y / 44 - q.X / 88);
     }
-    // One scale anchor: an adult actor is 85 px. Small props stay below waist height,
-    // the hut has an adult-sized doorway, and tree crowns rise well above the roof.
+    // Adult actors are 85 px; trees and the hut are landmark-scale, with the hut tallest.
     private static float Height(Thing t) => t.Kind switch
     {
         "tree" => 210 + t.Id % 5 * 7,
@@ -95,13 +107,59 @@ public partial class WorldView : Node2D
     public Thing? Pick(Vector2 screen) => World.S.Things.Where(t => (t.Remaining > 0 || !t.IsResource || t.Kind == "berries") && Hit(t, screen))
         .OrderByDescending(t => t.X + t.Y).FirstOrDefault();
     public Worker? PickWorker(Vector2 screen) => World.S.Workers.FirstOrDefault(w => new Rect2(Screen(w.Pos) - new Vector2(24, 77) * Zoom, new Vector2(48, 84) * Zoom).HasPoint(screen));
+    public override void _ExitTree() => World.PlayerActed -= PlayerActed;
+    private void PlayerActed(ActorAction action, Vector2 target)
+    {
+        pulseAction = action; pulseTarget = target; pulseRemaining = 1;
+        player.Time = 0;
+    }
+    public ActorAction PlayerAnimation => player.Action;
+    public float PlayerAnimationTime => player.Time;
+    public ActorAction WorkerAnimation(int id) => crew.TryGetValue(id, out var state) ? state.Action : ActorAction.Idle;
+    private sealed class ActorState
+    {
+        public Vector2 Position;
+        public int Facing;
+        public ActorAction Action;
+        public float Time;
+        public bool Moving;
+        public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt)
+        {
+            Moving = position.DistanceSquaredTo(Position) > .000001f;
+            Facing = ActorAnimation.Direction(Moving ? position - Position : facingTarget - position, Facing);
+            Position = position;
+            if (Action != action) { Action = action; Time = 0; }
+            else Time += dt;
+        }
+    }
     public override void _Process(double delta)
     {
-        Elapsed += (float)delta;
-        if (MoveDirection.LengthSquared() > .01f)
+        if (!Paused)
         {
-            var d = Iso(MoveDirection);
-            facing = d.Y >= 0 ? d.X >= 0 ? 0 : 1 : d.X >= 0 ? 2 : 3;
+            float dt = Math.Min((float)delta, .1f);
+            Elapsed += dt;
+            bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
+            ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, false, World.S.Backpack, SelectedTool);
+            Vector2 target = Gathering && GatheringTarget != null ? GatheringTarget.Pos : World.Player;
+            if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; }
+            if (action == ActorAction.Idle)
+            {
+                var anvil = World.S.Things.FirstOrDefault(t => t.Kind == "anvil" && t.Processing && World.Near(t) &&
+                    !World.S.Workers.Any(w => w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2));
+                if (anvil != null) { action = ActorAction.Hammer; target = anvil.Pos; }
+            }
+            player.Update(World.Player, action, target, dt);
+            pulseRemaining = Math.Max(0, pulseRemaining - dt);
+            foreach (var worker in World.S.Workers)
+            {
+                if (!crew.TryGetValue(worker.Id, out var state)) { state = new ActorState { Position = worker.Pos }; crew.Add(worker.Id, state); }
+                bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
+                var assignment = World.S.Things.FirstOrDefault(t => t.Id == worker.Assignment);
+                var work = ActorAnimation.WorkerAction(worker, assignment, walking);
+                if (work == ActorAction.Hammer && assignment?.Processing != true) work = ActorAction.Idle;
+                state.Update(worker.Pos, work, assignment?.Pos ?? worker.Pos, dt);
+            }
+            foreach (int id in crew.Keys.Where(id => !World.S.Workers.Any(w => w.Id == id)).ToArray()) crew.Remove(id);
         }
         QueueRedraw();
     }
@@ -169,18 +227,46 @@ public partial class WorldView : Node2D
             }
         }
     }
-    private void DrawActor(Vector2 pos, int direction, bool moving, bool worker = false)
+    private void DrawClip(ActorClip clip, Vector2 feet, int direction, int frame, float height)
     {
-        var p = Screen(pos); float height = 85 * Zoom;
+        var pose = clip.Get(direction, frame);
+        float scale = height / clip.BodyHeight;
+        DrawTextureRect(pose.Texture, new Rect2(feet - pose.Foot * scale, pose.Texture.GetSize() * scale), false);
+    }
+    private void DrawActor(Vector2 pos, ActorState state, bool worker = false)
+    {
+        var p = Screen(pos);
         Ellipse(p, new Vector2(13, 6) * Zoom, new Color(0, 0, 0, .23f));
-        int frame = direction + (moving && (int)(Elapsed * 5) % 2 == 1 ? 4 : 0);
-        float bob = moving ? MathF.Sin(Elapsed * 12) * 1.2f * Zoom : 0;
-        Sprite(worker ? workers : actors, frame, 4, 2, p + new Vector2(0, bob), new Vector2(height * .75f, height), Colors.White);
-        if (!worker) { DrawArc(p, 18 * Zoom, 0, Mathf.Tau, 32, new Color(.95f, .88f, .57f, .8f), 1.4f, true); }
+        var action = state.Action;
+        int frame = action == ActorAction.Idle || action == ActorAction.Carry && !state.Moving ? 0 : ActorAnimation.Frame(action, state.Time);
+        // Quiet breathing for idle; harvesting and combat use the complete tool stroke.
+        float breath = action == ActorAction.Idle ? MathF.Sin(state.Time * 2.5f) * .5f * Zoom : 0;
+        var clip = clips.Get(worker, action);
+        if (action == ActorAction.Idle)
+            Sprite(worker ? idleWorker : idlePlayer, state.Facing, 4, 2, p + new Vector2(0, breath), new Vector2(63.75f, 85) * Zoom, Colors.White);
+        else DrawClip(clip, p + new Vector2(0, breath), state.Facing, frame, 75 * Zoom);
+        if (!worker) DrawArc(p, 18 * Zoom, 0, Mathf.Tau, 32, new Color(.95f, .88f, .57f, .8f), 1.4f, true);
+    }
+    private void DrawAnimationReview()
+    {
+        DrawRect(GetViewportRect(), new Color("263e34"));
+        Text(new Vector2(28, 35), "ANIMATION REVIEW · 8 poses × 4 directions · tools, work and hauling", 23, new Color("f2e8cf"));
+        int i = 0;
+        foreach (var entry in clips.NamedClips)
+        {
+            int col = i % 5, row = i / 5;
+            var feet = new Vector2(140 + col * 280, 260 + row * 270);
+            int direction = (int)(Elapsed / 2) % 4;
+            int frame = (int)(Elapsed * 8) % 8;
+            DrawClip(entry.Value, feet, direction, frame, 135);
+            Text(feet + new Vector2(-95, 38), entry.Key, 18, new Color("f2e8cf"));
+            i++;
+        }
     }
     public override void _Draw()
     {
         if (World == null || atlas == null) return;
+        if (AnimationReview) { DrawAnimationReview(); return; }
         DrawRect(GetViewportRect(), new Color("879c69"));
         var viewport = GetViewportRect().Grow(260);
         // Broad, quiet grass patches replace the checkerboard of individually colored tiles.
@@ -227,17 +313,16 @@ public partial class WorldView : Node2D
             if (!viewport.HasPoint(Screen(t.Pos))) continue;
             list.Add((t.X + t.Y, () => DrawThing(captured)));
         }
-        list.Add((World.Player.X + World.Player.Y, () => DrawActor(World.Player, facing, MoveDirection.LengthSquared() > .01f || Gathering)));
+        list.Add((World.Player.X + World.Player.Y, () => DrawActor(World.Player, player)));
         foreach (var w in World.S.Workers)
         {
             var worker = w;
             list.Add((w.X + w.Y, () =>
             {
-                DrawActor(worker.Pos, worker.Destination != 0 ? 2 : 0, worker.Status.StartsWith("Carrying") || worker.Status.StartsWith("Fetching"), true);
+                if (crew.TryGetValue(worker.Id, out var state)) DrawActor(worker.Pos, state, true);
                 var p = Screen(worker.Pos);
                 if (worker.Id == SelectedWorker) Ellipse(p, new Vector2(22, 10) * Zoom, new Color(1, .8f, .3f, .35f));
                 Text(p + new Vector2(-20, -80) * Zoom, worker.Name, 13, Ink);
-                if (worker.Bag.Count > 0) DrawCircle(p - new Vector2(12, 37) * Zoom, 5 * Zoom, new Color("e1c383"));
             }
             ));
         }

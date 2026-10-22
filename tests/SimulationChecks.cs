@@ -10,6 +10,7 @@ public static class SimulationChecks
 
     public static void Run(GameData data)
     {
+        AnimationChecks.Run();
         CheckInventoryFilters(data);
         CheckStorageRouting(data);
         CheckWorkerGatherAndRetarget(data);
@@ -21,6 +22,7 @@ public static class SimulationChecks
         CheckFuelAndHeatGates(data);
         CheckProcessingOutputCapacity(data);
         CheckToolGatesAndPlacement(data);
+        CheckStoneYieldWithSteelTools(data);
         CheckNightAndSurvival(data);
         CheckSleepAdvancesWorld(data);
         CheckActualProgression(data);
@@ -386,6 +388,18 @@ public static class SimulationChecks
         var chest = world.Build("chest", World.Spawn + new Vector2(2, 0));
         Require(chest != null && chest.Kind == "chest" && world.S.Backpack["wood"] == 0,
                 "building placement should accept a nearby clear tile and spend its cost");
+    }
+
+    private static void CheckStoneYieldWithSteelTools(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var stone = world.Add("stone", world.Player, 20);
+        world.S.Backpack.Add("steel_tools", 1);
+
+        world.Gather(stone, data.GatherSeconds);
+
+        Require(world.S.Backpack["stone"] == 4,
+                "steel tools should yield the full stone amount without a separate iron pick");
     }
 
     private static void CheckNightAndSurvival(GameData data)

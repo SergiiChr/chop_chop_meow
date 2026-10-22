@@ -23,7 +23,9 @@ The project targets Godot 4.7.2 .NET with C#. The `World` simulation and `SaveSt
 
 Keep balance and recipe values in `data/game.json` so they can be adjusted without changing simulation code. Keep rendering and input separate from state transitions so headless checks can exercise gameplay rules without relying on screenshots. Simulation checks live in `tests/SimulationChecks.cs` and cover filters, worker routing, furnace work, trade, wages, recovery after death, saves, and a material-driven progression run.
 
-The sprite sheets under `assets/` are generated game art: `world-atlas.png` uses a 4-by-3 layout, player and overall-clad worker skins use separate 4-by-2 directional/walk atlases, `travel-atlas.png` contains a wolf and goods/payment carts, `environment-details.png` contains the natural pond and human-scale hut, and `item-atlas.png` supplies hotbar icons. The scene uses a common actor scale and larger hut footprint, sparse resource groupings and a continuous grass/trail treatment. They are prototype assets and may need redraws or replacement as the game art develops.
+The sprite sheets under `assets/` are generated game art: `world-atlas.png` uses a 4-by-3 layout; `travel-atlas.png` contains a wolf and goods/payment carts; `environment-details.png` contains the natural pond and human-scale hut; and `item-atlas.png` supplies hotbar icons. Thirteen dedicated actor animation atlases provide four directions and eight frames for player and worker walking, tool use, and work. They cover iron axe and pick use by both actors, player steel axe and pick use, player and worker hammer and bellows work, and worker crate carrying. The scene uses a common actor scale and larger hut footprint, sparse resource groupings and a continuous grass/trail treatment. These are prototype assets and may need redraws or replacement as the game art develops.
+
+Actor animation is driven by gameplay state. The player's held tool selects its matching animation; workers animate according to actual movement and assigned work. Pausing freezes animation, while attacks and manual bellows pumping start their corresponding action cycles.
 
 ## Development and verification
 
@@ -37,4 +39,4 @@ Use the repository launcher from its root:
 
 `play` sets up Godot 4.7.2 .NET and the .NET 10 SDK locally when missing. `test` runs the simulation checks with a 120-second limit and requires `SELF-TEST PASS`, followed by Godot input/UI checks requiring `UI-TEST PASS`. `build` runs both, exports a Linux executable, smoke-tests it, and packages the executable, game pack and runtime into a tar archive. Tool downloads and build output remain under ignored project-local directories.
 
-The project targets Linux x86_64 and Godot's Compatibility renderer. First-time setup requires internet access; interactive play requires a supported graphics driver. The export is a runnable prototype. The world is a fixed small map; workers use grid detours around water and buildings, and actor animation is limited to a few directional walk frames.
+The project targets Linux x86_64 and Godot's Compatibility renderer. First-time setup requires internet access; interactive play requires a supported graphics driver. The export is a runnable prototype. The world is a fixed small map, and workers use grid detours around water and buildings.

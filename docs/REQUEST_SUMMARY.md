@@ -20,8 +20,9 @@ Workers should be individually hired, paid daily, assigned, reassigned, and dism
 - **Furnace work:** Basic furnaces can burn wood or coal. Reinforced furnaces use coal and require bellows to make steel. With two workers assigned, one pumps the bellows and the other hauls materials.
 - **Storage filters:** Input and output filters are separate allowlists. An empty filter means all items are allowed. Automated transfers respect the relevant filter; manual transfers can bypass filters.
 - **Art direction:** The user reviewed drawn/illustrated player and furnace samples and selected the illustrated option (option 2). Later guidance asked for a cohesive, to-scale environment and visually distinct workers in overalls; the current intended worker appearance is blue overalls over a cream shirt with a distinct sprite.
+- **Animation:** Add more animation frames and a dedicated animation for every available tool. The implementation now has thirteen four-direction, eight-frame atlases covering player/worker walking, iron and steel axe/pick use, player and worker hammer/bellows work, and worker crate carrying. Gameplay state selects the relevant tool animation; worker animation follows movement and job status, pauses with the game, and attacks/manual pumping trigger their own cycles.
 - **Interface:** Show stats in the inventory only, not as a persistent HUD. Use Factorio-style hotbar slots 1–9 for item use. The implementation includes saved item/building-plan assignment and keyboard/click activation.
-- **Delivery:** Finish the requested changes on branch `codex/initial_poc`, then push them and provide a PR description. The parent task handles the push. This request is for a PR description, not creation of a GitHub PR.
+- **Delivery, updated:** Rebase the animation changes on `main` and push them on branch `codex/improved_animations`; `origin/main` already contains the initial POC. Provide a PR description focused on the final animation changes. This supersedes the earlier `codex/initial_poc` delivery target.
 
 ## Implementation choices recorded in the repository
 
@@ -33,4 +34,4 @@ The POC stops at steel. Pollution, vampires, multiplayer, charcoal production, a
 
 ## Current state and evidence limits
 
-Simulation and input/UI checks cover the production path, survival, hauling, filters, hotbar use/assignment and persistence, and inventory-only stats. The 10–15 minute target is not a measured human playthrough; production-chain simulation time excludes travel and UI decision time. Final export and visual verification are recorded in IMPLEMENTATION_PLAN.md.
+Animation asset/state checks, real Godot input/UI checks, lint, Linux export and exported smoke test pass. Rendered export review captures cover all four directions. The 10–15 minute target is not a measured human playthrough; production-chain simulation time excludes travel and UI decision time.

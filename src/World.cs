@@ -90,6 +90,7 @@ public sealed class World
     public readonly GameData Data;
     public SaveState S { get; private set; } = new();
     public Action<string>? Notify;
+    public Action<ActorAction, Vector2>? PlayerActed;
     public const int MapSize = 48;
     public static readonly Vector2 Spawn = new(23, 24);
     public static readonly Vector2 Pond = new(16, 22);
@@ -165,7 +166,7 @@ public sealed class World
         float seconds = Data.GatherSeconds * (S.Backpack["steel_tools"] > 0 ? .55f : 1);
         if (gatherClock < seconds) return;
         gatherClock = 0;
-        int amount = Math.Min(t.Remaining, t.Kind == "stone" && S.Backpack["iron_pick"] == 0 ? 2 : t.Kind == "water" ? 4 : 4);
+        int amount = Math.Min(t.Remaining, t.Kind == "stone" && S.Backpack["iron_pick"] == 0 && S.Backpack["steel_tools"] == 0 ? 2 : t.Kind == "water" ? 4 : 4);
         amount = S.Backpack.Add(ResourceItem(t), amount); t.Remaining -= amount;
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
         else Say($"+{amount} {Data.Name(ResourceItem(t))} · {t.Remaining} left here.");
@@ -200,7 +201,7 @@ public sealed class World
     public void Pump(Thing t)
     {
         if (!Near(t) || t.Kind != "reinforced") return;
-        t.Heat = Math.Min(100, t.Heat + 24); Say($"Bellows: {t.Heat:0}° / 80° needed for steel.");
+        t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos); Say($"Bellows: {t.Heat:0}° / 80° needed for steel.");
     }
     public void FuelFire(Thing t)
     {
@@ -257,6 +258,9 @@ public sealed class World
         if (attackClock > 0) return;
         attackClock = .6f;
         var wolf = S.Wolves.OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
+        ActorAction action = S.Backpack["steel_tools"] > 0 ? ActorAction.SteelChop : S.Backpack["iron_axe"] > 0 ? ActorAction.Chop : ActorAction.Attack;
+        Vector2 target = wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f ? wolf.Pos : Player;
+        PlayerActed?.Invoke(action, target);
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f)
         {
             wolf.Health -= S.Backpack["steel_tools"] > 0 ? 3 : S.Backpack["iron_axe"] > 0 ? 1.5f : .5f;
