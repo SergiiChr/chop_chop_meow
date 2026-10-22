@@ -23,8 +23,9 @@ public static class ActorAnimation
 {
     public const int Frames = 8;
 
-    public static int Frame(ActorAction action, float elapsed)
+    public static int Frame(ActorAction action, float elapsed, int frameCount = Frames)
     {
+        if (frameCount <= 0) throw new ArgumentOutOfRangeException(nameof(frameCount));
         float fps = action switch
         {
             ActorAction.Idle => 4,
@@ -32,8 +33,8 @@ public static class ActorAnimation
             _ => 8
         };
         if (!float.IsFinite(elapsed)) return 0;
-        float cycle = (elapsed * fps) % Frames;
-        if (cycle < 0) cycle += Frames;
+        float cycle = (elapsed * fps) % frameCount;
+        if (cycle < 0) cycle += frameCount;
         return (int)cycle;
     }
 
@@ -51,16 +52,10 @@ public static class ActorAnimation
         string? resourceKind,
         bool gathering,
         bool moving,
-        bool attacking,
         Inventory backpack,
         string? selectedTool)
     {
         if (moving) return ActorAction.Walk;
-        if (attacking)
-        {
-            string? attackTool = BestTool(backpack, selectedTool, "iron_axe");
-            return attackTool == "steel_tools" ? ActorAction.SteelChop : attackTool == "iron_axe" ? ActorAction.Chop : ActorAction.Attack;
-        }
         if (!gathering || string.IsNullOrEmpty(resourceKind)) return ActorAction.Idle;
 
         string? requiredTool = resourceKind == "tree" ? "iron_axe" : resourceKind is "stone" or "iron" or "coal" ? "iron_pick" : null;
@@ -94,13 +89,7 @@ public static class ActorAnimation
     {
         if (worker.Bag.Count > 0) return ActorAction.Carry;
         if (moving) return ActorAction.Walk;
-
-        string status = worker.Status ?? "";
-        if (status.StartsWith("Operating bellows", StringComparison.OrdinalIgnoreCase) ||
-            status.StartsWith("Pumping bellows", StringComparison.OrdinalIgnoreCase)) return ActorAction.Pump;
-        if (status.StartsWith("On strike", StringComparison.OrdinalIgnoreCase)) return ActorAction.Idle;
-
-        if (assignment?.IsResource == true && status.StartsWith("Gathering ", StringComparison.OrdinalIgnoreCase))
+        if (worker.WorkState == WorkerWorkState.Gathering && assignment?.IsResource == true)
         {
             return assignment.Kind switch
             {
@@ -110,10 +99,12 @@ public static class ActorAnimation
             };
         }
 
-        if (assignment?.Kind == "anvil" && status.StartsWith("Working at station", StringComparison.OrdinalIgnoreCase))
-            return ActorAction.Hammer;
-
-        return ActorAction.Idle;
+        return worker.WorkState switch
+        {
+            WorkerWorkState.Pumping => ActorAction.Pump,
+            WorkerWorkState.Hammering when assignment?.Kind == "anvil" => ActorAction.Hammer,
+            _ => ActorAction.Idle
+        };
     }
 
     private static string? BestTool(Inventory backpack, string? selectedTool, string ironTool)

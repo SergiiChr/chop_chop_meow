@@ -26,6 +26,8 @@ public sealed class Thing
     [JsonIgnore] public bool IsResource => Kind is "tree" or "stone" or "iron" or "loose_iron" or "coal" or "berries" or "water";
     [JsonIgnore] public bool IsStorage => Kind is "chest" or "grave";
 }
+public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked }
+
 public sealed class Worker
 {
     public int Id { get; set; }
@@ -41,6 +43,7 @@ public sealed class Worker
     public float WageDebt { get; set; }
     [JsonIgnore] public List<Vector2> Route { get; } = new();
     [JsonIgnore] public Vector2 RouteTarget { get; set; } = new(-100, -100);
+    [JsonIgnore] public WorkerWorkState WorkState { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
 }
 public sealed class TradeOrder
@@ -300,7 +303,7 @@ public sealed class World
     }
     public void Assign(Worker w, Thing? target)
     {
-        w.Assignment = target?.Id ?? 0; w.Job = target == null ? "idle" : target.IsResource ? "gather" : "building";
+        w.Assignment = target?.Id ?? 0; w.Job = target == null ? "idle" : target.IsResource ? "gather" : "building"; w.WorkState = WorkerWorkState.Idle;
         w.Destination = 0; w.Timer = 0; w.Status = target == null ? "Available" : "Starting work";
         if (target != null) S.Milestones.Add("assigned");
     }
@@ -348,13 +351,14 @@ public sealed class World
         if (w.Route.Count == 0 && CanStand(next)) { w.Pos = next; return false; }
         if (w.Route.Count > 0 && !CanStand(w.Route[0])) w.Route.Clear();
         if (w.Route.Count == 0) w.Route.AddRange(FindRoute(w.Pos, destination));
-        if (w.Route.Count == 0) { w.Status = "Path blocked · clear a route"; return false; }
+        if (w.Route.Count == 0) { w.Status = "Path blocked · clear a route"; w.WorkState = WorkerWorkState.Blocked; return false; }
         w.Pos = w.Pos.MoveToward(w.Route[0], dt * 2.25f);
         if (w.Pos.DistanceTo(w.Route[0]) < .06f) w.Route.RemoveAt(0);
         return false;
     }
     private void WorkerTick(Worker w, float dt)
     {
+        w.WorkState = WorkerWorkState.Idle;
         if (w.WageDebt > 0) { w.Status = "On strike · wages owed"; return; }
         var target = Find(w.Assignment);
         if (w.Bag.Count > 0)
@@ -377,6 +381,7 @@ public sealed class World
             if (DepositFor(item, target.Pos) == null) { w.Status = "Needs an accepting storage chest"; return; }
             w.Status = $"Gathering {Data.Name(item)}";
             if (!Walk(w, target.Pos, dt)) return;
+            w.WorkState = WorkerWorkState.Gathering;
             w.Timer += dt;
             if (w.Timer >= Data.GatherSeconds * 1.6f)
             {
@@ -388,7 +393,8 @@ public sealed class World
         var coworkers = S.Workers.Where(other => other.Assignment == target.Id && other.WageDebt <= 0).OrderBy(other => other.Id).ToList();
         if (target.Kind == "reinforced" && coworkers.Count >= 2 && coworkers[0] == w)
         {
-            w.Status = "Operating bellows"; if (Walk(w, target.Pos + new Vector2(.7f, .2f), dt)) target.Heat = Math.Min(100, target.Heat + dt * 18); return;
+            w.Status = "Operating bellows"; if (Walk(w, target.Pos + new Vector2(.7f, .2f), dt)) { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 18); }
+            return;
         }
         if (target.Kind == "campfire")
         {
@@ -418,7 +424,11 @@ public sealed class World
             return;
         }
         w.Status = target.Kind == "reinforced" ? "Pumping bellows between loads" : "Working at station";
-        if (Walk(w, target.Pos, dt) && target.Kind == "reinforced") target.Heat = Math.Min(100, target.Heat + dt * 16);
+        if (Walk(w, target.Pos, dt))
+        {
+            if (target.Kind == "reinforced") { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 16); }
+            else if (target.Kind == "anvil") w.WorkState = WorkerWorkState.Hammering;
+        }
     }
     public void PayWages()
     {

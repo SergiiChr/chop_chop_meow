@@ -11,6 +11,7 @@ public static class SimulationChecks
     public static void Run(GameData data)
     {
         AnimationChecks.Run();
+        WorkerStateChecks.Run(data);
         CheckInventoryFilters(data);
         CheckStorageRouting(data);
         CheckWorkerGatherAndRetarget(data);

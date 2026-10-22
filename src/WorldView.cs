@@ -110,7 +110,7 @@ public partial class WorldView : Node2D
     public override void _ExitTree() => World.PlayerActed -= PlayerActed;
     private void PlayerActed(ActorAction action, Vector2 target)
     {
-        pulseAction = action; pulseTarget = target; pulseRemaining = 1;
+        pulseAction = action; pulseTarget = target; pulseRemaining = clips.Get(false, action).FrameCount / 8f;
         player.Time = 0;
     }
     public ActorAction PlayerAnimation => player.Action;
@@ -139,7 +139,7 @@ public partial class WorldView : Node2D
             float dt = Math.Min((float)delta, .1f);
             Elapsed += dt;
             bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
-            ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, false, World.S.Backpack, SelectedTool);
+            ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, SelectedTool);
             Vector2 target = Gathering && GatheringTarget != null ? GatheringTarget.Pos : World.Player;
             if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; }
             if (action == ActorAction.Idle)
@@ -180,6 +180,21 @@ public partial class WorldView : Node2D
         var rect = new Rect2(basePoint - new Vector2(size.X / 2, size.Y * .93f), size);
         DrawTextureRectRegion(texture, rect, region, tint);
     }
+    internal bool TreeCanopyCoversThing(Thing tree, Thing thing)
+    {
+        // Depth decides which object is in front; alpha-mask overlap avoids fading trees
+        // merely because their large transparent sprite rectangles happen to intersect.
+        if (tree.X + tree.Y <= thing.X + thing.Y) return false;
+        var treeBounds = Bounds(tree);
+        var thingBounds = Bounds(thing);
+        var overlap = treeBounds.Intersection(thingBounds);
+        if (overlap.Size.X <= 0 || overlap.Size.Y <= 0) return false;
+        // Sample actual source alpha, including the larger replacement hut sprite.
+        for (float y = overlap.Position.Y + 3; y < overlap.End.Y; y += 6)
+            for (float x = overlap.Position.X + 3; x < overlap.End.X; x += 6)
+                if (Hit(tree, new Vector2(x, y)) && Hit(thing, new Vector2(x, y))) return true;
+        return false;
+    }
     private void DrawThing(Thing t, Color? overrideTint = null)
     {
         var p = Screen(t.Pos); float h = Height(t) * Zoom;
@@ -199,10 +214,12 @@ public partial class WorldView : Node2D
         if (t.Kind == "berries" && t.Remaining == 0) tint = new Color(.6f, .7f, .5f, 1);
         if (t.Kind == "grave") tint = new Color(1, .75f, .5f);
         if (t.Kind == "campfire" && t.Burn == 0) tint = new Color(.38f, .4f, .36f);
-        // Canopies fade over people, keeping the player and overall-clad crew readable.
+        // Canopies fade over people and structures that sit behind the visible foliage.
         if (t.Kind == "tree" &&
             (Bounds(t).HasPoint(Screen(World.Player) - new Vector2(0, 40)) && t.X + t.Y > World.Player.X + World.Player.Y ||
-             World.S.Workers.Any(w => Bounds(t).HasPoint(Screen(w.Pos) - new Vector2(0, 40)) && t.X + t.Y > w.X + w.Y))) tint.A = .26f;
+             World.S.Workers.Any(w => Bounds(t).HasPoint(Screen(w.Pos) - new Vector2(0, 40)) && t.X + t.Y > w.X + w.Y) ||
+             World.S.Things.Any(other => other.Id != t.Id && !other.IsResource &&
+                 cells.ContainsKey(other.Kind) && TreeCanopyCoversThing(t, other)))) tint.A = .26f;
         if (t.Kind == "hut" && details != null) Sprite(details, 1, 2, 1, p, ThingSize(t), tint);
         else Sprite(atlas, cells.GetValueOrDefault(t.Kind), 4, 3, p, ThingSize(t), tint);
         if (t.Kind is "furnace" or "reinforced" or "campfire" && (t.Processing || t.Burn > 0))
@@ -238,10 +255,10 @@ public partial class WorldView : Node2D
         var p = Screen(pos);
         Ellipse(p, new Vector2(13, 6) * Zoom, new Color(0, 0, 0, .23f));
         var action = state.Action;
-        int frame = action == ActorAction.Idle || action == ActorAction.Carry && !state.Moving ? 0 : ActorAnimation.Frame(action, state.Time);
+        var clip = clips.Get(worker, action);
+        int frame = action == ActorAction.Idle || action == ActorAction.Carry && !state.Moving ? 0 : ActorAnimation.Frame(action, state.Time, clip.FrameCount);
         // Quiet breathing for idle; harvesting and combat use the complete tool stroke.
         float breath = action == ActorAction.Idle ? MathF.Sin(state.Time * 2.5f) * .5f * Zoom : 0;
-        var clip = clips.Get(worker, action);
         if (action == ActorAction.Idle)
             Sprite(worker ? idleWorker : idlePlayer, state.Facing, 4, 2, p + new Vector2(0, breath), new Vector2(63.75f, 85) * Zoom, Colors.White);
         else DrawClip(clip, p + new Vector2(0, breath), state.Facing, frame, 75 * Zoom);
@@ -250,16 +267,16 @@ public partial class WorldView : Node2D
     private void DrawAnimationReview()
     {
         DrawRect(GetViewportRect(), new Color("263e34"));
-        Text(new Vector2(28, 35), "ANIMATION REVIEW · 8 poses × 4 directions · tools, work and hauling", 23, new Color("f2e8cf"));
+        Text(new Vector2(28, 35), "ANIMATION REVIEW · 7–8 poses × 4 directions · tools, work and hauling", 23, new Color("f2e8cf"));
         int i = 0;
         foreach (var entry in clips.NamedClips)
         {
             int col = i % 5, row = i / 5;
-            var feet = new Vector2(140 + col * 280, 260 + row * 270);
+            var feet = new Vector2(140 + col * 280, 210 + row * 210);
             int direction = (int)(Elapsed / 2) % 4;
-            int frame = (int)(Elapsed * 8) % 8;
-            DrawClip(entry.Value, feet, direction, frame, 135);
-            Text(feet + new Vector2(-95, 38), entry.Key, 18, new Color("f2e8cf"));
+            int frame = (int)(Elapsed * 8) % entry.Value.FrameCount;
+            DrawClip(entry.Value, feet, direction, frame, 115);
+            Text(feet + new Vector2(-95, 30), entry.Key, 18, new Color("f2e8cf"));
             i++;
         }
     }

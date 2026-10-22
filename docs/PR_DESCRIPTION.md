@@ -1,19 +1,13 @@
-# Add dedicated player and worker animations
+# Baked actor animation atlases and work-state rendering
 
 ## Summary
 
-Adds thirteen four-direction, eight-frame animation atlases for player and worker movement and actions, including iron and steel tools, hammering, bellows, and crate carrying. The player animation follows the relevant carried tool, with an appropriate axe or pick selected when needed; worker animation follows actual movement and work status. Pausing freezes the animation, while attacks and manual bellows pumping play their own action cycles.
+Replace runtime sprite-sheet seam detection with sixteen named WebP atlases and authored region and foot-pivot metadata. The set contains fifteen four-direction, eight-frame clips and a seven-frame-per-direction unarmed player punch. It adds distinct hand-gathering clips for player and worker, and preserves the existing tool, work, walk, and carry actions.
 
-Adds a developer animation review fixture with frame captures for visual inspection. Also blocks tool and bellows actions while paused and gives steel tools the full pickaxe yield when gathering stone.
+An optional offline baker uses explicit crop rectangles and preserves every RGBA pixel inside each crop. The game loads only the baked atlases and `data/animations.json`; it does not need Pillow or source art at runtime. Tree canopies now fade over buildings using their alpha masks and draw depth.
 
-## Validation
+Worker animation uses a transient work-state enum updated by the simulation, rather than status strings. The state is excluded from saves and recomputed after loading. The unused player attack selector argument was removed; the actual attack event continues to trigger the punch animation.
 
-- `./build.py lint` — passed.
-- `./build.py build` — simulation, all 13 animation assets, real Godot input/UI checks, Linux export and exported smoke test passed.
-- Exported executable rendered 96 review frames covering all four directions; checked poses and boot anchors. See [animation preview](screenshots/animations.gif).
+## Review
 
-The review fixture is developer-only and is not a human playthrough or a measurement of the 10–15 minute pacing target.
-
-## Limitations
-
-The prototype still uses a compact fixed map and simple worker pathing, and its gameplay progression ends at steel. Later technology, pollution, vampires, multiplayer, and a measured first-playthrough duration remain out of scope.
+The runtime preview is [animations.gif](screenshots/animations.gif). The animation review fixture supports four-direction capture for inspecting poses and foot alignment. Final build, test, export, and image-size measurements are pending review.
