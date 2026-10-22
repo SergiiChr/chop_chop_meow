@@ -1,6 +1,6 @@
 # Chop Chop Meow
 
-A single-player isometric woodland survival and production prototype. Gather nearby materials, build a small settlement, produce and sell steel tools, then hire workers to automate resource gathering and furnace work. The selected art direction is smooth illustrated sprites with natural colors and readable silhouettes; the previews in [docs/art](docs/art/README.md) show the two directions that were considered.
+A single-player isometric woodland survival and production prototype. Gather nearby materials, build a small settlement, produce and sell steel tools, then hire workers to automate resource gathering and furnace work. The world is rendered in 3D with code-built low-poly models under an orthographic isometric camera: natural woodland, modern DIY buildings and readable silhouettes. Hotbar and toolbar icons are the original illustrated set; the earlier 2D art directions are kept in [docs/art](docs/art/README.md).
 
 ## Run on Linux
 
@@ -28,7 +28,7 @@ Play accepts Godot arguments after `--`. `--showcase` loads a populated review f
 ./build.py play -- --showcase --screenshot /tmp/chop-chop-meow.png
 ```
 
-For animation review, `--animation-review` loads a developer fixture and `--animation-capture /tmp/directory` captures its animation frames for visual inspection:
+For animation review, `--animation-review` shows every actor action on rotating rigs and `--animation-capture /tmp/directory` captures its frames for visual inspection:
 
 ```sh
 ./build.py play -- --animation-review --animation-capture /tmp/chop-chop-meow-animation
@@ -68,6 +68,6 @@ The opening progression covers hand gathering, construction, food and water, day
 
 Market orders settle after a visible 30-second cart trip. Selling lowers an item's price unit by unit and the price recovers over time; buying costs a fixed 1.25× the base price, so a buy-and-resell loop never profits. Workers are individual entities with assignments, wages, cargo, and visible work status. An unpaid worker strikes, and owed wages stop growing until the strike is settled. Storage input filters govern automated deposits; output filters govern worker withdrawals. Empty filters allow all items. Workers prefer explicitly accepting chests and reroute cargo when filters change. Manual inventory transfers ignore these automation filters.
 
-The world is a fixed, compact map. Workers use simple grid detours around water and buildings; this is not a full navigation system. Player and worker actions use baked four-direction animations for walking, hand gathering, tools, hammering, bellows, carrying, and an unarmed punch. Most clips have eight frames; the punch has seven. Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text. Animations pause with gameplay. Tree canopies fade over buildings using their authored alpha masks and draw depth. Worker automation is limited to gathering and station/furnace tasks, with at most eight workers. There is no charcoal system, pollution, vampire threat, multiplayer, or technology beyond steel in this POC.
+The world is a fixed, compact map. Workers use simple grid detours around water and buildings; this is not a full navigation system. Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, hand gathering, iron and steel axe and pick strokes, hammering, bellows pumping, crate carrying and an unarmed punch. Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text. The world reacts too: trees shake and topple into stumps, deposits shrink and throw chips, the bellows board travels with each press, the heat gauge tracks the forge, anvils spark, storage lids open on transfers, the cabin door opens as you approach, the market mailbox flag rises while a cart is out, wolves trot, and couriers pull the trade cart. Animations pause with gameplay. Trees in front of the player, a worker or a structure turn see-through. Worker automation is limited to gathering and station/furnace tasks, with at most eight workers. There is no charcoal system, pollution, vampire threat, multiplayer, or technology beyond steel in this POC.
 
-The environment uses a shared human scale, a natural shoreline, a quiet grass field and worn trail, and less densely repeated resource clusters. Workers have a separate illustrated skin with blue overalls and cream shirts.
+The environment uses a shared human scale, an irregular pond with reeds and lily pads, a grass field with scattered tufts and wildflowers, a worn trail, and three tree types (oak, spruce, birch). Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack. Night is lit by the sun, ambient light and real fire light from campfires, furnaces and cabin windows.

@@ -571,7 +571,7 @@ public sealed class World
     public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch
     {
         0 => ("A place to begin", "Hold right mouse near trees and stones. You carry an iron axe. B opens building plans."),
-        1 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A hut and campfire make nights safer."),
+        1 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A cabin and campfire make nights safer."),
         2 => ("The first iron", "Pick up loose rusty ore by the mine. Load the furnace with ore + wood. Collect iron bars."),
         3 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. Keep smelting for a pickaxe and bellows furnace."),
         4 => ("Beneath the surface", "At the anvil, forge an iron pickaxe: 3 bars + 2 wood. It opens coal and iron deposits."),

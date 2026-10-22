@@ -2,10 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Godot;
+using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-public partial class WorldView : Node2D
+/// <summary>
+/// Renders the simulation as a 3D scene under an orthographic isometric camera.
+/// World (x, y) maps to 3D (x, 0, y); one tile is one unit and an adult is about 1.65 units tall.
+/// </summary>
+public partial class WorldView : Node3D
 {
     public World World = null!;
     public int Selected;
@@ -22,390 +27,614 @@ public partial class WorldView : Node2D
     public bool AnimationReview;
     public float Elapsed;
     public bool PanelOpen;
-    private Texture2D atlas = null!;
-    private ActorClips clips = null!;
-    private Texture2D idlePlayer = null!;
-    private Texture2D idleWorker = null!;
+    // A 30° pitch keeps the old 2:1 isometric footprint; this ortho height matches the old 85 px actor scale at zoom 1.
+    private const float Pitch = 30, BaseSize = 14.5f;
+    private Camera3D camera = null!;
+    private DirectionalLight3D sun = null!;
+    private Godot.Environment environment = null!;
+    private Node3D scene = null!;
+    private Node2D overlay = null!;
+    private readonly Dictionary<int, Prop> props = new();
     private readonly ActorState player = new();
-    private readonly Dictionary<int, ActorState> crew = new();
+    private ActorRig playerRig = null!;
+    private readonly Dictionary<int, (ActorRig Rig, ActorState State)> crew = new();
+    private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
+    private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
+    private readonly Dictionary<int, float> pumping = new();
+    private readonly Dictionary<string, Prop> ghosts = new();
+    private MeshInstance3D selectRing = null!, hoverRing = null!, workerRing = null!, playerRing = null!, placeTile = null!;
     private float pulseRemaining;
     private ActorAction pulseAction;
     private Vector2 pulseTarget;
-    private Texture2D? details;
-    private Image? detailImage;
-    private Image atlasImage = null!;
-    private Texture2D? extras;
-    private NoiseTexture2D ground = null!;
-    private Font font = ThemeDB.FallbackFont;
-    private (Vector2 At, string Text)? tag;
-    private static readonly Color Ink = new("283d34");
-    private readonly Dictionary<string, int> cells = new() { ["tree"] = 0, ["stone"] = 1, ["iron"] = 2, ["loose_iron"] = 2, ["coal"] = 3, ["berries"] = 4, ["furnace"] = 5, ["reinforced"] = 6, ["hut"] = 7, ["chest"] = 8, ["grave"] = 8, ["anvil"] = 9, ["signpost"] = 10, ["campfire"] = 11 };
+    private float night;
+    private readonly Font font = ThemeDB.FallbackFont;
+    private static readonly StandardMaterial3D GhostValid = Flat(new Color(.55f, .95f, .45f, .45f));
+    private static readonly StandardMaterial3D GhostBlocked = Flat(new Color(1, .35f, .3f, .5f));
+    private static readonly StandardMaterial3D NightGlass = Mat("ffd58a", .3f, 0, 1.6f);
+
+    private static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
+
     public override void _Ready()
     {
-        atlas = GD.Load<Texture2D>("res://assets/world-atlas.png");
-        clips = ActorClips.Load();
-        idlePlayer = GD.Load<Texture2D>("res://assets/player-atlas.png");
-        idleWorker = GD.Load<Texture2D>("res://assets/worker-atlas.png");
-        player.Position = World.Player;
-        World.PlayerActed += PlayerActed;
-        if (ResourceLoader.Exists("res://assets/environment-details.png"))
+        camera = new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = BaseSize, Near = 1, Far = 200, Current = true };
+        AddChild(camera);
+        environment = new Godot.Environment
         {
-            details = GD.Load<Texture2D>("res://assets/environment-details.png");
-            detailImage = details.GetImage();
-            if (detailImage.IsCompressed()) detailImage.Decompress();
-        }
-        atlasImage = atlas.GetImage();
-        if (atlasImage.IsCompressed()) atlasImage.Decompress();
-        if (ResourceLoader.Exists("res://assets/travel-atlas.png")) extras = GD.Load<Texture2D>("res://assets/travel-atlas.png");
-        TextureFilter = TextureFilterEnum.Linear;
-        // Fine grass grain with occasional bare-earth flecks at the top of the ramp.
-        var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
-        var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
-        ground = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
+            BackgroundMode = Godot.Environment.BGMode.Color,
+            BackgroundColor = new Color("879c69"),
+            AmbientLightSource = Godot.Environment.AmbientSource.Color,
+            AmbientLightColor = new Color("c7d3dc"),
+            AmbientLightEnergy = .32f,
+        };
+        AddChild(new WorldEnvironment { Environment = environment });
+        // Light from the upper left and slightly behind, like the illustrated references, so shadows fall to the right.
+        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = .8f };
+        sun.Basis = Basis.LookingAt(new Vector3(1, -1.25f, -.45f), Vector3.Up);
+        AddChild(sun);
+        scene = new Node3D(); AddChild(scene);
+        BuildGround(scene);
+        BuildEffects(scene);
+        playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root);
+        selectRing = Ring(new Color(.95f, .82f, .4f, .85f));
+        hoverRing = Ring(new Color(1, .95f, .75f, .55f));
+        workerRing = Ring(new Color(1, .8f, .3f, .8f));
+        playerRing = Ring(new Color(.95f, .88f, .57f, .6f));
+        placeTile = Add(scene, new PlaneMesh { Size = new Vector2(1.4f, 1.4f) }, GhostValid, Vector3.Zero);
+        placeTile.Visible = false;
+        player.Position = World.Player;
+        overlay = new Node2D(); AddChild(overlay);
+        overlay.Draw += PaintOverlay;
+        World.PlayerActed += PlayerActed;
     }
-    /// <summary>Tiles a seamless grass-and-earth noise anchored to the world origin, so it scrolls and zooms with the map.</summary>
-    private void DrawGround()
+
+    private MeshInstance3D Ring(Color color)
     {
-        float size = 512 * Zoom;
-        var origin = Screen(Vector2.Zero); var screen = GetViewportRect().Size;
-        for (float x = Mathf.PosMod(origin.X, size) - size; x < screen.X; x += size)
-            for (float y = Mathf.PosMod(origin.Y, size) - size; y < screen.Y; y += size)
-                DrawTextureRect(ground, new Rect2(x, y, size, size), false);
+        var ring = Torus(scene, .9f, 1, Vector3.Zero, Flat(color));
+        ring.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        ring.Visible = false;
+        return ring;
     }
-    public Vector2 Center => GetViewportRect().Size * new Vector2(PanelOpen ? .38f : .5f, .52f);
-    public static Vector2 Iso(Vector2 p) => new((p.X - p.Y) * 44, (p.X + p.Y) * 22);
-    public Vector2 Screen(Vector2 p) => (Iso(p) - Iso(World.Player)) * Zoom + Center;
-    public Vector2 ToWorld(Vector2 p)
-    {
-        var q = (p - Center) / Zoom + Iso(World.Player);
-        return new Vector2(q.X / 88 + q.Y / 44, q.Y / 44 - q.X / 88);
-    }
-    // One scale anchor: an adult actor is 85 px; trees stand roughly four people tall. Small props stay below waist height,
-    // the hut has an adult-sized doorway, and tree crowns rise well above the roof.
-    private static float Height(Thing t) => t.Kind switch
-    {
-        "tree" => 320 + t.Id % 5 * 14,
-        "hut" => 270,
-        "reinforced" => 98,
-        "furnace" => 86,
-        "stone" or "iron" or "coal" => 58,
-        "loose_iron" => 27,
-        "berries" => 51,
-        "signpost" => 87,
-        "anvil" => 53,
-        "water" => 110,
-        "campfire" => 48,
-        _ => 46
-    };
-    private Vector2 ThingSize(Thing t) => new Vector2(Height(t) * (t.Kind == "tree" ? .88f : t.Kind == "reinforced" ? 1.20f : 1.05f), Height(t)) * Zoom;
-    private Rect2 Bounds(Thing t)
-    {
-        var size = ThingSize(t);
-        return new Rect2(Screen(t.Pos) - new Vector2(size.X / 2, size.Y * .93f), size);
-    }
-    private bool Hit(Thing t, Vector2 screen)
-    {
-        var bounds = Bounds(t);
-        if (!bounds.HasPoint(screen)) return false;
-        if (t.Kind == "water") return true;
-        if (!cells.TryGetValue(t.Kind, out int cell)) return false;
-        var uv = (screen - bounds.Position) / bounds.Size;
-        bool hutDetail = t.Kind == "hut" && detailImage != null;
-        var image = hutDetail ? detailImage! : atlasImage;
-        int columns = hutDetail ? 2 : 4, rows = hutDetail ? 1 : 3;
-        if (hutDetail) cell = 1;
-        int w = image.GetWidth() / columns, h = image.GetHeight() / rows;
-        int x = cell % columns * w + Math.Clamp((int)(uv.X * w), 0, w - 1);
-        int y = cell / columns * h + Math.Clamp((int)(uv.Y * h), 0, h - 1);
-        return image.GetPixel(x, y).A > .20f;
-    }
-    public Thing? Pick(Vector2 screen) => World.S.Things.Where(t => (t.Remaining > 0 || !t.IsResource || t.Kind == "berries") && Hit(t, screen))
-        .OrderByDescending(t => t.X + t.Y).FirstOrDefault();
-    public Worker? PickWorker(Vector2 screen) => World.S.Workers.FirstOrDefault(w => new Rect2(Screen(w.Pos) - new Vector2(24, 77) * Zoom, new Vector2(48, 84) * Zoom).HasPoint(screen));
+
     public override void _ExitTree() => World.PlayerActed -= PlayerActed;
+
     private void PlayerActed(ActorAction action, Vector2 target)
     {
-        pulseAction = action; pulseTarget = target; pulseRemaining = clips.Get(false, action).FrameCount / 8f;
+        pulseAction = action; pulseTarget = target; pulseRemaining = ActorAnimation.Duration(action);
         player.Time = 0;
     }
+
     public ActorAction PlayerAnimation => player.Action;
     public float PlayerAnimationTime => player.Time;
-    public ActorAction WorkerAnimation(int id) => crew.TryGetValue(id, out var state) ? state.Action : ActorAction.Idle;
+    public ActorAction WorkerAnimation(int id) => crew.TryGetValue(id, out var entry) ? entry.State.Action : ActorAction.Idle;
+
     private sealed class ActorState
     {
         public Vector2 Position;
-        public int Facing;
+        public float Yaw;
         public ActorAction Action;
         public float Time;
+        public float PreviousTime = -1;
         public bool Moving;
         public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt)
         {
             Moving = position.DistanceSquaredTo(Position) > .000001f;
-            Facing = ActorAnimation.Direction(Moving ? position - Position : facingTarget - position, Facing);
+            float yaw = ActorAnimation.Yaw(Moving ? position - Position : facingTarget - position, Yaw);
+            Yaw = Mathf.LerpAngle(Yaw, yaw, Math.Min(1, dt * 14));
             Position = position;
-            if (Action != action) { Action = action; Time = 0; }
-            else Time += dt;
+            if (Action != action) { Action = action; Time = 0; PreviousTime = -1; }
+            else { PreviousTime = Time; Time += dt; }
+        }
+        /// <summary>True on the frame an action loop passes its impact moment.</summary>
+        public bool Struck(float at)
+        {
+            if (PreviousTime < 0) return false;
+            float before = ActorAnimation.Phase(Action, PreviousTime), now = ActorAnimation.Phase(Action, Time);
+            return before <= now ? before < at && at <= now : at > before || at <= now;
         }
     }
-    public override void _Process(double delta)
+
+    // ---------- Camera and picking ----------
+
+    public Vector2 Center => GetViewport().GetVisibleRect().Size * new Vector2(PanelOpen ? .38f : .5f, .52f);
+
+    /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
+    private void SyncCamera()
     {
-        if (!Paused)
-        {
-            float dt = Math.Min((float)delta, .1f);
-            Elapsed += dt;
-            bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
-            ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, SelectedTool);
-            Vector2 target = Gathering && GatheringTarget != null ? GatheringTarget.Pos : World.Player;
-            if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; }
-            if (action == ActorAction.Idle)
-            {
-                var anvil = World.S.Things.FirstOrDefault(t => t.Kind == "anvil" && t.Processing && World.Near(t) &&
-                    !World.S.Workers.Any(w => w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2));
-                if (anvil != null) { action = ActorAction.Hammer; target = anvil.Pos; }
-            }
-            player.Update(World.Player, action, target, dt);
-            pulseRemaining = Math.Max(0, pulseRemaining - dt);
-            foreach (var worker in World.S.Workers)
-            {
-                if (!crew.TryGetValue(worker.Id, out var state)) { state = new ActorState { Position = worker.Pos }; crew.Add(worker.Id, state); }
-                bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
-                var assignment = World.S.Things.FirstOrDefault(t => t.Id == worker.Assignment);
-                var work = ActorAnimation.WorkerAction(worker, assignment, walking);
-                if (work == ActorAction.Hammer && assignment?.Processing != true) work = ActorAction.Idle;
-                state.Update(worker.Pos, work, assignment?.Pos ?? worker.Pos, dt);
-            }
-            foreach (int id in crew.Keys.Where(id => !World.S.Workers.Any(w => w.Id == id)).ToArray()) crew.Remove(id);
-        }
-        QueueRedraw();
+        var size = GetViewport().GetVisibleRect().Size;
+        camera.Size = (AnimationReview ? 9.5f : BaseSize) / Zoom;
+        float pitch = Mathf.DegToRad(Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
+        var back = new Vector3(across, MathF.Sin(pitch), across);
+        var target = AnimationReview ? ReviewCenter : To3(World.Player);
+        camera.Basis = Basis.LookingAt(-back, Vector3.Up);
+        camera.Position = target + back * 60;
+        float unitsPerPixel = camera.Size / Math.Max(1, size.Y);
+        camera.HOffset = (.5f - Center.X / Math.Max(1, size.X)) * size.X * unitsPerPixel;
+        camera.VOffset = (Center.Y / Math.Max(1, size.Y) - .5f) * size.Y * unitsPerPixel;
     }
-    private void Diamond(Vector2 p, float size, Color c)
+
+    private float PixelsPerUnit => GetViewport().GetVisibleRect().Size.Y / camera.Size;
+    public Vector2 Screen(Vector2 p) => Screen(p, 0);
+    public Vector2 Screen(Vector2 p, float height) { SyncCamera(); return camera.UnprojectPosition(To3(p, height)); }
+
+    public Vector2 ToWorld(Vector2 screen)
     {
-        DrawColoredPolygon(new[] { p + new Vector2(0, -22 * size), p + new Vector2(44 * size, 0), p + new Vector2(0, 22 * size), p + new Vector2(-44 * size, 0) }, c);
+        SyncCamera();
+        var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
+        if (Math.Abs(direction.Y) < 1e-5f) return World.Player;
+        var hit = origin + direction * (-origin.Y / direction.Y);
+        return new Vector2(hit.X, hit.Z);
     }
-    private void Ellipse(Vector2 p, Vector2 radius, Color color)
+
+    private Hit[] HitsOf(Thing t) => props.TryGetValue(t.Id, out var prop) && prop.Kind == t.Kind ? prop.Hits : WorldModels.Hits(t);
+
+    private static bool RayCylinder(Vector3 origin, Vector3 direction, Vector2 center, Hit hit, out float distance)
     {
-        var points = new Vector2[40];
-        for (int i = 0; i < points.Length; i++) { float a = i * Mathf.Tau / points.Length; points[i] = p + new Vector2(MathF.Cos(a) * radius.X, MathF.Sin(a) * radius.Y); }
-        DrawColoredPolygon(points, color);
+        distance = float.MaxValue;
+        float r2 = hit.Radius * hit.Radius;
+        if (Math.Abs(direction.Y) > 1e-5f)
+        {
+            float cap = (hit.Top - origin.Y) / direction.Y;
+            var p = origin + direction * cap;
+            if (cap > 0 && (p.X - center.X) * (p.X - center.X) + (p.Z - center.Y) * (p.Z - center.Y) <= r2) distance = cap;
+        }
+        float ox = origin.X - center.X, oz = origin.Z - center.Y;
+        float a = direction.X * direction.X + direction.Z * direction.Z, b = 2 * (ox * direction.X + oz * direction.Z), c = ox * ox + oz * oz - r2;
+        float disc = b * b - 4 * a * c;
+        if (a > 1e-8f && disc >= 0)
+        {
+            float side = (-b - MathF.Sqrt(disc)) / (2 * a), y = origin.Y + direction.Y * side;
+            if (side > 0 && y >= hit.Bottom && y <= hit.Top && side < distance) distance = side;
+        }
+        return distance < float.MaxValue;
     }
-    private void Text(Vector2 p, string s, int size, Color color) => DrawString(font, p, s, HorizontalAlignment.Center, -1, size, color);
-    private void Sprite(Texture2D texture, int cell, int columns, int rows, Vector2 basePoint, Vector2 size, Color tint)
+
+    private bool RayHits(Vector2 screen, Vector2 at, IEnumerable<Hit> hits, out float distance)
     {
-        var region = new Rect2(cell % columns * texture.GetWidth() / (float)columns, cell / columns * texture.GetHeight() / (float)rows, texture.GetWidth() / (float)columns, texture.GetHeight() / (float)rows);
-        var rect = new Rect2(basePoint - new Vector2(size.X / 2, size.Y * .93f), size);
-        DrawTextureRectRegion(texture, rect, region, tint);
+        var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
+        distance = float.MaxValue;
+        foreach (var hit in hits)
+            if (RayCylinder(origin, direction, at, hit, out float d)) distance = Math.Min(distance, d);
+        return distance < float.MaxValue;
     }
-    internal bool TreeCanopyCoversThing(Thing tree, Thing thing)
+
+    /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit cylinders.</summary>
+    public Thing? Pick(Vector2 screen)
     {
-        // Depth decides which object is in front; alpha-mask overlap avoids fading trees
-        // merely because their large transparent sprite rectangles happen to intersect.
-        if (tree.X + tree.Y <= thing.X + thing.Y) return false;
-        var treeBounds = Bounds(tree);
-        var thingBounds = Bounds(thing);
-        var overlap = treeBounds.Intersection(thingBounds);
-        if (overlap.Size.X <= 0 || overlap.Size.Y <= 0) return false;
-        // Sample actual source alpha, including the larger replacement hut sprite.
-        for (float y = overlap.Position.Y + 3; y < overlap.End.Y; y += 6)
-            for (float x = overlap.Position.X + 3; x < overlap.End.X; x += 6)
-                if (Hit(tree, new Vector2(x, y)) && Hit(thing, new Vector2(x, y))) return true;
-        return false;
-    }
-    private void DrawThing(Thing t, Color? overrideTint = null)
-    {
-        var p = Screen(t.Pos); float h = Height(t) * Zoom;
-        var tint = overrideTint ?? Colors.White;
-        if (t.Kind == "water")
-        {
-            return; // The pond art is the drinking spot; this object only provides the hit area.
-        }
-        if (t.IsResource && t.Remaining == 0 && t.Kind != "berries")
-        {
-            if (t.Kind == "tree") { Ellipse(p, new Vector2(12, 7) * Zoom, new Color("886d45")); }
-            return;
-        }
-        bool selected = t.Id == Selected || t.Id == Hover;
-        if (selected) Ellipse(p, new Vector2(36, 17) * Zoom, new Color(.92f, .83f, .46f, .5f));
-        if (t.Kind != "hut") Ellipse(p + new Vector2(4, 1) * Zoom, new Vector2(h * .32f, h * .10f), new Color(.14f, .22f, .13f, .18f));
-        if (t.Kind == "berries" && t.Remaining == 0) tint = new Color(.6f, .7f, .5f, 1);
-        if (t.Kind == "grave") tint = new Color(1, .75f, .5f);
-        if (t.Kind == "campfire" && t.Burn == 0) tint = new Color(.38f, .4f, .36f);
-        // Canopies fade over people and structures that sit behind the visible foliage.
-        if (t.Kind == "tree" &&
-            (Bounds(t).HasPoint(Screen(World.Player) - new Vector2(0, 40)) && t.X + t.Y > World.Player.X + World.Player.Y ||
-             World.S.Workers.Any(w => Bounds(t).HasPoint(Screen(w.Pos) - new Vector2(0, 40)) && t.X + t.Y > w.X + w.Y) ||
-             World.S.Things.Any(other => other.Id != t.Id && !other.IsResource &&
-                 cells.ContainsKey(other.Kind) && TreeCanopyCoversThing(t, other)))) tint.A = .26f;
-        if (t.Kind == "hut" && details != null) Sprite(details, 1, 2, 1, p, ThingSize(t), tint);
-        else Sprite(atlas, cells.GetValueOrDefault(t.Kind), 4, 3, p, ThingSize(t), tint);
-        if (t.Kind is "furnace" or "reinforced" or "campfire" && (t.Processing || t.Burn > 0))
-        {
-            for (int i = 0; i < 3; i++)
-            {
-                float age = (Elapsed * .6f + i * .33f) % 1;
-                DrawCircle(p + new Vector2(MathF.Sin(age * 8 + i) * 9, -h * .36f - age * 40 * Zoom), (2 - age) * Zoom, new Color(1, .65f, .2f, (1 - age) * .8f));
-            }
-        }
-        // Only the hovered object is named; the side panel already names the selection.
-        if (t.Id == Hover && overrideTint == null) tag = (p + new Vector2(0, -h - 8), t.Kind == "loose_iron" ? "Loose iron" : World.Data.Name(t.Kind));
-        if (t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var r))
-        {
-            DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), new Color("2b4135"));
-            DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * t.Progress / r.Seconds, 5)), new Color("e5bf68"));
-        }
-    }
-    private void DrawClip(ActorClip clip, Vector2 feet, int direction, int frame, float height)
-    {
-        var pose = clip.Get(direction, frame);
-        float scale = height / clip.BodyHeight;
-        DrawTextureRect(pose.Texture, new Rect2(feet - pose.Foot * scale, pose.Texture.GetSize() * scale), false);
-    }
-    private void DrawActor(Vector2 pos, ActorState state, bool worker = false)
-    {
-        var p = Screen(pos);
-        Ellipse(p, new Vector2(13, 6) * Zoom, new Color(0, 0, 0, .23f));
-        var action = state.Action;
-        var clip = clips.Get(worker, action);
-        int frame = action == ActorAction.Idle || action == ActorAction.Carry && !state.Moving ? 0 : ActorAnimation.Frame(action, state.Time, clip.FrameCount);
-        // Quiet breathing for idle; harvesting and combat use the complete tool stroke.
-        float breath = action == ActorAction.Idle ? MathF.Sin(state.Time * 2.5f) * .5f * Zoom : 0;
-        if (action == ActorAction.Idle)
-            Sprite(worker ? idleWorker : idlePlayer, state.Facing, 4, 2, p + new Vector2(0, breath), new Vector2(63.75f, 85) * Zoom, Colors.White);
-        else DrawClip(clip, p + new Vector2(0, breath), state.Facing, frame, 75 * Zoom);
-        if (!worker) DrawArc(p, 18 * Zoom, 0, Mathf.Tau, 32, new Color(.95f, .88f, .57f, .8f), 1.4f, true);
-    }
-    private void DrawAnimationReview()
-    {
-        DrawRect(GetViewportRect(), new Color("263e34"));
-        Text(new Vector2(28, 35), "ANIMATION REVIEW · 7–8 poses × 4 directions · tools, work and hauling", 23, new Color("f2e8cf"));
-        int i = 0;
-        foreach (var entry in clips.NamedClips)
-        {
-            int col = i % 5, row = i / 5;
-            var feet = new Vector2(140 + col * 280, 210 + row * 210);
-            int direction = (int)(Elapsed / 2) % 4;
-            int frame = (int)(Elapsed * 8) % entry.Value.FrameCount;
-            DrawClip(entry.Value, feet, direction, frame, 115);
-            Text(feet + new Vector2(-95, 30), entry.Key, 18, new Color("f2e8cf"));
-            i++;
-        }
-    }
-    public override void _Draw()
-    {
-        if (World == null || atlas == null) return;
-        if (AnimationReview) { DrawAnimationReview(); return; }
-        DrawRect(GetViewportRect(), new Color("879c69"));
-        DrawGround();
-        var viewport = GetViewportRect().Grow(260);
-        // Broad, quiet grass patches replace the checkerboard of individually colored tiles.
-        for (int x = 0; x < World.MapSize; x += 2) for (int y = 0; y < World.MapSize; y += 2)
-        {
-            float seed = ((x * 127 + y * 311 + x * y * 7) % 31) / 31f;
-            var p = Screen(new Vector2(x + seed * .6f, y - seed * .4f));
-            if (!viewport.HasPoint(p)) continue;
-            Ellipse(p, new Vector2(108 + seed * 38, 48 + seed * 15) * Zoom, new Color(.35f, .47f, .27f, .025f + seed * .025f));
-            if (seed > .7f)
-            {
-                var q = p + new Vector2(seed * 27, seed * 13) * Zoom;
-                DrawLine(q, q + new Vector2(-2, -4) * Zoom, new Color(.39f, .51f, .29f, .28f), 1, true);
-                DrawLine(q, q + new Vector2(3, -3) * Zoom, new Color(.39f, .51f, .29f, .28f), 1, true);
-                if (seed > .95f) DrawCircle(q + new Vector2(2, -4) * Zoom, 1.5f * Zoom, new Color("d7d49c"));
-            }
-        }
-        for (int ring = 16; ring > 0; ring--)
-            Ellipse(Screen(ChopChopMeow.World.Spawn), new Vector2(150, 68) * Zoom * ring / 16f, new Color(.66f, .60f, .41f, .018f));
-        // A narrow, worn trail with soft shoulders; the grid remains implicit for building placement.
-        for (int layer = 3; layer > 0; layer--)
-        {
-            float width = .33f + layer * .12f;
-            var edges = new List<Vector2>();
-            for (int x = 22; x <= 49; x++) edges.Add(Screen(new Vector2(x, 24 + MathF.Sin(x * .6f) * .13f - width)));
-            for (int x = 49; x >= 22; x--) edges.Add(Screen(new Vector2(x, 24 + MathF.Sin(x * .6f) * .13f + width)));
-            DrawColoredPolygon(edges.ToArray(), new Color(.67f, .60f, .43f, layer == 1 ? .28f : .14f));
-        }
-        var pond = Screen(ChopChopMeow.World.Pond);
-        // The pond art was sized for a 2.7-tile radius; scale it with the walkable boundary.
-        float pondScale = ChopChopMeow.World.PondRadius / 2.7f * Zoom;
-        if (details != null)
-        {
-            float cell = details.GetWidth() / 2f;
-            DrawTextureRectRegion(details, new Rect2(pond - new Vector2(170, 170) * pondScale, new Vector2(340, 340) * pondScale), new Rect2(0, 0, cell, details.GetHeight()));
-        }
-        else
-        {
-            Ellipse(pond, new Vector2(150, 73) * pondScale, new Color("b1ae79"));
-            Ellipse(pond, new Vector2(130, 63) * pondScale, new Color("6e9b9b"));
-        }
-        tag = null;
-        var list = new List<(float Depth, Action Draw)>();
+        SyncCamera();
+        Thing? best = null; float nearest = float.MaxValue;
         foreach (var t in World.S.Things)
         {
-            var captured = t;
-            if (!viewport.HasPoint(Screen(t.Pos))) continue;
-            list.Add((t.X + t.Y, () => DrawThing(captured)));
+            if (t.Remaining <= 0 && t.IsResource && t.Kind != "berries") continue;
+            if (RayHits(screen, t.Pos, HitsOf(t), out float d) && d < nearest) { nearest = d; best = t; }
         }
-        if (!World.Dead) list.Add((World.Player.X + World.Player.Y, () => DrawActor(World.Player, player)));
+        return best;
+    }
+
+    private static readonly Hit[] PersonHit = { new(.38f, 0, 1.75f) };
+    public Worker? PickWorker(Vector2 screen)
+    {
+        SyncCamera();
+        Worker? best = null; float nearest = float.MaxValue;
         foreach (var w in World.S.Workers)
+            if (RayHits(screen, w.Pos, PersonHit, out float d) && d < nearest) { nearest = d; best = w; }
+        return best;
+    }
+
+    /// <summary>Screen rectangles of an object's hit cylinders, used to decide when a canopy hides something.</summary>
+    private IEnumerable<Rect2> ScreenRects(Vector2 at, IEnumerable<Hit> hits)
+    {
+        float ppu = PixelsPerUnit;
+        foreach (var hit in hits)
         {
-            var worker = w;
-            list.Add((w.X + w.Y, () =>
-            {
-                if (crew.TryGetValue(worker.Id, out var state)) DrawActor(worker.Pos, state, true);
-                var p = Screen(worker.Pos);
-                if (worker.Id == SelectedWorker) Ellipse(p, new Vector2(22, 10) * Zoom, new Color(1, .8f, .3f, .35f));
-                if (worker.Id == HoverWorker || worker.Id == SelectedWorker) tag = (p + new Vector2(0, -88) * Zoom, worker.Name);
-            }
-            ));
+            var bottom = camera.UnprojectPosition(To3(at, hit.Bottom)); var top = camera.UnprojectPosition(To3(at, hit.Top));
+            float half = hit.Radius * ppu;
+            yield return new Rect2(bottom.X - half, top.Y - half * .5f, half * 2, bottom.Y - top.Y + half);
         }
+    }
+
+    internal bool TreeCanopyCoversThing(Thing tree, Thing thing)
+    {
+        SyncCamera();
+        return Covers(tree, thing);
+    }
+
+    private bool Covers(Thing tree, Thing thing)
+    {
+        // Depth decides which object is in front; projected volumes must then actually overlap.
+        if (tree.X + tree.Y <= thing.X + thing.Y) return false;
+        var thingRects = ScreenRects(thing.Pos, HitsOf(thing)).ToArray();
+        return ScreenRects(tree.Pos, HitsOf(tree)).Any(a => thingRects.Any(b => a.Intersects(b)));
+    }
+
+    private bool TreeCoversPerson(Thing tree, Vector2 person)
+    {
+        if (tree.X + tree.Y <= person.X + person.Y) return false;
+        var head = camera.UnprojectPosition(To3(person, 1.2f));
+        return ScreenRects(tree.Pos, HitsOf(tree)).Any(r => r.HasPoint(head));
+    }
+
+    // ---------- Frame update ----------
+
+    public override void _Process(double delta)
+    {
+        if (World == null) return;
+        float dt = Paused ? 0 : Math.Min((float)delta, .1f);
+        Elapsed += dt;
+        SyncCamera();
+        if (AnimationReview) { UpdateReview(); overlay.QueueRedraw(); return; }
+        if (dt > 0) UpdateActors(dt);
+        SyncThings(dt);
+        if (dt > 0) { SyncWolves(dt); SyncCarts(dt); }
+        UpdateEffects(dt);
+        UpdateMarkers();
+        UpdateLighting();
+        overlay.QueueRedraw();
+    }
+
+    private string? HeldTool() => SelectedTool switch
+    {
+        "steel_tools" when World.S.Backpack["steel_tools"] > 0 => "steel_axe",
+        "iron_axe" or "iron_pick" when World.S.Backpack[SelectedTool] > 0 => SelectedTool,
+        _ => null
+    };
+
+    private void UpdateActors(float dt)
+    {
+        pumping.Clear();
+        bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
+        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, SelectedTool);
+        Vector2 target = Gathering && GatheringTarget != null ? GatheringTarget.Pos : World.Player;
+        Thing? subject = Gathering ? GatheringTarget : null;
+        if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; subject = World.S.Things.FirstOrDefault(t => t.Pos == pulseTarget); }
+        if (action == ActorAction.Idle)
+        {
+            var anvil = World.S.Things.FirstOrDefault(t => t.Kind == "anvil" && t.Processing && World.Near(t) &&
+                !World.S.Workers.Any(w => w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2));
+            if (anvil != null) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
+        }
+        player.Update(World.Player, action, target, dt);
+        pulseRemaining = Math.Max(0, pulseRemaining - dt);
+        string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool() : null);
+        Pose(playerRig, player, tool);
+        playerRig.Root.Visible = !World.Dead;
+        Work(player, subject);
+        foreach (var worker in World.S.Workers)
+        {
+            if (!crew.TryGetValue(worker.Id, out var entry))
+            {
+                entry = (new ActorRig(ActorSkin.Worker), new ActorState { Position = worker.Pos });
+                scene.AddChild(entry.Rig.Root); crew.Add(worker.Id, entry);
+            }
+            var state = entry.State;
+            bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
+            var assignment = World.Find(worker.Assignment);
+            var work = ActorAnimation.WorkerAction(worker, assignment, walking);
+            if (work == ActorAction.Hammer && assignment?.Processing != true) work = ActorAction.Idle;
+            state.Update(worker.Pos, work, assignment?.Pos ?? worker.Pos, dt);
+            Pose(entry.Rig, state, ActorAnimation.Tool(work));
+            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? null : assignment);
+        }
+        foreach (int id in crew.Keys.Where(id => World.S.Workers.All(w => w.Id != id)).ToArray())
+        {
+            crew[id].Rig.Root.QueueFree(); crew.Remove(id);
+        }
+    }
+
+    private static void Pose(ActorRig rig, ActorState state, string? tool)
+    {
+        rig.Root.Position = To3(state.Position);
+        rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
+        rig.Show(ActorAnimation.PoseAt(state.Action, state.Time, state.Moving), tool, state.Action == ActorAction.Carry);
+    }
+
+    /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
+    private void Work(ActorState actor, Thing? subject)
+    {
+        if (subject == null) return;
+        var action = actor.Action;
+        // The bellows board follows the lean of the person pressing it.
+        if (action == ActorAction.Pump)
+            pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
+        float impact = action switch
+        {
+            ActorAction.Chop or ActorAction.SteelChop => .52f,
+            ActorAction.Mine or ActorAction.SteelMine => .55f,
+            ActorAction.Hammer => .5f,
+            ActorAction.Pump => .35f,
+            ActorAction.Gather => .1f,
+            _ => -1
+        };
+        if (impact < 0 || !actor.Struck(impact) || !props.TryGetValue(subject.Id, out var prop)) return;
+        prop.Shake = 1;
+        var toward = (actor.Position - subject.Pos).Normalized();
+        var side = To3(subject.Pos + toward * .35f);
+        switch (subject.Kind)
+        {
+            case "tree":
+                Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
+                Burst(To3(subject.Pos, 3.6f), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
+                break;
+            case "stone" or "iron" or "coal":
+                var color = subject.Kind == "stone" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : "26282b";
+                Burst(side + Vector3.Up * .5f, Mat(color), 6, 2.4f, .5f, 9, .07f);
+                Burst(side + Vector3.Up * .4f, Flat(new Color(.8f, .78f, .7f, .45f)), 3, .5f, .9f, -.3f, .16f, 1.5f);
+                if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Flat(new Color("ffd27a")), 5, 3.2f, .3f, 4, .025f);
+                break;
+            case "loose_iron": Burst(side + Vector3.Up * .1f, Flat(new Color(.75f, .6f, .45f, .5f)), 3, .5f, .7f, -.2f, .12f, 1.2f); break;
+            case "berries": Burst(To3(subject.Pos, .7f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f); break;
+            case "water": Burst(side + Vector3.Up * .05f, Flat(new Color(.7f, .88f, .95f, .8f)), 6, 1.6f, .45f, 7, .045f); break;
+            case "anvil": Burst(To3(subject.Pos) + prop.Vent, Flat(new Color("ffd27a")), 10, 3, .35f, 5, .025f); break;
+            case "reinforced":
+                if (subject.Heat > 10) Burst(To3(subject.Pos, .9f) + new Vector3(0, 0, .5f), Flat(new Color("ffb347")), 6, 1.4f, .6f, -1, .03f);
+                break;
+        }
+    }
+
+    private void SyncThings(float dt)
+    {
+        var seen = new HashSet<int>();
+        foreach (var t in World.S.Things)
+        {
+            seen.Add(t.Id);
+            if (!props.TryGetValue(t.Id, out var prop) || prop.Kind != t.Kind)
+            {
+                if (prop != null) prop.Root.QueueFree();
+                prop = WorldModels.Build(t);
+                scene.AddChild(prop.Root);
+                props[t.Id] = prop;
+            }
+            prop.Root.Position = To3(t.Pos);
+            Animate(prop, t, dt);
+        }
+        foreach (int id in props.Keys.Where(id => !seen.Contains(id)).ToArray())
+        {
+            props[id].Root.QueueFree(); props.Remove(id);
+        }
+        FadeCanopies(dt);
+    }
+
+    private void Animate(Prop prop, Thing t, float dt)
+    {
+        bool first = !prop.Seen;
+        prop.Seen = true;
+        prop.Shake = Math.Max(0, prop.Shake - dt * 2.5f);
+        float wobble = prop.Shake * MathF.Sin(Elapsed * 34);
+        float flicker = MathF.Sin(Elapsed * 13 + t.Id) * .5f + MathF.Sin(Elapsed * 7.3f + t.Id * 3) * .5f;
+        switch (t.Kind)
+        {
+            case "tree":
+                var sway = prop.Sway!;
+                if (t.Remaining > 0)
+                {
+                    prop.Fall = -1; sway.Visible = true; prop.Stump!.Visible = false;
+                    sway.RotationDegrees = new Vector3(wobble * 3, 0, prop.Shake * 2 * MathF.Cos(Elapsed * 29));
+                    break;
+                }
+                // A felled tree topples, fades away and leaves its stump.
+                if (prop.Fall < 0) prop.Fall = first ? 9 : 0;
+                float before = prop.Fall; prop.Fall += dt;
+                float drop = Math.Min(1, prop.Fall / 1.1f);
+                sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
+                if (before < 1.1f && prop.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, Flat(new Color(.7f, .66f, .52f, .45f)), 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
+                SetFade(sway, Math.Clamp((prop.Fall - 1.2f) / .5f, 0, 1));
+                sway.Visible = prop.Fall < 1.7f;
+                prop.Stump!.Visible = true;
+                break;
+            case "stone" or "iron" or "coal" or "loose_iron":
+                prop.Body.Visible = t.Remaining > 0;
+                prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
+                prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
+                break;
+            case "berries":
+                prop.Fruit!.Visible = t.Remaining > 0;
+                prop.Body.Scale = new Vector3(1 + wobble * .04f, 1 - wobble * .03f, 1 + wobble * .04f);
+                break;
+            case "furnace":
+                prop.Glow!.Visible = t.Processing;
+                prop.Light!.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
+                Smoke(prop, t, t.Processing, dt);
+                break;
+            case "reinforced":
+                float heat = t.Heat / 100;
+                prop.Glow!.Visible = heat > .05f || t.Processing;
+                prop.Light!.LightEnergy = (heat * 1.5f + (t.Processing ? .4f : 0)) * (1 + flicker * .15f) * (.5f + night);
+                prop.Needle!.RotationDegrees = new Vector3(0, 0, Mathf.Lerp(prop.Needle.RotationDegrees.Z, WorldModels.Gauge(heat), Math.Min(1, dt * 6)));
+                prop.Lever!.RotationDegrees = new Vector3(-16 * (1 - pumping.GetValueOrDefault(t.Id)), 0, 0);
+                Smoke(prop, t, t.Processing || heat > .3f, dt);
+                break;
+            case "campfire":
+                bool burning = t.Burn > 0;
+                prop.Fire!.Visible = burning;
+                prop.Fire.Scale = new Vector3(1 + flicker * .08f, .85f + MathF.Abs(MathF.Sin(Elapsed * 9 + t.Id)) * .3f, 1 - flicker * .08f);
+                prop.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
+                prop.Light!.LightEnergy = burning ? (1.2f + flicker * .3f) * (.35f + night * 1.4f) : 0;
+                if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Flat(new Color("ff9a3a")), 1, .5f, 1.1f, -1.4f, .025f);
+                Smoke(prop, t, burning, dt);
+                break;
+            case "chest" or "grave":
+                int count = t.Inventory.Count;
+                if (!first && count != prop.LastCount) prop.Puff = .9f;
+                prop.LastCount = count;
+                prop.Puff = Math.Max(0, prop.Puff - dt);
+                bool open = prop.Puff > 0 || t.Id == Selected && PanelOpen && World.Near(t);
+                prop.Open = Mathf.MoveToward(prop.Open, open ? 1 : 0, dt * 4);
+                prop.Lid!.RotationDegrees = new Vector3(-80 * Ease(prop.Open), 0, 0);
+                break;
+            case "hut":
+                bool near = !World.Dead && World.Player.DistanceTo(t.Pos) < 2.6f;
+                prop.Open = Mathf.MoveToward(prop.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
+                prop.Door!.RotationDegrees = new Vector3(0, -100 * Ease(prop.Open), 0);
+                prop.Window!.MaterialOverride = night > .45f ? NightGlass : Mat("8fb4c4", .15f, .2f);
+                prop.Light!.LightEnergy = night > .45f ? .9f : 0;
+                break;
+            case "signpost":
+                bool waiting = World.S.Orders.Any(o => o.Signpost == t.Id);
+                prop.Open = Mathf.MoveToward(prop.Open, waiting ? 1 : 0, Math.Max(dt, .016f) * 3);
+                prop.Flag!.RotationDegrees = new Vector3(-90 * (1 - Ease(prop.Open)), 0, 0);
+                break;
+        }
+    }
+
+    private static float Ease(float t) => t * t * (3 - 2 * t);
+
+    private void Smoke(Prop prop, Thing t, bool active, float dt)
+    {
+        if (!active || dt <= 0) return;
+        prop.Puff -= dt;
+        if (prop.Puff > 0) return;
+        prop.Puff = .5f;
+        Burst(To3(t.Pos) + prop.Vent, Flat(new Color(.62f, .62f, .6f, .38f)), 1, .25f, 2.4f, -.45f, .14f, 2.2f);
+    }
+
+    /// <summary>Trees in front of the player, a worker or a structure turn see-through instead of hiding them.</summary>
+    private void FadeCanopies(float dt)
+    {
+        var bounds = GetViewport().GetVisibleRect().Grow(300);
+        var structures = World.S.Things.Where(o => !o.IsResource && props.ContainsKey(o.Id) && bounds.HasPoint(camera.UnprojectPosition(To3(o.Pos)))).ToArray();
+        foreach (var t in World.S.Things)
+        {
+            if (t.Kind != "tree" || t.Remaining <= 0 || !props.TryGetValue(t.Id, out var prop)) continue;
+            if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
+            bool covers = !World.Dead && TreeCoversPerson(t, World.Player) ||
+                World.S.Workers.Any(w => TreeCoversPerson(t, w.Pos)) ||
+                structures.Any(o => Covers(t, o));
+            float fade = Mathf.MoveToward(prop.Fade, covers ? .68f : 0, Math.Max(dt, .016f) * 3);
+            if (Math.Abs(fade - prop.Fade) < .001f) continue;
+            prop.Fade = fade; SetFade(prop.Sway!, fade);
+        }
+    }
+
+    private void SyncWolves(float dt)
+    {
         foreach (var wolf in World.S.Wolves)
         {
-            var captured = wolf;
-            list.Add((wolf.X + wolf.Y, () =>
+            if (!wolves.TryGetValue(wolf, out var model))
             {
-                var p = Screen(captured.Pos);
-                if (extras != null) Sprite(extras, 0, 3, 1, p, new Vector2(86, 52) * Zoom, Colors.White);
-                else { Ellipse(p - new Vector2(0, 12), new Vector2(22, 12) * Zoom, new Color("5a5d58")); DrawCircle(p + new Vector2(19, -18) * Zoom, 9 * Zoom, new Color("6d7168")); }
-                DrawCircle(p + new Vector2(20, -20) * Zoom, 2 * Zoom, new Color("e2a570"));
+                model = new WorldModels.WolfModel { Last = wolf.Pos, Yaw = ActorAnimation.Yaw(World.Player - wolf.Pos, 0) };
+                scene.AddChild(model.Root); wolves[wolf] = model;
             }
-            ));
+            var moved = wolf.Pos - model.Last;
+            bool running = moved.LengthSquared() > 1e-6f;
+            model.Stride += running ? moved.Length() * 7 : dt * 2;
+            model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(running ? moved : World.Player - wolf.Pos, model.Yaw), Math.Min(1, dt * 10));
+            model.Last = wolf.Pos;
+            model.Root.Position = To3(wolf.Pos);
+            model.Root.Rotation = new Vector3(0, model.Yaw, 0);
+            model.Trot(model.Stride, running);
         }
+        foreach (var gone in wolves.Keys.Where(w => !World.S.Wolves.Contains(w)).ToArray())
+        {
+            wolves[gone].Root.QueueFree(); wolves.Remove(gone);
+        }
+    }
+
+    private void SyncCarts(float dt)
+    {
         foreach (var order in World.S.Orders)
         {
-            var sign = World.Find(order.Signpost); if (sign == null) continue;
+            var sign = World.Find(order.Signpost);
             float phase = order.Elapsed / World.Data.TradeSeconds;
-            Vector2 destination = new(49, 24);
-            var pos = sign.Pos.Lerp(destination, phase < .5f ? phase * 2 : (1 - phase) * 2);
-            list.Add((pos.X + pos.Y, () =>
+            var pos = sign == null ? new Vector2(49, 24) : sign.Pos.Lerp(new Vector2(49, 24), phase < .5f ? phase * 2 : (1 - phase) * 2);
+            if (!carts.TryGetValue(order, out var cart))
             {
-                var p = Screen(pos);
-                bool cash = !order.Buying && phase >= .5f;
-                if (extras != null) Sprite(extras, cash ? 2 : 1, 3, 1, p, new Vector2(108, 72) * Zoom, Colors.White);
-                else { DrawRect(new Rect2(p - new Vector2(22, 25), new Vector2(44, 24)), new Color("947342")); DrawCircle(p + new Vector2(-16, 1), 8, Ink); DrawCircle(p + new Vector2(16, 1), 8, Ink); }
+                cart = new WorldModels.CartModel { Last = pos };
+                scene.AddChild(cart.Root); carts[order] = cart;
             }
-            ));
+            var moved = pos - cart.Last;
+            cart.Distance += moved.Length();
+            cart.Yaw = Mathf.LerpAngle(cart.Yaw, ActorAnimation.Yaw(moved, cart.Yaw), Math.Min(1, dt * 8));
+            cart.Last = pos;
+            cart.Root.Position = To3(pos);
+            cart.Root.Rotation = new Vector3(0, cart.Yaw, 0);
+            cart.Roll(cart.Distance);
+            // The courier walks with arms trailing back to the cart handle.
+            var stride = ActorAnimation.PoseAt(ActorAction.Walk, cart.Distance / 2.1f, true) with { RaiseL = -22, RaiseR = -22, OutL = 12, OutR = 12, ElbowL = 8, ElbowR = 8, Lean = 10 };
+            cart.Courier.Show(stride, null, false);
+            bool cash = !order.Buying && phase >= .5f;
+            cart.Cash.Visible = cash; cart.Goods.Visible = !cash;
         }
-        foreach (var entry in list.OrderBy(v => v.Depth)) entry.Draw();
-        if (BuildMode != "")
+        foreach (var gone in carts.Keys.Where(o => !World.S.Orders.Contains(o)).ToArray())
         {
-            var pos = ToWorld(Mouse).Round(); bool valid = World.PlacementBlock(BuildMode, pos) == null;
-            Diamond(Screen(pos), Zoom * 1.4f, valid ? new Color(.7f, .9f, .5f, .5f) : new Color(.9f, .3f, .2f, .5f));
-            DrawThing(new Thing { Kind = BuildMode, Pos = pos }, valid ? new Color(1, 1, 1, .65f) : new Color(1, .5f, .5f, .6f));
+            carts[gone].Root.QueueFree(); carts.Remove(gone);
         }
+    }
+
+    private void UpdateMarkers()
+    {
+        Mark(selectRing, World.Find(Selected), 0);
+        Mark(hoverRing, Hover != Selected ? World.Find(Hover) : null, .004f);
+        var worker = World.S.Workers.FirstOrDefault(w => w.Id == SelectedWorker);
+        workerRing.Visible = worker != null;
+        if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
+        playerRing.Visible = !World.Dead;
+        playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
+        foreach (var (kind, ghost) in ghosts) ghost.Root.Visible = kind == BuildMode;
+        placeTile.Visible = BuildMode != "";
+        if (BuildMode == "") return;
+        var at = ToWorld(Mouse).Round();
+        bool valid = World.PlacementBlock(BuildMode, at) == null;
+        if (!ghosts.TryGetValue(BuildMode, out var shown))
+        {
+            shown = WorldModels.Build(new Thing { Kind = BuildMode, Pos = at });
+            SetFade(shown.Root, .35f);
+            scene.AddChild(shown.Root); ghosts[BuildMode] = shown;
+        }
+        if (shown.Tint != (valid ? 1 : 0)) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid ? 1 : 0; }
+        shown.Root.Position = To3(at);
+        placeTile.Position = To3(at, .02f);
+        placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
+    }
+
+    private void Mark(MeshInstance3D ring, Thing? t, float lift)
+    {
+        ring.Visible = t != null;
+        if (t == null) return;
+        float radius = Math.Min(1.7f, HitsOf(t).Min(h => h.Radius) + .25f);
+        ring.Position = To3(t.Pos, .02f + lift);
+        ring.Scale = new Vector3(radius, 1, radius);
+    }
+
+    private void UpdateLighting()
+    {
         // Dusk deepens into full night and dawn fades out, so neither boundary jumps in brightness.
         float dayPhase = World.DayPhase, dusk = World.Data.NightStarts - .1f;
         float darkness = World.Night ? .65f : dayPhase > dusk ? .02f + (dayPhase - dusk) / .1f * .63f : dayPhase < .05f ? .65f - dayPhase / .05f * .63f : .02f;
-        if (darkness > 0)
+        night = Math.Clamp((darkness - .02f) / .63f, 0, 1);
+        sun.LightEnergy = Mathf.Lerp(.8f, .08f, night);
+        sun.LightColor = new Color("fff1dc").Lerp(new Color("8296d6"), night);
+        environment.AmbientLightColor = new Color("c7d3dc").Lerp(new Color("33447a"), night);
+        environment.AmbientLightEnergy = Mathf.Lerp(.32f, .3f, night);
+        environment.BackgroundColor = new Color("879c69").Lerp(new Color("1b2733"), night);
+    }
+
+    // ---------- 2D overlay: names, progress and the landmark guide ----------
+
+    private void Tag(Vector2 at, string text)
+    {
+        var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, 14);
+        overlay.DrawStyleBox(new StyleBoxFlat { BgColor = new Color(.12f, .18f, .15f, .86f), CornerRadiusTopLeft = 5, CornerRadiusTopRight = 5, CornerRadiusBottomLeft = 5, CornerRadiusBottomRight = 5 }, new Rect2(at - new Vector2(size.X / 2 + 6, 18), size + new Vector2(12, 6)));
+        overlay.DrawString(font, at - new Vector2(size.X / 2, 0), text, HorizontalAlignment.Left, -1, 14, new Color("f5ecd1"));
+    }
+
+    private void PaintOverlay()
+    {
+        if (World == null) return;
+        if (AnimationReview) { PaintReview(); return; }
+        foreach (var t in World.S.Things.Where(t => t.Processing && World.Data.Recipes.ContainsKey(t.Recipe)))
         {
-            DrawRect(GetViewportRect(), new Color(.05f, .10f, .22f, darkness));
-            foreach (var fire in World.S.Things.Where(t => t.Kind == "campfire" && t.Burn > 0 || t.Processing && t.Kind is "furnace" or "reinforced"))
-            {
-                var p = Screen(fire.Pos); float radius = fire.Kind == "campfire" ? 233 : 65;
-                for (int i = 40; i > 0; i--) Ellipse(p - new Vector2(0, 10) * Zoom, new Vector2(radius, radius * .5f) * Zoom * i / 40f, new Color(1, .66f, .24f, .006f));
-            }
+            var p = Screen(t.Pos); var r = World.Data.Recipes[t.Recipe];
+            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), new Color("2b4135"));
+            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), new Color("e5bf68"));
         }
+        // Only the hovered object is named; the side panel already names the selection.
+        var hovered = World.Find(Hover);
+        if (hovered != null) Tag(Screen(hovered.Pos, HitsOf(hovered).Max(h => h.Top) + .2f) - new Vector2(0, 8), hovered.Kind == "loose_iron" ? "Loose iron" : World.Data.Name(hovered.Kind));
+        foreach (var w in World.S.Workers.Where(w => w.Id == HoverWorker || w.Id == SelectedWorker))
+            Tag(Screen(w.Pos, 2.05f), w.Name);
         // The landmark guide follows the player's position rather than assuming they remain at spawn.
         string Direction(Vector2 target)
         {
-            var d = Iso(target - World.Player);
+            var d = Screen(target) - Screen(World.Player);
             if (d.Length() < 95) return "HERE";
             if (Math.Abs(d.X) > Math.Abs(d.Y) * 2) return d.X > 0 ? "→" : "←";
             if (Math.Abs(d.Y) > Math.Abs(d.X) * 2) return d.Y > 0 ? "↓" : "↑";
@@ -413,13 +642,6 @@ public partial class WorldView : Node2D
         }
         // Point only toward what the current objective sends the player to find.
         string? guide = World.S.Goal switch { 2 => $"IRON {Direction(new Vector2(30, 18))}", 5 => $"COAL {Direction(new Vector2(37, 20))}", _ => null };
-        if (guide != null) Text(new Vector2(25, GetViewportRect().Size.Y - 210), guide, 13, new Color("f4ecd3"));
-        // Drawn last so no sprite or night shading covers it.
-        if (tag is var (at, text))
-        {
-            var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, 14);
-            DrawStyleBox(new StyleBoxFlat { BgColor = new Color(.12f, .18f, .15f, .86f), CornerRadiusTopLeft = 5, CornerRadiusTopRight = 5, CornerRadiusBottomLeft = 5, CornerRadiusBottomRight = 5 }, new Rect2(at - new Vector2(size.X / 2 + 6, 18), size + new Vector2(12, 6)));
-            DrawString(font, at - new Vector2(size.X / 2, 0), text, HorizontalAlignment.Left, -1, 14, new Color("f5ecd1"));
-        }
+        if (guide != null) overlay.DrawString(font, new Vector2(25, GetViewport().GetVisibleRect().Size.Y - 210), guide, HorizontalAlignment.Left, -1, 13, new Color("f4ecd3"));
     }
 }

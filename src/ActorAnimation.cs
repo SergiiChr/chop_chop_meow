@@ -18,34 +18,134 @@ public enum ActorAction
     Attack
 }
 
-/// <summary>Pure actor animation selection and timing helpers.</summary>
+/// <summary>
+/// Joint angles in degrees for the humanoid rig.
+/// Raise lifts an arm forward from hanging (90 is horizontal, 180 overhead), Out swings it sideways (negative crosses the body),
+/// and Swing moves a thigh forward while Knee folds the shin back.
+/// </summary>
+public readonly record struct Pose(
+    float Lean = 0, float Twist = 0, float Head = 0,
+    float RaiseL = 6, float OutL = 7, float ElbowL = 12,
+    float RaiseR = 6, float OutR = 7, float ElbowR = 12,
+    float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0)
+{
+    public static Pose Lerp(Pose a, Pose b, float t) => new(
+        Mathf.Lerp(a.Lean, b.Lean, t), Mathf.Lerp(a.Twist, b.Twist, t), Mathf.Lerp(a.Head, b.Head, t),
+        Mathf.Lerp(a.RaiseL, b.RaiseL, t), Mathf.Lerp(a.OutL, b.OutL, t), Mathf.Lerp(a.ElbowL, b.ElbowL, t),
+        Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
+        Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t));
+}
+
+/// <summary>Pure actor animation selection, timing and keyframed poses.</summary>
 public static class ActorAnimation
 {
-    public const int Frames = 8;
-
-    public static int Frame(ActorAction action, float elapsed, int frameCount = Frames)
+    /// <summary>Seconds per loop; player action pulses last exactly one loop.</summary>
+    public static float Duration(ActorAction action) => action switch
     {
-        if (frameCount <= 0) throw new ArgumentOutOfRangeException(nameof(frameCount));
-        float fps = action switch
-        {
-            ActorAction.Idle => 4,
-            ActorAction.Walk => 10,
-            _ => 8
-        };
+        ActorAction.Idle => 3,
+        ActorAction.Walk or ActorAction.Carry => .8f,
+        ActorAction.SteelChop or ActorAction.SteelMine => .8f,
+        ActorAction.Gather => 1.2f,
+        ActorAction.Hammer => .6f,
+        ActorAction.Attack => .875f,
+        _ => 1
+    };
+
+    /// <summary>Position within the current loop, from 0 inclusive to 1 exclusive.</summary>
+    public static float Phase(ActorAction action, float elapsed)
+    {
         if (!float.IsFinite(elapsed)) return 0;
-        float cycle = (elapsed * fps) % frameCount;
-        if (cycle < 0) cycle += frameCount;
-        return (int)cycle;
+        float phase = elapsed / Duration(action) % 1;
+        return phase < 0 ? phase + 1 : phase;
     }
 
-    /// <summary>Maps a world movement vector into SE, SW, NE, NW sprite directions.</summary>
-    public static int Direction(Vector2 movement, int previous)
+    /// <summary>Turns world-plane movement into a rig yaw in radians; the rig faces +Z, which is world +Y.</summary>
+    public static float Yaw(Vector2 movement, float previous) =>
+        movement.LengthSquared() < 0.0001f ? previous : MathF.Atan2(movement.X, movement.Y);
+
+    /// <summary>The tool mesh an action shows in the right hand, or null for empty hands.</summary>
+    public static string? Tool(ActorAction action) => action switch
     {
-        if (movement.LengthSquared() < 0.0001f) return previous is >= 0 and <= 3 ? previous : 0;
-        float x = (movement.X - movement.Y) * 44;
-        float y = (movement.X + movement.Y) * 22;
-        if (x >= 0) return y >= 0 ? 0 : 2;
-        return y >= 0 ? 1 : 3;
+        ActorAction.Chop => "iron_axe",
+        ActorAction.SteelChop => "steel_axe",
+        ActorAction.Mine => "iron_pick",
+        ActorAction.SteelMine => "steel_pick",
+        ActorAction.Hammer => "hammer",
+        _ => null
+    };
+
+    private static readonly Pose Stance = new(SwingL: 16, KneeL: 16, SwingR: -10, KneeR: 10);
+
+    public static Pose PoseAt(ActorAction action, float elapsed, bool moving)
+    {
+        float p = Phase(action, elapsed);
+        float wave = MathF.Sin(p * Mathf.Tau);
+        switch (action)
+        {
+            case ActorAction.Walk:
+                return Stride(wave, p) with { RaiseL = 6 - wave * 26, RaiseR = 6 + wave * 26, ElbowL = 20, ElbowR = 20 };
+            case ActorAction.Carry:
+                var carry = new Pose(Lean: -4, RaiseL: 62, OutL: -6, ElbowL: 62, RaiseR: 62, OutR: -6, ElbowR: 62);
+                return moving ? Stride(wave, p) with { Lean = carry.Lean, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
+            case ActorAction.Chop or ActorAction.SteelChop:
+                var ready = Stance with { Lean = 6, RaiseL = 50, OutL = -24, ElbowL = 35, RaiseR = 55, OutR = -16, ElbowR = 25 };
+                return Keys(p, (0, ready),
+                    (.38f, ready with { Lean = -8, Twist = 24, RaiseL = 150, OutL = -26, ElbowL = 60, RaiseR = 168, OutR = -10, ElbowR = 45 }),
+                    (.52f, ready with { Lean = 18, Twist = -12, RaiseL = 80, OutL = -26, ElbowL = 14, RaiseR = 86, OutR = -12, ElbowR = 4 }),
+                    (.66f, ready with { Lean = 20, Twist = -14, RaiseL = 76, OutL = -26, ElbowL = 14, RaiseR = 80, OutR = -12, ElbowR = 6 }));
+            case ActorAction.Mine or ActorAction.SteelMine:
+                var guard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
+                return Keys(p, (0, guard),
+                    (.4f, guard with { Lean = -6, RaiseL = 160, OutL = -24, ElbowL = 50, RaiseR = 175, OutR = -10, ElbowR = 35 }),
+                    (.55f, guard with { Lean = 32, Head = 10, RaiseL = 34, OutL = -26, ElbowL = 10, RaiseR = 36, OutR = -12, ElbowR = 0, KneeL = 28, KneeR = 22 }),
+                    (.68f, guard with { Lean = 30, Head = 10, RaiseL = 32, OutL = -26, ElbowL = 12, RaiseR = 34, OutR = -12, ElbowR = 2, KneeL = 26, KneeR = 20 }));
+            case ActorAction.Gather:
+                var crouch = new Pose(Lean: 38, Head: 18, SwingL: 72, KneeL: 118, SwingR: 50, KneeR: 112);
+                // Reach with one hand, close it on the find and pull it in while the other hand reaches.
+                return Keys(p, (0, crouch with { RaiseR = 66, ElbowR = 6, OutR = -6, RaiseL = 24, ElbowL = 70 }),
+                    (.22f, crouch with { Lean = 44, RaiseR = 50, ElbowR = 34, OutR = -10, RaiseL = 30, ElbowL = 60 }),
+                    (.5f, crouch with { RaiseL = 66, ElbowL = 6, OutL = -6, RaiseR = 24, ElbowR = 70 }),
+                    (.72f, crouch with { Lean = 44, RaiseL = 50, ElbowL = 34, OutL = -10, RaiseR = 30, ElbowR = 60 }));
+            case ActorAction.Pump:
+                var lever = Stance with { Lean = 16, RaiseL = 78, OutL = -12, ElbowL = 42, RaiseR = 78, OutR = -12, ElbowR = 42 };
+                // A quick shove down on the lever, a short hold, then a slower lift as the bellows refill.
+                var pressed = lever with { Lean = 32, RaiseL = 44, ElbowL = 6, RaiseR = 44, ElbowR = 6, KneeL = 30, KneeR = 24 };
+                return Keys(p, (0, lever), (.35f, pressed), (.5f, pressed with { Lean = 30, KneeL = 27, KneeR = 21 }));
+            case ActorAction.Hammer:
+                var hold = Stance with { Lean = 15, RaiseL = 48, OutL = -16, ElbowL = 52, RaiseR = 70, OutR = -8, ElbowR = 50 };
+                return Keys(p, (0, hold),
+                    (.35f, hold with { Lean = 8, RaiseR = 150, ElbowR = 96 }),
+                    (.5f, hold with { Lean = 18, RaiseR = 58, ElbowR = 22 }),
+                    (.7f, hold with { Lean = 18, RaiseR = 60, ElbowR = 24 }));
+            case ActorAction.Attack:
+                var fists = Stance with { Twist = 10, RaiseL = 48, OutL = -14, ElbowL = 112, RaiseR = 44, OutR = -14, ElbowR = 115 };
+                return Keys(p, (0, fists),
+                    (.32f, fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
+                    (.5f, fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }));
+            default:
+                float breath = wave;
+                return new Pose(Lean: 1 + breath * .8f, Head: breath * 1.5f, OutL: 7 + breath, OutR: 7 + breath);
+        }
+    }
+
+    private static Pose Stride(float wave, float phase)
+    {
+        float lift = MathF.Cos(phase * Mathf.Tau);
+        return new Pose(Lean: 4, SwingL: wave * 26, SwingR: -wave * 26, KneeL: 8 + Math.Max(0, lift) * 34, KneeR: 8 + Math.Max(0, -lift) * 34);
+    }
+
+    /// <summary>Loops smoothly through keys sorted by phase; the last key eases back into the first.</summary>
+    private static Pose Keys(float phase, params (float At, Pose Pose)[] keys)
+    {
+        for (int i = 0; i < keys.Length; i++)
+        {
+            var from = keys[i];
+            var (toAt, toPose) = i + 1 < keys.Length ? keys[i + 1] : (1f, keys[0].Pose);
+            if (phase < from.At || phase >= toAt) continue;
+            float t = (phase - from.At) / (toAt - from.At);
+            return Pose.Lerp(from.Pose, toPose, t * t * (3 - 2 * t));
+        }
+        return keys[0].Pose;
     }
 
     public static ActorAction PlayerAction(
@@ -68,13 +168,7 @@ public static class ActorAnimation
                 "iron_axe" => ActorAction.Chop,
                 _ => ActorAction.Gather
             },
-            "stone" => tool switch
-            {
-                "steel_tools" => ActorAction.SteelMine,
-                "iron_pick" => ActorAction.Mine,
-                _ => ActorAction.Gather
-            },
-            "iron" or "coal" => tool switch
+            "stone" or "iron" or "coal" => tool switch
             {
                 "steel_tools" => ActorAction.SteelMine,
                 "iron_pick" => ActorAction.Mine,
@@ -107,7 +201,8 @@ public static class ActorAnimation
         };
     }
 
-    private static string? BestTool(Inventory backpack, string? selectedTool, string ironTool)
+    /// <summary>The carried tool the player would use on a resource, preferring the selected hotbar tool.</summary>
+    public static string? BestTool(Inventory backpack, string? selectedTool, string ironTool)
     {
         if (selectedTool is "steel_tools" && backpack[selectedTool] > 0) return selectedTool;
         if (selectedTool == ironTool && backpack[selectedTool] > 0)
