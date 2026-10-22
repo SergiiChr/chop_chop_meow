@@ -1,0 +1,117 @@
+using System;
+using ChopChopMeow;
+using Godot;
+
+/// <summary>Simulation checks for worker animation state transitions.</summary>
+public static class WorkerStateChecks
+{
+    public static void Run(GameData data)
+    {
+        CheckGatherAndReassign(data);
+        CheckStrikeResetsWorkState(data);
+        CheckBlockedPath(data);
+        CheckFurnacePumping(data);
+        CheckSaveRoundTrip(data);
+    }
+
+    private static void Require(bool condition, string message)
+    {
+        if (!condition) throw new InvalidOperationException($"Worker state check failed: {message}");
+    }
+
+    private static World EmptyWorld(GameData data) => new(data, false);
+
+    private static Worker AddWorker(World world, Vector2 position)
+    {
+        var worker = new Worker { Id = world.S.NextId++, Name = "State check worker", Pos = position };
+        world.S.Workers.Add(worker);
+        return worker;
+    }
+
+    private static void CheckGatherAndReassign(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var tree = world.Add("tree", new Vector2(10, 10), 12);
+        world.Add("chest", new Vector2(12, 10));
+        var worker = AddWorker(world, tree.Pos);
+        world.Assign(worker, tree);
+
+        world.Tick(.25f);
+        Require(worker.WorkState == WorkerWorkState.Gathering,
+                "a worker at its resource should enter gathering state through World.Tick");
+
+        world.Assign(worker, null);
+        Require(worker.WorkState == WorkerWorkState.Idle,
+                "reassigning a working worker to idle should clear its transient work state");
+        world.Tick(.25f);
+        Require(worker.WorkState == WorkerWorkState.Idle,
+                "an available worker should remain idle after its next simulation tick");
+    }
+
+    private static void CheckStrikeResetsWorkState(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var tree = world.Add("tree", new Vector2(10, 10), 12);
+        world.Add("chest", new Vector2(12, 10));
+        var worker = AddWorker(world, tree.Pos);
+        world.Assign(worker, tree);
+        worker.WorkState = WorkerWorkState.Gathering;
+        worker.WageDebt = data.DailyWage;
+
+        world.Tick(.25f);
+        Require(worker.WorkState == WorkerWorkState.Idle,
+                "a worker on strike should have no active work animation state");
+    }
+
+    private static void CheckBlockedPath(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var tree = world.Add("tree", new Vector2(47, 47), 12);
+        world.Add("chest", new Vector2(42, 42));
+        var worker = AddWorker(world, new Vector2(40, 40));
+        world.Assign(worker, tree);
+
+        for (int i = 0; i < 80 && worker.WorkState != WorkerWorkState.Blocked; i++) world.Tick(.25f);
+        Require(worker.WorkState == WorkerWorkState.Blocked,
+                "a worker with no valid route to its destination should enter blocked state through Walk");
+    }
+
+    private static void CheckFurnacePumping(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var furnace = world.Add("reinforced", new Vector2(20, 20));
+        var bellowsWorker = AddWorker(world, furnace.Pos + new Vector2(.7f, .2f));
+        var secondWorker = AddWorker(world, furnace.Pos);
+        world.Assign(bellowsWorker, furnace);
+        world.Assign(secondWorker, furnace);
+
+        world.Tick(.25f);
+        Require(bellowsWorker.WorkState == WorkerWorkState.Pumping,
+                "the assigned furnace bellows operator should enter pumping state through World.Tick");
+    }
+
+    private static void CheckSaveRoundTrip(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var tree = world.Add("tree", new Vector2(10, 10), 12);
+        world.Add("chest", new Vector2(12, 10));
+        var worker = AddWorker(world, tree.Pos);
+        world.Assign(worker, tree);
+        world.Tick(.25f);
+        Require(worker.WorkState == WorkerWorkState.Gathering,
+                "save fixture should contain a worker actively gathering");
+
+        string save = world.Serialize();
+        Require(!save.Contains("WorkState", StringComparison.Ordinal),
+                "transient worker work state should be excluded from saved data");
+
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(save);
+        var loadedWorker = loaded.S.Workers[0];
+        Require(loadedWorker.WorkState == WorkerWorkState.Idle,
+                "a loaded worker should start with the default transient state");
+        loaded.Tick(.25f);
+        Require(loadedWorker.WorkState == WorkerWorkState.Gathering,
+                "the next world tick should recompute a loaded worker's active state");
+    }
+}
