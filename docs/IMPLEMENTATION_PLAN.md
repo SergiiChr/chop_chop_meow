@@ -10,8 +10,8 @@ A single-player isometric woodland survival and production game. The player gath
 - Simulation of resources, inventories, construction, recipes, tool progression, furnaces and bellows, storage filters, market pricing and delayed cart settlement, worker assignments and wages, food/water, day/night, wolves and campfire protection, death recovery, and JSON save/load.
 - Isometric movement, gathering, building placement, selection, inventory and station interfaces, worker management, and guided objectives.
 - Data-driven item/building/recipe values in `data/game.json`.
-- Selected smooth illustrated sprite direction. The two art samples are in `docs/art/`; current rendered atlas assets are in `assets/`.
-- Refined shared-scale environment, quieter grass/trail, natural pond, sparse resource groups, human-sized hut doorway and separate blue-overall worker skin.
+- 3D world with code-built low-poly models replacing the original illustrated sprites; modern DIY buildings, three tree variants, a jointed actor rig with keyframed actions, and illustrated icons kept for the interface. The 2D art samples remain in `docs/art/`.
+- Shared-scale environment, grass/trail, irregular pond, sparse resource groups, human-sized cabin doorway and separate blue-overall worker look.
 - Player stats live in inventory; a saved nine-slot Factorio-style hotbar supports item use, building plans and reassignment.
 - Deterministic headless simulation checks covering filters, worker gathering and rerouting, furnace hauling and bellows, market settlement, wages, death recovery, save state, and a resource-driven progression through hiring and worker delivery.
 

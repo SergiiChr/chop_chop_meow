@@ -170,7 +170,7 @@ public partial class Game : Node
         AddLabel("A small settlement begins with your own two hands. Shape iron, master the bellows, and send your first steel tools to the village.", 16, Muted);
         AddLabel("FIRST STEPS", 14);
         AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Pick up loose iron northeast of the clearing.\n4  Press Esc any time to see your current goal.");
-        AddLabel("You begin with an iron axe, 10 berries and 6 wood. Drink at the pond to the west; gather water to carry. A fire and hut protect you after dark.", 15, Muted);
+        AddLabel("You begin with an iron axe, 10 berries and 6 wood. Drink at the pond to the west; gather water to carry. A fire and cabin protect you after dark.", 15, Muted);
         AddButton("Into the clearing", ClosePanel);
         if (Godot.FileAccess.FileExists(SavePath)) AddButton("Continue saved settlement", () => { Load(); ClosePanel(); });
         AddLabel("10–15 minute POC · single player · Linux", 13, Muted);
@@ -185,7 +185,7 @@ public partial class Game : Node
         AddLabel("Hire at a signpost (24 coins; 8/day). Worker → Work → click a resource. Building → Assign → select named villagers. Put inputs in storage for hauling. One furnace worker alternates hauling and pumping; with two, the first pumps while the second hauls. No accepting chest means work pauses safely.", 15, Muted);
         AddLabel("Empty filters allow everything. Input filters control worker deposits; output filters control worker withdrawals. Workers prefer explicitly matching input-filter chests before the nearest general chest. Manual transfers ignore automation filters. Hold Shift while transferring to move a full stack.", 15, Muted);
         AddLabel("STAY ALIVE", 16);
-        AddLabel("Food and water drain over time. Wolves fear campfires (5-tile radius) and huts. Feed fires with wood; each log adds 90s. Sleep in a hut at night; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
+        AddLabel("Food and water drain over time. Wolves fear campfires (5-tile radius) and cabins. Feed fires with wood; each log adds 90s. Sleep in a cabin at night; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
         AddLabel("Trade returns in 30 seconds. Prices fall when you sell and slowly recover. Sale proceeds arrive with the returning coin cart. Your world autosaves every 90 seconds; F5 saves immediately.", 15, Muted);
     }
     private string Needs(Dictionary<string, int> cost) => string.Join("  ·  ", cost.Select(p => $"{world.Data.Name(p.Key)} {world.S.Backpack[p.Key]}/{p.Value}"));
@@ -437,7 +437,8 @@ public partial class Game : Node
             bool right = Input.IsMouseButtonPressed(MouseButton.Right);
             if (gathering != null && right && direction == Vector2.Zero)
             {
-                if (!world.Near(gathering, 2.5f)) direction = (gathering.Pos - world.Player).Normalized();
+                // Step in close enough for the tool to reach the model; the pond edge keeps its wider reach.
+                if (!world.Near(gathering, gathering.Kind == "water" ? 2.5f : 1.35f)) direction = (gathering.Pos - world.Player).Normalized();
                 else { world.Gather(gathering, dt); if (world.GatherBlock(gathering) is string blocked) { Notify(blocked); gathering = null; } }
             }
             else { world.ResetGather(); if (!right) gathering = null; }

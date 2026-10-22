@@ -1,2 +1,0 @@
-# Offline art packaging only. Not required to launch or export the committed game.
-Pillow==12.3.0

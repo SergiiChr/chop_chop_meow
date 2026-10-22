@@ -8,11 +8,11 @@ public static class AnimationChecks
 {
     public static void Run()
     {
-        CheckFrameTiming();
-        CheckDirections();
+        CheckTiming();
+        CheckFacing();
         CheckPlayerActions();
         CheckWorkerActions();
-        CheckClipAssets();
+        CheckPoses();
     }
 
     private static void Require(bool condition, string message)
@@ -20,26 +20,22 @@ public static class AnimationChecks
         if (!condition) throw new InvalidOperationException($"Animation check failed: {message}");
     }
 
-    private static void CheckFrameTiming()
+    private static void CheckTiming()
     {
-        var frames = new HashSet<int>();
-        for (int i = 0; i < ActorAnimation.Frames; i++)
-            frames.Add(ActorAnimation.Frame(ActorAction.Chop, i / 8f));
-        Require(frames.Count == 8, "action timing should cover all eight frames");
-        Require(ActorAnimation.Frame(ActorAction.Chop, 1) == 0, "action animation should wrap after one second");
-        Require(ActorAnimation.Frame(ActorAction.Chop, -.125f) == 7, "negative elapsed time should wrap safely");
-        Require(ActorAnimation.Frame(ActorAction.Walk, .1f) == 1, "walking should advance at ten frames per second");
-        Require(ActorAnimation.Frame(ActorAction.Attack, .875f, 7) == 0, "seven-frame punching clips should wrap at their actual length");
-        Require(ActorAnimation.Frame(ActorAction.Idle, .25f) == 1, "idle should advance at four frames per second");
+        Require(ActorAnimation.Phase(ActorAction.Chop, .25f) == .25f, "a one-second chop should be a quarter through after .25s");
+        Require(ActorAnimation.Phase(ActorAction.Chop, 1) == 0, "action loops should wrap after their duration");
+        Require(Math.Abs(ActorAnimation.Phase(ActorAction.Chop, -.125f) - .875f) < 1e-5f, "negative elapsed time should wrap safely");
+        Require(Math.Abs(ActorAnimation.Phase(ActorAction.Walk, .4f) - .5f) < 1e-5f, "walking should loop every .8 seconds");
+        Require(ActorAnimation.Phase(ActorAction.Attack, ActorAnimation.Duration(ActorAction.Attack)) == 0, "punches should wrap at their own duration");
+        Require(ActorAnimation.Phase(ActorAction.Idle, float.NaN) == 0, "invalid time should fall back to the first pose");
     }
 
-    private static void CheckDirections()
+    private static void CheckFacing()
     {
-        Require(ActorAnimation.Direction(new Vector2(1, 0), 1) == 0, "eastward world movement should face southeast");
-        Require(ActorAnimation.Direction(new Vector2(0, 1), 0) == 1, "southward world movement should face southwest");
-        Require(ActorAnimation.Direction(new Vector2(0, -1), 0) == 2, "northward world movement should face northeast");
-        Require(ActorAnimation.Direction(new Vector2(-1, 0), 0) == 3, "westward world movement should face northwest");
-        Require(ActorAnimation.Direction(Vector2.Zero, 2) == 2, "zero movement should retain the previous direction");
+        Require(Math.Abs(ActorAnimation.Yaw(new Vector2(0, 1), 1) - 0) < 1e-5f, "world +Y movement should face the rig's +Z forward");
+        Require(Math.Abs(ActorAnimation.Yaw(new Vector2(1, 0), 0) - Mathf.Pi / 2) < 1e-5f, "eastward movement should turn a quarter turn");
+        Require(Math.Abs(Math.Abs(ActorAnimation.Yaw(new Vector2(0, -1), 0)) - Mathf.Pi) < 1e-5f, "northward movement should face backward");
+        Require(ActorAnimation.Yaw(Vector2.Zero, 2) == 2, "zero movement should retain the previous facing");
     }
 
     private static void CheckPlayerActions()
@@ -127,45 +123,24 @@ public static class AnimationChecks
             "available workers should remain idle");
     }
 
-    private static void CheckClipAssets()
+    private static void CheckPoses()
     {
-        ActorClips clips = ActorClips.Load();
-        Require(clips.NamedClips.Count == 16, "the animation catalog should expose all sixteen named clips");
-        foreach (var entry in clips.NamedClips)
+        foreach (var action in Enum.GetValues<ActorAction>())
         {
-            Require(entry.Value.BodyHeight > 0, $"{entry.Key} should have a positive body height");
-            for (int direction = 0; direction < ActorClip.Directions; direction++)
-            {
-                for (int frame = 0; frame < entry.Value.FrameCount; frame++)
-                    Require(entry.Value.Get(direction, frame).Texture is AtlasTexture, $"{entry.Key} should reference a baked region at direction {direction}, frame {frame}");
-                Require(DistinctFrameCount(entry.Value, direction) >= 6,
-                    $"{entry.Key} direction {direction} should contain at least six distinct frames");
-            }
+            var poses = new HashSet<Pose>();
+            for (int step = 0; step < 8; step++)
+                poses.Add(ActorAnimation.PoseAt(action, ActorAnimation.Duration(action) * step / 8, action == ActorAction.Carry));
+            Require(poses.Count >= 6, $"{action} should move through at least six distinct poses per loop, found {poses.Count}");
+            var start = ActorAnimation.PoseAt(action, 0, false);
+            var end = ActorAnimation.PoseAt(action, ActorAnimation.Duration(action) - .001f, false);
+            Require(Math.Abs(start.RaiseR - end.RaiseR) < 2 && Math.Abs(start.Lean - end.Lean) < 2 && Math.Abs(start.SwingL - end.SwingL) < 2,
+                $"{action} should loop without a visible jump");
         }
-
-        Require(ReferenceEquals(clips.Get(false, ActorAction.Idle), clips.NamedClips["player-walk"]),
-            "player idle should use the walk clip as a source atlas");
-        Require(ReferenceEquals(clips.Get(true, ActorAction.Gather), clips.NamedClips["worker-gather"]),
-            "worker hand gathering should use its dedicated clip");
-        Require(ReferenceEquals(clips.Get(false, ActorAction.Gather), clips.NamedClips["player-gather"]),
-            "player hand gathering should use its dedicated clip");
-        Require(ReferenceEquals(clips.Get(false, ActorAction.Attack), clips.NamedClips["player-attack"]),
-            "unarmed player attacks should use their dedicated punch clip");
-        Require(ReferenceEquals(clips.Get(false, ActorAction.SteelChop), clips.NamedClips["player-steel-axe"]),
-            "player steel chopping should select the steel axe clip");
-        Require(ReferenceEquals(clips.Get(true, ActorAction.SteelMine), clips.NamedClips["worker-pick"]),
-            "worker steel mining should use the available pick clip");
+        var windup = ActorAnimation.PoseAt(ActorAction.Chop, .38f, false);
+        var strike = ActorAnimation.PoseAt(ActorAction.Chop, .52f, false);
+        Require(windup.RaiseR > 150 && strike.RaiseR < 100, "the axe stroke should rise overhead and come down to the trunk");
+        Require(ActorAnimation.PoseAt(ActorAction.Gather, .3f, false).KneeL > 80, "hand gathering should crouch");
+        Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick" && ActorAnimation.Tool(ActorAction.Hammer) == "hammer" && ActorAnimation.Tool(ActorAction.Gather) == null,
+            "each action should show its own tool, and hand gathering none");
     }
-    private static int DistinctFrameCount(ActorClip clip, int direction)
-    {
-        var hashes = new HashSet<string>();
-        for (int frame = 0; frame < clip.FrameCount; frame++)
-        {
-            using var image = clip.Get(direction, frame).Texture.GetImage();
-            if (image.IsCompressed()) image.Decompress();
-            hashes.Add(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(image.GetData())));
-        }
-        return hashes.Count;
-    }
-
 }

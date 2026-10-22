@@ -80,7 +80,7 @@
       "description": "Burns wood. Protects a 5-tile radius from wolves."
     },
     "hut": {
-      "name": "Thatched hut",
+      "name": "Cabin",
       "cost": {
         "wood": 20,
         "stone": 8
