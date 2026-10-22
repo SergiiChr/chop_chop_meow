@@ -13,7 +13,6 @@ public partial class Game : Node
     private PanelContainer panel = null!;
     private VBoxContainer content = null!;
     private Label stats = null!;
-    private Label objective = null!;
     private Label toast = null!;
     private Label modeLabel = null!;
     private Label deathLabel = null!;
@@ -106,24 +105,19 @@ public partial class Game : Node
         var clock = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = -374, OffsetRight = -16, OffsetTop = 14, OffsetBottom = 52, MouseFilter = Control.MouseFilterEnum.Ignore };
         clock.AddThemeStyleboxOverride("panel", Box(new Color(.14f, .23f, .18f, .89f), 8, 9)); ui.AddChild(clock);
         stats = Label("", 15); stats.HorizontalAlignment = HorizontalAlignment.Center; clock.AddChild(stats);
-        var goalBox = new PanelContainer { OffsetLeft = 16, OffsetTop = 14, OffsetRight = 416, OffsetBottom = 110, MouseFilter = Control.MouseFilterEnum.Ignore };
-        goalBox.AddThemeStyleboxOverride("panel", Box(new Color(.14f, .23f, .18f, .89f), 8, 12)); ui.AddChild(goalBox);
-        objective = Label("", 15); goalBox.AddChild(objective);
-        modeLabel = Label("", 15); modeLabel.OffsetLeft = 20; modeLabel.OffsetTop = 130; modeLabel.OffsetRight = 550; modeLabel.OffsetBottom = 185; modeLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(modeLabel);
-        var bottom = new PanelContainer { AnchorTop = 1, AnchorBottom = 1, AnchorRight = 1, OffsetLeft = 16, OffsetRight = -16, OffsetTop = -150, OffsetBottom = -14 }; ui.AddChild(bottom);
-        var bars = new VBoxContainer(); bottom.AddChild(bars);
-        var actions = new HBoxContainer(); bars.AddChild(actions);
-        actions.AddChild(Button("Build · B", () => OpenPage("build"))); actions.AddChild(Button("Inventory · I", () => OpenPage("inventory")));
-        actions.AddChild(Button("Workers", () => OpenPage("workers"))); actions.AddChild(Button("Guide · Tab", () => OpenPage("help")));
-        actions.AddChild(Button("Pause · Esc", () => { paused = !paused; RefreshLive(); }));
-        var slots = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; bars.AddChild(slots);
+        modeLabel = Label("", 15); modeLabel.OffsetLeft = 20; modeLabel.OffsetTop = 18; modeLabel.OffsetRight = 550; modeLabel.OffsetBottom = 73; modeLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(modeLabel);
+        var bottom = new PanelContainer { AnchorTop = 1, AnchorBottom = 1, AnchorRight = 1, OffsetLeft = 16, OffsetRight = -16, OffsetTop = -92, OffsetBottom = -14 }; ui.AddChild(bottom);
+        var slots = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; bottom.AddChild(slots);
+        slots.AddChild(MenuIcon("hammer", "Build · B", () => OpenPage("build"))); slots.AddChild(MenuIcon("backpack", "Inventory · I", () => OpenPage("inventory")));
+        slots.AddChild(MenuIcon("hardhat", "Workers", () => OpenPage("workers"))); slots.AddChild(MenuIcon("book", "Guide · Tab", () => OpenPage("help")));
+        slots.AddChild(new VSeparator { CustomMinimumSize = new Vector2(24, 0) });
         for (int i = 0; i < 9; i++) { int slot = i; var button = Button("", () => UseHotbar(slot)); ConfigureHotbarButton(button, slot); slots.AddChild(button); }
-        toast = Label("", 15); toast.AnchorTop = 1; toast.AnchorBottom = 1; toast.OffsetLeft = 22; toast.OffsetTop = -198; toast.OffsetRight = 850; toast.OffsetBottom = -158; toast.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(toast);
-        panel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, AnchorBottom = 1, OffsetLeft = -374, OffsetRight = -16, OffsetTop = 64, OffsetBottom = -164 };
+        toast = Label("", 15); toast.AnchorTop = 1; toast.AnchorBottom = 1; toast.OffsetLeft = 22; toast.OffsetTop = -140; toast.OffsetRight = 850; toast.OffsetBottom = -100; toast.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(toast);
+        panel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, AnchorBottom = 1, OffsetLeft = -374, OffsetRight = -16, OffsetTop = 64, OffsetBottom = -106 };
         ui.AddChild(panel);
         deathLabel = Label("", 26); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.AddThemeConstantOverride("outline_size", 8); deathLabel.AddThemeColorOverride("font_outline_color", new Color("1c2b24")); deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
-        BuildEnding(); RefreshLive();
+        BuildEnding(); BuildMenu(); RefreshLive();
     }
     private void Notify(string message)
     {
@@ -135,9 +129,8 @@ public partial class Game : Node
         if (world == null || stats == null) return;
         int hour = (int)(world.DayPhase * 24 + 6) % 24;
         stats.Text = $"Day {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}  {(world.Night ? "NIGHT" : "DAYLIGHT")}";
-        var goal = world.Objective; objective.Text = $"{world.S.Goal + 1:00}  /  {goal.Title.ToUpperInvariant()}\n{goal.Hint}";
         deathLabel.Text = world.Dead ? $"You collapsed\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
-        modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : paused && !ending.Visible ? "PAUSED · Esc to resume" : "";
+        modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
         foreach (var update in live.ToArray()) update();
         RefreshHotbar();
     }
@@ -170,7 +163,7 @@ public partial class Game : Node
         AddLabel("The woods are quiet. For now.", 21);
         AddLabel("A small settlement begins with your own two hands. Shape iron, master the bellows, and send your first steel tools to the village.", 16, Muted);
         AddLabel("FIRST STEPS", 14);
-        AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Pick up loose iron northeast of the clearing.\n4  Follow the objective card at top left.");
+        AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Pick up loose iron northeast of the clearing.\n4  Press Esc any time to see your current goal.");
         AddLabel("You begin with an iron axe, 10 berries and 6 wood. Drink at the pond to the west; gather water to carry. A fire and hut protect you after dark.", 15, Muted);
         AddButton("Into the clearing", ClosePanel);
         if (Godot.FileAccess.FileExists(SavePath)) AddButton("Continue saved settlement", () => { Load(); ClosePanel(); });
@@ -351,13 +344,14 @@ public partial class Game : Node
     public override void _UnhandledInput(InputEvent ev)
     {
         if (world == null || view == null || ending.Visible) return;
+        if (menu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) CloseMenu(); return; }
         if (ev is InputEventKey key && key.Pressed && !key.Echo)
         {
             switch (key.PhysicalKeycode)
             {
                 case Key.Escape:
                     if (view.BuildMode != "" || assigningWorker > 0) { view.BuildMode = ""; assigningWorker = 0; }
-                    else if (panel.Visible) ClosePanel(); else paused = !paused;
+                    else if (panel.Visible) ClosePanel(); else OpenMenu();
                     RefreshLive(); break;
                 case Key.B: OpenPage("build"); break;
                 case Key.I: OpenPage("inventory"); break;

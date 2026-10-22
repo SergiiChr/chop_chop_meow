@@ -174,8 +174,8 @@ public static class SimulationChecks
     private static void CheckWorkerDetoursAroundPond(GameData data)
     {
         var world = EmptyWorld(data);
-        var tree = world.Add("tree", new Vector2(22, 22), 12);
-        var chest = world.Add("chest", new Vector2(10, 22));
+        var tree = world.Add("tree", World.Pond + new Vector2(World.PondRadius + 2, 0), 12);
+        var chest = world.Add("chest", World.Pond - new Vector2(World.PondRadius + 1.5f, 0));
         var worker = AddWorker(world, tree.Pos);
         world.Assign(worker, tree);
 
@@ -183,7 +183,7 @@ public static class SimulationChecks
         for (int i = 0; i < 700 && chest.Inventory["wood"] == 0; i++)
         {
             SafeTick(world, .25f);
-            stayedOutOfPond &= worker.Pos.DistanceTo(World.Pond) >= 2.7f;
+            stayedOutOfPond &= worker.Pos.DistanceTo(World.Pond) >= World.PondRadius;
         }
 
         Require(stayedOutOfPond,

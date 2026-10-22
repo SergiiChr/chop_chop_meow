@@ -40,15 +40,15 @@ The launcher keeps its Godot user-data directory under `.tools/xdg-data`; a laun
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans |
 | I | Open backpack; crafting is available when inspecting a station |
-| Tab | Open or close objectives and help |
+| Tab | Open or close the field guide |
 | 1–9 | Use the corresponding hotbar slot; defaults: axe, pickaxe, chest, campfire, furnace, anvil, bellows furnace, berries, water |
 | Space | Swing axe, or pump the selected nearby reinforced furnace |
 | F5 / F9 | Save / load |
-| Escape | Cancel placement/assignment, close a panel, or pause/resume |
+| Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save and load |
 | Mouse wheel | Zoom |
 | Click / Shift-click an inventory cell | Move one stack / every unit of that item |
 
-The interface also exposes visible buttons for common actions. Worker assignment starts from worker management; select a resource to assign a gatherer. Assigning a building job to a furnace enables material hauling and operation, with two workers splitting hauling and bellows work.
+The bottom bar holds icon buttons for building (hammer), the backpack, workers (hard hat) and the field guide (book), next to the hotbar. Worker assignment starts from worker management; select a resource to assign a gatherer. Assigning a building job to a furnace enables material hauling and operation, with two workers splitting hauling and bellows work.
 
 Health, hunger, thirst, coins, carrying capacity, and daily wages are shown in Inventory only. Inventories are grids of slots and every item stacks to 64: the backpack has 24 slots, chests and stations 18, and a worker carries one stack of up to 5. Clicking a berry or water cell in the backpack consumes one. Building plans are an icon grid; hovering a plan shows its description and what it still needs. Assign hotbar slots from **Inventory → Assign hotbar slots**. Slots reference carried items or building plans; they are not extra storage. Consumable slots use one item, building slots enter placement, and tools select a working reference. A selected raw-material stack can be deposited by clicking a nearby chest. Hotbar assignments persist in saves.
 

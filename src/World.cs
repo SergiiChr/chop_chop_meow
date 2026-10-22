@@ -95,7 +95,8 @@ public sealed class World
     public Action<string>? Notify;
     public const int MapSize = 48;
     public static readonly Vector2 Spawn = new(23, 24);
-    public static readonly Vector2 Pond = new(16, 22);
+    public static readonly Vector2 Pond = new(14, 22);
+    public const float PondRadius = 4.5f;
     private float gatherClock;
     private float attackClock;
     private float nightSpawn;
@@ -123,11 +124,12 @@ public sealed class World
         for (int i = 0; i < 110; i++)
         {
             var p = new Vector2(rng.Next(3, 45), rng.Next(3, 45));
-            if (p.DistanceTo(Spawn) < 5 || p.DistanceTo(Pond) < 4.3f || p.DistanceTo(new Vector2(30, 18)) < 6 || Math.Abs(p.Y - 24) < 1.5f) continue;
-            if (S.Things.Any(t => t.Pos.DistanceTo(p) < 2.3f)) continue;
+            if (p.DistanceTo(Spawn) < 8 || p.DistanceTo(Pond) < PondRadius + 3.5f || p.DistanceTo(new Vector2(30, 18)) < 6 || Math.Abs(p.Y - 24) < 1.5f) continue;
+            // Full-size trees need room for their crowns, so the woods stay walkable and readable.
+            if (S.Things.Any(t => t.Pos.DistanceTo(p) < 3.6f)) continue;
             Add("tree", p, 42);
         }
-        Add("tree", new(20, 27), 42); Add("tree", new(25, 28), 42); Add("tree", new(28, 24), 42);
+        Add("tree", new(28, 24), 42);
         Vector2[] stones = { new(19, 28), new(22, 30), new(26, 30), new(24, 33), new(18, 32), new(29, 33), new(21, 35) };
         foreach (var p in stones) Add("stone", p, 64);
         Vector2[] loose = { new(28, 19), new(30, 21), new(33, 20), new(29, 17), new(32, 17) };
@@ -135,13 +137,13 @@ public sealed class World
         foreach (var p in new Vector2[] { new(32, 13), new(35, 15), new(34, 11) }) Add("iron", p, 400);
         foreach (var p in new Vector2[] { new(37, 19), new(40, 21), new(37, 23) }) Add("coal", p, 400);
         foreach (var p in new Vector2[] { new(13, 28), new(16, 30), new(12, 32), new(15, 34), new(10, 29) }) Add("berries", p, 34);
-        Add("water", new(18.4f, 23), 9999);
+        Add("water", Pond + (Spawn - Pond).Normalized() * (PondRadius + .2f), 9999);
         S.Things.RemoveAll(t => t.Kind == "tree" && S.Things.Any(other => other.Id != t.Id && other.IsResource && other.Kind != "tree" && other.Pos.DistanceTo(t.Pos) < 1.3f));
         Say("Welcome to Bramblewick. Gather wood and stone; build a sheltered workshop.");
     }
     public bool CanStand(Vector2 p)
     {
-        if (p.X < 1 || p.Y < 1 || p.X > 46 || p.Y > 46 || p.DistanceTo(Pond) < 2.7f) return false;
+        if (p.X < 1 || p.Y < 1 || p.X > 46 || p.Y > 46 || p.DistanceTo(Pond) < PondRadius) return false;
         return !S.Things.Any(t => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" && t.Pos.DistanceTo(p) < Footprint(t.Kind));
     }
     public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "chest" or "anvil" => .45f, _ => .35f };
@@ -184,7 +186,7 @@ public sealed class World
         if (Dead) return "You are still recovering.";
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
         if (Player.DistanceTo(p) < 1.2f || Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
-        if (!CanStand(p) || p.DistanceTo(Pond) < 3.5f) return "Choose dry, open ground.";
+        if (!CanStand(p) || p.DistanceTo(Pond) < PondRadius + .8f) return "Choose dry, open ground.";
         if (S.Things.Any(t => t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + .65f : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource))) return "Leave room around resources and buildings.";
         if (!S.Backpack.Has(Data.Buildings[kind].Cost)) return "Missing materials in your backpack.";
         return null;
@@ -550,7 +552,9 @@ public sealed class World
     {
         while (!GoalComplete && S.Milestones.Contains(Milestones[S.Goal])) S.Goal++;
     }
-    public (string Title, string Hint) Objective => S.Goal switch
+    public static int GoalCount => Milestones.Length;
+    public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
+    public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch
     {
         0 => ("A place to begin", "Hold right mouse near trees and stones. You carry an iron axe. B opens building plans."),
         1 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A hut and campfire make nights safer."),

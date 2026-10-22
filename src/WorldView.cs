@@ -26,6 +26,7 @@ public partial class WorldView : Node2D
     private Image? detailImage;
     private Image atlasImage = null!;
     private Texture2D? extras;
+    private NoiseTexture2D ground = null!;
     private Font font = ThemeDB.FallbackFont;
     private int facing;
     private (Vector2 At, string Text)? tag;
@@ -46,6 +47,19 @@ public partial class WorldView : Node2D
         if (atlasImage.IsCompressed()) atlasImage.Decompress();
         if (ResourceLoader.Exists("res://assets/travel-atlas.png")) extras = GD.Load<Texture2D>("res://assets/travel-atlas.png");
         TextureFilter = TextureFilterEnum.Linear;
+        // Fine grass grain with occasional bare-earth flecks at the top of the ramp.
+        var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
+        var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
+        ground = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
+    }
+    /// <summary>Tiles a seamless grass-and-earth noise anchored to the world origin, so it scrolls and zooms with the map.</summary>
+    private void DrawGround()
+    {
+        float size = 512 * Zoom;
+        var origin = Screen(Vector2.Zero); var screen = GetViewportRect().Size;
+        for (float x = Mathf.PosMod(origin.X, size) - size; x < screen.X; x += size)
+            for (float y = Mathf.PosMod(origin.Y, size) - size; y < screen.Y; y += size)
+                DrawTextureRect(ground, new Rect2(x, y, size, size), false);
     }
     public Vector2 Center => GetViewportRect().Size * new Vector2(PanelOpen ? .38f : .5f, .52f);
     public static Vector2 Iso(Vector2 p) => new((p.X - p.Y) * 44, (p.X + p.Y) * 22);
@@ -55,11 +69,11 @@ public partial class WorldView : Node2D
         var q = (p - Center) / Zoom + Iso(World.Player);
         return new Vector2(q.X / 88 + q.Y / 44, q.Y / 44 - q.X / 88);
     }
-    // One scale anchor: an adult actor is 85 px. Small props stay below waist height,
+    // One scale anchor: an adult actor is 85 px; trees stand roughly four people tall. Small props stay below waist height,
     // the hut has an adult-sized doorway, and tree crowns rise well above the roof.
     private static float Height(Thing t) => t.Kind switch
     {
-        "tree" => 210 + t.Id % 5 * 7,
+        "tree" => 320 + t.Id % 5 * 14,
         "hut" => 270,
         "reinforced" => 98,
         "furnace" => 86,
@@ -68,7 +82,7 @@ public partial class WorldView : Node2D
         "berries" => 51,
         "signpost" => 87,
         "anvil" => 53,
-        "water" => 24,
+        "water" => 110,
         "campfire" => 48,
         _ => 46
     };
@@ -130,7 +144,7 @@ public partial class WorldView : Node2D
         var tint = overrideTint ?? Colors.White;
         if (t.Kind == "water")
         {
-            DrawCircle(p, 11 * Zoom, new Color("a4d7e2")); return;
+            return; // The pond art is the drinking spot; this object only provides the hit area.
         }
         if (t.IsResource && t.Remaining == 0 && t.Kind != "berries")
         {
@@ -178,6 +192,7 @@ public partial class WorldView : Node2D
     {
         if (World == null || atlas == null) return;
         DrawRect(GetViewportRect(), new Color("879c69"));
+        DrawGround();
         var viewport = GetViewportRect().Grow(260);
         // Broad, quiet grass patches replace the checkerboard of individually colored tiles.
         for (int x = 0; x < World.MapSize; x += 2) for (int y = 0; y < World.MapSize; y += 2)
@@ -206,15 +221,17 @@ public partial class WorldView : Node2D
             DrawColoredPolygon(edges.ToArray(), new Color(.67f, .60f, .43f, layer == 1 ? .28f : .14f));
         }
         var pond = Screen(ChopChopMeow.World.Pond);
+        // The pond art was sized for a 2.7-tile radius; scale it with the walkable boundary.
+        float pondScale = ChopChopMeow.World.PondRadius / 2.7f * Zoom;
         if (details != null)
         {
             float cell = details.GetWidth() / 2f;
-            DrawTextureRectRegion(details, new Rect2(pond - new Vector2(170, 170) * Zoom, new Vector2(340, 340) * Zoom), new Rect2(0, 0, cell, details.GetHeight()));
+            DrawTextureRectRegion(details, new Rect2(pond - new Vector2(170, 170) * pondScale, new Vector2(340, 340) * pondScale), new Rect2(0, 0, cell, details.GetHeight()));
         }
         else
         {
-            Ellipse(pond, new Vector2(150, 73) * Zoom, new Color("b1ae79"));
-            Ellipse(pond, new Vector2(130, 63) * Zoom, new Color("6e9b9b"));
+            Ellipse(pond, new Vector2(150, 73) * pondScale, new Color("b1ae79"));
+            Ellipse(pond, new Vector2(130, 63) * pondScale, new Color("6e9b9b"));
         }
         tag = null;
         var list = new List<(float Depth, Action Draw)>();

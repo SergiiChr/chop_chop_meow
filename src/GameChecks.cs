@@ -47,6 +47,10 @@ public partial class Game
         try
         {
             await Frames(4); ClosePanel();
+            await KeyStroke(Key.Escape);
+            UIRequire(menu.Visible && paused && HasLabel(menu, World.ObjectiveFor(world.S.Goal).Title), "Esc must open the pause menu with the current goal.");
+            await KeyStroke(Key.Escape);
+            UIRequire(!menu.Visible && !paused, "Esc must close the pause menu and resume.");
             var start = world.Player;
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
             await ToSignal(GetTree().CreateTimer(.3), SceneTreeTimer.SignalName.Timeout);
