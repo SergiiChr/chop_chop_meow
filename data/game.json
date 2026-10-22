@@ -1,0 +1,181 @@
+{
+  "daySeconds": 420,
+  "nightStarts": 0.7,
+  "tradeSeconds": 30,
+  "hireCost": 24,
+  "dailyWage": 8,
+  "gatherSeconds": 2.0,
+  "items": {
+    "wood": {
+      "name": "Wood",
+      "price": 1.5,
+      "color": "af8053"
+    },
+    "stone": {
+      "name": "Stone",
+      "price": 1.2,
+      "color": "aab2af"
+    },
+    "iron_ore": {
+      "name": "Iron ore",
+      "price": 3,
+      "color": "cc8a60"
+    },
+    "coal": {
+      "name": "Mined coal",
+      "price": 4,
+      "color": "81818c"
+    },
+    "iron_bar": {
+      "name": "Iron bar",
+      "price": 9,
+      "color": "c2c9c9"
+    },
+    "steel_bar": {
+      "name": "Steel bar",
+      "price": 25,
+      "color": "b5d8e4"
+    },
+    "iron_axe": {
+      "name": "Iron axe",
+      "price": 16,
+      "color": "c9b68c"
+    },
+    "iron_pick": {
+      "name": "Iron pickaxe",
+      "price": 25,
+      "color": "c9b68c"
+    },
+    "steel_tools": {
+      "name": "Steel tools",
+      "price": 85,
+      "color": "e7c978"
+    },
+    "berries": {
+      "name": "Berries",
+      "price": 3,
+      "color": "e49488"
+    },
+    "water": {
+      "name": "Fresh water",
+      "price": 2,
+      "color": "88cbe0"
+    }
+  },
+  "buildings": {
+    "chest": {
+      "name": "Storage chest",
+      "cost": {
+        "wood": 8
+      },
+      "description": "160 items. Separate input/output filters for workers."
+    },
+    "campfire": {
+      "name": "Campfire",
+      "cost": {
+        "wood": 6,
+        "stone": 4
+      },
+      "description": "Burns wood. Protects a 5-tile radius from wolves."
+    },
+    "hut": {
+      "name": "Thatched hut",
+      "cost": {
+        "wood": 20,
+        "stone": 8
+      },
+      "description": "Shelter. Sleep until dawn, at the cost of food and water."
+    },
+    "furnace": {
+      "name": "Stone furnace",
+      "cost": {
+        "stone": 16,
+        "wood": 6
+      },
+      "description": "Smelts iron ore. Uses wood or mined coal as fuel."
+    },
+    "anvil": {
+      "name": "Anvil",
+      "cost": {
+        "iron_bar": 4,
+        "stone": 6
+      },
+      "description": "Forge iron axes, pickaxes and steel tools."
+    },
+    "reinforced": {
+      "name": "Bellows furnace",
+      "cost": {
+        "stone": 20,
+        "iron_bar": 5,
+        "wood": 8
+      },
+      "description": "Steel from iron + mined coal. Coal fuel only. Pump bellows to reach 80\u00b0."
+    },
+    "signpost": {
+      "name": "Village signpost",
+      "cost": {
+        "wood": 10,
+        "stone": 4
+      },
+      "description": "Trade by cart. Hire and manage neighboring villagers."
+    }
+  },
+  "recipes": {
+    "iron_bar": {
+      "name": "Smelt iron",
+      "station": "furnace",
+      "inputs": {
+        "iron_ore": 2
+      },
+      "output": "iron_bar",
+      "amount": 1,
+      "seconds": 8
+    },
+    "steel_bar": {
+      "name": "Smelt steel",
+      "station": "reinforced",
+      "inputs": {
+        "iron_bar": 2,
+        "coal": 2
+      },
+      "output": "steel_bar",
+      "amount": 1,
+      "seconds": 10
+    },
+    "iron_axe": {
+      "name": "Iron axe",
+      "station": "anvil",
+      "inputs": {
+        "iron_bar": 2,
+        "wood": 2
+      },
+      "output": "iron_axe",
+      "amount": 1,
+      "seconds": 3
+    },
+    "iron_pick": {
+      "name": "Iron pickaxe",
+      "station": "anvil",
+      "inputs": {
+        "iron_bar": 3,
+        "wood": 2
+      },
+      "output": "iron_pick",
+      "amount": 1,
+      "seconds": 4
+    },
+    "steel_tools": {
+      "name": "Steel tools",
+      "station": "anvil",
+      "inputs": {
+        "steel_bar": 2,
+        "wood": 2
+      },
+      "output": "steel_tools",
+      "amount": 1,
+      "seconds": 6
+    }
+  },
+  "hungerPerSecond": 0.12,
+  "thirstPerSecond": 0.16
+}
