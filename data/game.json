@@ -5,6 +5,7 @@
   "hireCost": 24,
   "dailyWage": 8,
   "gatherSeconds": 2.0,
+  "respawnSeconds": 30,
   "items": {
     "wood": {
       "name": "Wood",
@@ -68,7 +69,7 @@
       "cost": {
         "wood": 8
       },
-      "description": "160 items. Separate input/output filters for workers."
+      "description": "18 slots of 64. Separate input/output filters for workers."
     },
     "campfire": {
       "name": "Campfire",

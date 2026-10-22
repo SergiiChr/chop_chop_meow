@@ -68,8 +68,8 @@ public static class SimulationChecks
 
     private static void CheckInventoryFilters(GameData data)
     {
-        var source = new Inventory { Capacity = 12 };
-        var destination = new Inventory { Capacity = 12 };
+        var source = new Inventory { Slots = 1 };
+        var destination = new Inventory { Slots = 1 };
         source.Add("iron_bar", 4);
         source.OutputFilter.Add("wood");
         destination.InputFilter.Add("wood");
@@ -118,7 +118,7 @@ public static class SimulationChecks
     private static void CheckWorkerGatherAndRetarget(GameData data)
     {
         var world = EmptyWorld(data);
-        var tree = world.Add("tree", new Vector2(10, 10), 6);
+        var tree = world.Add("tree", new Vector2(10, 10), 5);
         var general = world.Add("chest", new Vector2(8.5f, 10));
         var filtered = world.Add("chest", new Vector2(13, 10));
         filtered.Inventory.InputFilter.Add("wood");
@@ -126,7 +126,7 @@ public static class SimulationChecks
         world.Assign(worker, tree);
 
         SafeTick(world, data.GatherSeconds * 1.6f + .3f);
-        Require(worker.Bag["wood"] == 6 && tree.Remaining == 0,
+        Require(worker.Bag["wood"] == 5 && tree.Remaining == 0,
                 "gathering worker should collect actual wood from its assigned resource");
         SafeTick(world, .1f);
         Require(worker.Destination == filtered.Id,
@@ -137,10 +137,10 @@ public static class SimulationChecks
         filtered.Inventory.InputFilter.Clear();
         filtered.Inventory.InputFilter.Add("stone");
         SafeTick(world, .1f);
-        Require(worker.Destination == general.Id && worker.Bag["wood"] == 6,
+        Require(worker.Destination == general.Id && worker.Bag["wood"] == 5,
                 "worker should retarget in transit when the destination filter changes");
         for (int i = 0; i < 32 && general.Inventory["wood"] == 0; i++) SafeTick(world, .25f);
-        Require(general.Inventory["wood"] == 6 && filtered.Inventory["wood"] == 0 && worker.Bag["wood"] == 0,
+        Require(general.Inventory["wood"] == 5 && filtered.Inventory["wood"] == 0 && worker.Bag["wood"] == 0,
                 "retargeted load should reach the newly accepting chest without leaking into the old one");
     }
 
@@ -188,7 +188,7 @@ public static class SimulationChecks
 
         Require(stayedOutOfPond,
                 "worker pathing should route around the pond without entering its blocked radius");
-        Require(chest.Inventory["wood"] >= 6 && worker.Bag["wood"] == 0,
+        Require(chest.Inventory["wood"] >= worker.Bag.StackSize && worker.Bag["wood"] == 0,
                 "worker assigned across the pond should eventually gather wood and deliver it to accepting storage");
     }
 
@@ -274,6 +274,12 @@ public static class SimulationChecks
         world.S.Coins = data.DailyWage;
         world.SettleDebt(worker);
         Require(worker.WageDebt == 0, "paying the full owed wage should clear the strike debt");
+        world.S.Coins = 0;
+        world.S.Time = data.DaySeconds * (world.Day + 1) - .1f;
+        SafeTick(world, .2f);
+        world.S.Time = data.DaySeconds * (world.Day + 1) - .1f;
+        SafeTick(world, .2f);
+        Require(worker.WageDebt == data.DailyWage, "a striking worker should not keep adding wages to the debt");
     }
 
     private static void CheckMarketRoundTrip(GameData data)
@@ -354,8 +360,15 @@ public static class SimulationChecks
         var grave = world.S.Things.LastOrDefault(t => t.Kind == "grave");
         Require(grave != null && grave.Pos == new Vector2(9, 12) && grave.Inventory["iron_ore"] == 7,
                 "death should place carried items in a recoverable box at the death location");
-        Require(world.Player == World.Spawn && world.S.Backpack.Count == 0 && world.S.Health == 100,
-                "death should respawn the player and replace the emptied backpack");
+        Require(world.Dead && world.S.RespawnIn == data.RespawnSeconds && world.S.Backpack.Count == 0,
+                "death should start the respawn timer and replace the emptied backpack");
+        world.MovePlayer(Vector2.One);
+        Require(world.Player == new Vector2(9, 12), "a collapsed player must not move before respawning");
+        SafeTick(world, data.RespawnSeconds - .5f);
+        Require(world.Dead && world.Player == new Vector2(9, 12), "the player must stay down for the whole respawn timer");
+        SafeTick(world, 1);
+        Require(!world.Dead && world.Player == World.Spawn && world.S.Health == 100,
+                "the player should respawn healthy at the clearing once the timer ends");
 
         var saved = EmptyWorld(data);
         var furnace = saved.Add("furnace", new Vector2(14, 17));
@@ -414,7 +427,7 @@ public static class SimulationChecks
     {
         var world = EmptyWorld(data);
         var furnace = world.Add("furnace", new Vector2(10, 10));
-        furnace.Inventory.Capacity = 4;
+        furnace.Inventory.Slots = 2;
         world.Player = furnace.Pos;
         world.S.Backpack.Add("iron_ore", 2);
         world.S.Backpack.Add("wood", 1);
@@ -423,13 +436,13 @@ public static class SimulationChecks
         Require(furnace.Processing && furnace.Inventory.Count == 0,
                 "furnace should consume a valid batch before cooking begins");
 
-        furnace.Inventory.Add("stone", 4);
+        furnace.Inventory.Add("stone", 128);
         float cookSeconds = data.Recipes["iron_bar"].Seconds;
         world.Tick(cookSeconds + 1);
         Require(furnace.Processing && Math.Abs(furnace.Progress - cookSeconds) < .01f && furnace.Inventory["iron_bar"] == 0,
                 "a completed batch must remain pending at full progress when the station has no output capacity");
 
-        furnace.Inventory.Remove("stone", 1);
+        furnace.Inventory.Remove("stone", 64);
         world.Tick(.25f);
         Require(!furnace.Processing && furnace.Progress == 0 && furnace.Inventory["iron_bar"] == 1,
                 "pending output should be added exactly once as soon as one slot becomes available");
@@ -498,6 +511,7 @@ public static class SimulationChecks
             var recovery = world.S.Things.LastOrDefault(t => t.Kind == "grave");
             Require(recovery != null && recovery.Pos == new Vector2(12, 13) && recovery.Inventory["berries"] == 2 && recovery.Inventory["water"] == 1,
                     $"{cause} death should recover the player's carried items at the collapse location");
+            SafeTick(world, data.RespawnSeconds + .1f);
             Require(world.Player == World.Spawn && world.S.Health == 100,
                     $"{cause} death should respawn the player in a healthy state");
         }

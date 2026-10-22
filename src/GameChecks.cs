@@ -11,6 +11,7 @@ public partial class Game
     {
         for (int i = 0; i < count; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
     }
+    private async Task Seconds(double seconds) => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
     private async Task KeyStroke(Key key)
     {
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = true });
@@ -27,6 +28,7 @@ public partial class Game
         }
         return null;
     }
+    private Button? Named(string name) => panel.FindChild(name, true, false) as Button;
     private bool HasLabel(Node parent, string text)
     {
         foreach (var child in parent.GetChildren())
@@ -72,8 +74,10 @@ public partial class Game
             await KeyStroke(Key.Key9);
             UIRequire(world.S.Backpack["water"] == 0 && world.S.Thirst > 20, "Key 9 must consume carried water and restore thirst.");
             await KeyStroke(Key.B); UIRequire(page == "build" && panel.Visible, "B must open the building plans.");
-            var plan = FindButton(panel, "Storage chest"); UIRequire(plan != null, "Building plans must expose storage construction.");
-            plan!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            var plan = Named("build_chest"); UIRequire(plan != null, "Building plans must expose storage construction.");
+            plan!.EmitSignal(Control.SignalName.MouseEntered); await Frames();
+            UIRequire(HasLabel(panel, "Needs: Wood") && HasLabel(panel, "18 slots"), "Hovering a plan must show its description and required resources.");
+            plan.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(view.BuildMode == "chest" && !panel.Visible, "Choosing a plan must enter placement mode.");
             Vector2 place = Vector2.Zero;
             for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++)
@@ -102,7 +106,7 @@ public partial class Game
             FindButton(panel, "1")!.EmitSignal(BaseButton.SignalName.Pressed);
             await Frames();
             int carriedBeforeAssignment = world.S.Backpack.Count;
-            FindButton(panel, "Plan: Thatched hut")!.EmitSignal(BaseButton.SignalName.Pressed);
+            Named("assign_hut")!.EmitSignal(BaseButton.SignalName.Pressed);
             await Frames();
             UIRequire(world.S.HotbarSlots[0] == "hut" && world.S.Backpack.Count == carriedBeforeAssignment, "Rebinding a hotbar slot must store a plan reference without creating items.");
             await KeyStroke(Key.Tab); UIRequire(page == "help", "Tab must open the field guide.");
@@ -118,6 +122,26 @@ public partial class Game
             UIRequire(world.Player.DistanceTo(savedPosition) < .01f && world.S.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] > 0), "F9 must restore position and stored items from disk.");
             UIRequire(world.S.HotbarSlots.SequenceEqual(savedSlots) && world.S.ActiveHotbar == savedActiveSlot, "F5 and F9 must preserve hotbar references and selection.");
             UIRequire(HasLabel(panel, "Coins") && HasLabel(panel, "Health") && HasLabel(panel, "Hunger") && HasLabel(panel, "Thirst") && HasLabel(panel, "Capacity") && HasLabel(panel, "Daily wages"), "Inventory must contain all player stats, capacity and wages.");
+            UIRequire(panel.FindChildren("slot_*", "Button", true, false).Count == world.S.Backpack.Slots, "The backpack must show one grid cell per slot.");
+            world.S.Backpack.Add("berries", 2); RefreshLive();
+            var berryCell = panel.FindChildren("slot_*", "Button", true, false).OfType<Button>().FirstOrDefault(c => c.TooltipText.StartsWith("Berries"));
+            int berriesBeforeClick = world.S.Backpack["berries"];
+            UIRequire(berryCell != null, "Carried berries must appear as a grid cell.");
+            berryCell!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            UIRequire(world.S.Backpack["berries"] == berriesBeforeClick - 1, "Clicking a berry cell must eat one berry.");
+
+            world.S.Health = -1; await Seconds(.3);
+            UIRequire(world.Dead && deathLabel.Text.Contains("Respawning in"), "Death must show the respawn countdown.");
+            world.S.RespawnIn = .01f; await Seconds(.3);
+            UIRequire(!world.Dead && deathLabel.Text == "", "The countdown must clear once the player respawns.");
+
+            world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools", "sold_steel", "hired", "assigned" });
+            await Frames(3);
+            UIRequire(ending.Visible && paused, "Completing the goal chain must show the ending and pause the world.");
+            ((Button)ending.FindChild("keep_playing", true, false)).EmitSignal(BaseButton.SignalName.Pressed); await Frames(3);
+            UIRequire(!ending.Visible && !paused && world.S.EndingShown, "Keep playing must close the ending and resume.");
+            await Frames(3);
+            UIRequire(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
             DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SavePath));
             GD.Print("UI-TEST PASS"); GetTree().Quit();
         }

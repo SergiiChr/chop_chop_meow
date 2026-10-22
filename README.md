@@ -46,17 +46,19 @@ The launcher keeps its Godot user-data directory under `.tools/xdg-data`; a laun
 | F5 / F9 | Save / load |
 | Escape | Cancel placement/assignment, close a panel, or pause/resume |
 | Mouse wheel | Zoom |
-| Shift while transferring | Move a full stack |
+| Click / Shift-click an inventory cell | Move one stack / every unit of that item |
 
 The interface also exposes visible buttons for common actions. Worker assignment starts from worker management; select a resource to assign a gatherer. Assigning a building job to a furnace enables material hauling and operation, with two workers splitting hauling and bellows work.
 
-Health, hunger, thirst, coins, carrying capacity, and daily wages are shown in Inventory only. Assign hotbar slots from **Inventory → Assign hotbar slots**. Slots reference carried items or building plans; they are not extra storage. Consumable slots use one item, building slots enter placement, and tools select a working reference. A selected raw-material stack can be deposited by clicking a nearby chest. Hotbar assignments persist in saves.
+Health, hunger, thirst, coins, carrying capacity, and daily wages are shown in Inventory only. Inventories are grids of slots and every item stacks to 64: the backpack has 24 slots, chests and stations 18, and a worker carries one stack of up to 5. Clicking a berry or water cell in the backpack consumes one. Building plans are an icon grid; hovering a plan shows its description and what it still needs. Assign hotbar slots from **Inventory → Assign hotbar slots**. Slots reference carried items or building plans; they are not extra storage. Consumable slots use one item, building slots enter placement, and tools select a working reference. A selected raw-material stack can be deposited by clicking a nearby chest. Hotbar assignments persist in saves.
 
 ## What the prototype includes
 
+Death drops your backpack in a recovery box and respawns you at the clearing after 30 seconds; emptied boxes disappear and workers never use them as storage. Completing the goal chain shows an ending screen with Restart and Keep playing.
+
 The opening progression covers hand gathering, construction, food and water, day/night, shelter, mining, iron and steel production, village trade, and worker hiring. The basic furnace accepts wood or mined coal as fuel. The reinforced furnace uses mined coal only and requires heat from manual or worker-operated bellows. Charcoal production is not implemented, and charcoal cannot substitute for mined coal.
 
-Market orders settle after a visible 30-second cart trip. Prices respond to supply and demand. Workers are individual entities with assignments, wages, cargo, and visible work status. Storage input filters govern automated deposits; output filters govern worker withdrawals. Empty filters allow all items. Workers prefer explicitly accepting chests and reroute cargo when filters change. Manual inventory transfers ignore these automation filters.
+Market orders settle after a visible 30-second cart trip. Selling lowers an item's price unit by unit and the price recovers over time; buying costs a fixed 1.25× the base price, so a buy-and-resell loop never profits. Workers are individual entities with assignments, wages, cargo, and visible work status. An unpaid worker strikes, and owed wages stop growing until the strike is settled. Storage input filters govern automated deposits; output filters govern worker withdrawals. Empty filters allow all items. Workers prefer explicitly accepting chests and reroute cargo when filters change. Manual inventory transfers ignore these automation filters.
 
 The world is a fixed, compact map. Workers use simple grid detours around water and buildings; this is not a full navigation system. The player and workers use a small set of directional walk frames, not a full animation set. Worker automation is limited to gathering and station/furnace tasks, with at most eight workers. There is no charcoal system, pollution, vampire threat, multiplayer, or technology beyond steel in this POC.
 

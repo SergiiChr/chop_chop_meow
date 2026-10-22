@@ -98,7 +98,7 @@ public partial class Game
             var id = HotbarId(slot);
             int count = world.S.Backpack[id];
             bool building = world.Data.Buildings.ContainsKey(id);
-            hotbarCounts[slot].Text = string.IsNullOrEmpty(id) ? "—" : building ? "PLAN" : $"×{count}";
+            hotbarCounts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : HotbarIcon(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · assign from Inventory" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
@@ -150,15 +150,13 @@ public partial class Game
         }
         string current = HotbarId(hotbarAssignSlot);
         AddLabel($"Assigning slot {hotbarAssignSlot + 1} · {(string.IsNullOrEmpty(current) ? "Empty" : world.Data.Name(current))}", 16);
-        foreach (var item in world.Data.Items)
+        var grid = AddGrid();
+        foreach (var id in world.Data.Items.Keys.Concat(world.Data.Buildings.Keys))
         {
-            string id = item.Key;
-            AddButton($"{item.Value.Name}  ·  carried × {world.S.Backpack[id]}", () => SetHotbar(hotbarAssignSlot, id));
-        }
-        foreach (var building in world.Data.Buildings)
-        {
-            string id = building.Key;
-            AddButton($"Plan: {building.Value.Name}", () => SetHotbar(hotbarAssignSlot, id));
+            var (cell, _) = IconCell($"assign_{id}"); cell.Icon = HotbarIcon(id);
+            cell.TooltipText = world.Data.Buildings.ContainsKey(id) ? $"Plan: {world.Data.Name(id)}" : world.Data.Name(id);
+            cell.Pressed += () => SetHotbar(hotbarAssignSlot, id);
+            grid.AddChild(cell);
         }
         AddButton("Clear selected slot", () => SetHotbar(hotbarAssignSlot, ""));
         AddButton("Back to inventory", () => OpenPage("inventory"));
