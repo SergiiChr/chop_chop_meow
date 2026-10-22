@@ -6,7 +6,7 @@
   ./build.py editor  Set up the project and open the Godot editor.
   ./build.py test    Run the game's --self-test mode headlessly (120 second limit).
   ./build.py build   Test, export, and smoke-test build/ChopChopMeow.x86_64.
-  ./build.py lint    Compile the C# project with warnings treated as errors.
+  ./build.py lint    Compile the C# project and verify its formatting.
 
 Godot, .NET, and export templates are kept under .tools/. Set GODOT_BIN to use an
 existing Godot 4.7.2 .NET executable.
@@ -31,12 +31,20 @@ ROOT = Path(__file__).resolve().parent
 TOOLS = ROOT / ".tools"
 BUILD = ROOT / "build"
 GODOT_DIR_NAME = f"Godot_v{GODOT_VERSION}-stable_mono_linux_x86_64"
-GODOT_RELATIVE = Path(GODOT_DIR_NAME) / f"Godot_v{GODOT_VERSION}-stable_mono_linux.x86_64"
-GODOT = Path(os.environ["GODOT_BIN"]).expanduser() if os.environ.get("GODOT_BIN") else TOOLS / GODOT_RELATIVE
+GODOT_RELATIVE = (
+    Path(GODOT_DIR_NAME) / f"Godot_v{GODOT_VERSION}-stable_mono_linux.x86_64"
+)
+GODOT = (
+    Path(os.environ["GODOT_BIN"]).expanduser()
+    if os.environ.get("GODOT_BIN")
+    else TOOLS / GODOT_RELATIVE
+)
 DOTNET_LOCAL = TOOLS / "dotnet"
 XDG_DATA = TOOLS / "xdg-data"
 TEMPLATES = XDG_DATA / "godot" / "export_templates" / f"{GODOT_VERSION}.stable.mono"
-BASE_URL = f"https://github.com/godotengine/godot/releases/download/{GODOT_VERSION}-stable"
+BASE_URL = (
+    f"https://github.com/godotengine/godot/releases/download/{GODOT_VERSION}-stable"
+)
 OUTPUT = BUILD / "ChopChopMeow.x86_64"
 ERRORS = re.compile(r"SCRIPT ERROR|Parse Error|ERROR:|Unhandled exception")
 
@@ -51,7 +59,10 @@ def download(url: str, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     for attempt in range(5):
         try:
-            with urllib.request.urlopen(url, timeout=60) as response, target.open("wb") as output:
+            with (
+                urllib.request.urlopen(url, timeout=60) as response,
+                target.open("wb") as output,
+            ):
                 shutil.copyfileobj(response, output)
             return
         except OSError as error:
@@ -71,10 +82,23 @@ def dotnet_env() -> dict[str, str]:
 
 
 def dotnet_supported(executable: str | Path, env: dict[str, str]) -> bool:
-    sdk = subprocess.run([str(executable), "--list-sdks"], capture_output=True, text=True, env=env, check=False)
-    runtime = subprocess.run([str(executable), "--list-runtimes"], capture_output=True, text=True, env=env, check=False)
+    sdk = subprocess.run(
+        [str(executable), "--list-sdks"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
+    runtime = subprocess.run(
+        [str(executable), "--list-runtimes"],
+        capture_output=True,
+        text=True,
+        env=env,
+        check=False,
+    )
     return any(line.startswith("10.") for line in sdk.stdout.splitlines()) and any(
-        line.startswith("Microsoft.NETCore.App 10.") for line in runtime.stdout.splitlines()
+        line.startswith("Microsoft.NETCore.App 10.")
+        for line in runtime.stdout.splitlines()
     )
 
 
@@ -91,7 +115,17 @@ def ensure_dotnet() -> dict[str, str]:
         print(f"Installing the .NET {DOTNET_CHANNEL} SDK into .tools/dotnet...")
         installer = TOOLS / "dotnet-install.sh"
         download("https://dot.net/v1/dotnet-install.sh", installer)
-        command(["bash", installer, "--channel", DOTNET_CHANNEL, "--install-dir", DOTNET_LOCAL], env=env)
+        command(
+            [
+                "bash",
+                installer,
+                "--channel",
+                DOTNET_CHANNEL,
+                "--install-dir",
+                DOTNET_LOCAL,
+            ],
+            env=env,
+        )
     env["DOTNET_ROOT"] = str(DOTNET_LOCAL)
     env["PATH"] = f"{DOTNET_LOCAL}{os.pathsep}{env.get('PATH', '')}"
     return env
@@ -108,9 +142,15 @@ def fetch_godot() -> None:
             zipped.extractall(TOOLS)
         archive.unlink(missing_ok=True)
         GODOT.chmod(0o755)
-    version = subprocess.run([str(GODOT), "--version"], capture_output=True, text=True, check=False)
-    if version.returncode or not version.stdout.startswith(f"{GODOT_VERSION}.stable.mono"):
-        raise SystemExit(f"Godot must be the {GODOT_VERSION} .NET build: {version.stdout.strip()}")
+    version = subprocess.run(
+        [str(GODOT), "--version"], capture_output=True, text=True, check=False
+    )
+    if version.returncode or not version.stdout.startswith(
+        f"{GODOT_VERSION}.stable.mono"
+    ):
+        raise SystemExit(
+            f"Godot must be the {GODOT_VERSION} .NET build: {version.stdout.strip()}"
+        )
 
 
 def run_godot(
@@ -124,22 +164,40 @@ def run_godot(
     log = BUILD / f"{name}.log"
     with log.open("w") as output:
         try:
-            result = subprocess.run([str(arg) for arg in args], cwd=ROOT, env=env, stdout=output,
-                                    stderr=subprocess.STDOUT, timeout=timeout, check=False)
+            result = subprocess.run(
+                [str(arg) for arg in args],
+                cwd=ROOT,
+                env=env,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                timeout=timeout,
+                check=False,
+            )
         except subprocess.TimeoutExpired as error:
-            raise SystemExit(f"{name} exceeded its {timeout}s time limit; see {log.relative_to(ROOT)}") from error
+            raise SystemExit(
+                f"{name} exceeded its {timeout}s time limit; see {log.relative_to(ROOT)}"
+            ) from error
     text = log.read_text(errors="replace")
-    failures = list(dict.fromkeys(line.strip() for line in text.splitlines() if ERRORS.search(line)))
+    failures = list(
+        dict.fromkeys(line.strip() for line in text.splitlines() if ERRORS.search(line))
+    )
     missing_marker = success_marker is not None and success_marker not in text
     if result.returncode or failures or missing_marker:
         if failures:
             print("\n".join(failures[:20]), file=sys.stderr)
-        detail = f"; missing success marker {success_marker!r}" if missing_marker else ""
-        raise SystemExit(f"{name} failed (exit {result.returncode}{detail}); see {log.relative_to(ROOT)}")
+        detail = (
+            f"; missing success marker {success_marker!r}" if missing_marker else ""
+        )
+        raise SystemExit(
+            f"{name} failed (exit {result.returncode}{detail}); see {log.relative_to(ROOT)}"
+        )
 
 
 def build_project(env: dict[str, str]) -> None:
-    command(["dotnet", "build", "--nologo", "-v", "quiet", ROOT / "ChopChopMeow.csproj"], env=env)
+    command(
+        ["dotnet", "build", "--nologo", "-v", "quiet", ROOT / "ChopChopMeow.csproj"],
+        env=env,
+    )
     run_godot("import", [GODOT, "--headless", "--path", ROOT, "--import"], env)
 
 
@@ -155,10 +213,20 @@ def setup() -> dict[str, str]:
 
 
 def test(env: dict[str, str]) -> None:
-    run_godot("test", [GODOT, "--headless", "--path", ROOT, "--", "--self-test"], env,
-              timeout=120, success_marker="SELF-TEST PASS")
-    run_godot("ui-test", [GODOT, "--headless", "--path", ROOT, "--", "--ui-test"], env,
-              timeout=45, success_marker="UI-TEST PASS")
+    run_godot(
+        "test",
+        [GODOT, "--headless", "--path", ROOT, "--", "--self-test"],
+        env,
+        timeout=120,
+        success_marker="SELF-TEST PASS",
+    )
+    run_godot(
+        "ui-test",
+        [GODOT, "--headless", "--path", ROOT, "--", "--ui-test"],
+        env,
+        timeout=45,
+        success_marker="UI-TEST PASS",
+    )
 
 
 def fetch_templates(env: dict[str, str]) -> None:
@@ -166,7 +234,9 @@ def fetch_templates(env: dict[str, str]) -> None:
         return
     print("Downloading Godot Linux export templates into .tools/...")
     archive = TOOLS / "templates.tpz"
-    download(f"{BASE_URL}/Godot_v{GODOT_VERSION}-stable_mono_export_templates.tpz", archive)
+    download(
+        f"{BASE_URL}/Godot_v{GODOT_VERSION}-stable_mono_export_templates.tpz", archive
+    )
     TEMPLATES.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(archive) as zipped:
         for name in ("linux_release.x86_64", "linux_debug.x86_64", "version.txt"):
@@ -194,16 +264,49 @@ def main() -> int:
         elif action == "build":
             test(env)
             fetch_templates(env)
-            run_godot("export", [GODOT, "--headless", "--path", ROOT, "--export-release", "Linux/X11", OUTPUT], env)
-            run_godot("export-smoke", [OUTPUT, "--headless", "--", "--smoke-test"], env,
-                      timeout=120, success_marker="SMOKE-TEST PASS")
+            run_godot(
+                "export",
+                [
+                    GODOT,
+                    "--headless",
+                    "--path",
+                    ROOT,
+                    "--export-release",
+                    "Linux/X11",
+                    OUTPUT,
+                ],
+                env,
+            )
+            run_godot(
+                "export-smoke",
+                [OUTPUT, "--headless", "--", "--smoke-test"],
+                env,
+                timeout=120,
+                success_marker="SMOKE-TEST PASS",
+            )
             archive = BUILD / "ChopChopMeow-linux-x86_64.tar.gz"
             with tarfile.open(archive, "w:gz") as bundle:
-                for path in (OUTPUT, OUTPUT.with_suffix(".pck"), BUILD / "data_ChopChopMeow_linuxbsd_x86_64", ROOT / "README.md", ROOT / "LICENSE"):
+                for path in (
+                    OUTPUT,
+                    OUTPUT.with_suffix(".pck"),
+                    BUILD / "data_ChopChopMeow_linuxbsd_x86_64",
+                    ROOT / "README.md",
+                    ROOT / "LICENSE",
+                ):
                     bundle.add(path, arcname=f"ChopChopMeow/{path.name}")
-            print(f"Built {OUTPUT.relative_to(ROOT)}\nPortable bundle: {archive.relative_to(ROOT)}")
+            print(
+                f"Built {OUTPUT.relative_to(ROOT)}\nPortable bundle: {archive.relative_to(ROOT)}"
+            )
         elif action == "lint":
-            command(["dotnet", "format", ROOT / "ChopChopMeow.csproj", "--verify-no-changes"], env=env)
+            command(
+                [
+                    "dotnet",
+                    "format",
+                    ROOT / "ChopChopMeow.csproj",
+                    "--verify-no-changes",
+                ],
+                env=env,
+            )
         elif action == "setup":
             print("Ready. Run ./build.py play to launch the game.")
         return 0

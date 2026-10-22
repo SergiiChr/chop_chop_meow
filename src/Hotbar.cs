@@ -98,7 +98,7 @@ public partial class Game
             var id = HotbarId(slot);
             int count = world.S.Backpack[id];
             bool building = world.Data.Buildings.ContainsKey(id);
-            hotbarCounts[slot].Text = string.IsNullOrEmpty(id) ? "—" : building ? "PLAN" : $"×{count}";
+            hotbarCounts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : HotbarIcon(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · assign from Inventory" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
@@ -106,26 +106,10 @@ public partial class Game
         }
     }
 
-    private string HotbarId(int slot)
-    {
-        var slots = world.S.HotbarSlots ??= new System.Collections.Generic.List<string>();
-        while (slots.Count < 9) slots.Add("");
-        if (slots.Count > 9) slots.RemoveRange(9, slots.Count - 9);
-        for (int i = 0; i < slots.Count; i++)
-        {
-            var id = slots[i];
-            if (string.IsNullOrEmpty(id) || (!world.Data.Items.ContainsKey(id) && !world.Data.Buildings.ContainsKey(id))) slots[i] = "";
-        }
-        world.S.ActiveHotbar = Math.Clamp(world.S.ActiveHotbar, 0, 8);
-        return slots[slot] ?? "";
-    }
+    // World.Deserialize keeps nine known entries, so reads need no repair here.
+    private string HotbarId(int slot) => world.S.HotbarSlots[slot];
 
-    private string? ActiveHotbarItem()
-    {
-        int slot = Math.Clamp(world.S.ActiveHotbar, 0, 8);
-        string id = HotbarId(slot);
-        return world.Data.Items.ContainsKey(id) ? id : null;
-    }
+    private string? ActiveHotbarItem() => world.Data.Items.ContainsKey(HotbarId(world.S.ActiveHotbar)) ? HotbarId(world.S.ActiveHotbar) : null;
 
     private bool IsTransferableHotbarItem(string id) => id is not "iron_axe" and not "iron_pick" and not "steel_tools" and not "berries" and not "water";
 
@@ -166,15 +150,13 @@ public partial class Game
         }
         string current = HotbarId(hotbarAssignSlot);
         AddLabel($"Assigning slot {hotbarAssignSlot + 1} · {(string.IsNullOrEmpty(current) ? "Empty" : world.Data.Name(current))}", 16);
-        foreach (var item in world.Data.Items)
+        var grid = AddGrid();
+        foreach (var id in world.Data.Items.Keys.Concat(world.Data.Buildings.Keys))
         {
-            string id = item.Key;
-            AddButton($"{item.Value.Name}  ·  carried × {world.S.Backpack[id]}", () => SetHotbar(hotbarAssignSlot, id));
-        }
-        foreach (var building in world.Data.Buildings)
-        {
-            string id = building.Key;
-            AddButton($"Plan: {building.Value.Name}", () => SetHotbar(hotbarAssignSlot, id));
+            var (cell, _) = IconCell($"assign_{id}"); cell.Icon = HotbarIcon(id);
+            cell.TooltipText = world.Data.Buildings.ContainsKey(id) ? $"Plan: {world.Data.Name(id)}" : world.Data.Name(id);
+            cell.Pressed += () => SetHotbar(hotbarAssignSlot, id);
+            grid.AddChild(cell);
         }
         AddButton("Clear selected slot", () => SetHotbar(hotbarAssignSlot, ""));
         AddButton("Back to inventory", () => OpenPage("inventory"));
@@ -182,7 +164,6 @@ public partial class Game
 
     private void SetHotbar(int slot, string id)
     {
-        HotbarId(slot);
         world.S.HotbarSlots[slot] = id;
         world.S.ActiveHotbar = slot;
         Notify(id == "" ? $"Cleared hotbar slot {slot + 1}." : $"Slot {slot + 1}: {world.Data.Name(id)}.");
