@@ -23,3 +23,10 @@ mono_crash.*.json
 *.exe
 # Uncomment if your project does not version PCK files as runtime dependencies.
 # *.pck
+.godot/
+.tools/
+build/
+bin/
+obj/
+__pycache__/
+*.py[cod]
