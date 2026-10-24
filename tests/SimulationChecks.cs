@@ -451,6 +451,19 @@ public static class SimulationChecks
         world.Tick(.25f);
         Require(!furnace.Processing && furnace.Progress == 0 && furnace.Inventory["iron_bar"] == 1,
                 "pending output should be added exactly once as soon as one slot becomes available");
+
+        furnace.Inventory.Slots = 18; furnace.Inventory.Remove("stone", 64);
+        furnace.Inventory.Add("iron_bar", furnace.Inventory.StackSize - 1);
+        world.S.Backpack.Add("iron_ore", 2); world.S.Backpack.Add("wood", 1);
+        world.LoadBatch(furnace);
+        world.Tick(.25f); world.Tick(cookSeconds + 1);
+        Require(furnace.Processing && furnace.Inventory["iron_bar"] == furnace.Inventory.StackSize,
+                "a full one-stack output slot must hold the next batch at full progress");
+        Require(world.LoadInput(furnace, "iron_ore", 999) == 0 && world.LoadInput(furnace, "stone", 1) == 0,
+                "manual loading must reject empty backpacks and items the recipe does not use");
+        world.S.Backpack.Add("iron_ore", 100);
+        Require(world.LoadInput(furnace, "iron_ore", 999) == furnace.Inventory.StackSize && world.LoadInput(furnace, "iron_ore", 1) == 0,
+                "an input slot must hold exactly one stack");
     }
 
     private static void CheckToolGatesAndPlacement(GameData data)

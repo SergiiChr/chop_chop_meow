@@ -563,8 +563,8 @@ public sealed class World
                 if (t.Progress >= recipe.Seconds)
                 {
                     // Manual loading or another hauler can fill the station while a batch cooks.
-                    // Retain the completed batch until there is room rather than discarding output.
-                    if (t.Inventory.Room(recipe.Output) < recipe.Amount) continue;
+                    // Retain the completed batch until the one-stack output slot has room rather than discarding output.
+                    if (Math.Min(t.Inventory.Room(recipe.Output), t.Inventory.StackSize - t.Inventory[recipe.Output]) < recipe.Amount) continue;
                     t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Progress = 0;
                     S.Milestones.Add(recipe.Output); if (recipe.Output == "iron_pick") S.Milestones.Add("pick");
                 }
