@@ -6,7 +6,7 @@ The prototype is a single-player, isometric woodland survival and production gam
 
 The intended fresh-start loop is to gather loose iron and nearby wood, build storage and a basic furnace, smelt iron and forge a pickaxe, mine iron and coal, then build and operate a reinforced furnace to make steel tools. Sell a steel tool through the village signpost and use the proceeds to hire and assign a worker. The 10–15 minute duration is a pacing target, subject to hands-on UI and exported-build review.
 
-Food, water, the day/night cycle, shelter, wages, and wolf encounters support the production loop. Campfire light repels wolves within its radius; sleeping in a cabin advances time toward dawn. Death moves carried items to a recovery box and respawns the player at the clearing after a 30-second timer. Recovery boxes are never automation storage and disappear once empty.
+Food, water, the day/night cycle, shelter, wages, and wolf encounters support the production loop. Campfire light repels wolves within its radius. At half health or less, an unprotected player can be pinned by a leaping wolf; the pinned state (`SaveState.Mauled`) blocks movement and actions, drains health while the pack feeds, and makes the following death strip food from the recovery box. Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the stone furnace cooks into edible meat. Sleeping in a cabin advances time toward dawn. Death moves carried items to a recovery box and respawns the player at the clearing after a 30-second timer. Recovery boxes are never automation storage and disappear once empty.
 
 ## Implemented rules
 

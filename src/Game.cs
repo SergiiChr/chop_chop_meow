@@ -122,6 +122,8 @@ public partial class Game : Node
         panel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, AnchorBottom = 1, OffsetLeft = -374, OffsetRight = -16, OffsetTop = 64, OffsetBottom = -106 };
         ui.AddChild(panel);
         deathLabel = Label("", 26); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.AddThemeConstantOverride("outline_size", 8); deathLabel.AddThemeColorOverride("font_outline_color", new Color("1c2b24")); deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
+        // Raised above the centred player so a downed body stays visible under the message.
+        deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
         BuildEnding(); BuildMenu(); RefreshLive();
     }
@@ -135,7 +137,7 @@ public partial class Game : Node
         if (world == null || stats == null) return;
         int hour = (int)(world.DayPhase * 24 + 6) % 24;
         stats.Text = $"Day {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}  {(world.Night ? "NIGHT" : "DAYLIGHT")}";
-        deathLabel.Text = world.Dead ? $"You collapsed\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
+        deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? "The pack is feeding" : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : world.S.Mauled ? "A wolf has you by the throat" : "";
         modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
         foreach (var update in live.ToArray()) update();
         RefreshHotbar();
@@ -185,7 +187,7 @@ public partial class Game : Node
         AddLabel("Hire at a signpost (24 coins; 8/day). Worker → Work → click a resource. Building → Assign → select named villagers. Put inputs in storage for hauling. One furnace worker alternates hauling and pumping; with two, the first pumps while the second hauls. No accepting chest means work pauses safely.", 15, Muted);
         AddLabel("Empty filters allow everything. Input filters control worker deposits; output filters control worker withdrawals. Workers prefer explicitly matching input-filter chests before the nearest general chest. Manual transfers ignore automation filters. Hold Shift while transferring to move a full stack.", 15, Muted);
         AddLabel("STAY ALIVE", 16);
-        AddLabel("Food and water drain over time. Wolves fear campfires (5-tile radius) and cabins. Feed fires with wood; each log adds 90s. Sleep in a cabin at night; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
+        AddLabel("Food and water drain over time. Wolves are fast and fear campfires (5-tile radius) and cabins. At half health or less, a nearby wolf leaps for your throat and the pack joins the feast; a wolf kill also destroys the food in your recovery box. Slain wolves leave a carcass: hold right mouse to butcher it for raw meat, then cook it in a stone furnace before eating. Feed fires with wood; each log adds 90s. Sleep in a cabin at night; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
         AddLabel("Trade returns in 30 seconds. Prices fall when you sell and slowly recover. Sale proceeds arrive with the returning coin cart. Your world autosaves every 90 seconds; F5 saves immediately.", 15, Muted);
     }
     private string Needs(Dictionary<string, int> cost) => string.Join("  ·  ", cost.Select(p => $"{world.Data.Name(p.Key)} {world.S.Backpack[p.Key]}/{p.Value}"));
@@ -207,7 +209,7 @@ public partial class Game : Node
     private void Backpack()
     {
         Dynamic(() => $"Coins {world.S.Coins:0.0}   Health {world.S.Health:0}\nHunger {world.S.Hunger:0}   Thirst {world.S.Thirst:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {world.S.Workers.Count * world.Data.DailyWage:0}", 15);
-        AddInventoryGrid(() => world.S.Backpack, id => { if (id is "berries" or "water") world.Consume(id); }, "Berries and water: click to consume. Tools work while carried.");
+        AddInventoryGrid(() => world.S.Backpack, id => { if (id is "berries" or "water" or "cooked_meat" or "raw_meat") world.Consume(id); }, "Berries, cooked meat and water: click to consume. Tools work while carried.");
         AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
     }
     private void Select(Thing t) { selected = t.Id; workerId = 0; view.Selected = t.Id; view.SelectedWorker = 0; view.BuildMode = ""; OpenPage("inspect"); }
@@ -481,5 +483,13 @@ public partial class Game : Node
         world.Trade(sign, "steel_tools", 1, false);
         if (OS.GetCmdlineUserArgs().Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         world.Player = World.Spawn; Select(bellows);
+        if (!OS.GetCmdlineUserArgs().Contains("--wolves")) return;
+        // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
+        var spot = new Vector2(34, 32);
+        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(spot) < 6);
+        world.S.Time = world.Data.DaySeconds * .78f; world.Player = spot; world.S.Health = 45;
+        foreach (var offset in new[] { new Vector2(2.5f, -1), new Vector2(-6, 3), new Vector2(5, 5) }) world.S.Wolves.Add(new Wolf { Pos = spot + offset });
+        world.Add("wolf_corpse", spot + new Vector2(-2, -2), 4);
+        ClosePanel(); view.Zoom = 1.6f;
     }
 }

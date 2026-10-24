@@ -23,7 +23,7 @@ public sealed class Thing
     public float Burn { get; set; }
     public float Regrow { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
-    [JsonIgnore] public bool IsResource => Kind is "tree" or "stone" or "iron" or "loose_iron" or "coal" or "berries" or "water";
+    [JsonIgnore] public bool IsResource => Kind is "tree" or "stone" or "iron" or "loose_iron" or "coal" or "berries" or "water" or "wolf_corpse";
     [JsonIgnore] public bool IsStorage => Kind is "chest" or "grave";
 }
 public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked }
@@ -59,8 +59,14 @@ public sealed class Wolf
 {
     public float X { get; set; }
     public float Y { get; set; }
-    public float Health { get; set; } = 3;
+    public float Health { get; set; } = 4;
     public float Attack { get; set; }
+    /// <summary>Seconds left in a throat leap; zero while the wolf runs on the ground.</summary>
+    public float Leap { get; set; }
+    /// <summary>True once the wolf has reached the downed player and is feeding.</summary>
+    public bool Feeding { get; set; }
+    /// <summary>The wolf whose leap landed; it holds the player's throat.</summary>
+    public bool Pinning { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
 }
 public sealed class SaveState
@@ -86,6 +92,8 @@ public sealed class SaveState
     public List<string> HotbarSlots { get; set; } = new() { "iron_axe", "iron_pick", "chest", "campfire", "furnace", "anvil", "reinforced", "berries", "water" };
     public int ActiveHotbar { get; set; }
     public float RespawnIn { get; set; }
+    /// <summary>A wolf has pinned the player; it stays set through the following death until respawn.</summary>
+    public bool Mauled { get; set; }
     public float PlaySeconds { get; set; }
     public bool EndingShown { get; set; }
 }
@@ -101,6 +109,9 @@ public sealed class World
     public static readonly Vector2 Spawn = new(23, 24);
     public static readonly Vector2 Pond = new(14, 22);
     public const float PondRadius = 4.5f;
+    public const float LeapSeconds = .4f;
+    // A wolf leaps from within LeapRange and lands PinDistance away, where its jaws reach the throat of the downed player.
+    private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f;
     private float gatherClock;
     private float attackClock;
     private float nightSpawn;
@@ -110,7 +121,9 @@ public sealed class World
     public float DayPhase => S.Time % Data.DaySeconds / Data.DaySeconds;
     public bool Night => DayPhase >= Data.NightStarts;
     public bool Dead => S.RespawnIn > 0;
-    public bool Near(Thing t, float radius = 3.2f) => !Dead && Player.DistanceTo(t.Pos) <= radius;
+    /// <summary>Dead or pinned by a wolf: the player cannot move or act.</summary>
+    public bool Downed => Dead || S.Mauled;
+    public bool Near(Thing t, float radius = 3.2f) => !Downed && Player.DistanceTo(t.Pos) <= radius;
     public Thing? Find(int id) => S.Things.FirstOrDefault(t => t.Id == id);
     public void Say(string message) => Notify?.Invoke(message);
     public Thing Add(string kind, Vector2 pos, int remaining = 0)
@@ -153,7 +166,7 @@ public sealed class World
     public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "chest" or "anvil" => .45f, _ => .35f };
     public void MovePlayer(Vector2 delta)
     {
-        if (Dead) return;
+        if (Downed) return;
         var p = Player + delta;
         if (CanStand(p)) Player = p;
         else { if (CanStand(Player + new Vector2(delta.X, 0))) Player += new Vector2(delta.X, 0); if (CanStand(Player + new Vector2(0, delta.Y))) Player += new Vector2(0, delta.Y); }
@@ -166,7 +179,7 @@ public sealed class World
         if (t.Kind is "coal" or "iron" && (worker ? !S.Milestones.Contains("pick") : S.Backpack["iron_pick"] == 0 && S.Backpack["steel_tools"] == 0)) return "Forge an iron pickaxe. Loose rusty ore nearby can be picked up by hand.";
         return null;
     }
-    public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", _ => t.Kind };
+    public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "wolf_corpse" => "raw_meat", _ => t.Kind };
     public void Gather(Thing t, float dt)
     {
         if (!Near(t)) { gatherClock = 0; return; }
@@ -176,7 +189,8 @@ public sealed class World
         float seconds = Data.GatherSeconds * (S.Backpack["steel_tools"] > 0 ? .55f : 1);
         if (gatherClock < seconds) return;
         gatherClock = 0;
-        int amount = Math.Min(t.Remaining, t.Kind == "stone" && S.Backpack["iron_pick"] == 0 && S.Backpack["steel_tools"] == 0 ? 2 : 4);
+        bool small = t.Kind == "wolf_corpse" || t.Kind == "stone" && S.Backpack["iron_pick"] == 0 && S.Backpack["steel_tools"] == 0;
+        int amount = Math.Min(t.Remaining, small ? 2 : 4);
         amount = S.Backpack.Add(ResourceItem(t), amount); t.Remaining -= amount;
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
         else Say($"+{amount} {Data.Name(ResourceItem(t))} · {t.Remaining} left here.");
@@ -187,7 +201,7 @@ public sealed class World
     public string? PlacementBlock(string kind, Vector2 p)
     {
         if (!Data.Buildings.ContainsKey(kind)) return "Unknown building.";
-        if (Dead) return "You are still recovering.";
+        if (Downed) return "You are still recovering.";
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
         if (Player.DistanceTo(p) < 1.2f || Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
         if (!CanStand(p) || p.DistanceTo(Pond) < PondRadius + .8f) return "Choose dry, open ground.";
@@ -203,10 +217,14 @@ public sealed class World
         var t = Add(kind, p); if (kind == "campfire") t.Burn = 90;
         S.Milestones.Add(kind); Say($"Built {Data.Name(kind)}."); return t;
     }
+    public static bool IsFood(string item) => item is "berries" or "raw_meat" or "cooked_meat";
     public void Consume(string item)
     {
+        if (Downed) return;
+        if (item == "raw_meat") { Say("Raw meat must be cooked in a furnace first."); return; }
         if (S.Backpack.Remove(item, 1) == 0) { Say($"No {Data.Name(item)} in your backpack."); return; }
         if (item == "berries") { S.Hunger = Math.Min(100, S.Hunger + 18); S.Health = Math.Min(100, S.Health + 5); }
+        if (item == "cooked_meat") { S.Hunger = Math.Min(100, S.Hunger + 40); S.Health = Math.Min(100, S.Health + 10); }
         if (item == "water") S.Thirst = Math.Min(100, S.Thirst + 28);
     }
     public void Pump(Thing t)
@@ -272,7 +290,7 @@ public sealed class World
     public bool Protected(Vector2 p) => S.Things.Any(t => (t.Kind == "campfire" && t.Burn > 0 && t.Pos.DistanceTo(p) < 5.3f) || (t.Kind == "hut" && t.Pos.DistanceTo(p) < 2.7f));
     public void Attack()
     {
-        if (attackClock > 0 || Dead) return;
+        if (attackClock > 0 || Downed) return;
         attackClock = .6f;
         var wolf = S.Wolves.OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         ActorAction action = S.Backpack["steel_tools"] > 0 ? ActorAction.SteelChop : S.Backpack["iron_axe"] > 0 ? ActorAction.Chop : ActorAction.Attack;
@@ -282,18 +300,32 @@ public sealed class World
         {
             wolf.Health -= S.Backpack["steel_tools"] > 0 ? 3 : S.Backpack["iron_axe"] > 0 ? 1.5f : .5f;
             wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f;
-            if (wolf.Health <= 0) { S.Wolves.Remove(wolf); Say("The wolf retreats into the woods."); }
+            if (wolf.Health <= 0)
+            {
+                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * 45), 4);
+                Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
+            }
         }
     }
     public void Die()
     {
-        var box = Add("grave", Player); box.Inventory = S.Backpack;
-        S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Wolves.Clear();
+        // After a mauling the box lands past the feet, away from the wolf at the throat, so the feeding stays visible.
+        var killer = S.Mauled ? S.Wolves.FirstOrDefault(w => w.Pinning) : null;
+        var box = Add("grave", killer == null ? Player : Player + (Player - killer.Pos).Normalized() * 1.5f); box.Inventory = S.Backpack;
+        S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds;
+        if (S.Mauled)
+        {
+            // The pack eats every scrap of food and stays to feed until the player respawns.
+            foreach (var item in box.Inventory.Items.Keys.Where(IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
+            Say($"The wolves brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.");
+            return;
+        }
+        S.Wolves.Clear();
         Say($"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
     }
     private void Respawn()
     {
-        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = Spawn;
+        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = Spawn; S.Mauled = false; S.Wolves.Clear();
         Say("You wake in the clearing. Recover your belongings from the box.");
     }
     // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.
@@ -497,9 +529,11 @@ public sealed class World
             else { S.Coins += order.Value; if (order.Item == "steel_tools") S.Milestones.Add("sold_steel"); }
             S.Orders.Remove(order); Say(order.Buying ? $"Cart returned with {order.Quantity} {Data.Name(order.Item)}." : $"Cart returned with {order.Value:0.0} coins.");
         }
-        S.Things.RemoveAll(t => t.Kind == "grave" && t.Inventory.Count == 0);
+        S.Things.RemoveAll(t => t.Kind == "grave" && t.Inventory.Count == 0 || t.Kind == "wolf_corpse" && t.Remaining <= 0);
         foreach (var t in S.Things.ToArray())
         {
+            // A carcass keeps its age so the death animation plays once and not again after loading.
+            if (t.Kind == "wolf_corpse") t.Progress = Math.Min(60, t.Progress + dt);
             if (t.Kind == "berries" && t.Remaining == 0) { t.Regrow += dt; if (t.Regrow >= 90) { t.Remaining = 24; t.Regrow = 0; } }
             if (t.Kind == "campfire")
             {
@@ -538,27 +572,65 @@ public sealed class World
                 if (CanStand(b.Pos - push)) b.Pos -= push;
             }
         }
-        if (!Night) { S.Wolves.Clear(); nightSpawn = 0; }
-        else if (!sleeping && !Dead)
-        {
-            nightSpawn -= dt;
-            if (nightSpawn <= 0 && S.Wolves.Count < Math.Min(5, 2 + Day))
-            {
-                nightSpawn = 18; float angle = S.Time * 2.4f;
-                var p = Player + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 11;
-                p = p.Clamp(Vector2.One * 2, Vector2.One * 45); S.Wolves.Add(new Wolf { Pos = p, Health = 3 + Day * .3f });
-                Say("A wolf is prowling nearby. Stay by fire or shelter; Space swings your axe.");
-            }
-            foreach (var wolf in S.Wolves)
-            {
-                if (Protected(wolf.Pos) || Protected(Player)) wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + (wolf.Pos - Player).Normalized() * 3, dt * 2.5f);
-                else wolf.Pos = wolf.Pos.MoveToward(Player, dt * (1.25f + Day * .08f));
-                wolf.Attack -= dt;
-                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1.1f; S.Health -= 9 + Day; }
-            }
-        }
+        if (!Night) { S.Wolves.Clear(); nightSpawn = 0; if (!Dead) S.Mauled = false; }
+        else if (!sleeping) TickWolves(dt);
         if (!Dead && S.Health <= 0) Die();
         UpdateGoal();
+    }
+    private void TickWolves(float dt)
+    {
+        if (!Dead)
+        {
+            nightSpawn -= dt;
+            if (nightSpawn <= 0 && S.Wolves.Count < Math.Min(6, 2 + Day))
+            {
+                nightSpawn = 15; float angle = S.Time * 2.4f;
+                var p = Player + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 11;
+                p = p.Clamp(Vector2.One * 2, Vector2.One * 45); S.Wolves.Add(new Wolf { Pos = p, Health = 4 + Day * .4f });
+                Say("A wolf is prowling nearby. Stay by fire or shelter; Space swings your axe.");
+            }
+        }
+        // A wounded player away from fire and shelter invites a leap for the throat.
+        if (!Downed && S.Health <= 50 && !Protected(Player) && S.Wolves.All(w => w.Leap <= 0))
+        {
+            var hunter = S.Wolves.Where(w => !Protected(w.Pos) && w.Pos.DistanceTo(Player) < LeapRange).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
+            if (hunter != null) { hunter.Leap = LeapSeconds; Say("A wolf leaps for your throat!"); }
+        }
+        float speed = Math.Min(3.8f, 3 + Day * .1f);
+        foreach (var wolf in S.Wolves)
+        {
+            wolf.Attack -= dt;
+            if (wolf.Leap > 0)
+            {
+                // Closing the remaining gap evenly makes every leap last LeapSeconds.
+                var landing = Player + (wolf.Pos - Player).Normalized() * PinDistance;
+                wolf.Pos = wolf.Pos.MoveToward(landing, wolf.Pos.DistanceTo(landing) * Math.Min(1, dt / wolf.Leap));
+                wolf.Leap = Math.Max(0, wolf.Leap - dt);
+                if (wolf.Leap == 0) { wolf.Feeding = wolf.Pinning = true; S.Mauled = true; Say("You are pinned. The pack closes in."); }
+            }
+            else if (S.Mauled)
+            {
+                if (wolf.Feeding) continue;
+                var seat = Player + (wolf.Pos - Player).Normalized() * FeastSeat;
+                wolf.Pos = wolf.Pos.MoveToward(seat, dt * FeastSpeed);
+                wolf.Feeding = wolf.Pos.DistanceTo(seat) < .05f;
+            }
+            else if (Protected(wolf.Pos) || Protected(Player)) wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + (wolf.Pos - Player).Normalized() * 3, dt * 3);
+            else
+            {
+                wolf.Pos = wolf.Pos.MoveToward(Player, dt * speed);
+                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; }
+            }
+        }
+        // Feeding wolves crowd around the player without stacking on one spot.
+        for (int i = 0; i < S.Wolves.Count; i++) for (int j = i + 1; j < S.Wolves.Count; j++)
+        {
+            var a = S.Wolves[i]; var b = S.Wolves[j]; var offset = a.Pos - b.Pos;
+            if (a.Leap > 0 || b.Leap > 0 || offset.LengthSquared() >= .5f) continue;
+            var push = (offset.LengthSquared() > .001f ? offset.Normalized() : Vector2.Right) * Math.Min(dt, .08f);
+            a.Pos += push; b.Pos -= push;
+        }
+        if (S.Mauled && !Dead) S.Health -= dt * (16 + 8 * S.Wolves.Count(w => w.Feeding));
     }
     private static readonly string[] Milestones = { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools", "sold_steel", "hired", "assigned" };
     public bool GoalComplete => S.Goal >= Milestones.Length;

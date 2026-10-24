@@ -15,7 +15,9 @@ public enum ActorAction
     Carry,
     Pump,
     Hammer,
-    Attack
+    Attack,
+    Mauled,
+    Devoured
 }
 
 /// <summary>
@@ -48,6 +50,8 @@ public static class ActorAnimation
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
+        ActorAction.Mauled => .5f,
+        ActorAction.Devoured => 1.4f,
         _ => 1
     };
 
@@ -122,6 +126,17 @@ public static class ActorAnimation
                 return Keys(p, (0, fists),
                     (.32f, fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
                     (.5f, fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }));
+            // Both downed poses are drawn with the rig tipped onto its back, so Raise points the arms at the sky.
+            case ActorAction.Mauled:
+                // Pushing at the jaws over the throat with the head forced back while the legs kick.
+                return new Pose(Head: -32 + MathF.Cos(p * Mathf.Tau) * 6, Twist: wave * 8,
+                    RaiseL: 128 + wave * 18, OutL: -8, ElbowL: 55 - wave * 20, RaiseR: 128 - wave * 18, OutR: -8, ElbowR: 55 + wave * 20,
+                    SwingL: 24 + wave * 22, KneeL: 40 + wave * 25, SwingR: 24 - wave * 22, KneeR: 40 - wave * 25);
+            case ActorAction.Devoured:
+                // A limp body that only twitches as the pack tears at it.
+                float tug = .7f * MathF.Sin(p * Mathf.Tau + .5f) + .3f * MathF.Sin(p * Mathf.Tau * 2 + 1.1f);
+                return new Pose(Head: -38 + tug * 4, Twist: tug * 5, RaiseL: 18 + tug * 6, OutL: 62, ElbowL: 20, RaiseR: 14 - tug * 5, OutR: 58, ElbowR: 26,
+                    SwingL: 10 + tug * 3, KneeL: 18, SwingR: 4, KneeR: 10 - tug * 3);
             default:
                 float breath = wave;
                 return new Pose(Lean: 1 + breath * .8f, Head: breath * 1.5f, OutL: 7 + breath, OutR: 7 + breath);
@@ -174,7 +189,7 @@ public static class ActorAnimation
                 "iron_pick" => ActorAction.Mine,
                 _ => ActorAction.Gather
             },
-            "berries" or "water" or "loose_iron" => ActorAction.Gather,
+            "berries" or "water" or "loose_iron" or "wolf_corpse" => ActorAction.Gather,
             _ => ActorAction.Idle
         };
     }

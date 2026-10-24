@@ -47,6 +47,8 @@ public partial class WorldView : Node3D
     private ActorAction pulseAction;
     private Vector2 pulseTarget;
     private float night;
+    private float downedFor;
+    private Vector2 mauledFrom;
     private readonly Font font = ThemeDB.FallbackFont;
     private static readonly StandardMaterial3D GhostValid = Flat(new Color(.55f, .95f, .45f, .45f));
     private static readonly StandardMaterial3D GhostBlocked = Flat(new Color(1, .35f, .3f, .5f));
@@ -292,11 +294,27 @@ public partial class WorldView : Node3D
                 !World.S.Workers.Any(w => w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2));
             if (anvil != null) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
         }
+        if (World.S.Mauled)
+        {
+            mauledFrom = World.S.Wolves.FirstOrDefault(w => w.Pinning)?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
+            // Facing away from the wolf at the throat lays the head toward it once the rig tips onto its back.
+            action = World.Dead ? ActorAction.Devoured : ActorAction.Mauled; target = World.Player * 2 - mauledFrom; subject = null;
+            downedFor += dt;
+        }
+        else downedFor = 0;
         player.Update(World.Player, action, target, dt);
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool() : null);
         Pose(playerRig, player, tool);
-        playerRig.Root.Visible = !World.Dead;
+        if (World.S.Mauled)
+        {
+            // Tip backwards about the feet, then slide forward so the body lies centred on the player's tile.
+            float tip = Ease(Math.Min(1, downedFor / .3f));
+            var forward = new Vector3(MathF.Sin(player.Yaw), 0, MathF.Cos(player.Yaw));
+            playerRig.Root.Position = To3(player.Position) + forward * .8f * tip + Vector3.Up * .17f * tip;
+            playerRig.Root.Rotation = new Vector3(-Mathf.Pi / 2 * tip, player.Yaw, 0);
+        }
+        playerRig.Root.Visible = !World.Dead || World.S.Mauled;
         Work(player, subject);
         foreach (var worker in World.S.Workers)
         {
@@ -361,6 +379,7 @@ public partial class WorldView : Node3D
                 if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Flat(new Color("ffd27a")), 5, 3.2f, .3f, 4, .025f);
                 break;
             case "loose_iron": Burst(side + Vector3.Up * .1f, Flat(new Color(.75f, .6f, .45f, .5f)), 3, .5f, .7f, -.2f, .12f, 1.2f); break;
+            case "wolf_corpse": Burst(side + Vector3.Up * .3f, Mat("7a1414", .6f), 5, 1.4f, .45f, 8, .04f); break;
             case "berries": Burst(To3(subject.Pos, .7f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f); break;
             case "water": Burst(side + Vector3.Up * .05f, Flat(new Color(.7f, .88f, .95f, .8f)), 6, 1.6f, .45f, 7, .045f); break;
             case "anvil": Burst(To3(subject.Pos) + prop.Vent, Flat(new Color("ffd27a")), 10, 3, .35f, 5, .025f); break;
@@ -382,6 +401,9 @@ public partial class WorldView : Node3D
                 prop = WorldModels.Build(t);
                 scene.AddChild(prop.Root);
                 props[t.Id] = prop;
+                // A fresh carcass keeps the heading of the wolf model it replaces.
+                if (t.Kind == "wolf_corpse" && wolves.FirstOrDefault(pair => !World.S.Wolves.Contains(pair.Key) && pair.Value.Last.DistanceTo(t.Pos) < 2).Value is { } dying)
+                    prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
             }
             prop.Root.Position = To3(t.Pos);
             Animate(prop, t, dt);
@@ -424,6 +446,14 @@ public partial class WorldView : Node3D
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
+                break;
+            case "wolf_corpse":
+                float dying = Math.Clamp(t.Progress / .9f, 0, 1);
+                prop.Wolf!.Fall(dying);
+                // Butchering flattens the carcass while the blood pool spreads out from under it.
+                prop.Wolf.Root.Scale = new Vector3(1, .6f + .4f * WorldModels.Fullness(t), 1);
+                prop.Wolf.Root.Position = new Vector3(wobble * .03f, 0, 0);
+                prop.Pool!.Scale = Vector3.One * (.2f + .8f * Ease(dying)) * (1.25f - .25f * WorldModels.Fullness(t));
                 break;
             case "berries":
                 prop.Fruit!.Visible = t.Remaining > 0;
@@ -514,13 +544,15 @@ public partial class WorldView : Node3D
                 scene.AddChild(model.Root); wolves[wolf] = model;
             }
             var moved = wolf.Pos - model.Last;
-            bool running = moved.LengthSquared() > 1e-6f;
-            model.Stride += running ? moved.Length() * 7 : dt * 2;
+            bool running = moved.LengthSquared() > 1e-6f && !wolf.Feeding;
+            model.Stride += running ? moved.Length() * 5 : dt * 2;
             model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(running ? moved : World.Player - wolf.Pos, model.Yaw), Math.Min(1, dt * 10));
             model.Last = wolf.Pos;
             model.Root.Position = To3(wolf.Pos);
             model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-            model.Trot(model.Stride, running);
+            if (wolf.Leap > 0) model.Leap(1 - wolf.Leap / World.LeapSeconds);
+            else if (wolf.Feeding) model.Feed(Elapsed + wolf.GetHashCode() % 7);
+            else model.Trot(model.Stride, running);
         }
         foreach (var gone in wolves.Keys.Where(w => !World.S.Wolves.Contains(w)).ToArray())
         {

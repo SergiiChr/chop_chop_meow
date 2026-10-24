@@ -74,6 +74,8 @@ public static class AnimationChecks
             "a carried but unsuitable axe should not animate as mining");
         Require(ActorAnimation.PlayerAction("berries", true, false, empty, null) == ActorAction.Gather,
             "hand gathering berries should use the gather action");
+        Require(ActorAnimation.PlayerAction("wolf_corpse", true, false, empty, null) == ActorAction.Gather,
+            "butchering a carcass should use the crouched gather action");
         Require(ActorAnimation.PlayerAction("tree", false, false, bag, "iron_axe") == ActorAction.Idle,
             "inactive gathering should leave the player idle");
     }

@@ -69,6 +69,7 @@ public sealed class GameData
         "iron" => "Iron deposit",
         "loose_iron" => "Loose iron ore",
         "grave" => "Recovery box",
+        "wolf_corpse" => "Wolf carcass",
         _ => id.Replace('_', ' ')
     };
 }

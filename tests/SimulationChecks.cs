@@ -28,6 +28,8 @@ public static class SimulationChecks
         CheckToolGatesAndPlacement(data);
         CheckStoneYieldWithSteelTools(data);
         CheckNightAndSurvival(data);
+        CheckWolfHuntAndMeat(data);
+        CheckWolfThroatLeap(data);
         CheckSleepAdvancesWorld(data);
         CheckActualProgression(data);
         GD.Print("SELF-TEST PASS");
@@ -530,6 +532,104 @@ public static class SimulationChecks
             Require(world.Player == World.Spawn && world.S.Health == 100,
                     $"{cause} death should respawn the player in a healthy state");
         }
+    }
+
+    private static World NightWorld(GameData data)
+    {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(20, 20);
+        world.S.Time = data.DaySeconds * (data.NightStarts + .02f);
+        return world;
+    }
+
+    private static void CheckWolfHuntAndMeat(GameData data)
+    {
+        var chase = NightWorld(data);
+        var runner = new Wolf { Pos = chase.Player + new Vector2(8, 0) };
+        chase.S.Wolves.Add(runner);
+        SafeTick(chase, 1);
+        Require(runner.Pos.DistanceTo(chase.Player) < 5, "a wolf should close at least three tiles per second");
+
+        var hunt = NightWorld(data);
+        hunt.S.Backpack.Add("iron_axe", 1);
+        hunt.S.Backpack.Add("wood", 1);
+        var prey = new Wolf { Pos = hunt.Player + new Vector2(1.5f, 0), Health = 1 };
+        hunt.S.Wolves.Add(prey);
+        hunt.Attack();
+        var carcass = hunt.S.Things.SingleOrDefault(t => t.Kind == "wolf_corpse");
+        Require(!hunt.S.Wolves.Contains(prey) && carcass != null && carcass.Remaining == 4,
+                "a killed wolf should leave a carcass with meat instead of retreating");
+        hunt.S.Time = data.DaySeconds * 1.2f;
+        SafeTick(hunt, .5f);
+        Require(hunt.S.Things.Contains(carcass!) && hunt.S.Wolves.Count == 0, "a carcass should outlast the night");
+
+        hunt.Player = carcass!.Pos + new Vector2(1, 0);
+        while (hunt.GatherBlock(carcass) == null) hunt.Gather(carcass, data.GatherSeconds);
+        Require(hunt.S.Backpack["raw_meat"] == 4, "butchering a carcass should yield all of its raw meat");
+        SafeTick(hunt, .1f);
+        Require(!hunt.S.Things.Contains(carcass), "a fully butchered carcass should disappear");
+
+        hunt.S.Hunger = 40;
+        hunt.Consume("raw_meat");
+        Require(hunt.S.Backpack["raw_meat"] == 4 && hunt.S.Hunger == 40, "raw meat must be cooked before it can be eaten");
+        var furnace = hunt.Add("furnace", hunt.Player + new Vector2(1, 1));
+        hunt.SetRecipe(furnace, "cooked_meat");
+        hunt.LoadBatch(furnace);
+        for (int i = 0; i < 28; i++) hunt.Tick(Step);
+        hunt.Collect(furnace);
+        Require(hunt.S.Backpack["cooked_meat"] == 2 && hunt.S.Backpack["raw_meat"] == 2 && hunt.S.Backpack["wood"] == 0,
+                "the stone furnace should cook two raw meat with one fuel");
+        hunt.S.Hunger = 40;
+        hunt.Consume("cooked_meat");
+        Require(hunt.S.Backpack["cooked_meat"] == 1 && hunt.S.Hunger == 80, "cooked meat should be edible and filling");
+    }
+
+    private static void CheckWolfThroatLeap(GameData data)
+    {
+        var healthy = NightWorld(data);
+        healthy.S.Health = 80;
+        var stalker = new Wolf { Pos = healthy.Player + new Vector2(3, 0), Attack = 5 };
+        healthy.S.Wolves.Add(stalker);
+        healthy.Tick(.2f);
+        Require(stalker.Leap == 0 && !healthy.S.Mauled, "wolves should not leap at a player above half health");
+
+        var sheltered = NightWorld(data);
+        sheltered.S.Health = 40;
+        sheltered.Add("campfire", sheltered.Player + new Vector2(2, 0)).Burn = 90;
+        var circling = new Wolf { Pos = sheltered.Player + new Vector2(-3, 0), Attack = 5 };
+        sheltered.S.Wolves.Add(circling);
+        sheltered.Tick(.2f);
+        Require(circling.Leap == 0 && !sheltered.S.Mauled, "campfire light should prevent the throat leap");
+
+        var maul = NightWorld(data);
+        maul.S.Health = 49;
+        foreach (var (item, count) in new[] { ("berries", 3), ("cooked_meat", 2), ("raw_meat", 1), ("water", 2), ("iron_axe", 1), ("wood", 4) })
+            maul.S.Backpack.Add(item, count);
+        var leaper = new Wolf { Pos = maul.Player + new Vector2(3, 0), Attack = 5 };
+        var packmate = new Wolf { Pos = maul.Player + new Vector2(-9, 4), Attack = 5 };
+        maul.S.Wolves.AddRange(new[] { leaper, packmate });
+        maul.Tick(.1f);
+        Require(leaper.Leap > 0 && !maul.S.Mauled, "a nearby wolf should leap at a player on half health");
+        maul.Tick(World.LeapSeconds);
+        Require(maul.S.Mauled && leaper.Feeding && leaper.Pinning && leaper.Pos.DistanceTo(maul.Player) < 1.6f,
+                "the leap should land at the throat and pin the player");
+        var pinned = maul.Player;
+        maul.MovePlayer(Vector2.Right);
+        maul.Attack();
+        Require(maul.Player == pinned && leaper.Health == 4, "a pinned player can neither move nor fight back");
+        for (int i = 0; i < 40 && !maul.Dead; i++) maul.Tick(.1f);
+        Require(maul.Dead, "a pinned player should be killed within seconds");
+        for (int i = 0; i < 20; i++) maul.Tick(.1f);
+        Require(packmate.Feeding && packmate.Pos.DistanceTo(pinned) < 1.6f && maul.S.Wolves.Contains(leaper),
+                "the rest of the pack should run in and stay to feed");
+        var box = maul.S.Things.Single(t => t.Kind == "grave");
+        Require(box.Inventory["berries"] == 0 && box.Inventory["cooked_meat"] == 0 && box.Inventory["raw_meat"] == 0,
+                "a wolf kill should leave no food in the recovery box");
+        Require(box.Inventory["water"] == 2 && box.Inventory["iron_axe"] == 1 && box.Inventory["wood"] == 4,
+                "a wolf kill should keep everything except food in the recovery box");
+        SafeTick(maul, data.RespawnSeconds);
+        Require(!maul.Dead && !maul.S.Mauled && !maul.S.Wolves.Contains(leaper) && !maul.S.Wolves.Contains(packmate),
+                "respawning should end the feast and free the player");
     }
 
     private static void CheckSleepAdvancesWorld(GameData data)

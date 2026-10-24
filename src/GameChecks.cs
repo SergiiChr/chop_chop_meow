@@ -136,6 +136,15 @@ public partial class Game
             berryCell!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(world.S.Backpack["berries"] == berriesBeforeClick - 1, "Clicking a berry cell must eat one berry.");
 
+            float dayTime = world.S.Time;
+            world.S.Time = world.Data.DaySeconds * (world.Data.NightStarts + .02f); world.S.Mauled = true;
+            var pinnedAt = world.Player;
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
+            await Seconds(.25);
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
+            await Frames();
+            UIRequire(world.Player == pinnedAt && view.PlayerAnimation == ActorAction.Mauled && deathLabel.Text.Contains("throat"), "A pinned player must not move and must show the mauled struggle.");
+            world.S.Mauled = false; world.S.Wolves.Clear(); world.S.Time = dayTime; world.S.Health = 100;
             world.S.Health = -1; await Seconds(.3);
             UIRequire(world.Dead && deathLabel.Text.Contains("Respawning in"), "Death must show the respawn countdown.");
             world.S.RespawnIn = .01f; await Seconds(.3);
