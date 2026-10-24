@@ -171,7 +171,7 @@ public partial class Game : Node
         AddLabel("The woods are quiet. For now.", 21);
         AddLabel("A small settlement begins with your own two hands. Shape iron, master the bellows, and send your first steel tools to the village.", 16, Muted);
         AddLabel("FIRST STEPS", 14);
-        AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Pick up loose iron northeast of the clearing.\n4  Press Esc any time to see your current goal.");
+        AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Right-click loose iron under the cliff to the northeast.\n4  Press Esc any time to see your current goal.");
         AddLabel("You begin with an iron axe, 10 berries and 6 wood. Drink at the pond to the west; gather water to carry. A fire and cabin protect you after dark.", 15, Muted);
         AddButton("Into the clearing", ClosePanel);
         if (Godot.FileAccess.FileExists(SavePath)) AddButton("Continue saved settlement", () => { Load(); ClosePanel(); });
@@ -219,11 +219,11 @@ public partial class Game : Node
         if (workerId > 0) { WorkerPanel(world.S.Workers.FirstOrDefault(w => w.Id == workerId)); return; }
         var t = world.Find(selected);
         if (t == null) { AddLabel("Select a building or resource in the world."); return; }
-        AddLabel(t.Kind == "loose_iron" ? "Loose iron ore" : t.Kind == "grave" ? "Recovery box" : world.Data.Name(t.Kind), 23);
+        AddLabel(world.Data.Name(t.Kind), 23);
         Dynamic(() => world.Near(t) ? "Within reach" : $"{world.Player.DistanceTo(t.Pos):0.0} tiles away · walk closer", 13, Muted);
         if (t.IsResource)
         {
-            Dynamic(() => $"{t.Remaining} remaining\n{world.GatherBlock(t) ?? "Hold right mouse on this resource to gather."}", 15);
+            Dynamic(() => $"{t.Remaining} remaining\n{world.GatherBlock(t) ?? (t.IsLoose ? "Right-click to walk over and pick it up." : "Hold right mouse on this resource to gather.")}", 15);
             if (t.Kind == "water") AddButton("Drink from the pond", () => { if (world.Near(t)) { world.S.Thirst = 100; Notify("Cool, fresh water."); } else Notify("Walk closer to the pond."); });
             AddLabel("Select a villager and choose Work to automate this resource. Their gathered supplies go to accepting storage.", 14, Muted); return;
         }
@@ -437,14 +437,21 @@ public partial class Game : Node
             float y = (Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up) ? 1 : 0);
             Vector2 direction = new Vector2(x + y * 2, y * 2 - x).Normalized();
             bool right = Input.IsMouseButtonPressed(MouseButton.Right);
-            if (gathering != null && right && direction == Vector2.Zero)
+            // A loose piece needs only one click: the player keeps walking to it after the button is released.
+            if (gathering != null && (right || gathering.IsLoose) && direction == Vector2.Zero)
             {
                 // Step in close enough for the tool to reach the model; the pond edge keeps its wider reach.
                 if (!world.Near(gathering, gathering.Kind == "water" ? 2.5f : 1.35f)) direction = (gathering.Pos - world.Player).Normalized();
+                else if (gathering.IsLoose)
+                {
+                    world.Gather(gathering, dt);
+                    if (world.Find(gathering.Id) == null && selected == gathering.Id) { selected = 0; view.Selected = 0; }
+                    gathering = null;
+                }
                 else { world.Gather(gathering, dt); if (world.GatherBlock(gathering) is string blocked) { Notify(blocked); gathering = null; } }
             }
-            else { world.ResetGather(); if (!right) gathering = null; }
-            world.MovePlayer(direction * dt * 4.2f); view.Gathering = gathering != null && right && world.Near(gathering, 2.5f);
+            else { world.ResetGather(); if (!right || gathering?.IsLoose == true) gathering = null; }
+            world.MovePlayer(direction * dt * 4.2f); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
             view.GatheringTarget = view.Gathering ? gathering : null;
             world.Tick(dt); ShowEndingOnce(); autosave += dt;
             if (autosave >= 90) { Save(); autosave = 0; }

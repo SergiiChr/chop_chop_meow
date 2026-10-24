@@ -372,13 +372,12 @@ public partial class WorldView : Node3D
                 Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
                 Burst(To3(subject.Pos, 3.6f), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
-            case "stone" or "iron" or "coal":
+            case "stone" or "iron" or "coal" or "loose_iron" or "loose_coal":
                 var color = subject.Kind == "stone" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : "26282b";
                 Burst(side + Vector3.Up * .5f, Mat(color), 6, 2.4f, .5f, 9, .07f);
                 Burst(side + Vector3.Up * .4f, Flat(new Color(.8f, .78f, .7f, .45f)), 3, .5f, .9f, -.3f, .16f, 1.5f);
                 if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Flat(new Color("ffd27a")), 5, 3.2f, .3f, 4, .025f);
                 break;
-            case "loose_iron": Burst(side + Vector3.Up * .1f, Flat(new Color(.75f, .6f, .45f, .5f)), 3, .5f, .7f, -.2f, .12f, 1.2f); break;
             case "wolf_corpse": Burst(side + Vector3.Up * .3f, Mat("7a1414", .6f), 5, 1.4f, .45f, 8, .04f); break;
             case "berries": Burst(To3(subject.Pos, .7f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f); break;
             case "water": Burst(side + Vector3.Up * .05f, Flat(new Color(.7f, .88f, .95f, .8f)), 6, 1.6f, .45f, 7, .045f); break;
@@ -442,7 +441,7 @@ public partial class WorldView : Node3D
                 sway.Visible = prop.Fall < 1.7f;
                 prop.Stump!.Visible = true;
                 break;
-            case "stone" or "iron" or "coal" or "loose_iron":
+            case "stone" or "iron" or "coal" or "loose_iron" or "loose_coal":
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
@@ -660,7 +659,7 @@ public partial class WorldView : Node3D
         }
         // Only the hovered object is named; the side panel already names the selection.
         var hovered = World.Find(Hover);
-        if (hovered != null) Tag(Screen(hovered.Pos, HitsOf(hovered).Max(h => h.Top) + .2f) - new Vector2(0, 8), hovered.Kind == "loose_iron" ? "Loose iron" : World.Data.Name(hovered.Kind));
+        if (hovered != null) Tag(Screen(hovered.Pos, HitsOf(hovered).Max(h => h.Top) + .2f) - new Vector2(0, 8), World.Data.Name(hovered.Kind));
         foreach (var w in World.S.Workers.Where(w => w.Id == HoverWorker || w.Id == SelectedWorker))
             Tag(Screen(w.Pos, 2.05f), w.Name);
         // The landmark guide follows the player's position rather than assuming they remain at spawn.
@@ -673,7 +672,7 @@ public partial class WorldView : Node3D
             return d.Y > 0 ? d.X > 0 ? "↘" : "↙" : d.X > 0 ? "↗" : "↖";
         }
         // Point only toward what the current objective sends the player to find.
-        string? guide = World.S.Goal switch { 2 => $"IRON {Direction(new Vector2(30, 18))}", 5 => $"COAL {Direction(new Vector2(37, 20))}", _ => null };
+        string? guide = World.S.Goal switch { 2 => $"IRON {Direction(World.CliffOf("iron").Center)}", 5 => $"COAL {Direction(World.CliffOf("coal").Center)}", _ => null };
         if (guide != null) overlay.DrawString(font, new Vector2(25, GetViewport().GetVisibleRect().Size.Y - 210), guide, HorizontalAlignment.Left, -1, 13, new Color("f4ecd3"));
     }
 }
