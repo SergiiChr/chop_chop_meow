@@ -61,6 +61,16 @@
       "name": "Fresh water",
       "price": 2,
       "color": "88cbe0"
+    },
+    "raw_meat": {
+      "name": "Raw meat",
+      "price": 2,
+      "color": "c4524a"
+    },
+    "cooked_meat": {
+      "name": "Cooked meat",
+      "price": 5,
+      "color": "9a5a32"
     }
   },
   "buildings": {
@@ -93,7 +103,7 @@
         "stone": 16,
         "wood": 6
       },
-      "description": "Smelts iron ore. Uses wood or mined coal as fuel."
+      "description": "Smelts iron ore and cooks meat. Uses wood or mined coal as fuel."
     },
     "anvil": {
       "name": "Anvil",
@@ -131,6 +141,16 @@
       "output": "iron_bar",
       "amount": 1,
       "seconds": 8
+    },
+    "cooked_meat": {
+      "name": "Cook meat",
+      "station": "furnace",
+      "inputs": {
+        "raw_meat": 2
+      },
+      "output": "cooked_meat",
+      "amount": 2,
+      "seconds": 6
     },
     "steel_bar": {
       "name": "Smelt steel",

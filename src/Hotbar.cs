@@ -23,6 +23,8 @@ public partial class Game
     {
         if (hotbarIcons.TryGetValue(id, out var cached)) return cached;
         Texture2D? atlas = null; int cell = -1, columns = 4, rows = 3;
+        // Meat icons are hand-written SVGs; the illustrated atlas has no free cells left for them.
+        if (id is "raw_meat" or "cooked_meat") return hotbarIcons[id] = GD.Load<Texture2D>($"res://assets/ui/{id}.svg");
         if (id is "iron_axe" or "iron_pick" or "steel_tools" or "iron_bar" or "steel_bar" or "wood" or "stone" or "iron_ore" or "coal" or "berries" or "water")
         {
             atlas = itemAtlas;
@@ -126,7 +128,7 @@ public partial class Game
         {
             view.BuildMode = id; ClosePanel(); Notify($"Place {world.Data.Name(id)}.");
         }
-        else if (id is "berries" or "water") world.Consume(id);
+        else if (id is "berries" or "water" or "cooked_meat" or "raw_meat") world.Consume(id);
         else if (world.Data.Items.ContainsKey(id)) Notify($"Selected {world.Data.Name(id)}. Carried tools work with Space and gathering.");
         else Notify($"Unknown hotbar item: {id}.");
         RefreshLive();

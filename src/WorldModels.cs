@@ -14,7 +14,8 @@ public sealed class Prop
     public readonly Node3D Root = new();
     public readonly Node3D Body;
     public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire;
-    public MeshInstance3D? Glow, Window;
+    public MeshInstance3D? Glow, Window, Pool;
+    public WorldModels.WolfModel? Wolf;
     public OmniLight3D? Light;
     public Vector3 Vent;
     public Hit[] Hits = Array.Empty<Hit>();
@@ -35,6 +36,7 @@ public static class WorldModels
         "stone" => t.Remaining / 64f,
         "iron" or "coal" => t.Remaining / 400f,
         "loose_iron" => t.Remaining / 16f,
+        "wolf_corpse" => t.Remaining / 4f,
         _ => 1
     };
 
@@ -57,6 +59,7 @@ public static class WorldModels
         "stone" => new[] { new Hit(.75f, 0, .9f) },
         "iron" or "coal" => new[] { new Hit(.8f, 0, 1) },
         "loose_iron" => new[] { new Hit(.45f, 0, .35f) },
+        "wolf_corpse" => new[] { new Hit(.65f, 0, .5f) },
         "berries" => new[] { new Hit(.65f, 0, 1) },
         "water" => new[] { new Hit(1.2f, 0, .5f) },
         "furnace" => new[] { new Hit(.72f, 0, 1.15f) },
@@ -81,6 +84,7 @@ public static class WorldModels
             case "iron": Rocks(body, t.Id, new[] { "7d5b45", "8f6a50", "6e4f3c" }, "b4622a"); break;
             case "coal": Rocks(body, t.Id, new[] { "2d2f33", "3a3c40", "26282b" }, "15161a"); break;
             case "loose_iron": LooseOre(body, t.Id); break;
+            case "wolf_corpse": Carcass(prop); break;
             case "berries": Bush(prop, t.Id); break;
             case "water": break; // The pond is the drinking spot; this thing only provides the hit area.
             case "furnace": BlockFurnace(prop); break;
@@ -157,6 +161,13 @@ public static class WorldModels
             var at = new Vector3(MathF.Cos(angle) * .22f, .08f, MathF.Sin(angle) * .22f);
             Sphere(body, .13f + Jitter(id, 70 + i) * .06f, at, Mat(i % 2 == 0 ? "a35a2e" : "8b4f2b", .95f), new Vector3(1, .7f, 1.1f), 6);
         }
+    }
+
+    private static void Carcass(Prop prop)
+    {
+        prop.Pool = Cylinder(prop.Body, .55f, .55f, .004f, new Vector3(.1f, .006f, 0), Flat(new Color(.36f, .05f, .05f, .75f), true), null, 14);
+        prop.Wolf = new WolfModel();
+        prop.Body.AddChild(prop.Wolf.Root);
     }
 
     private static void Bush(Prop prop, int id)
@@ -364,10 +375,11 @@ public static class WorldModels
         return light;
     }
 
-    /// <summary>Wolf with four hinged legs, built facing +Z.</summary>
+    /// <summary>Wolf with four hinged legs, built facing +Z; <see cref="Body"/> lifts and tilts for leaps, feeding and death.</summary>
     public sealed class WolfModel
     {
         public readonly Node3D Root = new();
+        public readonly Node3D Body;
         public readonly Node3D[] Legs = new Node3D[4];
         public readonly Node3D Head, Tail;
         public float Stride, Yaw;
@@ -375,10 +387,11 @@ public static class WorldModels
 
         public WolfModel()
         {
+            Body = Pivot(Root, Vector3.Zero);
             var fur = Mat("6b6e6a"); var light = Mat("a5a69e"); var dark = Mat("44464a");
-            Add(Root, new CapsuleMesh { Radius = .2f, Height = 1f, RadialSegments = 10 }, fur, new Vector3(0, .62f, 0), new Vector3(90, 0, 0), new Vector3(1, 1, 1.05f));
-            Add(Root, new CapsuleMesh { Radius = .16f, Height = .7f, RadialSegments = 10 }, light, new Vector3(0, .54f, .02f), new Vector3(90, 0, 0));
-            Head = Pivot(Root, new Vector3(0, .78f, .48f));
+            Add(Body, new CapsuleMesh { Radius = .2f, Height = 1f, RadialSegments = 10 }, fur, new Vector3(0, .62f, 0), new Vector3(90, 0, 0), new Vector3(1, 1, 1.05f));
+            Add(Body, new CapsuleMesh { Radius = .16f, Height = .7f, RadialSegments = 10 }, light, new Vector3(0, .54f, .02f), new Vector3(90, 0, 0));
+            Head = Pivot(Body, new Vector3(0, .78f, .48f));
             Sphere(Head, .16f, new Vector3(0, 0, .04f), fur, new Vector3(1, .95f, 1.1f), 10);
             Cylinder(Head, .09f, .05f, .22f, new Vector3(0, -.04f, .26f), light, new Vector3(90, 0, 0), 8);
             Sphere(Head, .03f, new Vector3(0, -.01f, .37f), dark, null, 6);
@@ -386,24 +399,64 @@ public static class WorldModels
             Post(Head, .05f, 0, .13f, new Vector3(-.08f, .12f, 0), fur, 4);
             Sphere(Head, .022f, new Vector3(.07f, .04f, .17f), Mat("e2a570", .3f, 0, 1.5f), null, 6);
             Sphere(Head, .022f, new Vector3(-.07f, .04f, .17f), Mat("e2a570", .3f, 0, 1.5f), null, 6);
-            Tail = Pivot(Root, new Vector3(0, .7f, -.52f), new Vector3(-130, 0, 0));
+            // Bared fangs under the muzzle.
+            Post(Head, .012f, 0, .05f, new Vector3(.03f, -.09f, .33f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
+            Post(Head, .012f, 0, .05f, new Vector3(-.03f, -.09f, .33f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
+            Tail = Pivot(Body, new Vector3(0, .7f, -.52f), new Vector3(-130, 0, 0));
             Add(Tail, new CapsuleMesh { Radius = .07f, Height = .5f, RadialSegments = 8 }, fur, new Vector3(0, .22f, 0));
             int index = 0;
             foreach (var (x, z) in new[] { (.11f, .32f), (-.11f, .32f), (.11f, -.32f), (-.11f, -.32f) })
             {
-                Legs[index] = Pivot(Root, new Vector3(x, .5f, z));
+                Legs[index] = Pivot(Body, new Vector3(x, .5f, z));
                 Limb(Legs[index], .045f, .5f, new Vector3(0, .02f, 0), index < 2 ? fur : dark);
                 index++;
             }
         }
 
+        /// <summary>Front legs take <paramref name="front"/> degrees and hind legs <paramref name="hind"/>; positive swings a foot back.</summary>
+        private void Pose(float front, float hind, float head, float tail, float lift = 0, float pitch = 0, float roll = 0, float shift = 0)
+        {
+            Body.Position = new Vector3(shift, lift, 0);
+            Body.RotationDegrees = new Vector3(pitch, 0, roll);
+            for (int i = 0; i < 4; i++) Legs[i].RotationDegrees = new Vector3(i < 2 ? front : hind, 0, 0);
+            Head.RotationDegrees = new Vector3(head, 0, 0);
+            Tail.RotationDegrees = new Vector3(tail, 0, 0);
+        }
+
         public void Trot(float stride, bool running)
         {
-            float swing = running ? MathF.Sin(stride) * 28 : 0;
+            Pose(0, 0, 0, 0);
+            float swing = running ? MathF.Sin(stride) * 34 : 0;
             for (int i = 0; i < 4; i++) Legs[i].RotationDegrees = new Vector3(i is 0 or 3 ? swing : -swing, 0, 0);
-            Head.RotationDegrees = new Vector3(running ? MathF.Sin(stride * 2) * 4 : MathF.Sin(stride * .5f) * 6 - 4, 0, 0);
+            // A running wolf carries its head low and level, like it is hunting.
+            Head.RotationDegrees = new Vector3(running ? 10 + MathF.Sin(stride * 2) * 4 : MathF.Sin(stride * .5f) * 6 - 4, 0, 0);
             Tail.RotationDegrees = new Vector3(-130 + MathF.Sin(stride * 1.3f) * 8, MathF.Sin(stride) * 10, 0);
         }
+
+        /// <summary>A leap at the throat: <paramref name="progress"/> runs 0 to 1 from take-off to landing.</summary>
+        public void Leap(float progress)
+        {
+            float t = Math.Clamp(progress, 0, 1);
+            Pose(-70 + t * 20, 65 - t * 35, -10 + t * 30, -95, MathF.Sin(t * Mathf.Pi) * .75f, Mathf.Lerp(-28, 26, t));
+        }
+
+        /// <summary>Head down and tearing, legs braced; <paramref name="time"/> drives the shaking.</summary>
+        public void Feed(float time)
+        {
+            Pose(-14, 22, 48 + MathF.Sin(time * 9) * 12, -150, -.1f, 14);
+            Head.RotationDegrees += new Vector3(0, MathF.Sin(time * 13) * 18, 0);
+        }
+
+        /// <summary>A killed wolf buckles, then rolls onto its side with stiff legs as <paramref name="progress"/> runs 0 to 1.</summary>
+        public void Fall(float progress)
+        {
+            float buckle = Ease(Math.Clamp(progress / .35f, 0, 1)), roll = Ease(Math.Clamp((progress - .25f) / .5f, 0, 1));
+            float fold = 45 * buckle * (1 - roll);
+            // Rolling about the ground point would sink the body, so it shifts back over its old footprint as it goes.
+            Pose(-fold - 22 * roll, fold + 26 * roll, 35 * buckle - 15 * roll, -150 + 40 * roll, -.22f * buckle * (1 - roll) + .2f * roll, 0, 90 * roll, .62f * roll);
+        }
+
+        private static float Ease(float t) => t * t * (3 - 2 * t);
     }
 
     /// <summary>Courier pulling a two-wheel garden cart; the cart load shows goods or the payment cash box.</summary>
