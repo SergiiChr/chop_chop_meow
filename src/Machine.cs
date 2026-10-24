@@ -3,7 +3,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Factorio-style station view: one typed slot per input and output, each holding a single stack.</summary>
+/// <summary>Station view: one typed slot per input and output, each holding a single stack.</summary>
 public partial class Game
 {
     private void Machine(Thing t)

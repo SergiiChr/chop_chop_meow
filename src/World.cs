@@ -267,7 +267,7 @@ public sealed class World
             foreach (var pair in cost) S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
         }
     }
-    /// <summary>Manual loading of one input slot, which holds at most one stack like a Factorio machine.</summary>
+    /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
     public int LoadInput(Thing t, string item, int quantity)
     {
         if (!Near(t)) { Say("Walk closer to load this building."); return 0; }

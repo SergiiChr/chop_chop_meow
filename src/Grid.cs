@@ -4,7 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Factorio-style icon cells shared by inventory, storage, station and build pages.</summary>
+/// <summary>Icon cells shared by inventory, storage, station and build pages.</summary>
 public partial class Game
 {
     private const int GridColumns = 6;
