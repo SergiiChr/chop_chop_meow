@@ -14,7 +14,7 @@ Food, water, the day/night cycle, shelter, wages, and wolf encounters support th
 - Steel recipes consume iron bars and mined coal. Charcoal production is not implemented.
 - Inventories are slot grids with stacks of 64; a worker carries one stack of up to 5.
 - Selling lowers prices unit by unit and they recover over time; buying costs a fixed 1.25× the base price. A cart trip takes 30 seconds; purchases and sale proceeds settle on return.
-- Workers are tracked individually. Resource assignments gather and deliver materials; building assignments haul recipe inputs and outputs and can operate furnace bellows. Two workers assigned to a reinforced furnace split bellows and hauling work.
+- Workers are tracked individually. Resource assignments gather and deliver materials; building assignments haul recipe inputs and outputs and can operate furnace bellows. Only one worker ever pumps a reinforced furnace: with two or more assigned, the first operates the bellows from its handle end and the rest only haul; a lone worker alternates pumping and hauling.
 - Chests have separate item allowlists for input and output. Empty lists allow all items. Automated deposits prefer a chest with a matching input filter, then a nearby unrestricted chest. Automated withdrawals respect output filters. Manual transfers ignore those filters.
 - Pollution, vampires, multiplayer, and technology beyond steel are outside this POC.
 

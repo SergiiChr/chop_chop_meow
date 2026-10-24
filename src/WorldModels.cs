@@ -14,6 +14,7 @@ public sealed class Prop
     public readonly Node3D Root = new();
     public readonly Node3D Body;
     public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire;
+    public Node3D[] Pleats = Array.Empty<Node3D>();
     public MeshInstance3D? Glow, Window, Pool;
     public WorldModels.WolfModel? Wolf;
     public OmniLight3D? Light;
@@ -214,7 +215,7 @@ public static class WorldModels
         prop.Light = Light(body, new Vector3(0, .35f, .7f), 2.6f);
     }
 
-    /// <summary>A propane-tank forge on an angle-iron stand, fed by a plywood lever bellows with a heat gauge on top.</summary>
+    /// <summary>A propane-tank forge on an angle-iron stand, fed by a hinged leather bellows with a heat gauge on top.</summary>
     private static void DrumForge(Prop prop)
     {
         var body = prop.Body;
@@ -238,18 +239,28 @@ public static class WorldModels
         var needle = Pivot(body, new Vector3(.2f, 1.48f, .22f));
         Box(needle, new Vector3(.012f, .085f, .01f), new Vector3(0, .04f, 0), Mat("c62828"));
         prop.Needle = needle;
-        // Air pipe from the bellows into the side of the tank.
-        Cylinder(body, .05f, .05f, .5f, new Vector3(.55f, .55f, .05f), steel, new Vector3(0, 0, 90), 8);
-        var ply = Mat("caa56c");
-        Box(body, new Vector3(.4f, .1f, .7f), new Vector3(1f, .05f, .05f), Mat("6f5a40"));
-        Box(body, new Vector3(.42f, .03f, .72f), new Vector3(1f, .4f, .05f), ply);
-        Box(body, new Vector3(.36f, .3f, .1f), new Vector3(1f, .25f, -.25f), Mat("6f5a40"));
-        var lever = Pivot(body, new Vector3(1f, .42f, -.3f));
-        Box(lever, new Vector3(.42f, .03f, .72f), new Vector3(0, .02f, .36f), ply);
-        Box(lever, new Vector3(.38f, .14f, .66f), new Vector3(0, -.06f, .34f), Mat("3a3330", .9f));
-        Box(lever, new Vector3(.05f, .6f, .05f), new Vector3(0, .3f, .62f), Mat("8a5a32"));
-        Cylinder(lever, .03f, .03f, .3f, new Vector3(0, .6f, .62f), Mat("222222"), new Vector3(0, 0, 90), 8);
+        // A classic hinged bellows behind the forge, built along the rig's +X, which points to the back of the tank.
+        // Teardrop boards hinge at the nozzle and are joined by leather pleats.
+        var rig = Pivot(body, Vector3.Zero, new Vector3(0, 90, 0));
+        Post(rig, .05f, .05f, .5f, new Vector3(.5f, .28f, 0), steel, 8);
+        var hinge = new Vector3(.66f, .26f, 0);
+        var wood = Mat("8a5f3c");
+        var leather = Mat("3b2619", .9f);
+        foreach (float x in new[] { .95f, 1.4f }) Box(rig, new Vector3(.08f, .2f, .5f), new Vector3(x, .1f, 0), Mat("6f5a40"));
+        Paddle(rig, hinge + new Vector3(0, -.03f, 0), 1, wood);
+        Cylinder(rig, .07f, .025f, .22f, new Vector3(.55f, .3f, 0), Mat("b8893a", .4f, .8f), new Vector3(0, 0, 90), 10);
+        var lever = Pivot(rig, hinge);
+        Paddle(lever, new Vector3(0, .13f, 0), 1, wood);
+        Box(lever, new Vector3(.06f, .62f, .06f), new Vector3(1f, .44f, 0), Mat("8a5a32"));
+        Cylinder(lever, .03f, .03f, .34f, new Vector3(1f, .75f, 0), Mat("222222"), new Vector3(90, 0, 0), 8);
         prop.Lever = lever;
+        // Each pleat hangs from the hinge and follows a share of the lid's swing, so the leather folds as it closes.
+        prop.Pleats = new Node3D[3];
+        for (int i = 0; i < 3; i++)
+        {
+            prop.Pleats[i] = Pivot(rig, hinge);
+            Paddle(prop.Pleats[i], new Vector3(0, -.03f + (i + 1) * .04f, 0), i % 2 == 0 ? .97f : .88f, leather);
+        }
         prop.Light = Light(body, new Vector3(0, .9f, .9f), 3);
     }
 
@@ -363,6 +374,13 @@ public static class WorldModels
         prop.Fire = fire;
         prop.Vent = new Vector3(0, .8f, 0);
         prop.Light = Light(body, new Vector3(0, .8f, 0), 7);
+    }
+
+    /// <summary>A flat teardrop bellows board pointing its narrow end at <paramref name="tip"/> and widening toward +X.</summary>
+    private static void Paddle(Node3D parent, Vector3 tip, float scale, Material material)
+    {
+        Cylinder(parent, .34f, .34f, .04f, tip + new Vector3(.34f * scale, 0, 0), material, new Vector3(0, -90, 0), 3).Scale = new Vector3(scale, 1, scale);
+        Cylinder(parent, .34f, .34f, .04f, tip + new Vector3(.68f * scale, 0, 0), material, null, 16).Scale = new Vector3(scale, 1, scale);
     }
 
     /// <summary>Needle roll in degrees for a heat fraction: cold points left, full heat points right.</summary>

@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using ChopChopMeow;
 using Godot;
 
@@ -80,7 +81,7 @@ public static class WorkerStateChecks
     {
         var world = EmptyWorld(data);
         var furnace = world.Add("reinforced", new Vector2(20, 20));
-        var bellowsWorker = AddWorker(world, furnace.Pos + new Vector2(.7f, .2f));
+        var bellowsWorker = AddWorker(world, furnace.Pos + World.BellowsStand);
         var secondWorker = AddWorker(world, furnace.Pos);
         world.Assign(bellowsWorker, furnace);
         world.Assign(secondWorker, furnace);
@@ -88,6 +89,18 @@ public static class WorkerStateChecks
         world.Tick(.25f);
         Require(bellowsWorker.WorkState == WorkerWorkState.Pumping,
                 "the assigned furnace bellows operator should enter pumping state through World.Tick");
+
+        // Idle haulers with nothing to fetch used to pump too; extra crew must never join the operator.
+        var thirdWorker = AddWorker(world, furnace.Pos);
+        world.Assign(thirdWorker, furnace);
+        for (int i = 0; i < 40; i++)
+        {
+            world.Tick(.25f);
+            Require(world.S.Workers.Count(w => w.WorkState == WorkerWorkState.Pumping) <= 1,
+                    "at most one worker should pump the bellows at a time");
+        }
+        Require(bellowsWorker.WorkState == WorkerWorkState.Pumping,
+                "the first assigned worker should keep operating the bellows with extra crew assigned");
     }
 
     private static void CheckSaveRoundTrip(GameData data)

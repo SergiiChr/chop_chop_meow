@@ -295,7 +295,7 @@ public partial class Game : Node
             check.Toggled += on => { world.Assign(worker, on ? t : null); RefreshLive(); };
             content.AddChild(check);
         }
-        if (t.Kind == "reinforced") AddLabel("Two workers: first assigned operates bellows; the other hauls. One worker alternates pumping and hauling.", 13, Muted);
+        if (t.Kind == "reinforced") AddLabel("Only one worker pumps: the first assigned operates the bellows and the rest haul. A lone worker alternates pumping and hauling.", 13, Muted);
     }
     private void WorkerPanel(Worker? w)
     {

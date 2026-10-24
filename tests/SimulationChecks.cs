@@ -157,7 +157,7 @@ public static class SimulationChecks
         var chest = world.Add("chest", new Vector2(23, 20));
         chest.Inventory.Add("iron_bar", 4);
         chest.Inventory.Add("coal", 6);
-        var bellowsWorker = AddWorker(world, furnace.Pos + new Vector2(.7f, .2f));
+        var bellowsWorker = AddWorker(world, furnace.Pos + World.BellowsStand);
         var hauler = AddWorker(world, chest.Pos);
         world.Assign(bellowsWorker, furnace);
         world.Assign(hauler, furnace);
