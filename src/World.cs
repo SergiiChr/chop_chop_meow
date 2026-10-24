@@ -185,6 +185,8 @@ public sealed class World
         if (p.X < 1 || p.Y < 1 || p.X > 46 || p.Y > 46 || p.DistanceTo(Pond) < PondRadius || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth)) return false;
         return !S.Things.Any(t => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" && t.Pos.DistanceTo(p) < Footprint(t.Kind));
     }
+    /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
+    public static readonly Vector2 BellowsStand = new(0, -2.1f);
     public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "chest" or "anvil" => .45f, _ => .35f };
     public void MovePlayer(Vector2 delta)
     {
@@ -438,14 +440,19 @@ public sealed class World
         while (node != start) { result.Add(node); node = previous[node]; }
         result.Reverse(); return result;
     }
-    private bool Walk(Worker w, Vector2 destination, float dt)
+    /// <summary>Moves a worker toward a destination and reports arrival within <paramref name="reach"/>.
+    /// A spot closer than the usual reach is a preference: if it cannot be reached, the usual reach counts as arrival.</summary>
+    private bool Walk(Worker w, Vector2 destination, float dt, float reach = 1.2f)
     {
-        if (w.Pos.DistanceTo(destination) < 1.2f) return true;
+        float distance = w.Pos.DistanceTo(destination);
+        if (distance < reach) return true;
         if (w.RouteTarget.DistanceTo(destination) > .2f) { w.Route.Clear(); w.RouteTarget = destination; }
-        var next = w.Pos.MoveToward(destination, dt * 2.25f);
+        // Stop at arrival range rather than overshooting into the target's footprint, where the step would be refused.
+        var next = w.Pos.MoveToward(destination, Math.Min(dt * 2.25f, distance - reach + .05f));
         if (w.Route.Count == 0 && CanStand(next)) { w.Pos = next; return false; }
         if (w.Route.Count > 0 && !CanStand(w.Route[0])) w.Route.Clear();
         if (w.Route.Count == 0) w.Route.AddRange(FindRoute(w.Pos, destination));
+        if (w.Route.Count == 0 && distance < 1.2f) return true;
         if (w.Route.Count == 0) { w.Status = "Path blocked · clear a route"; w.WorkState = WorkerWorkState.Blocked; return false; }
         w.Pos = w.Pos.MoveToward(w.Route[0], dt * 2.25f);
         if (w.Pos.DistanceTo(w.Route[0]) < .06f) w.Route.RemoveAt(0);
@@ -489,7 +496,7 @@ public sealed class World
         var coworkers = S.Workers.Where(other => other.Assignment == target.Id && other.WageDebt <= 0).OrderBy(other => other.Id).ToList();
         if (target.Kind == "reinforced" && coworkers.Count >= 2 && coworkers[0] == w)
         {
-            w.Status = "Operating bellows"; if (Walk(w, target.Pos + new Vector2(.7f, .2f), dt)) { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 18); }
+            w.Status = "Operating bellows"; if (Walk(w, target.Pos + BellowsStand, dt, .1f)) { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 18); }
             return;
         }
         if (target.Kind == "campfire")
@@ -519,10 +526,12 @@ public sealed class World
             if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, pair.Key, pair.Value * 2 - target.Inventory[pair.Key], true); w.Destination = target.Id; }
             return;
         }
-        w.Status = target.Kind == "reinforced" ? "Pumping bellows between loads" : "Working at station";
+        // Only one worker ever pumps: a lone worker pumps between loads, while extra crew only haul.
+        bool pumps = target.Kind == "reinforced" && coworkers.Count < 2;
+        w.Status = pumps ? "Pumping bellows between loads" : target.Kind == "reinforced" ? "Waiting for the next load" : "Working at station";
         if (Walk(w, target.Pos, dt))
         {
-            if (target.Kind == "reinforced") { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 16); }
+            if (pumps) { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 16); }
             else if (target.Kind == "anvil") w.WorkState = WorkerWorkState.Hammering;
         }
     }

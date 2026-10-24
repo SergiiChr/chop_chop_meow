@@ -468,7 +468,9 @@ public partial class WorldView : Node3D
                 prop.Glow!.Visible = heat > .05f || t.Processing;
                 prop.Light!.LightEnergy = (heat * 1.5f + (t.Processing ? .4f : 0)) * (1 + flicker * .15f) * (.5f + night);
                 prop.Needle!.RotationDegrees = new Vector3(0, 0, Mathf.Lerp(prop.Needle.RotationDegrees.Z, WorldModels.Gauge(heat), Math.Min(1, dt * 6)));
-                prop.Lever!.RotationDegrees = new Vector3(-16 * (1 - pumping.GetValueOrDefault(t.Id)), 0, 0);
+                float lift = 18 * (1 - pumping.GetValueOrDefault(t.Id));
+                prop.Lever!.RotationDegrees = new Vector3(0, 0, lift);
+                for (int i = 0; i < prop.Pleats.Length; i++) prop.Pleats[i].RotationDegrees = new Vector3(0, 0, lift * (i + 1) / (prop.Pleats.Length + 1));
                 Smoke(prop, t, t.Processing || heat > .3f, dt);
                 break;
             case "campfire":
