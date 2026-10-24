@@ -35,7 +35,6 @@ public static class WorldModels
     {
         "stone" => t.Remaining / 64f,
         "iron" or "coal" => t.Remaining / 400f,
-        "loose_iron" => t.Remaining / 16f,
         "wolf_corpse" => t.Remaining / 4f,
         _ => 1
     };
@@ -58,7 +57,7 @@ public static class WorldModels
         },
         "stone" => new[] { new Hit(.75f, 0, .9f) },
         "iron" or "coal" => new[] { new Hit(.8f, 0, 1) },
-        "loose_iron" => new[] { new Hit(.45f, 0, .35f) },
+        "loose_iron" or "loose_coal" => new[] { new Hit(.45f, 0, .35f) },
         "wolf_corpse" => new[] { new Hit(.65f, 0, .5f) },
         "berries" => new[] { new Hit(.65f, 0, 1) },
         "water" => new[] { new Hit(1.2f, 0, .5f) },
@@ -83,7 +82,8 @@ public static class WorldModels
             case "stone": Rocks(body, t.Id, new[] { "8d918e", "a3a7a3", "7c807d" }, null); break;
             case "iron": Rocks(body, t.Id, new[] { "7d5b45", "8f6a50", "6e4f3c" }, "b4622a"); break;
             case "coal": Rocks(body, t.Id, new[] { "2d2f33", "3a3c40", "26282b" }, "15161a"); break;
-            case "loose_iron": LooseOre(body, t.Id); break;
+            case "loose_iron": LooseOre(body, t.Id, "a35a2e", "8b4f2b"); break;
+            case "loose_coal": LooseOre(body, t.Id, "2d2f33", "1d1e21"); break;
             case "wolf_corpse": Carcass(prop); break;
             case "berries": Bush(prop, t.Id); break;
             case "water": break; // The pond is the drinking spot; this thing only provides the hit area.
@@ -153,13 +153,13 @@ public static class WorldModels
         }
     }
 
-    private static void LooseOre(Node3D body, int id)
+    private static void LooseOre(Node3D body, int id, string light, string dark)
     {
         for (int i = 0; i < 4; i++)
         {
             float angle = i * 1.6f + Jitter(id, 60 + i);
             var at = new Vector3(MathF.Cos(angle) * .22f, .08f, MathF.Sin(angle) * .22f);
-            Sphere(body, .13f + Jitter(id, 70 + i) * .06f, at, Mat(i % 2 == 0 ? "a35a2e" : "8b4f2b", .95f), new Vector3(1, .7f, 1.1f), 6);
+            Sphere(body, .13f + Jitter(id, 70 + i) * .06f, at, Mat(i % 2 == 0 ? light : dark, .95f), new Vector3(1, .7f, 1.1f), 6);
         }
     }
 

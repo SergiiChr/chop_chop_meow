@@ -68,6 +68,7 @@ public sealed class GameData
         "tree" => "Tree",
         "iron" => "Iron deposit",
         "loose_iron" => "Loose iron ore",
+        "loose_coal" => "Loose coal",
         "grave" => "Recovery box",
         "wolf_corpse" => "Wolf carcass",
         _ => id.Replace('_', ' ')

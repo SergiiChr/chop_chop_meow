@@ -26,6 +26,7 @@ public static class SimulationChecks
         CheckFuelAndHeatGates(data);
         CheckProcessingOutputCapacity(data);
         CheckToolGatesAndPlacement(data);
+        CheckCliffsAndLoosePickup(data);
         CheckStoneYieldWithSteelTools(data);
         CheckNightAndSurvival(data);
         CheckWolfHuntAndMeat(data);
@@ -689,6 +690,46 @@ public static class SimulationChecks
         Require(world.S.Backpack[item] >= quantity, $"gathered enough {item} for the progression");
     }
 
+    private static void PickUp(World world, Thing loose)
+    {
+        world.Player = loose.Pos;
+        world.Gather(loose, 0);
+        Require(world.Find(loose.Id) == null, $"picking up {loose.Kind} should take the whole piece at once");
+    }
+
+    private static void CheckCliffsAndLoosePickup(GameData data)
+    {
+        var world = new World(data);
+        foreach (var cliff in World.Cliffs)
+        {
+            Require(!world.CanStand(cliff.Center), $"the {cliff.Ore} cliff should block movement");
+            var deposits = world.S.Things.Where(t => t.Kind == cliff.Ore).ToList();
+            var loose = world.S.Things.Where(t => t.Kind == $"loose_{cliff.Ore}").ToList();
+            Require(deposits.Count > 0 && deposits.All(t => cliff.DistanceTo(t.Pos) < 3),
+                    $"{cliff.Ore} deposits should only spawn at the foot of their cliff");
+            Require(loose.Count > 0 && loose.All(t => cliff.DistanceTo(t.Pos) is > 3 and < 10 && world.CanStand(t.Pos)),
+                    $"loose {cliff.Ore} should spread a little further than the deposits but stay near the cliff");
+        }
+        Require(world.S.Things.Where(t => t.Kind == "loose_iron").Sum(t => t.Remaining) is >= 14 and < 24,
+                "loose iron should cover the anvil and pickaxe without also paying for a bellows furnace");
+
+        // Loose pieces need no tool and no gather time; the whole piece goes into the backpack.
+        var piece = world.S.Things.First(t => t.Kind == "loose_coal");
+        world.S.Backpack.Remove("iron_axe", 99);
+        Require(world.GatherBlock(piece) == null, "loose coal should need no tool");
+        PickUp(world, piece);
+        Require(world.S.Backpack["coal"] == 2, "a loose coal piece should give coal");
+
+        world = EmptyWorld(data);
+        world.Add("chest", new Vector2(12, 10));
+        var worker = AddWorker(world, new Vector2(10, 10));
+        var assigned = world.Add("loose_iron", new Vector2(10.5f, 10), 2);
+        world.Assign(worker, assigned);
+        SafeTick(world, Step);
+        Require(world.Find(assigned.Id) == null && worker.Bag["iron_ore"] == 2,
+                "a worker should pick up a loose piece at once, and it should not linger as an empty pile");
+    }
+
     private static Thing BuildAt(World world, string kind, Vector2 position)
     {
         world.Player = position + new Vector2(-2, 0);
@@ -719,10 +760,10 @@ public static class SimulationChecks
 
         var tree = world.Add("tree", new Vector2(8, 8), 300);
         var stone = world.Add("stone", new Vector2(8, 14), 300);
-        var looseIron = world.Add("loose_iron", new Vector2(12, 8), 120);
         GatherUntil(world, tree, "wood", 58);
         GatherUntil(world, stone, "stone", 58);
-        GatherUntil(world, looseIron, "iron_ore", 14);
+        for (int i = 0; i < 7; i++) PickUp(world, world.Add("loose_iron", new Vector2(12, 8 + i), 2));
+        Require(world.S.Backpack["iron_ore"] == 14, "seven loose pieces should give the ore for seven bars");
 
         var furnace = BuildAt(world, "furnace", new Vector2(25, 25));
         world.LoadBatch(furnace, 7);

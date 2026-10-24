@@ -38,7 +38,32 @@ public partial class WorldView
             Add(parent, strip.Commit(), Flat(new Color(.67f, .6f, .43f, layer == 1 ? .3f : .16f), true), Vector3.Zero);
         }
         BuildPond(parent);
+        foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
         BuildTufts(parent);
+    }
+
+    /// <summary>A jagged wall of faceted columns with ore seams on the face and scree at its foot.</summary>
+    private static void BuildCliff(Node3D parent, Cliff cliff)
+    {
+        bool iron = cliff.Ore == "iron";
+        string[] rock = iron ? new[] { "7d5b45", "8a6650", "6e4f3c" } : new[] { "3a3c40", "45474c", "2d2f33" };
+        var seam = Mat(iron ? "b4622a" : "15161a", .5f, iron ? 0 : .3f);
+        // Local +Z is the face, so everything toward the camera and the deposits is built on the positive side.
+        var wall = Pivot(parent, new Vector3(cliff.Center.X, 0, cliff.Center.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(cliff.Face.X, cliff.Face.Y)), 0));
+        var rng = new Random(iron ? 11 : 23);
+        float R() => (float)rng.NextDouble();
+        for (float x = -cliff.HalfLength - .4f; x <= cliff.HalfLength + .4f; x += .8f)
+        {
+            // The ends taper down so the wall reads as a rock outcrop rather than a cut block.
+            float edge = 1 - Math.Clamp((Math.Abs(x) - cliff.HalfLength + 1.5f) / 2.5f, 0, 1) * .6f;
+            float height = (2.8f + R() * 1.8f) * edge, z = -.4f + R() * .5f;
+            Cylinder(wall, .95f + R() * .2f, .55f + R() * .25f, height, new Vector3(x, height / 2, z), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3((R() - .5f) * 8, R() * 360, (R() - .5f) * 8), 5);
+            Sphere(wall, .55f + R() * .3f, new Vector3(x + (R() - .5f) * .4f, height + .05f, z - .1f), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3(1.2f, .6f, 1), 5);
+            for (int i = 0; i < 2; i++)
+                Box(wall, new Vector3(.35f + R() * .3f, .08f + R() * .06f, .12f), new Vector3(x + (R() - .5f) * .5f, .5f + R() * (height - .9f), z + .95f), seam, new Vector3(0, 0, (R() - .5f) * 40));
+            for (int i = 0; i < 2; i++)
+                Sphere(wall, .14f + R() * .16f, new Vector3(x + (R() - .5f) * .8f, .06f, 1.1f + R() * .6f), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3(1.2f, .6f, 1), 5);
+        }
     }
 
     private void BuildPond(Node3D parent)

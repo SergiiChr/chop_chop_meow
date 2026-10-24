@@ -23,8 +23,18 @@ public sealed class Thing
     public float Burn { get; set; }
     public float Regrow { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
-    [JsonIgnore] public bool IsResource => Kind is "tree" or "stone" or "iron" or "loose_iron" or "coal" or "berries" or "water" or "wolf_corpse";
+    [JsonIgnore] public bool IsResource => IsLoose || Kind is "tree" or "stone" or "iron" or "coal" or "berries" or "water" or "wolf_corpse";
+    /// <summary>Loose pieces are picked up whole in one go and vanish, instead of being worked down like a deposit.</summary>
+    [JsonIgnore] public bool IsLoose => Kind is "loose_iron" or "loose_coal";
     [JsonIgnore] public bool IsStorage => Kind is "chest" or "grave";
+}
+/// <summary>An impassable rock face whose ore deposits sit at its foot, with loose pieces scattered toward the clearing.</summary>
+public readonly record struct Cliff(string Ore, Vector2 Center, Vector2 Face, float HalfLength)
+{
+    public const float Depth = 1.4f;
+    public Vector2 Along => new(-Face.Y, Face.X);
+    /// <summary>Distance to the cliff's spine, so the whole wall blocks movement rather than only its middle.</summary>
+    public float DistanceTo(Vector2 p) => p.DistanceTo(Center + Along * Math.Clamp((p - Center).Dot(Along), -HalfLength, HalfLength));
 }
 public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked }
 
@@ -112,6 +122,9 @@ public sealed class World
     public const float LeapSeconds = .4f;
     // A wolf leaps from within LeapRange and lands PinDistance away, where its jaws reach the throat of the downed player.
     private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f;
+    // Both faces turn toward the camera so the deposits at their feet stay in view.
+    public static readonly Cliff[] Cliffs = { new("iron", new(31, 4), new(0, 1), 4.5f), new("coal", new(4, 40), new(1, 0), 4.5f) };
+    public static Cliff CliffOf(string ore) => Cliffs.First(c => c.Ore == ore);
     private float gatherClock;
     private float attackClock;
     private float nightSpawn;
@@ -138,10 +151,23 @@ public sealed class World
         S = new SaveState();
         S.Backpack.Add("iron_axe", 1); S.Backpack.Add("berries", 10); S.Backpack.Add("wood", 6);
         var rng = new Random(4271);
+        foreach (var cliff in Cliffs)
+        {
+            foreach (float along in new[] { -2.8f, 0, 2.8f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, 400);
+            // Loose pieces stay on the cliff's side of the map but roll a little further out than the deposits.
+            // Iron is the tool-free bootstrap: 20 ore covers the anvil and pickaxe but not a bellows furnace too.
+            (string kind, int count) = cliff.Ore == "iron" ? ("loose_iron", 10) : ("loose_coal", 6);
+            for (int placed = 0; placed < count;)
+            {
+                var p = cliff.Center + cliff.Face * (4.2f + (float)rng.NextDouble() * 4.5f) + cliff.Along * ((float)rng.NextDouble() * 2 - 1) * (cliff.HalfLength + 1.5f);
+                if (!CanStand(p) || p.DistanceTo(Pond) < PondRadius + 1 || S.Things.Any(t => t.Pos.DistanceTo(p) < 1.2f)) continue;
+                Add(kind, p, 2); placed++;
+            }
+        }
         for (int i = 0; i < 110; i++)
         {
             var p = new Vector2(rng.Next(3, 45), rng.Next(3, 45));
-            if (p.DistanceTo(Spawn) < 8 || p.DistanceTo(Pond) < PondRadius + 3.5f || p.DistanceTo(new Vector2(30, 18)) < 6 || Math.Abs(p.Y - 24) < 1.5f) continue;
+            if (p.DistanceTo(Spawn) < 8 || p.DistanceTo(Pond) < PondRadius + 3.5f || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || Math.Abs(p.Y - 24) < 1.5f) continue;
             // Full-size trees need room for their crowns, so the woods stay walkable and readable.
             if (S.Things.Any(t => t.Pos.DistanceTo(p) < 3.6f)) continue;
             Add("tree", p, 42);
@@ -149,10 +175,6 @@ public sealed class World
         Add("tree", new(28, 24), 42);
         Vector2[] stones = { new(19, 28), new(22, 30), new(26, 30), new(24, 33), new(18, 32), new(29, 33), new(21, 35) };
         foreach (var p in stones) Add("stone", p, 64);
-        Vector2[] loose = { new(28, 19), new(30, 21), new(33, 20), new(29, 17), new(32, 17) };
-        foreach (var p in loose) Add("loose_iron", p, 16);
-        foreach (var p in new Vector2[] { new(32, 13), new(35, 15), new(34, 11) }) Add("iron", p, 400);
-        foreach (var p in new Vector2[] { new(37, 19), new(40, 21), new(37, 23) }) Add("coal", p, 400);
         foreach (var p in new Vector2[] { new(13, 28), new(16, 30), new(12, 32), new(15, 34), new(10, 29) }) Add("berries", p, 34);
         Add("water", Pond + (Spawn - Pond).Normalized() * (PondRadius + .2f), 9999);
         S.Things.RemoveAll(t => t.Kind == "tree" && S.Things.Any(other => other.Id != t.Id && other.IsResource && other.Kind != "tree" && other.Pos.DistanceTo(t.Pos) < 1.3f));
@@ -160,7 +182,7 @@ public sealed class World
     }
     public bool CanStand(Vector2 p)
     {
-        if (p.X < 1 || p.Y < 1 || p.X > 46 || p.Y > 46 || p.DistanceTo(Pond) < PondRadius) return false;
+        if (p.X < 1 || p.Y < 1 || p.X > 46 || p.Y > 46 || p.DistanceTo(Pond) < PondRadius || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth)) return false;
         return !S.Things.Any(t => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" && t.Pos.DistanceTo(p) < Footprint(t.Kind));
     }
     public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "chest" or "anvil" => .45f, _ => .35f };
@@ -179,12 +201,13 @@ public sealed class World
         if (t.Kind is "coal" or "iron" && (worker ? !S.Milestones.Contains("pick") : S.Backpack["iron_pick"] == 0 && S.Backpack["steel_tools"] == 0)) return "Forge an iron pickaxe. Loose rusty ore nearby can be picked up by hand.";
         return null;
     }
-    public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "wolf_corpse" => "raw_meat", _ => t.Kind };
+    public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "loose_coal" => "coal", "wolf_corpse" => "raw_meat", _ => t.Kind };
     public void Gather(Thing t, float dt)
     {
         if (!Near(t)) { gatherClock = 0; return; }
         var blocked = GatherBlock(t);
         if (blocked != null) { gatherClock = 0; return; }
+        if (t.IsLoose) { PickUp(t); return; }
         gatherClock += dt;
         float seconds = Data.GatherSeconds * (S.Backpack["steel_tools"] > 0 ? .55f : 1);
         if (gatherClock < seconds) return;
@@ -196,6 +219,14 @@ public sealed class World
         else Say($"+{amount} {Data.Name(ResourceItem(t))} · {t.Remaining} left here.");
         if (t.Kind == "water") { S.Thirst = Math.Min(100, S.Thirst + 15); t.Remaining = 9999; }
         if (amount > 0) S.Milestones.Add("gather");
+    }
+    private void PickUp(Thing t)
+    {
+        string item = ResourceItem(t);
+        int amount = S.Backpack.Add(item, t.Remaining); t.Remaining -= amount;
+        if (amount == 0) { Say("Backpack full. Store or sell some supplies."); return; }
+        if (t.Remaining <= 0) S.Things.Remove(t);
+        Say($"+{amount} {Data.Name(item)}."); S.Milestones.Add("gather");
     }
     public void ResetGather() => gatherClock = 0;
     public string? PlacementBlock(string kind, Vector2 p)
@@ -447,10 +478,11 @@ public sealed class World
             if (!Walk(w, target.Pos, dt)) return;
             w.WorkState = WorkerWorkState.Gathering;
             w.Timer += dt;
-            if (w.Timer >= Data.GatherSeconds * 1.6f)
+            if (target.IsLoose || w.Timer >= Data.GatherSeconds * 1.6f)
             {
                 w.Timer = 0; target.Remaining -= w.Bag.Add(item, target.Remaining);
                 if (target.Kind == "water") target.Remaining = 9999;
+                if (target.IsLoose && target.Remaining <= 0) S.Things.Remove(target);
             }
             return;
         }
@@ -653,10 +685,10 @@ public sealed class World
     {
         0 => ("A place to begin", "Hold right mouse near trees and stones. You carry an iron axe. B opens building plans."),
         1 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A cabin and campfire make nights safer."),
-        2 => ("The first iron", "Pick up loose rusty ore by the mine. Load the furnace with ore + wood. Collect iron bars."),
+        2 => ("The first iron", "Pick up loose rusty ore below the iron cliff. Load the furnace with ore + wood. Collect iron bars."),
         3 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. Keep smelting for a pickaxe and bellows furnace."),
         4 => ("Beneath the surface", "At the anvil, forge an iron pickaxe: 3 bars + 2 wood. It opens coal and iron deposits."),
-        5 => ("Hotter than fire", "Mine real coal beyond the iron piles; the landmark guide points the way. Build a bellows furnace: 20 stone, 5 iron bars, 8 wood."),
+        5 => ("Hotter than fire", "Mine coal at the foot of the dark cliff; the landmark guide points the way. Build a bellows furnace: 20 stone, 5 iron bars, 8 wood."),
         6 => ("Make steel", "Load iron + mined coal into the bellows furnace. Pump regularly to stay above 80°. Each bar costs 2 iron + 3 coal incl. fuel."),
         7 => ("Tools for the village", "At the anvil choose Steel tools. Load 2 steel bars + 2 wood, then collect your tools."),
         8 => ("The road to Bramblewick", "Build a village signpost. Sell steel tools. The cart returns with payment after 30 seconds."),

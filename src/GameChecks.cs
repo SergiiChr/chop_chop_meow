@@ -254,17 +254,22 @@ public partial class Game
             await ToSignal(GetTree().CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
             var gatheringPosition = new Vector2(8, 8);
             // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
-            world.S.Things.RemoveAll(t => t.Pos.DistanceTo(gatheringPosition) < 8);
+            world.S.Things.RemoveAll(t => t.Pos.DistanceTo(gatheringPosition) < 12);
             world.Player = gatheringPosition;
-            var looseOre = world.Add("loose_iron", gatheringPosition + new Vector2(1, 0), 4);
+            // Far enough that the player has to keep walking after the button is released.
+            var looseOre = world.Add("loose_iron", gatheringPosition + new Vector2(2, 0), 2);
+            int oreBefore = world.S.Backpack["iron_ore"];
             await Frames();
             point = view.Screen(looseOre.Pos) - new Vector2(0, 12) * view.Zoom;
             UIRequire(view.Pick(point)?.Id == looseOre.Id, "The loose ore fixture must be selectable.");
             windowPoint = GetViewport().GetFinalTransform() * point;
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-            await Frames(3);
-            UIRequire(view.PlayerAnimation == ActorAction.Gather, "Hand-picking loose ore must trigger gathering rather than pumping.");
-            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, Pressed = false });
+            await Frames();
+            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
+            bool harvestAnimation = false;
+            for (int i = 0; i < 120 && world.Find(looseOre.Id) != null; i++) { await Frames(); harvestAnimation |= view.PlayerAnimation == ActorAction.Gather; }
+            UIRequire(world.Find(looseOre.Id) == null && world.S.Backpack["iron_ore"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
+            UIRequire(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
             DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SavePath));
             GD.Print("UI-TEST PASS"); GetTree().Quit();
         }
