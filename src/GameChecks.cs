@@ -38,6 +38,37 @@ public partial class Game
         }
         return false;
     }
+    /// <summary>Window position of a control's centre, scrolled into view first.</summary>
+    private async Task<Vector2> At(Control control)
+    {
+        for (Node? n = control.GetParent(); n != null; n = n.GetParent()) if (n is ScrollContainer scroll) scroll.EnsureControlVisible(control);
+        await Frames();
+        return GetViewport().GetFinalTransform() * control.GetGlobalRect().GetCenter();
+    }
+    private async Task Click(Control control)
+    {
+        var at = await At(control);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
+        await Frames();
+    }
+    /// <summary>A real mouse drag: press, move in steps past the drag threshold, release over the target.</summary>
+    private async Task DragTo(Control from, Control to)
+    {
+        var start = await At(from); var end = await At(to);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = start, GlobalPosition = start, Pressed = true });
+        await Frames();
+        for (int i = 1; i <= 8; i++)
+        {
+            var at = start.Lerp(end, i / 8f);
+            Input.ParseInputEvent(new InputEventMouseMotion { ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Relative = (end - start) / 8 });
+            await Frames(1);
+        }
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
+        await Frames();
+    }
+    private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false)[grid].GetChildren().OfType<ItemSlot>().First(match);
     private static void UIRequire(bool okay, string message)
     {
         if (!okay) throw new InvalidOperationException("UI check failed: " + message);
@@ -103,6 +134,14 @@ public partial class Game
             var deposit = FindButton(panel, "Deposit all materials (keep tools)"); UIRequire(deposit != null, "Chest context must expose deposit action.");
             deposit!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(chest!.Inventory["wood"] > 0 && world.S.Backpack["iron_axe"] == 1, "Manual deposit must move materials and retain equipped tools.");
+            int storedWood = chest.Inventory["wood"]; RefreshLive();
+            await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), Cell(1, c => c.TooltipText == ""));
+            UIRequire(chest.Inventory["wood"] == 0 && world.S.Backpack["wood"] == storedWood, "Dragging a chest stack onto the backpack must move it.");
+            RefreshLive();
+            await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), hotbarButtons[3]);
+            UIRequire(world.S.HotbarSlots[3] == "wood" && world.S.Backpack["wood"] == storedWood, "Dragging an item onto the hotbar must assign a reference without moving items.");
+            await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
+            UIRequire(chest.Inventory["wood"] == storedWood, "Dragging a backpack stack onto the chest must store it.");
             var filters = FindButton(panel, "Input / output filters"); filters!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(page == "filters", "Chest filters must be reachable from the live context UI.");
             await KeyStroke(Key.I);
@@ -127,7 +166,10 @@ public partial class Game
             await KeyStroke(Key.F9);
             UIRequire(world.Player.DistanceTo(savedPosition) < .01f && world.S.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] > 0), "F9 must restore position and stored items from disk.");
             UIRequire(world.S.HotbarSlots.SequenceEqual(savedSlots) && world.S.ActiveHotbar == savedActiveSlot, "F5 and F9 must preserve hotbar references and selection.");
-            UIRequire(HasLabel(panel, "Coins") && HasLabel(panel, "Health") && HasLabel(panel, "Hunger") && HasLabel(panel, "Thirst") && HasLabel(panel, "Capacity") && HasLabel(panel, "Daily wages"), "Inventory must contain all player stats, capacity and wages.");
+            UIRequire(HasLabel(panel, "Coins") && HasLabel(panel, "Health") && HasLabel(panel, "Capacity") && HasLabel(panel, "Daily wages"), "Inventory must contain coins, health, capacity and wages.");
+            UIRequire(!HasLabel(panel, "Hunger") && !HasLabel(panel, "Thirst"), "Hunger and thirst belong to the HUD icons, not the inventory.");
+            world.S.Hunger = 40; world.S.Thirst = 70; RefreshLive();
+            UIRequire(hunger.Visible && thirst.Visible && hunger.TooltipText == "Hunger 40%" && thirst.TooltipText == "Thirst 70%", "The HUD stomach and droplet must track hunger and thirst.");
             UIRequire(panel.FindChildren("slot_*", "Button", true, false).Count == world.S.Backpack.Slots, "The backpack must show one grid cell per slot.");
             world.S.Backpack.Add("berries", 2); RefreshLive();
             var berryCell = panel.FindChildren("slot_*", "Button", true, false).OfType<Button>().FirstOrDefault(c => c.TooltipText.StartsWith("Berries"));
@@ -160,6 +202,16 @@ public partial class Game
             ClosePanel();
             var furnace = world.Add("reinforced", world.Player + new Vector2(1, 0));
             Select(furnace);
+            UIRequire(Named("input_iron_bar") != null && Named("input_coal") != null && Named("output_steel_bar") != null, "The steel furnace must show one slot per input and output.");
+            world.S.Backpack.Add("iron_bar", 5); world.S.Backpack.Add("coal", 100); RefreshLive();
+            await DragTo(Cell(0, c => c.TooltipText.StartsWith("Iron bar")), Named("input_iron_bar")!);
+            UIRequire(furnace.Inventory["iron_bar"] == 5 && world.S.Backpack["iron_bar"] == 0, "Dragging bars onto the matching input slot must load them.");
+            await DragTo(Cell(0, c => c.TooltipText.StartsWith("Mined coal")), Named("input_iron_bar")!);
+            UIRequire(furnace.Inventory["coal"] == 0, "An input slot must reject a different item.");
+            await Click(Cell(0, c => c.TooltipText.StartsWith("Mined coal")));
+            UIRequire(furnace.Inventory["coal"] == furnace.Inventory.StackSize, "Clicking a backpack item must fill its input slot up to one stack.");
+            await Click(Named("input_iron_bar")!);
+            UIRequire(furnace.Inventory["iron_bar"] == 0 && world.S.Backpack["iron_bar"] == 5, "Clicking an input slot must return its stack.");
             await KeyStroke(Key.Space);
             UIRequire(view.PlayerAnimation == ActorAction.Pump, "Manual bellows input must trigger its dedicated cycle.");
             await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);

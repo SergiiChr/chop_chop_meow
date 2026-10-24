@@ -117,7 +117,7 @@ public partial class Game : Node
         slots.AddChild(MenuIcon("hammer", "Build · B", () => OpenPage("build"))); slots.AddChild(MenuIcon("backpack", "Inventory · I", () => OpenPage("inventory")));
         slots.AddChild(MenuIcon("hardhat", "Workers", () => OpenPage("workers"))); slots.AddChild(MenuIcon("book", "Guide · Tab", () => OpenPage("help")));
         slots.AddChild(new VSeparator { CustomMinimumSize = new Vector2(24, 0) });
-        for (int i = 0; i < 9; i++) { int slot = i; var button = Button("", () => UseHotbar(slot)); ConfigureHotbarButton(button, slot); slots.AddChild(button); }
+        for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
         toast = Label("", 15); toast.AnchorTop = 1; toast.AnchorBottom = 1; toast.OffsetLeft = 22; toast.OffsetTop = -140; toast.OffsetRight = 850; toast.OffsetBottom = -100; toast.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(toast);
         panel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, AnchorBottom = 1, OffsetLeft = -374, OffsetRight = -16, OffsetTop = 64, OffsetBottom = -106 };
         ui.AddChild(panel);
@@ -125,7 +125,7 @@ public partial class Game : Node
         // Raised above the centred player so a downed body stays visible under the message.
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
-        BuildEnding(); BuildMenu(); RefreshLive();
+        BuildNeeds(); BuildEnding(); BuildMenu(); RefreshLive();
     }
     private void Notify(string message)
     {
@@ -140,7 +140,7 @@ public partial class Game : Node
         deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? "The pack is feeding" : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : world.S.Mauled ? "A wolf has you by the throat" : "";
         modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
         foreach (var update in live.ToArray()) update();
-        RefreshHotbar();
+        RefreshHotbar(); RefreshNeeds();
     }
     private void OpenPage(string name)
     {
@@ -198,7 +198,7 @@ public partial class Game : Node
         var details = Label("Hover a plan to see what it needs. Click it, then click open ground nearby.", 14, Muted);
         foreach (var (id, def) in world.Data.Buildings)
         {
-            var (cell, _) = IconCell($"build_{id}"); cell.Icon = HotbarIcon(id); cell.TooltipText = def.Name;
+            var (cell, _) = IconCell($"build_{id}"); cell.Icon = HotbarIcon(id); cell.TooltipText = $"{def.Name}\nClick to place · Drag onto the hotbar"; DragReference(cell, id);
             cell.Pressed += () => { view.BuildMode = id; assigningWorker = 0; ClosePanel(); RefreshLive(); };
             cell.MouseEntered += () => details.Text = $"{def.Name}\n{def.Description}\n\nNeeds: {Needs(def.Cost)}";
             live.Add(() => { if (GodotObject.IsInstanceValid(cell)) cell.Modulate = world.S.Backpack.Has(def.Cost) ? Colors.White : new Color(1, .7f, .65f); });
@@ -208,8 +208,8 @@ public partial class Game : Node
     }
     private void Backpack()
     {
-        Dynamic(() => $"Coins {world.S.Coins:0.0}   Health {world.S.Health:0}\nHunger {world.S.Hunger:0}   Thirst {world.S.Thirst:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {world.S.Workers.Count * world.Data.DailyWage:0}", 15);
-        AddInventoryGrid(() => world.S.Backpack, id => { if (id is "berries" or "water" or "cooked_meat" or "raw_meat") world.Consume(id); }, "Berries, cooked meat and water: click to consume. Tools work while carried.");
+        Dynamic(() => $"Coins {world.S.Coins:0.0}   Health {world.S.Health:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {world.S.Workers.Count * world.Data.DailyWage:0}", 15);
+        AddInventoryGrid(() => world.S.Backpack, null, id => { if (id is "berries" or "water" or "cooked_meat" or "raw_meat") world.Consume(id); }, "Berries, cooked meat and water: click to consume. Drag onto the hotbar to assign.");
         AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
     }
     private void Select(Thing t) { selected = t.Id; workerId = 0; view.Selected = t.Id; view.SelectedWorker = 0; view.BuildMode = ""; OpenPage("inspect"); }
@@ -240,29 +240,29 @@ public partial class Game : Node
         {
             var opt = new OptionButton { CustomMinimumSize = new Vector2(0, 38), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
             foreach (var r in recipes) opt.AddItem(r.Value.Name);
-            opt.Selected = Math.Max(0, recipes.FindIndex(p => p.Key == t.Recipe));
+            opt.Selected = recipes.FindIndex(p => p.Key == t.Recipe);
             opt.ItemSelected += index => { world.SetRecipe(t, recipes[(int)index].Key); OpenPage("inspect"); }; content.AddChild(opt);
         }
         else if (recipes.Count == 1) AddLabel(recipes[0].Value.Name.ToUpperInvariant(), 16);
         if (t.Kind == "furnace") AddButton($"Fuel: {world.Data.Name(t.Fuel)} · click to switch", () => { if (!t.Processing) { t.Fuel = t.Fuel == "wood" ? "coal" : "wood"; OpenPage("inspect"); } });
         if (t.Recipe != "")
         {
-            Dynamic(() => $"Batch: {Cost(world.BatchCost(t))}\n{(t.Processing ? $"Working · {t.Progress:0.0}/{world.Data.Recipes[t.Recipe].Seconds:0}s" : "Waiting for ingredients / temperature")}", 14, Muted);
-            var row = Row(); row.AddChild(Button("Load 1 batch", () => world.LoadBatch(t))); row.AddChild(Button("Load 5", () => world.LoadBatch(t, 5)));
-            AddButton("Collect finished goods", () => world.Collect(t));
+            Machine(t);
+            var row = Row(); row.AddChild(Button("Load 1 batch", () => world.LoadBatch(t))); row.AddChild(Button("Load 5", () => world.LoadBatch(t, 5))); row.AddChild(Button("Collect", () => world.Collect(t)));
         }
+        else if (recipes.Count > 1) AddLabel("Choose a recipe.", 14, Muted);
         if (t.Kind == "reinforced") { Dynamic(() => $"TEMPERATURE   {t.Heat:0}° / 80° required", 17, new Color("edc17c")); AddButton("Pump bellows · Space", () => { if (paused) Notify("Resume before operating the bellows."); else world.Pump(t); }); }
-        AddLabel("INSIDE", 14);
-        AddInventoryGrid(() => t.Inventory, id => MoveStack(t.Inventory, world.S.Backpack, id, t), "Click: take a stack · Shift: take all");
+        AddLabel("BACKPACK", 14);
+        AddInventoryGrid(() => world.S.Backpack, null, id => world.LoadInput(t, id, Input.IsKeyPressed(Key.Shift) ? world.S.Backpack[id] : world.S.Backpack.StackSize), "Click: fill its input slot · Drag onto a slot");
         Assignment(t);
     }
     private string Items(Inventory inv) => inv.Count == 0 ? "empty" : string.Join(", ", inv.Items.Select(p => $"{p.Value} {world.Data.Name(p.Key)}"));
     private void Storage(Thing t)
     {
         Dynamic(() => $"{t.Inventory.UsedSlots}/{t.Inventory.Slots} slots", 14, Muted);
-        AddInventoryGrid(() => t.Inventory, id => MoveStack(t.Inventory, world.S.Backpack, id, t), "Click: take a stack · Shift: take all");
+        AddInventoryGrid(() => t.Inventory, t, id => MoveStack(t.Inventory, world.S.Backpack, id, t), "Click: take a stack · Shift: take all · Drag to move");
         AddLabel("BACKPACK", 14);
-        AddInventoryGrid(() => world.S.Backpack, id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Shift: store all");
+        AddInventoryGrid(() => world.S.Backpack, null, id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Shift: store all · Drag to move");
         if (t.Kind == "chest") AddButton("Input / output filters", () => OpenPage("filters"));
         AddButton("Deposit all materials (keep tools)", () => { if (world.Near(t)) foreach (var id in world.S.Backpack.Items.Keys.Where(i => i is not "iron_axe" and not "iron_pick" and not "steel_tools").ToArray()) world.S.Backpack.TransferTo(t.Inventory, id, 999); });
         AddButton("Take everything", () => { if (world.Near(t)) foreach (var id in t.Inventory.Items.Keys.ToArray()) t.Inventory.TransferTo(world.S.Backpack, id, 999); });
@@ -475,7 +475,7 @@ public partial class Game : Node
         var bellows = world.Add("reinforced", new Vector2(29, 25)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Heat = 100;
         var chest = world.Add("chest", new Vector2(25, 27)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
         world.Add("anvil", new Vector2(27, 28)); var sign = world.Add("signpost", new Vector2(22, 28));
-        world.S.Coins = 140; world.S.Backpack.Add("steel_tools", 2); world.S.Backpack.Add("water", 4); world.S.Backpack.Add("iron_pick", 1);
+        world.S.Coins = 140; world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("steel_tools", 2); world.S.Backpack.Add("water", 4); world.S.Backpack.Add("iron_pick", 1);
         world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools" });
         var w1 = world.Hire(sign); // The review fixture is deliberately separate from a fresh playable game.
         if (w1 == null) { world.Player = sign.Pos + Vector2.One; w1 = world.Hire(sign); }

@@ -263,9 +263,18 @@ public sealed class World
         for (int i = 0; i < batches; i++)
         {
             if (!S.Backpack.Has(cost)) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
-            if (!t.Inventory.Fits(cost)) { Say("Building inventory is full."); break; }
+            if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize)) { Say("Input slots are full."); break; }
             foreach (var pair in cost) S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
         }
+    }
+    /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
+    public int LoadInput(Thing t, string item, int quantity)
+    {
+        if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
+        if (!BatchCost(t).ContainsKey(item)) { Say($"{Data.Name(item)} is not used by this recipe."); return 0; }
+        int moved = S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, t.Inventory.StackSize - t.Inventory[item]));
+        if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(item)} slot is full.");
+        return moved;
     }
     public void Collect(Thing t)
     {
@@ -554,8 +563,8 @@ public sealed class World
                 if (t.Progress >= recipe.Seconds)
                 {
                     // Manual loading or another hauler can fill the station while a batch cooks.
-                    // Retain the completed batch until there is room rather than discarding output.
-                    if (t.Inventory.Room(recipe.Output) < recipe.Amount) continue;
+                    // Retain the completed batch until the one-stack output slot has room rather than discarding output.
+                    if (Math.Min(t.Inventory.Room(recipe.Output), t.Inventory.StackSize - t.Inventory[recipe.Output]) < recipe.Amount) continue;
                     t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Progress = 0;
                     S.Milestones.Add(recipe.Output); if (recipe.Output == "iron_pick") S.Milestones.Add("pick");
                 }

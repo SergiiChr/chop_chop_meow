@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 public partial class Game
 {
     private int hotbarAssignSlot;
-    private readonly System.Collections.Generic.List<Button> hotbarButtons = new();
+    private readonly System.Collections.Generic.List<ItemSlot> hotbarButtons = new();
     private readonly System.Collections.Generic.List<Label> hotbarCounts = new();
     private readonly System.Collections.Generic.Dictionary<string, Texture2D> hotbarIcons = new();
     private Texture2D? itemAtlas;
@@ -45,8 +45,13 @@ public partial class Game
         return icon;
     }
 
-    private Button ConfigureHotbarButton(Button button, int slot)
+    /// <summary>A hotbar slot; dropping an item or building plan on it assigns that reference.</summary>
+    private ItemSlot HotbarButton(int slot)
     {
+        var button = new ItemSlot { FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
+        button.Pressed += () => UseHotbar(slot);
+        button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.Buildings.ContainsKey(drag.Item);
+        button.Take = drag => SetHotbar(slot, drag.Item);
         button.CustomMinimumSize = new Vector2(66, 62);
         button.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
         button.Text = "";
@@ -136,7 +141,7 @@ public partial class Game
 
     private void HotbarAssignment()
     {
-        AddLabel("Choose a slot, then assign an item or building plan. A slot stores a reference; it does not duplicate anything.", 14, Muted);
+        AddLabel("Choose a slot, then assign an item or building plan, or drag one onto the hotbar. A slot stores a reference; it does not duplicate anything.", 14, Muted);
         var row = Row();
         for (int i = 0; i < 9; i++)
         {
@@ -155,7 +160,7 @@ public partial class Game
         var grid = AddGrid();
         foreach (var id in world.Data.Items.Keys.Concat(world.Data.Buildings.Keys))
         {
-            var (cell, _) = IconCell($"assign_{id}"); cell.Icon = HotbarIcon(id);
+            var (cell, _) = IconCell($"assign_{id}"); cell.Icon = HotbarIcon(id); DragReference(cell, id);
             cell.TooltipText = world.Data.Buildings.ContainsKey(id) ? $"Plan: {world.Data.Name(id)}" : world.Data.Name(id);
             cell.Pressed += () => SetHotbar(hotbarAssignSlot, id);
             grid.AddChild(cell);
@@ -169,6 +174,6 @@ public partial class Game
         world.S.HotbarSlots[slot] = id;
         world.S.ActiveHotbar = slot;
         Notify(id == "" ? $"Cleared hotbar slot {slot + 1}." : $"Slot {slot + 1}: {world.Data.Name(id)}.");
-        OpenPage("hotbar");
+        if (page == "hotbar") OpenPage("hotbar"); else RefreshLive();
     }
 }

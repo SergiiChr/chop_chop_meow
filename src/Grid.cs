@@ -4,14 +4,14 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Factorio-style icon cells shared by inventory, storage, station and build pages.</summary>
+/// <summary>Icon cells shared by inventory, storage, station and build pages.</summary>
 public partial class Game
 {
     private const int GridColumns = 6;
 
-    private (Button Cell, Label Count) IconCell(string name)
+    private (ItemSlot Cell, Label Count) IconCell(string name)
     {
-        var cell = new Button
+        var cell = new ItemSlot
         {
             Name = name,
             CustomMinimumSize = new Vector2(50, 50),
@@ -52,30 +52,35 @@ public partial class Game
 
     /// <summary>
     /// One cell per slot, refreshed live from the inventory's stacks.
+    /// Cells drag their stack out and accept stacks dragged in from another inventory.
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// </summary>
-    private void AddInventoryGrid(Func<Inventory> inventory, Action<string> click, string hint)
+    private void AddInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint)
     {
         var grid = AddGrid();
-        var ids = new string?[inventory().Slots];
-        var cells = Enumerable.Range(0, ids.Length).Select(i => IconCell($"slot_{i}")).ToArray();
+        var stacks = new (string Item, int Count)?[inventory().Slots];
+        var cells = Enumerable.Range(0, stacks.Length).Select(i => IconCell($"slot_{i}")).ToArray();
         for (int i = 0; i < cells.Length; i++)
         {
             int slot = i;
-            cells[i].Cell.Pressed += () => { if (ids[slot] is string id) { click(id); RefreshLive(); } };
-            grid.AddChild(cells[i].Cell);
+            var cell = cells[i].Cell;
+            cell.Pressed += () => { if (stacks[slot] is (string id, _)) { click(id); RefreshLive(); } };
+            cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container) : null;
+            cell.CanTake = drag => drag.From != null && drag.From != inventory();
+            cell.Take = drag => { MoveDrag(drag, inventory(), container); RefreshLive(); };
+            grid.AddChild(cell);
         }
         live.Add(() =>
         {
-            var stacks = inventory().Stacks().ToList();
+            var current = inventory().Stacks().ToList();
             for (int i = 0; i < cells.Length; i++)
             {
                 var (cell, count) = cells[i];
                 if (!GodotObject.IsInstanceValid(cell)) return;
-                ids[i] = i < stacks.Count ? stacks[i].Item : null;
-                cell.Icon = ids[i] is string id ? HotbarIcon(id) : null;
-                count.Text = i < stacks.Count ? stacks[i].Count.ToString() : "";
-                cell.TooltipText = ids[i] is string named ? $"{world.Data.Name(named)} · {inventory()[named]} total\n{hint}" : "";
+                stacks[i] = i < current.Count ? current[i] : null;
+                cell.Icon = stacks[i] is (string id, _) ? HotbarIcon(id) : null;
+                count.Text = stacks[i] is (_, int n) ? n.ToString() : "";
+                cell.TooltipText = stacks[i] is (string named, _) ? $"{world.Data.Name(named)} · {inventory()[named]} total\n{hint}" : "";
             }
         });
     }
@@ -86,4 +91,14 @@ public partial class Game
         if (!world.Near(near)) { Notify("Walk closer first."); return; }
         from.TransferTo(to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackSize);
     }
+
+    /// <summary>Drops a dragged stack into an inventory; the building on either end must be within reach.</summary>
+    private void MoveDrag(ItemDrag drag, Inventory to, Thing? container)
+    {
+        if ((drag.Container ?? container) is Thing near && !world.Near(near)) { Notify("Walk closer first."); return; }
+        drag.From?.TransferTo(to, drag.Item, drag.Count);
+    }
+
+    /// <summary>Building plans and palette entries drag as hotbar references.</summary>
+    private static void DragReference(ItemSlot cell, string id) => cell.Drag = () => new ItemDrag(id, 0, null, null);
 }
