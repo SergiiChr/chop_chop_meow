@@ -586,11 +586,7 @@ public static class WorldModels
         foreach (var (x, z) in new[] { (-.2f, -.15f), (.2f, -.15f), (-.2f, .15f), (.2f, .15f) }) Box(body, new Vector3(.06f, .46f, .06f), new Vector3(x * 1.1f, .23f, z * 1.1f), tube);
         Box(body, new Vector3(.52f, .05f, .4f), new Vector3(0, .47f, 0), tube);
         Box(body, new Vector3(.5f, .04f, .05f), new Vector3(0, .12f, .17f), tube);
-        var iron = Mat("3b3e41", .45f, .7f);
-        Box(body, new Vector3(.34f, .1f, .24f), new Vector3(0, .55f, 0), iron);
-        Box(body, new Vector3(.18f, .12f, .14f), new Vector3(0, .66f, 0), iron);
-        Box(body, new Vector3(.46f, .12f, .2f), new Vector3(-.03f, .78f, 0), iron);
-        Cylinder(body, .075f, 0, .26f, new Vector3(.33f, .79f, 0), iron, new Vector3(0, 0, -90), 8);
+        Add(body, AnvilShape.Casting, AnvilShape.Iron, Vector3.Zero);
         prop.Vent = new Vector3(0, .86f, 0);
     }
 
