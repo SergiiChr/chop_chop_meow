@@ -531,6 +531,18 @@ public static class WorldModels
             foreach (float x in new[] { -.64f, .64f }) Box(frame, new Vector3(.12f, 1.72f, .12f), new Vector3(x, .86f, z), Dark("6f6150", i));
             Box(frame, new Vector3(1.4f, .12f, .14f), new Vector3(0, 1.7f, z), Dark("6f6150", i));
         }
+        // A lantern hangs from the header on a hook; its flame and light burn only while someone works.
+        var lantern = Pivot(frame, new Vector3(.55f, 1.46f, .32f));
+        var iron = Mat("2f3134", .5f, .6f);
+        Box(lantern, new Vector3(.03f, .3f, .03f), new Vector3(0, .3f, -.08f), iron);
+        Box(lantern, new Vector3(.03f, .03f, .14f), new Vector3(0, .44f, -.02f), iron);
+        Cylinder(lantern, .04f, .1f, .07f, new Vector3(0, .2f, 0), iron, null, 6);
+        Cylinder(lantern, .1f, .1f, .04f, new Vector3(0, -.02f, 0), iron, null, 6);
+        Box(lantern, new Vector3(.13f, .18f, .13f), new Vector3(0, .08f, 0), Mat("6d6658", .3f));
+        var flame = Pivot(lantern, Vector3.Zero);
+        Box(flame, new Vector3(.135f, .185f, .135f), new Vector3(0, .08f, 0), Flat(new Color("ffcf6a")));
+        prop.Fire = flame;
+        prop.Light = Light(lantern, new Vector3(0, .08f, .2f), 5);
         prop.Frame = frame;
         // Rails from the front of the spoil patch all the way in, the inner lengths darkening with the tunnel.
         var rails = Pivot(body, Vector3.Zero);
@@ -544,7 +556,7 @@ public static class WorldModels
             Box(rails, new Vector3(.8f, .04f, .14f), new Vector3(0, .045f, z), Dark("5a4030", i));
         }
         prop.Rails = rails;
-        // The cart rides the rails: out front when idle, into the dark while miners work, and back out loaded.
+        // The cart rests at the end of the rails, loaded once there is output; it is underground with the miners while they work.
         var cart = Pivot(body, Vector3.Zero);
         var tub = Mat("4f5a5e", .5f, .6f);
         Box(cart, new Vector3(.66f, .06f, .86f), new Vector3(0, .3f, 0), tub);
@@ -556,9 +568,8 @@ public static class WorldModels
         foreach (var (x, z, r) in new[] { (0f, 0f, .3f), (-.16f, .2f, .18f), (.15f, -.22f, .17f), (.12f, .18f, .15f), (-.12f, -.18f, .16f) }) Sphere(load, r, new Vector3(x, .62f, z), lump, new Vector3(1, .6f, 1), 6);
         prop.Load = load;
         prop.Cart = cart;
-        // Lamplight deep inside while someone works underground: a faint warm haze at the dark end and light spilling out.
+        // Lamplight deep inside while someone works underground: a faint warm haze at the dark end.
         prop.Glow = Box(body, new Vector3(1.4f, 1.7f, .02f), new Vector3(0, .86f, Door - 2.5f), Flat(new Color(1, .55f, .2f, .25f)));
-        prop.Light = Light(body, new Vector3(0, 1.2f, Door + .6f), 4.5f);
     }
 
     /// <summary>An unlit tunnel color for step <paramref name="step"/> of the tunnel, darker the deeper it is and black at the far end.</summary>
