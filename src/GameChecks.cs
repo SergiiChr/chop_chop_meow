@@ -189,7 +189,7 @@ public partial class Game
         UIRequire(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Clicking with a lit torch must swing it.");
     }
 
-    /// <summary>A stack bigger than a crate's room fills it and the rest stays in the backpack, whether dragged whole or split off.</summary>
+    /// <summary>A stack bigger than a crate's room fills it and the rest stays on the cursor until it is dropped elsewhere.</summary>
     private async Task CheckCrateOverflow()
     {
         world.S.Backpack.Remove("wood", world.S.Backpack["wood"]);
@@ -198,10 +198,13 @@ public partial class Game
         int cap = world.Data.CrateCapacity;
         Select(crates[0]); await Frames();
         await DragTo(Cell(1, c => c.TooltipText.Contains("Wood · 64 total")), Cell(0, c => c.TooltipText == ""));
-        UIRequire(crates[0].Inventory["wood"] == cap && world.S.Backpack["wood"] == 64 - cap, "Dragging a full stack into a crate must fill it and keep the rest in the backpack.");
+        UIRequire(crates[0].Inventory["wood"] == cap && world.S.Backpack["wood"] == 64 - cap, "Dragging a full stack into a crate must fill it and leave the rest in the backpack.");
+        UIRequire(GetViewport().GuiIsDragging(), "What did not fit into the crate must stay held.");
         Select(crates[1]); await Frames();
-        await SplitTo(Cell(1, c => c.TooltipText.Contains("Wood · ")), Cell(0, c => c.TooltipText == ""));
-        UIRequire(crates[1].Inventory["wood"] == cap && world.S.Backpack["wood"] == 64 - 2 * cap, "Dropping a split half bigger than a crate must fill it and keep the rest in the backpack.");
+        await Click(Cell(0, c => c.TooltipText == ""));
+        UIRequire(crates[1].Inventory["wood"] == cap && world.S.Backpack["wood"] == 64 - 2 * cap && GetViewport().GuiIsDragging(), "The held rest must drop into the next crate and keep what still does not fit.");
+        await Click(Cell(1, c => c.TooltipText.Contains("Wood · ")));
+        UIRequire(!GetViewport().GuiIsDragging() && world.S.Backpack["wood"] == 64 - 2 * cap, "Clicking the backpack must let go of the held rest.");
         foreach (var crate in crates) world.S.Things.Remove(crate);
         ClosePanel(); await Frames();
     }

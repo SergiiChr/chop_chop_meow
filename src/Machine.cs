@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Godot;
 
@@ -49,7 +50,11 @@ public partial class Game
         if (input)
         {
             cell.CanTake = drag => drag.From == world.S.Backpack && drag.Item == item;
-            cell.Take = drag => { Act(() => world.LoadInput(t, item, drag.Count)); RefreshLive(); };
+            cell.Take = drag =>
+            {
+                int left = world.Near(t) ? Leftover(drag, Math.Min(t.Inventory.StackSize - t.Inventory[item], t.Inventory.Room(item))) : 0;
+                Act(() => world.LoadInput(t, item, drag.Count)); RefreshLive(); return left;
+            };
         }
         string hint = input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: collect";
         live.Add(() =>

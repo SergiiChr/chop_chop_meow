@@ -52,7 +52,7 @@ public partial class Game
         var button = new ItemSlot { FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
         button.Pressed += () => SelectHotbar(slot);
         button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.Buildings.ContainsKey(drag.Item);
-        button.Take = drag => SetHotbar(slot, drag.Item);
+        button.Take = drag => { SetHotbar(slot, drag.Item); return 0; };
         button.CustomMinimumSize = new Vector2(66, 62);
         button.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
         button.Text = "";

@@ -19,7 +19,8 @@ public partial class ItemSlot : Button
     /// <summary>What a right click picks up: half the stack, carried until a left click drops it.</summary>
     public Func<ItemDrag?>? Half { get; set; }
     public Func<ItemDrag, bool>? CanTake { get; set; }
-    public Action<ItemDrag>? Take { get; set; }
+    /// <summary>Drops the drag here and returns the units that did not fit, which stay on the cursor.</summary>
+    public Func<ItemDrag, int>? Take { get; set; }
     /// <summary>Builds a richer tooltip than plain text; the tooltip text must still be non-empty for Godot to show it.</summary>
     public Func<Control>? Popup { get; set; }
 
@@ -57,7 +58,20 @@ public partial class ItemSlot : Button
 
     public override void _DropData(Vector2 atPosition, Variant data)
     {
-        if (dragging != null) Take?.Invoke(dragging);
+        if (dragging == null || Take?.Invoke(dragging) is not int left || left <= 0) return;
+        Hold(dragging with { Count = left });
+    }
+
+    /// <summary>
+    /// Puts what did not fit back on the cursor.
+    /// This drag ends right after the drop, and a held stack drops on a press, so the rest is picked up again only once the button is up: its release would otherwise drop it at once.
+    /// </summary>
+    private async void Hold(ItemDrag rest)
+    {
+        do await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        while (Input.IsMouseButtonPressed(MouseButton.Left));
+        if (!IsInstanceValid(this) || !IsInsideTree()) return;
+        dragging = rest; ForceDrag(rest.Item, Preview());
     }
 
     public override void _Notification(int what)

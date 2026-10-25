@@ -97,7 +97,7 @@ public partial class Game
         cell.Pressed += () => { if (world.BenchTool(bench, tool) is string held) { Act(() => world.UnslotTool(bench, held)); RefreshLive(); } };
         cell.Drag = () => world.BenchTool(bench, tool) is string held ? new ItemDrag(held, 1, bench.Tools, bench) : null;
         cell.CanTake = drag => drag.From == world.S.Backpack && world.Data.Items.GetValueOrDefault(drag.Item)?.Tool == tool;
-        cell.Take = drag => { Act(() => world.SlotTool(bench, drag.Item)); RefreshLive(); };
+        cell.Take = drag => { Act(() => world.SlotTool(bench, drag.Item)); RefreshLive(); return 0; };
         live.Add(() =>
         {
             if (!GodotObject.IsInstanceValid(cell)) return;

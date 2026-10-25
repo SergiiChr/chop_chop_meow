@@ -73,7 +73,7 @@ public partial class Game
             cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container) : null;
             cell.Half = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, (count + 1) / 2, inventory(), container) : null;
             cell.CanTake = accepts ?? (drag => drag.From != null && drag.From != inventory());
-            cell.Take = drag => { Act(() => MoveDrag(drag, inventory(), container)); RefreshLive(); };
+            cell.Take = drag => { int left = 0; Act(() => left = MoveDrag(drag, inventory(), container)); RefreshLive(); return left; };
             grid.AddChild(cell);
         }
         live.Add(() =>
@@ -131,14 +131,22 @@ public partial class Game
         world.Transfer(from, to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackOf(item));
     }
 
-    /// <summary>Drops a dragged stack into an inventory; the building on either end must be within reach.</summary>
-    private void MoveDrag(ItemDrag drag, Inventory to, Thing? container)
+    /// <summary>Drops a dragged stack into an inventory and returns what did not fit; the building on either end must be within reach.</summary>
+    private int MoveDrag(ItemDrag drag, Inventory to, Thing? container)
     {
-        if ((drag.Container ?? container) is Thing near && !world.Near(near)) { Notify("Walk closer first."); return; }
-        if (container != null && world.BoxBlock(container, to, drag.Item) is string refused) { Notify(refused); return; }
-        if (CrateIntoCrate(container, to, drag.Item)) return;
-        if (drag.From != null) world.Transfer(drag.From, to, drag.Item, drag.Count);
+        if ((drag.Container ?? container) is Thing near && !world.Near(near)) { Notify("Walk closer first."); return 0; }
+        if (container != null && world.BoxBlock(container, to, drag.Item) is string refused) { Notify(refused); return 0; }
+        if (CrateIntoCrate(container, to, drag.Item) || drag.From == null) return 0;
+        int left = Leftover(drag, to.Room(drag.Item));
+        world.Transfer(drag.From, to, drag.Item, drag.Count);
+        return left;
     }
+
+    /// <summary>
+    /// Units of a drag that will not fit into the given room.
+    /// Worked out before the move because a guest's move happens later, on the host.
+    /// </summary>
+    private static int Leftover(ItemDrag drag, int room) => Math.Max(0, Math.Min(drag.Count, drag.From![drag.Item]) - room);
 
     /// <summary>Building plans and palette entries drag as hotbar references.</summary>
     private static void DragReference(ItemSlot cell, string id) => cell.Drag = () => new ItemDrag(id, 0, null, null);
