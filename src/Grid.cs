@@ -38,6 +38,8 @@ public partial class Game
         count.AddThemeColorOverride("font_outline_color", new Color("1c2b24"));
         count.AddThemeConstantOverride("outline_size", 4);
         cell.AddChild(count);
+        // A packed crate shows what it holds in the corner.
+        cell.AddChild(new TextureRect { Name = "badge", Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore, Position = new Vector2(2, 22), Size = new Vector2(20, 20), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered });
         return (cell, count);
     }
 
@@ -52,6 +54,7 @@ public partial class Game
 
     /// <summary>
     /// One cell per slot, refreshed live from the inventory's stacks.
+    /// An inventory with a capacity shows only <see cref="Inventory.ShownSlots"/>; cells grow in and shrink away as that changes.
     /// Cells drag their stack out and accept stacks dragged in from another inventory, unless <paramref name="accepts"/> narrows that.
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// </summary>
@@ -60,6 +63,8 @@ public partial class Game
         var grid = AddGrid();
         var stacks = new (string Item, int Count)?[inventory().Slots];
         var cells = Enumerable.Range(0, stacks.Length).Select(i => IconCell($"slot_{i}")).ToArray();
+        var shown = new bool[cells.Length];
+        bool first = true;
         for (int i = 0; i < cells.Length; i++)
         {
             int slot = i;
@@ -73,22 +78,54 @@ public partial class Game
         live.Add(() =>
         {
             var current = inventory().Stacks().ToList();
+            int visible = inventory().ShownSlots, changed = 0;
             for (int i = 0; i < cells.Length; i++)
             {
                 var (cell, count) = cells[i];
                 if (!GodotObject.IsInstanceValid(cell)) return;
                 stacks[i] = i < current.Count ? current[i] : null;
                 cell.Icon = stacks[i] is (string id, _) ? HotbarIcon(id) : null;
-                count.Text = stacks[i] is (_, int n) ? n.ToString() : "";
-                cell.TooltipText = stacks[i] is (string named, _) ? $"{world.Data.Name(named)} · {inventory()[named]} total\n{hint}" : "";
+                var contents = stacks[i] is (string crate, _) ? world.Packed(crate) : null;
+                var badge = cell.GetNode<TextureRect>("badge");
+                badge.Visible = contents != null;
+                if (contents != null) badge.Texture = HotbarIcon(contents.Items.OrderByDescending(p => p.Value).First().Key);
+                count.Text = contents != null ? contents.Count.ToString() : stacks[i] is (_, int n) ? n.ToString() : "";
+                cell.TooltipText = stacks[i] is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {inventory()[named]} total")}\n{hint}" : "";
+                if (shown[i] == i < visible && !first) continue;
+                shown[i] = i < visible;
+                if (first) cell.Visible = shown[i];
+                else GrowCell(cell, shown[i], changed++ * .035f);
             }
+            first = false;
         });
+    }
+
+    /// <summary>A slot that springs open with a slight overshoot, or shrinks and fades before it leaves the grid.</summary>
+    private static void GrowCell(Control cell, bool open, float delay)
+    {
+        if (cell.HasMeta("tween") && cell.GetMeta("tween").As<Tween>() is Tween running && running.IsValid()) running.Kill();
+        cell.PivotOffset = cell.CustomMinimumSize / 2;
+        var tween = cell.CreateTween(); cell.SetMeta("tween", tween);
+        tween.SetParallel();
+        if (open)
+        {
+            if (!cell.Visible) { cell.Visible = true; cell.Scale = Vector2.One * .2f; cell.Modulate = new Color(1, 1, 1, 0); }
+            tween.TweenProperty(cell, "scale", Vector2.One, .42f).SetDelay(delay).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.Out);
+            tween.TweenProperty(cell, "modulate:a", 1f, .25f).SetDelay(delay);
+        }
+        else
+        {
+            tween.TweenProperty(cell, "scale", Vector2.One * .15f, .28f).SetDelay(delay).SetTrans(Tween.TransitionType.Back).SetEase(Tween.EaseType.In);
+            tween.TweenProperty(cell, "modulate:a", 0f, .28f).SetDelay(delay);
+            tween.Chain().TweenCallback(Callable.From(() => cell.Visible = false));
+        }
     }
 
     /// <summary>Moves one stack, or every unit of the item while Shift is held.</summary>
     private void MoveStack(Inventory from, Inventory to, string item, Thing near)
     {
         if (!world.Near(near)) { Notify("Walk closer first."); return; }
+        if (CrateIntoCrate(near, to, item)) return;
         from.TransferTo(to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackOf(item));
     }
 
@@ -96,6 +133,7 @@ public partial class Game
     private void MoveDrag(ItemDrag drag, Inventory to, Thing? container)
     {
         if ((drag.Container ?? container) is Thing near && !world.Near(near)) { Notify("Walk closer first."); return; }
+        if (CrateIntoCrate(container, to, drag.Item)) return;
         drag.From?.TransferTo(to, drag.Item, drag.Count);
     }
 

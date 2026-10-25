@@ -21,14 +21,15 @@ public partial class Game
 
     private Texture2D? HotbarIcon(string id)
     {
+        if (World.IsCrate(id)) id = "crate";
         if (hotbarIcons.TryGetValue(id, out var cached)) return cached;
         Texture2D? atlas = null; int cell = -1, columns = 4, rows = 3;
-        // Meat and coin icons are hand-written SVGs; the illustrated atlas has no free cells left for them.
-        if (id is "raw_meat" or "cooked_meat" or Inventory.Coins) return hotbarIcons[id] = GD.Load<Texture2D>($"res://assets/ui/{id}.svg");
-        if (id is "iron_axe" or "iron_pick" or "steel_tools" or "iron_bar" or "steel_bar" or "wood" or "stone" or "iron_ore" or "coal" or "berries" or "water")
+        // Items added after the illustrated atlas have hand-written SVG icons named by their id.
+        if (ResourceLoader.Exists($"res://assets/ui/{id}.svg")) return hotbarIcons[id] = GD.Load<Texture2D>($"res://assets/ui/{id}.svg");
+        if (id is "iron_axe" or "iron_pick" or "iron_bar" or "steel_bar" or "wood" or "stone" or "iron_ore" or "coal" or "berries" or "water")
         {
             atlas = itemAtlas;
-            cell = id switch { "iron_axe" => 0, "iron_pick" => 1, "steel_tools" => 2, "iron_bar" => 3, "steel_bar" => 4, "wood" => 5, "stone" => 6, "iron_ore" => 7, "coal" => 8, "berries" => 9, "water" => 10, _ => 11 };
+            cell = id switch { "iron_axe" => 0, "iron_pick" => 1, "iron_bar" => 3, "steel_bar" => 4, "wood" => 5, "stone" => 6, "iron_ore" => 7, "coal" => 8, "berries" => 9, "water" => 10, _ => 11 };
         }
         else
         {
@@ -118,7 +119,7 @@ public partial class Game
 
     private string? ActiveHotbarItem() => world.Data.Items.ContainsKey(HotbarId(world.S.ActiveHotbar)) ? HotbarId(world.S.ActiveHotbar) : null;
 
-    private bool IsTransferableHotbarItem(string id) => id is not "iron_axe" and not "iron_pick" and not "steel_tools" and not "berries" and not "water";
+    private bool IsTransferableHotbarItem(string id) => world.Data.Items[id].Tool == "" && !World.IsConsumable(id);
 
     private void UseHotbar(int slot)
     {
@@ -133,7 +134,8 @@ public partial class Game
         {
             view.BuildMode = id; ClosePanel(); Notify($"Place {world.Data.Name(id)}.");
         }
-        else if (id is "berries" or "water" or "cooked_meat" or "raw_meat") Act(() => world.Consume(id));
+        else if (World.IsConsumable(id)) Act(() => world.Consume(id));
+        else if (id == "crate") PlaceCrate(id);
         else if (world.Data.Items.ContainsKey(id)) Notify($"Selected {world.Data.Name(id)}. Carried tools work with Space and gathering.");
         else Notify($"Unknown hotbar item: {id}.");
         RefreshLive();

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 using Godot;
 
@@ -10,6 +11,10 @@ public sealed class ItemDef
     public string Name { get; set; } = "";
     public float Price { get; set; }
     public string Color { get; set; } = "ffffff";
+    /// <summary>The kind of tool this item is (axe, pickaxe, hammer or chisel), or empty for materials.</summary>
+    public string Tool { get; set; } = "";
+    /// <summary>How fast the tool works compared with the plainest tool of its kind.</summary>
+    public float Speed { get; set; } = 1;
 }
 public sealed class BuildingDef
 {
@@ -25,6 +30,16 @@ public sealed class RecipeDef
     public string Output { get; set; } = "";
     public int Amount { get; set; } = 1;
     public float Seconds { get; set; }
+    /// <summary>The tool kind the recipe needs: carried for crafting by hand, slotted at a bench.</summary>
+    public string Tool { get; set; } = "";
+    /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
+    public bool Hand { get; set; }
+}
+/// <summary>What the village takes in crates, and what it sells with how many units make one purchase.</summary>
+public sealed class MarketDef
+{
+    public List<string> Sells { get; set; } = new();
+    public Dictionary<string, int> Buys { get; set; } = new();
 }
 /// <summary>A hiring deal: a larger payment up front buys a lower daily wage.</summary>
 public sealed class HireOffer
@@ -50,6 +65,11 @@ public sealed class GameData
     public float ThirstPerSecond => 100 / (ThirstHours / 24 * DaySeconds);
     /// <summary>Radius in tiles of the player's live view; sized to fill a 16:10 screen at full zoom-out.</summary>
     public float SightRadius { get; set; } = 20;
+    /// <summary>Items one crate holds in total, in stacks of one item each.</summary>
+    public int CrateCapacity { get; set; } = 12;
+    /// <summary>How much faster a crafting bench works than crafting by hand.</summary>
+    public float BenchSpeed { get; set; } = 2;
+    public MarketDef Market { get; set; } = new();
     public Dictionary<string, ItemDef> Items { get; set; } = new();
     public Dictionary<string, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
@@ -63,20 +83,23 @@ public sealed class GameData
     }
     public void Validate()
     {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || NightStarts <= 0 || NightStarts >= 1 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0)
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || NightStarts <= 0 || NightStarts >= 1 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || !Items.ContainsKey("crate"))
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)
                 if (!Items.ContainsKey(cost.Key) || cost.Value <= 0) throw new InvalidOperationException($"Invalid cost for {building.Key}: {cost.Key}.");
         foreach (var recipe in Recipes)
         {
-            if (!Buildings.ContainsKey(recipe.Value.Station) || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
+            bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool);
+            if (!(recipe.Value.Station == "" ? recipe.Value.Hand : Buildings.ContainsKey(recipe.Value.Station)) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
             foreach (var input in recipe.Value.Inputs)
                 if (!Items.ContainsKey(input.Key) || input.Value <= 0) throw new InvalidOperationException($"Invalid input for {recipe.Key}: {input.Key}.");
         }
+        if (Items.Values.Any(i => i.Speed <= 0) || Market.Sells.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
+            throw new InvalidOperationException("Invalid tool speed or market goods in data/game.json.");
     }
-    public string Name(string id) => Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch
+    public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch
     {
         "tree" => "Tree",
         "iron" => "Iron deposit",

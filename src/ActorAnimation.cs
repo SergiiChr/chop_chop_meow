@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -173,19 +174,19 @@ public static class ActorAnimation
         if (moving) return ActorAction.Walk;
         if (!gathering || string.IsNullOrEmpty(resourceKind)) return ActorAction.Idle;
 
-        string? requiredTool = resourceKind == "tree" ? "iron_axe" : resourceKind is "stone" or "iron" or "coal" ? "iron_pick" : null;
-        string? tool = requiredTool == null ? null : BestTool(backpack, selectedTool, requiredTool);
+        string[]? family = resourceKind == "tree" ? Axes : resourceKind is "stone" or "iron" or "coal" ? Picks : null;
+        string? tool = family == null ? null : BestTool(backpack, selectedTool, family);
         return resourceKind switch
         {
             "tree" => tool switch
             {
-                "steel_tools" => ActorAction.SteelChop,
+                "steel_axe" => ActorAction.SteelChop,
                 "iron_axe" => ActorAction.Chop,
                 _ => ActorAction.Gather
             },
             "stone" or "iron" or "coal" => tool switch
             {
-                "steel_tools" => ActorAction.SteelMine,
+                "steel_pick" => ActorAction.SteelMine,
                 "iron_pick" => ActorAction.Mine,
                 _ => ActorAction.Gather
             },
@@ -211,19 +212,18 @@ public static class ActorAnimation
         return worker.WorkState switch
         {
             WorkerWorkState.Pumping => ActorAction.Pump,
-            WorkerWorkState.Hammering when assignment?.Kind == "anvil" => ActorAction.Hammer,
+            WorkerWorkState.Hammering when assignment != null && World.Worked(assignment.Kind) => ActorAction.Hammer,
             _ => ActorAction.Idle
         };
     }
 
-    /// <summary>The carried tool the player would use on a resource, preferring the selected hotbar tool.</summary>
-    public static string? BestTool(Inventory backpack, string? selectedTool, string ironTool)
+    // Best first.
+    private static readonly string[] Axes = { "steel_axe", "iron_axe" }, Picks = { "steel_pick", "iron_pick" };
+
+    /// <summary>The carried tool of a family the player would use on a resource, preferring the selected hotbar tool, then the best one.</summary>
+    public static string? BestTool(Inventory backpack, string? selectedTool, string[] family)
     {
-        if (selectedTool is "steel_tools" && backpack[selectedTool] > 0) return selectedTool;
-        if (selectedTool == ironTool && backpack[selectedTool] > 0)
-            return selectedTool;
-        if (backpack["steel_tools"] > 0) return "steel_tools";
-        if (backpack[ironTool] > 0) return ironTool;
-        return null;
+        if (selectedTool != null && family.Contains(selectedTool) && backpack[selectedTool] > 0) return selectedTool;
+        return family.FirstOrDefault(tool => backpack[tool] > 0);
     }
 }

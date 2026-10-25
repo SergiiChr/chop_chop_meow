@@ -11,16 +11,51 @@
   "gatherSeconds": 2.0,
   "respawnSeconds": 30,
   "sightRadius": 20,
+  "crateCapacity": 12,
+  "benchSpeed": 2,
+  "market": {
+    "sells": [
+      "raw_meat",
+      "cooked_meat",
+      "berries",
+      "steel_axe",
+      "steel_pick",
+      "steel_hammer"
+    ],
+    "buys": {
+      "steel_axe": 1,
+      "steel_pick": 1,
+      "steel_hammer": 1,
+      "canned_food": 12,
+      "water": 12
+    }
+  },
   "items": {
     "wood": {
       "name": "Wood",
       "price": 1.5,
       "color": "af8053"
     },
+    "planks": {
+      "name": "Wood planks",
+      "price": 0.6,
+      "color": "d2a26a"
+    },
+    "wood_parts": {
+      "name": "Wood parts",
+      "price": 1,
+      "color": "b98552"
+    },
     "stone": {
       "name": "Stone",
       "price": 1.2,
       "color": "aab2af"
+    },
+    "stone_chisel": {
+      "name": "Stone chisel",
+      "price": 3,
+      "color": "9aa29f",
+      "tool": "chisel"
     },
     "iron_ore": {
       "name": "Iron ore",
@@ -42,20 +77,61 @@
       "price": 25,
       "color": "b5d8e4"
     },
+    "iron_parts": {
+      "name": "Iron parts",
+      "price": 10,
+      "color": "aeb6b7"
+    },
+    "steel_parts": {
+      "name": "Steel parts",
+      "price": 27,
+      "color": "b5d8e4"
+    },
+    "wood_hammer": {
+      "name": "Wooden mallet",
+      "price": 3,
+      "color": "b98552",
+      "tool": "hammer"
+    },
+    "iron_hammer": {
+      "name": "Iron hammer",
+      "price": 13,
+      "color": "c9b68c",
+      "tool": "hammer",
+      "speed": 1.3
+    },
+    "steel_hammer": {
+      "name": "Steel hammer",
+      "price": 40,
+      "color": "e7c978",
+      "tool": "hammer",
+      "speed": 1.8
+    },
     "iron_axe": {
       "name": "Iron axe",
-      "price": 16,
-      "color": "c9b68c"
+      "price": 22,
+      "color": "c9b68c",
+      "tool": "axe"
     },
     "iron_pick": {
       "name": "Iron pickaxe",
-      "price": 25,
-      "color": "c9b68c"
+      "price": 22,
+      "color": "c9b68c",
+      "tool": "pickaxe"
     },
-    "steel_tools": {
-      "name": "Steel tools",
-      "price": 85,
-      "color": "e7c978"
+    "steel_axe": {
+      "name": "Steel axe",
+      "price": 75,
+      "color": "e7c978",
+      "tool": "axe",
+      "speed": 1.8
+    },
+    "steel_pick": {
+      "name": "Steel pickaxe",
+      "price": 75,
+      "color": "e7c978",
+      "tool": "pickaxe",
+      "speed": 1.8
     },
     "berries": {
       "name": "Berries",
@@ -67,6 +143,11 @@
       "price": 2,
       "color": "88cbe0"
     },
+    "canned_food": {
+      "name": "Canned food",
+      "price": 4,
+      "color": "c8574a"
+    },
     "raw_meat": {
       "name": "Raw meat",
       "price": 2,
@@ -76,6 +157,11 @@
       "name": "Cooked meat",
       "price": 5,
       "color": "9a5a32"
+    },
+    "crate": {
+      "name": "Wood crate",
+      "price": 4,
+      "color": "c9a46e"
     },
     "coins": {
       "name": "Coins",
@@ -121,7 +207,14 @@
         "iron_bar": 4,
         "stone": 6
       },
-      "description": "Forge iron axes, pickaxes and steel tools."
+      "description": "Hammer iron and steel bars into parts for tools. Someone has to stand at it and hammer."
+    },
+    "bench": {
+      "name": "Crafting bench",
+      "cost": {
+        "planks": 10
+      },
+      "description": "Crafts planks, crates and tools twice as fast as by hand. Slot a chisel and a hammer; someone has to work at it."
     },
     "reinforced": {
       "name": "Bellows furnace",
@@ -173,38 +266,162 @@
       "amount": 1,
       "seconds": 10
     },
-    "iron_axe": {
-      "name": "Iron axe",
+    "iron_parts": {
+      "name": "Iron parts",
       "station": "anvil",
       "inputs": {
-        "iron_bar": 2,
-        "wood": 2
+        "iron_bar": 1
       },
-      "output": "iron_axe",
+      "output": "iron_parts",
       "amount": 1,
       "seconds": 3
     },
-    "iron_pick": {
-      "name": "Iron pickaxe",
+    "steel_parts": {
+      "name": "Steel parts",
       "station": "anvil",
       "inputs": {
-        "iron_bar": 3,
-        "wood": 2
+        "steel_bar": 1
+      },
+      "output": "steel_parts",
+      "amount": 1,
+      "seconds": 5
+    },
+    "stone_chisel": {
+      "name": "Stone chisel",
+      "station": "",
+      "hand": true,
+      "inputs": {
+        "stone": 2
+      },
+      "output": "stone_chisel",
+      "amount": 1,
+      "seconds": 8
+    },
+    "planks": {
+      "name": "Wood planks",
+      "station": "bench",
+      "hand": true,
+      "tool": "chisel",
+      "inputs": {
+        "wood": 1
+      },
+      "output": "planks",
+      "amount": 4,
+      "seconds": 10
+    },
+    "wood_parts": {
+      "name": "Wood parts",
+      "station": "bench",
+      "hand": true,
+      "tool": "chisel",
+      "inputs": {
+        "wood": 1
+      },
+      "output": "wood_parts",
+      "amount": 2,
+      "seconds": 10
+    },
+    "wood_hammer": {
+      "name": "Wooden mallet",
+      "station": "bench",
+      "hand": true,
+      "tool": "chisel",
+      "inputs": {
+        "wood_parts": 1
+      },
+      "output": "wood_hammer",
+      "amount": 1,
+      "seconds": 10
+    },
+    "crate": {
+      "name": "Wood crate",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "inputs": {
+        "planks": 6
+      },
+      "output": "crate",
+      "amount": 1,
+      "seconds": 10
+    },
+    "iron_axe": {
+      "name": "Iron axe",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "inputs": {
+        "iron_parts": 2,
+        "wood_parts": 1
+      },
+      "output": "iron_axe",
+      "amount": 1,
+      "seconds": 10
+    },
+    "iron_pick": {
+      "name": "Iron pickaxe",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "inputs": {
+        "iron_parts": 2,
+        "wood_parts": 1
       },
       "output": "iron_pick",
       "amount": 1,
-      "seconds": 4
+      "seconds": 10
     },
-    "steel_tools": {
-      "name": "Steel tools",
-      "station": "anvil",
+    "iron_hammer": {
+      "name": "Iron hammer",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
       "inputs": {
-        "steel_bar": 2,
-        "wood": 2
+        "iron_parts": 1,
+        "wood_parts": 1
       },
-      "output": "steel_tools",
+      "output": "iron_hammer",
       "amount": 1,
-      "seconds": 6
+      "seconds": 10
+    },
+    "steel_axe": {
+      "name": "Steel axe",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "inputs": {
+        "steel_parts": 2,
+        "wood_parts": 1
+      },
+      "output": "steel_axe",
+      "amount": 1,
+      "seconds": 10
+    },
+    "steel_pick": {
+      "name": "Steel pickaxe",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "inputs": {
+        "steel_parts": 2,
+        "wood_parts": 1
+      },
+      "output": "steel_pick",
+      "amount": 1,
+      "seconds": 10
+    },
+    "steel_hammer": {
+      "name": "Steel hammer",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "inputs": {
+        "steel_parts": 1,
+        "wood_parts": 1
+      },
+      "output": "steel_hammer",
+      "amount": 1,
+      "seconds": 10
     }
   },
   "hungerHours": 24,

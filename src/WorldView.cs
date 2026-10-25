@@ -18,6 +18,9 @@ public partial class WorldView : Node3D
     public int SelectedWorker;
     public int HoverWorker;
     public string BuildMode = "";
+    /// <summary>The crate the player is lifting with a held right click, and how far along the lift is from 0 to 1.</summary>
+    public int Lifting;
+    public float LiftProgress;
     public Vector2 Mouse;
     public float Zoom = 1;
     public bool Gathering;
@@ -338,8 +341,8 @@ public partial class WorldView : Node3D
 
     private string? HeldTool() => SelectedTool switch
     {
-        "steel_tools" when World.S.Backpack["steel_tools"] > 0 => "steel_axe",
-        "iron_axe" or "iron_pick" when World.S.Backpack[SelectedTool] > 0 => SelectedTool,
+        "iron_axe" or "iron_pick" or "steel_axe" or "steel_pick" when World.S.Backpack[SelectedTool] > 0 => SelectedTool,
+        "wood_hammer" or "iron_hammer" or "steel_hammer" when World.S.Backpack[SelectedTool] > 0 => "hammer",
         _ => null
     };
 
@@ -353,7 +356,7 @@ public partial class WorldView : Node3D
         if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; subject = World.S.Things.FirstOrDefault(t => t.Pos == pulseTarget); }
         if (action == ActorAction.Idle)
         {
-            var anvil = World.S.Things.FirstOrDefault(t => t.Kind == "anvil" && t.Processing && World.Near(t) &&
+            var anvil = World.S.Things.FirstOrDefault(t => World.Worked(t.Kind) && t.Processing && World.Near(t) &&
                 !World.S.Workers.Any(w => w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2));
             if (anvil != null) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
         }
@@ -437,7 +440,8 @@ public partial class WorldView : Node3D
         };
         if (impact < 0 || !actor.Struck(impact) || !props.TryGetValue(subject.Id, out var prop)) return;
         prop.Shake = 1;
-        if (subject.Kind is "tree" or "anvil") Sounds?.Play(subject.Kind == "tree" ? "chop_tree" : "anvil_work", subject.Pos);
+        // A bench knocks wood on wood, so it borrows the axe's knock.
+        if (subject.Kind is "tree" or "anvil" or "bench") Sounds?.Play(subject.Kind == "anvil" ? "anvil_work" : "chop_tree", subject.Pos);
         var toward = (actor.Position - subject.Pos).Normalized();
         var side = To3(subject.Pos + toward * .35f);
         switch (subject.Kind)
@@ -556,7 +560,14 @@ public partial class WorldView : Node3D
                 if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Flat(new Color("ff9a3a")), 1, .5f, 1.1f, -1.4f, .025f);
                 Smoke(prop, t, burning, dt, CampfireSmoke);
                 break;
-            case "chest" or "grave":
+            case "bench":
+                // Slotted tools lie on the bench top.
+                if (!World.Sees(t.Pos)) break;
+                prop.Chisel!.Visible = t.Tools != null && World.BenchTool(t, "chisel") != null;
+                prop.Hammer!.Visible = t.Tools != null && World.BenchTool(t, "hammer") != null;
+                prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
+                break;
+            case "chest" or "grave" or "crate":
                 // Remembered boxes carry no inventory, so the lid stays as it was last seen.
                 if (!World.Sees(t.Pos)) break;
                 int count = t.Inventory.Count;
@@ -567,6 +578,9 @@ public partial class WorldView : Node3D
                 if (dt > 0 && (open ? prop.Open == 0 : prop.Open == 1)) Sounds?.Play(open ? "open_chest" : "close_chest", t.Pos);
                 prop.Open = Mathf.MoveToward(prop.Open, open ? 1 : 0, dt * 4);
                 prop.Lid!.RotationDegrees = new Vector3(-80 * Ease(prop.Open), 0, 0);
+                // A crate being lifted rises and rocks before it goes into the backpack.
+                float lifted = t.Id == Lifting ? Ease(LiftProgress) : 0;
+                if (t.Kind == "crate") { prop.Body.Position = new Vector3(0, lifted * .35f, 0); prop.Body.RotationDegrees = new Vector3(lifted * 9 * MathF.Sin(Elapsed * 18), 0, lifted * 6 * MathF.Cos(Elapsed * 15)); }
                 break;
             case "hut":
                 bool near = !World.Dead && World.Player.DistanceTo(t.Pos) < 2.6f;
@@ -670,8 +684,9 @@ public partial class WorldView : Node3D
             // The courier walks with arms trailing back to the cart handle.
             var stride = ActorAnimation.PoseAt(ActorAction.Walk, cart.Distance / 2.1f, true) with { RaiseL = -22, RaiseR = -22, OutL = 12, OutR = 12, ElbowL = 8, ElbowR = 8, Lean = 10 };
             cart.Courier.Show(stride, null, false);
-            bool cash = !order.Buying && phase >= .5f;
-            cart.Cash.Visible = cash; cart.Goods.Visible = !cash;
+            // A sale leaves with its crates and returns with the payment; a purchase leaves with the payment and returns with the goods.
+            bool back = phase >= .5f;
+            cart.Load(order.Buying == back ? order.Crates : 0, order.Buying && back, order.Buying != back);
         }
         foreach (var gone in carts.Keys.Where(o => !World.S.Orders.Contains(o)).ToArray())
         {

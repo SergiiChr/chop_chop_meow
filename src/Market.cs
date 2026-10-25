@@ -35,7 +35,7 @@ public partial class Game
     private void Market(Thing sign)
     {
         var output = sign.Output!;
-        AddInventoryGrid(() => sign.Inventory, sign, id => MoveStack(sign.Inventory, world.S.Backpack, id, sign), "Click: take back · Drag a backpack stack here to sell", drag => drag.From == world.S.Backpack && World.Tradable(drag.Item));
+        AddInventoryGrid(() => sign.Inventory, sign, id => MoveStack(sign.Inventory, world.S.Backpack, id, sign), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item));
         var trip = new ProgressBar { MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 10), Name = "cart" };
         content.AddChild(trip);
         live.Add(() =>
@@ -52,7 +52,8 @@ public partial class Game
         var collect = Button("Collect", () => { if (world.Near(sign)) foreach (var id in output.Items.Keys.ToArray()) output.TransferTo(world.S.Backpack, id, output[id]); else Notify("Walk closer first."); });
         collect.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(collect);
         AddLabel("BACKPACK", 14);
-        AddInventoryGrid(() => world.S.Backpack, null, id => { if (World.Tradable(id)) MoveStack(world.S.Backpack, sign.Inventory, id, sign); }, "Click: put a stack in the market · Drag onto a box");
+        AddLabel("The village only takes crates packed with meat, berries or steel tools.", 13, Muted);
+        AddInventoryGrid(() => world.S.Backpack, null, id => { if (world.CanSell(id)) MoveStack(world.S.Backpack, sign.Inventory, id, sign); else Notify("Pack meat, berries or steel tools in a crate to sell them."); }, "Click: put a packed crate in the market · Drag onto a box");
     }
 
     private void HireOffers(Thing sign)
@@ -74,6 +75,7 @@ public partial class Game
         sheet.AddChild(Label("MARKET PRICES", 20));
         var age = Label("", 13, Muted); sheet.AddChild(age);
         live.Add(() => { if (GodotObject.IsInstanceValid(age)) age.Text = world.PriceAge switch { 0 => "News from today", 1 => "News from yesterday", int n => $"News from {n} days ago" }; });
+        AddSheetNote("Sell prices are per item, sold in crates. Tools are bought one by one; other goods come in crates.");
         var header = new HBoxContainer(); sheet.AddChild(header);
         header.AddChild(new Label { Text = "", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
         foreach (string column in new[] { "sell", "buy" }) header.AddChild(PriceCell(column, Muted));
@@ -81,15 +83,19 @@ public partial class Game
         var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; rows.AddThemeConstantOverride("separation", 3);
         var scroll = new ScrollContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         scroll.AddChild(rows); sheet.AddChild(scroll);
-        foreach (string id in world.Data.Items.Keys.Where(World.Tradable))
+        foreach (string id in world.Data.Market.Sells.Union(world.Data.Market.Buys.Keys))
         {
+            bool sells = world.Data.Market.Sells.Contains(id), buys = world.Data.Market.Buys.ContainsKey(id);
             var row = new HBoxContainer(); rows.AddChild(row);
             row.AddChild(new TextureRect { Texture = HotbarIcon(id), CustomMinimumSize = new Vector2(26, 26), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered });
-            var name = Label(world.Data.Name(id), 14); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.AutowrapMode = TextServer.AutowrapMode.Off; name.ClipText = true; row.AddChild(name);
-            var sellPrice = PriceCell("", Cream); row.AddChild(sellPrice); row.AddChild(PriceCell($"{world.UnitPrice(id, true):0.0}", Cream));
-            live.Add(() => { if (GodotObject.IsInstanceValid(sellPrice)) sellPrice.Text = $"{world.KnownPrice(id):0.0}"; });
-            var buy = Button("Buy", () => world.Buy(sign, id, Input.IsKeyPressed(Key.Shift) ? 10 : 1));
-            buy.Name = $"buy_{id}"; buy.CustomMinimumSize = new Vector2(52, 28); buy.TooltipText = "Buy 1 · Shift: 10\nGoods arrive in the market output."; row.AddChild(buy);
+            var name = Label(world.Lot(id) > 1 ? $"{world.Lot(id)} {world.Data.Name(id)}" : world.Data.Name(id), 14); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.AutowrapMode = TextServer.AutowrapMode.Off; name.ClipText = true; row.AddChild(name);
+            // Goods the village does not take show no sell price, and goods it does not sell no buy price.
+            var sellPrice = PriceCell("", Cream); row.AddChild(sellPrice); row.AddChild(PriceCell(buys ? $"{world.LotPrice(id)}" : "", Cream));
+            if (sells) live.Add(() => { if (GodotObject.IsInstanceValid(sellPrice)) sellPrice.Text = $"{world.KnownPrice(id):0.0}"; });
+            if (!buys) { row.AddChild(new Control { CustomMinimumSize = new Vector2(52, 28) }); continue; }
+            var buy = Button("Buy", () => world.Buy(sign, id, Input.IsKeyPressed(Key.Shift) ? 5 : 1));
+            buy.Name = $"buy_{id}"; buy.CustomMinimumSize = new Vector2(52, 28); row.AddChild(buy);
+            buy.TooltipText = world.Lot(id) > 1 ? $"Buy a crate of {world.Lot(id)} · Shift: 5 crates\nCrates arrive in the market output." : "Buy 1 · Shift: 5\nGoods arrive in the market output.";
         }
         var fetch = Button("Send for fresh prices", () => world.FetchPrices(sign)); fetch.Name = "fetch"; sheet.AddChild(fetch);
         live.Add(() =>
@@ -99,6 +105,8 @@ public partial class Game
             fetch.Disabled = blocked != null; fetch.TooltipText = blocked ?? "The worker assigned here walks to Bramblewick and back with fresh prices.";
         });
     }
+
+    private void AddSheetNote(string text) => sheet.AddChild(Label(text, 13, Muted));
 
     private Label PriceCell(string text, Color color)
     {

@@ -13,7 +13,7 @@ public sealed class Prop
 {
     public readonly Node3D Root = new();
     public readonly Node3D Body;
-    public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire;
+    public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer;
     public Node3D[] Pleats = Array.Empty<Node3D>();
     public MeshInstance3D? Glow, Window, Pool;
     public WorldModels.WolfModel? Wolf;
@@ -66,6 +66,8 @@ public static class WorldModels
         "reinforced" => new[] { new Hit(.95f, 0, 1.45f) },
         "hut" => new[] { new Hit(1.6f, 0, 3.1f) },
         "chest" => new[] { new Hit(.5f, 0, .65f) },
+        "crate" => new[] { new Hit(.4f, 0, .55f) },
+        "bench" => new[] { new Hit(.6f, 0, .95f) },
         "grave" => new[] { new Hit(.45f, 0, .55f) },
         "anvil" => new[] { new Hit(.45f, 0, .85f) },
         "signpost" => new[] { new Hit(.5f, 0, 1.9f) },
@@ -94,6 +96,8 @@ public static class WorldModels
             case "chest": StorageBox(prop, "c9a46e", "9d7a4c", "2f3133"); break;
             case "grave": StorageBox(prop, "e2701e", "c45b12", "f2f2ea"); break;
             case "anvil": Anvil(prop); break;
+            case "crate": Crate(prop); break;
+            case "bench": Workbench(prop); break;
             case "signpost": Signpost(prop); break;
             case "campfire": FirePit(prop); break;
         }
@@ -321,6 +325,50 @@ public static class WorldModels
         prop.Lid = lid;
     }
 
+    /// <summary>A slatted wood crate with darker corner battens and a slatted lid.</summary>
+    private static void Crate(Prop prop)
+    {
+        var body = prop.Body;
+        var size = new Vector3(.6f, .42f, .46f);
+        var board = Mat("c9a46e"); var batten = Mat("8f6a3f"); var gap = Mat("4a3420");
+        Box(body, size - new Vector3(.02f, .02f, .02f), new Vector3(0, size.Y / 2, 0), gap);
+        // Three slats a side leave dark gaps between them.
+        for (int i = 0; i < 3; i++)
+        {
+            float y = .07f + i * .14f;
+            Box(body, new Vector3(size.X, .11f, .02f), new Vector3(0, y, size.Z / 2), board);
+            Box(body, new Vector3(size.X, .11f, .02f), new Vector3(0, y, -size.Z / 2), board);
+            Box(body, new Vector3(.02f, .11f, size.Z), new Vector3(size.X / 2, y, 0), board);
+            Box(body, new Vector3(.02f, .11f, size.Z), new Vector3(-size.X / 2, y, 0), board);
+        }
+        foreach (var (x, z) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) }) Box(body, new Vector3(.05f, size.Y, .05f), new Vector3(x * (size.X / 2 - .01f), size.Y / 2, z * (size.Z / 2 - .01f)), batten);
+        var lid = Pivot(body, new Vector3(0, size.Y, -size.Z / 2));
+        for (int i = 0; i < 3; i++) Box(lid, new Vector3(size.X + .03f, .035f, size.Z / 3 - .015f), new Vector3(0, .018f, size.Z / 6 + i * size.Z / 3), board);
+        Box(lid, new Vector3(.05f, .045f, size.Z + .02f), new Vector3(size.X / 2 - .05f, .03f, size.Z / 2), batten);
+        Box(lid, new Vector3(.05f, .045f, size.Z + .02f), new Vector3(-size.X / 2 + .05f, .03f, size.Z / 2), batten);
+        prop.Lid = lid;
+    }
+
+    /// <summary>A plank-topped workbench with a lower shelf and a vise; slotted tools lie on the top.</summary>
+    private static void Workbench(Prop prop)
+    {
+        var body = prop.Body;
+        var wood = Mat("b98552"); var dark = Mat("7a5432"); var steel = Mat("4a4d50", .4f, .6f);
+        foreach (var (x, z) in new[] { (-.5f, -.25f), (.5f, -.25f), (-.5f, .25f), (.5f, .25f) }) Box(body, new Vector3(.08f, .74f, .08f), new Vector3(x, .37f, z), dark);
+        Box(body, new Vector3(1.1f, .07f, .62f), new Vector3(0, .78f, 0), wood);
+        for (int i = 0; i < 3; i++) Box(body, new Vector3(1.11f, .005f, .01f), new Vector3(0, .816f, -.2f + i * .2f), dark);
+        Box(body, new Vector3(1f, .04f, .5f), new Vector3(0, .2f, 0), dark);
+        Box(body, new Vector3(.3f, .12f, .2f), new Vector3(.62f, .78f, .2f), steel);
+        Box(body, new Vector3(.04f, .04f, .26f), new Vector3(.62f, .8f, .4f), steel);
+        var chisel = Pivot(body, new Vector3(-.25f, .83f, .05f), new Vector3(0, 30, 0));
+        Box(chisel, new Vector3(.24f, .03f, .06f), Vector3.Zero, Mat("9aa29f"));
+        prop.Chisel = chisel;
+        var hammer = Pivot(body, new Vector3(.15f, .83f, -.1f), new Vector3(0, -20, 0));
+        Box(hammer, new Vector3(.34f, .03f, .035f), Vector3.Zero, wood);
+        Box(hammer, new Vector3(.06f, .06f, .14f), new Vector3(.17f, .02f, 0), steel);
+        prop.Hammer = hammer;
+    }
+
     /// <summary>Anvil bolted to a welded square-tube stand.</summary>
     private static void Anvil(Prop prop)
     {
@@ -477,12 +525,14 @@ public static class WorldModels
         private static float Ease(float t) => t * t * (3 - 2 * t);
     }
 
-    /// <summary>Courier pulling a two-wheel garden cart; the cart load shows goods or the payment cash box.</summary>
+    /// <summary>Courier pulling a two-wheel garden cart; the cart load shows its crates, loose goods or the payment cash box.</summary>
     public sealed class CartModel
     {
         public readonly Node3D Root = new();
         public readonly ActorRig Courier = new(ActorSkin.Courier);
         public readonly Node3D Goods, Cash;
+        /// <summary>One crate model per market slot: four on the bed and two stacked on top.</summary>
+        public readonly Node3D[] Crates = new Node3D[World.MarketSlots];
         private readonly Node3D[] wheels = new Node3D[2];
         public float Distance, Yaw;
         public Vector2 Last;
@@ -508,10 +558,26 @@ public static class WorldModels
             Box(Goods, new Vector3(.4f, .28f, .32f), new Vector3(-.08f, .14f, .18f), Mat("c9a46e"));
             Box(Goods, new Vector3(.36f, .24f, .3f), new Vector3(.1f, .12f, -.2f), Mat("b8925c"));
             Box(Goods, new Vector3(.3f, .22f, .26f), new Vector3(.05f, .39f, .05f), Mat("c9a46e"));
+            for (int i = 0; i < Crates.Length; i++)
+            {
+                // Small gaps and dark corner battens keep each crate countable at a glance.
+                var at = i < 4 ? new Vector3(i % 2 == 0 ? -.15f : .15f, 0, i < 2 ? .2f : -.2f) : new Vector3(i == 4 ? -.15f : .15f, .25f, i == 4 ? .08f : -.12f);
+                Crates[i] = Pivot(cart, new Vector3(0, .68f, 0) + at, new Vector3(0, i * 23 % 13 - 6, 0));
+                Box(Crates[i], new Vector3(.25f, .22f, .32f), new Vector3(0, .11f, 0), Mat("d4b07a"));
+                foreach (var (x, z) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) }) Box(Crates[i], new Vector3(.035f, .225f, .035f), new Vector3(x * .11f, .112f, z * .15f), Mat("6e4f2c"));
+                Box(Crates[i], new Vector3(.255f, .025f, .325f), new Vector3(0, .21f, 0), Mat("8f6a3f"));
+            }
             Cash = Pivot(cart, new Vector3(0, .68f, 0));
             Box(Cash, new Vector3(.36f, .2f, .26f), new Vector3(0, .1f, .1f), Mat("4a5258", .4f, .7f));
             Sphere(Cash, .14f, new Vector3(.12f, .12f, -.2f), Mat("c9a227", .5f), new Vector3(1, .9f, 1), 8);
             Sphere(Cash, .12f, new Vector3(-.14f, .1f, -.22f), Mat("b89120", .5f), new Vector3(1, .9f, 1), 8);
+        }
+
+        /// <summary>Shows exactly <paramref name="crates"/> crates, or loose goods, or the cash box.</summary>
+        public void Load(int crates, bool goods, bool cash)
+        {
+            for (int i = 0; i < Crates.Length; i++) Crates[i].Visible = !cash && i < crates;
+            Goods.Visible = goods && !cash && crates == 0; Cash.Visible = cash;
         }
 
         public void Roll(float distance)

@@ -85,17 +85,22 @@ public partial class Game
     {
         ClosePanel(); await Frames();
         var sign = world.Add("signpost", world.Player + new Vector2(2, 0));
-        world.S.Backpack.Add("wood", 5); world.S.Backpack.Add(Inventory.Coins, 60);
+        world.S.Backpack.Add("wood", 5); world.S.Backpack.Add(Inventory.Coins, 100);
+        var berries = world.Add("crate", world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); world.PickUpCrate(berries);
+        string packed = world.S.Backpack.Items.Keys.Single(World.IsCrate);
         await Click(view.Screen(sign.Pos, .8f));
         UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A signpost must open the market with its icon buttons.");
-        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood")));
-        UIRequire(sign.Inventory["wood"] == 5 && world.S.Backpack["wood"] == 0, "Clicking a backpack stack must load it into the market input.");
+        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·")));
+        UIRequire(sign.Inventory.Count == 0 && world.S.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
+        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));
+        UIRequire(sign.Inventory[packed] == 1 && world.S.Backpack[packed] == 0, "Clicking a packed crate must load it into the market input.");
         await Click(Named("sell")!);
         UIRequire(world.S.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
         await Click(Named("prices")!);
         var fetch = Named("fetch");
         UIRequire(sheet.Visible && panel.OffsetLeft == PanelLeft - SheetWidth && fetch != null && fetch.Disabled && fetch.TooltipText == "No worker assigned.", "The price sheet must open beside the panel and explain why no one can fetch prices.");
-        await Click(Named("buy_wood")!);
+        UIRequire(Named("buy_wood") == null && Named("buy_berries") == null && Named("buy_water") != null, "The price sheet must only offer what the village sells.");
+        await Click(Named("buy_water")!);
         UIRequire(world.S.Orders.Count == 2 && world.S.Orders[1].Buying, "Buy on the price sheet must order goods.");
         await Click(Named("hardhat")!);
         var dear = world.Data.HireOffers.OrderBy(o => o.Upfront).Last();
@@ -303,7 +308,7 @@ public partial class Game
             await CheckCabinAndCanopy();
             await CheckSignpost();
 
-            world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools", "sold_steel", "hired", "assigned" });
+            world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "bench", "pick", "reinforced", "steel_bar", "steel_tool", "sold_steel", "hired", "assigned" });
             await Frames(3);
             UIRequire(ending.Visible && paused, "Completing the goal chain must show the ending and pause the world.");
             ((Button)ending.FindChild("keep_playing", true, false)).EmitSignal(BaseButton.SignalName.Pressed); await Frames(3);
@@ -359,7 +364,7 @@ public partial class Game
             foregroundTree.Pos = world.Player + new Vector2(8, -8);
             UIRequire(!view.TreeCanopyCoversThing(foregroundTree, occluded), "A distant tree must not fade for a building.");
             ClosePanel(); selected = 0;
-            world.S.Backpack.Remove("iron_axe", 99); world.S.Backpack.Remove("steel_tools", 99);
+            world.S.Backpack.Remove("iron_axe", 99); world.S.Backpack.Remove("steel_axe", 99);
             await KeyStroke(Key.Space);
             UIRequire(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
             await ToSignal(GetTree().CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
