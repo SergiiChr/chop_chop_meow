@@ -580,12 +580,43 @@ public static class WorldModels
     /// <summary>Ore color in a mine cart: rusty iron, black coal, and pale grey for anything else.</summary>
     private static string OreColor(string ore) => ore switch { "iron" => "a35a2e", "coal" => "26282b", _ => "b9bbb4" };
 
-    /// <summary>A timbered adit cut into the cliff's end, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>
+    /// <summary>The portal, this far behind a mine's spot along its rails; the cart stands at the spot (see <see cref="World.MineSpot"/>).</summary>
+    public const float MineDoor = -2.2f;
+    /// <summary>How far the tunnel runs into the spur before it is black.</summary>
+    public const float MineDepth = 3;
+
+    /// <summary>
+    /// The rock spur at a cliff's seaward end, built in a mine's local frame: rock to both sides of and over a cave mouth, so a mine's tunnel can run into it.
+    /// Part of the scenery, so every cliff has one whether or not it is mined.
+    /// </summary>
+    public static void MineSpur(Node3D parent, Cliff cliff, string[] rock)
+    {
+        var spot = World.MineSpot(cliff);
+        var spur = Pivot(parent, new Vector3(spot.X, 0, spot.Y));
+        spur.Rotation = MineYaw(spot);
+        var rng = new Random((int)(cliff.Center.X * 31 + cliff.Center.Y));
+        float R() => (float)rng.NextDouble();
+        Material Rock() => Mat(rock[rng.Next(rock.Length)], .95f);
+        // Side masses stay outside the tunnel's walls, and the cap stays above its roof.
+        for (int i = 0; i < 3; i++)
+            foreach (int side in new[] { -1, 1 })
+            {
+                float height = 2.3f + R() * .7f;
+                Cylinder(spur, 1.05f, .65f + R() * .15f, height, new Vector3(side * 1.75f, height / 2, MineDoor - .45f - i * 1.15f), Rock(), new Vector3(0, R() * 72, 0), 5);
+            }
+        for (int i = 0; i < 3; i++)
+            for (int x = -1; x <= 1; x++)
+                Sphere(spur, .85f + R() * .15f, new Vector3(x * .95f, 2.4f + R() * .25f, MineDoor - .7f - i * 1.15f), Rock(), new Vector3(1.3f, .6f, 1.2f), 5);
+        Cylinder(spur, 1, .7f, 2.8f, new Vector3(0, 1.4f, MineDoor - MineDepth - .6f), Rock(), null, 5);
+        for (int i = 0; i < 6; i++)
+            Sphere(spur, .16f + R() * .14f, new Vector3((i % 2 == 0 ? -1 : 1) * (1.1f + R() * .9f), .06f, MineDoor + .3f + R() * 1.2f), Rock(), new Vector3(1.2f, .6f, 1), 5);
+    }
+
+    /// <summary>A timbered adit into the cliff's spur, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>
     private static void Mine(Prop prop, string ore)
     {
         var body = prop.Body;
-        // The portal sits this far behind the cart, at the rock face past the cliff's end (see World.MineSpot).
-        const float Door = -2.2f;
+        const float Door = MineDoor;
         // The marking: a see-through green footprint and portal, shown until the mine is finished.
         var outline = Pivot(body, Vector3.Zero);
         var green = Flat(new Color(.45f, .95f, .4f, .45f));
@@ -594,16 +625,20 @@ public static class WorldModels
         foreach (float x in new[] { -.7f, .7f }) Box(outline, new Vector3(.08f, 1.75f, .08f), new Vector3(x, .88f, Door), green);
         Box(outline, new Vector3(1.56f, .08f, .08f), new Vector3(0, 1.75f, Door), green);
         prop.Outline = outline;
-        // Rock around the portal, so the adit reads as cut into the cliff even where its end tapers low.
-        // Matches the cliff palettes in WorldScene.BuildCliff.
-        var rock = ore switch { "iron" => new[] { "7d5b45", "8a6650", "6e4f3c" }, "tin" => new[] { "7f827d", "8b8e88", "737671" }, _ => new[] { "3a3c40", "45474c", "2d2f33" } };
-        foreach (var (x, h, r) in new[] { (-1.25f, 2.6f, .7f), (1.25f, 2.4f, .75f), (0f, 1.1f, .95f) })
-            Cylinder(body, r + .15f, r, h, new Vector3(x, x == 0 ? 2.05f + h / 2 - .2f : h / 2, Door - .55f), Mat(rock[(int)(h * 10) % 3], .95f), null, 5);
-        // The opening: black inside, with a ground patch of spoil in front; it grows from the floor up as it is dug.
+        // The dug tunnel: unlit floor, walls and roof that darken step by step to black, so the light never reaches its end.
+        // It deepens from the portal as the entrance is dug; a spoil patch lies in front.
         var hole = Pivot(body, new Vector3(0, 0, Door));
-        Box(hole, new Vector3(1.3f, 1.65f, .9f), new Vector3(0, .82f, -.47f), Flat(new Color("0b0b0c")));
-        Box(hole, new Vector3(1.5f, .03f, 1.4f), new Vector3(0, .015f, .7f), Mat("5d564c", 1));
-        foreach (var (x, z) in new[] { (-.95f, .9f), (1f, .5f), (-1.1f, .3f) }) Sphere(hole, .22f, new Vector3(x, .06f, z), Mat("7c807d", .95f), new Vector3(1.3f, .5f, 1), 6);
+        const int Steps = 6;
+        for (int i = 0; i < Steps; i++)
+        {
+            float z = -(i + .5f) * MineDepth / Steps, length = MineDepth / Steps + .01f;
+            var dark = Dark("3a332c", i);
+            Box(hole, new Vector3(1.5f, .02f, length), new Vector3(0, .01f, z), dark);
+            foreach (float x in new[] { -.74f, .74f }) Box(hole, new Vector3(.04f, 1.78f, length), new Vector3(x, .89f, z), Dark("3f3830", i));
+            Box(hole, new Vector3(1.52f, .04f, length), new Vector3(0, 1.78f, z), Dark("362f28", i));
+        }
+        Box(hole, new Vector3(1.5f, 1.8f, .04f), new Vector3(0, .9f, -MineDepth), Flat(Colors.Black));
+        Box(hole, new Vector3(1.6f, .03f, 1.4f), new Vector3(0, .015f, .7f), Mat("5d564c", 1));
         prop.Hole = hole;
         // Delivered materials wait beside the entrance: a log pile, stones and a few iron bars.
         var supplies = Pivot(body, Vector3.Zero);
@@ -611,18 +646,33 @@ public static class WorldModels
         for (int i = 0; i < 4; i++) Sphere(supplies, .17f, new Vector3(-1.35f + (i % 2) * .26f, .1f + (i / 2) * .18f, -.2f + (i % 2) * .1f), Mat("a3a7a3", .9f), new Vector3(1.2f, .7f, 1), 6);
         for (int i = 0; i < 3; i++) Box(supplies, new Vector3(.12f, .06f, .5f), new Vector3(-1.3f, .03f + i * .06f, -1f), Mat("c2c9c9", .4f, .6f), new Vector3(0, i * 12, 0));
         prop.Supplies = supplies;
-        // Timber set: two posts, a cap beam and side lagging, fitted in the last stage.
+        // Rough timber sets: a weathered portal with a plank hood and a warning board, then sets down the tunnel fading into the dark.
         var frame = Pivot(body, new Vector3(0, 0, Door));
-        var timber = Mat("7a5235"); var dark = Mat("5d3f28");
-        foreach (float x in new[] { -.72f, .72f }) Box(frame, new Vector3(.18f, 1.8f, .18f), new Vector3(x, .9f, .05f), timber);
-        Box(frame, new Vector3(1.8f, .2f, .24f), new Vector3(0, 1.85f, .05f), timber);
-        foreach (float x in new[] { -.9f, .9f }) for (int i = 0; i < 3; i++) Box(frame, new Vector3(.08f, .5f, .3f), new Vector3(x, .3f + i * .55f, 0), dark);
-        Box(frame, new Vector3(.3f, .16f, .04f), new Vector3(0, 1.85f, .18f), Mat("c62828", .6f));
+        var timber = Mat("8a7a62", .95f); var plank = Mat("6f6150", .95f);
+        foreach (float x in new[] { -.7f, .7f }) Box(frame, new Vector3(.2f, 1.82f, .2f), new Vector3(x, .91f, .08f), timber, new Vector3(0, 0, x > 0 ? 2 : -2));
+        Box(frame, new Vector3(1.8f, .2f, .26f), new Vector3(0, 1.88f, .08f), timber);
+        for (int i = 0; i < 5; i++) Box(frame, new Vector3(1.9f, .05f, .2f), new Vector3(0, 2.02f, .2f - i * .19f), plank, new Vector3(-6, 0, 0));
+        Box(frame, new Vector3(.5f, .32f, .03f), new Vector3(-1.1f, 1.15f, .25f), Mat("e8e2d2", .8f), new Vector3(0, 0, -3));
+        Box(frame, new Vector3(.4f, .06f, .031f), new Vector3(-1.1f, 1.22f, .25f), Mat("b3261e", .7f), new Vector3(0, 0, -3));
+        Box(frame, new Vector3(.06f, .9f, .06f), new Vector3(-1.1f, .5f, .2f), timber);
+        for (int i = 1; i < Steps; i += 2)
+        {
+            float z = -i * MineDepth / Steps;
+            foreach (float x in new[] { -.64f, .64f }) Box(frame, new Vector3(.12f, 1.72f, .12f), new Vector3(x, .86f, z), Dark("6f6150", i));
+            Box(frame, new Vector3(1.4f, .12f, .14f), new Vector3(0, 1.7f, z), Dark("6f6150", i));
+        }
         prop.Frame = frame;
+        // Rails from the front of the spoil patch all the way in, the inner lengths darkening with the tunnel.
         var rails = Pivot(body, Vector3.Zero);
-        var steel = Mat("6c7175", .4f, .7f);
-        foreach (float x in new[] { -.28f, .28f }) Box(rails, new Vector3(.05f, .05f, 3.6f), new Vector3(x, .07f, Door + 1.5f), steel);
-        for (int i = 0; i < 9; i++) Box(rails, new Vector3(.8f, .04f, .14f), new Vector3(0, .025f, Door - .3f + i * .4f), Mat("6e4a2e"));
+        var steel = Mat("6c7175", .4f, .7f); var sleeper = Mat("6e4a2e");
+        foreach (float x in new[] { -.28f, .28f }) Box(rails, new Vector3(.05f, .05f, -Door + 1), new Vector3(x, .07f, (Door + 1) / 2), steel);
+        for (int i = 0; i < 6; i++) Box(rails, new Vector3(.8f, .04f, .14f), new Vector3(0, .025f, Door + .2f + i * .55f), sleeper);
+        for (int i = 0; i < Steps; i++)
+        {
+            float z = Door - (i + .5f) * MineDepth / Steps;
+            foreach (float x in new[] { -.28f, .28f }) Box(rails, new Vector3(.05f, .05f, MineDepth / Steps + .01f), new Vector3(x, .07f, z), Dark("8a8f93", i));
+            Box(rails, new Vector3(.8f, .04f, .14f), new Vector3(0, .045f, z), Dark("5a4030", i));
+        }
         prop.Rails = rails;
         // The cart rides the rails: out front when idle, into the dark while miners work, and back out loaded.
         var cart = Pivot(body, Vector3.Zero);
@@ -636,10 +686,13 @@ public static class WorldModels
         foreach (var (x, z, r) in new[] { (0f, 0f, .3f), (-.16f, .2f, .18f), (.15f, -.22f, .17f), (.12f, .18f, .15f), (-.12f, -.18f, .16f) }) Sphere(load, r, new Vector3(x, .62f, z), lump, new Vector3(1, .6f, 1), 6);
         prop.Load = load;
         prop.Cart = cart;
-        // Lamplight from inside while someone works underground.
-        prop.Glow = Box(body, new Vector3(1.1f, 1.4f, .02f), new Vector3(0, .72f, Door + .03f), Flat(new Color(1, .62f, .25f, .35f)));
-        prop.Light = Light(body, new Vector3(0, .9f, Door + .8f), 4.5f);
+        // Lamplight deep inside while someone works underground: a faint warm haze at the dark end and light spilling out.
+        prop.Glow = Box(body, new Vector3(1.4f, 1.7f, .02f), new Vector3(0, .86f, Door - 2.5f), Flat(new Color(1, .55f, .2f, .25f)));
+        prop.Light = Light(body, new Vector3(0, 1.2f, Door + .6f), 4.5f);
     }
+
+    /// <summary>An unlit tunnel color for step <paramref name="step"/> of the tunnel, darker the deeper it is and black at the far end.</summary>
+    private static StandardMaterial3D Dark(string hex, int step) => Flat(new Color(hex).Lerp(Colors.Black, MathF.Pow((step + 1) / 6f, .45f)));
 
     private static OmniLight3D Light(Node3D parent, Vector3 at, float range)
     {

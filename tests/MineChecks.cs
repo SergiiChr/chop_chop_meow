@@ -66,7 +66,8 @@ public static class MineChecks
         var mine = MarkMine(world);
         Require(mine.Pos == World.MineSpot(cliff) && mine.Stage == 0 && world.S.Backpack.Count == carried, "marking must be free and snap to the cliff's mine spot");
         Require(world.Build("mine", World.MineSpot(cliff) - cliff.Along * 2) == null && world.S.Things.Count(t => t.Kind == "mine") == 1, "a cliff must take only one mine");
-        Require(world.CanStand(mine.Pos), "a mine site must not block its own workers");
+        Require(World.Cliffs.All(c => world.CanStand(World.MineSpot(c)) && world.CanStand(World.MineDoor(new Thing { Kind = "mine", Pos = World.MineSpot(c) }))), "every cliff's mine spot and entrance must be open ground");
+        Require(!world.CanStand(World.MineDoor(mine) - World.MineOut(cliff) * 2), "the rock spur the tunnel runs into must block walking");
         var coal = MarkMine(world, "coal");
         Require(World.MineOre(coal) == "coal" && World.MineOre(mine) == "iron_ore", "each mine must yield the ore of its own cliff");
     }
