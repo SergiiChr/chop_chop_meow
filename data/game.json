@@ -21,6 +21,7 @@
     "seconds": 1.6,
     "workers": 3
   },
+  "farm": { "sow": { "wheat_seeds": 1, "fertilizer": 1 }, "growDays": 3, "harvestWorkdays": 2, "yield": { "wheat": 1, "wheat_seeds": 2, "grass": 1 } },
   "goals": { "dailyProfit": 1300, "profitDays": 7 },
   "market": {
     "sells": {
@@ -398,6 +399,13 @@
         "wood": 8
       },
       "description": "A 3\u00d73 yard holding 14 stacks of one resource; the first one in sets it, and emptying it frees it. Snaps edge to edge with other piles. Tick Compost to turn leaves, grass and food into fertilizer."
+    },
+    "farm": {
+      "name": "Farm plot",
+      "cost": {
+        "wood": 8
+      },
+      "description": "A 3\u00d73 field that snaps edge to edge with piles and other plots. Wheat seeds and fertilizer sow it; the wheat grows for 3 days and is harvested by hand, by you or a worker, for wheat, more seeds and grass."
     },
     "toolstation": {
       "name": "Tool station",

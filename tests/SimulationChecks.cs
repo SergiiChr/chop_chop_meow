@@ -50,6 +50,7 @@ public static class SimulationChecks
         CheckRaking(data);
         CheckPilesAndCompost(data);
         CheckCookingAndCanning(data);
+        CheckFarmPlot(data);
         CheckNewFoodsAndRename(data);
         CheckMarketTakesOnlyCrates(data);
         CheckLegacySteelTools(data);
@@ -1487,6 +1488,49 @@ public static class SimulationChecks
         Require(world.CraftBlock("crushed_berries") != null, "crushing berries by hand should need the mortar");
     }
 
+    /// <summary>
+    /// A farm plot snaps beside a pile, sows itself from seeds and fertilizer, shows its growth over its days, and is harvested by the player and a worker sharing one progress.
+    /// The worker carries the wheat to storage rather than to compost and the grass to compost, keeps the seeds and sows again.
+    /// </summary>
+    private static void CheckFarmPlot(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var origin = new Vector2(20, 20);
+        world.Player = origin + new Vector2(1.5f, 2.5f);
+        world.S.Backpack.Add("wood", 16); world.S.Backpack.Add("wheat_seeds", 1); world.S.Backpack.Add("fertilizer", 1);
+        var compost = world.Build("pile", origin) ?? throw new InvalidOperationException("a pile should build on open ground");
+        world.SetCompost(compost, true);
+        var farm = world.Build("farm", origin + new Vector2(3.4f, .3f)) ?? throw new InvalidOperationException("a farm plot should build beside a pile");
+        Require(farm.Pos == origin + new Vector2(3, 0), "a farm plot should snap edge to edge with a pile");
+        Require(world.CanStand(farm.Pos) && !world.Holds(farm, "stone") && world.GatherBlock(farm) != null, "a plot is walkable, takes only farm goods, and has nothing to harvest before sowing");
+
+        world.S.Backpack.TransferTo(farm.Inventory, "wheat_seeds", 1); world.S.Backpack.TransferTo(farm.Inventory, "fertilizer", 1);
+        world.Tick(.1f);
+        Require(farm.Stage == World.FarmGrowing && farm.Inventory.Count == 0 && World.CropLook(farm, world.GrowSeconds) == 1, "seeds and fertilizer should sow the plot into soil");
+        var looks = new List<int>();
+        for (int day = 0; day < 3; day++) { SafeTick(world, data.DaySeconds - 1); looks.Add(World.CropLook(farm, world.GrowSeconds)); SafeTick(world, 1); }
+        Require(looks.SequenceEqual(new[] { 1, 2, 3 }) && farm.Stage == World.FarmRipe && World.CropLook(farm, world.GrowSeconds) == 4,
+                $"wheat should grow through soil, straws and green plants to ripe in {data.Farm.GrowDays} days: {string.Join(",", looks)}");
+
+        world.Player = farm.Pos;
+        world.Gather(farm, world.HarvestSeconds / 2);
+        Require(farm.Stage == World.FarmRipe && Math.Abs(farm.Progress - world.HarvestSeconds / 2) < .01f, "the player should harvest by hand, without a tool");
+        var chest = world.Add("chest", origin + new Vector2(3, 4));
+        var worker = AddWorker(world, chest.Pos);
+        world.Assign(worker, farm);
+        world.S.Backpack.Add(Inventory.Coins, 500);
+        // The player waits out the nights in a cabin, out of the wolves' reach.
+        var hut = world.Add("hut", new Vector2(40, 40));
+        world.Player = hut.Pos + new Vector2(0, 2); world.S.Sheltered = hut.Id;
+        for (int i = 0; i < 4 * data.DaySeconds && farm.Stage == World.FarmRipe; i++) SafeTick(world, 1);
+        Require(farm.Stage == World.FarmFallow && farm.Inventory["wheat_seeds"] == 2, "a worker should finish the shared harvest and keep the seeds in the plot");
+        SafeTick(world, 30);
+        Require(chest.Inventory["wheat"] == 1 && compost.Inventory["wheat"] == 0 && compost.Inventory["grass"] == 1, "the wheat should go to storage rather than rot, and the grass to the compost");
+        chest.Inventory.Add("fertilizer", 1);
+        SafeTick(world, 60);
+        Require(farm.Stage == World.FarmGrowing && farm.Inventory["wheat_seeds"] == 1 && chest.Inventory["fertilizer"] == 0, "the worker should bring fertilizer and sow again from the kept seeds");
+    }
+
     /// <summary>Foods restore what their data says, raw ones only say they need cooking, and saves from before the rename keep their cooked meat.</summary>
     private static void CheckNewFoodsAndRename(GameData data)
     {
@@ -1573,15 +1617,16 @@ public static class SimulationChecks
             if (HasTool("pickaxe")) grew |= have.Add("tin_ore");
             if (HasTool("rake")) grew |= have.Add("leaves");
             foreach (var (id, b) in data.Buildings) if (b.Cost.Keys.All(have.Contains)) grew |= built.Add(id);
+            if (built.Contains("pile") && have.Any(data.IsFood)) grew |= have.Add("fertilizer");
+            // Seeds are bought with berry money to start the first plot.
+            if (built.Contains("farm") && data.Farm.Sow.Keys.All(id => have.Contains(id) || data.Market.Buys.ContainsKey(id))) foreach (var item in data.Farm.Yield.Keys) grew |= have.Add(item);
             foreach (var r in data.Recipes.Values)
             {
                 bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool, r.Tier)) || built.Contains(r.Station) && (World.SlotKinds(r.Station).Length == 0 || r.Tool == "" || HasTool(r.Tool, r.Tier));
                 if (where && r.Inputs.Keys.All(have.Contains)) grew |= have.Add(r.Output);
             }
         }
-        // These come from farm plots, which are still to be built.
-        string[] pending = { "grass", "wheat", "flour", "dough", "bread" };
-        var unreachable = data.Items.Keys.Where(id => id != Inventory.Coins && !data.Market.Buys.ContainsKey(id) && !have.Contains(id) && !pending.Contains(id)).Concat(data.Buildings.Keys.Where(id => !built.Contains(id))).ToList();
+        var unreachable = data.Items.Keys.Where(id => id != Inventory.Coins && !data.Market.Buys.ContainsKey(id) && !have.Contains(id)).Concat(data.Buildings.Keys.Where(id => !built.Contains(id))).ToList();
         Require(unreachable.Count == 0, $"everything should be reachable from a fresh start: {string.Join(", ", unreachable)}");
         // The village never takes the tools that start the loop, so selling cannot strand the player.
         Require(fresh.S.Backpack.Items.Keys.Where(id => data.Items[id].Tool != "").All(id => !data.Market.Sells.ContainsKey(id)) && !data.Market.Sells.Keys.Any(id => id is "stone_chisel" or "iron_pick" or "wood_hammer"),

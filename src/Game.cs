@@ -280,6 +280,7 @@ public partial class Game : Node
         if (t.Tools != null) { Bench(t); return; }
         if (t.Kind == "signpost") { Signpost(t); return; }
         if (t.Kind == "mine") { MinePanel(t); return; }
+        if (t.Kind == "farm") { FarmPanel(t); return; }
         if (t.IsStorage) { Storage(t); return; }
         if (t.Kind == "campfire")
         {
@@ -353,6 +354,16 @@ public partial class Game : Node
         AddButton("Deposit all materials (keep tools)", () => { if (world.Near(t)) foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray()) if (world.Holds(t, id)) world.S.Backpack.TransferTo(t.Inventory, id, 999); });
         AddButton("Take everything", () => { if (world.Near(t)) foreach (var id in t.Inventory.Items.Keys.ToArray()) t.Inventory.TransferTo(world.S.Backpack, id, 999); });
         if (crate) AddLabel("Hold right click on the crate to pick it up with everything inside. The village market only takes packed crates.", 13, Muted);
+    }
+    private void FarmPanel(Thing farm)
+    {
+        AddLabel(world.Data.Buildings["farm"].Description, 14, Muted);
+        Dynamic(() => world.FarmStatus(farm), 15);
+        AddInventoryGrid(() => farm.Inventory, farm, id => MoveStack(farm.Inventory, world.S.Backpack, id, farm), "Click: take a stack · Drag to move");
+        AddLabel("BACKPACK", 14);
+        AddInventoryGrid(() => world.S.Backpack, null, id => MoveStack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move");
+        Assignment(farm);
+        AddLabel("An assigned worker brings seeds and fertilizer from storage, harvests the ripe wheat and carries the yield to storage. Several workers share one harvest.", 13, Muted);
     }
     private void Filters()
     {
@@ -478,7 +489,7 @@ public partial class Game : Node
             if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
             if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed)
             {
-                var t = view.Pick(mouse.Position); if (t?.IsResource == true) { gathering = t; selected = t.Id; view.Selected = t.Id; } else gathering = null;
+                var t = view.Pick(mouse.Position); if (t?.IsResource == true || t?.Kind == "farm") { gathering = t; selected = t.Id; view.Selected = t.Id; } else gathering = null;
                 lifting = t?.Kind == "crate" ? t : null; liftClock = 0;
             }
             if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed)
@@ -662,6 +673,20 @@ public partial class Game : Node
                 if (item == "leaves") { pile.Compost = true; pile.Inventory.Add("fertilizer", 20); }
             }
             world.Player = at + new Vector2(3, -2.5f); world.Tick(0); ClosePanel(); view.Zoom = 1.4f;
+        }
+        if (OS.GetCmdlineUserArgs().Contains("--farm"))
+        {
+            // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
+            var at = World.Spawn + new Vector2(-6, 9);
+            for (int i = 0; i < 5; i++)
+            {
+                var plot = world.Add("farm", at + new Vector2(i * World.ZoneSize, 0));
+                plot.Stage = i switch { 0 => World.FarmFallow, 4 => World.FarmRipe, _ => World.FarmGrowing };
+                plot.Progress = i == 4 ? world.HarvestSeconds / 2 : (i - 1) * world.GrowSeconds / 3 + 1;
+            }
+            var wheat = world.Add("pile", at + new Vector2(0, World.ZoneSize)); wheat.Inventory.Add("wheat", 300);
+            world.Player = at + new Vector2(6, 2.5f); world.Tick(0); view.Zoom = 1.2f;
+            if (OS.GetCmdlineUserArgs().Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == "farm")); else ClosePanel();
         }
         if (OS.GetCmdlineUserArgs().Contains("--kitchen"))
         {

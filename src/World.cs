@@ -249,6 +249,7 @@ public sealed partial class World
         if (kind == "mine") { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
         if (kind == "toolstation") t.Inventory.Slots = 12;
         if (kind == "pile") t.Inventory.Slots = PileStacks;
+        if (kind == "farm") t.Inventory.Slots = Data.Farm.Sow.Keys.Union(Data.Farm.Yield.Keys).Count();
         S.Things.Add(t); return t;
     }
     public void NewGame()
@@ -323,7 +324,7 @@ public sealed partial class World
     private static bool Open(Vector2 p) => Terrain.Open(p) && !Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth) && !InSpur(p);
     private static bool Blocks(Thing t, Vector2 p) => !t.IsResource && !IsZone(t.Kind) && t.Kind is not "campfire" and not "grave" and not "signpost" and not "mine" && t.Pos.DistanceTo(p) < Footprint(t.Kind);
     /// <summary>Square 3×3 yards laid out on the ground, walkable and snapping edge to edge into grids.</summary>
-    public static bool IsZone(string kind) => kind is "pile";
+    public static bool IsZone(string kind) => kind is "pile" or "farm";
     public const float ZoneSize = 3;
     public const int PileStacks = 14;
     /// <summary>Snaps a mine to its cliff and a yard to the grid of the nearest yard close enough to touch it.</summary>
@@ -337,7 +338,7 @@ public sealed partial class World
     private static IEnumerable<Vector2> ZoneTiles(Vector2 p) => Enumerable.Range(-1, 3).SelectMany(x => Enumerable.Range(-1, 3).Select(y => p + new Vector2(x, y)));
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
-    public static float Footprint(string kind) => kind switch { "pile" => 1.5f, "cooktable" => .6f, "cannery" => .5f, "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" or "toolstation" => .45f, _ => .35f };
+    public static float Footprint(string kind) => kind switch { "pile" or "farm" => 1.5f, "cooktable" => .6f, "cannery" => .5f, "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" or "toolstation" => .45f, _ => .35f };
     /// <summary>The tool kind gathering this needs: an axe for trees, a pickaxe for deposits and a rake for leaves; stone, berries and loose pieces need none.</summary>
     public static string? ToolKind(Thing t) => t.Kind == "tree" ? "axe" : t.IsDeposit ? "pickaxe" : t.Kind == "leaves" ? "rake" : null;
     private static string A(string word) => ("aeiou".Contains(word[0]) ? "an " : "a ") + word;
@@ -364,6 +365,7 @@ public sealed partial class World
     }
     public string? GatherBlock(Thing t, bool worker = false)
     {
+        if (t.Kind == "farm") return t.Stage switch { FarmRipe => null, FarmGrowing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (!t.IsResource) return "Select a natural resource.";
         if (t.Remaining <= 0) return t.Kind switch { "berries" => $"Picked clean. The bush fruits again in {Data.BerryRegrowHours:0} hours.", "tree" => "Only a stump is left. Find another tree.", "leaves" => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
         // Workers fetch their tools from a tool station instead of needing them carried.
@@ -383,6 +385,7 @@ public sealed partial class World
         var blocked = GatherBlock(t);
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
+        if (t.Kind == "farm") { Harvest(t, dt); if (t.Stage == FarmFallow) Say("Harvested. Take the wheat, seeds and grass from the plot."); return; }
         gatherClock += dt;
         string? tool = t.Kind == "stone" ? BestTool("pickaxe") : ToolKind(t) is string kind ? BestTool(kind) : null;
         float seconds = Data.GatherSeconds / Speed(tool);
@@ -856,6 +859,7 @@ public sealed partial class World
         "toolstation" when !(Data.Items.TryGetValue(item, out var def) && def.Tool != "") => "The tool station only holds tools.",
         "pile" when t.Compost && !Compostable(item) && item != "fertilizer" => "The compost takes leaves, grass and food.",
         "pile" when !t.Compost && t.Inventory.Items.Keys.FirstOrDefault(k => k != item) is string held => $"This pile holds {Data.Name(held)}. Empty it to store something else.",
+        "farm" when !FarmItem(item) => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}.",
         _ => null
     };
     public bool Compostable(string item) => item is "leaves" or "grass" || Data.IsFood(item);
@@ -890,7 +894,8 @@ public sealed partial class World
     // Only chests and piles take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
     public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) => S.Things
         .Where(t => t.Kind is "chest" or "pile" && t.Id != exclude && t.Inventory.Room(item) > 0 && t.Inventory.Accepts(item) && Holds(t, item))
-        .OrderBy(t => t.Inventory.InputFilter.Contains(item) ? 0 : 1).ThenBy(t => t.Pos.DistanceSquaredTo(origin)).FirstOrDefault();
+        // Compost names every food in its filter, but takes food only when nothing else will, so harvests and picked berries are not left to rot.
+        .OrderBy(t => t.Compost && Data.IsFood(item) ? 2 : t.Inventory.InputFilter.Contains(item) ? 0 : 1).ThenBy(t => t.Pos.DistanceSquaredTo(origin)).FirstOrDefault();
     public Thing? SourceFor(string item, Vector2 origin, int exclude = 0) => S.Things
         .Where(t => t.Kind is "chest" or "pile" && t.Id != exclude && t.Inventory[item] > 0 && t.Inventory.AllowsWithdrawal(item))
         .OrderBy(t => t.Pos.DistanceSquaredTo(origin)).FirstOrDefault();
@@ -1025,6 +1030,7 @@ public sealed partial class World
         }
         var coworkers = S.Workers.Where(other => other.Assignment == target.Id && other.WageDebt <= 0).OrderBy(other => other.Id).ToList();
         if (target.Kind == "mine") { MineWork(w, target, coworkers, dt); return; }
+        if (target.Kind == "farm") { FarmWork(w, target, dt); return; }
         if (target.Kind == "reinforced" && coworkers.Count >= 2 && coworkers[0] == w)
         {
             w.Status = "Operating bellows"; if (Walk(w, target.Pos + BellowsStand, dt, .1f)) { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 18); }
@@ -1182,6 +1188,7 @@ public sealed partial class World
             if (t.Kind == "wolf_corpse") t.Progress = Math.Min(60, t.Progress + dt);
             if (t.Kind == "mine") MineTick(t, dt);
             if (t.Kind == "pile") { PileFilters(t); if (t.Compost) CompostTick(t, dt); }
+            if (t.Kind == "farm") FarmTick(t, dt);
             if (t.Kind == "berries" && t.Remaining == 0) { t.Regrow += dt; if (t.Regrow >= Data.BerryRegrowSeconds) { t.Remaining = 24; t.Regrow = 0; } }
             if (t.Kind == "campfire")
             {

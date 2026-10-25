@@ -80,6 +80,16 @@ public sealed class MineDef
     public float Seconds { get; set; } = 2;
     public int Workers { get; set; } = 3;
 }
+/// <summary>A farm plot's season: what sows it, how long the wheat grows and how much work its harvest takes.</summary>
+public sealed class FarmDef
+{
+    public Dictionary<string, int> Sow { get; set; } = new();
+    /// <summary>Whole days from sowing to ripe wheat, nights included.</summary>
+    public float GrowDays { get; set; } = 3;
+    /// <summary>Working days of one worker that a harvest takes; several workers share it.</summary>
+    public float HarvestWorkdays { get; set; } = 2;
+    public Dictionary<string, int> Yield { get; set; } = new();
+}
 /// <summary>The end goals: a mine on every ore and a week of steady profit.</summary>
 public sealed class GoalsDef
 {
@@ -119,6 +129,7 @@ public sealed class GameData
     public float BenchSpeed { get; set; } = 2;
     public MarketDef Market { get; set; } = new();
     public MineDef Mine { get; set; } = new();
+    public FarmDef Farm { get; set; } = new();
     public GoalsDef Goals { get; set; } = new();
     /// <summary>A worker's time on duty in a day: dawn to dusk, less lunch and the walk in.</summary>
     public float WorkdaySeconds => DuskStarts * DaySeconds - DaySeconds / 24 - TradeSeconds / 2;
@@ -152,6 +163,8 @@ public sealed class GameData
             throw new InvalidOperationException("Invalid tool speed or market goods in data/game.json.");
         if (Mine.Materials.Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Mine.StageWorkdays <= 0 || Mine.Seconds <= 0 || Mine.Workers <= 0 || Goals.DailyProfit <= 0 || Goals.ProfitDays <= 0)
             throw new InvalidOperationException("Invalid mine or goals in data/game.json.");
+        if (Farm.Sow.Count == 0 || Farm.Yield.Count == 0 || Farm.Sow.Concat(Farm.Yield).Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Farm.GrowDays <= 0 || Farm.HarvestWorkdays <= 0)
+            throw new InvalidOperationException("Invalid farm in data/game.json.");
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
     public bool IsConsumable(string item) => Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);

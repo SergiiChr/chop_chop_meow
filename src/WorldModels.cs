@@ -21,6 +21,8 @@ public sealed class Prop
     /// <summary>A pile's stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
     public MeshInstance3D[] Stacks = Array.Empty<MeshInstance3D>();
     public string StackKey = "";
+    /// <summary>A farm plot's looks by <see cref="World.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
+    public Node3D[] Crops = Array.Empty<Node3D>();
     public Node3D[] Pleats = Array.Empty<Node3D>();
     public MeshInstance3D? Glow, Window, Pool;
     public WorldModels.WolfModel? Wolf;
@@ -80,6 +82,7 @@ public static class WorldModels
         "cannery" => new[] { new Hit(.6f, 0, 1f) },
         "toolstation" => new[] { new Hit(.55f, 0, 1.5f) },
         "pile" => new[] { new Hit(1.5f, 0, .5f) },
+        "farm" => new[] { new Hit(1.5f, 0, .5f) },
         "leaves" => new[] { new Hit(.6f, 0, .15f) },
         "grave" => new[] { new Hit(.45f, 0, .55f) },
         "anvil" => new[] { new Hit(.45f, 0, .85f) },
@@ -117,6 +120,7 @@ public static class WorldModels
             case "cannery": Cannery(prop); break;
             case "toolstation": ToolRack(prop); break;
             case "pile": Pile(prop); break;
+            case "farm": Farm(prop, t.Id); break;
             case "leaves": LeafLitter(body, t.Id); break;
             case "signpost": Signpost(prop); break;
             case "campfire": FirePit(prop); break;
@@ -475,13 +479,7 @@ public static class WorldModels
     private static void Pile(Prop prop)
     {
         var body = prop.Body;
-        Box(body, new Vector3(2.9f, .02f, 2.9f), new Vector3(0, .01f, 0), Mat("7a6548", 1));
-        var log = Mat("8a6a48");
-        foreach (float s in new[] { -1.42f, 1.42f })
-        {
-            Cylinder(body, .09f, .09f, 2.9f, new Vector3(s, .09f, 0), log, new Vector3(90, 0, 0), 6);
-            Cylinder(body, .09f, .09f, 2.9f, new Vector3(0, .09f, s), log, new Vector3(0, 0, 90), 6);
-        }
+        Yard(body);
         var stacks = new List<MeshInstance3D>();
         foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
             for (int x = 0; x < count; x++)
@@ -492,6 +490,54 @@ public static class WorldModels
                     block.Visible = false; stacks.Add(block);
                 }
         prop.Stacks = stacks.ToArray();
+    }
+
+    /// <summary>A pile's and a farm plot's base: a bare dirt pad edged with logs.</summary>
+    private static void Yard(Node3D body)
+    {
+        Box(body, new Vector3(2.9f, .02f, 2.9f), new Vector3(0, .01f, 0), Mat("7a6548", 1));
+        var log = Mat("8a6a48");
+        foreach (float s in new[] { -1.42f, 1.42f })
+        {
+            Cylinder(body, .09f, .09f, 2.9f, new Vector3(s, .09f, 0), log, new Vector3(90, 0, 0), 6);
+            Cylinder(body, .09f, .09f, 2.9f, new Vector3(0, .09f, s), log, new Vector3(0, 0, 90), 6);
+        }
+    }
+
+    /// <summary>A farm plot: an empty pile's yard that, once sown, shows dark tilled rows and then the wheat growing on them.</summary>
+    private static void Farm(Prop prop, int id)
+    {
+        var body = prop.Body;
+        Yard(body);
+        var soil = Pivot(body, Vector3.Zero);
+        Box(soil, new Vector3(2.7f, .03f, 2.7f), new Vector3(0, .025f, 0), Mat("4f3a28", 1));
+        for (int row = 0; row < 5; row++) Box(soil, new Vector3(2.6f, .06f, .22f), new Vector3(0, .05f, -1.08f + row * .54f), Mat("5e4630", 1));
+        // Each look is a full field of plants on the rows, shifted a little at random so the field is not a perfect grid.
+        Node3D Field(Action<Node3D, Vector3, int> plant)
+        {
+            var field = Pivot(body, Vector3.Zero);
+            for (int row = 0; row < 5; row++)
+                for (int i = 0; i < 7; i++)
+                {
+                    int n = row * 7 + i;
+                    plant(field, new Vector3(-1.14f + i * .38f + (Jitter(id, n) - .5f) * .1f, .08f, -1.08f + row * .54f), n);
+                }
+            return field;
+        }
+        var sprout = Mat("7fae45"); var leaf = Mat("4f8a34"); var straw = Mat("d6b354"); var ear = Mat("e2c25b");
+        var straws = Field((f, at, n) => { for (int k = -1; k <= 1; k += 2) Box(f, new Vector3(.02f, .16f, .02f), at + new Vector3(k * .03f, .08f, 0), sprout, new Vector3(0, n * 37, k * 12)); });
+        var plants = Field((f, at, n) => { for (int k = -1; k <= 1; k++) Box(f, new Vector3(.03f, .5f, .03f), at + new Vector3(k * .05f, .25f, 0), leaf, new Vector3(0, n * 37, k * 14)); });
+        var wheat = Field((f, at, n) =>
+        {
+            for (int k = -1; k <= 1; k++)
+            {
+                var stalk = Pivot(f, at, new Vector3(0, n * 37, k * 10));
+                Box(stalk, new Vector3(.025f, .7f, .025f), new Vector3(0, .35f, 0), straw);
+                Box(stalk, new Vector3(.06f, .18f, .06f), new Vector3(0, .78f, 0), ear);
+            }
+        });
+        prop.Crops = new[] { soil, straws, plants, wheat };
+        foreach (var crop in prop.Crops) crop.Visible = false;
     }
 
     /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>

@@ -234,7 +234,7 @@ public static class ActorAnimation
         if (worker.WorkState == WorkerWorkState.Resting && !moving) return worker.Id % 2 == 0 ? ActorAction.Perch : ActorAction.Sit;
         if (worker.Bag.Count > 0) return ActorAction.Carry;
         if (moving) return ActorAction.Walk;
-        if (worker.WorkState == WorkerWorkState.Gathering && assignment?.IsResource == true)
+        if (worker.WorkState == WorkerWorkState.Gathering && (assignment?.IsResource == true || assignment?.Kind == "farm"))
         {
             return assignment.Kind switch
             {

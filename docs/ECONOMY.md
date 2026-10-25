@@ -17,7 +17,7 @@ Every item has a `price`. For goods the village trades, it is the trade price; f
 | 3 | 30% | steel parts, iron axe, iron pickaxe, iron hammer, bread, canned meat stew, canned jam, canned food |
 | 4 | 20% | steel axe, steel pickaxe, steel hammer, steel chisel, rake |
 
-Wheat for flour comes from farm plots, which are still to be built. Canned food, which the village also sells, is canned raw meat and now costs 5.35 instead of 4.
+Canned food, which the village also sells, is canned raw meat and now costs 5.35 instead of 4.
 
 A new recipe gets its price from this rule. The check fails if any recipe loses value or a deeper recipe marks up more than a shallower one.
 
@@ -32,6 +32,7 @@ Worker output is measured by running one worker through a whole day: walking, ha
 - A cook earns at least 1.5 times their pay.
 - A longer chain earns more per worker-day than a shorter one, comparing tools with tools and food with food.
 - Goods made from meat or wheat are left out: meat comes from wolves at night, when workers are home, and wheat from farm plots.
+- Farming does not pay yet. A harvest takes 2 worker-days and returns 1 wheat (1.5), 1 seed beyond the one sown (1) and 1 grass (0.25) for 1 fertilizer (1.5): about 1.25 coins, against 50 coins of wages. The yields and harvest time in `farm` need tuning before wheat goods can be priced against labour.
 
 Measured with the current data:
 

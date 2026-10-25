@@ -611,6 +611,12 @@ public partial class WorldView : Node3D
                     if (i < stacks.Count) prop.Stacks[i].MaterialOverride = Mat(World.Data.Items.TryGetValue(stacks[i], out var def) ? def.Color : "b0a58a", .95f);
                 }
                 break;
+            case "farm":
+                if (!World.Sees(t.Pos)) break;
+                int look = World.CropLook(t, World.GrowSeconds);
+                prop.Crops[0].Visible = look > 0;
+                for (int i = 1; i < prop.Crops.Length; i++) prop.Crops[i].Visible = look == i + 1;
+                break;
             case "toolstation":
                 if (!World.Sees(t.Pos)) break;
                 foreach (var (kind, tool) in prop.Racked) tool.Visible = World.BestTool(kind, t.Inventory) != null;
