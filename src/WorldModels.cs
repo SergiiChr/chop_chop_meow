@@ -101,9 +101,9 @@ public static class WorldModels
         {
             case "tree": Tree(prop, t.Id); break;
             case "stone": Rocks(body, t.Kind, t.Id, "8d918e"); break;
-            case "iron": Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b"); break;
-            case "coal": Rocks(body, t.Kind, t.Id, "505257", "121316"); break;
-            case "tin": Rocks(body, t.Kind, t.Id, "858882", "b9bcb4"); break;
+            case "iron": Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
+            case "coal": Rocks(body, t.Kind, t.Id, "505257", "121316", "15161a"); break;
+            case "tin": Rocks(body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
             case "loose_iron": LooseOre(body, t.Kind, t.Id, "a35a2e", "8b4f2b"); break;
             case "loose_coal": LooseOre(body, t.Kind, t.Id, "2d2f33", "1d1e21"); break;
             case "wolf_corpse": Carcass(prop); break;
@@ -154,12 +154,14 @@ public static class WorldModels
         prop.Stump = stump;
     }
 
-    /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows its veins across the rock faces.</summary>
-    private static void Rocks(Node3D body, string kind, int id, string stone, string? vein = null)
+    /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows veins across the rock faces and ore chunks set into it.</summary>
+    private static void Rocks(Node3D body, string kind, int id, string stone, string? vein = null, string? chunks = null)
     {
         int variant = id % NatureShape.Variants;
         Add(body, NatureShape.Rocks(kind, new Color(stone), variant, vein == null ? null : false), NatureShape.Natural, Vector3.Zero);
-        if (vein != null) Add(body, NatureShape.Rocks(kind, new Color(vein), variant, true), NatureShape.Mineral, Vector3.Zero);
+        if (vein == null || chunks == null) return;
+        Add(body, NatureShape.Rocks(kind, new Color(vein), variant, true), NatureShape.Mineral, Vector3.Zero);
+        Add(body, NatureShape.Insertions(kind, new Color(chunks), variant), NatureShape.Mineral, Vector3.Zero);
     }
 
     private static void LooseOre(Node3D body, string kind, int id, string light, string dark) =>
