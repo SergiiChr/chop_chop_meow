@@ -24,6 +24,7 @@ Start with `./build.py setup` if the tools have not been provisioned. The launch
 - `./build.py test`: deterministic simulation and real Godot input/UI checks; both require explicit pass markers.
 - `./build.py lint`: compilation and C# format verification.
 - `./build.py build`: tests, Linux export, and an exported executable smoke test.
+- Ambient music goes in `assets/music` as 192 kbps MP3 normalised to -18 LUFS integrated with true peaks below -1 dBTP (measure with ffmpeg `ebur128`, then apply the gain).
 - `./build.py play -- --showcase --screenshot /absolute/path.png`: a separate visual-review fixture, never the normal opening state.
 
 Run checks appropriate to the change. For a visual change, launch a rendered instance and inspect the actual image; headless tests cannot verify presentation. Treat Godot error output as a failure even when the process exits zero. Report limitations candidly; do not claim a full playthrough from a fixture that injects finished goods.

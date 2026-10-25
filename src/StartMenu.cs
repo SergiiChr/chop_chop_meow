@@ -91,6 +91,16 @@ public partial class Game
             ApplyResolution(Resolutions[index]);
         };
         row.AddChild(picker);
+        var musicRow = new HBoxContainer(); screen.AddChild(musicRow);
+        var musicLabel = Label("Music volume"); musicLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; musicRow.AddChild(musicLabel);
+        var slider = new HSlider { Name = "music", MaxValue = 100, Step = 5, Value = SavedMusicVolume() * 100, CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
+        slider.ValueChanged += value =>
+        {
+            var config = new ConfigFile(); config.Load(SettingsPath);
+            config.SetValue("audio", "music", value / 100); config.Save(SettingsPath);
+            sounds.MusicVolume = (float)value / 100;
+        };
+        musicRow.AddChild(slider);
         AddScreenButton("Back · Esc", back);
     }
 
@@ -100,6 +110,12 @@ public partial class Game
         var config = new ConfigFile(); config.Load(SettingsPath);
         var fallback = new Vector2I(ProjectSettings.GetSetting("display/window/size/viewport_width").AsInt32(), ProjectSettings.GetSetting("display/window/size/viewport_height").AsInt32());
         return config.GetValue("display", "resolution", fallback).AsVector2I();
+    }
+
+    private static float SavedMusicVolume()
+    {
+        var config = new ConfigFile(); config.Load(SettingsPath);
+        return config.GetValue("audio", "music", 1f).AsSingle();
     }
 
     private void ApplyResolution(Vector2I size)
