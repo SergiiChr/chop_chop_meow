@@ -397,7 +397,8 @@ public partial class WorldView : Node3D
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, ActorAnimation.Tool(work));
             entry.Rig.Root.Visible = World.Sees(worker);
-            Fade(entry.Rig.Root, worker.Away > 0 ? TripFade(World.TripLeg(1 - worker.Away / World.Data.TradeSeconds)) : 0);
+            float trip = worker.Away > 0 ? World.TripLeg(1 - worker.Away / World.Data.TradeSeconds) : worker.Commute / (World.Data.TradeSeconds / 2);
+            Fade(entry.Rig.Root, TripFade(trip));
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch ? null : assignment);
         }
         foreach (int id in crew.Keys.Where(id => World.S.Workers.All(w => w.Id != id)).ToArray())

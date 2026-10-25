@@ -1142,7 +1142,10 @@ public static class SimulationChecks
         var sign = world.Add("signpost", new Vector2(30, 20));
         world.Assign(AddWorker(world, sign.Pos), sign);
         SafeTick(world, 40);
-        Require(world.S.Workers.All(w => w.Home && !world.Sees(w)), "at dusk every worker should sign out and leave the map");
+        Require(world.S.Workers.All(w => w.Home && !world.Sees(w) && w.Commute == data.TradeSeconds / 2), "at dusk every worker should walk off like a cart and sign out");
+        // Walking arrives within reach of the signpost, so the walk-off starts up to that far from it.
+        Require(cutter.Pos.DistanceTo(sign.Pos + Vector2.One + Terrain.Seaward * World.TripDistance) < 1.25f,
+                "a worker should sign out a cart's trip down the valley from the signpost");
         Require(cutter.Bag["wood"] == 2 && cutter.Assignment == tree.Id && pumper.Assignment == forge.Id,
                 "signing out should keep assignments and carried items");
         Require(world.FetchBlock(sign) == "Your workers have signed out until morning.", "nobody should run for prices after signing out");
@@ -1152,6 +1155,9 @@ public static class SimulationChecks
 
         world.S.Time = data.DaySeconds - 1;
         chest.Inventory.InputFilter.Clear();
+        SafeTick(world, 1 + data.TradeSeconds / 4);
+        Require(cutter.Commute > 0 && !cutter.Home && cutter.Pos.DistanceTo(sign.Pos + Vector2.One) < World.TripDistance,
+                "at dawn a worker should walk back up the valley as they fade in");
         SafeTick(world, 25);
         Require(world.S.Workers.All(w => !w.Home && w.WageDebt == 0) && cutter.Pos.DistanceTo(sign.Pos) > 5 && pumper.Pos.DistanceTo(sign.Pos) > 5,
                 "at dawn paid workers should reappear at the signpost and walk back to work");

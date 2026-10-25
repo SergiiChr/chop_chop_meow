@@ -59,6 +59,8 @@ public sealed class Worker
     public float Away { get; set; }
     /// <summary>Signed out for the night: off the map in the village until dawn, still holding their assignment and anything carried.</summary>
     public bool Home { get; set; }
+    /// <summary>Seconds into the walk down the valley at dusk, counted back down on the way in at dawn; the view fades the worker with it.</summary>
+    public float Commute { get; set; }
     [JsonIgnore] public List<Vector2> Route { get; } = new();
     [JsonIgnore] public Vector2 RouteTarget { get; set; } = new(-100, -100);
     [JsonIgnore] public WorkerWorkState WorkState { get; set; }
@@ -628,18 +630,32 @@ public sealed class World
             if (w.Away == 0) { UpdatePrices(); Say($"{w.Name} is back with fresh prices from Bramblewick."); }
             return;
         }
-        if (w.Home)
+        // Like a cart, the walk home goes a little way down the valley over half a trade trip while the worker fades out, and back at dawn.
+        float half = Data.TradeSeconds / 2, pace = TripDistance / half;
+        if (w.Home && Dusk) { w.Status = "Signed out · back in the morning"; return; }
+        if (!Dusk && w.Commute > 0)
         {
-            if (Dusk) { w.Status = "Signed out · back in the morning"; return; }
-            w.Home = false; w.Route.Clear();
+            w.Home = false; w.Status = "Walking in from Bramblewick";
+            float step = Math.Min(dt, w.Commute);
+            w.Commute -= step; w.Pos -= Terrain.Seaward * pace * step;
+            if (w.Commute == 0) w.Route.Clear();
+            return;
         }
+        w.Home = false;
         if (Dusk)
         {
-            // Everyone signs out at the nearest signpost, or the clearing without one, and reappears there at dawn.
-            // Assignments and loads are kept, and one cut off from the way still goes home.
-            var post = S.Things.Where(t => t.Kind == "signpost").MinBy(t => t.Pos.DistanceSquaredTo(w.Pos));
+            // Everyone signs out from the nearest signpost, or the clearing without one, and comes back there at dawn.
+            // Assignments and loads are kept, and one cut off from the way still sets off.
             w.Status = "Heading home to Bramblewick";
-            if (Walk(w, post?.Pos + Vector2.One ?? Spawn, dt) || w.WorkState == WorkerWorkState.Blocked) { w.Home = true; w.WorkState = WorkerWorkState.Idle; w.Status = "Signed out · back in the morning"; }
+            if (w.Commute == 0)
+            {
+                var post = S.Things.Where(t => t.Kind == "signpost").MinBy(t => t.Pos.DistanceSquaredTo(w.Pos));
+                if (!Walk(w, post?.Pos + Vector2.One ?? Spawn, dt) && w.WorkState != WorkerWorkState.Blocked) return;
+                w.WorkState = WorkerWorkState.Idle;
+            }
+            float step = Math.Min(dt, half - w.Commute);
+            w.Commute += step; w.Pos += Terrain.Seaward * pace * step;
+            if (w.Commute >= half) { w.Home = true; w.Status = "Signed out · back in the morning"; }
             return;
         }
         if (w.WageDebt > 0) { w.Status = "On strike · wages owed"; return; }
