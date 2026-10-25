@@ -387,6 +387,14 @@
       "cost": {},
       "description": "Marking is free and snaps to an ore cliff, one mine per cliff. Dig with a pickaxe, deliver 50 wood, 10 iron bars and 50 stone, then fit it with a hammer. Up to 3 miners with pickaxes bring out ore and rocks for good."
     },
+    "toolstation": {
+      "name": "Tool station",
+      "cost": {
+        "planks": 8,
+        "stone": 4
+      },
+      "description": "A rack for tools. Workers take an axe, pickaxe or rake from it when their job needs one and put it back when they finish or go home."
+    },
     "signpost": {
       "name": "Village signpost",
       "cost": {

@@ -29,12 +29,12 @@ public sealed class Thing
     /// <summary>Building stages finished, for buildings put up in stages: a mine counts up to <see cref="World.MineOpen"/>.</summary>
     public int Stage { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
-    [JsonIgnore] public bool IsResource => IsLoose || IsDeposit || Kind is "tree" or "stone" or "berries" or "water" or "wolf_corpse";
+    [JsonIgnore] public bool IsResource => IsLoose || IsDeposit || Kind is "tree" or "stone" or "berries" or "water" or "wolf_corpse" or "leaves";
     /// <summary>Ore at the foot of a cliff, mined with a pickaxe.</summary>
     [JsonIgnore] public bool IsDeposit => Kind is "iron" or "coal" or "tin";
     /// <summary>Loose pieces are picked up whole in one go and vanish, instead of being worked down like a deposit.</summary>
     [JsonIgnore] public bool IsLoose => Kind is "loose_iron" or "loose_coal";
-    [JsonIgnore] public bool IsStorage => Kind is "chest" or "grave" or "crate";
+    [JsonIgnore] public bool IsStorage => Kind is "chest" or "grave" or "crate" or "toolstation";
 }
 /// <summary>An impassable rock face whose ore deposits sit at its foot, with loose pieces scattered toward the clearing.</summary>
 public readonly record struct Cliff(string Ore, Vector2 Center, Vector2 Face, float HalfLength)
@@ -58,6 +58,10 @@ public sealed class Worker
     /// <summary>Units of one stack a worker carries; a miner bringing out a full mine output carries the whole stack.</summary>
     public const int BagStack = 5;
     public Inventory Bag { get; set; } = new() { Slots = 1, StackSize = BagStack };
+    /// <summary>The tool taken from a tool station for the current job, or empty; it goes back to a station when the job no longer needs it.</summary>
+    public string Tool { get; set; } = "";
+    /// <summary>The tool kind the worker last reported missing, so the message is said once rather than every tick.</summary>
+    [JsonIgnore] public string Missing { get; set; } = "";
     public int Destination { get; set; }
     public float Timer { get; set; }
     public float WageDebt { get; set; }
@@ -241,6 +245,7 @@ public sealed partial class World
         if (kind == "bench") t.Tools = new() { Slots = 2, StackSize = 1 };
         if (kind == "crate") t.Inventory = NewCrate();
         if (kind == "mine") { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
+        if (kind == "toolstation") t.Inventory.Slots = 12;
         S.Things.Add(t); return t;
     }
     public void NewGame()
@@ -271,8 +276,17 @@ public sealed partial class World
         // Trees are occasional on the plains and thicken into woods toward the mountains.
         // Full-size trees need room for their crowns, so even the woods stay walkable and readable.
         Scatter(rng, "tree", int.MaxValue, 42, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
+        DropLeaves();
         Look();
         Say("Welcome to Bramblewick. Gather wood and stone; build a sheltered workshop.");
+    }
+    /// <summary>Leaves a rake gathers in one go from a patch, which fills again every day.</summary>
+    public const int LeafPatch = 12;
+    public static readonly Vector2 LeafOffset = new(.9f, .9f);
+    /// <summary>Leaf litter around every oak, the broadleaf one of the three tree variants picked by id; the patch sits off the trunk so both can be clicked.</summary>
+    private void DropLeaves()
+    {
+        foreach (var tree in S.Things.Where(t => t.Kind == "tree" && t.Id % 3 == 0 && Terrain.Open(t.Pos + LeafOffset)).ToList()) Add("leaves", tree.Pos + LeafOffset, LeafPatch);
     }
     /// <summary>Places resources on open ground away from the clearing, at least <paramref name="spacing"/> apart from their own kind.</summary>
     /// <param name="chance">How likely a spot is kept, so density can follow the landscape.</param>
@@ -307,12 +321,20 @@ public sealed partial class World
     private static bool Blocks(Thing t, Vector2 p) => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" and not "mine" && t.Pos.DistanceTo(p) < Footprint(t.Kind);
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
-    public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" => .45f, _ => .35f };
+    public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" or "toolstation" => .45f, _ => .35f };
+    /// <summary>The tool kind gathering this needs: an axe for trees, a pickaxe for deposits and a rake for leaves; stone, berries and loose pieces need none.</summary>
+    public static string? ToolKind(Thing t) => t.Kind == "tree" ? "axe" : t.IsDeposit ? "pickaxe" : t.Kind == "leaves" ? "rake" : null;
+    private static string A(string word) => ("aeiou".Contains(word[0]) ? "an " : "a ") + word;
+    private static string Task(Thing t) => t.Kind switch
+    {
+        "tree" => "chop wood",
+        "leaves" => "rake leaves",
+        "mine" => t.Stage == 0 ? "dig the mine" : t.Stage == MineSupplied ? "fit the mine frame" : $"mine {CliffAt(t.Pos).Ore}",
+        _ => $"mine {t.Kind}"
+    };
     /// <summary>The fastest carried tool of a kind at or above <paramref name="tier"/>, or null when none is carried.</summary>
     public string? BestTool(string tool, Inventory? from = null, int tier = 0) => (from ?? S.Backpack).Items.Keys
         .Where(id => Data.Items.TryGetValue(id, out var def) && def.Tool == tool && def.Tier >= tier).OrderByDescending(id => Data.Items[id].Speed).FirstOrDefault();
-    /// <summary>Whether workers have a tool of this kind: they get one once the player has made one, and pickaxes once the first is forged.</summary>
-    public bool CrewHas(string tool) => tool == "pickaxe" ? S.Milestones.Contains("pick") : Data.Items.Any(p => p.Value.Tool == tool && S.Milestones.Contains(p.Key));
     private float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
     public void MovePlayer(Vector2 delta)
     {
@@ -327,10 +349,15 @@ public sealed partial class World
     public string? GatherBlock(Thing t, bool worker = false)
     {
         if (!t.IsResource) return "Select a natural resource.";
-        if (t.Remaining <= 0) return t.Kind switch { "berries" => $"Picked clean. The bush fruits again in {Data.BerryRegrowHours:0} hours.", "tree" => "Only a stump is left. Find another tree.", _ => "Depleted. Look for another deposit." };
-        if (t.Kind == "tree" && !worker && BestTool("axe") == null) return "An axe is needed. Recover your belongings or craft one at a bench.";
-        if (t.IsDeposit && (worker ? !CrewHas("pickaxe") : BestTool("pickaxe") == null)) return t.Kind == "tin" ? "Mining tin needs a pickaxe." : "Craft a pickaxe at a bench. Loose rusty ore nearby can be picked up by hand.";
-        return null;
+        if (t.Remaining <= 0) return t.Kind switch { "berries" => $"Picked clean. The bush fruits again in {Data.BerryRegrowHours:0} hours.", "tree" => "Only a stump is left. Find another tree.", "leaves" => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
+        // Workers fetch their tools from a tool station instead of needing them carried.
+        if (worker || ToolKind(t) is not string kind || BestTool(kind) != null) return null;
+        return kind switch
+        {
+            "axe" => "An axe is needed. Recover your belongings or craft one at a bench.",
+            "rake" => "Raking leaves needs a rake. Craft one at a bench.",
+            _ => t.Kind == "tin" ? "Mining tin needs a pickaxe." : "Craft a pickaxe at a bench. Loose rusty ore nearby can be picked up by hand."
+        };
     }
     public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "tin" => "tin_ore", "loose_coal" => "coal", "wolf_corpse" => "raw_meat", _ => t.Kind };
     public void Gather(Thing t, float dt)
@@ -341,7 +368,7 @@ public sealed partial class World
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
         gatherClock += dt;
-        string? tool = t.Kind == "tree" ? BestTool("axe") : t.Kind == "stone" || t.IsDeposit ? BestTool("pickaxe") : null;
+        string? tool = t.Kind == "stone" ? BestTool("pickaxe") : ToolKind(t) is string kind ? BestTool(kind) : null;
         float seconds = Data.GatherSeconds / Speed(tool);
         if (gatherClock < seconds) return;
         gatherClock = 0;
@@ -785,9 +812,11 @@ public sealed partial class World
     }
     public void Fire(Worker w)
     {
-        if (w.Bag.Count > 0) { var box = Add("grave", w.Pos); box.Inventory = w.Bag; }
+        if (w.Bag.Count > 0 || w.Tool != "") { var box = Add("grave", w.Pos); box.Inventory = w.Bag; box.Inventory.Slots++; box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1); }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
+    /// <summary>A tool station holds only tools; other storage holds anything.</summary>
+    public bool Holds(Thing t, string item) => t.Kind != "toolstation" || Data.Items.TryGetValue(item, out var def) && def.Tool != "";
     // Only chests take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
     public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) => S.Things
         .Where(t => t.Kind == "chest" && t.Id != exclude && t.Inventory.Room(item) > 0 && t.Inventory.Accepts(item))
@@ -871,6 +900,7 @@ public sealed partial class World
             w.Status = "Heading home to Bramblewick";
             if (w.Commute == 0)
             {
+                if (w.Tool != "" && !ReturnTool(w, dt)) return;
                 var post = S.Things.Where(t => t.Kind == "signpost").MinBy(t => t.Pos.DistanceSquaredTo(w.Pos));
                 if (!Walk(w, post?.Pos + Vector2.One ?? Spawn, dt) && w.WorkState != WorkerWorkState.Blocked) return;
                 w.WorkState = WorkerWorkState.Idle;
@@ -900,6 +930,9 @@ public sealed partial class World
             }
             return;
         }
+        string? need = target is { IsResource: true } ? ToolKind(target) : target is { Kind: "mine" } ? MineTool(target.Stage) : null;
+        if (need == null) w.Missing = "";
+        if (w.Tool != "" && Data.Items[w.Tool].Tool != need && !ReturnTool(w, dt)) return;
         if (target == null) { w.Status = "Available"; return; }
         if (target.IsResource)
         {
@@ -907,11 +940,12 @@ public sealed partial class World
             if (blocked != null) { w.Status = blocked; return; }
             string item = ResourceItem(target);
             if (DepositFor(item, target.Pos) == null) { w.Status = "Needs an accepting storage chest"; return; }
+            if (need != null && w.Tool == "") { FetchTool(w, need, target, dt); return; }
             w.Status = $"Gathering {Data.Name(item)}";
             if (!Walk(w, target.Pos, dt)) return;
             w.WorkState = WorkerWorkState.Gathering;
             w.Timer += dt;
-            if (target.IsLoose || w.Timer >= Data.GatherSeconds * 1.6f)
+            if (target.IsLoose || w.Timer >= Data.GatherSeconds * 1.6f / Speed(w.Tool == "" ? null : w.Tool))
             {
                 w.Timer = 0; target.Remaining -= w.Bag.Add(item, target.Remaining);
                 if (target.Kind == "water") target.Remaining = 9999;
@@ -965,6 +999,30 @@ public sealed partial class World
             else if (Worked(target.Kind)) w.WorkState = WorkerWorkState.Hammering;
         }
     }
+    /// <summary>Walks a tool the job no longer needs to the nearest tool station with room, and reports when it is put back; with no such station the worker keeps it.</summary>
+    private bool ReturnTool(Worker w, float dt)
+    {
+        var station = S.Things.Where(t => t.Kind == "toolstation" && t.Inventory.Room(w.Tool) > 0).MinBy(t => t.Pos.DistanceSquaredTo(w.Pos));
+        if (station == null) return true;
+        w.Status = $"Putting back the {Data.Name(w.Tool).ToLowerInvariant()}";
+        if (!Walk(w, station.Pos, dt)) return false;
+        station.Inventory.Add(w.Tool, 1); w.Tool = ""; return true;
+    }
+    /// <summary>Takes the best tool of a kind from the nearest tool station holding one; without one, the worker says once what they need and waits.</summary>
+    private void FetchTool(Worker w, string kind, Thing target, float dt)
+    {
+        var station = S.Things.Where(t => t.Kind == "toolstation" && BestTool(kind, t.Inventory) != null).MinBy(t => t.Pos.DistanceSquaredTo(w.Pos));
+        if (station == null)
+        {
+            w.Status = $"Needs {A(kind)} to {Task(target)}";
+            if (w.Missing != kind) { w.Missing = kind; Say($"{w.Name} needs {A(kind)} to {Task(target)}. Put one in a tool station."); }
+            return;
+        }
+        w.Missing = "";
+        w.Status = $"Fetching {A(kind)} from the tool station";
+        if (!Walk(w, station.Pos, dt)) return;
+        w.Tool = BestTool(kind, station.Inventory)!; station.Inventory.Remove(w.Tool, 1);
+    }
     /// <summary>Walks to an evenly spaced seat around the lunch fire and sits; without a campfire the worker sits where they are.</summary>
     private void EatLunch(Worker w, float dt)
     {
@@ -1013,6 +1071,7 @@ public sealed partial class World
             // Workers on strike are not charged, so their wage does not count against the day.
             int wages = S.Workers.Where(w => w.WageDebt <= 0).Sum(w => w.Wage);
             PayWages(); CloseDay(wages); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow.");
+            foreach (var leaves in S.Things.Where(t => t.Kind == "leaves")) leaves.Remaining = LeafPatch;
         }
         if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Your workers head home to Bramblewick until morning.");
         if (S.Workers.Count > 0 && Lunch && !wasLunch) Say("Midday. Your workers gather by the campfire for an hour of lunch.");
@@ -1247,7 +1306,7 @@ public sealed partial class World
         8 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),
         9 => ("The road to Bramblewick", "Build a village signpost. Craft a crate at the bench (6 planks, hammer slotted), place it, pack your steel tools, pick it up and put it in the market. Sell, then collect the coins."),
         10 => ("Many hands", "At the signpost pick a hiring offer: more coins up front means a lower daily wage. Keep wages in your backpack for each dawn."),
-        11 => ("Your first automation", "Build storage. Select a worker → Work → click a resource. Or select a furnace → Assign."),
+        11 => ("Your first automation", "Build storage, and a tool station holding a spare axe or pickaxe for woodcutters and miners. Select a worker → Work → click a resource. Or select a furnace → Assign."),
         _ => ("A settlement of your own", "The starter goals are done. Work toward the end goals: a mine on every ore and a week of steady profit.")
     };
     // ---------- End goals ----------
@@ -1302,6 +1361,9 @@ public sealed partial class World
         }
         // The goal chain gained steps, so the current goal is worked out again from the milestones.
         loaded.Goal = 0;
-        S = loaded; UpdateGoal(); gatherClock = 0; ExploredRevision++; Look(); Say("Settlement loaded.");
+        S = loaded;
+        // Saves from before raking have no leaf litter.
+        if (!S.Things.Any(t => t.Kind == "leaves")) DropLeaves();
+        UpdateGoal(); gatherClock = 0; ExploredRevision++; Look(); Say("Settlement loaded.");
     }
 }

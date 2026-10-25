@@ -69,7 +69,7 @@ public sealed partial class World
 
     private void MineWork(Worker w, Thing mine, List<Worker> crew, float dt)
     {
-        if (MineTool(mine.Stage) is string tool && !CrewHas(tool)) { w.Status = $"Needs a {tool} · make one first"; return; }
+        if (MineTool(mine.Stage) is string tool && w.Tool == "") { FetchTool(w, tool, mine, dt); return; }
         if (mine.Stage == MineDug)
         {
             foreach (var (item, need) in MineNeeds(mine))

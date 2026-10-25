@@ -125,6 +125,7 @@ public partial class Game
     private void MoveStack(Inventory from, Inventory to, string item, Thing near)
     {
         if (!world.Near(near)) { Notify("Walk closer first."); return; }
+        if (to == near.Inventory && !world.Holds(near, item)) { Notify("The tool station only holds tools."); return; }
         if (CrateIntoCrate(near, to, item)) return;
         from.TransferTo(to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackOf(item));
     }
@@ -133,6 +134,7 @@ public partial class Game
     private void MoveDrag(ItemDrag drag, Inventory to, Thing? container)
     {
         if ((drag.Container ?? container) is Thing near && !world.Near(near)) { Notify("Walk closer first."); return; }
+        if (container != null && to == container.Inventory && !world.Holds(container, drag.Item)) { Notify("The tool station only holds tools."); return; }
         if (CrateIntoCrate(container, to, drag.Item)) return;
         drag.From?.TransferTo(to, drag.Item, drag.Count);
     }

@@ -542,7 +542,7 @@ public partial class WorldView : Node3D
                 sway.Visible = prop.Fall < 1.7f;
                 prop.Stump!.Visible = true;
                 break;
-            case "stone" or "iron" or "coal" or "tin" or "loose_iron" or "loose_coal":
+            case "stone" or "iron" or "coal" or "tin" or "loose_iron" or "loose_coal" or "leaves":
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
@@ -589,6 +589,10 @@ public partial class WorldView : Node3D
                 prop.Chisel!.Visible = t.Tools != null && World.BenchTool(t, "chisel") != null;
                 prop.Hammer!.Visible = t.Tools != null && World.BenchTool(t, "hammer") != null;
                 prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
+                break;
+            case "toolstation":
+                if (!World.Sees(t.Pos)) break;
+                foreach (var (kind, tool) in prop.Racked) tool.Visible = World.BestTool(kind, t.Inventory) != null;
                 break;
             case "chest" or "grave" or "crate":
                 // Remembered boxes carry no inventory, so the lid stays as it was last seen.

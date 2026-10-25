@@ -16,6 +16,8 @@ public sealed class Prop
     public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer;
     /// <summary>A mine's parts, shown stage by stage: the marked outline, the dug hole, the delivered materials, the timber frame, the rails and the cart with its load.</summary>
     public Node3D? Outline, Hole, Supplies, Frame, Rails, Cart, Load;
+    /// <summary>A tool station's hanging tools by kind, each shown while the station holds one.</summary>
+    public Dictionary<string, Node3D> Racked = new();
     public Node3D[] Pleats = Array.Empty<Node3D>();
     public MeshInstance3D? Glow, Window, Pool;
     public WorldModels.WolfModel? Wolf;
@@ -39,6 +41,7 @@ public static class WorldModels
         "stone" => t.Remaining / 64f,
         "iron" or "coal" or "tin" => t.Remaining / 400f,
         "wolf_corpse" => t.Remaining / 4f,
+        "leaves" => t.Remaining / (float)World.LeafPatch,
         _ => 1
     };
 
@@ -70,6 +73,8 @@ public static class WorldModels
         "chest" => new[] { new Hit(.5f, 0, .65f) },
         "crate" => new[] { new Hit(.4f, 0, .55f) },
         "bench" => new[] { new Hit(.6f, 0, .95f) },
+        "toolstation" => new[] { new Hit(.55f, 0, 1.5f) },
+        "leaves" => new[] { new Hit(.6f, 0, .15f) },
         "grave" => new[] { new Hit(.45f, 0, .55f) },
         "anvil" => new[] { new Hit(.45f, 0, .85f) },
         "signpost" => new[] { new Hit(.5f, 0, 1.9f) },
@@ -102,6 +107,8 @@ public static class WorldModels
             case "anvil": Anvil(prop); break;
             case "crate": Crate(prop); break;
             case "bench": Workbench(prop); break;
+            case "toolstation": ToolRack(prop); break;
+            case "leaves": LeafLitter(body, t.Id); break;
             case "signpost": Signpost(prop); break;
             case "campfire": FirePit(prop); break;
             case "mine": Mine(prop, World.CliffAt(t.Pos).Ore); break;
@@ -373,6 +380,43 @@ public static class WorldModels
         Box(hammer, new Vector3(.34f, .03f, .035f), Vector3.Zero, wood);
         Box(hammer, new Vector3(.06f, .06f, .14f), new Vector3(.17f, .02f, 0), steel);
         prop.Hammer = hammer;
+    }
+
+    /// <summary>A plank pegboard on two posts set in a cinder-block footing, with an axe, a pickaxe and a rake hanging on it.</summary>
+    private static void ToolRack(Prop prop)
+    {
+        // Turned to face down the valley, toward the camera, so the hanging tools show.
+        var body = Pivot(prop.Body, Vector3.Zero, new Vector3(0, 45, 0));
+        var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var block = Mat("9a9d99", .95f); var handle = Mat("e0b07a"); var steel = Mat("b9c3c6", .4f, .3f);
+        Box(body, new Vector3(1.1f, .22f, .36f), new Vector3(0, .11f, 0), block);
+        foreach (float x in new[] { -.48f, .48f }) Box(body, new Vector3(.1f, 1.45f, .1f), new Vector3(x, .9f, 0), post);
+        Box(body, new Vector3(1.05f, .9f, .04f), new Vector3(0, 1.0f, -.03f), plank);
+        Box(body, new Vector3(1.15f, .06f, .2f), new Vector3(0, 1.5f, 0), post);
+        foreach (float x in new[] { -.3f, 0, .3f }) Box(body, new Vector3(.03f, .03f, .1f), new Vector3(x, 1.32f, .05f), post);
+        // Each tool hangs from its peg by the head, handle down along the board.
+        Node3D Hang(float x)
+        {
+            var hook = Pivot(body, new Vector3(x, 1.3f, .06f));
+            Box(hook, new Vector3(.04f, .72f, .04f), new Vector3(0, -.36f, 0), handle);
+            return hook;
+        }
+        var axe = Hang(-.3f); Box(axe, new Vector3(.22f, .12f, .03f), new Vector3(.08f, -.04f, 0), steel);
+        var pick = Hang(0); Box(pick, new Vector3(.38f, .05f, .04f), new Vector3(0, -.02f, 0), steel, new Vector3(0, 0, 8));
+        var rake = Hang(.3f);
+        Box(rake, new Vector3(.3f, .04f, .04f), new Vector3(0, -.74f, 0), steel);
+        for (int i = 0; i < 5; i++) Box(rake, new Vector3(.015f, .12f, .015f), new Vector3(-.12f + i * .06f, -.82f, 0), steel);
+        prop.Racked = new() { ["axe"] = axe, ["pickaxe"] = pick, ["rake"] = rake };
+    }
+
+    /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>
+    private static void LeafLitter(Node3D body, int id)
+    {
+        string[] colors = { "c08a3a", "a8652c", "d0a347", "8e5a2a", "b8753a" };
+        for (int i = 0; i < 26; i++)
+        {
+            float angle = i * 2.4f + Jitter(id, 80 + i) * 2, r = .15f + Jitter(id, 110 + i) * .55f;
+            Box(body, new Vector3(.16f, .012f, .1f), new Vector3(MathF.Cos(angle) * r, .01f + i * .002f, MathF.Sin(angle) * r), Mat(colors[i % colors.Length], .95f), new Vector3(Jitter(id, 140 + i) * 12, Jitter(id, 170 + i) * 360, 0));
+        }
     }
 
     /// <summary>Anvil bolted to a welded square-tube stand.</summary>

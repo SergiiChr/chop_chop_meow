@@ -223,7 +223,7 @@ public static class ActorAnimation
                 "iron_pick" => ActorAction.Mine,
                 _ => ActorAction.Gather
             },
-            "berries" or "water" or "wolf_corpse" => ActorAction.Gather,
+            "berries" or "water" or "wolf_corpse" or "leaves" => ActorAction.Gather,
             _ => ActorAction.Idle
         };
     }

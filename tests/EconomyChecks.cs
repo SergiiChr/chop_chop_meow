@@ -149,7 +149,6 @@ public static class EconomyChecks
         var world = new World(data, false);
         world.S.Time = 0;
         world.S.Backpack.Add(Inventory.Coins, 1000);
-        world.S.Milestones.Add("pick");
         return world;
     }
 
@@ -165,6 +164,9 @@ public static class EconomyChecks
         var world = WorkDay(data);
         var source = world.Add(kind, new Vector2(20, 20), kind == "berries" ? 24 : 9999);
         var chest = world.Add("chest", new Vector2(22.5f, 20));
+        // Workers take plain iron tools from a station beside the chest, so the measure stays the baseline output.
+        var station = world.Add("toolstation", new Vector2(22.5f, 22));
+        station.Inventory.Add("iron_axe", 1); station.Inventory.Add("iron_pick", 1);
         Hire(world, source);
         Pass(world, days * data.DaySeconds);
         return chest.Inventory[World.ResourceItem(source)] / (float)days;
