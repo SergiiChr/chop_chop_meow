@@ -67,9 +67,10 @@ public static class WorkerStateChecks
     private static void CheckBlockedPath(GameData data)
     {
         var world = EmptyWorld(data);
-        var tree = world.Add("tree", new Vector2(47, 47), 12);
-        world.Add("chest", new Vector2(42, 42));
-        var worker = AddWorker(world, new Vector2(40, 40));
+        // Off the map's edge: the tree is out of reach.
+        var tree = world.Add("tree", Vector2.One * (World.MapSize - 1), 12);
+        world.Add("chest", Vector2.One * (World.MapSize - 6));
+        var worker = AddWorker(world, Vector2.One * (World.MapSize - 8));
         world.Assign(worker, tree);
 
         for (int i = 0; i < 80 && worker.WorkState != WorkerWorkState.Blocked; i++) world.Tick(.25f);

@@ -16,6 +16,7 @@ public enum ActorAction
     Pump,
     Hammer,
     Attack,
+    Sit,
     Mauled,
     Devoured
 }
@@ -50,6 +51,7 @@ public static class ActorAnimation
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
+        ActorAction.Sit => 4,
         ActorAction.Mauled => .5f,
         ActorAction.Devoured => 1.4f,
         _ => 1
@@ -126,6 +128,12 @@ public static class ActorAnimation
                 return Keys(p, (0, fists),
                     (.32f, fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
                     (.5f, fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }));
+            case ActorAction.Sit:
+                // Sitting low with knees up and forearms on them, now and then lifting a bite to the mouth.
+                var seated = new Pose(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, SwingL: 112, KneeL: 100, SwingR: 108, KneeR: 96);
+                var bite = seated with { Head = 10, Lean = 2, RaiseR = 40, OutR = -24, ElbowR = 140 };
+                var eating = Keys(p, (0, seated), (.55f, seated), (.68f, bite), (.8f, bite), (.92f, seated));
+                return eating with { Lean = eating.Lean + wave * 1.2f, Head = eating.Head + wave * 1.5f };
             // Both downed poses are drawn with the rig tipped onto its back, so Raise points the arms at the sky.
             case ActorAction.Mauled:
                 // Pushing at the jaws over the throat with the head forced back while the legs kick.
@@ -196,6 +204,7 @@ public static class ActorAnimation
 
     public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving)
     {
+        if (worker.WorkState == WorkerWorkState.Resting && !moving) return ActorAction.Sit;
         if (worker.Bag.Count > 0) return ActorAction.Carry;
         if (moving) return ActorAction.Walk;
         if (worker.WorkState == WorkerWorkState.Gathering && assignment?.IsResource == true)

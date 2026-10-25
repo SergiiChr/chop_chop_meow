@@ -130,7 +130,7 @@ public partial class Game
         world.S.Things.Remove(hut); ClosePanel(); await Frames();
 
         // A loose piece far enough behind a tree sits under its crown on screen; it must still be the one picked.
-        var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == new Vector2(28, 24));
+        var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == World.Spawn + new Vector2(5, 0));
         var hidden = world.Add("loose_iron", tree.Pos - new Vector2(3.3f, 3.3f), 2);
         var point = view.Screen(hidden.Pos, .15f);
         UIRequire(view.Pick(point)?.Id == hidden.Id, "A tree crown must not steal the click from a loose piece behind it.");
@@ -179,7 +179,7 @@ public partial class Game
             UIRequire(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
             int heard = sounds.Played; sounds.Play("anvil_work", world.Player + Vector2.One * 40);
             UIRequire(view.OffScreen(world.Player) == 0 && view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach && sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
-            var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == new Vector2(28, 24));
+            var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == World.Spawn + new Vector2(5, 0));
             int wood = world.S.Backpack["wood"];
             var point = view.Screen(tree.Pos) - new Vector2(0, 70);
             UIRequire(view.Pick(point)?.Id == tree.Id, "Illustrated tree hit area must select the visible resource.");

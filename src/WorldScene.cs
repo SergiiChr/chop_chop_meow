@@ -19,7 +19,7 @@ public partial class WorldView
         var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
         const float span = 160;
         var ground = new StandardMaterial3D { AlbedoTexture = grass, Roughness = 1, Uv1Scale = new Vector3(span / 9, span / 9, 1) };
-        Add(parent, new PlaneMesh { Size = new Vector2(span, span) }, ground, new Vector3(24, 0, 24));
+        Add(parent, new PlaneMesh { Size = new Vector2(span, span) }, ground, new Vector3(World.MapSize / 2f, 0, World.MapSize / 2f));
         // The arrival clearing: overlapping translucent discs soften into the grass.
         for (int ring = 0; ring < 4; ring++)
             Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(World.Spawn.X, .003f + ring * .0005f, World.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
@@ -29,9 +29,9 @@ public partial class WorldView
             float width = .33f + layer * .12f;
             var strip = new SurfaceTool();
             strip.Begin(Mesh.PrimitiveType.TriangleStrip);
-            for (int x = 22; x <= 60; x++)
+            for (int x = (int)World.Spawn.X - 1; x <= World.MapSize + 12; x++)
             {
-                float y = 24 + MathF.Sin(x * .6f) * .13f, lift = .006f + (3 - layer) * .001f;
+                float y = World.Spawn.Y + MathF.Sin(x * .6f) * .13f, lift = .006f + (3 - layer) * .001f;
                 strip.SetNormal(Vector3.Up); strip.AddVertex(new Vector3(x, lift, y - width));
                 strip.SetNormal(Vector3.Up); strip.AddVertex(new Vector3(x, lift, y + width));
             }
@@ -123,10 +123,10 @@ public partial class WorldView
         var blades = new List<(Transform3D At, Color Color)>();
         var flowers = new List<(Transform3D At, Color Color)>();
         Color[] petals = { new("f2efe0"), new("e9cf5a"), new("b68ad6") };
-        while (blades.Count < 2600)
+        while (blades.Count < 5400)
         {
-            var p = new Vector2((float)rng.NextDouble() * 54 - 3, (float)rng.NextDouble() * 54 - 3);
-            if (p.DistanceTo(World.Pond) < World.PondRadius + .8f || Math.Abs(p.Y - 24) < .7f && p.X > 21) continue;
+            var p = new Vector2((float)rng.NextDouble() * (World.MapSize + 6) - 3, (float)rng.NextDouble() * (World.MapSize + 6) - 3);
+            if (p.DistanceTo(World.Pond) < World.PondRadius + .8f || Math.Abs(p.Y - World.Spawn.Y) < .7f && p.X > World.Spawn.X - 2) continue;
             var basis = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau).Scaled(Vector3.One * (.7f + (float)rng.NextDouble() * .7f));
             blades.Add((new Transform3D(basis, new Vector3(p.X, 0, p.Y)), new Color("5f7d43").Lerp(new Color("8ea75f"), (float)rng.NextDouble())));
             if (rng.NextDouble() < .07) flowers.Add((new Transform3D(Basis.Identity, new Vector3(p.X + .12f, .14f, p.Y + .05f)), petals[rng.Next(petals.Length)]));

@@ -279,7 +279,7 @@ public partial class WorldView : Node3D
     {
         SyncCamera();
         Worker? best = null; float nearest = float.MaxValue;
-        foreach (var w in World.S.Workers.Where(w => World.Sees(w.Pos)))
+        foreach (var w in World.S.Workers.Where(w => World.Sees(w)))
             if (RayHits(screen, w.Pos, PersonHit, out float d) && d < nearest) { nearest = d; best = w; }
         return best;
     }
@@ -393,10 +393,11 @@ public partial class WorldView : Node3D
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking);
             if (work == ActorAction.Hammer && assignment?.Processing != true) work = ActorAction.Idle;
-            state.Update(worker.Pos, work, assignment?.Pos ?? worker.Pos, dt);
+            var facing = work == ActorAction.Sit && World.LunchFire is Thing fire ? fire.Pos : assignment?.Pos ?? worker.Pos;
+            state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, ActorAnimation.Tool(work));
-            entry.Rig.Root.Visible = World.Sees(worker.Pos);
-            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? null : assignment);
+            entry.Rig.Root.Visible = World.Sees(worker);
+            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit ? null : assignment);
         }
         foreach (int id in crew.Keys.Where(id => World.S.Workers.All(w => w.Id != id)).ToArray())
         {
@@ -612,7 +613,7 @@ public partial class WorldView : Node3D
             if (t.Kind != "tree" || t.Remaining <= 0 || !props.TryGetValue(t.Id, out var prop)) continue;
             if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
             bool covers = !World.Dead && TreeCoversPerson(t, World.Player) ||
-                World.S.Workers.Any(w => World.Sees(w.Pos) && TreeCoversPerson(t, w.Pos)) ||
+                World.S.Workers.Any(w => World.Sees(w) && TreeCoversPerson(t, w.Pos)) ||
                 structures.Any(o => Covers(t, o));
             float fade = Mathf.MoveToward(prop.Fade, covers ? .68f : 0, Math.Max(dt, .016f) * 3);
             if (Math.Abs(fade - prop.Fade) < .001f) continue;
@@ -684,7 +685,7 @@ public partial class WorldView : Node3D
         Mark(selectRing, World.Find(Selected), 0);
         Mark(hoverRing, Hover != Selected ? World.Find(Hover) : null, .004f);
         var worker = World.S.Workers.FirstOrDefault(w => w.Id == SelectedWorker);
-        workerRing.Visible = worker != null && World.Sees(worker.Pos);
+        workerRing.Visible = worker != null && World.Sees(worker);
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
@@ -717,7 +718,7 @@ public partial class WorldView : Node3D
     private void UpdateLighting()
     {
         // Dusk deepens into full night and dawn fades out, so neither boundary jumps in brightness.
-        float dayPhase = World.DayPhase, dusk = World.Data.NightStarts - .1f;
+        float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts;
         float darkness = World.Night ? .65f : dayPhase > dusk ? .02f + (dayPhase - dusk) / .1f * .63f : dayPhase < .05f ? .65f - dayPhase / .05f * .63f : .02f;
         night = Math.Clamp((darkness - .02f) / .63f, 0, 1);
         sun.LightEnergy = Mathf.Lerp(.8f, .08f, night);
@@ -757,7 +758,7 @@ public partial class WorldView : Node3D
         // Only the hovered object is named; the side panel already names the selection.
         var hovered = World.Find(Hover);
         if (hovered != null) Tag(Screen(hovered.Pos, HitsOf(hovered).Max(h => h.Top) + .2f) - new Vector2(0, 8), World.Data.Name(hovered.Kind));
-        foreach (var w in World.S.Workers.Where(w => World.Sees(w.Pos) && (w.Id == HoverWorker || w.Id == SelectedWorker)))
+        foreach (var w in World.S.Workers.Where(w => World.Sees(w) && (w.Id == HoverWorker || w.Id == SelectedWorker)))
             Tag(Screen(w.Pos, 2.05f), w.Name);
     }
 }

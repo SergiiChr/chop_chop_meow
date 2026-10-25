@@ -119,6 +119,13 @@ public static class AnimationChecks
         worker.Status = "Arbitrary status";
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "iron" }, false) == ActorAction.Mine,
             "workers gathering iron should mine");
+        worker.WorkState = WorkerWorkState.Resting;
+        worker.Bag.Add("wood", 2);
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, false) == ActorAction.Sit,
+            "a worker at lunch should sit, even holding a load");
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, true) == ActorAction.Carry,
+            "a worker still walking to lunch should not sit");
+        worker.Bag.Remove("wood", 2);
         worker.Status = "Available";
         worker.WorkState = WorkerWorkState.Idle;
         Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Idle,

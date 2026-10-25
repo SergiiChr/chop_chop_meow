@@ -39,6 +39,7 @@ public static class SimulationChecks
         CheckCoinStacks(data);
         CheckLegacySave(data);
         CheckCrewKeepsForgeHot(data);
+        CheckWorkerSchedule(data);
         CheckFogOfWar(data);
         CheckActualProgression(data);
         GD.Print("SELF-TEST PASS");
@@ -822,11 +823,21 @@ public static class SimulationChecks
             var loose = world.S.Things.Where(t => t.Kind == $"loose_{cliff.Ore}").ToList();
             Require(deposits.Count > 0 && deposits.All(t => cliff.DistanceTo(t.Pos) < 3),
                     $"{cliff.Ore} deposits should only spawn at the foot of their cliff");
-            Require(loose.Count > 0 && loose.All(t => cliff.DistanceTo(t.Pos) is > 3 and < 10 && world.CanStand(t.Pos)),
-                    $"loose {cliff.Ore} should spread a little further than the deposits but stay near the cliff");
+            Require(loose.Count > 0 && loose.All(t => cliff.DistanceTo(t.Pos) is > 3 and < 12 && world.CanStand(t.Pos)),
+                    $"loose {cliff.Ore} should spread further than the deposits but stay on the cliff's side of the map");
+            Require(loose.All(a => loose.All(b => a == b || a.Pos.DistanceTo(b.Pos) >= 2)), $"loose {cliff.Ore} pieces should lie apart");
         }
         Require(world.S.Things.Where(t => t.Kind == "loose_iron").Sum(t => t.Remaining) is >= 14 and < 24,
                 "loose iron should cover the anvil and pickaxe without also paying for a bellows furnace");
+
+        foreach (var (kind, spacing) in new[] { ("stone", 9f), ("berries", 10f) })
+        {
+            var found = world.S.Things.Where(t => t.Kind == kind).ToList();
+            Require(found.Count >= 5 && found.All(t => t.Pos.DistanceTo(World.Spawn) >= 9 && found.All(o => o == t || o.Pos.DistanceTo(t.Pos) >= spacing)),
+                    $"{kind} should be scattered singly away from the clearing, so more of it takes exploring");
+        }
+        Require(world.S.Things.Count(t => t.Kind == "tree" && t.Pos.DistanceTo(World.Spawn) < 9) == 1,
+                "the clearing should keep only its one nearby tree");
 
         // Loose pieces need no tool and no gather time; the whole piece goes into the backpack.
         var piece = world.S.Things.First(t => t.Kind == "loose_coal");
@@ -1047,6 +1058,18 @@ public static class SimulationChecks
         Require(loaded.Find(sign.Id) is { Output.Slots: World.MarketSlots, Inventory.Slots: World.MarketSlots }, "an older signpost should get its market boxes");
         Require(loaded.S.Orders.Single().Goods.GetValueOrDefault("wood") == 4 && loaded.S.Orders.Single().Item == null, "an older single-item order should keep its goods");
         Require(!loaded.Serialize().Contains("\"Item\"") && !loaded.Serialize().Contains("\"Coins\""), "migrated fields should not be written back");
+
+        // Saves from the 48-tile map move into the middle of the larger map, where the clearing, pond and cliffs now are.
+        AddWorker(old, new Vector2(12, 12));
+        var small = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;
+        var explored = new byte[48 * 48];
+        explored[2 * 48 + 2] = 255;
+        small["Version"] = 2; small["PlayerX"] = 23; small["PlayerY"] = 24; small["Explored"] = Convert.ToBase64String(explored);
+        var moved = EmptyWorld(data);
+        moved.Deserialize(small.ToJsonString());
+        Require(moved.S.Version == 3 && moved.Player == World.Spawn && moved.Find(sign.Id)!.Pos == new Vector2(22, 22) && moved.S.Workers[0].Pos == new Vector2(24, 24),
+                "a 48-tile save should shift everything by the same offset as the clearing");
+        Require(moved.Explored(new Vector2(14, 14)) && !moved.Explored(new Vector2(2, 2)), "explored ground should move with the map");
     }
 
     private static void CheckCrewKeepsForgeHot(GameData data)
@@ -1074,5 +1097,56 @@ public static class SimulationChecks
         SafeTick(world, data.TradeSeconds / 4);
         world.Assign(runner, null);
         Require(runner.Away == 0, "reassigning a runner should call off the errand rather than freeze them on the road");
+    }
+
+    private static void CheckWorkerSchedule(GameData data)
+    {
+        var world = EmptyWorld(data);
+        float At(float hour) => (hour - 6) / 24 * data.DaySeconds;
+        SetCoins(world, 200);
+        var tree = world.Add("tree", new Vector2(10, 10), 400);
+        var chest = world.Add("chest", new Vector2(12, 10));
+        var near = world.Add("campfire", new Vector2(14, 14));
+        world.Add("campfire", new Vector2(36, 36));
+        var forge = world.Add("reinforced", new Vector2(20, 12));
+        var cutter = AddWorker(world, tree.Pos);
+        var pumper = AddWorker(world, forge.Pos);
+        var hauler = AddWorker(world, forge.Pos);
+        world.Assign(cutter, tree); world.Assign(pumper, forge); world.Assign(hauler, forge);
+
+        world.S.Time = At(data.LunchHour) - 5;
+        forge.Heat = 100;
+        SafeTick(world, 25);
+        Require(world.Lunch && world.LunchFire == near && world.S.Workers.All(w => w.WorkState == WorkerWorkState.Resting && w.Pos.DistanceTo(near.Pos) < 2),
+                "at lunch the whole crew should sit around the campfire closest to them");
+        Require(cutter.Assignment == tree.Id && pumper.Assignment == forge.Id && hauler.Assignment == forge.Id,
+                "lunch should keep every assignment");
+        Require(forge.Heat < World.SteelHeat, "with the crew at lunch the forge should cool below the clear bar");
+        SafeTick(world, At(data.LunchHour + 1) - world.S.Time + 10);
+        Require(cutter.WorkState == WorkerWorkState.Gathering && pumper.WorkState == WorkerWorkState.Pumping,
+                "after lunch workers should walk back to their jobs");
+
+        float dusk = data.DuskStarts * data.DaySeconds;
+        world.S.Time = dusk - 2;
+        cutter.Bag.Remove("wood", 99); cutter.Bag.Add("wood", 2);
+        chest.Inventory.InputFilter.Add("iron_bar");
+        var sign = world.Add("signpost", new Vector2(30, 20));
+        world.Assign(AddWorker(world, sign.Pos), sign);
+        SafeTick(world, 40);
+        Require(world.S.Workers.All(w => w.Home && !world.Sees(w)), "at dusk every worker should sign out and leave the map");
+        Require(cutter.Bag["wood"] == 2 && cutter.Assignment == tree.Id && pumper.Assignment == forge.Id,
+                "signing out should keep assignments and carried items");
+        Require(world.FetchBlock(sign) == "Your workers have signed out until morning.", "nobody should run for prices after signing out");
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(world.Serialize());
+        Require(loaded.S.Workers.All(w => w.Home), "signed-out workers should stay signed out after loading");
+
+        world.S.Time = data.DaySeconds - 1;
+        chest.Inventory.InputFilter.Clear();
+        SafeTick(world, 25);
+        Require(world.S.Workers.All(w => !w.Home && w.WageDebt == 0 && w.Pos.DistanceTo(World.RoadEnd) > 5),
+                "at dawn paid workers should walk back in from the road");
+        Require(cutter.Assignment == tree.Id && pumper.Assignment == forge.Id && hauler.Assignment == forge.Id,
+                "a night away should keep every assignment");
     }
 }

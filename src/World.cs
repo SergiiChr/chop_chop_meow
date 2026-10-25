@@ -38,7 +38,7 @@ public readonly record struct Cliff(string Ore, Vector2 Center, Vector2 Face, fl
     /// <summary>Distance to the cliff's spine, so the whole wall blocks movement rather than only its middle.</summary>
     public float DistanceTo(Vector2 p) => p.DistanceTo(Center + Along * Math.Clamp((p - Center).Dot(Along), -HalfLength, HalfLength));
 }
-public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked }
+public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting }
 
 public sealed class Worker
 {
@@ -57,6 +57,8 @@ public sealed class Worker
     public int Wage { get; set; } = 8;
     /// <summary>Seconds until the worker returns from fetching village prices; while away they are off the map.</summary>
     public float Away { get; set; }
+    /// <summary>Signed out for the night: off the map in the village until dawn, still holding their assignment and anything carried.</summary>
+    public bool Home { get; set; }
     [JsonIgnore] public List<Vector2> Route { get; } = new();
     [JsonIgnore] public Vector2 RouteTarget { get; set; } = new(-100, -100);
     [JsonIgnore] public WorkerWorkState WorkState { get; set; }
@@ -93,7 +95,8 @@ public sealed class Wolf
 }
 public sealed class SaveState
 {
-    public int Version { get; set; } = 2;
+    /// <summary>3 is the 72-tile map; version 2 saves come from the 48-tile map, which sits at its centre.</summary>
+    public int Version { get; set; } = 3;
     public List<Thing> Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -106,8 +109,8 @@ public sealed class SaveState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public float? Coins { get; set; }
     public float PricesTime { get; set; }
     public HashSet<string> Milestones { get; set; } = new();
-    public float PlayerX { get; set; } = 23;
-    public float PlayerY { get; set; } = 24;
+    public float PlayerX { get; set; } = 35;
+    public float PlayerY { get; set; } = 36;
     public float Time { get; set; } = 55;
     public float Health { get; set; } = 100;
     public float Hunger { get; set; } = 100;
@@ -139,11 +142,13 @@ public sealed class World
     public Action<ActorAction, Vector2>? PlayerActed;
     /// <summary>A named sound effect and where it happens; the simulation only names it.</summary>
     public Action<string, Vector2>? Sound;
-    public const int MapSize = 48;
-    public static readonly Vector2 Spawn = new(23, 24);
-    public static readonly Vector2 Pond = new(14, 22);
+    public const int MapSize = 72;
+    public static readonly Vector2 Spawn = new(35, 36);
+    public static readonly Vector2 Pond = new(26, 34);
     /// <summary>Where the road east leaves the map toward Bramblewick; carts and errand runners walk there and back.</summary>
-    public static readonly Vector2 Village = new(49, 24);
+    public static readonly Vector2 Village = new(MapSize + 1, 36);
+    /// <summary>Where the village road meets the map edge; workers leave here at dusk and walk back in at dawn.</summary>
+    public static readonly Vector2 RoadEnd = new(MapSize - 2, 36);
     public const float PondRadius = 4.5f;
     public const float LeapSeconds = .4f;
     // A wolf leaps from within LeapRange and lands PinDistance away, where its jaws reach the throat of the downed player.
@@ -151,7 +156,7 @@ public sealed class World
     /// <summary>Minimum bellows furnace temperature: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
     // Both faces turn toward the camera so the deposits at their feet stay in view.
-    public static readonly Cliff[] Cliffs = { new("iron", new(31, 4), new(0, 1), 4.5f), new("coal", new(4, 40), new(1, 0), 4.5f) };
+    public static readonly Cliff[] Cliffs = { new("iron", new(43, 16), new(0, 1), 4.5f), new("coal", new(16, 52), new(1, 0), 4.5f) };
     public static Cliff CliffOf(string ore) => Cliffs.First(c => c.Ore == ore);
     private float gatherClock;
     private float attackClock;
@@ -166,6 +171,16 @@ public sealed class World
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
     public float DayPhase => S.Time % Data.DaySeconds / Data.DaySeconds;
     public bool Night => DayPhase >= Data.NightStarts;
+    /// <summary>Clock hour, with the day starting at 06:00.</summary>
+    public float Hour => (DayPhase * 24 + 6) % 24;
+    /// <summary>From the first fading light until dawn; workers are off duty.</summary>
+    public bool Dusk => DayPhase >= Data.DuskStarts;
+    public bool Lunch => Hour >= Data.LunchHour && Hour < Data.LunchHour + 1;
+    /// <summary>On the map and neither signed out nor at lunch.</summary>
+    public bool OnDuty(Worker w) => !w.Home && !Dusk && !Lunch;
+    /// <summary>The campfire the crew sits around at lunch: the one closest to them all, or null outside lunch or without a campfire.</summary>
+    public Thing? LunchFire { get; private set; }
+    public bool Sees(Worker w) => !w.Home && Sees(w.Pos);
     public bool Dead => S.RespawnIn > 0;
     /// <summary>Dead or pinned by a wolf: the player cannot move or act.</summary>
     public bool Downed => Dead || S.Mauled;
@@ -199,36 +214,40 @@ public sealed class World
         foreach (var cliff in Cliffs)
         {
             foreach (float along in new[] { -2.8f, 0, 2.8f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, 400);
-            // Loose pieces stay on the cliff's side of the map but roll a little further out than the deposits.
+            // Loose pieces stay on the cliff's side of the map but roll well out past the deposits, so collecting them takes a search.
             // Iron is the tool-free bootstrap: 20 ore covers the anvil and pickaxe but not a bellows furnace too.
             (string kind, int count) = cliff.Ore == "iron" ? ("loose_iron", 10) : ("loose_coal", 6);
             for (int placed = 0; placed < count;)
             {
-                var p = cliff.Center + cliff.Face * (4.2f + (float)rng.NextDouble() * 4.5f) + cliff.Along * ((float)rng.NextDouble() * 2 - 1) * (cliff.HalfLength + 1.5f);
-                if (!CanStand(p) || p.DistanceTo(Pond) < PondRadius + 1 || S.Things.Any(t => t.Pos.DistanceTo(p) < 1.2f)) continue;
+                var p = cliff.Center + cliff.Face * (4.2f + (float)rng.NextDouble() * 6.5f) + cliff.Along * ((float)rng.NextDouble() * 2 - 1) * (cliff.HalfLength + 4);
+                if (!CanStand(p) || p.DistanceTo(Pond) < PondRadius + 1 || S.Things.Any(t => t.Pos.DistanceTo(p) < 2)) continue;
                 Add(kind, p, 2); placed++;
             }
         }
-        for (int i = 0; i < 110; i++)
-        {
-            var p = new Vector2(rng.Next(3, 45), rng.Next(3, 45));
-            if (p.DistanceTo(Spawn) < 8 || p.DistanceTo(Pond) < PondRadius + 3.5f || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || Math.Abs(p.Y - 24) < 1.5f) continue;
-            // Full-size trees need room for their crowns, so the woods stay walkable and readable.
-            if (S.Things.Any(t => t.Pos.DistanceTo(p) < 3.6f)) continue;
-            Add("tree", p, 42);
-        }
-        Add("tree", new(28, 24), 42);
-        Vector2[] stones = { new(19, 28), new(22, 30), new(26, 30), new(24, 33), new(18, 32), new(29, 33), new(21, 35) };
-        foreach (var p in stones) Add("stone", p, 64);
-        foreach (var p in new Vector2[] { new(13, 28), new(16, 30), new(12, 32), new(15, 34), new(10, 29) }) Add("berries", p, 34);
+        // Stones and berry bushes stand alone, far from the clearing and each other, so more of them means exploring.
+        Scatter(rng, "stone", 14, 64, 9, 9);
+        Scatter(rng, "berries", 10, 34, 10, 10);
         Add("water", Pond + (Spawn - Pond).Normalized() * (PondRadius + .2f), 9999);
-        S.Things.RemoveAll(t => t.Kind == "tree" && S.Things.Any(other => other.Id != t.Id && other.IsResource && other.Kind != "tree" && other.Pos.DistanceTo(t.Pos) < 1.3f));
+        Add("tree", Spawn + new Vector2(5, 0), 42);
+        // Full-size trees need room for their crowns, so the woods stay walkable and readable.
+        Scatter(rng, "tree", 160, 42, 4.4f, 9);
         Look();
         Say("Welcome to Bramblewick. Gather wood and stone; build a sheltered workshop.");
     }
+    /// <summary>Places resources on open ground away from the clearing, at least <paramref name="spacing"/> apart from their own kind.</summary>
+    private void Scatter(Random rng, string kind, int count, int remaining, float spacing, float clearing)
+    {
+        for (int placed = 0, tries = 0; placed < count && tries < 5000; tries++)
+        {
+            var p = new Vector2(rng.Next(3, MapSize - 3), rng.Next(3, MapSize - 3));
+            if (p.DistanceTo(Spawn) < clearing || p.DistanceTo(Pond) < PondRadius + 3.5f || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || Math.Abs(p.Y - Spawn.Y) < 1.5f) continue;
+            if (S.Things.Any(t => t.Pos.DistanceTo(p) < (t.Kind == kind ? spacing : 2))) continue;
+            Add(kind, p, remaining); placed++;
+        }
+    }
     public bool CanStand(Vector2 p)
     {
-        if (p.X < 1 || p.Y < 1 || p.X > 46 || p.Y > 46 || p.DistanceTo(Pond) < PondRadius || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth)) return false;
+        if (p.X < 1 || p.Y < 1 || p.X > MapSize - 2 || p.Y > MapSize - 2 || p.DistanceTo(Pond) < PondRadius || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth)) return false;
         return !S.Things.Any(t => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" && t.Pos.DistanceTo(p) < Footprint(t.Kind));
     }
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
@@ -405,7 +424,7 @@ public sealed class World
         asleep = true;
         while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
         asleep = false;
-        S.Wolves.Clear(); Say(S.Workers.Count > 0 ? "Dawn breaks. Your workers continued through the night." : "Dawn breaks.");
+        S.Wolves.Clear(); Say(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
     /// <summary>Burning campfires keep wolves out of their light, unless a wolf is already chasing the player.</summary>
     public bool Protected(Vector2 p) => S.Things.Any(t => t.Kind == "campfire" && t.Burn > 0 && t.Pos.DistanceTo(p) < 5.3f);
@@ -423,7 +442,7 @@ public sealed class World
             wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f;
             if (wolf.Health <= 0)
             {
-                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * 45), 4);
+                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
                 Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
             }
         }
@@ -493,6 +512,8 @@ public sealed class World
     {
         var crew = S.Workers.Where(w => w.Assignment == sign.Id).ToList();
         if (crew.Count == 0) return "No worker assigned.";
+        if (Dusk) return "Your workers have signed out until morning.";
+        if (Lunch) return "Your workers are at lunch.";
         if (crew.FirstOrDefault(w => w.Away > 0) is Worker away) return $"{away.Name} is already on the way.";
         return crew.Any(w => w.WageDebt <= 0) ? null : "The assigned worker is on strike.";
     }
@@ -590,7 +611,20 @@ public sealed class World
             if (w.Away == 0) { UpdatePrices(); Say($"{w.Name} is back with fresh prices from Bramblewick."); }
             return;
         }
+        if (w.Home)
+        {
+            if (Dusk) { w.Status = "Signed out · back in the morning"; return; }
+            w.Home = false; w.Pos = RoadEnd; w.Route.Clear();
+        }
+        if (Dusk)
+        {
+            // Everyone signs out with their assignment and load kept; one cut off from the road still goes home.
+            w.Status = "Heading home to Bramblewick";
+            if (Walk(w, RoadEnd, dt) || w.WorkState == WorkerWorkState.Blocked) { w.Home = true; w.WorkState = WorkerWorkState.Idle; w.Status = "Signed out · back in the morning"; }
+            return;
+        }
         if (w.WageDebt > 0) { w.Status = "On strike · wages owed"; return; }
+        if (Lunch) { EatLunch(w, dt); return; }
         var target = Find(w.Assignment);
         if (w.Bag.Count > 0)
         {
@@ -666,6 +700,16 @@ public sealed class World
             else if (target.Kind == "anvil") w.WorkState = WorkerWorkState.Hammering;
         }
     }
+    /// <summary>Walks to an evenly spaced seat around the lunch fire and sits; without a campfire the worker sits where they are.</summary>
+    private void EatLunch(Worker w, float dt)
+    {
+        w.Status = "Lunch break";
+        if (LunchFire is not Thing fire) { w.WorkState = WorkerWorkState.Resting; return; }
+        var circle = S.Workers.Where(o => !o.Home && o.Away <= 0).ToList();
+        float angle = circle.IndexOf(w) * Mathf.Tau / circle.Count;
+        w.Status = "Lunch break by the campfire";
+        if (Walk(w, fire.Pos + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 1.4f, dt, .1f)) w.WorkState = WorkerWorkState.Resting;
+    }
     public void PayWages()
     {
         foreach (var w in S.Workers)
@@ -682,6 +726,7 @@ public sealed class World
     }
     public void Tick(float dt, bool sleeping = false)
     {
+        bool wasDusk = Dusk, wasLunch = Lunch;
         S.Time += dt; attackClock = Math.Max(0, attackClock - dt);
         if (!sleeping) S.PlaySeconds += dt;
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); }
@@ -692,6 +737,8 @@ public sealed class World
             else if (S.Hunger > 45 && S.Thirst > 45) S.Health = Math.Min(100, S.Health + dt * .12f);
         }
         if (Day > S.WageDay) { PayWages(); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow."); }
+        if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Your workers head home to Bramblewick until morning.");
+        if (S.Workers.Count > 0 && Lunch && !wasLunch) Say("Midday. Your workers gather by the campfire for an hour of lunch.");
         foreach (var item in S.Demand.Keys.ToArray()) S.Demand[item] = Mathf.MoveToward(S.Demand[item], 1, dt * .0009f);
         foreach (var order in S.Orders.ToArray())
         {
@@ -729,7 +776,8 @@ public sealed class World
             {
                 // Once a working crew has the forge hot, they keep it at or above the clear bar between strokes.
                 // A crew that is striking or stuck on a blocked path is not working, so the forge cools.
-                bool crewed = S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked);
+                // So is a crew that has signed out or is at lunch.
+                bool crewed = S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w));
                 t.Heat = Math.Max(crewed && t.Heat >= SteelHeat ? SteelHeat : 0, t.Heat - dt * 3.2f);
             }
             if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) continue;
@@ -761,11 +809,13 @@ public sealed class World
                 }
             }
         }
+        var present = S.Workers.Where(w => !w.Home && w.Away <= 0).ToList();
+        LunchFire = Lunch && present.Count > 0 ? S.Things.Where(t => t.Kind == "campfire").MinBy(t => present.Sum(w => w.Pos.DistanceTo(t.Pos))) : null;
         foreach (var w in S.Workers.ToArray()) WorkerTick(w, dt);
         for (int i = 0; i < S.Workers.Count; i++) for (int j = i + 1; j < S.Workers.Count; j++)
         {
             var a = S.Workers[i]; var b = S.Workers[j]; var offset = a.Pos - b.Pos;
-            if (offset.LengthSquared() < .64f)
+            if (!a.Home && !b.Home && offset.LengthSquared() < .64f)
             {
                 var push = (offset.LengthSquared() > .001f ? offset.Normalized() : Vector2.Right) * Math.Min(dt, .08f);
                 if (CanStand(a.Pos + push)) a.Pos += push;
@@ -806,7 +856,7 @@ public sealed class World
             {
                 nightSpawn = 15; float angle = S.Time * 2.4f;
                 var p = Player + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 11;
-                p = p.Clamp(Vector2.One * 2, Vector2.One * 45); S.Wolves.Add(new Wolf { Pos = p, Health = 4 + Day * .4f });
+                p = p.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)); S.Wolves.Add(new Wolf { Pos = p, Health = 4 + Day * .4f });
                 Say("A wolf is prowling nearby. Stay by fire or shelter; Space swings your axe."); Play("wolf_growl_distance", p);
             }
         }
@@ -883,7 +933,7 @@ public sealed class World
     public void Deserialize(string json)
     {
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
-        if (loaded.Version != 2 || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Version is not (2 or 3) || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
         // Edited or older saves may hold missing, extra or unknown hotbar entries.
         var slots = loaded.HotbarSlots ?? new();
         loaded.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.Buildings.ContainsKey(id)) ? id : "").ToList();
@@ -894,9 +944,24 @@ public sealed class World
         foreach (var order in loaded.Orders.Where(o => o.Item != null && o.Goods.Count == 0)) { order.Goods[order.Item!] = order.Quantity; order.Item = null; order.Quantity = 0; }
         // Signposts from older saves had no market, so they get its boxes on load.
         foreach (var sign in loaded.Things.Where(t => t.Kind == "signpost" && t.Output == null)) { sign.Inventory.Slots = MarketSlots; sign.Output = new() { Slots = MarketSlots }; }
+        if (loaded.Version == 2) Recenter(loaded);
         // Saves from before the fog start unexplored.
         if (loaded.Explored?.Length != MapSize * MapSize) loaded.Explored = new byte[MapSize * MapSize];
         loaded.Remembered ??= new();
         S = loaded; gatherClock = 0; ExploredRevision++; Look(); Say("Settlement loaded.");
+    }
+    /// <summary>Moves a 48-tile save into the middle of the 72-tile map, where the same clearing, pond and cliffs now are.</summary>
+    private static void Recenter(SaveState save)
+    {
+        const int old = 48, shift = (MapSize - old) / 2;
+        var by = new Vector2(shift, shift);
+        foreach (var t in save.Things.Concat(save.Remembered?.Values ?? Enumerable.Empty<Thing>())) t.Pos += by;
+        foreach (var w in save.Workers) w.Pos += by;
+        foreach (var wolf in save.Wolves) wolf.Pos += by;
+        save.PlayerX += shift; save.PlayerY += shift;
+        var explored = new byte[MapSize * MapSize];
+        if (save.Explored?.Length == old * old)
+            for (int y = 0; y < old; y++) Array.Copy(save.Explored, y * old, explored, (y + shift) * MapSize + shift, old);
+        save.Explored = explored; save.Version = 3;
     }
 }
