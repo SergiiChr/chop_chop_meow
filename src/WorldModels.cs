@@ -254,14 +254,18 @@ public static class WorldModels
         var steel = Mat("3b3f42", .5f, .7f);
         foreach (var (x, z) in new[] { (-.35f, -.3f), (.35f, -.3f), (-.35f, .3f), (.35f, .3f) }) Box(body, new Vector3(.05f, .5f, .05f), new Vector3(x, .25f, z), steel);
         Box(body, new Vector3(.8f, .04f, .7f), new Vector3(0, .5f, 0), steel);
-        var tank = Mat("4d6a7a", .45f, .55f);
-        Cylinder(body, .38f, .38f, .9f, new Vector3(0, .9f, 0), tank, new Vector3(90, 0, 0), 14);
-        Sphere(body, .38f, new Vector3(0, .9f, -.45f), tank, new Vector3(1, 1, .35f), 14);
-        Torus(body, .37f, .42f, new Vector3(0, .9f, .2f), steel).RotationDegrees = new Vector3(90, 0, 0);
-        Torus(body, .37f, .42f, new Vector3(0, .9f, -.25f), steel).RotationDegrees = new Vector3(90, 0, 0);
-        Cylinder(body, .3f, .3f, .04f, new Vector3(0, .9f, .45f), Mat("d9c7a3", .95f), new Vector3(90, 0, 0), 14);
-        prop.Glow = Cylinder(body, .17f, .17f, .05f, new Vector3(0, .9f, .46f), Flat(new Color("ff7a24")), new Vector3(90, 0, 0), 12);
-        Post(body, .07f, .07f, .65f, new Vector3(0, 1.22f, -.2f), Mat("8e9396", .45f, .7f));
+        Add(body, ForgeShape.Shell, FurnaceShape.Steel, Vector3.Zero);
+        prop.Glow = Add(body, ForgeShape.Fire, FurnaceShape.Flame, Vector3.Zero);
+        // Saddles meet the round shell above the stand instead of balancing it on a flat plate.
+        foreach (float z in new[] { -.25f, .2f })
+            foreach (float x in new[] { -.25f, .25f })
+                Box(body, new Vector3(.12f, .15f, .09f), new Vector3(x, .565f, z), steel, new Vector3(0, 0, x < 0 ? -28 : 28));
+        var flue = Pivot(body, new Vector3(0, 0, -.2f));
+        var metal = new Color("8e9396");
+        ActorShape.Add(flue, new[] {
+            new ActorShape.Ring(1.95f, .07f, .07f, metal), new ActorShape.Ring(1.91f, .08f, .08f, metal),
+            new ActorShape.Ring(1.88f, .07f, .07f, metal), new ActorShape.Ring(1.34f, .07f, .07f, metal),
+            new ActorShape.Ring(1.29f, .10f, .10f, metal), new ActorShape.Ring(1.25f, .115f, .115f, metal) }, material: FurnaceShape.Steel);
         prop.Vent = new Vector3(0, 1.95f, -.2f);
         // Heat gauge: the needle sweeps from cold to the 80° steel mark.
         Post(body, .03f, .03f, .18f, new Vector3(.2f, 1.25f, .2f), steel);
@@ -279,10 +283,10 @@ public static class WorldModels
         var wood = Mat("8a5f3c");
         var leather = Mat("3b2619", .9f);
         foreach (float x in new[] { .95f, 1.4f }) Box(rig, new Vector3(.08f, .2f, .5f), new Vector3(x, .1f, 0), Mat("6f5a40"));
-        Paddle(rig, hinge + new Vector3(0, -.03f, 0), 1, wood);
+        Add(rig, ForgeShape.Board, wood, hinge + new Vector3(0, -.03f, 0));
         Cylinder(rig, .07f, .025f, .22f, new Vector3(.55f, .3f, 0), Mat("b8893a", .4f, .8f), new Vector3(0, 0, 90), 10);
         var lever = Pivot(rig, hinge);
-        Paddle(lever, new Vector3(0, .13f, 0), 1, wood);
+        Add(lever, ForgeShape.Board, wood, new Vector3(0, .13f, 0));
         Box(lever, new Vector3(.06f, .62f, .06f), new Vector3(1f, .44f, 0), Mat("8a5a32"));
         Cylinder(lever, .03f, .03f, .34f, new Vector3(1f, .75f, 0), Mat("222222"), new Vector3(90, 0, 0), 8);
         prop.Lever = lever;
@@ -291,7 +295,8 @@ public static class WorldModels
         for (int i = 0; i < 3; i++)
         {
             prop.Pleats[i] = Pivot(rig, hinge);
-            Paddle(prop.Pleats[i], new Vector3(0, -.03f + (i + 1) * .04f, 0), i % 2 == 0 ? .97f : .88f, leather);
+            float size = i % 2 == 0 ? .97f : .88f;
+            Add(prop.Pleats[i], ForgeShape.Board, leather, new Vector3(0, -.03f + (i + 1) * .04f, 0), scale: new Vector3(size, 1, size));
         }
         prop.Light = Light(body, new Vector3(0, .9f, .9f), 3);
     }
@@ -626,13 +631,6 @@ public static class WorldModels
         prop.Fire = fire;
         prop.Vent = new Vector3(0, .8f, 0);
         prop.Light = Light(body, new Vector3(0, .8f, 0), 7);
-    }
-
-    /// <summary>A flat teardrop bellows board pointing its narrow end at <paramref name="tip"/> and widening toward +X.</summary>
-    private static void Paddle(Node3D parent, Vector3 tip, float scale, Material material)
-    {
-        Cylinder(parent, .34f, .34f, .04f, tip + new Vector3(.34f * scale, 0, 0), material, new Vector3(0, -90, 0), 3).Scale = new Vector3(scale, 1, scale);
-        Cylinder(parent, .34f, .34f, .04f, tip + new Vector3(.68f * scale, 0, 0), material, null, 16).Scale = new Vector3(scale, 1, scale);
     }
 
     /// <summary>Needle roll in degrees for a heat fraction: cold points left, full heat points right.</summary>
