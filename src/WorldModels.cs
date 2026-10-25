@@ -136,7 +136,7 @@ public static class WorldModels
     /// <summary>The outdoor pile represents stocked fuel, excluding fuel already burning in a batch.</summary>
     public static void SyncFuel(Prop prop, Thing t)
     {
-        string fuel = t.Fuel is "wood" or "coal" ? t.Fuel : "wood";
+        string fuel = World.BurnedFuel(t);
         prop.WoodPile!.Visible = fuel == "wood" && t.Inventory["wood"] > 0;
         prop.CoalPile!.Visible = fuel == "coal" && t.Inventory["coal"] > 0;
     }
