@@ -73,6 +73,70 @@ public partial class Game
     {
         if (!okay) throw new InvalidOperationException("UI check failed: " + message);
     }
+    private async Task Click(Vector2 point)
+    {
+        var at = GetViewport().GetFinalTransform() * point;
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
+        await Frames();
+    }
+    private async Task CheckSignpost()
+    {
+        ClosePanel(); await Frames();
+        var sign = world.Add("signpost", world.Player + new Vector2(2, 0));
+        world.S.Backpack.Add("wood", 5); world.S.Backpack.Add(Inventory.Coins, 60);
+        await Click(view.Screen(sign.Pos, .8f));
+        UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A signpost must open the market with its icon buttons.");
+        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood")));
+        UIRequire(sign.Inventory["wood"] == 5 && world.S.Backpack["wood"] == 0, "Clicking a backpack stack must load it into the market input.");
+        await Click(Named("sell")!);
+        UIRequire(world.S.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
+        await Click(Named("prices")!);
+        var fetch = Named("fetch");
+        UIRequire(sheet.Visible && panel.OffsetLeft == PanelLeft - SheetWidth && fetch != null && fetch.Disabled && fetch.TooltipText == "No worker assigned.", "The price sheet must open beside the panel and explain why no one can fetch prices.");
+        await Click(Named("buy_wood")!);
+        UIRequire(world.S.Orders.Count == 2 && world.S.Orders[1].Buying, "Buy on the price sheet must order goods.");
+        await Click(Named("hardhat")!);
+        var dear = world.Data.HireOffers.OrderBy(o => o.Upfront).Last();
+        await Click(Named($"hire_{dear.Upfront:0}")!);
+        var hired = world.S.Workers.LastOrDefault();
+        UIRequire(hired != null && hired.Wage == dear.Wage, "A hiring offer must set the new worker's wage.");
+        world.Assign(hired!, sign); Select(sign); await Frames();
+        UIRequire(!Named("fetch")!.Disabled, "With a worker assigned, fresh prices can be fetched.");
+        await Click(Named("fetch")!);
+        UIRequire(hired!.Away > 0, "Fetching must send the assigned worker to the village.");
+        await Click(Named("prices")!);
+        UIRequire(!sheet.Visible && panel.OffsetLeft == PanelLeft, "The price sheet icon must close the sheet again.");
+        world.S.Workers.Remove(hired); world.S.Orders.Clear(); world.S.Things.Remove(sign); world.S.Backpack.Remove(Inventory.Coins, 999);
+        signpostTab = "market"; ClosePanel(); await Frames();
+    }
+    private async Task CheckCabinAndCanopy()
+    {
+        ClosePanel(); await Frames();
+        var hut = world.Add("hut", world.Player + new Vector2(0, 4));
+        await Click(view.Screen(hut.Pos, 1.5f)); await Seconds(1.5);
+        UIRequire(world.S.Sheltered == hut.Id && page == "inspect" && selected == hut.Id, "Clicking a cabin must walk the player inside and open it.");
+        float dayTime = world.S.Time;
+        world.S.Time = world.Data.DaySeconds * (world.Data.NightStarts + .02f); world.S.Hunger = 5; RefreshLive();
+        var sleep = Named("sleep");
+        UIRequire(sleep != null && sleep.TooltipText.Contains("too hungry"), "The sleep button must explain that the player is too hungry to sleep.");
+        world.S.Time = dayTime; world.S.Hunger = 100;
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true });
+        await Seconds(.2);
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = false });
+        await Frames();
+        UIRequire(world.S.Sheltered == 0, "Moving must step the player back out of the cabin.");
+        world.S.Things.Remove(hut); ClosePanel(); await Frames();
+
+        // A loose piece far enough behind a tree sits under its crown on screen; it must still be the one picked.
+        var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == new Vector2(28, 24));
+        var hidden = world.Add("loose_iron", tree.Pos - new Vector2(3.3f, 3.3f), 2);
+        var point = view.Screen(hidden.Pos, .15f);
+        UIRequire(view.Pick(point)?.Id == hidden.Id, "A tree crown must not steal the click from a loose piece behind it.");
+        world.S.Things.Remove(hidden);
+        UIRequire(view.Pick(point)?.Id == tree.Id, "With nothing behind it, the crown must still select its tree.");
+    }
     private static void RemoveCheckFiles()
     {
         foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
@@ -195,7 +259,13 @@ public partial class Game
             UIRequire(FindButton(screen, "Slot 2 · empty")!.Disabled, "The load screen must disable empty slots.");
             await Click(screen.GetChildren().OfType<Button>().First(b => b.Text.StartsWith("Slot 1 · ")));
             UIRequire(!backdrop.Visible && !menu.Visible && !paused && world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the save and resume.");
-            UIRequire(HasLabel(panel, "Coins") && HasLabel(panel, "Health") && HasLabel(panel, "Capacity") && HasLabel(panel, "Daily wages"), "Inventory must contain coins, health, capacity and wages.");
+            UIRequire(HasLabel(panel, "Health") && HasLabel(panel, "Capacity") && HasLabel(panel, "Daily wages"), "Inventory must contain health, capacity and wages.");
+            world.S.Backpack.Add(Inventory.Coins, 1200); RefreshLive();
+            UIRequire(panel.FindChildren("slot_*", "Button", true, false).OfType<Button>().Count(c => c.TooltipText.StartsWith("Coins")) == 2, "Carried coins must show as backpack cells stacking to 1000.");
+            world.S.Backpack.Remove(Inventory.Coins, 1200);
+            float healthBefore = world.S.Health; world.S.Health -= 12; RefreshLive(); DamageFlash(healthBefore - world.S.Health);
+            UIRequire(health.TooltipText == $"Health {world.S.Health:0}%" && damageEdges.Strength > 0, "The HUD heart must track health and a hit must flash the screen edges.");
+            world.S.Health = healthBefore;
             UIRequire(!HasLabel(panel, "Hunger") && !HasLabel(panel, "Thirst"), "Hunger and thirst belong to the HUD icons, not the inventory.");
             world.S.Hunger = 40; world.S.Thirst = 70; RefreshLive();
             UIRequire(hunger.Visible && thirst.Visible && hunger.TooltipText == "Hunger 40%" && thirst.TooltipText == "Thirst 70%", "The HUD stomach and droplet must track hunger and thirst.");
@@ -214,12 +284,15 @@ public partial class Game
             await Seconds(.25);
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
             await Frames();
-            UIRequire(world.Player == pinnedAt && view.PlayerAnimation == ActorAction.Mauled && deathLabel.Text.Contains("throat"), "A pinned player must not move and must show the mauled struggle.");
+            UIRequire(world.Player == pinnedAt && view.PlayerAnimation == ActorAction.Mauled && deathLabel.Text == "", "A pinned player must not move, must show the mauled struggle and leaves the message to the pinned notice.");
             world.S.Mauled = false; world.S.Wolves.Clear(); world.S.Time = dayTime; world.S.Health = 100;
             world.S.Health = -1; await Seconds(.3);
             UIRequire(world.Dead && deathLabel.Text.Contains("Respawning in"), "Death must show the respawn countdown.");
             world.S.RespawnIn = .01f; await Seconds(.3);
             UIRequire(!world.Dead && deathLabel.Text == "", "The countdown must clear once the player respawns.");
+
+            await CheckCabinAndCanopy();
+            await CheckSignpost();
 
             world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools", "sold_steel", "hired", "assigned" });
             await Frames(3);

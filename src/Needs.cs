@@ -17,6 +17,10 @@ public partial class NeedGauge : Control
     public static readonly Vector2[] Droplet = Enumerable.Range(0, 25)
         .Select(i => Mathf.DegToRad(63 + i * 234 / 24f)).Select(a => new Vector2(.34f + .3f * MathF.Sin(a), .66f - .3f * MathF.Cos(a)))
         .Prepend(new Vector2(.34f, 0)).ToArray();
+    // The classic parametric heart, scaled to the unit height with its point at the bottom.
+    public static readonly Vector2[] Heart = Enumerable.Range(0, 40).Select(i => i * MathF.Tau / 40)
+        .Select(a => new Vector2(16 * MathF.Pow(MathF.Sin(a), 3), 13 * MathF.Cos(a) - 5 * MathF.Cos(2 * a) - 2 * MathF.Cos(3 * a) - MathF.Cos(4 * a)))
+        .Select(p => new Vector2((p.X + 17) / 30, (12 - p.Y) / 30)).ToArray();
     public Vector2[] Shape { get; set; } = Droplet;
     public Color Fill { get; set; }
     public Func<float> Level { get; set; } = () => 100;
@@ -35,22 +39,62 @@ public partial class NeedGauge : Control
 
 public partial class Game
 {
+    private NeedGauge health = null!;
     private NeedGauge hunger = null!;
     private NeedGauge thirst = null!;
+    private DamageEdges damageEdges = null!;
 
     private void BuildNeeds()
     {
-        var box = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = -460, OffsetRight = -384, OffsetTop = 14, OffsetBottom = 52 };
+        var box = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = PanelLeft - 118, OffsetRight = PanelLeft - 10, OffsetTop = 14, OffsetBottom = 52 };
         box.AddThemeStyleboxOverride("panel", Box(new Color(.14f, .23f, .18f, .89f), 8, 4)); ui.AddChild(box);
         var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; box.AddChild(row);
         hunger = new NeedGauge { Name = "hunger", Shape = NeedGauge.Stomach, Fill = new Color("d99a5b"), Level = () => world.S.Hunger, CustomMinimumSize = new Vector2(30, 30) };
         thirst = new NeedGauge { Name = "thirst", Shape = NeedGauge.Droplet, Fill = new Color("6db6df"), Level = () => world.S.Thirst, CustomMinimumSize = new Vector2(26, 30) };
-        row.AddChild(hunger); row.AddChild(thirst);
+        health = new NeedGauge { Name = "health", Shape = NeedGauge.Heart, Fill = new Color("d9534f"), Level = () => world.S.Health, CustomMinimumSize = new Vector2(30, 30) };
+        row.AddChild(health); row.AddChild(hunger); row.AddChild(thirst);
+        damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); ui.AddChild(damageEdges);
+    }
+
+    /// <summary>Flashes the screen edges on a hit; a pinned player keeps a steady glow while the wolves feed.</summary>
+    private void DamageFlash(float lost)
+    {
+        if (lost >= 3) damageEdges.Strength = 1;
+        if (world.S.Mauled && !world.Dead) damageEdges.Strength = Math.Max(damageEdges.Strength, .55f);
     }
 
     private void RefreshNeeds()
     {
-        hunger.TooltipText = $"Hunger {world.S.Hunger:0}%"; thirst.TooltipText = $"Thirst {world.S.Thirst:0}%";
-        hunger.QueueRedraw(); thirst.QueueRedraw();
+        health.TooltipText = $"Health {world.S.Health:0}%"; hunger.TooltipText = $"Hunger {world.S.Hunger:0}%"; thirst.TooltipText = $"Thirst {world.S.Thirst:0}%";
+        health.QueueRedraw(); hunger.QueueRedraw(); thirst.QueueRedraw();
     }
+}
+
+/// <summary>A red glow along the screen edges, at most 5% of the screen deep, that fades after a hit.</summary>
+public partial class DamageEdges : Control
+{
+    public float Strength { get; set; }
+
+    public DamageEdges() { MouseFilter = MouseFilterEnum.Ignore; }
+
+    public override void _Process(double delta)
+    {
+        if (Strength <= 0) return;
+        Strength = Math.Max(0, Strength - (float)delta * 1.6f); QueueRedraw();
+    }
+
+    public override void _Draw()
+    {
+        if (Strength <= 0) return;
+        var edge = new Color(.85f, .05f, .05f, .7f * Strength); var clear = new Color(.85f, .05f, .05f, 0);
+        float x = Size.X * .05f, y = Size.Y * .05f;
+        // Each band runs from the opaque screen edge to transparent at its inner side.
+        Band(new(0, 0), new(Size.X, 0), new(Size.X - x, y), new(x, y), edge, clear);
+        Band(new(0, Size.Y), new(Size.X, Size.Y), new(Size.X - x, Size.Y - y), new(x, Size.Y - y), edge, clear);
+        Band(new(0, 0), new(0, Size.Y), new(x, Size.Y - y), new(x, y), edge, clear);
+        Band(new(Size.X, 0), new(Size.X, Size.Y), new(Size.X - x, Size.Y - y), new(Size.X - x, y), edge, clear);
+    }
+
+    private void Band(Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color edge, Color clear) =>
+        DrawPolygon(new[] { a, b, c, d }, new[] { edge, edge, clear, clear });
 }

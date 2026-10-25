@@ -203,13 +203,20 @@ public partial class WorldView : Node3D
     public Thing? Pick(Vector2 screen)
     {
         SyncCamera();
-        Thing? best = null; float nearest = float.MaxValue;
+        Thing? best = null, crown = null; float nearest = float.MaxValue, nearestCrown = float.MaxValue;
         foreach (var t in World.S.Things)
         {
             if (t.Remaining <= 0 && t.IsResource && t.Kind != "berries") continue;
-            if (RayHits(screen, t.Pos, HitsOf(t), out float d) && d < nearest) { nearest = d; best = t; }
+            var hits = HitsOf(t);
+            // A tree's first hit is its trunk; a crown only wins when nothing else is under the cursor, so things behind it stay clickable.
+            if (t.Kind == "tree" && !RayHits(screen, t.Pos, hits.Take(1), out _))
+            {
+                if (RayHits(screen, t.Pos, hits.Skip(1), out float c) && c < nearestCrown) { nearestCrown = c; crown = t; }
+                continue;
+            }
+            if (RayHits(screen, t.Pos, hits, out float d) && d < nearest) { nearest = d; best = t; }
         }
-        return best;
+        return best ?? crown;
     }
 
     private static readonly Hit[] PersonHit = { new(.38f, 0, 1.75f) };
@@ -314,7 +321,7 @@ public partial class WorldView : Node3D
             playerRig.Root.Position = To3(player.Position) + forward * .8f * tip + Vector3.Up * .17f * tip;
             playerRig.Root.Rotation = new Vector3(-Mathf.Pi / 2 * tip, player.Yaw, 0);
         }
-        playerRig.Root.Visible = !World.Dead || World.S.Mauled;
+        playerRig.Root.Visible = (!World.Dead || World.S.Mauled) && World.S.Sheltered == 0;
         Work(player, subject);
         foreach (var worker in World.S.Workers)
         {
@@ -567,7 +574,7 @@ public partial class WorldView : Node3D
         {
             var sign = World.Find(order.Signpost);
             float phase = order.Elapsed / World.Data.TradeSeconds;
-            var pos = sign == null ? new Vector2(49, 24) : sign.Pos.Lerp(new Vector2(49, 24), phase < .5f ? phase * 2 : (1 - phase) * 2);
+            var pos = sign == null ? World.Village : sign.Pos.Lerp(World.Village, phase < .5f ? phase * 2 : (1 - phase) * 2);
             if (!carts.TryGetValue(order, out var cart))
             {
                 cart = new WorldModels.CartModel { Last = pos };
@@ -640,7 +647,7 @@ public partial class WorldView : Node3D
         environment.BackgroundColor = new Color("879c69").Lerp(new Color("1b2733"), night);
     }
 
-    // ---------- 2D overlay: names, progress and the landmark guide ----------
+    // ---------- 2D overlay: names, progress and forge heat ----------
 
     private void Tag(Vector2 at, string text)
     {
@@ -659,22 +666,18 @@ public partial class WorldView : Node3D
             overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), new Color("2b4135"));
             overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), new Color("e5bf68"));
         }
+        // Forge heat under each bellows furnace, with a tick at the clear bar steel needs.
+        foreach (var t in World.S.Things.Where(t => t.Kind == "reinforced"))
+        {
+            var p = Screen(t.Pos) + new Vector2(-28, 18);
+            overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), new Color("2b4135"));
+            overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? new Color("f0a03c") : new Color("8a5a46"));
+            overlay.DrawLine(p + new Vector2(56 * World.SteelHeat / 100, -2), p + new Vector2(56 * World.SteelHeat / 100, 7), new Color("f2e8cf"), 2);
+        }
         // Only the hovered object is named; the side panel already names the selection.
         var hovered = World.Find(Hover);
         if (hovered != null) Tag(Screen(hovered.Pos, HitsOf(hovered).Max(h => h.Top) + .2f) - new Vector2(0, 8), World.Data.Name(hovered.Kind));
         foreach (var w in World.S.Workers.Where(w => w.Id == HoverWorker || w.Id == SelectedWorker))
             Tag(Screen(w.Pos, 2.05f), w.Name);
-        // The landmark guide follows the player's position rather than assuming they remain at spawn.
-        string Direction(Vector2 target)
-        {
-            var d = Screen(target) - Screen(World.Player);
-            if (d.Length() < 95) return "HERE";
-            if (Math.Abs(d.X) > Math.Abs(d.Y) * 2) return d.X > 0 ? "→" : "←";
-            if (Math.Abs(d.Y) > Math.Abs(d.X) * 2) return d.Y > 0 ? "↓" : "↑";
-            return d.Y > 0 ? d.X > 0 ? "↘" : "↙" : d.X > 0 ? "↗" : "↖";
-        }
-        // Point only toward what the current objective sends the player to find.
-        string? guide = World.S.Goal switch { 2 => $"IRON {Direction(World.CliffOf("iron").Center)}", 5 => $"COAL {Direction(World.CliffOf("coal").Center)}", _ => null };
-        if (guide != null) overlay.DrawString(font, new Vector2(25, GetViewport().GetVisibleRect().Size.Y - 210), guide, HorizontalAlignment.Left, -1, 13, new Color("f4ecd3"));
     }
 }

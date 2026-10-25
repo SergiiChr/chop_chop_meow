@@ -23,8 +23,8 @@ public partial class Game
     {
         if (hotbarIcons.TryGetValue(id, out var cached)) return cached;
         Texture2D? atlas = null; int cell = -1, columns = 4, rows = 3;
-        // Meat icons are hand-written SVGs; the illustrated atlas has no free cells left for them.
-        if (id is "raw_meat" or "cooked_meat") return hotbarIcons[id] = GD.Load<Texture2D>($"res://assets/ui/{id}.svg");
+        // Meat and coin icons are hand-written SVGs; the illustrated atlas has no free cells left for them.
+        if (id is "raw_meat" or "cooked_meat" or Inventory.Coins) return hotbarIcons[id] = GD.Load<Texture2D>($"res://assets/ui/{id}.svg");
         if (id is "iron_axe" or "iron_pick" or "steel_tools" or "iron_bar" or "steel_bar" or "wood" or "stone" or "iron_ore" or "coal" or "berries" or "water")
         {
             atlas = itemAtlas;
