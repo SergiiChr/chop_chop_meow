@@ -487,14 +487,18 @@ public static class SimulationChecks
         for (int i = 0; i < 4; i++) { world.Gather(anvil, .25f); world.Tick(.25f); }
         Require(anvil.Progress == progress, "a busy player must not advance the anvil");
 
-        // A worker fetching the next load is away from the anvil, so the batch waits.
+        // A paid smith stays to hammer a running batch; one on strike beside the anvil does not count.
         var chest = world.Add("chest", new Vector2(24, 10));
         chest.Inventory.Add("iron_bar", 6);
         var worker = AddWorker(world, anvil.Pos + Vector2.One);
         world.Assign(worker, anvil);
         world.Player = new Vector2(30, 30);
+        worker.WageDebt = 8;
         SafeTick(world, 1);
-        Require(worker.Status.StartsWith("Fetching") && anvil.Progress == progress, "an assigned worker away fetching must not advance the anvil");
+        Require(anvil.Progress == progress, "a striking worker next to the anvil must not advance it");
+        worker.WageDebt = 0;
+        SafeTick(world, 1);
+        Require(worker.WorkState == WorkerWorkState.Hammering && anvil.Progress > progress, "a lone smith should hammer the running batch before fetching the next load");
         SafeTick(world, 45);
         Require(chest.Inventory["iron_pick"] == 1, "a worker hammering at the anvil should finish the batch and store it");
     }

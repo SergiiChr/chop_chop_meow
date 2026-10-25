@@ -24,7 +24,7 @@ public partial class Game
     /// <summary>Bellows furnace temperature with the clear bar that steel needs.</summary>
     private void HeatGauge(Thing t)
     {
-        Dynamic(() => $"HEAT  {t.Heat:0}°  ·  {(t.Heat >= World.SteelHeat ? "steel progressing" : $"pump above {World.SteelHeat:0}°")}", 15, new Color("edc17c"));
+        Dynamic(() => $"HEAT  {t.Heat:0}°  ·  {(t.Heat >= World.SteelHeat ? "steel progressing" : t.Processing ? $"burning coal · pump above {World.SteelHeat:0}°" : $"pump above {World.SteelHeat:0}°")}", 15, new Color("edc17c"));
         var gauge = new HeatBar { Level = () => t.Heat, CustomMinimumSize = new Vector2(0, 22), Name = "heat" };
         content.AddChild(gauge); live.Add(() => { if (GodotObject.IsInstanceValid(gauge)) gauge.QueueRedraw(); });
     }

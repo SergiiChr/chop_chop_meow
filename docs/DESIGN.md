@@ -10,7 +10,7 @@ Food, water, the day/night cycle, shelter, wages, and wolf encounters support th
 
 ## Implemented rules
 
-- An anvil only progresses while someone hammers it: the player standing within reach without walking or gathering, or a paid assigned worker at the station. A worker away fetching inputs pauses the batch.
+- An anvil only progresses while someone hammers it: the player standing within reach without walking or gathering, or a paid assigned worker hammering at the station. A smith stays with a running batch and fetches the next load once it is done.
 - The basic furnace accepts wood or mined coal for fuel. The reinforced furnace uses coal only, and steel only progresses while the heat is at or above the 80° clear bar (`World.SteelHeat`); a batch pauses below it, keeps burning one coal from its slot per batch length while cold, and resumes when reheated, with no failure. Once an active crew has the forge hot, it never falls below the bar.
 - Steel recipes consume iron bars and mined coal. Charcoal production is not implemented.
 - Inventories are slot grids with stacks of 64; a worker carries one stack of up to 5.

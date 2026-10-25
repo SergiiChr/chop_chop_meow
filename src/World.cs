@@ -143,7 +143,7 @@ public sealed class World
     private float gatherClock;
     private float attackClock;
     private float nightSpawn;
-    // Set by walking or gathering and cleared at the end of each tick: a busy player is not hammering.
+    // Set by walking, gathering or pumping and cleared at the end of each tick: a busy player is not hammering.
     private bool playerBusy;
     public World(GameData data, bool generate = true) { Data = data; if (generate) NewGame(); }
     public Vector2 Player { get => new(S.PlayerX, S.PlayerY); set { S.PlayerX = value.X; S.PlayerY = value.Y; } }
@@ -258,6 +258,7 @@ public sealed class World
     }
     public void ResetGather() => gatherClock = 0;
     /// <summary>The player hammers an anvil while standing by it with nothing else to do.</summary>
+    /// <remarks>Input calls <see cref="MovePlayer"/> and <see cref="Gather"/> before each tick, so a tick without them counts as standing still.</remarks>
     public bool PlayerHammers(Thing anvil) => !playerBusy && Near(anvil);
     /// <summary>An anvil only works while the player or a paid worker is hammering at it, not merely standing near.</summary>
     public bool Hammered(Thing anvil) => PlayerHammers(anvil) ||
@@ -295,6 +296,7 @@ public sealed class World
     public void Pump(Thing t)
     {
         if (!Near(t) || t.Kind != "reinforced") return;
+        playerBusy = true;
         t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos); Say($"Bellows: {t.Heat:0}° / {SteelHeat:0}° needed for steel.");
     }
     public void FuelFire(Thing t)
@@ -615,7 +617,8 @@ public sealed class World
             return;
         }
         var costs = BatchCost(target);
-        foreach (var pair in costs)
+        // An anvil only works while hammered, so its smith stays put until the batch is done before fetching the next one.
+        if (target.Kind != "anvil" || !target.Processing) foreach (var pair in costs)
         {
             if (target.Inventory[pair.Key] >= pair.Value * 2) continue;
             var source = SourceFor(pair.Key, w.Pos);
@@ -706,6 +709,7 @@ public sealed class World
             if (t.Processing && !hot)
             {
                 // A cold forge mid-batch keeps burning coal from its slot at the batch fuel rate, but the steel waits for heat.
+                // Burn is the campfire's fuel clock, reused here to time the next coal.
                 t.Burn = Math.Min(recipe.Seconds, t.Burn + dt);
                 if (t.Burn >= recipe.Seconds && t.Inventory.Remove("coal", 1) > 0) t.Burn = 0;
             }
