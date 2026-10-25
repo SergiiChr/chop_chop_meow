@@ -49,6 +49,7 @@ public static class SimulationChecks
         CheckToolStation(data);
         CheckRaking(data);
         CheckPilesAndCompost(data);
+        CheckCookingAndCanning(data);
         CheckNewFoodsAndRename(data);
         CheckMarketTakesOnlyCrates(data);
         CheckLegacySteelTools(data);
@@ -1398,8 +1399,8 @@ public static class SimulationChecks
         Require(pile != null && world.S.Backpack["wood"] == 32 && pile!.Inventory.Slots == World.PileStacks, "a pile should cost 8 wood and hold 14 stacks");
         Require(world.Snap("pile", origin + new Vector2(3.4f, .4f)) == origin + new Vector2(3, 0) && world.Snap("pile", origin + new Vector2(9, 0)) == origin + new Vector2(9, 0),
                 "a pile placed beside another should snap edge to edge, and one far away should not");
-        var east = world.Build("pile", origin + new Vector2(3.3f, 0));
-        Require(world.PlacementBlock("pile", origin + new Vector2(2, 0)) != null && east?.Pos == origin + new Vector2(3, 0), "piles must not overlap but may touch");
+        var east = world.Build("pile", origin + new Vector2(3.3f, 0)) ?? throw new InvalidOperationException("a pile beside another should build");
+        Require(world.PlacementBlock("pile", origin + new Vector2(2, 0)) != null && east.Pos == origin + new Vector2(3, 0), "piles must not overlap but may touch");
         Require(world.CanStand(origin), "a pile should be walkable");
 
         world.Player = origin;
@@ -1412,7 +1413,7 @@ public static class SimulationChecks
         world.Tick(.1f);
         Require(pile.Inventory.InputFilter.Count == 0 && world.Holds(pile, "stone"), "emptying a pile should clear its filters");
 
-        Require(world.SetCompost(east!, true) && east.Inventory.InputFilter.Contains("leaves") && east.Inventory.InputFilter.Contains("crushed_berries") && !east.Inventory.InputFilter.Contains("stone")
+        Require(world.SetCompost(east, true) && east.Inventory.InputFilter.Contains("leaves") && east.Inventory.InputFilter.Contains("crushed_berries") && !east.Inventory.InputFilter.Contains("stone")
                 && east.Inventory.OutputFilter.SetEquals(new[] { "fertilizer" }), "compost should take leaves, grass and any food, and give fertilizer");
         east.Inventory.Add("leaves", 6); east.Inventory.Add("burnt_steak", 2);
         Require(world.HoldBlock(east, "stone") != null && !world.SetCompost(east, false), "compost should refuse stone and stay compost while mixed");
@@ -1430,6 +1431,60 @@ public static class SimulationChecks
         world.Player = new Vector2(40, 40);
         SafeTick(world, 40);
         Require(east.Inventory["leaves"] + east.Inventory["fertilizer"] * 4 > 8, "raked leaves should go to the compost, which takes them explicitly");
+    }
+
+    /// <summary>
+    /// The cooking table's mortar recipes only advance while someone works the slotted mortar, its fire recipes cook unattended on their fuel, and dough needs no fire.
+    /// The canning station seals food into tin cans over its fire.
+    /// </summary>
+    private static void CheckCookingAndCanning(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var table = world.Add("cooktable", new Vector2(20, 20));
+        world.Player = table.Pos + new Vector2(1, 0);
+        world.S.Backpack.Add("mortar", 1); world.S.Backpack.Add("stone_chisel", 1); world.S.Backpack.Add("berries", 8);
+        Require(!world.SlotTool(table, "stone_chisel") && world.SlotTool(table, "mortar") && world.BenchTool(table, "mortar") == "mortar", "the cooking table should only slot a mortar");
+        world.SetRecipe(table, "crushed_berries");
+        Require(!world.BatchCost(table).ContainsKey("wood"), "crushing berries should burn no fuel");
+        world.LoadBatch(table);
+        world.Player = new Vector2(40, 40);
+        SafeTick(world, 30);
+        Require(table.Inventory["crushed_berries"] == 0, "the mortar should not work without someone at it");
+        var cook = AddWorker(world, table.Pos + new Vector2(0, 1));
+        world.Assign(cook, table);
+        SafeTick(world, 15);
+        Require(table.Inventory["crushed_berries"] == 4, "a worker should work the mortar into crushed berries");
+        world.Assign(cook, null);
+
+        world.Player = table.Pos + new Vector2(1, 0);
+        world.Collect(table);
+        world.SetRecipe(table, "berry_jam");
+        table.Fuel = "coal"; world.S.Backpack.Add("coal", 1);
+        Require(world.BatchCost(table).SequenceEqual(new Dictionary<string, int> { ["crushed_berries"] = 2, ["coal"] = 1 }), "jam should take crushed berries and the chosen fuel");
+        world.LoadBatch(table);
+        world.Player = new Vector2(40, 40);
+        SafeTick(world, data.Recipes["berry_jam"].Seconds + 1);
+        Require(table.Inventory["berry_jam"] == 1 && table.Inventory["coal"] == 0, "jam should cook on its own over the fire");
+        world.SetRecipe(table, "dough");
+        Require(world.BatchCost(table).Keys.Order().SequenceEqual(new[] { "flour", "water" }), "dough should need no fire");
+
+        var cannery = world.Add("cannery", new Vector2(24, 20));
+        world.SetRecipe(cannery, "canned_meat_stew");
+        cannery.Inventory.Add("meat_stew", 1); cannery.Inventory.Add("tin_can", 1); cannery.Inventory.Add("wood", 1);
+        SafeTick(world, data.Recipes["canned_meat_stew"].Seconds + 1);
+        Require(cannery.Inventory["canned_meat_stew"] == 1 && cannery.Inventory.Count == 1, "the canning station should seal stew into a can over wood");
+
+        var furnace = world.Add("furnace", new Vector2(28, 20));
+        world.SetRecipe(furnace, "bread");
+        Require(world.BatchCost(furnace).Keys.Order().SequenceEqual(new[] { "dough", "wood" }), "bread should bake from dough in the furnace");
+
+        // By hand, the mortar is carried like any other tool.
+        world.Player = table.Pos + new Vector2(1, 0);
+        world.UnslotTool(table, "mortar");
+        world.S.Backpack.Add("berries", 4);
+        Require(world.CraftBlock("crushed_berries") == null, "berries should be crushed by hand with a carried mortar");
+        world.S.Backpack.Remove("mortar", 1);
+        Require(world.CraftBlock("crushed_berries") != null, "crushing berries by hand should need the mortar");
     }
 
     /// <summary>Foods restore what their data says, raw ones only say they need cooking, and saves from before the rename keep their cooked meat.</summary>
@@ -1520,12 +1575,12 @@ public static class SimulationChecks
             foreach (var (id, b) in data.Buildings) if (b.Cost.Keys.All(have.Contains)) grew |= built.Add(id);
             foreach (var r in data.Recipes.Values)
             {
-                bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool, r.Tier)) || built.Contains(r.Station) && (r.Station != "bench" || r.Tool == "" || HasTool(r.Tool, r.Tier));
+                bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool, r.Tier)) || built.Contains(r.Station) && (World.SlotKinds(r.Station).Length == 0 || r.Tool == "" || HasTool(r.Tool, r.Tier));
                 if (where && r.Inputs.Keys.All(have.Contains)) grew |= have.Add(r.Output);
             }
         }
-        // These come from features still to be built: raking, farm plots, compost, the cooking table and the canning station.
-        string[] pending = { "grass", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "canned_jam", "canned_meat_stew" };
+        // These come from farm plots, which are still to be built.
+        string[] pending = { "grass", "wheat", "flour", "dough", "bread" };
         var unreachable = data.Items.Keys.Where(id => id != Inventory.Coins && !data.Market.Buys.ContainsKey(id) && !have.Contains(id) && !pending.Contains(id)).Concat(data.Buildings.Keys.Where(id => !built.Contains(id))).ToList();
         Require(unreachable.Count == 0, $"everything should be reachable from a fresh start: {string.Join(", ", unreachable)}");
         // The village never takes the tools that start the loop, so selling cannot strand the player.

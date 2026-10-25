@@ -356,7 +356,7 @@ public partial class WorldView : Node3D
         if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; subject = World.S.Things.FirstOrDefault(t => t.Pos == pulseTarget); }
         if (action == ActorAction.Idle)
         {
-            var anvil = World.S.Things.FirstOrDefault(t => World.Worked(t.Kind) && t.Processing && World.Near(t) &&
+            var anvil = World.S.Things.FirstOrDefault(t => World.Worked(t) && t.Processing && World.Near(t) &&
                 !World.S.Workers.Any(w => w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2));
             if (anvil != null) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
         }
@@ -563,6 +563,14 @@ public partial class WorldView : Node3D
                 prop.Glow!.Visible = t.Processing;
                 prop.Light!.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
                 Smoke(prop, t, t.Processing, dt, FurnaceSmoke);
+                break;
+            case "cooktable" or "cannery":
+                // The fire only burns for recipes that take fuel; the mortar's work and kneading dough are cold.
+                bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Fuel;
+                prop.Glow!.Visible = cooking;
+                prop.Light!.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
+                if (prop.Mortar != null && World.Sees(t.Pos)) prop.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null;
+                Smoke(prop, t, cooking, dt, FurnaceSmoke);
                 break;
             case "reinforced":
                 float heat = t.Heat / 100;

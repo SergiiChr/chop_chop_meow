@@ -13,7 +13,7 @@ public sealed class Prop
 {
     public readonly Node3D Root = new();
     public readonly Node3D Body;
-    public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer;
+    public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer, Mortar;
     /// <summary>A mine's parts, shown stage by stage: the marked outline, the dug hole, the delivered materials, the timber frame, the rails and the cart with its load.</summary>
     public Node3D? Outline, Hole, Supplies, Frame, Rails, Cart, Load;
     /// <summary>A tool station's hanging tools by kind, each shown while the station holds one.</summary>
@@ -76,6 +76,8 @@ public static class WorldModels
         "chest" => new[] { new Hit(.5f, 0, .65f) },
         "crate" => new[] { new Hit(.4f, 0, .55f) },
         "bench" => new[] { new Hit(.6f, 0, .95f) },
+        "cooktable" => new[] { new Hit(.7f, 0, .9f) },
+        "cannery" => new[] { new Hit(.6f, 0, 1f) },
         "toolstation" => new[] { new Hit(.55f, 0, 1.5f) },
         "pile" => new[] { new Hit(1.5f, 0, .5f) },
         "leaves" => new[] { new Hit(.6f, 0, .15f) },
@@ -111,6 +113,8 @@ public static class WorldModels
             case "anvil": Anvil(prop); break;
             case "crate": Crate(prop); break;
             case "bench": Workbench(prop); break;
+            case "cooktable": CookingTable(prop); break;
+            case "cannery": Cannery(prop); break;
             case "toolstation": ToolRack(prop); break;
             case "pile": Pile(prop); break;
             case "leaves": LeafLitter(body, t.Id); break;
@@ -385,6 +389,60 @@ public static class WorldModels
         Box(hammer, new Vector3(.34f, .03f, .035f), Vector3.Zero, wood);
         Box(hammer, new Vector3(.06f, .06f, .14f), new Vector3(.17f, .02f, 0), steel);
         prop.Hammer = hammer;
+    }
+
+    /// <summary>A stone firebox under a steel grill with a stew pot, beside a plank counter where the slotted mortar and pestle sits.</summary>
+    private static void CookingTable(Prop prop)
+    {
+        var body = prop.Body;
+        var stone = Mat("9b9c98", .95f); var joint = Mat("7b7c78", 1); var plank = Mat("d2a26a"); var post = Mat("8a6a48");
+        var steel = Mat("b9c3c6", .4f, .3f); var dark = Mat("45494c", .5f, .6f);
+        Box(body, new Vector3(.62f, .6f, .62f), new Vector3(-.33f, .3f, 0), stone);
+        for (int row = 1; row < 3; row++)
+        {
+            Box(body, new Vector3(.63f, .015f, .01f), new Vector3(-.33f, row * .2f, .311f), joint);
+            Box(body, new Vector3(.01f, .015f, .63f), new Vector3(-.019f, row * .2f, 0), joint);
+        }
+        Box(body, new Vector3(.32f, .24f, .03f), new Vector3(-.33f, .17f, .31f), Mat("2b2522"));
+        prop.Glow = Box(body, new Vector3(.26f, .18f, .03f), new Vector3(-.33f, .14f, .315f), Flat(new Color("ff7a24")));
+        // The grill: a steel rim with bars across it, raised a little off the firebox.
+        foreach (float z in new[] { -.3f, .3f }) Box(body, new Vector3(.66f, .04f, .04f), new Vector3(-.33f, .63f, z), steel);
+        foreach (float x in new[] { -.64f, -.02f }) Box(body, new Vector3(.04f, .04f, .64f), new Vector3(x, .63f, 0), steel);
+        for (int i = 0; i < 7; i++) Box(body, new Vector3(.02f, .02f, .58f), new Vector3(-.57f + i * .08f, .64f, 0), steel);
+        Cylinder(body, .15f, .16f, .16f, new Vector3(-.36f, .73f, -.04f), dark, null, 14);
+        Cylinder(body, .02f, .02f, .2f, new Vector3(-.15f, .78f, -.04f), dark, new Vector3(0, 0, 90), 6);
+        Post(body, .07f, .07f, .75f, new Vector3(-.56f, .6f, -.24f), dark);
+        prop.Vent = new Vector3(-.56f, 1.4f, -.24f);
+        foreach (var (x, z) in new[] { (.06f, -.24f), (.6f, -.24f), (.06f, .24f), (.6f, .24f) }) Box(body, new Vector3(.06f, .6f, .06f), new Vector3(x, .3f, z), post);
+        Box(body, new Vector3(.64f, .05f, .6f), new Vector3(.33f, .62f, 0), plank);
+        var mortar = Pivot(body, new Vector3(.36f, .645f, .06f));
+        Cylinder(mortar, .07f, .1f, .1f, new Vector3(0, .05f, 0), Mat("9aa29f", .9f), null, 12);
+        Cylinder(mortar, .025f, .02f, .2f, new Vector3(.03f, .14f, 0), Mat("c4c8c3", .9f), new Vector3(0, 0, -25), 8);
+        prop.Mortar = mortar;
+        prop.Light = Light(body, new Vector3(-.33f, .3f, .6f), 2.2f);
+    }
+
+    /// <summary>A steel stove with a lidded canning pot, beside a plank table with tin cans and a lever press.</summary>
+    private static void Cannery(Prop prop)
+    {
+        var body = prop.Body;
+        var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var steel = Mat("b9c3c6", .4f, .3f); var dark = Mat("45494c", .5f, .6f); var tin = Mat("d4d9d6", .35f, .4f);
+        Box(body, new Vector3(.46f, .5f, .5f), new Vector3(-.27f, .25f, 0), dark);
+        Box(body, new Vector3(.24f, .18f, .03f), new Vector3(-.27f, .16f, .25f), Mat("2b2522"));
+        prop.Glow = Box(body, new Vector3(.2f, .14f, .03f), new Vector3(-.27f, .14f, .255f), Flat(new Color("ff7a24")));
+        Cylinder(body, .2f, .2f, .34f, new Vector3(-.27f, .67f, 0), steel, null, 16);
+        Cylinder(body, .21f, .21f, .03f, new Vector3(-.27f, .85f, 0), dark, null, 16);
+        Post(body, .03f, .03f, .06f, new Vector3(-.27f, .86f, 0), dark, 8);
+        Post(body, .06f, .06f, .55f, new Vector3(-.44f, .5f, -.18f), dark);
+        prop.Vent = new Vector3(-.44f, 1.1f, -.18f);
+        foreach (var (x, z) in new[] { (.02f, -.22f), (.5f, -.22f), (.02f, .22f), (.5f, .22f) }) Box(body, new Vector3(.06f, .56f, .06f), new Vector3(x, .28f, z), post);
+        Box(body, new Vector3(.56f, .05f, .54f), new Vector3(.26f, .58f, 0), plank);
+        foreach (var (x, z, y) in new[] { (.14f, .12f, 0f), (.26f, .14f, 0f), (.2f, .13f, .12f), (.36f, .02f, 0f) })
+            Cylinder(body, .05f, .05f, .11f, new Vector3(x, .66f + y, z), tin, null, 10);
+        Box(body, new Vector3(.14f, .03f, .14f), new Vector3(.38f, .62f, -.14f), steel);
+        Post(body, .025f, .025f, .4f, new Vector3(.44f, .6f, -.18f), steel, 8);
+        Box(body, new Vector3(.3f, .03f, .03f), new Vector3(.32f, .98f, -.16f), steel, new Vector3(0, 0, -15));
+        prop.Light = Light(body, new Vector3(-.27f, .25f, .55f), 2f);
     }
 
     /// <summary>A plank pegboard on two posts set in a cinder-block footing, with an axe, a pickaxe and a rake hanging on it.</summary>

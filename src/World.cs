@@ -244,7 +244,7 @@ public sealed partial class World
         if (kind == "furnace") t.Recipe = "iron_bar";
         if (kind == "reinforced") { t.Recipe = "steel_bar"; t.Fuel = "coal"; }
         if (kind == "signpost") { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; }
-        if (kind == "bench") t.Tools = new() { Slots = 2, StackSize = 1 };
+        if (SlotKinds(kind).Length > 0) t.Tools = NewToolSlots(kind);
         if (kind == "crate") t.Inventory = NewCrate();
         if (kind == "mine") { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
         if (kind == "toolstation") t.Inventory.Slots = 12;
@@ -337,7 +337,7 @@ public sealed partial class World
     private static IEnumerable<Vector2> ZoneTiles(Vector2 p) => Enumerable.Range(-1, 3).SelectMany(x => Enumerable.Range(-1, 3).Select(y => p + new Vector2(x, y)));
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
-    public static float Footprint(string kind) => kind switch { "pile" => 1.5f, "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" or "toolstation" => .45f, _ => .35f };
+    public static float Footprint(string kind) => kind switch { "pile" => 1.5f, "cooktable" => .6f, "cannery" => .5f, "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" or "toolstation" => .45f, _ => .35f };
     /// <summary>The tool kind gathering this needs: an axe for trees, a pickaxe for deposits and a rake for leaves; stone, berries and loose pieces need none.</summary>
     public static string? ToolKind(Thing t) => t.Kind == "tree" ? "axe" : t.IsDeposit ? "pickaxe" : t.Kind == "leaves" ? "rake" : null;
     private static string A(string word) => ("aeiou".Contains(word[0]) ? "an " : "a ") + word;
@@ -408,8 +408,10 @@ public sealed partial class World
     /// <summary>The player hammers an anvil while standing by it with nothing else to do.</summary>
     /// <remarks>Input calls <see cref="MovePlayer"/> and <see cref="Gather"/> before each tick, so a tick without them counts as standing still.</remarks>
     public bool PlayerHammers(Thing anvil) => !playerBusy && Near(anvil);
-    /// <summary>Stations that only work while someone works at them.</summary>
-    public static bool Worked(string kind) => kind is "anvil" or "bench";
+    /// <summary>Stations that can need someone working at them.</summary>
+    public static bool Worked(string kind) => kind is "anvil" or "bench" or "cooktable";
+    /// <summary>Whether the station's current recipe only advances while someone works at it; at the cooking table that is the mortar's recipes.</summary>
+    public bool Worked(Thing t) => Worked(t.Kind) && (t.Kind != "cooktable" || Data.Recipes.TryGetValue(t.Recipe, out var r) && r.Tool != "");
     /// <summary>An anvil or bench only works while the player or a paid worker is hammering at it, not merely standing near.</summary>
     public bool Hammered(Thing anvil) => PlayerHammers(anvil) ||
         S.Workers.Any(w => w.Assignment == anvil.Id && w.WageDebt <= 0 && w.WorkState == WorkerWorkState.Hammering);
@@ -480,7 +482,7 @@ public sealed partial class World
         var cost = new Dictionary<string, int>();
         if (!Data.Recipes.TryGetValue(t.Recipe, out var r)) return cost;
         foreach (var p in r.Inputs) cost[p.Key] = p.Value;
-        if (t.Kind is "furnace" or "reinforced")
+        if (r.Fuel)
         {
             string fuel = t.Kind == "reinforced" ? "coal" : t.Fuel is "wood" or "coal" ? t.Fuel : "wood";
             cost[fuel] = cost.GetValueOrDefault(fuel) + 1;
@@ -787,20 +789,25 @@ public sealed partial class World
         if (Data.Items[output].Tool == "pickaxe") S.Milestones.Add("pick");
         if (output.StartsWith("steel_") && Data.Items[output].Tool != "") S.Milestones.Add("steel_tool");
     }
-    /// <summary>The tool of a kind slotted in a bench, or null when its slot is empty or holds a tool below <paramref name="tier"/>.</summary>
+    /// <summary>The tool kinds a station has slots for.</summary>
+    public static string[] SlotKinds(string kind) => kind switch { "bench" => new[] { "chisel", "hammer" }, "cooktable" => new[] { "mortar" }, _ => Array.Empty<string>() };
+    private static Inventory NewToolSlots(string kind) => new() { Slots = SlotKinds(kind).Length, StackSize = 1 };
+    /// <summary>The tool of a kind slotted in a station, or null when its slot is empty or holds a tool below <paramref name="tier"/>.</summary>
     public string? BenchTool(Thing bench, string tool, int tier = 0) => bench.Tools == null ? null : BestTool(tool, bench.Tools, tier);
-    /// <summary>Puts a chisel or hammer from the backpack into its empty bench slot.</summary>
+    /// <summary>Puts a tool from the backpack into the station's empty slot for its kind.</summary>
     public bool SlotTool(Thing bench, string item)
     {
-        if (bench.Tools == null || !Near(bench)) { Say("Walk closer to the bench."); return false; }
+        string name = Data.Name(bench.Kind).ToLowerInvariant();
+        if (bench.Tools == null || !Near(bench)) { Say($"Walk closer to the {name}."); return false; }
         string tool = Data.Items.TryGetValue(item, out var def) ? def.Tool : "";
-        if (tool is not "chisel" and not "hammer") { Say("The bench has slots for a chisel and a hammer."); return false; }
+        var kinds = SlotKinds(bench.Kind);
+        if (!kinds.Contains(tool)) { Say($"The {name} has slots for {(kinds.Length == 1 ? A(kinds[0]) : $"a {kinds[0]} and a {kinds[1]}")}."); return false; }
         if (BenchTool(bench, tool) != null) { Say($"The {tool} slot is taken. Take that {tool} out first."); return false; }
         return S.Backpack.TransferTo(bench.Tools, item, 1) == 1;
     }
     public void UnslotTool(Thing bench, string item)
     {
-        if (bench.Tools == null || !Near(bench)) { Say("Walk closer to the bench."); return; }
+        if (bench.Tools == null || !Near(bench)) { Say($"Walk closer to the {Data.Name(bench.Kind).ToLowerInvariant()}."); return; }
         if (bench.Tools.TransferTo(S.Backpack, item, 1) == 0 && bench.Tools[item] > 0) Say("Backpack full.");
     }
     public string? FetchBlock(Thing sign)
@@ -1043,7 +1050,7 @@ public sealed partial class World
         }
         var costs = BatchCost(target);
         // An anvil only works while hammered, so its smith stays put until the batch is done before fetching the next one.
-        if (!Worked(target.Kind) || !target.Processing) foreach (var pair in costs)
+        if (!Worked(target) || !target.Processing) foreach (var pair in costs)
         {
             if (target.Inventory[pair.Key] >= pair.Value * 2) continue;
             var source = SourceFor(pair.Key, w.Pos);
@@ -1054,12 +1061,12 @@ public sealed partial class World
         }
         // Only one worker ever pumps: a lone worker pumps between loads, while extra crew only haul.
         bool pumps = target.Kind == "reinforced" && coworkers.Count < 2;
-        string? missing = target.Kind == "bench" && Data.Recipes[target.Recipe] is var needed && needed.Tool != "" && BenchTool(target, needed.Tool, needed.Tier) == null ? Data.ToolName(needed.Tool, needed.Tier) : null;
-        w.Status = pumps ? "Pumping bellows between loads" : target.Kind == "reinforced" ? "Waiting for the next load" : missing != null ? $"Needs a {missing} in the bench" : "Working at station";
+        string? missing = target.Tools != null && Data.Recipes[target.Recipe] is var needed && needed.Tool != "" && BenchTool(target, needed.Tool, needed.Tier) == null ? Data.ToolName(needed.Tool, needed.Tier) : null;
+        w.Status = pumps ? "Pumping bellows between loads" : target.Kind == "reinforced" ? "Waiting for the next load" : missing != null ? $"Needs {A(missing)} in the {Data.Name(target.Kind).ToLowerInvariant()}" : "Working at station";
         if (Walk(w, target.Pos, dt))
         {
             if (pumps) { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 16); }
-            else if (Worked(target.Kind)) w.WorkState = WorkerWorkState.Hammering;
+            else if (Worked(target)) w.WorkState = WorkerWorkState.Hammering;
         }
     }
     /// <summary>Walks a tool the job no longer needs to the nearest tool station with room, and reports when it is put back; with no such station the worker keeps it.</summary>
@@ -1192,15 +1199,15 @@ public sealed partial class World
             if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) continue;
             bool burning = stillBurning.Remove(t.Id);
             bool hot = t.Kind != "reinforced" || t.Heat >= SteelHeat;
-            bool atAnvil = !Worked(t.Kind) || Hammered(t);
-            // A bench recipe needs its tool slotted, and the tool's speed sets the pace.
-            string? tool = t.Kind == "bench" && recipe.Tool != "" ? BenchTool(t, recipe.Tool, recipe.Tier) : null;
-            if (t.Kind == "bench" && recipe.Tool != "" && tool == null) atAnvil = false;
-            float rate = t.Kind == "bench" ? Data.BenchSpeed * Speed(tool) : 1;
+            bool atAnvil = !Worked(t) || Hammered(t);
+            // A recipe at a station with tool slots needs its tool slotted, and the tool's speed sets the pace.
+            string? tool = t.Tools != null && recipe.Tool != "" ? BenchTool(t, recipe.Tool, recipe.Tier) : null;
+            if (t.Tools != null && recipe.Tool != "" && tool == null) atAnvil = false;
+            float rate = (t.Kind == "bench" ? Data.BenchSpeed : 1) * Speed(tool);
             if (!t.Processing && hot && atAnvil && t.Inventory.Has(BatchCost(t)))
             {
                 t.Inventory.Spend(BatchCost(t)); t.Processing = true; t.Progress = 0;
-                if (t.Kind is "furnace" or "reinforced" && !burning) Play("start_fire", t.Pos);
+                if (recipe.Fuel && !burning) Play("start_fire", t.Pos);
             }
             if (t.Processing && !hot)
             {
@@ -1415,7 +1422,7 @@ public sealed partial class World
         {
             // Anvils of older saves may still be set to tools that are now made at the bench.
             if (t.Recipe != "" && (!Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Station != t.Kind)) { t.Recipe = ""; t.Processing = false; t.Progress = 0; }
-            if (t.Kind == "bench") t.Tools ??= new() { Slots = 2, StackSize = 1 };
+            if (SlotKinds(t.Kind).Length > 0) t.Tools ??= NewToolSlots(t.Kind);
         }
         if (legacyTools)
         {

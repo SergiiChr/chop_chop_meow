@@ -277,7 +277,7 @@ public partial class Game : Node
             AddLabel("Select a villager and choose Work to automate this resource. Their gathered supplies go to accepting storage.", 14, Muted); return;
         }
         if (t.Kind == "hut") { Cabin(t); return; }
-        if (t.Kind == "bench") { Bench(t); return; }
+        if (t.Tools != null) { Bench(t); return; }
         if (t.Kind == "signpost") { Signpost(t); return; }
         if (t.Kind == "mine") { MinePanel(t); return; }
         if (t.IsStorage) { Storage(t); return; }
@@ -295,7 +295,7 @@ public partial class Game : Node
             opt.ItemSelected += index => { world.SetRecipe(t, recipes[(int)index].Key); OpenPage("inspect"); }; content.AddChild(opt);
         }
         else if (recipes.Count == 1) AddLabel(recipes[0].Value.Name.ToUpperInvariant(), 16);
-        if (t.Kind == "furnace") AddButton($"Fuel: {world.Data.Name(t.Fuel)} · click to switch", () => { if (!t.Processing) { t.Fuel = t.Fuel == "wood" ? "coal" : "wood"; OpenPage("inspect"); } });
+        FuelToggle(t);
         if (t.Recipe != "")
         {
             Machine(t);
@@ -662,6 +662,18 @@ public partial class Game : Node
                 if (item == "leaves") { pile.Compost = true; pile.Inventory.Add("fertilizer", 20); }
             }
             world.Player = at + new Vector2(3, -2.5f); world.Tick(0); ClosePanel(); view.Zoom = 1.4f;
+        }
+        if (OS.GetCmdlineUserArgs().Contains("--kitchen"))
+        {
+            // The cooking table mid-stew beside a canning station sealing cans, with the mortar slotted.
+            var at = World.Spawn + new Vector2(-3, 8);
+            world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
+            var table = world.Add("cooktable", at); table.Tools!.Add("mortar", 1); world.SetRecipe(table, "meat_stew");
+            table.Inventory.Add("water", 2); table.Inventory.Add("raw_meat", 2); table.Inventory.Add("wood", 2);
+            var cannery = world.Add("cannery", at + new Vector2(2.2f, 0)); world.SetRecipe(cannery, "canned_meat_stew");
+            cannery.Inventory.Add("meat_stew", 2); cannery.Inventory.Add("tin_can", 2); cannery.Inventory.Add("wood", 2);
+            world.Player = at + new Vector2(1, 2.5f); world.Tick(.5f); view.Zoom = 1.7f;
+            if (OS.GetCmdlineUserArgs().Contains("--panel")) Select(table); else ClosePanel();
         }
         if (OS.GetCmdlineUserArgs().Contains("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); ClosePanel(); view.Zoom = 1.6f; }
         if (OS.GetCmdlineUserArgs().Contains("--tin")) { var cliff = World.CliffOf("tin"); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); ClosePanel(); }

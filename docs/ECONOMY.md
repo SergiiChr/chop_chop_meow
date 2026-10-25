@@ -12,12 +12,12 @@ Every item has a `price`. For goods the village trades, it is the trade price; f
 
 | Step | Markup | Recipes |
 |---|---|---|
-| 1 | 50% | iron bar, tin bar, burnt steak, planks, wood parts, stone chisel, torch, mortar and pestle |
-| 2 | 40% | steel bar, iron parts, crate, wooden mallet, tin cans |
-| 3 | 30% | steel parts, iron axe, iron pickaxe, iron hammer |
+| 1 | 50% | iron bar, tin bar, burnt steak, planks, wood parts, stone chisel, torch, mortar and pestle, crushed berries, flour, meat stew |
+| 2 | 40% | steel bar, iron parts, crate, wooden mallet, tin cans, berry jam, dough |
+| 3 | 30% | steel parts, iron axe, iron pickaxe, iron hammer, bread, canned meat stew, canned jam, canned food |
 | 4 | 20% | steel axe, steel pickaxe, steel hammer, steel chisel, rake |
 
-Foods whose recipes come with the cooking table and canning station are priced ahead by the same rule, assuming these batches: 1 berries → 1 crushed berries and 1 wheat → 1 flour with the mortar; 2 crushed berries + 1 wood → 1 jam; 1 water + 1 raw meat + 1 wood → 1 stew; 1 flour + 1 water → 1 dough; 1 dough + 1 wood → 1 bread; and a can + its filling + 1 wood → a canned good. Canned food keeps its old price of 4 until it has a recipe.
+Wheat for flour comes from farm plots, which are still to be built. Canned food, which the village also sells, is canned raw meat and now costs 5.35 instead of 4.
 
 A new recipe gets its price from this rule. The check fails if any recipe loses value or a deeper recipe marks up more than a shallower one.
 
@@ -29,8 +29,9 @@ Worker output is measured by running one worker through a whole day: walking, ha
 
 - A hired berry picker barely breaks even: 0.9 to 1.25 times a worker-day's cost. Bushes fruit once a day (`berryRegrowHours`), so one picker brings in two crates of berries a day, within what the village takes at the full price.
 - A worker in a steel tool chain earns at least 4 times their pay.
-- A longer chain earns more per worker-day than a shorter one.
-- Meat is left out: it comes from wolves at night, when workers are home.
+- A cook earns at least 1.5 times their pay.
+- A longer chain earns more per worker-day than a shorter one, comparing tools with tools and food with food.
+- Goods made from meat or wheat are left out: meat comes from wolves at night, when workers are home, and wheat from farm plots.
 
 Measured with the current data:
 
@@ -43,10 +44,17 @@ Measured with the current data:
 | Anvil, steel parts | 57 |
 | Bench, wood parts | 114 |
 | Bench, steel tools | 58 |
+| Stone furnace, tin bars | 62 |
+| Bench, tin cans | 300 |
+| Cooking table, crushed berries | 140 |
+| Cooking table, berry jam | 42 |
+| Canning station, canned jam | 49 |
 
 | Product | Worker-days each | Coins per worker-day | Times pay |
 |---|---|---|---|
 | Berries | 0.042 | 24 | 1.0× |
+| Berry jam | 0.123 | 45 | 1.8× |
+| Canned jam | 0.154 | 73 | 2.9× |
 | Steel hammer | 0.114 | 324 | 13× |
 | Steel axe or pickaxe | 0.202 | 362 | 14.5× |
 
@@ -63,11 +71,12 @@ Each good the village takes has `daily`, `steady` and `drop` in `market.sells`:
 |---|---|---|---|
 | Berries | 36 (3 crates) | 36 | 5% |
 | Raw meat and burnt steak | 24 (2 crates) | 24 | 5% |
+| Bread, berry jam, meat stew, canned jam and canned meat stew | 24 (2 crates) | 24 | 5% |
 | Steel axe, pickaxe and hammer | 12 (1 crate) | 0 | 50% |
 
 Food is a steady staple: its daily amount sells at the full price, and past it the price slips slowly. Tools react sharply: a crate of one tool takes half off the price of the last one in it and averages 77%, and a second crate the same day sells for little. Selling past the basket keeps that good cheap for days.
 
-A day's basket sells for about 1,840 coins: 1,690 from tools, 115 from food and 30 for the crates.
+A day's basket sells for about 2,920 coins: 1,690 from tools, 1,165 from food and 63 for the crates.
 
 ## 4. Trade
 
