@@ -37,7 +37,7 @@ internal static class MineShape
     private static ArrayMesh BuildTunnel()
     {
         var s = Begin();
-        // Only the inward faces are needed; all outer faces lie inside the unchanged cliff spur.
+        // Only the inward faces are needed; all outer faces lie inside the mountain outcrop.
         for (int i = 0; i < 6; i++)
         {
             float near = -i * WorldModels.MineDepth / 6, far = -(i + 1) * WorldModels.MineDepth / 6;

@@ -14,6 +14,7 @@ public static class SimulationChecks
         EconomyChecks.Run(data);
         AnimationChecks.Run();
         PileModelChecks.Run(data);
+        MineRockChecks.Run();
         WorkerStateChecks.Run(data);
         CheckInventoryFilters(data);
         CheckStorageRouting(data);

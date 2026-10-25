@@ -73,17 +73,8 @@ public partial class WorldView
     /// <summary>Both ranges as one flat-shaded height field that rises from the valley's edge into ridged peaks.</summary>
     private static void BuildMountains(Node3D parent)
     {
-        var ridges = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Simplex, Frequency = .018f, FractalType = FastNoiseLite.FractalTypeEnum.Ridged, FractalOctaves = 4, Seed = 31 };
         var tint = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Simplex, Frequency = .05f, Seed = 5 };
-        float Height(Vector2 p)
-        {
-            float depth = -Terrain.FromMountains(p);
-            if (depth <= 0) return 0;
-            // A steady climb from the foot that levels off, with ridges and peaks growing in higher up, easing down where the range meets the sea.
-            float h = 26 * (1 - MathF.Exp(-depth / 16)) + (ridges.GetNoise2D(p.X, p.Y) + 1) * 13 * Math.Clamp(depth / 18, 0, 1);
-            float seaward = Math.Clamp((Terrain.Coast(Terrain.Across(p)) + 14 - Terrain.Along(p)) / 14, 0, 1);
-            return h * seaward;
-        }
+        float Height(Vector2 p) => MountainShape.Height(p);
         const float step = 2, from = -110, to = Terrain.Size + 110;
         int count = (int)((to - from) / step) + 1;
         var heights = new float[count, count];
@@ -106,7 +97,8 @@ public partial class WorldView
                     // Gentle, low ground stays grassy and lower slopes scrubby; steep or high faces are bare rock, and the highest pale.
                     var palette = top > 40 ? crest : top < 24 && normal.Y > .6f ? grass : top < 30 && normal.Y > .35f ? scrub : rock;
                     var color = palette[(int)((shade + 1) * 1.99f * palette.Length / 2) % palette.Length];
-                    foreach (var v in new[] { p, q, r }) { tool.SetColor(color); tool.SetNormal(normal); tool.AddVertex(v + Vector3.Down * .03f); }
+                    tool.SetColor(color); tool.SetNormal(normal);
+                    MountainShape.AddCarvedTriangle(tool, p + Vector3.Down * .03f, q + Vector3.Down * .03f, r + Vector3.Down * .03f);
                 }
             }
         var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
@@ -130,15 +122,18 @@ public partial class WorldView
         float R() => (float)rng.NextDouble();
         for (float x = -cliff.HalfLength - .4f; x <= cliff.HalfLength + .4f; x += .8f)
         {
+            var column = Pivot(wall, Vector3.Zero);
             // The ends taper down so the wall reads as a rock outcrop rather than a cut block.
             float edge = 1 - Math.Clamp((Math.Abs(x) - cliff.HalfLength + 1.5f) / 2.5f, 0, 1) * .6f;
             float height = (2.8f + R() * 1.8f) * edge, z = -.4f + R() * .5f;
-            Cylinder(wall, .95f + R() * .2f, .55f + R() * .25f, height, new Vector3(x, height / 2, z), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3((R() - .5f) * 8, R() * 360, (R() - .5f) * 8), 5);
-            Sphere(wall, .55f + R() * .3f, new Vector3(x + (R() - .5f) * .4f, height + .05f, z - .1f), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3(1.2f, .6f, 1), 5);
+            Cylinder(column, .95f + R() * .2f, .55f + R() * .25f, height, new Vector3(x, height / 2, z), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3((R() - .5f) * 8, R() * 360, (R() - .5f) * 8), 5);
+            Sphere(column, .55f + R() * .3f, new Vector3(x + (R() - .5f) * .4f, height + .05f, z - .1f), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3(1.2f, .6f, 1), 5);
             for (int i = 0; i < 2; i++)
-                Box(wall, new Vector3(.35f + R() * .3f, .08f + R() * .06f, .12f), new Vector3(x + (R() - .5f) * .5f, .5f + R() * (height - .9f), z + .95f), seam, new Vector3(0, 0, (R() - .5f) * 40));
+                Box(column, new Vector3(.35f + R() * .3f, .08f + R() * .06f, .12f), new Vector3(x + (R() - .5f) * .5f, .5f + R() * (height - .9f), z + .95f), seam, new Vector3(0, 0, (R() - .5f) * 40));
             for (int i = 0; i < 2; i++)
-                Sphere(wall, .14f + R() * .16f, new Vector3(x + (R() - .5f) * .8f, .06f, 1.1f + R() * .6f), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3(1.2f, .6f, 1), 5);
+                Sphere(column, .14f + R() * .16f, new Vector3(x + (R() - .5f) * .8f, .06f, 1.1f + R() * .6f), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3(1.2f, .6f, 1), 5);
+            // The continuous outcrop replaces the middle wall and keeps the tunnel clear.
+            if (Math.Abs(x) < 2.6f) column.Free();
         }
     }
 

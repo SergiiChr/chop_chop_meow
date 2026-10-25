@@ -571,22 +571,7 @@ public static class WorldModels
         var spot = World.MineSpot(cliff);
         var spur = Pivot(parent, new Vector3(spot.X, 0, spot.Y));
         spur.Rotation = MineYaw(spot);
-        var rng = new Random((int)(cliff.Center.X * 31 + cliff.Center.Y));
-        float R() => (float)rng.NextDouble();
-        Material Rock() => Mat(rock[rng.Next(rock.Length)], .95f);
-        // Side masses stay outside the tunnel's walls, and the cap stays above its roof.
-        for (int i = 0; i < 3; i++)
-            foreach (int side in new[] { -1, 1 })
-            {
-                float height = 2.3f + R() * .7f;
-                Cylinder(spur, 1.05f, .65f + R() * .15f, height, new Vector3(side * 1.75f, height / 2, MineDoor - .45f - i * 1.15f), Rock(), new Vector3(0, R() * 72, 0), 5);
-            }
-        for (int i = 0; i < 3; i++)
-            for (int x = -1; x <= 1; x++)
-                Sphere(spur, .85f + R() * .15f, new Vector3(x * .95f, 2.4f + R() * .25f, MineDoor - .7f - i * 1.15f), Rock(), new Vector3(1.3f, .6f, 1.2f), 5);
-        Cylinder(spur, 1, .7f, 2.8f, new Vector3(0, 1.4f, MineDoor - MineDepth - .6f), Rock(), null, 5);
-        for (int i = 0; i < 6; i++)
-            Sphere(spur, .16f + R() * .14f, new Vector3((i % 2 == 0 ? -1 : 1) * (1.1f + R() * .9f), .06f, MineDoor + .3f + R() * 1.2f), Rock(), new Vector3(1.2f, .6f, 1), 5);
+        Add(spur, MineRockShape.Mesh(cliff, rock), MineRockShape.Rock, Vector3.Zero);
     }
 
     /// <summary>A timbered adit into the cliff's spur, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>

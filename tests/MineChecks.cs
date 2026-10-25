@@ -76,7 +76,7 @@ public static class MineChecks
             var oldAlong = cliff.Along * Math.Sign(cliff.Along.Dot(Terrain.Seaward));
             var end = cliff.Center + oldAlong * (cliff.HalfLength + 6.7f);
             var oldSpot = end + cliff.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
-            Require(!world.CanStand(oldSpot - oldAlong * 4.2f), "the old rock footprint must remain blocked after rotating the entrance");
+            Require(World.MineSpot(cliff).IsEqualApprox(cliff.Center + cliff.Face * 4.2f), "each new entrance must project directly from its cliff center");
             var mine = world.Add("mine", oldSpot); expected[mine.Id] = World.MineSpot(cliff); mine.Stage = World.MineOpen; mine.Progress = 2;
             mine.Inventory.Add("wood", 7); mine.Output!.Add(World.MineOre(mine), 12);
             world.S.Remembered[mine.Id] = new Thing { Id = mine.Id, Kind = "mine", Pos = oldSpot, Stage = World.MineOpen };
@@ -84,7 +84,7 @@ public static class MineChecks
         }
         world.S.Version = 4;
         var loaded = EmptyWorld(data); loaded.Deserialize(world.Serialize());
-        Require(loaded.S.Version == 5, "older valley saves must upgrade the mine layout");
+        Require(loaded.S.Version == 6, "version 4 valley saves must upgrade to the current mine layout");
         foreach (var mine in loaded.S.Things.Where(t => t.Kind == "mine"))
         {
             Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
@@ -96,6 +96,33 @@ public static class MineChecks
         var restored = EmptyWorld(data); restored.Deserialize(loaded.Serialize());
         Require(restored.S.Things.Where(t => t.Kind == "mine").All(m => m.Pos.IsEqualApprox(loaded.Find(m.Id)!.Pos)),
             "loading an aligned save must not move its mines again");
+
+        // Version 5 had already moved each mine to the old spur anchor. Loading it must select by that
+        // intermediate position, then preserve the same completed mine and fog-memory state.
+        var v5 = EmptyWorld(data);
+        var v5Expected = new Dictionary<int, Vector2>();
+        foreach (var cliff in World.Cliffs)
+        {
+            var oldAlong = cliff.Along * Math.Sign(cliff.Along.Dot(Terrain.Seaward));
+            var end = cliff.Center + oldAlong * (cliff.HalfLength + 6.7f);
+            var legacy = end + cliff.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
+            var oldV5Spot = legacy - oldAlong * 4.2f + cliff.Face * 4.2f;
+            var mine = v5.Add("mine", oldV5Spot); mine.Stage = World.MineOpen; mine.Progress = 3;
+            mine.Inventory.Add("wood", 9); mine.Output!.Add(World.MineOre(mine), 14);
+            v5Expected[mine.Id] = World.MineSpot(cliff);
+            v5.S.Remembered[mine.Id] = new Thing { Id = mine.Id, Kind = "mine", Pos = oldV5Spot, Stage = World.MineOpen };
+            var worker = AddWorker(v5, oldV5Spot + cliff.Face * 3); worker.Assignment = mine.Id;
+        }
+        v5.S.Version = 5;
+        var migratedV5 = EmptyWorld(data); migratedV5.Deserialize(v5.Serialize());
+        Require(migratedV5.S.Version == 6, "version 5 mine saves must upgrade to version 6");
+        foreach (var mine in migratedV5.S.Things.Where(t => t.Kind == "mine"))
+        {
+            Require(mine.Pos.IsEqualApprox(v5Expected[mine.Id]) && migratedV5.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
+                "version 5 mines and their fog memories must move from the intermediate anchor");
+            Require(mine.Stage == World.MineOpen && mine.Progress == 3 && mine.Inventory["wood"] == 9 && mine.Output![World.MineOre(mine)] == 14 && migratedV5.S.Workers.Any(w => w.Assignment == mine.Id),
+                "version 5 migration must preserve mine stage, progress, stock, output and assigned workers");
+        }
     }
 
     private static void CheckMarking(GameData data)

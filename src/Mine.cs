@@ -18,28 +18,40 @@ public sealed partial class World
     public static Cliff CliffAt(Vector2 p) => Cliffs.MinBy(c => c.DistanceTo(p));
     /// <summary>The outward normal of this cliff: each portal follows its own rock face, with rails toward the valley.</summary>
     public static Vector2 MineOut(Cliff c) => c.Face;
-    /// <summary>The cart's spot, outward from the existing rock site; the portal follows the cliff rather than its seaward end.</summary>
-    public static Vector2 MineSpot(Cliff c) => SpurCenter(c) + MineOut(c) * 4.2f;
-    /// <summary>The earlier end-facing cart position, retained for loading old settlements and keeping rock footprints stable.</summary>
+    /// <summary>The cart's spot, outward from the cliff center, with the portal projecting from the mountain foot.</summary>
+    public static Vector2 MineSpot(Cliff c) => c.Center + MineOut(c) * 4.2f;
+    /// <summary>The earlier end-facing cart position, retained for loading old settlements.</summary>
     private static Vector2 LegacyMineSpot(Cliff c)
     {
         var along = c.Along * Math.Sign(c.Along.Dot(Terrain.Seaward));
         var end = c.Center + along * (c.HalfLength + 6.7f);
         return end + c.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
     }
-    /// <summary>The rock site's fixed center; rotating its entrance does not displace surrounding settlement objects.</summary>
-    private static Vector2 SpurCenter(Cliff c) => LegacyMineSpot(c) - c.Along * Math.Sign(c.Along.Dot(Terrain.Seaward)) * 4.2f;
-    private static bool InSpur(Vector2 p, float margin = 0) => Cliffs.Any(c => p.DistanceTo(SpurCenter(c)) < 2 + margin);
+    /// <summary>The version 5 cart position, retained only to migrate saves made before portals moved to the cliff face.</summary>
+    private static Vector2 PreviousMineSpot(Cliff c) => LegacyMineSpot(c) - c.Along * Math.Sign(c.Along.Dot(Terrain.Seaward)) * 4.2f + MineOut(c) * 4.2f;
+    /// <summary>Whether a point lies within the solid rock skin; the tunnel approach at depth -1.4 stays open.</summary>
+    private static bool InSpur(Vector2 p, float margin = 0) => Cliffs.Any(c =>
+    {
+        var offset = p - MineSpot(c);
+        float depth = offset.Dot(MineOut(c));
+        if (depth > -2.28f + margin * 2) return false;
+        float across = Math.Abs(offset.Dot(c.Along));
+        float width = depth >= -4.2f ? 2.55f + (depth + 2.28f) * (2.8f - 2.55f) / (-4.2f + 2.28f)
+            : depth >= -6 ? 2.8f + (depth + 4.2f) * (3.35f - 2.8f) / (-6 + 4.2f)
+            : depth >= -32 ? 3.35f + (depth + 6) * (4.6f - 3.35f) / (-32 + 6)
+            : 4.6f;
+        return across < width + margin;
+    });
 
     /// <summary>Old saves keep mine inventories, stages and worker assignments while the cart snaps to the aligned entrance.</summary>
-    private static void AlignLegacyMines(SaveState state)
+    private static void AlignMines(SaveState state, Func<Cliff, Vector2> oldSpot)
     {
         foreach (var mine in state.Things.Concat(state.Remembered.Values).Where(t => t.Kind == "mine"))
         {
-            var cliff = Cliffs.MinBy(c => mine.Pos.DistanceSquaredTo(LegacyMineSpot(c)));
+            var cliff = Cliffs.MinBy(c => mine.Pos.DistanceSquaredTo(oldSpot(c)));
             mine.Pos = MineSpot(cliff);
         }
-        state.Version = 5;
+        state.Version = 6;
     }
     /// <summary>Where diggers and miners stand: at the entrance, against the rock.</summary>
     public static Vector2 MineDoor(Thing mine) => mine.Pos - MineOut(CliffAt(mine.Pos)) * 1.4f;
