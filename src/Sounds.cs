@@ -9,7 +9,7 @@ namespace ChopChopMeow;
 /// One-shot sound effects from <c>assets/sounds</c>.
 /// A sound named <c>x</c> is <c>x.mp3</c>, or the variants <c>x_1.mp3</c>, <c>x_2.mp3</c> and so on.
 /// Each play picks a variant other than the previous one and nudges its pitch and volume, so repeated actions do not sound mechanical.
-/// Day and night music crossfade when the time of day changes, and each track resumes where it last stopped.
+/// Day and night music crossfade when the time of day changes, and each resumes where it last stopped.
 /// </summary>
 public partial class Sounds : Node
 {
@@ -65,12 +65,15 @@ public partial class Sounds : Node
     /// <summary>Music loudness from the options, 0 to 1.</summary>
     public float MusicVolume = 1;
     public bool DayMusicPlaying => day.Player.Playing;
+    public int DayMusicIndex => day.Index;
+    /// <summary>Ends the current day track early, as if it had played to its end.</summary>
+    public void FinishDayTrack() => day.Player.EmitSignal(AudioStreamPlayer.SignalName.Finished);
     public bool NightMusicPlaying => night.Player.Playing;
     public float NightMusicPosition => night.Position;
 
     public override void _Ready()
     {
-        day = new Track(this, "path_to_lake_land");
+        day = new Track(this, "path_to_lake_land", "mystic_theme");
         night = new Track(this, "forest");
     }
 
@@ -131,17 +134,24 @@ public partial class Sounds : Node
         foreach (var player in GetChildren().OfType<AudioStreamPlayer>()) player.Stop();
     }
 
-    /// <summary>A looping music track that stops once faded out and keeps its position, so it wraps to the start only at its end.</summary>
+    /// <summary>
+    /// A music playlist that stops once faded out and keeps its place, so it carries on next time.
+    /// Its tracks play in order and wrap to the first after the last; a single track loops seamlessly.
+    /// </summary>
     private sealed class Track
     {
         public readonly AudioStreamPlayer Player;
+        private readonly AudioStreamMP3[] streams;
         private float level, at;
+        public int Index { get; private set; }
         public float Position => Player.Playing ? Player.GetPlaybackPosition() : at;
 
-        public Track(Node parent, string name)
+        public Track(Node parent, params string[] names)
         {
-            var stream = GD.Load<AudioStreamMP3>($"res://assets/music/{name}.mp3"); stream.Loop = true;
-            Player = new AudioStreamPlayer { Stream = stream };
+            streams = names.Select(name => GD.Load<AudioStreamMP3>($"res://assets/music/{name}.mp3")).ToArray();
+            streams[0].Loop = streams.Length == 1;
+            Player = new AudioStreamPlayer { Stream = streams[0] };
+            Player.Finished += () => { Index = (Index + 1) % streams.Length; Player.Stream = streams[Index]; Player.Play(); };
             parent.AddChild(Player);
         }
 
