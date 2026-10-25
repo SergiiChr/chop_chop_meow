@@ -116,6 +116,15 @@ public partial class Game
         world.S.Workers.Remove(hired); world.S.Orders.Clear(); world.S.Things.Remove(sign); world.S.Backpack.Remove(Inventory.Coins, 999);
         signpostTab = "market"; ClosePanel(); await Frames();
     }
+    /// <summary>Clicks open ground beside the player, so the click uses the item in hand instead of selecting something.</summary>
+    private async Task ClickGround()
+    {
+        await Frames();
+        var open = Enumerable.Range(1, 6).SelectMany(r => Enumerable.Range(0, 8).Select(a => world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r))
+            .Select(p => view.Screen(p)).First(p => view.Pick(p) == null && view.PickWorker(p) == null && GetViewport().GetVisibleRect().HasPoint(p) && p.Y < GetViewport().GetVisibleRect().Size.Y - 120);
+        await Click(open);
+    }
+
     private async Task CheckCraftingAndTorch()
     {
         ClosePanel(); world.S.Backpack.Remove("stone_chisel", 99); world.S.Backpack.Add("stone", 2); world.S.Backpack.Add("wood", 3);
@@ -133,7 +142,13 @@ public partial class Game
         UIRequire(world.S.Backpack["torch"] == 1 && world.S.Backpack["wood"] == wood - 3, "A torch must be made by hand from 3 wood.");
         ClosePanel(); world.S.HotbarSlots[8] = "torch";
         await KeyStroke(Key.Key9);
-        UIRequire(world.S.Torch > 0 && world.S.Backpack["torch"] == 0, "The torch hotbar key must light a carried torch.");
+        UIRequire(world.S.Torch == 0, "Selecting a torch must not light it.");
+        await ClickGround();
+        UIRequire(world.S.TorchKindling > 0 && world.S.Backpack["torch"] == 0 && view.PlayerAnimation == ActorAction.Kindle, "The first click must strike flint and steel with the torch in hand.");
+        await Seconds(World.KindleSeconds + .3);
+        UIRequire(world.S.TorchLit, "The torch must catch after the lighting animation.");
+        await ClickGround();
+        UIRequire(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Clicking with a lit torch must swing it.");
     }
 
     private async Task CheckCrateInCrate()
@@ -241,14 +256,19 @@ public partial class Game
             int berries = world.S.Backpack["berries"];
             await KeyStroke(Key.Key3);
             UIRequire(view.BuildMode == "chest", "A building-plan hotkey must enter placement mode.");
-            int played = sounds.Played;
             await KeyStroke(Key.Key8);
-            UIRequire(world.S.Backpack["berries"] == berries - 1, "Key 8 must consume the berries assigned to hotbar slot 8.");
+            UIRequire(world.S.ActiveHotbar == 7 && world.S.Backpack["berries"] == berries && hotbarButtons[7].HasThemeStyleboxOverride("normal") && !hotbarButtons[2].HasThemeStyleboxOverride("normal"),
+                "Key 8 must put the berries in hand with an outline, without eating them.");
+            UIRequire(view.BuildMode == "", "Selecting an item must clear any previously selected building plan.");
+            int played = sounds.Played;
+            await ClickGround();
+            UIRequire(world.S.Backpack["berries"] == berries - 1, "A left click on open ground must eat the berries in hand.");
             UIRequire(sounds.Played == played + 1 && sounds.Last == "eat_berry", "Eating must play only the eating sound, not an inventory sound as well.");
-            UIRequire(view.BuildMode == "", "Using a consumable must clear any previously selected building plan.");
-            world.S.Backpack.Add("water", 1); world.S.Thirst = 20;
-            await KeyStroke(Key.Key9);
-            UIRequire(world.S.Backpack["water"] == 0 && world.S.Thirst > 20, "Key 9 must consume carried water and restore thirst.");
+            world.S.Backpack.Add("water", 1); world.S.Thirst = 20; RefreshLive();
+            await Click(hotbarButtons[8]);
+            UIRequire(world.S.ActiveHotbar == 8 && world.S.Backpack["water"] == 1, "Clicking a hotbar slot must only select it.");
+            await ClickGround();
+            UIRequire(world.S.Backpack["water"] == 0 && world.S.Thirst > 20, "A left click on open ground must drink the water in hand.");
             await KeyStroke(Key.B); UIRequire(page == "build" && panel.Visible, "B must open the building plans.");
             var plan = Named("build_chest"); UIRequire(plan != null, "Building plans must expose storage construction.");
             plan!.EmitSignal(Control.SignalName.MouseEntered); await Frames();

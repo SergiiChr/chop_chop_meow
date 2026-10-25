@@ -212,7 +212,7 @@ public partial class Game : Node
     private void Help()
     {
         AddLabel("MOVE & WORK", 16);
-        AddLabel("WASD / arrows: move in screen directions\nHold right mouse: approach and gather\nLeft click: select resource, building or worker\nE: inspect nearest object\nSpace: use carried tool; at selected bellows furnace, pump\nMouse wheel: zoom\n1–9: use hotbar slot (food and water consume, a torch lights, building plans place)\nHold right mouse on a placed crate: pick it up\nB: build   I: inventory   C: crafting   Tab: guide\nF5: save   F9: load   Esc: cancel / pause");
+        AddLabel("WASD / arrows: move in screen directions\nHold right mouse: approach and gather\nLeft click: select resource, building, crate or worker; on open ground, use the item in hand\nE: inspect nearest object\nSpace: use carried tool; at selected bellows furnace, pump\nMouse wheel: zoom\n1–9 or click a slot: put it in hand (plans and crates go to placement)\nHold right mouse on a placed crate: pick it up\nB: build   I: inventory   C: crafting   Tab: guide\nF5: save   F9: load   Esc: cancel / pause");
         AddLabel("IRON → STEEL", 16);
         AddLabel("Loose iron needs no pickaxe. Smelt 2 ore + 1 wood/coal per iron bar. Build an anvil and hammer bars into iron parts. Steel needs the reinforced furnace: 2 iron bars + 2 mined coal, plus 1 mined coal as fuel. Pump regularly above 80°. The anvil also turns steel bars into steel parts.", 15, Muted);
         AddLabel("CRAFTING", 16);
@@ -221,7 +221,7 @@ public partial class Game : Node
         AddLabel("Hire at a signpost (24 coins; 8/day). Worker → Work → click a resource. Building → Assign → select named villagers. Put inputs in storage for hauling. One furnace worker alternates hauling and pumping; with two, the first pumps while the second hauls. No accepting chest means work pauses safely.", 15, Muted);
         AddLabel("Empty filters allow everything. Input filters control worker deposits; output filters control worker withdrawals. Workers prefer explicitly matching input-filter chests before the nearest general chest. Manual transfers ignore automation filters. Hold Shift while transferring to move a full stack.", 15, Muted);
         AddLabel("STAY ALIVE", 16);
-        AddLabel("A full stomach lasts a day and a full water droplet half a day. Wolves are fast and avoid campfire light (5-tile radius), though a wolf already chasing you follows briefly into it. Click a cabin to step inside; wolves back off at once. At half health or less, a nearby wolf leaps for your throat and the pack joins the feast; a wolf kill also destroys the food in your recovery box. Slain wolves leave a carcass: hold right mouse to butcher it for raw meat, then cook it in a stone furnace before eating. A burning campfire keeps wolves away; feed it wood, and each log burns about 4 hours. A lit torch burns as long but only once: a lone wolf trails you at the edge of its light, and the pack attacks once five gather around you. Sleep in a cabin at night if your food and water will last until morning; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
+        AddLabel("A full stomach lasts a day and a full water droplet half a day. Wolves are fast and avoid campfire light (5-tile radius), though a wolf already chasing you follows briefly into it. Click a cabin to step inside; wolves back off at once. At half health or less, a nearby wolf leaps for your throat and the pack joins the feast; a wolf kill also destroys the food in your recovery box. Slain wolves leave a carcass: hold right mouse to butcher it for raw meat, then cook it in a stone furnace before eating. A burning campfire keeps wolves away; feed it wood, and each log burns about 4 hours. A torch burns as long, once: click to strike it alight, then click to swing it. Swinging four times in 2 seconds puts it out. A lone wolf creeps in on a torch until you swing at it; then it follows at the light's edge. Once five gather, they attack together. Sleep in a cabin at night if your food and water will last until morning; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
         AddLabel("Crates hold 12 items. Click a placed crate to open it; hold right mouse to pick it up with everything inside. Water bottles only stack inside a crate. Never put a crate inside a crate. At a signpost, load crates of meat, berries or steel tools into the market and press Sell; the village takes nothing loose, and bought supplies arrive in crates; the cart returns in 30 seconds and leaves coins in the market output. Buy from the price sheet. The sheet only shows prices as last heard from the village: it updates when a cart returns or when a worker assigned to the signpost fetches fresh prices. Prices fall when you sell and slowly recover. Your world autosaves every 90 seconds; F5 saves immediately.", 15, Muted);
     }
     private string Needs(Dictionary<string, int> cost) => string.Join("  ·  ", cost.Select(p => $"{world.Data.Name(p.Key)} {world.S.Backpack[p.Key]}/{p.Value}"));
@@ -243,7 +243,7 @@ public partial class Game : Node
     private void Backpack()
     {
         Dynamic(() => $"Health {world.S.Health:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {world.S.Workers.Sum(w => w.Wage):0}", 15);
-        AddInventoryGrid(() => world.S.Backpack, null, id => { if (World.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch") world.LightTorch(); }, "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.");
+        AddInventoryGrid(() => world.S.Backpack, null, id => { if (World.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero); }, "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.");
         AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
     }
     private void Select(Thing t)
@@ -425,15 +425,15 @@ public partial class Game : Node
                 // Until a numbered slot is chosen, quick save and load ask which slot to use.
                 case Key.F5: if (slot > 0) Save(slot); else ShowSlots(true, HideScreen); break;
                 case Key.F9: if (slot > 0) Load(slot); else ShowSlots(false, HideScreen); break;
-                case Key.Key1: UseHotbar(0); break;
-                case Key.Key2: UseHotbar(1); break;
-                case Key.Key3: UseHotbar(2); break;
-                case Key.Key4: UseHotbar(3); break;
-                case Key.Key5: UseHotbar(4); break;
-                case Key.Key6: UseHotbar(5); break;
-                case Key.Key7: UseHotbar(6); break;
-                case Key.Key8: UseHotbar(7); break;
-                case Key.Key9: UseHotbar(8); break;
+                case Key.Key1: SelectHotbar(0); break;
+                case Key.Key2: SelectHotbar(1); break;
+                case Key.Key3: SelectHotbar(2); break;
+                case Key.Key4: SelectHotbar(3); break;
+                case Key.Key5: SelectHotbar(4); break;
+                case Key.Key6: SelectHotbar(5); break;
+                case Key.Key7: SelectHotbar(6); break;
+                case Key.Key8: SelectHotbar(7); break;
+                case Key.Key9: SelectHotbar(8); break;
                 case Key.E:
                     var t = world.Find(selected);
                     if (t == null || !world.Near(t)) t = world.S.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
@@ -487,6 +487,7 @@ public partial class Game : Node
                     }
                     Select(t);
                 }
+                else if (ActiveHotbarItem() is string held && UseOf(held) != null) UseHeld(view.ToWorld(mouse.Position));
                 else ClosePanel();
             }
         }
@@ -600,7 +601,15 @@ public partial class Game : Node
         if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
         if (OS.GetCmdlineUserArgs().Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
         if (OS.GetCmdlineUserArgs().Contains("--craft")) OpenPage("craft");
-        if (OS.GetCmdlineUserArgs().Contains("--torch")) { world.Player = new Vector2(18, 30); world.S.Backpack.Add("torch", 1); world.LightTorch(); ClosePanel(); }
+        // Hovering a recipe shows its description below the grids and as a tooltip at the pointer.
+        if (OS.GetCmdlineUserArgs().Contains("--hover")) GetTree().CreateTimer(.5).Timeout += () =>
+        {
+            if (Named("craft_torch") is not Button cell) return;
+            cell.EmitSignal(Control.SignalName.MouseEntered);
+            var at = GetViewport().GetFinalTransform() * cell.GetGlobalRect().GetCenter();
+            Input.WarpMouse(at); Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
+        };
+        if (OS.GetCmdlineUserArgs().Contains("--torch")) { world.Player = new Vector2(18, 30); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!OS.GetCmdlineUserArgs().Contains("--kindle")) world.Tick(World.KindleSeconds); ClosePanel(); view.Zoom = 1.6f; }
         if (OS.GetCmdlineUserArgs().Contains("--crate")) { world.Player = crate.Pos + Vector2.One; Select(crate); }
         if (OS.GetCmdlineUserArgs().Contains("--anomaly")) { world.Player = crate.Pos + Vector2.One; CrateIntoCrate(crate, crate.Inventory, "crate"); }
         if (OS.GetCmdlineUserArgs().Contains("--collapse")) { world.Player = crate.Pos + Vector2.One; ClosePanel(); CrateIntoCrate(crate, crate.Inventory, "crate"); Collapse(crate); }

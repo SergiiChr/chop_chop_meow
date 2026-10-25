@@ -17,6 +17,8 @@ public enum ActorAction
     Pump,
     Hammer,
     Attack,
+    Kindle,
+    TorchSwing,
     Mauled,
     Devoured
 }
@@ -51,6 +53,8 @@ public static class ActorAnimation
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
+        ActorAction.Kindle => World.KindleSeconds,
+        ActorAction.TorchSwing => .6f,
         ActorAction.Mauled => .5f,
         ActorAction.Devoured => 1.4f,
         _ => 1
@@ -127,6 +131,18 @@ public static class ActorAnimation
                 return Keys(p, (0, fists),
                     (.32f, fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
                     (.5f, fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }));
+            case ActorAction.Kindle:
+                // The left hand holds the torch head forward while the right strikes steel down across flint four times.
+                var kneel = Stance with { Lean = 14, Head = 14, RaiseL = 40, OutL = -10, ElbowL = 70, RaiseR = 52, OutR = -20, ElbowR = 80 };
+                float strike = MathF.Sin(p * Mathf.Tau * 4);
+                return kneel with { RaiseR = 52 + strike * 18, ElbowR = 80 - strike * 34, Twist = strike * 4, RaiseL = 40 + MathF.Sin(p * Mathf.Tau) * 4 };
+            case ActorAction.TorchSwing:
+                // A wide forehand sweep of the torch arm across the body.
+                var torchUp = Stance with { RaiseL = 30, OutL = 4, ElbowL = 60, RaiseR = 20, OutR = 10, ElbowR = 30 };
+                return Keys(p, (0, torchUp),
+                    (.2f, torchUp with { Twist = 22, Lean = -4, RaiseL = 70, OutL = 50, ElbowL = 30 }),
+                    (.45f, torchUp with { Twist = -24, Lean = 10, RaiseL = 95, OutL = -40, ElbowL = 8 }),
+                    (.65f, torchUp with { Twist = -16, Lean = 6, RaiseL = 80, OutL = -30, ElbowL = 20 }));
             // Both downed poses are drawn with the rig tipped onto its back, so Raise points the arms at the sky.
             case ActorAction.Mauled:
                 // Pushing at the jaws over the throat with the head forced back while the legs kick.

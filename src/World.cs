@@ -93,6 +93,10 @@ public sealed class Wolf
     [JsonIgnore] public bool Growled { get; set; }
     /// <summary>Seconds a chasing wolf keeps following the player into firelight before it gives up.</summary>
     public float Chase { get; set; }
+    /// <summary>A torch swing toward this wolf made it keep its distance; it lasts while the torch burns.</summary>
+    public bool Scared { get; set; }
+    /// <summary>Seconds left running away after a direct torch hit.</summary>
+    public float Flee { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
 }
 public sealed class SaveState
@@ -126,8 +130,11 @@ public sealed class SaveState
     public List<string> Crafting { get; set; } = new();
     /// <summary>Seconds spent on the first queued recipe, at the speed of the tool used.</summary>
     public float CraftTime { get; set; }
-    /// <summary>Seconds left on the lit torch in the player's left hand, or zero when none burns.</summary>
+    /// <summary>Burn time left on the torch in the player's left hand, or zero when the hand is empty; it only burns while lit.</summary>
     public float Torch { get; set; }
+    public bool TorchLit { get; set; }
+    /// <summary>Seconds left striking flint and steel before the torch catches.</summary>
+    public float TorchKindling { get; set; }
     public int ActiveHotbar { get; set; }
     public float RespawnIn { get; set; }
     /// <summary>A wolf has pinned the player; it stays set through the following death until respawn.</summary>
@@ -436,18 +443,63 @@ public sealed class World
     }
     /// <summary>Burning campfires keep wolves out of their light, unless a wolf is already chasing the player.</summary>
     public bool Protected(Vector2 p) => S.Things.Any(t => t.Kind == "campfire" && t.Burn > 0 && t.Pos.DistanceTo(p) < 5.3f);
-    /// <summary>Wolves held off by a torch circle the player at this distance until enough gather to attack together.</summary>
+    /// <summary>Wolves scared by a torch circle the player at this distance until enough gather to attack together.</summary>
     public const float StalkDistance = 4.5f;
     public const int PackSize = 5;
+    public const float KindleSeconds = 2, ScareRange = 9, FleeSeconds = 2.5f;
+    /// <summary>
+    /// This many torch swings within <see cref="WildWindow"/> seconds put the torch out.
+    /// The swing cooldown allows at most four in two seconds, so four is the fastest non-stop swinging.
+    /// </summary>
+    public const int WildSwings = 4;
+    public const float WildWindow = 2;
+    private readonly List<float> torchSwings = new();
+    /// <summary>Seconds left of the brighter flare that follows a torch swing.</summary>
+    public float TorchFlare { get; private set; }
     /// <summary>Wolves close enough to the player to count toward a pack attack.</summary>
     public int PackAround => S.Wolves.Count(w => w.Pos.DistanceTo(Player) < StalkDistance * 2);
-    public bool LightTorch()
+    /// <summary>A burning torch in hand, with the player out in the open, sets how wolves behave.</summary>
+    private bool Torchlit => S.TorchLit && !Downed && S.Sheltered == 0 && !Protected(Player);
+    /// <summary>Lights the torch in hand, taking a new one from the backpack if the hand is empty, or swings it once it burns.</summary>
+    public void UseTorch(Vector2 aim)
     {
-        if (Downed) return false;
-        if (S.Torch > 0) { Say($"Your torch is still burning: {S.Torch / Data.DaySeconds * 24:0.#} hours left."); return false; }
-        if (S.Backpack.Remove("torch", 1) == 0) { Say("No torch in your backpack. Make one with a chisel from the crafting menu."); return false; }
-        S.Torch = Data.CampfireSeconds; Play("start_fire", Player);
-        Say($"Torch lit: {Data.CampfireHours:0} hours of light."); return true;
+        if (Downed || S.Sheltered != 0 || S.TorchKindling > 0) return;
+        if (S.TorchLit) { SwingTorch(aim); return; }
+        if (S.Torch <= 0)
+        {
+            if (S.Backpack.Remove("torch", 1) == 0) { Say("No torch in your backpack. Make one with a chisel from the crafting menu."); return; }
+            S.Torch = Data.CampfireSeconds;
+        }
+        S.TorchKindling = KindleSeconds; PlayerActed?.Invoke(ActorAction.Kindle, Player);
+    }
+    private void SwingTorch(Vector2 aim)
+    {
+        if (attackClock > 0) return;
+        attackClock = .6f;
+        torchSwings.RemoveAll(t => S.Time - t > WildWindow); torchSwings.Add(S.Time);
+        Vector2 direction = aim == Vector2.Zero ? Vector2.Down : aim.Normalized();
+        PlayerActed?.Invoke(ActorAction.TorchSwing, Player + direction); Play("tool_air_swing", Player);
+        if (torchSwings.Count >= WildSwings) { PutOutTorch(); Say("Torch went off due to wild swinging."); return; }
+        TorchFlare = .5f;
+        bool pack = PackAround >= PackSize;
+        var wolf = S.Wolves.Where(w => w.Leap <= 0 && !w.Feeding).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
+        if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f)
+        {
+            wolf.Health -= 1; wolf.Flee = FleeSeconds; wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f;
+            if (wolf.Health <= 0)
+            {
+                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * 45), 4);
+                Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
+            }
+        }
+        // A wave of fire toward a wolf on its own makes it keep its distance; a pack closing in no longer cares.
+        if (!pack)
+            foreach (var w in S.Wolves.Where(w => w.Pos.DistanceTo(Player) < ScareRange && (w.Pos - Player).Normalized().Dot(direction) > .7f)) w.Scared = true;
+    }
+    private void PutOutTorch()
+    {
+        S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
+        foreach (var w in S.Wolves) w.Scared = false;
     }
     public void Attack()
     {
@@ -474,7 +526,7 @@ public sealed class World
         // After a mauling the box lands past the feet, away from the wolf at the throat, so the feeding stays visible.
         var killer = S.Mauled ? S.Wolves.FirstOrDefault(w => w.Pinning) : null;
         var box = Add("grave", killer == null ? Player : Player + (Player - killer.Pos).Normalized() * 1.5f); box.Inventory = S.Backpack;
-        S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0;
+        S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
         if (S.Mauled)
         {
             // The pack eats every scrap of food and stays to feed until the player respawns.
@@ -846,7 +898,13 @@ public sealed class World
             if (S.Hunger <= 0 || S.Thirst <= 0) S.Health -= dt * 1.4f;
             else if (S.Hunger > 45 && S.Thirst > 45) S.Health = Math.Min(100, S.Health + dt * .12f);
         }
-        if (S.Torch > 0 && (S.Torch -= dt) <= 0) { S.Torch = 0; Say("Your torch burned out."); }
+        TorchFlare = Math.Max(0, TorchFlare - dt);
+        if (S.TorchKindling > 0 && (S.TorchKindling -= dt) <= 0)
+        {
+            S.TorchKindling = 0;
+            if (!Downed && S.Torch > 0) { S.TorchLit = true; Play("start_fire", Player); Say($"Torch lit: {S.Torch / Data.DaySeconds * 24:0.#} hours of light left."); }
+        }
+        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); Say("Your torch burned out."); }
         if (Day > S.WageDay) { PayWages(); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow."); }
         foreach (var item in S.Demand.Keys.ToArray()) S.Demand[item] = Mathf.MoveToward(S.Demand[item], 1, dt * .0009f);
         foreach (var order in S.Orders.ToArray())
@@ -967,22 +1025,23 @@ public sealed class World
         {
             nightSpawn -= dt;
             // A torch draws the whole pack in, but slowly.
-            if (nightSpawn <= 0 && S.Wolves.Count < (S.Torch > 0 ? 6 : Math.Min(6, 2 + Day)))
+            if (nightSpawn <= 0 && S.Wolves.Count < (S.TorchLit ? 6 : Math.Min(6, 2 + Day)))
             {
-                nightSpawn = S.Torch > 0 ? 25 : 15; float angle = S.Time * 2.4f;
+                nightSpawn = S.TorchLit ? 25 : 15; float angle = S.Time * 2.4f;
                 var p = Player + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 11;
                 p = p.Clamp(Vector2.One * 2, Vector2.One * 45); S.Wolves.Add(new Wolf { Pos = p, Health = 4 + Day * .4f });
-                Say("A wolf is prowling nearby. Stay by fire or shelter; Space swings your axe."); Play("wolf_growl_distance", p);
+                Say("A wolf is prowling nearby. Stay by fire or shelter; Space or a click with an axe in hand swings it."); Play("wolf_growl_distance", p);
             }
         }
         bool lit = Protected(Player), inside = S.Sheltered != 0;
-        bool stalking = S.Torch > 0 && !lit && !inside && !Downed && PackAround < PackSize;
-        if (S.Torch > 0 && !stalking && !lit && !inside && !Downed && !packAttack) Say("The pack has you surrounded. They attack!");
-        packAttack = S.Torch > 0 && !stalking;
+        // Behind a torch a lone wolf creeps in until a swing scares it off; once the pack is complete they attack together.
+        bool torch = Torchlit, pack = torch && PackAround >= PackSize, wary = torch && !pack;
+        if (pack && !packAttack) Say("The pack has you surrounded. They attack!");
+        packAttack = pack;
         // A wounded player away from fire and shelter invites a leap for the throat.
-        if (!Downed && S.Health <= 50 && !lit && !inside && !stalking && S.Wolves.All(w => w.Leap <= 0))
+        if (!Downed && S.Health <= 50 && !lit && !inside && !wary && S.Wolves.All(w => w.Leap <= 0))
         {
-            var hunter = S.Wolves.Where(w => !Protected(w.Pos) && w.Pos.DistanceTo(Player) < LeapRange).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
+            var hunter = S.Wolves.Where(w => !Protected(w.Pos) && w.Flee <= 0 && w.Pos.DistanceTo(Player) < LeapRange).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
             if (hunter != null) { hunter.Leap = LeapSeconds; Say("A wolf leaps for your throat!"); }
         }
         float speed = Math.Min(3.8f, 3 + Day * .1f);
@@ -1004,13 +1063,25 @@ public sealed class World
                 wolf.Pos = wolf.Pos.MoveToward(seat, dt * FeastSpeed);
                 wolf.Feeding = wolf.Pos.DistanceTo(seat) < .05f;
             }
-            else if (stalking)
+            else if (wolf.Flee > 0)
             {
-                // Each wolf keeps its bearing and closes to the edge of the torchlight, so a growing pack surrounds the player.
+                wolf.Flee -= dt; wolf.Chase = 0;
+                wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + (wolf.Pos - Player).Normalized() * 3, dt * speed);
+            }
+            else if (wary && wolf.Scared)
+            {
+                // Each scared wolf keeps its bearing at the edge of the torchlight, so a growing pack surrounds the player.
                 wolf.Chase = 0;
                 var away = wolf.Pos == Player ? Vector2.Right : (wolf.Pos - Player).Normalized();
                 wolf.Pos = wolf.Pos.MoveToward(Player + away * StalkDistance, dt * speed * .6f);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
+            }
+            else if (wary)
+            {
+                wolf.Chase = 0;
+                wolf.Pos = wolf.Pos.MoveToward(Player, dt * speed * .35f);
+                if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
+                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
             }
             // A wolf already on the player's heels follows briefly into firelight, but backs off from a cabin at once.
             else if (inside || (lit || Protected(wolf.Pos)) && wolf.Chase <= 0) { wolf.Chase = 0; wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + (wolf.Pos - Player).Normalized() * 3, dt * 3); }

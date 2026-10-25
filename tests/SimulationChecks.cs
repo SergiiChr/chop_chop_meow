@@ -47,7 +47,7 @@ public static class SimulationChecks
         CheckLegacySteelTools(data);
         CheckNoToolDeadlocks(data);
         CheckTorch(data);
-        CheckTorchHoldsOffLoneWolves(data);
+        CheckTorchAndWolves(data);
         CheckWaterStacksOnlyInCrates(data);
         CheckActualProgression(data);
         GD.Print("SELF-TEST PASS");
@@ -1092,37 +1092,93 @@ public static class SimulationChecks
     {
         var world = EmptyWorld(data);
         world.S.Backpack.Add("wood", 3);
-        Require(!world.Craft("torch") && !world.LightTorch() && world.S.Torch == 0, "a torch needs a chisel to make and a torch to light");
+        world.UseTorch(Vector2.Zero);
+        Require(!world.Craft("torch") && world.S.Torch == 0 && world.S.TorchKindling == 0, "a torch needs a chisel to make and a torch to light");
         world.S.Backpack.Add("stone_chisel", 1);
         Require(world.Craft("torch") && world.S.Backpack["wood"] == 0, "a torch should take 3 wood and nothing else");
         SafeTick(world, data.Recipes["torch"].Seconds + .25f);
         world.S.Backpack.Add("torch", 1);
-        Require(world.S.Backpack["torch"] == 2 && world.LightTorch() && world.S.Backpack["torch"] == 1 && world.S.Torch == data.CampfireSeconds,
-                "lighting a torch should use one up and burn as long as a campfire");
-        Require(!world.LightTorch() && world.S.Backpack["torch"] == 1, "a second torch should not be wasted while one burns");
-        SafeTick(world, data.CampfireSeconds + .25f);
-        Require(world.S.Torch == 0 && world.S.Backpack["torch"] == 1, "a torch should burn out for good");
-        world.LightTorch(); world.Die();
-        Require(world.S.Torch == 0, "a torch should go out when the player falls");
+        world.UseTorch(Vector2.Zero);
+        Require(world.S.Backpack["torch"] == 1 && world.S.Torch == data.CampfireSeconds && !world.S.TorchLit, "the first use should take a torch in hand and start striking flint");
+        SafeTick(world, World.KindleSeconds - .2f);
+        Require(!world.S.TorchLit, "lighting should take its time");
+        SafeTick(world, .3f);
+        Require(world.S.TorchLit && world.S.Backpack["torch"] == 1, "the torch should catch after the lighting animation");
+
+        // Steady swings keep it burning and flare the light; four in two seconds put it out.
+        for (int i = 0; i < 4; i++) { world.UseTorch(Vector2.Right); Require(world.TorchFlare > 0, "a swing should flare the light"); SafeTick(world, .7f); }
+        Require(world.S.TorchLit, "swinging at a steady pace should keep the torch burning");
+        SafeTick(world, World.WildWindow);
+        string said = "";
+        world.Notify += message => said = message;
+        for (int i = 0; i < World.WildSwings; i++) { world.UseTorch(Vector2.Right); SafeTick(world, .65f); }
+        float left = world.S.Torch;
+        Require(!world.S.TorchLit && said == "Torch went off due to wild swinging.", "wild swinging should put the torch out with a message");
+        SafeTick(world, 5);
+        Require(world.S.Torch == left, "an unlit torch should keep its burn time");
+        world.UseTorch(Vector2.Zero); SafeTick(world, World.KindleSeconds + .1f);
+        Require(world.S.TorchLit && world.S.Backpack["torch"] == 1 && world.S.Torch < left && world.S.Torch > left - 1, "relighting should not use a new torch or reset its time");
+        SafeTick(world, world.S.Torch + .25f);
+        Require(world.S.Torch == 0 && !world.S.TorchLit && world.S.Backpack["torch"] == 1, "a torch should burn out for good");
+        world.UseTorch(Vector2.Zero); world.Die();
+        Require(world.S.Torch == 0 && !world.S.TorchLit && world.S.TorchKindling == 0, "a torch should go out when the player falls");
     }
 
-    private static void CheckTorchHoldsOffLoneWolves(GameData data)
+    private static World TorchNight(GameData data)
     {
         var world = NightWorld(data);
-        world.S.Backpack.Add("torch", 1); world.LightTorch(); world.S.Health = 40;
-        var wolf = new Wolf { Pos = world.Player + new Vector2(8, 0), Health = 4 };
-        world.S.Wolves.Add(wolf);
-        for (int i = 0; i < 100; i++) { world.S.Hunger = world.S.Thirst = 100; world.Tick(.1f); }
-        Require(world.S.Health >= 40 && !world.S.Mauled && wolf.Leap == 0 && Math.Abs(wolf.Pos.DistanceTo(world.Player) - World.StalkDistance) < .3f,
-                "with a torch a lone wolf should follow at the edge of its light, not bite or leap");
-        Require(world.S.Wolves.Count < World.PackSize, "the pack should gather slowly");
+        world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); world.Tick(World.KindleSeconds + .1f);
+        Require(world.S.TorchLit, "the torch fixture should be lit");
+        return world;
+    }
 
-        var pack = NightWorld(data);
-        pack.S.Backpack.Add("torch", 1); pack.LightTorch();
-        for (int i = 0; i < World.PackSize; i++)
-            pack.S.Wolves.Add(new Wolf { Pos = pack.Player + Vector2.Right.Rotated(i * Mathf.Tau / World.PackSize) * World.StalkDistance, Health = 4 });
-        for (int i = 0; i < 40; i++) { pack.S.Hunger = pack.S.Thirst = 100; pack.Tick(.1f); }
-        Require(pack.S.Health < 100, $"{World.PackSize} wolves around a torch should attack");
+    /// <summary>Ticks a night with only the given wolves, so new arrivals do not interfere.</summary>
+    private static void WolfTick(World world, float seconds, params Wolf[] keep)
+    {
+        for (float t = 0; t < seconds; t += .1f)
+        {
+            world.S.Hunger = world.S.Thirst = 100; world.Tick(.1f);
+            world.S.Wolves.RemoveAll(w => !keep.Contains(w));
+        }
+    }
+
+    private static void CheckTorchAndWolves(GameData data)
+    {
+        var creeping = TorchNight(data);
+        var lone = new Wolf { Pos = creeping.Player + new Vector2(8, 0), Health = 4 };
+        creeping.S.Wolves.Add(lone);
+        WolfTick(creeping, 3, lone);
+        Require(lone.Pos.DistanceTo(creeping.Player) < 6.5f && lone.Pos.DistanceTo(creeping.Player) > 3.5f, "a lone wolf should creep in slowly even with a torch");
+
+        var scared = TorchNight(data);
+        var wolf = new Wolf { Pos = scared.Player + new Vector2(6, 0), Health = 4 };
+        var behind = new Wolf { Pos = scared.Player + new Vector2(-6, 0), Health = 4 };
+        scared.S.Wolves.AddRange(new[] { wolf, behind });
+        scared.UseTorch(Vector2.Right);
+        Require(wolf.Scared && !behind.Scared, "a swing should scare only the wolves it is aimed at");
+        scared.S.Wolves.Remove(behind);
+        WolfTick(scared, 8, wolf);
+        Require(scared.S.Health == 100 && Math.Abs(wolf.Pos.DistanceTo(scared.Player) - World.StalkDistance) < .3f, "a scared wolf should follow at the edge of the light without biting");
+
+        var hit = TorchNight(data);
+        var close = new Wolf { Pos = hit.Player + new Vector2(2, 0), Health = 4 };
+        hit.S.Wolves.Add(close);
+        hit.UseTorch(Vector2.Right);
+        float struck = close.Pos.DistanceTo(hit.Player);
+        WolfTick(hit, 1, close);
+        Require(close.Health == 3 && close.Flee > 0 && close.Pos.DistanceTo(hit.Player) > struck + 1, "a direct torch hit should hurt the wolf and send it running");
+
+        var gathering = TorchNight(data);
+        for (int i = 0; i < 100; i++) { gathering.S.Hunger = gathering.S.Thirst = 100; gathering.Tick(.1f); }
+        Require(gathering.S.Wolves.Count < World.PackSize, "the pack should gather slowly");
+
+        var pack = TorchNight(data);
+        var wolves = Enumerable.Range(0, World.PackSize).Select(i => new Wolf { Pos = pack.Player + Vector2.Right.Rotated(i * Mathf.Tau / World.PackSize) * World.StalkDistance, Health = 4 }).ToArray();
+        pack.S.Wolves.AddRange(wolves);
+        pack.UseTorch(Vector2.Right);
+        Require(wolves.All(w => !w.Scared), "a complete pack should ignore a swing");
+        WolfTick(pack, 4, wolves);
+        Require(pack.S.Health < 100, $"{World.PackSize} wolves around a torch should attack together");
     }
 
     private static void CheckWaterStacksOnlyInCrates(GameData data)

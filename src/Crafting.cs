@@ -12,7 +12,7 @@ public partial class Game
 
     private void CraftMenu()
     {
-        AddLabel("Crafting by hand takes about 10 seconds and works on the go. A crafting bench works twice as fast.", 13, Muted);
+        AddLabel("Crafting on the go. Using workbench is faster.", 13, Muted);
         var details = Label("Hover a recipe to see what it needs. Click to start making it.", 14, Muted);
         foreach (var group in world.HandRecipes.GroupBy(id => world.Data.Recipes[id].Tool).OrderBy(g => g.Key))
         {
@@ -112,27 +112,22 @@ public partial class Game
     }
 
     /// <summary>
-    /// A boxed grid of recipe icons; the icon of the tool they need sits over the box's top-left corner and turns red while that tool is missing.
+    /// A boxed grid of recipe icons under a heading naming the tool they need, whose icon turns red while that tool is missing.
     /// <paramref name="held"/> names the tool in use, or null when it is missing or none is needed.
     /// </summary>
     private void CraftSection(string tool, Func<string?> held, IEnumerable<string> recipes, Label details, bool atBench, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready)
     {
-        // Room above the box for the badge, which hangs over its corner.
-        content.AddChild(new Control { CustomMinimumSize = new Vector2(0, tool == "" ? 2 : 12) });
         var section = new PanelContainer { Name = $"section_{(tool == "" ? "hand" : tool)}" };
         section.AddThemeStyleboxOverride("panel", Box(new Color("1f342b"), 6, 10));
         content.AddChild(section);
         var column = new VBoxContainer(); section.AddChild(column);
-        var heading = new HBoxContainer(); column.AddChild(heading);
+        var heading = new HBoxContainer(); heading.AddThemeConstantOverride("separation", 6); column.AddChild(heading);
+        var title = Label(tool == "" ? "No requirements" : "Required:", 13, Muted); title.AutowrapMode = TextServer.AutowrapMode.Off; heading.AddChild(title);
         if (tool != "")
         {
             string plainest = world.Data.Items.Where(p => p.Value.Tool == tool).OrderBy(p => p.Value.Speed).First().Key;
-            // A zero-size anchor lets the badge overlap the corner without the container laying it out.
-            var anchor = new Control { MouseFilter = Control.MouseFilterEnum.Ignore };
-            heading.AddChild(anchor);
-            var badge = new TextureRect { Name = "badge", Texture = HotbarIcon(plainest), Position = new Vector2(-20, -24), Size = new Vector2(36, 36), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };
-            anchor.AddChild(badge);
-            heading.AddChild(new Control { CustomMinimumSize = new Vector2(22, 0) });
+            var badge = new TextureRect { Name = "badge", Texture = HotbarIcon(plainest), CustomMinimumSize = new Vector2(26, 26), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };
+            heading.AddChild(badge);
             live.Add(() =>
             {
                 if (!GodotObject.IsInstanceValid(badge)) return;
@@ -144,7 +139,6 @@ public partial class Game
                     : atBench ? $"Needs a {tool} in the bench's {tool} slot" : $"Needs a {tool} in your backpack{(tool == "chisel" ? " · knap a stone chisel from 2 stone" : "")}";
             });
         }
-        var title = Label(tool == "" ? "BY HAND" : tool.ToUpperInvariant(), 13, Muted); title.AutowrapMode = TextServer.AutowrapMode.Off; heading.AddChild(title);
         var grid = new GridContainer { Columns = GridColumns };
         grid.AddThemeConstantOverride("h_separation", 4); grid.AddThemeConstantOverride("v_separation", 4);
         column.AddChild(grid);

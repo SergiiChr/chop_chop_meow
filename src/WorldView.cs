@@ -375,11 +375,20 @@ public partial class WorldView : Node3D
         string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool() : null);
         bool torch = World.S.Torch > 0 && !World.Dead;
         Pose(playerRig, player, tool, torch);
-        if (torch)
+        playerRig.Flame.Visible = World.S.TorchLit;
+        if (World.S.TorchLit)
         {
-            float flicker = MathF.Sin(Elapsed * 13) * .5f + MathF.Sin(Elapsed * 29 + 1) * .5f;
-            playerRig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + MathF.Abs(MathF.Sin(Elapsed * 11)) * .3f, 1 - flicker * .1f);
-            playerRig.TorchLight.LightEnergy = (1 + flicker * .25f) * (.3f + night * 1.3f);
+            float flicker = MathF.Sin(Elapsed * 13) * .5f + MathF.Sin(Elapsed * 29 + 1) * .5f, flare = World.TorchFlare / .5f;
+            playerRig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + MathF.Abs(MathF.Sin(Elapsed * 11)) * .3f, 1 - flicker * .1f) * (1 + flare * .25f);
+            // A swing fans the flame: the lit circle grows by a fifth and settles back.
+            playerRig.TorchLight.OmniRange = 5 * (1 + .2f * flare);
+            playerRig.TorchLight.LightEnergy = (1 + flicker * .25f + flare * .3f) * (.3f + night * 1.3f);
+        }
+        // Each strike of steel on flint throws a few sparks onto the torch head.
+        if (player.Action == ActorAction.Kindle && (player.Struck(.1875f) || player.Struck(.4375f) || player.Struck(.6875f) || player.Struck(.9375f)))
+        {
+            Burst(playerRig.Flame.GlobalPosition, Flat(new Color("ffd27a")), 7, 2.2f, .3f, 6, .022f);
+            Sounds?.Play("anvil_work");
         }
         if (World.S.Mauled)
         {
