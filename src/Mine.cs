@@ -20,9 +20,13 @@ public sealed partial class World
     public static Vector2 MineOut(Cliff c) => c.Along * Math.Sign(c.Along.Dot(Terrain.Seaward));
     /// <summary>
     /// A mine's spot: on open ground in front of the rock spur at the cliff's seaward end, where the cart stands at the end of the rails.
-    /// It sits a little toward the valley, since some cliffs end where the valley's edge already climbs into the mountains.
+    /// It sits toward the valley, far enough from the foot of the range that the slopes in front of the camera do not hide the entrance.
     /// </summary>
-    public static Vector2 MineSpot(Cliff c) => c.Center + MineOut(c) * (c.HalfLength + 6.7f) + c.Face * 2.5f;
+    public static Vector2 MineSpot(Cliff c)
+    {
+        var end = c.Center + MineOut(c) * (c.HalfLength + 6.7f);
+        return end + c.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
+    }
     /// <summary>The middle of the spur the adit is driven into; it blocks walking like the cliff, whether or not it is mined.</summary>
     private static Vector2 SpurCenter(Cliff c) => MineSpot(c) - MineOut(c) * 4.2f;
     private static bool InSpur(Vector2 p, float margin = 0) => Cliffs.Any(c => p.DistanceTo(SpurCenter(c)) < 2 + margin);
