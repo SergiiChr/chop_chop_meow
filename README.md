@@ -10,7 +10,7 @@ From the project directory:
 ./build.py play
 ```
 
-The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates, and build output under `.tools/` and `build/`. First-time setup downloads missing tools and needs internet access. To use an installed Godot 4.7.2 .NET binary, set `GODOT_BIN=/path/to/godot`. Interactive play needs a working Linux graphics driver; the project uses Godot's Compatibility renderer. OpenGL renders on the integrated GPU of a hybrid-graphics laptop unless told otherwise, so with the NVIDIA driver loaded `play` and `editor` request PRIME render offload to the NVIDIA GPU. Set `CHOP_CHOP_MEOW_GPU=integrated` to keep the default GPU. The exported executable does not do this; launch it with `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia` (or your desktop's "Launch using dedicated GPU") for the same effect.
+The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates, and build output under `.tools/` and `build/`. First-time setup downloads missing tools and needs internet access. To use an installed Godot 4.7.2 .NET binary, set `GODOT_BIN=/path/to/godot`. Interactive play needs a working Linux graphics driver; the project uses Godot's Compatibility renderer. OpenGL picks the integrated GPU by default, so where switcheroo-control reports a discrete GPU, `play` and `editor` launch with its environment, the same as the desktop's "Launch using Discrete GPU". Launch the exported executable that way to get the same effect.
 
 ```sh
 ./build.py setup    # prepare local tools, compile C#, and import assets
