@@ -157,7 +157,7 @@ public partial class Game : Node
     private void RefreshLive()
     {
         if (world == null || stats == null) return;
-        int hour = (int)(world.DayPhase * 24 + 6) % 24;
+        int hour = (int)world.Hour;
         stats.Text = $"Day {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}  {(world.Night ? "NIGHT" : "DAYLIGHT")}";
         string feeding = world.S.Wolves.Count(w => w.Feeding) > 1 ? "The pack is feeding" : "A wolf is feeding";
         deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? feeding : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
@@ -198,7 +198,7 @@ public partial class Game : Node
         AddLabel("A small settlement begins with your own two hands. Shape iron, master the bellows, and send your first steel tools to the village.", 16, Muted);
         AddLabel("FIRST STEPS", 14);
         AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Explore the woods for loose iron at the foot of a cliff.\n4  Press Esc any time to see your current goal.");
-        AddLabel("You begin with an iron axe, 10 berries and 6 wood. Drink at the pond to the west; gather water to carry. A fire and cabin protect you after dark.", 15, Muted);
+        AddLabel("You begin with an iron axe, 10 berries and 6 wood. Drink at the lake up the valley; gather water to carry. The sea is salt and cannot be drunk. A fire and cabin protect you after dark.", 15, Muted);
         AddButton("Into the clearing", ClosePanel);
         AddLabel("10–15 minute POC · single player · Linux", 13, Muted);
     }
@@ -209,7 +209,7 @@ public partial class Game : Node
         AddLabel("IRON → STEEL", 16);
         AddLabel("Loose iron needs no pickaxe. Smelt 2 ore + 1 wood/coal per iron bar. Build an anvil and forge an iron pickaxe to mine real coal. Steel needs the reinforced furnace: 2 iron bars + 2 mined coal, plus 1 mined coal as fuel. Pump regularly above 80°. Forge 2 steel bars + 2 wood into steel tools.", 15, Muted);
         AddLabel("VILLAGERS & STORAGE", 16);
-        AddLabel("Hire at a signpost (24 coins; 8/day). Worker → Work → click a resource. Building → Assign → select named villagers. Put inputs in storage for hauling. One furnace worker alternates hauling and pumping; with two, the first pumps while the second hauls. No accepting chest means work pauses safely.", 15, Muted);
+        AddLabel("Hire at a signpost (24 coins; 8/day). Worker → Work → click a resource. Building → Assign → select named villagers. Put inputs in storage for hauling. One furnace worker alternates hauling and pumping; with two, the first pumps while the second hauls. No accepting chest means work pauses safely. Workers break for lunch at noon around the nearest campfire, sign out at dusk and walk back in at dawn; their assignments and loads stay as they were.", 15, Muted);
         AddLabel("Empty filters allow everything. Input filters control worker deposits; output filters control worker withdrawals. Workers prefer explicitly matching input-filter chests before the nearest general chest. Manual transfers ignore automation filters. Hold Shift while transferring to move a full stack.", 15, Muted);
         AddLabel("STAY ALIVE", 16);
         AddLabel("A full stomach lasts a day and a full water droplet half a day. Wolves are fast and avoid campfire light (5-tile radius), though a wolf already chasing you follows briefly into it. Click a cabin to step inside; wolves back off at once. At half health or less, a nearby wolf leaps for your throat and the pack joins the feast; a wolf kill also destroys the food in your recovery box. Slain wolves leave a carcass: hold right mouse to butcher it for raw meat, then cook it in a stone furnace before eating. Only a burning campfire keeps wolves away; feed it wood, and each log burns about 4 hours. Sleep in a cabin at night if your food and water will last until morning; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
@@ -253,7 +253,7 @@ public partial class Game : Node
         if (t.IsResource)
         {
             Dynamic(() => $"{t.Remaining} remaining\n{world.GatherBlock(t) ?? (t.IsLoose ? "Right-click to walk over and pick it up." : "Hold right mouse on this resource to gather.")}", 15);
-            if (t.Kind == "water") AddButton("Drink from the pond", () => { if (world.Near(t)) { world.S.Thirst = 100; Notify("Cool, fresh water."); sounds.Play("gather_water"); } else Notify("Walk closer to the pond."); });
+            if (t.Kind == "water") AddButton("Drink from the lake", () => { if (world.Near(t)) { world.S.Thirst = 100; Notify("Cool, fresh water."); sounds.Play("gather_water"); } else Notify("Walk closer to the lake."); });
             AddLabel("Select a villager and choose Work to automate this resource. Their gathered supplies go to accepting storage.", 14, Muted); return;
         }
         if (t.Kind == "hut") { Cabin(t); return; }
@@ -352,11 +352,12 @@ public partial class Game : Node
     }
     private void Workers()
     {
-        AddLabel($"{world.S.Workers.Count}/8 villagers · {world.S.Workers.Sum(w => w.Wage):0} coins/day", 17);
+        AddLabel($"Daily pay {world.S.Workers.Sum(w => w.Wage):0} coins", 19);
+        AddLabel($"{world.S.Workers.Count}/8 villagers · paid from your backpack at dawn", 14, Muted);
         if (world.S.Workers.Count == 0) AddLabel("Build a village signpost to hire help. Your first steel-tool sale can cover hiring and wages.", 15, Muted);
         foreach (var w in world.S.Workers)
         {
-            var worker = w; AddButton(w.Name, () => Select(worker)); Dynamic(() => worker.Status, 14, Muted);
+            var worker = w; AddButton($"{w.Name} · {w.Wage:0} coins/day", () => Select(worker)); Dynamic(() => worker.Status, 14, Muted);
         }
     }
     /// <summary>Burn time as in-game hours and minutes.</summary>
@@ -482,7 +483,7 @@ public partial class Game : Node
             // A loose piece needs only one click: the player keeps walking to it after the button is released.
             if (gathering != null && (right || gathering.IsLoose) && direction == Vector2.Zero && entering == null)
             {
-                // Step in close enough for the tool to reach the model; the pond edge keeps its wider reach.
+                // Step in close enough for the tool to reach the model; the lake edge keeps its wider reach.
                 if (!world.Near(gathering, gathering.Kind == "water" ? 2.5f : 1.35f)) direction = (gathering.Pos - world.Player).Normalized();
                 else if (gathering.IsLoose)
                 {
@@ -530,11 +531,11 @@ public partial class Game : Node
     private void Showcase()
     {
         foreach (var t in world.S.Things.Where(t => t.Pos.DistanceTo(World.Spawn) < 8).ToArray()) world.S.Things.Remove(t);
-        var hut = world.Add("hut", new Vector2(21, 22)); var fire = world.Add("campfire", new Vector2(24, 21)); fire.Burn = 200;
-        var f = world.Add("furnace", new Vector2(27, 22)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);
-        var bellows = world.Add("reinforced", new Vector2(29, 25)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Heat = 100;
-        var chest = world.Add("chest", new Vector2(25, 27)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
-        world.Add("anvil", new Vector2(27, 28)); var sign = world.Add("signpost", new Vector2(22, 28));
+        var hut = world.Add("hut", World.Spawn + new Vector2(-2, -2)); var fire = world.Add("campfire", World.Spawn + new Vector2(1, -3)); fire.Burn = 200;
+        var f = world.Add("furnace", World.Spawn + new Vector2(4, -2)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);
+        var bellows = world.Add("reinforced", World.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Heat = 100;
+        var chest = world.Add("chest", World.Spawn + new Vector2(2, 3)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
+        world.Add("anvil", World.Spawn + new Vector2(4, 4)); var sign = world.Add("signpost", World.Spawn + new Vector2(-1, 4));
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("steel_tools", 2); world.S.Backpack.Add("water", 4); world.S.Backpack.Add("iron_pick", 1);
         world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools" });
         // The review fixture is deliberately separate from a fresh playable game.
@@ -545,12 +546,19 @@ public partial class Game : Node
         sign.Inventory.Add("iron_bar", 6); sign.Output!.Add(Inventory.Coins, 36);
         if (OS.GetCmdlineUserArgs().Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         // A past walk toward the iron cliff leaves explored ground beyond the live sight circle.
-        for (float y = 24; y >= 10; y -= 2) { world.Player = new Vector2(23 + (24 - y) * .5f, y); world.Tick(0); }
+        for (float d = 0; d <= 14; d += 2) { world.Player = World.Spawn + new Vector2(d * .5f, -d); world.Tick(0); }
         world.Player = World.Spawn; world.Tick(0); Select(bellows);
         if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
+        if (OS.GetCmdlineUserArgs().Contains("--lunch"))
+        {
+            // Lunch review: the crew has walked over and sat down around the campfire, with the pay overview open.
+            world.S.Time = (world.Data.LunchHour - 6) / 24 * world.Data.DaySeconds;
+            for (int i = 0; i < 60; i++) world.Tick(.25f);
+            OpenPage("workers");
+        }
         if (!OS.GetCmdlineUserArgs().Contains("--wolves")) return;
         // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
-        var spot = new Vector2(34, 32);
+        var spot = World.Spawn + new Vector2(11, 8);
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(spot) < 6);
         world.S.Time = world.Data.DaySeconds * .78f; world.Player = spot; world.S.Health = 45;
         foreach (var offset in new[] { new Vector2(2.5f, -1), new Vector2(-6, 3), new Vector2(5, 5) }) world.S.Wolves.Add(new Wolf { Pos = spot + offset });

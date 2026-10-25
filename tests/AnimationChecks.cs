@@ -119,6 +119,17 @@ public static class AnimationChecks
         worker.Status = "Arbitrary status";
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "iron" }, false) == ActorAction.Mine,
             "workers gathering iron should mine");
+        worker.WorkState = WorkerWorkState.Resting;
+        worker.Bag.Add("wood", 2);
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, false) == ActorAction.Perch,
+            "a worker at lunch should sit, even holding a load");
+        worker.Id = 1;
+        Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Sit,
+            "every other worker should sit cross-legged on the ground rather than on a rock");
+        worker.Id = 0;
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, true) == ActorAction.Carry,
+            "a worker still walking to lunch should not sit");
+        worker.Bag.Remove("wood", 2);
         worker.Status = "Available";
         worker.WorkState = WorkerWorkState.Idle;
         Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Idle,
@@ -142,6 +153,8 @@ public static class AnimationChecks
         var strike = ActorAnimation.PoseAt(ActorAction.Chop, .52f, false);
         Require(windup.RaiseR > 150 && strike.RaiseR < 100, "the axe stroke should rise overhead and come down to the trunk");
         Require(ActorAnimation.PoseAt(ActorAction.Gather, .3f, false).KneeL > 80, "hand gathering should crouch");
+        Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Seat is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Seat == 0,
+            "a cross-legged worker should sit on the ground, and one on a rock should not");
         Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick" && ActorAnimation.Tool(ActorAction.Hammer) == "hammer" && ActorAnimation.Tool(ActorAction.Gather) == null,
             "each action should show its own tool, and hand gathering none");
     }

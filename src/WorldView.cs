@@ -279,7 +279,7 @@ public partial class WorldView : Node3D
     {
         SyncCamera();
         Worker? best = null; float nearest = float.MaxValue;
-        foreach (var w in World.S.Workers.Where(w => World.Sees(w.Pos)))
+        foreach (var w in World.S.Workers.Where(w => World.Sees(w)))
             if (RayHits(screen, w.Pos, PersonHit, out float d) && d < nearest) { nearest = d; best = w; }
         return best;
     }
@@ -393,20 +393,23 @@ public partial class WorldView : Node3D
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking);
             if (work == ActorAction.Hammer && assignment?.Processing != true) work = ActorAction.Idle;
-            state.Update(worker.Pos, work, assignment?.Pos ?? worker.Pos, dt);
+            var facing = work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment?.Pos ?? worker.Pos;
+            state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, ActorAnimation.Tool(work));
-            entry.Rig.Root.Visible = World.Sees(worker.Pos);
-            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? null : assignment);
+            entry.Rig.Root.Visible = World.Sees(worker);
+            float trip = worker.Away > 0 ? World.TripLeg(1 - worker.Away / World.Data.TradeSeconds) : worker.Commute / (World.Data.TradeSeconds / 2);
+            Fade(entry.Rig.Root, TripFade(trip));
+            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch ? null : assignment);
         }
         foreach (int id in crew.Keys.Where(id => World.S.Workers.All(w => w.Id != id)).ToArray())
         {
-            crew[id].Rig.Root.QueueFree(); crew.Remove(id);
+            fades.Remove(crew[id].Rig.Root); crew[id].Rig.Root.QueueFree(); crew.Remove(id);
         }
     }
 
     private string FootstepSound(Vector2 p)
     {
-        if (p.DistanceTo(World.Pond) < World.PondRadius + 1) return "footsteps_water";
+        if (Terrain.InLake(p, 1)) return "footsteps_water";
         bool rocky = World.Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 3) || World.S.Things.Any(t => t.Kind is "stone" or "iron" or "coal" && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f);
         return rocky ? "footsteps_rocks" : "footsteps_default";
     }
@@ -415,7 +418,7 @@ public partial class WorldView : Node3D
     {
         rig.Root.Position = To3(state.Position);
         rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
-        rig.Show(ActorAnimation.PoseAt(state.Action, state.Time, state.Moving), tool, state.Action == ActorAction.Carry);
+        rig.Show(ActorAnimation.PoseAt(state.Action, state.Time, state.Moving), tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch);
     }
 
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
@@ -612,7 +615,7 @@ public partial class WorldView : Node3D
             if (t.Kind != "tree" || t.Remaining <= 0 || !props.TryGetValue(t.Id, out var prop)) continue;
             if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
             bool covers = !World.Dead && TreeCoversPerson(t, World.Player) ||
-                World.S.Workers.Any(w => World.Sees(w.Pos) && TreeCoversPerson(t, w.Pos)) ||
+                World.S.Workers.Any(w => World.Sees(w) && TreeCoversPerson(t, w.Pos)) ||
                 structures.Any(o => Covers(t, o));
             float fade = Mathf.MoveToward(prop.Fade, covers ? .68f : 0, Math.Max(dt, .016f) * 3);
             if (Math.Abs(fade - prop.Fade) < .001f) continue;
@@ -647,13 +650,26 @@ public partial class WorldView : Node3D
         }
     }
 
+    /// <summary>Fully drawn for the first part of a trip, then fading to nothing at the turn.</summary>
+    private static float TripFade(float leg) => Math.Clamp((leg - .35f) / .55f, 0, 1);
+    private readonly Dictionary<Node, float> fades = new();
+    /// <summary>Applies a fade only when it changes, since it walks every mesh under the node.</summary>
+    private void Fade(Node node, float transparency)
+    {
+        float step = MathF.Round(transparency * 10) / 10;
+        if (fades.GetValueOrDefault(node) == step) return;
+        fades[node] = step; SetFade(node, step);
+    }
+
     private void SyncCarts(float dt)
     {
         foreach (var order in World.S.Orders)
         {
             var sign = World.Find(order.Signpost);
             float phase = order.Elapsed / World.Data.TradeSeconds;
-            var pos = sign == null ? World.Village : sign.Pos.Lerp(World.Village, phase < .5f ? phase * 2 : (1 - phase) * 2);
+            // The cart sets off down the valley and fades out on its way to Bramblewick, then fades back in on return.
+            float leg = World.TripLeg(phase);
+            var pos = (sign?.Pos ?? World.Spawn) + Terrain.Seaward * World.TripDistance * leg;
             if (!carts.TryGetValue(order, out var cart))
             {
                 cart = new WorldModels.CartModel { Last = pos };
@@ -664,7 +680,8 @@ public partial class WorldView : Node3D
             cart.Yaw = Mathf.LerpAngle(cart.Yaw, ActorAnimation.Yaw(moved, cart.Yaw), Math.Min(1, dt * 8));
             cart.Last = pos;
             cart.Root.Position = To3(pos);
-            cart.Root.Visible = World.Sees(pos);
+            cart.Root.Visible = World.Sees(pos) && leg < 1;
+            Fade(cart.Root, TripFade(leg));
             cart.Root.Rotation = new Vector3(0, cart.Yaw, 0);
             cart.Roll(cart.Distance);
             // The courier walks with arms trailing back to the cart handle.
@@ -675,7 +692,7 @@ public partial class WorldView : Node3D
         }
         foreach (var gone in carts.Keys.Where(o => !World.S.Orders.Contains(o)).ToArray())
         {
-            carts[gone].Root.QueueFree(); carts.Remove(gone);
+            fades.Remove(carts[gone].Root); carts[gone].Root.QueueFree(); carts.Remove(gone);
         }
     }
 
@@ -684,7 +701,7 @@ public partial class WorldView : Node3D
         Mark(selectRing, World.Find(Selected), 0);
         Mark(hoverRing, Hover != Selected ? World.Find(Hover) : null, .004f);
         var worker = World.S.Workers.FirstOrDefault(w => w.Id == SelectedWorker);
-        workerRing.Visible = worker != null && World.Sees(worker.Pos);
+        workerRing.Visible = worker != null && World.Sees(worker);
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
@@ -717,7 +734,7 @@ public partial class WorldView : Node3D
     private void UpdateLighting()
     {
         // Dusk deepens into full night and dawn fades out, so neither boundary jumps in brightness.
-        float dayPhase = World.DayPhase, dusk = World.Data.NightStarts - .1f;
+        float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts;
         float darkness = World.Night ? .65f : dayPhase > dusk ? .02f + (dayPhase - dusk) / .1f * .63f : dayPhase < .05f ? .65f - dayPhase / .05f * .63f : .02f;
         night = Math.Clamp((darkness - .02f) / .63f, 0, 1);
         sun.LightEnergy = Mathf.Lerp(.8f, .08f, night);
@@ -757,7 +774,7 @@ public partial class WorldView : Node3D
         // Only the hovered object is named; the side panel already names the selection.
         var hovered = World.Find(Hover);
         if (hovered != null) Tag(Screen(hovered.Pos, HitsOf(hovered).Max(h => h.Top) + .2f) - new Vector2(0, 8), World.Data.Name(hovered.Kind));
-        foreach (var w in World.S.Workers.Where(w => World.Sees(w.Pos) && (w.Id == HoverWorker || w.Id == SelectedWorker)))
+        foreach (var w in World.S.Workers.Where(w => World.Sees(w) && (w.Id == HoverWorker || w.Id == SelectedWorker)))
             Tag(Screen(w.Pos, 2.05f), w.Name);
     }
 }
