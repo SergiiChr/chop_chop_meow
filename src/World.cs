@@ -122,6 +122,10 @@ public sealed class SaveState
     public int Sheltered { get; set; }
     public float PlaySeconds { get; set; }
     public bool EndingShown { get; set; }
+    /// <summary>One byte per map tile, 255 once the player has seen it; serialized as base64.</summary>
+    public byte[] Explored { get; set; } = new byte[World.MapSize * World.MapSize];
+    /// <summary>Things as last seen, kept so the fog shows them unchanged until the player looks again.</summary>
+    public Dictionary<int, Thing> Remembered { get; set; } = new();
 }
 
 /// <summary>Authoritative single-player simulation, independent of rendering and UI.</summary>
@@ -158,6 +162,11 @@ public sealed class World
     public bool Dead => S.RespawnIn > 0;
     /// <summary>Dead or pinned by a wolf: the player cannot move or act.</summary>
     public bool Downed => Dead || S.Mauled;
+    public bool Sees(Vector2 p) => p.DistanceTo(Player) <= Data.SightRadius;
+    /// <summary>Raised whenever newly seen tiles join the explored map.</summary>
+    public int ExploredRevision { get; private set; }
+    /// <summary>Things as the player knows them: live within sight, as last seen elsewhere, and absent if never seen.</summary>
+    public IEnumerable<Thing> Known => S.Things.Where(t => Sees(t.Pos)).Concat(S.Remembered.Values.Where(t => !Sees(t.Pos)));
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
     public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(t.Pos) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
@@ -205,6 +214,7 @@ public sealed class World
         foreach (var p in new Vector2[] { new(13, 28), new(16, 30), new(12, 32), new(15, 34), new(10, 29) }) Add("berries", p, 34);
         Add("water", Pond + (Spawn - Pond).Normalized() * (PondRadius + .2f), 9999);
         S.Things.RemoveAll(t => t.Kind == "tree" && S.Things.Any(other => other.Id != t.Id && other.IsResource && other.Kind != "tree" && other.Pos.DistanceTo(t.Pos) < 1.3f));
+        Look();
         Say("Welcome to Bramblewick. Gather wood and stone; build a sheltered workshop.");
     }
     public bool CanStand(Vector2 p)
@@ -748,8 +758,27 @@ public sealed class World
         else if (!sleeping) TickWolves(dt);
         if (!Dead && S.Health <= 0) Die();
         playerBusy = false;
+        Look();
         UpdateGoal();
     }
+    /// <summary>Explores the tiles in sight and replaces the memory of everything there with its current state.</summary>
+    private void Look()
+    {
+        float radius = Data.SightRadius;
+        int fromX = Math.Max(0, (int)(Player.X - radius)), toX = Math.Min(MapSize - 1, (int)(Player.X + radius) + 1);
+        int fromY = Math.Max(0, (int)(Player.Y - radius)), toY = Math.Min(MapSize - 1, (int)(Player.Y + radius) + 1);
+        for (int y = fromY; y <= toY; y++)
+            for (int x = fromX; x <= toX; x++)
+                if (S.Explored[y * MapSize + x] == 0 && Sees(new Vector2(x, y))) { S.Explored[y * MapSize + x] = 255; ExploredRevision++; }
+        foreach (var id in S.Remembered.Where(pair => Sees(pair.Value.Pos) && Find(pair.Key) == null).Select(pair => pair.Key).ToArray()) S.Remembered.Remove(id);
+        // Only the look is remembered: no inventory, and no fire, heat or work, so nothing out of sight smokes or glows.
+        foreach (var t in S.Things.Where(t => Sees(t.Pos)))
+        {
+            if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id };
+            memory.Kind = t.Kind; memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Recipe = t.Recipe; memory.Progress = t.Progress;
+        }
+    }
+    public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < MapSize && p.Y < MapSize && S.Explored[(int)p.Y * MapSize + (int)p.X] != 0;
     private void TickWolves(float dt)
     {
         if (!Dead)
@@ -846,6 +875,9 @@ public sealed class World
         foreach (var order in loaded.Orders.Where(o => o.Item != null && o.Goods.Count == 0)) { order.Goods[order.Item!] = order.Quantity; order.Item = null; order.Quantity = 0; }
         // Signposts from older saves had no market, so they get its boxes on load.
         foreach (var sign in loaded.Things.Where(t => t.Kind == "signpost" && t.Output == null)) { sign.Inventory.Slots = MarketSlots; sign.Output = new() { Slots = MarketSlots }; }
-        S = loaded; gatherClock = 0; Say("Settlement loaded.");
+        // Saves from before the fog start unexplored.
+        if (loaded.Explored?.Length != MapSize * MapSize) loaded.Explored = new byte[MapSize * MapSize];
+        loaded.Remembered ??= new();
+        S = loaded; gatherClock = 0; ExploredRevision++; Look(); Say("Settlement loaded.");
     }
 }

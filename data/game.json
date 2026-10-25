@@ -10,6 +10,7 @@
   "campfireHours": 4,
   "gatherSeconds": 2.0,
   "respawnSeconds": 30,
+  "sightRadius": 20,
   "items": {
     "wood": {
       "name": "Wood",

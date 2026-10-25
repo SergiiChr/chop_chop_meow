@@ -48,6 +48,8 @@ public sealed class GameData
     public float CampfireSeconds => CampfireHours / 24 * DaySeconds;
     public float HungerPerSecond => 100 / (HungerHours / 24 * DaySeconds);
     public float ThirstPerSecond => 100 / (ThirstHours / 24 * DaySeconds);
+    /// <summary>Radius in tiles of the player's live view; sized to fill a 16:10 screen at full zoom-out.</summary>
+    public float SightRadius { get; set; } = 20;
     public Dictionary<string, ItemDef> Items { get; set; } = new();
     public Dictionary<string, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
@@ -61,7 +63,7 @@ public sealed class GameData
     }
     public void Validate()
     {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || NightStarts <= 0 || NightStarts >= 1 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || NightStarts <= 0 || NightStarts >= 1 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0)
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)
