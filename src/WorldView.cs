@@ -397,17 +397,18 @@ public partial class WorldView : Node3D
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, ActorAnimation.Tool(work));
             entry.Rig.Root.Visible = World.Sees(worker);
+            Fade(entry.Rig.Root, worker.Away > 0 ? TripFade(World.TripLeg(1 - worker.Away / World.Data.TradeSeconds)) : 0);
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch ? null : assignment);
         }
         foreach (int id in crew.Keys.Where(id => World.S.Workers.All(w => w.Id != id)).ToArray())
         {
-            crew[id].Rig.Root.QueueFree(); crew.Remove(id);
+            fades.Remove(crew[id].Rig.Root); crew[id].Rig.Root.QueueFree(); crew.Remove(id);
         }
     }
 
     private string FootstepSound(Vector2 p)
     {
-        if (p.DistanceTo(World.Pond) < World.PondRadius + 1) return "footsteps_water";
+        if (Terrain.InLake(p, 1)) return "footsteps_water";
         bool rocky = World.Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 3) || World.S.Things.Any(t => t.Kind is "stone" or "iron" or "coal" && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f);
         return rocky ? "footsteps_rocks" : "footsteps_default";
     }
@@ -648,13 +649,26 @@ public partial class WorldView : Node3D
         }
     }
 
+    /// <summary>Fully drawn for the first part of a trip, then fading to nothing at the turn.</summary>
+    private static float TripFade(float leg) => Math.Clamp((leg - .35f) / .55f, 0, 1);
+    private readonly Dictionary<Node, float> fades = new();
+    /// <summary>Applies a fade only when it changes, since it walks every mesh under the node.</summary>
+    private void Fade(Node node, float transparency)
+    {
+        float step = MathF.Round(transparency * 10) / 10;
+        if (fades.GetValueOrDefault(node) == step) return;
+        fades[node] = step; SetFade(node, step);
+    }
+
     private void SyncCarts(float dt)
     {
         foreach (var order in World.S.Orders)
         {
             var sign = World.Find(order.Signpost);
             float phase = order.Elapsed / World.Data.TradeSeconds;
-            var pos = sign == null ? World.Village : sign.Pos.Lerp(World.Village, phase < .5f ? phase * 2 : (1 - phase) * 2);
+            // The cart sets off down the valley and fades out on its way to Bramblewick, then fades back in on return.
+            float leg = World.TripLeg(phase);
+            var pos = (sign?.Pos ?? World.Spawn) + Terrain.Seaward * World.TripDistance * leg;
             if (!carts.TryGetValue(order, out var cart))
             {
                 cart = new WorldModels.CartModel { Last = pos };
@@ -665,7 +679,8 @@ public partial class WorldView : Node3D
             cart.Yaw = Mathf.LerpAngle(cart.Yaw, ActorAnimation.Yaw(moved, cart.Yaw), Math.Min(1, dt * 8));
             cart.Last = pos;
             cart.Root.Position = To3(pos);
-            cart.Root.Visible = World.Sees(pos);
+            cart.Root.Visible = World.Sees(pos) && leg < 1;
+            Fade(cart.Root, TripFade(leg));
             cart.Root.Rotation = new Vector3(0, cart.Yaw, 0);
             cart.Roll(cart.Distance);
             // The courier walks with arms trailing back to the cart handle.
@@ -676,7 +691,7 @@ public partial class WorldView : Node3D
         }
         foreach (var gone in carts.Keys.Where(o => !World.S.Orders.Contains(o)).ToArray())
         {
-            carts[gone].Root.QueueFree(); carts.Remove(gone);
+            fades.Remove(carts[gone].Root); carts[gone].Root.QueueFree(); carts.Remove(gone);
         }
     }
 

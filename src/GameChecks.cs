@@ -363,7 +363,7 @@ public partial class Game
             await KeyStroke(Key.Space);
             UIRequire(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
             await ToSignal(GetTree().CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
-            var gatheringPosition = new Vector2(8, 8);
+            var gatheringPosition = World.Spawn - new Vector2(30, 30);
             // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(gatheringPosition) < 12);
             world.Player = gatheringPosition;

@@ -198,7 +198,7 @@ public partial class Game : Node
         AddLabel("A small settlement begins with your own two hands. Shape iron, master the bellows, and send your first steel tools to the village.", 16, Muted);
         AddLabel("FIRST STEPS", 14);
         AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Explore the woods for loose iron at the foot of a cliff.\n4  Press Esc any time to see your current goal.");
-        AddLabel("You begin with an iron axe, 10 berries and 6 wood. Drink at the pond to the west; gather water to carry. A fire and cabin protect you after dark.", 15, Muted);
+        AddLabel("You begin with an iron axe, 10 berries and 6 wood. Drink at the lake up the valley; gather water to carry. The sea is salt and cannot be drunk. A fire and cabin protect you after dark.", 15, Muted);
         AddButton("Into the clearing", ClosePanel);
         AddLabel("10–15 minute POC · single player · Linux", 13, Muted);
     }
@@ -253,7 +253,7 @@ public partial class Game : Node
         if (t.IsResource)
         {
             Dynamic(() => $"{t.Remaining} remaining\n{world.GatherBlock(t) ?? (t.IsLoose ? "Right-click to walk over and pick it up." : "Hold right mouse on this resource to gather.")}", 15);
-            if (t.Kind == "water") AddButton("Drink from the pond", () => { if (world.Near(t)) { world.S.Thirst = 100; Notify("Cool, fresh water."); sounds.Play("gather_water"); } else Notify("Walk closer to the pond."); });
+            if (t.Kind == "water") AddButton("Drink from the lake", () => { if (world.Near(t)) { world.S.Thirst = 100; Notify("Cool, fresh water."); sounds.Play("gather_water"); } else Notify("Walk closer to the lake."); });
             AddLabel("Select a villager and choose Work to automate this resource. Their gathered supplies go to accepting storage.", 14, Muted); return;
         }
         if (t.Kind == "hut") { Cabin(t); return; }
@@ -483,7 +483,7 @@ public partial class Game : Node
             // A loose piece needs only one click: the player keeps walking to it after the button is released.
             if (gathering != null && (right || gathering.IsLoose) && direction == Vector2.Zero && entering == null)
             {
-                // Step in close enough for the tool to reach the model; the pond edge keeps its wider reach.
+                // Step in close enough for the tool to reach the model; the lake edge keeps its wider reach.
                 if (!world.Near(gathering, gathering.Kind == "water" ? 2.5f : 1.35f)) direction = (gathering.Pos - world.Player).Normalized();
                 else if (gathering.IsLoose)
                 {

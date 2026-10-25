@@ -17,29 +17,99 @@ public partial class WorldView
         var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
         var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
         var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
-        const float span = 160;
+        const float span = Terrain.Size * 4;
         var ground = new StandardMaterial3D { AlbedoTexture = grass, Roughness = 1, Uv1Scale = new Vector3(span / 9, span / 9, 1) };
-        Add(parent, new PlaneMesh { Size = new Vector2(span, span) }, ground, new Vector3(World.MapSize / 2f, 0, World.MapSize / 2f));
+        Add(parent, new PlaneMesh { Size = new Vector2(span, span) }, ground, new Vector3(Terrain.Size / 2f, 0, Terrain.Size / 2f));
         // The arrival clearing: overlapping translucent discs soften into the grass.
         for (int ring = 0; ring < 4; ring++)
             Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(World.Spawn.X, .003f + ring * .0005f, World.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
-        // A narrow, worn trail toward the village with soft shoulders.
+        // A narrow, worn trail from the clearing down the valley to the shore, the way the carts go.
+        float from = Terrain.Along(World.Spawn), across = Terrain.Across(World.Spawn);
         for (int layer = 3; layer > 0; layer--)
         {
             float width = .33f + layer * .12f;
             var strip = new SurfaceTool();
             strip.Begin(Mesh.PrimitiveType.TriangleStrip);
-            for (int x = (int)World.Spawn.X - 1; x <= World.MapSize + 12; x++)
+            for (float along = from - 1; along <= Terrain.Coast(across) + 2; along += 1)
             {
-                float y = World.Spawn.Y + MathF.Sin(x * .6f) * .13f, lift = .006f + (3 - layer) * .001f;
-                strip.SetNormal(Vector3.Up); strip.AddVertex(new Vector3(x, lift, y - width));
-                strip.SetNormal(Vector3.Up); strip.AddVertex(new Vector3(x, lift, y + width));
+                var mid = Terrain.Point(along, across + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f);
+                float lift = .006f + (3 - layer) * .001f;
+                strip.SetNormal(Vector3.Up); strip.AddVertex(To3(mid - Terrain.Sideways * width, lift));
+                strip.SetNormal(Vector3.Up); strip.AddVertex(To3(mid + Terrain.Sideways * width, lift));
             }
             Add(parent, strip.Commit(), Flat(new Color(.67f, .6f, .43f, layer == 1 ? .3f : .16f), true), Vector3.Zero);
         }
-        BuildPond(parent);
+        BuildSea(parent);
+        BuildLake(parent);
+        BuildMountains(parent);
         foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
         BuildTufts(parent);
+    }
+
+    /// <summary>Sea beyond a sandy shore along the valley's mouth; it runs past the map so the coast is its edge.</summary>
+    private static void BuildSea(Node3D parent)
+    {
+        var water = new StandardMaterial3D { AlbedoColor = new Color("2e5966"), Roughness = .08f, Metallic = .3f, MetallicSpecular = .9f };
+        Band(parent, -1.2f, 400, .02f, water);
+        Band(parent, -4.5f, .4f, .008f, Mat("bdb08a", 1));
+        Band(parent, -.2f, 5, .024f, Flat(new Color(.55f, .78f, .76f, .22f), true));
+    }
+
+    /// <summary>A strip following the coastline from <paramref name="inner"/> to <paramref name="outer"/> tiles past it.</summary>
+    private static void Band(Node3D parent, float inner, float outer, float height, Material material)
+    {
+        var strip = new SurfaceTool();
+        strip.Begin(Mesh.PrimitiveType.TriangleStrip);
+        for (float across = -300; across <= 300; across += 1.5f)
+        {
+            float coast = Terrain.Coast(across);
+            strip.SetNormal(Vector3.Up); strip.AddVertex(To3(Terrain.Point(coast + outer, across), height));
+            strip.SetNormal(Vector3.Up); strip.AddVertex(To3(Terrain.Point(coast + inner, across), height));
+        }
+        Add(parent, strip.Commit(), material, Vector3.Zero);
+    }
+
+    /// <summary>Both ranges as one flat-shaded height field that rises from the valley's edge into ridged peaks.</summary>
+    private static void BuildMountains(Node3D parent)
+    {
+        var ridges = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Simplex, Frequency = .018f, FractalType = FastNoiseLite.FractalTypeEnum.Ridged, FractalOctaves = 4, Seed = 31 };
+        var tint = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Simplex, Frequency = .05f, Seed = 5 };
+        float Height(Vector2 p)
+        {
+            float depth = -Terrain.FromMountains(p);
+            if (depth <= 0) return 0;
+            // A steady climb from the foot that levels off, with ridges and peaks growing in higher up, easing down where the range meets the sea.
+            float h = 26 * (1 - MathF.Exp(-depth / 16)) + (ridges.GetNoise2D(p.X, p.Y) + 1) * 13 * Math.Clamp(depth / 18, 0, 1);
+            float seaward = Math.Clamp((Terrain.Coast(Terrain.Across(p)) + 14 - Terrain.Along(p)) / 14, 0, 1);
+            return h * seaward;
+        }
+        const float step = 2, from = -110, to = Terrain.Size + 110;
+        int count = (int)((to - from) / step) + 1;
+        var heights = new float[count, count];
+        for (int y = 0; y < count; y++)
+            for (int x = 0; x < count; x++) heights[x, y] = Height(new Vector2(from + x * step, from + y * step));
+        Color[] grass = { new("56663a"), new("5e6c3e"), new("67703f"), new("6d6a3c") }, scrub = { new("6b6a43"), new("5f5e3d"), new("74703f"), new("62603f") }, rock = { new("55524c"), new("5f5b54"), new("4b4945"), new("68635b") }, crest = { new("8a8984"), new("7c7b76") };
+        var tool = new SurfaceTool();
+        tool.Begin(Mesh.PrimitiveType.Triangles);
+        for (int y = 0; y + 1 < count; y++)
+            for (int x = 0; x + 1 < count; x++)
+            {
+                Vector3 V(int i, int j) => new(from + i * step, heights[i, j], from + j * step);
+                var a = V(x, y); var b = V(x + 1, y); var c = V(x, y + 1); var d = V(x + 1, y + 1);
+                foreach (var (p, q, r) in new[] { (a, b, d), (a, d, c) })
+                {
+                    if (p.Y + q.Y + r.Y <= 0) continue;
+                    var normal = (r - p).Cross(q - p).Normalized();
+                    if (normal.Y < 0) normal = -normal;
+                    float top = Math.Max(p.Y, Math.Max(q.Y, r.Y)), shade = tint.GetNoise2D(p.X, p.Z);
+                    // Gentle, low ground stays grassy and lower slopes scrubby; steep or high faces are bare rock, and the highest pale.
+                    var palette = top > 40 ? crest : top < 24 && normal.Y > .6f ? grass : top < 30 && normal.Y > .35f ? scrub : rock;
+                    var color = palette[(int)((shade + 1) * 1.99f * palette.Length / 2) % palette.Length];
+                    foreach (var v in new[] { p, q, r }) { tool.SetColor(color); tool.SetNormal(normal); tool.AddVertex(v + Vector3.Down * .03f); }
+                }
+            }
+        var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+        parent.AddChild(new MeshInstance3D { Mesh = tool.Commit(), MaterialOverride = material });
     }
 
     /// <summary>A jagged wall of faceted columns with ore seams on the face and scree at its foot.</summary>
@@ -66,26 +136,27 @@ public partial class WorldView
         }
     }
 
-    private void BuildPond(Node3D parent)
+    private static void BuildLake(Node3D parent)
     {
-        var pond = World.Pond; float radius = World.PondRadius;
-        var at = new Vector3(pond.X, 0, pond.Y);
-        // An irregular bank; the water never reaches past the walkable boundary at PondRadius.
-        float Shore(float angle) => radius * (.94f + .03f * MathF.Sin(angle * 3 + 1) + .03f * MathF.Sin(angle * 5 + 2.3f));
-        Blob(parent, at + new Vector3(0, .005f, 0), a => Shore(a) + .75f + .12f * MathF.Sin(a * 4), Mat("7f7556", 1));
-        Blob(parent, at + new Vector3(0, .012f, 0), a => Shore(a) + .18f, Mat("5d5540", 1));
+        var at = To3(Terrain.Lake);
+        // The bank and water follow the same shore line that bounds walking.
+        float Shore(float angle) => Terrain.Shore(angle);
+        Blob(parent, at + new Vector3(0, .005f, 0), a => Shore(a) + 1.4f + .3f * MathF.Sin(a * 4), Mat("7f7556", 1));
+        Blob(parent, at + new Vector3(0, .012f, 0), a => Shore(a) + .3f, Mat("5d5540", 1));
         var water = new StandardMaterial3D { AlbedoColor = new Color("3f6f72"), Roughness = .06f, Metallic = .3f, MetallicSpecular = .9f };
         Blob(parent, at + new Vector3(0, .025f, 0), Shore, water);
-        Blob(parent, at + new Vector3(0, .028f, 0), a => Shore(a) * .6f, Flat(new Color(.12f, .27f, .3f, .4f), true));
+        Blob(parent, at + new Vector3(0, .028f, 0), a => Shore(a) * .7f, Flat(new Color(.12f, .27f, .3f, .4f), true));
+        Blob(parent, at + new Vector3(0, .03f, 0), a => Shore(a) * .4f, Flat(new Color(.08f, .2f, .24f, .4f), true));
         var rng = new Random(77);
-        for (int i = 0; i < 46; i++)
+        const int stones = 150;
+        for (int i = 0; i < stones; i++)
         {
-            float angle = i * Mathf.Tau / 46 + (float)rng.NextDouble() * .1f, r = Shore(angle) + .2f + (float)rng.NextDouble() * .45f;
-            var stone = Sphere(parent, .1f + (float)rng.NextDouble() * .12f, at + new Vector3(MathF.Cos(angle) * r, .03f, MathF.Sin(angle) * r), Mat(i % 3 == 0 ? "a3a7a3" : "8d918e", .9f), new Vector3(1.2f, .5f, 1), 6);
+            float angle = i * Mathf.Tau / stones + (float)rng.NextDouble() * .03f, r = Shore(angle) + .2f + (float)rng.NextDouble() * .5f;
+            var stone = Sphere(parent, .1f + (float)rng.NextDouble() * .14f, at + new Vector3(MathF.Cos(angle) * r, .03f, MathF.Sin(angle) * r), Mat(i % 3 == 0 ? "a3a7a3" : "8d918e", .9f), new Vector3(1.2f, .5f, 1), 6);
             stone.RotationDegrees = new Vector3(0, i * 47, 0);
         }
-        // Reed clumps with cattails on the far banks, lily pads near the shore.
-        foreach (float angle in new[] { 3.6f, 4.1f, 4.8f, 2.4f, 5.6f })
+        // Reed clumps with cattails along the banks, lily pads near the shore.
+        for (float angle = .2f; angle < Mathf.Tau; angle += .45f + (float)rng.NextDouble() * .5f)
         {
             var clump = at + new Vector3(MathF.Cos(angle) * (Shore(angle) - .1f), 0, MathF.Sin(angle) * (Shore(angle) - .1f));
             for (int i = 0; i < 7; i++)
@@ -96,8 +167,11 @@ public partial class WorldView
                 if (i % 3 == 0) Cylinder(parent, .035f, .035f, .16f, clump + offset + new Vector3(0, height - .05f, 0), Mat("6e4a2e"), null, 6);
             }
         }
-        foreach (float angle in new[] { .4f, 1.1f, 1.5f, 5.9f })
-            Cylinder(parent, .28f, .28f, .01f, at + new Vector3(MathF.Cos(angle) * (radius - 1.1f), .035f, MathF.Sin(angle) * (radius - 1.1f)), Mat("5b8a3e", .7f), null, 9);
+        for (int i = 0; i < 24; i++)
+        {
+            float angle = (float)rng.NextDouble() * Mathf.Tau, r = Shore(angle) - 1 - (float)rng.NextDouble() * 3;
+            Cylinder(parent, .28f, .28f, .01f, at + new Vector3(MathF.Cos(angle) * r, .035f, MathF.Sin(angle) * r), Mat("5b8a3e", .7f), null, 9);
+        }
     }
 
     /// <summary>A flat, star-shaped disc whose edge distance comes from <paramref name="radius"/>.</summary>
@@ -123,10 +197,24 @@ public partial class WorldView
         var blades = new List<(Transform3D At, Color Color)>();
         var flowers = new List<(Transform3D At, Color Color)>();
         Color[] petals = { new("f2efe0"), new("e9cf5a"), new("b68ad6") };
-        while (blades.Count < 5400)
+        var bushes = new List<(Transform3D At, Color Color)>();
+        Color[] leaves = { new("4f6b35"), new("5b7a3c"), new("466130") };
+        while (bushes.Count < 900)
         {
-            var p = new Vector2((float)rng.NextDouble() * (World.MapSize + 6) - 3, (float)rng.NextDouble() * (World.MapSize + 6) - 3);
-            if (p.DistanceTo(World.Pond) < World.PondRadius + .8f || Math.Abs(p.Y - World.Spawn.Y) < .7f && p.X > World.Spawn.X - 2) continue;
+            // Plain bushes dot the open valley, a few leafy lumps each; berry bushes are resources and drawn with them.
+            var p = new Vector2((float)rng.NextDouble() * Terrain.Size, (float)rng.NextDouble() * Terrain.Size);
+            if (!Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 1.5f) || p.DistanceTo(World.Spawn) < 6 || Terrain.FromMountains(p) < 3) continue;
+            for (int i = 0; i < 3; i++)
+            {
+                float size = .35f + (float)rng.NextDouble() * .3f;
+                var at = new Vector3(p.X + ((float)rng.NextDouble() - .5f) * .7f, size * .35f, p.Y + ((float)rng.NextDouble() - .5f) * .7f);
+                bushes.Add((new Transform3D(Basis.Identity.Scaled(new Vector3(size, size * .75f, size)), at), leaves[rng.Next(leaves.Length)]));
+            }
+        }
+        while (blades.Count < 32000)
+        {
+            var p = new Vector2((float)rng.NextDouble() * Terrain.Size, (float)rng.NextDouble() * Terrain.Size);
+            if (!Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, .8f)) continue;
             var basis = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau).Scaled(Vector3.One * (.7f + (float)rng.NextDouble() * .7f));
             blades.Add((new Transform3D(basis, new Vector3(p.X, 0, p.Y)), new Color("5f7d43").Lerp(new Color("8ea75f"), (float)rng.NextDouble())));
             if (rng.NextDouble() < .07) flowers.Add((new Transform3D(Basis.Identity, new Vector3(p.X + .12f, .14f, p.Y + .05f)), petals[rng.Next(petals.Length)]));
@@ -143,6 +231,7 @@ public partial class WorldView
         }
         Scatter(parent, tuft.Commit(), blades);
         Scatter(parent, new SphereMesh { Radius = .045f, Height = .07f, RadialSegments = 6, Rings = 3 }, flowers);
+        Scatter(parent, new SphereMesh { Radius = 1, Height = 2, RadialSegments = 7, Rings = 4 }, bushes);
     }
 
     private static void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items)
