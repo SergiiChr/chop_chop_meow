@@ -7,15 +7,12 @@ using Godot;
 /// Holds code that runs every tick to its allocation budget: every byte it allocates is garbage the runtime collects later,
 /// in a pause that stalls a frame. Counts the calling thread's bytes, so it holds the same on any machine.
 /// </summary>
-public static class AllocationChecks
-{
-    public static void Run(GameData data)
-    {
+public static class AllocationChecks {
+    public static void Run(GameData data) {
         var valley = new World(data);
         float angle = 0;
         // A small circle the warm-up walks once, so the measured laps cross ground already seen: seeing something for the first time is a rare event that may allocate.
-        Check("tick: fresh valley, player walking", () =>
-        {
+        Check("tick: fresh valley, player walking", () => {
             angle += .11f;
             valley.MovePlayer(new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * .07f);
             valley.Tick(1 / 60f);
@@ -37,8 +34,7 @@ public static class AllocationChecks
     /// Fails when <paramref name="work"/>, after <paramref name="warmup"/> runs, allocates more than <paramref name="maxBytesPerRun"/>
     /// bytes per run over <paramref name="runs"/> more. The total counts, so an allocation every few runs fails a budget of 0 too.
     /// </summary>
-    public static void Check(string label, Action work, long maxBytesPerRun = 0, int warmup = 60, int runs = 600)
-    {
+    public static void Check(string label, Action work, long maxBytesPerRun = 0, int warmup = 60, int runs = 600) {
         for (int i = 0; i < warmup; i++) work();
         long before = GC.GetAllocatedBytesForCurrentThread();
         for (int i = 0; i < runs; i++) work();
@@ -51,8 +47,7 @@ public static class AllocationChecks
     private static void Fed(World world) { world.S.Hunger = 100; world.S.Thirst = 100; world.S.Health = 100; }
 
     /// <summary>A daytime camp in the generated valley: woodcutters, a bellows crew at a hot forge, a furnace, a campfire and storage.</summary>
-    private static World Settlement(GameData data)
-    {
+    private static World Settlement(GameData data) {
         var world = new World(data);
         world.S.Time = data.DaySeconds * .3f;
         var at = world.Player;

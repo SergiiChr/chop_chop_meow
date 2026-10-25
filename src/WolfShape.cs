@@ -4,8 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Cached anatomical profiles for the wolf; all poses keep the original rig pivots.</summary>
-internal static class WolfShape
-{
+internal static class WolfShape {
     private readonly record struct Section(float Z, float Y, float Width, float Height);
     private static ArrayMesh? body, head;
     public static readonly StandardMaterial3D Fur = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .95f };
@@ -17,23 +16,19 @@ internal static class WolfShape
         new(.51f, .79f, .105f, .13f) }, false);
     public static Mesh Head => head ??= BuildHead();
 
-    private static ArrayMesh Loft(Section[] sections, bool muzzle)
-    {
+    private static ArrayMesh Loft(Section[] sections, bool muzzle) {
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         AppendLoft(s, sections, muzzle);
         return s.Commit();
     }
 
-    private static void AppendLoft(SurfaceTool s, Section[] sections, bool muzzle)
-    {
+    private static void AppendLoft(SurfaceTool s, Section[] sections, bool muzzle) {
         const int sides = 12;
         const int start = 0;
         // Vertex colors follow the same surface: dark back, grey flanks, pale jaw/chest.
-        for (int row = 0; row < sections.Length; row++)
-        {
+        for (int row = 0; row < sections.Length; row++) {
             var r = sections[row]; var before = sections[Math.Max(0, row - 1)]; var after = sections[Math.Min(sections.Length - 1, row + 1)];
-            for (int i = 0; i < sides; i++)
-            {
+            for (int i = 0; i < sides; i++) {
                 float a = i * Mathf.Tau / sides, x = MathF.Cos(a), y = MathF.Sin(a);
                 var around = new Vector3(-r.Width * y, r.Height * x, 0);
                 var along = new Vector3((after.Width - before.Width) * x, after.Y - before.Y + (after.Height - before.Height) * y, after.Z - before.Z);
@@ -45,36 +40,31 @@ internal static class WolfShape
             }
         }
         for (int row = 0; row < sections.Length - 1; row++)
-            for (int i = 0; i < sides; i++)
-            {
+            for (int i = 0; i < sides; i++) {
                 int a = start + row * sides + i, b = start + (row + 1) * sides + i;
                 int c = start + row * sides + (i + 1) % sides, d = start + (row + 1) * sides + (i + 1) % sides;
                 s.AddIndex(a); s.AddIndex(b); s.AddIndex(c); s.AddIndex(c); s.AddIndex(b); s.AddIndex(d);
             }
-        for (int end = 0; end < 2; end++)
-        {
+        for (int end = 0; end < 2; end++) {
             int row = end == 0 ? 0 : sections.Length - 1;
             s.SetNormal(end == 0 ? Vector3.Forward : Vector3.Back); s.SetColor(new Color("7c8077"));
             int center = start + sections.Length * sides + end;
             s.AddVertex(new Vector3(0, sections[row].Y, sections[row].Z));
-            for (int i = 0; i < sides; i++)
-            {
+            for (int i = 0; i < sides; i++) {
                 int a = start + row * sides + i, b = start + row * sides + (i + 1) % sides;
                 s.AddIndex(center); s.AddIndex(end == 0 ? a : b); s.AddIndex(end == 0 ? b : a);
             }
         }
     }
 
-    private static ArrayMesh BuildHead()
-    {
+    private static ArrayMesh BuildHead() {
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         AppendLoft(s, new[] { new Section(-.12f, -.015f, .08f, .095f), new(-.045f, .025f, .145f, .145f),
             new(.07f, .025f, .14f, .14f), new(.15f, -.005f, .10f, .105f),
             new(.22f, -.035f, .075f, .065f), new(.34f, -.04f, .05f, .042f), new(.365f, -.035f, .038f, .032f) }, true);
         // Broad triangular ears, with a small thickness and a recessed dark inner face.
         int index = 7 * 12 + 2;
-        foreach (float side in new[] { -1f, 1f })
-        {
+        foreach (float side in new[] { -1f, 1f }) {
             var a = new Vector3(side * .045f, .115f, .025f); var b = new Vector3(side * .135f, .105f, .015f);
             var tip = new Vector3(side * .115f, .275f, -.025f); var back = new Vector3(side * .09f, .13f, -.055f);
             Triangle(s, ref index, a, b, tip, new Color("73796e"), Vector3.Back);
@@ -87,8 +77,7 @@ internal static class WolfShape
         return s.Commit();
     }
 
-    private static void Triangle(SurfaceTool s, ref int index, Vector3 a, Vector3 b, Vector3 c, Color tint, Vector3 outward)
-    {
+    private static void Triangle(SurfaceTool s, ref int index, Vector3 a, Vector3 b, Vector3 c, Color tint, Vector3 outward) {
         var normal = (c - a).Cross(b - a).Normalized();
         if (normal.Dot(outward) < 0) { (b, c) = (c, b); normal = -normal; }
         // Match the existing indexed loft when appending the ears.
@@ -96,8 +85,7 @@ internal static class WolfShape
         s.AddIndex(index); s.AddIndex(index + 1); s.AddIndex(index + 2); index += 3;
     }
 
-    public static void Leg(Node3D parent, bool hind)
-    {
+    public static void Leg(Node3D parent, bool hind) {
         Color fur = new("777d72"), pale = new("a8ad9d"), dark = new("5d655c");
         ActorShape.Add(parent, new[] {
             new ActorShape.Ring(.13f, hind ? .10f : .075f, .11f, fur),
@@ -111,8 +99,7 @@ internal static class WolfShape
             new ActorShape.Ring(-.49f, .048f, .072f, dark, .045f) });
     }
 
-    public static void Tail(Node3D parent)
-    {
+    public static void Tail(Node3D parent) {
         Color grey = new("777d72"), dark = new("4e574e");
         ActorShape.Add(parent, new[] {
             new ActorShape.Ring(.51f, .008f, .008f, dark, .035f),

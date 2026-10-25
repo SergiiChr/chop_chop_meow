@@ -13,8 +13,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The fog the host has uncovered so far, which a joining guest starts from; after that each machine works it out itself.</summary>
-internal sealed class Fog
-{
+internal sealed class Fog {
     public byte[] Explored { get; set; } = [];
     public Dictionary<int, Thing> Remembered { get; set; } = new();
 }
@@ -28,8 +27,7 @@ internal sealed class Fog
 /// Joining sends the guest's player as saved on its machine, which the host checks before letting it in.
 /// Leaving asks the host for the guest's player as the host last had it, so nothing in flight is lost or kept twice.
 /// </summary>
-public partial class Net : Node
-{
+public partial class Net : Node {
     public const int DefaultPort = 24565;
     public const int MaxGuests = 3;
     /// <summary>ENet drops a peer once a reliable packet stays unanswered this long (or TimeoutMinMsec after TimeoutLimit resends).</summary>
@@ -93,10 +91,8 @@ public partial class Net : Node
     private static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered) }
         .Concat(typeof(PlayerState).GetProperties().Select(p => p.Name).Where(n => n != nameof(SaveState.Crates))).ToHashSet();
     // The world's own fields, without the lists and players that have entries of their own, or the fog, which each machine works out from where everyone stands.
-    private static readonly JsonSerializerOptions Rest = new(Compact)
-    {
-        TypeInfoResolver = new DefaultJsonTypeInfoResolver
-        {
+    private static readonly JsonSerializerOptions Rest = new(Compact) {
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver {
             Modifiers = { info => { if (info.Type == typeof(SaveState)) foreach (var p in info.Properties.Where(p => Shared.Contains(p.Name)).ToList()) info.Properties.Remove(p); } }
         }
     };
@@ -109,8 +105,7 @@ public partial class Net : Node
     public string Address { get; private set; } = "";
     public int Guests => Hosting ? World.S.Players.Count - 1 : 0;
 
-    public override void _Ready()
-    {
+    public override void _Ready() {
         // Guests only hear about each other from the host's messages and updates.
         if (Multiplayer is SceneMultiplayer scene) scene.ServerRelay = false;
         Multiplayer.PeerDisconnected += id => { if (Hosting) Forget((int)id); };
@@ -123,8 +118,7 @@ public partial class Net : Node
     private static void TolerateLag(ENetPacketPeer peer) => peer.SetTimeout(TimeoutLimit, TimeoutMinMsec, TimeoutMaxMsec);
 
     /// <summary>Opens the current game to guests.</summary>
-    public Error Host(int port = DefaultPort)
-    {
+    public Error Host(int port = DefaultPort) {
         Leave();
         var peer = new ENetMultiplayerPeer();
         var error = peer.CreateServer(port, MaxGuests);
@@ -134,8 +128,7 @@ public partial class Net : Node
         return Error.Ok;
     }
 
-    public Error Join(string ip, int port = DefaultPort)
-    {
+    public Error Join(string ip, int port = DefaultPort) {
         Leave();
         var peer = new ENetMultiplayerPeer();
         var error = peer.CreateClient(ip, port);
@@ -150,12 +143,10 @@ public partial class Net : Node
     }
 
     /// <summary>Ends hosting or a joined game; a guest saves its player first, as the host has it when the line still works.</summary>
-    public void Leave()
-    {
+    public void Leave() {
         if (leaving) return;
         leaving = true;
-        if (welcomed && Multiplayer.MultiplayerPeer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Connected)
-        {
+        if (welcomed && Multiplayer.MultiplayerPeer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Connected) {
             // Actions already sent arrive before this, so the player that comes back has them all.
             farewell = null; RpcId(HostId, MethodName.Bye);
             for (ulong until = Time.GetTicksMsec() + FarewellMsec; farewell == null && Time.GetTicksMsec() < until; OS.DelayMsec(5)) Multiplayer.Poll();
@@ -171,8 +162,7 @@ public partial class Net : Node
     }
 
     /// <summary>Host: a guest has gone, by saying goodbye or losing the line.</summary>
-    private void Forget(int id)
-    {
+    private void Forget(int id) {
         walks.Remove(id); acked.Remove(id); heard.Remove(id); World.RemoveGuest(id);
     }
 
@@ -189,8 +179,7 @@ public partial class Net : Node
 
     /// <summary>A guest keeps its own player, and what it carries, for the next time it joins this host.</summary>
     /// <param name="player">The player as the host exported it; without it, as this machine's copy has it.</param>
-    public void SaveGuest(string? player = null)
-    {
+    public void SaveGuest(string? player = null) {
         if (!welcomed || !World.Remote) return;
         using var file = Godot.FileAccess.Open(GuestPath, Godot.FileAccess.ModeFlags.Write);
         file?.StoreString(player ?? World.ExportPlayer(World.Me));
@@ -198,8 +187,7 @@ public partial class Net : Node
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Hello(int protocol, string saved)
-    {
+    private void Hello(int protocol, string saved) {
         int id = Multiplayer.GetRemoteSenderId();
         if (!Hosting || World.S.Players.Any(p => p.Id == id)) return;
         if (protocol != Protocol) { RpcId(id, MethodName.Refused, "The host runs a different version of the game."); return; }
@@ -214,8 +202,7 @@ public partial class Net : Node
     private void Refused(string reason) => Fail(reason);
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Welcome(int id, int update, byte[] packed, byte[] fog)
-    {
+    private void Welcome(int id, int update, byte[] packed, byte[] fog) {
         var uncovered = Unpack<Fog>(fog);
         // An empty world with a stand-in for this player, which the first update fills in.
         var state = new SaveState { Explored = uncovered.Explored, Remembered = uncovered.Remembered };
@@ -228,8 +215,7 @@ public partial class Net : Node
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Bye()
-    {
+    private void Bye() {
         if (!Hosting || Guest() is not PlayerState p) return;
         RpcId(p.Id, MethodName.Farewell, World.ExportPlayer(p));
         Forget(p.Id);
@@ -240,8 +226,7 @@ public partial class Net : Node
 
     // ---------- Running ----------
 
-    public override void _Process(double delta)
-    {
+    public override void _Process(double delta) {
         if (!Online) return;
         float dt = Math.Min((float)delta, .1f);
         foreach (var (owner, goal) in goals) Place(owner, Glide(Position(owner), goal, dt));
@@ -250,13 +235,10 @@ public partial class Net : Node
         if (World.Remote) World.Look();
         if (unsaved && (saveClock += dt) >= SaveInterval) SaveGuest();
         sendClock += dt;
-        if (Hosting && sendClock >= SnapshotInterval)
-        {
+        if (Hosting && sendClock >= SnapshotInterval) {
             sendClock = 0;
             if (World.S.Players.Count > 1) SendUpdates();
-        }
-        else if (welcomed && sendClock >= InputInterval)
-        {
+        } else if (welcomed && sendClock >= InputInterval) {
             sendClock = 0;
             var me = World.Me;
             RpcId(HostId, MethodName.Walked, ++stamp, me.Pos, me.Warp, me.GatherTarget, me.Held, appliedSequence);
@@ -272,8 +254,7 @@ public partial class Net : Node
     private PlayerState? Guest() => World.S.Players.Find(p => p.Id == Multiplayer.GetRemoteSenderId() && p != World.Me);
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = StreamChannel)]
-    private void Walked(int order, Vector2 at, int warp, int gathering, string held, int seen)
-    {
+    private void Walked(int order, Vector2 at, int warp, int gathering, string held, int seen) {
         if (!Hosting || Guest() is not PlayerState p) return;
         if (sent.ContainsKey(seen) && seen > acked.GetValueOrDefault(p.Id)) acked[p.Id] = seen;
         // An action on the other channel may have overtaken this report and already put the guest further along.
@@ -284,8 +265,7 @@ public partial class Net : Node
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Do(int order, Vector2 standing, int warp, string verb, int target, int other, string item, int count, Vector2 at)
-    {
+    private void Do(int order, Vector2 standing, int warp, string verb, int target, int other, string item, int count, Vector2 at) {
         if (!Hosting || Guest() is not PlayerState p) return;
         heard[p.Id] = Math.Max(order, heard.GetValueOrDefault(p.Id));
         // The action happened where the guest stood, so it goes there at once.
@@ -297,16 +277,14 @@ public partial class Net : Node
     /// Where a guest says it stands, unless a respawn or other move by the simulation came since.
     /// A long way from the last report, after a stall on the line, is still where it stands: the glide jumps there.
     /// </summary>
-    private bool Stand(PlayerState p, Vector2 at, int warp)
-    {
+    private bool Stand(PlayerState p, Vector2 at, int warp) {
         if (warp != p.Warp) return false;
         walks[p.Id] = (at, warp);
         return true;
     }
 
     /// <summary>Host: passes a message on to one guest, or all of them.</summary>
-    private void Tell(PlayerState? to, string message)
-    {
+    private void Tell(PlayerState? to, string message) {
         foreach (var p in World.S.Players.Where(p => p != World.Me && (to == null || p == to))) RpcId(p.Id, MethodName.Told, message);
     }
 
@@ -314,8 +292,7 @@ public partial class Net : Node
     private void Told(string message) => Said?.Invoke(message);
 
     /// <summary>Host: lets the guests hear a sound of the world.</summary>
-    public void Echo(string sound, Vector2 at)
-    {
+    public void Echo(string sound, Vector2 at) {
         if (Hosting) Rpc(MethodName.Hear, sound, at);
     }
 
@@ -323,8 +300,7 @@ public partial class Net : Node
     private void Hear(string sound, Vector2 at) { if (welcomed) Heard?.Invoke(sound, at); }
 
     /// <summary>Host: lets the guests see a player swing, pump or light a torch.</summary>
-    public void Echo(int player, ActorAction action, Vector2 at)
-    {
+    public void Echo(int player, ActorAction action, Vector2 at) {
         if (Hosting) Rpc(MethodName.See, player, (int)action, at);
     }
 
@@ -333,31 +309,26 @@ public partial class Net : Node
 
     // ---------- Updates ----------
 
-    private static byte[] Pack<T>(T value)
-    {
+    private static byte[] Pack<T>(T value) {
         using var output = new MemoryStream();
         using (var brotli = new BrotliStream(output, CompressionLevel.Fastest)) JsonSerializer.Serialize(brotli, value, Compact);
         return output.ToArray();
     }
 
-    private static T Unpack<T>(byte[] packed)
-    {
+    private static T Unpack<T>(byte[] packed) {
         using var brotli = new BrotliStream(new MemoryStream(packed), CompressionMode.Decompress);
         return JsonSerializer.Deserialize<T>(brotli, Compact) ?? throw new InvalidDataException("Empty message");
     }
 
-    private void Work()
-    {
+    private void Work() {
         foreach (var w in World.S.Workers) w.WorkState = work.GetValueOrDefault(w.Id);
     }
 
     /// <summary>The world as entries a guest can compare one by one: each thing, worker, wolf, trade order and player under its id, and the rest in two shared entries.</summary>
-    private Dictionary<string, string> Entries()
-    {
+    private Dictionary<string, string> Entries() {
         var s = World.S;
         World.NumberWolvesAndOrders();
-        var entries = new Dictionary<string, string>
-        {
+        var entries = new Dictionary<string, string> {
             ["state"] = JsonSerializer.Serialize(s, Rest),
             ["work"] = JsonSerializer.Serialize(s.Workers.ToDictionary(w => w.Id, w => w.WorkState), Compact)
         };
@@ -369,13 +340,11 @@ public partial class Net : Node
         return entries;
     }
 
-    private void SendUpdates()
-    {
+    private void SendUpdates() {
         var entries = Entries();
         sent[++sequence] = entries;
         sent.Remove(sequence - History);
-        foreach (var p in World.S.Players.Where(p => p != World.Me))
-        {
+        foreach (var p in World.S.Players.Where(p => p != World.Me)) {
             int baseline = acked.GetValueOrDefault(p.Id);
             var known = sent.GetValueOrDefault(baseline);
             var delta = Delta(entries, known);
@@ -391,24 +360,19 @@ public partial class Net : Node
     /// The entries that differ from <paramref name="known"/>, all of them without it, with null for each entry that is gone.
     /// A changed entry only carries its changed fields, under its key with <see cref="Patched"/> in front.
     /// </summary>
-    private static byte[] Delta(Dictionary<string, string> entries, Dictionary<string, string>? known)
-    {
+    private static byte[] Delta(Dictionary<string, string> entries, Dictionary<string, string>? known) {
         using var output = new MemoryStream();
         using (var brotli = new BrotliStream(output, CompressionLevel.Fastest))
-        using (var json = new Utf8JsonWriter(brotli))
-        {
+        using (var json = new Utf8JsonWriter(brotli)) {
             json.WriteStartObject();
-            foreach (var (key, value) in entries)
-            {
+            foreach (var (key, value) in entries) {
                 var before = known?.GetValueOrDefault(key);
                 if (before == value) continue;
-                if (before != null && Fields(value) is { } now && Fields(before) is { } then && then.Keys.All(now.ContainsKey))
-                {
+                if (before != null && Fields(value) is { } now && Fields(before) is { } then && then.Keys.All(now.ContainsKey)) {
                     json.WriteStartObject(Patched + key);
                     foreach (var (field, raw) in now.Where(f => then[f.Key] != f.Value)) { json.WritePropertyName(field); json.WriteRawValue(raw, skipInputValidation: true); }
                     json.WriteEndObject();
-                }
-                else { json.WritePropertyName(key); json.WriteRawValue(value, skipInputValidation: true); }
+                } else { json.WritePropertyName(key); json.WriteRawValue(value, skipInputValidation: true); }
             }
             foreach (var key in known?.Keys.Where(k => !entries.ContainsKey(k)) ?? []) json.WriteNull(key);
             json.WriteEndObject();
@@ -419,8 +383,7 @@ public partial class Net : Node
     private const char Patched = '~';
 
     /// <summary>An object entry's fields as raw JSON, or null for a list.</summary>
-    private static Dictionary<string, string>? Fields(string entry)
-    {
+    private static Dictionary<string, string>? Fields(string entry) {
         using var document = JsonDocument.Parse(entry);
         return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.EnumerateObject().ToDictionary(f => f.Name, f => f.Value.GetRawText()) : null;
     }
@@ -433,8 +396,7 @@ public partial class Net : Node
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable, TransferChannel = BulkChannel)]
     private void RefreshReliably(int update, int baseline, byte[] packed) => Take(update, baseline, packed);
 
-    private void Take(int update, int baseline, byte[] packed)
-    {
+    private void Take(int update, int baseline, byte[] packed) {
         if (!welcomed || update <= appliedSequence) return;
         // An update against one this machine has forgotten waits for the host to catch up with the confirmations.
         if (baseline != 0 && !received.ContainsKey(baseline)) return;
@@ -452,8 +414,7 @@ public partial class Net : Node
     }
 
     /// <summary>Brings the guest's copy from the entries it shows now to <paramref name="entries"/>, touching only what differs.</summary>
-    private void Apply(Dictionary<string, string> entries)
-    {
+    private void Apply(Dictionary<string, string> entries) {
         var s = World.S;
         string? Changed(string key) => entries.TryGetValue(key, out var value) && applied.GetValueOrDefault(key) != value ? value : null;
         if (Changed("state") is string state) CopyExcept(s, Read<SaveState>(state), Shared);
@@ -478,8 +439,7 @@ public partial class Net : Node
         World.UpdateLunchFire();
     }
 
-    private static string Patch(string entry, JsonElement changes)
-    {
+    private static string Patch(string entry, JsonElement changes) {
         var fields = JsonNode.Parse(entry)!.AsObject();
         foreach (var field in changes.EnumerateObject()) fields[field.Name] = JsonNode.Parse(field.Value.GetRawText());
         return fields.ToJsonString();
@@ -491,12 +451,10 @@ public partial class Net : Node
     /// Updates the members of <paramref name="list"/> whose entries changed, in place, adds new ones and drops those without an entry.
     /// <paramref name="moved"/> sees each updated member with its position before the update.
     /// </summary>
-    private void Sync<T>(List<T> list, string prefix, Func<T, int> id, Dictionary<string, string> entries, Action<object, Vector2>? moved) where T : class
-    {
+    private void Sync<T>(List<T> list, string prefix, Func<T, int> id, Dictionary<string, string> entries, Action<object, Vector2>? moved) where T : class {
         var have = list.ToDictionary(t => prefix + id(t));
         list.RemoveAll(t => !entries.ContainsKey(prefix + id(t)));
-        foreach (var (key, json) in entries)
-        {
+        foreach (var (key, json) in entries) {
             if (!key.StartsWith(prefix) || applied.GetValueOrDefault(key) == json && have.ContainsKey(key)) continue;
             var item = Read<T>(json);
             if (!have.TryGetValue(key, out var old)) { list.Add(item); continue; }
@@ -510,22 +468,19 @@ public partial class Net : Node
 
     private static Vector2 Position(object o) => o switch { Worker w => w.Pos, Wolf w => w.Pos, PlayerState p => p.Pos, _ => Vector2.Zero };
 
-    private static void Place(object o, Vector2 at)
-    {
+    private static void Place(object o, Vector2 at) {
         if (o is Worker w) w.Pos = at; else if (o is Wolf wolf) wolf.Pos = at; else if (o is PlayerState p) p.Pos = at;
     }
 
     private static readonly Dictionary<Type, PropertyInfo[]> properties = new();
 
     /// <summary>Copies every saved property; inventories are copied into the ones already there, which open panels and drags hold on to.</summary>
-    private static void CopyExcept(object target, object source, HashSet<string>? skip)
-    {
+    private static void CopyExcept(object target, object source, HashSet<string>? skip) {
         var type = target.GetType();
         if (!properties.TryGetValue(type, out var list))
             properties[type] = list = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0 && p.GetCustomAttribute<JsonIgnoreAttribute>() is not { Condition: JsonIgnoreCondition.Always }).ToArray();
-        foreach (var property in list)
-        {
+        foreach (var property in list) {
             if (skip?.Contains(property.Name) == true) continue;
             var value = property.GetValue(source);
             if (value is Inventory inventory && property.GetValue(target) is Inventory existing) CopyExcept(existing, inventory, null);

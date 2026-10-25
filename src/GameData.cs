@@ -6,8 +6,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-public sealed class ItemDef
-{
+public sealed class ItemDef {
     public string Name { get; set; } = "";
     public float Price { get; set; }
     public string Color { get; set; } = "ffffff";
@@ -24,14 +23,12 @@ public sealed class ItemDef
     public float Thirst { get; set; }
     public float Health { get; set; }
 }
-public sealed class BuildingDef
-{
+public sealed class BuildingDef {
     public string Name { get; set; } = "";
     public Dictionary<string, int> Cost { get; set; } = new();
     public string Description { get; set; } = "";
 }
-public sealed class RecipeDef
-{
+public sealed class RecipeDef {
     public string Name { get; set; } = "";
     public string Station { get; set; } = "";
     public Dictionary<string, int> Inputs { get; set; } = new();
@@ -48,8 +45,7 @@ public sealed class RecipeDef
     public bool Fuel { get; set; }
 }
 /// <summary>How the village's appetite for a good it takes moves with sales.</summary>
-public sealed class DemandDef
-{
+public sealed class DemandDef {
     /// <summary>Units the village absorbs in a day: a day restores what selling this many takes.</summary>
     public int Daily { get; set; }
     /// <summary>Units of the daily amount that sell at the full price before it starts to fall.</summary>
@@ -58,20 +54,17 @@ public sealed class DemandDef
     public float Drop { get; set; }
 }
 /// <summary>What the village takes in crates with its demand, and what it sells with how many units make one purchase.</summary>
-public sealed class MarketDef
-{
+public sealed class MarketDef {
     public Dictionary<string, DemandDef> Sells { get; set; } = new();
     public Dictionary<string, int> Buys { get; set; } = new();
 }
 /// <summary>A hiring deal: a larger payment up front buys a lower daily wage.</summary>
-public sealed class HireOffer
-{
+public sealed class HireOffer {
     public int Upfront { get; set; }
     public int Wage { get; set; }
 }
 /// <summary>How a mine is built and how fast it yields.</summary>
-public sealed class MineDef
-{
+public sealed class MineDef {
     /// <summary>Materials the second stage needs delivered to the site.</summary>
     public Dictionary<string, int> Materials { get; set; } = new();
     /// <summary>Working days of one worker that digging the entrance, and later fitting the frame, each take.</summary>
@@ -81,8 +74,7 @@ public sealed class MineDef
     public int Workers { get; set; } = 3;
 }
 /// <summary>A farm plot's season: what sows it, how long the wheat grows and how much work its harvest takes.</summary>
-public sealed class FarmDef
-{
+public sealed class FarmDef {
     public Dictionary<string, int> Sow { get; set; } = new();
     /// <summary>Whole days from sowing to ripe wheat, nights included.</summary>
     public float GrowDays { get; set; } = 3;
@@ -91,15 +83,13 @@ public sealed class FarmDef
     public Dictionary<string, int> Yield { get; set; } = new();
 }
 /// <summary>The end goals: a mine on every ore and a week of steady profit.</summary>
-public sealed class GoalsDef
-{
+public sealed class GoalsDef {
     /// <summary>Sale coins minus wages that a day has to clear.</summary>
     public int DailyProfit { get; set; }
     /// <summary>Consecutive days that have to clear it.</summary>
     public int ProfitDays { get; set; }
 }
-public sealed class GameData
-{
+public sealed class GameData {
     public float DaySeconds { get; set; } = 420;
     public float NightStarts { get; set; } = .7f;
     /// <summary>Day phase where the light starts to fade, a tenth of a day before night; workers sign out then.</summary>
@@ -137,22 +127,19 @@ public sealed class GameData
     public Dictionary<string, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
     public static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true, WriteIndented = true };
-    public static GameData Load()
-    {
+    public static GameData Load() {
         using var file = Godot.FileAccess.Open("res://data/game.json", Godot.FileAccess.ModeFlags.Read);
         var data = JsonSerializer.Deserialize<GameData>(file.GetAsText(), Json) ?? throw new InvalidOperationException("Missing game data");
         data.Validate();
         return data;
     }
-    public void Validate()
-    {
+    public void Validate() {
         if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || !Items.ContainsKey("crate"))
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)
                 if (!Items.ContainsKey(cost.Key) || cost.Value <= 0) throw new InvalidOperationException($"Invalid cost for {building.Key}: {cost.Key}.");
-        foreach (var recipe in Recipes)
-        {
+        foreach (var recipe in Recipes) {
             bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool && i.Tier >= recipe.Value.Tier);
             if (!(recipe.Value.Station == "" ? recipe.Value.Hand : Buildings.ContainsKey(recipe.Value.Station)) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
@@ -170,16 +157,14 @@ public sealed class GameData
     public bool IsConsumable(string item) => Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>The plainest tool of a kind that meets a tier, for naming what a recipe needs.</summary>
-    public string ToolName(string tool, int tier)
-    {
+    public string ToolName(string tool, int tier) {
         if (!toolNames.TryGetValue((tool, tier), out var name))
             toolNames[(tool, tier)] = name = Items.Values.Where(i => i.Tool == tool && i.Tier >= tier).MinBy(i => i.Tier) is ItemDef def && tier > 0 ? def.Name.ToLowerInvariant() : tool;
         return name;
     }
     // Named once per tool and tier, since workers ask every tick while a station waits for its tool.
     private readonly Dictionary<(string, int), string> toolNames = new();
-    public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch
-    {
+    public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch {
         "tree" => "Tree",
         "iron" => "Iron deposit",
         "tin" => "Tin deposit",

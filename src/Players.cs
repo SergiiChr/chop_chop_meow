@@ -11,8 +11,7 @@ namespace ChopChopMeow;
 /// One player's body and belongings.
 /// The host's own player is saved with the world; a guest's player is in the world only while connected and is saved on the guest's machine.
 /// </summary>
-public sealed class PlayerState
-{
+public sealed class PlayerState {
     /// <summary>Network peer id: 1 for the host and in single player.</summary>
     public int Id { get; set; } = 1;
     public float PlayerX { get; set; } = Terrain.Spawn.X;
@@ -60,14 +59,11 @@ public sealed class PlayerState
 public readonly record struct Command(string Verb, int Target, int Other, string Item, int Count, Vector2 At);
 
 /// <summary>The players in the world and the guest side of actions.</summary>
-public sealed partial class World
-{
+public sealed partial class World {
     /// <summary>The player at this machine; the host and a single-player game are 1, a guest gets its peer id.</summary>
     public int LocalId { get; set; } = 1;
-    public PlayerState Me
-    {
-        get
-        {
+    public PlayerState Me {
+        get {
             foreach (var p in S.Players) if (p.Id == LocalId) return p;
             return S.Players[0];
         }
@@ -80,8 +76,7 @@ public sealed partial class World
     // While the tick runs the shared world, what it says is for everyone.
     private bool everyone;
 
-    private void SayToAll(string message)
-    {
+    private void SayToAll(string message) {
         bool was = everyone; everyone = true;
         Say(message); everyone = was;
     }
@@ -92,32 +87,27 @@ public sealed partial class World
     public T As<T>(PlayerState p, Func<T> action) { using (ActAs(p)) return action(); }
 
     /// <summary>Acts as another player until the returned scope ends; a struct, so code that runs every tick switches players without allocating.</summary>
-    private Acting ActAs(PlayerState p)
-    {
+    private Acting ActAs(PlayerState p) {
         var scope = new Acting(this, S.Actor, everyone);
         S.Actor = p; everyone = false;
         return scope;
     }
 
-    private readonly struct Acting(World world, PlayerState actor, bool everyone) : IDisposable
-    {
+    private readonly struct Acting(World world, PlayerState actor, bool everyone) : IDisposable {
         public void Dispose() { world.S.Actor = actor; world.everyone = everyone; }
     }
 
     /// <summary>In a guest's copy, sends the action to the host and tells the caller to stop.</summary>
-    private bool Forwarded(string verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default)
-    {
+    private bool Forwarded(string verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
         Host?.Invoke(new Command(verb, target, other, item, count, at));
         return Host != null;
     }
 
     /// <summary>Host: runs a guest's action as that guest. The action checks reach and costs as it does for the host.</summary>
-    public void Run(PlayerState p, Command c) => As(p, () =>
-    {
+    public void Run(PlayerState p, Command c) => As(p, () => {
         var t = Find(c.Target);
         var w = S.Workers.Find(w => w.Id == c.Other);
-        switch (c.Verb)
-        {
+        switch (c.Verb) {
             case "build": Build(c.Item, c.At); break;
             case "place_crate": PlaceCrate(c.Item, c.At); break;
             case "consume": Consume(c.Item); break;
@@ -132,8 +122,7 @@ public sealed partial class World
             case "settle": if (w != null) SettleDebt(w); break;
         }
         if (t == null) return;
-        switch (c.Verb)
-        {
+        switch (c.Verb) {
             case "pick_up": if (t.IsLoose) Gather(t, 0); break;
             case "pump": Pump(t); break;
             case "fuel_fire": FuelFire(t); break;
@@ -162,11 +151,9 @@ public sealed partial class World
     /// <summary>
     /// An inventory as a number another machine can look up: 0 is the acting player's backpack, otherwise its holder's id and which of its boxes.
     /// </summary>
-    private int Locate(Inventory inventory)
-    {
+    private int Locate(Inventory inventory) {
         if (inventory == S.Backpack) return 0;
-        foreach (var t in S.Things)
-        {
+        foreach (var t in S.Things) {
             int box = Array.IndexOf(Boxes(t), inventory);
             if (box >= 0) return t.Id * BoxCodes + box + 1;
         }
@@ -178,8 +165,7 @@ public sealed partial class World
     private Inventory? Resolve(int at) => at == 0 ? S.Backpack : Find(at / BoxCodes) is not Thing t || at % BoxCodes == 0 ? null : Boxes(t)[at % BoxCodes - 1];
 
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
-    public int Transfer(Inventory from, Inventory to, string item, int quantity)
-    {
+    public int Transfer(Inventory from, Inventory to, string item, int quantity) {
         int a = Locate(from), b = Locate(to);
         if (a < 0 || b < 0 || Forwarded("transfer", a, b, item, quantity)) return 0;
         if (new[] { a, b }.Where(at => at > 0).Any(at => !Near(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
@@ -187,42 +173,36 @@ public sealed partial class World
         return from.TransferTo(to, item, quantity);
     }
 
-    public void Drink(Thing lake)
-    {
+    public void Drink(Thing lake) {
         if (lake.Kind != "water" || !Near(lake)) { Say("Walk closer to the lake."); return; }
         if (Forwarded("drink", lake.Id)) return;
         S.Thirst = 100; Say("Cool, fresh water."); Play("gather_water", Player);
     }
 
-    public void SetFuel(Thing furnace, string fuel)
-    {
+    public void SetFuel(Thing furnace, string fuel) {
         if (furnace.Kind is not ("furnace" or "cooktable" or "cannery") || furnace.Processing || fuel is not "wood" and not "coal" || Forwarded("set_fuel", furnace.Id, item: fuel)) return;
         furnace.Fuel = fuel;
     }
 
-    public void SetFilter(Thing chest, string item, bool output, bool allowed)
-    {
+    public void SetFilter(Thing chest, string item, bool output, bool allowed) {
         if (!chest.IsStorage || !Data.Items.ContainsKey(item) || Forwarded("set_filter", chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         var filter = output ? chest.Inventory.OutputFilter : chest.Inventory.InputFilter;
         if (allowed) filter.Add(item); else filter.Remove(item);
     }
 
-    public void ClearFilters(Thing chest)
-    {
+    public void ClearFilters(Thing chest) {
         if (!chest.IsStorage || Forwarded("clear_filters", chest.Id)) return;
         chest.Inventory.InputFilter.Clear(); chest.Inventory.OutputFilter.Clear();
     }
 
     /// <summary>Gives new wolves and trade carts ids, which other machines tell them apart by.</summary>
-    public void NumberWolvesAndOrders()
-    {
+    public void NumberWolvesAndOrders() {
         foreach (var w in S.Wolves.Where(w => w.Id == 0)) w.Id = S.NextId++;
         foreach (var o in S.Orders.Where(o => o.Id == 0)) o.Id = S.NextId++;
     }
 
     /// <summary>Host: puts a guest where their own machine walked them, as <see cref="MovePlayer"/> does for the host.</summary>
-    public void MoveTo(Vector2 p)
-    {
+    public void MoveTo(Vector2 p) {
         if (Downed || p == Player) return;
         playerBusy = true; S.Sheltered = 0; Player = p;
     }
@@ -231,8 +211,7 @@ public sealed partial class World
     /// Host: brings a guest in with the player they saved on their machine.
     /// Anything missing, unknown or out of range gives them a new player instead: an empty backpack at the clearing.
     /// </summary>
-    public PlayerState AddGuest(int id, string? saved)
-    {
+    public PlayerState AddGuest(int id, string? saved) {
         var p = Adopt(saved) ?? new PlayerState();
         p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(1, 3).First(i => S.Players.All(o => o.Shirt != i));
         S.Players.Add(p);
@@ -240,11 +219,9 @@ public sealed partial class World
         return p;
     }
 
-    private PlayerState? Adopt(string? saved)
-    {
+    private PlayerState? Adopt(string? saved) {
         PlayerState? p;
-        try { p = saved == null ? null : JsonSerializer.Deserialize<PlayerState>(saved, GameData.Json); }
-        catch (JsonException) { return null; }
+        try { p = saved == null ? null : JsonSerializer.Deserialize<PlayerState>(saved, GameData.Json); } catch (JsonException) { return null; }
         if (p?.Backpack?.Items == null || p.HotbarSlots == null || p.Crafting == null) return null;
         var crates = p.Crates ?? new();
         bool Known(string item) => Data.Items.ContainsKey(item) && !item.StartsWith(PackedPrefix);
@@ -257,11 +234,9 @@ public sealed partial class World
         var backpack = new Inventory { Slots = 24 };
         if (!valid || !backpack.Fits(p.Backpack.Items)) return null;
         // Packed crates get new numbers here, since the guest's old ones may be taken in this world.
-        foreach (var (item, quantity) in p.Backpack.Items)
-        {
+        foreach (var (item, quantity) in p.Backpack.Items) {
             string id = item;
-            if (crates.TryGetValue(PackedId(item), out var box))
-            {
+            if (crates.TryGetValue(PackedId(item), out var box)) {
                 var crate = NewCrate(); foreach (var (inside, count) in box.Items) crate.Add(inside, count);
                 id = Pack(crate); p.HotbarSlots = p.HotbarSlots.Select(slot => slot == item ? id : slot).ToList();
             }
@@ -276,8 +251,7 @@ public sealed partial class World
     }
 
     /// <summary>Host: a guest has gone, with everything they carry; the contents of their packed crates go with them.</summary>
-    public void RemoveGuest(int id)
-    {
+    public void RemoveGuest(int id) {
         if (id == Me.Id || S.Players.Find(p => p.Id == id) is not PlayerState p) return;
         foreach (var item in p.Backpack.Items.Keys) S.Crates.Remove(PackedId(item));
         S.Players.Remove(p);
@@ -285,16 +259,13 @@ public sealed partial class World
     }
 
     /// <summary>A player as a guest saves them on their own machine, with what their packed crates hold.</summary>
-    public string ExportPlayer(PlayerState p)
-    {
+    public string ExportPlayer(PlayerState p) {
         p.Crates = p.Backpack.Items.Keys.Where(id => Packed(id) != null).ToDictionary(PackedId, id => Packed(id)!);
-        try { return JsonSerializer.Serialize(p, GameData.Json); }
-        finally { p.Crates = null; }
+        try { return JsonSerializer.Serialize(p, GameData.Json); } finally { p.Crates = null; }
     }
 
     /// <summary>A guest takes the host's whole world as its copy.</summary>
-    public void Mirror(SaveState state, List<PlayerState> players, int localId)
-    {
+    public void Mirror(SaveState state, List<PlayerState> players, int localId) {
         state.Players = players; LocalId = localId; S = state; S.Actor = Me;
         UpdateLunchFire(); ExploredRevision++; Look();
     }

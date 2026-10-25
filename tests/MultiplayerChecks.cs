@@ -9,12 +9,10 @@ using Godot;
 /// each player has their own needs, pack and messages, and a guest's saved player is checked before it comes in.
 /// The real two-process session is covered by the network check.
 /// </summary>
-public static class MultiplayerChecks
-{
+public static class MultiplayerChecks {
     private const int GuestId = 7;
 
-    public static void Run(GameData data)
-    {
+    public static void Run(GameData data) {
         CheckGuestActsThroughCommands(data);
         CheckGuestCopyForwardsActions(data);
         CheckGuestGathersAndHammers(data);
@@ -24,13 +22,11 @@ public static class MultiplayerChecks
         CheckBrokenGuestSavesStartEmpty(data);
     }
 
-    private static void Require(bool condition, string message)
-    {
+    private static void Require(bool condition, string message) {
         if (!condition) throw new InvalidOperationException($"Multiplayer check failed: {message}");
     }
 
-    private static (World World, PlayerState Guest, List<string> Heard) Hosted(GameData data)
-    {
+    private static (World World, PlayerState Guest, List<string> Heard) Hosted(GameData data) {
         var world = new World(data, false);
         var heard = new List<string>();
         world.Relay = (to, message) => { if (to == null || to.Id == GuestId) heard.Add(message); };
@@ -38,17 +34,14 @@ public static class MultiplayerChecks
         return (world, guest, heard);
     }
 
-    private static void Tick(World world, float seconds)
-    {
-        for (; seconds > 0; seconds -= .25f)
-        {
+    private static void Tick(World world, float seconds) {
+        for (; seconds > 0; seconds -= .25f) {
             foreach (var p in world.S.Players) { p.Hunger = 100; p.Thirst = 100; }
             world.Tick(.25f);
         }
     }
 
-    private static void CheckGuestActsThroughCommands(GameData data)
-    {
+    private static void CheckGuestActsThroughCommands(GameData data) {
         var (world, guest, heard) = Hosted(data);
         Require(heard.Contains("A neighbor joined the settlement."), "everyone should hear that a guest joined");
         Require(guest.Backpack.Count == 0 && guest.Pos == World.Spawn && guest.Warp == 1, "a guest without a saved player should start with an empty backpack at the clearing");
@@ -76,8 +69,7 @@ public static class MultiplayerChecks
         Require(world.S.Players.Count == 1 && heard.Contains("A neighbor left the settlement."), "a leaving guest should leave the world");
     }
 
-    private static void CheckGuestCopyForwardsActions(GameData data)
-    {
+    private static void CheckGuestCopyForwardsActions(GameData data) {
         var (host, guest, _) = Hosted(data);
         var copy = new World(data, false);
         var sent = new List<Command>();
@@ -103,8 +95,7 @@ public static class MultiplayerChecks
         Require(host.S.Backpack["berries"] == 0 && host.S.Hunger == 100, "the host's own player should be untouched by a guest's actions");
     }
 
-    private static void CheckGuestGathersAndHammers(GameData data)
-    {
+    private static void CheckGuestGathersAndHammers(GameData data) {
         var (world, guest, _) = Hosted(data);
         var tree = world.Add("tree", World.Spawn + new Vector2(4, 0), 40);
         guest.Backpack.Add("iron_axe", 1);
@@ -125,8 +116,7 @@ public static class MultiplayerChecks
         Require(anvil.Inventory["iron_parts"] == 1, "a guest standing at an anvil should hammer it");
     }
 
-    private static void CheckEachPlayerHasTheirOwnPack(GameData data)
-    {
+    private static void CheckEachPlayerHasTheirOwnPack(GameData data) {
         var (world, guest, heard) = Hosted(data);
         world.Player = World.Spawn;
         var far = Enumerable.Range(0, 63).Select(i => World.Spawn + Vector2.Right.Rotated(i * .1f) * 35).First(world.CanStand);
@@ -149,8 +139,7 @@ public static class MultiplayerChecks
         Require(guest.RespawnIn == 0 && guest.Pos == World.Spawn && guest.Warp == warp + 1, "a guest should respawn at the clearing, and the move should tell their machine");
     }
 
-    private static void CheckSleepWaitsForEveryone(GameData data)
-    {
+    private static void CheckSleepWaitsForEveryone(GameData data) {
         var (world, guest, _) = Hosted(data);
         world.S.Time = data.DaySeconds * (data.NightStarts + .02f);
         var hut = world.Add("hut", World.Spawn + new Vector2(3, 0));
@@ -170,8 +159,7 @@ public static class MultiplayerChecks
         Require(world.S.Backpack[Inventory.Coins] == 40 && guest.Backpack[Inventory.Coins] == 50, "the host's backpack should pay the wages even when a guest sleeps");
     }
 
-    private static void CheckGuestSaveRoundTrip(GameData data)
-    {
+    private static void CheckGuestSaveRoundTrip(GameData data) {
         var (world, guest, _) = Hosted(data);
         guest.Backpack.Add("coal", 5);
         world.As(guest, () => world.MoveTo(World.Spawn + new Vector2(6, 1)));
@@ -196,8 +184,7 @@ public static class MultiplayerChecks
         Require(renamed != packed && other.Packed(renamed)?["steel_axe"] == 2 && back.HotbarSlots[3] == renamed, "a guest's packed crate should come back with its contents under a number free in this world");
     }
 
-    private static void CheckBrokenGuestSavesStartEmpty(GameData data)
-    {
+    private static void CheckBrokenGuestSavesStartEmpty(GameData data) {
         var world = new World(data, false);
         var good = new PlayerState { Health = 80 };
         good.Backpack.Add("wood", 3);
@@ -206,8 +193,7 @@ public static class MultiplayerChecks
         var unknown = new PlayerState(); unknown.Backpack.Items["diamond"] = 2;
         var crowded = new PlayerState(); for (int i = 0; i < 30; i++) crowded.Backpack.Items[$"{World.PackedPrefix}{900 + i}"] = 1;
         var underwater = new PlayerState { PlayerX = Terrain.Lake.X, PlayerY = Terrain.Lake.Y }; underwater.Backpack.Add("stone", 1);
-        foreach (var (saved, why) in new[] { ("{ not json", "garbage"), ("null", "an empty save"), (Json(unknown), "an unknown item"), (Json(crowded), "crates without contents"), (Json(new PlayerState { Health = 0 }), "a dead player"), (Json(new PlayerState { Hunger = 900 }), "hunger out of range") })
-        {
+        foreach (var (saved, why) in new[] { ("{ not json", "garbage"), ("null", "an empty save"), (Json(unknown), "an unknown item"), (Json(crowded), "crates without contents"), (Json(new PlayerState { Health = 0 }), "a dead player"), (Json(new PlayerState { Hunger = 900 }), "hunger out of range") }) {
             var p = world.AddGuest(20, saved);
             Require(p.Backpack.Count == 0 && p.Pos == World.Spawn && p.Health == 100, $"{why} should give an empty backpack at the clearing");
             world.RemoveGuest(20);

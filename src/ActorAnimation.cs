@@ -4,8 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-public enum ActorAction
-{
+public enum ActorAction {
     Idle,
     Walk,
     Chop,
@@ -37,8 +36,7 @@ public readonly record struct Pose(
     float RaiseL = 6, float OutL = 7, float ElbowL = 12,
     float RaiseR = 6, float OutR = 7, float ElbowR = 12,
     float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0,
-    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Seat = 0)
-{
+    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Seat = 0) {
     public static Pose Lerp(Pose a, Pose b, float t) => new(
         Mathf.Lerp(a.Lean, b.Lean, t), Mathf.Lerp(a.Twist, b.Twist, t), Mathf.Lerp(a.Head, b.Head, t),
         Mathf.Lerp(a.RaiseL, b.RaiseL, t), Mathf.Lerp(a.OutL, b.OutL, t), Mathf.Lerp(a.ElbowL, b.ElbowL, t),
@@ -48,11 +46,9 @@ public readonly record struct Pose(
 }
 
 /// <summary>Pure actor animation selection, timing and keyframed poses.</summary>
-public static class ActorAnimation
-{
+public static class ActorAnimation {
     /// <summary>Seconds per loop; player action pulses last exactly one loop.</summary>
-    public static float Duration(ActorAction action) => action switch
-    {
+    public static float Duration(ActorAction action) => action switch {
         ActorAction.Idle => 3,
         ActorAction.Walk or ActorAction.Carry => .8f,
         ActorAction.SteelChop or ActorAction.SteelMine => .8f,
@@ -68,8 +64,7 @@ public static class ActorAnimation
     };
 
     /// <summary>Position within the current loop, from 0 inclusive to 1 exclusive.</summary>
-    public static float Phase(ActorAction action, float elapsed)
-    {
+    public static float Phase(ActorAction action, float elapsed) {
         if (!float.IsFinite(elapsed)) return 0;
         float phase = elapsed / Duration(action) % 1;
         return phase < 0 ? phase + 1 : phase;
@@ -80,8 +75,7 @@ public static class ActorAnimation
         movement.LengthSquared() < 0.0001f ? previous : MathF.Atan2(movement.X, movement.Y);
 
     /// <summary>The tool mesh an action shows in the right hand, or null for empty hands.</summary>
-    public static string? Tool(ActorAction action) => action switch
-    {
+    public static string? Tool(ActorAction action) => action switch {
         ActorAction.Chop => "iron_axe",
         ActorAction.SteelChop => "steel_axe",
         ActorAction.Mine => "iron_pick",
@@ -92,12 +86,10 @@ public static class ActorAnimation
 
     private static readonly Pose Stance = new(SwingL: 16, KneeL: 16, SwingR: -10, KneeR: 10);
 
-    public static Pose PoseAt(ActorAction action, float elapsed, bool moving)
-    {
+    public static Pose PoseAt(ActorAction action, float elapsed, bool moving) {
         float p = Phase(action, elapsed);
         float wave = MathF.Sin(p * Mathf.Tau);
-        switch (action)
-        {
+        switch (action) {
             case ActorAction.Walk:
                 return Stride(wave, p) with { RaiseL = 6 - wave * 26, RaiseR = 6 + wave * 26, ElbowL = 20, ElbowR = 20 };
             case ActorAction.Carry:
@@ -177,17 +169,14 @@ public static class ActorAnimation
         }
     }
 
-    private static Pose Stride(float wave, float phase)
-    {
+    private static Pose Stride(float wave, float phase) {
         float lift = MathF.Cos(phase * Mathf.Tau);
         return new Pose(Lean: 4, SwingL: wave * 26, SwingR: -wave * 26, KneeL: 8 + Math.Max(0, lift) * 34, KneeR: 8 + Math.Max(0, -lift) * 34);
     }
 
     /// <summary>Loops smoothly through keys sorted by phase; the last key eases back into the first.</summary>
-    private static Pose Keys(float phase, params (float At, Pose Pose)[] keys)
-    {
-        for (int i = 0; i < keys.Length; i++)
-        {
+    private static Pose Keys(float phase, params (float At, Pose Pose)[] keys) {
+        for (int i = 0; i < keys.Length; i++) {
             var from = keys[i];
             var (toAt, toPose) = i + 1 < keys.Length ? keys[i + 1] : (1f, keys[0].Pose);
             if (phase < from.At || phase >= toAt) continue;
@@ -202,23 +191,19 @@ public static class ActorAnimation
         bool gathering,
         bool moving,
         Inventory backpack,
-        string? selectedTool)
-    {
+        string? selectedTool) {
         if (moving) return ActorAction.Walk;
         if (!gathering || string.IsNullOrEmpty(resourceKind)) return ActorAction.Idle;
 
         string[]? family = resourceKind == "tree" ? Axes : resourceKind is "stone" or "iron" or "coal" or "tin" ? Picks : null;
         string? tool = family == null ? null : BestTool(backpack, selectedTool, family);
-        return resourceKind switch
-        {
-            "tree" => tool switch
-            {
+        return resourceKind switch {
+            "tree" => tool switch {
                 "steel_axe" => ActorAction.SteelChop,
                 "iron_axe" => ActorAction.Chop,
                 _ => ActorAction.Gather
             },
-            "stone" or "iron" or "coal" or "tin" => tool switch
-            {
+            "stone" or "iron" or "coal" or "tin" => tool switch {
                 "steel_pick" => ActorAction.SteelMine,
                 "iron_pick" => ActorAction.Mine,
                 _ => ActorAction.Gather
@@ -228,24 +213,20 @@ public static class ActorAnimation
         };
     }
 
-    public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving)
-    {
+    public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving) {
         // Every other worker sits on a rock rather than the ground.
         if (worker.WorkState == WorkerWorkState.Resting && !moving) return worker.Id % 2 == 0 ? ActorAction.Perch : ActorAction.Sit;
         if (worker.Bag.Count > 0) return ActorAction.Carry;
         if (moving) return ActorAction.Walk;
-        if (worker.WorkState == WorkerWorkState.Gathering && (assignment?.IsResource == true || assignment?.Kind == "farm"))
-        {
-            return assignment.Kind switch
-            {
+        if (worker.WorkState == WorkerWorkState.Gathering && (assignment?.IsResource == true || assignment?.Kind == "farm")) {
+            return assignment.Kind switch {
                 "tree" => ActorAction.Chop,
                 "stone" or "iron" or "coal" or "tin" => ActorAction.Mine,
                 _ => ActorAction.Gather
             };
         }
 
-        return worker.WorkState switch
-        {
+        return worker.WorkState switch {
             WorkerWorkState.Pumping => ActorAction.Pump,
             WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == "mine") => ActorAction.Hammer,
             WorkerWorkState.Digging => ActorAction.Mine,
@@ -257,8 +238,7 @@ public static class ActorAnimation
     private static readonly string[] Axes = { "steel_axe", "iron_axe" }, Picks = { "steel_pick", "iron_pick" };
 
     /// <summary>The carried tool of a family the player would use on a resource, preferring the selected hotbar tool, then the best one.</summary>
-    public static string? BestTool(Inventory backpack, string? selectedTool, string[] family)
-    {
+    public static string? BestTool(Inventory backpack, string? selectedTool, string[] family) {
         if (selectedTool != null && family.Contains(selectedTool) && backpack[selectedTool] > 0) return selectedTool;
         return family.FirstOrDefault(tool => backpack[tool] > 0);
     }

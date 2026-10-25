@@ -5,8 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>An outlined icon whose fill drains from the top as its level falls.</summary>
-public partial class NeedGauge : Control
-{
+public partial class NeedGauge : Control {
     // Outlines in units of the gauge height; x is centred afterwards.
     public static readonly Vector2[] Stomach =
     {
@@ -25,8 +24,7 @@ public partial class NeedGauge : Control
     public Color Fill { get; set; }
     public Func<float> Level { get; set; } = () => 100;
 
-    public override void _Draw()
-    {
+    public override void _Draw() {
         float scale = Size.Y, left = Shape.Min(p => p.X), width = (Shape.Max(p => p.X) - left) * scale;
         var outline = Shape.Select(p => (p - new Vector2(left, 0)) * scale + new Vector2((Size.X - width) / 2, 0)).ToArray();
         float level = Math.Clamp(Level(), 0, 100) / 100;
@@ -37,15 +35,13 @@ public partial class NeedGauge : Control
     }
 }
 
-public partial class Game
-{
+public partial class Game {
     private NeedGauge health = null!;
     private NeedGauge hunger = null!;
     private NeedGauge thirst = null!;
     private DamageEdges damageEdges = null!;
 
-    private void BuildNeeds()
-    {
+    private void BuildNeeds() {
         var box = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = PanelLeft - 118, OffsetRight = PanelLeft - 10, OffsetTop = 14, OffsetBottom = 52 };
         box.AddThemeStyleboxOverride("panel", Box(new Color(.14f, .23f, .18f, .89f), 8, 4)); ui.AddChild(box);
         var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; box.AddChild(row);
@@ -57,19 +53,16 @@ public partial class Game
     }
 
     /// <summary>Flashes the screen edges on a hit; a pinned player keeps a steady glow while the wolves feed.</summary>
-    private void DamageFlash(float lost)
-    {
+    private void DamageFlash(float lost) {
         if (lost >= 3) damageEdges.Strength = 1;
         if (world.S.Mauled && !world.Dead) damageEdges.Strength = Math.Max(damageEdges.Strength, .55f);
     }
 
     // The rounded values the tooltips show, so their text is built only when one changes.
     private (int Health, int Hunger, int Thirst) shownNeeds = (-1, -1, -1);
-    private void RefreshNeeds()
-    {
+    private void RefreshNeeds() {
         var needs = ((int)MathF.Round(world.S.Health, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Hunger, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Thirst, MidpointRounding.AwayFromZero));
-        if (needs != shownNeeds)
-        {
+        if (needs != shownNeeds) {
             shownNeeds = needs;
             health.TooltipText = $"Health {world.S.Health:0}%"; hunger.TooltipText = $"Hunger {world.S.Hunger:0}%"; thirst.TooltipText = $"Thirst {world.S.Thirst:0}%";
             // Redrawing clips each outline to its level, which allocates, so a gauge redraws only when its level moves a whole percent.
@@ -79,20 +72,17 @@ public partial class Game
 }
 
 /// <summary>A red glow along the screen edges, at most 5% of the screen deep, that fades after a hit.</summary>
-public partial class DamageEdges : Control
-{
+public partial class DamageEdges : Control {
     public float Strength { get; set; }
 
     public DamageEdges() { MouseFilter = MouseFilterEnum.Ignore; }
 
-    public override void _Process(double delta)
-    {
+    public override void _Process(double delta) {
         if (Strength <= 0) return;
         Strength = Math.Max(0, Strength - (float)delta * 1.6f); QueueRedraw();
     }
 
-    public override void _Draw()
-    {
+    public override void _Draw() {
         if (Strength <= 0) return;
         var edge = new Color(.85f, .05f, .05f, .7f * Strength); var clear = new Color(.85f, .05f, .05f, 0);
         float x = Size.X * .05f, y = Size.Y * .05f;

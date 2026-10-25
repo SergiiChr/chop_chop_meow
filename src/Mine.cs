@@ -6,8 +6,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Mines: marked free at an ore cliff, built in three stages, then worked underground for ore and rocks that never run out.</summary>
-public sealed partial class World
-{
+public sealed partial class World {
     /// <summary>Values of <see cref="Thing.Stage"/>: the entrance is dug, the materials are in, and the frame and rails are fitted.</summary>
     public const int MineDug = 1, MineSupplied = 2, MineOpen = 3;
     /// <summary>How far from a cliff a mine plan still snaps to it.</summary>
@@ -15,8 +14,7 @@ public sealed partial class World
     // Mines already reported full with nowhere to take the output, so the message shows once per stoppage.
     private readonly HashSet<int> mineFullReported = new();
 
-    public static Cliff CliffAt(Vector2 p)
-    {
+    public static Cliff CliffAt(Vector2 p) {
         var nearest = Cliffs[0];
         foreach (var c in Cliffs) if (c.DistanceTo(p) < nearest.DistanceTo(p)) nearest = c;
         return nearest;
@@ -27,15 +25,13 @@ public sealed partial class World
     /// A mine's spot: on open ground in front of the rock spur at the cliff's seaward end, where the cart stands at the end of the rails.
     /// It sits toward the valley, far enough from the foot of the range that the slopes in front of the camera do not hide the entrance.
     /// </summary>
-    public static Vector2 MineSpot(Cliff c)
-    {
+    public static Vector2 MineSpot(Cliff c) {
         var end = c.Center + MineOut(c) * (c.HalfLength + 6.7f);
         return end + c.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
     }
     /// <summary>The middle of the spur the adit is driven into; it blocks walking like the cliff, whether or not it is mined.</summary>
     private static Vector2 SpurCenter(Cliff c) => MineSpot(c) - MineOut(c) * 4.2f;
-    private static bool InSpur(Vector2 p, float margin = 0)
-    {
+    private static bool InSpur(Vector2 p, float margin = 0) {
         foreach (var c in Cliffs) if (p.DistanceTo(SpurCenter(c)) < 2 + margin) return true;
         return false;
     }
@@ -53,8 +49,7 @@ public sealed partial class World
     public int MineNeed(Thing mine, string item) => mine.Stage == MineDug && Data.Mine.Materials.TryGetValue(item, out int wanted) ? Math.Max(0, wanted - mine.Inventory[item]) : 0;
     // The waiting status names what the site lacks; it is rebuilt only when that changes.
     private readonly Dictionary<int, (int Key, string Text)> mineWants = new();
-    private string MineWants(Thing mine)
-    {
+    private string MineWants(Thing mine) {
         int key = 17;
         foreach (var pair in Data.Mine.Materials) key = key * 31 + MineNeed(mine, pair.Key);
         if (!mineWants.TryGetValue(mine.Id, out var cached) || cached.Key != key) mineWants[mine.Id] = cached = (key, $"Needs {Goods(MineNeeds(mine))} in output-enabled storage");
@@ -65,8 +60,7 @@ public sealed partial class World
     /// <summary>The tool a stage needs each worker to have, or null for the stage where materials are hauled in.</summary>
     public static string? MineTool(int stage) => stage switch { 0 => "pickaxe", MineDug => null, MineSupplied => "hammer", _ => "pickaxe" };
 
-    private string? MineBlock(Vector2 p)
-    {
+    private string? MineBlock(Vector2 p) {
         var cliff = CliffAt(p);
         if (cliff.DistanceTo(p) > MineReach) return "Mark a mine at the foot of an ore cliff.";
         if (S.Things.Any(t => t.Kind == "mine" && t.Pos.DistanceTo(MineSpot(cliff)) < .1f)) return "This cliff already has a mine.";
@@ -74,43 +68,35 @@ public sealed partial class World
     }
 
     /// <summary>Hands the site whatever it still needs from the backpack.</summary>
-    public void SupplyMine(Thing mine)
-    {
+    public void SupplyMine(Thing mine) {
         if (!Near(mine)) { Say("Walk closer to the mine."); return; }
         var needs = MineNeeds(mine);
         if (needs.Count == 0 || Forwarded("supply_mine", mine.Id)) return;
         if (needs.Sum(p => S.Backpack.TransferTo(mine.Inventory, p.Key, p.Value)) == 0) Say($"The mine still needs {Goods(needs)}.");
     }
 
-    private void MineTick(Thing mine, float dt)
-    {
-        if (mine.Stage == MineDug && mine.Inventory.Spend(Data.Mine.Materials))
-        {
+    private void MineTick(Thing mine, float dt) {
+        if (mine.Stage == MineDug && mine.Inventory.Spend(Data.Mine.Materials)) {
             mine.Stage = MineSupplied; mine.Progress = 0; Say($"The {MineName(mine)} has its timber, iron and stone. A worker with a hammer can fit the frame and rails.");
         }
         if (mine.Stage != MineOpen || MineFull(mine)) return;
         int miners = 0;
         foreach (var w in S.Workers) if (w.Assignment == mine.Id && w.WorkState == WorkerWorkState.Underground) miners++;
         mine.Progress += dt * miners;
-        while (mine.Progress >= Data.Mine.Seconds && !MineFull(mine))
-        {
+        while (mine.Progress >= Data.Mine.Seconds && !MineFull(mine)) {
             mine.Progress -= Data.Mine.Seconds; mine.Output!.Add(MineOre(mine), 1); mine.Output.Add("stone", 1);
         }
     }
 
-    private Worker? FirstFreeHands(List<Worker> crew)
-    {
+    private Worker? FirstFreeHands(List<Worker> crew) {
         foreach (var c in crew) if (c.Bag.Count == 0 && OnDuty(c)) return c;
         throw new InvalidOperationException("A mine crew member with free hands is the one asking.");
     }
 
-    private void MineWork(Worker w, Thing mine, List<Worker> crew, float dt)
-    {
+    private void MineWork(Worker w, Thing mine, List<Worker> crew, float dt) {
         if (MineTool(mine.Stage) is string tool && w.Tool == "") { FetchTool(w, tool, mine, dt); return; }
-        if (mine.Stage == MineDug)
-        {
-            foreach (var pair in Data.Mine.Materials)
-            {
+        if (mine.Stage == MineDug) {
+            foreach (var pair in Data.Mine.Materials) {
                 string item = pair.Key; int need = MineNeed(mine, item);
                 if (need == 0) continue;
                 var source = SourceFor(item, w.Pos);
@@ -121,8 +107,7 @@ public sealed partial class World
             }
             w.Status = MineWants(mine); return;
         }
-        if (mine.Stage < MineOpen)
-        {
+        if (mine.Stage < MineOpen) {
             bool digging = mine.Stage == 0;
             w.Status = digging ? "Digging the mine entrance" : "Fitting the mine frame and rails";
             if (!Walk(w, MineDoor(mine), dt, .5f)) return;
@@ -134,26 +119,19 @@ public sealed partial class World
             return;
         }
         string ore = MineOre(mine);
-        if (MineFull(mine))
-        {
+        if (MineFull(mine)) {
             // The first miner with free hands brings the full stack out to storage; the rest wait underground.
             string full = mine.Output![ore] >= mine.Output.StackSize ? ore : "stone";
             var dest = DepositFor(full, mine.Pos);
-            if (dest == null)
-            {
+            if (dest == null) {
                 w.Status = Phrase("Mine full · no storage takes ", Data.Name(full));
                 if (mineFullReported.Add(mine.Id)) Say($"The {MineName(mine)} is full with no output available.");
-            }
-            else if (FirstFreeHands(crew) == w)
-            {
+            } else if (FirstFreeHands(crew) == w) {
                 w.Status = Phrase("Bringing out ", Data.Name(full));
                 if (Walk(w, MineDoor(mine), dt, .5f)) { w.Bag.StackSize = mine.Output.StackSize; mine.Output.TransferTo(w.Bag, full, mine.Output.StackSize); w.Destination = dest.Id; }
                 return;
-            }
-            else w.Status = "Waiting · the mine output is full";
-        }
-        else
-        {
+            } else w.Status = "Waiting · the mine output is full";
+        } else {
             mineFullReported.Remove(mine.Id);
             w.Status = Phrase("Mining ", Data.Name(ore), " underground");
         }
