@@ -73,11 +73,32 @@ public partial class Game
     {
         if (!okay) throw new InvalidOperationException("UI check failed: " + message);
     }
+    private static void RemoveCheckFiles()
+    {
+        foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
+    }
     private async void RunUIChecks()
     {
         try
         {
-            await Frames(4); ClosePanel();
+            // A failed earlier run may have left saves behind, which would enable Continue.
+            RemoveCheckFiles(); ShowStart(); await Frames(4);
+            UIRequire(backdrop.Visible && paused && FindButton(screen, "New game") != null && FindButton(screen, "Continue")!.Disabled, "Launch must open the start menu, hold the world and offer no save to continue.");
+            float launchTime = world.S.Time; await KeyStroke(Key.Escape);
+            UIRequire(backdrop.Visible && world.S.Time == launchTime, "Esc must not leave the start menu, and the world must not advance behind it.");
+            await Click(FindButton(screen, "Options")!);
+            var picker = (OptionButton)screen.FindChild("resolution", true, false);
+            UIRequire(picker.Selected == Array.IndexOf(Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
+            picker.Select(0); picker.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
+            UIRequire(SavedResolution() == Resolutions[0], "Choosing a resolution must store it in the settings file.");
+            await KeyStroke(Key.Escape);
+            UIRequire(FindButton(screen, "New game") != null, "Esc in options must return to the start menu.");
+            await Click(FindButton(screen, "Load game")!);
+            UIRequire(Enumerable.Range(0, SlotCount + 1).All(n => FindButton(screen, $"{SlotName(n)} · empty")!.Disabled), "Empty save slots must not be loadable.");
+            await Click(FindButton(screen, "Back · Esc")!);
+            await Click(FindButton(screen, "New game")!);
+            UIRequire(!backdrop.Visible && !paused && page == "welcome", "New game must close the start menu and show the welcome page.");
+            ClosePanel();
             await KeyStroke(Key.Escape);
             UIRequire(menu.Visible && paused && HasLabel(menu, World.ObjectiveFor(world.S.Goal).Title), "Esc must open the pause menu with the current goal.");
             await KeyStroke(Key.Escape);
@@ -158,7 +179,9 @@ public partial class Game
             var savedPosition = world.Player;
             var savedSlots = world.S.HotbarSlots.ToArray(); int savedActiveSlot = world.S.ActiveHotbar;
             await KeyStroke(Key.F5);
-            UIRequire(Godot.FileAccess.FileExists(SavePath), "F5 must write a settlement save.");
+            UIRequire(backdrop.Visible && FindButton(screen, "Slot 1 · empty") != null && FindButton(screen, "Autosave · empty") == null, "F5 in a new game must ask for a save slot and leave out the autosave.");
+            await Click(FindButton(screen, "Slot 1 · empty")!);
+            UIRequire(SlotUsed(1) && !backdrop.Visible && !paused, "Choosing a slot must write the save and resume.");
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
             await ToSignal(GetTree().CreateTimer(.25), SceneTreeTimer.SignalName.Timeout);
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
@@ -166,6 +189,12 @@ public partial class Game
             await KeyStroke(Key.F9);
             UIRequire(world.Player.DistanceTo(savedPosition) < .01f && world.S.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] > 0), "F9 must restore position and stored items from disk.");
             UIRequire(world.S.HotbarSlots.SequenceEqual(savedSlots) && world.S.ActiveHotbar == savedActiveSlot, "F5 and F9 must preserve hotbar references and selection.");
+            world.Player += Vector2.One; ClosePanel();
+            await KeyStroke(Key.Escape);
+            await Click(FindButton(menu, "Load")!);
+            UIRequire(FindButton(screen, "Slot 2 · empty")!.Disabled, "The load screen must disable empty slots.");
+            await Click(screen.GetChildren().OfType<Button>().First(b => b.Text.StartsWith("Slot 1 · ")));
+            UIRequire(!backdrop.Visible && !menu.Visible && !paused && world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the save and resume.");
             UIRequire(HasLabel(panel, "Coins") && HasLabel(panel, "Health") && HasLabel(panel, "Capacity") && HasLabel(panel, "Daily wages"), "Inventory must contain coins, health, capacity and wages.");
             UIRequire(!HasLabel(panel, "Hunger") && !HasLabel(panel, "Thirst"), "Hunger and thirst belong to the HUD icons, not the inventory.");
             world.S.Hunger = 40; world.S.Thirst = 70; RefreshLive();
@@ -270,7 +299,7 @@ public partial class Game
             for (int i = 0; i < 120 && world.Find(looseOre.Id) != null; i++) { await Frames(); harvestAnimation |= view.PlayerAnimation == ActorAction.Gather; }
             UIRequire(world.Find(looseOre.Id) == null && world.S.Backpack["iron_ore"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
             UIRequire(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
-            DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SavePath));
+            RemoveCheckFiles();
             GD.Print("UI-TEST PASS"); GetTree().Quit();
         }
         catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }

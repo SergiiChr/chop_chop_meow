@@ -30,7 +30,7 @@ public partial class Game
         goals = new VBoxContainer(); goals.AddThemeConstantOverride("separation", 3); column.AddChild(goals);
         var resume = Button("Resume · Esc", CloseMenu); resume.Name = "resume"; column.AddChild(resume);
         var files = new HBoxContainer(); column.AddChild(files);
-        foreach (var (text, action) in new (string, Action)[] { ("Save · F5", Save), ("Load · F9", () => { CloseMenu(); Load(); }) })
+        foreach (var (text, action) in new (string, Action)[] { ("Save", () => ShowSlots(true, BackToPause)), ("Load", () => ShowSlots(false, BackToPause)), ("Options", () => ShowOptions(BackToPause)) })
         {
             var button = Button(text, action); button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; files.AddChild(button);
         }
