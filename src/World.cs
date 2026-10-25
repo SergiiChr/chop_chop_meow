@@ -101,17 +101,27 @@ public sealed class Wolf
     public bool Scared { get; set; }
     /// <summary>Seconds left running away after a direct torch hit.</summary>
     public float Flee { get; set; }
+    /// <summary>Id of the player this wolf hunts; each player draws their own pack.</summary>
+    public int Target { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
 }
+/// <summary>
+/// Everything a save holds. The player properties read and write <see cref="Actor"/>, the player whose action or turn
+/// the simulation is running, so the save keeps the host's player at the top level as single player always has.
+/// </summary>
 public sealed class SaveState
 {
+    /// <summary>Everyone in the world; the first is the save's own player. Guests are saved on their own machines.</summary>
+    [JsonIgnore] public List<PlayerState> Players { get; set; }
+    [JsonIgnore] public PlayerState Actor { get; set; }
+    public SaveState() { Players = new() { new PlayerState() }; Actor = Players[0]; }
     /// <summary>4 is the valley map; earlier versions come from smaller maps and are refused.</summary>
     public int Version { get; set; } = 4;
     public List<Thing> Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
     public List<Wolf> Wolves { get; set; } = new();
-    public Inventory Backpack { get; set; } = new() { Slots = 24 };
+    public Inventory Backpack { get => Actor.Backpack; set => Actor.Backpack = value; }
     public Dictionary<string, float> Demand { get; set; } = new();
     /// <summary>Sale prices as last reported by someone arriving from the village, and when that was.</summary>
     public Dictionary<string, float> Prices { get; set; } = new();
@@ -119,33 +129,27 @@ public sealed class SaveState
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public float? Coins { get; set; }
     public float PricesTime { get; set; }
     public HashSet<string> Milestones { get; set; } = new();
-    public float PlayerX { get; set; } = Terrain.Spawn.X;
-    public float PlayerY { get; set; } = Terrain.Spawn.Y;
+    public float PlayerX { get => Actor.PlayerX; set => Actor.PlayerX = value; }
+    public float PlayerY { get => Actor.PlayerY; set => Actor.PlayerY = value; }
     public float Time { get; set; } = 55;
-    public float Health { get; set; } = 100;
-    public float Hunger { get; set; } = 100;
-    public float Thirst { get; set; } = 100;
+    public float Health { get => Actor.Health; set => Actor.Health = value; }
+    public float Hunger { get => Actor.Hunger; set => Actor.Hunger = value; }
+    public float Thirst { get => Actor.Thirst; set => Actor.Thirst = value; }
     public int NextId { get; set; } = 1;
     public int Goal { get; set; }
     public int WageDay { get; set; } = 1;
-    public List<string> HotbarSlots { get; set; } = new() { "iron_axe", "iron_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", "water" };
+    public List<string> HotbarSlots { get => Actor.HotbarSlots; set => Actor.HotbarSlots = value; }
     /// <summary>Contents of crates packed into items, keyed by the number in their item id.</summary>
     public Dictionary<int, Inventory> Crates { get; set; } = new();
-    /// <summary>Recipes queued in the personal crafting menu; their inputs are already taken from the backpack.</summary>
-    public List<string> Crafting { get; set; } = new();
-    /// <summary>Seconds spent on the first queued recipe, at the speed of the tool used.</summary>
-    public float CraftTime { get; set; }
-    /// <summary>Burn time left on the torch in the player's left hand, or zero when the hand is empty; it only burns while lit.</summary>
-    public float Torch { get; set; }
-    public bool TorchLit { get; set; }
-    /// <summary>Seconds left striking flint and steel before the torch catches.</summary>
-    public float TorchKindling { get; set; }
-    public int ActiveHotbar { get; set; }
-    public float RespawnIn { get; set; }
-    /// <summary>A wolf has pinned the player; it stays set through the following death until respawn.</summary>
-    public bool Mauled { get; set; }
-    /// <summary>Id of the cabin the player is inside, or zero; inside, wolves back off and the player is hidden.</summary>
-    public int Sheltered { get; set; }
+    public List<string> Crafting { get => Actor.Crafting; set => Actor.Crafting = value; }
+    public float CraftTime { get => Actor.CraftTime; set => Actor.CraftTime = value; }
+    public float Torch { get => Actor.Torch; set => Actor.Torch = value; }
+    public bool TorchLit { get => Actor.TorchLit; set => Actor.TorchLit = value; }
+    public float TorchKindling { get => Actor.TorchKindling; set => Actor.TorchKindling = value; }
+    public int ActiveHotbar { get => Actor.ActiveHotbar; set => Actor.ActiveHotbar = value; }
+    public float RespawnIn { get => Actor.RespawnIn; set => Actor.RespawnIn = value; }
+    public bool Mauled { get => Actor.Mauled; set => Actor.Mauled = value; }
+    public int Sheltered { get => Actor.Sheltered; set => Actor.Sheltered = value; }
     public float PlaySeconds { get; set; }
     public bool EndingShown { get; set; }
     /// <summary>One byte per map tile, 255 once the player has seen it; serialized as base64.</summary>
@@ -154,8 +158,8 @@ public sealed class SaveState
     public Dictionary<int, Thing> Remembered { get; set; } = new();
 }
 
-/// <summary>Authoritative single-player simulation, independent of rendering and UI.</summary>
-public sealed class World
+/// <summary>Authoritative simulation, independent of rendering and UI; the host runs it for every player.</summary>
+public sealed partial class World
 {
     public readonly GameData Data;
     public SaveState S { get; private set; } = new();
@@ -171,7 +175,7 @@ public sealed class World
     public static float TripLeg(float phase) => phase < .5f ? phase * 2 : (1 - phase) * 2;
     public const float LeapSeconds = .4f;
     // A wolf leaps from within LeapRange and lands PinDistance away, where its jaws reach the throat of the downed player.
-    private bool packAttack;
+    private bool packAttack { get => S.Actor.PackAttack; set => S.Actor.PackAttack = value; }
     private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f, ChaseSeconds = 3;
     /// <summary>Minimum bellows furnace temperature: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
@@ -180,14 +184,14 @@ public sealed class World
     private static Cliff FootCliff(string ore, float along, int side) =>
         new(ore, Terrain.Point(along, side * (Terrain.HalfWidth(along, side) + .6f)), Terrain.Sideways * -side, 4.5f);
     public static Cliff CliffOf(string ore) => Cliffs.First(c => c.Ore == ore);
-    private float gatherClock;
-    private float attackClock;
-    private float nightSpawn;
+    private float gatherClock { get => S.Actor.GatherClock; set => S.Actor.GatherClock = value; }
+    private float attackClock { get => S.Actor.AttackClock; set => S.Actor.AttackClock = value; }
+    private float nightSpawn { get => S.Actor.NightSpawn; set => S.Actor.NightSpawn = value; }
     private bool asleep;
     // Furnaces whose batch finished on the previous tick: starting the next batch keeps the fire going rather than lighting it.
     private readonly HashSet<int> stillBurning = new();
     // Set by walking, gathering or pumping and cleared at the end of each tick: a busy player is not hammering.
-    private bool playerBusy;
+    private bool playerBusy { get => S.Actor.Busy; set => S.Actor.Busy = value; }
     public World(GameData data, bool generate = true) { Data = data; if (generate) NewGame(); }
     public Vector2 Player { get => new(S.PlayerX, S.PlayerY); set { S.PlayerX = value.X; S.PlayerY = value.Y; } }
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
@@ -217,7 +221,12 @@ public sealed class World
     /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
     public bool Pay(int amount) => amount <= Coins && S.Backpack.Remove(Inventory.Coins, amount) == amount;
     public Thing? Find(int id) => S.Things.FirstOrDefault(t => t.Id == id);
-    public void Say(string message) => Notify?.Invoke(message);
+    /// <summary>Tells the acting player, or everyone while the tick runs the shared world.</summary>
+    public void Say(string message)
+    {
+        if (everyone || S.Actor == Me) Notify?.Invoke(message);
+        if (everyone || S.Actor != Me) Relay?.Invoke(everyone ? null : S.Actor, message);
+    }
     // Sleep fast-forwards hours in one frame, so its events stay silent instead of playing all at once.
     private void Play(string sound, Vector2 at) { if (!asleep) Sound?.Invoke(sound, at); }
     public Thing Add(string kind, Vector2 pos, int remaining = 0)
@@ -320,6 +329,9 @@ public sealed class World
     public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "loose_coal" => "coal", "wolf_corpse" => "raw_meat", _ => t.Kind };
     public void Gather(Thing t, float dt)
     {
+        // A loose piece is a single pick-up; anything else the host works on for as long as the player holds on to it.
+        if (t.IsLoose ? Forwarded("pick_up", t.Id) : Remote) { S.Actor.GatherTarget = t.IsLoose ? 0 : t.Id; return; }
+        S.Actor.GatherTarget = t.Id;
         playerBusy = true;
         if (!Near(t)) { gatherClock = 0; return; }
         var blocked = GatherBlock(t);
@@ -346,14 +358,14 @@ public sealed class World
         if (t.Remaining <= 0) S.Things.Remove(t);
         Say($"+{amount} {Data.Name(item)}."); S.Milestones.Add("gather"); Play("wood_rocks_inventory", t.Pos);
     }
-    public void ResetGather() => gatherClock = 0;
+    public void ResetGather() { gatherClock = 0; S.Actor.GatherTarget = 0; }
     /// <summary>The player hammers an anvil while standing by it with nothing else to do.</summary>
     /// <remarks>Input calls <see cref="MovePlayer"/> and <see cref="Gather"/> before each tick, so a tick without them counts as standing still.</remarks>
     public bool PlayerHammers(Thing anvil) => !playerBusy && Near(anvil);
     /// <summary>Stations that only work while someone works at them.</summary>
     public static bool Worked(string kind) => kind is "anvil" or "bench";
     /// <summary>An anvil or bench only works while the player or a paid worker is hammering at it, not merely standing near.</summary>
-    public bool Hammered(Thing anvil) => PlayerHammers(anvil) ||
+    public bool Hammered(Thing anvil) => S.Players.Any(p => As(p, () => PlayerHammers(anvil))) ||
         S.Workers.Any(w => w.Assignment == anvil.Id && w.WageDebt <= 0 && w.WorkState == WorkerWorkState.Hammering);
     /// <summary>Why a building, or a crate from the backpack when <paramref name="item"/> names one, cannot go here.</summary>
     public string? PlacementBlock(string kind, Vector2 p, string? item = null)
@@ -373,6 +385,7 @@ public sealed class World
     {
         var blocked = PlacementBlock(kind, p);
         if (blocked != null) { Say(blocked); return null; }
+        if (Forwarded("build", item: kind, at: p)) return null;
         S.Backpack.Spend(Data.Buildings[kind].Cost);
         var t = Add(kind, p); if (kind == "campfire") { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
         S.Milestones.Add(kind); Say($"Built {Data.Name(kind)}."); return t;
@@ -382,7 +395,7 @@ public sealed class World
     public static bool IsConsumable(string item) => IsFood(item) || item == "water";
     public void Consume(string item)
     {
-        if (Downed) return;
+        if (Downed || Forwarded("consume", item: item)) return;
         if (item == "raw_meat") { Say("Raw meat must be cooked in a furnace first."); return; }
         if (S.Backpack.Remove(item, 1) == 0) { Say($"No {Data.Name(item)} in your backpack."); return; }
         if (item == "berries") { S.Hunger = Math.Min(100, S.Hunger + 18); S.Health = Math.Min(100, S.Health + 5); }
@@ -393,13 +406,13 @@ public sealed class World
     }
     public void Pump(Thing t)
     {
-        if (!Near(t) || t.Kind != "reinforced") return;
+        if (!Near(t) || t.Kind != "reinforced" || Forwarded("pump", t.Id)) return;
         playerBusy = true;
         t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos); Say($"Bellows: {t.Heat:0}° / {SteelHeat:0}° needed for steel.");
     }
     public void FuelFire(Thing t)
     {
-        if (!Near(t)) return;
+        if (!Near(t) || Forwarded("fuel_fire", t.Id)) return;
         int n = S.Backpack.Remove("wood", 1);
         if (n == 0) { Say("You need wood to feed the fire."); return; }
         if (t.Burn <= 0) Play("start_fire", t.Pos);
@@ -408,6 +421,7 @@ public sealed class World
     public void SetRecipe(Thing t, string recipe)
     {
         if (t.Processing) { Say("Wait until the current batch finishes."); return; }
+        if (Forwarded("set_recipe", t.Id, item: recipe)) return;
         if (Data.Recipes.TryGetValue(recipe, out var r) && r.Station == t.Kind) { t.Recipe = recipe; t.Progress = 0; }
     }
     public Dictionary<string, int> BatchCost(Thing t)
@@ -425,6 +439,7 @@ public sealed class World
     public void LoadBatch(Thing t, int batches = 1)
     {
         if (!Near(t)) { Say("Walk closer to load this building."); return; }
+        if (Forwarded("load_batch", t.Id, count: batches)) return;
         var cost = BatchCost(t);
         if (cost.Count == 0) { Say("Choose a recipe first."); return; }
         for (int i = 0; i < batches; i++)
@@ -439,6 +454,7 @@ public sealed class World
     {
         if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
         if (!BatchCost(t).ContainsKey(item)) { Say($"{Data.Name(item)} is not used by this recipe."); return 0; }
+        if (Forwarded("load_input", t.Id, item: item, count: quantity)) return 0;
         int moved = S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, t.Inventory.StackSize - t.Inventory[item]));
         if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(item)} slot is full.");
         return moved;
@@ -446,6 +462,7 @@ public sealed class World
     public void Collect(Thing t)
     {
         if (!Near(t)) { Say("Walk closer to collect items."); return; }
+        if (Forwarded("collect", t.Id)) return;
         foreach (var item in Leftovers(t).ToArray()) t.Inventory.TransferTo(S.Backpack, item, 999);
     }
     /// <summary>Finished goods plus anything a previous recipe or fuel choice left behind.</summary>
@@ -458,21 +475,28 @@ public sealed class World
     public bool Enter(Thing hut)
     {
         if (hut.Kind != "hut" || !Near(hut, 2.6f)) return false;
-        S.Sheltered = hut.Id; return true;
+        if (!Forwarded("enter", hut.Id)) S.Sheltered = hut.Id;
+        return true;
     }
-    public void Leave() => S.Sheltered = 0;
+    public void Leave() { if (!Forwarded("leave")) S.Sheltered = 0; }
     private float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
     /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
     public string? SleepBlock()
     {
         if (!Night) return "You can sleep at night. Keep food and water for the morning.";
         bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = S.Thirst - SecondsToDawn * Data.ThirstPerSecond <= 0;
-        return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : thirsty ? "You are too thirsty to sleep." : null;
+        if (hungry || thirsty) return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : "You are too thirsty to sleep.";
+        // The night passes for everyone at once, so the others have to be inside and fed too.
+        var others = S.Players.Where(p => p != S.Actor).ToList();
+        if (others.Any(p => p.Sheltered == 0)) return "Everyone has to be inside a cabin to sleep.";
+        if (others.Any(p => p.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0 || p.Thirst - SecondsToDawn * Data.ThirstPerSecond <= 0)) return "Someone is too hungry or thirsty to sleep.";
+        return null;
     }
     public void Sleep(Thing hut)
     {
         if (!Near(hut)) return;
         if (SleepBlock() is string blocked) { Say(blocked); return; }
+        if (Forwarded("sleep", hut.Id)) return;
         // Time, wages, trades, hunger and production advance together; no frozen night exploit.
         float seconds = SecondsToDawn;
         asleep = true;
@@ -492,9 +516,9 @@ public sealed class World
     /// </summary>
     public const int WildSwings = 4;
     public const float WildWindow = 2;
-    private readonly List<float> torchSwings = new();
+    private List<float> torchSwings => S.Actor.TorchSwings;
     /// <summary>Seconds left of the brighter flare that follows a torch swing.</summary>
-    public float TorchFlare { get; private set; }
+    public float TorchFlare { get => S.Actor.TorchFlare; private set => S.Actor.TorchFlare = value; }
     /// <summary>Wolves close enough to the player to count toward a pack attack.</summary>
     public int PackAround => S.Wolves.Count(w => w.Pos.DistanceTo(Player) < StalkDistance * 2);
     /// <summary>A burning torch in hand, with the player out in the open, sets how wolves behave.</summary>
@@ -502,7 +526,7 @@ public sealed class World
     /// <summary>Lights the torch in hand, taking a new one from the backpack if the hand is empty, or swings it once it burns.</summary>
     public void UseTorch(Vector2 aim)
     {
-        if (Downed || S.Sheltered != 0 || S.TorchKindling > 0) return;
+        if (Downed || S.Sheltered != 0 || S.TorchKindling > 0 || Forwarded("torch", at: aim)) return;
         if (S.TorchLit) { SwingTorch(aim); return; }
         if (S.Torch <= 0)
         {
@@ -538,11 +562,11 @@ public sealed class World
     private void PutOutTorch()
     {
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
-        foreach (var w in S.Wolves) w.Scared = false;
+        foreach (var w in S.Wolves.Where(w => w.Target == S.Actor.Id)) w.Scared = false;
     }
     public void Attack()
     {
-        if (attackClock > 0 || Downed || S.Sheltered != 0) return;
+        if (attackClock > 0 || Downed || S.Sheltered != 0 || Forwarded("attack")) return;
         attackClock = .6f;
         var wolf = S.Wolves.OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         string? axe = BestTool("axe");
@@ -573,12 +597,12 @@ public sealed class World
             Say($"{(S.Wolves.Count > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.");
             return;
         }
-        S.Wolves.Clear();
+        S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
         Say($"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
     }
     private void Respawn()
     {
-        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = Spawn; S.Mauled = false; S.Sheltered = 0; S.Wolves.Clear();
+        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = Spawn; S.Actor.Warp++; S.Mauled = false; S.Sheltered = 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
         Say("You wake in the clearing. Recover your belongings from the box.");
     }
     // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.
@@ -606,6 +630,7 @@ public sealed class World
     public bool Sell(Thing sign)
     {
         if (CartBlock(sign) is string blocked) { Say(blocked); return false; }
+        if (Forwarded("sell", sign.Id)) return false;
         var crates = sign.Inventory.Items.Keys.Where(CanSell).ToList();
         if (crates.Count == 0) { Say(sign.Inventory.Count > 0 ? "The village only takes crates packed with meat, berries or steel tools." : "Put a packed crate in the market first."); return false; }
         var goods = new Dictionary<string, int>();
@@ -633,6 +658,7 @@ public sealed class World
     {
         if (!Data.Market.Buys.ContainsKey(item) || lots <= 0) return false;
         if (CartBlock(sign) is string blocked) { Say(blocked); return false; }
+        if (Forwarded("buy", sign.Id, item: item, count: lots)) return false;
         int price = LotPrice(item) * lots, units = Lot(item) * lots;
         if (!Pay(price)) { Say("Not enough coins in your backpack."); return false; }
         S.Orders.Add(new TradeOrder { Goods = new() { [item] = units }, Buying = true, Value = price, Signpost = sign.Id, Crates = Lot(item) > 1 ? lots : 0 });
@@ -658,6 +684,7 @@ public sealed class World
     {
         if (!IsCrate(item)) return null;
         if (PlacementBlock("crate", p, item) is string blocked) { Say(blocked); return null; }
+        if (Forwarded("place_crate", item: item, at: p)) return null;
         S.Backpack.Remove(item, 1);
         var crate = Add("crate", p);
         if (Packed(item) is Inventory contents) { crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
@@ -666,7 +693,7 @@ public sealed class World
     /// <summary>Lifts a placed crate into the backpack; anything inside stays packed in it.</summary>
     public bool PickUpCrate(Thing crate)
     {
-        if (crate.Kind != "crate" || !Near(crate)) return false;
+        if (crate.Kind != "crate" || !Near(crate) || Forwarded("pick_up_crate", crate.Id)) return false;
         bool empty = crate.Inventory.Count == 0;
         if (S.Backpack.Room(empty ? "crate" : PackedPrefix) == 0) { Say("Backpack full. Make room for the crate."); return false; }
         S.Backpack.Add(empty ? "crate" : Pack(crate.Inventory), 1); S.Things.Remove(crate);
@@ -688,12 +715,13 @@ public sealed class World
     public bool Craft(string recipe)
     {
         if (CraftBlock(recipe) is string blocked) { Say(blocked); return false; }
+        if (Forwarded("craft", item: recipe)) return false;
         S.Backpack.Spend(Data.Recipes[recipe].Inputs); S.Crafting.Add(recipe); return true;
     }
     /// <summary>Cancels a queued recipe and returns its inputs; what the backpack cannot hold goes into a box at the player's feet.</summary>
     public void CancelCraft(int index)
     {
-        if (index < 0 || index >= S.Crafting.Count) return;
+        if (index < 0 || index >= S.Crafting.Count || Forwarded("cancel_craft", count: index)) return;
         foreach (var (item, quantity) in Data.Recipes[S.Crafting[index]].Inputs) Give(item, quantity);
         S.Crafting.RemoveAt(index); if (index == 0) S.CraftTime = 0;
     }
@@ -731,11 +759,13 @@ public sealed class World
         string tool = Data.Items.TryGetValue(item, out var def) ? def.Tool : "";
         if (tool is not "chisel" and not "hammer") { Say("The bench has slots for a chisel and a hammer."); return false; }
         if (BenchTool(bench, tool) != null) { Say($"The {tool} slot is taken. Take that {tool} out first."); return false; }
+        if (Forwarded("slot_tool", bench.Id, item: item)) return false;
         return S.Backpack.TransferTo(bench.Tools, item, 1) == 1;
     }
     public void UnslotTool(Thing bench, string item)
     {
         if (bench.Tools == null || !Near(bench)) { Say("Walk closer to the bench."); return; }
+        if (Forwarded("unslot_tool", bench.Id, item: item)) return;
         if (bench.Tools.TransferTo(S.Backpack, item, 1) == 0 && bench.Tools[item] > 0) Say("Backpack full.");
     }
     public string? FetchBlock(Thing sign)
@@ -751,12 +781,13 @@ public sealed class World
     public bool FetchPrices(Thing sign)
     {
         if (FetchBlock(sign) is string blocked) { Say(blocked); return false; }
+        if (Forwarded("fetch_prices", sign.Id)) return false;
         var w = S.Workers.First(w => w.Assignment == sign.Id && w.WageDebt <= 0);
         w.Away = Data.TradeSeconds; Say($"{w.Name} set off to Bramblewick for fresh prices."); return true;
     }
     public Worker? Hire(Thing sign, HireOffer offer)
     {
-        if (!Near(sign) || sign.Kind != "signpost") return null;
+        if (!Near(sign) || sign.Kind != "signpost" || Forwarded("hire", sign.Id, count: Data.HireOffers.IndexOf(offer))) return null;
         if (S.Workers.Count >= 8) { Say("The POC supports eight workers."); return null; }
         if (!Pay(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from your backpack."); return null; }
         string[] names = { "Rowan", "Hazel", "Milo", "Fern", "Jasper", "Willow", "Clover", "Ash" };
@@ -766,6 +797,7 @@ public sealed class World
     }
     public void Assign(Worker w, Thing? target)
     {
+        if (Forwarded("assign", target?.Id ?? 0, w.Id)) return;
         // Reassigning calls off a price errand, so the worker never freezes on the road.
         w.Assignment = target?.Id ?? 0; w.Away = 0; w.Job = target == null ? "idle" : target.IsResource ? "gather" : "building"; w.WorkState = WorkerWorkState.Idle;
         w.Destination = 0; w.Timer = 0; w.Status = target == null ? "Available" : "Starting work";
@@ -773,6 +805,7 @@ public sealed class World
     }
     public void Fire(Worker w)
     {
+        if (Forwarded("fire", other: w.Id)) return;
         if (w.Bag.Count > 0) { var box = Add("grave", w.Pos); box.Inventory = w.Bag; }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
@@ -967,28 +1000,18 @@ public sealed class World
     }
     public void SettleDebt(Worker w)
     {
+        if (Forwarded("settle", other: w.Id)) return;
         if (!Pay((int)w.WageDebt)) { Say("Not enough coins in your backpack to settle wages."); return; }
         w.WageDebt = 0;
     }
     public void Tick(float dt, bool sleeping = false)
     {
-        bool wasDusk = Dusk, wasLunch = Lunch;
-        S.Time += dt; attackClock = Math.Max(0, attackClock - dt);
+        bool wasDusk = Dusk, wasLunch = Lunch, wasEveryone = everyone;
+        everyone = true;
+        S.Time += dt;
         if (!sleeping) S.PlaySeconds += dt;
-        if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); }
-        else
-        {
-            S.Hunger = Math.Max(0, S.Hunger - dt * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * Data.ThirstPerSecond);
-            if (S.Hunger <= 0 || S.Thirst <= 0) S.Health -= dt * 1.4f;
-            else if (S.Hunger > 45 && S.Thirst > 45) S.Health = Math.Min(100, S.Health + dt * .12f);
-        }
-        TorchFlare = Math.Max(0, TorchFlare - dt);
-        if (S.TorchKindling > 0 && (S.TorchKindling -= dt) <= 0)
-        {
-            S.TorchKindling = 0;
-            if (!Downed && S.Torch > 0) { S.TorchLit = true; Play("start_fire", Player); Say($"Torch lit: {S.Torch / Data.DaySeconds * 24:0.#} hours of light left."); }
-        }
-        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); Say("Your torch burned out."); }
+        foreach (var wolf in S.Wolves.Where(w => S.Players.All(p => p.Id != w.Target))) wolf.Target = S.Players.MinBy(p => p.Pos.DistanceSquaredTo(wolf.Pos))!.Id;
+        foreach (var p in S.Players.ToArray()) As(p, () => NeedsTick(dt));
         if (Day > S.WageDay) { PayWages(); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow."); }
         if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Your workers head home to Bramblewick until morning.");
         if (S.Workers.Count > 0 && Lunch && !wasLunch) Say("Midday. Your workers gather by the campfire for an hour of lunch.");
@@ -1074,9 +1097,8 @@ public sealed class World
                 }
             }
         }
-        CraftTick(dt);
-        var present = S.Workers.Where(w => !w.Home && w.Away <= 0).ToList();
-        LunchFire = Lunch && present.Count > 0 ? S.Things.Where(t => t.Kind == "campfire").MinBy(t => present.Sum(w => w.Pos.DistanceTo(t.Pos))) : null;
+        foreach (var p in S.Players.ToArray()) As(p, () => CraftTick(dt));
+        UpdateLunchFire();
         foreach (var w in S.Workers.ToArray()) WorkerTick(w, dt);
         for (int i = 0; i < S.Workers.Count; i++) for (int j = i + 1; j < S.Workers.Count; j++)
         {
@@ -1088,15 +1110,48 @@ public sealed class World
                 if (CanStand(b.Pos - push)) b.Pos -= push;
             }
         }
-        if (!Night) { S.Wolves.Clear(); nightSpawn = 0; if (!Dead) S.Mauled = false; }
-        else if (!sleeping) TickWolves(dt);
-        if (!Dead && S.Health <= 0) Die();
-        playerBusy = false;
+        if (!Night) S.Wolves.Clear();
+        foreach (var p in S.Players.ToArray())
+            As(p, () =>
+            {
+                if (!Night) { nightSpawn = 0; if (!Dead) S.Mauled = false; }
+                else if (!sleeping) TickWolves(dt, S.Wolves.Where(w => w.Target == p.Id).ToList());
+                if (!Dead && S.Health <= 0) Die();
+                playerBusy = false;
+            });
+        everyone = wasEveryone;
         Look();
         UpdateGoal();
     }
-    /// <summary>Explores the tiles in sight and replaces the memory of everything there with its current state.</summary>
-    private void Look()
+    /// <summary>The acting player's clocks, hunger and thirst, and the torch in hand; a remote player's held gather also runs here.</summary>
+    private void NeedsTick(float dt)
+    {
+        attackClock = Math.Max(0, attackClock - dt);
+        if (S.Actor != Me && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
+        if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); }
+        else
+        {
+            S.Hunger = Math.Max(0, S.Hunger - dt * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * Data.ThirstPerSecond);
+            if (S.Hunger <= 0 || S.Thirst <= 0) S.Health -= dt * 1.4f;
+            else if (S.Hunger > 45 && S.Thirst > 45) S.Health = Math.Min(100, S.Health + dt * .12f);
+        }
+        TorchFlare = Math.Max(0, TorchFlare - dt);
+        if (S.TorchKindling > 0 && (S.TorchKindling -= dt) <= 0)
+        {
+            S.TorchKindling = 0;
+            if (!Downed && S.Torch > 0) { S.TorchLit = true; Play("start_fire", Player); Say($"Torch lit: {S.Torch / Data.DaySeconds * 24:0.#} hours of light left."); }
+        }
+        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); Say("Your torch burned out."); }
+    }
+    /// <summary>The campfire the crew sits around: the one closest to them all, during lunch.</summary>
+    internal void UpdateLunchFire()
+    {
+        var present = S.Workers.Where(w => !w.Home && w.Away <= 0).ToList();
+        LunchFire = Lunch && present.Count > 0 ? S.Things.Where(t => t.Kind == "campfire").MinBy(t => present.Sum(w => w.Pos.DistanceTo(t.Pos))) : null;
+    }
+    /// <summary>Explores the tiles in every player's sight and replaces the memory of everything there with its current state.</summary>
+    public void Look() { foreach (var p in S.Players) As(p, LookAround); }
+    private void LookAround()
     {
         float radius = Data.SightRadius;
         int fromX = Math.Max(0, (int)(Player.X - radius)), toX = Math.Min(MapSize - 1, (int)(Player.X + radius) + 1);
@@ -1113,20 +1168,21 @@ public sealed class World
         }
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < MapSize && p.Y < MapSize && S.Explored[(int)p.Y * MapSize + (int)p.X] != 0;
-    private void TickWolves(float dt)
+    /// <summary>Moves the pack hunting the acting player.</summary>
+    private void TickWolves(float dt, List<Wolf> hunters)
     {
         if (!Dead)
         {
             nightSpawn -= dt;
             // A torch draws the whole pack in, but slowly.
-            if (nightSpawn <= 0 && S.Wolves.Count < (S.TorchLit ? 6 : Math.Min(6, 2 + Day)))
+            if (nightSpawn <= 0 && hunters.Count < (S.TorchLit ? 6 : Math.Min(6, 2 + Day)))
             {
                 nightSpawn = S.TorchLit ? 25 : 15; float angle = S.Time * 2.4f;
                 // Wolves come out of the woods, never the sea or the mountains: turn until open ground is found.
                 var p = Player;
                 for (int turn = 0; turn < 12 && !Open(p); turn++) p = Player + new Vector2(MathF.Cos(angle + turn * .52f), MathF.Sin(angle + turn * .52f)) * 11;
                 if (p == Player) p += new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 11;
-                S.Wolves.Add(new Wolf { Pos = p, Health = 4 + Day * .4f });
+                var wolf = new Wolf { Pos = p, Health = 4 + Day * .4f, Target = S.Actor.Id }; S.Wolves.Add(wolf); hunters.Add(wolf);
                 Say("A wolf is prowling nearby. Stay by fire or shelter; Space or a click with an axe in hand swings it."); Play("wolf_growl_distance", p);
             }
         }
@@ -1136,13 +1192,13 @@ public sealed class World
         if (pack && !packAttack) Say("The pack has you surrounded. They attack!");
         packAttack = pack;
         // A wounded player away from fire and shelter invites a leap for the throat.
-        if (!Downed && S.Health <= 50 && !lit && !inside && !wary && S.Wolves.All(w => w.Leap <= 0))
+        if (!Downed && S.Health <= 50 && !lit && !inside && !wary && hunters.All(w => w.Leap <= 0))
         {
-            var hunter = S.Wolves.Where(w => !Protected(w.Pos) && w.Flee <= 0 && w.Pos.DistanceTo(Player) < LeapRange).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
+            var hunter = hunters.Where(w => !Protected(w.Pos) && w.Flee <= 0 && w.Pos.DistanceTo(Player) < LeapRange).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
             if (hunter != null) { hunter.Leap = LeapSeconds; Say("A wolf leaps for your throat!"); }
         }
         float speed = Math.Min(3.8f, 3 + Day * .1f);
-        foreach (var wolf in S.Wolves)
+        foreach (var wolf in hunters)
         {
             wolf.Attack -= dt;
             if (wolf.Leap > 0)
@@ -1151,7 +1207,7 @@ public sealed class World
                 var landing = Player + (wolf.Pos - Player).Normalized() * PinDistance;
                 wolf.Pos = wolf.Pos.MoveToward(landing, wolf.Pos.DistanceTo(landing) * Math.Min(1, dt / wolf.Leap));
                 wolf.Leap = Math.Max(0, wolf.Leap - dt);
-                if (wolf.Leap == 0) { wolf.Feeding = wolf.Pinning = true; S.Mauled = true; Say(S.Wolves.Count > 1 ? "You are pinned. The pack closes in." : "You are pinned."); Play("wolf_bite", Player); }
+                if (wolf.Leap == 0) { wolf.Feeding = wolf.Pinning = true; S.Mauled = true; Say(hunters.Count > 1 ? "You are pinned. The pack closes in." : "You are pinned."); Play("wolf_bite", Player); }
             }
             else if (S.Mauled)
             {
@@ -1191,14 +1247,14 @@ public sealed class World
             }
         }
         // Feeding wolves crowd around the player without stacking on one spot.
-        for (int i = 0; i < S.Wolves.Count; i++) for (int j = i + 1; j < S.Wolves.Count; j++)
+        for (int i = 0; i < hunters.Count; i++) for (int j = i + 1; j < hunters.Count; j++)
         {
-            var a = S.Wolves[i]; var b = S.Wolves[j]; var offset = a.Pos - b.Pos;
+            var a = hunters[i]; var b = hunters[j]; var offset = a.Pos - b.Pos;
             if (a.Leap > 0 || b.Leap > 0 || offset.LengthSquared() >= .5f) continue;
             var push = (offset.LengthSquared() > .001f ? offset.Normalized() : Vector2.Right) * Math.Min(dt, .08f);
             a.Pos += push; b.Pos -= push;
         }
-        if (S.Mauled && !Dead) S.Health -= dt * (16 + 8 * S.Wolves.Count(w => w.Feeding));
+        if (S.Mauled && !Dead) S.Health -= dt * (16 + 8 * hunters.Count(w => w.Feeding));
     }
     private static readonly string[] Milestones = { "gather", "furnace", "iron_bar", "anvil", "bench", "pick", "reinforced", "steel_bar", "steel_tool", "sold_steel", "hired", "assigned" };
     public bool GoalComplete => S.Goal >= Milestones.Length;

@@ -16,7 +16,7 @@ public partial class Game
     private int slot;
 
     // Review fixtures and UI checks keep their own files so they never touch the player's saves or settings.
-    private static string FilePrefix => OS.GetCmdlineUserArgs().Contains("--showcase") ? "review-" : OS.GetCmdlineUserArgs().Contains("--ui-test") ? "ui-check-" : "";
+    private static string FilePrefix => OS.GetCmdlineUserArgs().Contains("--showcase") ? "review-" : OS.GetCmdlineUserArgs().Contains("--ui-test") ? "ui-check-" : OS.GetCmdlineUserArgs().Contains("--net-check") ? "net-check-" : "";
     private static string SettingsPath => $"user://{FilePrefix}settings.cfg";
     // Slot 0 is the autosave; slot 1 keeps the original single-save file name, so older saves load as slot 1.
     private static string SlotPath(int n) => $"user://{FilePrefix}{(n == 0 ? "autosave" : n == 1 ? "settlement" : $"settlement-{n}")}.json";
@@ -56,10 +56,12 @@ public partial class Game
     private void ShowStart()
     {
         ClosePanel(); OpenScreen("CHOP CHOP MEOW", null);
+        if (leftReason != "") { var note = Label(leftReason, 14, new Color("f2b38b")); note.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(note); leftReason = ""; }
         int latest = Enumerable.Range(0, SlotCount + 1).Where(SlotUsed).OrderByDescending(SavedAt).DefaultIfEmpty(-1).First();
         AddScreenButton("Continue", () => LoadSlot(latest), latest < 0);
         AddScreenButton("New game", () => { HideScreen(); Restart(); });
         AddScreenButton("Load game", () => ShowSlots(false, ShowStart));
+        AddScreenButton("Join game", () => ShowJoin(ShowStart, false));
         AddScreenButton("Options", () => ShowOptions(ShowStart));
         AddScreenButton("Quit", () => Quit());
     }

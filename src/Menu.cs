@@ -8,6 +8,8 @@ public partial class Game
 {
     private PanelContainer menu = null!;
     private VBoxContainer goals = null!;
+    private Button hostButton = null!, joinButton = null!, saveButton = null!;
+    private Label netLine = null!;
 
     private Button MenuIcon(string icon, string tooltip, Action action)
     {
@@ -33,7 +35,13 @@ public partial class Game
         foreach (var (text, action) in new (string, Action)[] { ("Save", () => ShowSlots(true, BackToPause)), ("Load", () => ShowSlots(false, BackToPause)), ("Options", () => ShowOptions(BackToPause)) })
         {
             var button = Button(text, action); button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; files.AddChild(button);
+            if (text == "Save") saveButton = button;
         }
+        var online = new HBoxContainer(); column.AddChild(online);
+        hostButton = Button("Host", HostGame); hostButton.Name = "host";
+        joinButton = Button("Join", () => { if (world.Remote) { net.Leave(); world.NewGame(); ShowStart(); } else ShowJoin(BackToPause, true); }); joinButton.Name = "join_game";
+        foreach (var button in new[] { hostButton, joinButton }) { button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; online.AddChild(button); }
+        netLine = Label("", 13, Muted); netLine.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(netLine);
     }
 
     private void OpenMenu()
@@ -47,6 +55,9 @@ public partial class Game
             if (current) goals.AddChild(Label(world.Objective.Hint, 14, Muted));
         }
         if (world.GoalComplete) goals.AddChild(Label(world.Objective.Hint, 14, Muted));
+        hostButton.Disabled = net.Online; hostButton.Text = net.Hosting ? "Hosting" : "Host";
+        joinButton.Text = world.Remote ? "Leave game" : "Join"; saveButton.Disabled = world.Remote;
+        netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
         menu.Visible = true; paused = true;
     }
 

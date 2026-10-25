@@ -4,7 +4,7 @@
   ./build.py play    Set up the local tools, then run the game. Forward flags after --.
   ./build.py setup   Download tools if needed, compile C#, and import the project.
   ./build.py editor  Set up the project and open the Godot editor.
-  ./build.py test    Run the game's --self-test mode headlessly (120 second limit).
+  ./build.py test    Run the simulation, UI and two-process network checks headlessly.
   ./build.py build   Test, export, and smoke-test build/ChopChopMeow.x86_64.
   ./build.py lint    Compile the C# project and verify its formatting.
 
@@ -23,6 +23,7 @@ import tarfile
 import time
 import urllib.request
 import zipfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 GODOT_VERSION = "4.7.2"
@@ -227,6 +228,21 @@ def test(env: dict[str, str]) -> None:
         timeout=45,
         success_marker="UI-TEST PASS",
     )
+    # The host and guest of the network check talk to each other, so both run at once.
+    with ThreadPoolExecutor() as pool:
+        checks = [
+            pool.submit(
+                run_godot,
+                f"net-{role}",
+                [GODOT, "--headless", "--path", ROOT, "--", "--net-check", role],
+                env,
+                timeout=240,
+                success_marker=f"NET-{role.upper()} PASS",
+            )
+            for role in ("host", "guest")
+        ]
+        for check in checks:
+            check.result()
 
 
 def fetch_templates(env: dict[str, str]) -> None:

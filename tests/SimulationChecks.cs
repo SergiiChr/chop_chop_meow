@@ -52,6 +52,7 @@ public static class SimulationChecks
         CheckTorchAndWolves(data);
         CheckWaterStacksOnlyInCrates(data);
         CheckActualProgression(data);
+        MultiplayerChecks.Run(data);
         GD.Print("SELF-TEST PASS");
     }
 

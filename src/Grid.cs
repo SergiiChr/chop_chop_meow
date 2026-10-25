@@ -126,7 +126,7 @@ public partial class Game
     {
         if (!world.Near(near)) { Notify("Walk closer first."); return; }
         if (CrateIntoCrate(near, to, item)) return;
-        from.TransferTo(to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackOf(item));
+        world.Transfer(from, to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackOf(item));
     }
 
     /// <summary>Drops a dragged stack into an inventory; the building on either end must be within reach.</summary>
@@ -134,7 +134,7 @@ public partial class Game
     {
         if ((drag.Container ?? container) is Thing near && !world.Near(near)) { Notify("Walk closer first."); return; }
         if (CrateIntoCrate(container, to, drag.Item)) return;
-        drag.From?.TransferTo(to, drag.Item, drag.Count);
+        if (drag.From != null) world.Transfer(drag.From, to, drag.Item, drag.Count);
     }
 
     /// <summary>Building plans and palette entries drag as hotbar references.</summary>
