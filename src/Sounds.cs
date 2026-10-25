@@ -14,7 +14,9 @@ public partial class Sounds : Node
 {
     private const string Folder = "res://assets/sounds";
     // Sounds within this many tiles of the player play at full volume and fade out to silence at the play's range.
-    private const float FullVolume = 3;
+    // The default range is about half the screen's height, so only work near the player is heard.
+    private const float FullVolume = 2;
+    public const float Range = 9;
     // Variants share a loudness, and these levels set each sound's place in the mix: quiet steps, then impacts and handling, then alerts.
     private static readonly Dictionary<string, float> Levels = new()
     {
@@ -64,11 +66,13 @@ public partial class Sounds : Node
     };
 
     /// <summary>Plays a sound; one with a world position fades with distance from the player and is silent beyond <paramref name="range"/> tiles.</summary>
-    public void Play(string name, Vector2? at = null, float range = 16)
+    public void Play(string name, Vector2? at = null, float range = Range)
     {
         var streams = Variants(name);
         if (streams.Length == 0) return;
         float fade = at is Vector2 p ? 1 - Math.Clamp((p.DistanceTo(World.Player) - FullVolume) / (range - FullVolume), 0, 1) : 1;
+        // Squaring drops volume quickly past arm's reach, closer to how loudness falls off with distance.
+        fade *= fade;
         if (fade <= 0) return;
         int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
         if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
