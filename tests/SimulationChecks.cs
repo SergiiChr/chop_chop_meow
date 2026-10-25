@@ -16,7 +16,7 @@ public static class SimulationChecks
         CheckInventoryFilters(data);
         CheckStorageRouting(data);
         CheckWorkerGatherAndRetarget(data);
-        CheckWorkerDetoursAroundPond(data);
+        CheckWorkerDetoursAroundLake(data);
         CheckCampfireWorkerFuel(data);
         CheckWorkerFurnaceCrew(data);
         CheckTradeAndWages(data);
@@ -39,6 +39,7 @@ public static class SimulationChecks
         CheckCoinStacks(data);
         CheckLegacySave(data);
         CheckCrewKeepsForgeHot(data);
+        CheckWorkerSchedule(data);
         CheckFogOfWar(data);
         CheckCrateCapacityAndPacking(data);
         CheckHandCrafting(data);
@@ -210,11 +211,12 @@ public static class SimulationChecks
                 "hauling should remove ingredients from the source chest");
     }
 
-    private static void CheckWorkerDetoursAroundPond(GameData data)
+    private static void CheckWorkerDetoursAroundLake(GameData data)
     {
         var world = EmptyWorld(data);
-        var tree = world.Add("tree", World.Pond + new Vector2(World.PondRadius + 2, 0), 12);
-        var chest = world.Add("chest", World.Pond - new Vector2(World.PondRadius + 1.5f, 0));
+        static Vector2 Bank(Vector2 direction, float past) => Terrain.Lake + direction * (Terrain.Shore(MathF.Atan2(direction.Y, direction.X)) + past);
+        var tree = world.Add("tree", Bank(Terrain.Seaward, 2), 12);
+        var chest = world.Add("chest", Bank(-Terrain.Seaward, 1.5f));
         var worker = AddWorker(world, tree.Pos);
         world.Assign(worker, tree);
 
@@ -222,7 +224,7 @@ public static class SimulationChecks
         for (int i = 0; i < 700 && chest.Inventory["wood"] == 0; i++)
         {
             SafeTick(world, .25f);
-            stayedOutOfPond &= worker.Pos.DistanceTo(World.Pond) >= World.PondRadius;
+            stayedOutOfPond &= !Terrain.InLake(worker.Pos);
         }
 
         Require(stayedOutOfPond,
@@ -321,7 +323,7 @@ public static class SimulationChecks
         Require(!world.S.Milestones.Contains("assigned"), "minding the signpost is not the first automation goal");
         Require(world.FetchPrices(sign) && runner!.Away > 0 && world.FetchBlock(sign) != null, "the assigned worker should set off once for fresh prices");
         SafeTick(world, data.TradeSeconds / 2);
-        Require(runner!.Pos.DistanceTo(World.Village) < 1, "the runner should reach the village halfway through the errand");
+        Require(runner!.Pos.DistanceTo(sign.Pos + Vector2.One + Terrain.Seaward * World.TripDistance) < 1, "the runner should be furthest down the valley halfway through the errand");
         SafeTick(world, data.TradeSeconds / 2 + .1f);
         Require(runner.Away == 0 && world.PriceAge == 0 && Math.Abs(world.KnownPrice("berries") - world.UnitPrice("berries", false)) < .01f && world.FetchBlock(sign) == null,
                 "the runner should return with current prices");
@@ -850,16 +852,35 @@ public static class SimulationChecks
         var world = new World(data);
         foreach (var cliff in World.Cliffs)
         {
-            Require(!world.CanStand(cliff.Center), $"the {cliff.Ore} cliff should block movement");
-            var deposits = world.S.Things.Where(t => t.Kind == cliff.Ore).ToList();
+            Require(!world.CanStand(cliff.Center) && Terrain.FromMountains(cliff.Center) < 0 && Terrain.FromMountains(cliff.Center + cliff.Face * 2.6f) > 0,
+                    $"each {cliff.Ore} cliff should block movement and stand at the foot of a mountain range");
+            Require(world.S.Things.Count(t => t.Kind == cliff.Ore && cliff.DistanceTo(t.Pos) < 3) == 3, $"each {cliff.Ore} cliff should have deposits at its foot");
+        }
+        foreach (var cliff in new[] { World.CliffOf("iron"), World.CliffOf("coal") })
+        {
             var loose = world.S.Things.Where(t => t.Kind == $"loose_{cliff.Ore}").ToList();
-            Require(deposits.Count > 0 && deposits.All(t => cliff.DistanceTo(t.Pos) < 3),
-                    $"{cliff.Ore} deposits should only spawn at the foot of their cliff");
-            Require(loose.Count > 0 && loose.All(t => cliff.DistanceTo(t.Pos) is > 3 and < 10 && world.CanStand(t.Pos)),
-                    $"loose {cliff.Ore} should spread a little further than the deposits but stay near the cliff");
+            Require(world.S.Things.Where(t => t.Kind == cliff.Ore).All(t => World.Cliffs.Any(c => c.Ore == cliff.Ore && c.DistanceTo(t.Pos) < 3)),
+                    $"{cliff.Ore} deposits should only spawn at the foot of their cliffs");
+            Require(loose.Count > 0 && loose.All(t => cliff.DistanceTo(t.Pos) is > 3 and < 12 && world.CanStand(t.Pos)),
+                    $"loose {cliff.Ore} should spread further than the deposits but stay near the nearer cliff");
+            Require(loose.All(a => loose.All(b => a == b || a.Pos.DistanceTo(b.Pos) >= 2)), $"loose {cliff.Ore} pieces should lie apart");
         }
         Require(world.S.Things.Where(t => t.Kind == "loose_iron").Sum(t => t.Remaining) is >= 14 and < 24,
                 "loose iron should cover the anvil and pickaxe without also paying for a bellows furnace");
+
+        foreach (var (kind, spacing) in new[] { ("stone", 15f), ("berries", 14f) })
+        {
+            var found = world.S.Things.Where(t => t.Kind == kind).ToList();
+            Require(found.Count >= 15 && found.All(t => t.Pos.DistanceTo(World.Spawn) >= 9 && found.All(o => o == t || o.Pos.DistanceTo(t.Pos) >= spacing)),
+                    $"{kind} should be scattered singly away from the clearing, so more of it takes exploring");
+        }
+        Require(world.S.Things.Where(t => t.IsResource || !t.IsResource).All(t => Terrain.Open(t.Pos) || t.Kind is "iron" or "coal"),
+                "nothing should be placed in the sea, the lake or the mountains");
+        var trees = world.S.Things.Where(t => t.Kind == "tree").ToList();
+        float woods = trees.Count(t => Terrain.FromMountains(t.Pos) < 15), plains = trees.Count(t => Terrain.FromMountains(t.Pos) >= 30);
+        Require(trees.Count > 400 && woods > plains * 3, $"trees should thicken toward the mountains ({trees.Count} in all, {woods} near them, {plains} on the plains)");
+        Require(world.S.Things.Count(t => t.Kind == "tree" && t.Pos.DistanceTo(World.Spawn) < 9) == 1,
+                "the clearing should keep only its one nearby tree");
 
         // Loose pieces need no tool and no gather time; the whole piece goes into the backpack.
         var piece = world.S.Things.First(t => t.Kind == "loose_coal");
@@ -905,6 +926,9 @@ public static class SimulationChecks
         Require(world.S.Crafting.Count == 0, $"hand crafting {recipe} should finish");
     }
 
+    /// <summary>A spot in the open middle of the valley, so the progression run has room to build.</summary>
+    private static Vector2 Site(float x, float y) => new(x + 60, y + 60);
+
     private static void CheckActualProgression(GameData data)
     {
         var world = EmptyWorld(data);
@@ -913,14 +937,14 @@ public static class SimulationChecks
         world.S.Backpack.Add("berries", 10);
         world.S.Backpack.Add("wood", 6);
 
-        var tree = world.Add("tree", new Vector2(8, 8), 300);
-        var stone = world.Add("stone", new Vector2(8, 14), 300);
+        var tree = world.Add("tree", Site(8, 8), 300);
+        var stone = world.Add("stone", Site(8, 14), 300);
         GatherUntil(world, tree, "wood", 64);
         GatherUntil(world, stone, "stone", 58);
-        for (int i = 0; i < 7; i++) PickUp(world, world.Add("loose_iron", new Vector2(12, 8 + i), 2));
+        for (int i = 0; i < 7; i++) PickUp(world, world.Add("loose_iron", Site(12, 8 + i), 2));
         Require(world.S.Backpack["iron_ore"] == 14, "seven loose pieces should give the ore for seven bars");
 
-        var furnace = BuildAt(world, "furnace", new Vector2(25, 25));
+        var furnace = BuildAt(world, "furnace", Site(25, 25));
         world.LoadBatch(furnace, 7);
         Require(furnace.Inventory["iron_ore"] == 14 && furnace.Inventory["wood"] == 7,
                 "loading the furnace should transfer the recipe inputs and one fuel per batch");
@@ -929,10 +953,11 @@ public static class SimulationChecks
         world.Collect(furnace);
         Require(world.S.Backpack["iron_bar"] == 7, "player should collect bars actually smelted by the furnace");
 
-        var anvil = BuildAt(world, "anvil", new Vector2(28, 25));
+        var anvil = BuildAt(world, "anvil", Site(28, 25));
         world.SetRecipe(anvil, "iron_parts");
         world.LoadBatch(anvil, 2);
         CompleteBatches(world, anvil, "iron_parts", 2);
+        world.Player = anvil.Pos;
         world.Collect(anvil);
 
         // A stone chisel from bare stone opens wood crafting by hand, which leads to the bench and its mallet.
@@ -942,7 +967,7 @@ public static class SimulationChecks
         CraftByHand(world, "wood_hammer", 1);
         Require(world.S.Backpack["planks"] == 16 && world.S.Backpack["wood_parts"] == 3 && world.S.Backpack["wood_hammer"] == 1,
                 "hand crafting should turn wood into planks, parts and a mallet");
-        var bench = BuildAt(world, "bench", new Vector2(28, 28));
+        var bench = BuildAt(world, "bench", Site(28, 28));
         Require(world.SlotTool(bench, "wood_hammer") && world.BenchTool(bench, "hammer") == "wood_hammer", "the mallet should go into the bench's hammer slot");
         world.SetRecipe(bench, "iron_pick");
         world.LoadBatch(bench);
@@ -951,8 +976,8 @@ public static class SimulationChecks
         Require(world.S.Backpack["iron_pick"] == 1 && world.S.Milestones.Contains("pick"),
                 "crafting and collecting an iron pick at the bench should unlock mining deposits");
 
-        var iron = world.Add("iron", new Vector2(12, 14), 120);
-        var coal = world.Add("coal", new Vector2(16, 8), 120);
+        var iron = world.Add("iron", Site(12, 14), 120);
+        var coal = world.Add("coal", Site(16, 8), 120);
         GatherUntil(world, iron, "iron_ore", 18);
         GatherUntil(world, coal, "coal", 6);
         Require(world.S.Backpack["iron_ore"] >= 18 && world.S.Backpack["coal"] >= 6,
@@ -966,8 +991,8 @@ public static class SimulationChecks
         Require(world.S.Backpack["iron_bar"] == 10,
                 "the bar left over from the parts plus mined iron should be smelted into the later bars needed for steel production");
 
-        var reinforced = BuildAt(world, "reinforced", new Vector2(31, 25));
-        BuildAt(world, "campfire", new Vector2(31, 28));
+        var reinforced = BuildAt(world, "reinforced", Site(31, 25));
+        BuildAt(world, "campfire", Site(31, 28));
         world.Player = reinforced.Pos;
         world.LoadBatch(reinforced, 2);
         Require(reinforced.Inventory["iron_bar"] == 4 && reinforced.Inventory["coal"] == 6,
@@ -994,7 +1019,7 @@ public static class SimulationChecks
         Require(world.S.Backpack["steel_pick"] == 1 && world.S.Backpack["crate"] == 1 && world.S.Milestones.Contains("steel_tool"),
                 "the bench should craft a steel pickaxe from steel parts and a crate from planks");
 
-        var sign = BuildAt(world, "signpost", new Vector2(34, 25));
+        var sign = BuildAt(world, "signpost", Site(34, 25));
         var crate = world.PlaceCrate("crate", sign.Pos + new Vector2(0, 2));
         Require(crate != null && world.S.Backpack["crate"] == 0, "an empty crate should be placed from the backpack");
         world.S.Backpack.TransferTo(crate!.Inventory, "steel_pick", 1);
@@ -1016,7 +1041,7 @@ public static class SimulationChecks
 
         var worker = world.Hire(sign, offer);
         Require(worker != null, "sale proceeds should fund a new worker");
-        var chest = BuildAt(world, "chest", new Vector2(37, 25));
+        var chest = BuildAt(world, "chest", Site(37, 25));
         var workerTree = world.S.Things.FirstOrDefault(t => t.Kind == "tree" && t.Remaining > 0);
         Require(workerTree != null, "a remaining tree should be available for the hired worker");
         world.Assign(worker!, workerTree);
@@ -1382,6 +1407,14 @@ public static class SimulationChecks
         Require(loaded.Find(sign.Id) is { Output.Slots: World.MarketSlots, Inventory.Slots: World.MarketSlots }, "an older signpost should get its market boxes");
         Require(loaded.S.Orders.Single().Goods.GetValueOrDefault("wood") == 4 && loaded.S.Orders.Single().Item == null, "an older single-item order should keep its goods");
         Require(!loaded.Serialize().Contains("\"Item\"") && !loaded.Serialize().Contains("\"Coins\""), "migrated fields should not be written back");
+
+        // Saves from the earlier, smaller maps would place the settlement in the mountains or the lake, so they are refused.
+        var small = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;
+        small["Version"] = 3;
+        bool refused = false;
+        try { EmptyWorld(data).Deserialize(small.ToJsonString()); }
+        catch (InvalidOperationException error) { refused = error.Message.Contains("older, smaller map"); }
+        Require(refused, "a save from the smaller map should be refused with a clear reason");
     }
 
     private static void CheckCrewKeepsForgeHot(GameData data)
@@ -1409,5 +1442,62 @@ public static class SimulationChecks
         SafeTick(world, data.TradeSeconds / 4);
         world.Assign(runner, null);
         Require(runner.Away == 0, "reassigning a runner should call off the errand rather than freeze them on the road");
+    }
+
+    private static void CheckWorkerSchedule(GameData data)
+    {
+        var world = EmptyWorld(data);
+        float At(float hour) => (hour - 6) / 24 * data.DaySeconds;
+        SetCoins(world, 200);
+        var tree = world.Add("tree", new Vector2(10, 10), 400);
+        var chest = world.Add("chest", new Vector2(12, 10));
+        var near = world.Add("campfire", new Vector2(14, 14));
+        world.Add("campfire", new Vector2(36, 36));
+        var forge = world.Add("reinforced", new Vector2(20, 12));
+        var cutter = AddWorker(world, tree.Pos);
+        var pumper = AddWorker(world, forge.Pos);
+        var hauler = AddWorker(world, forge.Pos);
+        world.Assign(cutter, tree); world.Assign(pumper, forge); world.Assign(hauler, forge);
+
+        world.S.Time = At(data.LunchHour) - 5;
+        forge.Heat = 100;
+        SafeTick(world, 25);
+        Require(world.Lunch && world.LunchFire == near && world.S.Workers.All(w => w.WorkState == WorkerWorkState.Resting && w.Pos.DistanceTo(near.Pos) < 2),
+                "at lunch the whole crew should sit around the campfire closest to them");
+        Require(cutter.Assignment == tree.Id && pumper.Assignment == forge.Id && hauler.Assignment == forge.Id,
+                "lunch should keep every assignment");
+        Require(forge.Heat < World.SteelHeat, "with the crew at lunch the forge should cool below the clear bar");
+        SafeTick(world, At(data.LunchHour + 1) - world.S.Time + 10);
+        Require(cutter.WorkState == WorkerWorkState.Gathering && pumper.WorkState == WorkerWorkState.Pumping,
+                "after lunch workers should walk back to their jobs");
+
+        float dusk = data.DuskStarts * data.DaySeconds;
+        world.S.Time = dusk - 2;
+        cutter.Bag.Remove("wood", 99); cutter.Bag.Add("wood", 2);
+        chest.Inventory.InputFilter.Add("iron_bar");
+        var sign = world.Add("signpost", new Vector2(30, 20));
+        world.Assign(AddWorker(world, sign.Pos), sign);
+        SafeTick(world, 40);
+        Require(world.S.Workers.All(w => w.Home && !world.Sees(w) && w.Commute == data.TradeSeconds / 2), "at dusk every worker should walk off like a cart and sign out");
+        // Walking arrives within reach of the signpost, so the walk-off starts up to that far from it.
+        Require(cutter.Pos.DistanceTo(sign.Pos + Vector2.One + Terrain.Seaward * World.TripDistance) < 1.25f,
+                "a worker should sign out a cart's trip down the valley from the signpost");
+        Require(cutter.Bag["wood"] == 2 && cutter.Assignment == tree.Id && pumper.Assignment == forge.Id,
+                "signing out should keep assignments and carried items");
+        Require(world.FetchBlock(sign) == "Your workers have signed out until morning.", "nobody should run for prices after signing out");
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(world.Serialize());
+        Require(loaded.S.Workers.All(w => w.Home), "signed-out workers should stay signed out after loading");
+
+        world.S.Time = data.DaySeconds - 1;
+        chest.Inventory.InputFilter.Clear();
+        SafeTick(world, 1 + data.TradeSeconds / 4);
+        Require(cutter.Commute > 0 && !cutter.Home && cutter.Pos.DistanceTo(sign.Pos + Vector2.One) < World.TripDistance,
+                "at dawn a worker should walk back up the valley as they fade in");
+        SafeTick(world, 25);
+        Require(world.S.Workers.All(w => !w.Home && w.WageDebt == 0) && cutter.Pos.DistanceTo(sign.Pos) > 5 && pumper.Pos.DistanceTo(sign.Pos) > 5,
+                "at dawn paid workers should reappear at the signpost and walk back to work");
+        Require(cutter.Assignment == tree.Id && pumper.Assignment == forge.Id && hauler.Assignment == forge.Id,
+                "a night away should keep every assignment");
     }
 }

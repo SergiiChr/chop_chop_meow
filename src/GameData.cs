@@ -51,6 +51,10 @@ public sealed class GameData
 {
     public float DaySeconds { get; set; } = 420;
     public float NightStarts { get; set; } = .7f;
+    /// <summary>Day phase where the light starts to fade, a tenth of a day before night; workers sign out then.</summary>
+    public float DuskStarts => NightStarts - .1f;
+    /// <summary>Clock hour when workers break for an hour of lunch; the day starts at 06:00.</summary>
+    public float LunchHour { get; set; } = 12;
     public float TradeSeconds { get; set; } = 30;
     public List<HireOffer> HireOffers { get; set; } = new();
     public float GatherSeconds { get; set; } = 1.5f;
@@ -83,7 +87,7 @@ public sealed class GameData
     }
     public void Validate()
     {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || NightStarts <= 0 || NightStarts >= 1 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || !Items.ContainsKey("crate"))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || !Items.ContainsKey("crate"))
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)

@@ -89,7 +89,7 @@ public static class WorldModels
             case "loose_coal": LooseOre(body, t.Id, "2d2f33", "1d1e21"); break;
             case "wolf_corpse": Carcass(prop); break;
             case "berries": Bush(prop, t.Id); break;
-            case "water": break; // The pond is the drinking spot; this thing only provides the hit area.
+            case "water": break; // The lake is the drinking spot; this thing only provides the hit area.
             case "furnace": BlockFurnace(prop); break;
             case "reinforced": DrumForge(prop); break;
             case "hut": Cabin(prop); break;

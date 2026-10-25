@@ -1,6 +1,7 @@
 {
   "daySeconds": 840,
   "nightStarts": 0.7,
+  "lunchHour": 12,
   "tradeSeconds": 30,
   "hireOffers": [
     { "upfront": 40, "wage": 5 },
