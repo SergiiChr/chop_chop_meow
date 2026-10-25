@@ -21,6 +21,15 @@ public partial class Game
         Dynamic(() => $"Batch: {Cost(world.BatchCost(t))}\n{(t.Processing ? $"Working · {t.Progress:0.0}/{recipe.Seconds:0}s" : "Waiting for ingredients / temperature")}", 14, Muted);
     }
 
+    /// <summary>Switches a wood-or-coal station's fuel between batches.</summary>
+    private void FuelToggle(Thing t)
+    {
+        if (t.Kind is not ("furnace" or "cooktable" or "cannery")) return;
+        // A guest's switch comes back with the host's next update, so the label follows the building rather than the click.
+        var fuel = Button("", () => world.SetFuel(t, t.Fuel == "wood" ? "coal" : "wood")); content.AddChild(fuel);
+        live.Add(() => { if (GodotObject.IsInstanceValid(fuel)) fuel.Text = $"Fuel: {world.Data.Name(t.Fuel)} · click to switch"; });
+    }
+
     /// <summary>Bellows furnace temperature with the clear bar that steel needs.</summary>
     private void HeatGauge(Thing t)
     {

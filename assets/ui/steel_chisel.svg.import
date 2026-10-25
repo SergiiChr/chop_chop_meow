@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b5lfc21yp716h"
-path="res://.godot/imported/cooked_meat.svg-d060617d5cf42b52d7f551afa56811bd.ctex"
+uid="uid://deu4q58den2ci"
+path="res://.godot/imported/steel_chisel.svg-b9b81edc92c26aaac7b0ab12c5be3d5a.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/cooked_meat.svg"
-dest_files=["res://.godot/imported/cooked_meat.svg-d060617d5cf42b52d7f551afa56811bd.ctex"]
+source_file="res://assets/ui/steel_chisel.svg"
+dest_files=["res://.godot/imported/steel_chisel.svg-b9b81edc92c26aaac7b0ab12c5be3d5a.ctex"]
 
 [params]
 

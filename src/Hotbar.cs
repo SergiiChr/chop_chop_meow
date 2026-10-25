@@ -132,7 +132,7 @@ public partial class Game
 
     private string? ActiveHotbarItem() => world.Data.Items.ContainsKey(HotbarId(world.S.ActiveHotbar)) ? HotbarId(world.S.ActiveHotbar) : null;
 
-    private bool IsTransferableHotbarItem(string id) => world.Data.Items[id].Tool == "" && !World.IsConsumable(id);
+    private bool IsTransferableHotbarItem(string id) => world.Data.Items[id].Tool == "" && !world.Data.IsConsumable(id);
 
     /// <summary>Puts a hotbar slot in hand; building plans and crates go straight to placement, everything else waits for a left click in the world.</summary>
     private void SelectHotbar(int slot)
@@ -152,7 +152,7 @@ public partial class Game
     }
 
     /// <summary>What a left click does with an item in hand, or null when it has no use.</summary>
-    private string? UseOf(string id) => World.IsConsumable(id) ? id == "water" ? "drink" : "eat"
+    private string? UseOf(string id) => world.Data.IsConsumable(id) ? id == "water" ? "drink" : "eat"
         : id == "torch" ? world.S.TorchLit ? "swing it" : "light it"
         : (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer" ? "swing" : null;
 
@@ -161,7 +161,7 @@ public partial class Game
     {
         if (ActiveHotbarItem() is not string id || UseOf(id) == null) return;
         if (paused) { Notify("Resume before using items."); return; }
-        if (World.IsConsumable(id)) Act(() => world.Consume(id));
+        if (world.Data.IsConsumable(id)) Act(() => world.Consume(id));
         else if (id == "torch") world.UseTorch(at - world.Player);
         else world.Attack();
     }

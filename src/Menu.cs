@@ -3,7 +3,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The Esc menu: pauses the world and lists the goal chain with the current goal's hint.</summary>
+/// <summary>The Esc menu: pauses the world and lists the starter goal chain with the current goal's hint, then the end goals.</summary>
 public partial class Game
 {
     private PanelContainer menu = null!;
@@ -55,6 +55,16 @@ public partial class Game
             if (current) goals.AddChild(Label(world.Objective.Hint, 14, Muted));
         }
         if (world.GoalComplete) goals.AddChild(Label(world.Objective.Hint, 14, Muted));
+        goals.AddChild(Label("END GOALS", 16));
+        foreach (string ore in World.MineOres)
+        {
+            bool built = world.HasMine(ore);
+            goals.AddChild(Label($"{(built ? "✓" : "·")}  A working {ore} mine", 15, built ? Muted : Cream));
+        }
+        var target = world.Data.Goals;
+        goals.AddChild(Label($"{(world.ProfitGoalMet ? "✓" : "·")}  {target.DailyProfit} coins profit a day for {target.ProfitDays} days in a row", 15, world.ProfitGoalMet ? Muted : Cream));
+        string yesterday = world.S.Profits.Count > 0 ? $"yesterday {world.S.Profits[^1]}" : "no day finished yet";
+        goals.AddChild(Label($"Profit is sale coins minus wages. {Math.Min(world.ProfitStreak, target.ProfitDays)}/{target.ProfitDays} days · {yesterday} · today's sales {world.S.DayRevenue}", 14, Muted));
         hostButton.Disabled = net.Online; hostButton.Text = net.Hosting ? "Hosting" : "Host";
         joinButton.Text = world.Remote ? "Leave game" : "Join"; saveButton.Disabled = world.Remote;
         netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";

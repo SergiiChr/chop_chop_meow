@@ -35,6 +35,7 @@ public static class WorkerStateChecks
         var tree = world.Add("tree", new Vector2(10, 10), 12);
         world.Add("chest", new Vector2(12, 10));
         var worker = AddWorker(world, tree.Pos);
+        worker.Tool = "iron_axe";
         world.Assign(worker, tree);
 
         world.Tick(.25f);
@@ -55,6 +56,7 @@ public static class WorkerStateChecks
         var tree = world.Add("tree", new Vector2(10, 10), 12);
         world.Add("chest", new Vector2(12, 10));
         var worker = AddWorker(world, tree.Pos);
+        worker.Tool = "iron_axe";
         world.Assign(worker, tree);
         worker.WorkState = WorkerWorkState.Gathering;
         worker.WageDebt = worker.Wage;
@@ -71,6 +73,7 @@ public static class WorkerStateChecks
         var tree = world.Add("tree", Vector2.One * (World.MapSize - 1), 12);
         world.Add("chest", Vector2.One * (World.MapSize - 6));
         var worker = AddWorker(world, Vector2.One * (World.MapSize - 8));
+        worker.Tool = "iron_axe";
         world.Assign(worker, tree);
 
         for (int i = 0; i < 80 && worker.WorkState != WorkerWorkState.Blocked; i++) world.Tick(.25f);
@@ -110,6 +113,7 @@ public static class WorkerStateChecks
         var tree = world.Add("tree", new Vector2(10, 10), 12);
         world.Add("chest", new Vector2(12, 10));
         var worker = AddWorker(world, tree.Pos);
+        worker.Tool = "iron_axe";
         world.Assign(worker, tree);
         world.Tick(.25f);
         Require(worker.WorkState == WorkerWorkState.Gathering,

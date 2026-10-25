@@ -126,6 +126,8 @@ public sealed partial class World
             case "set_fuel": SetFuel(t, c.Item); break;
             case "set_filter": SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
             case "clear_filters": ClearFilters(t); break;
+            case "set_compost": SetCompost(t, c.Count != 0); break;
+            case "supply_mine": SupplyMine(t); break;
             case "load_batch": LoadBatch(t, Math.Clamp(c.Count, 1, 5)); break;
             case "load_input": LoadInput(t, c.Item, c.Count); break;
             case "collect": Collect(t); break;
@@ -164,6 +166,7 @@ public sealed partial class World
         int a = Locate(from), b = Locate(to);
         if (a < 0 || b < 0 || Forwarded("transfer", a, b, item, quantity)) return 0;
         if (new[] { a, b }.Where(at => at > 0).Any(at => !Near(Find(at / 4)!))) { Say("Walk closer first."); return 0; }
+        if (b % 4 == 1 && HoldBlock(Find(b / 4)!, item) is string refused) { Say(refused); return 0; }
         return from.TransferTo(to, item, quantity);
     }
 
@@ -176,7 +179,7 @@ public sealed partial class World
 
     public void SetFuel(Thing furnace, string fuel)
     {
-        if (furnace.Kind != "furnace" || furnace.Processing || fuel is not "wood" and not "coal" || Forwarded("set_fuel", furnace.Id, item: fuel)) return;
+        if (furnace.Kind is not ("furnace" or "cooktable" or "cannery") || furnace.Processing || fuel is not "wood" and not "coal" || Forwarded("set_fuel", furnace.Id, item: fuel)) return;
         furnace.Fuel = fuel;
     }
 

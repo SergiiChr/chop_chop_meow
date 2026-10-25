@@ -236,7 +236,10 @@ def lag_proxy(stop: threading.Event, delay: float = 0.08, loss: float = 0.05) ->
                 [front, *upstreams.values()], [], [], max(0, min(wait, 0.05))
             )
             for sock in ready:
-                data, sender = sock.recvfrom(65536)
+                try:
+                    data, sender = sock.recvfrom(65536)
+                except ConnectionRefusedError:
+                    continue  # The host is not listening yet; the guest retries.
                 if sock is front:
                     if sender not in upstreams:
                         upstreams[sender] = socket.socket(

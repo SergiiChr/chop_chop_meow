@@ -8,7 +8,7 @@ The 2D images that remain are interface icons and are unchanged:
 
 - `item-atlas.png` is a 4×3 sheet of hotbar inventory icons (axe, pickaxe, an unused steel tools cell, iron, steel, wood, stone, iron ore, coal, berries, water, empty).
 - `world-atlas.png` is a 4×3 sheet (362 × 362 px cells) whose building cells supply the building-plan and hotbar icons.
-- `ui/` holds hand-written SVG toolbar icons: hammer (build), backpack (inventory), hard hat (workers) and open book (guide). Items added after the atlas also have hand-written SVG icons named by item id, which the hotbar prefers over the atlas: planks, wood and metal parts, stone chisel, mallet, iron and steel hammers, steel axe and pickaxe, crate, canned food, torch and the crafting bench.
+- `ui/` holds hand-written SVG toolbar icons: hammer (build), backpack (inventory), hard hat (workers) and open book (guide). Items added after the atlas also have hand-written SVG icons named by item id, which the hotbar prefers over the atlas: planks, wood and metal parts, stone and steel chisels, mallet, iron and steel hammers, steel axe and pickaxe, rake, mortar and pestle, crate, torch, the crafting bench, tin ore, bars and cans, leaves, grass, fertilizer, wheat seeds, wheat, flour, dough, and the foods: raw meat, burnt steak, bread, crushed berries, berry jam, meat stew and the canned goods.
 
 Both PNG atlases were generated with the built-in image generation tool for this project; no external copyrighted game art or third-party packs are used. Their prompts are preserved in [PROMPTS.md](PROMPTS.md).
 
