@@ -64,10 +64,10 @@ public partial class Game
         {
             int slot = i;
             var cell = cells[i].Cell;
-            cell.Pressed += () => { if (stacks[slot] is (string id, _)) { click(id); RefreshLive(); } };
+            cell.Pressed += () => { if (stacks[slot] is (string id, _)) { Act(() => click(id)); RefreshLive(); } };
             cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container) : null;
             cell.CanTake = accepts ?? (drag => drag.From != null && drag.From != inventory());
-            cell.Take = drag => { MoveDrag(drag, inventory(), container); RefreshLive(); };
+            cell.Take = drag => { Act(() => MoveDrag(drag, inventory(), container)); RefreshLive(); };
             grid.AddChild(cell);
         }
         live.Add(() =>

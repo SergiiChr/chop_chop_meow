@@ -133,7 +133,7 @@ public partial class Game
         {
             view.BuildMode = id; ClosePanel(); Notify($"Place {world.Data.Name(id)}.");
         }
-        else if (id is "berries" or "water" or "cooked_meat" or "raw_meat") world.Consume(id);
+        else if (id is "berries" or "water" or "cooked_meat" or "raw_meat") Act(() => world.Consume(id));
         else if (world.Data.Items.ContainsKey(id)) Notify($"Selected {world.Data.Name(id)}. Carried tools work with Space and gathering.");
         else Notify($"Unknown hotbar item: {id}.");
         RefreshLive();
@@ -173,6 +173,7 @@ public partial class Game
     {
         world.S.HotbarSlots[slot] = id;
         world.S.ActiveHotbar = slot;
+        if (id != "") sounds.Play("putting_items_on_hotbar");
         Notify(id == "" ? $"Cleared hotbar slot {slot + 1}." : $"Slot {slot + 1}: {world.Data.Name(id)}.");
         if (page == "hotbar") OpenPage("hotbar"); else RefreshLive();
     }

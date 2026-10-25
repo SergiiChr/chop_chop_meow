@@ -173,6 +173,12 @@ public partial class Game
             UIRequire(view.PlayerAnimation == ActorAction.Walk, "Movement must select the full walking cycle.");
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
             await Frames(); UIRequire(world.Player.DistanceTo(start) > .25f, "WASD must move the player through Godot input.");
+            UIRequire(sounds.Last == "footsteps_default", "Walking on grass must play grass footsteps.");
+            UIRequire(Sounds.Names.All(name => sounds.VariantCount(name) > 0) && sounds.VariantCount("footsteps_default") == 3 && sounds.VariantCount("chop_tree") == 1, "Every sound must load, with numbered files grouped as variants.");
+            var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
+            UIRequire(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
+            int heard = sounds.Played; sounds.Play("anvil_work", world.Player + Vector2.One * 40);
+            UIRequire(view.OffScreen(world.Player) == 0 && view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach && sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
             var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == new Vector2(28, 24));
             int wood = world.S.Backpack["wood"];
             var point = view.Screen(tree.Pos) - new Vector2(0, 70);
@@ -182,6 +188,7 @@ public partial class Game
             await Frames(3);
             await ToSignal(GetTree().CreateTimer(4), SceneTreeTimer.SignalName.Timeout);
             UIRequire(view.PlayerAnimation == ActorAction.Chop, "RMB gathering with the starting axe must select the axe stroke.");
+            UIRequire(sounds.Last == "chop_tree", "Axe strokes on a tree must play the chop sound.");
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
             await Frames(); UIRequire(world.S.Backpack["wood"] > wood, "Holding RMB must approach and gather a real resource.");
             UIRequire(!stats.Text.Contains("Health") && !stats.Text.Contains("Food") && !stats.Text.Contains("Water") && !stats.Text.Contains("coins") && !stats.Text.Contains("Pack"), "The persistent HUD must show only the day and clock beside the brand.");
@@ -189,8 +196,10 @@ public partial class Game
             int berries = world.S.Backpack["berries"];
             await KeyStroke(Key.Key3);
             UIRequire(view.BuildMode == "chest", "A building-plan hotkey must enter placement mode.");
+            int played = sounds.Played;
             await KeyStroke(Key.Key8);
             UIRequire(world.S.Backpack["berries"] == berries - 1, "Key 8 must consume the berries assigned to hotbar slot 8.");
+            UIRequire(sounds.Played == played + 1 && sounds.Last == "eat_berry", "Eating must play only the eating sound, not an inventory sound as well.");
             UIRequire(view.BuildMode == "", "Using a consumable must clear any previously selected building plan.");
             world.S.Backpack.Add("water", 1); world.S.Thirst = 20;
             await KeyStroke(Key.Key9);
@@ -373,7 +382,7 @@ public partial class Game
             UIRequire(world.Find(looseOre.Id) == null && world.S.Backpack["iron_ore"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
             UIRequire(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
             RemoveCheckFiles();
-            GD.Print("UI-TEST PASS"); GetTree().Quit();
+            GD.Print("UI-TEST PASS"); Quit();
         }
         catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }

@@ -11,3 +11,7 @@ The 2D images that remain are interface icons and are unchanged:
 - `ui/` holds hand-written SVG toolbar icons: hammer (build), backpack (inventory), hard hat (workers) and open book (guide).
 
 Both PNG atlases were generated with the built-in image generation tool for this project; no external copyrighted game art or third-party packs are used. Their prompts are preserved in [PROMPTS.md](PROMPTS.md).
+
+## Sounds
+
+`sounds/` holds the sound effects as 320 kbps MP3, converted from the supplied files and peak-normalised, with variants of one sound matched in loudness. A numbered suffix marks variants of one sound. Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com)).

@@ -47,7 +47,8 @@ public partial class Game
         });
         AddInventoryGrid(() => output, sign, id => MoveStack(output, world.S.Backpack, id, sign), "Click or drag: collect", _ => false);
         var row = Row();
-        var sell = Button("Sell", () => world.Sell(sign)); sell.Name = "sell"; sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(sell);
+        // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
+        var sell = Button("Sell", () => { var load = sign.Inventory.Items.Keys.OrderByDescending(id => sign.Inventory[id]).FirstOrDefault(); if (world.Sell(sign) && load != null) sounds.Play(Sounds.ForItem(load)); }); sell.Name = "sell"; sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(sell);
         var collect = Button("Collect", () => { if (world.Near(sign)) foreach (var id in output.Items.Keys.ToArray()) output.TransferTo(world.S.Backpack, id, output[id]); else Notify("Walk closer first."); });
         collect.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(collect);
         AddLabel("BACKPACK", 14);
