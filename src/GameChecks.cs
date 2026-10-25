@@ -189,6 +189,23 @@ public partial class Game
         UIRequire(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Clicking with a lit torch must swing it.");
     }
 
+    /// <summary>A stack bigger than a crate's room fills it and the rest stays in the backpack, whether dragged whole or split off.</summary>
+    private async Task CheckCrateOverflow()
+    {
+        world.S.Backpack.Remove("wood", world.S.Backpack["wood"]);
+        UIRequire(world.S.Backpack.Add("wood", 64) == 64, "The backpack must have room for a stack of wood.");
+        var crates = new[] { world.Add("crate", world.Player + new Vector2(-1, 0)), world.Add("crate", world.Player + new Vector2(0, -1)) };
+        int cap = world.Data.CrateCapacity;
+        Select(crates[0]); await Frames();
+        await DragTo(Cell(1, c => c.TooltipText.Contains("Wood · 64 total")), Cell(0, c => c.TooltipText == ""));
+        UIRequire(crates[0].Inventory["wood"] == cap && world.S.Backpack["wood"] == 64 - cap, "Dragging a full stack into a crate must fill it and keep the rest in the backpack.");
+        Select(crates[1]); await Frames();
+        await SplitTo(Cell(1, c => c.TooltipText.Contains("Wood · ")), Cell(0, c => c.TooltipText == ""));
+        UIRequire(crates[1].Inventory["wood"] == cap && world.S.Backpack["wood"] == 64 - 2 * cap, "Dropping a split half bigger than a crate must fill it and keep the rest in the backpack.");
+        foreach (var crate in crates) world.S.Things.Remove(crate);
+        ClosePanel(); await Frames();
+    }
+
     private async Task CheckCrateInCrate()
     {
         var crate = world.Add("crate", world.Player + new Vector2(1, 0));
@@ -525,6 +542,7 @@ public partial class Game
             UIRequire(world.Find(looseOre.Id) == null && world.S.Backpack["iron_ore"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
             UIRequire(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
             await CheckCraftingAndTorch();
+            await CheckCrateOverflow();
             await CheckCrateInCrate();
             RemoveCheckFiles();
             GD.Print("UI-TEST PASS"); Quit();
