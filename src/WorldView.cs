@@ -468,7 +468,7 @@ public partial class WorldView : Node3D
             case "furnace":
                 prop.Glow!.Visible = t.Processing;
                 prop.Light!.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
-                Smoke(prop, t, t.Processing, dt);
+                Smoke(prop, t, t.Processing, dt, FurnaceSmoke);
                 break;
             case "reinforced":
                 float heat = t.Heat / 100;
@@ -478,7 +478,7 @@ public partial class WorldView : Node3D
                 float lift = 18 * (1 - pumping.GetValueOrDefault(t.Id));
                 prop.Lever!.RotationDegrees = new Vector3(0, 0, lift);
                 for (int i = 0; i < prop.Pleats.Length; i++) prop.Pleats[i].RotationDegrees = new Vector3(0, 0, lift * (i + 1) / (prop.Pleats.Length + 1));
-                Smoke(prop, t, t.Processing || heat > .3f, dt);
+                Smoke(prop, t, t.Processing || heat > .3f, dt, ForgeSmoke);
                 break;
             case "campfire":
                 bool burning = t.Burn > 0;
@@ -487,7 +487,7 @@ public partial class WorldView : Node3D
                 prop.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
                 prop.Light!.LightEnergy = burning ? (1.2f + flicker * .3f) * (.35f + night * 1.4f) : 0;
                 if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Flat(new Color("ff9a3a")), 1, .5f, 1.1f, -1.4f, .025f);
-                Smoke(prop, t, burning, dt);
+                Smoke(prop, t, burning, dt, CampfireSmoke);
                 break;
             case "chest" or "grave":
                 int count = t.Inventory.Count;
@@ -515,13 +515,19 @@ public partial class WorldView : Node3D
 
     private static float Ease(float t) => t * t * (3 - 2 * t);
 
-    private void Smoke(Prop prop, Thing t, bool active, float dt)
+    // Campfire, furnace and bellows furnace smoke: the coal forge's plume is darker, denser and wider.
+    private readonly record struct SmokeStyle(float Every, Color Color, float Size, float Grow);
+    private static readonly SmokeStyle CampfireSmoke = new(.5f, new Color(.62f, .62f, .6f, .38f), .14f, 2.2f);
+    private static readonly SmokeStyle FurnaceSmoke = new(.3f, new Color(.58f, .58f, .56f, .42f), .14f, 2.4f);
+    private static readonly SmokeStyle ForgeSmoke = new(.16f, new Color(.36f, .36f, .36f, .55f), .2f, 2.8f);
+
+    private void Smoke(Prop prop, Thing t, bool active, float dt, SmokeStyle smoke)
     {
         if (!active || dt <= 0) return;
         prop.Puff -= dt;
         if (prop.Puff > 0) return;
-        prop.Puff = .5f;
-        Burst(To3(t.Pos) + prop.Vent, Flat(new Color(.62f, .62f, .6f, .38f)), 1, .25f, 2.4f, -.45f, .14f, 2.2f);
+        prop.Puff = smoke.Every;
+        Burst(To3(t.Pos) + prop.Vent, Flat(smoke.Color), 1, .25f, 2.4f, -.45f, smoke.Size, smoke.Grow);
     }
 
     /// <summary>Trees in front of the player, a worker or a structure turn see-through instead of hiding them.</summary>

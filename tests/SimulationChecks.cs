@@ -25,6 +25,7 @@ public static class SimulationChecks
         CheckRecipeSwitchLeftovers(data);
         CheckDeathAndSaveState(data);
         CheckFuelAndHeatGates(data);
+        CheckAnvilNeedsHammering(data);
         CheckProcessingOutputCapacity(data);
         CheckToolGatesAndPlacement(data);
         CheckCliffsAndLoosePickup(data);
@@ -465,6 +466,43 @@ public static class SimulationChecks
         SafeTick(world, .25f);
         Require(reinforced.Processing && reinforced.Inventory["iron_bar"] == 0 && reinforced.Inventory["coal"] == 0,
                 "once hot enough, the reinforced furnace should consume the retained batch inputs");
+        reinforced.Inventory.Add("coal", 3);
+        SafeTick(world, 30);
+        Require(reinforced.Processing && reinforced.Progress < data.Recipes["steel_bar"].Seconds && reinforced.Inventory["coal"] == 1,
+                "a cooled forge should keep burning coal while the steel batch stops progressing");
+    }
+
+    private static void CheckAnvilNeedsHammering(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var anvil = world.Add("anvil", new Vector2(10, 10));
+        world.SetRecipe(anvil, "iron_pick");
+        anvil.Inventory.Add("iron_bar", 3);
+        anvil.Inventory.Add("wood", 2);
+        world.Player = anvil.Pos + new Vector2(1.5f, 0);
+        for (int i = 0; i < 8; i++) { world.MovePlayer(new Vector2(i % 2 == 0 ? .1f : -.1f, 0)); world.Tick(.25f); }
+        Require(!anvil.Processing && anvil.Inventory["iron_bar"] == 3, "an anvil must not start while the player only walks past it");
+        world.Tick(.25f);
+        Require(anvil.Processing && anvil.Progress > 0, "a player standing at the anvil should hammer the batch");
+        float progress = anvil.Progress;
+        world.Player = anvil.Pos + new Vector2(1.5f, 0);
+        for (int i = 0; i < 4; i++) { world.Gather(anvil, .25f); world.Tick(.25f); }
+        Require(anvil.Progress == progress, "a busy player must not advance the anvil");
+
+        // A paid smith stays to hammer a running batch; one on strike beside the anvil does not count.
+        var chest = world.Add("chest", new Vector2(24, 10));
+        chest.Inventory.Add("iron_bar", 6);
+        var worker = AddWorker(world, anvil.Pos + Vector2.One);
+        world.Assign(worker, anvil);
+        world.Player = new Vector2(30, 30);
+        worker.WageDebt = 8;
+        SafeTick(world, 1);
+        Require(anvil.Progress == progress, "a striking worker next to the anvil must not advance it");
+        worker.WageDebt = 0;
+        SafeTick(world, 1);
+        Require(worker.WorkState == WorkerWorkState.Hammering && anvil.Progress > progress, "a lone smith should hammer the running batch before fetching the next load");
+        SafeTick(world, 45);
+        Require(chest.Inventory["iron_pick"] == 1, "a worker hammering at the anvil should finish the batch and store it");
     }
 
     private static void CheckProcessingOutputCapacity(GameData data)
