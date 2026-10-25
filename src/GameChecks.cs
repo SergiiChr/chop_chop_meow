@@ -68,6 +68,21 @@ public partial class Game
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
         await Frames();
     }
+    /// <summary>A right click on a stack, a move to the target and a left click there.</summary>
+    private async Task SplitTo(Control from, Control to)
+    {
+        var start = await At(from); var end = await At(to);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = start, GlobalPosition = start, Pressed = true });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = start, GlobalPosition = start, Pressed = false });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseMotion { Position = end, GlobalPosition = end, Relative = end - start });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = end, GlobalPosition = end, Pressed = true });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
+        await Frames();
+    }
     private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false)[grid].GetChildren().OfType<ItemSlot>().First(match);
     private static void UIRequire(bool okay, string message)
     {
@@ -90,9 +105,9 @@ public partial class Game
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         await Click(view.Screen(sign.Pos, .8f));
         UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A signpost must open the market with its icon buttons.");
-        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·")));
+        await Click(Cell(3, c => c.TooltipText.StartsWith("Wood ·")));
         UIRequire(sign.Inventory.Count == 0 && world.S.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
-        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));
+        await Click(Cell(3, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));
         UIRequire(sign.Inventory[packed] == 1 && world.S.Backpack[packed] == 0, "Clicking a packed crate must load it into the market input.");
         await Click(Named("sell")!);
         UIRequire(world.S.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
@@ -348,6 +363,13 @@ public partial class Game
             UIRequire(world.S.HotbarSlots[3] == "wood" && world.S.Backpack["wood"] == storedWood, "Dragging an item onto the hotbar must assign a reference without moving items.");
             await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
             UIRequire(chest.Inventory["wood"] == storedWood, "Dragging a backpack stack onto the chest must store it.");
+            RefreshLive();
+            await SplitTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), Cell(1, c => c.TooltipText == ""));
+            int half = (Math.Min(storedWood, world.S.Backpack.StackOf("wood")) + 1) / 2;
+            UIRequire(world.S.Backpack["wood"] == half && chest.Inventory["wood"] == storedWood - half, $"A right click must pick up half a stack and a left click must drop it ({world.S.Backpack["wood"]} of {half}, chest {chest.Inventory["wood"]} of {storedWood}).");
+            RefreshLive();
+            await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
+            UIRequire(chest.Inventory["wood"] == storedWood, "The split half must go back into the chest.");
             var filters = FindButton(panel, "Input / output filters"); filters!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(page == "filters", "Chest filters must be reachable from the live context UI.");
             await KeyStroke(Key.I);

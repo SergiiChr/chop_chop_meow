@@ -153,22 +153,23 @@ public sealed partial class World
         if (inventory == S.Backpack) return 0;
         foreach (var t in S.Things)
         {
-            if (inventory == t.Inventory) return t.Id * 4 + 1;
-            if (inventory == t.Output) return t.Id * 4 + 2;
-            if (inventory == t.Tools) return t.Id * 4 + 3;
+            int box = Array.IndexOf(Boxes(t), inventory);
+            if (box >= 0) return t.Id * BoxCodes + box + 1;
         }
         return -1;
     }
 
-    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : Find(at / 4) is not Thing t ? null : (at % 4) switch { 1 => t.Inventory, 2 => t.Output, 3 => t.Tools, _ => null };
+    public const int BoxCodes = 5;
+    private static Inventory?[] Boxes(Thing t) => [t.Inventory, t.Output, t.Tools, t.Wages];
+    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : Find(at / BoxCodes) is not Thing t || at % BoxCodes == 0 ? null : Boxes(t)[at % BoxCodes - 1];
 
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity)
     {
         int a = Locate(from), b = Locate(to);
         if (a < 0 || b < 0 || Forwarded("transfer", a, b, item, quantity)) return 0;
-        if (new[] { a, b }.Where(at => at > 0).Any(at => !Near(Find(at / 4)!))) { Say("Walk closer first."); return 0; }
-        if (b % 4 == 1 && HoldBlock(Find(b / 4)!, item) is string refused) { Say(refused); return 0; }
+        if (new[] { a, b }.Where(at => at > 0).Any(at => !Near(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
+        if (b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
         return from.TransferTo(to, item, quantity);
     }
 

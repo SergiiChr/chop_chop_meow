@@ -22,8 +22,10 @@ public sealed class Thing
     public float Heat { get; set; }
     public float Burn { get; set; }
     public float Regrow { get; set; }
-    /// <summary>A signpost's market output: sale coins and bought goods arrive here with the returning cart.</summary>
+    /// <summary>A signpost's market output: bought goods arrive here with the returning cart, and sale coins once <see cref="Wages"/> is full.</summary>
     public Inventory? Output { get; set; }
+    /// <summary>A signpost's one stack of coins for wages: sale coins land here first, and dawn wages come out of it before any backpack.</summary>
+    public Inventory? Wages { get; set; }
     /// <summary>A crafting bench's chisel and hammer slots; automation never touches them.</summary>
     public Inventory? Tools { get; set; }
     /// <summary>Building stages finished, for buildings put up in stages: a mine counts up to <see cref="World.MineOpen"/>.</summary>
@@ -256,7 +258,7 @@ public sealed partial class World
         var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining };
         if (kind == "furnace") t.Recipe = "iron_bar";
         if (kind == "reinforced") { t.Recipe = "steel_bar"; t.Fuel = "coal"; }
-        if (kind == "signpost") { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; }
+        if (kind == "signpost") { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; t.Wages = NewWageSlot(); }
         if (SlotKinds(kind).Length > 0) t.Tools = NewToolSlots(kind);
         if (kind == "crate") t.Inventory = NewCrate();
         if (kind == "mine") { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
@@ -690,6 +692,18 @@ public sealed partial class World
     /// <summary>The whole coins one purchase costs, crate included for boxed goods.</summary>
     public int LotPrice(string item) => (int)MathF.Ceiling(1.25f * (Data.Items[item].Price * Lot(item) + (Lot(item) > 1 ? Data.Items["crate"].Price : 0)));
     public const int MarketSlots = 6;
+    private static Inventory NewWageSlot() => new() { Slots = 1, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
+    /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins.</summary>
+    public string? BoxBlock(Thing t, Inventory box, string item) => box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." : box == t.Inventory ? HoldBlock(t, item) : null;
+    /// <summary>Coins kept for wages in every signpost's wage slot.</summary>
+    public int WageCoins => S.Things.Sum(t => t.Wages?[Inventory.Coins] ?? 0);
+    /// <summary>Pays wages from the signposts' wage slots first, then the acting player's backpack, or nothing if together they fall short.</summary>
+    private bool PayWage(int amount)
+    {
+        if (amount > WageCoins + Coins) return false;
+        foreach (var box in S.Things.Select(t => t.Wages).OfType<Inventory>()) amount -= box.Remove(Inventory.Coins, amount);
+        return Pay(amount);
+    }
     /// <summary>The village only takes packed crates holding nothing but goods it buys.</summary>
     public bool CanSell(string item) => Packed(item) is { Count: > 0 } contents && contents.Items.Keys.All(Data.Market.Sells.ContainsKey);
     /// <summary>The sale price as last reported from the village; it goes stale until someone arrives with news.</summary>
@@ -1153,13 +1167,13 @@ public sealed partial class World
         {
             // A striking worker does not work, so no further wages are added until the strike is settled.
             if (w.WageDebt > 0) continue;
-            if (!Pay(w.Wage)) { float due = w.WageDebt = w.Wage; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the signpost."); }
+            if (!PayWage(w.Wage)) { float due = w.WageDebt = w.Wage; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the signpost."); }
         }
     }
     public void SettleDebt(Worker w)
     {
         if (Forwarded("settle", other: w.Id)) return;
-        if (!Pay((int)w.WageDebt)) { Say("Not enough coins in your backpack to settle wages."); return; }
+        if (!PayWage((int)w.WageDebt)) { Say("Not enough coins in the wage slot or your backpack to settle wages."); return; }
         w.WageDebt = 0;
     }
     /// <summary>The wolves hunting the acting player.</summary>
@@ -1198,7 +1212,7 @@ public sealed partial class World
             // The cart unloads into the market output; whatever does not fit waits in a box beside the signpost.
             var sign = Find(order.Signpost);
             var output = sign?.Output ?? S.Backpack;
-            var goods = order.Buying ? order.Goods : new() { [Inventory.Coins] = (int)order.Value };
+            var goods = order.Buying ? order.Goods : new() { [Inventory.Coins] = (int)order.Value - (sign?.Wages?.Add(Inventory.Coins, (int)order.Value) ?? 0) };
             // Boxed goods come back as packed crates of one purchase each.
             if (order.Buying && order.Crates > 0)
                 goods = order.Goods.SelectMany(p => Enumerable.Range(0, order.Crates).Select(_ => { var box = NewCrate(); box.Add(p.Key, p.Value / order.Crates); return Pack(box); })).ToDictionary(id => id, _ => 1);
@@ -1488,6 +1502,7 @@ public sealed partial class World
         foreach (var order in loaded.Orders.Where(o => o.Item != null && o.Goods.Count == 0)) { order.Goods[order.Item!] = order.Quantity; order.Item = null; order.Quantity = 0; }
         // Signposts from older saves had no market, so they get its boxes on load.
         foreach (var sign in loaded.Things.Where(t => t.Kind == "signpost" && t.Output == null)) { sign.Inventory.Slots = MarketSlots; sign.Output = new() { Slots = MarketSlots }; }
+        foreach (var sign in loaded.Things.Where(t => t.Kind == "signpost" && t.Wages == null)) sign.Wages = NewWageSlot();
         // Saves from before the fog start unexplored.
         if (loaded.Explored?.Length != MapSize * MapSize) loaded.Explored = new byte[MapSize * MapSize];
         loaded.Remembered ??= new();

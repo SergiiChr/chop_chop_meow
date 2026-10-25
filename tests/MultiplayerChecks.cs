@@ -64,11 +64,11 @@ public static class MultiplayerChecks
         Require(guest.Backpack["iron_ore"] == 2 && world.S.Backpack["iron_ore"] == hostOre && world.Find(ore.Id) == null, "a guest's pick-up should go into the guest's backpack only");
         Require(heard.Contains($"+2 {data.Name("iron_ore")}.") && hostHeard == null, "what a guest's action says should reach the guest, not the host");
 
-        world.Run(guest, new Command("transfer", 0, chest.Id * 4 + 1, "iron_ore", 99, default));
+        world.Run(guest, new Command("transfer", 0, chest.Id * World.BoxCodes + 1, "iron_ore", 99, default));
         Require(chest.Inventory["iron_ore"] == 2 && guest.Backpack["iron_ore"] == 0, "a guest should store into a chest within reach");
         world.Player = chest.Pos + new Vector2(1, 0);
         Require(world.Transfer(chest.Inventory, world.S.Backpack, "iron_ore", 99) == 2 && world.S.Backpack["iron_ore"] == hostOre + 2, "the host should take what a guest stored");
-        world.Run(guest, new Command("transfer", chest.Id * 4 + 2, 0, "iron_ore", 99, default));
+        world.Run(guest, new Command("transfer", chest.Id * World.BoxCodes + 2, 0, "iron_ore", 99, default));
         world.Run(guest, new Command("hire", chest.Id, 0, "", 99, default));
         Require(guest.Backpack.Count == 0 && world.S.Workers.Count == 0, "commands naming boxes or offers that do not exist should do nothing");
 
