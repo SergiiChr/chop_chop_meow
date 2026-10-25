@@ -647,10 +647,13 @@ public sealed class World
         for (int y = fromY; y <= toY; y++)
             for (int x = fromX; x <= toX; x++)
                 if (S.Explored[y * MapSize + x] == 0 && Sees(new Vector2(x, y))) { S.Explored[y * MapSize + x] = 255; ExploredRevision++; }
-        foreach (var id in S.Remembered.Where(pair => Sees(pair.Value.Pos)).Select(pair => pair.Key).ToArray()) S.Remembered.Remove(id);
-        // Inventories are left out: the fog shows how things looked, not what they held.
+        foreach (var id in S.Remembered.Where(pair => Sees(pair.Value.Pos) && Find(pair.Key) == null).Select(pair => pair.Key).ToArray()) S.Remembered.Remove(id);
+        // Only the look is remembered: no inventory, and no fire, heat or work, so nothing out of sight smokes or glows.
         foreach (var t in S.Things.Where(t => Sees(t.Pos)))
-            S.Remembered[t.Id] = new Thing { Id = t.Id, Kind = t.Kind, Pos = t.Pos, Remaining = t.Remaining, Recipe = t.Recipe, Fuel = t.Fuel, Progress = t.Progress, Processing = t.Processing, Heat = t.Heat, Burn = t.Burn };
+        {
+            if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id };
+            memory.Kind = t.Kind; memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Recipe = t.Recipe; memory.Progress = t.Progress;
+        }
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < MapSize && p.Y < MapSize && S.Explored[(int)p.Y * MapSize + (int)p.X] != 0;
     private void TickWolves(float dt)

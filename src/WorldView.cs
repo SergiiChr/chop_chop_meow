@@ -249,10 +249,11 @@ public partial class WorldView : Node3D
     {
         SyncCamera();
         Thing? best = null; float nearest = float.MaxValue;
-        foreach (var t in World.S.Things.Where(t => World.Sees(t.Pos) || World.S.Remembered.ContainsKey(t.Id)))
+        // Hits follow what is drawn, including memories, but only things that still exist can be picked.
+        foreach (var known in World.Known)
         {
-            if (t.Remaining <= 0 && t.IsResource && t.Kind != "berries") continue;
-            if (RayHits(screen, t.Pos, HitsOf(t), out float d) && d < nearest) { nearest = d; best = t; }
+            if (known.Remaining <= 0 && known.IsResource && known.Kind != "berries" || World.Find(known.Id) is not Thing t) continue;
+            if (RayHits(screen, t.Pos, HitsOf(known), out float d) && d < nearest) { nearest = d; best = t; }
         }
         return best;
     }

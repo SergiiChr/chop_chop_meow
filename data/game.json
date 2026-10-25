@@ -6,7 +6,7 @@
   "dailyWage": 8,
   "gatherSeconds": 2.0,
   "respawnSeconds": 30,
-  "sightRadius": 9,
+  "sightRadius": 20,
   "items": {
     "wood": {
       "name": "Wood",

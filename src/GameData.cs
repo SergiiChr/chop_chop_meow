@@ -37,8 +37,8 @@ public sealed class GameData
     public float HungerPerSecond { get; set; } = .12f;
     public float RespawnSeconds { get; set; } = 30;
     public float ThirstPerSecond { get; set; } = .16f;
-    /// <summary>Radius in tiles of the player's live view; sized to fit the screen at default zoom.</summary>
-    public float SightRadius { get; set; } = 9;
+    /// <summary>Radius in tiles of the player's live view; sized to fill a 16:10 screen at full zoom-out.</summary>
+    public float SightRadius { get; set; } = 20;
     public Dictionary<string, ItemDef> Items { get; set; } = new();
     public Dictionary<string, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();

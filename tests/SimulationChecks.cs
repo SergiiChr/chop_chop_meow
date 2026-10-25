@@ -680,7 +680,7 @@ public static class SimulationChecks
     private static void CheckFogOfWar(GameData data)
     {
         var fresh = new World(data);
-        var far = World.Cliffs.Select(c => c.Center).First();
+        var far = World.CliffOf("coal").Center;
         Require(fresh.Explored(World.Spawn) && !fresh.Explored(far),
                 "a new game should reveal only the clearing around the player");
         Require(fresh.Known.All(t => t.Pos.DistanceTo(World.Spawn) <= data.SightRadius),
@@ -689,22 +689,24 @@ public static class SimulationChecks
         var world = EmptyWorld(data);
         world.Player = new Vector2(10, 10);
         var tree = world.Add("tree", new Vector2(12, 10), 42);
-        var hidden = world.Add("stone", new Vector2(40, 40), 64);
+        var hidden = world.Add("stone", new Vector2(44, 44), 64);
+        var furnace = world.Add("furnace", new Vector2(9, 12));
+        furnace.Processing = true;
         SafeTick(world, Step);
         Require(world.Known.Contains(tree) && !world.Known.Any(t => t.Id == hidden.Id),
                 "only things within the sight circle should become known");
 
-        world.Player = new Vector2(30, 10);
+        world.Player = new Vector2(40, 10);
         SafeTick(world, Step);
         tree.Remaining = 0;
         world.S.Things.Remove(world.Add("chest", new Vector2(11, 11)));
         var memory = world.Known.Single(t => t.Id == tree.Id);
-        Require(memory != tree && memory.Remaining == 42 && world.Explored(new Vector2(12, 10)),
-                "explored ground out of sight should keep the last seen state, not the live one");
+        Require(memory != tree && memory.Remaining == 42 && world.Explored(new Vector2(12, 10)) && !world.Known.Single(t => t.Id == furnace.Id).Processing,
+                "explored ground out of sight should keep the last seen look, not the live state or its activity");
 
         var loaded = EmptyWorld(data);
         loaded.Deserialize(world.Serialize());
-        Require(loaded.Explored(new Vector2(12, 10)) && !loaded.Explored(new Vector2(40, 40)) && loaded.Known.Single(t => t.Id == tree.Id).Remaining == 42,
+        Require(loaded.Explored(new Vector2(12, 10)) && !loaded.Explored(new Vector2(44, 44)) && loaded.Known.Single(t => t.Id == tree.Id).Remaining == 42,
                 "save/load should keep explored ground and remembered things");
 
         world.Player = new Vector2(10, 10);
