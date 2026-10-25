@@ -102,7 +102,7 @@ public static class ModelKit
 
     /// <summary>
     /// Fades a whole model by swapping in alpha-blended copies of its materials.
-    /// Copies are cached per tenth of transparency, so fading trees still share materials; this works in the Compatibility renderer, which ignores per-instance transparency.
+    /// Copies are cached per tenth of transparency, so fading trees still share materials.
     /// </summary>
     public static void SetFade(Node node, float transparency)
     {

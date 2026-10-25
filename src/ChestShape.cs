@@ -11,8 +11,8 @@ internal static class ChestShape
     public static Mesh Lid => lid ??= BuildWood(true);
     public static Mesh Frame => frame ??= BuildMetal(false);
     public static Mesh LidFrame => lidFrame ??= BuildMetal(true);
-    public static readonly StandardMaterial3D Wood = new() { VertexColorUseAsAlbedo = true, Roughness = .9f };
-    public static readonly StandardMaterial3D Metal = new() { VertexColorUseAsAlbedo = true, Roughness = .5f, Metallic = .6f };
+    public static readonly StandardMaterial3D Wood = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f };
+    public static readonly StandardMaterial3D Metal = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .5f, Metallic = .6f };
 
     private static Vector3[] Ring(float x, float z, float y, float corner, float forward = 0)
     {

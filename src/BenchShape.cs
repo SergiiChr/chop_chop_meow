@@ -9,8 +9,8 @@ internal static class BenchShape
     private static ArrayMesh? wood, vise;
     public static Mesh Wood => wood ??= BuildWood();
     public static Mesh Vise => vise ??= BuildVise();
-    public static readonly StandardMaterial3D Timber = new() { VertexColorUseAsAlbedo = true, Roughness = .85f };
-    public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, Roughness = .45f, Metallic = .6f };
+    public static readonly StandardMaterial3D Timber = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .85f };
+    public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .45f, Metallic = .6f };
 
     private static ArrayMesh BuildWood()
     {

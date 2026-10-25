@@ -8,7 +8,7 @@ internal static class WolfShape
 {
     private readonly record struct Section(float Z, float Y, float Width, float Height);
     private static ArrayMesh? body, head;
-    public static readonly StandardMaterial3D Fur = new() { VertexColorUseAsAlbedo = true, Roughness = .95f };
+    public static readonly StandardMaterial3D Fur = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .95f };
     public static Mesh Body => body ??= Loft(new[] {
         new Section(-.51f, .64f, .025f, .055f), new(-.46f, .64f, .13f, .16f),
         new(-.33f, .64f, .185f, .195f), new(-.15f, .66f, .16f, .165f),

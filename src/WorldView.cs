@@ -33,6 +33,8 @@ public partial class WorldView : Node3D
     public Sounds? Sounds;
     // A 30° pitch keeps the old 2:1 isometric footprint; this ortho height matches the old 85 px actor scale at zoom 1.
     private const float Pitch = 30, BaseSize = 14.5f;
+    // Forward+ lights in linear space, so the sun is stronger than the 0.8 to 0.08 the Compatibility renderer looked right with.
+    private const float DaySun = 1.84f, NightSun = .184f;
     private Camera3D camera = null!;
     private DirectionalLight3D sun = null!;
     private Godot.Environment environment = null!;
@@ -98,10 +100,11 @@ public partial class WorldView : Node3D
             AmbientLightSource = Godot.Environment.AmbientSource.Color,
             AmbientLightColor = new Color("c7d3dc"),
             AmbientLightEnergy = .32f,
+            ReflectedLightSource = Godot.Environment.ReflectionSource.Disabled,
         };
         AddChild(new WorldEnvironment { Environment = environment });
         // Light from the upper left and slightly behind, like the illustrated references, so shadows fall to the right.
-        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = .8f };
+        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = DaySun };
         sun.Basis = Basis.LookingAt(new Vector3(1, -1.25f, -.45f), Vector3.Up);
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
@@ -915,7 +918,7 @@ public partial class WorldView : Node3D
         float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts;
         float darkness = World.Night ? .65f : dayPhase > dusk ? .02f + (dayPhase - dusk) / .1f * .63f : dayPhase < .05f ? .65f - dayPhase / .05f * .63f : .02f;
         night = Math.Clamp((darkness - .02f) / .63f, 0, 1);
-        sun.LightEnergy = Mathf.Lerp(.8f, .08f, night);
+        sun.LightEnergy = Mathf.Lerp(DaySun, NightSun, night);
         sun.LightColor = new Color("fff1dc").Lerp(new Color("8296d6"), night);
         environment.AmbientLightColor = new Color("c7d3dc").Lerp(new Color("33447a"), night);
         environment.AmbientLightEnergy = Mathf.Lerp(.32f, .3f, night);

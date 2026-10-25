@@ -7,9 +7,9 @@ namespace ChopChopMeow;
 internal static class FurnaceShape
 {
     private static ArrayMesh? masonry, plate, fire, coalPile;
-    public static readonly StandardMaterial3D Concrete = new() { VertexColorUseAsAlbedo = true, Roughness = .95f };
-    public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, Roughness = .45f, Metallic = .7f };
-    public static readonly StandardMaterial3D Flame = new() { VertexColorUseAsAlbedo = true, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
+    public static readonly StandardMaterial3D Concrete = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .95f };
+    public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .45f, Metallic = .7f };
+    public static readonly StandardMaterial3D Flame = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
     public static Mesh Masonry => masonry ??= BuildMasonry();
     public static Mesh Plate => plate ??= BuildPlate();
     public static Mesh Fire => fire ??= BuildFire();

@@ -10,7 +10,7 @@ From the project directory:
 ./build.py play
 ```
 
-The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates, and build output under `.tools/` and `build/`. First-time setup downloads missing tools and needs internet access. To use an installed Godot 4.7.2 .NET binary, set `GODOT_BIN=/path/to/godot`. Interactive play needs a working Linux graphics driver; the project uses Godot's Compatibility renderer. OpenGL picks the integrated GPU by default, so where switcheroo-control reports a discrete GPU, `play` and `editor` launch with its environment, the same as the desktop's "Launch using Discrete GPU". If switcheroo-control is missing, the first `play` or `editor` from a terminal installs it with the system package manager (dnf, apt, pacman or zypper) through sudo and enables its service; declining or a failed install leaves the default GPU and is not asked again. Launch the exported executable that way to get the same effect.
+The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates, and build output under `.tools/` and `build/`. First-time setup downloads missing tools and needs internet access. To use an installed Godot 4.7.2 .NET binary, set `GODOT_BIN=/path/to/godot`. Interactive play needs a Vulkan-capable graphics driver; the project uses Godot's Forward+ renderer, which picks a discrete GPU over an integrated one by itself.
 
 ```sh
 ./build.py setup    # prepare local tools, compile C#, and import assets

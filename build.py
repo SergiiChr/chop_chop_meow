@@ -9,8 +9,7 @@
   ./build.py lint    Compile the C# project and verify its formatting.
 
 Godot, .NET, and export templates are kept under .tools/. Set GODOT_BIN to use an
-existing Godot 4.7.2 .NET executable. Play and editor prefer a discrete GPU when
-switcheroo-control reports one; the first launch from a terminal installs it with sudo.
+existing Godot 4.7.2 .NET executable.
 """
 
 from __future__ import annotations
@@ -86,42 +85,6 @@ def dotnet_env() -> dict[str, str]:
     env["XDG_DATA_HOME"] = str(XDG_DATA)
     env["XDG_CONFIG_HOME"] = str(TOOLS / "xdg-config")
     env["XDG_CACHE_HOME"] = str(TOOLS / "xdg-cache")
-    return env
-
-
-SWITCHEROO_ASKED = TOOLS / ".switcheroo-asked"
-INSTALL = {
-    "dnf": ["dnf", "install", "-y"],
-    "apt-get": ["apt-get", "install", "-y"],
-    "pacman": ["pacman", "-S", "--noconfirm", "--needed"],
-    "zypper": ["zypper", "--non-interactive", "install"],
-}
-
-
-def ensure_switcheroo() -> None:
-    """Install switcheroo-control once, so launches can find the discrete GPU; it asks for sudo only from a terminal."""
-    if shutil.which("switcherooctl") or SWITCHEROO_ASKED.exists() or not sys.stdin.isatty():
-        return
-    SWITCHEROO_ASKED.touch()
-    manager = next((name for name in INSTALL if shutil.which(name)), None)
-    if manager is None:
-        print("Install switcheroo-control with your package manager so the game can use a discrete GPU.")
-        return
-    print("Installing switcheroo-control (needs sudo) so the game can find a discrete GPU.")
-    installed = subprocess.run(["sudo", *INSTALL[manager], "switcheroo-control"], check=False).returncode == 0
-    if not installed or subprocess.run(["sudo", "systemctl", "enable", "--now", "switcheroo-control"], check=False).returncode:
-        print("switcheroo-control is not set up; the game runs on the default GPU.")
-
-
-def discrete_gpu(env: dict[str, str]) -> dict[str, str]:
-    """Prefer a discrete GPU of any brand, using the launch environment switcheroo-control gives for it."""
-    if not shutil.which("switcherooctl"):
-        return env
-    listing = subprocess.run(["switcherooctl", "list"], capture_output=True, text=True, check=False).stdout
-    for device in listing.split("\n\n"):
-        fields = dict(line.strip().split(":", 1) for line in device.splitlines() if ":" in line)
-        if fields.get("Discrete", "").strip() == "yes":
-            return {**env, **dict(pair.split("=", 1) for pair in fields.get("Environment", "").split())}
     return env
 
 
@@ -368,16 +331,14 @@ def main() -> int:
         return 0
     if action in {"play", "run", "editor", "setup", "test", "build", "lint"}:
         env = setup()
-        if action in {"play", "run", "editor"}:
-            ensure_switcheroo()
         if action in {"play", "run"}:
             forwarded = sys.argv[2:]
             if forwarded[:1] == ["--"]:
                 forwarded = forwarded[1:]
             game_args = ["--", *forwarded] if forwarded else []
-            os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *game_args], discrete_gpu(env))
+            os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *game_args], env)
         if action == "editor":
-            os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], discrete_gpu(env))
+            os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], env)
         if action == "test":
             test(env)
         elif action == "build":
