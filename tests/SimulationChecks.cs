@@ -32,6 +32,7 @@ public static class SimulationChecks
         CheckWolfHuntAndMeat(data);
         CheckWolfThroatLeap(data);
         CheckSleepAdvancesWorld(data);
+        CheckFogOfWar(data);
         CheckActualProgression(data);
         GD.Print("SELF-TEST PASS");
     }
@@ -674,6 +675,42 @@ public static class SimulationChecks
                 "furnace production should continue while the player sleeps");
         Require(world.S.Wolves.Count == 0 && world.S.Hunger < priorHunger,
                 "nighttime sleep should advance survival needs and clear wolves at dawn");
+    }
+
+    private static void CheckFogOfWar(GameData data)
+    {
+        var fresh = new World(data);
+        var far = World.Cliffs.Select(c => c.Center).First();
+        Require(fresh.Explored(World.Spawn) && !fresh.Explored(far),
+                "a new game should reveal only the clearing around the player");
+        Require(fresh.Known.All(t => t.Pos.DistanceTo(World.Spawn) <= data.SightRadius),
+                "things beyond sight should stay unknown until seen");
+
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(10, 10);
+        var tree = world.Add("tree", new Vector2(12, 10), 42);
+        var hidden = world.Add("stone", new Vector2(40, 40), 64);
+        SafeTick(world, Step);
+        Require(world.Known.Contains(tree) && !world.Known.Any(t => t.Id == hidden.Id),
+                "only things within the sight circle should become known");
+
+        world.Player = new Vector2(30, 10);
+        SafeTick(world, Step);
+        tree.Remaining = 0;
+        world.S.Things.Remove(world.Add("chest", new Vector2(11, 11)));
+        var memory = world.Known.Single(t => t.Id == tree.Id);
+        Require(memory != tree && memory.Remaining == 42 && world.Explored(new Vector2(12, 10)),
+                "explored ground out of sight should keep the last seen state, not the live one");
+
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(world.Serialize());
+        Require(loaded.Explored(new Vector2(12, 10)) && !loaded.Explored(new Vector2(40, 40)) && loaded.Known.Single(t => t.Id == tree.Id).Remaining == 42,
+                "save/load should keep explored ground and remembered things");
+
+        world.Player = new Vector2(10, 10);
+        SafeTick(world, Step);
+        Require(world.Known.Single(t => t.Id == tree.Id).Remaining == 0,
+                "looking again should replace the memory with the current state");
     }
 
     private static void GatherUntil(World world, Thing resource, string item, int quantity)

@@ -495,7 +495,9 @@ public partial class Game : Node
         var w2 = world.Hire(sign); if (w1 != null) world.Assign(w1, bellows); if (w2 != null) world.Assign(w2, bellows);
         world.Trade(sign, "steel_tools", 1, false);
         if (OS.GetCmdlineUserArgs().Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
-        world.Player = World.Spawn; Select(bellows);
+        // A past walk toward the iron cliff leaves explored ground beyond the live sight circle.
+        for (float y = 24; y >= 10; y -= 2) { world.Player = new Vector2(23 + (24 - y) * .5f, y); world.Tick(0); }
+        world.Player = World.Spawn; world.Tick(0); Select(bellows);
         if (!OS.GetCmdlineUserArgs().Contains("--wolves")) return;
         // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
         var spot = new Vector2(34, 32);

@@ -37,6 +37,8 @@ public sealed class GameData
     public float HungerPerSecond { get; set; } = .12f;
     public float RespawnSeconds { get; set; } = 30;
     public float ThirstPerSecond { get; set; } = .16f;
+    /// <summary>Radius in tiles of the player's live view; sized to fit the screen at default zoom.</summary>
+    public float SightRadius { get; set; } = 9;
     public Dictionary<string, ItemDef> Items { get; set; } = new();
     public Dictionary<string, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
@@ -50,7 +52,7 @@ public sealed class GameData
     }
     public void Validate()
     {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || NightStarts <= 0 || NightStarts >= 1 || HireCost < 0 || DailyWage < 0 || RespawnSeconds < 0)
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || NightStarts <= 0 || NightStarts >= 1 || HireCost < 0 || DailyWage < 0 || RespawnSeconds < 0 || SightRadius <= 0)
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)
