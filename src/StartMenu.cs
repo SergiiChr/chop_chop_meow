@@ -61,7 +61,7 @@ public partial class Game
         AddScreenButton("New game", () => { HideScreen(); Restart(); });
         AddScreenButton("Load game", () => ShowSlots(false, ShowStart));
         AddScreenButton("Options", () => ShowOptions(ShowStart));
-        AddScreenButton("Quit", () => GetTree().Quit());
+        AddScreenButton("Quit", () => Quit());
     }
 
     private void ShowSlots(bool saving, Action back)

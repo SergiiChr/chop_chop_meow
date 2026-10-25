@@ -27,12 +27,12 @@ public partial class Game
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 3);
         column.AddChild(new TextureRect { Texture = HotbarIcon(item), CustomMinimumSize = new Vector2(36, 36), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered, TooltipText = world.Data.Name(item) });
         var (cell, count) = IconCell($"{(input ? "input" : "output")}_{item}");
-        cell.Pressed += () => { MoveStack(t.Inventory, world.S.Backpack, item, t); RefreshLive(); };
+        cell.Pressed += () => { Act(() => MoveStack(t.Inventory, world.S.Backpack, item, t)); RefreshLive(); };
         cell.Drag = () => t.Inventory[item] > 0 ? new ItemDrag(item, t.Inventory[item], t.Inventory, t) : null;
         if (input)
         {
             cell.CanTake = drag => drag.From == world.S.Backpack && drag.Item == item;
-            cell.Take = drag => { world.LoadInput(t, item, drag.Count); RefreshLive(); };
+            cell.Take = drag => { Act(() => world.LoadInput(t, item, drag.Count)); RefreshLive(); };
         }
         string hint = input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: collect";
         live.Add(() =>

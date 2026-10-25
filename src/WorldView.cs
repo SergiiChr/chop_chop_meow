@@ -27,6 +27,7 @@ public partial class WorldView : Node3D
     public bool AnimationReview;
     public float Elapsed;
     public bool PanelOpen;
+    public Sounds? Sounds;
     // A 30° pitch keeps the old 2:1 isometric footprint; this ortho height matches the old 85 px actor scale at zoom 1.
     private const float Pitch = 30, BaseSize = 14.5f;
     private Camera3D camera = null!;
@@ -303,6 +304,8 @@ public partial class WorldView : Node3D
         }
         else downedFor = 0;
         player.Update(World.Player, action, target, dt);
+        // A foot lands at each extreme of the stride.
+        if (action == ActorAction.Walk && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool() : null);
         Pose(playerRig, player, tool);
@@ -338,6 +341,13 @@ public partial class WorldView : Node3D
         }
     }
 
+    private string FootstepSound(Vector2 p)
+    {
+        if (p.DistanceTo(World.Pond) < World.PondRadius + 1) return "footsteps_water";
+        bool rocky = World.Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 3) || World.S.Things.Any(t => t.Kind is "stone" or "iron" or "coal" && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f);
+        return rocky ? "footsteps_rocks" : "footsteps_default";
+    }
+
     private static void Pose(ActorRig rig, ActorState state, string? tool)
     {
         rig.Root.Position = To3(state.Position);
@@ -364,6 +374,7 @@ public partial class WorldView : Node3D
         };
         if (impact < 0 || !actor.Struck(impact) || !props.TryGetValue(subject.Id, out var prop)) return;
         prop.Shake = 1;
+        if (subject.Kind is "tree" or "anvil") Sounds?.Play(subject.Kind == "tree" ? "chop_tree" : "anvil_work", subject.Pos);
         var toward = (actor.Position - subject.Pos).Normalized();
         var side = To3(subject.Pos + toward * .35f);
         switch (subject.Kind)
@@ -488,11 +499,14 @@ public partial class WorldView : Node3D
                 prop.LastCount = count;
                 prop.Puff = Math.Max(0, prop.Puff - dt);
                 bool open = prop.Puff > 0 || t.Id == Selected && PanelOpen && World.Near(t);
+                if (dt > 0 && (open ? prop.Open == 0 : prop.Open == 1)) Sounds?.Play(open ? "open_chest" : "close_chest", t.Pos);
                 prop.Open = Mathf.MoveToward(prop.Open, open ? 1 : 0, dt * 4);
                 prop.Lid!.RotationDegrees = new Vector3(-80 * Ease(prop.Open), 0, 0);
                 break;
             case "hut":
                 bool near = !World.Dead && World.Player.DistanceTo(t.Pos) < 2.6f;
+                // Running inside from a hunting pack slams the door instead of swinging it open.
+                if (dt > 0 && near && prop.Open == 0) Sounds?.Play(World.S.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
                 prop.Open = Mathf.MoveToward(prop.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
                 prop.Door!.RotationDegrees = new Vector3(0, -100 * Ease(prop.Open), 0);
                 prop.Window!.MaterialOverride = night > .45f ? NightGlass : Mat("8fb4c4", .15f, .2f);

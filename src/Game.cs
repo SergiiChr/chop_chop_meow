@@ -9,6 +9,7 @@ public partial class Game : Node
 {
     private World world = null!;
     private WorldView view = null!;
+    private Sounds sounds = null!;
     private Control ui = null!;
     private PanelContainer panel = null!;
     private VBoxContainer content = null!;
@@ -28,6 +29,7 @@ public partial class Game : Node
     private float autosave;
     private float runTime;
     private bool capturing;
+    private bool quitting;
     private string marketItem = "steel_tools";
     private int quantity = 1;
     private static readonly Color Cream = new("f2e8cf");
@@ -40,7 +42,11 @@ public partial class Game : Node
             if (OS.GetCmdlineUserArgs().Contains("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             world.Notify = Notify;
             LoadHotbarAtlases();
-            view = new WorldView { World = world }; AddChild(view);
+            sounds = new Sounds { World = world }; AddChild(sounds);
+            // Closing the window goes through Quit, which lets playing sounds stop first.
+            GetTree().AutoAcceptQuit = false;
+            world.Sound = (name, at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 28 : 16);
+            view = new WorldView { World = world, Sounds = sounds }; AddChild(view);
             var layer = new CanvasLayer(); AddChild(layer);
             ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
             SetTheme(); BuildHud();
@@ -97,7 +103,22 @@ public partial class Game : Node
     private Button Button(string text, Action action, bool disabled = false)
     {
         var b = new Button { Text = text, Disabled = disabled, MouseDefaultCursorShape = Control.CursorShape.PointingHand, CustomMinimumSize = new Vector2(0, 34), FocusMode = Control.FocusModeEnum.None };
-        b.Pressed += () => { action(); RefreshLive(); }; return b;
+        b.Pressed += () => { Act(action); RefreshLive(); }; return b;
+    }
+    /// <summary>
+    /// Runs a player action and gives it a generic sound when it made none of its own:
+    /// coins when it spent money, otherwise the item whose backpack count changed most.
+    /// </summary>
+    private void Act(Action action)
+    {
+        var state = world.S; int played = sounds.Played; float coins = state.Coins;
+        var before = new Dictionary<string, int>(state.Backpack.Items);
+        action();
+        // Starting or loading a game replaces the whole state; that is not an item moving.
+        if (world.S != state || sounds.Played != played) return;
+        if (state.Coins < coins) { sounds.Play("move_coins_inventory"); return; }
+        var moved = state.Backpack.Items.Keys.Union(before.Keys).OrderByDescending(id => Math.Abs(state.Backpack[id] - before.GetValueOrDefault(id))).FirstOrDefault();
+        if (moved != null && state.Backpack[moved] != before.GetValueOrDefault(moved)) sounds.Play(Sounds.ForItem(moved));
     }
     private HBoxContainer Row() { var r = new HBoxContainer(); content.AddChild(r); return r; }
     private void AddLabel(string text, int size = 15, Color? color = null) => content.AddChild(Label(text, size, color));
@@ -211,7 +232,11 @@ public partial class Game : Node
         AddInventoryGrid(() => world.S.Backpack, null, id => { if (id is "berries" or "water" or "cooked_meat" or "raw_meat") world.Consume(id); }, "Berries, cooked meat and water: click to consume. Drag onto the hotbar to assign.");
         AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
     }
-    private void Select(Thing t) { selected = t.Id; workerId = 0; view.Selected = t.Id; view.SelectedWorker = 0; view.BuildMode = ""; OpenPage("inspect"); }
+    private void Select(Thing t)
+    {
+        if (t.Kind == "reinforced" && !(page == "inspect" && selected == t.Id)) sounds.Play("open_steel_smelter", t.Pos);
+        selected = t.Id; workerId = 0; view.Selected = t.Id; view.SelectedWorker = 0; view.BuildMode = ""; OpenPage("inspect");
+    }
     private void Select(Worker w) { workerId = w.Id; selected = 0; view.Selected = 0; view.SelectedWorker = w.Id; OpenPage("inspect"); }
     private void Inspect()
     {
@@ -223,7 +248,7 @@ public partial class Game : Node
         if (t.IsResource)
         {
             Dynamic(() => $"{t.Remaining} remaining\n{world.GatherBlock(t) ?? (t.IsLoose ? "Right-click to walk over and pick it up." : "Hold right mouse on this resource to gather.")}", 15);
-            if (t.Kind == "water") AddButton("Drink from the pond", () => { if (world.Near(t)) { world.S.Thirst = 100; Notify("Cool, fresh water."); } else Notify("Walk closer to the pond."); });
+            if (t.Kind == "water") AddButton("Drink from the pond", () => { if (world.Near(t)) { world.S.Thirst = 100; Notify("Cool, fresh water."); sounds.Play("gather_water"); } else Notify("Walk closer to the pond."); });
             AddLabel("Select a villager and choose Work to automate this resource. Their gathered supplies go to accepting storage.", 14, Muted); return;
         }
         if (t.Kind == "hut") { AddButton("Sleep until dawn", () => world.Sleep(t)); AddLabel("Shelter keeps nearby wolves at bay. Sleeping advances production, hunger, trade and wages.", 14, Muted); return; }
@@ -424,7 +449,7 @@ public partial class Game : Node
                 {
                     if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item))
                     {
-                        if (world.Near(t)) { int moved = world.S.Backpack.TransferTo(t.Inventory, item, 999); Notify(moved > 0 ? $"Stored {moved} {world.Data.Name(item)}." : $"No {world.Data.Name(item)} to store, or chest is full."); }
+                        if (world.Near(t)) { int moved = 0; Act(() => moved = world.S.Backpack.TransferTo(t.Inventory, item, 999)); Notify(moved > 0 ? $"Stored {moved} {world.Data.Name(item)}." : $"No {world.Data.Name(item)} to store, or chest is full."); }
                         else Notify("Walk closer to the chest to store the selected stack.");
                     }
                     Select(t);
@@ -467,7 +492,7 @@ public partial class Game : Node
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }
         toastClock -= dt; if (toastClock <= 0 && toast != null) toast.Text = "";
-        if (OS.GetCmdlineUserArgs().Contains("--smoke-test") && runTime > .5f) { GD.Print("SMOKE-TEST PASS"); GetTree().Quit(); }
+        if (OS.GetCmdlineUserArgs().Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
         var args = OS.GetCmdlineUserArgs(); int shot = Array.IndexOf(args, "--screenshot");
         if (shot >= 0 && shot + 1 < args.Length && runTime > 2 && !capturing)
         {
@@ -478,7 +503,16 @@ public partial class Game : Node
     {
         await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
         var error = GetViewport().GetTexture().GetImage().SavePng(path);
-        GD.Print($"Screenshot: {path} ({error})"); GetTree().Quit(error == Error.Ok ? 0 : 1);
+        GD.Print($"Screenshot: {path} ({error})"); Quit(error == Error.Ok ? 0 : 1);
+    }
+    public override void _Notification(int what)
+    {
+        if (what == NotificationWMCloseRequest && !GetTree().AutoAcceptQuit) Quit();
+    }
+    private async void Quit(int code = 0)
+    {
+        if (quitting) return;
+        quitting = true; sounds.StopAll(); await Seconds(.2); GetTree().Quit(code);
     }
     private void Showcase()
     {
