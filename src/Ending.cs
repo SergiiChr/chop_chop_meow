@@ -3,14 +3,12 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Shown once when the end goals are reached; playing on is allowed.</summary>
-public partial class Game
-{
+public partial class Game {
     private PanelContainer ending = null!;
     private Label endingStats = null!;
     private bool endingSeen;
 
-    private void BuildEnding()
-    {
+    private void BuildEnding() {
         ending = new PanelContainer { Visible = false };
         ending.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
         ending.GrowHorizontal = Control.GrowDirection.Both; ending.GrowVertical = Control.GrowDirection.Both;
@@ -23,8 +21,7 @@ public partial class Game
         var restart = Button("Restart", Restart); restart.Name = "restart"; column.AddChild(restart);
     }
 
-    private void ShowEndingOnce()
-    {
+    private void ShowEndingOnce() {
         // A guest's copy takes the host's flag with every update, so a guest remembers its own.
         if (!world.EndGoalsComplete || (world.Remote ? endingSeen : world.S.EndingShown)) return;
         world.S.EndingShown = endingSeen = true; paused = true; ClosePanel();
@@ -33,8 +30,7 @@ public partial class Game
         ending.Visible = true;
     }
 
-    private void Restart()
-    {
+    private void Restart() {
         net.Leave();
         world.NewGame();
         selected = 0; workerId = 0; gathering = null; assigningWorker = 0; slot = 0; autosave = 0;

@@ -5,14 +5,12 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Signpost panel: the market, hiring, and a price sheet that opens to the left of the panel.</summary>
-public partial class Game
-{
+public partial class Game {
     private const int SheetWidth = 316;
     private string signpostTab = "market";
     private bool sheetOpen;
 
-    private void Signpost(Thing sign)
-    {
+    private void Signpost(Thing sign) {
         var tabs = Row();
         tabs.AddChild(TabIcon("coins", "Market", () => signpostTab = "market", signpostTab == "market"));
         tabs.AddChild(TabIcon("hardhat", "Workers", () => signpostTab = "workers", signpostTab == "workers"));
@@ -23,8 +21,7 @@ public partial class Game
         else Market(sign);
     }
 
-    private Button TabIcon(string icon, string tooltip, Action action, bool active)
-    {
+    private Button TabIcon(string icon, string tooltip, Action action, bool active) {
         var button = MenuIcon(icon, tooltip, () => { action(); OpenPage("inspect"); });
         button.CustomMinimumSize = new Vector2(48, 48); button.AddThemeConstantOverride("icon_max_width", 32);
         if (active) button.AddThemeStyleboxOverride("normal", Box(new Color("7c8550"), 5, 9));
@@ -32,14 +29,12 @@ public partial class Game
     }
 
     /// <summary>Unlabeled input and output boxes like a station's, with the nearest cart's trip between them.</summary>
-    private void Market(Thing sign)
-    {
+    private void Market(Thing sign) {
         var output = sign.Output!;
         AddInventoryGrid(() => sign.Inventory, sign, id => MoveStack(sign.Inventory, world.S.Backpack, id, sign), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item));
         var trip = new ProgressBar { MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 10), Name = "cart" };
         content.AddChild(trip);
-        live.Add(() =>
-        {
+        live.Add(() => {
             if (!GodotObject.IsInstanceValid(trip)) return;
             var next = world.S.Orders.Where(o => o.Signpost == sign.Id).OrderByDescending(o => o.Elapsed).FirstOrDefault();
             trip.Value = next == null ? 0 : next.Elapsed / world.Data.TradeSeconds;
@@ -59,11 +54,9 @@ public partial class Game
         AddInventoryGrid(() => world.S.Backpack, null, id => { if (world.CanSell(id)) MoveStack(world.S.Backpack, sign.Inventory, id, sign); else Notify("Pack meat, berries or steel tools in a crate to sell them."); }, "Click: put a packed crate in the market · Drag onto a box");
     }
 
-    private void HireOffers(Thing sign)
-    {
+    private void HireOffers(Thing sign) {
         AddLabel("HIRE A VILLAGER", 16);
-        foreach (var offer in world.Data.HireOffers)
-        {
+        foreach (var offer in world.Data.HireOffers) {
             var hire = Button($"{offer.Upfront:0} coins now · {offer.Wage:0} a day", () => { if (world.Hire(sign, offer) is Worker w) Select(w); });
             hire.Name = $"hire_{offer.Upfront:0}"; content.AddChild(hire);
         }
@@ -72,8 +65,7 @@ public partial class Game
     }
 
     /// <summary>Prices as last heard from the village, beside the panel; buying is always at the current price.</summary>
-    private void PriceSheet(Thing sign)
-    {
+    private void PriceSheet(Thing sign) {
         panel.OffsetLeft = PanelLeft - SheetWidth; sheet.Visible = true;
         sheet.AddChild(Label("MARKET PRICES", 20));
         var age = Label("", 13, Muted); sheet.AddChild(age);
@@ -86,8 +78,7 @@ public partial class Game
         var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; rows.AddThemeConstantOverride("separation", 3);
         var scroll = new ScrollContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         scroll.AddChild(rows); sheet.AddChild(scroll);
-        foreach (string id in world.Data.Market.Sells.Keys.Union(world.Data.Market.Buys.Keys))
-        {
+        foreach (string id in world.Data.Market.Sells.Keys.Union(world.Data.Market.Buys.Keys)) {
             bool sells = world.Data.Market.Sells.ContainsKey(id), buys = world.Data.Market.Buys.ContainsKey(id);
             var row = new HBoxContainer(); rows.AddChild(row);
             row.AddChild(new TextureRect { Texture = HotbarIcon(id), CustomMinimumSize = new Vector2(26, 26), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered });
@@ -101,8 +92,7 @@ public partial class Game
             buy.TooltipText = world.Lot(id) > 1 ? $"Buy a crate of {world.Lot(id)} · Shift: 5 crates\nCrates arrive in the market output." : "Buy 1 · Shift: 5\nGoods arrive in the market output.";
         }
         var fetch = Button("Send for fresh prices", () => world.FetchPrices(sign)); fetch.Name = "fetch"; sheet.AddChild(fetch);
-        live.Add(() =>
-        {
+        live.Add(() => {
             if (!GodotObject.IsInstanceValid(fetch)) return;
             string? blocked = world.FetchBlock(sign);
             fetch.Disabled = blocked != null; fetch.TooltipText = blocked ?? "The worker assigned here walks to Bramblewick and back with fresh prices.";
@@ -111,8 +101,7 @@ public partial class Game
 
     private void AddSheetNote(string text) => sheet.AddChild(Label(text, 13, Muted));
 
-    private Label PriceCell(string text, Color color)
-    {
+    private Label PriceCell(string text, Color color) {
         var cell = Label(text, 14, color); cell.CustomMinimumSize = new Vector2(44, 0); cell.HorizontalAlignment = HorizontalAlignment.Right; cell.AutowrapMode = TextServer.AutowrapMode.Off;
         return cell;
     }

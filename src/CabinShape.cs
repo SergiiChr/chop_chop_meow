@@ -4,8 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Shared cabin shell and sheet-metal geometry, fitted to the same shed-roof plane.</summary>
-internal static class CabinShape
-{
+internal static class CabinShape {
     private static ArrayMesh? walls, roof, interior;
     public static readonly StandardMaterial3D WallMaterial = new() { VertexColorUseAsAlbedo = true, Roughness = .95f };
     private const float Pitch = 9 * Mathf.Pi / 180;
@@ -18,12 +17,10 @@ internal static class CabinShape
     public static Mesh Roof => roof ??= BuildRoof();
     public static Mesh Interior => interior ??= BuildInterior();
 
-    private static ArrayMesh BuildWalls()
-    {
+    private static ArrayMesh BuildWalls() {
         var surface = new SurfaceTool();
         surface.Begin(Mesh.PrimitiveType.Triangles);
-        void Face(Vector3 a, Vector3 b, Vector3 c, Vector3 d)
-        {
+        void Face(Vector3 a, Vector3 b, Vector3 c, Vector3 d) {
             var normal = (c - a).Cross(b - a).Normalized();
             var center = (a + b + c + d) / 4;
             bool inside = normal.Z > .9f && Mathf.IsEqualApprox(center.Z, -1.01f)
@@ -33,8 +30,7 @@ internal static class CabinShape
             surface.SetColor(new Color(inside ? "74614c" : "c8a46a"));
             Quad(surface, a, b, c, d);
         }
-        void Patch(float x0, float x1, float z0, float z1, float bottom, float? top = null)
-        {
+        void Patch(float x0, float x1, float z0, float z1, float bottom, float? top = null) {
             float back = top ?? WallTop(z0), front = top ?? WallTop(z1);
             var a = new Vector3(x0, bottom, z0); var b = new Vector3(x1, bottom, z0);
             var c = new Vector3(x1, bottom, z1); var d = new Vector3(x0, bottom, z1);
@@ -61,12 +57,10 @@ internal static class CabinShape
         return surface.Commit();
     }
 
-    private static ArrayMesh BuildInterior()
-    {
+    private static ArrayMesh BuildInterior() {
         var surface = new SurfaceTool();
         surface.Begin(Mesh.PrimitiveType.Triangles);
-        void Box(Vector3 size, Vector3 center, string color)
-        {
+        void Box(Vector3 size, Vector3 center, string color) {
             var min = center - size / 2; var max = center + size / 2;
             var a = new Vector3(min.X, min.Y, min.Z); var b = new Vector3(max.X, min.Y, min.Z);
             var c = new Vector3(max.X, min.Y, max.Z); var d = new Vector3(min.X, min.Y, max.Z);
@@ -92,16 +86,13 @@ internal static class CabinShape
         float[] scales = { .95f, 1f, .95f };
         Vector3 Point(int row, int corner) => new Vector3(-.72f, levels[row], .05f) + outline[corner] * scales[row];
         for (int row = 0; row < levels.Length - 1; row++)
-            for (int corner = 0; corner < outline.Length; corner++)
-            {
+            for (int corner = 0; corner < outline.Length; corner++) {
                 int next = (corner + 1) % outline.Length;
                 Quad(surface, Point(row, corner), Point(row, next), Point(row + 1, next), Point(row + 1, corner));
             }
-        for (int end = 0; end < 2; end++)
-        {
+        for (int end = 0; end < 2; end++) {
             int row = end == 0 ? 0 : levels.Length - 1;
-            for (int corner = 0; corner < outline.Length; corner++)
-            {
+            for (int corner = 0; corner < outline.Length; corner++) {
                 int next = (corner + 1) % outline.Length;
                 surface.SetNormal(end == 0 ? Vector3.Down : Vector3.Up);
                 surface.AddVertex(new Vector3(-.72f, levels[row], .05f));
@@ -112,15 +103,13 @@ internal static class CabinShape
         return surface.Commit();
     }
 
-    private static ArrayMesh BuildRoof()
-    {
+    private static ArrayMesh BuildRoof() {
         const int segments = 60;
         var surface = new SurfaceTool();
         surface.Begin(Mesh.PrimitiveType.Triangles);
         float Wave(float x) => Ripple * MathF.Cos((x + 1.45f) * Mathf.Tau / .29f);
         Vector3 Normal(float x) => new Vector3(Ripple * Mathf.Tau / .29f * MathF.Sin((x + 1.45f) * Mathf.Tau / .29f), 1, 0).Normalized();
-        for (int i = 0; i < segments; i++)
-        {
+        for (int i = 0; i < segments; i++) {
             float x0 = -1.45f + 2.9f * i / segments, x1 = -1.45f + 2.9f * (i + 1) / segments;
             float y0 = Wave(x0), y1 = Wave(x1);
             var a = new Vector3(x0, y0 + Thickness / 2, -1.4f); var b = new Vector3(x1, y1 + Thickness / 2, -1.4f);
@@ -135,16 +124,14 @@ internal static class CabinShape
         return surface.Commit();
     }
 
-    private static void Quad(SurfaceTool surface, Vector3 a, Vector3 b, Vector3 c, Vector3 d)
-    {
+    private static void Quad(SurfaceTool surface, Vector3 a, Vector3 b, Vector3 c, Vector3 d) {
         var normal = (c - a).Cross(b - a).Normalized();
         surface.SetNormal(normal);
         surface.AddVertex(a); surface.AddVertex(b); surface.AddVertex(c);
         surface.AddVertex(a); surface.AddVertex(c); surface.AddVertex(d);
     }
 
-    private static void SmoothQuad(SurfaceTool surface, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 left, Vector3 right)
-    {
+    private static void SmoothQuad(SurfaceTool surface, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 left, Vector3 right) {
         surface.SetNormal(left); surface.AddVertex(a);
         surface.SetNormal(right); surface.AddVertex(b); surface.AddVertex(c);
         surface.SetNormal(left); surface.AddVertex(a);

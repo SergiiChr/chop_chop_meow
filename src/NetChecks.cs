@@ -9,31 +9,25 @@ namespace ChopChopMeow;
 /// A real two-process session on this machine: build.py starts a host and a guest with --net-check host and --net-check guest.
 /// Both drive their menus and the world through Input.ParseInputEvent, and each prints its own pass marker.
 /// </summary>
-public partial class Game
-{
+public partial class Game {
     private static readonly Vector2 NetOre = World.Spawn + new Vector2(2.5f, 0), NetCoal = World.Spawn + new Vector2(-1.5f, 3.5f), NetChest = World.Spawn + new Vector2(.5f, 3), NetHut = World.Spawn + new Vector2(-3.5f, -3);
 
-    private async Task Until(Func<bool> done, string what, double seconds = 60)
-    {
-        for (ulong until = Time.GetTicksMsec() + (ulong)(seconds * 1000); !done();)
-        {
+    private async Task Until(Func<bool> done, string what, double seconds = 60) {
+        for (ulong until = Time.GetTicksMsec() + (ulong)(seconds * 1000); !done();) {
             if (Time.GetTicksMsec() > until) throw new TimeoutException($"Network check failed: {what} never happened.");
             await Frames(1);
         }
     }
 
-    private async Task Type(string text)
-    {
-        foreach (char c in text)
-        {
+    private async Task Type(string text) {
+        foreach (char c in text) {
             Input.ParseInputEvent(new InputEventKey { Keycode = (Key)c, Unicode = c, Pressed = true });
             Input.ParseInputEvent(new InputEventKey { Keycode = (Key)c, Unicode = c, Pressed = false });
             await Frames(1);
         }
     }
 
-    private async Task RightClick(Vector2 at)
-    {
+    private async Task RightClick(Vector2 at) {
         var point = GetViewport().GetFinalTransform() * view.Screen(at, .2f);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = point, GlobalPosition = point, Pressed = true });
         await Frames();
@@ -41,18 +35,14 @@ public partial class Game
         await Frames();
     }
 
-    private async void RunNetCheck(bool hosting)
-    {
-        try
-        {
+    private async void RunNetCheck(bool hosting) {
+        try {
             if (hosting) await HostNetCheck(); else await GuestNetCheck();
             GD.Print(hosting ? "NET-HOST PASS" : "NET-GUEST PASS"); Quit();
-        }
-        catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
+        } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 
-    private async Task HostNetCheck()
-    {
+    private async Task HostNetCheck() {
         RemoveCheckFiles(); await Frames(4);
         await Click(FindButton(screen, "New game")!); ClosePanel();
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(World.Spawn) < 6);
@@ -81,8 +71,7 @@ public partial class Game
         await Until(() => world.S.Players.Count == 1, "the guest leaving for good");
     }
 
-    private async Task GuestNetCheck()
-    {
+    private async Task GuestNetCheck() {
         RemoveCheckFiles(); DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(GuestSave)); await Frames(4);
         await JoinFromStart();
         UIRequire(!backdrop.Visible && world.S.Players.Count == 2 && world.S.Things.Any(t => t.Kind == "chest" && t.Pos == NetChest), "Joining must replace the start menu with the host's world.");
@@ -117,10 +106,8 @@ public partial class Game
     private static string GuestSave => $"user://{FilePrefix}guest-127-0-0-1-{CheckPort}.json";
 
     /// <summary>Join game on the start menu, the address typed into the popup and the port as it comes; tried again until the host is up.</summary>
-    private async Task JoinFromStart()
-    {
-        for (ulong until = Time.GetTicksMsec() + 45000; !world.Remote;)
-        {
+    private async Task JoinFromStart() {
+        for (ulong until = Time.GetTicksMsec() + 45000; !world.Remote;) {
             if (Time.GetTicksMsec() > until) throw new TimeoutException($"Network check failed: could not join: {joinStatus?.Text}");
             await Click(FindButton(screen, "Join game")!);
             var port = (LineEdit)screen.FindChild("port", true, false);
@@ -137,8 +124,7 @@ public partial class Game
         await Until(() => !backdrop.Visible, "the join popup closing");
     }
 
-    private async Task LeaveGame()
-    {
+    private async Task LeaveGame() {
         ClosePanel(); await KeyStroke(Key.Escape);
         UIRequire(menu.Visible && joinButton.Text == "Leave game" && saveButton.Disabled, "A guest's pause menu must offer to leave and not to save the host's world.");
         await Click(joinButton);

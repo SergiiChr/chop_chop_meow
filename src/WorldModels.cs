@@ -9,8 +9,7 @@ namespace ChopChopMeow;
 public readonly record struct Hit(float Radius, float Bottom, float Top);
 
 /// <summary>A built world object plus the moving parts that <see cref="WorldView"/> animates from simulation state.</summary>
-public sealed class Prop
-{
+public sealed class Prop {
     public readonly Node3D Root = new();
     public readonly Node3D Body;
     public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer, Mortar;
@@ -38,12 +37,10 @@ public sealed class Prop
 }
 
 /// <summary>Code-built low-poly models for every world object: natural, modern and DIY rather than fantasy.</summary>
-public static class WorldModels
-{
+public static class WorldModels {
     public const int TreeVariants = 3;
     /// <summary>Full deposit sizes from world generation; piles shrink toward half size as they are worked.</summary>
-    public static float Fullness(Thing t) => t.Kind switch
-    {
+    public static float Fullness(Thing t) => t.Kind switch {
         "stone" => t.Remaining / 64f,
         "iron" or "coal" or "tin" => t.Remaining / 400f,
         "wolf_corpse" => t.Remaining / 4f,
@@ -52,17 +49,14 @@ public static class WorldModels
     };
 
     /// <summary>Stable pseudo-random value in [0, 1) so a thing looks the same after every load.</summary>
-    public static float Jitter(int id, int salt)
-    {
+    public static float Jitter(int id, int salt) {
         uint h = (uint)(id * 73856093) ^ (uint)(salt * 19349663);
         h ^= h >> 13; h *= 0x5bd1e995; h ^= h >> 15;
         return (h & 0xffff) / 65536f;
     }
 
-    public static Hit[] Hits(Thing t) => t.Kind switch
-    {
-        "tree" => (t.Id % TreeVariants) switch
-        {
+    public static Hit[] Hits(Thing t) => t.Kind switch {
+        "tree" => (t.Id % TreeVariants) switch {
             1 => new[] { new Hit(.3f, 0, 1.2f), new Hit(1.25f, 1.2f, 5.6f) },
             2 => new[] { new Hit(.25f, 0, 2.6f), new Hit(1.05f, 2.6f, 5.4f) },
             _ => new[] { new Hit(.35f, 0, 2.5f), new Hit(1.45f, 2.5f, 5.3f) },
@@ -93,12 +87,10 @@ public static class WorldModels
         _ => new[] { new Hit(.5f, 0, .8f) },
     };
 
-    public static Prop Build(Thing t)
-    {
+    public static Prop Build(Thing t) {
         var prop = new Prop { Kind = t.Kind, Hits = Hits(t) };
         var body = prop.Body;
-        switch (t.Kind)
-        {
+        switch (t.Kind) {
             case "tree": Tree(prop, t.Id); break;
             case "stone": Rocks(body, t.Kind, t.Id, "8d918e"); break;
             case "iron": Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
@@ -134,15 +126,13 @@ public static class WorldModels
     }
 
     /// <summary>The outdoor pile represents stocked fuel, excluding fuel already burning in a batch.</summary>
-    public static void SyncFuel(Prop prop, Thing t)
-    {
+    public static void SyncFuel(Prop prop, Thing t) {
         string fuel = World.BurnedFuel(t);
         prop.WoodPile!.Visible = fuel == "wood" && t.Inventory["wood"] > 0;
         prop.CoalPile!.Visible = fuel == "coal" && t.Inventory["coal"] > 0;
     }
 
-    private static void Tree(Prop prop, int id)
-    {
+    private static void Tree(Prop prop, int id) {
         var sway = Pivot(prop.Body, Vector3.Zero);
         prop.Sway = sway; // the whole tree shakes and falls about its base
         float scale = .9f + Jitter(id, 2) * .22f;
@@ -155,8 +145,7 @@ public static class WorldModels
     }
 
     /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows veins across the rock faces and ore chunks set into it.</summary>
-    private static void Rocks(Node3D body, string kind, int id, string stone, string? vein = null, string? chunks = null)
-    {
+    private static void Rocks(Node3D body, string kind, int id, string stone, string? vein = null, string? chunks = null) {
         int variant = id % NatureShape.Variants;
         Add(body, NatureShape.Rocks(kind, new Color(stone), variant, vein == null ? null : false), NatureShape.Natural, Vector3.Zero);
         if (vein == null || chunks == null) return;
@@ -167,15 +156,13 @@ public static class WorldModels
     private static void LooseOre(Node3D body, string kind, int id, string light, string dark) =>
         Add(body, NatureShape.Loose(kind, new Color(light), new Color(dark), id % NatureShape.Variants), NatureShape.Natural, Vector3.Zero);
 
-    private static void Carcass(Prop prop)
-    {
+    private static void Carcass(Prop prop) {
         prop.Pool = Cylinder(prop.Body, .55f, .55f, .004f, new Vector3(.1f, .006f, 0), Flat(new Color(.36f, .05f, .05f, .75f), true), null, 14);
         prop.Wolf = new WolfModel();
         prop.Body.AddChild(prop.Wolf.Root);
     }
 
-    private static void Bush(Prop prop, int id)
-    {
+    private static void Bush(Prop prop, int id) {
         int variant = id % NatureShape.Variants;
         Add(prop.Body, NatureShape.Bush(variant), NatureShape.Natural, Vector3.Zero);
         var fruit = Pivot(prop.Body, Vector3.Zero);
@@ -184,8 +171,7 @@ public static class WorldModels
     }
 
     /// <summary>Cinder-block furnace with a steel top plate, stovepipe and stocked fuel pile.</summary>
-    private static void BlockFurnace(Prop prop)
-    {
+    private static void BlockFurnace(Prop prop) {
         var body = prop.Body;
         Add(body, FurnaceShape.Masonry, FurnaceShape.Concrete, Vector3.Zero);
         prop.Glow = Add(body, FurnaceShape.Fire, FurnaceShape.Flame, Vector3.Zero);
@@ -206,8 +192,7 @@ public static class WorldModels
     }
 
     /// <summary>A propane-tank forge on an angle-iron stand, fed by a hinged leather bellows with a heat gauge on top.</summary>
-    private static void DrumForge(Prop prop)
-    {
+    private static void DrumForge(Prop prop) {
         var body = prop.Body;
         var steel = Mat("3b3f42", .5f, .7f);
         foreach (var (x, z) in new[] { (-.35f, -.3f), (.35f, -.3f), (-.35f, .3f), (.35f, .3f) }) Box(body, new Vector3(.05f, .5f, .05f), new Vector3(x, .25f, z), steel);
@@ -250,8 +235,7 @@ public static class WorldModels
         prop.Lever = lever;
         // Each pleat hangs from the hinge and follows a share of the lid's swing, so the leather folds as it closes.
         prop.Pleats = new Node3D[3];
-        for (int i = 0; i < 3; i++)
-        {
+        for (int i = 0; i < 3; i++) {
             prop.Pleats[i] = Pivot(rig, hinge);
             float size = i % 2 == 0 ? .97f : .88f;
             Add(prop.Pleats[i], ForgeShape.Board, leather, new Vector3(0, -.03f + (i + 1) * .04f, 0), scale: new Vector3(size, 1, size));
@@ -260,26 +244,22 @@ public static class WorldModels
     }
 
     /// <summary>Small OSB cabin on block piers with a corrugated shed roof, solar panel and rain barrel.</summary>
-    private static void Cabin(Prop prop)
-    {
+    private static void Cabin(Prop prop) {
         var body = prop.Body;
         foreach (var (x, z) in new[] { (-1.1f, -1f), (1.1f, -1f), (-1.1f, 1f), (1.1f, 1f) }) Box(body, new Vector3(.3f, .3f, .3f), new Vector3(x, .15f, z), Mat("9a9b97"));
         Box(body, new Vector3(2.6f, .12f, 2.4f), new Vector3(0, .36f, 0), Mat("7d5f43"));
         Add(body, CabinShape.Walls, CabinShape.WallMaterial, Vector3.Zero);
         Add(body, CabinShape.Interior, CabinShape.WallMaterial, Vector3.Zero);
         var trim = Mat("3d4245");
-        foreach (var (x, z) in new[] { (-1.2f, -1.1f), (1.2f, -1.1f), (-1.2f, 1f), (1.2f, 1f) })
-        {
+        foreach (var (x, z) in new[] { (-1.2f, -1.1f), (1.2f, -1.1f), (-1.2f, 1f), (1.2f, 1f) }) {
             float height = CabinShape.WallTop(z) - .42f;
             Box(body, new Vector3(.08f, height, .08f), new Vector3(x, .42f + height / 2, z), trim);
         }
-        foreach (float x in new[] { -.95f, .15f, 1.03f })
-        {
+        foreach (float x in new[] { -.95f, .15f, 1.03f }) {
             float height = CabinShape.WallTop(1) - .42f;
             Box(body, new Vector3(.025f, height, .015f), new Vector3(x, .42f + height / 2, 1.005f), Mat("b08c55"));
         }
-        foreach (float z in new[] { -.8f, .65f })
-        {
+        foreach (float z in new[] { -.8f, .65f }) {
             float height = CabinShape.WallTop(z) - .42f;
             Box(body, new Vector3(.015f, height, .025f), new Vector3(1.205f, .42f + height / 2, z), Mat("b08c55"));
         }
@@ -316,11 +296,9 @@ public static class WorldModels
         prop.Light = Light(body, new Vector3(.55f, 1.65f, 1.4f), 2.5f);
     }
 
-    private static void StorageBox(Prop prop, string panel, string edge, string fittings)
-    {
+    private static void StorageBox(Prop prop, string panel, string edge, string fittings) {
         var body = prop.Body;
-        if (prop.Kind == "chest")
-        {
+        if (prop.Kind == "chest") {
             Add(body, ChestShape.Body, ChestShape.Wood, Vector3.Zero);
             Add(body, ChestShape.Frame, ChestShape.Metal, Vector3.Zero);
             var hinge = Pivot(body, new Vector3(0, .49f, -.275f));
@@ -332,14 +310,12 @@ public static class WorldModels
         bool tote = panel == "e2701e";
         var size = tote ? new Vector3(.75f, .36f, .5f) : new Vector3(.85f, .45f, .55f);
         Box(body, size, new Vector3(0, size.Y / 2 + .04f, 0), Mat(panel, tote ? .5f : .9f));
-        if (!tote)
-        {
+        if (!tote) {
             foreach (var (x, z) in new[] { (-.4f, -.25f), (.4f, -.25f), (-.4f, .25f), (.4f, .25f) }) Box(body, new Vector3(.07f, .5f, .07f), new Vector3(x, .27f, z), Mat(fittings, .5f, .6f));
             Box(body, new Vector3(.87f, .06f, .57f), new Vector3(0, .07f, 0), Mat(edge));
             Box(body, new Vector3(.2f, .05f, .04f), new Vector3(.25f, .3f, .29f), Mat(fittings, .5f, .6f));
             Box(body, new Vector3(.2f, .05f, .04f), new Vector3(-.25f, .3f, .29f), Mat(fittings, .5f, .6f));
-        }
-        else Box(body, new Vector3(.77f, .05f, .52f), new Vector3(0, .25f, 0), Mat(fittings, .4f));
+        } else Box(body, new Vector3(.77f, .05f, .52f), new Vector3(0, .25f, 0), Mat(fittings, .4f));
         var lid = Pivot(body, new Vector3(0, size.Y + .04f, -size.Z / 2));
         Box(lid, new Vector3(size.X + .04f, .06f, size.Z + .04f), new Vector3(0, .03f, size.Z / 2), Mat(tote ? edge : edge, tote ? .5f : .85f));
         Box(lid, new Vector3(.12f, .04f, .03f), new Vector3(0, .02f, size.Z + .03f), Mat(fittings, .5f, .6f));
@@ -347,15 +323,13 @@ public static class WorldModels
     }
 
     /// <summary>A slatted wood crate with darker corner battens and a slatted lid.</summary>
-    private static void Crate(Prop prop)
-    {
+    private static void Crate(Prop prop) {
         var body = prop.Body;
         var size = new Vector3(.6f, .42f, .46f);
         var board = Mat("c9a46e"); var batten = Mat("8f6a3f"); var gap = Mat("4a3420");
         Box(body, size - new Vector3(.02f, .02f, .02f), new Vector3(0, size.Y / 2, 0), gap);
         // Three slats a side leave dark gaps between them.
-        for (int i = 0; i < 3; i++)
-        {
+        for (int i = 0; i < 3; i++) {
             float y = .07f + i * .14f;
             Box(body, new Vector3(size.X, .11f, .02f), new Vector3(0, y, size.Z / 2), board);
             Box(body, new Vector3(size.X, .11f, .02f), new Vector3(0, y, -size.Z / 2), board);
@@ -371,8 +345,7 @@ public static class WorldModels
     }
 
     /// <summary>A plank-topped workbench with a lower shelf and a vise; slotted tools lie on the top.</summary>
-    private static void Workbench(Prop prop)
-    {
+    private static void Workbench(Prop prop) {
         var body = prop.Body;
         var wood = Mat("b98552"); var steel = Mat("4a4d50", .4f, .6f);
         Add(body, BenchShape.Wood, BenchShape.Timber, Vector3.Zero);
@@ -389,14 +362,12 @@ public static class WorldModels
     }
 
     /// <summary>A stone firebox under a steel grill with a stew pot, beside a plank counter where the slotted mortar and pestle sits.</summary>
-    private static void CookingTable(Prop prop)
-    {
+    private static void CookingTable(Prop prop) {
         var body = prop.Body;
         var stone = Mat("9b9c98", .95f); var joint = Mat("7b7c78", 1); var plank = Mat("d2a26a"); var post = Mat("8a6a48");
         var steel = Mat("b9c3c6", .4f, .3f); var dark = Mat("45494c", .5f, .6f);
         Box(body, new Vector3(.62f, .6f, .62f), new Vector3(-.33f, .3f, 0), stone);
-        for (int row = 1; row < 3; row++)
-        {
+        for (int row = 1; row < 3; row++) {
             Box(body, new Vector3(.63f, .015f, .01f), new Vector3(-.33f, row * .2f, .311f), joint);
             Box(body, new Vector3(.01f, .015f, .63f), new Vector3(-.019f, row * .2f, 0), joint);
         }
@@ -420,8 +391,7 @@ public static class WorldModels
     }
 
     /// <summary>A steel stove with a lidded canning pot, beside a plank table with tin cans and a lever press.</summary>
-    private static void Cannery(Prop prop)
-    {
+    private static void Cannery(Prop prop) {
         var body = prop.Body;
         var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var steel = Mat("b9c3c6", .4f, .3f); var dark = Mat("45494c", .5f, .6f); var tin = Mat("d4d9d6", .35f, .4f);
         Box(body, new Vector3(.46f, .5f, .5f), new Vector3(-.27f, .25f, 0), dark);
@@ -443,8 +413,7 @@ public static class WorldModels
     }
 
     /// <summary>A plank pegboard on two posts set in a cinder-block footing, with an axe, a pickaxe and a rake hanging on it.</summary>
-    private static void ToolRack(Prop prop)
-    {
+    private static void ToolRack(Prop prop) {
         // Turned to face down the valley, toward the camera, so the hanging tools show.
         var body = Pivot(prop.Body, Vector3.Zero, new Vector3(0, 45, 0));
         var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var block = Mat("9a9d99", .95f); var handle = Mat("e0b07a"); var steel = Mat("b9c3c6", .4f, .3f);
@@ -454,8 +423,7 @@ public static class WorldModels
         Box(body, new Vector3(1.15f, .06f, .2f), new Vector3(0, 1.5f, 0), post);
         foreach (float x in new[] { -.3f, 0, .3f }) Box(body, new Vector3(.03f, .03f, .1f), new Vector3(x, 1.32f, .05f), post);
         // Each tool hangs from its peg by the head, handle down along the board.
-        Node3D Hang(float x)
-        {
+        Node3D Hang(float x) {
             var hook = Pivot(body, new Vector3(x, 1.3f, .06f));
             Box(hook, new Vector3(.04f, .72f, .04f), new Vector3(0, -.36f, 0), handle);
             return hook;
@@ -469,15 +437,13 @@ public static class WorldModels
     }
 
     /// <summary>A 3×3 yard of packed earth edged with logs, with fourteen stack blocks in a 9-4-1 pyramid that the view shows as the pile fills.</summary>
-    private static void Pile(Prop prop)
-    {
+    private static void Pile(Prop prop) {
         var body = prop.Body;
         Yard(body);
         var stacks = new List<MeshInstance3D>();
         foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
             for (int x = 0; x < count; x++)
-                for (int z = 0; z < count; z++)
-                {
+                for (int z = 0; z < count; z++) {
                     float step = .82f, offset = (count - 1) * step / 2;
                     var block = Box(body, new Vector3(.74f, .4f, .74f), new Vector3(x * step - offset, y, z * step - offset), Mat("b0a58a"));
                     block.Visible = false; stacks.Add(block);
@@ -486,32 +452,27 @@ public static class WorldModels
     }
 
     /// <summary>A pile's and a farm plot's base: a bare dirt pad edged with logs.</summary>
-    private static void Yard(Node3D body)
-    {
+    private static void Yard(Node3D body) {
         Box(body, new Vector3(2.9f, .02f, 2.9f), new Vector3(0, .01f, 0), Mat("7a6548", 1));
         var log = Mat("8a6a48");
-        foreach (float s in new[] { -1.42f, 1.42f })
-        {
+        foreach (float s in new[] { -1.42f, 1.42f }) {
             Cylinder(body, .09f, .09f, 2.9f, new Vector3(s, .09f, 0), log, new Vector3(90, 0, 0), 6);
             Cylinder(body, .09f, .09f, 2.9f, new Vector3(0, .09f, s), log, new Vector3(0, 0, 90), 6);
         }
     }
 
     /// <summary>A farm plot: an empty pile's yard that, once sown, shows dark tilled rows and then the wheat growing on them.</summary>
-    private static void Farm(Prop prop, int id)
-    {
+    private static void Farm(Prop prop, int id) {
         var body = prop.Body;
         Yard(body);
         var soil = Pivot(body, Vector3.Zero);
         Box(soil, new Vector3(2.7f, .03f, 2.7f), new Vector3(0, .025f, 0), Mat("4f3a28", 1));
         for (int row = 0; row < 5; row++) Box(soil, new Vector3(2.6f, .06f, .22f), new Vector3(0, .05f, -1.08f + row * .54f), Mat("5e4630", 1));
         // Each look is a full field of plants on the rows, shifted a little at random so the field is not a perfect grid.
-        Node3D Field(Action<Node3D, Vector3, int> plant)
-        {
+        Node3D Field(Action<Node3D, Vector3, int> plant) {
             var field = Pivot(body, Vector3.Zero);
             for (int row = 0; row < 5; row++)
-                for (int i = 0; i < 7; i++)
-                {
+                for (int i = 0; i < 7; i++) {
                     int n = row * 7 + i;
                     plant(field, new Vector3(-1.14f + i * .38f + (Jitter(id, n) - .5f) * .1f, .08f, -1.08f + row * .54f), n);
                 }
@@ -520,10 +481,8 @@ public static class WorldModels
         var sprout = Mat("7fae45"); var leaf = Mat("4f8a34"); var straw = Mat("d6b354"); var ear = Mat("e2c25b");
         var straws = Field((f, at, n) => { for (int k = -1; k <= 1; k += 2) Box(f, new Vector3(.02f, .16f, .02f), at + new Vector3(k * .03f, .08f, 0), sprout, new Vector3(0, n * 37, k * 12)); });
         var plants = Field((f, at, n) => { for (int k = -1; k <= 1; k++) Box(f, new Vector3(.03f, .5f, .03f), at + new Vector3(k * .05f, .25f, 0), leaf, new Vector3(0, n * 37, k * 14)); });
-        var wheat = Field((f, at, n) =>
-        {
-            for (int k = -1; k <= 1; k++)
-            {
+        var wheat = Field((f, at, n) => {
+            for (int k = -1; k <= 1; k++) {
                 var stalk = Pivot(f, at, new Vector3(0, n * 37, k * 10));
                 Box(stalk, new Vector3(.025f, .7f, .025f), new Vector3(0, .35f, 0), straw);
                 Box(stalk, new Vector3(.06f, .18f, .06f), new Vector3(0, .78f, 0), ear);
@@ -534,19 +493,16 @@ public static class WorldModels
     }
 
     /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>
-    private static void LeafLitter(Node3D body, int id)
-    {
+    private static void LeafLitter(Node3D body, int id) {
         string[] colors = { "c08a3a", "a8652c", "d0a347", "8e5a2a", "b8753a" };
-        for (int i = 0; i < 26; i++)
-        {
+        for (int i = 0; i < 26; i++) {
             float angle = i * 2.4f + Jitter(id, 80 + i) * 2, r = .15f + Jitter(id, 110 + i) * .55f;
             Box(body, new Vector3(.16f, .012f, .1f), new Vector3(MathF.Cos(angle) * r, .01f + i * .002f, MathF.Sin(angle) * r), Mat(colors[i % colors.Length], .95f), new Vector3(Jitter(id, 140 + i) * 12, Jitter(id, 170 + i) * 360, 0));
         }
     }
 
     /// <summary>Anvil bolted to a welded square-tube stand.</summary>
-    private static void Anvil(Prop prop)
-    {
+    private static void Anvil(Prop prop) {
         var body = prop.Body;
         var tube = Mat("5d6a4f", .6f, .4f);
         foreach (var (x, z) in new[] { (-.2f, -.15f), (.2f, -.15f), (-.2f, .15f), (.2f, .15f) }) Box(body, new Vector3(.06f, .46f, .06f), new Vector3(x * 1.1f, .23f, z * 1.1f), tube);
@@ -557,8 +513,7 @@ public static class WorldModels
     }
 
     /// <summary>A 4x4 post with a painted market sign and a mailbox whose flag rises while an order is out.</summary>
-    private static void Signpost(Prop prop)
-    {
+    private static void Signpost(Prop prop) {
         var body = prop.Body;
         Box(body, new Vector3(.12f, 1.95f, .12f), new Vector3(0, .975f, 0), Mat("8a6a48"));
         Box(body, new Vector3(.95f, .42f, .04f), new Vector3(.3f, 1.55f, .08f), Mat("2f5d4a", .7f));
@@ -574,15 +529,13 @@ public static class WorldModels
     }
 
     /// <summary>Fire pit made from an old steel wheel rim, with a log teepee and flickering flames.</summary>
-    private static void FirePit(Prop prop)
-    {
+    private static void FirePit(Prop prop) {
         var body = prop.Body;
         var rim = Mat("3d3f42", .55f, .6f);
         Cylinder(body, .46f, .44f, .22f, new Vector3(0, .11f, 0), rim, null, 16);
         Torus(body, .42f, .5f, new Vector3(0, .22f, 0), rim);
         Cylinder(body, .4f, .4f, .02f, new Vector3(0, .23f, 0), Mat("4d4440", 1), null, 14);
-        for (int i = 0; i < 4; i++)
-        {
+        for (int i = 0; i < 4; i++) {
             var log = Pivot(body, new Vector3(0, .25f, 0), new Vector3(0, i * 90 + 20, 0));
             Cylinder(log, .05f, .045f, .55f, new Vector3(0, .17f, .14f), Mat(i % 2 == 0 ? "6e4a2e" : "5d3f28"), new Vector3(-28, 0, 0), 6);
         }
@@ -599,8 +552,7 @@ public static class WorldModels
     public static float Gauge(float heat) => 110 - 220 * Math.Clamp(heat, 0, 1);
 
     /// <summary>Turns a mine's local +Z along its rails, out of the cliff's end.</summary>
-    public static Vector3 MineYaw(Vector2 p)
-    {
+    public static Vector3 MineYaw(Vector2 p) {
         var way = World.MineOut(World.CliffAt(p));
         return new Vector3(0, MathF.Atan2(way.X, way.Y), 0);
     }
@@ -617,8 +569,7 @@ public static class WorldModels
     /// The rock spur at a cliff's seaward end, built in a mine's local frame: rock to both sides of and over a cave mouth, so a mine's tunnel can run into it.
     /// Part of the scenery, so every cliff has one whether or not it is mined.
     /// </summary>
-    public static void MineSpur(Node3D parent, Cliff cliff, string[] rock)
-    {
+    public static void MineSpur(Node3D parent, Cliff cliff, string[] rock) {
         var spot = World.MineSpot(cliff);
         var spur = Pivot(parent, new Vector3(spot.X, 0, spot.Y));
         spur.Rotation = MineYaw(spot);
@@ -627,8 +578,7 @@ public static class WorldModels
         Material Rock() => Mat(rock[rng.Next(rock.Length)], .95f);
         // Side masses stay outside the tunnel's walls, and the cap stays above its roof.
         for (int i = 0; i < 3; i++)
-            foreach (int side in new[] { -1, 1 })
-            {
+            foreach (int side in new[] { -1, 1 }) {
                 float height = 2.3f + R() * .7f;
                 Cylinder(spur, 1.05f, .65f + R() * .15f, height, new Vector3(side * 1.75f, height / 2, MineDoor - .45f - i * 1.15f), Rock(), new Vector3(0, R() * 72, 0), 5);
             }
@@ -641,8 +591,7 @@ public static class WorldModels
     }
 
     /// <summary>A timbered adit into the cliff's spur, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>
-    private static void Mine(Prop prop, string ore)
-    {
+    private static void Mine(Prop prop, string ore) {
         var body = prop.Body;
         const float Door = MineDoor;
         // The marking: a see-through green footprint and portal, shown until the mine is finished.
@@ -657,8 +606,7 @@ public static class WorldModels
         // It deepens from the portal as the entrance is dug; a spoil patch lies in front.
         var hole = Pivot(body, new Vector3(0, 0, Door));
         const int Steps = 6;
-        for (int i = 0; i < Steps; i++)
-        {
+        for (int i = 0; i < Steps; i++) {
             float z = -(i + .5f) * MineDepth / Steps, length = MineDepth / Steps + .01f;
             var dark = Dark("3a332c", i);
             Box(hole, new Vector3(1.5f, .02f, length), new Vector3(0, .01f, z), dark);
@@ -683,8 +631,7 @@ public static class WorldModels
         Box(frame, new Vector3(.5f, .32f, .03f), new Vector3(-1.1f, 1.15f, .25f), Mat("e8e2d2", .8f), new Vector3(0, 0, -3));
         Box(frame, new Vector3(.4f, .06f, .031f), new Vector3(-1.1f, 1.22f, .25f), Mat("b3261e", .7f), new Vector3(0, 0, -3));
         Box(frame, new Vector3(.06f, .9f, .06f), new Vector3(-1.1f, .5f, .2f), timber);
-        for (int i = 1; i < Steps; i += 2)
-        {
+        for (int i = 1; i < Steps; i += 2) {
             float z = -i * MineDepth / Steps;
             foreach (float x in new[] { -.64f, .64f }) Box(frame, new Vector3(.12f, 1.72f, .12f), new Vector3(x, .86f, z), Dark("6f6150", i));
             Box(frame, new Vector3(1.4f, .12f, .14f), new Vector3(0, 1.7f, z), Dark("6f6150", i));
@@ -707,8 +654,7 @@ public static class WorldModels
         var steel = Mat("6c7175", .4f, .7f); var sleeper = Mat("6e4a2e");
         foreach (float x in new[] { -.28f, .28f }) Box(rails, new Vector3(.05f, .05f, -Door + 1), new Vector3(x, .07f, (Door + 1) / 2), steel);
         for (int i = 0; i < 6; i++) Box(rails, new Vector3(.8f, .04f, .14f), new Vector3(0, .025f, Door + .2f + i * .55f), sleeper);
-        for (int i = 0; i < Steps; i++)
-        {
+        for (int i = 0; i < Steps; i++) {
             float z = Door - (i + .5f) * MineDepth / Steps;
             foreach (float x in new[] { -.28f, .28f }) Box(rails, new Vector3(.05f, .05f, MineDepth / Steps + .01f), new Vector3(x, .07f, z), Dark("8a8f93", i));
             Box(rails, new Vector3(.8f, .04f, .14f), new Vector3(0, .045f, z), Dark("5a4030", i));
@@ -733,16 +679,14 @@ public static class WorldModels
     /// <summary>An unlit tunnel color for step <paramref name="step"/> of the tunnel, darker the deeper it is and black at the far end.</summary>
     private static StandardMaterial3D Dark(string hex, int step) => Flat(new Color(hex).Lerp(Colors.Black, MathF.Pow((step + 1) / 6f, .45f)));
 
-    private static OmniLight3D Light(Node3D parent, Vector3 at, float range)
-    {
+    private static OmniLight3D Light(Node3D parent, Vector3 at, float range) {
         var light = new OmniLight3D { Position = at, OmniRange = range, LightColor = new Color("ff9a45"), LightEnergy = 0, ShadowEnabled = false, OmniAttenuation = 1.4f };
         parent.AddChild(light);
         return light;
     }
 
     /// <summary>Wolf with four hinged legs, built facing +Z; <see cref="Body"/> lifts and tilts for leaps, feeding and death.</summary>
-    public sealed class WolfModel
-    {
+    public sealed class WolfModel {
         public readonly Node3D Root = new();
         public readonly Node3D Body;
         public readonly Node3D[] Legs = new Node3D[4];
@@ -750,16 +694,14 @@ public static class WorldModels
         public float Stride, Yaw;
         public Vector2 Last;
 
-        public WolfModel()
-        {
+        public WolfModel() {
             Body = Pivot(Root, Vector3.Zero);
             var dark = Mat("353c36");
             Add(Body, WolfShape.Body, WolfShape.Fur, Vector3.Zero);
             Head = Pivot(Body, new Vector3(0, .78f, .48f));
             Add(Head, WolfShape.Head, WolfShape.Fur, Vector3.Zero);
             Sphere(Head, .038f, new Vector3(0, -.027f, .366f), dark, new Vector3(1, .7f, .65f), 8);
-            foreach (float side in new[] { -1f, 1f })
-            {
+            foreach (float side in new[] { -1f, 1f }) {
                 Sphere(Head, .023f, new Vector3(side * .095f, .05f, .132f), dark, new Vector3(.7f, .75f, 1), 8);
                 Sphere(Head, .012f, new Vector3(side * .111f, .05f, .136f), Mat("d49a50", .4f, 0, .5f), null, 8);
                 Post(Head, .012f, 0, .045f, new Vector3(side * .035f, -.09f, .31f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
@@ -767,8 +709,7 @@ public static class WorldModels
             Tail = Pivot(Body, new Vector3(0, .7f, -.48f), new Vector3(-130, 0, 0));
             WolfShape.Tail(Tail);
             int index = 0;
-            foreach (var (x, z) in new[] { (.11f, .32f), (-.11f, .32f), (.11f, -.32f), (-.11f, -.32f) })
-            {
+            foreach (var (x, z) in new[] { (.11f, .32f), (-.11f, .32f), (.11f, -.32f), (-.11f, -.32f) }) {
                 Legs[index] = Pivot(Body, new Vector3(x, .5f, z));
                 WolfShape.Leg(Legs[index], index >= 2);
                 index++;
@@ -776,12 +717,10 @@ public static class WorldModels
         }
 
         /// <summary>Front legs take <paramref name="front"/> degrees and hind legs <paramref name="hind"/>; positive swings a foot back.</summary>
-        private void Pose(float front, float hind, float head, float tail, float lift = 0, float pitch = 0, float roll = 0, float shift = 0)
-        {
+        private void Pose(float front, float hind, float head, float tail, float lift = 0, float pitch = 0, float roll = 0, float shift = 0) {
             Body.Position = new Vector3(shift, lift, 0);
             Body.RotationDegrees = new Vector3(pitch, 0, roll);
-            for (int i = 0; i < 4; i++)
-            {
+            for (int i = 0; i < 4; i++) {
                 Legs[i].Position = Legs[i].Position with { Y = .5f };
                 Legs[i].RotationDegrees = new Vector3(i < 2 ? front : hind, 0, 0);
             }
@@ -789,8 +728,7 @@ public static class WorldModels
             Tail.RotationDegrees = new Vector3(tail, 0, 0);
         }
 
-        public void Trot(float stride, bool running)
-        {
+        public void Trot(float stride, bool running) {
             Pose(0, 0, 0, 0);
             float swing = running ? MathF.Sin(stride) * 34 : 0;
             for (int i = 0; i < 4; i++) Legs[i].RotationDegrees = new Vector3(i is 0 or 3 ? swing : -swing, 0, 0);
@@ -800,20 +738,17 @@ public static class WorldModels
         }
 
         /// <summary>A leap at the throat: <paramref name="progress"/> runs 0 to 1 from take-off to landing.</summary>
-        public void Leap(float progress)
-        {
+        public void Leap(float progress) {
             float t = Math.Clamp(progress, 0, 1);
             Pose(-70 + t * 20, 65 - t * 35, -10 + t * 30, -95, MathF.Sin(t * Mathf.Pi) * .75f, Mathf.Lerp(-28, 26, t));
         }
 
         /// <summary>Head down and tearing, legs braced; <paramref name="time"/> drives the shaking.</summary>
-        public void Feed(float time)
-        {
+        public void Feed(float time) {
             Pose(-14, 22, 48 + MathF.Sin(time * 9) * 12, -150, -.1f, 14);
             Head.RotationDegrees += new Vector3(0, MathF.Sin(time * 13) * 18, 0);
             // Plant each paw while the chest pitches down; the upper profiles stay buried in the shoulders/hips.
-            foreach (var leg in Legs)
-            {
+            foreach (var leg in Legs) {
                 float lowest = Math.Min(
                     (Body.Transform * (leg.Transform * new Vector3(0, -.49f, -.03f))).Y,
                     (Body.Transform * (leg.Transform * new Vector3(0, -.49f, .12f))).Y);
@@ -822,8 +757,7 @@ public static class WorldModels
         }
 
         /// <summary>A killed wolf buckles, then rolls onto its side with stiff legs as <paramref name="progress"/> runs 0 to 1.</summary>
-        public void Fall(float progress)
-        {
+        public void Fall(float progress) {
             float buckle = Ease(Math.Clamp(progress / .35f, 0, 1)), roll = Ease(Math.Clamp((progress - .25f) / .5f, 0, 1));
             float fold = 45 * buckle * (1 - roll);
             // Rolling about the ground point would sink the body, so it shifts back over its old footprint as it goes.
@@ -834,8 +768,7 @@ public static class WorldModels
     }
 
     /// <summary>Courier pulling a two-wheel garden cart; the cart load shows its crates, loose goods or the payment cash box.</summary>
-    public sealed class CartModel
-    {
+    public sealed class CartModel {
         public readonly Node3D Root = new();
         public readonly ActorRig Courier = new(ActorSkin.Courier);
         public readonly Node3D Goods, Cash;
@@ -845,16 +778,14 @@ public static class WorldModels
         public float Distance, Yaw;
         public Vector2 Last;
 
-        public CartModel()
-        {
+        public CartModel() {
             Root.AddChild(Courier.Root);
             Courier.Root.Position = new Vector3(0, 0, .55f);
             var cart = Pivot(Root, new Vector3(0, 0, -.45f));
             var green = Mat("3f6b3a", .55f, .3f);
             Box(cart, new Vector3(.7f, .3f, .85f), new Vector3(0, .5f, 0), green);
             Box(cart, new Vector3(.62f, .02f, .78f), new Vector3(0, .66f, 0), Mat("2d4a2a", .7f));
-            for (int i = 0; i < 2; i++)
-            {
+            for (int i = 0; i < 2; i++) {
                 wheels[i] = Pivot(cart, new Vector3(i == 0 ? .42f : -.42f, .26f, 0));
                 Cylinder(wheels[i], .26f, .26f, .1f, Vector3.Zero, Mat("222222", .9f), new Vector3(0, 0, 90), 12);
                 Cylinder(wheels[i], .1f, .1f, .12f, Vector3.Zero, Mat("c9ced2", .4f, .7f), new Vector3(0, 0, 90), 8);
@@ -866,8 +797,7 @@ public static class WorldModels
             Box(Goods, new Vector3(.4f, .28f, .32f), new Vector3(-.08f, .14f, .18f), Mat("c9a46e"));
             Box(Goods, new Vector3(.36f, .24f, .3f), new Vector3(.1f, .12f, -.2f), Mat("b8925c"));
             Box(Goods, new Vector3(.3f, .22f, .26f), new Vector3(.05f, .39f, .05f), Mat("c9a46e"));
-            for (int i = 0; i < Crates.Length; i++)
-            {
+            for (int i = 0; i < Crates.Length; i++) {
                 // Small gaps and dark corner battens keep each crate countable at a glance.
                 var at = i < 4 ? new Vector3(i % 2 == 0 ? -.15f : .15f, 0, i < 2 ? .2f : -.2f) : new Vector3(i == 4 ? -.15f : .15f, .25f, i == 4 ? .08f : -.12f);
                 Crates[i] = Pivot(cart, new Vector3(0, .68f, 0) + at, new Vector3(0, i * 23 % 13 - 6, 0));
@@ -882,14 +812,12 @@ public static class WorldModels
         }
 
         /// <summary>Shows exactly <paramref name="crates"/> crates, or loose goods, or the cash box.</summary>
-        public void Load(int crates, bool goods, bool cash)
-        {
+        public void Load(int crates, bool goods, bool cash) {
             for (int i = 0; i < Crates.Length; i++) Crates[i].Visible = !cash && i < crates;
             Goods.Visible = goods && !cash && crates == 0; Cash.Visible = cash;
         }
 
-        public void Roll(float distance)
-        {
+        public void Roll(float distance) {
             foreach (var wheel in wheels) wheel.RotationDegrees = new Vector3(Mathf.RadToDeg(distance / .26f), 0, 0);
         }
     }
