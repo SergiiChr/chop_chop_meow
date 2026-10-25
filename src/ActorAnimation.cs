@@ -17,6 +17,7 @@ public enum ActorAction
     Hammer,
     Attack,
     Sit,
+    Perch,
     Mauled,
     Devoured
 }
@@ -25,18 +26,22 @@ public enum ActorAction
 /// Joint angles in degrees for the humanoid rig.
 /// Raise lifts an arm forward from hanging (90 is horizontal, 180 overhead), Out swings it sideways (negative crosses the body),
 /// and Swing moves a thigh forward while Knee folds the shin back.
+/// Turn splays a thigh outward and Roll turns it about its own length, so a bent knee folds the shin sideways across the body.
+/// Seat is the hip height for sitting on the ground; zero keeps the lower foot on the ground instead.
 /// </summary>
 public readonly record struct Pose(
     float Lean = 0, float Twist = 0, float Head = 0,
     float RaiseL = 6, float OutL = 7, float ElbowL = 12,
     float RaiseR = 6, float OutR = 7, float ElbowR = 12,
-    float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0)
+    float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0,
+    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Seat = 0)
 {
     public static Pose Lerp(Pose a, Pose b, float t) => new(
         Mathf.Lerp(a.Lean, b.Lean, t), Mathf.Lerp(a.Twist, b.Twist, t), Mathf.Lerp(a.Head, b.Head, t),
         Mathf.Lerp(a.RaiseL, b.RaiseL, t), Mathf.Lerp(a.OutL, b.OutL, t), Mathf.Lerp(a.ElbowL, b.ElbowL, t),
         Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
-        Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t));
+        Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t),
+        Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), Mathf.Lerp(a.Seat, b.Seat, t));
 }
 
 /// <summary>Pure actor animation selection, timing and keyframed poses.</summary>
@@ -51,7 +56,7 @@ public static class ActorAnimation
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
-        ActorAction.Sit => 4,
+        ActorAction.Sit or ActorAction.Perch => 4,
         ActorAction.Mauled => .5f,
         ActorAction.Devoured => 1.4f,
         _ => 1
@@ -128,10 +133,14 @@ public static class ActorAnimation
                 return Keys(p, (0, fists),
                     (.32f, fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
                     (.5f, fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }));
-            case ActorAction.Sit:
-                // Sitting low with knees up and forearms on them, now and then lifting a bite to the mouth.
-                var seated = new Pose(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, SwingL: 112, KneeL: 100, SwingR: 108, KneeR: 96);
-                var bite = seated with { Head = 10, Lean = 2, RaiseR = 40, OutR = -24, ElbowR = 140 };
+            case ActorAction.Sit or ActorAction.Perch:
+                // Cross-legged on the ground with hands on the knees, or on a rock with knees up and forearms on them.
+                // Now and then a bite goes up to the mouth.
+                var seated = action == ActorAction.Sit
+                    ? new Pose(Lean: 6, Head: 2, RaiseL: 30, OutL: 22, ElbowL: 34, RaiseR: 30, OutR: 22, ElbowR: 34,
+                        SwingL: 86, KneeL: 150, TurnL: 40, RollL: 90, SwingR: 82, KneeR: 150, TurnR: 40, RollR: 90, Seat: .15f)
+                    : new Pose(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, SwingL: 112, KneeL: 100, SwingR: 108, KneeR: 96);
+                var bite = seated with { Head = seated.Head + 6, Lean = seated.Lean + 6, RaiseR = 40, OutR = -24, ElbowR = 140 };
                 var eating = Keys(p, (0, seated), (.55f, seated), (.68f, bite), (.8f, bite), (.92f, seated));
                 return eating with { Lean = eating.Lean + wave * 1.2f, Head = eating.Head + wave * 1.5f };
             // Both downed poses are drawn with the rig tipped onto its back, so Raise points the arms at the sky.
@@ -204,7 +213,8 @@ public static class ActorAnimation
 
     public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving)
     {
-        if (worker.WorkState == WorkerWorkState.Resting && !moving) return ActorAction.Sit;
+        // Every other worker sits on a rock rather than the ground.
+        if (worker.WorkState == WorkerWorkState.Resting && !moving) return worker.Id % 2 == 0 ? ActorAction.Perch : ActorAction.Sit;
         if (worker.Bag.Count > 0) return ActorAction.Carry;
         if (moving) return ActorAction.Walk;
         if (worker.WorkState == WorkerWorkState.Gathering && assignment?.IsResource == true)

@@ -15,7 +15,7 @@ public sealed class ActorRig
 {
     private const float Thigh = .38f, Shin = .37f, Sole = .07f;
     public readonly Node3D Root = new();
-    private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate;
+    private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     private readonly Dictionary<string, Node3D> tools = new();
 
     public ActorRig(ActorSkin skin)
@@ -68,6 +68,10 @@ public sealed class ActorRig
         Box(crate, new Vector3(.42f, .28f, .3f), Vector3.Zero, Mat("c9a46e"));
         Box(crate, new Vector3(.44f, .04f, .32f), new Vector3(0, .1f, 0), Mat("a9824f"));
         Box(crate, new Vector3(.44f, .04f, .32f), new Vector3(0, -.1f, 0), Mat("a9824f"));
+        // A low boulder to sit on, under the hips.
+        rock = Pivot(Root, Vector3.Zero);
+        Sphere(rock, .24f, new Vector3(0, .1f, -.04f), Mat("8d918c"), new Vector3(1.15f, .85f, 1));
+        Sphere(rock, .13f, new Vector3(.15f, .05f, .1f), Mat("7a7e79"), new Vector3(1, .7f, 1));
         BuildTools();
     }
 
@@ -123,7 +127,7 @@ public sealed class ActorRig
         }
     }
 
-    public void Show(Pose pose, string? tool, bool carrying)
+    public void Show(Pose pose, string? tool, bool carrying, bool onRock = false)
     {
         torso.RotationDegrees = new Vector3(pose.Lean, pose.Twist, 0);
         head.RotationDegrees = new Vector3(pose.Head - pose.Lean * .4f, -pose.Twist * .5f, 0);
@@ -131,14 +135,19 @@ public sealed class ActorRig
         shoulderR.RotationDegrees = new Vector3(-pose.RaiseR, 0, -pose.OutR);
         elbowL.RotationDegrees = new Vector3(-pose.ElbowL, 0, 0);
         elbowR.RotationDegrees = new Vector3(-pose.ElbowR, 0, 0);
-        legL.RotationDegrees = new Vector3(-pose.SwingL, 0, 0);
-        legR.RotationDegrees = new Vector3(-pose.SwingR, 0, 0);
+        legL.Basis = HipTurn(pose.SwingL, pose.TurnL, pose.RollL);
+        legR.Basis = HipTurn(pose.SwingR, -pose.TurnR, -pose.RollR);
         kneeL.RotationDegrees = new Vector3(pose.KneeL, 0, 0);
         kneeR.RotationDegrees = new Vector3(pose.KneeR, 0, 0);
-        hips.Position = new Vector3(0, Math.Max(Reach(pose.SwingL, pose.KneeL), Reach(pose.SwingR, pose.KneeR)) + Sole, 0);
+        hips.Position = new Vector3(0, pose.Seat > 0 ? pose.Seat : Math.Max(Reach(pose.SwingL, pose.KneeL), Reach(pose.SwingR, pose.KneeR)) + Sole, 0);
+        rock.Visible = onRock;
         foreach (var (name, node) in tools) node.Visible = name == tool;
         crate.Visible = carrying;
     }
+
+    /// <summary>Splays the thigh outward, swings it forward, then rolls it about its own length; the left side turns toward +X.</summary>
+    private static Basis HipTurn(float swing, float turn, float roll) =>
+        new Basis(Vector3.Up, Mathf.DegToRad(turn)) * new Basis(Vector3.Right, Mathf.DegToRad(-swing)) * new Basis(Vector3.Up, Mathf.DegToRad(roll));
 
     private static float Reach(float swing, float knee) =>
         Thigh * MathF.Cos(Mathf.DegToRad(swing)) + Shin * MathF.Cos(Mathf.DegToRad(swing - knee));

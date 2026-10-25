@@ -393,11 +393,11 @@ public partial class WorldView : Node3D
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking);
             if (work == ActorAction.Hammer && assignment?.Processing != true) work = ActorAction.Idle;
-            var facing = work == ActorAction.Sit && World.LunchFire is Thing fire ? fire.Pos : assignment?.Pos ?? worker.Pos;
+            var facing = work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, ActorAnimation.Tool(work));
             entry.Rig.Root.Visible = World.Sees(worker);
-            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit ? null : assignment);
+            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch ? null : assignment);
         }
         foreach (int id in crew.Keys.Where(id => World.S.Workers.All(w => w.Id != id)).ToArray())
         {
@@ -416,7 +416,7 @@ public partial class WorldView : Node3D
     {
         rig.Root.Position = To3(state.Position);
         rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
-        rig.Show(ActorAnimation.PoseAt(state.Action, state.Time, state.Moving), tool, state.Action == ActorAction.Carry);
+        rig.Show(ActorAnimation.PoseAt(state.Action, state.Time, state.Moving), tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch);
     }
 
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
