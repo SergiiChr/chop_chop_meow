@@ -38,9 +38,11 @@ public sealed class RecipeDef
 /// <summary>How the village's appetite for a good it takes moves with sales.</summary>
 public sealed class DemandDef
 {
-    /// <summary>Units the village absorbs in a day: selling this many lowers the price by <see cref="Drop"/>, and a day restores it.</summary>
+    /// <summary>Units the village absorbs in a day: a day restores what selling this many takes.</summary>
     public int Daily { get; set; }
-    /// <summary>Fraction of the price lost by selling one day's amount; small for staple goods, large for tools.</summary>
+    /// <summary>Units of the daily amount that sell at the full price before it starts to fall.</summary>
+    public int Steady { get; set; }
+    /// <summary>Fraction of the full price each crate's worth sold past the steady amount takes off; small for staples, large for tools.</summary>
     public float Drop { get; set; }
 }
 /// <summary>What the village takes in crates with its demand, and what it sells with how many units make one purchase.</summary>
@@ -111,7 +113,7 @@ public sealed class GameData
             foreach (var input in recipe.Value.Inputs)
                 if (!Items.ContainsKey(input.Key) || input.Value <= 0) throw new InvalidOperationException($"Invalid input for {recipe.Key}: {input.Key}.");
         }
-        if (Items.Values.Any(i => i.Speed <= 0) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
+        if (Items.Values.Any(i => i.Speed <= 0) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in data/game.json.");
     }
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch

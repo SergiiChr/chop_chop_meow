@@ -582,7 +582,11 @@ public sealed class World
         Say("You wake in the clearing. Recover your belongings from the box.");
     }
     // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.
-    public float UnitPrice(string item, bool buying) => Data.Items[item].Price * (buying ? 1.25f : S.Demand.GetValueOrDefault(item, 1));
+    public float UnitPrice(string item, bool buying) => Data.Items[item].Price * (buying ? 1.25f : Math.Min(1, Demand(item)));
+    // Demand runs above 1 by the steady amount's worth, so those units sell at the full price; past it, each unit takes a share of a crate's drop.
+    private float DemandStep(string item) => Data.Market.Sells[item].Drop / Data.CrateCapacity;
+    private float FullDemand(string item) => Data.Market.Sells.TryGetValue(item, out var demand) ? 1 + demand.Steady * DemandStep(item) : 1;
+    private float Demand(string item) => S.Demand.TryGetValue(item, out float demand) ? demand : FullDemand(item);
     /// <summary>Units in one purchase of a good the village sells; more than one arrive packed in a crate.</summary>
     public int Lot(string item) => Data.Market.Buys.GetValueOrDefault(item, 1);
     /// <summary>The whole coins one purchase costs, crate included for boxed goods.</summary>
@@ -615,8 +619,8 @@ public sealed class World
         foreach (var (item, quantity) in goods)
         {
             // A sale lowers demand unit by unit, so a bulk sale is not paid entirely at the pre-sale price.
-            float demand = Math.Min(1, S.Demand.GetValueOrDefault(item, 1)), step = Data.Market.Sells[item].Drop / Data.Market.Sells[item].Daily;
-            for (int i = 0; i < quantity; i++) { price += Data.Items[item].Price * demand; demand = Math.Max(.25f, demand - step); }
+            float demand = Demand(item);
+            for (int i = 0; i < quantity; i++) { price += Data.Items[item].Price * Math.Min(1, demand); demand = Math.Max(.25f, demand - DemandStep(item)); }
             S.Demand[item] = demand;
         }
         // Coins are whole: sales round down and purchases round up, so a round trip never profits.
@@ -988,9 +992,12 @@ public sealed class World
         if (Day > S.WageDay) { PayWages(); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow."); }
         if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Your workers head home to Bramblewick until morning.");
         if (S.Workers.Count > 0 && Lunch && !wasLunch) Say("Midday. Your workers gather by the campfire for an hour of lunch.");
-        // A day restores one day's drop, so selling each good's daily amount every day keeps its price steady.
-        // A good no longer taken recovers at once.
-        foreach (var item in S.Demand.Keys.ToArray()) S.Demand[item] = Mathf.MoveToward(S.Demand[item], 1, Data.Market.Sells.TryGetValue(item, out var demand) ? dt * demand.Drop / Data.DaySeconds : 1);
+        // A day restores what selling the daily amount takes, so selling it every day keeps the price steady.
+        foreach (var item in S.Demand.Keys.ToArray())
+        {
+            if (!Data.Market.Sells.TryGetValue(item, out var demand)) continue;
+            S.Demand[item] = Mathf.MoveToward(S.Demand[item], FullDemand(item), dt * demand.Daily * DemandStep(item) / Data.DaySeconds);
+        }
         foreach (var order in S.Orders.ToArray())
         {
             order.Elapsed += dt; if (order.Elapsed < Data.TradeSeconds) continue;

@@ -6,7 +6,7 @@
   "hireOffers": [
     { "upfront": 60, "wage": 18 },
     { "upfront": 30, "wage": 22 },
-    { "upfront": 10, "wage": 25 }
+    { "upfront": 0, "wage": 26 }
   ],
   "campfireHours": 4,
   "gatherSeconds": 2.0,
@@ -17,12 +17,12 @@
   "benchSpeed": 2,
   "market": {
     "sells": {
-      "raw_meat": { "daily": 24, "drop": 0.1 },
-      "cooked_meat": { "daily": 24, "drop": 0.1 },
-      "berries": { "daily": 24, "drop": 0.1 },
-      "steel_axe": { "daily": 12, "drop": 0.3 },
-      "steel_pick": { "daily": 12, "drop": 0.3 },
-      "steel_hammer": { "daily": 12, "drop": 0.3 }
+      "raw_meat": { "daily": 24, "steady": 24, "drop": 0.05 },
+      "cooked_meat": { "daily": 24, "steady": 24, "drop": 0.05 },
+      "berries": { "daily": 36, "steady": 36, "drop": 0.05 },
+      "steel_axe": { "daily": 12, "steady": 0, "drop": 0.5 },
+      "steel_pick": { "daily": 12, "steady": 0, "drop": 0.5 },
+      "steel_hammer": { "daily": 12, "steady": 0, "drop": 0.5 }
     },
     "buys": {
       "steel_axe": 1,

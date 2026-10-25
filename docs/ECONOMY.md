@@ -21,11 +21,11 @@ A new recipe gets its price from this rule. The check fails if any recipe loses 
 
 ## 2. Hiring
 
-A worker-day costs the daily wage plus the up-front payment spread over 10 days. All offers cost about the same over that time (24 to 26 coins); more up front means a lower wage, so a worker kept longer is cheaper.
+A worker-day costs the daily wage plus the up-front payment spread over 10 days. All offers cost about the same over that time (24 to 26 coins); more up front means a lower wage, so a worker kept longer is cheaper, and the dearest wage needs nothing up front.
 
 Worker output is measured by running one worker through a whole day: walking, hauling, lunch and the commute included, with chests 2.5 tiles away and steel tools at the bench. A product's worker-days are its materials' worker-days plus one over its station's daily output.
 
-- A hired berry picker barely breaks even: 0.9 to 1.25 times a worker-day's cost. Bushes fruit once a day (`berryRegrowHours`), so one picker brings in about two crates of berries a day.
+- A hired berry picker barely breaks even: 0.9 to 1.25 times a worker-day's cost. Bushes fruit once a day (`berryRegrowHours`), so one picker brings in two crates of berries a day, within what the village takes at the full price.
 - A worker in a steel tool chain earns at least 4 times their pay.
 - A longer chain earns more per worker-day than a shorter one.
 - Meat is left out: it comes from wolves at night, when workers are home.
@@ -52,13 +52,20 @@ These are for a crew sized so no one waits. A starter crew of one worker per job
 
 ## 3. Demand
 
-Each good the village takes has a `daily` amount and a `drop` in `market.sells`. Selling one unit lowers its price by `drop / daily`, down to a quarter of the base price, and the price climbs back by `drop` over a day.
+Each good the village takes has `daily`, `steady` and `drop` in `market.sells`:
 
-- Selling each good's daily amount every day is sustainable: the next day's sale pays the same.
-- The basket is about two crates of each food (24) and a full crate of each steel tool (12) a day.
-- Food is a steady staple: its daily amount takes 10% off its price. Tools swing more: a crate of one tool takes 30% off. Selling past the basket keeps that good cheap for days.
+- The first `steady` units sell at the full price. Past them, each crate's worth sold takes `drop` off the full price, down to a quarter of it.
+- A day restores what selling `daily` units takes, so selling each good's daily amount every day is sustainable: the next day's sale pays the same.
 
-A basket sells for about 2,020 coins a day: 1,890 from tools, 100 from food and 30 for the crates.
+| Good | Daily | Steady | Drop per crate |
+|---|---|---|---|
+| Berries | 36 (3 crates) | 36 | 5% |
+| Raw and cooked meat | 24 (2 crates) | 24 | 5% |
+| Steel axe, pickaxe and hammer | 12 (1 crate) | 0 | 50% |
+
+Food is a steady staple: its daily amount sells at the full price, and past it the price slips slowly. Tools react sharply: a crate of one tool takes half off the price of the last one in it and averages 77%, and a second crate the same day sells for little. Selling past the basket keeps that good cheap for days.
+
+A day's basket sells for about 1,840 coins: 1,690 from tools, 115 from food and 30 for the crates.
 
 ## 4. Trade
 

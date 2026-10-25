@@ -295,23 +295,24 @@ public static class SimulationChecks
         world.S.Backpack.TransferTo(sign.Inventory, "wood", 3);
         Require(!world.Sell(sign) && world.S.Orders.Count == 0 && sign.Inventory["wood"] == 3, "loose goods must not be sold");
         sign.Inventory.TransferTo(world.S.Backpack, "wood", 3);
-        world.S.Backpack.TransferTo(sign.Inventory, PackCrate(world, ("berries", 3)), 1);
+        // Tools have no steady amount, so even a small sale lowers their price.
+        world.S.Backpack.TransferTo(sign.Inventory, PackCrate(world, ("steel_axe", 3)), 1);
         world.Player = sign.Pos;
-        float coinsBeforeSale = world.Coins, quotedPrice = world.KnownPrice("berries");
+        float coinsBeforeSale = world.Coins, quotedPrice = world.KnownPrice("steel_axe");
         Require(world.Sell(sign), "market should sell the goods loaded into it");
         Require(sign.Inventory.Count == 0 && world.Coins == coinsBeforeSale && output[Inventory.Coins] == 0,
                 "sale removes goods at dispatch but does not pay before the cart returns");
-        float loweredDemand = world.S.Demand["berries"];
-        Require(loweredDemand < 1 && world.KnownPrice("berries") == quotedPrice, "selling should lower demand while the price sheet still shows old news");
+        float loweredDemand = world.S.Demand["steel_axe"];
+        Require(loweredDemand < 1 && world.KnownPrice("steel_axe") == quotedPrice, "selling should lower demand while the price sheet still shows old news");
         Require(!world.Sell(sign), "an empty market has nothing to sell");
         SafeTick(world, 30.1f);
         Require(world.S.Orders.Count == 0 && output[Inventory.Coins] > 0 && world.Coins == coinsBeforeSale,
                 "sale proceeds should arrive in the market output when the cart returns");
-        Require(world.KnownPrice("berries") < quotedPrice && world.PriceAge == 0, "the returning carter should bring today's lower price");
+        Require(world.KnownPrice("steel_axe") < quotedPrice && world.PriceAge == 0, "the returning carter should bring today's lower price");
         world.S.Time += data.DaySeconds * 2;
-        Require(world.S.Demand["berries"] > loweredDemand && world.PriceAge == 2, "the sheet should age by whole days");
+        Require(world.S.Demand["steel_axe"] > loweredDemand && world.PriceAge == 2, "the sheet should age by whole days");
         SafeTick(world, 60);
-        Require(world.S.Demand["berries"] > loweredDemand && world.S.Demand["berries"] < 1 && world.KnownPrice("berries") < world.UnitPrice("berries", false),
+        Require(world.S.Demand["steel_axe"] > loweredDemand && world.S.Demand["steel_axe"] < 1 && world.KnownPrice("steel_axe") < world.UnitPrice("steel_axe", false),
                 "market demand should recover while the price sheet stays stale");
 
         Require(world.FetchBlock(sign) == "No worker assigned." && !world.FetchPrices(sign), "fetching prices needs a worker assigned to the signpost");

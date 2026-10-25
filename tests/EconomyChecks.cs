@@ -92,28 +92,46 @@ public static class EconomyChecks
         for (int day = 1; day <= 4; day++)
         {
             Pass(world, (day - 1) * data.DaySeconds + 60 - world.S.Time);
-            var crates = sells.SelectMany(p => Enumerable.Range(0, (p.Value.Daily + data.CrateCapacity - 1) / data.CrateCapacity)
-                .Select(i => (p.Key, Math.Min(data.CrateCapacity, p.Value.Daily - i * data.CrateCapacity)))).ToList();
-            int coins = 0;
-            foreach (var load in crates.Chunk(World.MarketSlots))
-            {
-                foreach (var (item, count) in load)
-                {
-                    var crate = world.Add("crate", sign.Pos + new Vector2(1, 0));
-                    crate.Inventory.Add(item, count);
-                    var before = world.S.Backpack.Items.Keys.ToHashSet();
-                    Require(world.PickUpCrate(crate), "a crate by the signpost should be picked up");
-                    world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.Single(id => !before.Contains(id)), 1);
-                }
-                Require(world.Sell(sign), "the village should take a day's basket");
-                Pass(world, data.TradeSeconds + .5f);
-                coins += sign.Output!.Remove(Inventory.Coins, sign.Output[Inventory.Coins]);
-            }
-            takings.Add(coins);
+            takings.Add(Sell(world, sign, sells.ToDictionary(p => p.Key, p => p.Value.Daily)));
         }
         GD.Print($"Economy: a day's basket sells for {string.Join(", ", takings)} coins on four days running");
         // Sales round down to whole coins, so the float recovery can cost one coin.
         Require(takings.All(t => Math.Abs(t - takings[0]) <= 1), "a day's basket should sell for the same every day");
+
+        foreach (var (item, demand) in sells.Where(p => p.Value.Steady > 0))
+        {
+            var fresh = new World(data, false);
+            var post = fresh.Add("signpost", new Vector2(20, 20));
+            fresh.Player = post.Pos;
+            int crates = (demand.Steady + data.CrateCapacity - 1) / data.CrateCapacity;
+            int full = (int)MathF.Floor(demand.Steady * data.Items[item].Price + crates * data.Items["crate"].Price);
+            Require(Sell(fresh, post, new() { [item] = demand.Steady }) == full && fresh.UnitPrice(item, false) == data.Items[item].Price,
+                    $"the steady amount of {item} should sell at the full price");
+            Sell(fresh, post, new() { [item] = data.CrateCapacity });
+            Require(fresh.UnitPrice(item, false) < data.Items[item].Price, $"selling {item} past its steady amount should lower the price");
+        }
+    }
+
+    /// <summary>Packs the goods into full crates by the signpost, sells them cart by cart and returns the coins.</summary>
+    private static int Sell(World world, Thing sign, Dictionary<string, int> goods)
+    {
+        int capacity = world.Data.CrateCapacity, coins = 0;
+        var crates = goods.SelectMany(p => Enumerable.Range(0, (p.Value + capacity - 1) / capacity).Select(i => (p.Key, Math.Min(capacity, p.Value - i * capacity)))).ToList();
+        foreach (var load in crates.Chunk(World.MarketSlots))
+        {
+            foreach (var (item, count) in load)
+            {
+                var crate = world.Add("crate", sign.Pos + new Vector2(1, 0));
+                crate.Inventory.Add(item, count);
+                var before = world.S.Backpack.Items.Keys.ToHashSet();
+                Require(world.PickUpCrate(crate), "a crate by the signpost should be picked up");
+                world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.Single(id => !before.Contains(id)), 1);
+            }
+            Require(world.Sell(sign), "the village should take a day's basket");
+            Pass(world, world.Data.TradeSeconds + .5f);
+            coins += sign.Output!.Remove(Inventory.Coins, sign.Output[Inventory.Coins]);
+        }
+        return coins;
     }
 
     /// <summary>Advances time like sleep, without wolves, keeping the player fed and watered.</summary>
