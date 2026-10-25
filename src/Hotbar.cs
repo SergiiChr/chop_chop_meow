@@ -4,8 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-public partial class Game
-{
+public partial class Game {
     private int hotbarAssignSlot;
     private readonly System.Collections.Generic.List<ItemSlot> hotbarButtons = new();
     private readonly System.Collections.Generic.List<Label> hotbarCounts = new();
@@ -13,32 +12,26 @@ public partial class Game
     private Texture2D? itemAtlas;
     private Texture2D? worldAtlas;
 
-    private void LoadHotbarAtlases()
-    {
+    private void LoadHotbarAtlases() {
         if (ResourceLoader.Exists("res://assets/item-atlas.png")) itemAtlas = GD.Load<Texture2D>("res://assets/item-atlas.png");
         if (ResourceLoader.Exists("res://assets/world-atlas.png")) worldAtlas = GD.Load<Texture2D>("res://assets/world-atlas.png");
     }
 
-    private Texture2D? HotbarIcon(string id)
-    {
+    private Texture2D? HotbarIcon(string id) {
         if (World.IsCrate(id)) id = "crate";
         if (hotbarIcons.TryGetValue(id, out var cached)) return cached;
         Texture2D? atlas = null; int cell = -1, columns = 4, rows = 3;
         // Items added after the illustrated atlas have hand-written SVG icons named by their id.
         if (ResourceLoader.Exists($"res://assets/ui/{id}.svg")) return hotbarIcons[id] = GD.Load<Texture2D>($"res://assets/ui/{id}.svg");
-        if (id is "iron_axe" or "iron_pick" or "iron_bar" or "steel_bar" or "wood" or "stone" or "iron_ore" or "coal" or "berries" or "water")
-        {
+        if (id is "iron_axe" or "iron_pick" or "iron_bar" or "steel_bar" or "wood" or "stone" or "iron_ore" or "coal" or "berries" or "water") {
             atlas = itemAtlas;
             cell = id switch { "iron_axe" => 0, "iron_pick" => 1, "iron_bar" => 3, "steel_bar" => 4, "wood" => 5, "stone" => 6, "iron_ore" => 7, "coal" => 8, "berries" => 9, "water" => 10, _ => 11 };
-        }
-        else
-        {
+        } else {
             atlas = worldAtlas;
             cell = id switch { "furnace" => 5, "reinforced" => 6, "hut" => 7, "chest" => 8, "anvil" => 9, "signpost" => 10, "campfire" => 11, _ => -1 };
         }
         if (atlas == null || cell < 0) return null;
-        var icon = new AtlasTexture
-        {
+        var icon = new AtlasTexture {
             Atlas = atlas,
             Region = new Rect2(cell % columns * atlas.GetWidth() / (float)columns, cell / columns * atlas.GetHeight() / (float)rows, atlas.GetWidth() / (float)columns, atlas.GetHeight() / (float)rows)
         };
@@ -47,8 +40,7 @@ public partial class Game
     }
 
     /// <summary>A hotbar slot; dropping an item or building plan on it assigns that reference.</summary>
-    private ItemSlot HotbarButton(int slot)
-    {
+    private ItemSlot HotbarButton(int slot) {
         var button = new ItemSlot { FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
         button.Pressed += () => SelectHotbar(slot);
         button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.Buildings.ContainsKey(drag.Item);
@@ -61,8 +53,7 @@ public partial class Game
         button.IconAlignment = HorizontalAlignment.Center;
         button.VerticalIconAlignment = VerticalAlignment.Center;
         button.TooltipText = $"Hotbar slot {slot + 1}";
-        var number = new Label
-        {
+        var number = new Label {
             Text = (slot + 1).ToString(),
             MouseFilter = Control.MouseFilterEnum.Ignore,
             AnchorRight = 1,
@@ -75,8 +66,7 @@ public partial class Game
         number.AddThemeFontSizeOverride("font_size", 12);
         number.AddThemeColorOverride("font_color", new Color("f2e8cf"));
         button.AddChild(number);
-        var count = new Label
-        {
+        var count = new Label {
             MouseFilter = Control.MouseFilterEnum.Ignore,
             HorizontalAlignment = HorizontalAlignment.Right,
             AnchorLeft = 0,
@@ -97,17 +87,14 @@ public partial class Game
     }
 
     private static readonly StyleBoxFlat ActiveSlotStyle = ActiveSlot();
-    private static StyleBoxFlat ActiveSlot()
-    {
+    private static StyleBoxFlat ActiveSlot() {
         var style = new StyleBoxFlat { BgColor = new Color("3d5446"), BorderColor = new Color("ffe08a"), ContentMarginLeft = 4, ContentMarginRight = 4, ContentMarginTop = 4, ContentMarginBottom = 4 };
         style.SetBorderWidthAll(3); style.SetCornerRadiusAll(6);
         return style;
     }
 
-    private void RefreshHotbar()
-    {
-        for (int slot = 0; slot < hotbarButtons.Count; slot++)
-        {
+    private void RefreshHotbar() {
+        for (int slot = 0; slot < hotbarButtons.Count; slot++) {
             var button = hotbarButtons[slot];
             if (!GodotObject.IsInstanceValid(button)) continue;
             if (button.GetParent() is HBoxContainer row) row.Alignment = BoxContainer.AlignmentMode.Center;
@@ -135,8 +122,7 @@ public partial class Game
     private bool IsTransferableHotbarItem(string id) => world.Data.Items[id].Tool == "" && !world.Data.IsConsumable(id);
 
     /// <summary>Puts a hotbar slot in hand; building plans and crates go straight to placement, everything else waits for a left click in the world.</summary>
-    private void SelectHotbar(int slot)
-    {
+    private void SelectHotbar(int slot) {
         if (world == null) return;
         slot = Math.Clamp(slot, 0, 8);
         world.S.ActiveHotbar = slot;
@@ -144,8 +130,7 @@ public partial class Game
         view.BuildMode = "";
         assigningWorker = 0;
         if (string.IsNullOrEmpty(id)) Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
-        else if (world.Data.Buildings.ContainsKey(id)) { view.BuildMode = id; ClosePanel(); Notify($"Place {world.Data.Name(id)}."); }
-        else if (id == "crate") PlaceCrate(id);
+        else if (world.Data.Buildings.ContainsKey(id)) { view.BuildMode = id; ClosePanel(); Notify($"Place {world.Data.Name(id)}."); } else if (id == "crate") PlaceCrate(id);
         else if (UseOf(id) is string use) Notify($"{world.Data.Name(id)} in hand. Left click to {use}.");
         else Notify($"{world.Data.Name(id)} in hand.");
         RefreshLive();
@@ -157,8 +142,7 @@ public partial class Game
         : (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer" ? "swing" : null;
 
     /// <summary>Uses the item in hand toward a point on the ground; items without a use do nothing.</summary>
-    private void UseHeld(Vector2 at)
-    {
+    private void UseHeld(Vector2 at) {
         if (ActiveHotbarItem() is not string id || UseOf(id) == null) return;
         if (paused) { Notify("Resume before using items."); return; }
         if (world.Data.IsConsumable(id)) Act(() => world.Consume(id));
@@ -166,12 +150,10 @@ public partial class Game
         else world.Attack();
     }
 
-    private void HotbarAssignment()
-    {
+    private void HotbarAssignment() {
         AddLabel("Choose a slot, then assign an item or building plan, or drag one onto the hotbar. A slot stores a reference; it does not duplicate anything.", 14, Muted);
         var row = Row();
-        for (int i = 0; i < 9; i++)
-        {
+        for (int i = 0; i < 9; i++) {
             int slot = i;
             string assigned = HotbarId(i);
             var slotButton = Button($"{i + 1}", () => { hotbarAssignSlot = slot; OpenPage("hotbar"); });
@@ -185,8 +167,7 @@ public partial class Game
         string current = HotbarId(hotbarAssignSlot);
         AddLabel($"Assigning slot {hotbarAssignSlot + 1} · {(string.IsNullOrEmpty(current) ? "Empty" : world.Data.Name(current))}", 16);
         var grid = AddGrid();
-        foreach (var id in world.Data.Items.Keys.Concat(world.Data.Buildings.Keys))
-        {
+        foreach (var id in world.Data.Items.Keys.Concat(world.Data.Buildings.Keys)) {
             var (cell, _) = IconCell($"assign_{id}"); cell.Icon = HotbarIcon(id); DragReference(cell, id);
             cell.TooltipText = world.Data.Buildings.ContainsKey(id) ? $"Plan: {world.Data.Name(id)}" : world.Data.Name(id);
             cell.Pressed += () => SetHotbar(hotbarAssignSlot, id);
@@ -196,8 +177,7 @@ public partial class Game
         AddButton("Back to inventory", () => OpenPage("inventory"));
     }
 
-    private void SetHotbar(int slot, string id)
-    {
+    private void SetHotbar(int slot, string id) {
         world.S.HotbarSlots[slot] = id;
         world.S.ActiveHotbar = slot;
         if (id != "") sounds.Play("putting_items_on_hotbar");

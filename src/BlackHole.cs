@@ -7,8 +7,7 @@ namespace ChopChopMeow;
 /// Putting a crate inside a crate: a warning, then a black hole that swallows the screen from the crate outward, then game over.
 /// The whole flow is styled like a starship console rather than the woodland interface.
 /// </summary>
-public partial class Game
-{
+public partial class Game {
     private static readonly Color Neon = new("4fe3ff");
     private static readonly Color Alarm = new("ff4f7a");
     private Control anomaly = null!;
@@ -49,8 +48,7 @@ void fragment() {
     COLOR = vec4(col, 1.0);
 }";
 
-    private void BuildAnomaly()
-    {
+    private void BuildAnomaly() {
         var layer = new CanvasLayer { Layer = 20 }; AddChild(layer);
         anomaly = new Control { Visible = false, Name = "anomaly" }; anomaly.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(anomaly);
         anomaly.Theme = ui.Theme;
@@ -77,13 +75,11 @@ void fragment() {
         anomaly.AddChild(singularity);
     }
 
-    private PanelContainer ConsolePanel(Color edge)
-    {
+    private PanelContainer ConsolePanel(Color edge) {
         var panel = new PanelContainer { CustomMinimumSize = new Vector2(520, 0) };
         panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
         panel.GrowHorizontal = Control.GrowDirection.Both; panel.GrowVertical = Control.GrowDirection.Both;
-        var style = new StyleBoxFlat
-        {
+        var style = new StyleBoxFlat {
             BgColor = new Color(.02f, .04f, .08f, .94f),
             BorderColor = edge,
             ShadowColor = edge with { A = .35f },
@@ -100,21 +96,18 @@ void fragment() {
 
     private static readonly SystemFont ConsoleFont = new() { FontNames = new[] { "DejaVu Sans Mono", "Liberation Mono", "monospace" } };
 
-    private Label ConsoleLabel(string text, int size, Color color)
-    {
+    private Label ConsoleLabel(string text, int size, Color color) {
         var label = Label(text, size, color); label.HorizontalAlignment = HorizontalAlignment.Center;
         label.AddThemeFontOverride("font", ConsoleFont);
         return label;
     }
 
-    private Button ConsoleButton(string text, Color edge, System.Action action)
-    {
+    private Button ConsoleButton(string text, Color edge, System.Action action) {
         var button = Button(text.ToUpperInvariant(), action);
         button.CustomMinimumSize = new Vector2(150, 40); button.AddThemeFontOverride("font", ConsoleFont);
         button.AddThemeColorOverride("font_color", edge); button.AddThemeColorOverride("font_hover_color", Colors.White);
         button.AddThemeColorOverride("font_disabled_color", edge with { A = .35f });
-        foreach (var (state, fill) in new[] { ("normal", .0f), ("hover", .25f), ("pressed", .45f), ("disabled", .0f) })
-        {
+        foreach (var (state, fill) in new[] { ("normal", .0f), ("hover", .25f), ("pressed", .45f), ("disabled", .0f) }) {
             var style = new StyleBoxFlat { BgColor = edge with { A = fill }, BorderColor = edge, ContentMarginLeft = 14, ContentMarginRight = 14 };
             style.SetBorderWidthAll(2); style.SetCornerRadiusAll(2);
             button.AddThemeStyleboxOverride(state, style);
@@ -123,8 +116,7 @@ void fragment() {
     }
 
     /// <summary>Stops a crate from going into a placed crate and asks first; true when the move was intercepted.</summary>
-    private bool CrateIntoCrate(Thing? target, Inventory to, string item)
-    {
+    private bool CrateIntoCrate(Thing? target, Inventory to, string item) {
         if (target?.Kind != "crate" || to != target.Inventory || !World.IsCrate(item)) return false;
         anomalyCrate = target; pausedBeforeAnomaly = paused; paused = true;
         anomalyReadout.Text = $"CONTAINER {target.Id:0000} · NESTING DEPTH 2 · LOCAL METRIC STABILITY 0.03%";
@@ -135,20 +127,17 @@ void fragment() {
         return true;
     }
 
-    private void CancelAnomaly()
-    {
+    private void CancelAnomaly() {
         StopPulse(); anomaly.Visible = false; anomalyCrate = null; paused = pausedBeforeAnomaly;
     }
 
-    private void StopPulse()
-    {
+    private void StopPulse() {
         if (anomalyWarning.HasMeta("tween") && anomalyWarning.GetMeta("tween").As<Tween>() is Tween pulse && pulse.IsValid()) pulse.Kill();
         anomalyWarning.SelfModulate = Colors.White;
     }
 
     /// <summary>The black hole opens at the crate, pulls the picture into itself until only black is left, then the game is over.</summary>
-    private void Collapse(Thing crate)
-    {
+    private void Collapse(Thing crate) {
         StopPulse(); anomalyWarning.Visible = false; ClosePanel(); paused = true;
         var size = GetViewport().GetVisibleRect().Size;
         var material = (ShaderMaterial)collapse.Material;
@@ -158,16 +147,14 @@ void fragment() {
         collapse.Visible = true;
         var tween = collapse.CreateTween();
         tween.TweenMethod(Callable.From<float>(p => material.SetShaderParameter("progress", p)), 0f, 1f, 5f);
-        tween.TweenCallback(Callable.From(() =>
-        {
+        tween.TweenCallback(Callable.From(() => {
             reloadAfterCollapse.Disabled = LatestSlot() < 0;
             singularity.Modulate = new Color(1, 1, 1, 0); singularity.Visible = true;
         }));
         tween.TweenProperty(singularity, "modulate:a", 1f, 1.2f);
     }
 
-    private void EndAnomaly()
-    {
+    private void EndAnomaly() {
         anomaly.Visible = false; collapse.Visible = false; singularity.Visible = false; anomalyCrate = null;
     }
 
