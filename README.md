@@ -46,7 +46,7 @@ The launcher keeps its Godot user-data directory under `.tools/xdg-data`; launch
 
 The host keeps the world and saves it as usual; guests are not kept in the host's saves. Each guest keeps its own player (position, health, needs, backpack, hotbar, crafting queue and carried crates) on its own computer, one file per host address, saved on leaving, on F5 and by the 5-minute autosave. A guest that joins for the first time, or whose save is missing, broken or does not fit the host's world, starts with an empty backpack at the clearing. Leaving, or losing the connection, returns a guest to the start menu.
 
-Everyone shares the world, the market and the workers. Sleep needs every player inside a cabin with enough food and water. Night wolves hunt each player separately. Limitations: the host sends guests the whole world ten times a second, which suits a home network rather than the internet; a guest's actions wait one round trip to the host; there is no port forwarding or address discovery; and hiring is paid by whoever hires, while daily wages come from the host's backpack.
+Everyone shares the world, the market and the workers. Sleep needs every player inside a cabin with enough food and water. Night wolves hunt each player separately. Ten times a second the host sends each guest only what changed since the last update that guest confirmed, usually a few hundred bytes, so it plays over the internet as well as at home. Limitations: a guest's actions on items and buildings wait one round trip to the host (walking does not); the host's port must be reachable, as there is no address discovery or NAT traversal; and hiring is paid by whoever hires, while daily wages come from the host's backpack.
 
 ## Controls
 

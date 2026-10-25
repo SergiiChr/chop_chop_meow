@@ -14,12 +14,18 @@ existing Godot 4.7.2 .NET executable.
 
 from __future__ import annotations
 
+import heapq
+import itertools
 import os
+import random
 import re
+import select
 import shutil
+import socket
 import subprocess
 import sys
 import tarfile
+import threading
 import time
 import urllib.request
 import zipfile
@@ -213,6 +219,49 @@ def setup() -> dict[str, str]:
     return env
 
 
+GAME_PORT = 24565
+LAG_PORT = 24575
+
+
+def lag_proxy(stop: threading.Event, delay: float = 0.08, loss: float = 0.05) -> None:
+    """Relay UDP between guests on LAG_PORT and the host, delaying and dropping packets both ways as a long connection would."""
+    queue: list[tuple[float, int, socket.socket, tuple[str, int] | None, bytes]] = []
+    order = itertools.count()
+    upstreams: dict[tuple[str, int], socket.socket] = {}
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as front:
+        front.bind(("127.0.0.1", LAG_PORT))
+        while not stop.is_set():
+            wait = queue[0][0] - time.monotonic() if queue else 0.05
+            ready, _, _ = select.select(
+                [front, *upstreams.values()], [], [], max(0, min(wait, 0.05))
+            )
+            for sock in ready:
+                data, sender = sock.recvfrom(65536)
+                if sock is front:
+                    if sender not in upstreams:
+                        upstreams[sender] = socket.socket(
+                            socket.AF_INET, socket.SOCK_DGRAM
+                        )
+                        upstreams[sender].connect(("127.0.0.1", GAME_PORT))
+                    target, client = upstreams[sender], None
+                else:
+                    target, client = (
+                        front,
+                        next(a for a, s in upstreams.items() if s is sock),
+                    )
+                if random.random() >= loss:
+                    due = time.monotonic() + delay * random.uniform(0.75, 1.25)
+                    heapq.heappush(queue, (due, next(order), target, client, data))
+            while queue and queue[0][0] <= time.monotonic():
+                _, _, target, client, data = heapq.heappop(queue)
+                if client:
+                    target.sendto(data, client)
+                else:
+                    target.send(data)
+    for upstream in upstreams.values():
+        upstream.close()
+
+
 def test(env: dict[str, str]) -> None:
     run_godot(
         "test",
@@ -229,20 +278,28 @@ def test(env: dict[str, str]) -> None:
         success_marker="UI-TEST PASS",
     )
     # The host and guest of the network check talk to each other, so both run at once.
+    # The guest joins through a relay that adds lag and packet loss.
+    stop = threading.Event()
+    roles = {"host": ["host"], "guest": ["guest", "--port", str(LAG_PORT)]}
     with ThreadPoolExecutor() as pool:
+        relay = pool.submit(lag_proxy, stop)
         checks = [
             pool.submit(
                 run_godot,
                 f"net-{role}",
-                [GODOT, "--headless", "--path", ROOT, "--", "--net-check", role],
+                [GODOT, "--headless", "--path", ROOT, "--", "--net-check", *args],
                 env,
                 timeout=240,
                 success_marker=f"NET-{role.upper()} PASS",
             )
-            for role in ("host", "guest")
+            for role, args in roles.items()
         ]
-        for check in checks:
-            check.result()
+        try:
+            for check in checks:
+                check.result()
+        finally:
+            stop.set()
+            relay.result()
 
 
 def fetch_templates(env: dict[str, str]) -> None:

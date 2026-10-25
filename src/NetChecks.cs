@@ -107,7 +107,10 @@ public partial class Game
         await LeaveGame();
     }
 
-    private static string GuestSave => $"user://{FilePrefix}guest-127-0-0-1-{Net.DefaultPort}.json";
+    /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
+    private static int CheckPort => Array.IndexOf(OS.GetCmdlineUserArgs(), "--port") is int at and >= 0 ? int.Parse(OS.GetCmdlineUserArgs()[at + 1]) : Net.DefaultPort;
+
+    private static string GuestSave => $"user://{FilePrefix}guest-127-0-0-1-{CheckPort}.json";
 
     /// <summary>Join game on the start menu, the address typed into the popup and the port as it comes; tried again until the host is up.</summary>
     private async Task JoinFromStart()
@@ -118,6 +121,7 @@ public partial class Game
             await Click(FindButton(screen, "Join game")!);
             var port = (LineEdit)screen.FindChild("port", true, false);
             UIRequire(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
+            port.Text = CheckPort.ToString();
             await Type("127.0.0.1");
             await Click(FindButton(screen, "Join")!);
             for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && joinStatus.Text == "Connecting…";) await Frames(1);
