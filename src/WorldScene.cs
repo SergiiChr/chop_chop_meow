@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using static ChopChopMeow.ModelKit;
 
@@ -224,6 +225,16 @@ public partial class WorldView
             blades.Add((new Transform3D(basis, new Vector3(p.X, 0, p.Y)), new Color("5f7d43").Lerp(new Color("8ea75f"), (float)rng.NextDouble())));
             if (rng.NextDouble() < .07) flowers.Add((new Transform3D(Basis.Identity, new Vector3(p.X + .12f, .14f, p.Y + .05f)), petals[rng.Next(petals.Length)]));
         }
+        // Clear only the cave and rail approaches after sampling, keeping all other seeded vegetation unchanged.
+        bool AtMine(Vector3 at) => World.Cliffs.Any(cliff =>
+        {
+            var offset = new Vector2(at.X, at.Z) - World.MineSpot(cliff);
+            float depth = offset.Dot(World.MineOut(cliff));
+            return Math.Abs(offset.Dot(cliff.Along)) < 2.8f && depth > -6 && depth < 1.3f;
+        });
+        blades.RemoveAll(item => AtMine(item.At.Origin));
+        flowers.RemoveAll(item => AtMine(item.At.Origin));
+        bushes.RemoveAll(item => AtMine(item.At.Origin));
         var tuft = new SurfaceTool();
         tuft.Begin(Mesh.PrimitiveType.Triangles);
         for (int i = 0; i < 4; i++)
