@@ -421,25 +421,15 @@ public static class WorldModels
     {
         // Turned to face down the valley, toward the camera, so the hanging tools show.
         var body = Pivot(prop.Body, Vector3.Zero, new Vector3(0, 45, 0));
-        var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var block = Mat("9a9d99", .95f); var handle = Mat("e0b07a"); var steel = Mat("b9c3c6", .4f, .3f);
-        Box(body, new Vector3(1.1f, .22f, .36f), new Vector3(0, .11f, 0), block);
-        foreach (float x in new[] { -.48f, .48f }) Box(body, new Vector3(.1f, 1.45f, .1f), new Vector3(x, .9f, 0), post);
-        Box(body, new Vector3(1.05f, .9f, .04f), new Vector3(0, 1.0f, -.03f), plank);
-        Box(body, new Vector3(1.15f, .06f, .2f), new Vector3(0, 1.5f, 0), post);
-        foreach (float x in new[] { -.3f, 0, .3f }) Box(body, new Vector3(.03f, .03f, .1f), new Vector3(x, 1.32f, .05f), post);
-        // Each tool hangs from its peg by the head, handle down along the board.
-        Node3D Hang(float x)
+        Add(body, RackShape.Feet, RackShape.Concrete, Vector3.Zero);
+        Add(body, RackShape.Frame, RackShape.Timber, Vector3.Zero);
+        Node3D Hang(float x, Mesh mesh)
         {
             var hook = Pivot(body, new Vector3(x, 1.3f, .06f));
-            Box(hook, new Vector3(.04f, .72f, .04f), new Vector3(0, -.36f, 0), handle);
+            Add(hook, mesh, RackShape.Tool, Vector3.Zero);
             return hook;
         }
-        var axe = Hang(-.3f); Box(axe, new Vector3(.22f, .12f, .03f), new Vector3(.08f, -.04f, 0), steel);
-        var pick = Hang(0); Box(pick, new Vector3(.38f, .05f, .04f), new Vector3(0, -.02f, 0), steel, new Vector3(0, 0, 8));
-        var rake = Hang(.3f);
-        Box(rake, new Vector3(.3f, .04f, .04f), new Vector3(0, -.74f, 0), steel);
-        for (int i = 0; i < 5; i++) Box(rake, new Vector3(.015f, .12f, .015f), new Vector3(-.12f + i * .06f, -.82f, 0), steel);
-        prop.Racked = new() { ["axe"] = axe, ["pickaxe"] = pick, ["rake"] = rake };
+        prop.Racked = new() { ["axe"] = Hang(-.3f, RackShape.Axe), ["pickaxe"] = Hang(0, RackShape.Pick), ["rake"] = Hang(.3f, RackShape.Rake) };
     }
 
     /// <summary>A 3×3 yard of packed earth edged with logs, with fourteen stack blocks in a 9-4-1 pyramid that the view shows as the pile fills.</summary>

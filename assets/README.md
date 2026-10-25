@@ -21,3 +21,5 @@ Both PNG atlases were generated with the built-in image generation tool for this
 `CookShape` caches the cooking table’s recessed masonry hearth, bevelled timber joinery, grill and open stew pot, hollow mortar with fitted pestle, and fire mesh. `WorldModels.CookingTable` preserves the independently visible `Glow` and `Mortar` handles, the light and smoke vent, and its existing hit volumes.
 
 `CanneryShape` caches the cannery’s bevelled steel stove with an open firebox and flue, fitted timber counter, shaped stockpot and lid with open handles, and hand press with cans. Bevels are limited to broad edges; simplified can profiles and omitted covered caps keep the lit model at 1,057 triangles across five visible mesh instances. The existing fire, light and smoke controls remain on `WorldModels.Cannery`.
+
+`RackShape` caches the tool station’s fitted concrete feet, bevelled planks and cap, and shaped axe, pickaxe and rake. Each tool retains its separate `Racked` visibility pivot; the rack keeps its existing orientation and picking volume. Fully stocked it uses 504 triangles across five visible mesh instances; empty it uses 268 across two.
