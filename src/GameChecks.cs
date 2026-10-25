@@ -87,7 +87,7 @@ public partial class Game
         var sign = world.Add("signpost", world.Player + new Vector2(2, 0));
         world.S.Backpack.Add("wood", 5); world.S.Backpack.Add(Inventory.Coins, 100);
         var berries = world.Add("crate", world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); world.PickUpCrate(berries);
-        string packed = world.S.Backpack.Items.Keys.Single(World.IsCrate);
+        string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         await Click(view.Screen(sign.Pos, .8f));
         UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A signpost must open the market with its icon buttons.");
         await Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·")));
@@ -116,6 +116,46 @@ public partial class Game
         world.S.Workers.Remove(hired); world.S.Orders.Clear(); world.S.Things.Remove(sign); world.S.Backpack.Remove(Inventory.Coins, 999);
         signpostTab = "market"; ClosePanel(); await Frames();
     }
+    private async Task CheckCraftingAndTorch()
+    {
+        ClosePanel(); world.S.Backpack.Remove("stone_chisel", 99); world.S.Backpack.Add("stone", 2); world.S.Backpack.Add("wood", 3);
+        await KeyStroke(Key.C);
+        UIRequire(page == "craft", "C must open the crafting menu.");
+        var badge = (TextureRect)panel.FindChild("section_chisel", true, false).FindChild("badge", true, false);
+        UIRequire(badge.Modulate != Colors.White && badge.TooltipText.Contains("Needs a chisel"), "A missing chisel must show a red badge with a hint.");
+        await Click(Named("craft_stone_chisel")!);
+        UIRequire(world.S.Crafting.SequenceEqual(new[] { "stone_chisel" }) && world.S.Backpack["stone"] == 0, "Clicking a recipe must queue it and take its materials.");
+        world.S.CraftTime = world.Data.Recipes["stone_chisel"].Seconds - .05f; await Frames(10); RefreshLive(); await Frames();
+        UIRequire(world.S.Backpack["stone_chisel"] == 1 && badge.Modulate == Colors.White, "The chisel must arrive and turn its badge back to normal.");
+        int wood = world.S.Backpack["wood"];
+        await Click(Named("craft_torch")!);
+        world.S.CraftTime = world.Data.Recipes["torch"].Seconds - .05f; await Frames(10);
+        UIRequire(world.S.Backpack["torch"] == 1 && world.S.Backpack["wood"] == wood - 3, "A torch must be made by hand from 3 wood.");
+        ClosePanel(); world.S.HotbarSlots[8] = "torch";
+        await KeyStroke(Key.Key9);
+        UIRequire(world.S.Torch > 0 && world.S.Backpack["torch"] == 0, "The torch hotbar key must light a carried torch.");
+    }
+
+    private async Task CheckCrateInCrate()
+    {
+        var crate = world.Add("crate", world.Player + new Vector2(1, 0));
+        var box = world.Add("crate", world.Player); box.Inventory.Add("berries", 3); world.PickUpCrate(box);
+        string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        Select(crate); await Frames();
+        await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
+        UIRequire(anomaly.Visible && anomalyWarning.Visible && world.S.Backpack[packed] == 1 && crate.Inventory.Count == 0, "A crate dragged into a crate must stop at the warning.");
+        await Click((Control)anomaly.FindChild("anomaly_no", true, false));
+        UIRequire(!anomaly.Visible && world.S.Backpack[packed] == 1 && world.Find(crate.Id) != null, "No must cancel and keep both crates.");
+        RefreshLive();
+        await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
+        await Click((Control)anomaly.FindChild("anomaly_yes", true, false));
+        UIRequire(collapse.Visible && !anomalyWarning.Visible, "Yes must open the black hole.");
+        for (int i = 0; i < 40 && !(singularity.Visible && singularity.Modulate.A > .99f); i++) await Seconds(.25);
+        UIRequire(singularity.Visible, "The collapse must end on the game over screen.");
+        await Click((Control)singularity.FindChild("menu_after_collapse", true, false));
+        UIRequire(!anomaly.Visible && backdrop.Visible && FindButton(screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
+    }
+
     private async Task CheckCabinAndCanopy()
     {
         ClosePanel(); await Frames();
@@ -386,6 +426,8 @@ public partial class Game
             for (int i = 0; i < 120 && world.Find(looseOre.Id) != null; i++) { await Frames(); harvestAnimation |= view.PlayerAnimation == ActorAction.Gather; }
             UIRequire(world.Find(looseOre.Id) == null && world.S.Backpack["iron_ore"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
             UIRequire(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
+            await CheckCraftingAndTorch();
+            await CheckCrateInCrate();
             RemoveCheckFiles();
             GD.Print("UI-TEST PASS"); Quit();
         }

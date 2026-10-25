@@ -27,7 +27,7 @@ public partial class Game
         if (!world.GoalComplete || world.S.EndingShown) return;
         world.S.EndingShown = true; paused = true; ClosePanel();
         int seconds = (int)world.S.PlaySeconds;
-        endingStats.Text = $"Steel tools reached the village and your first villager is at work.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";
+        endingStats.Text = $"A crate of steel tools reached the village and your first villager is at work.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";
         ending.Visible = true;
     }
 
