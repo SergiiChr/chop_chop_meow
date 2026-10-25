@@ -111,6 +111,24 @@ public partial class Game
         return column;
     }
 
+    /// <summary>A recipe's hover popup: its name, each input as an icon with the amount (red while the backpack is short), and the time where it is crafted.</summary>
+    private Control RecipePopup(RecipeDef r, float seconds)
+    {
+        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 6);
+        column.AddChild(Label($"{r.Name}{(r.Amount > 1 ? $" ×{r.Amount}" : "")}", 15));
+        var inputs = new HBoxContainer(); inputs.AddThemeConstantOverride("separation", 10); column.AddChild(inputs);
+        foreach (var (item, amount) in r.Inputs)
+        {
+            var icon = new TextureRect { Texture = HotbarIcon(item), CustomMinimumSize = new Vector2(30, 30), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };
+            var count = Label(amount.ToString(), 14, world.S.Backpack[item] >= amount ? Cream : new Color("ff8a7a"));
+            var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 2); pair.AddChild(icon); pair.AddChild(count); inputs.AddChild(pair);
+        }
+        column.AddChild(Label($"{seconds:0.#}s", 14, Muted));
+        // The shared label helper wraps text, which squeezes a popup with no set width down to single letters.
+        foreach (var label in column.FindChildren("*", "Label", true, false).OfType<Label>()) label.AutowrapMode = TextServer.AutowrapMode.Off;
+        return column;
+    }
+
     /// <summary>
     /// A boxed grid of recipe icons under a heading naming the tool they need, whose icon turns red while that tool is missing.
     /// <paramref name="held"/> names the tool in use, or null when it is missing or none is needed.
@@ -150,16 +168,14 @@ public partial class Game
             count.Text = r.Amount > 1 ? r.Amount.ToString() : "";
             if (chosen(id)) cell.AddThemeStyleboxOverride("normal", Box(new Color("7c8550"), 4, 3));
             cell.Pressed += () => { click(id); RefreshLive(); };
-            string Describe()
-            {
-                float rate = (atBench ? world.Data.BenchSpeed : 1) * (held() is string inUse ? world.Data.Items[inUse].Speed : 1);
-                return $"{r.Name}{(r.Amount > 1 ? $" ×{r.Amount}" : "")}\nNeeds: {Needs(r.Inputs)}\n{r.Seconds / rate:0.#} s{(atBench ? " at this bench" : " by hand")}";
-            }
+            float Time() => r.Seconds / ((atBench ? world.Data.BenchSpeed : 1) * (held() is string inUse ? world.Data.Items[inUse].Speed : 1));
+            string Describe() => $"{r.Name}{(r.Amount > 1 ? $" ×{r.Amount}" : "")}\nNeeds: {Needs(r.Inputs)}\n{Time():0.#}s";
+            cell.Popup = () => RecipePopup(r, Time());
             cell.MouseEntered += () => details.Text = Describe();
             live.Add(() =>
             {
                 if (!GodotObject.IsInstanceValid(cell)) return;
-                cell.TooltipText = $"{Describe()}\n{(atBench ? "Click to set the bench to it" : "Click to craft")}";
+                cell.TooltipText = Describe();
                 cell.Modulate = ready(id) ? Colors.White : new Color(1, .7f, .65f);
             });
             grid.AddChild(cell);

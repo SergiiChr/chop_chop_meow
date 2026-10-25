@@ -90,6 +90,11 @@ public partial class Game : Node
         theme.SetConstant("separation", "VBoxContainer", 9);
         theme.SetConstant("separation", "HBoxContainer", 8);
         theme.SetStylebox("normal", "OptionButton", Box(new Color("405b47"), 5, 10));
+        // Tooltips read as solid popups with a bright edge rather than a translucent wash over the scene.
+        var tip = Box(new Color("1b2b24"), 6, 10); tip.BorderColor = new Color("e9d9a6"); tip.SetBorderWidthAll(2);
+        tip.ShadowColor = new Color(0, 0, 0, .45f); tip.ShadowSize = 6;
+        theme.SetStylebox("panel", "TooltipPanel", tip);
+        theme.SetColor("font_color", "TooltipLabel", Cream);
         ui.Theme = theme;
     }
     private static StyleBoxFlat Box(Color color, int radius, int margin) => new()

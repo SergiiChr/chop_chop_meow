@@ -18,6 +18,10 @@ public partial class ItemSlot : Button
     public Func<ItemDrag?>? Drag { get; set; }
     public Func<ItemDrag, bool>? CanTake { get; set; }
     public Action<ItemDrag>? Take { get; set; }
+    /// <summary>Builds a richer tooltip than plain text; the tooltip text must still be non-empty for Godot to show it.</summary>
+    public Func<Control>? Popup { get; set; }
+
+    public override GodotObject? _MakeCustomTooltip(string forText) => Popup?.Invoke();
 
     public override Variant _GetDragData(Vector2 atPosition)
     {
