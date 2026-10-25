@@ -361,6 +361,16 @@ public static class WorldModels
     private static void StorageBox(Prop prop, string panel, string edge, string fittings)
     {
         var body = prop.Body;
+        if (prop.Kind == "chest")
+        {
+            Add(body, ChestShape.Body, ChestShape.Wood, Vector3.Zero);
+            Add(body, ChestShape.Frame, ChestShape.Metal, Vector3.Zero);
+            var hinge = Pivot(body, new Vector3(0, .49f, -.275f));
+            Add(hinge, ChestShape.Lid, ChestShape.Wood, Vector3.Zero);
+            Add(hinge, ChestShape.LidFrame, ChestShape.Metal, Vector3.Zero);
+            prop.Lid = hinge;
+            return;
+        }
         bool tote = panel == "e2701e";
         var size = tote ? new Vector3(.75f, .36f, .5f) : new Vector3(.85f, .45f, .55f);
         Box(body, size, new Vector3(0, size.Y / 2 + .04f, 0), Mat(panel, tote ? .5f : .9f));
