@@ -67,6 +67,25 @@ public sealed class HireOffer
     public int Upfront { get; set; }
     public int Wage { get; set; }
 }
+/// <summary>How a mine is built and how fast it yields.</summary>
+public sealed class MineDef
+{
+    /// <summary>Materials the second stage needs delivered to the site.</summary>
+    public Dictionary<string, int> Materials { get; set; } = new();
+    /// <summary>Working days of one worker that digging the entrance, and later fitting the frame, each take.</summary>
+    public float StageWorkdays { get; set; } = 1;
+    /// <summary>Seconds one miner takes to bring out one ore and one rock.</summary>
+    public float Seconds { get; set; } = 2;
+    public int Workers { get; set; } = 3;
+}
+/// <summary>The end goals: a mine on every ore and a week of steady profit.</summary>
+public sealed class GoalsDef
+{
+    /// <summary>Sale coins minus wages that a day has to clear.</summary>
+    public int DailyProfit { get; set; }
+    /// <summary>Consecutive days that have to clear it.</summary>
+    public int ProfitDays { get; set; }
+}
 public sealed class GameData
 {
     public float DaySeconds { get; set; } = 420;
@@ -97,6 +116,10 @@ public sealed class GameData
     /// <summary>How much faster a crafting bench works than crafting by hand.</summary>
     public float BenchSpeed { get; set; } = 2;
     public MarketDef Market { get; set; } = new();
+    public MineDef Mine { get; set; } = new();
+    public GoalsDef Goals { get; set; } = new();
+    /// <summary>A worker's time on duty in a day: dawn to dusk, less lunch and the walk in.</summary>
+    public float WorkdaySeconds => DuskStarts * DaySeconds - DaySeconds / 24 - TradeSeconds / 2;
     public Dictionary<string, ItemDef> Items { get; set; } = new();
     public Dictionary<string, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
@@ -125,6 +148,8 @@ public sealed class GameData
         }
         if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Health < 0 || i.Hunger > 0 && !i.Food) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in data/game.json.");
+        if (Mine.Materials.Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Mine.StageWorkdays <= 0 || Mine.Seconds <= 0 || Mine.Workers <= 0 || Goals.DailyProfit <= 0 || Goals.ProfitDays <= 0)
+            throw new InvalidOperationException("Invalid mine or goals in data/game.json.");
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
     public bool IsConsumable(string item) => Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);

@@ -14,6 +14,8 @@ public sealed class Prop
     public readonly Node3D Root = new();
     public readonly Node3D Body;
     public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer;
+    /// <summary>A mine's parts, shown stage by stage: the marked outline, the dug hole, the delivered materials, the timber frame, the rails and the cart with its load.</summary>
+    public Node3D? Outline, Hole, Supplies, Frame, Rails, Cart, Load;
     public Node3D[] Pleats = Array.Empty<Node3D>();
     public MeshInstance3D? Glow, Window, Pool;
     public WorldModels.WolfModel? Wolf;
@@ -72,6 +74,7 @@ public static class WorldModels
         "anvil" => new[] { new Hit(.45f, 0, .85f) },
         "signpost" => new[] { new Hit(.5f, 0, 1.9f) },
         "campfire" => new[] { new Hit(.55f, 0, .7f) },
+        "mine" => new[] { new Hit(.9f, 0, 1.8f) },
         _ => new[] { new Hit(.5f, 0, .8f) },
     };
 
@@ -101,8 +104,10 @@ public static class WorldModels
             case "bench": Workbench(prop); break;
             case "signpost": Signpost(prop); break;
             case "campfire": FirePit(prop); break;
+            case "mine": Mine(prop, World.CliffAt(t.Pos).Ore); break;
         }
         if (t.Kind != "water") body.RotationDegrees = new Vector3(0, t.Kind == "tree" || t.IsResource ? Jitter(t.Id, 1) * 360 : 0, 0);
+        if (t.Kind == "mine") body.Rotation = MineYaw(t.Pos);
         return prop;
     }
 
@@ -434,6 +439,77 @@ public static class WorldModels
 
     /// <summary>Needle roll in degrees for a heat fraction: cold points left, full heat points right.</summary>
     public static float Gauge(float heat) => 110 - 220 * Math.Clamp(heat, 0, 1);
+
+    /// <summary>Turns a mine's local +Z along its rails, out of the cliff's end.</summary>
+    public static Vector3 MineYaw(Vector2 p)
+    {
+        var way = World.MineOut(World.CliffAt(p));
+        return new Vector3(0, MathF.Atan2(way.X, way.Y), 0);
+    }
+
+    /// <summary>Ore color in a mine cart: rusty iron, black coal, and pale grey for anything else.</summary>
+    private static string OreColor(string ore) => ore switch { "iron" => "a35a2e", "coal" => "26282b", _ => "b9bbb4" };
+
+    /// <summary>A timbered adit cut into the cliff's end, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>
+    private static void Mine(Prop prop, string ore)
+    {
+        var body = prop.Body;
+        // The portal sits this far behind the cart, at the rock face past the cliff's end (see World.MineSpot).
+        const float Door = -2.2f;
+        // The marking: a see-through green footprint and portal, shown until the mine is finished.
+        var outline = Pivot(body, Vector3.Zero);
+        var green = Flat(new Color(.45f, .95f, .4f, .45f));
+        foreach (float x in new[] { -.8f, .8f }) Box(outline, new Vector3(.06f, .03f, 3.3f), new Vector3(x, .02f, Door + 1.65f), green);
+        foreach (float z in new[] { Door, Door + 3.3f }) Box(outline, new Vector3(1.66f, .03f, .06f), new Vector3(0, .02f, z), green);
+        foreach (float x in new[] { -.7f, .7f }) Box(outline, new Vector3(.08f, 1.75f, .08f), new Vector3(x, .88f, Door), green);
+        Box(outline, new Vector3(1.56f, .08f, .08f), new Vector3(0, 1.75f, Door), green);
+        prop.Outline = outline;
+        // Rock around the portal, so the adit reads as cut into the cliff even where its end tapers low.
+        // Matches the cliff palettes in WorldScene.BuildCliff.
+        var rock = ore switch { "iron" => new[] { "7d5b45", "8a6650", "6e4f3c" }, "tin" => new[] { "7f827d", "8b8e88", "737671" }, _ => new[] { "3a3c40", "45474c", "2d2f33" } };
+        foreach (var (x, h, r) in new[] { (-1.25f, 2.6f, .7f), (1.25f, 2.4f, .75f), (0f, 1.1f, .95f) })
+            Cylinder(body, r + .15f, r, h, new Vector3(x, x == 0 ? 2.05f + h / 2 - .2f : h / 2, Door - .55f), Mat(rock[(int)(h * 10) % 3], .95f), null, 5);
+        // The opening: black inside, with a ground patch of spoil in front; it grows from the floor up as it is dug.
+        var hole = Pivot(body, new Vector3(0, 0, Door));
+        Box(hole, new Vector3(1.3f, 1.65f, .9f), new Vector3(0, .82f, -.47f), Flat(new Color("0b0b0c")));
+        Box(hole, new Vector3(1.5f, .03f, 1.4f), new Vector3(0, .015f, .7f), Mat("5d564c", 1));
+        foreach (var (x, z) in new[] { (-.95f, .9f), (1f, .5f), (-1.1f, .3f) }) Sphere(hole, .22f, new Vector3(x, .06f, z), Mat("7c807d", .95f), new Vector3(1.3f, .5f, 1), 6);
+        prop.Hole = hole;
+        // Delivered materials wait beside the entrance: a log pile, stones and a few iron bars.
+        var supplies = Pivot(body, Vector3.Zero);
+        for (int i = 0; i < 5; i++) Cylinder(supplies, .11f, .11f, .9f, new Vector3(1.3f + (i % 3) * .23f + (i > 2 ? .11f : 0), .11f + (i > 2 ? .19f : 0), -.6f), Mat(i % 2 == 0 ? "8a5f3c" : "7a5235"), new Vector3(90, 0, 0), 7);
+        for (int i = 0; i < 4; i++) Sphere(supplies, .17f, new Vector3(-1.35f + (i % 2) * .26f, .1f + (i / 2) * .18f, -.2f + (i % 2) * .1f), Mat("a3a7a3", .9f), new Vector3(1.2f, .7f, 1), 6);
+        for (int i = 0; i < 3; i++) Box(supplies, new Vector3(.12f, .06f, .5f), new Vector3(-1.3f, .03f + i * .06f, -1f), Mat("c2c9c9", .4f, .6f), new Vector3(0, i * 12, 0));
+        prop.Supplies = supplies;
+        // Timber set: two posts, a cap beam and side lagging, fitted in the last stage.
+        var frame = Pivot(body, new Vector3(0, 0, Door));
+        var timber = Mat("7a5235"); var dark = Mat("5d3f28");
+        foreach (float x in new[] { -.72f, .72f }) Box(frame, new Vector3(.18f, 1.8f, .18f), new Vector3(x, .9f, .05f), timber);
+        Box(frame, new Vector3(1.8f, .2f, .24f), new Vector3(0, 1.85f, .05f), timber);
+        foreach (float x in new[] { -.9f, .9f }) for (int i = 0; i < 3; i++) Box(frame, new Vector3(.08f, .5f, .3f), new Vector3(x, .3f + i * .55f, 0), dark);
+        Box(frame, new Vector3(.3f, .16f, .04f), new Vector3(0, 1.85f, .18f), Mat("c62828", .6f));
+        prop.Frame = frame;
+        var rails = Pivot(body, Vector3.Zero);
+        var steel = Mat("6c7175", .4f, .7f);
+        foreach (float x in new[] { -.28f, .28f }) Box(rails, new Vector3(.05f, .05f, 3.6f), new Vector3(x, .07f, Door + 1.5f), steel);
+        for (int i = 0; i < 9; i++) Box(rails, new Vector3(.8f, .04f, .14f), new Vector3(0, .025f, Door - .3f + i * .4f), Mat("6e4a2e"));
+        prop.Rails = rails;
+        // The cart rides the rails: out front when idle, into the dark while miners work, and back out loaded.
+        var cart = Pivot(body, Vector3.Zero);
+        var tub = Mat("4f5a5e", .5f, .6f);
+        Box(cart, new Vector3(.66f, .06f, .86f), new Vector3(0, .3f, 0), tub);
+        foreach (float x in new[] { -.33f, .33f }) Box(cart, new Vector3(.05f, .38f, .86f), new Vector3(x, .5f, 0), tub, new Vector3(0, 0, x > 0 ? -8 : 8));
+        foreach (float z in new[] { -.43f, .43f }) Box(cart, new Vector3(.72f, .38f, .05f), new Vector3(0, .5f, z), tub);
+        foreach (var (x, z) in new[] { (-.3f, -.28f), (.3f, -.28f), (-.3f, .28f), (.3f, .28f) }) Cylinder(cart, .12f, .12f, .05f, new Vector3(x, .14f, z), Mat("2b2d30", .5f, .6f), new Vector3(0, 0, 90), 10);
+        var load = Pivot(cart, Vector3.Zero);
+        var lump = Mat(OreColor(ore), .8f);
+        foreach (var (x, z, r) in new[] { (0f, 0f, .3f), (-.16f, .2f, .18f), (.15f, -.22f, .17f), (.12f, .18f, .15f), (-.12f, -.18f, .16f) }) Sphere(load, r, new Vector3(x, .62f, z), lump, new Vector3(1, .6f, 1), 6);
+        prop.Load = load;
+        prop.Cart = cart;
+        // Lamplight from inside while someone works underground.
+        prop.Glow = Box(body, new Vector3(1.1f, 1.4f, .02f), new Vector3(0, .72f, Door + .03f), Flat(new Color(1, .62f, .25f, .35f)));
+        prop.Light = Light(body, new Vector3(0, .9f, Door + .8f), 4.5f);
+    }
 
     private static OmniLight3D Light(Node3D parent, Vector3 at, float range)
     {

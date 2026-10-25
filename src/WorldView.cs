@@ -411,8 +411,9 @@ public partial class WorldView : Node3D
             bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking);
-            if (work == ActorAction.Hammer && assignment?.Processing != true) work = ActorAction.Idle;
-            var facing = work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment?.Pos ?? worker.Pos;
+            if (work == ActorAction.Hammer && assignment?.Processing != true && assignment?.Kind != "mine") work = ActorAction.Idle;
+            // At a mine the worker faces the rock past the entrance, not the cart out front.
+            var facing = work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment is { Kind: "mine" } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, ActorAnimation.Tool(work));
             entry.Rig.Root.Visible = World.Sees(worker);
@@ -472,8 +473,8 @@ public partial class WorldView : Node3D
                 Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
                 Burst(To3(subject.Pos, 3.6f), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
-            case "stone" or "iron" or "coal" or "tin":
-                var color = subject.Kind == "stone" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : subject.Kind == "tin" ? "b9bbb4" : "26282b";
+            case "stone" or "iron" or "coal" or "tin" or "mine":
+                var color = subject.Kind is "stone" or "mine" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : subject.Kind == "tin" ? "b9bbb4" : "26282b";
                 Burst(side + Vector3.Up * .5f, Mat(color), 6, 2.4f, .5f, 9, .07f);
                 Burst(side + Vector3.Up * .4f, Flat(new Color(.8f, .78f, .7f, .45f)), 3, .5f, .9f, -.3f, .16f, 1.5f);
                 if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Flat(new Color("ffd27a")), 5, 3.2f, .3f, 4, .025f);
@@ -613,6 +614,26 @@ public partial class WorldView : Node3D
                 prop.Window!.MaterialOverride = night > .45f ? NightGlass : Mat("8fb4c4", .15f, .2f);
                 prop.Light!.LightEnergy = night > .45f ? .9f : 0;
                 break;
+            case "mine":
+                // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty and unlit.
+                float stageShare = Math.Clamp(t.Progress / World.MineStageSeconds, 0, 1);
+                bool finished = t.Stage == World.MineOpen;
+                prop.Outline!.Visible = !finished;
+                prop.Hole!.Visible = t.Stage > 0 || stageShare > 0;
+                prop.Hole.Scale = new Vector3(1, t.Stage > 0 ? 1 : Math.Max(.05f, stageShare), 1);
+                prop.Supplies!.Visible = t.Stage == World.MineSupplied;
+                prop.Frame!.Visible = finished || t.Stage == World.MineSupplied && stageShare > 0;
+                prop.Frame.Scale = new Vector3(1, finished ? 1 : Math.Max(.05f, stageShare), 1);
+                prop.Rails!.Visible = prop.Cart!.Visible = finished;
+                bool mining = finished && World.Sees(t.Pos) && World.S.Workers.Any(w => w.Assignment == t.Id && w.WorkState == WorkerWorkState.Underground);
+                // The cart runs a round trip into the dark every few seconds while miners are inside.
+                float cartTrip = (Elapsed / 7 + WorldModels.Jitter(t.Id, 3)) % 1;
+                prop.Open = mining ? World.TripLeg(cartTrip) : Mathf.MoveToward(prop.Open, 0, dt * .4f);
+                prop.Cart.Position = new Vector3(0, 0, -3 * Ease(prop.Open));
+                prop.Load!.Visible = (t.Output?.Count ?? 0) > 0 && (!mining || cartTrip > .5f);
+                prop.Glow!.Visible = mining;
+                prop.Light!.LightEnergy = mining ? (1.3f + flicker * .2f) * (.5f + night) : 0;
+                break;
             case "signpost":
                 bool waiting = World.S.Orders.Any(o => o.Signpost == t.Id);
                 prop.Open = Mathf.MoveToward(prop.Open, waiting ? 1 : 0, Math.Max(dt, .016f) * 3);
@@ -742,7 +763,7 @@ public partial class WorldView : Node3D
         foreach (var (kind, ghost) in ghosts) ghost.Root.Visible = kind == BuildMode;
         placeTile.Visible = BuildMode != "";
         if (BuildMode == "") return;
-        var at = ToWorld(Mouse).Round();
+        var at = World.Snap(BuildMode, ToWorld(Mouse).Round());
         bool valid = World.PlacementBlock(BuildMode, at) == null;
         if (!ghosts.TryGetValue(BuildMode, out var shown))
         {
@@ -752,6 +773,7 @@ public partial class WorldView : Node3D
         }
         if (shown.Tint != (valid ? 1 : 0)) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid ? 1 : 0; }
         shown.Root.Position = To3(at);
+        if (BuildMode == "mine") shown.Body.Rotation = WorldModels.MineYaw(at);
         placeTile.Position = To3(at, .02f);
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
     }

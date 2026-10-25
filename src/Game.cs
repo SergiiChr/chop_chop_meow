@@ -279,6 +279,7 @@ public partial class Game : Node
         if (t.Kind == "hut") { Cabin(t); return; }
         if (t.Kind == "bench") { Bench(t); return; }
         if (t.Kind == "signpost") { Signpost(t); return; }
+        if (t.Kind == "mine") { MinePanel(t); return; }
         if (t.IsStorage) { Storage(t); return; }
         if (t.Kind == "campfire")
         {
@@ -358,7 +359,8 @@ public partial class Game : Node
         {
             var worker = w; var current = world.Find(w.Assignment);
             var check = new CheckBox { Text = $"{w.Name} · {(current == null ? "available" : world.Data.Name(current.Kind))}", ButtonPressed = w.Assignment == t.Id, FocusMode = Control.FocusModeEnum.None };
-            check.Toggled += on => { world.Assign(worker, on ? t : null); RefreshLive(); };
+            // A full mine refuses the worker, so the box shows what actually happened.
+            check.Toggled += on => { world.Assign(worker, on ? t : null); check.SetPressedNoSignal(worker.Assignment == t.Id); RefreshLive(); };
             content.AddChild(check);
         }
         if (t.Kind == "signpost") AddLabel("A villager assigned here minds the post and can fetch fresh prices from the village.", 13, Muted);
@@ -573,6 +575,28 @@ public partial class Game : Node
         if (quitting) return;
         quitting = true; sounds.StopAll(); await Seconds(.2); GetTree().Quit(code);
     }
+    /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
+    private void MineReview(Thing sign)
+    {
+        var args = OS.GetCmdlineUserArgs(); int at = Array.IndexOf(args, "--mine-stage");
+        int stage = at >= 0 && at + 1 < args.Length && int.TryParse(args[at + 1], out int n) ? n : World.MineOpen;
+        int ore = Array.IndexOf(args, "--mine-ore");
+        var cliff = World.CliffOf(ore >= 0 && ore + 1 < args.Length ? args[ore + 1] : "iron");
+        world.Player = World.MineSpot(cliff) + cliff.Face * 3;
+        var mine = world.Build("mine", World.MineSpot(cliff))!;
+        world.S.Milestones.Add("iron_hammer");
+        mine.Stage = stage; mine.Progress = stage is 0 or World.MineSupplied ? world.MineStageSeconds / 2 : 0;
+        if (stage == World.MineDug) mine.Inventory.Add("wood", 20);
+        world.Add("chest", mine.Pos + cliff.Face * 3 + cliff.Along * 2);
+        foreach (var w in world.S.Workers.ToArray()) world.Assign(w, null);
+        foreach (var w in world.S.Workers.Take(stage == World.MineOpen ? 3 : 1)) { w.Pos = world.Player; world.Assign(w, mine); }
+        if (stage == World.MineOpen && !args.Contains("--idle")) mine.Output!.Add(World.MineOre(mine), 20);
+        if (args.Contains("--idle")) { foreach (var w in world.S.Workers) world.Assign(w, null); mine.Output!.Add(World.MineOre(mine), 12); mine.Output.Add("stone", 12); }
+        world.S.Time = world.Data.DaySeconds * (args.Contains("--night") ? .55f : .2f);
+        for (int i = 0; i < 80; i++) world.Tick(.25f);
+        if (args.Contains("--panel")) Select(mine); else ClosePanel();
+        view.Zoom = 1.6f;
+    }
     private void Showcase()
     {
         foreach (var t in world.S.Things.Where(t => t.Pos.DistanceTo(World.Spawn) < 8).ToArray()) world.S.Things.Remove(t);
@@ -632,6 +656,7 @@ public partial class Game : Node
             for (int i = 0; i < 60; i++) world.Tick(.25f);
             OpenPage("workers");
         }
+        if (OS.GetCmdlineUserArgs().Contains("--mine")) MineReview(sign);
         if (!OS.GetCmdlineUserArgs().Contains("--wolves")) return;
         // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
         var spot = World.Spawn + new Vector2(11, 8);

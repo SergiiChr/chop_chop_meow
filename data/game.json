@@ -15,6 +15,13 @@
   "sightRadius": 20,
   "crateCapacity": 12,
   "benchSpeed": 2,
+  "mine": {
+    "materials": { "wood": 50, "iron_bar": 10, "stone": 50 },
+    "stageWorkdays": 1,
+    "seconds": 1.6,
+    "workers": 3
+  },
+  "goals": { "dailyProfit": 1300, "profitDays": 7 },
   "market": {
     "sells": {
       "raw_meat": { "daily": 24, "steady": 24, "drop": 0.05 },
@@ -374,6 +381,11 @@
         "wood": 8
       },
       "description": "Steel from iron + mined coal. Coal fuel only. Pump bellows to reach 80\u00b0."
+    },
+    "mine": {
+      "name": "Mine",
+      "cost": {},
+      "description": "Marking is free and snaps to an ore cliff, one mine per cliff. Dig with a pickaxe, deliver 50 wood, 10 iron bars and 50 stone, then fit it with a hammer. Up to 3 miners with pickaxes bring out ore and rocks for good."
     },
     "signpost": {
       "name": "Village signpost",

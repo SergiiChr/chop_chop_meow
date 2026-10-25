@@ -116,6 +116,29 @@ public partial class Game
         world.S.Workers.Remove(hired); world.S.Orders.Clear(); world.S.Things.Remove(sign); world.S.Backpack.Remove(Inventory.Coins, 999);
         signpostTab = "market"; ClosePanel(); await Frames();
     }
+    /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
+    private async Task CheckMine()
+    {
+        var home = world.Player;
+        foreach (string ore in World.MineOres)
+        {
+            var cliff = World.CliffOf(ore);
+            var spot = World.MineSpot(cliff);
+            world.Player = spot + cliff.Face * 3; await Frames(4);
+            await KeyStroke(Key.B);
+            Named("build_mine")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            UIRequire(view.BuildMode == "mine", "The mine plan must enter placement mode.");
+            // Off the exact spot, so the click shows the plan snapping to the cliff.
+            await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
+            var mine = world.S.Things.LastOrDefault(t => t.Kind == "mine");
+            UIRequire(mine != null && mine.Pos == spot && selected == mine.Id && view.BuildMode == "", $"A click near the {ore} cliff must mark a mine on its spot and select it.");
+            UIRequire(HasLabel(panel, "Stage 1 · Dig the entrance") && HasLabel(panel, "Stage 2 · Shore it up") && HasLabel(panel, "Stage 3 · Fit the frame and rails"), "The mine panel must list its three stages.");
+        }
+        world.Player = home; ClosePanel();
+        await KeyStroke(Key.Escape);
+        UIRequire(HasLabel(menu, "END GOALS") && HasLabel(menu, "A working iron mine") && HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"), "The pause menu must list the end goals.");
+        await KeyStroke(Key.Escape);
+    }
     /// <summary>Clicks open ground beside the player, so the click uses the item in hand instead of selecting something.</summary>
     private async Task ClickGround()
     {
@@ -370,7 +393,12 @@ public partial class Game
 
             world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "bench", "pick", "reinforced", "steel_bar", "steel_tool", "sold_steel", "hired", "assigned" });
             await Frames(3);
-            UIRequire(ending.Visible && paused, "Completing the goal chain must show the ending and pause the world.");
+            UIRequire(!ending.Visible && !paused, "The starter goal chain alone must not end the game.");
+            await CheckMine();
+            foreach (var mine in world.S.Things.Where(t => t.Kind == "mine")) mine.Stage = World.MineOpen;
+            world.S.Milestones.Add("profit_week");
+            await Frames(3);
+            UIRequire(ending.Visible && paused, "Reaching the end goals must show the ending and pause the world.");
             ((Button)ending.FindChild("keep_playing", true, false)).EmitSignal(BaseButton.SignalName.Pressed); await Frames(3);
             UIRequire(!ending.Visible && !paused && world.S.EndingShown, "Keep playing must close the ending and resume.");
             await Frames(3);

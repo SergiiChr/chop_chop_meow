@@ -26,6 +26,8 @@ public sealed class Thing
     public Inventory? Output { get; set; }
     /// <summary>A crafting bench's chisel and hammer slots; automation never touches them.</summary>
     public Inventory? Tools { get; set; }
+    /// <summary>Building stages finished, for buildings put up in stages: a mine counts up to <see cref="World.MineOpen"/>.</summary>
+    public int Stage { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
     [JsonIgnore] public bool IsResource => IsLoose || IsDeposit || Kind is "tree" or "stone" or "berries" or "water" or "wolf_corpse";
     /// <summary>Ore at the foot of a cliff, mined with a pickaxe.</summary>
@@ -42,7 +44,7 @@ public readonly record struct Cliff(string Ore, Vector2 Center, Vector2 Face, fl
     /// <summary>Distance to the cliff's spine, so the whole wall blocks movement rather than only its middle.</summary>
     public float DistanceTo(Vector2 p) => p.DistanceTo(Center + Along * Math.Clamp((p - Center).Dot(Along), -HalfLength, HalfLength));
 }
-public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting }
+public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting, Digging, Underground }
 
 public sealed class Worker
 {
@@ -53,7 +55,9 @@ public sealed class Worker
     public int Assignment { get; set; }
     public string Job { get; set; } = "idle";
     public string Status { get; set; } = "Available";
-    public Inventory Bag { get; set; } = new() { Slots = 1, StackSize = 5 };
+    /// <summary>Units of one stack a worker carries; a miner bringing out a full mine output carries the whole stack.</summary>
+    public const int BagStack = 5;
+    public Inventory Bag { get; set; } = new() { Slots = 1, StackSize = BagStack };
     public int Destination { get; set; }
     public float Timer { get; set; }
     public float WageDebt { get; set; }
@@ -150,6 +154,10 @@ public sealed class SaveState
     public int Sheltered { get; set; }
     public float PlaySeconds { get; set; }
     public bool EndingShown { get; set; }
+    /// <summary>Coins from sales that came back today; wages are taken off at dawn to give the day's profit.</summary>
+    public int DayRevenue { get; set; }
+    /// <summary>Profit of each finished day, oldest first.</summary>
+    public List<int> Profits { get; set; } = new();
     /// <summary>One byte per map tile, 255 once the player has seen it; serialized as base64.</summary>
     public byte[] Explored { get; set; } = new byte[World.MapSize * World.MapSize];
     /// <summary>Things as last seen, kept so the fog shows them unchanged until the player looks again.</summary>
@@ -157,7 +165,7 @@ public sealed class SaveState
 }
 
 /// <summary>Authoritative single-player simulation, independent of rendering and UI.</summary>
-public sealed class World
+public sealed partial class World
 {
     public readonly GameData Data;
     public SaveState S { get; private set; } = new();
@@ -205,7 +213,8 @@ public sealed class World
     public bool OnDuty(Worker w) => !w.Home && !Dusk && !Lunch;
     /// <summary>The campfire the crew sits around at lunch: the one closest to them all, or null outside lunch or without a campfire.</summary>
     public Thing? LunchFire { get; private set; }
-    public bool Sees(Worker w) => !w.Home && Sees(w.Pos);
+    /// <summary>A worker in sight on the map; one mining underground is out of sight inside the hill.</summary>
+    public bool Sees(Worker w) => !w.Home && w.WorkState != WorkerWorkState.Underground && Sees(w.Pos);
     public bool Dead => S.RespawnIn > 0;
     /// <summary>Dead or pinned by a wolf: the player cannot move or act.</summary>
     public bool Downed => Dead || S.Mauled;
@@ -231,6 +240,7 @@ public sealed class World
         if (kind == "signpost") { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; }
         if (kind == "bench") t.Tools = new() { Slots = 2, StackSize = 1 };
         if (kind == "crate") t.Inventory = NewCrate();
+        if (kind == "mine") { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
         S.Things.Add(t); return t;
     }
     public void NewGame()
@@ -294,13 +304,15 @@ public sealed class World
     public bool CanStand(Vector2 p) => Open(p) && !S.Things.Any(t => Blocks(t, p));
     /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls.</summary>
     private static bool Open(Vector2 p) => Terrain.Open(p) && !Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth);
-    private static bool Blocks(Thing t, Vector2 p) => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" && t.Pos.DistanceTo(p) < Footprint(t.Kind);
+    private static bool Blocks(Thing t, Vector2 p) => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" and not "mine" && t.Pos.DistanceTo(p) < Footprint(t.Kind);
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
     public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" => .45f, _ => .35f };
     /// <summary>The fastest carried tool of a kind at or above <paramref name="tier"/>, or null when none is carried.</summary>
     public string? BestTool(string tool, Inventory? from = null, int tier = 0) => (from ?? S.Backpack).Items.Keys
         .Where(id => Data.Items.TryGetValue(id, out var def) && def.Tool == tool && def.Tier >= tier).OrderByDescending(id => Data.Items[id].Speed).FirstOrDefault();
+    /// <summary>Whether workers have a tool of this kind: they get one once the player has made one, and pickaxes once the first is forged.</summary>
+    public bool CrewHas(string tool) => tool == "pickaxe" ? S.Milestones.Contains("pick") : Data.Items.Any(p => p.Value.Tool == tool && S.Milestones.Contains(p.Key));
     private float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
     public void MovePlayer(Vector2 delta)
     {
@@ -317,7 +329,7 @@ public sealed class World
         if (!t.IsResource) return "Select a natural resource.";
         if (t.Remaining <= 0) return t.Kind switch { "berries" => $"Picked clean. The bush fruits again in {Data.BerryRegrowHours:0} hours.", "tree" => "Only a stump is left. Find another tree.", _ => "Depleted. Look for another deposit." };
         if (t.Kind == "tree" && !worker && BestTool("axe") == null) return "An axe is needed. Recover your belongings or craft one at a bench.";
-        if (t.IsDeposit && (worker ? !S.Milestones.Contains("pick") : BestTool("pickaxe") == null)) return t.Kind == "tin" ? "Mining tin needs a pickaxe." : "Craft a pickaxe at a bench. Loose rusty ore nearby can be picked up by hand.";
+        if (t.IsDeposit && (worker ? !CrewHas("pickaxe") : BestTool("pickaxe") == null)) return t.Kind == "tin" ? "Mining tin needs a pickaxe." : "Craft a pickaxe at a bench. Loose rusty ore nearby can be picked up by hand.";
         return null;
     }
     public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "tin" => "tin_ore", "loose_coal" => "coal", "wolf_corpse" => "raw_meat", _ => t.Kind };
@@ -365,6 +377,7 @@ public sealed class World
         if (!crate && !Data.Buildings.ContainsKey(kind)) return "Unknown building.";
         if (Downed) return "You are still recovering.";
         if (S.Sheltered != 0) return "Leave the cabin first.";
+        if (kind == "mine") return MineBlock(p);
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
         if (Player.DistanceTo(p) < 1.2f || Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
         if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
@@ -374,11 +387,12 @@ public sealed class World
     }
     public Thing? Build(string kind, Vector2 p)
     {
+        p = Snap(kind, p);
         var blocked = PlacementBlock(kind, p);
         if (blocked != null) { Say(blocked); return null; }
         S.Backpack.Spend(Data.Buildings[kind].Cost);
         var t = Add(kind, p); if (kind == "campfire") { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
-        S.Milestones.Add(kind); Say($"Built {Data.Name(kind)}."); return t;
+        S.Milestones.Add(kind); Say(kind == "mine" ? $"Marked the {MineName(t)} site. Assign a worker to dig the entrance; they need a pickaxe." : $"Built {Data.Name(kind)}."); return t;
     }
     public void Consume(string item)
     {
@@ -763,6 +777,7 @@ public sealed class World
     }
     public void Assign(Worker w, Thing? target)
     {
+        if (target?.Kind == "mine" && w.Assignment != target.Id && S.Workers.Count(o => o.Assignment == target.Id) >= Data.Mine.Workers) { Say($"A mine has room for {Data.Mine.Workers} workers."); return; }
         // Reassigning calls off a price errand, so the worker never freezes on the road.
         w.Assignment = target?.Id ?? 0; w.Away = 0; w.Job = target == null ? "idle" : target.IsResource ? "gather" : "building"; w.WorkState = WorkerWorkState.Idle;
         w.Destination = 0; w.Timer = 0; w.Status = target == null ? "Available" : "Starting work";
@@ -873,10 +888,16 @@ public sealed class World
             string item = w.Bag.Items.Keys.First();
             var dest = Find(w.Destination);
             // Re-evaluate rules every tick, including filters changed while a worker is carrying goods.
-            if (dest == null || dest.Inventory.Room(item) == 0 || !dest.Inventory.Accepts(item) || (dest.Id == target?.Id && w.Job != "building")) dest = DepositFor(item, w.Pos);
+            // A mine site takes only what it still needs, so a surplus goes back to storage.
+            int wanted = dest?.Kind == "mine" ? MineNeeds(dest).GetValueOrDefault(item) : int.MaxValue;
+            if (dest == null || wanted == 0 || dest.Inventory.Room(item) == 0 || !dest.Inventory.Accepts(item) || (dest.Id == target?.Id && w.Job != "building")) dest = DepositFor(item, w.Pos);
             if (dest == null) { w.Status = $"Holding {Data.Name(item)} · no accepting storage"; return; }
             w.Destination = dest.Id; w.Status = $"Carrying {Data.Name(item)} → {Data.Name(dest.Kind)}";
-            if (Walk(w, dest.Pos, dt)) { w.Bag.TransferTo(dest.Inventory, item, 99, true); w.Destination = 0; }
+            if (Walk(w, dest.Pos, dt))
+            {
+                w.Bag.TransferTo(dest.Inventory, item, dest.Kind == "mine" ? MineNeeds(dest).GetValueOrDefault(item) : w.Bag[item], true); w.Destination = 0;
+                if (w.Bag.Count == 0) w.Bag.StackSize = Worker.BagStack;
+            }
             return;
         }
         if (target == null) { w.Status = "Available"; return; }
@@ -899,6 +920,7 @@ public sealed class World
             return;
         }
         var coworkers = S.Workers.Where(other => other.Assignment == target.Id && other.WageDebt <= 0).OrderBy(other => other.Id).ToList();
+        if (target.Kind == "mine") { MineWork(w, target, coworkers, dt); return; }
         if (target.Kind == "reinforced" && coworkers.Count >= 2 && coworkers[0] == w)
         {
             w.Status = "Operating bellows"; if (Walk(w, target.Pos + BellowsStand, dt, .1f)) { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 18); }
@@ -986,7 +1008,12 @@ public sealed class World
             if (!Downed && S.Torch > 0) { S.TorchLit = true; Play("start_fire", Player); Say($"Torch lit: {S.Torch / Data.DaySeconds * 24:0.#} hours of light left."); }
         }
         if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); Say("Your torch burned out."); }
-        if (Day > S.WageDay) { PayWages(); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow."); }
+        if (Day > S.WageDay)
+        {
+            // Workers on strike are not charged, so their wage does not count against the day.
+            int wages = S.Workers.Where(w => w.WageDebt <= 0).Sum(w => w.Wage);
+            PayWages(); CloseDay(wages); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow.");
+        }
         if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Your workers head home to Bramblewick until morning.");
         if (S.Workers.Count > 0 && Lunch && !wasLunch) Say("Midday. Your workers gather by the campfire for an hour of lunch.");
         // A day restores what selling the daily amount takes, so selling it every day keeps the price steady.
@@ -1015,7 +1042,7 @@ public sealed class World
             }
             if (!order.Buying && order.Goods.Keys.Any(id => id.StartsWith("steel_") && Data.Items[id].Tool != "")) S.Milestones.Add("sold_steel");
             // Played at the player, not the signpost, so a payment is heard wherever the player is.
-            if (!order.Buying) Play("payment_from_village_arrives", Player);
+            if (!order.Buying) { Play("payment_from_village_arrives", Player); S.DayRevenue += (int)order.Value; }
             S.Orders.Remove(order); UpdatePrices();
             Say(order.Buying ? $"Cart returned with {Goods(order.Goods)}." : $"Cart returned with {(int)order.Value} coins.");
         }
@@ -1024,6 +1051,7 @@ public sealed class World
         {
             // A carcass keeps its age so the death animation plays once and not again after loading.
             if (t.Kind == "wolf_corpse") t.Progress = Math.Min(60, t.Progress + dt);
+            if (t.Kind == "mine") MineTick(t, dt);
             if (t.Kind == "berries" && t.Remaining == 0) { t.Regrow += dt; if (t.Regrow >= Data.BerryRegrowSeconds) { t.Remaining = 24; t.Regrow = 0; } }
             if (t.Kind == "campfire")
             {
@@ -1078,7 +1106,8 @@ public sealed class World
         for (int i = 0; i < S.Workers.Count; i++) for (int j = i + 1; j < S.Workers.Count; j++)
         {
             var a = S.Workers[i]; var b = S.Workers[j]; var offset = a.Pos - b.Pos;
-            if (!a.Home && !b.Home && offset.LengthSquared() < .64f)
+            // Miners underground are inside the hill, so they never crowd anyone at the entrance.
+            if (!a.Home && !b.Home && a.WorkState != WorkerWorkState.Underground && b.WorkState != WorkerWorkState.Underground && offset.LengthSquared() < .64f)
             {
                 var push = (offset.LengthSquared() > .001f ? offset.Normalized() : Vector2.Right) * Math.Min(dt, .08f);
                 if (CanStand(a.Pos + push)) a.Pos += push;
@@ -1106,7 +1135,7 @@ public sealed class World
         foreach (var t in S.Things.Where(t => Sees(t.Pos)))
         {
             if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id };
-            memory.Kind = t.Kind; memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Recipe = t.Recipe; memory.Progress = t.Progress;
+            memory.Kind = t.Kind; memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Recipe = t.Recipe; memory.Progress = t.Progress; memory.Stage = t.Stage;
         }
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < MapSize && p.Y < MapSize && S.Explored[(int)p.Y * MapSize + (int)p.X] != 0;
@@ -1219,8 +1248,22 @@ public sealed class World
         9 => ("The road to Bramblewick", "Build a village signpost. Craft a crate at the bench (6 planks, hammer slotted), place it, pack your steel tools, pick it up and put it in the market. Sell, then collect the coins."),
         10 => ("Many hands", "At the signpost pick a hiring offer: more coins up front means a lower daily wage. Keep wages in your backpack for each dawn."),
         11 => ("Your first automation", "Build storage. Select a worker → Work → click a resource. Or select a furnace → Assign."),
-        _ => ("A settlement of your own", "POC goal reached! Expand production. Filter chests, assign furnace crews, and keep wages paid.")
+        _ => ("A settlement of your own", "The starter goals are done. Work toward the end goals: a mine on every ore and a week of steady profit.")
     };
+    // ---------- End goals ----------
+    /// <summary>Ores found in the valley's cliffs; the end goal wants a working mine on each.</summary>
+    public static IEnumerable<string> MineOres => Cliffs.Select(c => c.Ore).Distinct();
+    public bool HasMine(string ore) => S.Things.Any(t => t.Kind == "mine" && t.Stage == MineOpen && CliffAt(t.Pos).Ore == ore);
+    /// <summary>Finished days in a row, up to today, whose profit reached the goal.</summary>
+    public int ProfitStreak => S.Profits.AsEnumerable().Reverse().TakeWhile(p => p >= Data.Goals.DailyProfit).Count();
+    /// <summary>Once reached, the week of profit stays reached even if later days fall short.</summary>
+    public bool ProfitGoalMet => S.Milestones.Contains("profit_week");
+    public bool EndGoalsComplete => MineOres.All(HasMine) && ProfitGoalMet;
+    private void CloseDay(int wages)
+    {
+        S.Profits.Add(S.DayRevenue - wages); S.DayRevenue = 0;
+        if (ProfitStreak >= Data.Goals.ProfitDays) S.Milestones.Add("profit_week");
+    }
     public string Serialize() => JsonSerializer.Serialize(S, GameData.Json);
     public void Deserialize(string json)
     {
@@ -1243,7 +1286,7 @@ public sealed class World
         // Saves from before the fog start unexplored.
         if (loaded.Explored?.Length != MapSize * MapSize) loaded.Explored = new byte[MapSize * MapSize];
         loaded.Remembered ??= new();
-        loaded.Crates ??= new(); loaded.Crafting ??= new();
+        loaded.Crates ??= new(); loaded.Crafting ??= new(); loaded.Profits ??= new();
         loaded.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
         foreach (var t in loaded.Things)
         {

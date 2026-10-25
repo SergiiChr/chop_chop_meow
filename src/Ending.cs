@@ -2,7 +2,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Shown once when the steel-to-village goal chain is complete.</summary>
+/// <summary>Shown once when the end goals are reached; playing on is allowed.</summary>
 public partial class Game
 {
     private PanelContainer ending = null!;
@@ -24,10 +24,10 @@ public partial class Game
 
     private void ShowEndingOnce()
     {
-        if (!world.GoalComplete || world.S.EndingShown) return;
+        if (!world.EndGoalsComplete || world.S.EndingShown) return;
         world.S.EndingShown = true; paused = true; ClosePanel();
         int seconds = (int)world.S.PlaySeconds;
-        endingStats.Text = $"A crate of steel tools reached the village and your first villager is at work.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";
+        endingStats.Text = $"Every ore in the valley has its mine, and the settlement cleared {world.Data.Goals.DailyProfit} coins a day for {world.Data.Goals.ProfitDays} days.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";
         ending.Visible = true;
     }
 

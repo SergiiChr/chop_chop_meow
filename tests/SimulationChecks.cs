@@ -53,6 +53,7 @@ public static class SimulationChecks
         CheckTorch(data);
         CheckTorchAndWolves(data);
         CheckWaterStacksOnlyInCrates(data);
+        MineChecks.Run(data);
         CheckActualProgression(data);
         GD.Print("SELF-TEST PASS");
     }

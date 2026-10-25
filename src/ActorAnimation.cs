@@ -247,7 +247,8 @@ public static class ActorAnimation
         return worker.WorkState switch
         {
             WorkerWorkState.Pumping => ActorAction.Pump,
-            WorkerWorkState.Hammering when assignment != null && World.Worked(assignment.Kind) => ActorAction.Hammer,
+            WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == "mine") => ActorAction.Hammer,
+            WorkerWorkState.Digging => ActorAction.Mine,
             _ => ActorAction.Idle
         };
     }
