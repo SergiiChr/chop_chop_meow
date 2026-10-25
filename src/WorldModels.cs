@@ -254,14 +254,18 @@ public static class WorldModels
         var steel = Mat("3b3f42", .5f, .7f);
         foreach (var (x, z) in new[] { (-.35f, -.3f), (.35f, -.3f), (-.35f, .3f), (.35f, .3f) }) Box(body, new Vector3(.05f, .5f, .05f), new Vector3(x, .25f, z), steel);
         Box(body, new Vector3(.8f, .04f, .7f), new Vector3(0, .5f, 0), steel);
-        var tank = Mat("4d6a7a", .45f, .55f);
-        Cylinder(body, .38f, .38f, .9f, new Vector3(0, .9f, 0), tank, new Vector3(90, 0, 0), 14);
-        Sphere(body, .38f, new Vector3(0, .9f, -.45f), tank, new Vector3(1, 1, .35f), 14);
-        Torus(body, .37f, .42f, new Vector3(0, .9f, .2f), steel).RotationDegrees = new Vector3(90, 0, 0);
-        Torus(body, .37f, .42f, new Vector3(0, .9f, -.25f), steel).RotationDegrees = new Vector3(90, 0, 0);
-        Cylinder(body, .3f, .3f, .04f, new Vector3(0, .9f, .45f), Mat("d9c7a3", .95f), new Vector3(90, 0, 0), 14);
-        prop.Glow = Cylinder(body, .17f, .17f, .05f, new Vector3(0, .9f, .46f), Flat(new Color("ff7a24")), new Vector3(90, 0, 0), 12);
-        Post(body, .07f, .07f, .65f, new Vector3(0, 1.22f, -.2f), Mat("8e9396", .45f, .7f));
+        Add(body, ForgeShape.Shell, FurnaceShape.Steel, Vector3.Zero);
+        prop.Glow = Add(body, ForgeShape.Fire, FurnaceShape.Flame, Vector3.Zero);
+        // Saddles meet the round shell above the stand instead of balancing it on a flat plate.
+        foreach (float z in new[] { -.25f, .2f })
+            foreach (float x in new[] { -.25f, .25f })
+                Box(body, new Vector3(.12f, .15f, .09f), new Vector3(x, .565f, z), steel, new Vector3(0, 0, x < 0 ? -28 : 28));
+        var flue = Pivot(body, new Vector3(0, 0, -.2f));
+        var metal = new Color("8e9396");
+        ActorShape.Add(flue, new[] {
+            new ActorShape.Ring(1.95f, .07f, .07f, metal), new ActorShape.Ring(1.91f, .08f, .08f, metal),
+            new ActorShape.Ring(1.88f, .07f, .07f, metal), new ActorShape.Ring(1.34f, .07f, .07f, metal),
+            new ActorShape.Ring(1.29f, .10f, .10f, metal), new ActorShape.Ring(1.25f, .115f, .115f, metal) }, material: FurnaceShape.Steel);
         prop.Vent = new Vector3(0, 1.95f, -.2f);
         // Heat gauge: the needle sweeps from cold to the 80° steel mark.
         Post(body, .03f, .03f, .18f, new Vector3(.2f, 1.25f, .2f), steel);
@@ -279,10 +283,10 @@ public static class WorldModels
         var wood = Mat("8a5f3c");
         var leather = Mat("3b2619", .9f);
         foreach (float x in new[] { .95f, 1.4f }) Box(rig, new Vector3(.08f, .2f, .5f), new Vector3(x, .1f, 0), Mat("6f5a40"));
-        Paddle(rig, hinge + new Vector3(0, -.03f, 0), 1, wood);
+        Add(rig, ForgeShape.Board, wood, hinge + new Vector3(0, -.03f, 0));
         Cylinder(rig, .07f, .025f, .22f, new Vector3(.55f, .3f, 0), Mat("b8893a", .4f, .8f), new Vector3(0, 0, 90), 10);
         var lever = Pivot(rig, hinge);
-        Paddle(lever, new Vector3(0, .13f, 0), 1, wood);
+        Add(lever, ForgeShape.Board, wood, new Vector3(0, .13f, 0));
         Box(lever, new Vector3(.06f, .62f, .06f), new Vector3(1f, .44f, 0), Mat("8a5a32"));
         Cylinder(lever, .03f, .03f, .34f, new Vector3(1f, .75f, 0), Mat("222222"), new Vector3(90, 0, 0), 8);
         prop.Lever = lever;
@@ -291,7 +295,8 @@ public static class WorldModels
         for (int i = 0; i < 3; i++)
         {
             prop.Pleats[i] = Pivot(rig, hinge);
-            Paddle(prop.Pleats[i], new Vector3(0, -.03f + (i + 1) * .04f, 0), i % 2 == 0 ? .97f : .88f, leather);
+            float size = i % 2 == 0 ? .97f : .88f;
+            Add(prop.Pleats[i], ForgeShape.Board, leather, new Vector3(0, -.03f + (i + 1) * .04f, 0), scale: new Vector3(size, 1, size));
         }
         prop.Light = Light(body, new Vector3(0, .9f, .9f), 3);
     }
@@ -356,6 +361,16 @@ public static class WorldModels
     private static void StorageBox(Prop prop, string panel, string edge, string fittings)
     {
         var body = prop.Body;
+        if (prop.Kind == "chest")
+        {
+            Add(body, ChestShape.Body, ChestShape.Wood, Vector3.Zero);
+            Add(body, ChestShape.Frame, ChestShape.Metal, Vector3.Zero);
+            var hinge = Pivot(body, new Vector3(0, .49f, -.275f));
+            Add(hinge, ChestShape.Lid, ChestShape.Wood, Vector3.Zero);
+            Add(hinge, ChestShape.LidFrame, ChestShape.Metal, Vector3.Zero);
+            prop.Lid = hinge;
+            return;
+        }
         bool tote = panel == "e2701e";
         var size = tote ? new Vector3(.75f, .36f, .5f) : new Vector3(.85f, .45f, .55f);
         Box(body, size, new Vector3(0, size.Y / 2 + .04f, 0), Mat(panel, tote ? .5f : .9f));
@@ -401,13 +416,11 @@ public static class WorldModels
     private static void Workbench(Prop prop)
     {
         var body = prop.Body;
-        var wood = Mat("b98552"); var dark = Mat("7a5432"); var steel = Mat("4a4d50", .4f, .6f);
-        foreach (var (x, z) in new[] { (-.5f, -.25f), (.5f, -.25f), (-.5f, .25f), (.5f, .25f) }) Box(body, new Vector3(.08f, .74f, .08f), new Vector3(x, .37f, z), dark);
-        Box(body, new Vector3(1.1f, .07f, .62f), new Vector3(0, .78f, 0), wood);
-        for (int i = 0; i < 3; i++) Box(body, new Vector3(1.11f, .005f, .01f), new Vector3(0, .816f, -.2f + i * .2f), dark);
-        Box(body, new Vector3(1f, .04f, .5f), new Vector3(0, .2f, 0), dark);
-        Box(body, new Vector3(.3f, .12f, .2f), new Vector3(.62f, .78f, .2f), steel);
-        Box(body, new Vector3(.04f, .04f, .26f), new Vector3(.62f, .8f, .4f), steel);
+        var wood = Mat("b98552"); var steel = Mat("4a4d50", .4f, .6f);
+        Add(body, BenchShape.Wood, BenchShape.Timber, Vector3.Zero);
+        Add(body, BenchShape.Vise, BenchShape.Steel, Vector3.Zero);
+        Cylinder(body, .014f, .014f, .19f, new Vector3(.35f, .86f, .37f), steel, new Vector3(90, 0, 0), 10);
+        Cylinder(body, .012f, .012f, .15f, new Vector3(.35f, .86f, .46f), steel, sides: 10);
         var chisel = Pivot(body, new Vector3(-.25f, .83f, .05f), new Vector3(0, 30, 0));
         Box(chisel, new Vector3(.24f, .03f, .06f), Vector3.Zero, Mat("9aa29f"));
         prop.Chisel = chisel;
@@ -581,11 +594,7 @@ public static class WorldModels
         foreach (var (x, z) in new[] { (-.2f, -.15f), (.2f, -.15f), (-.2f, .15f), (.2f, .15f) }) Box(body, new Vector3(.06f, .46f, .06f), new Vector3(x * 1.1f, .23f, z * 1.1f), tube);
         Box(body, new Vector3(.52f, .05f, .4f), new Vector3(0, .47f, 0), tube);
         Box(body, new Vector3(.5f, .04f, .05f), new Vector3(0, .12f, .17f), tube);
-        var iron = Mat("3b3e41", .45f, .7f);
-        Box(body, new Vector3(.34f, .1f, .24f), new Vector3(0, .55f, 0), iron);
-        Box(body, new Vector3(.18f, .12f, .14f), new Vector3(0, .66f, 0), iron);
-        Box(body, new Vector3(.46f, .12f, .2f), new Vector3(-.03f, .78f, 0), iron);
-        Cylinder(body, .075f, 0, .26f, new Vector3(.33f, .79f, 0), iron, new Vector3(0, 0, -90), 8);
+        Add(body, AnvilShape.Casting, AnvilShape.Iron, Vector3.Zero);
         prop.Vent = new Vector3(0, .86f, 0);
     }
 
@@ -626,13 +635,6 @@ public static class WorldModels
         prop.Fire = fire;
         prop.Vent = new Vector3(0, .8f, 0);
         prop.Light = Light(body, new Vector3(0, .8f, 0), 7);
-    }
-
-    /// <summary>A flat teardrop bellows board pointing its narrow end at <paramref name="tip"/> and widening toward +X.</summary>
-    private static void Paddle(Node3D parent, Vector3 tip, float scale, Material material)
-    {
-        Cylinder(parent, .34f, .34f, .04f, tip + new Vector3(.34f * scale, 0, 0), material, new Vector3(0, -90, 0), 3).Scale = new Vector3(scale, 1, scale);
-        Cylinder(parent, .34f, .34f, .04f, tip + new Vector3(.68f * scale, 0, 0), material, null, 16).Scale = new Vector3(scale, 1, scale);
     }
 
     /// <summary>Needle roll in degrees for a heat fraction: cold points left, full heat points right.</summary>
@@ -793,27 +795,24 @@ public static class WorldModels
         public WolfModel()
         {
             Body = Pivot(Root, Vector3.Zero);
-            var fur = Mat("6b6e6a"); var light = Mat("a5a69e"); var dark = Mat("44464a");
-            Add(Body, new CapsuleMesh { Radius = .2f, Height = 1f, RadialSegments = 10 }, fur, new Vector3(0, .62f, 0), new Vector3(90, 0, 0), new Vector3(1, 1, 1.05f));
-            Add(Body, new CapsuleMesh { Radius = .16f, Height = .7f, RadialSegments = 10 }, light, new Vector3(0, .54f, .02f), new Vector3(90, 0, 0));
+            var dark = Mat("353c36");
+            Add(Body, WolfShape.Body, WolfShape.Fur, Vector3.Zero);
             Head = Pivot(Body, new Vector3(0, .78f, .48f));
-            Sphere(Head, .16f, new Vector3(0, 0, .04f), fur, new Vector3(1, .95f, 1.1f), 10);
-            Cylinder(Head, .09f, .05f, .22f, new Vector3(0, -.04f, .26f), light, new Vector3(90, 0, 0), 8);
-            Sphere(Head, .03f, new Vector3(0, -.01f, .37f), dark, null, 6);
-            Post(Head, .05f, 0, .13f, new Vector3(.08f, .12f, 0), fur, 4);
-            Post(Head, .05f, 0, .13f, new Vector3(-.08f, .12f, 0), fur, 4);
-            Sphere(Head, .022f, new Vector3(.07f, .04f, .17f), Mat("e2a570", .3f, 0, 1.5f), null, 6);
-            Sphere(Head, .022f, new Vector3(-.07f, .04f, .17f), Mat("e2a570", .3f, 0, 1.5f), null, 6);
-            // Bared fangs under the muzzle.
-            Post(Head, .012f, 0, .05f, new Vector3(.03f, -.09f, .33f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
-            Post(Head, .012f, 0, .05f, new Vector3(-.03f, -.09f, .33f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
-            Tail = Pivot(Body, new Vector3(0, .7f, -.52f), new Vector3(-130, 0, 0));
-            Add(Tail, new CapsuleMesh { Radius = .07f, Height = .5f, RadialSegments = 8 }, fur, new Vector3(0, .22f, 0));
+            Add(Head, WolfShape.Head, WolfShape.Fur, Vector3.Zero);
+            Sphere(Head, .038f, new Vector3(0, -.027f, .366f), dark, new Vector3(1, .7f, .65f), 8);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Sphere(Head, .023f, new Vector3(side * .095f, .05f, .132f), dark, new Vector3(.7f, .75f, 1), 8);
+                Sphere(Head, .012f, new Vector3(side * .111f, .05f, .136f), Mat("d49a50", .4f, 0, .5f), null, 8);
+                Post(Head, .012f, 0, .045f, new Vector3(side * .035f, -.09f, .31f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
+            }
+            Tail = Pivot(Body, new Vector3(0, .7f, -.48f), new Vector3(-130, 0, 0));
+            WolfShape.Tail(Tail);
             int index = 0;
             foreach (var (x, z) in new[] { (.11f, .32f), (-.11f, .32f), (.11f, -.32f), (-.11f, -.32f) })
             {
                 Legs[index] = Pivot(Body, new Vector3(x, .5f, z));
-                Limb(Legs[index], .045f, .5f, new Vector3(0, .02f, 0), index < 2 ? fur : dark);
+                WolfShape.Leg(Legs[index], index >= 2);
                 index++;
             }
         }
@@ -823,7 +822,11 @@ public static class WorldModels
         {
             Body.Position = new Vector3(shift, lift, 0);
             Body.RotationDegrees = new Vector3(pitch, 0, roll);
-            for (int i = 0; i < 4; i++) Legs[i].RotationDegrees = new Vector3(i < 2 ? front : hind, 0, 0);
+            for (int i = 0; i < 4; i++)
+            {
+                Legs[i].Position = Legs[i].Position with { Y = .5f };
+                Legs[i].RotationDegrees = new Vector3(i < 2 ? front : hind, 0, 0);
+            }
             Head.RotationDegrees = new Vector3(head, 0, 0);
             Tail.RotationDegrees = new Vector3(tail, 0, 0);
         }
@@ -850,6 +853,14 @@ public static class WorldModels
         {
             Pose(-14, 22, 48 + MathF.Sin(time * 9) * 12, -150, -.1f, 14);
             Head.RotationDegrees += new Vector3(0, MathF.Sin(time * 13) * 18, 0);
+            // Plant each paw while the chest pitches down; the upper profiles stay buried in the shoulders/hips.
+            foreach (var leg in Legs)
+            {
+                float lowest = Math.Min(
+                    (Body.Transform * (leg.Transform * new Vector3(0, -.49f, -.03f))).Y,
+                    (Body.Transform * (leg.Transform * new Vector3(0, -.49f, .12f))).Y);
+                leg.Position += Vector3.Up * ((.01f - lowest) / Body.Basis.Y.Y);
+            }
         }
 
         /// <summary>A killed wolf buckles, then rolls onto its side with stiff legs as <paramref name="progress"/> runs 0 to 1.</summary>
