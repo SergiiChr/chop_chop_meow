@@ -174,15 +174,36 @@ public partial class Game : Node
         if (toast != null) { toast.Text = message; toastClock = 7; }
         GD.Print(message);
     }
+    // What the labels show, so their text is built only when it changes: building it allocates.
+    private (int Day, int Minute, bool Night) shownClock = (-1, -1, false);
+    private (bool Dead, bool Mauled, bool Pack, int Seconds) shownDeath;
+    private (bool Assigning, string Mode) shownMode = (false, "");
     private void RefreshLive()
     {
         if (world == null || stats == null) return;
-        int hour = (int)world.Hour;
-        stats.Text = $"Day {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}  {(world.Night ? "NIGHT" : "DAYLIGHT")}";
-        string feeding = world.S.Wolves.Count(w => w.Feeding) > 1 ? "The pack is feeding" : "A wolf is feeding";
-        deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? feeding : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
-        modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
-        foreach (var update in live.ToArray()) update();
+        var clock = (world.Day, (int)(world.DayPhase * 1440), world.Night);
+        if (clock != shownClock)
+        {
+            shownClock = clock;
+            int hour = (int)world.Hour;
+            stats.Text = $"Day {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}  {(world.Night ? "NIGHT" : "DAYLIGHT")}";
+        }
+        int feeding = 0;
+        foreach (var w in world.S.Wolves) if (w.Feeding) feeding++;
+        var death = (world.Dead, world.S.Mauled, feeding > 1, (int)MathF.Ceiling(world.S.RespawnIn));
+        if (death != shownDeath)
+        {
+            shownDeath = death;
+            deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? feeding > 1 ? "The pack is feeding" : "A wolf is feeding" : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
+        }
+        var mode = (assigningWorker > 0, view.BuildMode);
+        if (mode != shownMode)
+        {
+            shownMode = mode;
+            modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
+        }
+        // A copy, since an update can open another page and replace the list.
+        if (live.Count > 0) foreach (var update in live.ToArray()) update();
         RefreshHotbar(); RefreshNeeds();
     }
     private void OpenPage(string name)

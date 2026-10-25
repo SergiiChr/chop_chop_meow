@@ -170,7 +170,14 @@ public sealed class GameData
     public bool IsConsumable(string item) => Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>The plainest tool of a kind that meets a tier, for naming what a recipe needs.</summary>
-    public string ToolName(string tool, int tier) => Items.Values.Where(i => i.Tool == tool && i.Tier >= tier).MinBy(i => i.Tier) is ItemDef def && tier > 0 ? def.Name.ToLowerInvariant() : tool;
+    public string ToolName(string tool, int tier)
+    {
+        if (!toolNames.TryGetValue((tool, tier), out var name))
+            toolNames[(tool, tier)] = name = Items.Values.Where(i => i.Tool == tool && i.Tier >= tier).MinBy(i => i.Tier) is ItemDef def && tier > 0 ? def.Name.ToLowerInvariant() : tool;
+        return name;
+    }
+    // Named once per tool and tier, since workers ask every tick while a station waits for its tool.
+    private readonly Dictionary<(string, int), string> toolNames = new();
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch
     {
         "tree" => "Tree",

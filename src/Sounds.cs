@@ -71,8 +71,14 @@ public partial class Sounds : Node
     public bool NightMusicPlaying => night.Player.Playing;
     public float NightMusicPosition => night.Position;
 
+    // Players made while loading and reused in turn, so a sound instantiates nothing mid-game.
+    private readonly List<AudioStreamPlayer> voices = new();
+    private const int VoiceCount = 24;
+    private int nextVoice;
+
     public override void _Ready()
     {
+        for (int i = 0; i < VoiceCount; i++) { var voice = new AudioStreamPlayer(); AddChild(voice); voices.Add(voice); }
         day = new Track(this, "path_to_lake_land", "mystic_theme");
         night = new Track(this, "forest");
     }
@@ -109,16 +115,27 @@ public partial class Sounds : Node
         int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
         if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
         previous[name] = pick;
-        var player = new AudioStreamPlayer
-        {
-            Stream = streams[pick],
-            PitchScale = 1 + (float)(random.NextDouble() * .12 - .06),
-            VolumeDb = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f
-        };
-        AddChild(player);
-        player.Finished += player.QueueFree;
+        var player = FreeVoice();
+        player.Stream = streams[pick];
+        player.PitchScale = 1 + (float)(random.NextDouble() * .12 - .06);
+        player.VolumeDb = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
         player.Play();
         Played++; Last = name;
+    }
+
+    /// <summary>The next idle player in turn; with all of them busy, the next in turn is cut off.</summary>
+    private AudioStreamPlayer FreeVoice()
+    {
+        for (int i = 0; i < voices.Count; i++)
+        {
+            var voice = voices[(nextVoice + i) % voices.Count];
+            if (voice.Playing) continue;
+            nextVoice = (nextVoice + i + 1) % voices.Count;
+            return voice;
+        }
+        var oldest = voices[nextVoice];
+        nextVoice = (nextVoice + 1) % voices.Count;
+        return oldest;
     }
 
     private bool silenced;

@@ -64,7 +64,14 @@ public sealed partial class World
 {
     /// <summary>The player at this machine; the host and a single-player game are 1, a guest gets its peer id.</summary>
     public int LocalId { get; set; } = 1;
-    public PlayerState Me => S.Players.Find(p => p.Id == LocalId) ?? S.Players[0];
+    public PlayerState Me
+    {
+        get
+        {
+            foreach (var p in S.Players) if (p.Id == LocalId) return p;
+            return S.Players[0];
+        }
+    }
     /// <summary>Set while this world is a guest's copy of the host's: player actions go there instead of changing the copy.</summary>
     public Action<Command>? Host;
     public bool Remote => Host != null;
@@ -80,14 +87,21 @@ public sealed partial class World
     }
 
     /// <summary>Runs an action as another player: their backpack, position and needs, and they hear what it says.</summary>
-    public void As(PlayerState p, Action action) => As(p, () => { action(); return 0; });
+    public void As(PlayerState p, Action action) { using (ActAs(p)) action(); }
 
-    public T As<T>(PlayerState p, Func<T> action)
+    public T As<T>(PlayerState p, Func<T> action) { using (ActAs(p)) return action(); }
+
+    /// <summary>Acts as another player until the returned scope ends; a struct, so code that runs every tick switches players without allocating.</summary>
+    private Acting ActAs(PlayerState p)
     {
-        var (actor, wasEveryone) = (S.Actor, everyone);
+        var scope = new Acting(this, S.Actor, everyone);
         S.Actor = p; everyone = false;
-        try { return action(); }
-        finally { S.Actor = actor; everyone = wasEveryone; }
+        return scope;
+    }
+
+    private readonly struct Acting(World world, PlayerState actor, bool everyone) : IDisposable
+    {
+        public void Dispose() { world.S.Actor = actor; world.everyone = everyone; }
     }
 
     /// <summary>In a guest's copy, sends the action to the host and tells the caller to stop.</summary>

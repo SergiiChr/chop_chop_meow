@@ -15,8 +15,24 @@ public sealed class Inventory
     /// <summary>Most units the inventory holds across all its stacks, or 0 for no limit beyond its slots.</summary>
     public int Capacity { get; set; }
     public const string Coins = "coins";
-    public int Count => Items.Values.Sum();
-    public int UsedSlots => Items.Sum(pair => SlotsFor(pair.Key, pair.Value));
+    public int Count
+    {
+        get
+        {
+            int count = 0;
+            foreach (var pair in Items) count += pair.Value;
+            return count;
+        }
+    }
+    public int UsedSlots
+    {
+        get
+        {
+            int slots = 0;
+            foreach (var pair in Items) slots += SlotsFor(pair.Key, pair.Value);
+            return slots;
+        }
+    }
     public int this[string item] => Items.GetValueOrDefault(item);
 
     /// <summary>Water bottles stack only inside a crate, which is the only container with a capacity.</summary>
@@ -60,9 +76,20 @@ public sealed class Inventory
     public bool Fits(IReadOnlyDictionary<string, int> added) => Items.Keys.Union(added.Keys).Sum(item => SlotsFor(item, this[item] + added.GetValueOrDefault(item))) <= Slots &&
         (Capacity == 0 || Count + added.Values.Sum() <= Capacity);
 
-    public bool Has(IReadOnlyDictionary<string, int> cost) => cost.All(pair => this[pair.Key] >= pair.Value);
+    public bool Has(Dictionary<string, int> cost)
+    {
+        foreach (var pair in cost) if (this[pair.Key] < pair.Value) return false;
+        return true;
+    }
 
-    public bool Spend(IReadOnlyDictionary<string, int> cost)
+    /// <summary>Any one item held, or null when empty.</summary>
+    public string? First()
+    {
+        foreach (var pair in Items) return pair.Key;
+        return null;
+    }
+
+    public bool Spend(Dictionary<string, int> cost)
     {
         if (!Has(cost)) return false;
         foreach (var pair in cost) Remove(pair.Key, pair.Value);

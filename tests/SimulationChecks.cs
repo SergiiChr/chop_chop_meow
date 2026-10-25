@@ -62,6 +62,7 @@ public static class SimulationChecks
         MineChecks.Run(data);
         CheckActualProgression(data);
         MultiplayerChecks.Run(data);
+        AllocationChecks.Run(data);
         GD.Print("SELF-TEST PASS");
     }
 

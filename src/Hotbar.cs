@@ -104,12 +104,18 @@ public partial class Game
         return style;
     }
 
+    // What each slot shows, so a slot is redrawn only when its item, count or selection changes: redrawing builds text and styles.
+    private readonly System.Collections.Generic.Dictionary<int, (ItemSlot Button, string Id, int Count, bool Active)> shownSlots = new();
+    private static readonly string[] SlotStates = { "normal", "hover", "pressed", "disabled" };
     private void RefreshHotbar()
     {
         for (int slot = 0; slot < hotbarButtons.Count; slot++)
         {
             var button = hotbarButtons[slot];
             if (!GodotObject.IsInstanceValid(button)) continue;
+            var shown = (button, HotbarId(slot), world.S.Backpack[HotbarId(slot)], world.S.ActiveHotbar == slot);
+            if (shownSlots.TryGetValue(slot, out var before) && before == shown) continue;
+            shownSlots[slot] = shown;
             if (button.GetParent() is HBoxContainer row) row.Alignment = BoxContainer.AlignmentMode.Center;
             var id = HotbarId(slot);
             int count = world.S.Backpack[id];
@@ -121,7 +127,7 @@ public partial class Game
             bool active = world.S.ActiveHotbar == slot;
             button.Modulate = active ? new Color("f2d98b") : Colors.White;
             // The item in hand gets a bright outline; the others fall back to the theme.
-            foreach (string state in new[] { "normal", "hover", "pressed", "disabled" })
+            foreach (string state in SlotStates)
                 if (active) button.AddThemeStyleboxOverride(state, ActiveSlotStyle);
                 else button.RemoveThemeStyleboxOverride(state);
         }

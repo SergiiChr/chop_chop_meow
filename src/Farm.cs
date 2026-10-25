@@ -36,7 +36,8 @@ public sealed partial class World
     {
         if (farm.Stage != FarmRipe) return;
         farm.Progress = Math.Min(HarvestSeconds, farm.Progress + dt);
-        if (farm.Progress < HarvestSeconds || Data.Farm.Yield.Any(p => farm.Inventory.Room(p.Key) < p.Value)) return;
+        if (farm.Progress < HarvestSeconds) return;
+        foreach (var pair in Data.Farm.Yield) if (farm.Inventory.Room(pair.Key) < pair.Value) return;
         foreach (var (item, amount) in Data.Farm.Yield) farm.Inventory.Add(item, amount);
         farm.Stage = FarmFallow; farm.Progress = 0;
     }
@@ -47,25 +48,27 @@ public sealed partial class World
     /// </summary>
     private void FarmWork(Worker w, Thing farm, float dt)
     {
-        foreach (var (item, count) in farm.Inventory.Items.ToArray())
+        // Each pass ends with a return, so the transfer never changes the stacks while they are still being walked.
+        foreach (var (item, count) in farm.Inventory.Items)
         {
             int spare = count - Data.Farm.Sow.GetValueOrDefault(item) * 2;
             if (spare <= 0 || DepositFor(item, farm.Pos) is not Thing dest) continue;
-            w.Status = $"Carrying out {Data.Name(item)}";
+            w.Status = Phrase("Carrying out ", Data.Name(item));
             if (Walk(w, farm.Pos, dt)) { farm.Inventory.TransferTo(w.Bag, item, Math.Min(spare, w.Bag.StackSize), true); w.Destination = dest.Id; }
             return;
         }
         if (farm.Stage == FarmFallow)
-            foreach (var (item, amount) in Data.Farm.Sow.Where(p => farm.Inventory[p.Key] < p.Value))
+            foreach (var (item, amount) in Data.Farm.Sow)
             {
+                if (farm.Inventory[item] >= amount) continue;
                 var source = SourceFor(item, w.Pos);
-                if (source == null) { w.Status = $"Needs {Data.Name(item)} in output-enabled storage"; return; }
-                w.Status = $"Fetching {Data.Name(item)}";
+                if (source == null) { w.Status = Phrase("Needs ", Data.Name(item), " in output-enabled storage"); return; }
+                w.Status = Phrase("Fetching ", Data.Name(item));
                 if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, item, amount - farm.Inventory[item], true); w.Destination = farm.Id; }
                 return;
             }
         if (farm.Stage != FarmRipe) { w.Status = "Waiting for the wheat to grow"; Walk(w, farm.Pos, dt); return; }
-        w.Status = $"Harvesting wheat · {farm.Progress / HarvestSeconds * 100:0}%";
+        w.Status = Phrase("Harvesting wheat · ", Number(farm.Progress / HarvestSeconds * 100), "%");
         if (!Walk(w, farm.Pos, dt)) return;
         w.WorkState = WorkerWorkState.Gathering;
         Harvest(farm, dt);
