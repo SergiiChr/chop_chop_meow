@@ -40,7 +40,7 @@ public partial class Net : Node
     private const int HostId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
     private const int Protocol = 2;
-    /// <summary>Furthest a guest can walk between two of its updates; anything further is ignored.</summary>
+    /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember; a guest that confirmed none of the last this many gets the whole world again.</summary>
     private const int History = 64;
@@ -232,7 +232,8 @@ public partial class Net : Node
         if (!Hosting || Guest() is not PlayerState p) return;
         if (sent.ContainsKey(seen) && seen > acked.GetValueOrDefault(p.Id)) acked[p.Id] = seen;
         // A guest that has not yet seen its respawn still walks where it died.
-        if (warp == p.Warp && at.DistanceTo(p.Pos) <= MaxStep) walks[p.Id] = (at, warp);
+        // A long way from the last report, after a stall on the line, is still where the guest stands: the glide jumps there.
+        if (warp == p.Warp) walks[p.Id] = (at, warp);
         p.GatherTarget = gathering; p.Held = held;
     }
 
@@ -257,7 +258,7 @@ public partial class Net : Node
         if (Hosting) Rpc(MethodName.Hear, sound, at);
     }
 
-    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable)]
+    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable, TransferChannel = 1)]
     private void Hear(string sound, Vector2 at) { if (welcomed) Heard?.Invoke(sound, at); }
 
     /// <summary>Host: lets the guests see a player swing, pump or light a torch.</summary>
@@ -266,7 +267,7 @@ public partial class Net : Node
         if (Hosting) Rpc(MethodName.See, player, (int)action, at);
     }
 
-    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable)]
+    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable, TransferChannel = 1)]
     private void See(int player, int action, Vector2 at) { if (welcomed) Acted?.Invoke(player, (ActorAction)action, at); }
 
     // ---------- Snapshots ----------
