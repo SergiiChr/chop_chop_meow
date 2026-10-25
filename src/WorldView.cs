@@ -666,15 +666,7 @@ public partial class WorldView : Node3D
             case "pile":
                 // Remembered piles carry no inventory, so they keep the stacks they had when last seen.
                 if (!World.Sees(t.Pos)) break;
-                var stacks = t.Inventory.Stacks().Select(s => s.Item).ToList();
-                string key = string.Join(",", stacks);
-                if (key == prop.StackKey) break;
-                prop.StackKey = key;
-                for (int i = 0; i < prop.Stacks.Length; i++)
-                {
-                    prop.Stacks[i].Visible = i < stacks.Count;
-                    if (i < stacks.Count) prop.Stacks[i].MaterialOverride = Mat(World.Data.Items.TryGetValue(stacks[i], out var def) ? def.Color : "b0a58a", .95f);
-                }
+                WorldModels.SyncPile(prop, t, World.Data);
                 break;
             case "farm":
                 if (!World.Sees(t.Pos)) break;

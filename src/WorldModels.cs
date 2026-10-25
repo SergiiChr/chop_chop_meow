@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using static ChopChopMeow.ModelKit;
 
@@ -436,17 +437,31 @@ public static class WorldModels
     private static void Pile(Prop prop)
     {
         var body = prop.Body;
-        Yard(body);
+        Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
         var stacks = new List<MeshInstance3D>();
         foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
             for (int x = 0; x < count; x++)
                 for (int z = 0; z < count; z++)
                 {
                     float step = .82f, offset = (count - 1) * step / 2;
-                    var block = Box(body, new Vector3(.74f, .4f, .74f), new Vector3(x * step - offset, y, z * step - offset), Mat("b0a58a"));
+                    var block = Add(body, PileShape.Stack, Mat("b0a58a", .95f), new Vector3(x * step - offset, y, z * step - offset));
                     block.Visible = false; stacks.Add(block);
                 }
         prop.Stacks = stacks.ToArray();
+    }
+
+    /// <summary>Refresh only visible inventory memory; the view guards this call with the existing sight check.</summary>
+    public static void SyncPile(Prop prop, Thing t, GameData data)
+    {
+        var stacks = t.Inventory.Stacks().Select(s => s.Item).ToList();
+        string key = string.Join(",", stacks);
+        if (key == prop.StackKey) return;
+        prop.StackKey = key;
+        for (int i = 0; i < prop.Stacks.Length; i++)
+        {
+            prop.Stacks[i].Visible = i < stacks.Count;
+            if (i < stacks.Count) PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : "b0a58a");
+        }
     }
 
     /// <summary>A pile's and a farm plot's base: a bare dirt pad edged with logs.</summary>

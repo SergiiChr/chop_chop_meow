@@ -13,6 +13,7 @@ public static class SimulationChecks
     {
         EconomyChecks.Run(data);
         AnimationChecks.Run();
+        PileModelChecks.Run(data);
         WorkerStateChecks.Run(data);
         CheckInventoryFilters(data);
         CheckStorageRouting(data);
