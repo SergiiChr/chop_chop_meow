@@ -18,6 +18,9 @@ public sealed class Prop
     public Node3D? Outline, Hole, Supplies, Frame, Rails, Cart, Load;
     /// <summary>A tool station's hanging tools by kind, each shown while the station holds one.</summary>
     public Dictionary<string, Node3D> Racked = new();
+    /// <summary>A pile's stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
+    public MeshInstance3D[] Stacks = Array.Empty<MeshInstance3D>();
+    public string StackKey = "";
     public Node3D[] Pleats = Array.Empty<Node3D>();
     public MeshInstance3D? Glow, Window, Pool;
     public WorldModels.WolfModel? Wolf;
@@ -74,6 +77,7 @@ public static class WorldModels
         "crate" => new[] { new Hit(.4f, 0, .55f) },
         "bench" => new[] { new Hit(.6f, 0, .95f) },
         "toolstation" => new[] { new Hit(.55f, 0, 1.5f) },
+        "pile" => new[] { new Hit(1.5f, 0, .5f) },
         "leaves" => new[] { new Hit(.6f, 0, .15f) },
         "grave" => new[] { new Hit(.45f, 0, .55f) },
         "anvil" => new[] { new Hit(.45f, 0, .85f) },
@@ -108,6 +112,7 @@ public static class WorldModels
             case "crate": Crate(prop); break;
             case "bench": Workbench(prop); break;
             case "toolstation": ToolRack(prop); break;
+            case "pile": Pile(prop); break;
             case "leaves": LeafLitter(body, t.Id); break;
             case "signpost": Signpost(prop); break;
             case "campfire": FirePit(prop); break;
@@ -406,6 +411,29 @@ public static class WorldModels
         Box(rake, new Vector3(.3f, .04f, .04f), new Vector3(0, -.74f, 0), steel);
         for (int i = 0; i < 5; i++) Box(rake, new Vector3(.015f, .12f, .015f), new Vector3(-.12f + i * .06f, -.82f, 0), steel);
         prop.Racked = new() { ["axe"] = axe, ["pickaxe"] = pick, ["rake"] = rake };
+    }
+
+    /// <summary>A 3×3 yard of packed earth edged with logs, with fourteen stack blocks in a 9-4-1 pyramid that the view shows as the pile fills.</summary>
+    private static void Pile(Prop prop)
+    {
+        var body = prop.Body;
+        Box(body, new Vector3(2.9f, .02f, 2.9f), new Vector3(0, .01f, 0), Mat("7a6548", 1));
+        var log = Mat("8a6a48");
+        foreach (float s in new[] { -1.42f, 1.42f })
+        {
+            Cylinder(body, .09f, .09f, 2.9f, new Vector3(s, .09f, 0), log, new Vector3(90, 0, 0), 6);
+            Cylinder(body, .09f, .09f, 2.9f, new Vector3(0, .09f, s), log, new Vector3(0, 0, 90), 6);
+        }
+        var stacks = new List<MeshInstance3D>();
+        foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
+            for (int x = 0; x < count; x++)
+                for (int z = 0; z < count; z++)
+                {
+                    float step = .82f, offset = (count - 1) * step / 2;
+                    var block = Box(body, new Vector3(.74f, .4f, .74f), new Vector3(x * step - offset, y, z * step - offset), Mat("b0a58a"));
+                    block.Visible = false; stacks.Add(block);
+                }
+        prop.Stacks = stacks.ToArray();
     }
 
     /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>

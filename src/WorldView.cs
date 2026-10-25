@@ -590,6 +590,19 @@ public partial class WorldView : Node3D
                 prop.Hammer!.Visible = t.Tools != null && World.BenchTool(t, "hammer") != null;
                 prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
                 break;
+            case "pile":
+                // Remembered piles carry no inventory, so they keep the stacks they had when last seen.
+                if (!World.Sees(t.Pos)) break;
+                var stacks = t.Inventory.Stacks().Select(s => s.Item).ToList();
+                string key = string.Join(",", stacks);
+                if (key == prop.StackKey) break;
+                prop.StackKey = key;
+                for (int i = 0; i < prop.Stacks.Length; i++)
+                {
+                    prop.Stacks[i].Visible = i < stacks.Count;
+                    if (i < stacks.Count) prop.Stacks[i].MaterialOverride = Mat(World.Data.Items.TryGetValue(stacks[i], out var def) ? def.Color : "b0a58a", .95f);
+                }
+                break;
             case "toolstation":
                 if (!World.Sees(t.Pos)) break;
                 foreach (var (kind, tool) in prop.Racked) tool.Visible = World.BestTool(kind, t.Inventory) != null;

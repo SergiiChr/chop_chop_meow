@@ -28,13 +28,15 @@ public sealed class Thing
     public Inventory? Tools { get; set; }
     /// <summary>Building stages finished, for buildings put up in stages: a mine counts up to <see cref="World.MineOpen"/>.</summary>
     public int Stage { get; set; }
+    /// <summary>A pile turned into compost: it takes leaves, grass and food and slowly turns them into fertilizer.</summary>
+    public bool Compost { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
     [JsonIgnore] public bool IsResource => IsLoose || IsDeposit || Kind is "tree" or "stone" or "berries" or "water" or "wolf_corpse" or "leaves";
     /// <summary>Ore at the foot of a cliff, mined with a pickaxe.</summary>
     [JsonIgnore] public bool IsDeposit => Kind is "iron" or "coal" or "tin";
     /// <summary>Loose pieces are picked up whole in one go and vanish, instead of being worked down like a deposit.</summary>
     [JsonIgnore] public bool IsLoose => Kind is "loose_iron" or "loose_coal";
-    [JsonIgnore] public bool IsStorage => Kind is "chest" or "grave" or "crate" or "toolstation";
+    [JsonIgnore] public bool IsStorage => Kind is "chest" or "grave" or "crate" or "toolstation" or "pile";
 }
 /// <summary>An impassable rock face whose ore deposits sit at its foot, with loose pieces scattered toward the clearing.</summary>
 public readonly record struct Cliff(string Ore, Vector2 Center, Vector2 Face, float HalfLength)
@@ -246,6 +248,7 @@ public sealed partial class World
         if (kind == "crate") t.Inventory = NewCrate();
         if (kind == "mine") { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
         if (kind == "toolstation") t.Inventory.Slots = 12;
+        if (kind == "pile") t.Inventory.Slots = PileStacks;
         S.Things.Add(t); return t;
     }
     public void NewGame()
@@ -318,10 +321,23 @@ public sealed partial class World
     public bool CanStand(Vector2 p) => Open(p) && !S.Things.Any(t => Blocks(t, p));
     /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls.</summary>
     private static bool Open(Vector2 p) => Terrain.Open(p) && !Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth);
-    private static bool Blocks(Thing t, Vector2 p) => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" and not "mine" && t.Pos.DistanceTo(p) < Footprint(t.Kind);
+    private static bool Blocks(Thing t, Vector2 p) => !t.IsResource && !IsZone(t.Kind) && t.Kind is not "campfire" and not "grave" and not "signpost" and not "mine" && t.Pos.DistanceTo(p) < Footprint(t.Kind);
+    /// <summary>Square 3×3 yards laid out on the ground, walkable and snapping edge to edge into grids.</summary>
+    public static bool IsZone(string kind) => kind is "pile";
+    public const float ZoneSize = 3;
+    public const int PileStacks = 14;
+    /// <summary>Snaps a mine to its cliff and a yard to the grid of the nearest yard close enough to touch it.</summary>
+    public Vector2 Snap(string kind, Vector2 p)
+    {
+        if (kind == "mine") return SnapMine(p);
+        if (!IsZone(kind) || S.Things.Where(t => IsZone(t.Kind)).MinBy(t => t.Pos.DistanceSquaredTo(p)) is not Thing near || near.Pos.DistanceTo(p) > ZoneSize * 1.6f) return p;
+        return near.Pos + ((p - near.Pos) / ZoneSize).Round() * ZoneSize;
+    }
+    /// <summary>Tile centres a yard at <paramref name="p"/> covers.</summary>
+    private static IEnumerable<Vector2> ZoneTiles(Vector2 p) => Enumerable.Range(-1, 3).SelectMany(x => Enumerable.Range(-1, 3).Select(y => p + new Vector2(x, y)));
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
-    public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" or "toolstation" => .45f, _ => .35f };
+    public static float Footprint(string kind) => kind switch { "pile" => 1.5f, "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" or "toolstation" => .45f, _ => .35f };
     /// <summary>The tool kind gathering this needs: an axe for trees, a pickaxe for deposits and a rake for leaves; stone, berries and loose pieces need none.</summary>
     public static string? ToolKind(Thing t) => t.Kind == "tree" ? "axe" : t.IsDeposit ? "pickaxe" : t.Kind == "leaves" ? "rake" : null;
     private static string A(string word) => ("aeiou".Contains(word[0]) ? "an " : "a ") + word;
@@ -405,12 +421,23 @@ public sealed partial class World
         if (Downed) return "You are still recovering.";
         if (S.Sheltered != 0) return "Leave the cabin first.";
         if (kind == "mine") return MineBlock(p);
+        if (IsZone(kind)) return ZoneBlock(kind, p);
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
         if (Player.DistanceTo(p) < 1.2f || Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
         if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         if (S.Things.Any(t => t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + .65f : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource))) return "Leave room around resources and buildings.";
         if (crate ? item != null && S.Backpack[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
         return null;
+    }
+    private string? ZoneBlock(string kind, Vector2 p)
+    {
+        if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
+        if (ZoneTiles(p).Any(q => !CanStand(q) || Terrain.InLake(q, .8f) || Spawn.DistanceTo(q) < 1)) return "Choose dry, open ground.";
+        float half = ZoneSize / 2;
+        // Yards may touch edge to edge; anything else keeps its usual room from the square.
+        bool Inside(Thing t, float margin) => Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin;
+        if (S.Things.Any(t => IsZone(t.Kind) ? Inside(t, half - .05f) : (t.Remaining > 0 || !t.IsResource) && Inside(t, t.IsResource ? .3f : Footprint(t.Kind) + .2f))) return "Leave room around resources and buildings.";
+        return S.Backpack.Has(Data.Buildings[kind].Cost) ? null : "Missing materials in your backpack.";
     }
     public Thing? Build(string kind, Vector2 p)
     {
@@ -815,14 +842,50 @@ public sealed partial class World
         if (w.Bag.Count > 0 || w.Tool != "") { var box = Add("grave", w.Pos); box.Inventory = w.Bag; box.Inventory.Slots++; box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1); }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
-    /// <summary>A tool station holds only tools; other storage holds anything.</summary>
-    public bool Holds(Thing t, string item) => t.Kind != "toolstation" || Data.Items.TryGetValue(item, out var def) && def.Tool != "";
-    // Only chests take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
+    public bool Holds(Thing t, string item) => HoldBlock(t, item) == null;
+    /// <summary>Why storage will not take an item: a tool station holds only tools, a pile one resource and compost what rots; other storage holds anything.</summary>
+    public string? HoldBlock(Thing t, string item) => t.Kind switch
+    {
+        "toolstation" when !(Data.Items.TryGetValue(item, out var def) && def.Tool != "") => "The tool station only holds tools.",
+        "pile" when t.Compost && !Compostable(item) && item != "fertilizer" => "The compost takes leaves, grass and food.",
+        "pile" when !t.Compost && t.Inventory.Items.Keys.FirstOrDefault(k => k != item) is string held => $"This pile holds {Data.Name(held)}. Empty it to store something else.",
+        _ => null
+    };
+    public bool Compostable(string item) => item is "leaves" or "grass" || Data.IsFood(item);
+    /// <summary>Turns a pile into compost or back; refused while it holds something the new use would not take.</summary>
+    public bool SetCompost(Thing pile, bool on)
+    {
+        if (pile.Kind != "pile" || pile.Compost == on) return false;
+        var items = pile.Inventory.Items.Keys.ToList();
+        if (on ? items.Any(i => !Compostable(i) && i != "fertilizer") : items.Count > 1) { Say(on ? "Empty the pile before composting." : "Empty the compost down to one resource first."); return false; }
+        pile.Compost = on; pile.Progress = 0; PileFilters(pile); return true;
+    }
+    /// <summary>Piles keep their automation filters in step with what they hold: one resource in and out, or compost in and fertilizer out.</summary>
+    private void PileFilters(Thing pile)
+    {
+        var inv = pile.Inventory;
+        inv.InputFilter.Clear(); inv.OutputFilter.Clear();
+        if (pile.Compost) { inv.InputFilter.UnionWith(Data.Items.Keys.Where(Compostable)); inv.OutputFilter.Add("fertilizer"); }
+        else if (inv.Items.Keys.FirstOrDefault() is string item) { inv.InputFilter.Add(item); inv.OutputFilter.Add(item); }
+    }
+    /// <summary>Compost turns 4 units of whatever it holds into 1 fertilizer each in-game hour.</summary>
+    public const int CompostBatch = 4;
+    private void CompostTick(Thing pile, float dt)
+    {
+        int rotting = pile.Inventory.Items.Where(p => Compostable(p.Key)).Sum(p => p.Value);
+        if (rotting < CompostBatch || pile.Inventory.Room("fertilizer") == 0) { pile.Progress = 0; return; }
+        pile.Progress += dt;
+        if (pile.Progress < Data.DaySeconds / 24) return;
+        pile.Progress = 0;
+        for (int left = CompostBatch; left > 0;) left -= pile.Inventory.Remove(pile.Inventory.Items.Keys.First(Compostable), left);
+        pile.Inventory.Add("fertilizer", 1);
+    }
+    // Only chests and piles take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
     public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) => S.Things
-        .Where(t => t.Kind == "chest" && t.Id != exclude && t.Inventory.Room(item) > 0 && t.Inventory.Accepts(item))
+        .Where(t => t.Kind is "chest" or "pile" && t.Id != exclude && t.Inventory.Room(item) > 0 && t.Inventory.Accepts(item) && Holds(t, item))
         .OrderBy(t => t.Inventory.InputFilter.Contains(item) ? 0 : 1).ThenBy(t => t.Pos.DistanceSquaredTo(origin)).FirstOrDefault();
     public Thing? SourceFor(string item, Vector2 origin, int exclude = 0) => S.Things
-        .Where(t => t.Kind == "chest" && t.Id != exclude && t.Inventory[item] > 0 && t.Inventory.AllowsWithdrawal(item))
+        .Where(t => t.Kind is "chest" or "pile" && t.Id != exclude && t.Inventory[item] > 0 && t.Inventory.AllowsWithdrawal(item))
         .OrderBy(t => t.Pos.DistanceSquaredTo(origin)).FirstOrDefault();
     private List<Vector2> FindRoute(Vector2 from, Vector2 destination)
     {
@@ -1111,6 +1174,7 @@ public sealed partial class World
             // A carcass keeps its age so the death animation plays once and not again after loading.
             if (t.Kind == "wolf_corpse") t.Progress = Math.Min(60, t.Progress + dt);
             if (t.Kind == "mine") MineTick(t, dt);
+            if (t.Kind == "pile") { PileFilters(t); if (t.Compost) CompostTick(t, dt); }
             if (t.Kind == "berries" && t.Remaining == 0) { t.Regrow += dt; if (t.Regrow >= Data.BerryRegrowSeconds) { t.Remaining = 24; t.Regrow = 0; } }
             if (t.Kind == "campfire")
             {

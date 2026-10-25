@@ -342,7 +342,15 @@ public partial class Game : Node
             return;
         }
         // Tools stay with the player, and crates stay out of the deposit so it never packs one crate inside another.
-        AddButton("Deposit all materials (keep tools)", () => { if (world.Near(t)) foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray()) world.S.Backpack.TransferTo(t.Inventory, id, 999); });
+        if (t.Kind == "pile")
+        {
+            var compost = new CheckBox { Text = "Compost: takes leaves, grass and food, and makes 1 fertilizer from 4 every hour", ButtonPressed = t.Compost, FocusMode = Control.FocusModeEnum.None };
+            compost.Toggled += on => { if (!world.SetCompost(t, on)) compost.SetPressedNoSignal(t.Compost); };
+            content.AddChild(compost);
+            Dynamic(() => t.Compost ? $"Composting · {(t.Progress > 0 ? $"next fertilizer in {GameHours(world.Data.DaySeconds / 24 - t.Progress)}" : "needs 4 leaves, grass or food")}" : t.Inventory.Items.Keys.FirstOrDefault() is string held ? $"A pile of {world.Data.Name(held)}. Workers store and take only that until it is emptied." : "Empty. The first resource put in sets what this pile holds.", 13, Muted);
+        }
+        // A pile checks each item as it goes, since the first one in decides what the rest may be.
+        AddButton("Deposit all materials (keep tools)", () => { if (world.Near(t)) foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray()) if (world.Holds(t, id)) world.S.Backpack.TransferTo(t.Inventory, id, 999); });
         AddButton("Take everything", () => { if (world.Near(t)) foreach (var id in t.Inventory.Items.Keys.ToArray()) t.Inventory.TransferTo(world.S.Backpack, id, 999); });
         if (crate) AddLabel("Hold right click on the crate to pick it up with everything inside. The village market only takes packed crates.", 13, Muted);
     }
@@ -645,6 +653,16 @@ public partial class Game : Node
         if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
         if (OS.GetCmdlineUserArgs().Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
         if (OS.GetCmdlineUserArgs().Contains("--craft")) OpenPage("craft");
+        if (OS.GetCmdlineUserArgs().Contains("--piles"))
+        {
+            var at = World.Spawn + new Vector2(-3, 9);
+            foreach (var (item, stacks, dx) in new[] { ("stone", 14, 0), ("wood", 6, 3), ("leaves", 3, 6) })
+            {
+                var pile = world.Add("pile", at + new Vector2(dx, 0)); pile.Inventory.Add(item, stacks * pile.Inventory.StackSize);
+                if (item == "leaves") { pile.Compost = true; pile.Inventory.Add("fertilizer", 20); }
+            }
+            world.Player = at + new Vector2(3, -2.5f); world.Tick(0); ClosePanel(); view.Zoom = 1.4f;
+        }
         if (OS.GetCmdlineUserArgs().Contains("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); ClosePanel(); view.Zoom = 1.6f; }
         if (OS.GetCmdlineUserArgs().Contains("--tin")) { var cliff = World.CliffOf("tin"); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); ClosePanel(); }
         if (OS.GetCmdlineUserArgs().Contains("--pantry"))

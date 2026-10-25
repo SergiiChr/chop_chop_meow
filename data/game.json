@@ -387,6 +387,13 @@
       "cost": {},
       "description": "Marking is free and snaps to an ore cliff, one mine per cliff. Dig with a pickaxe, deliver 50 wood, 10 iron bars and 50 stone, then fit it with a hammer. Up to 3 miners with pickaxes bring out ore and rocks for good."
     },
+    "pile": {
+      "name": "Pile",
+      "cost": {
+        "wood": 8
+      },
+      "description": "A 3\u00d73 yard holding 14 stacks of one resource; the first one in sets it, and emptying it frees it. Snaps edge to edge with other piles. Tick Compost to turn leaves, grass and food into fertilizer."
+    },
     "toolstation": {
       "name": "Tool station",
       "cost": {

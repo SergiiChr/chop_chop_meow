@@ -32,7 +32,7 @@ Run checks appropriate to the change. For a visual change, launch a rendered ins
 
 Keep authoritative simulation in `World.cs`, independent of menus or rendering. `WorldView.cs` reads state and draws; `Game.cs` handles UI/input/save integration. `GameData.cs` loads and validates editable data. Inventory rules belong in `Inventory.cs`, not in individual worker jobs.
 
-Automated transfers must respect input/output allowlists. Empty means unrestricted. Prefer explicitly matching input-filter storage over general storage. Manual transfers can bypass automation filters. Never delete carried items when a worker is reassigned, fired, blocked or rerouted.
+Automated transfers must respect input/output allowlists. Empty means unrestricted. Prefer explicitly matching input-filter storage over general storage. Piles set their own filters from what they hold. Manual transfers can bypass automation filters. Never delete carried items when a worker is reassigned, fired, blocked or rerouted.
 
 Preserve the progression: loose iron provides a tool-free bootstrap; the player starts with an iron axe; mining coal and iron deposits requires a carried pickaxe or steel tools. Workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, rake for leaves, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; without one they wait and say so once. Steel requires iron, mined coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling duties.
 

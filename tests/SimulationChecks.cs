@@ -48,6 +48,7 @@ public static class SimulationChecks
         CheckTinAndToolTiers(data);
         CheckToolStation(data);
         CheckRaking(data);
+        CheckPilesAndCompost(data);
         CheckNewFoodsAndRename(data);
         CheckMarketTakesOnlyCrates(data);
         CheckLegacySteelTools(data);
@@ -1384,6 +1385,51 @@ public static class SimulationChecks
         world.Player = new Vector2(30, 30);
         SafeTick(world, 20);
         Require(worker.Tool == "rake" && leaves.Remaining < World.LeafPatch, "a worker should fetch the rake and rake leaves");
+    }
+
+    /// <summary>Piles snap into grids, hold one resource whose filters follow what is in them, and compost turns leaves and food into fertilizer.</summary>
+    private static void CheckPilesAndCompost(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var origin = new Vector2(20, 20);
+        world.Player = origin + new Vector2(0, 2);
+        world.S.Backpack.Add("wood", 40);
+        var pile = world.Build("pile", origin);
+        Require(pile != null && world.S.Backpack["wood"] == 32 && pile!.Inventory.Slots == World.PileStacks, "a pile should cost 8 wood and hold 14 stacks");
+        Require(world.Snap("pile", origin + new Vector2(3.4f, .4f)) == origin + new Vector2(3, 0) && world.Snap("pile", origin + new Vector2(9, 0)) == origin + new Vector2(9, 0),
+                "a pile placed beside another should snap edge to edge, and one far away should not");
+        var east = world.Build("pile", origin + new Vector2(3.3f, 0));
+        Require(world.PlacementBlock("pile", origin + new Vector2(2, 0)) != null && east?.Pos == origin + new Vector2(3, 0), "piles must not overlap but may touch");
+        Require(world.CanStand(origin), "a pile should be walkable");
+
+        world.Player = origin;
+        Require(world.S.Backpack.TransferTo(pile!.Inventory, "wood", 10) == 10 && world.HoldBlock(pile, "stone") != null, "the first resource in should be the only one the pile takes");
+        world.Tick(.1f);
+        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && pile.Inventory.OutputFilter.SetEquals(new[] { "wood" }), "a pile's filters should follow its one resource");
+        var chest = world.Add("chest", origin + new Vector2(0, 5));
+        Require(world.DepositFor("wood", chest.Pos) == pile && world.DepositFor("stone", origin) != pile, "workers should prefer the matching pile and keep other goods out of it");
+        pile.Inventory.Remove("wood", 10);
+        world.Tick(.1f);
+        Require(pile.Inventory.InputFilter.Count == 0 && world.Holds(pile, "stone"), "emptying a pile should clear its filters");
+
+        Require(world.SetCompost(east!, true) && east.Inventory.InputFilter.Contains("leaves") && east.Inventory.InputFilter.Contains("crushed_berries") && !east.Inventory.InputFilter.Contains("stone")
+                && east.Inventory.OutputFilter.SetEquals(new[] { "fertilizer" }), "compost should take leaves, grass and any food, and give fertilizer");
+        east.Inventory.Add("leaves", 6); east.Inventory.Add("burnt_steak", 2);
+        Require(world.HoldBlock(east, "stone") != null && !world.SetCompost(east, false), "compost should refuse stone and stay compost while mixed");
+        SafeTick(world, data.DaySeconds / 24 + .5f);
+        Require(east.Inventory["fertilizer"] == 1 && east.Inventory.Count == 5, "4 inputs should rot into 1 fertilizer in an in-game hour");
+        SafeTick(world, data.DaySeconds / 24 + .5f);
+        Require(east.Inventory["fertilizer"] == 2 && east.Inventory.Items.Keys.All(k => k == "fertilizer"), "compost should keep going while it has 4 inputs");
+        Require(world.SourceFor("fertilizer", origin) == east, "workers should be able to take the fertilizer out");
+
+        var station = world.Add("toolstation", origin + new Vector2(-4, 4));
+        station.Inventory.Add("rake", 1);
+        var leaves = world.Add("leaves", origin + new Vector2(-4, -4), World.LeafPatch);
+        var worker = AddWorker(world, station.Pos);
+        world.Assign(worker, leaves);
+        world.Player = new Vector2(40, 40);
+        SafeTick(world, 40);
+        Require(east.Inventory["leaves"] + east.Inventory["fertilizer"] * 4 > 8, "raked leaves should go to the compost, which takes them explicitly");
     }
 
     /// <summary>Foods restore what their data says, raw ones only say they need cooking, and saves from before the rename keep their cooked meat.</summary>

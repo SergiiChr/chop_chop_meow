@@ -23,7 +23,7 @@ public sealed partial class World
     /// <summary>Where diggers and miners stand: at the entrance, against the rock.</summary>
     public static Vector2 MineDoor(Thing mine) => mine.Pos - MineOut(CliffAt(mine.Pos)) * 1.4f;
     /// <summary>Where a plan placed at <paramref name="p"/> goes: a mine near a cliff snaps to that cliff's spot.</summary>
-    public static Vector2 Snap(string kind, Vector2 p) => kind == "mine" && CliffAt(p) is var c && c.DistanceTo(p) <= MineReach ? MineSpot(c) : p;
+    private static Vector2 SnapMine(Vector2 p) => CliffAt(p) is var c && c.DistanceTo(p) <= MineReach ? MineSpot(c) : p;
     public static string MineOre(Thing mine) => ResourceItem(new Thing { Kind = CliffAt(mine.Pos).Ore });
     public static string MineName(Thing mine) => $"{CliffAt(mine.Pos).Ore} mine";
     public float MineStageSeconds => Data.Mine.StageWorkdays * Data.WorkdaySeconds;
