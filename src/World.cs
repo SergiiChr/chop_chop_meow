@@ -1197,11 +1197,11 @@ public sealed partial class World
     }
     /// <summary>The wolves hunting the acting player.</summary>
     private IEnumerable<Wolf> Hunters => S.Wolves.Where(w => w.Target == S.Actor.Id);
+    private readonly List<Thing> ticking = new();
     /// <summary>
     /// Advances the world. It runs as the world's own player, whoever's action started it, such as a guest's sleep:
     /// wages come out of that player's backpack, and each player's own part runs as that player.
     /// </summary>
-    private readonly List<Thing> ticking = new();
     public void Tick(float dt, bool sleeping = false) => As(S.Players[0], () => TickWorld(dt, sleeping));
     private void TickWorld(float dt, bool sleeping)
     {

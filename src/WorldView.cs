@@ -771,8 +771,8 @@ public partial class WorldView : Node3D
         Burst(To3(t.Pos) + prop.Vent, Flat(smoke.Color), 1, .25f, 2.4f, -.45f, smoke.Size, smoke.Grow);
     }
 
-    /// <summary>Trees in front of the player, a worker or a structure turn see-through instead of hiding them.</summary>
     private readonly List<Thing> structures = new();
+    /// <summary>Trees in front of the player, a worker or a structure turn see-through instead of hiding them.</summary>
     private void FadeCanopies(float dt)
     {
         var bounds = GetViewport().GetVisibleRect().Grow(300);

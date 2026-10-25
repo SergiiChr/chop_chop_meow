@@ -89,12 +89,45 @@ def dotnet_env() -> dict[str, str]:
     return env
 
 
+def nvidia_offload_available(env: dict[str, str]) -> bool:
+    """True on a hybrid machine where another GPU drives the display and the NVIDIA driver can take render offload."""
+    try:
+        match = re.search(r"\s(\d+)\.\d+", Path("/proc/driver/nvidia/version").read_text())
+    except OSError:
+        return False
+    # PRIME render offload arrived in driver 435.
+    if not match or int(match.group(1)) < 435:
+        return False
+    nvidia_display = other_display = False
+    for card in Path("/sys/class/drm").glob("card[0-9]*"):
+        try:
+            vendor = (card / "device" / "vendor").read_text().strip()
+            if not (card / "device" / "class").read_text().startswith("0x03"):
+                continue
+            boot = (card / "device" / "boot_vga").read_text().strip() == "1"
+        except OSError:
+            continue
+        if vendor == "0x10de":
+            nvidia_display |= boot
+        elif boot:
+            other_display = True
+    if nvidia_display or not other_display:
+        return False
+    # An X server lists the offload provider; without it the NVIDIA GLX library cannot make a context.
+    if env.get("XDG_SESSION_TYPE") == "x11" and shutil.which("xrandr"):
+        providers = subprocess.run(
+            ["xrandr", "--listproviders"], env=env, capture_output=True, text=True, check=False
+        )
+        return "NVIDIA-G0" in providers.stdout
+    return True
+
+
 def discrete_gpu(env: dict[str, str]) -> dict[str, str]:
     """Render on the NVIDIA GPU through PRIME offload, since OpenGL otherwise picks the integrated one."""
     offload = ("__NV_PRIME_RENDER_OFFLOAD", "__GLX_VENDOR_LIBRARY_NAME", "DRI_PRIME")
     if env.get("CHOP_CHOP_MEOW_GPU") == "integrated" or any(name in env for name in offload):
         return env
-    if not Path("/proc/driver/nvidia/version").exists():
+    if not nvidia_offload_available(env):
         return env
     return {**env, "__NV_PRIME_RENDER_OFFLOAD": "1", "__GLX_VENDOR_LIBRARY_NAME": "nvidia"}
 
