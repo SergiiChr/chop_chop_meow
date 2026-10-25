@@ -79,6 +79,22 @@ public partial class Game {
         foreach (var t in new[] { chest, pile, forge, furnace, fire, hut, sign, farm }) world.S.Things.Remove(t);
         await Frames();
     }
+    /// <summary>
+    /// A new game reuses the ids of the last one, so the models the view keeps for them must be built anew:
+    /// an old one would carry the last game's state, such as a felled tree faded out.
+    /// </summary>
+    private async Task CheckFreshModelsAfterRestart() {
+        var tree = world.S.Things.Where(t => t.Kind == "tree").MinBy(t => t.Pos.DistanceTo(world.Player))!;
+        await Frames();
+        var old = view.PropOf(tree.Id);
+        UIRequire(old != null, "Every tree must have its model once the world has loaded.");
+        old!.Fade = .68f; old.Fall = 9;
+        Restart(); await Frames(2);
+        var fresh = view.PropOf(tree.Id);
+        UIRequire(world.Find(tree.Id)?.Kind == "tree" && fresh != null && fresh != old && fresh.Fade == 0 && fresh.Fall < 0,
+            "A new game must build fresh models rather than keep the last game's, faded or fallen.");
+        ClosePanel();
+    }
     private Button? FindButton(Node parent, string text) {
         foreach (var child in parent.GetChildren()) {
             if (child is Button b && b.Text == text) return b;
@@ -595,6 +611,7 @@ public partial class Game {
             await CheckCrateOverflow();
             await CheckCrateInCrate();
             RemoveCheckFiles();
+            await CheckFreshModelsAfterRestart();
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }

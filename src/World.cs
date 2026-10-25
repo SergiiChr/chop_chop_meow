@@ -807,18 +807,26 @@ public sealed partial class World {
     // ---------- Crafting ----------
     /// <summary>Hand recipes for the personal crafting menu.</summary>
     public IEnumerable<string> HandRecipes => Data.Recipes.Where(p => p.Value.Hand).Select(p => p.Key);
-    /// <summary>Why a recipe cannot be queued from the backpack now, or null.</summary>
-    /// <summary>Whether a hand recipe can be queued now; <see cref="CraftBlock"/> says why not.</summary>
-    public bool CanCraft(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand && !Downed &&
-        (r.Tool == "" || BestTool(r.Tool, null, r.Tier) != null) && S.Backpack.Has(r.Inputs) && S.Crafting.Count < 8;
-    public string? CraftBlock(string recipe) {
-        if (CanCraft(recipe)) return null;
-        if (!Data.Recipes.TryGetValue(recipe, out var r) || !r.Hand) return "This can only be made at a station.";
-        if (Downed) return "You are still recovering.";
-        if (r.Tool != "" && BestTool(r.Tool, null, r.Tier) == null) return $"Needs a {Data.ToolName(r.Tool, r.Tier)} in your backpack.";
-        if (!S.Backpack.Has(r.Inputs)) return $"Needs {Goods(r.Inputs)} in your backpack.";
-        return S.Crafting.Count >= 8 ? "Eight things are already being made." : null;
+    private enum CraftRefusal { None, StationOnly, Recovering, NoTool, NoInputs, QueueFull }
+    /// <summary>The one place the hand-crafting rules live; <see cref="CanCraft"/> and <see cref="CraftBlock"/> both read it.</summary>
+    private CraftRefusal CraftCheck(string recipe) {
+        if (!Data.Recipes.TryGetValue(recipe, out var r) || !r.Hand) return CraftRefusal.StationOnly;
+        if (Downed) return CraftRefusal.Recovering;
+        if (r.Tool != "" && BestTool(r.Tool, null, r.Tier) == null) return CraftRefusal.NoTool;
+        if (!S.Backpack.Has(r.Inputs)) return CraftRefusal.NoInputs;
+        return S.Crafting.Count >= 8 ? CraftRefusal.QueueFull : CraftRefusal.None;
     }
+    /// <summary>Whether a hand recipe can be queued now, without building the reason; the crafting page asks on every refresh.</summary>
+    public bool CanCraft(string recipe) => CraftCheck(recipe) == CraftRefusal.None;
+    /// <summary>Why a recipe cannot be queued from the backpack now, or null.</summary>
+    public string? CraftBlock(string recipe) => CraftCheck(recipe) switch {
+        CraftRefusal.StationOnly => "This can only be made at a station.",
+        CraftRefusal.Recovering => "You are still recovering.",
+        CraftRefusal.NoTool => $"Needs a {Data.ToolName(Data.Recipes[recipe].Tool, Data.Recipes[recipe].Tier)} in your backpack.",
+        CraftRefusal.NoInputs => $"Needs {Goods(Data.Recipes[recipe].Inputs)} in your backpack.",
+        CraftRefusal.QueueFull => "Eight things are already being made.",
+        _ => null
+    };
     /// <summary>Queues a hand recipe; its inputs leave the backpack now so they cannot be spent twice.</summary>
     public bool Craft(string recipe) {
         if (CraftBlock(recipe) is string blocked) { Say(blocked); return false; }
@@ -912,20 +920,24 @@ public sealed partial class World {
         if (w.Bag.Count > 0 || w.Tool != "") { var box = Add("grave", w.Pos); box.Inventory = w.Bag; box.Inventory.Slots++; box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1); }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
-    /// <summary>Whether storage takes an item: a tool station holds only tools, a pile one resource and compost what rots; other storage holds anything.</summary>
-    public bool Holds(Thing t, string item) => t.Kind switch {
-        "toolstation" => Data.Items.TryGetValue(item, out var def) && def.Tool != "",
-        "pile" when t.Compost => Compostable(item) || item == "fertilizer",
-        "pile" => HeldOtherThan(t.Inventory, item) == null,
-        "farm" => FarmItem(item),
-        _ => true
+    private enum HoldRefusal { None, ToolsOnly, CompostOnly, OtherResource, FarmOnly }
+    /// <summary>The one place the storage rules live: a tool station holds only tools, a pile one resource and compost what rots; other storage holds anything.</summary>
+    private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
+        "toolstation" when !(Data.Items.TryGetValue(item, out var def) && def.Tool != "") => HoldRefusal.ToolsOnly,
+        "pile" when t.Compost && !Compostable(item) && item != "fertilizer" => HoldRefusal.CompostOnly,
+        "pile" when !t.Compost && HeldOtherThan(t.Inventory, item) != null => HoldRefusal.OtherResource,
+        "farm" when !FarmItem(item) => HoldRefusal.FarmOnly,
+        _ => HoldRefusal.None
     };
-    /// <summary>Why storage will not take an item, or null when <see cref="Holds"/> allows it.</summary>
-    public string? HoldBlock(Thing t, string item) => Holds(t, item) ? null : t.Kind switch {
-        "toolstation" => "The tool station only holds tools.",
-        "pile" when t.Compost => "The compost takes leaves, grass and food.",
-        "pile" => $"This pile holds {Data.Name(HeldOtherThan(t.Inventory, item)!)}. Empty it to store something else.",
-        _ => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}."
+    /// <summary>Whether storage takes an item, without building the reason; workers ask on every tick.</summary>
+    public bool Holds(Thing t, string item) => HoldCheck(t, item) == HoldRefusal.None;
+    /// <summary>Why storage will not take an item, or null.</summary>
+    public string? HoldBlock(Thing t, string item) => HoldCheck(t, item) switch {
+        HoldRefusal.ToolsOnly => "The tool station only holds tools.",
+        HoldRefusal.CompostOnly => "The compost takes leaves, grass and food.",
+        HoldRefusal.OtherResource => $"This pile holds {Data.Name(HeldOtherThan(t.Inventory, item)!)}. Empty it to store something else.",
+        HoldRefusal.FarmOnly => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}.",
+        _ => null
     };
     private static string? HeldOtherThan(Inventory inventory, string item) {
         foreach (var pair in inventory.Items) if (pair.Key != item) return pair.Key;

@@ -295,6 +295,8 @@ public partial class WorldView : Node3D {
         return new Rect2(bottom.X - half, top.Y - half * .5f, half * 2, bottom.Y - top.Y + half);
     }
 
+    internal Prop? PropOf(int id) => props.GetValueOrDefault(id);
+
     internal bool TreeCanopyCoversThing(Thing tree, Thing thing) {
         SyncCamera();
         return Covers(tree, thing, PixelsPerUnit);
@@ -541,30 +543,39 @@ public partial class WorldView : Node3D {
     private readonly List<Thing> known = new();
     private readonly List<int> gone = new();
     private SaveState? builtFor;
+    private int thingsCounted = -1;
     private void SyncThings(float dt) {
         // Every model is built while a world loads, hidden until the player first sees it, so exploring builds nothing mid-game.
+        // Another world, loaded or started, starts from fresh models: the old ones carry the state of things with the same ids.
         if (builtFor != World.S) {
             builtFor = World.S;
-            foreach (var t in World.S.Things) PropFor(t);
+            foreach (var (_, old) in props) old.Root.QueueFree();
+            props.Clear();
+            foreach (var t in World.S.Things) Show(PropFor(t), false);
         }
         seen.Clear();
         World.CollectKnown(known);
         foreach (var t in known) {
             seen.Add(t.Id);
             var prop = PropFor(t);
-            prop.Root.Visible = true;
+            Show(prop, true);
             prop.Root.Position = To3(t.Pos);
             Animate(prop, t, dt);
         }
-        // Models of things not known stay hidden; those of things gone from the world as well are freed.
-        gone.Clear();
-        foreach (var (id, prop) in props) {
-            if (seen.Contains(id)) continue;
-            if (World.Find(id) == null) gone.Add(id);
-            else prop.Root.Visible = false;
+        foreach (var (id, prop) in props) if (!seen.Contains(id)) Show(prop, false);
+        // Things leave the world rarely, so their models are looked for only when the count changes.
+        if (thingsCounted != World.S.Things.Count) {
+            thingsCounted = World.S.Things.Count;
+            gone.Clear();
+            foreach (var (id, _) in props) if (!seen.Contains(id) && World.Find(id) == null) gone.Add(id);
+            foreach (int id in gone) { props[id].Root.QueueFree(); props.Remove(id); }
         }
-        foreach (int id in gone) { props[id].Root.QueueFree(); props.Remove(id); }
         FadeCanopies(dt);
+    }
+
+    private static void Show(Prop prop, bool shown) {
+        if (prop.Shown == shown) return;
+        prop.Shown = shown; prop.Root.Visible = shown;
     }
 
     /// <summary>The model drawn for a thing, built when it has none or its kind changed.</summary>
@@ -738,10 +749,22 @@ public partial class WorldView : Node3D {
     private static float Ease(float t) => t * t * (3 - 2 * t);
 
     // Lookups that would otherwise capture the thing in a lambda, which allocates on every call for every thing drawn.
-    private WorldModels.WolfModel? Dying(Vector2 at) => wolves.FirstOrDefault(pair => !World.S.Wolves.Contains(pair.Key) && pair.Value.Last.DistanceTo(at) < 2).Value;
-    private bool AnyPlayerNear(Vector2 at, float radius) => World.S.Players.Any(p => p.RespawnIn <= 0 && p.Pos.DistanceTo(at) < radius);
-    private bool Underground(int mine) => World.S.Workers.Any(w => w.Assignment == mine && w.WorkState == WorkerWorkState.Underground);
-    private bool OrderAt(int signpost) => World.S.Orders.Any(o => o.Signpost == signpost);
+    private WorldModels.WolfModel? Dying(Vector2 at) {
+        foreach (var (wolf, model) in wolves) if (!World.S.Wolves.Contains(wolf) && model.Last.DistanceTo(at) < 2) return model;
+        return null;
+    }
+    private bool AnyPlayerNear(Vector2 at, float radius) {
+        foreach (var p in World.S.Players) if (p.RespawnIn <= 0 && p.Pos.DistanceTo(at) < radius) return true;
+        return false;
+    }
+    private bool Underground(int mine) {
+        foreach (var w in World.S.Workers) if (w.Assignment == mine && w.WorkState == WorkerWorkState.Underground) return true;
+        return false;
+    }
+    private bool OrderAt(int signpost) {
+        foreach (var o in World.S.Orders) if (o.Signpost == signpost) return true;
+        return false;
+    }
 
     // Campfire, furnace and bellows furnace smoke: the coal forge's plume is darker, denser and wider.
     private readonly record struct SmokeStyle(float Every, Color Color, float Size, float Grow);
