@@ -57,7 +57,7 @@ public static class WorkerStateChecks
         var worker = AddWorker(world, tree.Pos);
         world.Assign(worker, tree);
         worker.WorkState = WorkerWorkState.Gathering;
-        worker.WageDebt = data.DailyWage;
+        worker.WageDebt = worker.Wage;
 
         world.Tick(.25f);
         Require(worker.WorkState == WorkerWorkState.Idle,

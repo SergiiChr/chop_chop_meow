@@ -81,6 +81,36 @@ public partial class Game
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
         await Frames();
     }
+    private async Task CheckSignpost()
+    {
+        ClosePanel(); await Frames();
+        var sign = world.Add("signpost", world.Player + new Vector2(2, 0));
+        world.S.Backpack.Add("wood", 5); world.S.Backpack.Add(Inventory.Coins, 60);
+        await Click(view.Screen(sign.Pos, .8f));
+        UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A signpost must open the market with its icon buttons.");
+        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood")));
+        UIRequire(sign.Inventory["wood"] == 5 && world.S.Backpack["wood"] == 0, "Clicking a backpack stack must load it into the market input.");
+        await Click(Named("sell")!);
+        UIRequire(world.S.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
+        await Click(Named("prices")!);
+        var fetch = Named("fetch");
+        UIRequire(sheet.Visible && panel.OffsetLeft == PanelLeft - SheetWidth && fetch != null && fetch.Disabled && fetch.TooltipText == "No worker assigned.", "The price sheet must open beside the panel and explain why no one can fetch prices.");
+        await Click(Named("buy_wood")!);
+        UIRequire(world.S.Orders.Count == 2 && world.S.Orders[1].Buying, "Buy on the price sheet must order goods.");
+        await Click(Named("hardhat")!);
+        var dear = world.Data.HireOffers.OrderBy(o => o.Upfront).Last();
+        await Click(Named($"hire_{dear.Upfront:0}")!);
+        var hired = world.S.Workers.LastOrDefault();
+        UIRequire(hired != null && hired.Wage == dear.Wage, "A hiring offer must set the new worker's wage.");
+        world.Assign(hired!, sign); Select(sign); await Frames();
+        UIRequire(!Named("fetch")!.Disabled, "With a worker assigned, fresh prices can be fetched.");
+        await Click(Named("fetch")!);
+        UIRequire(hired!.Away > 0, "Fetching must send the assigned worker to the village.");
+        await Click(Named("prices")!);
+        UIRequire(!sheet.Visible && panel.OffsetLeft == PanelLeft, "The price sheet icon must close the sheet again.");
+        world.S.Workers.Remove(hired); world.S.Orders.Clear(); world.S.Things.Remove(sign); world.S.Backpack.Remove(Inventory.Coins, 999);
+        signpostTab = "market"; ClosePanel(); await Frames();
+    }
     private async Task CheckCabinAndCanopy()
     {
         ClosePanel(); await Frames();
@@ -254,7 +284,7 @@ public partial class Game
             await Seconds(.25);
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
             await Frames();
-            UIRequire(world.Player == pinnedAt && view.PlayerAnimation == ActorAction.Mauled && deathLabel.Text.Contains("throat"), "A pinned player must not move and must show the mauled struggle.");
+            UIRequire(world.Player == pinnedAt && view.PlayerAnimation == ActorAction.Mauled && deathLabel.Text == "", "A pinned player must not move, must show the mauled struggle and leaves the message to the pinned notice.");
             world.S.Mauled = false; world.S.Wolves.Clear(); world.S.Time = dayTime; world.S.Health = 100;
             world.S.Health = -1; await Seconds(.3);
             UIRequire(world.Dead && deathLabel.Text.Contains("Respawning in"), "Death must show the respawn countdown.");
@@ -262,6 +292,7 @@ public partial class Game
             UIRequire(!world.Dead && deathLabel.Text == "", "The countdown must clear once the player respawns.");
 
             await CheckCabinAndCanopy();
+            await CheckSignpost();
 
             world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools", "sold_steel", "hired", "assigned" });
             await Frames(3);
