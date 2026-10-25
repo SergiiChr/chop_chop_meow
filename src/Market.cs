@@ -45,11 +45,14 @@ public partial class Game
             trip.Value = next == null ? 0 : next.Elapsed / world.Data.TradeSeconds;
             trip.TooltipText = next == null ? "No carts on the road." : $"Cart back in {Math.Max(0, world.Data.TradeSeconds - next.Elapsed):0}s";
         });
+        var wages = sign.Wages!;
+        AddLabel("WAGES", 14);
+        AddInventoryGrid(() => wages, sign, id => MoveStack(wages, world.S.Backpack, id, sign), "Sale coins land here first and pay wages at dawn\nClick or drag: take · Drop coins here to top it up", drag => drag.Item == Inventory.Coins && drag.From != null && drag.From != wages);
         AddInventoryGrid(() => output, sign, id => MoveStack(output, world.S.Backpack, id, sign), "Click or drag: collect", _ => false);
         var row = Row();
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
         var sell = Button("Sell", () => { var load = sign.Inventory.Items.Keys.OrderByDescending(id => sign.Inventory[id]).FirstOrDefault(); if (world.Sell(sign) && load != null) sounds.Play(Sounds.ForItem(load)); }); sell.Name = "sell"; sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(sell);
-        var collect = Button("Collect", () => { if (world.Near(sign)) foreach (var id in output.Items.Keys.ToArray()) output.TransferTo(world.S.Backpack, id, output[id]); else Notify("Walk closer first."); });
+        var collect = Button("Collect", () => { if (world.Near(sign)) foreach (var id in output.Items.Keys.ToArray()) world.Transfer(output, world.S.Backpack, id, output[id]); else Notify("Walk closer first."); });
         collect.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(collect);
         AddLabel("BACKPACK", 14);
         AddLabel("The village only takes crates packed with meat, berries or steel tools.", 13, Muted);
@@ -64,7 +67,7 @@ public partial class Game
             var hire = Button($"{offer.Upfront:0} coins now · {offer.Wage:0} a day", () => { if (world.Hire(sign, offer) is Worker w) Select(w); });
             hire.Name = $"hire_{offer.Upfront:0}"; content.AddChild(hire);
         }
-        AddLabel("Wages are paid from your backpack at each dawn. Unpaid workers strike.", 13, Muted);
+        AddLabel("Wages are paid at each dawn from the market's wage slot, then from your backpack. Unpaid workers strike.", 13, Muted);
         Assignment(sign);
     }
 

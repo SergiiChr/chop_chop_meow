@@ -68,6 +68,21 @@ public partial class Game
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
         await Frames();
     }
+    /// <summary>A right click on a stack, a move to the target and a left click there.</summary>
+    private async Task SplitTo(Control from, Control to)
+    {
+        var start = await At(from); var end = await At(to);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = start, GlobalPosition = start, Pressed = true });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = start, GlobalPosition = start, Pressed = false });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseMotion { Position = end, GlobalPosition = end, Relative = end - start });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = end, GlobalPosition = end, Pressed = true });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
+        await Frames();
+    }
     private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false)[grid].GetChildren().OfType<ItemSlot>().First(match);
     private static void UIRequire(bool okay, string message)
     {
@@ -90,9 +105,9 @@ public partial class Game
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         await Click(view.Screen(sign.Pos, .8f));
         UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A signpost must open the market with its icon buttons.");
-        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·")));
+        await Click(Cell(3, c => c.TooltipText.StartsWith("Wood ·")));
         UIRequire(sign.Inventory.Count == 0 && world.S.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
-        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));
+        await Click(Cell(3, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));
         UIRequire(sign.Inventory[packed] == 1 && world.S.Backpack[packed] == 0, "Clicking a packed crate must load it into the market input.");
         await Click(Named("sell")!);
         UIRequire(world.S.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
@@ -115,6 +130,29 @@ public partial class Game
         UIRequire(!sheet.Visible && panel.OffsetLeft == PanelLeft, "The price sheet icon must close the sheet again.");
         world.S.Workers.Remove(hired); world.S.Orders.Clear(); world.S.Things.Remove(sign); world.S.Backpack.Remove(Inventory.Coins, 999);
         signpostTab = "market"; ClosePanel(); await Frames();
+    }
+    /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
+    private async Task CheckMine()
+    {
+        var home = world.Player;
+        foreach (string ore in World.MineOres)
+        {
+            var cliff = World.CliffOf(ore);
+            var spot = World.MineSpot(cliff);
+            world.Player = spot + cliff.Face * 3; await Frames(4);
+            await KeyStroke(Key.B);
+            Named("build_mine")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            UIRequire(view.BuildMode == "mine", "The mine plan must enter placement mode.");
+            // Off the exact spot, so the click shows the plan snapping to the cliff.
+            await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
+            var mine = world.S.Things.LastOrDefault(t => t.Kind == "mine");
+            UIRequire(mine != null && mine.Pos == spot && selected == mine.Id && view.BuildMode == "", $"A click near the {ore} cliff must mark a mine on its spot and select it.");
+            UIRequire(HasLabel(panel, "Stage 1 · Dig the entrance") && HasLabel(panel, "Stage 2 · Shore it up") && HasLabel(panel, "Stage 3 · Fit the frame and rails"), "The mine panel must list its three stages.");
+        }
+        world.Player = home; ClosePanel();
+        await KeyStroke(Key.Escape);
+        UIRequire(HasLabel(menu, "END GOALS") && HasLabel(menu, "A working iron mine") && HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"), "The pause menu must list the end goals.");
+        await KeyStroke(Key.Escape);
     }
     /// <summary>Clicks open ground beside the player, so the click uses the item in hand instead of selecting something.</summary>
     private async Task ClickGround()
@@ -215,6 +253,10 @@ public partial class Game
             UIRequire(picker.Selected == Array.IndexOf(Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
             picker.Select(0); picker.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
             UIRequire(SavedResolution() == Resolutions[0], "Choosing a resolution must store it in the settings file.");
+            var musicSlider = (HSlider)screen.FindChild("music", true, false);
+            UIRequire(musicSlider.Value == 100, "Music must start at full volume.");
+            musicSlider.Value = 40; await Frames();
+            UIRequire(Mathf.IsEqualApprox(SavedMusicVolume(), .4f) && Mathf.IsEqualApprox(sounds.MusicVolume, .4f), "The music slider must set and store the music volume.");
             await KeyStroke(Key.Escape);
             UIRequire(FindButton(screen, "New game") != null, "Esc in options must return to the start menu.");
             await Click(FindButton(screen, "Load game")!);
@@ -237,6 +279,17 @@ public partial class Game
             UIRequire(Sounds.Names.All(name => sounds.VariantCount(name) > 0) && sounds.VariantCount("footsteps_default") == 3 && sounds.VariantCount("chop_tree") == 1, "Every sound must load, with numbered files grouped as variants.");
             var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
             UIRequire(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
+            float musicDay = world.S.Time; sounds.UpdateMusic(Sounds.MusicFadeSeconds);
+            UIRequire(sounds.DayMusicPlaying && !sounds.NightMusicPlaying, "Daytime must play the day music only.");
+            world.S.Time = world.Data.DaySeconds * (world.Data.NightStarts + .02f); sounds.UpdateMusic(Sounds.MusicFadeSeconds / 2);
+            UIRequire(sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Nightfall must crossfade the day music into the night music.");
+            sounds.UpdateMusic(Sounds.MusicFadeSeconds); await Seconds(.5f);
+            UIRequire(!sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Day music must stop once faded out.");
+            world.S.Time = musicDay; sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2); float stoppedAt = sounds.NightMusicPosition;
+            UIRequire(!sounds.NightMusicPlaying && sounds.DayMusicPlaying && stoppedAt > .2f, "Dawn must stop the night music, keep its position and bring the day music back.");
+            world.S.Time = world.Data.DaySeconds * (1 + world.Data.NightStarts + .02f); sounds.UpdateMusic(.1f);
+            UIRequire(sounds.NightMusicPlaying && sounds.NightMusicPosition >= stoppedAt, "The next night must resume the music where it stopped.");
+            world.S.Time = musicDay; sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2);
             int heard = sounds.Played; sounds.Play("anvil_work", world.Player + Vector2.One * 40);
             UIRequire(view.OffScreen(world.Player) == 0 && view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach && sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
             var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == World.Spawn + new Vector2(5, 0));
@@ -251,6 +304,15 @@ public partial class Game
             UIRequire(sounds.Last == "chop_tree", "Axe strokes on a tree must play the chop sound.");
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
             await Frames(); UIRequire(world.S.Backpack["wood"] > wood, "Holding RMB must approach and gather a real resource.");
+            var farm = world.Add("farm", world.Player + new Vector2(-3, 3)); farm.Stage = World.FarmRipe;
+            await Frames(2);
+            var farmPoint = GetViewport().GetFinalTransform() * view.Screen(farm.Pos);
+            UIRequire(view.Pick(view.Screen(farm.Pos))?.Id == farm.Id, "A farm plot must be picked where it is drawn.");
+            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = farmPoint, GlobalPosition = farmPoint, Pressed = true });
+            await ToSignal(GetTree().CreateTimer(3), SceneTreeTimer.SignalName.Timeout);
+            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = farmPoint, Pressed = false });
+            await Frames(); UIRequire(farm.Progress > 0 && farm.Stage == World.FarmRipe, "Holding RMB on a ripe farm plot must walk over and harvest by hand.");
+            world.S.Things.Remove(farm);
             UIRequire(!stats.Text.Contains("Health") && !stats.Text.Contains("Food") && !stats.Text.Contains("Water") && !stats.Text.Contains("coins") && !stats.Text.Contains("Pack"), "The persistent HUD must show only the day and clock beside the brand.");
             UIRequire(hotbarButtons.Count == 9 && world.S.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
             int berries = world.S.Backpack["berries"];
@@ -301,6 +363,13 @@ public partial class Game
             UIRequire(world.S.HotbarSlots[3] == "wood" && world.S.Backpack["wood"] == storedWood, "Dragging an item onto the hotbar must assign a reference without moving items.");
             await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
             UIRequire(chest.Inventory["wood"] == storedWood, "Dragging a backpack stack onto the chest must store it.");
+            RefreshLive();
+            await SplitTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), Cell(1, c => c.TooltipText == ""));
+            int half = (Math.Min(storedWood, world.S.Backpack.StackOf("wood")) + 1) / 2;
+            UIRequire(world.S.Backpack["wood"] == half && chest.Inventory["wood"] == storedWood - half, $"A right click must pick up half a stack and a left click must drop it ({world.S.Backpack["wood"]} of {half}, chest {chest.Inventory["wood"]} of {storedWood}).");
+            RefreshLive();
+            await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
+            UIRequire(chest.Inventory["wood"] == storedWood, "The split half must go back into the chest.");
             var filters = FindButton(panel, "Input / output filters"); filters!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(page == "filters", "Chest filters must be reachable from the live context UI.");
             await KeyStroke(Key.I);
@@ -370,7 +439,12 @@ public partial class Game
 
             world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "bench", "pick", "reinforced", "steel_bar", "steel_tool", "sold_steel", "hired", "assigned" });
             await Frames(3);
-            UIRequire(ending.Visible && paused, "Completing the goal chain must show the ending and pause the world.");
+            UIRequire(!ending.Visible && !paused, "The starter goal chain alone must not end the game.");
+            await CheckMine();
+            foreach (var mine in world.S.Things.Where(t => t.Kind == "mine")) mine.Stage = World.MineOpen;
+            world.S.Milestones.Add("profit_week");
+            await Frames(3);
+            UIRequire(ending.Visible && paused, "Reaching the end goals must show the ending and pause the world.");
             ((Button)ending.FindChild("keep_playing", true, false)).EmitSignal(BaseButton.SignalName.Pressed); await Frames(3);
             UIRequire(!ending.Visible && !paused && world.S.EndingShown, "Keep playing must close the ending and resume.");
             await Frames(3);

@@ -52,38 +52,49 @@ public static class EconomyChecks
                 Require(high.Markup <= low.Markup + .005f, $"{high.Recipe} (step {high.Depth}) should not mark up more than {low.Recipe} (step {low.Depth})");
     }
 
-    /// <summary>A berry picker barely covers their pay, while steel tool crews earn several times theirs, and longer chains earn more per worker-day.</summary>
+    /// <summary>
+    /// A berry picker barely covers their pay, steel tool crews earn several times theirs and cooks a good part more, and longer chains earn more per worker-day.
+    /// Food chains are compared among themselves, apart from the tools.
+    /// </summary>
     private static void CheckHiringPays(GameData data)
     {
-        var gathered = new[] { ("iron_ore", "iron"), ("coal", "coal"), ("wood", "tree"), ("berries", "berries") }.ToDictionary(p => p.Item1, p => Gather(data, p.Item2, p.Item2 == "berries" ? 2 : 1));
-        var made = new[] { "iron_bar", "steel_bar", "steel_parts", "wood_parts" }.ToDictionary(recipe => recipe, recipe => Station(data, recipe));
-        foreach (var tool in data.Market.Sells.Keys.Where(id => data.Items[id].Tool != "")) made[tool] = Station(data, tool);
+        var gathered = new[] { ("iron_ore", "iron"), ("coal", "coal"), ("tin_ore", "tin"), ("wood", "tree"), ("berries", "berries") }.ToDictionary(p => p.Item1, p => Gather(data, p.Item2, p.Item2 == "berries" ? 2 : 1));
+        var made = new Dictionary<string, float>();
+        float Made(string recipe) => made.TryGetValue(recipe, out float perDay) ? perDay : made[recipe] = Station(data, recipe);
         var world = new World(data, false);
+        string RecipeFor(string item) => data.Recipes.First(p => p.Value.Output == item).Key;
+        // Meat comes from wolves at night and wheat from farms, so no hired gatherer or station crew alone accounts for them.
+        bool Measurable(string item) => gathered.ContainsKey(item) || data.Recipes.Values.Any(r => r.Output == item) && BatchCost(world, RecipeFor(item)).Keys.All(Measurable);
         // Worker-days per unit: the materials' share plus the recipe's own station time, one over the station's daily output.
         float Labor(string item)
         {
             if (gathered.TryGetValue(item, out float perDay)) return 1 / perDay;
-            var (key, recipe) = data.Recipes.First(p => p.Value.Output == item);
-            return BatchCost(world, key).Sum(p => Labor(p.Key) * p.Value) / recipe.Amount + 1 / made[key];
+            string key = RecipeFor(item);
+            return BatchCost(world, key).Sum(p => Labor(p.Key) * p.Value) / data.Recipes[key].Amount + 1 / Made(key);
         }
         float cost = data.HireOffers.Average(o => o.Wage + o.Upfront / HireDays);
-        // Meat comes from wolves at night, so no worker can be hired to produce it.
-        var earnings = data.Market.Sells.Keys.Where(id => id != "raw_meat" && id != "cooked_meat")
-            .Select(id => (Item: id, Depth: Depth(data, id), PerDay: data.Items[id].Price / Labor(id))).OrderBy(e => e.Depth).ToList();
+        GD.Print($"Economy: not measured, made from goods no hire gathers: {string.Join(", ", data.Market.Sells.Keys.Where(id => !Measurable(id)))}");
+        var earnings = data.Market.Sells.Keys.Where(Measurable)
+            .Select(id => (Item: id, Tool: data.Items[id].Tool != "", Depth: Depth(data, id), PerDay: data.Items[id].Price / Labor(id))).OrderBy(e => e.Depth).ToList();
         GD.Print($"Economy: a worker-day costs {cost:0.0} coins; gathered per day {string.Join(", ", gathered.Select(p => $"{p.Key} {p.Value:0}"))}; made per day {string.Join(", ", made.Select(p => $"{p.Key} {p.Value:0}"))}");
-        foreach (var e in earnings) GD.Print($"Economy: {e.Item,-13} {Labor(e.Item):0.000} worker-days each, {e.PerDay:0} coins per worker-day ({e.PerDay / cost:0.0}x pay)");
+        foreach (var e in earnings) GD.Print($"Economy: {e.Item,-16} {Labor(e.Item):0.000} worker-days each, {e.PerDay:0} coins per worker-day ({e.PerDay / cost:0.0}x pay)");
         float berries = earnings.Single(e => e.Item == "berries").PerDay;
         Require(berries >= .9f * cost && berries <= 1.25f * cost, $"a hired berry picker should barely break even: {berries:0.0} coins a day against {cost:0.0}");
-        Require(earnings.Where(e => e.Item != "berries").All(e => e.PerDay >= 4 * cost), "a worker in a steel tool chain should earn at least four times their pay");
-        for (int i = 1; i < earnings.Count; i++)
-            Require(earnings[i].Depth == earnings[i - 1].Depth || earnings[i].PerDay > earnings[i - 1].PerDay, $"{earnings[i].Item} has a longer chain and should earn more per worker-day than {earnings[i - 1].Item}");
+        Require(earnings.Where(e => e.Tool).All(e => e.PerDay >= 4 * cost), "a worker in a steel tool chain should earn at least four times their pay");
+        Require(earnings.Where(e => !e.Tool && e.Depth > 0).All(e => e.PerDay >= 1.5f * cost), "a cook should earn at least half as much again as their pay");
+        foreach (var chain in earnings.GroupBy(e => e.Tool))
+        {
+            var ladder = chain.ToList();
+            for (int i = 1; i < ladder.Count; i++)
+                Require(ladder[i].Depth == ladder[i - 1].Depth || ladder[i].PerDay > ladder[i - 1].PerDay, $"{ladder[i].Item} has a longer chain and should earn more per worker-day than {ladder[i - 1].Item}");
+        }
     }
 
     /// <summary>Selling each good's daily amount every day keeps prices steady, and staple food holds its price better than tools.</summary>
     private static void CheckBasketIsSustainable(GameData data)
     {
         var sells = data.Market.Sells;
-        Require(sells.Where(p => World.IsFood(p.Key)).All(food => sells.Where(p => data.Items[p.Key].Tool != "").All(tool => food.Value.Drop < tool.Value.Drop)),
+        Require(sells.Where(p => data.IsFood(p.Key)).All(food => sells.Where(p => data.Items[p.Key].Tool != "").All(tool => food.Value.Drop < tool.Value.Drop)),
                 "food demand should be steadier than tool demand");
         var world = new World(data, false);
         var sign = world.Add("signpost", new Vector2(20, 20));
@@ -129,7 +140,7 @@ public static class EconomyChecks
             }
             Require(world.Sell(sign), "the village should take a day's basket");
             Pass(world, world.Data.TradeSeconds + .5f);
-            coins += sign.Output!.Remove(Inventory.Coins, sign.Output[Inventory.Coins]);
+            coins += sign.Wages!.Remove(Inventory.Coins, sign.Wages[Inventory.Coins]) + sign.Output!.Remove(Inventory.Coins, sign.Output[Inventory.Coins]);
         }
         return coins;
     }
@@ -149,7 +160,6 @@ public static class EconomyChecks
         var world = new World(data, false);
         world.S.Time = 0;
         world.S.Backpack.Add(Inventory.Coins, 1000);
-        world.S.Milestones.Add("pick");
         return world;
     }
 
@@ -165,6 +175,9 @@ public static class EconomyChecks
         var world = WorkDay(data);
         var source = world.Add(kind, new Vector2(20, 20), kind == "berries" ? 24 : 9999);
         var chest = world.Add("chest", new Vector2(22.5f, 20));
+        // Workers take plain iron tools from a station beside the chest, so the measure stays the baseline output.
+        var station = world.Add("toolstation", new Vector2(22.5f, 22));
+        station.Inventory.Add("iron_axe", 1); station.Inventory.Add("iron_pick", 1);
         Hire(world, source);
         Pass(world, days * data.DaySeconds);
         return chest.Inventory[World.ResourceItem(source)] / (float)days;
@@ -177,7 +190,7 @@ public static class EconomyChecks
         var r = data.Recipes[recipe];
         var station = world.Add(r.Station, new Vector2(20, 20));
         world.SetRecipe(station, recipe);
-        if (station.Tools != null) { station.Tools.Add("stone_chisel", 1); station.Tools.Add("steel_hammer", 1); }
+        foreach (string tool in World.SlotKinds(station.Kind)) station.Tools!.Add(tool switch { "chisel" => "stone_chisel", "hammer" => "steel_hammer", _ => tool }, 1);
         var supply = world.Add("chest", new Vector2(23, 20));
         supply.Inventory.Slots = 60;
         foreach (var item in BatchCost(world, recipe).Keys) { supply.Inventory.Add(item, 600); supply.Inventory.OutputFilter.Add(item); }

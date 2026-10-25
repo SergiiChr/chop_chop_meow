@@ -11,10 +11,18 @@ public sealed class ItemDef
     public string Name { get; set; } = "";
     public float Price { get; set; }
     public string Color { get; set; } = "ffffff";
-    /// <summary>The kind of tool this item is (axe, pickaxe, hammer or chisel), or empty for materials.</summary>
+    /// <summary>The kind of tool this item is (axe, pickaxe, hammer, chisel, rake or mortar), or empty for materials.</summary>
     public string Tool { get; set; } = "";
     /// <summary>How fast the tool works compared with the plainest tool of its kind.</summary>
     public float Speed { get; set; } = 1;
+    /// <summary>The tool's material grade: 0 for wood and stone, 1 for iron, 2 for steel.</summary>
+    public int Tier { get; set; }
+    /// <summary>Wolves eat it and compost takes it, cooked or not; only items that restore hunger or thirst can be eaten.</summary>
+    public bool Food { get; set; }
+    /// <summary>What eating or drinking one restores.</summary>
+    public float Hunger { get; set; }
+    public float Thirst { get; set; }
+    public float Health { get; set; }
 }
 public sealed class BuildingDef
 {
@@ -32,8 +40,12 @@ public sealed class RecipeDef
     public float Seconds { get; set; }
     /// <summary>The tool kind the recipe needs: carried for crafting by hand, slotted at a bench.</summary>
     public string Tool { get; set; } = "";
+    /// <summary>The lowest <see cref="ItemDef.Tier"/> of that tool that will do; a better one always does.</summary>
+    public int Tier { get; set; }
     /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
     public bool Hand { get; set; }
+    /// <summary>Each batch burns one wood or coal, whichever the station is set to; the bellows furnace burns coal.</summary>
+    public bool Fuel { get; set; }
 }
 /// <summary>How the village's appetite for a good it takes moves with sales.</summary>
 public sealed class DemandDef
@@ -56,6 +68,35 @@ public sealed class HireOffer
 {
     public int Upfront { get; set; }
     public int Wage { get; set; }
+}
+/// <summary>How a mine is built and how fast it yields.</summary>
+public sealed class MineDef
+{
+    /// <summary>Materials the second stage needs delivered to the site.</summary>
+    public Dictionary<string, int> Materials { get; set; } = new();
+    /// <summary>Working days of one worker that digging the entrance, and later fitting the frame, each take.</summary>
+    public float StageWorkdays { get; set; } = 1;
+    /// <summary>Seconds one miner takes to bring out one ore and one rock.</summary>
+    public float Seconds { get; set; } = 2;
+    public int Workers { get; set; } = 3;
+}
+/// <summary>A farm plot's season: what sows it, how long the wheat grows and how much work its harvest takes.</summary>
+public sealed class FarmDef
+{
+    public Dictionary<string, int> Sow { get; set; } = new();
+    /// <summary>Whole days from sowing to ripe wheat, nights included.</summary>
+    public float GrowDays { get; set; } = 3;
+    /// <summary>Working days of one worker that a harvest takes; several workers share it.</summary>
+    public float HarvestWorkdays { get; set; } = 2;
+    public Dictionary<string, int> Yield { get; set; } = new();
+}
+/// <summary>The end goals: a mine on every ore and a week of steady profit.</summary>
+public sealed class GoalsDef
+{
+    /// <summary>Sale coins minus wages that a day has to clear.</summary>
+    public int DailyProfit { get; set; }
+    /// <summary>Consecutive days that have to clear it.</summary>
+    public int ProfitDays { get; set; }
 }
 public sealed class GameData
 {
@@ -87,6 +128,11 @@ public sealed class GameData
     /// <summary>How much faster a crafting bench works than crafting by hand.</summary>
     public float BenchSpeed { get; set; } = 2;
     public MarketDef Market { get; set; } = new();
+    public MineDef Mine { get; set; } = new();
+    public FarmDef Farm { get; set; } = new();
+    public GoalsDef Goals { get; set; } = new();
+    /// <summary>A worker's time on duty in a day: dawn to dusk, less lunch and the walk in.</summary>
+    public float WorkdaySeconds => DuskStarts * DaySeconds - DaySeconds / 24 - TradeSeconds / 2;
     public Dictionary<string, ItemDef> Items { get; set; } = new();
     public Dictionary<string, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
@@ -107,19 +153,29 @@ public sealed class GameData
                 if (!Items.ContainsKey(cost.Key) || cost.Value <= 0) throw new InvalidOperationException($"Invalid cost for {building.Key}: {cost.Key}.");
         foreach (var recipe in Recipes)
         {
-            bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool);
+            bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool && i.Tier >= recipe.Value.Tier);
             if (!(recipe.Value.Station == "" ? recipe.Value.Hand : Buildings.ContainsKey(recipe.Value.Station)) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
             foreach (var input in recipe.Value.Inputs)
                 if (!Items.ContainsKey(input.Key) || input.Value <= 0) throw new InvalidOperationException($"Invalid input for {recipe.Key}: {input.Key}.");
         }
-        if (Items.Values.Any(i => i.Speed <= 0) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
+        if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Health < 0 || i.Hunger > 0 && !i.Food) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in data/game.json.");
+        if (Mine.Materials.Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Mine.StageWorkdays <= 0 || Mine.Seconds <= 0 || Mine.Workers <= 0 || Goals.DailyProfit <= 0 || Goals.ProfitDays <= 0)
+            throw new InvalidOperationException("Invalid mine or goals in data/game.json.");
+        if (Farm.Sow.Count == 0 || Farm.Yield.Count == 0 || Farm.Sow.Concat(Farm.Yield).Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Farm.GrowDays <= 0 || Farm.HarvestWorkdays <= 0)
+            throw new InvalidOperationException("Invalid farm in data/game.json.");
     }
+    /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
+    public bool IsConsumable(string item) => Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
+    public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
+    /// <summary>The plainest tool of a kind that meets a tier, for naming what a recipe needs.</summary>
+    public string ToolName(string tool, int tier) => Items.Values.Where(i => i.Tool == tool && i.Tier >= tier).MinBy(i => i.Tier) is ItemDef def && tier > 0 ? def.Name.ToLowerInvariant() : tool;
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch
     {
         "tree" => "Tree",
         "iron" => "Iron deposit",
+        "tin" => "Tin deposit",
         "loose_iron" => "Loose iron ore",
         "loose_coal" => "Loose coal",
         "grave" => "Recovery box",

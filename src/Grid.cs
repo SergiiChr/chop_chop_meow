@@ -55,7 +55,7 @@ public partial class Game
     /// <summary>
     /// One cell per slot, refreshed live from the inventory's stacks.
     /// An inventory with a capacity shows only <see cref="Inventory.ShownSlots"/>; cells grow in and shrink away as that changes.
-    /// Cells drag their stack out and accept stacks dragged in from another inventory, unless <paramref name="accepts"/> narrows that.
+    /// Cells drag their stack out, or half of it on a right click, and accept stacks dragged in from another inventory, unless <paramref name="accepts"/> narrows that.
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// </summary>
     private void AddInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null)
@@ -71,6 +71,7 @@ public partial class Game
             var cell = cells[i].Cell;
             cell.Pressed += () => { if (stacks[slot] is (string id, _)) { Act(() => click(id)); RefreshLive(); } };
             cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container) : null;
+            cell.Half = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, (count + 1) / 2, inventory(), container) : null;
             cell.CanTake = accepts ?? (drag => drag.From != null && drag.From != inventory());
             cell.Take = drag => { Act(() => MoveDrag(drag, inventory(), container)); RefreshLive(); };
             grid.AddChild(cell);
@@ -125,16 +126,18 @@ public partial class Game
     private void MoveStack(Inventory from, Inventory to, string item, Thing near)
     {
         if (!world.Near(near)) { Notify("Walk closer first."); return; }
+        if (world.BoxBlock(near, to, item) is string refused) { Notify(refused); return; }
         if (CrateIntoCrate(near, to, item)) return;
-        from.TransferTo(to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackOf(item));
+        world.Transfer(from, to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackOf(item));
     }
 
     /// <summary>Drops a dragged stack into an inventory; the building on either end must be within reach.</summary>
     private void MoveDrag(ItemDrag drag, Inventory to, Thing? container)
     {
         if ((drag.Container ?? container) is Thing near && !world.Near(near)) { Notify("Walk closer first."); return; }
+        if (container != null && world.BoxBlock(container, to, drag.Item) is string refused) { Notify(refused); return; }
         if (CrateIntoCrate(container, to, drag.Item)) return;
-        drag.From?.TransferTo(to, drag.Item, drag.Count);
+        if (drag.From != null) world.Transfer(drag.From, to, drag.Item, drag.Count);
     }
 
     /// <summary>Building plans and palette entries drag as hotbar references.</summary>

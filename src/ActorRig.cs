@@ -24,7 +24,8 @@ public sealed class ActorRig
     public readonly Node3D Flame;
     public readonly OmniLight3D TorchLight;
 
-    public ActorRig(ActorSkin skin)
+    /// <param name="shirtColor">Tells players apart; each skin has its own otherwise.</param>
+    public ActorRig(ActorSkin skin, string? shirtColor = null)
     {
         var (skinTone, hair, shirt, legs, boots) = skin switch
         {
@@ -33,6 +34,7 @@ public sealed class ActorRig
             _ => ("d9a27c", "5a3b25", "2f7f86", "34465e", "6b4428"),
         };
         bool smooth = skin != ActorSkin.Courier;
+        shirt = shirtColor ?? shirt;
         hips = Pivot(Root, new Vector3(0, Thigh + Shin + Sole, 0));
         (legL, kneeL) = Leg(.09f, legs, boots, smooth);
         (legR, kneeR) = Leg(-.09f, legs, boots, smooth);

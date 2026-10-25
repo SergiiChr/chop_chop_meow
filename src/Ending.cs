@@ -2,11 +2,12 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Shown once when the steel-to-village goal chain is complete.</summary>
+/// <summary>Shown once when the end goals are reached; playing on is allowed.</summary>
 public partial class Game
 {
     private PanelContainer ending = null!;
     private Label endingStats = null!;
+    private bool endingSeen;
 
     private void BuildEnding()
     {
@@ -24,15 +25,17 @@ public partial class Game
 
     private void ShowEndingOnce()
     {
-        if (!world.GoalComplete || world.S.EndingShown) return;
-        world.S.EndingShown = true; paused = true; ClosePanel();
+        // A guest's copy takes the host's flag with every update, so a guest remembers its own.
+        if (!world.EndGoalsComplete || (world.Remote ? endingSeen : world.S.EndingShown)) return;
+        world.S.EndingShown = endingSeen = true; paused = true; ClosePanel();
         int seconds = (int)world.S.PlaySeconds;
-        endingStats.Text = $"A crate of steel tools reached the village and your first villager is at work.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";
+        endingStats.Text = $"Every ore in the valley has its mine, and the settlement cleared {world.Data.Goals.DailyProfit} coins a day for {world.Data.Goals.ProfitDays} days.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";
         ending.Visible = true;
     }
 
     private void Restart()
     {
+        net.Leave();
         world.NewGame();
         selected = 0; workerId = 0; gathering = null; assigningWorker = 0; slot = 0; autosave = 0;
         view.BuildMode = ""; view.Selected = 0; view.SelectedWorker = 0;

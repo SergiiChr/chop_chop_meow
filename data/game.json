@@ -15,11 +15,24 @@
   "sightRadius": 20,
   "crateCapacity": 12,
   "benchSpeed": 2,
+  "mine": {
+    "materials": { "wood": 50, "iron_bar": 10, "stone": 50 },
+    "stageWorkdays": 1,
+    "seconds": 1.6,
+    "workers": 3
+  },
+  "farm": { "sow": { "wheat_seeds": 1, "fertilizer": 1 }, "growDays": 3, "harvestWorkdays": 1, "yield": { "wheat": 4, "wheat_seeds": 2, "grass": 1 } },
+  "goals": { "dailyProfit": 1300, "profitDays": 7 },
   "market": {
     "sells": {
       "raw_meat": { "daily": 24, "steady": 24, "drop": 0.05 },
-      "cooked_meat": { "daily": 24, "steady": 24, "drop": 0.05 },
+      "burnt_steak": { "daily": 24, "steady": 24, "drop": 0.05 },
       "berries": { "daily": 36, "steady": 36, "drop": 0.05 },
+      "bread": { "daily": 24, "steady": 24, "drop": 0.05 },
+      "berry_jam": { "daily": 24, "steady": 24, "drop": 0.05 },
+      "meat_stew": { "daily": 24, "steady": 24, "drop": 0.05 },
+      "canned_jam": { "daily": 24, "steady": 24, "drop": 0.05 },
+      "canned_meat_stew": { "daily": 24, "steady": 24, "drop": 0.05 },
       "steel_axe": { "daily": 12, "steady": 0, "drop": 0.5 },
       "steel_pick": { "daily": 12, "steady": 0, "drop": 0.5 },
       "steel_hammer": { "daily": 12, "steady": 0, "drop": 0.5 }
@@ -29,7 +42,9 @@
       "steel_pick": 1,
       "steel_hammer": 1,
       "canned_food": 12,
-      "water": 12
+      "water": 12,
+      "wheat_seeds": 4,
+      "fertilizer": 4
     }
   },
   "items": {
@@ -105,65 +120,206 @@
       "price": 11.9,
       "color": "c9b68c",
       "tool": "hammer",
-      "speed": 1.3
+      "speed": 1.3,
+      "tier": 1
     },
     "steel_hammer": {
       "name": "Steel hammer",
       "price": 37,
       "color": "e7c978",
       "tool": "hammer",
-      "speed": 1.8
+      "speed": 1.8,
+      "tier": 2
     },
     "iron_axe": {
       "name": "Iron axe",
       "price": 22.8,
       "color": "c9b68c",
-      "tool": "axe"
+      "tool": "axe",
+      "tier": 1
     },
     "iron_pick": {
       "name": "Iron pickaxe",
       "price": 22.8,
       "color": "c9b68c",
-      "tool": "pickaxe"
+      "tool": "pickaxe",
+      "tier": 1
     },
     "steel_axe": {
       "name": "Steel axe",
       "price": 73,
       "color": "e7c978",
       "tool": "axe",
-      "speed": 1.8
+      "speed": 1.8,
+      "tier": 2
     },
     "steel_pick": {
       "name": "Steel pickaxe",
       "price": 73,
       "color": "e7c978",
       "tool": "pickaxe",
-      "speed": 1.8
+      "speed": 1.8,
+      "tier": 2
     },
     "berries": {
       "name": "Berries",
       "price": 1,
-      "color": "e49488"
+      "color": "e49488",
+      "food": true,
+      "hunger": 18,
+      "health": 5
     },
     "water": {
       "name": "Water bottle",
       "price": 2,
-      "color": "88cbe0"
+      "color": "88cbe0",
+      "thirst": 28
     },
     "canned_food": {
       "name": "Canned food",
-      "price": 4,
-      "color": "c8574a"
+      "price": 5.35,
+      "color": "c8574a",
+      "food": true,
+      "hunger": 35,
+      "health": 5
     },
     "raw_meat": {
       "name": "Raw meat",
       "price": 1,
-      "color": "c4524a"
+      "color": "c4524a",
+      "food": true
     },
-    "cooked_meat": {
-      "name": "Cooked meat",
+    "burnt_steak": {
+      "name": "Burnt steak",
       "price": 2.25,
-      "color": "9a5a32"
+      "color": "5e3b25",
+      "food": true,
+      "hunger": 40,
+      "health": 10
+    },
+    "tin_ore": {
+      "name": "Tin ore",
+      "price": 1.5,
+      "color": "c7c9c2"
+    },
+    "tin_bar": {
+      "name": "Tin bar",
+      "price": 6,
+      "color": "dfe2dc"
+    },
+    "tin_can": {
+      "name": "Tin can",
+      "price": 2.1,
+      "color": "d4d9d6"
+    },
+    "steel_chisel": {
+      "name": "Steel chisel",
+      "price": 37,
+      "color": "b5d8e4",
+      "tool": "chisel",
+      "speed": 2,
+      "tier": 2
+    },
+    "rake": {
+      "name": "Rake",
+      "price": 37.8,
+      "color": "e7c978",
+      "tool": "rake",
+      "tier": 2
+    },
+    "mortar": {
+      "name": "Mortar and pestle",
+      "price": 4.5,
+      "color": "9aa29f",
+      "tool": "mortar"
+    },
+    "leaves": {
+      "name": "Leaves",
+      "price": 0.25,
+      "color": "c08a3a"
+    },
+    "grass": {
+      "name": "Grass",
+      "price": 0.25,
+      "color": "8fae55"
+    },
+    "fertilizer": {
+      "name": "Fertilizer",
+      "price": 1.5,
+      "color": "6b5233"
+    },
+    "wheat_seeds": {
+      "name": "Wheat seeds",
+      "price": 1,
+      "color": "d9c27a"
+    },
+    "wheat": {
+      "name": "Wheat",
+      "price": 1.5,
+      "color": "e2c25b",
+      "food": true
+    },
+    "flour": {
+      "name": "Flour",
+      "price": 2.25,
+      "color": "f2ece0",
+      "food": true
+    },
+    "dough": {
+      "name": "Dough",
+      "price": 5.95,
+      "color": "efdcb0",
+      "food": true
+    },
+    "bread": {
+      "name": "Bread",
+      "price": 2.26,
+      "color": "c98a45",
+      "food": true,
+      "hunger": 12,
+      "health": 2
+    },
+    "crushed_berries": {
+      "name": "Crushed berries",
+      "price": 1.5,
+      "color": "b8434f",
+      "food": true,
+      "hunger": 20,
+      "health": 5
+    },
+    "berry_jam": {
+      "name": "Berry jam",
+      "price": 5.6,
+      "color": "b3263c",
+      "food": true,
+      "hunger": 30,
+      "health": 10
+    },
+    "meat_stew": {
+      "name": "Meat stew",
+      "price": 6,
+      "color": "8f5a33",
+      "food": true,
+      "hunger": 60,
+      "thirst": 15,
+      "health": 15
+    },
+    "canned_jam": {
+      "name": "Canned jam",
+      "price": 11.3,
+      "color": "9b2f4f",
+      "food": true,
+      "hunger": 30,
+      "health": 10
+    },
+    "canned_meat_stew": {
+      "name": "Canned meat stew",
+      "price": 11.85,
+      "color": "a8643a",
+      "food": true,
+      "hunger": 60,
+      "thirst": 15,
+      "health": 15
     },
     "crate": {
       "name": "Wood crate",
@@ -206,7 +362,7 @@
         "stone": 16,
         "wood": 6
       },
-      "description": "Smelts iron ore and cooks meat. Uses wood or mined coal as fuel."
+      "description": "Smelts iron and tin ore, sears meat and bakes bread. Uses wood or mined coal as fuel."
     },
     "anvil": {
       "name": "Anvil",
@@ -232,6 +388,50 @@
       },
       "description": "Steel from iron + mined coal. Coal fuel only. Pump bellows to reach 80\u00b0."
     },
+    "mine": {
+      "name": "Mine",
+      "cost": {},
+      "description": "Marking is free and snaps to an ore cliff, one mine per cliff. Dig with a pickaxe, deliver 50 wood, 10 iron bars and 50 stone, then fit it with a hammer. Up to 3 miners with pickaxes bring out ore and rocks for good."
+    },
+    "pile": {
+      "name": "Pile",
+      "cost": {
+        "wood": 8
+      },
+      "description": "A 3\u00d73 yard holding 14 stacks of one resource; the first one in sets it, and emptying it frees it. Snaps edge to edge with other piles. Tick Compost to turn leaves, grass and food into fertilizer."
+    },
+    "farm": {
+      "name": "Farm plot",
+      "cost": {
+        "wood": 8
+      },
+      "description": "A 3\u00d73 field that snaps edge to edge with piles and other plots. Wheat seeds and fertilizer sow it; the wheat grows for 3 days and is harvested by hand, by you or a worker, for wheat, more seeds and grass."
+    },
+    "toolstation": {
+      "name": "Tool station",
+      "cost": {
+        "planks": 8,
+        "stone": 4
+      },
+      "description": "A rack for tools. Workers take an axe, pickaxe or rake from it when their job needs one and put it back when they finish or go home."
+    },
+    "cooktable": {
+      "name": "Cooking table",
+      "cost": {
+        "steel_bar": 2,
+        "stone": 6,
+        "planks": 8
+      },
+      "description": "A steel grill over a firebox, with a mortar slot. Crushing berries and grinding wheat need the mortar and someone working it; jam and stew cook on their own over wood or coal, and dough needs no fire."
+    },
+    "cannery": {
+      "name": "Canning station",
+      "cost": {
+        "steel_bar": 2,
+        "planks": 8
+      },
+      "description": "Seals stew, jam or meat into tin cans over a wood or coal fire. Canned goods keep and sell for the most."
+    },
     "signpost": {
       "name": "Village signpost",
       "cost": {
@@ -245,6 +445,7 @@
     "iron_bar": {
       "name": "Smelt iron",
       "station": "furnace",
+      "fuel": true,
       "inputs": {
         "iron_ore": 2
       },
@@ -252,19 +453,32 @@
       "amount": 1,
       "seconds": 8
     },
-    "cooked_meat": {
-      "name": "Cook meat",
+    "tin_bar": {
+      "name": "Smelt tin",
       "station": "furnace",
+      "fuel": true,
+      "inputs": {
+        "tin_ore": 2
+      },
+      "output": "tin_bar",
+      "amount": 1,
+      "seconds": 8
+    },
+    "burnt_steak": {
+      "name": "Sear meat",
+      "station": "furnace",
+      "fuel": true,
       "inputs": {
         "raw_meat": 2
       },
-      "output": "cooked_meat",
+      "output": "burnt_steak",
       "amount": 2,
       "seconds": 6
     },
     "steel_bar": {
       "name": "Smelt steel",
       "station": "reinforced",
+      "fuel": true,
       "inputs": {
         "iron_bar": 2,
         "coal": 2
@@ -439,6 +653,163 @@
         "wood_parts": 1
       },
       "output": "steel_hammer",
+      "amount": 1,
+      "seconds": 10
+    },
+    "tin_can": {
+      "name": "Tin cans",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "tier": 2,
+      "inputs": {
+        "tin_bar": 1
+      },
+      "output": "tin_can",
+      "amount": 4,
+      "seconds": 10
+    },
+    "steel_chisel": {
+      "name": "Steel chisel",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "inputs": {
+        "steel_parts": 1,
+        "wood_parts": 1
+      },
+      "output": "steel_chisel",
+      "amount": 1,
+      "seconds": 10
+    },
+    "rake": {
+      "name": "Rake",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "inputs": {
+        "wood_parts": 2,
+        "steel_parts": 1
+      },
+      "output": "rake",
+      "amount": 1,
+      "seconds": 10
+    },
+    "mortar": {
+      "name": "Mortar and pestle",
+      "station": "bench",
+      "hand": true,
+      "tool": "chisel",
+      "tier": 2,
+      "inputs": {
+        "stone": 3
+      },
+      "output": "mortar",
+      "amount": 1,
+      "seconds": 10
+    },
+    "bread": {
+      "name": "Bake bread",
+      "station": "furnace",
+      "fuel": true,
+      "inputs": {
+        "dough": 1
+      },
+      "output": "bread",
+      "amount": 4,
+      "seconds": 8
+    },
+    "crushed_berries": {
+      "name": "Crush berries",
+      "station": "cooktable",
+      "hand": true,
+      "tool": "mortar",
+      "inputs": {
+        "berries": 4
+      },
+      "output": "crushed_berries",
+      "amount": 4,
+      "seconds": 10
+    },
+    "flour": {
+      "name": "Grind flour",
+      "station": "cooktable",
+      "hand": true,
+      "tool": "mortar",
+      "inputs": {
+        "wheat": 1
+      },
+      "output": "flour",
+      "amount": 1,
+      "seconds": 10
+    },
+    "berry_jam": {
+      "name": "Cook jam",
+      "station": "cooktable",
+      "fuel": true,
+      "inputs": {
+        "crushed_berries": 2
+      },
+      "output": "berry_jam",
+      "amount": 1,
+      "seconds": 12
+    },
+    "meat_stew": {
+      "name": "Cook meat stew",
+      "station": "cooktable",
+      "fuel": true,
+      "inputs": {
+        "water": 1,
+        "raw_meat": 1
+      },
+      "output": "meat_stew",
+      "amount": 1,
+      "seconds": 12
+    },
+    "dough": {
+      "name": "Knead dough",
+      "station": "cooktable",
+      "inputs": {
+        "flour": 1,
+        "water": 1
+      },
+      "output": "dough",
+      "amount": 1,
+      "seconds": 8
+    },
+    "canned_meat_stew": {
+      "name": "Can meat stew",
+      "station": "cannery",
+      "fuel": true,
+      "inputs": {
+        "meat_stew": 1,
+        "tin_can": 1
+      },
+      "output": "canned_meat_stew",
+      "amount": 1,
+      "seconds": 10
+    },
+    "canned_jam": {
+      "name": "Can jam",
+      "station": "cannery",
+      "fuel": true,
+      "inputs": {
+        "berry_jam": 1,
+        "tin_can": 1
+      },
+      "output": "canned_jam",
+      "amount": 1,
+      "seconds": 10
+    },
+    "canned_food": {
+      "name": "Can meat",
+      "station": "cannery",
+      "fuel": true,
+      "inputs": {
+        "raw_meat": 1,
+        "tin_can": 1
+      },
+      "output": "canned_food",
       "amount": 1,
       "seconds": 10
     }

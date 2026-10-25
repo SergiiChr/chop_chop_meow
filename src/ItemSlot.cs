@@ -16,6 +16,8 @@ public partial class ItemSlot : Button
     // Godot drag data must be a Variant, so the C# payload rides alongside it for the drag's lifetime.
     private static ItemDrag? dragging;
     public Func<ItemDrag?>? Drag { get; set; }
+    /// <summary>What a right click picks up: half the stack, carried until a left click drops it.</summary>
+    public Func<ItemDrag?>? Half { get; set; }
     public Func<ItemDrag, bool>? CanTake { get; set; }
     public Action<ItemDrag>? Take { get; set; }
     /// <summary>Builds a richer tooltip than plain text; the tooltip text must still be non-empty for Godot to show it.</summary>
@@ -27,10 +29,28 @@ public partial class ItemSlot : Button
     {
         dragging = Drag?.Invoke();
         if (dragging == null) return default;
+        SetDragPreview(Preview());
+        return dragging.Item;
+    }
+
+    public override void _GuiInput(InputEvent ev)
+    {
+        if (ev is not InputEventMouseButton { Pressed: true } click) return;
+        // The click that drops a split half would also press this slot, whose own action could move the items straight back.
+        if (click.ButtonIndex == MouseButton.Left && GetViewport().GuiIsDragging()) AcceptEvent();
+        else if (click.ButtonIndex == MouseButton.Right && Half?.Invoke() is ItemDrag half)
+        {
+            dragging = half;
+            ForceDrag(half.Item, Preview());
+            AcceptEvent();
+        }
+    }
+
+    private Control Preview()
+    {
         var preview = new Control();
         preview.AddChild(new TextureRect { Texture = Icon, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, Size = new Vector2(40, 40), Position = new Vector2(-20, -20), Modulate = new Color(1, 1, 1, .85f) });
-        SetDragPreview(preview);
-        return dragging.Item;
+        return preview;
     }
 
     public override bool _CanDropData(Vector2 atPosition, Variant data) => dragging != null && CanTake?.Invoke(dragging) == true;

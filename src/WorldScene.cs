@@ -115,12 +115,17 @@ public partial class WorldView
     /// <summary>A jagged wall of faceted columns with ore seams on the face and scree at its foot.</summary>
     private static void BuildCliff(Node3D parent, Cliff cliff)
     {
-        bool iron = cliff.Ore == "iron";
-        string[] rock = iron ? new[] { "7d5b45", "8a6650", "6e4f3c" } : new[] { "3a3c40", "45474c", "2d2f33" };
-        var seam = Mat(iron ? "b4622a" : "15161a", .5f, iron ? 0 : .3f);
+        // Rust-streaked iron, black coal and pale grey tin with bright metallic seams.
+        (string[] rock, var seam, int seed) = cliff.Ore switch
+        {
+            "iron" => (new[] { "7d5b45", "8a6650", "6e4f3c" }, Mat("b4622a", .5f), 11),
+            "tin" => (new[] { "7f827d", "8b8e88", "737671" }, Mat("e9ebe4", .35f), 37),
+            _ => (new[] { "3a3c40", "45474c", "2d2f33" }, Mat("15161a", .5f, .3f), 23),
+        };
         // Local +Z is the face, so everything toward the camera and the deposits is built on the positive side.
         var wall = Pivot(parent, new Vector3(cliff.Center.X, 0, cliff.Center.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(cliff.Face.X, cliff.Face.Y)), 0));
-        var rng = new Random(iron ? 11 : 23);
+        WorldModels.MineSpur(parent, cliff, rock);
+        var rng = new Random(seed);
         float R() => (float)rng.NextDouble();
         for (float x = -cliff.HalfLength - .4f; x <= cliff.HalfLength + .4f; x += .8f)
         {

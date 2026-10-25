@@ -9,6 +9,7 @@ namespace ChopChopMeow;
 /// One-shot sound effects from <c>assets/sounds</c>.
 /// A sound named <c>x</c> is <c>x.mp3</c>, or the variants <c>x_1.mp3</c>, <c>x_2.mp3</c> and so on.
 /// Each play picks a variant other than the previous one and nudges its pitch and volume, so repeated actions do not sound mechanical.
+/// Day and night music crossfade when the time of day changes, and each track resumes where it last stopped.
 /// </summary>
 public partial class Sounds : Node
 {
@@ -45,6 +46,9 @@ public partial class Sounds : Node
         ["wolf_growl_approaching"] = -3,
         ["wolf_bite"] = -3,
     };
+    private const float MusicDb = -14;
+    public const float MusicFadeSeconds = 4;
+    private Track day = null!, night = null!;
     private readonly Dictionary<string, AudioStream[]> variants = new();
     private readonly Dictionary<string, int> previous = new();
     private readonly Random random = new();
@@ -58,14 +62,36 @@ public partial class Sounds : Node
     public int VariantCount(string name) => Variants(name).Length;
     public int LastVariant(string name) => previous.GetValueOrDefault(name, -1);
 
+    /// <summary>Music loudness from the options, 0 to 1.</summary>
+    public float MusicVolume = 1;
+    public bool DayMusicPlaying => day.Player.Playing;
+    public bool NightMusicPlaying => night.Player.Playing;
+    public float NightMusicPosition => night.Position;
+
+    public override void _Ready()
+    {
+        day = new Track(this, "path_to_lake_land");
+        night = new Track(this, "forest");
+    }
+
+    public override void _Process(double delta) => UpdateMusic((float)delta);
+
+    /// <summary>Fades the track for the current time of day in and the other out.</summary>
+    public void UpdateMusic(float dt)
+    {
+        float volume = MusicDb + Mathf.LinearToDb(Math.Max(MusicVolume, .0001f));
+        day.Update(!World.Night, dt, volume);
+        night.Update(World.Night, dt, volume);
+    }
+
     /// <summary>The inventory sound for moving an item by hand.</summary>
     public static string ForItem(string item) => item switch
     {
         Inventory.Coins => "move_coins_inventory",
-        "raw_meat" or "cooked_meat" => "meat_inventory",
-        "wood" or "stone" or "iron_ore" or "coal" or "planks" or "wood_parts" or "wood_hammer" or "stone_chisel" or "torch" => "wood_rocks_inventory",
+        "raw_meat" or "burnt_steak" or "meat_stew" => "meat_inventory",
+        "wood" or "stone" or "iron_ore" or "coal" or "tin_ore" or "leaves" or "planks" or "wood_parts" or "wood_hammer" or "stone_chisel" or "torch" => "wood_rocks_inventory",
         _ when World.IsCrate(item) => "wood_rocks_inventory",
-        _ when item.StartsWith("iron_") || item.StartsWith("steel_") || item == "canned_food" => "pickup_gold",
+        _ when item.StartsWith("iron_") || item.StartsWith("steel_") || item.StartsWith("tin_") || item.StartsWith("canned_") || item == "rake" => "pickup_gold",
         _ => "moving_leather_in_inventory"
     };
 
@@ -73,7 +99,7 @@ public partial class Sounds : Node
     public void Play(string name, Vector2? at = null, float reach = Reach)
     {
         var streams = Variants(name);
-        if (streams.Length == 0) return;
+        if (streams.Length == 0 || silenced) return;
         float outside = at is Vector2 p ? OffScreen(p) : 0;
         float fade = outside <= 0 ? 1 : EdgeVolume * MathF.Pow(1 - Math.Min(1, outside / reach), 2);
         if (fade <= 0) return;
@@ -92,13 +118,40 @@ public partial class Sounds : Node
         Played++; Last = name;
     }
 
+    private bool silenced;
+
     /// <summary>
-    /// Stops every sound.
+    /// Stops every sound, music included, for good ahead of quitting.
     /// The audio thread releases a stopped stream only on its next mix, so quitting must wait a moment after this, or Godot reports the stream as leaked.
     /// </summary>
     public void StopAll()
     {
+        silenced = true;
+        ProcessMode = ProcessModeEnum.Disabled;
         foreach (var player in GetChildren().OfType<AudioStreamPlayer>()) player.Stop();
+    }
+
+    /// <summary>A looping music track that stops once faded out and keeps its position, so it wraps to the start only at its end.</summary>
+    private sealed class Track
+    {
+        public readonly AudioStreamPlayer Player;
+        private float level, at;
+        public float Position => Player.Playing ? Player.GetPlaybackPosition() : at;
+
+        public Track(Node parent, string name)
+        {
+            var stream = GD.Load<AudioStreamMP3>($"res://assets/music/{name}.mp3"); stream.Loop = true;
+            Player = new AudioStreamPlayer { Stream = stream };
+            parent.AddChild(Player);
+        }
+
+        public void Update(bool wanted, float dt, float volume)
+        {
+            level = Mathf.MoveToward(level, wanted ? 1 : 0, dt / MusicFadeSeconds);
+            if (level > 0 && !Player.Playing) Player.Play(at);
+            else if (level == 0 && Player.Playing) { at = Player.GetPlaybackPosition(); Player.Stop(); }
+            Player.VolumeDb = volume + Mathf.LinearToDb(Math.Max(level, .0001f));
+        }
     }
 
     private AudioStream[] Variants(string name)
