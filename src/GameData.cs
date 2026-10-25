@@ -35,10 +35,18 @@ public sealed class RecipeDef
     /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
     public bool Hand { get; set; }
 }
-/// <summary>What the village takes in crates, and what it sells with how many units make one purchase.</summary>
+/// <summary>How the village's appetite for a good it takes moves with sales.</summary>
+public sealed class DemandDef
+{
+    /// <summary>Units the village absorbs in a day: selling this many lowers the price by <see cref="Drop"/>, and a day restores it.</summary>
+    public int Daily { get; set; }
+    /// <summary>Fraction of the price lost by selling one day's amount; small for staple goods, large for tools.</summary>
+    public float Drop { get; set; }
+}
+/// <summary>What the village takes in crates with its demand, and what it sells with how many units make one purchase.</summary>
 public sealed class MarketDef
 {
-    public List<string> Sells { get; set; } = new();
+    public Dictionary<string, DemandDef> Sells { get; set; } = new();
     public Dictionary<string, int> Buys { get; set; } = new();
 }
 /// <summary>A hiring deal: a larger payment up front buys a lower daily wage.</summary>
@@ -59,6 +67,9 @@ public sealed class GameData
     public List<HireOffer> HireOffers { get; set; } = new();
     public float GatherSeconds { get; set; } = 1.5f;
     public float RespawnSeconds { get; set; } = 30;
+    /// <summary>In-game hours a picked-clean berry bush takes to fruit again.</summary>
+    public float BerryRegrowHours { get; set; } = 24;
+    public float BerryRegrowSeconds => BerryRegrowHours / 24 * DaySeconds;
     /// <summary>In-game hours a full hunger or thirst bar lasts, so the drain follows the day length.</summary>
     public float HungerHours { get; set; } = 24;
     public float ThirstHours { get; set; } = 12;
@@ -87,7 +98,7 @@ public sealed class GameData
     }
     public void Validate()
     {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || !Items.ContainsKey("crate"))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || !Items.ContainsKey("crate"))
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)
@@ -100,7 +111,7 @@ public sealed class GameData
             foreach (var input in recipe.Value.Inputs)
                 if (!Items.ContainsKey(input.Key) || input.Value <= 0) throw new InvalidOperationException($"Invalid input for {recipe.Key}: {input.Key}.");
         }
-        if (Items.Values.Any(i => i.Speed <= 0) || Market.Sells.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
+        if (Items.Values.Any(i => i.Speed <= 0) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in data/game.json.");
     }
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch

@@ -12,6 +12,7 @@ Linux-first, single-player isometric woodland survival and production POC in God
 
 - [README.md](README.md): launch, controls, saves and limitations.
 - [docs/DESIGN.md](docs/DESIGN.md): architecture and gameplay rules.
+- [docs/ECONOMY.md](docs/ECONOMY.md): pricing, wages and demand rules.
 - [data/game.json](data/game.json): items, recipes, building costs and pacing.
 - [assets/README.md](assets/README.md): 3D model sources, icon atlases and provenance.
 - [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md): original scope and decisions.

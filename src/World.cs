@@ -312,7 +312,7 @@ public sealed class World
     public string? GatherBlock(Thing t, bool worker = false)
     {
         if (!t.IsResource) return "Select a natural resource.";
-        if (t.Remaining <= 0) return t.Kind switch { "berries" => "Picked clean. The bush regrows in a while.", "tree" => "Only a stump is left. Find another tree.", _ => "Depleted. Look for another deposit." };
+        if (t.Remaining <= 0) return t.Kind switch { "berries" => $"Picked clean. The bush fruits again in {Data.BerryRegrowHours:0} hours.", "tree" => "Only a stump is left. Find another tree.", _ => "Depleted. Look for another deposit." };
         if (t.Kind == "tree" && !worker && BestTool("axe") == null) return "An axe is needed. Recover your belongings or craft one at a bench.";
         if (t.Kind is "coal" or "iron" && (worker ? !S.Milestones.Contains("pick") : BestTool("pickaxe") == null)) return "Craft a pickaxe at a bench. Loose rusty ore nearby can be picked up by hand.";
         return null;
@@ -589,13 +589,13 @@ public sealed class World
     public int LotPrice(string item) => (int)MathF.Ceiling(1.25f * (Data.Items[item].Price * Lot(item) + (Lot(item) > 1 ? Data.Items["crate"].Price : 0)));
     public const int MarketSlots = 6;
     /// <summary>The village only takes packed crates holding nothing but goods it buys.</summary>
-    public bool CanSell(string item) => Packed(item) is { Count: > 0 } contents && contents.Items.Keys.All(Data.Market.Sells.Contains);
+    public bool CanSell(string item) => Packed(item) is { Count: > 0 } contents && contents.Items.Keys.All(Data.Market.Sells.ContainsKey);
     /// <summary>The sale price as last reported from the village; it goes stale until someone arrives with news.</summary>
     public float KnownPrice(string item) => S.Prices.TryGetValue(item, out float price) ? price : Data.Items[item].Price;
     public int PriceAge => Day - (int)(S.PricesTime / Data.DaySeconds) - 1;
     private void UpdatePrices()
     {
-        S.Prices = Data.Market.Sells.ToDictionary(item => item, item => UnitPrice(item, false)); S.PricesTime = S.Time;
+        S.Prices = Data.Market.Sells.Keys.ToDictionary(item => item, item => UnitPrice(item, false)); S.PricesTime = S.Time;
     }
     private string? CartBlock(Thing sign) => !Near(sign) || sign.Kind != "signpost" ? "Walk closer to the signpost." : S.Orders.Count >= 3 ? "All three village carts are busy." : null;
     /// <summary>Sends every acceptable crate in the market input on one cart; the coins come back into the market output.</summary>
@@ -615,8 +615,8 @@ public sealed class World
         foreach (var (item, quantity) in goods)
         {
             // A sale lowers demand unit by unit, so a bulk sale is not paid entirely at the pre-sale price.
-            float demand = Math.Min(1, S.Demand.GetValueOrDefault(item, 1));
-            for (int i = 0; i < quantity; i++) { price += Data.Items[item].Price * demand; demand = Math.Max(.25f, demand - .045f); }
+            float demand = Math.Min(1, S.Demand.GetValueOrDefault(item, 1)), step = Data.Market.Sells[item].Drop / Data.Market.Sells[item].Daily;
+            for (int i = 0; i < quantity; i++) { price += Data.Items[item].Price * demand; demand = Math.Max(.25f, demand - step); }
             S.Demand[item] = demand;
         }
         // Coins are whole: sales round down and purchases round up, so a round trip never profits.
@@ -988,7 +988,9 @@ public sealed class World
         if (Day > S.WageDay) { PayWages(); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow."); }
         if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Your workers head home to Bramblewick until morning.");
         if (S.Workers.Count > 0 && Lunch && !wasLunch) Say("Midday. Your workers gather by the campfire for an hour of lunch.");
-        foreach (var item in S.Demand.Keys.ToArray()) S.Demand[item] = Mathf.MoveToward(S.Demand[item], 1, dt * .0009f);
+        // A day restores one day's drop, so selling each good's daily amount every day keeps its price steady.
+        // A good no longer taken recovers at once.
+        foreach (var item in S.Demand.Keys.ToArray()) S.Demand[item] = Mathf.MoveToward(S.Demand[item], 1, Data.Market.Sells.TryGetValue(item, out var demand) ? dt * demand.Drop / Data.DaySeconds : 1);
         foreach (var order in S.Orders.ToArray())
         {
             order.Elapsed += dt; if (order.Elapsed < Data.TradeSeconds) continue;
@@ -1018,7 +1020,7 @@ public sealed class World
         {
             // A carcass keeps its age so the death animation plays once and not again after loading.
             if (t.Kind == "wolf_corpse") t.Progress = Math.Min(60, t.Progress + dt);
-            if (t.Kind == "berries" && t.Remaining == 0) { t.Regrow += dt; if (t.Regrow >= 90) { t.Remaining = 24; t.Regrow = 0; } }
+            if (t.Kind == "berries" && t.Remaining == 0) { t.Regrow += dt; if (t.Regrow >= Data.BerryRegrowSeconds) { t.Remaining = 24; t.Regrow = 0; } }
             if (t.Kind == "campfire")
             {
                 t.Burn = Math.Max(0, t.Burn - dt);

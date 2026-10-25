@@ -4,25 +4,26 @@
   "lunchHour": 12,
   "tradeSeconds": 30,
   "hireOffers": [
-    { "upfront": 40, "wage": 5 },
-    { "upfront": 24, "wage": 8 },
-    { "upfront": 10, "wage": 12 }
+    { "upfront": 60, "wage": 18 },
+    { "upfront": 30, "wage": 22 },
+    { "upfront": 10, "wage": 25 }
   ],
   "campfireHours": 4,
   "gatherSeconds": 2.0,
   "respawnSeconds": 30,
+  "berryRegrowHours": 24,
   "sightRadius": 20,
   "crateCapacity": 12,
   "benchSpeed": 2,
   "market": {
-    "sells": [
-      "raw_meat",
-      "cooked_meat",
-      "berries",
-      "steel_axe",
-      "steel_pick",
-      "steel_hammer"
-    ],
+    "sells": {
+      "raw_meat": { "daily": 24, "drop": 0.1 },
+      "cooked_meat": { "daily": 24, "drop": 0.1 },
+      "berries": { "daily": 24, "drop": 0.1 },
+      "steel_axe": { "daily": 12, "drop": 0.3 },
+      "steel_pick": { "daily": 12, "drop": 0.3 },
+      "steel_hammer": { "daily": 12, "drop": 0.3 }
+    },
     "buys": {
       "steel_axe": 1,
       "steel_pick": 1,
@@ -34,27 +35,27 @@
   "items": {
     "wood": {
       "name": "Wood",
-      "price": 1.5,
+      "price": 1,
       "color": "af8053"
     },
     "planks": {
       "name": "Wood planks",
-      "price": 0.6,
+      "price": 0.375,
       "color": "d2a26a"
     },
     "wood_parts": {
       "name": "Wood parts",
-      "price": 1,
+      "price": 0.75,
       "color": "b98552"
     },
     "stone": {
       "name": "Stone",
-      "price": 1.2,
+      "price": 1,
       "color": "aab2af"
     },
     "torch": {
       "name": "Torch",
-      "price": 2,
+      "price": 4.5,
       "color": "e8913a"
     },
     "stone_chisel": {
@@ -65,83 +66,83 @@
     },
     "iron_ore": {
       "name": "Iron ore",
-      "price": 3,
+      "price": 1.5,
       "color": "cc8a60"
     },
     "coal": {
       "name": "Mined coal",
-      "price": 4,
+      "price": 1.5,
       "color": "81818c"
     },
     "iron_bar": {
       "name": "Iron bar",
-      "price": 9,
+      "price": 6,
       "color": "c2c9c9"
     },
     "steel_bar": {
       "name": "Steel bar",
-      "price": 25,
+      "price": 23.1,
       "color": "b5d8e4"
     },
     "iron_parts": {
       "name": "Iron parts",
-      "price": 10,
+      "price": 8.4,
       "color": "aeb6b7"
     },
     "steel_parts": {
       "name": "Steel parts",
-      "price": 27,
+      "price": 30,
       "color": "b5d8e4"
     },
     "wood_hammer": {
       "name": "Wooden mallet",
-      "price": 3,
+      "price": 1.05,
       "color": "b98552",
       "tool": "hammer"
     },
     "iron_hammer": {
       "name": "Iron hammer",
-      "price": 13,
+      "price": 11.9,
       "color": "c9b68c",
       "tool": "hammer",
       "speed": 1.3
     },
     "steel_hammer": {
       "name": "Steel hammer",
-      "price": 40,
+      "price": 37,
       "color": "e7c978",
       "tool": "hammer",
       "speed": 1.8
     },
     "iron_axe": {
       "name": "Iron axe",
-      "price": 22,
+      "price": 22.8,
       "color": "c9b68c",
       "tool": "axe"
     },
     "iron_pick": {
       "name": "Iron pickaxe",
-      "price": 22,
+      "price": 22.8,
       "color": "c9b68c",
       "tool": "pickaxe"
     },
     "steel_axe": {
       "name": "Steel axe",
-      "price": 75,
+      "price": 73,
       "color": "e7c978",
       "tool": "axe",
       "speed": 1.8
     },
     "steel_pick": {
       "name": "Steel pickaxe",
-      "price": 75,
+      "price": 73,
       "color": "e7c978",
       "tool": "pickaxe",
       "speed": 1.8
     },
     "berries": {
       "name": "Berries",
-      "price": 3,
+      "price": 1,
       "color": "e49488"
     },
     "water": {
@@ -156,17 +157,17 @@
     },
     "raw_meat": {
       "name": "Raw meat",
-      "price": 2,
+      "price": 1,
       "color": "c4524a"
     },
     "cooked_meat": {
       "name": "Cooked meat",
-      "price": 5,
+      "price": 2.25,
       "color": "9a5a32"
     },
     "crate": {
       "name": "Wood crate",
-      "price": 4,
+      "price": 3.15,
       "color": "c9a46e"
     },
     "coins": {

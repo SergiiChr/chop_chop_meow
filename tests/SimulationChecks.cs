@@ -11,6 +11,7 @@ public static class SimulationChecks
 
     public static void Run(GameData data)
     {
+        EconomyChecks.Run(data);
         AnimationChecks.Run();
         WorkerStateChecks.Run(data);
         CheckInventoryFilters(data);
@@ -1314,10 +1315,10 @@ public static class SimulationChecks
         var unreachable = data.Items.Keys.Where(id => id != Inventory.Coins && !data.Market.Buys.ContainsKey(id) && !have.Contains(id)).Concat(data.Buildings.Keys.Where(id => !built.Contains(id))).ToList();
         Require(unreachable.Count == 0, $"everything should be reachable from a fresh start: {string.Join(", ", unreachable)}");
         // The village never takes the tools that start the loop, so selling cannot strand the player.
-        Require(fresh.S.Backpack.Items.Keys.Where(id => data.Items[id].Tool != "").All(id => !data.Market.Sells.Contains(id)) && !data.Market.Sells.Any(id => id is "stone_chisel" or "iron_pick" or "wood_hammer"),
+        Require(fresh.S.Backpack.Items.Keys.Where(id => data.Items[id].Tool != "").All(id => !data.Market.Sells.ContainsKey(id)) && !data.Market.Sells.Keys.Any(id => id is "stone_chisel" or "iron_pick" or "wood_hammer"),
                 "starting and bootstrap tools must not be sellable");
         // Even without any axe, coins from crates of berries can buy one, and a crate needs only planks and a mallet.
-        Require(data.Market.Sells.Contains("berries") && data.Market.Buys.ContainsKey("steel_axe") && data.Market.Buys.ContainsKey("steel_pick"), "a lost axe or pickaxe must be buyable with berry money");
+        Require(data.Market.Sells.ContainsKey("berries") && data.Market.Buys.ContainsKey("steel_axe") && data.Market.Buys.ContainsKey("steel_pick"), "a lost axe or pickaxe must be buyable with berry money");
         var noIron = new World(data);
         Require(noIron.S.Things.Where(t => t.Kind == "loose_iron").Sum(t => t.Remaining) / 2 >= data.Buildings["anvil"].Cost["iron_bar"] + data.Recipes["iron_pick"].Inputs["iron_parts"],
                 "loose iron should always cover the anvil and the parts for the first pickaxe");
