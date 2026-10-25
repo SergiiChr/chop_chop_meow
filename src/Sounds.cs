@@ -63,8 +63,9 @@ public partial class Sounds : Node
     {
         Inventory.Coins => "move_coins_inventory",
         "raw_meat" or "cooked_meat" => "meat_inventory",
-        "wood" or "stone" or "iron_ore" or "coal" => "wood_rocks_inventory",
-        "iron_bar" or "steel_bar" or "iron_axe" or "iron_pick" or "steel_tools" => "pickup_gold",
+        "wood" or "stone" or "iron_ore" or "coal" or "planks" or "wood_parts" or "wood_hammer" or "stone_chisel" or "torch" => "wood_rocks_inventory",
+        _ when World.IsCrate(item) => "wood_rocks_inventory",
+        _ when item.StartsWith("iron_") || item.StartsWith("steel_") || item == "canned_food" => "pickup_gold",
         _ => "moving_leather_in_inventory"
     };
 

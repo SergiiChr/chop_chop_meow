@@ -43,7 +43,8 @@ public static class AnimationChecks
         var bag = new Inventory();
         bag.Add("iron_axe", 1);
         bag.Add("iron_pick", 1);
-        bag.Add("steel_tools", 1);
+        bag.Add("steel_axe", 1);
+        bag.Add("steel_pick", 1);
         var ironTools = new Inventory();
         ironTools.Add("iron_axe", 1);
         ironTools.Add("iron_pick", 1);
@@ -52,13 +53,13 @@ public static class AnimationChecks
             "movement toward a resource should animate as walking");
         Require(ActorAnimation.PlayerAction("tree", true, false, bag, "iron_axe") == ActorAction.Chop,
             "a stationary player with an iron axe should chop a tree");
-        Require(ActorAnimation.PlayerAction("tree", true, false, bag, "steel_tools") == ActorAction.SteelChop,
+        Require(ActorAnimation.PlayerAction("tree", true, false, bag, "steel_axe") == ActorAction.SteelChop,
             "selected carried steel tools should use the steel chopping action");
         Require(ActorAnimation.PlayerAction("iron", true, false, bag, "iron_pick") == ActorAction.Mine,
             "selected carried iron pick should mine iron deposits");
         Require(ActorAnimation.PlayerAction("iron", true, false, ironTools, "iron_axe") == ActorAction.Mine,
             "an irrelevant default axe selection should fall back to a carried pick for iron");
-        Require(ActorAnimation.PlayerAction("coal", true, false, bag, "steel_tools") == ActorAction.SteelMine,
+        Require(ActorAnimation.PlayerAction("coal", true, false, bag, "steel_pick") == ActorAction.SteelMine,
             "selected carried steel tools should use steel mining action");
         Require(ActorAnimation.PlayerAction("stone", true, false, bag, "iron_axe") == ActorAction.SteelMine,
             "steel tools should use the steel mining action on stone");

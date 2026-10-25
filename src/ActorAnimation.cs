@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -16,6 +17,8 @@ public enum ActorAction
     Pump,
     Hammer,
     Attack,
+    Kindle,
+    TorchSwing,
     Sit,
     Perch,
     Mauled,
@@ -56,6 +59,8 @@ public static class ActorAnimation
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
+        ActorAction.Kindle => World.KindleSeconds,
+        ActorAction.TorchSwing => .6f,
         ActorAction.Sit or ActorAction.Perch => 4,
         ActorAction.Mauled => .5f,
         ActorAction.Devoured => 1.4f,
@@ -133,6 +138,18 @@ public static class ActorAnimation
                 return Keys(p, (0, fists),
                     (.32f, fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
                     (.5f, fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }));
+            case ActorAction.Kindle:
+                // The left hand holds the torch head forward while the right strikes steel down across flint four times.
+                var kneel = Stance with { Lean = 14, Head = 14, RaiseL = 40, OutL = -10, ElbowL = 70, RaiseR = 52, OutR = -20, ElbowR = 80 };
+                float strike = MathF.Sin(p * Mathf.Tau * 4);
+                return kneel with { RaiseR = 52 + strike * 18, ElbowR = 80 - strike * 34, Twist = strike * 4, RaiseL = 40 + MathF.Sin(p * Mathf.Tau) * 4 };
+            case ActorAction.TorchSwing:
+                // A wide forehand sweep of the torch arm across the body.
+                var torchUp = Stance with { RaiseL = 30, OutL = 4, ElbowL = 60, RaiseR = 20, OutR = 10, ElbowR = 30 };
+                return Keys(p, (0, torchUp),
+                    (.2f, torchUp with { Twist = 22, Lean = -4, RaiseL = 70, OutL = 50, ElbowL = 30 }),
+                    (.45f, torchUp with { Twist = -24, Lean = 10, RaiseL = 95, OutL = -40, ElbowL = 8 }),
+                    (.65f, torchUp with { Twist = -16, Lean = 6, RaiseL = 80, OutL = -30, ElbowL = 20 }));
             case ActorAction.Sit or ActorAction.Perch:
                 // Cross-legged on the ground with hands on the knees, or on a rock with knees up and forearms on them.
                 // Now and then a bite goes up to the mouth.
@@ -190,19 +207,19 @@ public static class ActorAnimation
         if (moving) return ActorAction.Walk;
         if (!gathering || string.IsNullOrEmpty(resourceKind)) return ActorAction.Idle;
 
-        string? requiredTool = resourceKind == "tree" ? "iron_axe" : resourceKind is "stone" or "iron" or "coal" ? "iron_pick" : null;
-        string? tool = requiredTool == null ? null : BestTool(backpack, selectedTool, requiredTool);
+        string[]? family = resourceKind == "tree" ? Axes : resourceKind is "stone" or "iron" or "coal" ? Picks : null;
+        string? tool = family == null ? null : BestTool(backpack, selectedTool, family);
         return resourceKind switch
         {
             "tree" => tool switch
             {
-                "steel_tools" => ActorAction.SteelChop,
+                "steel_axe" => ActorAction.SteelChop,
                 "iron_axe" => ActorAction.Chop,
                 _ => ActorAction.Gather
             },
             "stone" or "iron" or "coal" => tool switch
             {
-                "steel_tools" => ActorAction.SteelMine,
+                "steel_pick" => ActorAction.SteelMine,
                 "iron_pick" => ActorAction.Mine,
                 _ => ActorAction.Gather
             },
@@ -230,19 +247,18 @@ public static class ActorAnimation
         return worker.WorkState switch
         {
             WorkerWorkState.Pumping => ActorAction.Pump,
-            WorkerWorkState.Hammering when assignment?.Kind == "anvil" => ActorAction.Hammer,
+            WorkerWorkState.Hammering when assignment != null && World.Worked(assignment.Kind) => ActorAction.Hammer,
             _ => ActorAction.Idle
         };
     }
 
-    /// <summary>The carried tool the player would use on a resource, preferring the selected hotbar tool.</summary>
-    public static string? BestTool(Inventory backpack, string? selectedTool, string ironTool)
+    // Best first.
+    private static readonly string[] Axes = { "steel_axe", "iron_axe" }, Picks = { "steel_pick", "iron_pick" };
+
+    /// <summary>The carried tool of a family the player would use on a resource, preferring the selected hotbar tool, then the best one.</summary>
+    public static string? BestTool(Inventory backpack, string? selectedTool, string[] family)
     {
-        if (selectedTool is "steel_tools" && backpack[selectedTool] > 0) return selectedTool;
-        if (selectedTool == ironTool && backpack[selectedTool] > 0)
-            return selectedTool;
-        if (backpack["steel_tools"] > 0) return "steel_tools";
-        if (backpack[ironTool] > 0) return ironTool;
-        return null;
+        if (selectedTool != null && family.Contains(selectedTool) && backpack[selectedTool] > 0) return selectedTool;
+        return family.FirstOrDefault(tool => backpack[tool] > 0);
     }
 }
