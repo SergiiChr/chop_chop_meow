@@ -69,20 +69,22 @@ public partial class Game {
             cell.Take = drag => { int left = 0; Act(() => left = MoveDrag(drag, inventory(), container)); RefreshLive(); return left; };
             grid.AddChild(cell);
         }
+        // What each cell last drew: its stack and the inventory's total of that item. A cell is redrawn only when they change.
+        var current = new System.Collections.Generic.List<(string Item, int Count)>();
+        var drawn = new (string? Item, int Count, int Total)[cells.Length];
         live.Add(() => {
-            var current = inventory().Stacks().ToList();
-            int visible = inventory().ShownSlots, changed = 0;
+            var held = inventory();
+            held.FillStacks(current);
+            int visible = held.ShownSlots, changed = 0;
             for (int i = 0; i < cells.Length; i++) {
                 var (cell, count) = cells[i];
                 if (!GodotObject.IsInstanceValid(cell)) return;
                 stacks[i] = i < current.Count ? current[i] : null;
-                cell.Icon = stacks[i] is (string id, _) ? HotbarIcon(id) : null;
-                var contents = stacks[i] is (string crate, _) ? world.Packed(crate) : null;
-                var badge = cell.GetNode<TextureRect>("badge");
-                badge.Visible = contents != null;
-                if (contents != null) badge.Texture = HotbarIcon(contents.Items.OrderByDescending(p => p.Value).First().Key);
-                count.Text = contents != null ? contents.Count.ToString() : stacks[i] is (_, int n) ? n.ToString() : "";
-                cell.TooltipText = stacks[i] is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {inventory()[named]} total")}\n{hint}" : "";
+                var looks = stacks[i] is (string item, int n) ? (item, n, held[item]) : ((string?)null, 0, 0);
+                if (first || looks != drawn[i]) {
+                    drawn[i] = looks;
+                    Redraw(cell, count, stacks[i], held);
+                }
                 if (shown[i] == i < visible && !first) continue;
                 shown[i] = i < visible;
                 if (first) cell.Visible = shown[i];
@@ -90,6 +92,15 @@ public partial class Game {
             }
             first = false;
         });
+        void Redraw(ItemSlot cell, Label count, (string Item, int Count)? stack, Inventory held) {
+            cell.Icon = stack is (string id, _) ? HotbarIcon(id) : null;
+            var contents = stack is (string crate, _) ? world.Packed(crate) : null;
+            var badge = cell.GetNode<TextureRect>("badge");
+            badge.Visible = contents != null;
+            if (contents != null) badge.Texture = HotbarIcon(contents.Items.OrderByDescending(p => p.Value).First().Key);
+            count.Text = contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
+            cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}\n{hint}" : "";
+        }
     }
 
     /// <summary>A slot that springs open with a slight overshoot, or shrinks and fades before it leaves the grid.</summary>

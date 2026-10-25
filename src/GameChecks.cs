@@ -16,6 +16,85 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = false });
         await Frames();
     }
+    /// <summary>
+    /// Walking for a few hundred real frames, through Godot input, allocates no more than its budget on the main thread:
+    /// every byte is garbage the runtime collects later, in a pause that stalls a frame.
+    /// </summary>
+    private async Task CheckWalkingFrames(long maxBytesPerFrame) {
+        var key = new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true };
+        Input.ParseInputEvent(key);
+        await Frames(120);
+        long before = GC.GetAllocatedBytesForCurrentThread(); ulong first = Engine.GetProcessFrames();
+        await Frames(300);
+        long bytes = GC.GetAllocatedBytesForCurrentThread() - before; ulong played = Math.Max(1, Engine.GetProcessFrames() - first);
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = false });
+        await Frames();
+        string report = $"frames: walking: {bytes} B over {played} frames, {bytes / (double)played:0.#} B per frame (budget {maxBytesPerFrame} B)";
+        GD.Print(report);
+        UIRequire(bytes <= maxBytesPerFrame * (long)played, $"Allocation budget exceeded: {report}");
+    }
+    /// <summary>
+    /// Every panel page, refreshed again and again while what it shows stays the same, allocates nothing:
+    /// the panel refreshes several times a second while it is open.
+    /// </summary>
+    private async Task CheckPanelRefresh() {
+        var at = world.Player;
+        var chest = world.Add("chest", at + new Vector2(2, 0)); chest.Inventory.Add("wood", 40); chest.Inventory.Add("coal", 12);
+        var pile = world.Add("pile", at + new Vector2(-4, 2)); pile.Inventory.Add("stone", 9);
+        var forge = world.Add("reinforced", at + new Vector2(-2, 0)); forge.Inventory.Add("iron_bar", 4); forge.Inventory.Add("coal", 6); forge.Heat = 85; forge.Processing = true; forge.Progress = 2;
+        var furnace = world.Add("furnace", at + new Vector2(0, 2)); furnace.Inventory.Add("iron_ore", 4);
+        var fire = world.Add("campfire", at + new Vector2(0, -2)); fire.Burn = 120;
+        var hut = world.Add("hut", at + new Vector2(4, -3));
+        var sign = world.Add("signpost", at + new Vector2(-4, -3));
+        var farm = world.Add("farm", at + new Vector2(5, 3));
+        var tree = world.S.Things.Where(t => t.Kind == "tree").MinBy(t => t.Pos.DistanceTo(at))!;
+        var worker = new Worker { Id = world.S.NextId++, Name = "Panel Check", Pos = at + Vector2.One, Wage = 5 };
+        world.S.Workers.Add(worker); world.Assign(worker, forge); worker.Bag.Add("coal", 2);
+        bool wasPaused = paused; paused = true;
+        var pages = new (string Name, Action Open)[] {
+            ("inventory", () => OpenPage("inventory")), ("craft", () => OpenPage("craft")), ("workers", () => OpenPage("workers")),
+            ("chest", () => Select(chest)), ("pile", () => Select(pile)), ("bellows furnace", () => Select(forge)), ("furnace", () => Select(furnace)),
+            ("campfire", () => Select(fire)), ("cabin", () => Select(hut)), ("signpost", () => Select(sign)), ("farm", () => Select(farm)),
+            ("tree", () => Select(tree)), ("worker", () => Select(worker)),
+        };
+        foreach (var (name, open) in pages) {
+            open(); await Frames();
+            // .NET first runs new code unoptimized, which boxes numbers written into text, and recompiles it optimized once it has been
+            // called often, as it does a few seconds after a panel opens. So the page is refreshed in rounds until one allocates nothing;
+            // garbage the code itself makes never gets there.
+            long bytes = 0; int rounds = 0;
+            while (rounds++ < 10) {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int i = 0; i < 50; i++) RefreshLive();
+                bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+                if (bytes == 0) break;
+                await Seconds(.2);
+            }
+            string report = $"panel: {name}: {bytes} B over 50 refreshes after {rounds} rounds (budget 0 B)";
+            GD.Print(report);
+            UIRequire(bytes == 0, $"Allocation budget exceeded: {report}");
+        }
+        ClosePanel(); paused = wasPaused;
+        world.S.Workers.Remove(worker);
+        foreach (var t in new[] { chest, pile, forge, furnace, fire, hut, sign, farm }) world.S.Things.Remove(t);
+        await Frames();
+    }
+    /// <summary>
+    /// A new game reuses the ids of the last one, so the models the view keeps for them must be built anew:
+    /// an old one would carry the last game's state, such as a felled tree faded out.
+    /// </summary>
+    private async Task CheckFreshModelsAfterRestart() {
+        var tree = world.S.Things.Where(t => t.Kind == "tree").MinBy(t => t.Pos.DistanceTo(world.Player))!;
+        await Frames();
+        var old = view.PropOf(tree.Id);
+        UIRequire(old != null, "Every tree must have its model once the world has loaded.");
+        old!.Fade = .68f; old.Fall = 9;
+        Restart(); await Frames(2);
+        var fresh = view.PropOf(tree.Id);
+        UIRequire(world.Find(tree.Id)?.Kind == "tree" && fresh != null && fresh != old && fresh.Fade == 0 && fresh.Fall < 0,
+            "A new game must build fresh models rather than keep the last game's, faded or fallen.");
+        ClosePanel();
+    }
     private Button? FindButton(Node parent, string text) {
         foreach (var child in parent.GetChildren()) {
             if (child is Button b && b.Text == text) return b;
@@ -248,6 +327,12 @@ public partial class Game {
             UIRequire(picker.Selected == Array.IndexOf(Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
             picker.Select(0); picker.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
             UIRequire(SavedResolution() == Resolutions[0], "Choosing a resolution must store it in the settings file.");
+            var limits = (OptionButton)screen.FindChild("frame_limit", true, false);
+            UIRequire(limits.Selected == 0 && limits.GetItemText(0) == "Off" && Engine.MaxFps == 0, "The frame rate limit must start off.");
+            limits.Select(2); limits.EmitSignal(OptionButton.SignalName.ItemSelected, 2L); await Frames();
+            UIRequire(SavedFrameLimit() == 90 && Engine.MaxFps == 90, "Choosing a frame rate limit must store it and cap the frame rate.");
+            limits.Select(0); limits.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
+            UIRequire(SavedFrameLimit() == 0 && Engine.MaxFps == 0, "Turning the frame rate limit off must store it and lift the cap.");
             var musicSlider = (HSlider)screen.FindChild("music", true, false);
             UIRequire(musicSlider.Value == 100, "Music must start at full volume.");
             musicSlider.Value = 40; await Frames();
@@ -271,6 +356,10 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
             await Frames(); UIRequire(world.Player.DistanceTo(start) > .25f, "WASD must move the player through Godot input.");
             UIRequire(sounds.Last == "footsteps_default", "Walking on grass must play grass footsteps.");
+            // Measured about 115 B a frame: this check's own await of each frame and the memory of things seen for the first time on a straight walk.
+            // The budget leaves a third more, so a change that adds garbage to every frame fails it.
+            await CheckWalkingFrames(150);
+            await CheckPanelRefresh();
             UIRequire(Sounds.Names.All(name => sounds.VariantCount(name) > 0) && sounds.VariantCount("footsteps_default") == 3 && sounds.VariantCount("chop_tree") == 1, "Every sound must load, with numbered files grouped as variants.");
             var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
             UIRequire(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
@@ -522,6 +611,7 @@ public partial class Game {
             await CheckCrateOverflow();
             await CheckCrateInCrate();
             RemoveCheckFiles();
+            await CheckFreshModelsAfterRestart();
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }

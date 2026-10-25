@@ -12,9 +12,9 @@ internal static class NatureShape {
     internal readonly record struct Step(float Y, float Radius, Color Color);
 
     public const int Variants = 3;
-    public static readonly StandardMaterial3D Natural = new() { VertexColorUseAsAlbedo = true, Roughness = .92f };
-    public static readonly StandardMaterial3D Glossy = new() { VertexColorUseAsAlbedo = true, Roughness = .4f };
-    public static readonly StandardMaterial3D Mineral = new() { VertexColorUseAsAlbedo = true, Roughness = .4f, Metallic = .3f };
+    public static readonly StandardMaterial3D Natural = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .92f };
+    public static readonly StandardMaterial3D Glossy = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .4f };
+    public static readonly StandardMaterial3D Mineral = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .4f, Metallic = .3f };
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
 
     private static Mesh Cached(string key, Action<SurfaceTool> build) {

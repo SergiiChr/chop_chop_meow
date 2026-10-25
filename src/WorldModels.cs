@@ -29,10 +29,14 @@ public sealed class Prop {
     public OmniLight3D? Light;
     public Vector3 Vent;
     public Hit[] Hits = Array.Empty<Hit>();
+    /// <summary>A tree crown's meshes and their own materials, for fading it without walking its nodes.</summary>
+    public (MeshInstance3D Mesh, StandardMaterial3D Material)[] SwayParts = Array.Empty<(MeshInstance3D, StandardMaterial3D)>();
     public string Kind = "";
     public float Fade, Fall = -1, Open, Shake, Puff;
     public int LastCount, Tint = -1;
     public bool Seen;
+    /// <summary>Whether the model is drawn, kept here so it is set in Godot only when it changes.</summary>
+    public bool Shown = true;
     public Prop() { Body = Pivot(Root, Vector3.Zero); }
 }
 

@@ -9,7 +9,7 @@ internal static class ActorShape {
     internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0);
 
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
-    private static readonly StandardMaterial3D Surface = new() { VertexColorUseAsAlbedo = true, Roughness = .85f };
+    private static readonly StandardMaterial3D Surface = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .85f };
 
     /// <summary>A cloth panel fitted to the shared torso profile, with no separate block over the shirt.</summary>
     public static void Bib(Node3D parent, string color) {

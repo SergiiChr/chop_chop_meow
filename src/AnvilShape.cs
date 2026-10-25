@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 internal static class AnvilShape {
     private static ArrayMesh? casting;
     public static Mesh Casting => casting ??= Build();
-    public static readonly StandardMaterial3D Iron = new() { VertexColorUseAsAlbedo = true, Roughness = .45f, Metallic = .7f };
+    public static readonly StandardMaterial3D Iron = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .45f, Metallic = .7f };
 
     private static ArrayMesh Build() {
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);

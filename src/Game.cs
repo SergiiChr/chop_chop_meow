@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Godot;
 
 namespace ChopChopMeow;
@@ -67,7 +68,7 @@ public partial class Game : Node {
             SetTheme(); BuildHud();
             if (OS.GetCmdlineUserArgs().Contains("--showcase")) Showcase();
             else if (!OS.GetCmdlineUserArgs().Contains("--animation-review")) ShowStart();
-            if (!OS.GetCmdlineUserArgs().Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review")) ApplyResolution(SavedResolution());
+            if (!OS.GetCmdlineUserArgs().Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review")) { ApplyResolution(SavedResolution()); Engine.MaxFps = SavedFrameLimit(); }
             if (OS.GetCmdlineUserArgs().Contains("--ui-test")) RunUIChecks();
             if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--net-check") is int check and >= 0) RunNetCheck(OS.GetCmdlineUserArgs().ElementAtOrDefault(check + 1) == "host");
             if (OS.GetCmdlineUserArgs().Contains("--animation-review")) {
@@ -134,8 +135,32 @@ public partial class Game : Node {
     private HBoxContainer Row() { var r = new HBoxContainer(); content.AddChild(r); return r; }
     private void AddLabel(string text, int size = 15, Color? color = null) => content.AddChild(Label(text, size, color));
     private void AddButton(string text, Action action, bool disabled = false) => content.AddChild(Button(text, action, disabled));
-    private void Dynamic(Func<string> get, int size = 15, Color? color = null) {
-        var l = Label(get(), size, color); content.AddChild(l); live.Add(() => { if (GodotObject.IsInstanceValid(l)) l.Text = get(); });
+    /// <summary>
+    /// Text rebuilt on every refresh into a reused buffer and handed to Godot only when it differs from what is shown,
+    /// so an open panel allocates nothing while what it shows stays the same.
+    /// </summary>
+    private sealed class LiveText(Action<string> show) {
+        private readonly StringBuilder text = new();
+        private string? shown;
+        public StringBuilder Clear() => text.Clear();
+        public void Show() {
+            if (shown != null && text.Equals(shown.AsSpan())) return;
+            shown = text.ToString(); show(shown);
+        }
+    }
+    /// <summary>A label whose text <paramref name="write"/> rebuilds on every refresh.</summary>
+    private void Dynamic(Action<StringBuilder> write, int size = 15, Color? color = null) {
+        var l = Label("", size, color); content.AddChild(l);
+        var text = new LiveText(shown => l.Text = shown);
+        void Update() {
+            if (!GodotObject.IsInstanceValid(l)) return;
+            write(text.Clear()); text.Show();
+        }
+        Update(); live.Add(Update);
+    }
+    /// <summary>Text from a writer that panels also use live, for one-off labels and messages.</summary>
+    private static string Text(Action<StringBuilder> write) {
+        var text = new StringBuilder(); write(text); return text.ToString();
     }
     private void BuildHud() {
         var clock = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = PanelLeft, OffsetRight = -16, OffsetTop = 14, OffsetBottom = 52, MouseFilter = Control.MouseFilterEnum.Ignore };
@@ -161,18 +186,37 @@ public partial class Game : Node {
         if (toast != null) { toast.Text = message; toastClock = 7; }
         GD.Print(message);
     }
+    // What the labels show, so their text is built only when it changes: building it allocates.
+    private (int Day, int Minute, bool Night) shownClock = (-1, -1, false);
+    private (bool Dead, bool Mauled, bool Pack, int Seconds) shownDeath;
+    private (bool Assigning, string Mode) shownMode = (false, "");
     private void RefreshLive() {
         if (world == null || stats == null) return;
-        int hour = (int)world.Hour;
-        stats.Text = $"Day {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}  {(world.Night ? "NIGHT" : "DAYLIGHT")}";
-        string feeding = world.S.Wolves.Count(w => w.Feeding) > 1 ? "The pack is feeding" : "A wolf is feeding";
-        deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? feeding : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
-        modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
-        foreach (var update in live.ToArray()) update();
+        var clock = (world.Day, (int)(world.DayPhase * 1440), world.Night);
+        if (clock != shownClock) {
+            shownClock = clock;
+            int hour = (int)world.Hour;
+            stats.Text = $"Day {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}  {(world.Night ? "NIGHT" : "DAYLIGHT")}";
+        }
+        int feeding = 0;
+        foreach (var w in world.S.Wolves) if (w.Feeding) feeding++;
+        var death = (world.Dead, world.S.Mauled, feeding > 1, (int)MathF.Ceiling(world.S.RespawnIn));
+        if (death != shownDeath) {
+            shownDeath = death;
+            deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? feeding > 1 ? "The pack is feeding" : "A wolf is feeding" : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
+        }
+        var mode = (assigningWorker > 0, view.BuildMode);
+        if (mode != shownMode) {
+            shownMode = mode;
+            modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
+        }
+        // An update can open another page, which replaces the list; the old page's remaining updates are then dropped.
+        int opened = pagesOpened;
+        for (int i = 0; i < live.Count && opened == pagesOpened; i++) live[i]();
         RefreshHotbar(); RefreshNeeds();
     }
     private void OpenPage(string name) {
-        page = name; live.Clear(); panel.Visible = true; view.PanelOpen = true;
+        page = name; live.Clear(); pagesOpened++; panel.Visible = true; view.PanelOpen = true;
         foreach (var child in panel.GetChildren()) { panel.RemoveChild(child); child.QueueFree(); }
         panel.OffsetLeft = PanelLeft;
         var frame = new HBoxContainer(); frame.AddThemeConstantOverride("separation", 16); panel.AddChild(frame);
@@ -196,7 +240,9 @@ public partial class Game : Node {
         }
         RefreshLive();
     }
-    private void ClosePanel() { panel.Visible = false; view.PanelOpen = false; page = ""; live.Clear(); }
+    private void ClosePanel() { panel.Visible = false; view.PanelOpen = false; page = ""; live.Clear(); pagesOpened++; }
+    // Counts pages opened and closed, so a refresh notices when an update replaced the page under it.
+    private int pagesOpened;
     private void Welcome() {
         AddLabel("The woods are quiet. For now.", 21);
         AddLabel("A small settlement begins with your own two hands. Shape iron, master the bellows, and send your first crate of steel tools to the village.", 16, Muted);
@@ -220,8 +266,25 @@ public partial class Game : Node {
         AddLabel("A full stomach lasts a day and a full water droplet half a day. Wolves are fast and avoid campfire light (5-tile radius), though a wolf already chasing you follows briefly into it. Click a cabin to step inside; wolves back off at once. At half health or less, a nearby wolf leaps for your throat and the pack joins the feast; a wolf kill also destroys the food in your recovery box. Slain wolves leave a carcass: hold right mouse to butcher it for raw meat, then cook it in a stone furnace before eating. A burning campfire keeps wolves away; feed it wood, and each log burns about 4 hours. A torch burns as long, once: click to strike it alight, then click to swing it. Swinging four times in 2 seconds puts it out. A lone wolf creeps in on a torch until you swing at it; then it follows at the light's edge. Once five gather, they attack together. Sleep in a cabin at night if your food and water will last until morning; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
         AddLabel("Crates hold 12 items. Click a placed crate to open it; hold right mouse to pick it up with everything inside. Water bottles only stack inside a crate. Never put a crate inside a crate. At a signpost, load crates of meat, berries or steel tools into the market and press Sell; the village takes nothing loose, and bought supplies arrive in crates; the cart returns in 30 seconds and leaves coins in the market's wage slot, which pays wages at dawn, and the rest in its output. Right-click a stack to pick up half of it, then click a slot to drop it. Buy from the price sheet. The sheet only shows prices as last heard from the village: it updates when a cart returns or when a worker assigned to the signpost fetches fresh prices. Prices fall when you sell and slowly recover. Your world autosaves every 5 minutes; F5 saves immediately. Host in the pause menu lets others join; Join game connects to a host's address.", 15, Muted);
     }
-    private string Needs(Dictionary<string, int> cost) => string.Join("  ·  ", cost.Select(p => $"{world.Data.Name(p.Key)} {world.S.Backpack[p.Key]}/{p.Value}"));
-    private string Cost(Dictionary<string, int> cost) => string.Join("  ·  ", cost.Select(p => $"{p.Value} {world.Data.Name(p.Key)}"));
+    private string Needs(Dictionary<string, int> cost) => Text(text => AppendNeeds(text, cost));
+    private string Cost(Dictionary<string, int> cost) => Text(text => AppendCost(text, cost));
+    /// <summary>Each input with how many the backpack holds of how many are needed.</summary>
+    private void AppendNeeds(StringBuilder text, Dictionary<string, int> cost) {
+        bool first = true;
+        foreach (var (item, amount) in cost) {
+            if (!first) text.Append("  ·  ");
+            first = false;
+            text.Append($"{world.Data.Name(item)} {world.S.Backpack[item]}/{amount}");
+        }
+    }
+    private void AppendCost(StringBuilder text, Dictionary<string, int> cost) {
+        bool first = true;
+        foreach (var (item, amount) in cost) {
+            if (!first) text.Append("  ·  ");
+            first = false;
+            text.Append($"{amount} {world.Data.Name(item)}");
+        }
+    }
     private void BuildingPlans() {
         var grid = AddGrid();
         var details = Label("Hover a plan to see what it needs. Click it, then click open ground nearby.", 14, Muted);
@@ -235,9 +298,14 @@ public partial class Game : Node {
         content.AddChild(details);
     }
     private void Backpack() {
-        Dynamic(() => $"Health {world.S.Health:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {world.S.Workers.Sum(w => w.Wage):0}", 15);
+        Dynamic(text => text.Append($"Health {world.S.Health:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {DailyWages():0}"), 15);
         AddInventoryGrid(() => world.S.Backpack, null, id => { if (world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero); }, "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.");
         AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
+    }
+    private int DailyWages() {
+        int wages = 0;
+        foreach (var w in world.S.Workers) wages += w.Wage;
+        return wages;
     }
     private void Select(Thing t) {
         if (t.Kind == "reinforced" && !(page == "inspect" && selected == t.Id)) sounds.Play("open_steel_smelter", t.Pos);
@@ -254,9 +322,12 @@ public partial class Game : Node {
         var t = world.Find(selected);
         if (t == null) { AddLabel("Select a building or resource in the world."); return; }
         AddLabel(world.Data.Name(t.Kind), 23);
-        Dynamic(() => world.Near(t) ? "Within reach" : $"{world.Player.DistanceTo(t.Pos):0.0} tiles away · walk closer", 13, Muted);
+        Dynamic(text => {
+            if (world.Near(t)) text.Append("Within reach");
+            else text.Append($"{world.Player.DistanceTo(t.Pos):0.0} tiles away · walk closer");
+        }, 13, Muted);
         if (t.IsResource) {
-            Dynamic(() => $"{t.Remaining} remaining\n{world.GatherBlock(t) ?? (t.IsLoose ? "Right-click to walk over and pick it up." : "Hold right mouse on this resource to gather.")}", 15);
+            Dynamic(text => text.Append($"{t.Remaining} remaining\n{world.GatherBlock(t) ?? (t.IsLoose ? "Right-click to walk over and pick it up." : "Hold right mouse on this resource to gather.")}"), 15);
             if (t.Kind == "water") AddButton("Drink from the lake", () => world.Drink(t));
             AddLabel("Select a villager and choose Work to automate this resource. Their gathered supplies go to accepting storage.", 14, Muted); return;
         }
@@ -267,7 +338,7 @@ public partial class Game : Node {
         if (t.Kind == "farm") { FarmPanel(t); return; }
         if (t.IsStorage) { Storage(t); return; }
         if (t.Kind == "campfire") {
-            Dynamic(() => $"Light remaining: {GameHours(t.Burn)}\nProtection radius: 5 tiles", 16); AddButton($"Feed fire · 1 wood / +{world.Data.CampfireHours:0}h", () => world.FuelFire(t)); Assignment(t); return;
+            Dynamic(text => { text.Append("Light remaining: "); AppendGameHours(text, t.Burn); text.Append("\nProtection radius: 5 tiles"); }, 16); AddButton($"Feed fire · 1 wood / +{world.Data.CampfireHours:0}h", () => world.FuelFire(t)); Assignment(t); return;
         }
         if (world.Data.Buildings.TryGetValue(t.Kind, out var bd)) AddLabel(bd.Description, 14, Muted);
         var recipes = world.Data.Recipes.Where(p => p.Value.Station == t.Kind).ToList();
@@ -288,7 +359,7 @@ public partial class Game : Node {
         Assignment(t);
     }
     private void Cabin(Thing hut) {
-        Dynamic(() => world.S.Sheltered == hut.Id ? "You are inside. Wolves keep their distance. Move to step outside." : "Click the cabin to step inside and escape wolves.", 14, Muted);
+        Dynamic(text => text.Append(world.S.Sheltered == hut.Id ? "You are inside. Wolves keep their distance. Move to step outside." : "Click the cabin to step inside and escape wolves."), 14, Muted);
         var door = Button("", () => { if (world.S.Sheltered == hut.Id) world.Leave(); else entering = hut; }); content.AddChild(door);
         var sleep = Button("Sleep until dawn", () => world.Sleep(hut)); sleep.Name = "sleep"; content.AddChild(sleep);
         live.Add(() => {
@@ -298,10 +369,21 @@ public partial class Game : Node {
         });
         AddLabel("Sleeping advances production, hunger, trade and wages. You need enough food and water to last until morning.", 14, Muted);
     }
-    private string Items(Inventory inv) => inv.Count == 0 ? "empty" : string.Join(", ", inv.Items.Select(p => $"{p.Value} {world.Data.Name(p.Key)}"));
+    private void AppendItems(StringBuilder text, Inventory inv) {
+        if (inv.Count == 0) { text.Append("empty"); return; }
+        bool first = true;
+        foreach (var (item, count) in inv.Items) {
+            if (!first) text.Append(", ");
+            first = false;
+            text.Append($"{count} {world.Data.Name(item)}");
+        }
+    }
     private void Storage(Thing t) {
         bool crate = t.Kind == "crate";
-        Dynamic(() => crate ? $"{t.Inventory.Count}/{t.Inventory.Capacity} items · up to {t.Inventory.Capacity} of one item, or {t.Inventory.Capacity} single items" : $"{t.Inventory.UsedSlots}/{t.Inventory.Slots} slots", 14, Muted);
+        Dynamic(text => {
+            if (crate) text.Append($"{t.Inventory.Count}/{t.Inventory.Capacity} items · up to {t.Inventory.Capacity} of one item, or {t.Inventory.Capacity} single items");
+            else text.Append($"{t.Inventory.UsedSlots}/{t.Inventory.Slots} slots");
+        }, 14, Muted);
         AddInventoryGrid(() => t.Inventory, t, id => MoveStack(t.Inventory, world.S.Backpack, id, t), "Click: take a stack · Shift: take all · Drag to move");
         AddLabel("BACKPACK", 14);
         AddInventoryGrid(() => world.S.Backpack, null, id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Shift: store all · Drag to move");
@@ -321,7 +403,21 @@ public partial class Game : Node {
             var compost = new CheckBox { Text = "Compost: takes leaves, grass and food, and makes 1 fertilizer from 4 every hour", ButtonPressed = t.Compost, FocusMode = Control.FocusModeEnum.None };
             compost.Toggled += on => { if (!world.SetCompost(t, on)) compost.SetPressedNoSignal(t.Compost); };
             content.AddChild(compost);
-            Dynamic(() => t.Compost ? $"Composting · {(t.Progress > 0 ? $"next fertilizer in {GameHours(world.Data.DaySeconds / 24 - t.Progress)}" : "needs 4 leaves, grass or food")}" : t.Inventory.Items.Keys.FirstOrDefault() is string held ? $"A pile of {world.Data.Name(held)}. Workers store and take only that until it is emptied." : "Empty. The first resource put in sets what this pile holds.", 13, Muted);
+            Dynamic(text => {
+                if (t.Compost) {
+                    text.Append("Composting · ");
+                    if (t.Progress > 0) {
+                        text.Append("next fertilizer in ");
+                        AppendGameHours(text, world.Data.DaySeconds / 24 - t.Progress);
+                    } else {
+                        text.Append("needs 4 leaves, grass or food");
+                    }
+                } else if (t.Inventory.First() is string held) {
+                    text.Append($"A pile of {world.Data.Name(held)}. Workers store and take only that until it is emptied.");
+                } else {
+                    text.Append("Empty. The first resource put in sets what this pile holds.");
+                }
+            }, 13, Muted);
         }
         // A pile checks each item as it goes, since the first one in decides what the rest may be.
         AddButton("Deposit all materials (keep tools)", () => { if (world.Near(t)) foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray()) if (world.Holds(t, id)) world.Transfer(world.S.Backpack, t.Inventory, id, 999); });
@@ -330,7 +426,7 @@ public partial class Game : Node {
     }
     private void FarmPanel(Thing farm) {
         AddLabel(world.Data.Buildings["farm"].Description, 14, Muted);
-        Dynamic(() => world.FarmStatus(farm), 15);
+        Dynamic(text => world.WriteFarmStatus(farm, text), 15);
         AddInventoryGrid(() => farm.Inventory, farm, id => MoveStack(farm.Inventory, world.S.Backpack, id, farm), "Click: take a stack · Drag to move");
         AddLabel("BACKPACK", 14);
         AddInventoryGrid(() => world.S.Backpack, null, id => MoveStack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move");
@@ -367,7 +463,8 @@ public partial class Game : Node {
     }
     private void WorkerPanel(Worker? w) {
         if (w == null) { AddLabel("This worker has left."); return; }
-        AddLabel(w.Name, 24); Dynamic(() => $"{w.Status}\nCarrying: {Items(w.Bag)}\nDaily wage: {w.Wage:0} coins\nWages owed: {w.WageDebt:0}", 15, Muted);
+        AddLabel(w.Name, 24);
+        Dynamic(text => { text.Append($"{w.Status}\nCarrying: "); AppendItems(text, w.Bag); text.Append($"\nDaily wage: {w.Wage:0} coins\nWages owed: {w.WageDebt:0}"); }, 15, Muted);
         AddButton("Work → choose a resource", () => { assigningWorker = w.Id; view.BuildMode = ""; ClosePanel(); RefreshLive(); });
         AddButton("Unassign", () => world.Assign(w, null));
         if (w.WageDebt > 0) AddButton("Pay outstanding wages", () => world.SettleDebt(w));
@@ -375,17 +472,17 @@ public partial class Game : Node {
         AddLabel("For furnace work, select the building and tick the workers you want to assign.", 14, Muted);
     }
     private void Workers() {
-        AddLabel($"Daily pay {world.S.Workers.Sum(w => w.Wage):0} coins", 19);
+        AddLabel($"Daily pay {DailyWages():0} coins", 19);
         AddLabel($"{world.S.Workers.Count}/8 villagers · paid from your backpack at dawn", 14, Muted);
         if (world.S.Workers.Count == 0) AddLabel("Build a village signpost to hire help. Your first steel-tool sale can cover hiring and wages.", 15, Muted);
         foreach (var w in world.S.Workers) {
-            var worker = w; AddButton($"{w.Name} · {w.Wage:0} coins/day", () => Select(worker)); Dynamic(() => worker.Status, 14, Muted);
+            var worker = w; AddButton($"{w.Name} · {w.Wage:0} coins/day", () => Select(worker)); Dynamic(text => text.Append(worker.Status), 14, Muted);
         }
     }
     /// <summary>Burn time as in-game hours and minutes.</summary>
-    private string GameHours(float seconds) {
+    private void AppendGameHours(StringBuilder text, float seconds) {
         int minutes = (int)(seconds / world.Data.DaySeconds * 1440);
-        return $"{minutes / 60}h {minutes % 60:00}m";
+        text.Append($"{minutes / 60}h {minutes % 60:00}m");
     }
     private void Save(int n) {
         try {
@@ -478,6 +575,8 @@ public partial class Game : Node {
             }
         }
     }
+    // Read once: fetching them from the engine every frame allocates a fresh array.
+    private readonly string[] launchArgs = OS.GetCmdlineUserArgs();
     public override void _Process(double delta) {
         if (world == null || view == null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;
@@ -527,8 +626,9 @@ public partial class Game : Node {
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }
         toastClock -= dt; if (toastClock <= 0 && toast != null) toast.Text = "";
-        if (OS.GetCmdlineUserArgs().Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
-        var args = OS.GetCmdlineUserArgs(); int shot = Array.IndexOf(args, "--screenshot");
+        var args = launchArgs;
+        if (args.Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
+        int shot = Array.IndexOf(args, "--screenshot");
         int delay = Array.IndexOf(args, "--shot-delay");
         float shotAt = delay >= 0 && delay + 1 < args.Length && float.TryParse(args[delay + 1], System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
         if (shot >= 0 && shot + 1 < args.Length && runTime > shotAt && !capturing) {

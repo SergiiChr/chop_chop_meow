@@ -8,6 +8,8 @@ namespace ChopChopMeow;
 public partial class Game {
     private const int SlotCount = 3;
     private static readonly Vector2I[] Resolutions = { new(1280, 720), new(1440, 900), new(1600, 900), new(1920, 1080), new(2560, 1440) };
+    /// <summary>Frame rate caps offered in the options; 0 leaves the rate to vsync alone.</summary>
+    private static readonly int[] FrameLimits = { 0, 60, 90 };
     private ColorRect backdrop = null!;
     private VBoxContainer screen = null!;
     private Action? screenBack;
@@ -83,6 +85,16 @@ public partial class Game {
             ApplyResolution(Resolutions[index]);
         };
         row.AddChild(picker);
+        var limitRow = new HBoxContainer(); screen.AddChild(limitRow);
+        var limitLabel = Label("Frame rate limit"); limitLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; limitRow.AddChild(limitLabel);
+        var limits = new OptionButton { Name = "frame_limit", CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
+        foreach (int fps in FrameLimits) limits.AddItem(fps == 0 ? "Off" : $"{fps} fps");
+        limits.Selected = Math.Max(0, Array.IndexOf(FrameLimits, SavedFrameLimit()));
+        limits.ItemSelected += index => {
+            StoreSetting("display", "frame_limit", FrameLimits[index]);
+            Engine.MaxFps = FrameLimits[index];
+        };
+        limitRow.AddChild(limits);
         var musicRow = new HBoxContainer(); screen.AddChild(musicRow);
         var musicLabel = Label("Music volume"); musicLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; musicRow.AddChild(musicLabel);
         var slider = new HSlider { Name = "music", MaxValue = 100, Step = 5, Value = SavedMusicVolume() * 100, CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
@@ -98,6 +110,8 @@ public partial class Game {
     /// <summary>The stored window size, or the project's default size before the player picks one.</summary>
     private static Vector2I SavedResolution() => Setting("display", "resolution",
         new Vector2I(ProjectSettings.GetSetting("display/window/size/viewport_width").AsInt32(), ProjectSettings.GetSetting("display/window/size/viewport_height").AsInt32()));
+
+    private static int SavedFrameLimit() => Setting("display", "frame_limit", 0);
 
     private static T Setting<[MustBeVariant] T>(string section, string key, T fallback) {
         var config = new ConfigFile(); config.Load(SettingsPath);

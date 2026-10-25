@@ -14,8 +14,20 @@ public sealed class Inventory {
     /// <summary>Most units the inventory holds across all its stacks, or 0 for no limit beyond its slots.</summary>
     public int Capacity { get; set; }
     public const string Coins = "coins";
-    public int Count => Items.Values.Sum();
-    public int UsedSlots => Items.Sum(pair => SlotsFor(pair.Key, pair.Value));
+    public int Count {
+        get {
+            int count = 0;
+            foreach (var pair in Items) count += pair.Value;
+            return count;
+        }
+    }
+    public int UsedSlots {
+        get {
+            int slots = 0;
+            foreach (var pair in Items) slots += SlotsFor(pair.Key, pair.Value);
+            return slots;
+        }
+    }
     public int this[string item] => Items.GetValueOrDefault(item);
 
     /// <summary>Water bottles stack only inside a crate, which is the only container with a capacity.</summary>
@@ -34,8 +46,18 @@ public sealed class Inventory {
     public int ShownSlots => Capacity > 0 ? Math.Min(Slots, UsedSlots + Math.Max(0, Capacity - Count)) : Slots;
 
     /// <summary>Each item split into full stacks followed by its remainder.</summary>
-    public IEnumerable<(string Item, int Count)> Stacks() => Items.SelectMany(pair =>
-        Enumerable.Range(0, SlotsFor(pair.Key, pair.Value)).Select(i => (pair.Key, Math.Min(StackOf(pair.Key), pair.Value - i * StackOf(pair.Key)))));
+    public IEnumerable<(string Item, int Count)> Stacks() {
+        var stacks = new List<(string, int)>();
+        FillStacks(stacks);
+        return stacks;
+    }
+
+    /// <summary>Fills <paramref name="stacks"/> with <see cref="Stacks"/>, without allocating, for panels that refresh while open.</summary>
+    public void FillStacks(List<(string Item, int Count)> stacks) {
+        stacks.Clear();
+        foreach (var (item, quantity) in Items)
+            for (int i = 0; i < SlotsFor(item, quantity); i++) stacks.Add((item, Math.Min(StackOf(item), quantity - i * StackOf(item))));
+    }
 
     public bool Accepts(string item) => InputFilter.Count == 0 || InputFilter.Contains(item);
     public bool AllowsWithdrawal(string item) => OutputFilter.Count == 0 || OutputFilter.Contains(item);
@@ -56,9 +78,18 @@ public sealed class Inventory {
     public bool Fits(IReadOnlyDictionary<string, int> added) => Items.Keys.Union(added.Keys).Sum(item => SlotsFor(item, this[item] + added.GetValueOrDefault(item))) <= Slots &&
         (Capacity == 0 || Count + added.Values.Sum() <= Capacity);
 
-    public bool Has(IReadOnlyDictionary<string, int> cost) => cost.All(pair => this[pair.Key] >= pair.Value);
+    public bool Has(Dictionary<string, int> cost) {
+        foreach (var pair in cost) if (this[pair.Key] < pair.Value) return false;
+        return true;
+    }
 
-    public bool Spend(IReadOnlyDictionary<string, int> cost) {
+    /// <summary>Any one item held, or null when empty.</summary>
+    public string? First() {
+        foreach (var pair in Items) return pair.Key;
+        return null;
+    }
+
+    public bool Spend(Dictionary<string, int> cost) {
         if (!Has(cost)) return false;
         foreach (var pair in cost) Remove(pair.Key, pair.Value);
         return true;

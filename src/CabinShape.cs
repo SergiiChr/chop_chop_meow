@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 /// <summary>Shared cabin shell and sheet-metal geometry, fitted to the same shed-roof plane.</summary>
 internal static class CabinShape {
     private static ArrayMesh? walls, roof, interior;
-    public static readonly StandardMaterial3D WallMaterial = new() { VertexColorUseAsAlbedo = true, Roughness = .95f };
+    public static readonly StandardMaterial3D WallMaterial = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .95f };
     private const float Pitch = 9 * Mathf.Pi / 180;
     private const float Thickness = .06f, Ripple = .018f;
 

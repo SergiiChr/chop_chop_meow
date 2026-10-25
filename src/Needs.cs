@@ -58,9 +58,16 @@ public partial class Game {
         if (world.S.Mauled && !world.Dead) damageEdges.Strength = Math.Max(damageEdges.Strength, .55f);
     }
 
+    // The rounded values the tooltips show, so their text is built only when one changes.
+    private (int Health, int Hunger, int Thirst) shownNeeds = (-1, -1, -1);
     private void RefreshNeeds() {
-        health.TooltipText = $"Health {world.S.Health:0}%"; hunger.TooltipText = $"Hunger {world.S.Hunger:0}%"; thirst.TooltipText = $"Thirst {world.S.Thirst:0}%";
-        health.QueueRedraw(); hunger.QueueRedraw(); thirst.QueueRedraw();
+        var needs = ((int)MathF.Round(world.S.Health, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Hunger, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Thirst, MidpointRounding.AwayFromZero));
+        if (needs != shownNeeds) {
+            shownNeeds = needs;
+            health.TooltipText = $"Health {world.S.Health:0}%"; hunger.TooltipText = $"Hunger {world.S.Hunger:0}%"; thirst.TooltipText = $"Thirst {world.S.Thirst:0}%";
+            // Redrawing clips each outline to its level, which allocates, so a gauge redraws only when its level moves a whole percent.
+            health.QueueRedraw(); hunger.QueueRedraw(); thirst.QueueRedraw();
+        }
     }
 }
 

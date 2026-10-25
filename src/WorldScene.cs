@@ -97,7 +97,7 @@ public partial class WorldView {
                     foreach (var v in new[] { p, q, r }) { tool.SetColor(color); tool.SetNormal(normal); tool.AddVertex(v + Vector3.Down * .03f); }
                 }
             }
-        var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+        var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = 1, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
         parent.AddChild(new MeshInstance3D { Mesh = tool.Commit(), MaterialOverride = material });
     }
 
@@ -216,7 +216,7 @@ public partial class WorldView {
     private static void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items) {
         var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = mesh, InstanceCount = items.Count };
         for (int i = 0; i < items.Count; i++) { multi.SetInstanceTransform(i, items[i].At); multi.SetInstanceColor(i, items[i].Color); }
-        var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
+        var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1, CullMode = BaseMaterial3D.CullModeEnum.Disabled, VertexColorIsSrgb = true };
         parent.AddChild(new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
@@ -224,6 +224,8 @@ public partial class WorldView {
 
     private sealed class Particle {
         public MeshInstance3D Node = null!;
+        public StandardMaterial3D Material = null!;
+        public bool Live;
         public Vector3 Velocity;
         public float Age, Life, Gravity, Size, Grow;
     }
@@ -232,22 +234,29 @@ public partial class WorldView {
     private readonly List<Particle> particles = new();
     private static readonly SphereMesh Mote = new() { Radius = .5f, Height = 1, RadialSegments = 6, Rings = 3 };
 
-    private void BuildEffects(Node3D parent) { effects = new Node3D(); parent.AddChild(effects); }
+    private const int MaxParticles = 400;
+    private void BuildEffects(Node3D parent) {
+        effects = new Node3D(); parent.AddChild(effects);
+        // The whole pool is made while loading, so a burst instantiates nothing mid-game.
+        for (int i = 0; i < MaxParticles; i++) {
+            var particle = new Particle { Node = new MeshInstance3D { Mesh = Mote, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false } };
+            effects.AddChild(particle.Node); particles.Add(particle);
+        }
+    }
+
+    private Particle? FreeParticle() {
+        foreach (var p in particles) if (!p.Live) return p;
+        return null;
+    }
 
     /// <summary>Spawns short-lived motes; negative gravity makes smoke and embers rise.</summary>
-    private void Burst(Vector3 at, Material material, int count, float speed, float life, float gravity, float size, float grow = 0) {
+    private void Burst(Vector3 at, StandardMaterial3D material, int count, float speed, float life, float gravity, float size, float grow = 0) {
         for (int i = 0; i < count; i++) {
-            var particle = particles.Find(p => !p.Node.Visible);
-            if (particle == null) {
-                if (particles.Count >= 400) return;
-                particle = new Particle { Node = new MeshInstance3D { Mesh = Mote, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off } };
-                effects.AddChild(particle.Node); particles.Add(particle);
-            }
+            if (FreeParticle() is not Particle particle) return;
             var direction = new Vector3(Jitter() - .5f, Jitter() * .8f + .4f, Jitter() - .5f).Normalized();
-            particle.Node.MaterialOverride = material;
-            particle.Node.SetMeta("base", material);
+            particle.Node.MaterialOverride = particle.Material = material;
             particle.Node.Position = at;
-            particle.Node.Visible = true;
+            particle.Node.Visible = particle.Live = true;
             particle.Velocity = direction * speed * (.6f + Jitter() * .6f);
             particle.Age = 0; particle.Life = life * (.7f + Jitter() * .6f); particle.Gravity = gravity; particle.Size = size; particle.Grow = grow;
             particle.Node.Scale = Vector3.One * size;
@@ -257,9 +266,9 @@ public partial class WorldView {
     private void UpdateEffects(float dt) {
         if (dt <= 0) return;
         foreach (var p in particles) {
-            if (!p.Node.Visible) continue;
+            if (!p.Live) continue;
             p.Age += dt;
-            if (p.Age >= p.Life) { p.Node.Visible = false; continue; }
+            if (p.Age >= p.Life) { p.Node.Visible = p.Live = false; continue; }
             p.Velocity += Vector3.Down * p.Gravity * dt;
             var position = p.Node.Position + p.Velocity * dt;
             // Chips and droplets settle on the ground instead of sinking through it.
@@ -267,7 +276,7 @@ public partial class WorldView {
             p.Node.Position = position;
             float t = p.Age / p.Life;
             p.Node.Scale = Vector3.One * p.Size * (1 + p.Grow * t) * (p.Grow > 0 ? 1 : 1 - t * t);
-            if (p.Grow > 0) SetFade(p.Node, t);
+            if (p.Grow > 0) SetFade(p.Node, p.Material, t);
         }
     }
 
