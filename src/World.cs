@@ -500,6 +500,8 @@ public sealed partial class World
         if (Forwarded("set_recipe", t.Id, item: recipe)) return;
         if (Data.Recipes.TryGetValue(recipe, out var r) && r.Station == t.Kind) { t.Recipe = recipe; t.Progress = 0; }
     }
+    /// <summary>The fuel a station burns: coal in the reinforced furnace, otherwise its selection, falling back to wood for anything unknown.</summary>
+    public static string BurnedFuel(Thing t) => t.Kind == "reinforced" ? "coal" : t.Fuel is "wood" or "coal" ? t.Fuel : "wood";
     public Dictionary<string, int> BatchCost(Thing t)
     {
         var cost = new Dictionary<string, int>();
@@ -507,7 +509,7 @@ public sealed partial class World
         foreach (var p in r.Inputs) cost[p.Key] = p.Value;
         if (r.Fuel)
         {
-            string fuel = t.Kind == "reinforced" ? "coal" : t.Fuel is "wood" or "coal" ? t.Fuel : "wood";
+            string fuel = BurnedFuel(t);
             cost[fuel] = cost.GetValueOrDefault(fuel) + 1;
         }
         return cost;

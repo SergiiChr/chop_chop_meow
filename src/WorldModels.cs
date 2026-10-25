@@ -24,6 +24,7 @@ public sealed class Prop
     /// <summary>A farm plot's looks by <see cref="World.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
     public Node3D[] Crops = Array.Empty<Node3D>();
     public Node3D[] Pleats = Array.Empty<Node3D>();
+    public Node3D? WoodPile, CoalPile;
     public MeshInstance3D? Glow, Window, Pool;
     public WorldModels.WolfModel? Wolf;
     public OmniLight3D? Light;
@@ -127,8 +128,17 @@ public static class WorldModels
             case "mine": Mine(prop, World.CliffAt(t.Pos).Ore); break;
         }
         if (t.Kind != "water") body.RotationDegrees = new Vector3(0, t.Kind == "tree" || t.IsResource ? Jitter(t.Id, 1) * 360 : 0, 0);
+        if (t.Kind == "furnace") SyncFuel(prop, t);
         if (t.Kind == "mine") body.Rotation = MineYaw(t.Pos);
         return prop;
+    }
+
+    /// <summary>The outdoor pile represents stocked fuel, excluding fuel already burning in a batch.</summary>
+    public static void SyncFuel(Prop prop, Thing t)
+    {
+        string fuel = World.BurnedFuel(t);
+        prop.WoodPile!.Visible = fuel == "wood" && t.Inventory["wood"] > 0;
+        prop.CoalPile!.Visible = fuel == "coal" && t.Inventory["coal"] > 0;
     }
 
     private static void Tree(Prop prop, int id)
@@ -215,33 +225,25 @@ public static class WorldModels
         prop.Fruit = fruit;
     }
 
-    /// <summary>Cinder-block furnace with a steel top plate, stovepipe and a firewood stack.</summary>
+    /// <summary>Cinder-block furnace with a steel top plate, stovepipe and stocked fuel pile.</summary>
     private static void BlockFurnace(Prop prop)
     {
         var body = prop.Body;
-        Box(body, new Vector3(1f, .8f, .9f), new Vector3(0, .4f, 0), Mat("9b9c98", .95f));
-        // Mortar joints on the two faces the camera sees give the stacked-block look.
-        var joint = Mat("7b7c78", 1);
-        for (int row = 1; row < 4; row++)
-        {
-            Box(body, new Vector3(1.01f, .015f, .01f), new Vector3(0, row * .2f, .451f), joint);
-            Box(body, new Vector3(.01f, .015f, .91f), new Vector3(.501f, row * .2f, 0), joint);
-        }
-        for (int row = 0; row < 4; row++)
-            for (int i = 0; i < 3; i++)
-            {
-                float offset = row % 2 == 0 ? -.2f : 0;
-                Box(body, new Vector3(.01f, .19f, .01f), new Vector3(-.2f + i * .4f + offset, row * .2f + .1f, .451f), joint);
-                Box(body, new Vector3(.01f, .19f, .01f), new Vector3(.501f, row * .2f + .1f, -.25f + i * .4f + offset), joint);
-            }
-        Box(body, new Vector3(.44f, .38f, .03f), new Vector3(0, .21f, .45f), Mat("2b2522"));
-        prop.Glow = Box(body, new Vector3(.34f, .26f, .03f), new Vector3(0, .17f, .46f), Flat(new Color("ff7a24")));
-        Box(body, new Vector3(1.14f, .05f, 1.0f), new Vector3(0, .82f, 0), Mat("45494c", .5f, .6f));
-        Post(body, .09f, .09f, 1.05f, new Vector3(-.3f, .84f, -.25f), Mat("8e9396", .45f, .7f));
-        Post(body, .16f, 0, .14f, new Vector3(-.3f, 1.92f, -.25f), Mat("8e9396", .45f, .7f), 8);
+        Add(body, FurnaceShape.Masonry, FurnaceShape.Concrete, Vector3.Zero);
+        prop.Glow = Add(body, FurnaceShape.Fire, FurnaceShape.Flame, Vector3.Zero);
+        Add(body, FurnaceShape.Plate, FurnaceShape.Steel, Vector3.Zero);
+        var flue = Pivot(body, new Vector3(-.3f, 0, -.25f));
+        var metal = new Color("8e9396");
+        ActorShape.Add(flue, new[] {
+            new ActorShape.Ring(2.05f, .001f, .001f, metal), new ActorShape.Ring(1.94f, .14f, .14f, metal),
+            new ActorShape.Ring(1.92f, .16f, .16f, metal), new ActorShape.Ring(1.90f, .09f, .09f, metal),
+            new ActorShape.Ring(.95f, .09f, .09f, metal), new ActorShape.Ring(.9f, .11f, .11f, metal),
+            new ActorShape.Ring(.85f, .12f, .12f, metal) }, material: FurnaceShape.Steel);
         prop.Vent = new Vector3(-.3f, 2.05f, -.25f);
+        prop.WoodPile = Pivot(body, Vector3.Zero);
         for (int i = 0; i < 3; i++)
-            Cylinder(body, .07f, .07f, .5f, new Vector3(.82f, .08f + (i == 2 ? .13f : 0), -.1f + (i == 2 ? .07f : i * .14f)), Mat(i == 1 ? "7a5235" : "8a5f3c"), new Vector3(90, 0, 0), 7);
+            Cylinder(prop.WoodPile, .07f, .065f, .5f, new Vector3(.82f, .08f + (i == 2 ? .13f : 0), -.1f + (i == 2 ? .07f : i * .14f)), Mat(i == 1 ? "7a5235" : "8a5f3c"), new Vector3(90, 0, 0), 10);
+        prop.CoalPile = Add(body, FurnaceShape.CoalPile, FurnaceShape.Concrete, new Vector3(.82f, 0, -.03f));
         prop.Light = Light(body, new Vector3(0, .35f, .7f), 2.6f);
     }
 
@@ -300,34 +302,54 @@ public static class WorldModels
         var body = prop.Body;
         foreach (var (x, z) in new[] { (-1.1f, -1f), (1.1f, -1f), (-1.1f, 1f), (1.1f, 1f) }) Box(body, new Vector3(.3f, .3f, .3f), new Vector3(x, .15f, z), Mat("9a9b97"));
         Box(body, new Vector3(2.6f, .12f, 2.4f), new Vector3(0, .36f, 0), Mat("7d5f43"));
-        var osb = Mat("c8a46a", .95f);
-        Box(body, new Vector3(2.4f, 2.1f, 2.1f), new Vector3(0, 1.47f, -.05f), osb);
+        Add(body, CabinShape.Walls, CabinShape.WallMaterial, Vector3.Zero);
+        Add(body, CabinShape.Interior, CabinShape.WallMaterial, Vector3.Zero);
         var trim = Mat("3d4245");
-        foreach (var (x, z) in new[] { (-1.2f, -1.1f), (1.2f, -1.1f), (-1.2f, 1f), (1.2f, 1f) }) Box(body, new Vector3(.08f, 2.2f, .08f), new Vector3(x, 1.47f, z), trim);
-        for (int i = 0; i < 4; i++) Box(body, new Vector3(.04f, 2.1f, .02f), new Vector3(-.95f + i * .6f + (i > 1 ? .3f : 0), 1.47f, 1.01f), Mat("b08c55"));
-        for (int i = 0; i < 4; i++) Box(body, new Vector3(.02f, 2.1f, .04f), new Vector3(1.21f, 1.47f, -.8f + i * .55f), Mat("b08c55"));
+        foreach (var (x, z) in new[] { (-1.2f, -1.1f), (1.2f, -1.1f), (-1.2f, 1f), (1.2f, 1f) })
+        {
+            float height = CabinShape.WallTop(z) - .42f;
+            Box(body, new Vector3(.08f, height, .08f), new Vector3(x, .42f + height / 2, z), trim);
+        }
+        foreach (float x in new[] { -.95f, .15f, 1.03f })
+        {
+            float height = CabinShape.WallTop(1) - .42f;
+            Box(body, new Vector3(.025f, height, .015f), new Vector3(x, .42f + height / 2, 1.005f), Mat("b08c55"));
+        }
+        foreach (float z in new[] { -.8f, .65f })
+        {
+            float height = CabinShape.WallTop(z) - .42f;
+            Box(body, new Vector3(.015f, height, .025f), new Vector3(1.205f, .42f + height / 2, z), Mat("b08c55"));
+        }
         // Shed roof pitched toward the back, overhanging the door.
         var roof = Pivot(body, new Vector3(0, 2.68f, -.05f), new Vector3(-9, 0, 0));
-        Box(roof, new Vector3(2.9f, .06f, 2.8f), Vector3.Zero, Mat("6f7a80", .45f, .6f));
-        for (int i = 0; i < 10; i++) Cylinder(roof, .03f, .03f, 2.8f, new Vector3(-1.35f + i * .3f, .04f, 0), Mat("7d878d", .45f, .6f), new Vector3(90, 0, 0), 6);
-        Box(roof, new Vector3(1.1f, .05f, .8f), new Vector3(.55f, .1f, -.4f), Mat("1f2c44", .25f, .4f));
-        Box(roof, new Vector3(1.14f, .03f, .84f), new Vector3(.55f, .08f, -.4f), Mat("c9ced2", .4f, .7f));
+        Add(roof, CabinShape.Roof, Mat("6f7a80", .45f, .6f), Vector3.Zero);
+        Box(roof, new Vector3(1.1f, .05f, .8f), new Vector3(.55f, .085f, -.4f), Mat("1f2c44", .25f, .4f));
+        Box(roof, new Vector3(1.14f, .03f, .84f), new Vector3(.55f, .065f, -.4f), Mat("c9ced2", .4f, .7f));
         Post(body, .08f, .08f, 1.1f, new Vector3(-.75f, 2.4f, -.6f), Mat("8e9396", .45f, .7f));
         Post(body, .14f, 0, .12f, new Vector3(-.75f, 3.48f, -.6f), Mat("8e9396", .45f, .7f), 8);
         prop.Vent = new Vector3(-.75f, 3.6f, -.6f);
         // Door hinged on its left edge, painted teal.
-        var door = Pivot(body, new Vector3(-.75f, .42f, 1.02f));
-        Box(door, new Vector3(.82f, 1.86f, .05f), new Vector3(.41f, .93f, 0), Mat("3e6e6a", .6f));
-        Sphere(door, .035f, new Vector3(.72f, .95f, .05f), Mat("c9ced2", .3f, .8f));
+        // The hinge axis sits just ahead of the jamb so the open leaf clears the frame.
+        var door = Pivot(body, new Vector3(-.75f, .42f, 1.075f));
+        Box(door, new Vector3(.82f, 1.86f, .05f), new Vector3(.41f, .93f, -.025f), Mat("3e6e6a", .6f));
+        Sphere(door, .035f, new Vector3(.72f, .95f, .025f), Mat("c9ced2", .3f, .8f));
         prop.Door = door;
-        Box(body, new Vector3(1, .14f, .4f), new Vector3(-.34f, .21f, 1.35f), Mat("a9824f"));
+        foreach (float x in new[] { -.79f, .11f })
+            Box(body, new Vector3(.06f, 1.93f, .1f), new Vector3(x, 1.385f, 1.015f), trim);
+        Box(body, new Vector3(.96f, .06f, .1f), new Vector3(-.34f, 2.32f, 1.015f), trim);
+        Box(body, new Vector3(1, .14f, .45f), new Vector3(-.34f, .07f, 1.375f), Mat("a9824f"));
+        Box(body, new Vector3(1, .28f, .26f), new Vector3(-.34f, .14f, 1.25f), Mat("a9824f"));
         var glass = Mat("8fb4c4", .15f, .2f);
         Box(body, new Vector3(.7f, .6f, .06f), new Vector3(.55f, 1.65f, 1.0f), trim);
         prop.Window = Box(body, new Vector3(.6f, .5f, .07f), new Vector3(.55f, 1.65f, 1.0f), glass);
         Box(body, new Vector3(.06f, .7f, .9f), new Vector3(1.2f, 1.6f, 0), trim);
         Box(body, new Vector3(.07f, .6f, .8f), new Vector3(1.2f, 1.6f, 0), glass);
-        Post(body, .26f, .26f, .8f, new Vector3(1.5f, 0, .6f), Mat("2c5f9e", .5f));
-        Cylinder(body, .27f, .27f, .04f, new Vector3(1.5f, .62f, .6f), Mat("244f85", .5f), null, 12);
+        var barrel = Pivot(body, new Vector3(1.5f, 0, .6f));
+        var blue = new Color("2c5f9e"); var rim = new Color("244f85");
+        ActorShape.Add(barrel, new[] {
+            new ActorShape.Ring(.8f, .23f, .23f, rim), new ActorShape.Ring(.77f, .27f, .27f, rim),
+            new ActorShape.Ring(.73f, .28f, .28f, blue), new ActorShape.Ring(.16f, .28f, .28f, blue),
+            new ActorShape.Ring(.03f, .255f, .255f, blue), new ActorShape.Ring(0, .23f, .23f, blue) });
         prop.Light = Light(body, new Vector3(.55f, 1.65f, 1.4f), 2.5f);
     }
 
