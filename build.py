@@ -9,7 +9,8 @@
   ./build.py lint    Compile the C# project and verify its formatting.
 
 Godot, .NET, and export templates are kept under .tools/. Set GODOT_BIN to use an
-existing Godot 4.7.2 .NET executable.
+existing Godot 4.7.2 .NET executable. On a hybrid-graphics laptop, play and editor
+render on the NVIDIA GPU; set CHOP_CHOP_MEOW_GPU=integrated to keep the default one.
 """
 
 from __future__ import annotations
@@ -86,6 +87,16 @@ def dotnet_env() -> dict[str, str]:
     env["XDG_CONFIG_HOME"] = str(TOOLS / "xdg-config")
     env["XDG_CACHE_HOME"] = str(TOOLS / "xdg-cache")
     return env
+
+
+def discrete_gpu(env: dict[str, str]) -> dict[str, str]:
+    """Render on the NVIDIA GPU through PRIME offload, since OpenGL otherwise picks the integrated one."""
+    offload = ("__NV_PRIME_RENDER_OFFLOAD", "__GLX_VENDOR_LIBRARY_NAME", "DRI_PRIME")
+    if env.get("CHOP_CHOP_MEOW_GPU") == "integrated" or any(name in env for name in offload):
+        return env
+    if not Path("/proc/driver/nvidia/version").exists():
+        return env
+    return {**env, "__NV_PRIME_RENDER_OFFLOAD": "1", "__GLX_VENDOR_LIBRARY_NAME": "nvidia"}
 
 
 def dotnet_supported(executable: str | Path, env: dict[str, str]) -> bool:
@@ -336,9 +347,9 @@ def main() -> int:
             if forwarded[:1] == ["--"]:
                 forwarded = forwarded[1:]
             game_args = ["--", *forwarded] if forwarded else []
-            os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *game_args], env)
+            os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *game_args], discrete_gpu(env))
         if action == "editor":
-            os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], env)
+            os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], discrete_gpu(env))
         if action == "test":
             test(env)
         elif action == "build":

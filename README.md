@@ -10,7 +10,7 @@ From the project directory:
 ./build.py play
 ```
 
-The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates, and build output under `.tools/` and `build/`. First-time setup downloads missing tools and needs internet access. To use an installed Godot 4.7.2 .NET binary, set `GODOT_BIN=/path/to/godot`. Interactive play needs a working Linux graphics driver; the project uses Godot's Compatibility renderer.
+The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates, and build output under `.tools/` and `build/`. First-time setup downloads missing tools and needs internet access. To use an installed Godot 4.7.2 .NET binary, set `GODOT_BIN=/path/to/godot`. Interactive play needs a working Linux graphics driver; the project uses Godot's Compatibility renderer. OpenGL renders on the integrated GPU of a hybrid-graphics laptop unless told otherwise, so with the NVIDIA driver loaded `play` and `editor` request PRIME render offload to the NVIDIA GPU. Set `CHOP_CHOP_MEOW_GPU=integrated` to keep the default GPU. The exported executable does not do this; launch it with `__NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia` (or your desktop's "Launch using dedicated GPU") for the same effect.
 
 ```sh
 ./build.py setup    # prepare local tools, compile C#, and import assets
@@ -36,7 +36,7 @@ For animation review, `--animation-review` shows every actor action on rotating 
 
 These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
-The game opens on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit. There are three save slots and a separate autosave written every 5 minutes. Options holds a window resolution picker; the choice is stored in `settings.cfg` and applied at launch.
+The game opens on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit. There are three save slots and a separate autosave written every 5 minutes. Options holds a window resolution picker and a frame rate limit (off, 60 or 90 fps); the choices are stored in `settings.cfg` and applied at launch.
 
 The launcher keeps its Godot user-data directory under `.tools/xdg-data`; launcher-managed saves are in `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/` as `settlement.json` (slot 1), `settlement-2.json`, `settlement-3.json` and `autosave.json`. A manually exported or otherwise normally launched Godot build uses Godot's standard per-user application-data location instead.
 

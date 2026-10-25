@@ -70,7 +70,7 @@ public partial class Game : Node
             SetTheme(); BuildHud();
             if (OS.GetCmdlineUserArgs().Contains("--showcase")) Showcase();
             else if (!OS.GetCmdlineUserArgs().Contains("--animation-review")) ShowStart();
-            if (!OS.GetCmdlineUserArgs().Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review")) ApplyResolution(SavedResolution());
+            if (!OS.GetCmdlineUserArgs().Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review")) { ApplyResolution(SavedResolution()); Engine.MaxFps = SavedFrameLimit(); }
             if (OS.GetCmdlineUserArgs().Contains("--ui-test")) RunUIChecks();
             if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--net-check") is int check and >= 0) RunNetCheck(OS.GetCmdlineUserArgs().ElementAtOrDefault(check + 1) == "host");
             if (OS.GetCmdlineUserArgs().Contains("--animation-review"))
@@ -544,6 +544,8 @@ public partial class Game : Node
             }
         }
     }
+    // Read once: fetching them from the engine every frame allocates a fresh array.
+    private readonly string[] launchArgs = OS.GetCmdlineUserArgs();
     public override void _Process(double delta)
     {
         if (world == null || view == null) return;
@@ -603,8 +605,9 @@ public partial class Game : Node
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }
         toastClock -= dt; if (toastClock <= 0 && toast != null) toast.Text = "";
-        if (OS.GetCmdlineUserArgs().Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
-        var args = OS.GetCmdlineUserArgs(); int shot = Array.IndexOf(args, "--screenshot");
+        var args = launchArgs;
+        if (args.Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
+        int shot = Array.IndexOf(args, "--screenshot");
         int delay = Array.IndexOf(args, "--shot-delay");
         float shotAt = delay >= 0 && delay + 1 < args.Length && float.TryParse(args[delay + 1], System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
         if (shot >= 0 && shot + 1 < args.Length && runTime > shotAt && !capturing)

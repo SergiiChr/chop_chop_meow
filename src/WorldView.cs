@@ -269,7 +269,7 @@ public partial class WorldView : Node3D
         return distance < float.MaxValue;
     }
 
-    private bool RayHits(Vector2 screen, Vector2 at, IEnumerable<Hit> hits, out float distance)
+    private bool RayHits(Vector2 screen, Vector2 at, ReadOnlySpan<Hit> hits, out float distance)
     {
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
         distance = float.MaxValue;
@@ -278,20 +278,25 @@ public partial class WorldView : Node3D
         return distance < float.MaxValue;
     }
 
+    // Reused every pick so hovering does not search the whole world once per known object.
+    private readonly Dictionary<int, Thing> live = new();
+
     /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit cylinders.</summary>
     public Thing? Pick(Vector2 screen)
     {
         SyncCamera();
+        live.Clear();
+        foreach (var thing in World.S.Things) live.TryAdd(thing.Id, thing);
         Thing? best = null, crown = null; float nearest = float.MaxValue, nearestCrown = float.MaxValue;
         // Hits follow what is drawn, including memories, but only things that still exist can be picked.
         foreach (var known in World.Known)
         {
-            if (known.Remaining <= 0 && known.IsResource && known.Kind != "berries" || World.Find(known.Id) is not Thing t) continue;
+            if (known.Remaining <= 0 && known.IsResource && known.Kind != "berries" || !live.TryGetValue(known.Id, out var t)) continue;
             var hits = HitsOf(known);
             // A tree's first hit is its trunk; a crown only wins when nothing else is under the cursor, so things behind it stay clickable.
-            if (t.Kind == "tree" && !RayHits(screen, t.Pos, hits.Take(1), out _))
+            if (t.Kind == "tree" && !RayHits(screen, t.Pos, hits.AsSpan(0, Math.Min(1, hits.Length)), out _))
             {
-                if (RayHits(screen, t.Pos, hits.Skip(1), out float c) && c < nearestCrown) { nearestCrown = c; crown = t; }
+                if (RayHits(screen, t.Pos, hits.AsSpan(Math.Min(1, hits.Length)), out float c) && c < nearestCrown) { nearestCrown = c; crown = t; }
                 continue;
             }
             if (RayHits(screen, t.Pos, hits, out float d) && d < nearest) { nearest = d; best = t; }
@@ -309,37 +314,41 @@ public partial class WorldView : Node3D
         return best;
     }
 
-    /// <summary>Screen rectangles of an object's hit cylinders, used to decide when a canopy hides something.</summary>
-    private IEnumerable<Rect2> ScreenRects(Vector2 at, IEnumerable<Hit> hits)
+    /// <summary>The screen rectangle of one hit cylinder, used to decide when a canopy hides something.</summary>
+    private Rect2 ScreenRect(Vector2 at, Hit hit, float ppu)
     {
-        float ppu = PixelsPerUnit;
-        foreach (var hit in hits)
-        {
-            var bottom = camera.UnprojectPosition(To3(at, hit.Bottom)); var top = camera.UnprojectPosition(To3(at, hit.Top));
-            float half = hit.Radius * ppu;
-            yield return new Rect2(bottom.X - half, top.Y - half * .5f, half * 2, bottom.Y - top.Y + half);
-        }
+        var bottom = camera.UnprojectPosition(To3(at, hit.Bottom)); var top = camera.UnprojectPosition(To3(at, hit.Top));
+        float half = hit.Radius * ppu;
+        return new Rect2(bottom.X - half, top.Y - half * .5f, half * 2, bottom.Y - top.Y + half);
     }
 
     internal bool TreeCanopyCoversThing(Thing tree, Thing thing)
     {
         SyncCamera();
-        return Covers(tree, thing);
+        return Covers(tree, thing, PixelsPerUnit);
     }
 
-    private bool Covers(Thing tree, Thing thing)
+    private bool Covers(Thing tree, Thing thing, float ppu)
     {
         // Depth decides which object is in front; projected volumes must then actually overlap.
         if (tree.X + tree.Y <= thing.X + thing.Y) return false;
-        var thingRects = ScreenRects(thing.Pos, HitsOf(thing)).ToArray();
-        return ScreenRects(tree.Pos, HitsOf(tree)).Any(a => thingRects.Any(b => a.Intersects(b)));
+        var thingHits = HitsOf(thing);
+        Span<Rect2> thingRects = stackalloc Rect2[thingHits.Length];
+        for (int i = 0; i < thingHits.Length; i++) thingRects[i] = ScreenRect(thing.Pos, thingHits[i], ppu);
+        foreach (var hit in HitsOf(tree))
+        {
+            var rect = ScreenRect(tree.Pos, hit, ppu);
+            foreach (var other in thingRects) if (rect.Intersects(other)) return true;
+        }
+        return false;
     }
 
-    private bool TreeCoversPerson(Thing tree, Vector2 person)
+    private bool TreeCoversPerson(Thing tree, Vector2 person, float ppu)
     {
         if (tree.X + tree.Y <= person.X + person.Y) return false;
         var head = camera.UnprojectPosition(To3(person, 1.2f));
-        return ScreenRects(tree.Pos, HitsOf(tree)).Any(r => r.HasPoint(head));
+        foreach (var hit in HitsOf(tree)) if (ScreenRect(tree.Pos, hit, ppu).HasPoint(head)) return true;
+        return false;
     }
 
     // ---------- Frame update ----------
@@ -553,9 +562,10 @@ public partial class WorldView : Node3D
         }
     }
 
+    private readonly HashSet<int> seen = new();
     private void SyncThings(float dt)
     {
-        var seen = new HashSet<int>();
+        seen.Clear();
         foreach (var t in World.Known)
         {
             seen.Add(t.Id);
@@ -566,16 +576,17 @@ public partial class WorldView : Node3D
                 scene.AddChild(prop.Root);
                 props[t.Id] = prop;
                 // A fresh carcass keeps the heading of the wolf model it replaces.
-                if (t.Kind == "wolf_corpse" && wolves.FirstOrDefault(pair => !World.S.Wolves.Contains(pair.Key) && pair.Value.Last.DistanceTo(t.Pos) < 2).Value is { } dying)
-                    prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
+                if (t.Kind == "wolf_corpse" && Dying(t.Pos) is { } dying) prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
             }
             prop.Root.Position = To3(t.Pos);
             Animate(prop, t, dt);
         }
-        foreach (int id in props.Keys.Where(id => !seen.Contains(id)).ToArray())
-        {
-            props[id].Root.QueueFree(); props.Remove(id);
-        }
+        // Every seen id has a prop, so equal counts mean nothing went out of memory.
+        if (props.Count > seen.Count)
+            foreach (int id in props.Keys.Where(id => !seen.Contains(id)).ToArray())
+            {
+                props[id].Root.QueueFree(); props.Remove(id);
+            }
         FadeCanopies(dt);
     }
 
@@ -702,7 +713,7 @@ public partial class WorldView : Node3D
                 if (t.Kind == "crate") { prop.Body.Position = new Vector3(0, lifted * .35f, 0); prop.Body.RotationDegrees = new Vector3(lifted * 9 * MathF.Sin(Elapsed * 18), 0, lifted * 6 * MathF.Cos(Elapsed * 15)); }
                 break;
             case "hut":
-                bool near = World.S.Players.Any(p => p.RespawnIn <= 0 && p.Pos.DistanceTo(t.Pos) < 2.6f);
+                bool near = AnyPlayerNear(t.Pos, 2.6f);
                 // Running inside from a hunting pack slams the door instead of swinging it open.
                 if (dt > 0 && near && prop.Open == 0) Sounds?.Play(World.S.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
                 prop.Open = Mathf.MoveToward(prop.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
@@ -720,7 +731,7 @@ public partial class WorldView : Node3D
                 prop.Supplies!.Visible = t.Stage == World.MineSupplied;
                 prop.Frame!.Visible = finished || t.Stage == World.MineSupplied && stageShare > 0;
                 prop.Frame.Scale = new Vector3(1, finished ? 1 : Math.Max(.05f, stageShare), 1);
-                bool mining = finished && World.Sees(t.Pos) && World.S.Workers.Any(w => w.Assignment == t.Id && w.WorkState == WorkerWorkState.Underground);
+                bool mining = finished && World.Sees(t.Pos) && Underground(t.Id);
                 prop.Rails!.Visible = finished;
                 prop.Cart!.Visible = finished && !mining;
                 prop.Load!.Visible = (t.Output?.Count ?? 0) > 0;
@@ -730,7 +741,7 @@ public partial class WorldView : Node3D
                 prop.Light!.LightEnergy = mining ? (1 + flicker * .25f) * (.3f + night * 1.3f) : 0;
                 break;
             case "signpost":
-                bool waiting = World.S.Orders.Any(o => o.Signpost == t.Id);
+                bool waiting = OrderAt(t.Id);
                 prop.Open = Mathf.MoveToward(prop.Open, waiting ? 1 : 0, Math.Max(dt, .016f) * 3);
                 prop.Flag!.RotationDegrees = new Vector3(-90 * (1 - Ease(prop.Open)), 0, 0);
                 break;
@@ -738,6 +749,12 @@ public partial class WorldView : Node3D
     }
 
     private static float Ease(float t) => t * t * (3 - 2 * t);
+
+    // Lookups that would otherwise capture the thing in a lambda, which allocates on every call for every thing drawn.
+    private WorldModels.WolfModel? Dying(Vector2 at) => wolves.FirstOrDefault(pair => !World.S.Wolves.Contains(pair.Key) && pair.Value.Last.DistanceTo(at) < 2).Value;
+    private bool AnyPlayerNear(Vector2 at, float radius) => World.S.Players.Any(p => p.RespawnIn <= 0 && p.Pos.DistanceTo(at) < radius);
+    private bool Underground(int mine) => World.S.Workers.Any(w => w.Assignment == mine && w.WorkState == WorkerWorkState.Underground);
+    private bool OrderAt(int signpost) => World.S.Orders.Any(o => o.Signpost == signpost);
 
     // Campfire, furnace and bellows furnace smoke: the coal forge's plume is darker, denser and wider.
     private readonly record struct SmokeStyle(float Every, Color Color, float Size, float Grow);
@@ -755,22 +772,31 @@ public partial class WorldView : Node3D
     }
 
     /// <summary>Trees in front of the player, a worker or a structure turn see-through instead of hiding them.</summary>
+    private readonly List<Thing> structures = new();
     private void FadeCanopies(float dt)
     {
         var bounds = GetViewport().GetVisibleRect().Grow(300);
-        var structures = World.S.Things.Where(o => !o.IsResource && props.ContainsKey(o.Id) && bounds.HasPoint(camera.UnprojectPosition(To3(o.Pos)))).ToArray();
+        float ppu = PixelsPerUnit;
+        structures.Clear();
+        foreach (var o in World.S.Things)
+            if (!o.IsResource && props.ContainsKey(o.Id) && bounds.HasPoint(camera.UnprojectPosition(To3(o.Pos)))) structures.Add(o);
         foreach (var t in World.S.Things)
         {
             if (t.Kind != "tree" || t.Remaining <= 0 || !props.TryGetValue(t.Id, out var prop)) continue;
             if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
-            bool covers = !World.Dead && TreeCoversPerson(t, World.Player) ||
-                World.S.Workers.Any(w => World.Sees(w) && TreeCoversPerson(t, w.Pos)) ||
-                World.S.Players.Any(p => p != World.Me && p.RespawnIn <= 0 && World.Sees(p.Pos) && TreeCoversPerson(t, p.Pos)) ||
-                structures.Any(o => Covers(t, o));
-            float fade = Mathf.MoveToward(prop.Fade, covers ? .68f : 0, Math.Max(dt, .016f) * 3);
+            float fade = Mathf.MoveToward(prop.Fade, CoversSomething(t, ppu) ? .68f : 0, Math.Max(dt, .016f) * 3);
             if (Math.Abs(fade - prop.Fade) < .001f) continue;
             prop.Fade = fade; SetFade(prop.Sway!, fade);
         }
+    }
+
+    private bool CoversSomething(Thing tree, float ppu)
+    {
+        if (!World.Dead && TreeCoversPerson(tree, World.Player, ppu)) return true;
+        foreach (var w in World.S.Workers) if (World.Sees(w) && TreeCoversPerson(tree, w.Pos, ppu)) return true;
+        foreach (var p in World.S.Players) if (p != World.Me && p.RespawnIn <= 0 && World.Sees(p.Pos) && TreeCoversPerson(tree, p.Pos, ppu)) return true;
+        foreach (var o in structures) if (Covers(tree, o, ppu)) return true;
+        return false;
     }
 
     private void SyncWolves(float dt)

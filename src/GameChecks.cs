@@ -273,6 +273,12 @@ public partial class Game
             UIRequire(picker.Selected == Array.IndexOf(Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
             picker.Select(0); picker.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
             UIRequire(SavedResolution() == Resolutions[0], "Choosing a resolution must store it in the settings file.");
+            var limits = (OptionButton)screen.FindChild("frame_limit", true, false);
+            UIRequire(limits.Selected == 0 && limits.GetItemText(0) == "Off" && Engine.MaxFps == 0, "The frame rate limit must start off.");
+            limits.Select(2); limits.EmitSignal(OptionButton.SignalName.ItemSelected, 2L); await Frames();
+            UIRequire(SavedFrameLimit() == 90 && Engine.MaxFps == 90, "Choosing a frame rate limit must store it and cap the frame rate.");
+            limits.Select(0); limits.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
+            UIRequire(SavedFrameLimit() == 0 && Engine.MaxFps == 0, "Turning the frame rate limit off must store it and lift the cap.");
             var musicSlider = (HSlider)screen.FindChild("music", true, false);
             UIRequire(musicSlider.Value == 100, "Music must start at full volume.");
             musicSlider.Value = 40; await Frames();

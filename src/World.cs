@@ -244,7 +244,21 @@ public sealed partial class World
     public int Coins => S.Backpack[Inventory.Coins];
     /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
     public bool Pay(int amount) => amount <= Coins && S.Backpack.Remove(Inventory.Coins, amount) == amount;
-    public Thing? Find(int id) => S.Things.FirstOrDefault(t => t.Id == id);
+    // Where each id sits in the things list. The list is also changed directly, so every lookup checks the entry and a stale one rebuilds it.
+    private readonly Dictionary<int, int> thingIndex = new();
+    public Thing? Find(int id)
+    {
+        var things = S.Things;
+        if (thingIndex.TryGetValue(id, out int at) && at < things.Count && things[at].Id == id) return things[at];
+        for (int i = 0; i < things.Count; i++)
+        {
+            if (things[i].Id != id) continue;
+            thingIndex.Clear();
+            for (int j = things.Count - 1; j >= 0; j--) thingIndex[things[j].Id] = j;
+            return things[i];
+        }
+        return null;
+    }
     /// <summary>Tells the acting player, or everyone while the tick runs the shared world.</summary>
     public void Say(string message)
     {
@@ -1187,6 +1201,7 @@ public sealed partial class World
     /// Advances the world. It runs as the world's own player, whoever's action started it, such as a guest's sleep:
     /// wages come out of that player's backpack, and each player's own part runs as that player.
     /// </summary>
+    private readonly List<Thing> ticking = new();
     public void Tick(float dt, bool sleeping = false) => As(S.Players[0], () => TickWorld(dt, sleeping));
     private void TickWorld(float dt, bool sleeping)
     {
@@ -1236,7 +1251,9 @@ public sealed partial class World
             Say(order.Buying ? $"Cart returned with {Goods(order.Goods)}." : $"Cart returned with {(int)order.Value} coins.");
         }
         S.Things.RemoveAll(t => t.Kind == "grave" && t.Inventory.Count == 0 || t.Kind == "wolf_corpse" && t.Remaining <= 0);
-        foreach (var t in S.Things.ToArray())
+        // A reused copy, since ticking can add and remove things.
+        ticking.Clear(); ticking.AddRange(S.Things);
+        foreach (var t in ticking)
         {
             // A carcass keeps its age so the death animation plays once and not again after loading.
             if (t.Kind == "wolf_corpse") t.Progress = Math.Min(60, t.Progress + dt);
@@ -1254,8 +1271,7 @@ public sealed partial class World
                 // Once a working crew has the forge hot, they keep it at or above the clear bar between strokes.
                 // A crew that is striking or stuck on a blocked path is not working, so the forge cools.
                 // So is a crew that has signed out or is at lunch.
-                bool crewed = S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w));
-                t.Heat = Math.Max(crewed && t.Heat >= SteelHeat ? SteelHeat : 0, t.Heat - dt * 3.2f);
+                t.Heat = Math.Max(Crewed(t) && t.Heat >= SteelHeat ? SteelHeat : 0, t.Heat - dt * 3.2f);
             }
             if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) continue;
             bool burning = stillBurning.Remove(t.Id);
@@ -1317,6 +1333,8 @@ public sealed partial class World
         Look();
         UpdateGoal();
     }
+    // Kept out of the tick loop, where a lambda capturing the loop's thing would allocate on every pass for every thing.
+    private bool Crewed(Thing t) => S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w));
     /// <summary>The acting player's clocks, hunger and thirst, and the torch in hand; a remote player's held gather also runs here.</summary>
     private void NeedsTick(float dt)
     {
