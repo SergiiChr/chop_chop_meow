@@ -277,9 +277,10 @@ public partial class Game : Node
             AddLabel("Select a villager and choose Work to automate this resource. Their gathered supplies go to accepting storage.", 14, Muted); return;
         }
         if (t.Kind == "hut") { Cabin(t); return; }
-        if (t.Kind == "bench") { Bench(t); return; }
+        if (t.Tools != null) { Bench(t); return; }
         if (t.Kind == "signpost") { Signpost(t); return; }
         if (t.Kind == "mine") { MinePanel(t); return; }
+        if (t.Kind == "farm") { FarmPanel(t); return; }
         if (t.IsStorage) { Storage(t); return; }
         if (t.Kind == "campfire")
         {
@@ -295,7 +296,7 @@ public partial class Game : Node
             opt.ItemSelected += index => { world.SetRecipe(t, recipes[(int)index].Key); OpenPage("inspect"); }; content.AddChild(opt);
         }
         else if (recipes.Count == 1) AddLabel(recipes[0].Value.Name.ToUpperInvariant(), 16);
-        if (t.Kind == "furnace") AddButton($"Fuel: {world.Data.Name(t.Fuel)} · click to switch", () => { if (!t.Processing) { t.Fuel = t.Fuel == "wood" ? "coal" : "wood"; OpenPage("inspect"); } });
+        FuelToggle(t);
         if (t.Recipe != "")
         {
             Machine(t);
@@ -329,10 +330,40 @@ public partial class Game : Node
         AddLabel("BACKPACK", 14);
         AddInventoryGrid(() => world.S.Backpack, null, id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Shift: store all · Drag to move");
         if (t.Kind == "chest") AddButton("Input / output filters", () => OpenPage("filters"));
+        if (t.Kind == "toolstation")
+        {
+            AddLabel("Workers take an axe for trees, a pickaxe for ore and coal, and a rake for leaves, and put it back when they finish or go home. Stone, berries and loose pieces need no tool.", 13, Muted);
+            AddButton("Store spare tools (keep your best of each)", () =>
+            {
+                if (!world.Near(t)) return;
+                foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Holds(t, i)).ToArray())
+                    world.S.Backpack.TransferTo(t.Inventory, id, world.BestTool(world.Data.Items[id].Tool) == id ? world.S.Backpack[id] - 1 : world.S.Backpack[id]);
+            });
+            AddButton("Take everything", () => { if (world.Near(t)) foreach (var id in t.Inventory.Items.Keys.ToArray()) t.Inventory.TransferTo(world.S.Backpack, id, 999); });
+            return;
+        }
         // Tools stay with the player, and crates stay out of the deposit so it never packs one crate inside another.
-        AddButton("Deposit all materials (keep tools)", () => { if (world.Near(t)) foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray()) world.S.Backpack.TransferTo(t.Inventory, id, 999); });
+        if (t.Kind == "pile")
+        {
+            var compost = new CheckBox { Text = "Compost: takes leaves, grass and food, and makes 1 fertilizer from 4 every hour", ButtonPressed = t.Compost, FocusMode = Control.FocusModeEnum.None };
+            compost.Toggled += on => { if (!world.SetCompost(t, on)) compost.SetPressedNoSignal(t.Compost); };
+            content.AddChild(compost);
+            Dynamic(() => t.Compost ? $"Composting · {(t.Progress > 0 ? $"next fertilizer in {GameHours(world.Data.DaySeconds / 24 - t.Progress)}" : "needs 4 leaves, grass or food")}" : t.Inventory.Items.Keys.FirstOrDefault() is string held ? $"A pile of {world.Data.Name(held)}. Workers store and take only that until it is emptied." : "Empty. The first resource put in sets what this pile holds.", 13, Muted);
+        }
+        // A pile checks each item as it goes, since the first one in decides what the rest may be.
+        AddButton("Deposit all materials (keep tools)", () => { if (world.Near(t)) foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray()) if (world.Holds(t, id)) world.S.Backpack.TransferTo(t.Inventory, id, 999); });
         AddButton("Take everything", () => { if (world.Near(t)) foreach (var id in t.Inventory.Items.Keys.ToArray()) t.Inventory.TransferTo(world.S.Backpack, id, 999); });
         if (crate) AddLabel("Hold right click on the crate to pick it up with everything inside. The village market only takes packed crates.", 13, Muted);
+    }
+    private void FarmPanel(Thing farm)
+    {
+        AddLabel(world.Data.Buildings["farm"].Description, 14, Muted);
+        Dynamic(() => world.FarmStatus(farm), 15);
+        AddInventoryGrid(() => farm.Inventory, farm, id => MoveStack(farm.Inventory, world.S.Backpack, id, farm), "Click: take a stack · Drag to move");
+        AddLabel("BACKPACK", 14);
+        AddInventoryGrid(() => world.S.Backpack, null, id => MoveStack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move");
+        Assignment(farm);
+        AddLabel("An assigned worker brings seeds and fertilizer from storage, harvests the ripe wheat and carries the yield to storage. Several workers share one harvest.", 13, Muted);
     }
     private void Filters()
     {
@@ -458,7 +489,7 @@ public partial class Game : Node
             if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
             if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed)
             {
-                var t = view.Pick(mouse.Position); if (t?.IsResource == true) { gathering = t; selected = t.Id; view.Selected = t.Id; } else gathering = null;
+                var t = view.Pick(mouse.Position); if (t?.IsResource == true || t?.Kind == "farm") { gathering = t; selected = t.Id; view.Selected = t.Id; } else gathering = null;
                 lifting = t?.Kind == "crate" ? t : null; liftClock = 0;
             }
             if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed)
@@ -479,7 +510,7 @@ public partial class Game : Node
                         string? blocked = world.GatherBlock(t, true);
                         if (blocked != null) Notify(blocked); else { world.Assign(worker, t); assigningWorker = 0; Select(worker); }
                     }
-                    else Notify("Choose a tree, stone, ore, coal, berry bush or water source.");
+                    else Notify("Choose a tree, leaves, stone, ore, coal, berry bush or water source.");
                     return;
                 }
                 var w = view.PickWorker(mouse.Position);
@@ -487,7 +518,7 @@ public partial class Game : Node
                 else if (t != null)
                 {
                     if (t.Kind == "hut") entering = t;
-                    if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item))
+                    if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item))
                     {
                         if (CrateIntoCrate(t, t.Inventory, item)) return;
                         if (world.Near(t)) { int moved = 0; Act(() => moved = world.S.Backpack.TransferTo(t.Inventory, item, 999)); Notify(moved > 0 ? $"Stored {moved} {world.Data.Name(item)}." : $"No {world.Data.Name(item)} to store, or chest is full."); }
@@ -607,6 +638,8 @@ public partial class Game : Node
         world.Add("anvil", World.Spawn + new Vector2(4, 4)); var sign = world.Add("signpost", World.Spawn + new Vector2(-1, 4));
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("water", 4); world.S.Backpack.Add("iron_pick", 1);
         var bench = world.Add("bench", World.Spawn + new Vector2(-4, 1.5f)); bench.Recipe = "crate"; bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("iron_hammer", 1);
+        var rack = world.Add("toolstation", World.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("iron_axe", 1); rack.Inventory.Add("rake", 1);
+        world.Add("leaves", World.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
         var crate = world.Add("crate", World.Spawn + new Vector2(1.5f, 1.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
         foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1), ("torch", 2) }) world.S.Backpack.Add(item, count);
         world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "bench", "pick", "reinforced", "steel_bar", "steel_tool" });
@@ -631,6 +664,43 @@ public partial class Game : Node
         if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
         if (OS.GetCmdlineUserArgs().Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
         if (OS.GetCmdlineUserArgs().Contains("--craft")) OpenPage("craft");
+        if (OS.GetCmdlineUserArgs().Contains("--piles"))
+        {
+            var at = World.Spawn + new Vector2(-3, 9);
+            foreach (var (item, stacks, dx) in new[] { ("stone", 14, 0), ("wood", 6, 3), ("leaves", 3, 6) })
+            {
+                var pile = world.Add("pile", at + new Vector2(dx, 0)); pile.Inventory.Add(item, stacks * pile.Inventory.StackSize);
+                if (item == "leaves") { pile.Compost = true; pile.Inventory.Add("fertilizer", 20); }
+            }
+            world.Player = at + new Vector2(3, -2.5f); world.Tick(0); ClosePanel(); view.Zoom = 1.4f;
+        }
+        if (OS.GetCmdlineUserArgs().Contains("--farm"))
+        {
+            // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
+            var at = World.Spawn + new Vector2(-6, 9);
+            for (int i = 0; i < 5; i++)
+            {
+                var plot = world.Add("farm", at + new Vector2(i * World.ZoneSize, 0));
+                plot.Stage = i switch { 0 => World.FarmFallow, 4 => World.FarmRipe, _ => World.FarmGrowing };
+                plot.Progress = i == 4 ? world.HarvestSeconds / 2 : (i - 1) * world.GrowSeconds / 3 + 1;
+            }
+            var wheat = world.Add("pile", at + new Vector2(0, World.ZoneSize)); wheat.Inventory.Add("wheat", 300);
+            world.Player = at + new Vector2(6, 2.5f); world.Tick(0); view.Zoom = 1.2f;
+            if (OS.GetCmdlineUserArgs().Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == "farm")); else ClosePanel();
+        }
+        if (OS.GetCmdlineUserArgs().Contains("--kitchen"))
+        {
+            // The cooking table mid-stew beside a canning station sealing cans, with the mortar slotted.
+            var at = World.Spawn + new Vector2(-3, 8);
+            world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
+            var table = world.Add("cooktable", at); table.Tools!.Add("mortar", 1); world.SetRecipe(table, "meat_stew");
+            table.Inventory.Add("water", 2); table.Inventory.Add("raw_meat", 2); table.Inventory.Add("wood", 2);
+            var cannery = world.Add("cannery", at + new Vector2(2.2f, 0)); world.SetRecipe(cannery, "canned_meat_stew");
+            cannery.Inventory.Add("meat_stew", 2); cannery.Inventory.Add("tin_can", 2); cannery.Inventory.Add("wood", 2);
+            world.Player = at + new Vector2(1, 2.5f); world.Tick(.5f); view.Zoom = 1.7f;
+            if (OS.GetCmdlineUserArgs().Contains("--panel")) Select(table); else ClosePanel();
+        }
+        if (OS.GetCmdlineUserArgs().Contains("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); ClosePanel(); view.Zoom = 1.6f; }
         if (OS.GetCmdlineUserArgs().Contains("--tin")) { var cliff = World.CliffOf("tin"); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); ClosePanel(); }
         if (OS.GetCmdlineUserArgs().Contains("--pantry"))
         {

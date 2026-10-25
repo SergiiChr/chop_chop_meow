@@ -85,7 +85,9 @@ public static class MineChecks
         Work(world, 30);
         Require(mine.Stage == 0 && mine.Progress == 0 && worker.Status.Contains("pickaxe"), "digging must wait until workers have a pickaxe");
 
-        world.S.Milestones.Add("pick");
+        // Workers take their tools from a tool station by the storage.
+        var station = world.Add("toolstation", chest.Pos + cliff.Along * 2);
+        station.Inventory.Add("iron_pick", 1);
         float started = world.S.Time;
         Work(world, data.DaySeconds * 3, () => mine.Stage > 0);
         Require(mine.Stage == World.MineDug && world.S.Time - started >= world.MineStageSeconds && world.S.Time - started < data.DaySeconds * 2, $"one worker must dig the entrance in about one working day: stage {mine.Stage}, {world.S.Time - started:0}s, progress {mine.Progress:0}, {worker.Status}");
@@ -97,7 +99,8 @@ public static class MineChecks
 
         Work(world, 30);
         Require(mine.Stage == World.MineSupplied && mine.Progress == 0 && worker.Status.Contains("hammer"), "fitting the frame must wait for a hammer");
-        world.S.Milestones.Add("wood_hammer");
+        Require(station.Inventory["iron_pick"] == 1, "a worker hauling materials needs no pickaxe and puts it back");
+        station.Inventory.Add("wood_hammer", 1);
         started = world.S.Time;
         Work(world, data.DaySeconds * 3, () => mine.Stage == World.MineOpen);
         Require(mine.Stage == World.MineOpen && world.S.Time - started >= world.MineStageSeconds, "a worker with a hammer must fit the frame in about one working day");
@@ -114,13 +117,12 @@ public static class MineChecks
     private static void CheckMiningAndFullOutput(GameData data)
     {
         var world = EmptyWorld(data);
-        world.S.Milestones.Add("pick");
         var mine = MarkMine(world);
         mine.Stage = World.MineOpen;
         var cliff = World.CliffAt(mine.Pos);
         var chest = world.Add("chest", mine.Pos + cliff.Face * 3);
         var crew = Enumerable.Range(0, 4).Select(_ => AddWorker(world, chest.Pos + cliff.Along)).ToList();
-        foreach (var w in crew) world.Assign(w, mine);
+        foreach (var w in crew) { w.Tool = "iron_pick"; world.Assign(w, mine); }
         Require(crew.Take(3).All(w => w.Assignment == mine.Id) && crew[3].Assignment == 0, "a mine must take three workers and refuse a fourth");
 
         Work(world, 20);
@@ -165,13 +167,13 @@ public static class MineChecks
         int Gathered(bool mining)
         {
             var world = EmptyWorld(data);
-            world.S.Milestones.Add("pick");
             var cliff = World.CliffOf("iron");
             Thing source;
             if (mining) { source = MarkMine(world); source.Stage = World.MineOpen; }
             else source = world.Add("iron", World.MineSpot(cliff), 400);
             var chest = world.Add("chest", source.Pos + cliff.Face * 2.5f);
             var worker = AddWorker(world, chest.Pos);
+            worker.Tool = "iron_pick";
             world.Assign(worker, source);
             Work(world, 300);
             return chest.Inventory["iron_ore"] + worker.Bag["iron_ore"] + (source.Output?["iron_ore"] ?? 0);

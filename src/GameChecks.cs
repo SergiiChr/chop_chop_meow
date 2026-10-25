@@ -274,6 +274,15 @@ public partial class Game
             UIRequire(sounds.Last == "chop_tree", "Axe strokes on a tree must play the chop sound.");
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
             await Frames(); UIRequire(world.S.Backpack["wood"] > wood, "Holding RMB must approach and gather a real resource.");
+            var farm = world.Add("farm", world.Player + new Vector2(-3, 3)); farm.Stage = World.FarmRipe;
+            await Frames(2);
+            var farmPoint = GetViewport().GetFinalTransform() * view.Screen(farm.Pos);
+            UIRequire(view.Pick(view.Screen(farm.Pos))?.Id == farm.Id, "A farm plot must be picked where it is drawn.");
+            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = farmPoint, GlobalPosition = farmPoint, Pressed = true });
+            await ToSignal(GetTree().CreateTimer(3), SceneTreeTimer.SignalName.Timeout);
+            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = farmPoint, Pressed = false });
+            await Frames(); UIRequire(farm.Progress > 0 && farm.Stage == World.FarmRipe, "Holding RMB on a ripe farm plot must walk over and harvest by hand.");
+            world.S.Things.Remove(farm);
             UIRequire(!stats.Text.Contains("Health") && !stats.Text.Contains("Food") && !stats.Text.Contains("Water") && !stats.Text.Contains("coins") && !stats.Text.Contains("Pack"), "The persistent HUD must show only the day and clock beside the brand.");
             UIRequire(hotbarButtons.Count == 9 && world.S.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
             int berries = world.S.Backpack["berries"];

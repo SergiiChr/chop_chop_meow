@@ -13,9 +13,16 @@ public sealed class Prop
 {
     public readonly Node3D Root = new();
     public readonly Node3D Body;
-    public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer;
+    public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer, Mortar;
     /// <summary>A mine's parts, shown stage by stage: the marked outline, the dug hole, the delivered materials, the timber frame, the rails and the cart with its load.</summary>
     public Node3D? Outline, Hole, Supplies, Frame, Rails, Cart, Load;
+    /// <summary>A tool station's hanging tools by kind, each shown while the station holds one.</summary>
+    public Dictionary<string, Node3D> Racked = new();
+    /// <summary>A pile's stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
+    public MeshInstance3D[] Stacks = Array.Empty<MeshInstance3D>();
+    public string StackKey = "";
+    /// <summary>A farm plot's looks by <see cref="World.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
+    public Node3D[] Crops = Array.Empty<Node3D>();
     public Node3D[] Pleats = Array.Empty<Node3D>();
     public MeshInstance3D? Glow, Window, Pool;
     public WorldModels.WolfModel? Wolf;
@@ -39,6 +46,7 @@ public static class WorldModels
         "stone" => t.Remaining / 64f,
         "iron" or "coal" or "tin" => t.Remaining / 400f,
         "wolf_corpse" => t.Remaining / 4f,
+        "leaves" => t.Remaining / (float)World.LeafPatch,
         _ => 1
     };
 
@@ -70,6 +78,12 @@ public static class WorldModels
         "chest" => new[] { new Hit(.5f, 0, .65f) },
         "crate" => new[] { new Hit(.4f, 0, .55f) },
         "bench" => new[] { new Hit(.6f, 0, .95f) },
+        "cooktable" => new[] { new Hit(.7f, 0, .9f) },
+        "cannery" => new[] { new Hit(.6f, 0, 1f) },
+        "toolstation" => new[] { new Hit(.55f, 0, 1.5f) },
+        "pile" => new[] { new Hit(1.5f, 0, .5f) },
+        "farm" => new[] { new Hit(1.5f, 0, .5f) },
+        "leaves" => new[] { new Hit(.6f, 0, .15f) },
         "grave" => new[] { new Hit(.45f, 0, .55f) },
         "anvil" => new[] { new Hit(.45f, 0, .85f) },
         "signpost" => new[] { new Hit(.5f, 0, 1.9f) },
@@ -102,6 +116,12 @@ public static class WorldModels
             case "anvil": Anvil(prop); break;
             case "crate": Crate(prop); break;
             case "bench": Workbench(prop); break;
+            case "cooktable": CookingTable(prop); break;
+            case "cannery": Cannery(prop); break;
+            case "toolstation": ToolRack(prop); break;
+            case "pile": Pile(prop); break;
+            case "farm": Farm(prop, t.Id); break;
+            case "leaves": LeafLitter(body, t.Id); break;
             case "signpost": Signpost(prop); break;
             case "campfire": FirePit(prop); break;
             case "mine": Mine(prop, World.CliffAt(t.Pos).Ore); break;
@@ -373,6 +393,162 @@ public static class WorldModels
         Box(hammer, new Vector3(.34f, .03f, .035f), Vector3.Zero, wood);
         Box(hammer, new Vector3(.06f, .06f, .14f), new Vector3(.17f, .02f, 0), steel);
         prop.Hammer = hammer;
+    }
+
+    /// <summary>A stone firebox under a steel grill with a stew pot, beside a plank counter where the slotted mortar and pestle sits.</summary>
+    private static void CookingTable(Prop prop)
+    {
+        var body = prop.Body;
+        var stone = Mat("9b9c98", .95f); var joint = Mat("7b7c78", 1); var plank = Mat("d2a26a"); var post = Mat("8a6a48");
+        var steel = Mat("b9c3c6", .4f, .3f); var dark = Mat("45494c", .5f, .6f);
+        Box(body, new Vector3(.62f, .6f, .62f), new Vector3(-.33f, .3f, 0), stone);
+        for (int row = 1; row < 3; row++)
+        {
+            Box(body, new Vector3(.63f, .015f, .01f), new Vector3(-.33f, row * .2f, .311f), joint);
+            Box(body, new Vector3(.01f, .015f, .63f), new Vector3(-.019f, row * .2f, 0), joint);
+        }
+        Box(body, new Vector3(.32f, .24f, .03f), new Vector3(-.33f, .17f, .31f), Mat("2b2522"));
+        prop.Glow = Box(body, new Vector3(.26f, .18f, .03f), new Vector3(-.33f, .14f, .315f), Flat(new Color("ff7a24")));
+        // The grill: a steel rim with bars across it, raised a little off the firebox.
+        foreach (float z in new[] { -.3f, .3f }) Box(body, new Vector3(.66f, .04f, .04f), new Vector3(-.33f, .63f, z), steel);
+        foreach (float x in new[] { -.64f, -.02f }) Box(body, new Vector3(.04f, .04f, .64f), new Vector3(x, .63f, 0), steel);
+        for (int i = 0; i < 7; i++) Box(body, new Vector3(.02f, .02f, .58f), new Vector3(-.57f + i * .08f, .64f, 0), steel);
+        Cylinder(body, .15f, .16f, .16f, new Vector3(-.36f, .73f, -.04f), dark, null, 14);
+        Cylinder(body, .02f, .02f, .2f, new Vector3(-.15f, .78f, -.04f), dark, new Vector3(0, 0, 90), 6);
+        Post(body, .07f, .07f, .75f, new Vector3(-.56f, .6f, -.24f), dark);
+        prop.Vent = new Vector3(-.56f, 1.4f, -.24f);
+        foreach (var (x, z) in new[] { (.06f, -.24f), (.6f, -.24f), (.06f, .24f), (.6f, .24f) }) Box(body, new Vector3(.06f, .6f, .06f), new Vector3(x, .3f, z), post);
+        Box(body, new Vector3(.64f, .05f, .6f), new Vector3(.33f, .62f, 0), plank);
+        var mortar = Pivot(body, new Vector3(.36f, .645f, .06f));
+        Cylinder(mortar, .07f, .1f, .1f, new Vector3(0, .05f, 0), Mat("9aa29f", .9f), null, 12);
+        Cylinder(mortar, .025f, .02f, .2f, new Vector3(.03f, .14f, 0), Mat("c4c8c3", .9f), new Vector3(0, 0, -25), 8);
+        prop.Mortar = mortar;
+        prop.Light = Light(body, new Vector3(-.33f, .3f, .6f), 2.2f);
+    }
+
+    /// <summary>A steel stove with a lidded canning pot, beside a plank table with tin cans and a lever press.</summary>
+    private static void Cannery(Prop prop)
+    {
+        var body = prop.Body;
+        var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var steel = Mat("b9c3c6", .4f, .3f); var dark = Mat("45494c", .5f, .6f); var tin = Mat("d4d9d6", .35f, .4f);
+        Box(body, new Vector3(.46f, .5f, .5f), new Vector3(-.27f, .25f, 0), dark);
+        Box(body, new Vector3(.24f, .18f, .03f), new Vector3(-.27f, .16f, .25f), Mat("2b2522"));
+        prop.Glow = Box(body, new Vector3(.2f, .14f, .03f), new Vector3(-.27f, .14f, .255f), Flat(new Color("ff7a24")));
+        Cylinder(body, .2f, .2f, .34f, new Vector3(-.27f, .67f, 0), steel, null, 16);
+        Cylinder(body, .21f, .21f, .03f, new Vector3(-.27f, .85f, 0), dark, null, 16);
+        Post(body, .03f, .03f, .06f, new Vector3(-.27f, .86f, 0), dark, 8);
+        Post(body, .06f, .06f, .55f, new Vector3(-.44f, .5f, -.18f), dark);
+        prop.Vent = new Vector3(-.44f, 1.1f, -.18f);
+        foreach (var (x, z) in new[] { (.02f, -.22f), (.5f, -.22f), (.02f, .22f), (.5f, .22f) }) Box(body, new Vector3(.06f, .56f, .06f), new Vector3(x, .28f, z), post);
+        Box(body, new Vector3(.56f, .05f, .54f), new Vector3(.26f, .58f, 0), plank);
+        foreach (var (x, z, y) in new[] { (.14f, .12f, 0f), (.26f, .14f, 0f), (.2f, .13f, .12f), (.36f, .02f, 0f) })
+            Cylinder(body, .05f, .05f, .11f, new Vector3(x, .66f + y, z), tin, null, 10);
+        Box(body, new Vector3(.14f, .03f, .14f), new Vector3(.38f, .62f, -.14f), steel);
+        Post(body, .025f, .025f, .4f, new Vector3(.44f, .6f, -.18f), steel, 8);
+        Box(body, new Vector3(.3f, .03f, .03f), new Vector3(.32f, .98f, -.16f), steel, new Vector3(0, 0, -15));
+        prop.Light = Light(body, new Vector3(-.27f, .25f, .55f), 2f);
+    }
+
+    /// <summary>A plank pegboard on two posts set in a cinder-block footing, with an axe, a pickaxe and a rake hanging on it.</summary>
+    private static void ToolRack(Prop prop)
+    {
+        // Turned to face down the valley, toward the camera, so the hanging tools show.
+        var body = Pivot(prop.Body, Vector3.Zero, new Vector3(0, 45, 0));
+        var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var block = Mat("9a9d99", .95f); var handle = Mat("e0b07a"); var steel = Mat("b9c3c6", .4f, .3f);
+        Box(body, new Vector3(1.1f, .22f, .36f), new Vector3(0, .11f, 0), block);
+        foreach (float x in new[] { -.48f, .48f }) Box(body, new Vector3(.1f, 1.45f, .1f), new Vector3(x, .9f, 0), post);
+        Box(body, new Vector3(1.05f, .9f, .04f), new Vector3(0, 1.0f, -.03f), plank);
+        Box(body, new Vector3(1.15f, .06f, .2f), new Vector3(0, 1.5f, 0), post);
+        foreach (float x in new[] { -.3f, 0, .3f }) Box(body, new Vector3(.03f, .03f, .1f), new Vector3(x, 1.32f, .05f), post);
+        // Each tool hangs from its peg by the head, handle down along the board.
+        Node3D Hang(float x)
+        {
+            var hook = Pivot(body, new Vector3(x, 1.3f, .06f));
+            Box(hook, new Vector3(.04f, .72f, .04f), new Vector3(0, -.36f, 0), handle);
+            return hook;
+        }
+        var axe = Hang(-.3f); Box(axe, new Vector3(.22f, .12f, .03f), new Vector3(.08f, -.04f, 0), steel);
+        var pick = Hang(0); Box(pick, new Vector3(.38f, .05f, .04f), new Vector3(0, -.02f, 0), steel, new Vector3(0, 0, 8));
+        var rake = Hang(.3f);
+        Box(rake, new Vector3(.3f, .04f, .04f), new Vector3(0, -.74f, 0), steel);
+        for (int i = 0; i < 5; i++) Box(rake, new Vector3(.015f, .12f, .015f), new Vector3(-.12f + i * .06f, -.82f, 0), steel);
+        prop.Racked = new() { ["axe"] = axe, ["pickaxe"] = pick, ["rake"] = rake };
+    }
+
+    /// <summary>A 3×3 yard of packed earth edged with logs, with fourteen stack blocks in a 9-4-1 pyramid that the view shows as the pile fills.</summary>
+    private static void Pile(Prop prop)
+    {
+        var body = prop.Body;
+        Yard(body);
+        var stacks = new List<MeshInstance3D>();
+        foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
+            for (int x = 0; x < count; x++)
+                for (int z = 0; z < count; z++)
+                {
+                    float step = .82f, offset = (count - 1) * step / 2;
+                    var block = Box(body, new Vector3(.74f, .4f, .74f), new Vector3(x * step - offset, y, z * step - offset), Mat("b0a58a"));
+                    block.Visible = false; stacks.Add(block);
+                }
+        prop.Stacks = stacks.ToArray();
+    }
+
+    /// <summary>A pile's and a farm plot's base: a bare dirt pad edged with logs.</summary>
+    private static void Yard(Node3D body)
+    {
+        Box(body, new Vector3(2.9f, .02f, 2.9f), new Vector3(0, .01f, 0), Mat("7a6548", 1));
+        var log = Mat("8a6a48");
+        foreach (float s in new[] { -1.42f, 1.42f })
+        {
+            Cylinder(body, .09f, .09f, 2.9f, new Vector3(s, .09f, 0), log, new Vector3(90, 0, 0), 6);
+            Cylinder(body, .09f, .09f, 2.9f, new Vector3(0, .09f, s), log, new Vector3(0, 0, 90), 6);
+        }
+    }
+
+    /// <summary>A farm plot: an empty pile's yard that, once sown, shows dark tilled rows and then the wheat growing on them.</summary>
+    private static void Farm(Prop prop, int id)
+    {
+        var body = prop.Body;
+        Yard(body);
+        var soil = Pivot(body, Vector3.Zero);
+        Box(soil, new Vector3(2.7f, .03f, 2.7f), new Vector3(0, .025f, 0), Mat("4f3a28", 1));
+        for (int row = 0; row < 5; row++) Box(soil, new Vector3(2.6f, .06f, .22f), new Vector3(0, .05f, -1.08f + row * .54f), Mat("5e4630", 1));
+        // Each look is a full field of plants on the rows, shifted a little at random so the field is not a perfect grid.
+        Node3D Field(Action<Node3D, Vector3, int> plant)
+        {
+            var field = Pivot(body, Vector3.Zero);
+            for (int row = 0; row < 5; row++)
+                for (int i = 0; i < 7; i++)
+                {
+                    int n = row * 7 + i;
+                    plant(field, new Vector3(-1.14f + i * .38f + (Jitter(id, n) - .5f) * .1f, .08f, -1.08f + row * .54f), n);
+                }
+            return field;
+        }
+        var sprout = Mat("7fae45"); var leaf = Mat("4f8a34"); var straw = Mat("d6b354"); var ear = Mat("e2c25b");
+        var straws = Field((f, at, n) => { for (int k = -1; k <= 1; k += 2) Box(f, new Vector3(.02f, .16f, .02f), at + new Vector3(k * .03f, .08f, 0), sprout, new Vector3(0, n * 37, k * 12)); });
+        var plants = Field((f, at, n) => { for (int k = -1; k <= 1; k++) Box(f, new Vector3(.03f, .5f, .03f), at + new Vector3(k * .05f, .25f, 0), leaf, new Vector3(0, n * 37, k * 14)); });
+        var wheat = Field((f, at, n) =>
+        {
+            for (int k = -1; k <= 1; k++)
+            {
+                var stalk = Pivot(f, at, new Vector3(0, n * 37, k * 10));
+                Box(stalk, new Vector3(.025f, .7f, .025f), new Vector3(0, .35f, 0), straw);
+                Box(stalk, new Vector3(.06f, .18f, .06f), new Vector3(0, .78f, 0), ear);
+            }
+        });
+        prop.Crops = new[] { soil, straws, plants, wheat };
+        foreach (var crop in prop.Crops) crop.Visible = false;
+    }
+
+    /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>
+    private static void LeafLitter(Node3D body, int id)
+    {
+        string[] colors = { "c08a3a", "a8652c", "d0a347", "8e5a2a", "b8753a" };
+        for (int i = 0; i < 26; i++)
+        {
+            float angle = i * 2.4f + Jitter(id, 80 + i) * 2, r = .15f + Jitter(id, 110 + i) * .55f;
+            Box(body, new Vector3(.16f, .012f, .1f), new Vector3(MathF.Cos(angle) * r, .01f + i * .002f, MathF.Sin(angle) * r), Mat(colors[i % colors.Length], .95f), new Vector3(Jitter(id, 140 + i) * 12, Jitter(id, 170 + i) * 360, 0));
+        }
     }
 
     /// <summary>Anvil bolted to a welded square-tube stand.</summary>

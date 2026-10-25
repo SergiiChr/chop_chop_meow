@@ -356,7 +356,7 @@ public partial class WorldView : Node3D
         if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; subject = World.S.Things.FirstOrDefault(t => t.Pos == pulseTarget); }
         if (action == ActorAction.Idle)
         {
-            var anvil = World.S.Things.FirstOrDefault(t => World.Worked(t.Kind) && t.Processing && World.Near(t) &&
+            var anvil = World.S.Things.FirstOrDefault(t => World.Worked(t) && t.Processing && World.Near(t) &&
                 !World.S.Workers.Any(w => w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2));
             if (anvil != null) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
         }
@@ -542,7 +542,7 @@ public partial class WorldView : Node3D
                 sway.Visible = prop.Fall < 1.7f;
                 prop.Stump!.Visible = true;
                 break;
-            case "stone" or "iron" or "coal" or "tin" or "loose_iron" or "loose_coal":
+            case "stone" or "iron" or "coal" or "tin" or "loose_iron" or "loose_coal" or "leaves":
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
@@ -563,6 +563,14 @@ public partial class WorldView : Node3D
                 prop.Glow!.Visible = t.Processing;
                 prop.Light!.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
                 Smoke(prop, t, t.Processing, dt, FurnaceSmoke);
+                break;
+            case "cooktable" or "cannery":
+                // The fire only burns for recipes that take fuel; the mortar's work and kneading dough are cold.
+                bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Fuel;
+                prop.Glow!.Visible = cooking;
+                prop.Light!.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
+                if (prop.Mortar != null && World.Sees(t.Pos)) prop.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null;
+                Smoke(prop, t, cooking, dt, FurnaceSmoke);
                 break;
             case "reinforced":
                 float heat = t.Heat / 100;
@@ -589,6 +597,29 @@ public partial class WorldView : Node3D
                 prop.Chisel!.Visible = t.Tools != null && World.BenchTool(t, "chisel") != null;
                 prop.Hammer!.Visible = t.Tools != null && World.BenchTool(t, "hammer") != null;
                 prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
+                break;
+            case "pile":
+                // Remembered piles carry no inventory, so they keep the stacks they had when last seen.
+                if (!World.Sees(t.Pos)) break;
+                var stacks = t.Inventory.Stacks().Select(s => s.Item).ToList();
+                string key = string.Join(",", stacks);
+                if (key == prop.StackKey) break;
+                prop.StackKey = key;
+                for (int i = 0; i < prop.Stacks.Length; i++)
+                {
+                    prop.Stacks[i].Visible = i < stacks.Count;
+                    if (i < stacks.Count) prop.Stacks[i].MaterialOverride = Mat(World.Data.Items.TryGetValue(stacks[i], out var def) ? def.Color : "b0a58a", .95f);
+                }
+                break;
+            case "farm":
+                if (!World.Sees(t.Pos)) break;
+                int look = World.CropLook(t, World.GrowSeconds);
+                prop.Crops[0].Visible = look > 0;
+                for (int i = 1; i < prop.Crops.Length; i++) prop.Crops[i].Visible = look == i + 1;
+                break;
+            case "toolstation":
+                if (!World.Sees(t.Pos)) break;
+                foreach (var (kind, tool) in prop.Racked) tool.Visible = World.BestTool(kind, t.Inventory) != null;
                 break;
             case "chest" or "grave" or "crate":
                 // Remembered boxes carry no inventory, so the lid stays as it was last seen.
