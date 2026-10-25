@@ -356,7 +356,7 @@ public partial class WorldView : Node3D
         if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; subject = World.S.Things.FirstOrDefault(t => t.Pos == pulseTarget); }
         if (action == ActorAction.Idle)
         {
-            var anvil = World.S.Things.FirstOrDefault(t => World.Worked(t.Kind) && t.Processing && World.Near(t) &&
+            var anvil = World.S.Things.FirstOrDefault(t => World.Worked(t) && t.Processing && World.Near(t) &&
                 !World.S.Workers.Any(w => w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2));
             if (anvil != null) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
         }
@@ -411,8 +411,9 @@ public partial class WorldView : Node3D
             bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking);
-            if (work == ActorAction.Hammer && assignment?.Processing != true) work = ActorAction.Idle;
-            var facing = work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment?.Pos ?? worker.Pos;
+            if (work == ActorAction.Hammer && assignment?.Processing != true && assignment?.Kind != "mine") work = ActorAction.Idle;
+            // At a mine the worker faces the rock past the entrance, not the cart out front.
+            var facing = work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment is { Kind: "mine" } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, ActorAnimation.Tool(work));
             entry.Rig.Root.Visible = World.Sees(worker);
@@ -472,8 +473,8 @@ public partial class WorldView : Node3D
                 Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
                 Burst(To3(subject.Pos, 3.6f), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
-            case "stone" or "iron" or "coal" or "tin":
-                var color = subject.Kind == "stone" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : subject.Kind == "tin" ? "b9bbb4" : "26282b";
+            case "stone" or "iron" or "coal" or "tin" or "mine":
+                var color = subject.Kind is "stone" or "mine" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : subject.Kind == "tin" ? "b9bbb4" : "26282b";
                 Burst(side + Vector3.Up * .5f, Mat(color), 6, 2.4f, .5f, 9, .07f);
                 Burst(side + Vector3.Up * .4f, Flat(new Color(.8f, .78f, .7f, .45f)), 3, .5f, .9f, -.3f, .16f, 1.5f);
                 if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Flat(new Color("ffd27a")), 5, 3.2f, .3f, 4, .025f);
@@ -541,7 +542,7 @@ public partial class WorldView : Node3D
                 sway.Visible = prop.Fall < 1.7f;
                 prop.Stump!.Visible = true;
                 break;
-            case "stone" or "iron" or "coal" or "tin" or "loose_iron" or "loose_coal":
+            case "stone" or "iron" or "coal" or "tin" or "loose_iron" or "loose_coal" or "leaves":
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
@@ -562,6 +563,14 @@ public partial class WorldView : Node3D
                 prop.Glow!.Visible = t.Processing;
                 prop.Light!.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
                 Smoke(prop, t, t.Processing, dt, FurnaceSmoke);
+                break;
+            case "cooktable" or "cannery":
+                // The fire only burns for recipes that take fuel; the mortar's work and kneading dough are cold.
+                bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Fuel;
+                prop.Glow!.Visible = cooking;
+                prop.Light!.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
+                if (prop.Mortar != null && World.Sees(t.Pos)) prop.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null;
+                Smoke(prop, t, cooking, dt, FurnaceSmoke);
                 break;
             case "reinforced":
                 float heat = t.Heat / 100;
@@ -589,6 +598,29 @@ public partial class WorldView : Node3D
                 prop.Hammer!.Visible = t.Tools != null && World.BenchTool(t, "hammer") != null;
                 prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
                 break;
+            case "pile":
+                // Remembered piles carry no inventory, so they keep the stacks they had when last seen.
+                if (!World.Sees(t.Pos)) break;
+                var stacks = t.Inventory.Stacks().Select(s => s.Item).ToList();
+                string key = string.Join(",", stacks);
+                if (key == prop.StackKey) break;
+                prop.StackKey = key;
+                for (int i = 0; i < prop.Stacks.Length; i++)
+                {
+                    prop.Stacks[i].Visible = i < stacks.Count;
+                    if (i < stacks.Count) prop.Stacks[i].MaterialOverride = Mat(World.Data.Items.TryGetValue(stacks[i], out var def) ? def.Color : "b0a58a", .95f);
+                }
+                break;
+            case "farm":
+                if (!World.Sees(t.Pos)) break;
+                int look = World.CropLook(t, World.GrowSeconds);
+                prop.Crops[0].Visible = look > 0;
+                for (int i = 1; i < prop.Crops.Length; i++) prop.Crops[i].Visible = look == i + 1;
+                break;
+            case "toolstation":
+                if (!World.Sees(t.Pos)) break;
+                foreach (var (kind, tool) in prop.Racked) tool.Visible = World.BestTool(kind, t.Inventory) != null;
+                break;
             case "chest" or "grave" or "crate":
                 // Remembered boxes carry no inventory, so the lid stays as it was last seen.
                 if (!World.Sees(t.Pos)) break;
@@ -612,6 +644,25 @@ public partial class WorldView : Node3D
                 prop.Door!.RotationDegrees = new Vector3(0, -100 * Ease(prop.Open), 0);
                 prop.Window!.MaterialOverride = night > .45f ? NightGlass : Mat("8fb4c4", .15f, .2f);
                 prop.Light!.LightEnergy = night > .45f ? .9f : 0;
+                break;
+            case "mine":
+                // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty, and the lantern is out.
+                float stageShare = Math.Clamp(t.Progress / World.MineStageSeconds, 0, 1);
+                bool finished = t.Stage == World.MineOpen;
+                prop.Outline!.Visible = !finished;
+                prop.Hole!.Visible = t.Stage > 0 || stageShare > 0;
+                prop.Hole.Scale = new Vector3(1, 1, t.Stage > 0 ? 1 : Math.Max(.05f, stageShare));
+                prop.Supplies!.Visible = t.Stage == World.MineSupplied;
+                prop.Frame!.Visible = finished || t.Stage == World.MineSupplied && stageShare > 0;
+                prop.Frame.Scale = new Vector3(1, finished ? 1 : Math.Max(.05f, stageShare), 1);
+                bool mining = finished && World.Sees(t.Pos) && World.S.Workers.Any(w => w.Assignment == t.Id && w.WorkState == WorkerWorkState.Underground);
+                prop.Rails!.Visible = finished;
+                prop.Cart!.Visible = finished && !mining;
+                prop.Load!.Visible = (t.Output?.Count ?? 0) > 0;
+                prop.Glow!.Visible = prop.Fire!.Visible = mining;
+                // The lantern lights its surroundings like a held torch.
+                if (mining) prop.Fire.Scale = new Vector3(1, .9f + flicker * .1f, 1);
+                prop.Light!.LightEnergy = mining ? (1 + flicker * .25f) * (.3f + night * 1.3f) : 0;
                 break;
             case "signpost":
                 bool waiting = World.S.Orders.Any(o => o.Signpost == t.Id);
@@ -742,7 +793,7 @@ public partial class WorldView : Node3D
         foreach (var (kind, ghost) in ghosts) ghost.Root.Visible = kind == BuildMode;
         placeTile.Visible = BuildMode != "";
         if (BuildMode == "") return;
-        var at = ToWorld(Mouse).Round();
+        var at = World.Snap(BuildMode, ToWorld(Mouse).Round());
         bool valid = World.PlacementBlock(BuildMode, at) == null;
         if (!ghosts.TryGetValue(BuildMode, out var shown))
         {
@@ -752,6 +803,7 @@ public partial class WorldView : Node3D
         }
         if (shown.Tint != (valid ? 1 : 0)) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid ? 1 : 0; }
         shown.Root.Position = To3(at);
+        if (BuildMode == "mine") shown.Body.Rotation = WorldModels.MineYaw(at);
         placeTile.Position = To3(at, .02f);
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
     }

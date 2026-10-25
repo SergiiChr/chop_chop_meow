@@ -124,6 +124,7 @@ public partial class WorldView
         };
         // Local +Z is the face, so everything toward the camera and the deposits is built on the positive side.
         var wall = Pivot(parent, new Vector3(cliff.Center.X, 0, cliff.Center.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(cliff.Face.X, cliff.Face.Y)), 0));
+        WorldModels.MineSpur(parent, cliff, rock);
         var rng = new Random(seed);
         float R() => (float)rng.NextDouble();
         for (float x = -cliff.HalfLength - .4f; x <= cliff.HalfLength + .4f; x += .8f)
