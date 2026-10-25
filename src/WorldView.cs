@@ -33,8 +33,6 @@ public partial class WorldView : Node3D
     public Sounds? Sounds;
     // A 30° pitch keeps the old 2:1 isometric footprint; this ortho height matches the old 85 px actor scale at zoom 1.
     private const float Pitch = 30, BaseSize = 14.5f;
-    // Forward+ lights in linear space, so the sun is stronger than the 0.8 to 0.08 the Compatibility renderer looked right with.
-    private const float DaySun = 1.84f, NightSun = .184f;
     private Camera3D camera = null!;
     private DirectionalLight3D sun = null!;
     private Godot.Environment environment = null!;
@@ -100,11 +98,10 @@ public partial class WorldView : Node3D
             AmbientLightSource = Godot.Environment.AmbientSource.Color,
             AmbientLightColor = new Color("c7d3dc"),
             AmbientLightEnergy = .32f,
-            ReflectedLightSource = Godot.Environment.ReflectionSource.Disabled,
         };
         AddChild(new WorldEnvironment { Environment = environment });
         // Light from the upper left and slightly behind, like the illustrated references, so shadows fall to the right.
-        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = DaySun };
+        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = .8f };
         sun.Basis = Basis.LookingAt(new Vector3(1, -1.25f, -.45f), Vector3.Up);
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
@@ -281,20 +278,15 @@ public partial class WorldView : Node3D
         return distance < float.MaxValue;
     }
 
-    // Reused every pick so hovering does not search the whole world once per known object.
-    private readonly Dictionary<int, Thing> live = new();
-
     /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit cylinders.</summary>
     public Thing? Pick(Vector2 screen)
     {
         SyncCamera();
-        live.Clear();
-        foreach (var thing in World.S.Things) live.TryAdd(thing.Id, thing);
         Thing? best = null, crown = null; float nearest = float.MaxValue, nearestCrown = float.MaxValue;
         // Hits follow what is drawn, including memories, but only things that still exist can be picked.
         foreach (var known in World.Known)
         {
-            if (known.Remaining <= 0 && known.IsResource && known.Kind != "berries" || !live.TryGetValue(known.Id, out var t)) continue;
+            if (known.Remaining <= 0 && known.IsResource && known.Kind != "berries" || World.Find(known.Id) is not Thing t) continue;
             var hits = HitsOf(known);
             // A tree's first hit is its trunk; a crown only wins when nothing else is under the cursor, so things behind it stay clickable.
             if (t.Kind == "tree" && !RayHits(screen, t.Pos, hits.AsSpan(0, Math.Min(1, hits.Length)), out _))
@@ -918,7 +910,7 @@ public partial class WorldView : Node3D
         float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts;
         float darkness = World.Night ? .65f : dayPhase > dusk ? .02f + (dayPhase - dusk) / .1f * .63f : dayPhase < .05f ? .65f - dayPhase / .05f * .63f : .02f;
         night = Math.Clamp((darkness - .02f) / .63f, 0, 1);
-        sun.LightEnergy = Mathf.Lerp(DaySun, NightSun, night);
+        sun.LightEnergy = Mathf.Lerp(.8f, .08f, night);
         sun.LightColor = new Color("fff1dc").Lerp(new Color("8296d6"), night);
         environment.AmbientLightColor = new Color("c7d3dc").Lerp(new Color("33447a"), night);
         environment.AmbientLightEnergy = Mathf.Lerp(.32f, .3f, night);
