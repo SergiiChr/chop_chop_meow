@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using static ChopChopMeow.ModelKit;
+using static ChopChopMeow.ActorShape;
 
 namespace ChopChopMeow;
 
@@ -18,6 +19,7 @@ public sealed class ActorRig
     private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     private readonly Dictionary<string, Node3D> tools = new();
     private readonly Node3D torch;
+    private readonly List<(Skeleton3D Skeleton, Node3D Joint)> smoothLimbs = new();
     /// <summary>The torch flame and its light, animated by the view while the torch burns.</summary>
     public readonly Node3D Flame;
     public readonly OmniLight3D TorchLight;
@@ -30,36 +32,48 @@ public sealed class ActorRig
             ActorSkin.Courier => ("b98060", "3a2c22", "6d7378", "3b3f45", "2d2a28"),
             _ => ("d9a27c", "5a3b25", "2f7f86", "34465e", "6b4428"),
         };
+        bool smooth = skin != ActorSkin.Courier;
         hips = Pivot(Root, new Vector3(0, Thigh + Shin + Sole, 0));
-        (legL, kneeL) = Leg(.09f, legs, boots);
-        (legR, kneeR) = Leg(-.09f, legs, boots);
+        (legL, kneeL) = Leg(.09f, legs, boots, smooth);
+        (legR, kneeR) = Leg(-.09f, legs, boots, smooth);
         torso = Pivot(hips, Vector3.Zero);
-        Box(torso, new Vector3(.3f, .16f, .19f), new Vector3(0, .02f, 0), Mat(legs));
-        Add(torso, new CapsuleMesh { Radius = .16f, Height = .52f, RadialSegments = 10, Rings = 3 }, Mat(shirt), new Vector3(0, .3f, 0), null, new Vector3(1, 1, .64f));
+        if (smooth)
+        {
+            var trousers = new Color(legs); var top = new Color(shirt);
+            ActorShape.Add(torso, new[] {
+                new Ring(.13f, .13f, .085f, trousers), new Ring(.08f, .155f, .1f, trousers),
+                new Ring(.02f, .165f, .09f, trousers), new Ring(-.015f, .165f, .088f, trousers) });
+            ActorShape.Add(torso, new[] {
+                new Ring(.54f, .055f, .05f, top), new Ring(.5f, .12f, .075f, top),
+                new Ring(.44f, .177f, .095f, top), new Ring(.35f, .17f, .105f, top),
+                new Ring(.23f, .145f, .095f, top), new Ring(.13f, .14f, .09f, top),
+                new Ring(.105f, .13f, .085f, top) });
+        }
+        else
+        {
+            Box(torso, new Vector3(.3f, .16f, .19f), new Vector3(0, .02f, 0), Mat(legs));
+            Add(torso, new CapsuleMesh { Radius = .16f, Height = .52f, RadialSegments = 10, Rings = 3 }, Mat(shirt), new Vector3(0, .3f, 0), null, new Vector3(1, 1, .64f));
+        }
         Cylinder(torso, .055f, .05f, .08f, new Vector3(0, .54f, 0), Mat(skinTone));
         head = Pivot(torso, new Vector3(0, .56f, 0));
-        Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(skinTone), new Vector3(.95f, 1.05f, 1));
-        Box(head, new Vector3(.035f, .05f, .05f), new Vector3(0, .12f, .12f), Mat(skinTone));
-        shoulderL = Pivot(torso, new Vector3(.19f, .45f, 0));
-        shoulderR = Pivot(torso, new Vector3(-.19f, .45f, 0));
-        elbowL = Arm(shoulderL, shirt, skinTone, skin == ActorSkin.Player);
-        elbowR = Arm(shoulderR, shirt, skinTone, skin == ActorSkin.Player);
-        Box(torso, new Vector3(.31f, .045f, .2f), new Vector3(0, .1f, 0), Mat(skin == ActorSkin.Player ? "4a3020" : legs));
+        Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(skinTone), new Vector3(.95f, 1.05f, 1), smooth ? 16 : 10);
+        if (smooth) Sphere(head, .023f, new Vector3(0, .12f, .115f), Mat(skinTone), new Vector3(.7f, 1, 1), 8);
+        else Box(head, new Vector3(.035f, .05f, .05f), new Vector3(0, .12f, .12f), Mat(skinTone));
+        float shoulder = smooth ? .17f : .19f;
+        shoulderL = Pivot(torso, new Vector3(shoulder, .45f, 0));
+        shoulderR = Pivot(torso, new Vector3(-shoulder, .45f, 0));
+        elbowL = Arm(shoulderL, shirt, skinTone, smooth, skin == ActorSkin.Player);
+        elbowR = Arm(shoulderR, shirt, skinTone, smooth, skin == ActorSkin.Player);
+        if (!smooth) Box(torso, new Vector3(.31f, .045f, .2f), new Vector3(0, .1f, 0), Mat(legs));
         switch (skin)
         {
             case ActorSkin.Player:
-                Sphere(head, .128f, new Vector3(0, .17f, -.02f), Mat(hair), new Vector3(1, .75f, 1.02f));
-                Box(head, new Vector3(.16f, .05f, .04f), new Vector3(0, .06f, .09f), Mat(hair));
-                // A small daypack sells the 24-slot backpack without hiding the shirt colour.
-                Box(torso, new Vector3(.26f, .3f, .12f), new Vector3(0, .3f, -.16f), Mat("5f6b3a"));
-                Box(torso, new Vector3(.2f, .1f, .04f), new Vector3(0, .22f, -.23f), Mat("4d5730"));
+                BuildPlayerDetails(skinTone, hair);
                 break;
             case ActorSkin.Worker:
-                Box(torso, new Vector3(.22f, .22f, .04f), new Vector3(0, .26f, .1f), Mat(legs));
-                Box(torso, new Vector3(.04f, .26f, .2f), new Vector3(.08f, .4f, 0), Mat(legs));
-                Box(torso, new Vector3(.04f, .26f, .2f), new Vector3(-.08f, .4f, 0), Mat(legs));
-                Sphere(head, .14f, new Vector3(0, .2f, 0), Mat("e8b323", .5f), new Vector3(1, .62f, 1.08f));
-                Cylinder(head, .17f, .17f, .02f, new Vector3(0, .17f, .02f), Mat("e8b323", .5f), null, 14);
+                BuildWorkerDetails(skinTone, hair, legs);
+                Sphere(head, .14f, new Vector3(0, .2f, 0), Mat("e8b323", .5f), new Vector3(1, .62f, 1.08f), 16);
+                Cylinder(head, .17f, .17f, .02f, new Vector3(0, .17f, .02f), Mat("e8b323", .5f), null, 20);
                 break;
             case ActorSkin.Courier:
                 Add(torso, new CapsuleMesh { Radius = .165f, Height = .42f, RadialSegments = 10, Rings = 3 }, Mat("f07a1f", .6f), new Vector3(0, .32f, 0), null, new Vector3(1.02f, 1, .67f));
@@ -80,6 +94,50 @@ public sealed class ActorRig
         (torch, Flame, TorchLight) = BuildTorch();
     }
 
+    /// <summary>Keep face cues and a simple canvas pack; silhouette and smooth transitions carry the design.</summary>
+    private void BuildPlayerDetails(string skinTone, string hair)
+    {
+        Sphere(head, .126f, new Vector3(0, .19f, -.025f), Mat(hair), new Vector3(1, .68f, 1.02f), 16);
+        BuildFace(skinTone, hair);
+        foreach (float side in new[] { -1f, 1f })
+        {
+            // Each continuous loop is buried in the pack at both ends and wraps the shoulder and ribs.
+            ActorShape.Strap(torso, new[] {
+                new Vector3(side * .09f, .46f, -.16f), new Vector3(side * .1f, .497f, -.065f),
+                new Vector3(side * .105f, .517f, -.015f), new Vector3(side * .105f, .49f, .055f),
+                new Vector3(side * .092f, .39f, .098f), new Vector3(side * .09f, .26f, .091f),
+                new Vector3(side * .14f, .205f, .04f), new Vector3(side * .15f, .21f, -.04f),
+                new Vector3(side * .115f, .22f, -.15f) });
+        }
+        var canvas = new Color("6c7849");
+        var pack = Pivot(torso, new Vector3(0, .32f, -.17f));
+        ActorShape.Add(pack, new[] {
+            new Ring(.18f, .025f, .025f, canvas), new Ring(.16f, .115f, .07f, canvas),
+            new Ring(.11f, .145f, .09f, canvas), new Ring(-.1f, .14f, .09f, canvas),
+            new Ring(-.16f, .11f, .065f, canvas), new Ring(-.18f, .025f, .025f, canvas) });
+    }
+
+    private void BuildFace(string skinTone, string hair)
+    {
+        foreach (float side in new[] { -1f, 1f })
+        {
+            Sphere(head, .025f, new Vector3(side * .11f, .125f, 0), Mat(skinTone), new Vector3(.7f, 1, .8f), 8);
+            Box(head, new Vector3(.022f, .024f, .012f), new Vector3(side * .046f, .145f, .108f), Mat("302b28"));
+            Box(head, new Vector3(.036f, .009f, .014f), new Vector3(side * .047f, .171f, .102f), Mat(hair));
+        }
+    }
+
+    private void BuildWorkerDetails(string skinTone, string hair, string overalls)
+    {
+        BuildFace(skinTone, hair);
+        ActorShape.Bib(torso, overalls);
+        foreach (float side in new[] { -1f, 1f })
+            ActorShape.Strap(torso, new[] {
+                new Vector3(side * .08f, .13f, -.09f), new Vector3(side * .09f, .44f, -.09f),
+                new Vector3(side * .09f, .515f, -.02f), new Vector3(side * .08f, .48f, .075f),
+                new Vector3(side * .08f, .35f, .1f) }, overalls);
+    }
+
     /// <summary>
     /// A torch held forward in the left fist.
     /// The flame leans back by the forearm's angle in the holding pose, so it burns upright while the arm is raised.
@@ -98,25 +156,62 @@ public sealed class ActorRig
         return (holder, flame, light);
     }
 
-    private (Node3D Hip, Node3D Knee) Leg(float x, string trousers, string boots)
+    private (Node3D Hip, Node3D Knee) Leg(float x, string trousers, string boots, bool smooth)
     {
         var hip = Pivot(hips, new Vector3(x, -.02f, 0));
-        Limb(hip, .08f, Thigh + .08f, new Vector3(0, .04f, 0), Mat(trousers));
         var knee = Pivot(hip, new Vector3(0, -Thigh, 0));
-        Limb(knee, .066f, Shin + .05f, new Vector3(0, .03f, 0), Mat(trousers));
-        Box(knee, new Vector3(.12f, Sole + .02f, .24f), new Vector3(0, -Shin - Sole / 2 + .01f, .05f), Mat(boots));
+        if (smooth)
+        {
+            var cloth = new Color(trousers); var leather = new Color(boots); var sole = new Color("302d29");
+            var skeleton = ActorShape.Limb(hip, new[] {
+                new Ring(.08f, .04f, .04f, cloth), new Ring(.035f, .082f, .085f, cloth),
+                new Ring(-.1f, .087f, .09f, cloth), new Ring(-.25f, .075f, .08f, cloth),
+                new Ring(-.32f, .068f, .073f, cloth), new Ring(-.38f, .065f, .07f, cloth),
+                new Ring(-.44f, .063f, .067f, cloth), new Ring(-.52f, .064f, .067f, cloth),
+                new Ring(-.63f, .055f, .058f, cloth), new Ring(-.635f, .057f, .06f, leather),
+                new Ring(-.69f, .06f, .065f, leather), new Ring(-.735f, .069f, .108f, leather, .035f),
+                new Ring(-.77f, .07f, .123f, leather, .045f), new Ring(-.78f, .071f, .123f, sole, .045f),
+                new Ring(-.8f, .058f, .108f, sole, .045f), new Ring(-.8f, .001f, .001f, sole, .045f)
+            }, Thigh);
+            smoothLimbs.Add((skeleton, knee));
+        }
+        else
+        {
+            Limb(hip, .08f, Thigh + .08f, new Vector3(0, .04f, 0), Mat(trousers));
+            Limb(knee, .066f, Shin + .05f, new Vector3(0, .03f, 0), Mat(trousers));
+            Box(knee, new Vector3(.12f, Sole + .02f, .24f), new Vector3(0, -Shin - Sole / 2 + .01f, .05f), Mat(boots));
+        }
         return (hip, knee);
     }
 
     /// <summary>Builds an arm hanging from the shoulder and returns its elbow; short sleeves show skin below the bicep.</summary>
-    private static Node3D Arm(Node3D shoulder, string sleeve, string skinTone, bool shortSleeve)
+    private Node3D Arm(Node3D shoulder, string sleeve, string skinTone, bool smooth, bool shortSleeve)
     {
-        Sphere(shoulder, .078f, Vector3.Zero, Mat(sleeve));
-        Limb(shoulder, .066f, shortSleeve ? .17f : .3f, new Vector3(0, .02f, 0), Mat(sleeve));
-        if (shortSleeve) Limb(shoulder, .058f, .18f, new Vector3(0, -.1f, 0), Mat(skinTone));
         var elbow = Pivot(shoulder, new Vector3(0, -.28f, 0));
-        Limb(elbow, .055f, .27f, new Vector3(0, .02f, 0), Mat(shortSleeve ? skinTone : sleeve));
-        Sphere(elbow, .058f, new Vector3(0, -.27f, .01f), Mat(skinTone));
+        if (smooth)
+        {
+            var shirt = new Color(sleeve); var skin = new Color(skinTone);
+            var forearm = shortSleeve ? skin : shirt;
+            float inward = -MathF.Sign(shoulder.Position.X);
+            var skeleton = ActorShape.Limb(shoulder, new[] {
+                new Ring(.065f, .012f, .012f, shirt, Sideways: inward * .065f), new Ring(.035f, .06f, .062f, shirt, Sideways: inward * .025f),
+                new Ring(-.025f, .077f, .073f, shirt), new Ring(-.11f, .07f, .065f, shirt),
+                new Ring(-.16f, .065f, .06f, shirt), new Ring(-.165f, .061f, .057f, forearm),
+                new Ring(-.22f, .057f, .054f, forearm), new Ring(-.28f, .051f, .051f, forearm),
+                new Ring(-.34f, .057f, .054f, forearm), new Ring(-.41f, .051f, .049f, forearm),
+                new Ring(-.49f, .037f, .038f, forearm), new Ring(-.525f, .046f, .04f, skin, .008f),
+                new Ring(-.565f, .044f, .041f, skin, .015f), new Ring(-.59f, .026f, .025f, skin, .015f),
+                new Ring(-.6f, .001f, .001f, skin, .015f)
+            }, .28f);
+            smoothLimbs.Add((skeleton, elbow));
+        }
+        else
+        {
+            Sphere(shoulder, .078f, Vector3.Zero, Mat(sleeve));
+            Limb(shoulder, .066f, .3f, new Vector3(0, .02f, 0), Mat(sleeve));
+            Limb(elbow, .055f, .27f, new Vector3(0, .02f, 0), Mat(sleeve));
+            Sphere(elbow, .058f, new Vector3(0, -.27f, .01f), Mat(skinTone));
+        }
         return elbow;
     }
 
@@ -162,6 +257,8 @@ public sealed class ActorRig
         legR.Basis = HipTurn(pose.SwingR, -pose.TurnR, -pose.RollR);
         kneeL.RotationDegrees = new Vector3(pose.KneeL, 0, 0);
         kneeR.RotationDegrees = new Vector3(pose.KneeR, 0, 0);
+        foreach (var (skeleton, joint) in smoothLimbs)
+            skeleton.SetBonePoseRotation(1, joint.Quaternion);
         hips.Position = new Vector3(0, pose.Seat > 0 ? pose.Seat : Math.Max(Reach(pose.SwingL, pose.KneeL), Reach(pose.SwingR, pose.KneeR)) + Sole, 0);
         rock.Visible = onRock;
         foreach (var (name, node) in tools) node.Visible = name == tool;

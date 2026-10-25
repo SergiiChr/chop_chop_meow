@@ -559,6 +559,7 @@ public partial class WorldView : Node3D
                 prop.Body.Scale = new Vector3(1 + wobble * .04f, 1 - wobble * .03f, 1 + wobble * .04f);
                 break;
             case "furnace":
+                if (World.Sees(t.Pos)) WorldModels.SyncFuel(prop, t);
                 prop.Glow!.Visible = t.Processing;
                 prop.Light!.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
                 Smoke(prop, t, t.Processing, dt, FurnaceSmoke);
