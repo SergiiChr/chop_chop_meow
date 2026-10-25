@@ -416,13 +416,11 @@ public static class WorldModels
     private static void Workbench(Prop prop)
     {
         var body = prop.Body;
-        var wood = Mat("b98552"); var dark = Mat("7a5432"); var steel = Mat("4a4d50", .4f, .6f);
-        foreach (var (x, z) in new[] { (-.5f, -.25f), (.5f, -.25f), (-.5f, .25f), (.5f, .25f) }) Box(body, new Vector3(.08f, .74f, .08f), new Vector3(x, .37f, z), dark);
-        Box(body, new Vector3(1.1f, .07f, .62f), new Vector3(0, .78f, 0), wood);
-        for (int i = 0; i < 3; i++) Box(body, new Vector3(1.11f, .005f, .01f), new Vector3(0, .816f, -.2f + i * .2f), dark);
-        Box(body, new Vector3(1f, .04f, .5f), new Vector3(0, .2f, 0), dark);
-        Box(body, new Vector3(.3f, .12f, .2f), new Vector3(.62f, .78f, .2f), steel);
-        Box(body, new Vector3(.04f, .04f, .26f), new Vector3(.62f, .8f, .4f), steel);
+        var wood = Mat("b98552"); var steel = Mat("4a4d50", .4f, .6f);
+        Add(body, BenchShape.Wood, BenchShape.Timber, Vector3.Zero);
+        Add(body, BenchShape.Vise, BenchShape.Steel, Vector3.Zero);
+        Cylinder(body, .014f, .014f, .19f, new Vector3(.35f, .86f, .37f), steel, new Vector3(90, 0, 0), 10);
+        Cylinder(body, .012f, .012f, .15f, new Vector3(.35f, .86f, .46f), steel, sides: 10);
         var chisel = Pivot(body, new Vector3(-.25f, .83f, .05f), new Vector3(0, 30, 0));
         Box(chisel, new Vector3(.24f, .03f, .06f), Vector3.Zero, Mat("9aa29f"));
         prop.Chisel = chisel;
