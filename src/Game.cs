@@ -256,7 +256,7 @@ public partial class Game : Node {
         AddLabel("MOVE & WORK", 16);
         AddLabel("WASD / arrows: move in screen directions\nHold right mouse: approach and gather\nLeft click: select resource, building, crate or worker; on open ground, use the item in hand\nE: inspect nearest object\nSpace: use carried tool; at selected bellows furnace, pump\nMouse wheel: zoom\n1–9 or click a slot: put it in hand (plans and crates go to placement)\nHold right mouse on a placed crate: pick it up\nB: build   I: inventory   C: crafting   Tab: guide\nF5: save   F9: load   Esc: cancel / pause");
         AddLabel("IRON → STEEL", 16);
-        AddLabel("Loose iron needs no pickaxe. Smelt 2 ore + 1 wood/coal per iron bar. Build an anvil and hammer bars into iron parts. Steel needs the reinforced furnace: 2 iron bars + 2 mined coal, plus 1 mined coal as fuel. Pump regularly above 80°. The anvil also turns steel bars into steel parts.", 15, Muted);
+        AddLabel("Loose iron needs no pickaxe. Smelt 2 ore + 1 wood/coal per iron bar. Build an anvil and hammer bars into iron parts. Steel needs the reinforced furnace: 2 iron bars + 2 mined coal make 2 steel bars, plus 1 mined coal as fuel. Pump regularly above 80°. The anvil also turns steel bars into steel parts.", 15, Muted);
         AddLabel("CRAFTING", 16);
         AddLabel("Press C to craft on the go; each recipe takes about 10 seconds. Knap a stone chisel from 2 stone, then carve planks, wood parts, a mallet and torches. Planks build a crafting bench, which works twice as fast and makes tools and crates: put a chisel and a hammer in its slots. A small tool takes 1 part of its metal and a big one 2, plus 1 wood part for the handle.", 15, Muted);
         AddLabel("VILLAGERS & STORAGE", 16);
@@ -348,7 +348,6 @@ public partial class Game : Node {
             opt.Selected = recipes.FindIndex(p => p.Key == t.Recipe);
             opt.ItemSelected += index => { world.SetRecipe(t, recipes[(int)index].Key); OpenPage("inspect"); }; content.AddChild(opt);
         } else if (recipes.Count == 1) AddLabel(recipes[0].Value.Name.ToUpperInvariant(), 16);
-        FuelToggle(t);
         if (t.Recipe != "") {
             Machine(t);
             var row = Row(); row.AddChild(Button("Load 1 batch", () => world.LoadBatch(t))); row.AddChild(Button("Load 5", () => world.LoadBatch(t, 5))); row.AddChild(Button("Collect", () => world.Collect(t)));
@@ -537,8 +536,10 @@ public partial class Game : Node {
             }
         }
         if (ev is InputEventMouseButton mouse) {
-            if (mouse.ButtonIndex == MouseButton.WheelUp && mouse.Pressed) view.Zoom = Math.Min(1.6f, view.Zoom + .1f);
-            if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
+            // A panel that has nothing to scroll passes the wheel on; over any panel it must not zoom the world behind.
+            bool overPanel = GetViewport().GuiGetHoveredControl() != null;
+            if (mouse.ButtonIndex == MouseButton.WheelUp && mouse.Pressed && !overPanel) view.Zoom = Math.Min(1.6f, view.Zoom + .1f);
+            if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed && !overPanel) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
             if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed) {
                 var t = view.Pick(mouse.Position); if (t?.IsResource == true || t?.Kind == "farm") { gathering = t; selected = t.Id; view.Selected = t.Id; } else gathering = null;
                 lifting = t?.Kind == "crate" ? t : null; liftClock = 0;
@@ -565,8 +566,8 @@ public partial class Game : Node {
                 if (w != null) Select(w);
                 else if (t != null) {
                     if (t.Kind == "hut") entering = t;
-                    if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item)) {
-                        if (CrateIntoCrate(t, t.Inventory, item)) return;
+                    // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
+                    if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item) && !(t.Kind == "crate" && World.IsCrate(item))) {
                         if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, 999)); if (!world.Remote) Notify(moved > 0 ? $"Stored {moved} {world.Data.Name(item)}." : $"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
                     }
                     Select(t);

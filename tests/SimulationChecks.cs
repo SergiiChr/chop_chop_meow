@@ -963,14 +963,15 @@ public static class SimulationChecks {
         var reinforced = BuildAt(world, "reinforced", Site(31, 25));
         BuildAt(world, "campfire", Site(31, 28));
         world.Player = reinforced.Pos;
-        world.LoadBatch(reinforced, 2);
-        Require(reinforced.Inventory["iron_bar"] == 4 && reinforced.Inventory["coal"] == 6,
+        int bars = world.S.Backpack["iron_bar"];
+        world.LoadBatch(reinforced, 1);
+        Require(reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 3,
                 "reinforced furnace should load iron plus mined coal and coal fuel");
         CompleteBatches(world, reinforced, "steel_bar", 2, true);
         world.Player = reinforced.Pos;
         world.Collect(reinforced);
-        Require(world.S.Backpack["steel_bar"] == 2,
-                "player should pump and collect two steel bars made from real inputs");
+        Require(world.S.Backpack["steel_bar"] == 2 && world.S.Backpack["iron_bar"] == bars - 2,
+                "one smelt of 2 iron bars and mined coal should make two steel bars from real inputs");
 
         world.Player = anvil.Pos + Vector2.One;
         world.SetRecipe(anvil, "steel_parts");

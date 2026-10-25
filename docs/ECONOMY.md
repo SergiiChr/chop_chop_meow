@@ -8,7 +8,7 @@ Every item has a `price`. For goods the village trades, it is the trade price; f
 
 - Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1; iron ore, mined coal and tin ore 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful and four make one fertilizer. Wheat is 1.5.
 - A recipe's output is worth its inputs plus the cheapest fuel its station burns, plus a markup that shrinks with each step from raw goods: 50% for the first step, then 40%, 30% and 20%.
-- So lower tiers keep a bigger share of their price as profit, and deeper goods are worth more coins in total. A steel axe earns 12 coins over its parts and an iron bar 2, though the bar's margin is far higher.
+- So lower tiers keep a bigger share of their price as profit, and deeper goods are worth more coins in total. A steel axe earns 6 coins over its parts and an iron bar 2, though the bar's margin is far higher.
 
 | Step | Markup | Recipes |
 |---|---|---|
@@ -40,10 +40,10 @@ Measured with the current data:
 
 | Job | Per worker-day |
 |---|---|
-| Mining ore or coal, chopping wood | 585 units |
+| Mining ore or coal, chopping wood | 320 units |
 | Picking berries | 24 berries |
 | Stone furnace, iron bars | 62 |
-| Bellows furnace, steel bars | 45 |
+| Bellows furnace, steel bars | 90 |
 | Anvil, steel parts | 57 |
 | Bench, wood parts | 114 |
 | Bench, steel tools | 58 |
@@ -56,12 +56,12 @@ Measured with the current data:
 | Product | Worker-days each | Coins per worker-day | Times pay |
 |---|---|---|---|
 | Berries | 0.042 | 24 | 1.0× |
-| Berry jam | 0.123 | 45 | 1.8× |
-| Canned jam | 0.154 | 73 | 2.9× |
-| Steel hammer | 0.114 | 324 | 13× |
-| Steel axe or pickaxe | 0.202 | 362 | 14.5× |
+| Berry jam | 0.125 | 45 | 1.8× |
+| Canned jam | 0.158 | 72 | 2.9× |
+| Steel hammer | 0.086 | 220 | 8.8× |
+| Steel axe or pickaxe | 0.145 | 255 | 10.2× |
 
-These are for a crew sized so no one waits. A starter crew of one worker per job (ore, coal, wood, stone furnace, bellows furnace, anvil and bench) is held back by the stone furnace: about 15 axes or 31 hammers a day, around 160 coins per worker-day, still 6 to 7 times pay.
+These are for a crew sized so no one waits. A starter crew of one worker per job (ore, coal, wood, stone furnace, bellows furnace, anvil and bench) is held back by the anvil: about 28 axes or 57 hammers a day, around 150 coins per worker-day, still about 6 times pay.
 
 ## 3. Demand
 
@@ -79,10 +79,10 @@ Each good the village takes has `daily`, `steady` and `drop` in `market.sells`:
 
 Food is a steady staple: its daily amount sells at the full price, and past it the price slips slowly. Tools react sharply: a crate of one tool takes half off the price of the last one in it and averages 77%, and a second crate the same day sells for little. Selling past the basket keeps that good cheap for days.
 
-A day's basket sells for about 2,755 coins: 1,690 from tools, 1,002 from food and 63 for the crates.
+A day's basket sells for about 1,923 coins: 858 from tools, 1,002 from food and 63 for the crates.
 
 ## 4. Trade
 
 - Buying costs 1.25 times the base price, crate included for boxed goods. Sale prices never exceed the base, so buying to resell always loses.
 - A sale pays back each crate's price. Count crates as packaging that pays for itself, not as profit.
-- The cheapest way to recover a lost axe is still berries: a steel axe costs 92 coins, about seven crates of berries.
+- The cheapest way to recover a lost axe is still berries: a steel axe costs 46 coins, about four crates of berries.

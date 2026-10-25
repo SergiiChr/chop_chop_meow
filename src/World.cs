@@ -184,7 +184,7 @@ public sealed partial class World {
     public Action<string, Vector2>? Sound;
     public const int MapSize = Terrain.Size;
     public static readonly Vector2 Spawn = Terrain.Spawn;
-    /// <summary>How far down the valley a cart or errand runner walks before fading from view on the way to Bramblewick.</summary>
+    /// <summary>How far down the valley an errand runner walks before fading from view on the way to Bramblewick.</summary>
     public const float TripDistance = 8;
     /// <summary>How far out a cart or runner is, from 0 at the start through 1 at the halfway turn and back to 0.</summary>
     public static float TripLeg(float phase) => phase < .5f ? phase * 2 : (1 - phase) * 2;
@@ -1446,7 +1446,7 @@ public sealed partial class World {
                 for (int turn = 0; turn < 12 && !Open(p); turn++) p = Player + new Vector2(MathF.Cos(angle + turn * .52f), MathF.Sin(angle + turn * .52f)) * 11;
                 if (p == Player) p += new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 11;
                 var wolf = new Wolf { Pos = p, Health = 4 + Day * .4f, Target = S.Actor.Id }; S.Wolves.Add(wolf); hunters.Add(wolf);
-                Say("A wolf is prowling nearby. Stay by fire or shelter; Space or a click with an axe in hand swings it."); Play("wolf_growl_distance", p);
+                Play("wolf_growl_distance", p);
             }
         }
         bool lit = Protected(Player), inside = S.Sheltered != 0;

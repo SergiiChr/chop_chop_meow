@@ -272,6 +272,12 @@ public partial class Game {
         var crate = world.Add("crate", world.Player + new Vector2(1, 0));
         var box = world.Add("crate", world.Player); box.Inventory.Add("berries", 3); world.PickUpCrate(box);
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        // A crate in hand on the hotbar only opens a clicked crate; the alert waits for a deliberate move.
+        string lastSlot = world.S.HotbarSlots[8]; int active = world.S.ActiveHotbar;
+        world.S.Backpack.Add("crate", 1); world.S.HotbarSlots[8] = "crate"; world.S.ActiveHotbar = 8; ClosePanel(); await Frames();
+        await Click(view.Screen(crate.Pos, .4f));
+        UIRequire(!anomaly.Visible && selected == crate.Id && crate.Inventory.Count == 0 && world.S.Backpack["crate"] == 1, "Clicking a crate with a crate in hand must open it without the nesting alert.");
+        world.S.Backpack.Remove("crate", 1); world.S.HotbarSlots[8] = lastSlot; world.S.ActiveHotbar = active;
         Select(crate); await Frames();
         await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
         UIRequire(anomaly.Visible && anomalyWarning.Visible && world.S.Backpack[packed] == 1 && crate.Inventory.Count == 0, "A crate dragged into a crate must stop at the warning.");
@@ -285,6 +291,29 @@ public partial class Game {
         UIRequire(singularity.Visible, "The collapse must end on the game over screen.");
         await Click((Control)singularity.FindChild("menu_after_collapse", true, false));
         UIRequire(!anomaly.Visible && backdrop.Visible && FindButton(screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
+    }
+
+    private async Task Wheel(Vector2 point) {
+        var at = GetViewport().GetFinalTransform() * point;
+        Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Position = at, GlobalPosition = at, Pressed = true, Factor = 1 });
+        await Frames();
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Position = at, GlobalPosition = at, Pressed = false, Factor = 1 });
+        await Frames();
+    }
+
+    private async Task CheckWheelOverPanel() {
+        float zoom = view.Zoom;
+        foreach (var page in new[] { "inventory", "build", "craft", "help" }) {
+            OpenPage(page); await Frames(3);
+            var box = panel.GetGlobalRect();
+            foreach (var spot in new[] { box.GetCenter(), box.Position + new Vector2(30, 30), box.End - new Vector2(30, 30) }) await Wheel(spot);
+            UIRequire(view.Zoom == zoom, $"The mouse wheel over the {page} panel must not zoom the world.");
+        }
+        ClosePanel(); await Frames();
+        await Wheel(GetViewport().GetVisibleRect().GetCenter());
+        UIRequire(view.Zoom < zoom, "The mouse wheel over the world must still zoom.");
+        view.Zoom = zoom;
     }
 
     private async Task CheckCabinAndCanopy() {
@@ -521,6 +550,7 @@ public partial class Game {
             world.S.RespawnIn = .01f; await Seconds(.3);
             UIRequire(!world.Dead && deathLabel.Text == "", "The countdown must clear once the player respawns.");
 
+            await CheckWheelOverPanel();
             await CheckCabinAndCanopy();
             await CheckSignpost();
 

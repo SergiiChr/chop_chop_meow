@@ -22,7 +22,7 @@
     "workers": 3
   },
   "farm": { "sow": { "wheat_seeds": 1, "fertilizer": 1 }, "growDays": 3, "harvestWorkdays": 1, "yield": { "wheat": 4, "wheat_seeds": 2, "grass": 1 } },
-  "goals": { "dailyProfit": 1300, "profitDays": 7 },
+  "goals": { "dailyProfit": 900, "profitDays": 7 },
   "market": {
     "sells": {
       "raw_meat": { "daily": 24, "steady": 24, "drop": 0.05 },
@@ -96,7 +96,7 @@
     },
     "steel_bar": {
       "name": "Steel bar",
-      "price": 23.1,
+      "price": 11.55,
       "color": "b5d8e4"
     },
     "iron_parts": {
@@ -106,7 +106,7 @@
     },
     "steel_parts": {
       "name": "Steel parts",
-      "price": 30,
+      "price": 15,
       "color": "b5d8e4"
     },
     "wood_hammer": {
@@ -125,7 +125,7 @@
     },
     "steel_hammer": {
       "name": "Steel hammer",
-      "price": 37,
+      "price": 19,
       "color": "e7c978",
       "tool": "hammer",
       "speed": 1.8,
@@ -147,7 +147,7 @@
     },
     "steel_axe": {
       "name": "Steel axe",
-      "price": 73,
+      "price": 37,
       "color": "e7c978",
       "tool": "axe",
       "speed": 1.8,
@@ -155,7 +155,7 @@
     },
     "steel_pick": {
       "name": "Steel pickaxe",
-      "price": 73,
+      "price": 37,
       "color": "e7c978",
       "tool": "pickaxe",
       "speed": 1.8,
@@ -214,7 +214,7 @@
     },
     "steel_chisel": {
       "name": "Steel chisel",
-      "price": 37,
+      "price": 19,
       "color": "b5d8e4",
       "tool": "chisel",
       "speed": 2,
@@ -222,7 +222,7 @@
     },
     "rake": {
       "name": "Rake",
-      "price": 37.8,
+      "price": 19.8,
       "color": "e7c978",
       "tool": "rake",
       "tier": 2
@@ -484,7 +484,7 @@
         "coal": 2
       },
       "output": "steel_bar",
-      "amount": 1,
+      "amount": 2,
       "seconds": 10
     },
     "iron_parts": {

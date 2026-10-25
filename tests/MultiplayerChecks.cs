@@ -117,7 +117,7 @@ public static class MultiplayerChecks {
     }
 
     private static void CheckEachPlayerHasTheirOwnPack(GameData data) {
-        var (world, guest, heard) = Hosted(data);
+        var (world, guest, _) = Hosted(data);
         world.Player = World.Spawn;
         var far = Enumerable.Range(0, 63).Select(i => World.Spawn + Vector2.Right.Rotated(i * .1f) * 35).First(world.CanStand);
         world.As(guest, () => world.MoveTo(far));
@@ -127,7 +127,6 @@ public static class MultiplayerChecks {
         var guestPack = world.S.Wolves.Where(w => w.Target == GuestId).ToList();
         Require(hostPack.Count > 0 && guestPack.Count > 0, "each player out at night should draw their own wolves");
         Require(guestPack.All(w => w.Pos.DistanceTo(guest.Pos) < 13) && hostPack.All(w => w.Pos.DistanceTo(world.Player) < 13), "wolves should come out near the player they hunt");
-        Require(heard.Any(m => m.StartsWith("A wolf is prowling")), "the guest should be warned about their own wolves");
 
         guest.Backpack.Add("stone", 2); guest.Health = -1;
         world.Tick(.25f);
