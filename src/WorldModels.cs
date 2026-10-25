@@ -35,7 +35,7 @@ public static class WorldModels
     public static float Fullness(Thing t) => t.Kind switch
     {
         "stone" => t.Remaining / 64f,
-        "iron" or "coal" => t.Remaining / 400f,
+        "iron" or "coal" or "tin" => t.Remaining / 400f,
         "wolf_corpse" => t.Remaining / 4f,
         _ => 1
     };
@@ -57,7 +57,7 @@ public static class WorldModels
             _ => new[] { new Hit(.35f, 0, 2.5f), new Hit(1.45f, 2.5f, 5.3f) },
         },
         "stone" => new[] { new Hit(.75f, 0, .9f) },
-        "iron" or "coal" => new[] { new Hit(.8f, 0, 1) },
+        "iron" or "coal" or "tin" => new[] { new Hit(.8f, 0, 1) },
         "loose_iron" or "loose_coal" => new[] { new Hit(.45f, 0, .35f) },
         "wolf_corpse" => new[] { new Hit(.65f, 0, .5f) },
         "berries" => new[] { new Hit(.65f, 0, 1) },
@@ -85,6 +85,7 @@ public static class WorldModels
             case "stone": Rocks(body, t.Id, new[] { "8d918e", "a3a7a3", "7c807d" }, null); break;
             case "iron": Rocks(body, t.Id, new[] { "7d5b45", "8f6a50", "6e4f3c" }, "b4622a"); break;
             case "coal": Rocks(body, t.Id, new[] { "2d2f33", "3a3c40", "26282b" }, "15161a"); break;
+            case "tin": Rocks(body, t.Id, new[] { "8e918c", "a2a59f", "7b7e79" }, "e6e8e2"); break;
             case "loose_iron": LooseOre(body, t.Id, "a35a2e", "8b4f2b"); break;
             case "loose_coal": LooseOre(body, t.Id, "2d2f33", "1d1e21"); break;
             case "wolf_corpse": Carcass(prop); break;

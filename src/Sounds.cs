@@ -62,10 +62,10 @@ public partial class Sounds : Node
     public static string ForItem(string item) => item switch
     {
         Inventory.Coins => "move_coins_inventory",
-        "raw_meat" or "cooked_meat" => "meat_inventory",
-        "wood" or "stone" or "iron_ore" or "coal" or "planks" or "wood_parts" or "wood_hammer" or "stone_chisel" or "torch" => "wood_rocks_inventory",
+        "raw_meat" or "burnt_steak" or "meat_stew" => "meat_inventory",
+        "wood" or "stone" or "iron_ore" or "coal" or "tin_ore" or "leaves" or "planks" or "wood_parts" or "wood_hammer" or "stone_chisel" or "torch" => "wood_rocks_inventory",
         _ when World.IsCrate(item) => "wood_rocks_inventory",
-        _ when item.StartsWith("iron_") || item.StartsWith("steel_") || item == "canned_food" => "pickup_gold",
+        _ when item.StartsWith("iron_") || item.StartsWith("steel_") || item.StartsWith("tin_") || item.StartsWith("canned_") || item == "rake" => "pickup_gold",
         _ => "moving_leather_in_inventory"
     };
 

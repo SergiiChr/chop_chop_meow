@@ -27,7 +27,9 @@ public sealed class Thing
     /// <summary>A crafting bench's chisel and hammer slots; automation never touches them.</summary>
     public Inventory? Tools { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
-    [JsonIgnore] public bool IsResource => IsLoose || Kind is "tree" or "stone" or "iron" or "coal" or "berries" or "water" or "wolf_corpse";
+    [JsonIgnore] public bool IsResource => IsLoose || IsDeposit || Kind is "tree" or "stone" or "berries" or "water" or "wolf_corpse";
+    /// <summary>Ore at the foot of a cliff, mined with a pickaxe.</summary>
+    [JsonIgnore] public bool IsDeposit => Kind is "iron" or "coal" or "tin";
     /// <summary>Loose pieces are picked up whole in one go and vanish, instead of being worked down like a deposit.</summary>
     [JsonIgnore] public bool IsLoose => Kind is "loose_iron" or "loose_coal";
     [JsonIgnore] public bool IsStorage => Kind is "chest" or "grave" or "crate";
@@ -175,8 +177,9 @@ public sealed class World
     private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f, ChaseSeconds = 3;
     /// <summary>Minimum bellows furnace temperature: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
-    // Rock faces at the foot of both ranges, facing into the valley; the first of each ore is the nearer one, with loose pieces below it.
-    public static readonly Cliff[] Cliffs = { FootCliff("iron", 172, 1), FootCliff("coal", 140, -1), FootCliff("iron", 80, -1), FootCliff("coal", 62, 1) };
+    // Rock faces at the foot of both ranges, facing into the valley; the first iron and coal cliffs are the nearer ones, with loose pieces below them.
+    // Tin has no loose pieces: it waits for a pickaxe, further inland.
+    public static readonly Cliff[] Cliffs = { FootCliff("iron", 172, 1), FootCliff("coal", 140, -1), FootCliff("tin", 108, 1), FootCliff("iron", 80, -1), FootCliff("coal", 62, 1) };
     private static Cliff FootCliff(string ore, float along, int side) =>
         new(ore, Terrain.Point(along, side * (Terrain.HalfWidth(along, side) + .6f)), Terrain.Sideways * -side, 4.5f);
     public static Cliff CliffOf(string ore) => Cliffs.First(c => c.Ore == ore);
@@ -238,7 +241,7 @@ public sealed class World
         foreach (var cliff in Cliffs)
         {
             foreach (float along in new[] { -2.8f, 0, 2.8f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, 400);
-            if (cliff != CliffOf(cliff.Ore)) continue;
+            if (cliff != CliffOf(cliff.Ore) || cliff.Ore == "tin") continue;
             // Loose pieces roll well out past the deposits of the nearer cliff, so collecting them takes a search.
             // Iron is the tool-free bootstrap: 20 ore covers the anvil and pickaxe but not a bellows furnace too.
             (string kind, int count) = cliff.Ore == "iron" ? ("loose_iron", 10) : ("loose_coal", 6);
@@ -295,9 +298,9 @@ public sealed class World
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
     public static float Footprint(string kind) => kind switch { "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" => .45f, _ => .35f };
-    /// <summary>The fastest carried tool of a kind (axe, pickaxe, hammer or chisel), or null when none is carried.</summary>
-    public string? BestTool(string tool, Inventory? from = null) => (from ?? S.Backpack).Items.Keys
-        .Where(id => Data.Items.TryGetValue(id, out var def) && def.Tool == tool).OrderByDescending(id => Data.Items[id].Speed).FirstOrDefault();
+    /// <summary>The fastest carried tool of a kind at or above <paramref name="tier"/>, or null when none is carried.</summary>
+    public string? BestTool(string tool, Inventory? from = null, int tier = 0) => (from ?? S.Backpack).Items.Keys
+        .Where(id => Data.Items.TryGetValue(id, out var def) && def.Tool == tool && def.Tier >= tier).OrderByDescending(id => Data.Items[id].Speed).FirstOrDefault();
     private float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
     public void MovePlayer(Vector2 delta)
     {
@@ -314,10 +317,10 @@ public sealed class World
         if (!t.IsResource) return "Select a natural resource.";
         if (t.Remaining <= 0) return t.Kind switch { "berries" => $"Picked clean. The bush fruits again in {Data.BerryRegrowHours:0} hours.", "tree" => "Only a stump is left. Find another tree.", _ => "Depleted. Look for another deposit." };
         if (t.Kind == "tree" && !worker && BestTool("axe") == null) return "An axe is needed. Recover your belongings or craft one at a bench.";
-        if (t.Kind is "coal" or "iron" && (worker ? !S.Milestones.Contains("pick") : BestTool("pickaxe") == null)) return "Craft a pickaxe at a bench. Loose rusty ore nearby can be picked up by hand.";
+        if (t.IsDeposit && (worker ? !S.Milestones.Contains("pick") : BestTool("pickaxe") == null)) return t.Kind == "tin" ? "Mining tin needs a pickaxe." : "Craft a pickaxe at a bench. Loose rusty ore nearby can be picked up by hand.";
         return null;
     }
-    public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "loose_coal" => "coal", "wolf_corpse" => "raw_meat", _ => t.Kind };
+    public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "tin" => "tin_ore", "loose_coal" => "coal", "wolf_corpse" => "raw_meat", _ => t.Kind };
     public void Gather(Thing t, float dt)
     {
         playerBusy = true;
@@ -326,7 +329,7 @@ public sealed class World
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
         gatherClock += dt;
-        string? tool = t.Kind == "tree" ? BestTool("axe") : t.Kind is "stone" or "iron" or "coal" ? BestTool("pickaxe") : null;
+        string? tool = t.Kind == "tree" ? BestTool("axe") : t.Kind == "stone" || t.IsDeposit ? BestTool("pickaxe") : null;
         float seconds = Data.GatherSeconds / Speed(tool);
         if (gatherClock < seconds) return;
         gatherClock = 0;
@@ -377,19 +380,13 @@ public sealed class World
         var t = Add(kind, p); if (kind == "campfire") { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
         S.Milestones.Add(kind); Say($"Built {Data.Name(kind)}."); return t;
     }
-    public static bool IsFood(string item) => item is "berries" or "raw_meat" or "cooked_meat" or "canned_food";
-    /// <summary>Items a click or hotkey eats or drinks.</summary>
-    public static bool IsConsumable(string item) => IsFood(item) || item == "water";
     public void Consume(string item)
     {
-        if (Downed) return;
-        if (item == "raw_meat") { Say("Raw meat must be cooked in a furnace first."); return; }
-        if (S.Backpack.Remove(item, 1) == 0) { Say($"No {Data.Name(item)} in your backpack."); return; }
-        if (item == "berries") { S.Hunger = Math.Min(100, S.Hunger + 18); S.Health = Math.Min(100, S.Health + 5); }
-        if (item == "cooked_meat") { S.Hunger = Math.Min(100, S.Hunger + 40); S.Health = Math.Min(100, S.Health + 10); }
-        if (item == "canned_food") { S.Hunger = Math.Min(100, S.Hunger + 35); S.Health = Math.Min(100, S.Health + 5); }
-        if (item == "water") S.Thirst = Math.Min(100, S.Thirst + 28);
-        else Play("eat_berry", Player);
+        if (Downed || !Data.Items.TryGetValue(item, out var def)) return;
+        if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
+        if (S.Backpack.Remove(item, 1) == 0) { Say($"No {def.Name} in your backpack."); return; }
+        S.Hunger = Math.Min(100, S.Hunger + def.Hunger); S.Thirst = Math.Min(100, S.Thirst + def.Thirst); S.Health = Math.Min(100, S.Health + def.Health);
+        if (def.Food) Play("eat_berry", Player);
     }
     public void Pump(Thing t)
     {
@@ -569,7 +566,7 @@ public sealed class World
         if (S.Mauled)
         {
             // The pack eats every scrap of food and stays to feed until the player respawns.
-            foreach (var item in box.Inventory.Items.Keys.Where(IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
+            foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
             Say($"{(S.Wolves.Count > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.");
             return;
         }
@@ -680,7 +677,7 @@ public sealed class World
     {
         if (!Data.Recipes.TryGetValue(recipe, out var r) || !r.Hand) return "This can only be made at a station.";
         if (Downed) return "You are still recovering.";
-        if (r.Tool != "" && BestTool(r.Tool) == null) return $"Needs a {r.Tool} in your backpack.";
+        if (r.Tool != "" && BestTool(r.Tool, null, r.Tier) == null) return $"Needs a {Data.ToolName(r.Tool, r.Tier)} in your backpack.";
         if (!S.Backpack.Has(r.Inputs)) return $"Needs {Goods(r.Inputs)} in your backpack.";
         return S.Crafting.Count >= 8 ? "Eight things are already being made." : null;
     }
@@ -704,7 +701,7 @@ public sealed class World
         var box = Add("grave", Player); box.Inventory.Slots = left / box.Inventory.StackOf(item) + 1; box.Inventory.Add(item, left);
     }
     /// <summary>How fast the first queued recipe progresses: the carried tool's speed, or zero while its tool is missing.</summary>
-    public float CraftRate => S.Crafting.Count == 0 || Downed ? 0 : Data.Recipes[S.Crafting[0]].Tool is var tool && tool != "" ? BestTool(tool) is string held ? Speed(held) : 0 : 1;
+    public float CraftRate => S.Crafting.Count == 0 || Downed ? 0 : Data.Recipes[S.Crafting[0]] is var r && r.Tool != "" ? BestTool(r.Tool, null, r.Tier) is string held ? Speed(held) : 0 : 1;
     private void CraftTick(float dt)
     {
         float rate = CraftRate;
@@ -722,8 +719,8 @@ public sealed class World
         if (Data.Items[output].Tool == "pickaxe") S.Milestones.Add("pick");
         if (output.StartsWith("steel_") && Data.Items[output].Tool != "") S.Milestones.Add("steel_tool");
     }
-    /// <summary>The tool of a kind slotted in a bench, or null.</summary>
-    public string? BenchTool(Thing bench, string tool) => bench.Tools == null ? null : BestTool(tool, bench.Tools);
+    /// <summary>The tool of a kind slotted in a bench, or null when its slot is empty or holds a tool below <paramref name="tier"/>.</summary>
+    public string? BenchTool(Thing bench, string tool, int tier = 0) => bench.Tools == null ? null : BestTool(tool, bench.Tools, tier);
     /// <summary>Puts a chisel or hammer from the backpack into its empty bench slot.</summary>
     public bool SlotTool(Thing bench, string item)
     {
@@ -938,7 +935,7 @@ public sealed class World
         }
         // Only one worker ever pumps: a lone worker pumps between loads, while extra crew only haul.
         bool pumps = target.Kind == "reinforced" && coworkers.Count < 2;
-        string? missing = target.Kind == "bench" && Data.Recipes[target.Recipe].Tool is var needed && needed != "" && BenchTool(target, needed) == null ? needed : null;
+        string? missing = target.Kind == "bench" && Data.Recipes[target.Recipe] is var needed && needed.Tool != "" && BenchTool(target, needed.Tool, needed.Tier) == null ? Data.ToolName(needed.Tool, needed.Tier) : null;
         w.Status = pumps ? "Pumping bellows between loads" : target.Kind == "reinforced" ? "Waiting for the next load" : missing != null ? $"Needs a {missing} in the bench" : "Working at station";
         if (Walk(w, target.Pos, dt))
         {
@@ -1046,7 +1043,7 @@ public sealed class World
             bool hot = t.Kind != "reinforced" || t.Heat >= SteelHeat;
             bool atAnvil = !Worked(t.Kind) || Hammered(t);
             // A bench recipe needs its tool slotted, and the tool's speed sets the pace.
-            string? tool = t.Kind == "bench" && recipe.Tool != "" ? BenchTool(t, recipe.Tool) : null;
+            string? tool = t.Kind == "bench" && recipe.Tool != "" ? BenchTool(t, recipe.Tool, recipe.Tier) : null;
             if (t.Kind == "bench" && recipe.Tool != "" && tool == null) atAnvil = false;
             float rate = t.Kind == "bench" ? Data.BenchSpeed * Speed(tool) : 1;
             if (!t.Processing && hot && atAnvil && t.Inventory.Has(BatchCost(t)))
@@ -1229,7 +1226,7 @@ public sealed class World
     {
         // Steel tools became steel parts; carried ones that were the only axe or pickaxe become those tools so the save stays playable.
         bool legacyTools = json.Contains("\"steel_tools\"");
-        json = json.Replace("\"steel_tools\"", "\"steel_parts\"");
+        json = json.Replace("\"steel_tools\"", "\"steel_parts\"").Replace("\"cooked_meat\"", "\"burnt_steak\"");
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version < 4) throw new InvalidOperationException("This save is from an older, smaller map and cannot be loaded. Start a new game.");
         if (loaded.Version != 4 || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");

@@ -207,7 +207,7 @@ public static class ActorAnimation
         if (moving) return ActorAction.Walk;
         if (!gathering || string.IsNullOrEmpty(resourceKind)) return ActorAction.Idle;
 
-        string[]? family = resourceKind == "tree" ? Axes : resourceKind is "stone" or "iron" or "coal" ? Picks : null;
+        string[]? family = resourceKind == "tree" ? Axes : resourceKind is "stone" or "iron" or "coal" or "tin" ? Picks : null;
         string? tool = family == null ? null : BestTool(backpack, selectedTool, family);
         return resourceKind switch
         {
@@ -217,7 +217,7 @@ public static class ActorAnimation
                 "iron_axe" => ActorAction.Chop,
                 _ => ActorAction.Gather
             },
-            "stone" or "iron" or "coal" => tool switch
+            "stone" or "iron" or "coal" or "tin" => tool switch
             {
                 "steel_pick" => ActorAction.SteelMine,
                 "iron_pick" => ActorAction.Mine,
@@ -239,7 +239,7 @@ public static class ActorAnimation
             return assignment.Kind switch
             {
                 "tree" => ActorAction.Chop,
-                "stone" or "iron" or "coal" => ActorAction.Mine,
+                "stone" or "iron" or "coal" or "tin" => ActorAction.Mine,
                 _ => ActorAction.Gather
             };
         }

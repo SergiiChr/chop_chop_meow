@@ -248,7 +248,7 @@ public partial class Game : Node
     private void Backpack()
     {
         Dynamic(() => $"Health {world.S.Health:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {world.S.Workers.Sum(w => w.Wage):0}", 15);
-        AddInventoryGrid(() => world.S.Backpack, null, id => { if (World.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero); }, "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.");
+        AddInventoryGrid(() => world.S.Backpack, null, id => { if (world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero); }, "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.");
         AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
     }
     private void Select(Thing t)
@@ -598,7 +598,7 @@ public partial class Game : Node
         }
         world.Sell(sign); world.S.Orders[0].Elapsed = 4;
         world.S.Crafting.AddRange(new[] { "planks", "wood_parts" }); world.S.CraftTime = 6;
-        var meat = world.Add("crate", world.Player); meat.Inventory.Add("cooked_meat", 12); world.PickUpCrate(meat);
+        var meat = world.Add("crate", world.Player); meat.Inventory.Add("burnt_steak", 12); world.PickUpCrate(meat);
         world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
         if (OS.GetCmdlineUserArgs().Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         // A past walk toward the iron cliff leaves explored ground beyond the live sight circle.
@@ -607,6 +607,12 @@ public partial class Game : Node
         if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
         if (OS.GetCmdlineUserArgs().Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
         if (OS.GetCmdlineUserArgs().Contains("--craft")) OpenPage("craft");
+        if (OS.GetCmdlineUserArgs().Contains("--tin")) { var cliff = World.CliffOf("tin"); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); ClosePanel(); }
+        if (OS.GetCmdlineUserArgs().Contains("--pantry"))
+        {
+            foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
+            OpenPage("inventory");
+        }
         // Hovering a recipe shows its description below the grids and as a tooltip at the pointer.
         if (OS.GetCmdlineUserArgs().Contains("--hover")) GetTree().CreateTimer(.5).Timeout += () =>
         {

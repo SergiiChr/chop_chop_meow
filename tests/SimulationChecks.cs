@@ -45,6 +45,8 @@ public static class SimulationChecks
         CheckCrateCapacityAndPacking(data);
         CheckHandCrafting(data);
         CheckBenchTools(data);
+        CheckTinAndToolTiers(data);
+        CheckNewFoodsAndRename(data);
         CheckMarketTakesOnlyCrates(data);
         CheckLegacySteelTools(data);
         CheckNoToolDeadlocks(data);
@@ -701,15 +703,15 @@ public static class SimulationChecks
         hunt.Consume("raw_meat");
         Require(hunt.S.Backpack["raw_meat"] == 4 && hunt.S.Hunger == 40, "raw meat must be cooked before it can be eaten");
         var furnace = hunt.Add("furnace", hunt.Player + new Vector2(1, 1));
-        hunt.SetRecipe(furnace, "cooked_meat");
+        hunt.SetRecipe(furnace, "burnt_steak");
         hunt.LoadBatch(furnace);
         for (int i = 0; i < 28; i++) hunt.Tick(Step);
         hunt.Collect(furnace);
-        Require(hunt.S.Backpack["cooked_meat"] == 2 && hunt.S.Backpack["raw_meat"] == 2 && hunt.S.Backpack["wood"] == 0,
+        Require(hunt.S.Backpack["burnt_steak"] == 2 && hunt.S.Backpack["raw_meat"] == 2 && hunt.S.Backpack["wood"] == 0,
                 "the stone furnace should cook two raw meat with one fuel");
         hunt.S.Hunger = 40;
-        hunt.Consume("cooked_meat");
-        Require(hunt.S.Backpack["cooked_meat"] == 1 && hunt.S.Hunger == 80, "cooked meat should be edible and filling");
+        hunt.Consume("burnt_steak");
+        Require(hunt.S.Backpack["burnt_steak"] == 1 && hunt.S.Hunger == 80, "cooked meat should be edible and filling");
     }
 
     private static void CheckWolfThroatLeap(GameData data)
@@ -731,7 +733,7 @@ public static class SimulationChecks
 
         var maul = NightWorld(data);
         maul.S.Health = 49;
-        foreach (var (item, count) in new[] { ("berries", 3), ("cooked_meat", 2), ("raw_meat", 1), ("water", 2), ("iron_axe", 1), ("wood", 4) })
+        foreach (var (item, count) in new[] { ("berries", 3), ("burnt_steak", 2), ("raw_meat", 1), ("water", 2), ("iron_axe", 1), ("wood", 4) })
             maul.S.Backpack.Add(item, count);
         var leaper = new Wolf { Pos = maul.Player + new Vector2(3, 0), Attack = 5 };
         var packmate = new Wolf { Pos = maul.Player + new Vector2(-9, 4), Attack = 5 };
@@ -751,7 +753,7 @@ public static class SimulationChecks
         Require(packmate.Feeding && packmate.Pos.DistanceTo(pinned) < 1.6f && maul.S.Wolves.Contains(leaper),
                 "the rest of the pack should run in and stay to feed");
         var box = maul.S.Things.Single(t => t.Kind == "grave");
-        Require(box.Inventory["berries"] == 0 && box.Inventory["cooked_meat"] == 0 && box.Inventory["raw_meat"] == 0,
+        Require(box.Inventory["berries"] == 0 && box.Inventory["burnt_steak"] == 0 && box.Inventory["raw_meat"] == 0,
                 "a wolf kill should leave no food in the recovery box");
         Require(box.Inventory["water"] == 2 && box.Inventory["iron_axe"] == 1 && box.Inventory["wood"] == 4,
                 "a wolf kill should keep everything except food in the recovery box");
@@ -876,7 +878,7 @@ public static class SimulationChecks
             Require(found.Count >= 15 && found.All(t => t.Pos.DistanceTo(World.Spawn) >= 9 && found.All(o => o == t || o.Pos.DistanceTo(t.Pos) >= spacing)),
                     $"{kind} should be scattered singly away from the clearing, so more of it takes exploring");
         }
-        Require(world.S.Things.Where(t => t.IsResource || !t.IsResource).All(t => Terrain.Open(t.Pos) || t.Kind is "iron" or "coal"),
+        Require(world.S.Things.Where(t => t.IsResource || !t.IsResource).All(t => Terrain.Open(t.Pos) || t.IsDeposit),
                 "nothing should be placed in the sea, the lake or the mountains");
         var trees = world.S.Things.Where(t => t.Kind == "tree").ToList();
         float woods = trees.Count(t => Terrain.FromMountains(t.Pos) < 15), plains = trees.Count(t => Terrain.FromMountains(t.Pos) >= 30);
@@ -1247,6 +1249,87 @@ public static class SimulationChecks
         Require(chest.Inventory["planks"] >= 8 && chest.Inventory["wood"] == 0, "a bench worker should fetch wood, work the bench and store the planks");
     }
 
+    /// <summary>Tin is mined with a pickaxe and smelted like iron; cans and the mortar need steel tools, and anything better than the tier asked for will do.</summary>
+    private static void CheckTinAndToolTiers(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var fresh = new World(data);
+        var cliff = World.CliffOf("tin");
+        Require(fresh.S.Things.Count(t => t.Kind == "tin" && cliff.DistanceTo(t.Pos) < 3) == 3 && !fresh.S.Things.Any(t => t.Kind == "loose_tin"),
+                "the tin cliff should have three deposits and no loose pieces");
+        var tin = world.Add("tin", Site(0, 0), 400);
+        world.Player = tin.Pos;
+        Require(world.GatherBlock(tin)?.Contains("pickaxe") == true, "tin should need a pickaxe");
+        world.S.Backpack.Add("iron_pick", 1);
+        GatherUntil(world, tin, "tin_ore", 4);
+
+        var furnace = world.Add("furnace", Site(3, 0));
+        world.Player = furnace.Pos + new Vector2(1.2f, 0);
+        world.S.Backpack.Add("wood", 2);
+        world.SetRecipe(furnace, "tin_bar");
+        world.LoadBatch(furnace, 2);
+        SafeTick(world, data.Recipes["tin_bar"].Seconds * 2 + 1);
+        world.Collect(furnace);
+        Require(world.S.Backpack["tin_bar"] == 2 && world.S.Backpack["tin_ore"] == 0, "the stone furnace should smelt 2 tin ore into a tin bar");
+
+        var bench = world.Add("bench", Site(0, 4));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        world.S.Backpack.Add("iron_hammer", 1);
+        world.SetRecipe(bench, "tin_can");
+        Require(world.SlotTool(bench, "iron_hammer"), "an iron hammer should fit the hammer slot");
+        world.LoadBatch(bench);
+        SafeTick(world, 20);
+        Require(!bench.Processing && bench.Inventory["tin_can"] == 0 && world.BenchTool(bench, "hammer", 2) == null, "tin cans should wait while only an iron hammer is slotted");
+        world.UnslotTool(bench, "iron_hammer");
+        world.S.Backpack.Add("steel_hammer", 1);
+        world.SlotTool(bench, "steel_hammer");
+        SafeTick(world, data.Recipes["tin_can"].Seconds / data.BenchSpeed / data.Items["steel_hammer"].Speed + 1);
+        Require(bench.Inventory["tin_can"] == 4, "a steel hammer should turn one tin bar into four cans");
+
+        world.S.Backpack.Add("stone", 3); world.S.Backpack.Add("stone_chisel", 1);
+        Require(world.CraftBlock("mortar") == "Needs a steel chisel in your backpack.", "a stone chisel should not carve a mortar");
+        world.S.Backpack.Add("steel_chisel", 1);
+        Require(world.BestTool("chisel") == "steel_chisel" && world.Craft("mortar"), "a steel chisel should carve a mortar from stone by hand");
+        SafeTick(world, data.Recipes["mortar"].Seconds / 2 + .25f);
+        Require(world.S.Backpack["mortar"] == 1, "a steel chisel should work twice as fast");
+        world.S.Backpack.Add("wood", 1);
+        Require(world.Craft("planks"), "a steel chisel should do everything a stone chisel does");
+        SafeTick(world, data.Recipes["planks"].Seconds / 2 + .25f);
+        Require(world.S.Backpack["planks"] == 4, "planks should come twice as fast with a steel chisel");
+
+        var sign = world.Add("signpost", Site(6, 6));
+        world.Player = sign.Pos;
+        SetCoins(world, 100);
+        Require(world.Buy(sign, "wheat_seeds", 1) && world.Buy(sign, "fertilizer", 1), "the village should sell wheat seeds and fertilizer");
+        SafeTick(world, data.TradeSeconds + .1f);
+        var bags = sign.Output!.Items.Keys.Where(World.IsCrate).Select(id => world.Packed(id)!).ToList();
+        Require(bags.Any(b => b["wheat_seeds"] == data.Market.Buys["wheat_seeds"]) && bags.Any(b => b["fertilizer"] == data.Market.Buys["fertilizer"]), "seeds and fertilizer should arrive by the crate");
+    }
+
+    /// <summary>Foods restore what their data says, raw ones only say they need cooking, and saves from before the rename keep their cooked meat.</summary>
+    private static void CheckNewFoodsAndRename(GameData data)
+    {
+        var world = EmptyWorld(data);
+        world.S.Hunger = 20; world.S.Thirst = 20; world.S.Health = 50;
+        world.S.Backpack.Add("meat_stew", 1); world.S.Backpack.Add("wheat", 1);
+        world.Consume("meat_stew");
+        var stew = data.Items["meat_stew"];
+        Require(world.S.Hunger == 20 + stew.Hunger && world.S.Thirst == 20 + stew.Thirst && world.S.Health == 50 + stew.Health && world.S.Backpack["meat_stew"] == 0, "meat stew should feed, water and heal by its data");
+        world.Consume("wheat");
+        Require(world.S.Backpack["wheat"] == 1 && data.IsFood("wheat") && data.IsConsumable("wheat"), "raw wheat is food for compost and wolves but not eaten as it is");
+        Require(!data.IsFood("water") && data.IsConsumable("water") && !data.IsFood("tin_can"), "water is drunk but is not food, and cans are neither");
+
+        var old = EmptyWorld(data);
+        var furnace = old.Add("furnace", new Vector2(10, 10));
+        furnace.Recipe = "burnt_steak"; furnace.Inventory.Add("burnt_steak", 2);
+        old.S.Backpack.Add("burnt_steak", 3);
+        var json = old.Serialize().Replace("\"burnt_steak\"", "\"cooked_meat\"");
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(json);
+        Require(loaded.S.Backpack["burnt_steak"] == 3 && loaded.Find(furnace.Id) is { Recipe: "burnt_steak" } f && f.Inventory["burnt_steak"] == 2,
+                "cooked meat from older saves should become burnt steak, furnace recipe included");
+    }
+
     private static void CheckMarketTakesOnlyCrates(GameData data)
     {
         var world = EmptyWorld(data);
@@ -1257,7 +1340,7 @@ public static class SimulationChecks
         Require(!world.CanSell(axes) && !world.CanSell(empty) && !world.CanSell("crate") && !world.CanSell("steel_axe"), "the village only takes packed crates of goods it buys");
         world.S.Backpack.TransferTo(sign.Inventory, axes, 1);
         Require(!world.Sell(sign) && world.Packed(axes) != null, "a crate holding a tool the village does not buy stays put");
-        string meat = PackCrate(world, ("raw_meat", 6), ("cooked_meat", 6));
+        string meat = PackCrate(world, ("raw_meat", 6), ("burnt_steak", 6));
         string tools = PackCrate(world, ("steel_hammer", 1), ("steel_pick", 1));
         world.Player = sign.Pos;
         world.S.Backpack.TransferTo(sign.Inventory, meat, 1); world.S.Backpack.TransferTo(sign.Inventory, tools, 1);
@@ -1271,7 +1354,7 @@ public static class SimulationChecks
         var bought = sign.Output!.Items.Keys.Where(World.IsCrate).ToList();
         Require(bought.Count == 2 && bought.All(id => world.Packed(id)?["canned_food"] == data.Market.Buys["canned_food"]), "each bought crate should arrive packed with one purchase");
         world.S.Hunger = 40; world.S.Backpack.Add("canned_food", 1); world.Consume("canned_food");
-        Require(world.S.Hunger > 40 && World.IsFood("canned_food"), "canned food should be edible");
+        Require(world.S.Hunger > 40 && data.IsFood("canned_food"), "canned food should be edible");
         Require(world.KnownPrice("raw_meat") > 0 && !world.S.Prices.ContainsKey("canned_food"), "the price sheet only tracks goods the village buys");
     }
 
@@ -1301,19 +1384,22 @@ public static class SimulationChecks
         var fresh = new World(data);
         var have = new HashSet<string>(fresh.S.Backpack.Items.Keys) { "stone", "berries", "water", "iron_ore", "coal", "raw_meat" };
         var built = new HashSet<string>();
-        bool HasTool(string tool) => have.Any(id => data.Items[id].Tool == tool);
+        bool HasTool(string tool, int tier = 0) => have.Any(id => data.Items[id].Tool == tool && data.Items[id].Tier >= tier);
         for (bool grew = true; grew;)
         {
             grew = false;
             if (HasTool("axe")) grew |= have.Add("wood");
+            if (HasTool("pickaxe")) grew |= have.Add("tin_ore");
             foreach (var (id, b) in data.Buildings) if (b.Cost.Keys.All(have.Contains)) grew |= built.Add(id);
             foreach (var r in data.Recipes.Values)
             {
-                bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool)) || built.Contains(r.Station) && (r.Station != "bench" || r.Tool == "" || HasTool(r.Tool));
+                bool where = r.Hand && (r.Tool == "" || HasTool(r.Tool, r.Tier)) || built.Contains(r.Station) && (r.Station != "bench" || r.Tool == "" || HasTool(r.Tool, r.Tier));
                 if (where && r.Inputs.Keys.All(have.Contains)) grew |= have.Add(r.Output);
             }
         }
-        var unreachable = data.Items.Keys.Where(id => id != Inventory.Coins && !data.Market.Buys.ContainsKey(id) && !have.Contains(id)).Concat(data.Buildings.Keys.Where(id => !built.Contains(id))).ToList();
+        // These come from features still to be built: raking, farm plots, compost, the cooking table and the canning station.
+        string[] pending = { "leaves", "grass", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "canned_jam", "canned_meat_stew" };
+        var unreachable = data.Items.Keys.Where(id => id != Inventory.Coins && !data.Market.Buys.ContainsKey(id) && !have.Contains(id) && !pending.Contains(id)).Concat(data.Buildings.Keys.Where(id => !built.Contains(id))).ToList();
         Require(unreachable.Count == 0, $"everything should be reachable from a fresh start: {string.Join(", ", unreachable)}");
         // The village never takes the tools that start the loop, so selling cannot strand the player.
         Require(fresh.S.Backpack.Items.Keys.Where(id => data.Items[id].Tool != "").All(id => !data.Market.Sells.ContainsKey(id)) && !data.Market.Sells.Keys.Any(id => id is "stone_chisel" or "iron_pick" or "wood_hammer"),

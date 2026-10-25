@@ -6,16 +6,18 @@ Prices, wages and demand live in `data/game.json`. `tests/EconomyChecks.cs` runs
 
 Every item has a `price`. For goods the village trades, it is the trade price; for the rest it is a reference value used only to keep recipes in line.
 
-- Raw goods: wood, stone, berries and raw meat are worth 1; iron ore and mined coal 1.5, since they need a pickaxe.
+- Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1; iron ore, mined coal and tin ore 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful and four make one fertilizer. Wheat is 1.5, what one bag of seeds and one of fertilizer return with the first-step markup.
 - A recipe's output is worth its inputs plus the cheapest fuel its station burns, plus a markup that shrinks with each step from raw goods: 50% for the first step, then 40%, 30% and 20%.
 - So lower tiers keep a bigger share of their price as profit, and deeper goods are worth more coins in total. A steel axe earns 12 coins over its parts and an iron bar 2, though the bar's margin is far higher.
 
 | Step | Markup | Recipes |
 |---|---|---|
-| 1 | 50% | iron bar, cooked meat, planks, wood parts, stone chisel, torch |
-| 2 | 40% | steel bar, iron parts, crate, wooden mallet |
+| 1 | 50% | iron bar, tin bar, burnt steak, planks, wood parts, stone chisel, torch, mortar and pestle |
+| 2 | 40% | steel bar, iron parts, crate, wooden mallet, tin cans |
 | 3 | 30% | steel parts, iron axe, iron pickaxe, iron hammer |
-| 4 | 20% | steel axe, steel pickaxe, steel hammer |
+| 4 | 20% | steel axe, steel pickaxe, steel hammer, steel chisel, rake |
+
+Foods whose recipes come with the cooking table and canning station are priced ahead by the same rule, assuming these batches: 1 berries → 1 crushed berries and 1 wheat → 1 flour with the mortar; 2 crushed berries + 1 wood → 1 jam; 1 water + 1 raw meat + 1 wood → 1 stew; 1 flour + 1 water → 1 dough; 1 dough + 1 wood → 1 bread; and a can + its filling + 1 wood → a canned good. Canned food keeps its old price of 4 until it has a recipe.
 
 A new recipe gets its price from this rule. The check fails if any recipe loses value or a deeper recipe marks up more than a shallower one.
 
@@ -60,7 +62,7 @@ Each good the village takes has `daily`, `steady` and `drop` in `market.sells`:
 | Good | Daily | Steady | Drop per crate |
 |---|---|---|---|
 | Berries | 36 (3 crates) | 36 | 5% |
-| Raw and cooked meat | 24 (2 crates) | 24 | 5% |
+| Raw meat and burnt steak | 24 (2 crates) | 24 | 5% |
 | Steel axe, pickaxe and hammer | 12 (1 crate) | 0 | 50% |
 
 Food is a steady staple: its daily amount sells at the full price, and past it the price slips slowly. Tools react sharply: a crate of one tool takes half off the price of the last one in it and averages 77%, and a second crate the same day sells for little. Selling past the basket keeps that good cheap for days.

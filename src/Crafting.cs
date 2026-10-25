@@ -14,10 +14,10 @@ public partial class Game
     {
         AddLabel("Crafting on the go. Using workbench is faster.", 13, Muted);
         var details = Label("Hover a recipe to see what it needs. Click to start making it.", 14, Muted);
-        foreach (var group in world.HandRecipes.GroupBy(id => world.Data.Recipes[id].Tool).OrderBy(g => g.Key))
+        foreach (var group in world.HandRecipes.GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key))
         {
-            string tool = group.Key;
-            CraftSection(tool, () => tool == "" ? null : world.BestTool(tool), group, details, false,
+            var (tool, tier) = group.Key;
+            CraftSection(tool, tier, () => tool == "" ? null : world.BestTool(tool, null, tier), group, details, false,
                 id => Act(() => world.Craft(id)), _ => false, id => world.CraftBlock(id) == null);
         }
         content.AddChild(details);
@@ -65,10 +65,10 @@ public partial class Game
         foreach (string tool in BenchSlots) slots.AddChild(ToolSlot(bench, tool));
         var details = Label("Hover a recipe to see what it needs. Click to set the bench to it.", 14, Muted);
         var recipes = world.Data.Recipes.Where(p => p.Value.Station == bench.Kind).Select(p => p.Key);
-        foreach (var group in recipes.GroupBy(id => world.Data.Recipes[id].Tool).OrderBy(g => g.Key))
+        foreach (var group in recipes.GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key))
         {
-            string tool = group.Key;
-            CraftSection(tool, () => tool == "" ? null : world.BenchTool(bench, tool), group, details, true,
+            var (tool, tier) = group.Key;
+            CraftSection(tool, tier, () => tool == "" ? null : world.BenchTool(bench, tool, tier), group, details, true,
                 id => { world.SetRecipe(bench, id); OpenPage("inspect"); }, id => bench.Recipe == id, id => world.S.Backpack.Has(world.Data.Recipes[id].Inputs));
         }
         content.AddChild(details);
@@ -130,12 +130,12 @@ public partial class Game
     }
 
     /// <summary>
-    /// A boxed grid of recipe icons under a heading naming the tool they need, whose icon turns red while that tool is missing.
+    /// A boxed grid of recipe icons under a heading naming the tool they need, at or above <paramref name="tier"/>, whose icon turns red while that tool is missing.
     /// <paramref name="held"/> names the tool in use, or null when it is missing or none is needed.
     /// </summary>
-    private void CraftSection(string tool, Func<string?> held, IEnumerable<string> recipes, Label details, bool atBench, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready)
+    private void CraftSection(string tool, int tier, Func<string?> held, IEnumerable<string> recipes, Label details, bool atBench, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready)
     {
-        var section = new PanelContainer { Name = $"section_{(tool == "" ? "hand" : tool)}" };
+        var section = new PanelContainer { Name = $"section_{(tool == "" ? "hand" : tool)}{(tier > 0 ? $"_{tier}" : "")}" };
         section.AddThemeStyleboxOverride("panel", Box(new Color("1f342b"), 6, 10));
         content.AddChild(section);
         var column = new VBoxContainer(); section.AddChild(column);
@@ -143,7 +143,8 @@ public partial class Game
         var title = Label(tool == "" ? "No requirements" : "Required:", 13, Muted); title.AutowrapMode = TextServer.AutowrapMode.Off; heading.AddChild(title);
         if (tool != "")
         {
-            string plainest = world.Data.Items.Where(p => p.Value.Tool == tool).OrderBy(p => p.Value.Speed).First().Key;
+            string plainest = world.Data.Items.Where(p => p.Value.Tool == tool && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
+            string name = world.Data.ToolName(tool, tier);
             var badge = new TextureRect { Name = "badge", Texture = HotbarIcon(plainest), CustomMinimumSize = new Vector2(26, 26), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };
             heading.AddChild(badge);
             live.Add(() =>
@@ -153,8 +154,8 @@ public partial class Game
                 if (inUse != null) badge.Texture = HotbarIcon(inUse);
                 badge.Modulate = inUse != null ? Colors.White : new Color(1, .25f, .2f);
                 badge.TooltipText = inUse != null
-                    ? $"Needs a {tool} · using {world.Data.Name(inUse)}"
-                    : atBench ? $"Needs a {tool} in the bench's {tool} slot" : $"Needs a {tool} in your backpack{(tool == "chisel" ? " · knap a stone chisel from 2 stone" : "")}";
+                    ? $"Needs a {name} · using {world.Data.Name(inUse)}"
+                    : atBench ? $"Needs a {name} in the bench's {tool} slot" : $"Needs a {name} in your backpack{(tool == "chisel" && tier == 0 ? " · knap a stone chisel from 2 stone" : "")}";
             });
         }
         var grid = new GridContainer { Columns = GridColumns };
