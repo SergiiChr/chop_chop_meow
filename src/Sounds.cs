@@ -61,6 +61,7 @@ public partial class Sounds : Node
     /// <summary>The inventory sound for moving an item by hand.</summary>
     public static string ForItem(string item) => item switch
     {
+        Inventory.Coins => "move_coins_inventory",
         "raw_meat" or "cooked_meat" => "meat_inventory",
         "wood" or "stone" or "iron_ore" or "coal" => "wood_rocks_inventory",
         "iron_bar" or "steel_bar" or "iron_axe" or "iron_pick" or "steel_tools" => "pickup_gold",

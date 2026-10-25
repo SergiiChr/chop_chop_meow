@@ -1,11 +1,16 @@
 {
-  "daySeconds": 420,
+  "daySeconds": 840,
   "nightStarts": 0.7,
   "tradeSeconds": 30,
-  "hireCost": 24,
-  "dailyWage": 8,
+  "hireOffers": [
+    { "upfront": 40, "wage": 5 },
+    { "upfront": 24, "wage": 8 },
+    { "upfront": 10, "wage": 12 }
+  ],
+  "campfireHours": 4,
   "gatherSeconds": 2.0,
   "respawnSeconds": 30,
+  "sightRadius": 20,
   "items": {
     "wood": {
       "name": "Wood",
@@ -71,6 +76,11 @@
       "name": "Cooked meat",
       "price": 5,
       "color": "9a5a32"
+    },
+    "coins": {
+      "name": "Coins",
+      "price": 1,
+      "color": "e3b94a"
     }
   },
   "buildings": {
@@ -197,6 +207,6 @@
       "seconds": 6
     }
   },
-  "hungerPerSecond": 0.12,
-  "thirstPerSecond": 0.16
+  "hungerHours": 24,
+  "thirstHours": 12
 }

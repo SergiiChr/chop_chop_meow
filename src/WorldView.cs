@@ -54,6 +54,28 @@ public partial class WorldView : Node3D
     private static readonly StandardMaterial3D GhostValid = Flat(new Color(.55f, .95f, .45f, .45f));
     private static readonly StandardMaterial3D GhostBlocked = Flat(new Color(1, .35f, .3f, .5f));
     private static readonly StandardMaterial3D NightGlass = Mat("ffd58a", .3f, 0, 1.6f);
+    private readonly ShaderMaterial fog = new() { Shader = new Shader { Code = FogShader } };
+    private Image explored = null!;
+    private ImageTexture exploredTexture = null!;
+    private int exploredRevision = -1;
+    // Drawn over every mesh: black where never explored, a grey wash over remembered ground, clear inside the sight circle.
+    // Texel centres sit on whole tiles, matching where the simulation measures sight.
+    private const string FogShader = """
+        shader_type spatial;
+        render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, shadows_disabled;
+        uniform sampler2D explored : filter_linear, repeat_disable;
+        uniform vec2 player;
+        uniform float radius;
+        uniform float map_size;
+        uniform vec3 memory : source_color;
+        void fragment() {
+            vec2 at = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xz;
+            float seen = texture(explored, (at + 0.5) / map_size).r;
+            float live = 1.0 - smoothstep(radius - 1.5, radius, distance(at, player));
+            ALBEDO = memory * seen;
+            ALPHA = (1.0 - live) * mix(1.0, 0.62, seen);
+        }
+        """;
 
     private static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
 
@@ -75,6 +97,11 @@ public partial class WorldView : Node3D
         sun.Basis = Basis.LookingAt(new Vector3(1, -1.25f, -.45f), Vector3.Up);
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
+        explored = Image.CreateFromData(World.MapSize, World.MapSize, false, Image.Format.L8, World.S.Explored);
+        exploredTexture = ImageTexture.CreateFromImage(explored);
+        fog.SetShaderParameter("explored", exploredTexture);
+        fog.SetShaderParameter("map_size", World.MapSize);
+        GetTree().NodeAdded += Fog;
         BuildGround(scene);
         BuildEffects(scene);
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root);
@@ -98,7 +125,25 @@ public partial class WorldView : Node3D
         return ring;
     }
 
-    public override void _ExitTree() => World.PlayerActed -= PlayerActed;
+    public override void _ExitTree() { World.PlayerActed -= PlayerActed; GetTree().NodeAdded -= Fog; }
+
+    /// <summary>Every mesh in the scene, including ones spawned later, takes the fog as its overlay.</summary>
+    private void Fog(Node node)
+    {
+        if (node is GeometryInstance3D geometry && scene.IsAncestorOf(geometry)) geometry.MaterialOverlay = fog;
+    }
+
+    private void UpdateFog()
+    {
+        if (AnimationReview) { fog.SetShaderParameter("radius", 1e6f); return; }
+        fog.SetShaderParameter("player", World.Player);
+        fog.SetShaderParameter("radius", World.Data.SightRadius);
+        fog.SetShaderParameter("memory", new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
+        if (exploredRevision == World.ExploredRevision) return;
+        exploredRevision = World.ExploredRevision;
+        explored.SetData(World.MapSize, World.MapSize, false, Image.Format.L8, World.S.Explored);
+        exploredTexture.Update(explored);
+    }
 
     private void PlayerActed(ActorAction action, Vector2 target)
     {
@@ -212,13 +257,21 @@ public partial class WorldView : Node3D
     public Thing? Pick(Vector2 screen)
     {
         SyncCamera();
-        Thing? best = null; float nearest = float.MaxValue;
-        foreach (var t in World.S.Things)
+        Thing? best = null, crown = null; float nearest = float.MaxValue, nearestCrown = float.MaxValue;
+        // Hits follow what is drawn, including memories, but only things that still exist can be picked.
+        foreach (var known in World.Known)
         {
-            if (t.Remaining <= 0 && t.IsResource && t.Kind != "berries") continue;
-            if (RayHits(screen, t.Pos, HitsOf(t), out float d) && d < nearest) { nearest = d; best = t; }
+            if (known.Remaining <= 0 && known.IsResource && known.Kind != "berries" || World.Find(known.Id) is not Thing t) continue;
+            var hits = HitsOf(known);
+            // A tree's first hit is its trunk; a crown only wins when nothing else is under the cursor, so things behind it stay clickable.
+            if (t.Kind == "tree" && !RayHits(screen, t.Pos, hits.Take(1), out _))
+            {
+                if (RayHits(screen, t.Pos, hits.Skip(1), out float c) && c < nearestCrown) { nearestCrown = c; crown = t; }
+                continue;
+            }
+            if (RayHits(screen, t.Pos, hits, out float d) && d < nearest) { nearest = d; best = t; }
         }
-        return best;
+        return best ?? crown;
     }
 
     private static readonly Hit[] PersonHit = { new(.38f, 0, 1.75f) };
@@ -226,7 +279,7 @@ public partial class WorldView : Node3D
     {
         SyncCamera();
         Worker? best = null; float nearest = float.MaxValue;
-        foreach (var w in World.S.Workers)
+        foreach (var w in World.S.Workers.Where(w => World.Sees(w.Pos)))
             if (RayHits(screen, w.Pos, PersonHit, out float d) && d < nearest) { nearest = d; best = w; }
         return best;
     }
@@ -272,13 +325,14 @@ public partial class WorldView : Node3D
         float dt = Paused ? 0 : Math.Min((float)delta, .1f);
         Elapsed += dt;
         SyncCamera();
-        if (AnimationReview) { UpdateReview(); overlay.QueueRedraw(); return; }
+        if (AnimationReview) { UpdateReview(); UpdateFog(); overlay.QueueRedraw(); return; }
         if (dt > 0) UpdateActors(dt);
         SyncThings(dt);
         if (dt > 0) { SyncWolves(dt); SyncCarts(dt); }
         UpdateEffects(dt);
         UpdateMarkers();
         UpdateLighting();
+        UpdateFog();
         overlay.QueueRedraw();
     }
 
@@ -325,7 +379,7 @@ public partial class WorldView : Node3D
             playerRig.Root.Position = To3(player.Position) + forward * .8f * tip + Vector3.Up * .17f * tip;
             playerRig.Root.Rotation = new Vector3(-Mathf.Pi / 2 * tip, player.Yaw, 0);
         }
-        playerRig.Root.Visible = !World.Dead || World.S.Mauled;
+        playerRig.Root.Visible = (!World.Dead || World.S.Mauled) && World.S.Sheltered == 0;
         Work(player, subject);
         foreach (var worker in World.S.Workers)
         {
@@ -341,6 +395,7 @@ public partial class WorldView : Node3D
             if (work == ActorAction.Hammer && assignment?.Processing != true) work = ActorAction.Idle;
             state.Update(worker.Pos, work, assignment?.Pos ?? worker.Pos, dt);
             Pose(entry.Rig, state, ActorAnimation.Tool(work));
+            entry.Rig.Root.Visible = World.Sees(worker.Pos);
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry ? null : assignment);
         }
         foreach (int id in crew.Keys.Where(id => World.S.Workers.All(w => w.Id != id)).ToArray())
@@ -410,7 +465,7 @@ public partial class WorldView : Node3D
     private void SyncThings(float dt)
     {
         var seen = new HashSet<int>();
-        foreach (var t in World.S.Things)
+        foreach (var t in World.Known)
         {
             seen.Add(t.Id);
             if (!props.TryGetValue(t.Id, out var prop) || prop.Kind != t.Kind)
@@ -480,7 +535,7 @@ public partial class WorldView : Node3D
             case "furnace":
                 prop.Glow!.Visible = t.Processing;
                 prop.Light!.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
-                Smoke(prop, t, t.Processing, dt);
+                Smoke(prop, t, t.Processing, dt, FurnaceSmoke);
                 break;
             case "reinforced":
                 float heat = t.Heat / 100;
@@ -490,7 +545,7 @@ public partial class WorldView : Node3D
                 float lift = 18 * (1 - pumping.GetValueOrDefault(t.Id));
                 prop.Lever!.RotationDegrees = new Vector3(0, 0, lift);
                 for (int i = 0; i < prop.Pleats.Length; i++) prop.Pleats[i].RotationDegrees = new Vector3(0, 0, lift * (i + 1) / (prop.Pleats.Length + 1));
-                Smoke(prop, t, t.Processing || heat > .3f, dt);
+                Smoke(prop, t, t.Processing || heat > .3f, dt, ForgeSmoke);
                 break;
             case "campfire":
                 bool burning = t.Burn > 0;
@@ -499,9 +554,11 @@ public partial class WorldView : Node3D
                 prop.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
                 prop.Light!.LightEnergy = burning ? (1.2f + flicker * .3f) * (.35f + night * 1.4f) : 0;
                 if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Flat(new Color("ff9a3a")), 1, .5f, 1.1f, -1.4f, .025f);
-                Smoke(prop, t, burning, dt);
+                Smoke(prop, t, burning, dt, CampfireSmoke);
                 break;
             case "chest" or "grave":
+                // Remembered boxes carry no inventory, so the lid stays as it was last seen.
+                if (!World.Sees(t.Pos)) break;
                 int count = t.Inventory.Count;
                 if (!first && count != prop.LastCount) prop.Puff = .9f;
                 prop.LastCount = count;
@@ -530,13 +587,19 @@ public partial class WorldView : Node3D
 
     private static float Ease(float t) => t * t * (3 - 2 * t);
 
-    private void Smoke(Prop prop, Thing t, bool active, float dt)
+    // Campfire, furnace and bellows furnace smoke: the coal forge's plume is darker, denser and wider.
+    private readonly record struct SmokeStyle(float Every, Color Color, float Size, float Grow);
+    private static readonly SmokeStyle CampfireSmoke = new(.5f, new Color(.62f, .62f, .6f, .38f), .14f, 2.2f);
+    private static readonly SmokeStyle FurnaceSmoke = new(.3f, new Color(.58f, .58f, .56f, .42f), .14f, 2.4f);
+    private static readonly SmokeStyle ForgeSmoke = new(.16f, new Color(.36f, .36f, .36f, .55f), .2f, 2.8f);
+
+    private void Smoke(Prop prop, Thing t, bool active, float dt, SmokeStyle smoke)
     {
         if (!active || dt <= 0) return;
         prop.Puff -= dt;
         if (prop.Puff > 0) return;
-        prop.Puff = .5f;
-        Burst(To3(t.Pos) + prop.Vent, Flat(new Color(.62f, .62f, .6f, .38f)), 1, .25f, 2.4f, -.45f, .14f, 2.2f);
+        prop.Puff = smoke.Every;
+        Burst(To3(t.Pos) + prop.Vent, Flat(smoke.Color), 1, .25f, 2.4f, -.45f, smoke.Size, smoke.Grow);
     }
 
     /// <summary>Trees in front of the player, a worker or a structure turn see-through instead of hiding them.</summary>
@@ -549,7 +612,7 @@ public partial class WorldView : Node3D
             if (t.Kind != "tree" || t.Remaining <= 0 || !props.TryGetValue(t.Id, out var prop)) continue;
             if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
             bool covers = !World.Dead && TreeCoversPerson(t, World.Player) ||
-                World.S.Workers.Any(w => TreeCoversPerson(t, w.Pos)) ||
+                World.S.Workers.Any(w => World.Sees(w.Pos) && TreeCoversPerson(t, w.Pos)) ||
                 structures.Any(o => Covers(t, o));
             float fade = Mathf.MoveToward(prop.Fade, covers ? .68f : 0, Math.Max(dt, .016f) * 3);
             if (Math.Abs(fade - prop.Fade) < .001f) continue;
@@ -572,6 +635,7 @@ public partial class WorldView : Node3D
             model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(running ? moved : World.Player - wolf.Pos, model.Yaw), Math.Min(1, dt * 10));
             model.Last = wolf.Pos;
             model.Root.Position = To3(wolf.Pos);
+            model.Root.Visible = World.Sees(wolf.Pos);
             model.Root.Rotation = new Vector3(0, model.Yaw, 0);
             if (wolf.Leap > 0) model.Leap(1 - wolf.Leap / World.LeapSeconds);
             else if (wolf.Feeding) model.Feed(Elapsed + wolf.GetHashCode() % 7);
@@ -589,7 +653,7 @@ public partial class WorldView : Node3D
         {
             var sign = World.Find(order.Signpost);
             float phase = order.Elapsed / World.Data.TradeSeconds;
-            var pos = sign == null ? new Vector2(49, 24) : sign.Pos.Lerp(new Vector2(49, 24), phase < .5f ? phase * 2 : (1 - phase) * 2);
+            var pos = sign == null ? World.Village : sign.Pos.Lerp(World.Village, phase < .5f ? phase * 2 : (1 - phase) * 2);
             if (!carts.TryGetValue(order, out var cart))
             {
                 cart = new WorldModels.CartModel { Last = pos };
@@ -600,6 +664,7 @@ public partial class WorldView : Node3D
             cart.Yaw = Mathf.LerpAngle(cart.Yaw, ActorAnimation.Yaw(moved, cart.Yaw), Math.Min(1, dt * 8));
             cart.Last = pos;
             cart.Root.Position = To3(pos);
+            cart.Root.Visible = World.Sees(pos);
             cart.Root.Rotation = new Vector3(0, cart.Yaw, 0);
             cart.Roll(cart.Distance);
             // The courier walks with arms trailing back to the cart handle.
@@ -619,7 +684,7 @@ public partial class WorldView : Node3D
         Mark(selectRing, World.Find(Selected), 0);
         Mark(hoverRing, Hover != Selected ? World.Find(Hover) : null, .004f);
         var worker = World.S.Workers.FirstOrDefault(w => w.Id == SelectedWorker);
-        workerRing.Visible = worker != null;
+        workerRing.Visible = worker != null && World.Sees(worker.Pos);
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
@@ -662,7 +727,7 @@ public partial class WorldView : Node3D
         environment.BackgroundColor = new Color("879c69").Lerp(new Color("1b2733"), night);
     }
 
-    // ---------- 2D overlay: names, progress and the landmark guide ----------
+    // ---------- 2D overlay: names, progress and forge heat ----------
 
     private void Tag(Vector2 at, string text)
     {
@@ -675,28 +740,24 @@ public partial class WorldView : Node3D
     {
         if (World == null) return;
         if (AnimationReview) { PaintReview(); return; }
-        foreach (var t in World.S.Things.Where(t => t.Processing && World.Data.Recipes.ContainsKey(t.Recipe)))
+        foreach (var t in World.S.Things.Where(t => t.Processing && World.Sees(t.Pos) && World.Data.Recipes.ContainsKey(t.Recipe)))
         {
             var p = Screen(t.Pos); var r = World.Data.Recipes[t.Recipe];
             overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), new Color("2b4135"));
             overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), new Color("e5bf68"));
         }
+        // Forge heat under each bellows furnace, with a tick at the clear bar steel needs.
+        foreach (var t in World.S.Things.Where(t => t.Kind == "reinforced" && World.Sees(t.Pos)))
+        {
+            var p = Screen(t.Pos) + new Vector2(-28, 18);
+            overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), new Color("2b4135"));
+            overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? new Color("f0a03c") : new Color("8a5a46"));
+            overlay.DrawLine(p + new Vector2(56 * World.SteelHeat / 100, -2), p + new Vector2(56 * World.SteelHeat / 100, 7), new Color("f2e8cf"), 2);
+        }
         // Only the hovered object is named; the side panel already names the selection.
         var hovered = World.Find(Hover);
         if (hovered != null) Tag(Screen(hovered.Pos, HitsOf(hovered).Max(h => h.Top) + .2f) - new Vector2(0, 8), World.Data.Name(hovered.Kind));
-        foreach (var w in World.S.Workers.Where(w => w.Id == HoverWorker || w.Id == SelectedWorker))
+        foreach (var w in World.S.Workers.Where(w => World.Sees(w.Pos) && (w.Id == HoverWorker || w.Id == SelectedWorker)))
             Tag(Screen(w.Pos, 2.05f), w.Name);
-        // The landmark guide follows the player's position rather than assuming they remain at spawn.
-        string Direction(Vector2 target)
-        {
-            var d = Screen(target) - Screen(World.Player);
-            if (d.Length() < 95) return "HERE";
-            if (Math.Abs(d.X) > Math.Abs(d.Y) * 2) return d.X > 0 ? "→" : "←";
-            if (Math.Abs(d.Y) > Math.Abs(d.X) * 2) return d.Y > 0 ? "↓" : "↑";
-            return d.Y > 0 ? d.X > 0 ? "↘" : "↙" : d.X > 0 ? "↗" : "↖";
-        }
-        // Point only toward what the current objective sends the player to find.
-        string? guide = World.S.Goal switch { 2 => $"IRON {Direction(World.CliffOf("iron").Center)}", 5 => $"COAL {Direction(World.CliffOf("coal").Center)}", _ => null };
-        if (guide != null) overlay.DrawString(font, new Vector2(25, GetViewport().GetVisibleRect().Size.Y - 210), guide, HorizontalAlignment.Left, -1, 13, new Color("f4ecd3"));
     }
 }

@@ -21,6 +21,14 @@ public partial class Game
         Dynamic(() => $"Batch: {Cost(world.BatchCost(t))}\n{(t.Processing ? $"Working · {t.Progress:0.0}/{recipe.Seconds:0}s" : "Waiting for ingredients / temperature")}", 14, Muted);
     }
 
+    /// <summary>Bellows furnace temperature with the clear bar that steel needs.</summary>
+    private void HeatGauge(Thing t)
+    {
+        Dynamic(() => $"HEAT  {t.Heat:0}°  ·  {(t.Heat >= World.SteelHeat ? "steel progressing" : t.Processing ? $"burning coal · pump above {World.SteelHeat:0}°" : $"pump above {World.SteelHeat:0}°")}", 15, new Color("edc17c"));
+        var gauge = new HeatBar { Level = () => t.Heat, CustomMinimumSize = new Vector2(0, 22), Name = "heat" };
+        content.AddChild(gauge); live.Add(() => { if (GodotObject.IsInstanceValid(gauge)) gauge.QueueRedraw(); });
+    }
+
     /// <summary>The item's icon above a box showing what the station holds.</summary>
     private VBoxContainer MachineSlot(Thing t, string item, bool input)
     {
@@ -44,5 +52,19 @@ public partial class Game
         });
         column.AddChild(cell);
         return column;
+    }
+}
+
+/// <summary>A 0–100° bar with a marker at the steel temperature; the fill turns warm once it clears the marker.</summary>
+public partial class HeatBar : Control
+{
+    public System.Func<float> Level { get; set; } = () => 0;
+
+    public override void _Draw()
+    {
+        float level = Mathf.Clamp(Level() / 100, 0, 1), clear = World.SteelHeat / 100 * Size.X;
+        DrawRect(new Rect2(Vector2.Zero, Size), new Color("1c2b24"));
+        DrawRect(new Rect2(Vector2.Zero, new Vector2(Size.X * level, Size.Y)), Level() >= World.SteelHeat ? new Color("f0a03c") : new Color("8a5a46"));
+        DrawLine(new Vector2(clear, -3), new Vector2(clear, Size.Y + 3), new Color("f2e8cf"), 3);
     }
 }
