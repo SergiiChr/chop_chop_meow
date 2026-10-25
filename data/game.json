@@ -51,6 +51,11 @@
       "price": 1.2,
       "color": "aab2af"
     },
+    "torch": {
+      "name": "Torch",
+      "price": 2,
+      "color": "e8913a"
+    },
     "stone_chisel": {
       "name": "Stone chisel",
       "price": 3,
@@ -139,7 +144,7 @@
       "color": "e49488"
     },
     "water": {
-      "name": "Fresh water",
+      "name": "Water bottle",
       "price": 2,
       "color": "88cbe0"
     },
@@ -296,6 +301,18 @@
       "output": "stone_chisel",
       "amount": 1,
       "seconds": 8
+    },
+    "torch": {
+      "name": "Torch",
+      "station": "bench",
+      "hand": true,
+      "tool": "chisel",
+      "inputs": {
+        "wood": 3
+      },
+      "output": "torch",
+      "amount": 1,
+      "seconds": 10
     },
     "planks": {
       "name": "Wood planks",

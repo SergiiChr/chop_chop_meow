@@ -17,6 +17,10 @@ public sealed class ActorRig
     public readonly Node3D Root = new();
     private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate;
     private readonly Dictionary<string, Node3D> tools = new();
+    private readonly Node3D torch;
+    /// <summary>The torch flame and its light, animated by the view while the torch burns.</summary>
+    public readonly Node3D Flame;
+    public readonly OmniLight3D TorchLight;
 
     public ActorRig(ActorSkin skin)
     {
@@ -69,6 +73,25 @@ public sealed class ActorRig
         Box(crate, new Vector3(.44f, .04f, .32f), new Vector3(0, .1f, 0), Mat("a9824f"));
         Box(crate, new Vector3(.44f, .04f, .32f), new Vector3(0, -.1f, 0), Mat("a9824f"));
         BuildTools();
+        (torch, Flame, TorchLight) = BuildTorch();
+    }
+
+    /// <summary>
+    /// A torch held forward in the left fist.
+    /// The flame leans back by the forearm's angle in the holding pose, so it burns upright while the arm is raised.
+    /// </summary>
+    private (Node3D Torch, Node3D Flame, OmniLight3D Light) BuildTorch()
+    {
+        var holder = Pivot(elbowL, new Vector3(0, -.27f, .01f));
+        Cylinder(holder, .024f, .03f, .52f, new Vector3(0, 0, .12f), Mat("6e4a2e", .8f), new Vector3(90, 0, 0), 6);
+        Cylinder(holder, .045f, .04f, .1f, new Vector3(0, 0, .37f), Mat("3a2a20", .9f), new Vector3(90, 0, 0), 7);
+        var flame = Pivot(holder, new Vector3(0, 0, .42f), new Vector3(90, 0, 0));
+        Post(flame, .07f, 0, .24f, Vector3.Zero, Flat(new Color("ff8a2a", .9f)), 7);
+        Post(flame, .045f, 0, .17f, new Vector3(.015f, 0, .01f), Flat(new Color("ffd36a", .95f)), 7);
+        var light = new OmniLight3D { Position = new Vector3(0, .2f, 0), OmniRange = 5, LightColor = new Color("ff9a45"), LightEnergy = 0, ShadowEnabled = false, OmniAttenuation = 1.4f };
+        flame.AddChild(light);
+        holder.Visible = false;
+        return (holder, flame, light);
     }
 
     private (Node3D Hip, Node3D Knee) Leg(float x, string trousers, string boots)
@@ -123,7 +146,7 @@ public sealed class ActorRig
         }
     }
 
-    public void Show(Pose pose, string? tool, bool carrying)
+    public void Show(Pose pose, string? tool, bool carrying, bool lit = false)
     {
         torso.RotationDegrees = new Vector3(pose.Lean, pose.Twist, 0);
         head.RotationDegrees = new Vector3(pose.Head - pose.Lean * .4f, -pose.Twist * .5f, 0);
@@ -138,6 +161,7 @@ public sealed class ActorRig
         hips.Position = new Vector3(0, Math.Max(Reach(pose.SwingL, pose.KneeL), Reach(pose.SwingR, pose.KneeR)) + Sole, 0);
         foreach (var (name, node) in tools) node.Visible = name == tool;
         crate.Visible = carrying;
+        torch.Visible = lit;
     }
 
     private static float Reach(float swing, float knee) =>

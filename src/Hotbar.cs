@@ -136,6 +136,7 @@ public partial class Game
         }
         else if (World.IsConsumable(id)) Act(() => world.Consume(id));
         else if (id == "crate") PlaceCrate(id);
+        else if (id == "torch") Act(() => world.LightTorch());
         else if (world.Data.Items.ContainsKey(id)) Notify($"Selected {world.Data.Name(id)}. Carried tools work with Space and gathering.");
         else Notify($"Unknown hotbar item: {id}.");
         RefreshLive();

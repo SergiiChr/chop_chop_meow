@@ -46,6 +46,9 @@ public static class SimulationChecks
         CheckMarketTakesOnlyCrates(data);
         CheckLegacySteelTools(data);
         CheckNoToolDeadlocks(data);
+        CheckTorch(data);
+        CheckTorchHoldsOffLoneWolves(data);
+        CheckWaterStacksOnlyInCrates(data);
         CheckActualProgression(data);
         GD.Print("SELF-TEST PASS");
     }
@@ -1083,6 +1086,54 @@ public static class SimulationChecks
         world.S.Backpack.Add("stone_chisel", 1);
         SafeTick(world, data.Recipes["wood_parts"].Seconds);
         Require(world.S.Backpack["wood_parts"] == 2, "it should continue once the tool is back");
+    }
+
+    private static void CheckTorch(GameData data)
+    {
+        var world = EmptyWorld(data);
+        world.S.Backpack.Add("wood", 3);
+        Require(!world.Craft("torch") && !world.LightTorch() && world.S.Torch == 0, "a torch needs a chisel to make and a torch to light");
+        world.S.Backpack.Add("stone_chisel", 1);
+        Require(world.Craft("torch") && world.S.Backpack["wood"] == 0, "a torch should take 3 wood and nothing else");
+        SafeTick(world, data.Recipes["torch"].Seconds + .25f);
+        world.S.Backpack.Add("torch", 1);
+        Require(world.S.Backpack["torch"] == 2 && world.LightTorch() && world.S.Backpack["torch"] == 1 && world.S.Torch == data.CampfireSeconds,
+                "lighting a torch should use one up and burn as long as a campfire");
+        Require(!world.LightTorch() && world.S.Backpack["torch"] == 1, "a second torch should not be wasted while one burns");
+        SafeTick(world, data.CampfireSeconds + .25f);
+        Require(world.S.Torch == 0 && world.S.Backpack["torch"] == 1, "a torch should burn out for good");
+        world.LightTorch(); world.Die();
+        Require(world.S.Torch == 0, "a torch should go out when the player falls");
+    }
+
+    private static void CheckTorchHoldsOffLoneWolves(GameData data)
+    {
+        var world = NightWorld(data);
+        world.S.Backpack.Add("torch", 1); world.LightTorch(); world.S.Health = 40;
+        var wolf = new Wolf { Pos = world.Player + new Vector2(8, 0), Health = 4 };
+        world.S.Wolves.Add(wolf);
+        for (int i = 0; i < 100; i++) { world.S.Hunger = world.S.Thirst = 100; world.Tick(.1f); }
+        Require(world.S.Health >= 40 && !world.S.Mauled && wolf.Leap == 0 && Math.Abs(wolf.Pos.DistanceTo(world.Player) - World.StalkDistance) < .3f,
+                "with a torch a lone wolf should follow at the edge of its light, not bite or leap");
+        Require(world.S.Wolves.Count < World.PackSize, "the pack should gather slowly");
+
+        var pack = NightWorld(data);
+        pack.S.Backpack.Add("torch", 1); pack.LightTorch();
+        for (int i = 0; i < World.PackSize; i++)
+            pack.S.Wolves.Add(new Wolf { Pos = pack.Player + Vector2.Right.Rotated(i * Mathf.Tau / World.PackSize) * World.StalkDistance, Health = 4 });
+        for (int i = 0; i < 40; i++) { pack.S.Hunger = pack.S.Thirst = 100; pack.Tick(.1f); }
+        Require(pack.S.Health < 100, $"{World.PackSize} wolves around a torch should attack");
+    }
+
+    private static void CheckWaterStacksOnlyInCrates(GameData data)
+    {
+        var world = EmptyWorld(data);
+        world.S.Backpack.Add("water", 3);
+        Require(world.S.Backpack.UsedSlots == 3, "loose water bottles should take a slot each");
+        var crate = world.NewCrate(); crate.Add("water", data.CrateCapacity);
+        Require(crate.UsedSlots == 1 && crate.ShownSlots == 1, "water bottles should stack inside a crate");
+        var chest = world.Add("chest", new Vector2(10, 10));
+        Require(crate.TransferTo(chest.Inventory, "water", 5) == 5 && chest.Inventory.UsedSlots == 5, "unpacked water should spread over one slot per bottle");
     }
 
     private static void CheckBenchTools(GameData data)

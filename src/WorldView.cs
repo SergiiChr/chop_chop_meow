@@ -373,7 +373,14 @@ public partial class WorldView : Node3D
         if (action == ActorAction.Walk && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool() : null);
-        Pose(playerRig, player, tool);
+        bool torch = World.S.Torch > 0 && !World.Dead;
+        Pose(playerRig, player, tool, torch);
+        if (torch)
+        {
+            float flicker = MathF.Sin(Elapsed * 13) * .5f + MathF.Sin(Elapsed * 29 + 1) * .5f;
+            playerRig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + MathF.Abs(MathF.Sin(Elapsed * 11)) * .3f, 1 - flicker * .1f);
+            playerRig.TorchLight.LightEnergy = (1 + flicker * .25f) * (.3f + night * 1.3f);
+        }
         if (World.S.Mauled)
         {
             // Tip backwards about the feet, then slide forward so the body lies centred on the player's tile.
@@ -414,11 +421,14 @@ public partial class WorldView : Node3D
         return rocky ? "footsteps_rocks" : "footsteps_default";
     }
 
-    private static void Pose(ActorRig rig, ActorState state, string? tool)
+    private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false)
     {
         rig.Root.Position = To3(state.Position);
         rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
-        rig.Show(ActorAnimation.PoseAt(state.Action, state.Time, state.Moving), tool, state.Action == ActorAction.Carry);
+        var pose = ActorAnimation.PoseAt(state.Action, state.Time, state.Moving);
+        // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
+        if (torch && state.Action is ActorAction.Idle or ActorAction.Walk) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
+        rig.Show(pose, tool, state.Action == ActorAction.Carry, torch);
     }
 
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>

@@ -241,7 +241,7 @@ public partial class Game : Node
     private void Backpack()
     {
         Dynamic(() => $"Health {world.S.Health:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {world.S.Workers.Sum(w => w.Wage):0}", 15);
-        AddInventoryGrid(() => world.S.Backpack, null, id => { if (World.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); }, "Food and water: click to consume. Crates: click to place. Drag onto the hotbar to assign.");
+        AddInventoryGrid(() => world.S.Backpack, null, id => { if (World.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch") world.LightTorch(); }, "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.");
         AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
     }
     private void Select(Thing t)
@@ -575,7 +575,7 @@ public partial class Game : Node
         var bench = world.Add("bench", new Vector2(19, 25.5f)); bench.Recipe = "crate"; bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("iron_hammer", 1);
         var crate = world.Add("crate", new Vector2(24.5f, 25.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("water", 4); world.S.Backpack.Add("iron_pick", 1);
-        foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1) }) world.S.Backpack.Add(item, count);
+        foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1), ("torch", 2) }) world.S.Backpack.Add(item, count);
         world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "bench", "pick", "reinforced", "steel_bar", "steel_tool" });
         // The review fixture is deliberately separate from a fresh playable game.
         world.Player = sign.Pos + Vector2.One; var offer = world.Data.HireOffers[1];
@@ -598,6 +598,7 @@ public partial class Game : Node
         if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
         if (OS.GetCmdlineUserArgs().Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
         if (OS.GetCmdlineUserArgs().Contains("--craft")) OpenPage("craft");
+        if (OS.GetCmdlineUserArgs().Contains("--torch")) { world.Player = new Vector2(18, 30); world.S.Backpack.Add("torch", 1); world.LightTorch(); ClosePanel(); }
         if (OS.GetCmdlineUserArgs().Contains("--crate")) { world.Player = crate.Pos + Vector2.One; Select(crate); }
         if (OS.GetCmdlineUserArgs().Contains("--anomaly")) { world.Player = crate.Pos + Vector2.One; CrateIntoCrate(crate, crate.Inventory, "crate"); }
         if (OS.GetCmdlineUserArgs().Contains("--collapse")) { world.Player = crate.Pos + Vector2.One; ClosePanel(); CrateIntoCrate(crate, crate.Inventory, "crate"); Collapse(crate); }
