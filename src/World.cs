@@ -133,6 +133,8 @@ public sealed class World
     private float gatherClock;
     private float attackClock;
     private float nightSpawn;
+    // Set by walking or gathering and cleared at the end of each tick: a busy player is not hammering.
+    private bool playerBusy;
     public World(GameData data, bool generate = true) { Data = data; if (generate) NewGame(); }
     public Vector2 Player { get => new(S.PlayerX, S.PlayerY); set { S.PlayerX = value.X; S.PlayerY = value.Y; } }
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
@@ -200,7 +202,9 @@ public sealed class World
     public void MovePlayer(Vector2 delta)
     {
         if (Downed) return;
-        if (S.Sheltered != 0 && delta != Vector2.Zero) S.Sheltered = 0;
+        if (delta == Vector2.Zero) return;
+        playerBusy = true;
+        if (S.Sheltered != 0) S.Sheltered = 0;
         var p = Player + delta;
         if (CanStand(p)) Player = p;
         else { if (CanStand(Player + new Vector2(delta.X, 0))) Player += new Vector2(delta.X, 0); if (CanStand(Player + new Vector2(0, delta.Y))) Player += new Vector2(0, delta.Y); }
@@ -216,6 +220,7 @@ public sealed class World
     public static string ResourceItem(Thing t) => t.Kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "loose_coal" => "coal", "wolf_corpse" => "raw_meat", _ => t.Kind };
     public void Gather(Thing t, float dt)
     {
+        playerBusy = true;
         if (!Near(t)) { gatherClock = 0; return; }
         var blocked = GatherBlock(t);
         if (blocked != null) { gatherClock = 0; return; }
@@ -241,6 +246,11 @@ public sealed class World
         Say($"+{amount} {Data.Name(item)}."); S.Milestones.Add("gather");
     }
     public void ResetGather() => gatherClock = 0;
+    /// <summary>The player hammers an anvil while standing by it with nothing else to do.</summary>
+    public bool PlayerHammers(Thing anvil) => !playerBusy && Near(anvil);
+    /// <summary>An anvil only works while the player or a paid worker is hammering at it, not merely standing near.</summary>
+    public bool Hammered(Thing anvil) => PlayerHammers(anvil) ||
+        S.Workers.Any(w => w.Assignment == anvil.Id && w.WageDebt <= 0 && w.WorkState == WorkerWorkState.Hammering);
     public string? PlacementBlock(string kind, Vector2 p)
     {
         if (!Data.Buildings.ContainsKey(kind)) return "Unknown building.";
@@ -625,10 +635,16 @@ public sealed class World
             }
             if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) continue;
             bool hot = t.Kind != "reinforced" || t.Heat >= SteelHeat;
-            bool atAnvil = t.Kind != "anvil" || Near(t) || S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt == 0 && w.Pos.DistanceTo(t.Pos) < 1.8f);
+            bool atAnvil = t.Kind != "anvil" || Hammered(t);
             if (!t.Processing && hot && atAnvil && t.Inventory.Has(BatchCost(t)))
             {
                 t.Inventory.Spend(BatchCost(t)); t.Processing = true; t.Progress = 0;
+            }
+            if (t.Processing && !hot)
+            {
+                // A cold forge mid-batch keeps burning coal from its slot at the batch fuel rate, but the steel waits for heat.
+                t.Burn = Math.Min(recipe.Seconds, t.Burn + dt);
+                if (t.Burn >= recipe.Seconds && t.Inventory.Remove("coal", 1) > 0) t.Burn = 0;
             }
             if (t.Processing && hot && atAnvil)
             {
@@ -657,6 +673,7 @@ public sealed class World
         if (!Night) { S.Wolves.Clear(); nightSpawn = 0; if (!Dead) S.Mauled = false; }
         else if (!sleeping) TickWolves(dt);
         if (!Dead && S.Health <= 0) Die();
+        playerBusy = false;
         UpdateGoal();
     }
     private void TickWolves(float dt)
