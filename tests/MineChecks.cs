@@ -195,7 +195,7 @@ public static class MineChecks
         world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.Single(World.IsCrate), 1);
         Require(world.Sell(sign), "a crate of berries should go to the village");
         Work(world, data.TradeSeconds + .5f);
-        int revenue = sign.Output![Inventory.Coins];
+        int revenue = sign.Wages![Inventory.Coins] + sign.Output![Inventory.Coins];
         Require(revenue > 0 && world.S.DayRevenue == revenue, "coins from a returned sale must count as the day's revenue");
 
         void NextDawn() { world.S.Time = world.Day * data.DaySeconds - .1f; world.S.Hunger = world.S.Thirst = 100; world.Tick(.2f, true); }

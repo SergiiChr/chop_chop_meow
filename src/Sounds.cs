@@ -99,7 +99,7 @@ public partial class Sounds : Node
     public void Play(string name, Vector2? at = null, float reach = Reach)
     {
         var streams = Variants(name);
-        if (streams.Length == 0) return;
+        if (streams.Length == 0 || silenced) return;
         float outside = at is Vector2 p ? OffScreen(p) : 0;
         float fade = outside <= 0 ? 1 : EdgeVolume * MathF.Pow(1 - Math.Min(1, outside / reach), 2);
         if (fade <= 0) return;
@@ -118,12 +118,15 @@ public partial class Sounds : Node
         Played++; Last = name;
     }
 
+    private bool silenced;
+
     /// <summary>
-    /// Stops every sound, and the night music for good.
+    /// Stops every sound, music included, for good ahead of quitting.
     /// The audio thread releases a stopped stream only on its next mix, so quitting must wait a moment after this, or Godot reports the stream as leaked.
     /// </summary>
     public void StopAll()
     {
+        silenced = true;
         ProcessMode = ProcessModeEnum.Disabled;
         foreach (var player in GetChildren().OfType<AudioStreamPlayer>()) player.Stop();
     }

@@ -140,7 +140,7 @@ public static class EconomyChecks
             }
             Require(world.Sell(sign), "the village should take a day's basket");
             Pass(world, world.Data.TradeSeconds + .5f);
-            coins += sign.Output!.Remove(Inventory.Coins, sign.Output[Inventory.Coins]);
+            coins += sign.Wages!.Remove(Inventory.Coins, sign.Wages[Inventory.Coins]) + sign.Output!.Remove(Inventory.Coins, sign.Output[Inventory.Coins]);
         }
         return coins;
     }

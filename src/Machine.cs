@@ -24,8 +24,10 @@ public partial class Game
     /// <summary>Switches a wood-or-coal station's fuel between batches.</summary>
     private void FuelToggle(Thing t)
     {
-        if (t.Kind is "furnace" or "cooktable" or "cannery")
-            AddButton($"Fuel: {world.Data.Name(t.Fuel)} · click to switch", () => { if (!t.Processing) { t.Fuel = t.Fuel == "wood" ? "coal" : "wood"; OpenPage("inspect"); } });
+        if (t.Kind is not ("furnace" or "cooktable" or "cannery")) return;
+        // A guest's switch comes back with the host's next update, so the label follows the building rather than the click.
+        var fuel = Button("", () => world.SetFuel(t, t.Fuel == "wood" ? "coal" : "wood")); content.AddChild(fuel);
+        live.Add(() => { if (GodotObject.IsInstanceValid(fuel)) fuel.Text = $"Fuel: {world.Data.Name(t.Fuel)} · click to switch"; });
     }
 
     /// <summary>Bellows furnace temperature with the clear bar that steel needs.</summary>

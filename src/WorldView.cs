@@ -41,6 +41,11 @@ public partial class WorldView : Node3D
     private readonly Dictionary<int, Prop> props = new();
     private readonly ActorState player = new();
     private ActorRig playerRig = null!;
+    private string playerShirt = "";
+    /// <summary>The other players in the game, keyed by their id.</summary>
+    private readonly Dictionary<int, Avatar> others = new();
+    // The host keeps the original teal; each guest keeps the first one free when it joined.
+    private static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
     private readonly Dictionary<int, (ActorRig Rig, ActorState State)> crew = new();
     private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
@@ -107,7 +112,7 @@ public partial class WorldView : Node3D
         GetTree().NodeAdded += Fog;
         BuildGround(scene);
         BuildEffects(scene);
-        playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root);
+        playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
         selectRing = Ring(new Color(.95f, .82f, .4f, .85f));
         hoverRing = Ring(new Color(1, .95f, .75f, .55f));
         workerRing = Ring(new Color(1, .8f, .3f, .8f));
@@ -148,11 +153,28 @@ public partial class WorldView : Node3D
         exploredTexture.Update(explored);
     }
 
-    private void PlayerActed(ActorAction action, Vector2 target)
+    private void PlayerActed(ActorAction action, Vector2 target) => Acted(World.S.Actor.Id, action, target);
+
+    /// <summary>Plays a swing, pump or kindling on the player who made it, here or at another machine.</summary>
+    public void Acted(int id, ActorAction action, Vector2 target)
     {
-        pulseAction = action; pulseTarget = target; pulseRemaining = ActorAnimation.Duration(action);
-        player.Time = 0;
+        if (id == World.Me.Id) { pulseAction = action; pulseTarget = target; pulseRemaining = ActorAnimation.Duration(action); player.Time = 0; }
+        else if (others.TryGetValue(id, out var other)) { other.Pulse = action; other.PulseTarget = target; other.PulseRemaining = ActorAnimation.Duration(action); other.State.Time = 0; }
     }
+
+    private sealed class Avatar(ActorRig rig, string shirt)
+    {
+        public readonly ActorRig Rig = rig;
+        public readonly string Shirt = shirt;
+        public readonly ActorState State = new();
+        public ActorAction Pulse;
+        public Vector2 PulseTarget;
+        public float PulseRemaining;
+    }
+
+    public bool ShowsPlayer(int id) => others.ContainsKey(id);
+
+    private static string ShirtOf(PlayerState p) => Shirts[p.Shirt % Shirts.Length];
 
     public ActorAction PlayerAnimation => player.Action;
     public float PlayerAnimationTime => player.Time;
@@ -339,16 +361,21 @@ public partial class WorldView : Node3D
         overlay.QueueRedraw();
     }
 
-    private string? HeldTool() => SelectedTool switch
+    private static string? HeldTool(string? selected, Inventory backpack) => selected switch
     {
-        "iron_axe" or "iron_pick" or "steel_axe" or "steel_pick" when World.S.Backpack[SelectedTool] > 0 => SelectedTool,
-        "wood_hammer" or "iron_hammer" or "steel_hammer" when World.S.Backpack[SelectedTool] > 0 => "hammer",
+        "iron_axe" or "iron_pick" or "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
+        "wood_hammer" or "iron_hammer" or "steel_hammer" when backpack[selected] > 0 => "hammer",
         _ => null
     };
 
     private void UpdateActors(float dt)
     {
         pumping.Clear();
+        if (ShirtOf(World.Me) != playerShirt)
+        {
+            playerShirt = ShirtOf(World.Me); playerRig.Root.QueueFree();
+            playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
+        }
         bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
         ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, SelectedTool);
         Vector2 target = Gathering && GatheringTarget != null ? GatheringTarget.Pos : World.Player;
@@ -372,24 +399,10 @@ public partial class WorldView : Node3D
         // A foot lands at each extreme of the stride.
         if (action == ActorAction.Walk && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
-        string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool() : null);
+        string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.S.Torch > 0 && !World.Dead;
         Pose(playerRig, player, tool, torch);
-        playerRig.Flame.Visible = World.S.TorchLit;
-        if (World.S.TorchLit)
-        {
-            float flicker = MathF.Sin(Elapsed * 13) * .5f + MathF.Sin(Elapsed * 29 + 1) * .5f, flare = World.TorchFlare / .5f;
-            playerRig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + MathF.Abs(MathF.Sin(Elapsed * 11)) * .3f, 1 - flicker * .1f) * (1 + flare * .25f);
-            // A swing fans the flame: the lit circle grows by a fifth and settles back.
-            playerRig.TorchLight.OmniRange = 5 * (1 + .2f * flare);
-            playerRig.TorchLight.LightEnergy = (1 + flicker * .25f + flare * .3f) * (.3f + night * 1.3f);
-        }
-        // Each strike of steel on flint throws a few sparks onto the torch head.
-        if (player.Action == ActorAction.Kindle && (player.Struck(.1875f) || player.Struck(.4375f) || player.Struck(.6875f) || player.Struck(.9375f)))
-        {
-            Burst(playerRig.Flame.GlobalPosition, Flat(new Color("ffd27a")), 7, 2.2f, .3f, 6, .022f);
-            Sounds?.Play("anvil_work");
-        }
+        Torch(playerRig, player, World.S.TorchLit, World.TorchFlare, null);
         if (World.S.Mauled)
         {
             // Tip backwards about the feet, then slide forward so the body lies centred on the player's tile.
@@ -400,6 +413,7 @@ public partial class WorldView : Node3D
         }
         playerRig.Root.Visible = (!World.Dead || World.S.Mauled) && World.S.Sheltered == 0;
         Work(player, subject);
+        UpdateOthers(dt);
         foreach (var worker in World.S.Workers)
         {
             if (!crew.TryGetValue(worker.Id, out var entry))
@@ -425,6 +439,56 @@ public partial class WorldView : Node3D
         {
             fades.Remove(crew[id].Rig.Root); crew[id].Rig.Root.QueueFree(); crew.Remove(id);
         }
+    }
+
+    /// <summary>The flame of a torch in hand, fanned by a swing, and the sparks of each strike while it is being lit.</summary>
+    private void Torch(ActorRig rig, ActorState state, bool lit, float flare, Vector2? at)
+    {
+        rig.Flame.Visible = lit;
+        if (lit)
+        {
+            float flicker = MathF.Sin(Elapsed * 13) * .5f + MathF.Sin(Elapsed * 29 + 1) * .5f; flare /= .5f;
+            rig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + MathF.Abs(MathF.Sin(Elapsed * 11)) * .3f, 1 - flicker * .1f) * (1 + flare * .25f);
+            // A swing fans the flame: the lit circle grows by a fifth and settles back.
+            rig.TorchLight.OmniRange = 5 * (1 + .2f * flare);
+            rig.TorchLight.LightEnergy = (1 + flicker * .25f + flare * .3f) * (.3f + night * 1.3f);
+        }
+        // Each strike of steel on flint throws a few sparks onto the torch head.
+        if (state.Action == ActorAction.Kindle && (state.Struck(.1875f) || state.Struck(.4375f) || state.Struck(.6875f) || state.Struck(.9375f)))
+        {
+            Burst(rig.Flame.GlobalPosition, Flat(new Color("ffd27a")), 7, 2.2f, .3f, 6, .022f);
+            Sounds?.Play("anvil_work", at);
+        }
+    }
+
+    /// <summary>The other players, posed from what their machines report: walking, the resource they work on, the tool in hand and their swings.</summary>
+    private void UpdateOthers(float dt)
+    {
+        foreach (var p in World.S.Players.Where(p => p != World.Me))
+        {
+            if (!others.TryGetValue(p.Id, out var other) || other.Shirt != ShirtOf(p))
+            {
+                other?.Rig.Root.QueueFree();
+                other = others[p.Id] = new Avatar(new ActorRig(ActorSkin.Player, ShirtOf(p)), ShirtOf(p));
+                other.State.Position = p.Pos; scene.AddChild(other.Rig.Root);
+            }
+            var state = other.State;
+            bool moving = p.Pos.DistanceSquaredTo(state.Position) > .000001f;
+            var target = World.Find(p.GatherTarget);
+            bool gathering = target != null && p.Pos.DistanceTo(target.Pos) < 2.5f;
+            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Held);
+            var facing = gathering ? target!.Pos : p.Pos;
+            if (!moving && other.PulseRemaining > 0) { action = other.Pulse; facing = other.PulseTarget; }
+            if (p.Mauled) action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
+            state.Update(p.Pos, action, facing, dt);
+            other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
+            if (action == ActorAction.Walk && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
+            Pose(other.Rig, state, ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool(p.Held, p.Backpack) : null), p.Torch > 0 && p.RespawnIn <= 0);
+            Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
+            other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
+            Work(state, gathering ? target : null);
+        }
+        foreach (int id in others.Keys.Where(id => World.S.Players.All(p => p.Id != id)).ToArray()) { others[id].Rig.Root.QueueFree(); others.Remove(id); }
     }
 
     private string FootstepSound(Vector2 p)
@@ -637,7 +701,7 @@ public partial class WorldView : Node3D
                 if (t.Kind == "crate") { prop.Body.Position = new Vector3(0, lifted * .35f, 0); prop.Body.RotationDegrees = new Vector3(lifted * 9 * MathF.Sin(Elapsed * 18), 0, lifted * 6 * MathF.Cos(Elapsed * 15)); }
                 break;
             case "hut":
-                bool near = !World.Dead && World.Player.DistanceTo(t.Pos) < 2.6f;
+                bool near = World.S.Players.Any(p => p.RespawnIn <= 0 && p.Pos.DistanceTo(t.Pos) < 2.6f);
                 // Running inside from a hunting pack slams the door instead of swinging it open.
                 if (dt > 0 && near && prop.Open == 0) Sounds?.Play(World.S.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
                 prop.Open = Mathf.MoveToward(prop.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
@@ -700,6 +764,7 @@ public partial class WorldView : Node3D
             if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
             bool covers = !World.Dead && TreeCoversPerson(t, World.Player) ||
                 World.S.Workers.Any(w => World.Sees(w) && TreeCoversPerson(t, w.Pos)) ||
+                World.S.Players.Any(p => p != World.Me && p.RespawnIn <= 0 && World.Sees(p.Pos) && TreeCoversPerson(t, p.Pos)) ||
                 structures.Any(o => Covers(t, o));
             float fade = Mathf.MoveToward(prop.Fade, covers ? .68f : 0, Math.Max(dt, .016f) * 3);
             if (Math.Abs(fade - prop.Fade) < .001f) continue;

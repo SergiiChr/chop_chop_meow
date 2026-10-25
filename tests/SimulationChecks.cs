@@ -35,6 +35,7 @@ public static class SimulationChecks
         CheckWolfHuntAndMeat(data);
         CheckWolfThroatLeap(data);
         CheckSleepAdvancesWorld(data);
+        CheckWageSlot(data);
         CheckSleepNeedsFoodAndWater(data);
         CheckCabinAndChaseIntoLight(data);
         CheckCoinStacks(data);
@@ -60,6 +61,7 @@ public static class SimulationChecks
         CheckWaterStacksOnlyInCrates(data);
         MineChecks.Run(data);
         CheckActualProgression(data);
+        MultiplayerChecks.Run(data);
         GD.Print("SELF-TEST PASS");
     }
 
@@ -310,14 +312,14 @@ public static class SimulationChecks
         world.Player = sign.Pos;
         float coinsBeforeSale = world.Coins, quotedPrice = world.KnownPrice("steel_axe");
         Require(world.Sell(sign), "market should sell the goods loaded into it");
-        Require(sign.Inventory.Count == 0 && world.Coins == coinsBeforeSale && output[Inventory.Coins] == 0,
+        Require(sign.Inventory.Count == 0 && world.Coins == coinsBeforeSale && sign.Wages![Inventory.Coins] == 0,
                 "sale removes goods at dispatch but does not pay before the cart returns");
         float loweredDemand = world.S.Demand["steel_axe"];
         Require(loweredDemand < 1 && world.KnownPrice("steel_axe") == quotedPrice, "selling should lower demand while the price sheet still shows old news");
         Require(!world.Sell(sign), "an empty market has nothing to sell");
         SafeTick(world, 30.1f);
-        Require(world.S.Orders.Count == 0 && output[Inventory.Coins] > 0 && world.Coins == coinsBeforeSale,
-                "sale proceeds should arrive in the market output when the cart returns");
+        Require(world.S.Orders.Count == 0 && sign.Wages![Inventory.Coins] > 0 && output[Inventory.Coins] == 0 && world.Coins == coinsBeforeSale,
+                "sale proceeds should arrive in the wage slot when the cart returns");
         Require(world.KnownPrice("steel_axe") < quotedPrice && world.PriceAge == 0, "the returning carter should bring today's lower price");
         world.S.Time += data.DaySeconds * 2;
         Require(world.S.Demand["steel_axe"] > loweredDemand && world.PriceAge == 2, "the sheet should age by whole days");
@@ -348,6 +350,7 @@ public static class SimulationChecks
         worker!.Tool = "iron_axe";
         world.Assign(worker, workTarget);
         SetCoins(world, 0);
+        sign.Wages!.Remove(Inventory.Coins, sign.Wages[Inventory.Coins]);
         world.S.Time = data.DaySeconds * world.Day - .1f;
         SafeTick(world, .2f);
         Require(worker!.WageDebt == cheap.Wage && workTarget.Remaining == 6 && worker.Bag.Count == 0,
@@ -382,7 +385,7 @@ public static class SimulationChecks
         world.Player = sign.Pos;
         Require(world.S.Backpack.TransferTo(sign.Inventory, crate, 1) == 1 && world.Sell(sign), "market should accept the purchased tools back in a crate");
         SafeTick(world, data.TradeSeconds + .1f);
-        int coins = world.Coins + sign.Output[Inventory.Coins];
+        int coins = world.Coins + sign.Wages![Inventory.Coins] + sign.Output[Inventory.Coins];
         float price = data.Items["steel_axe"].Price;
         Require(coins < 20000 - lot * price * 1.25f + lot * price,
                 "buying tools and selling them straight back must lose coins, and a bulk sale must be paid less than its full pre-sale price");
@@ -791,8 +794,8 @@ public static class SimulationChecks
         world.Sleep(hut);
         Require(world.S.Time > priorTime && world.Day > 1,
                 "sleep should advance the world clock through dawn");
-        Require(world.S.Orders.Count == 0 && world.Coins == 3 && sign.Output![Inventory.Coins] == 12,
-                "trade settlement and daily wages should both resolve during sleep");
+        Require(world.S.Orders.Count == 0 && sign.Wages![Inventory.Coins] == 12 - worker.Wage && world.Coins == worker.Wage + 3,
+                "trade settlement should fill the wage slot and the daily wage should come out of it during sleep");
         Require(worker.WageDebt == 0,
                 "a funded worker should receive the normal daily wage during sleep");
         Require(!furnace.Processing && furnace.Inventory["iron_bar"] > 0,
@@ -1047,7 +1050,7 @@ public static class SimulationChecks
         Require(world.Coins == beforeReturn && world.S.Orders.Count == 1,
                 "steel-tool payment should remain in transit until the trade delay elapses");
         SafeTick(world, .2f);
-        sign.Output!.TransferTo(world.S.Backpack, Inventory.Coins, sign.Output[Inventory.Coins]);
+        sign.Wages!.TransferTo(world.S.Backpack, Inventory.Coins, sign.Wages[Inventory.Coins]);
         var offer = data.HireOffers[1];
         Require(world.Coins >= offer.Upfront && world.S.Milestones.Contains("sold_steel"),
                 $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, upfront={offer.Upfront:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_pick"]}");
@@ -1698,10 +1701,33 @@ public static class SimulationChecks
         world.S.Backpack.TransferTo(sign.Inventory, PackCrate(world, ("steel_axe", 1)), 1);
         Require(world.Sell(sign), "a loaded crate should sell");
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(world.Coins == 5 && sign.Output![Inventory.Coins] == (int)(data.Items["steel_axe"].Price + data.Items["crate"].Price), "sale proceeds for the goods and their crate should arrive as whole coins in the market output");
+        Require(world.Coins == 5 && sign.Wages![Inventory.Coins] == (int)(data.Items["steel_axe"].Price + data.Items["crate"].Price), "sale proceeds for the goods and their crate should arrive as whole coins in the wage slot");
         world.S.Backpack.TransferTo(sign.Inventory, Inventory.Coins, 1);
         Require(!world.Sell(sign) && sign.Inventory[Inventory.Coins] == 1, "coins themselves cannot be sold");
         Require(!world.Buy(sign, Inventory.Coins, 1), "coins themselves cannot be bought");
+    }
+
+    private static void CheckWageSlot(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var sign = world.Add("signpost", new Vector2(10, 10));
+        world.Player = sign.Pos;
+        int full = sign.Wages!.StackOf(Inventory.Coins);
+        sign.Wages.Add(Inventory.Coins, full - 5);
+        world.S.Orders.Add(new TradeOrder { Goods = new() { ["wood"] = 1 }, Buying = false, Value = 12, Signpost = sign.Id });
+        SafeTick(world, data.TradeSeconds + .1f);
+        Require(sign.Wages[Inventory.Coins] == full && sign.Output![Inventory.Coins] == 7, "sale coins should top up the one-stack wage slot and spill the rest into the output");
+        world.S.Backpack.Add("wood", 1);
+        Require(world.Transfer(world.S.Backpack, sign.Wages, "wood", 1) == 0 && world.S.Backpack["wood"] == 1, "the wage slot should refuse anything but coins, even by hand");
+
+        var worker = AddWorker(world, sign.Pos);
+        sign.Wages.Remove(Inventory.Coins, full - 3);
+        SetCoins(world, 10);
+        world.PayWages();
+        Require(worker.WageDebt == 0 && sign.Wages[Inventory.Coins] == 0 && world.Coins == 10 - (worker.Wage - 3), "wages should come out of the wage slot first and the backpack after");
+        SetCoins(world, 0);
+        world.PayWages();
+        Require(worker.WageDebt == worker.Wage && sign.Output![Inventory.Coins] == 7, "wages should not be taken from the market output");
     }
 
     private static void CheckLegacySave(GameData data)
@@ -1713,13 +1739,13 @@ public static class SimulationChecks
         var json = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;
         json["Coins"] = 30;
         var post = json["Things"]!.AsArray().First(t => t!["Id"]!.GetValue<int>() == sign.Id)!;
-        post["Output"] = null; post["Inventory"]!["Slots"] = 18;
+        post["Output"] = null; post["Wages"] = null; post["Inventory"]!["Slots"] = 18;
         var order = json["Orders"]![0]!;
         order["Goods"] = new System.Text.Json.Nodes.JsonObject(); order["Item"] = "wood"; order["Quantity"] = 4;
         var loaded = EmptyWorld(data);
         loaded.Deserialize(json.ToJsonString());
         Require(loaded.Coins == 30 && loaded.S.Coins == null, "coins from an older save should move into the backpack");
-        Require(loaded.Find(sign.Id) is { Output.Slots: World.MarketSlots, Inventory.Slots: World.MarketSlots }, "an older signpost should get its market boxes");
+        Require(loaded.Find(sign.Id) is { Output.Slots: World.MarketSlots, Inventory.Slots: World.MarketSlots, Wages.Slots: 1 }, "an older signpost should get its market boxes");
         Require(loaded.S.Orders.Single().Goods.GetValueOrDefault("wood") == 4 && loaded.S.Orders.Single().Item == null, "an older single-item order should keep its goods");
         Require(!loaded.Serialize().Contains("\"Item\"") && !loaded.Serialize().Contains("\"Coins\""), "migrated fields should not be written back");
 

@@ -58,7 +58,7 @@ public sealed partial class World
     {
         if (!Near(mine)) { Say("Walk closer to the mine."); return; }
         var needs = MineNeeds(mine);
-        if (needs.Count == 0) return;
+        if (needs.Count == 0 || Forwarded("supply_mine", mine.Id)) return;
         if (needs.Sum(p => S.Backpack.TransferTo(mine.Inventory, p.Key, p.Value)) == 0) Say($"The mine still needs {Goods(needs)}.");
     }
 
