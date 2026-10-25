@@ -791,27 +791,24 @@ public static class WorldModels
         public WolfModel()
         {
             Body = Pivot(Root, Vector3.Zero);
-            var fur = Mat("6b6e6a"); var light = Mat("a5a69e"); var dark = Mat("44464a");
-            Add(Body, new CapsuleMesh { Radius = .2f, Height = 1f, RadialSegments = 10 }, fur, new Vector3(0, .62f, 0), new Vector3(90, 0, 0), new Vector3(1, 1, 1.05f));
-            Add(Body, new CapsuleMesh { Radius = .16f, Height = .7f, RadialSegments = 10 }, light, new Vector3(0, .54f, .02f), new Vector3(90, 0, 0));
+            var dark = Mat("353c36");
+            Add(Body, WolfShape.Body, WolfShape.Fur, Vector3.Zero);
             Head = Pivot(Body, new Vector3(0, .78f, .48f));
-            Sphere(Head, .16f, new Vector3(0, 0, .04f), fur, new Vector3(1, .95f, 1.1f), 10);
-            Cylinder(Head, .09f, .05f, .22f, new Vector3(0, -.04f, .26f), light, new Vector3(90, 0, 0), 8);
-            Sphere(Head, .03f, new Vector3(0, -.01f, .37f), dark, null, 6);
-            Post(Head, .05f, 0, .13f, new Vector3(.08f, .12f, 0), fur, 4);
-            Post(Head, .05f, 0, .13f, new Vector3(-.08f, .12f, 0), fur, 4);
-            Sphere(Head, .022f, new Vector3(.07f, .04f, .17f), Mat("e2a570", .3f, 0, 1.5f), null, 6);
-            Sphere(Head, .022f, new Vector3(-.07f, .04f, .17f), Mat("e2a570", .3f, 0, 1.5f), null, 6);
-            // Bared fangs under the muzzle.
-            Post(Head, .012f, 0, .05f, new Vector3(.03f, -.09f, .33f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
-            Post(Head, .012f, 0, .05f, new Vector3(-.03f, -.09f, .33f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
-            Tail = Pivot(Body, new Vector3(0, .7f, -.52f), new Vector3(-130, 0, 0));
-            Add(Tail, new CapsuleMesh { Radius = .07f, Height = .5f, RadialSegments = 8 }, fur, new Vector3(0, .22f, 0));
+            Add(Head, WolfShape.Head, WolfShape.Fur, Vector3.Zero);
+            Sphere(Head, .038f, new Vector3(0, -.027f, .366f), dark, new Vector3(1, .7f, .65f), 8);
+            foreach (float side in new[] { -1f, 1f })
+            {
+                Sphere(Head, .023f, new Vector3(side * .095f, .05f, .132f), dark, new Vector3(.7f, .75f, 1), 8);
+                Sphere(Head, .012f, new Vector3(side * .111f, .05f, .136f), Mat("d49a50", .4f, 0, .5f), null, 8);
+                Post(Head, .012f, 0, .045f, new Vector3(side * .035f, -.09f, .31f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
+            }
+            Tail = Pivot(Body, new Vector3(0, .7f, -.48f), new Vector3(-130, 0, 0));
+            WolfShape.Tail(Tail);
             int index = 0;
             foreach (var (x, z) in new[] { (.11f, .32f), (-.11f, .32f), (.11f, -.32f), (-.11f, -.32f) })
             {
                 Legs[index] = Pivot(Body, new Vector3(x, .5f, z));
-                Limb(Legs[index], .045f, .5f, new Vector3(0, .02f, 0), index < 2 ? fur : dark);
+                WolfShape.Leg(Legs[index], index >= 2);
                 index++;
             }
         }
@@ -821,7 +818,11 @@ public static class WorldModels
         {
             Body.Position = new Vector3(shift, lift, 0);
             Body.RotationDegrees = new Vector3(pitch, 0, roll);
-            for (int i = 0; i < 4; i++) Legs[i].RotationDegrees = new Vector3(i < 2 ? front : hind, 0, 0);
+            for (int i = 0; i < 4; i++)
+            {
+                Legs[i].Position = Legs[i].Position with { Y = .5f };
+                Legs[i].RotationDegrees = new Vector3(i < 2 ? front : hind, 0, 0);
+            }
             Head.RotationDegrees = new Vector3(head, 0, 0);
             Tail.RotationDegrees = new Vector3(tail, 0, 0);
         }
@@ -848,6 +849,14 @@ public static class WorldModels
         {
             Pose(-14, 22, 48 + MathF.Sin(time * 9) * 12, -150, -.1f, 14);
             Head.RotationDegrees += new Vector3(0, MathF.Sin(time * 13) * 18, 0);
+            // Plant each paw while the chest pitches down; the upper profiles stay buried in the shoulders/hips.
+            foreach (var leg in Legs)
+            {
+                float lowest = Math.Min(
+                    (Body.Transform * (leg.Transform * new Vector3(0, -.49f, -.03f))).Y,
+                    (Body.Transform * (leg.Transform * new Vector3(0, -.49f, .12f))).Y);
+                leg.Position += Vector3.Up * ((.01f - lowest) / Body.Basis.Y.Y);
+            }
         }
 
         /// <summary>A killed wolf buckles, then rolls onto its side with stiff legs as <paramref name="progress"/> runs 0 to 1.</summary>
