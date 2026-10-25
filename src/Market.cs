@@ -83,9 +83,9 @@ public partial class Game
         var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; rows.AddThemeConstantOverride("separation", 3);
         var scroll = new ScrollContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
         scroll.AddChild(rows); sheet.AddChild(scroll);
-        foreach (string id in world.Data.Market.Sells.Union(world.Data.Market.Buys.Keys))
+        foreach (string id in world.Data.Market.Sells.Keys.Union(world.Data.Market.Buys.Keys))
         {
-            bool sells = world.Data.Market.Sells.Contains(id), buys = world.Data.Market.Buys.ContainsKey(id);
+            bool sells = world.Data.Market.Sells.ContainsKey(id), buys = world.Data.Market.Buys.ContainsKey(id);
             var row = new HBoxContainer(); rows.AddChild(row);
             row.AddChild(new TextureRect { Texture = HotbarIcon(id), CustomMinimumSize = new Vector2(26, 26), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered });
             var name = Label(world.Lot(id) > 1 ? $"{world.Lot(id)} {world.Data.Name(id)}" : world.Data.Name(id), 14); name.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; name.AutowrapMode = TextServer.AutowrapMode.Off; name.ClipText = true; row.AddChild(name);
