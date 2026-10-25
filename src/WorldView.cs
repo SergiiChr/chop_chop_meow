@@ -574,7 +574,7 @@ public partial class WorldView : Node3D
         {
             var sign = World.Find(order.Signpost);
             float phase = order.Elapsed / World.Data.TradeSeconds;
-            var pos = sign == null ? new Vector2(49, 24) : sign.Pos.Lerp(new Vector2(49, 24), phase < .5f ? phase * 2 : (1 - phase) * 2);
+            var pos = sign == null ? World.Village : sign.Pos.Lerp(World.Village, phase < .5f ? phase * 2 : (1 - phase) * 2);
             if (!carts.TryGetValue(order, out var cart))
             {
                 cart = new WorldModels.CartModel { Last = pos };

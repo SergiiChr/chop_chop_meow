@@ -240,7 +240,7 @@ public static class SimulationChecks
         Require(fire.Inventory["wood"] > 0 && fire.Burn > 0,
                 "carried firewood should be deposited into the fire and consumed to sustain its burn");
         int storedBeforeBurn = fire.Inventory["wood"];
-        SafeTick(world, 61);
+        SafeTick(world, fire.Burn - 29);
         Require(fire.Inventory["wood"] < storedBeforeBurn && fire.Burn > 0,
                 "campfire should consume stored wood when its burn falls low");
     }
@@ -249,53 +249,77 @@ public static class SimulationChecks
     {
         var world = EmptyWorld(data);
         var sign = world.Add("signpost", new Vector2(10, 10));
+        var output = sign.Output!;
         world.Player = sign.Pos;
         SetCoins(world, 100);
         float coinsBeforeBuy = world.Coins;
-        Require(world.Trade(sign, "wood", 1, true), "market should accept an affordable buy order");
-        Require(world.Coins < coinsBeforeBuy && world.S.Orders.Count == 1 && world.S.Backpack["wood"] == 0,
+        Require(world.Buy(sign, "wood", 1), "market should accept an affordable buy order");
+        Require(world.Coins < coinsBeforeBuy && world.S.Orders.Count == 1 && output["wood"] == 0,
                 "buy order should reserve coins immediately while goods remain in transit");
         SafeTick(world, 29.9f);
-        Require(world.S.Orders.Count == 1 && world.S.Backpack["wood"] == 0,
+        Require(world.S.Orders.Count == 1 && output["wood"] == 0,
                 "cart must not deliver before the full 30-second trip");
         SafeTick(world, .2f);
-        Require(world.S.Orders.Count == 0 && world.S.Backpack["wood"] == 1,
-                "cart should deliver the purchased item after its trip");
+        Require(world.S.Orders.Count == 0 && output["wood"] == 1 && world.S.Backpack["wood"] == 0,
+                "cart should deliver the purchased item into the market output");
 
-        world.S.Backpack.Add("wood", 2);
-        float coinsBeforeSale = world.Coins;
-        Require(world.Trade(sign, "wood", 3, false), "market should accept items held by the player");
-        Require(world.S.Backpack["wood"] == 0 && world.Coins == coinsBeforeSale,
+        world.S.Backpack.Add("wood", 3);
+        world.S.Backpack.TransferTo(sign.Inventory, "wood", 3);
+        float coinsBeforeSale = world.Coins, quotedPrice = world.KnownPrice("wood");
+        Require(world.Sell(sign), "market should sell the goods loaded into it");
+        Require(sign.Inventory.Count == 0 && world.Coins == coinsBeforeSale && output[Inventory.Coins] == 0,
                 "sale removes goods at dispatch but does not pay before the cart returns");
         float loweredDemand = world.S.Demand["wood"];
-        Require(loweredDemand < 1, "selling should lower demand");
+        Require(loweredDemand < 1 && world.KnownPrice("wood") == quotedPrice, "selling should lower demand while the price sheet still shows old news");
+        Require(!world.Sell(sign), "an empty market has nothing to sell");
         SafeTick(world, 30.1f);
-        Require(world.S.Orders.Count == 0 && world.Coins > coinsBeforeSale,
-                "sale proceeds should arrive only when the cart returns");
-        Require(world.S.Demand["wood"] > loweredDemand && world.S.Demand["wood"] < 1,
-                "market demand should gradually recover toward its baseline");
+        Require(world.S.Orders.Count == 0 && output[Inventory.Coins] > 0 && world.Coins == coinsBeforeSale,
+                "sale proceeds should arrive in the market output when the cart returns");
+        Require(world.KnownPrice("wood") < quotedPrice && world.PriceAge == 0, "the returning carter should bring today's lower price");
+        world.S.Time += data.DaySeconds * 2;
+        Require(world.S.Demand["wood"] > loweredDemand && world.PriceAge == 2, "the sheet should age by whole days");
+        SafeTick(world, 60);
+        Require(world.S.Demand["wood"] > loweredDemand && world.S.Demand["wood"] < 1 && world.KnownPrice("wood") < world.UnitPrice("wood", false),
+                "market demand should recover while the price sheet stays stale");
 
-        var worker = world.Hire(sign);
-        Require(worker != null, "player should be able to hire an individually tracked worker");
+        Require(world.FetchBlock(sign) == "No worker assigned." && !world.FetchPrices(sign), "fetching prices needs a worker assigned to the signpost");
+        var cheap = data.HireOffers.OrderBy(o => o.Upfront).First(); var dear = data.HireOffers.OrderBy(o => o.Upfront).Last();
+        Require(cheap.Wage > dear.Wage, "a smaller payment up front must come with a higher wage");
+        SetCoins(world, (int)dear.Upfront);
+        var runner = world.Hire(sign, dear);
+        Require(runner != null && runner.Wage == dear.Wage && world.Coins == 0, "a hiring offer should charge its payment up front and fix the worker's wage");
+        world.Assign(runner!, sign);
+        Require(!world.S.Milestones.Contains("assigned"), "minding the signpost is not the first automation goal");
+        Require(world.FetchPrices(sign) && runner!.Away > 0 && world.FetchBlock(sign) != null, "the assigned worker should set off once for fresh prices");
+        SafeTick(world, data.TradeSeconds / 2);
+        Require(runner!.Pos.DistanceTo(World.Village) < 1, "the runner should reach the village halfway through the errand");
+        SafeTick(world, data.TradeSeconds / 2 + .1f);
+        Require(runner.Away == 0 && world.PriceAge == 0 && Math.Abs(world.KnownPrice("wood") - world.UnitPrice("wood", false)) < .01f && world.FetchBlock(sign) == null,
+                "the runner should return with current prices");
+        world.Fire(runner);
+
+        SetCoins(world, (int)cheap.Upfront);
+        var worker = world.Hire(sign, cheap);
+        Require(worker != null && worker.Wage == cheap.Wage, "player should be able to hire an individually tracked worker");
         var workTarget = world.Add("tree", new Vector2(12, 10), 6);
         world.Assign(worker!, workTarget);
         SetCoins(world, 0);
-        world.S.Time = data.DaySeconds - .1f;
+        world.S.Time = data.DaySeconds * world.Day - .1f;
         SafeTick(world, .2f);
-        Require(worker!.WageDebt == data.DailyWage && workTarget.Remaining == 6 && worker.Bag.Count == 0,
+        Require(worker!.WageDebt == cheap.Wage && workTarget.Remaining == 6 && worker.Bag.Count == 0,
                 "an unpaid dawn wage should put the worker on strike");
-        SetCoins(world, (int)(data.DailyWage - 1));
+        SetCoins(world, (int)(cheap.Wage - 1));
         world.SettleDebt(worker);
-        Require(worker.WageDebt == data.DailyWage, "insufficient funds must not partly clear wage debt");
-        SetCoins(world, (int)(data.DailyWage));
+        Require(worker.WageDebt == cheap.Wage, "insufficient funds must not partly clear wage debt");
+        SetCoins(world, (int)cheap.Wage);
         world.SettleDebt(worker);
         Require(worker.WageDebt == 0, "paying the full owed wage should clear the strike debt");
         SetCoins(world, 0);
-        world.S.Time = data.DaySeconds * (world.Day + 1) - .1f;
+        world.S.Time = data.DaySeconds * world.Day - .1f;
         SafeTick(world, .2f);
-        world.S.Time = data.DaySeconds * (world.Day + 1) - .1f;
+        world.S.Time = data.DaySeconds * world.Day - .1f;
         SafeTick(world, .2f);
-        Require(worker.WageDebt == data.DailyWage, "a striking worker should not keep adding wages to the debt");
+        Require(worker.WageDebt == cheap.Wage, "a striking worker should not keep adding wages to the debt");
     }
 
     private static void CheckMarketRoundTrip(GameData data)
@@ -304,13 +328,14 @@ public static class SimulationChecks
         var sign = world.Add("signpost", new Vector2(10, 10));
         world.Player = sign.Pos;
         SetCoins(world, 20000);
-        Require(world.Trade(sign, "steel_tools", 100, true), "market should accept a large affordable purchase");
+        Require(world.Buy(sign, "steel_tools", 100), "market should accept a large affordable purchase");
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(world.Trade(sign, "steel_tools", 100, false), "market should accept the purchased goods back");
+        Require(sign.Output!.TransferTo(sign.Inventory, "steel_tools", 100) == 100 && world.Sell(sign), "market should accept the purchased goods back");
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(world.Coins < 20000, "buying goods and selling them straight back must lose coins");
+        int coins = world.Coins + sign.Output[Inventory.Coins];
+        Require(coins < 20000, "buying goods and selling them straight back must lose coins");
         float price = data.Items["steel_tools"].Price;
-        Require(world.Coins < 20000 - 100 * price * 1.25f + 100 * price,
+        Require(coins < 20000 - 100 * price * 1.25f + 100 * price,
                 "a bulk sale must be paid less than its full pre-sale price for every unit");
     }
 
@@ -391,7 +416,8 @@ public static class SimulationChecks
         furnace.Inventory.Add("wood", 2);
         furnace.Processing = true;
         furnace.Progress = 2.5f;
-        saved.S.Orders.Add(new TradeOrder { Item = "wood", Quantity = 4, Buying = true, Value = 7.5f, Elapsed = 17, Signpost = 31 });
+        saved.S.Orders.Add(new TradeOrder { Goods = new() { ["wood"] = 4 }, Buying = true, Value = 7.5f, Elapsed = 17, Signpost = 31 });
+        saved.S.Prices["wood"] = 1.1f;
         saved.S.Demand["wood"] = 1.4f;
         var worker = AddWorker(saved, new Vector2(15, 18));
         worker.Bag.Add("stone", 2);
@@ -401,7 +427,7 @@ public static class SimulationChecks
         var loadedFurnace = loaded.Find(furnace.Id);
         Require(loadedFurnace != null && loadedFurnace.Processing && Math.Abs(loadedFurnace.Progress - 2.5f) < .01f,
                 "save/load should preserve a batch already in progress");
-        Require(loaded.S.Orders.Count == 1 && Math.Abs(loaded.S.Orders[0].Elapsed - 17) < .01f,
+        Require(loaded.S.Orders.Count == 1 && Math.Abs(loaded.S.Orders[0].Elapsed - 17) < .01f && loaded.S.Orders[0].Goods["wood"] == 4 && Math.Abs(loaded.KnownPrice("wood") - 1.1f) < .01f,
                 "save/load should preserve an order and its elapsed cart time");
         Require(loaded.S.Workers.Count == 1 && loaded.S.Workers[0].Bag["stone"] == 2 &&
                 loaded.S.Workers[0].Destination == furnace.Id,
@@ -662,21 +688,21 @@ public static class SimulationChecks
         world.Player = World.Spawn;
         world.S.Time = data.DaySeconds * (data.NightStarts + .01f);
         world.S.WageDay = world.Day;
-        SetCoins(world, (int)(data.DailyWage + 3));
         var hut = world.Add("hut", world.Player + new Vector2(2, 0));
         var sign = world.Add("signpost", world.Player + new Vector2(1, 2));
         var furnace = world.Add("furnace", world.Player + new Vector2(-2, 1));
         furnace.Processing = true;
-        var order = new TradeOrder { Item = "wood", Quantity = 1, Buying = false, Value = 12, Signpost = sign.Id };
+        var order = new TradeOrder { Goods = new() { ["wood"] = 1 }, Buying = false, Value = 12, Signpost = sign.Id };
         world.S.Orders.Add(order);
         var worker = AddWorker(world, sign.Pos);
+        SetCoins(world, (int)worker.Wage + 3);
         world.S.Wolves.Add(new Wolf { Pos = world.Player + new Vector2(8, 0) });
         float priorTime = world.S.Time;
         float priorHunger = world.S.Hunger;
         world.Sleep(hut);
         Require(world.S.Time > priorTime && world.Day > 1,
                 "sleep should advance the world clock through dawn");
-        Require(world.S.Orders.Count == 0 && world.Coins == 15,
+        Require(world.S.Orders.Count == 0 && world.Coins == 3 && sign.Output![Inventory.Coins] == 12,
                 "trade settlement and daily wages should both resolve during sleep");
         Require(worker.WageDebt == 0,
                 "a funded worker should receive the normal daily wage during sleep");
@@ -830,16 +856,19 @@ public static class SimulationChecks
 
         var sign = BuildAt(world, "signpost", new Vector2(34, 25));
         world.Player = sign.Pos;
-        Require(world.Trade(sign, "steel_tools", 1, false), "signpost should dispatch a steel-tool sale");
+        world.S.Backpack.TransferTo(sign.Inventory, "steel_tools", 1);
+        Require(world.Sell(sign), "signpost should dispatch a steel-tool sale");
         float beforeReturn = world.Coins;
         SafeTick(world, data.TradeSeconds - .1f);
         Require(world.Coins == beforeReturn && world.S.Orders.Count == 1,
                 "steel-tool payment should remain in transit until the trade delay elapses");
         SafeTick(world, .2f);
-        Require(world.Coins >= data.HireCost && world.S.Milestones.Contains("sold_steel"),
-                $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, hireCost={data.HireCost:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_tools"]}");
+        sign.Output!.TransferTo(world.S.Backpack, Inventory.Coins, sign.Output[Inventory.Coins]);
+        var offer = data.HireOffers[1];
+        Require(world.Coins >= offer.Upfront && world.S.Milestones.Contains("sold_steel"),
+                $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, upfront={offer.Upfront:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_tools"]}");
 
-        var worker = world.Hire(sign);
+        var worker = world.Hire(sign, offer);
         Require(worker != null, "sale proceeds should fund a new worker");
         var chest = BuildAt(world, "chest", new Vector2(37, 25));
         var workerTree = world.S.Things.FirstOrDefault(t => t.Kind == "tree" && t.Remaining > 0);
@@ -912,10 +941,13 @@ public static class SimulationChecks
         world.Player = sign.Pos;
         SetCoins(world, 5);
         world.S.Backpack.Add("steel_tools", 1);
-        Require(world.Trade(sign, "steel_tools", 1, false), "a carried item should sell");
+        world.S.Backpack.TransferTo(sign.Inventory, "steel_tools", 1);
+        Require(world.Sell(sign), "a loaded item should sell");
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(world.Coins == 5 + (int)data.Items["steel_tools"].Price, "sale proceeds should arrive as whole coins in the backpack");
-        Require(!world.Trade(sign, Inventory.Coins, 1, false), "coins themselves cannot be traded");
+        Require(world.Coins == 5 && sign.Output![Inventory.Coins] == (int)data.Items["steel_tools"].Price, "sale proceeds should arrive as whole coins in the market output");
+        world.S.Backpack.TransferTo(sign.Inventory, Inventory.Coins, 1);
+        Require(!world.Sell(sign) && sign.Inventory[Inventory.Coins] == 1, "coins themselves cannot be sold");
+        Require(!world.Buy(sign, Inventory.Coins, 1), "coins themselves cannot be bought");
     }
 
     private static void CheckCrewKeepsForgeHot(GameData data)

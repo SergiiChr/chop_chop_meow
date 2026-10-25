@@ -30,8 +30,8 @@ public partial class Game : Node
     private float autosave;
     private float runTime;
     private bool capturing;
-    private string marketItem = "steel_tools";
-    private int quantity = 1;
+    /// <summary>Left column of the side panel; only the signpost's price sheet uses it.</summary>
+    private VBoxContainer sheet = null!;
     /// <summary>Left edge of the side panel and the clock above it, measured from the right of the screen.</summary>
     private const int PanelLeft = -338;
     private static readonly Color Cream = new("f2e8cf");
@@ -142,7 +142,7 @@ public partial class Game : Node
         int hour = (int)(world.DayPhase * 24 + 6) % 24;
         stats.Text = $"Day {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}  {(world.Night ? "NIGHT" : "DAYLIGHT")}";
         string feeding = world.S.Wolves.Count(w => w.Feeding) > 1 ? "The pack is feeding" : "A wolf is feeding";
-        deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? feeding : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : world.S.Mauled ? "A wolf has you by the throat" : "";
+        deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? feeding : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
         modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
         foreach (var update in live.ToArray()) update();
         RefreshHotbar(); RefreshNeeds();
@@ -151,7 +151,10 @@ public partial class Game : Node
     {
         page = name; live.Clear(); panel.Visible = true; view.PanelOpen = true;
         foreach (var child in panel.GetChildren()) { panel.RemoveChild(child); child.QueueFree(); }
-        var outer = new VBoxContainer(); panel.AddChild(outer);
+        panel.OffsetLeft = PanelLeft;
+        var frame = new HBoxContainer(); frame.AddThemeConstantOverride("separation", 16); panel.AddChild(frame);
+        sheet = new VBoxContainer { Visible = false, CustomMinimumSize = new Vector2(SheetWidth - 16, 0) }; frame.AddChild(sheet);
+        var outer = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; frame.AddChild(outer);
         var heading = new HBoxContainer(); outer.AddChild(heading);
         var title = Label(name switch { "welcome" => "A NEW BEGINNING", "build" => "BUILDING PLANS", "inventory" => "YOUR BACKPACK", "hotbar" => "HOTBAR ASSIGNMENT", "help" => "FIELD GUIDE", "workers" => "YOUR NEIGHBORS", "filters" => "STORAGE FILTERS", _ => "INSPECT" }, 20);
         title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; heading.AddChild(title); heading.AddChild(Button("×", ClosePanel));
@@ -191,8 +194,8 @@ public partial class Game : Node
         AddLabel("Hire at a signpost (24 coins; 8/day). Worker → Work → click a resource. Building → Assign → select named villagers. Put inputs in storage for hauling. One furnace worker alternates hauling and pumping; with two, the first pumps while the second hauls. No accepting chest means work pauses safely.", 15, Muted);
         AddLabel("Empty filters allow everything. Input filters control worker deposits; output filters control worker withdrawals. Workers prefer explicitly matching input-filter chests before the nearest general chest. Manual transfers ignore automation filters. Hold Shift while transferring to move a full stack.", 15, Muted);
         AddLabel("STAY ALIVE", 16);
-        AddLabel("A full stomach lasts a day and a full water droplet half a day. Wolves are fast and avoid campfire light (5-tile radius), though a wolf already chasing you follows briefly into it. Click a cabin to step inside; wolves back off at once. At half health or less, a nearby wolf leaps for your throat and the pack joins the feast; a wolf kill also destroys the food in your recovery box. Slain wolves leave a carcass: hold right mouse to butcher it for raw meat, then cook it in a stone furnace before eating. Feed fires with wood; each log adds 90s. Sleep in a cabin at night if your food and water will last until morning; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
-        AddLabel("Trade returns in 30 seconds. Prices fall when you sell and slowly recover. Sale proceeds arrive with the returning coin cart. Your world autosaves every 90 seconds; F5 saves immediately.", 15, Muted);
+        AddLabel("A full stomach lasts a day and a full water droplet half a day. Wolves are fast and avoid campfire light (5-tile radius), though a wolf already chasing you follows briefly into it. Click a cabin to step inside; wolves back off at once. At half health or less, a nearby wolf leaps for your throat and the pack joins the feast; a wolf kill also destroys the food in your recovery box. Slain wolves leave a carcass: hold right mouse to butcher it for raw meat, then cook it in a stone furnace before eating. Only a burning campfire keeps wolves away; feed it wood, and each log burns about 4 hours. Sleep in a cabin at night if your food and water will last until morning; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
+        AddLabel("At a signpost, load goods into the market and press Sell; the cart returns in 30 seconds and leaves coins in the market output. Buy from the price sheet. The sheet only shows prices as last heard from the village: it updates when a cart returns or when a worker assigned to the signpost fetches fresh prices. Prices fall when you sell and slowly recover. Your world autosaves every 90 seconds; F5 saves immediately.", 15, Muted);
     }
     private string Needs(Dictionary<string, int> cost) => string.Join("  ·  ", cost.Select(p => $"{world.Data.Name(p.Key)} {world.S.Backpack[p.Key]}/{p.Value}"));
     private string Cost(Dictionary<string, int> cost) => string.Join("  ·  ", cost.Select(p => $"{p.Value} {world.Data.Name(p.Key)}"));
@@ -212,7 +215,7 @@ public partial class Game : Node
     }
     private void Backpack()
     {
-        Dynamic(() => $"Health {world.S.Health:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {world.S.Workers.Count * world.Data.DailyWage:0}", 15);
+        Dynamic(() => $"Health {world.S.Health:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {world.S.Workers.Sum(w => w.Wage):0}", 15);
         AddInventoryGrid(() => world.S.Backpack, null, id => { if (id is "berries" or "water" or "cooked_meat" or "raw_meat") world.Consume(id); }, "Berries, cooked meat and water: click to consume. Drag onto the hotbar to assign.");
         AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
     }
@@ -232,11 +235,11 @@ public partial class Game : Node
             AddLabel("Select a villager and choose Work to automate this resource. Their gathered supplies go to accepting storage.", 14, Muted); return;
         }
         if (t.Kind == "hut") { Cabin(t); return; }
-        if (t.Kind == "signpost") { Market(t); return; }
+        if (t.Kind == "signpost") { Signpost(t); return; }
         if (t.IsStorage) { Storage(t); return; }
         if (t.Kind == "campfire")
         {
-            Dynamic(() => $"Light remaining: {t.Burn:0}s\nProtection radius: 5 tiles", 16); AddButton("Feed fire · 1 wood / +90s", () => world.FuelFire(t)); Assignment(t); return;
+            Dynamic(() => $"Light remaining: {GameHours(t.Burn)}\nProtection radius: 5 tiles", 16); AddButton($"Feed fire · 1 wood / +{world.Data.CampfireHours:0}h", () => world.FuelFire(t)); Assignment(t); return;
         }
         if (world.Data.Buildings.TryGetValue(t.Kind, out var bd)) AddLabel(bd.Description, 14, Muted);
         var recipes = world.Data.Recipes.Where(p => p.Value.Station == t.Kind).ToList();
@@ -312,12 +315,13 @@ public partial class Game : Node
             check.Toggled += on => { world.Assign(worker, on ? t : null); RefreshLive(); };
             content.AddChild(check);
         }
+        if (t.Kind == "signpost") AddLabel("A villager assigned here minds the post and can fetch fresh prices from the village.", 13, Muted);
         if (t.Kind == "reinforced") AddLabel("Only one worker pumps: the first assigned operates the bellows and the rest haul. A lone worker alternates pumping and hauling.", 13, Muted);
     }
     private void WorkerPanel(Worker? w)
     {
         if (w == null) { AddLabel("This worker has left."); return; }
-        AddLabel(w.Name, 24); Dynamic(() => $"{w.Status}\nCarrying: {Items(w.Bag)}\nDaily wage: {world.Data.DailyWage:0} coins\nWages owed: {w.WageDebt:0}", 15, Muted);
+        AddLabel(w.Name, 24); Dynamic(() => $"{w.Status}\nCarrying: {Items(w.Bag)}\nDaily wage: {w.Wage:0} coins\nWages owed: {w.WageDebt:0}", 15, Muted);
         AddButton("Work → choose a resource", () => { assigningWorker = w.Id; view.BuildMode = ""; ClosePanel(); RefreshLive(); });
         AddButton("Unassign", () => world.Assign(w, null));
         if (w.WageDebt > 0) AddButton("Pay outstanding wages", () => world.SettleDebt(w));
@@ -326,30 +330,18 @@ public partial class Game : Node
     }
     private void Workers()
     {
-        AddLabel($"{world.S.Workers.Count}/8 villagers · {world.S.Workers.Count * world.Data.DailyWage:0} coins/day", 17);
+        AddLabel($"{world.S.Workers.Count}/8 villagers · {world.S.Workers.Sum(w => w.Wage):0} coins/day", 17);
         if (world.S.Workers.Count == 0) AddLabel("Build a village signpost to hire help. Your first steel-tool sale can cover hiring and wages.", 15, Muted);
         foreach (var w in world.S.Workers)
         {
             var worker = w; AddButton(w.Name, () => Select(worker)); Dynamic(() => worker.Status, 14, Muted);
         }
     }
-    private void Market(Thing sign)
+    /// <summary>Burn time as in-game hours and minutes.</summary>
+    private string GameHours(float seconds)
     {
-        AddLabel("BRAMBLEWICK MARKET", 17);
-        AddLabel("Delivery takes 30 seconds. Prices respond to your trades and gradually recover. Goods and payment are reserved when dispatched.", 13, Muted);
-        var opt = new OptionButton { CustomMinimumSize = new Vector2(0, 38) }; string[] ids = world.Data.Items.Keys.Where(id => id != Inventory.Coins).ToArray();
-        foreach (var id in ids) opt.AddItem(world.Data.Name(id)); opt.Selected = Array.IndexOf(ids, marketItem);
-        opt.ItemSelected += index => { marketItem = ids[(int)index]; RefreshLive(); }; content.AddChild(opt);
-        Dynamic(() => $"Sell {world.UnitPrice(marketItem, false):0.00} coins each\nBuy {world.UnitPrice(marketItem, true):0.00} coins each\nDemand {world.S.Demand.GetValueOrDefault(marketItem, 1) * 100:0}%\nCarrying {world.Coins} coins", 16);
-        var row = Row(); row.AddChild(Button("−5", () => quantity = Math.Max(1, quantity - 5))); row.AddChild(Button("−", () => quantity = Math.Max(1, quantity - 1)));
-        var count = Label(quantity.ToString(), 18); count.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(count); live.Add(() => count.Text = quantity.ToString());
-        row.AddChild(Button("+", () => quantity = Math.Min(100, quantity + 1))); row.AddChild(Button("+5", () => quantity = Math.Min(100, quantity + 5)));
-        AddButton("Sell selected quantity", () => world.Trade(sign, marketItem, quantity, false));
-        AddButton("Buy selected quantity", () => world.Trade(sign, marketItem, quantity, true));
-        Dynamic(() => world.S.Orders.Count == 0 ? "No carts on the road." : string.Join("\n", world.S.Orders.Select(o => $"{(o.Buying ? "Buy" : "Sell")} {o.Quantity} {world.Data.Name(o.Item)} · {Math.Max(0, world.Data.TradeSeconds - o.Elapsed):0}s")), 14, Muted);
-        AddButton($"Hire villager · {world.Data.HireCost:0} coins", () => { world.Hire(sign); OpenPage("inspect"); });
-        AddLabel($"{world.Data.DailyWage:0} coins per worker at each dawn. Unpaid workers strike.", 13, Muted);
-        foreach (var worker in world.S.Workers) { var w = worker; AddButton($"{w.Name} · {w.Job} · manage", () => Select(w)); }
+        int minutes = (int)(seconds / world.Data.DaySeconds * 1440);
+        return $"{minutes / 60}h {minutes % 60:00}m";
     }
     private void Save(int n)
     {
@@ -514,12 +506,15 @@ public partial class Game : Node
         world.Add("anvil", new Vector2(27, 28)); var sign = world.Add("signpost", new Vector2(22, 28));
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("steel_tools", 2); world.S.Backpack.Add("water", 4); world.S.Backpack.Add("iron_pick", 1);
         world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "pick", "reinforced", "steel_bar", "steel_tools" });
-        var w1 = world.Hire(sign); // The review fixture is deliberately separate from a fresh playable game.
-        if (w1 == null) { world.Player = sign.Pos + Vector2.One; w1 = world.Hire(sign); }
-        var w2 = world.Hire(sign); if (w1 != null) world.Assign(w1, bellows); if (w2 != null) world.Assign(w2, bellows);
-        world.Trade(sign, "steel_tools", 1, false);
+        // The review fixture is deliberately separate from a fresh playable game.
+        world.Player = sign.Pos + Vector2.One; var offer = world.Data.HireOffers[1];
+        var w1 = world.Hire(sign, offer); var w2 = world.Hire(sign, offer); var w3 = world.Hire(sign, offer);
+        if (w1 != null) world.Assign(w1, bellows); if (w2 != null) world.Assign(w2, bellows); if (w3 != null) world.Assign(w3, sign);
+        world.S.Backpack.TransferTo(sign.Inventory, "steel_tools", 1); world.Sell(sign);
+        sign.Inventory.Add("iron_bar", 6); sign.Output!.Add(Inventory.Coins, 36);
         if (OS.GetCmdlineUserArgs().Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         world.Player = World.Spawn; Select(bellows);
+        if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
         if (!OS.GetCmdlineUserArgs().Contains("--wolves")) return;
         // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
         var spot = new Vector2(34, 32);
