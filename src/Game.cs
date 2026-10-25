@@ -36,7 +36,6 @@ public partial class Game : Node
     private const int PanelLeft = -338;
     private static readonly Color Cream = new("f2e8cf");
     private static readonly Color Muted = new("b7c6ae");
-    private static string SavePath => OS.GetCmdlineUserArgs().Contains("--showcase") ? "user://review-settlement.json" : OS.GetCmdlineUserArgs().Contains("--ui-test") ? "user://ui-check.json" : "user://settlement.json";
     public override void _Ready()
     {
         try
@@ -48,9 +47,10 @@ public partial class Game : Node
             view = new WorldView { World = world }; AddChild(view);
             var layer = new CanvasLayer(); AddChild(layer);
             ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
-            SetTheme(); BuildHud(); OpenPage("welcome");
+            SetTheme(); BuildHud();
             if (OS.GetCmdlineUserArgs().Contains("--showcase")) Showcase();
-            Notify("Welcome. WASD to move; hold right mouse to approach and gather. Tab shows the field guide.");
+            else if (!OS.GetCmdlineUserArgs().Contains("--animation-review")) ShowStart();
+            if (!OS.GetCmdlineUserArgs().Any(a => a is "--showcase" or "--ui-test" or "--animation-review")) ApplyResolution(SavedResolution());
             if (OS.GetCmdlineUserArgs().Contains("--ui-test")) RunUIChecks();
             if (OS.GetCmdlineUserArgs().Contains("--animation-review"))
             {
@@ -129,7 +129,7 @@ public partial class Game : Node
         // Raised above the centred player so a downed body stays visible under the message.
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
-        BuildNeeds(); BuildEnding(); BuildMenu(); RefreshLive();
+        BuildNeeds(); BuildEnding(); BuildMenu(); BuildScreens(); RefreshLive();
     }
     private void Notify(string message)
     {
@@ -179,7 +179,6 @@ public partial class Game : Node
         AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Explore the woods for loose iron at the foot of a cliff.\n4  Press Esc any time to see your current goal.");
         AddLabel("You begin with an iron axe, 10 berries and 6 wood. Drink at the pond to the west; gather water to carry. A fire and cabin protect you after dark.", 15, Muted);
         AddButton("Into the clearing", ClosePanel);
-        if (Godot.FileAccess.FileExists(SavePath)) AddButton("Continue saved settlement", () => { Load(); ClosePanel(); });
         AddLabel("10–15 minute POC · single player · Linux", 13, Muted);
     }
     private void Help()
@@ -352,24 +351,30 @@ public partial class Game : Node
         AddLabel($"{world.Data.DailyWage:0} coins per worker at each dawn. Unpaid workers strike.", 13, Muted);
         foreach (var worker in world.S.Workers) { var w = worker; AddButton($"{w.Name} · {w.Job} · manage", () => Select(w)); }
     }
-    private void Save()
-    {
-        try { using var file = Godot.FileAccess.Open(SavePath, Godot.FileAccess.ModeFlags.Write); if (file == null) throw new InvalidOperationException("Cannot open save file"); file.StoreString(world.Serialize()); Notify("Settlement saved."); }
-        catch (Exception e) { Notify($"Save failed: {e.Message}"); }
-    }
-    private void Load()
+    private void Save(int n)
     {
         try
         {
-            if (!Godot.FileAccess.FileExists(SavePath)) { Notify("No saved settlement yet."); return; }
-            using var file = Godot.FileAccess.Open(SavePath, Godot.FileAccess.ModeFlags.Read); world.Deserialize(file.GetAsText());
-            selected = 0; workerId = 0; gathering = null; entering = null; assigningWorker = 0; view.BuildMode = ""; view.Selected = 0; view.SelectedWorker = 0; OpenPage("inventory");
+            using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Write); if (file == null) throw new InvalidOperationException("Cannot open save file");
+            file.StoreString(world.Serialize()); if (n > 0) slot = n; Notify($"Settlement saved · {SlotName(n)}.");
         }
-        catch (Exception e) { Notify($"Load failed: {e.Message}"); }
+        catch (Exception e) { Notify($"Save failed: {e.Message}"); }
+    }
+    private bool Load(int n)
+    {
+        try
+        {
+            if (!SlotUsed(n)) { Notify($"{SlotName(n)} is empty."); return false; }
+            using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Read); world.Deserialize(file.GetAsText());
+            slot = n; selected = 0; workerId = 0; gathering = null; entering = null; assigningWorker = 0; view.BuildMode = ""; view.Selected = 0; view.SelectedWorker = 0; OpenPage("inventory");
+            return true;
+        }
+        catch (Exception e) { Notify($"Load failed: {e.Message}"); return false; }
     }
     public override void _UnhandledInput(InputEvent ev)
     {
         if (world == null || view == null || ending.Visible) return;
+        if (backdrop.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) screenBack?.Invoke(); return; }
         if (menu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) CloseMenu(); return; }
         if (ev is InputEventKey key && key.Pressed && !key.Echo)
         {
@@ -382,8 +387,9 @@ public partial class Game : Node
                 case Key.B: OpenPage("build"); break;
                 case Key.I: OpenPage("inventory"); break;
                 case Key.Tab: if (page == "help") ClosePanel(); else OpenPage("help"); break;
-                case Key.F5: Save(); break;
-                case Key.F9: Load(); break;
+                // Until a numbered slot is chosen, quick save and load ask which slot to use.
+                case Key.F5: if (slot > 0) Save(slot); else ShowSlots(true, HideScreen); break;
+                case Key.F9: if (slot > 0) Load(slot); else ShowSlots(false, HideScreen); break;
                 case Key.Key1: UseHotbar(0); break;
                 case Key.Key2: UseHotbar(1); break;
                 case Key.Key3: UseHotbar(2); break;
@@ -478,7 +484,7 @@ public partial class Game : Node
             float health = world.S.Health;
             world.Tick(dt); ShowEndingOnce(); autosave += dt;
             DamageFlash(health - world.S.Health);
-            if (autosave >= 90) { Save(); autosave = 0; }
+            if (autosave >= 90) { Save(0); autosave = 0; }
         }
         view.Paused = paused; view.SelectedTool = ActiveHotbarItem();
         view.Mouse = GetViewport().GetMousePosition();

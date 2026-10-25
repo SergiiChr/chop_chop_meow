@@ -36,7 +36,9 @@ For animation review, `--animation-review` shows every actor action on rotating 
 
 These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
-The launcher keeps its Godot user-data directory under `.tools/xdg-data`; a launcher-managed save is at `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/settlement.json`. A manually exported or otherwise normally launched Godot build uses Godot's standard per-user application-data location instead.
+The game opens on a start menu with Continue (the most recent save), New game, Load game, Options and Quit. There are three save slots and a separate autosave written every 90 seconds. Options holds a window resolution picker; the choice is stored in `settings.cfg` and applied at launch.
+
+The launcher keeps its Godot user-data directory under `.tools/xdg-data`; launcher-managed saves are in `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/` as `settlement.json` (slot 1), `settlement-2.json`, `settlement-3.json` and `autosave.json`. A manually exported or otherwise normally launched Godot build uses Godot's standard per-user application-data location instead.
 
 ## Controls
 
@@ -51,8 +53,8 @@ The launcher keeps its Godot user-data directory under `.tools/xdg-data`; a laun
 | Tab | Open or close the field guide |
 | 1–9 | Use the corresponding hotbar slot; defaults: axe, pickaxe, chest, campfire, furnace, anvil, bellows furnace, berries, water |
 | Space | Swing axe, or pump the selected nearby reinforced furnace |
-| F5 / F9 | Save / load |
-| Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save and load |
+| F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
+| Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load and options |
 | Mouse wheel | Zoom |
 | Click / Shift-click an inventory cell | Move one stack / every unit of that item |
 | Drag a cell | Move its stack to another inventory or a station input slot; drop an item or building plan on the hotbar to assign it |
