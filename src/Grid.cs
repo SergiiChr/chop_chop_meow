@@ -14,7 +14,7 @@ public partial class Game
         var cell = new ItemSlot
         {
             Name = name,
-            CustomMinimumSize = new Vector2(50, 50),
+            CustomMinimumSize = new Vector2(44, 44),
             ExpandIcon = true,
             IconAlignment = HorizontalAlignment.Center,
             VerticalIconAlignment = VerticalAlignment.Center,
@@ -52,10 +52,10 @@ public partial class Game
 
     /// <summary>
     /// One cell per slot, refreshed live from the inventory's stacks.
-    /// Cells drag their stack out and accept stacks dragged in from another inventory.
+    /// Cells drag their stack out and accept stacks dragged in from another inventory, unless <paramref name="accepts"/> narrows that.
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// </summary>
-    private void AddInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint)
+    private void AddInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null)
     {
         var grid = AddGrid();
         var stacks = new (string Item, int Count)?[inventory().Slots];
@@ -66,7 +66,7 @@ public partial class Game
             var cell = cells[i].Cell;
             cell.Pressed += () => { if (stacks[slot] is (string id, _)) { click(id); RefreshLive(); } };
             cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container) : null;
-            cell.CanTake = drag => drag.From != null && drag.From != inventory();
+            cell.CanTake = accepts ?? (drag => drag.From != null && drag.From != inventory());
             cell.Take = drag => { MoveDrag(drag, inventory(), container); RefreshLive(); };
             grid.AddChild(cell);
         }
@@ -89,7 +89,7 @@ public partial class Game
     private void MoveStack(Inventory from, Inventory to, string item, Thing near)
     {
         if (!world.Near(near)) { Notify("Walk closer first."); return; }
-        from.TransferTo(to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackSize);
+        from.TransferTo(to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackOf(item));
     }
 
     /// <summary>Drops a dragged stack into an inventory; the building on either end must be within reach.</summary>
