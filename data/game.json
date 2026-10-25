@@ -338,7 +338,7 @@
       "cost": {
         "wood": 8
       },
-      "description": "18 slots of 64. Separate input/output filters for workers."
+      "description": "5 slots of 64. Separate input/output filters for workers."
     },
     "campfire": {
       "name": "Campfire",

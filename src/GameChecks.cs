@@ -189,6 +189,26 @@ public partial class Game
         UIRequire(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Clicking with a lit torch must swing it.");
     }
 
+    /// <summary>A stack bigger than a crate's room fills it and the rest stays on the cursor until it is dropped elsewhere.</summary>
+    private async Task CheckCrateOverflow()
+    {
+        world.S.Backpack.Remove("wood", world.S.Backpack["wood"]);
+        UIRequire(world.S.Backpack.Add("wood", 64) == 64, "The backpack must have room for a stack of wood.");
+        var crates = new[] { world.Add("crate", world.Player + new Vector2(-1, 0)), world.Add("crate", world.Player + new Vector2(0, -1)) };
+        int cap = world.Data.CrateCapacity;
+        Select(crates[0]); await Frames();
+        await DragTo(Cell(1, c => c.TooltipText.Contains("Wood · 64 total")), Cell(0, c => c.TooltipText == ""));
+        UIRequire(crates[0].Inventory["wood"] == cap && world.S.Backpack["wood"] == 64 - cap, "Dragging a full stack into a crate must fill it and leave the rest in the backpack.");
+        UIRequire(GetViewport().GuiIsDragging(), "What did not fit into the crate must stay held.");
+        Select(crates[1]); await Frames();
+        await Click(Cell(0, c => c.TooltipText == ""));
+        UIRequire(crates[1].Inventory["wood"] == cap && world.S.Backpack["wood"] == 64 - 2 * cap && GetViewport().GuiIsDragging(), "The held rest must drop into the next crate and keep what still does not fit.");
+        await Click(Cell(1, c => c.TooltipText.Contains("Wood · ")));
+        UIRequire(!GetViewport().GuiIsDragging() && world.S.Backpack["wood"] == 64 - 2 * cap, "Clicking the backpack must let go of the held rest.");
+        foreach (var crate in crates) world.S.Things.Remove(crate);
+        ClosePanel(); await Frames();
+    }
+
     private async Task CheckCrateInCrate()
     {
         var crate = world.Add("crate", world.Player + new Vector2(1, 0));
@@ -338,7 +358,7 @@ public partial class Game
             await KeyStroke(Key.B); UIRequire(page == "build" && panel.Visible, "B must open the building plans.");
             var plan = Named("build_chest"); UIRequire(plan != null, "Building plans must expose storage construction.");
             plan!.EmitSignal(Control.SignalName.MouseEntered); await Frames();
-            UIRequire(HasLabel(panel, "Needs: Wood") && HasLabel(panel, "18 slots"), "Hovering a plan must show its description and required resources.");
+            UIRequire(HasLabel(panel, "Needs: Wood") && HasLabel(panel, "5 slots"), "Hovering a plan must show its description and required resources.");
             plan.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(view.BuildMode == "chest" && !panel.Visible, "Choosing a plan must enter placement mode.");
             Vector2 place = Vector2.Zero;
@@ -525,6 +545,7 @@ public partial class Game
             UIRequire(world.Find(looseOre.Id) == null && world.S.Backpack["iron_ore"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
             UIRequire(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
             await CheckCraftingAndTorch();
+            await CheckCrateOverflow();
             await CheckCrateInCrate();
             RemoveCheckFiles();
             GD.Print("UI-TEST PASS"); Quit();
