@@ -6,7 +6,7 @@ Prices, wages and demand live in `data/game.json`. `tests/EconomyChecks.cs` runs
 
 Every item has a `price`. For goods the village trades, it is the trade price; for the rest it is a reference value used only to keep recipes in line.
 
-- Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1; iron ore, mined coal and tin ore 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful and four make one fertilizer. Wheat is 1.5, what one bag of seeds and one of fertilizer return with the first-step markup.
+- Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1; iron ore, mined coal and tin ore 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful and four make one fertilizer. Wheat is 1.5.
 - A recipe's output is worth its inputs plus the cheapest fuel its station burns, plus a markup that shrinks with each step from raw goods: 50% for the first step, then 40%, 30% and 20%.
 - So lower tiers keep a bigger share of their price as profit, and deeper goods are worth more coins in total. A steel axe earns 12 coins over its parts and an iron bar 2, though the bar's margin is far higher.
 
@@ -32,7 +32,7 @@ Worker output is measured by running one worker through a whole day: walking, ha
 - A cook earns at least 1.5 times their pay.
 - A longer chain earns more per worker-day than a shorter one, comparing tools with tools and food with food.
 - Goods made from meat or wheat are left out: meat comes from wolves at night, when workers are home, and wheat from farm plots.
-- Farming does not pay yet. A harvest takes 2 worker-days and returns 1 wheat (1.5), 1 seed beyond the one sown (1) and 1 grass (0.25) for 1 fertilizer (1.5): about 1.25 coins, against 50 coins of wages. The yields and harvest time in `farm` need tuning before wheat goods can be priced against labour.
+- Farming breaks even as a baseline, like picking berries, and is meant to improve with better tools. A harvest takes 1 worker-day and returns 4 wheat, 1 seed beyond the one sown and 1 grass for 1 fertilizer. Sold raw, that is about 6 coins. Ground, kneaded and baked, the 4 wheat make 16 bread worth 36 coins, about 24 coins after the water and wood, against a worker-day's 25.
 
 Measured with the current data:
 
@@ -77,7 +77,7 @@ Each good the village takes has `daily`, `steady` and `drop` in `market.sells`:
 
 Food is a steady staple: its daily amount sells at the full price, and past it the price slips slowly. Tools react sharply: a crate of one tool takes half off the price of the last one in it and averages 77%, and a second crate the same day sells for little. Selling past the basket keeps that good cheap for days.
 
-A day's basket sells for about 2,920 coins: 1,690 from tools, 1,165 from food and 63 for the crates.
+A day's basket sells for about 2,755 coins: 1,690 from tools, 1,002 from food and 63 for the crates.
 
 ## 4. Trade
 

@@ -21,7 +21,7 @@
     "seconds": 1.6,
     "workers": 3
   },
-  "farm": { "sow": { "wheat_seeds": 1, "fertilizer": 1 }, "growDays": 3, "harvestWorkdays": 2, "yield": { "wheat": 1, "wheat_seeds": 2, "grass": 1 } },
+  "farm": { "sow": { "wheat_seeds": 1, "fertilizer": 1 }, "growDays": 3, "harvestWorkdays": 1, "yield": { "wheat": 4, "wheat_seeds": 2, "grass": 1 } },
   "goals": { "dailyProfit": 1300, "profitDays": 7 },
   "market": {
     "sells": {
@@ -273,11 +273,11 @@
     },
     "bread": {
       "name": "Bread",
-      "price": 9.05,
+      "price": 2.26,
       "color": "c98a45",
       "food": true,
-      "hunger": 45,
-      "health": 5
+      "hunger": 12,
+      "health": 2
     },
     "crushed_berries": {
       "name": "Crushed berries",
@@ -716,7 +716,7 @@
         "dough": 1
       },
       "output": "bread",
-      "amount": 1,
+      "amount": 4,
       "seconds": 8
     },
     "crushed_berries": {

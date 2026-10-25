@@ -1525,7 +1525,7 @@ public static class SimulationChecks
         for (int i = 0; i < 4 * data.DaySeconds && farm.Stage == World.FarmRipe; i++) SafeTick(world, 1);
         Require(farm.Stage == World.FarmFallow && farm.Inventory["wheat_seeds"] == 2, "a worker should finish the shared harvest and keep the seeds in the plot");
         SafeTick(world, 30);
-        Require(chest.Inventory["wheat"] == 1 && compost.Inventory["wheat"] == 0 && compost.Inventory["grass"] == 1, "the wheat should go to storage rather than rot, and the grass to the compost");
+        Require(chest.Inventory["wheat"] == data.Farm.Yield["wheat"] && compost.Inventory["wheat"] == 0 && compost.Inventory["grass"] == 1, "the wheat should go to storage rather than rot, and the grass to the compost");
         chest.Inventory.Add("fertilizer", 1);
         SafeTick(world, 60);
         Require(farm.Stage == World.FarmGrowing && farm.Inventory["wheat_seeds"] == 1 && chest.Inventory["fertilizer"] == 0, "the worker should bring fertilizer and sow again from the kept seeds");
