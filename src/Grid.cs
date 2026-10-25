@@ -14,7 +14,7 @@ public partial class Game
         var cell = new ItemSlot
         {
             Name = name,
-            CustomMinimumSize = new Vector2(50, 50),
+            CustomMinimumSize = new Vector2(44, 44),
             ExpandIcon = true,
             IconAlignment = HorizontalAlignment.Center,
             VerticalIconAlignment = VerticalAlignment.Center,
@@ -89,7 +89,7 @@ public partial class Game
     private void MoveStack(Inventory from, Inventory to, string item, Thing near)
     {
         if (!world.Near(near)) { Notify("Walk closer first."); return; }
-        from.TransferTo(to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackSize);
+        from.TransferTo(to, item, Input.IsKeyPressed(Key.Shift) ? from[item] : from.StackOf(item));
     }
 
     /// <summary>Drops a dragged stack into an inventory; the building on either end must be within reach.</summary>

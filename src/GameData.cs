@@ -34,9 +34,12 @@ public sealed class GameData
     public float HireCost { get; set; } = 24;
     public float DailyWage { get; set; } = 8;
     public float GatherSeconds { get; set; } = 1.5f;
-    public float HungerPerSecond { get; set; } = .12f;
     public float RespawnSeconds { get; set; } = 30;
-    public float ThirstPerSecond { get; set; } = .16f;
+    /// <summary>In-game hours a full hunger or thirst bar lasts, so the drain follows the day length.</summary>
+    public float HungerHours { get; set; } = 24;
+    public float ThirstHours { get; set; } = 12;
+    public float HungerPerSecond => 100 / (HungerHours / 24 * DaySeconds);
+    public float ThirstPerSecond => 100 / (ThirstHours / 24 * DaySeconds);
     public Dictionary<string, ItemDef> Items { get; set; } = new();
     public Dictionary<string, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
@@ -50,7 +53,7 @@ public sealed class GameData
     }
     public void Validate()
     {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || NightStarts <= 0 || NightStarts >= 1 || HireCost < 0 || DailyWage < 0 || RespawnSeconds < 0)
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || NightStarts <= 0 || NightStarts >= 1 || HireCost < 0 || DailyWage < 0 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0)
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)

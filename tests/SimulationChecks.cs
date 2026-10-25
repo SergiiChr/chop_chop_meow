@@ -32,6 +32,10 @@ public static class SimulationChecks
         CheckWolfHuntAndMeat(data);
         CheckWolfThroatLeap(data);
         CheckSleepAdvancesWorld(data);
+        CheckSleepNeedsFoodAndWater(data);
+        CheckCabinAndChaseIntoLight(data);
+        CheckCoinStacks(data);
+        CheckCrewKeepsForgeHot(data);
         CheckActualProgression(data);
         GD.Print("SELF-TEST PASS");
     }
@@ -39,6 +43,12 @@ public static class SimulationChecks
     private static void Require(bool condition, string message)
     {
         if (!condition) throw new InvalidOperationException($"Simulation check failed: {message}");
+    }
+
+    private static void SetCoins(World world, int coins)
+    {
+        world.S.Backpack.Remove(Inventory.Coins, world.Coins);
+        world.S.Backpack.Add(Inventory.Coins, coins);
     }
 
     private static World EmptyWorld(GameData data)
@@ -240,10 +250,10 @@ public static class SimulationChecks
         var world = EmptyWorld(data);
         var sign = world.Add("signpost", new Vector2(10, 10));
         world.Player = sign.Pos;
-        world.S.Coins = 100;
-        float coinsBeforeBuy = world.S.Coins;
+        SetCoins(world, 100);
+        float coinsBeforeBuy = world.Coins;
         Require(world.Trade(sign, "wood", 1, true), "market should accept an affordable buy order");
-        Require(world.S.Coins < coinsBeforeBuy && world.S.Orders.Count == 1 && world.S.Backpack["wood"] == 0,
+        Require(world.Coins < coinsBeforeBuy && world.S.Orders.Count == 1 && world.S.Backpack["wood"] == 0,
                 "buy order should reserve coins immediately while goods remain in transit");
         SafeTick(world, 29.9f);
         Require(world.S.Orders.Count == 1 && world.S.Backpack["wood"] == 0,
@@ -253,14 +263,14 @@ public static class SimulationChecks
                 "cart should deliver the purchased item after its trip");
 
         world.S.Backpack.Add("wood", 2);
-        float coinsBeforeSale = world.S.Coins;
+        float coinsBeforeSale = world.Coins;
         Require(world.Trade(sign, "wood", 3, false), "market should accept items held by the player");
-        Require(world.S.Backpack["wood"] == 0 && world.S.Coins == coinsBeforeSale,
+        Require(world.S.Backpack["wood"] == 0 && world.Coins == coinsBeforeSale,
                 "sale removes goods at dispatch but does not pay before the cart returns");
         float loweredDemand = world.S.Demand["wood"];
         Require(loweredDemand < 1, "selling should lower demand");
         SafeTick(world, 30.1f);
-        Require(world.S.Orders.Count == 0 && world.S.Coins > coinsBeforeSale,
+        Require(world.S.Orders.Count == 0 && world.Coins > coinsBeforeSale,
                 "sale proceeds should arrive only when the cart returns");
         Require(world.S.Demand["wood"] > loweredDemand && world.S.Demand["wood"] < 1,
                 "market demand should gradually recover toward its baseline");
@@ -269,18 +279,18 @@ public static class SimulationChecks
         Require(worker != null, "player should be able to hire an individually tracked worker");
         var workTarget = world.Add("tree", new Vector2(12, 10), 6);
         world.Assign(worker!, workTarget);
-        world.S.Coins = 0;
+        SetCoins(world, 0);
         world.S.Time = data.DaySeconds - .1f;
         SafeTick(world, .2f);
         Require(worker!.WageDebt == data.DailyWage && workTarget.Remaining == 6 && worker.Bag.Count == 0,
                 "an unpaid dawn wage should put the worker on strike");
-        world.S.Coins = data.DailyWage - 1;
+        SetCoins(world, (int)(data.DailyWage - 1));
         world.SettleDebt(worker);
         Require(worker.WageDebt == data.DailyWage, "insufficient funds must not partly clear wage debt");
-        world.S.Coins = data.DailyWage;
+        SetCoins(world, (int)(data.DailyWage));
         world.SettleDebt(worker);
         Require(worker.WageDebt == 0, "paying the full owed wage should clear the strike debt");
-        world.S.Coins = 0;
+        SetCoins(world, 0);
         world.S.Time = data.DaySeconds * (world.Day + 1) - .1f;
         SafeTick(world, .2f);
         world.S.Time = data.DaySeconds * (world.Day + 1) - .1f;
@@ -293,14 +303,14 @@ public static class SimulationChecks
         var world = EmptyWorld(data);
         var sign = world.Add("signpost", new Vector2(10, 10));
         world.Player = sign.Pos;
-        world.S.Coins = 20000;
+        SetCoins(world, 20000);
         Require(world.Trade(sign, "steel_tools", 100, true), "market should accept a large affordable purchase");
         SafeTick(world, data.TradeSeconds + .1f);
         Require(world.Trade(sign, "steel_tools", 100, false), "market should accept the purchased goods back");
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(world.S.Coins < 20000, "buying goods and selling them straight back must lose coins");
+        Require(world.Coins < 20000, "buying goods and selling them straight back must lose coins");
         float price = data.Items["steel_tools"].Price;
-        Require(world.S.Coins < 20000 - 100 * price * 1.25f + 100 * price,
+        Require(world.Coins < 20000 - 100 * price * 1.25f + 100 * price,
                 "a bulk sale must be paid less than its full pre-sale price for every unit");
     }
 
@@ -652,7 +662,7 @@ public static class SimulationChecks
         world.Player = World.Spawn;
         world.S.Time = data.DaySeconds * (data.NightStarts + .01f);
         world.S.WageDay = world.Day;
-        world.S.Coins = data.DailyWage + 3;
+        SetCoins(world, (int)(data.DailyWage + 3));
         var hut = world.Add("hut", world.Player + new Vector2(2, 0));
         var sign = world.Add("signpost", world.Player + new Vector2(1, 2));
         var furnace = world.Add("furnace", world.Player + new Vector2(-2, 1));
@@ -666,7 +676,7 @@ public static class SimulationChecks
         world.Sleep(hut);
         Require(world.S.Time > priorTime && world.Day > 1,
                 "sleep should advance the world clock through dawn");
-        Require(world.S.Orders.Count == 0 && world.S.Coins == 15,
+        Require(world.S.Orders.Count == 0 && world.Coins == 15,
                 "trade settlement and daily wages should both resolve during sleep");
         Require(worker.WageDebt == 0,
                 "a funded worker should receive the normal daily wage during sleep");
@@ -821,13 +831,13 @@ public static class SimulationChecks
         var sign = BuildAt(world, "signpost", new Vector2(34, 25));
         world.Player = sign.Pos;
         Require(world.Trade(sign, "steel_tools", 1, false), "signpost should dispatch a steel-tool sale");
-        float beforeReturn = world.S.Coins;
+        float beforeReturn = world.Coins;
         SafeTick(world, data.TradeSeconds - .1f);
-        Require(world.S.Coins == beforeReturn && world.S.Orders.Count == 1,
+        Require(world.Coins == beforeReturn && world.S.Orders.Count == 1,
                 "steel-tool payment should remain in transit until the trade delay elapses");
         SafeTick(world, .2f);
-        Require(world.S.Coins >= data.HireCost && world.S.Milestones.Contains("sold_steel"),
-                $"returned cart should fund hire and mark the sale: coins={world.S.Coins:0.0}, hireCost={data.HireCost:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_tools"]}");
+        Require(world.Coins >= data.HireCost && world.S.Milestones.Contains("sold_steel"),
+                $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, hireCost={data.HireCost:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_tools"]}");
 
         var worker = world.Hire(sign);
         Require(worker != null, "sale proceeds should fund a new worker");
@@ -842,5 +852,84 @@ public static class SimulationChecks
                 "hired worker should gather actual wood and deliver it to a built chest");
         Require(world.S.Goal == 11, "objective chain should reach the first automation milestone");
         GD.Print($"Progression simulation elapsed: {world.S.Time - startTime:0} seconds.");
+    }
+
+    private static void CheckSleepNeedsFoodAndWater(GameData data)
+    {
+        Require(Math.Abs(100 / data.HungerPerSecond - data.DaySeconds) < .01f && Math.Abs(100 / data.ThirstPerSecond - data.DaySeconds / 2) < .01f,
+                "a full stomach should last one in-game day and a full water droplet half a day");
+        foreach (var (hunger, thirst, reason) in new[] { (10f, 100f, "hungry"), (100f, 10f, "thirsty") })
+        {
+            var world = NightWorld(data);
+            var hut = world.Add("hut", world.Player + new Vector2(2, 0));
+            world.S.Hunger = hunger; world.S.Thirst = thirst;
+            float time = world.S.Time;
+            world.Sleep(hut);
+            Require(world.S.Time == time && world.SleepBlock()?.Contains(reason) == true,
+                    $"sleep must be refused when the player is too {reason} to last until morning");
+        }
+    }
+
+    private static void CheckCabinAndChaseIntoLight(GameData data)
+    {
+        var world = NightWorld(data);
+        var hut = world.Add("hut", world.Player + new Vector2(2, 0));
+        var wolf = new Wolf { Pos = world.Player + new Vector2(-4, 0) };
+        world.S.Wolves.Add(wolf);
+        SafeTick(world, .5f);
+        Require(world.Enter(hut) && world.S.Sheltered == hut.Id, "clicking a nearby cabin should take the player inside");
+        float before = wolf.Pos.DistanceTo(world.Player);
+        world.S.Health = 40;
+        SafeTick(world, 1);
+        Require(wolf.Pos.DistanceTo(world.Player) > before && wolf.Leap <= 0 && world.S.Health >= 40,
+                "a wolf must back off at once when the player is inside a cabin");
+        world.MovePlayer(new Vector2(0, .1f));
+        Require(world.S.Sheltered == 0, "moving should take the player back outside");
+
+        var lit = NightWorld(data);
+        var chaser = new Wolf { Pos = lit.Player + new Vector2(-5, 0) };
+        lit.S.Wolves.Add(chaser);
+        SafeTick(lit, .5f);
+        lit.Add("campfire", lit.Player + new Vector2(2, 0)).Burn = 300;
+        float gap = chaser.Pos.DistanceTo(lit.Player);
+        SafeTick(lit, .5f);
+        Require(chaser.Pos.DistanceTo(lit.Player) < gap, "a wolf already chasing should follow the player briefly into firelight");
+        SafeTick(lit, 4);
+        gap = chaser.Pos.DistanceTo(lit.Player);
+        SafeTick(lit, .5f);
+        Require(chaser.Pos.DistanceTo(lit.Player) > gap, "a chasing wolf should give up and back away after a few seconds in the light");
+    }
+
+    private static void CheckCoinStacks(GameData data)
+    {
+        var bag = new Inventory { Slots = 2 };
+        Require(bag.Add(Inventory.Coins, 1500) == 1500 && bag.UsedSlots == 2 && bag.Stacks().First().Count == 1000,
+                "coins should stack to 1000 per slot");
+        Require(bag.Room(Inventory.Coins) == 500 && bag.Room("wood") == 0, "only coins should use the larger stack");
+
+        var world = EmptyWorld(data);
+        var sign = world.Add("signpost", new Vector2(10, 10));
+        world.Player = sign.Pos;
+        SetCoins(world, 5);
+        world.S.Backpack.Add("steel_tools", 1);
+        Require(world.Trade(sign, "steel_tools", 1, false), "a carried item should sell");
+        SafeTick(world, data.TradeSeconds + .1f);
+        Require(world.Coins == 5 + (int)data.Items["steel_tools"].Price, "sale proceeds should arrive as whole coins in the backpack");
+        Require(!world.Trade(sign, Inventory.Coins, 1, false), "coins themselves cannot be traded");
+    }
+
+    private static void CheckCrewKeepsForgeHot(GameData data)
+    {
+        var world = EmptyWorld(data);
+        var furnace = world.Add("reinforced", new Vector2(20, 20));
+        furnace.Heat = World.SteelHeat + 5;
+        // The worker starts far off, so the forge would cool past the bar before they arrive to pump.
+        AddWorker(world, new Vector2(30, 30)).Assignment = furnace.Id;
+        world.S.Workers[0].Job = "building";
+        SafeTick(world, 4);
+        Require(furnace.Heat >= World.SteelHeat, "a working crew should keep the forge at or above the clear bar");
+        world.S.Workers.Clear();
+        SafeTick(world, 5);
+        Require(furnace.Heat < World.SteelHeat, "without a crew the forge should cool below the clear bar");
     }
 }

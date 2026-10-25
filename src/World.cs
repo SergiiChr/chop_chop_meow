@@ -77,6 +77,8 @@ public sealed class Wolf
     public bool Feeding { get; set; }
     /// <summary>The wolf whose leap landed; it holds the player's throat.</summary>
     public bool Pinning { get; set; }
+    /// <summary>Seconds a chasing wolf keeps following the player into firelight before it gives up.</summary>
+    public float Chase { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
 }
 public sealed class SaveState
@@ -92,7 +94,6 @@ public sealed class SaveState
     public float PlayerX { get; set; } = 23;
     public float PlayerY { get; set; } = 24;
     public float Time { get; set; } = 55;
-    public float Coins { get; set; }
     public float Health { get; set; } = 100;
     public float Hunger { get; set; } = 100;
     public float Thirst { get; set; } = 100;
@@ -104,6 +105,8 @@ public sealed class SaveState
     public float RespawnIn { get; set; }
     /// <summary>A wolf has pinned the player; it stays set through the following death until respawn.</summary>
     public bool Mauled { get; set; }
+    /// <summary>Id of the cabin the player is inside, or zero; inside, wolves back off and the player is hidden.</summary>
+    public int Sheltered { get; set; }
     public float PlaySeconds { get; set; }
     public bool EndingShown { get; set; }
 }
@@ -121,7 +124,9 @@ public sealed class World
     public const float PondRadius = 4.5f;
     public const float LeapSeconds = .4f;
     // A wolf leaps from within LeapRange and lands PinDistance away, where its jaws reach the throat of the downed player.
-    private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f;
+    private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f, ChaseSeconds = 3;
+    /// <summary>Minimum bellows furnace temperature: steel only progresses at or above it.</summary>
+    public const float SteelHeat = 80;
     // Both faces turn toward the camera so the deposits at their feet stay in view.
     public static readonly Cliff[] Cliffs = { new("iron", new(31, 4), new(0, 1), 4.5f), new("coal", new(4, 40), new(1, 0), 4.5f) };
     public static Cliff CliffOf(string ore) => Cliffs.First(c => c.Ore == ore);
@@ -136,7 +141,11 @@ public sealed class World
     public bool Dead => S.RespawnIn > 0;
     /// <summary>Dead or pinned by a wolf: the player cannot move or act.</summary>
     public bool Downed => Dead || S.Mauled;
-    public bool Near(Thing t, float radius = 3.2f) => !Downed && Player.DistanceTo(t.Pos) <= radius;
+    /// <summary>From inside a cabin only that cabin is within reach.</summary>
+    public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(t.Pos) <= radius;
+    public int Coins => S.Backpack[Inventory.Coins];
+    /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
+    public bool Pay(int amount) => amount <= Coins && S.Backpack.Remove(Inventory.Coins, amount) == amount;
     public Thing? Find(int id) => S.Things.FirstOrDefault(t => t.Id == id);
     public void Say(string message) => Notify?.Invoke(message);
     public Thing Add(string kind, Vector2 pos, int remaining = 0)
@@ -191,6 +200,7 @@ public sealed class World
     public void MovePlayer(Vector2 delta)
     {
         if (Downed) return;
+        if (S.Sheltered != 0 && delta != Vector2.Zero) S.Sheltered = 0;
         var p = Player + delta;
         if (CanStand(p)) Player = p;
         else { if (CanStand(Player + new Vector2(delta.X, 0))) Player += new Vector2(delta.X, 0); if (CanStand(Player + new Vector2(0, delta.Y))) Player += new Vector2(0, delta.Y); }
@@ -198,7 +208,7 @@ public sealed class World
     public string? GatherBlock(Thing t, bool worker = false)
     {
         if (!t.IsResource) return "Select a natural resource.";
-        if (t.Remaining <= 0) return "Depleted. Berries regrow; look for another deposit.";
+        if (t.Remaining <= 0) return t.Kind switch { "berries" => "Picked clean. The bush regrows in a while.", "tree" => "Only a stump is left. Find another tree.", _ => "Depleted. Look for another deposit." };
         if (t.Kind == "tree" && !worker && S.Backpack["iron_axe"] == 0 && S.Backpack["steel_tools"] == 0) return "An iron axe is needed. Recover your belongings or forge one.";
         if (t.Kind is "coal" or "iron" && (worker ? !S.Milestones.Contains("pick") : S.Backpack["iron_pick"] == 0 && S.Backpack["steel_tools"] == 0)) return "Forge an iron pickaxe. Loose rusty ore nearby can be picked up by hand.";
         return null;
@@ -235,6 +245,7 @@ public sealed class World
     {
         if (!Data.Buildings.ContainsKey(kind)) return "Unknown building.";
         if (Downed) return "You are still recovering.";
+        if (S.Sheltered != 0) return "Leave the cabin first.";
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
         if (Player.DistanceTo(p) < 1.2f || Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
         if (!CanStand(p) || p.DistanceTo(Pond) < PondRadius + .8f) return "Choose dry, open ground.";
@@ -263,7 +274,7 @@ public sealed class World
     public void Pump(Thing t)
     {
         if (!Near(t) || t.Kind != "reinforced") return;
-        t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos); Say($"Bellows: {t.Heat:0}° / 80° needed for steel.");
+        t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos); Say($"Bellows: {t.Heat:0}° / {SteelHeat:0}° needed for steel.");
     }
     public void FuelFire(Thing t)
     {
@@ -320,19 +331,35 @@ public sealed class World
         var cost = BatchCost(t);
         return t.Inventory.Items.Keys.Where(item => !cost.ContainsKey(item));
     }
+    /// <summary>Steps inside a cabin, out of reach of wolves; any movement steps back out.</summary>
+    public bool Enter(Thing hut)
+    {
+        if (hut.Kind != "hut" || !Near(hut, 2.6f)) return false;
+        S.Sheltered = hut.Id; return true;
+    }
+    public void Leave() => S.Sheltered = 0;
+    private float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
+    /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
+    public string? SleepBlock()
+    {
+        if (!Night) return "You can sleep at night. Keep food and water for the morning.";
+        bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = S.Thirst - SecondsToDawn * Data.ThirstPerSecond <= 0;
+        return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : thirsty ? "You are too thirsty to sleep." : null;
+    }
     public void Sleep(Thing hut)
     {
         if (!Near(hut)) return;
-        if (!Night) { Say("You can sleep at night. Keep food and water for the morning."); return; }
+        if (SleepBlock() is string blocked) { Say(blocked); return; }
         // Time, wages, trades, hunger and production advance together; no frozen night exploit.
-        float seconds = Data.DaySeconds - S.Time % Data.DaySeconds + 1;
+        float seconds = SecondsToDawn;
         while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
-        S.Wolves.Clear(); Say("Dawn breaks. Your workers continued through the night.");
+        S.Wolves.Clear(); Say(S.Workers.Count > 0 ? "Dawn breaks. Your workers continued through the night." : "Dawn breaks.");
     }
-    public bool Protected(Vector2 p) => S.Things.Any(t => (t.Kind == "campfire" && t.Burn > 0 && t.Pos.DistanceTo(p) < 5.3f) || (t.Kind == "hut" && t.Pos.DistanceTo(p) < 2.7f));
+    /// <summary>Burning campfires keep wolves out of their light, unless a wolf is already chasing the player.</summary>
+    public bool Protected(Vector2 p) => S.Things.Any(t => t.Kind == "campfire" && t.Burn > 0 && t.Pos.DistanceTo(p) < 5.3f);
     public void Attack()
     {
-        if (attackClock > 0 || Downed) return;
+        if (attackClock > 0 || Downed || S.Sheltered != 0) return;
         attackClock = .6f;
         var wolf = S.Wolves.OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         ActorAction action = S.Backpack["steel_tools"] > 0 ? ActorAction.SteelChop : S.Backpack["iron_axe"] > 0 ? ActorAction.Chop : ActorAction.Attack;
@@ -354,12 +381,12 @@ public sealed class World
         // After a mauling the box lands past the feet, away from the wolf at the throat, so the feeding stays visible.
         var killer = S.Mauled ? S.Wolves.FirstOrDefault(w => w.Pinning) : null;
         var box = Add("grave", killer == null ? Player : Player + (Player - killer.Pos).Normalized() * 1.5f); box.Inventory = S.Backpack;
-        S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds;
+        S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0;
         if (S.Mauled)
         {
             // The pack eats every scrap of food and stays to feed until the player respawns.
             foreach (var item in box.Inventory.Items.Keys.Where(IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
-            Say($"The wolves brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.");
+            Say($"{(S.Wolves.Count > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.");
             return;
         }
         S.Wolves.Clear();
@@ -367,7 +394,7 @@ public sealed class World
     }
     private void Respawn()
     {
-        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = Spawn; S.Mauled = false; S.Wolves.Clear();
+        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = Spawn; S.Mauled = false; S.Sheltered = 0; S.Wolves.Clear();
         Say("You wake in the clearing. Recover your belongings from the box.");
     }
     // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.
@@ -375,13 +402,16 @@ public sealed class World
     public bool Trade(Thing sign, string item, int quantity, bool buying)
     {
         if (!Near(sign) || sign.Kind != "signpost" || !Data.Items.ContainsKey(item) || quantity <= 0) return false;
+        if (item == Inventory.Coins) { Say("The village does not trade coins for coins."); return false; }
         if (S.Orders.Count >= 3) { Say("All three village carts are busy."); return false; }
         float demand = Math.Min(1, S.Demand.GetValueOrDefault(item, 1)), price = buying ? UnitPrice(item, true) * quantity : 0;
         // A sale lowers demand unit by unit, so a bulk sale is not paid entirely at the pre-sale price.
         for (int i = 0; !buying && i < quantity; i++) { price += Data.Items[item].Price * demand; demand = Math.Max(.25f, demand - .045f); }
-        if (buying && S.Coins < price) { Say("Not enough coins."); return false; }
+        // Coins are whole: purchases round up and sales round down, so a round trip still never profits.
+        price = buying ? MathF.Ceiling(price) : MathF.Floor(price);
+        if (buying && Coins < price) { Say("Not enough coins in your backpack."); return false; }
         if (!buying && S.Backpack[item] < quantity) { Say("Not enough items in your backpack."); return false; }
-        if (buying) S.Coins -= price; else S.Backpack.Remove(item, quantity);
+        if (buying) Pay((int)price); else S.Backpack.Remove(item, quantity);
         S.Orders.Add(new TradeOrder { Item = item, Quantity = quantity, Buying = buying, Value = price, Signpost = sign.Id });
         if (!buying) S.Demand[item] = demand;
         Say($"Cart dispatched: {(buying ? "buying" : "selling")} {quantity} {Data.Name(item)}. Returns in 30 seconds."); return true;
@@ -390,8 +420,7 @@ public sealed class World
     {
         if (!Near(sign) || sign.Kind != "signpost") return null;
         if (S.Workers.Count >= 8) { Say("The POC supports eight workers."); return null; }
-        if (S.Coins < Data.HireCost) { Say($"Hiring costs {Data.HireCost:0} coins; wages are {Data.DailyWage:0} per dawn."); return null; }
-        S.Coins -= Data.HireCost;
+        if (!Pay((int)Data.HireCost)) { Say($"Hiring costs {Data.HireCost:0} coins from your backpack; wages are {Data.DailyWage:0} per dawn."); return null; }
         string[] names = { "Rowan", "Hazel", "Milo", "Fern", "Jasper", "Willow", "Clover", "Ash" };
         string name = names.FirstOrDefault(n => S.Workers.All(w => w.Name != n)) ?? "Neighbor";
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0) };
@@ -541,14 +570,13 @@ public sealed class World
         {
             // A striking worker does not work, so no further wages are added until the strike is settled.
             if (w.WageDebt > 0) continue;
-            if (S.Coins >= Data.DailyWage) S.Coins -= Data.DailyWage;
-            else { float due = w.WageDebt = Data.DailyWage; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the signpost."); }
+            if (!Pay((int)Data.DailyWage)) { float due = w.WageDebt = Data.DailyWage; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the signpost."); }
         }
     }
     public void SettleDebt(Worker w)
     {
-        if (S.Coins < w.WageDebt) { Say("Not enough coins to settle wages."); return; }
-        S.Coins -= w.WageDebt; w.WageDebt = 0;
+        if (!Pay((int)w.WageDebt)) { Say("Not enough coins in your backpack to settle wages."); return; }
+        w.WageDebt = 0;
     }
     public void Tick(float dt, bool sleeping = false)
     {
@@ -566,18 +594,17 @@ public sealed class World
         foreach (var order in S.Orders.ToArray())
         {
             order.Elapsed += dt; if (order.Elapsed < Data.TradeSeconds) continue;
-            if (order.Buying)
+            // Goods or sale proceeds that do not fit in the backpack wait in a box by the signpost.
+            var (item, quantity) = order.Buying ? (order.Item, order.Quantity) : (Inventory.Coins, (int)order.Value);
+            int overflow = quantity - S.Backpack.Add(item, quantity);
+            if (overflow > 0)
             {
-                int overflow = order.Quantity - S.Backpack.Add(order.Item, order.Quantity);
-                if (overflow > 0)
-                {
-                    var delivery = Add("grave", Find(order.Signpost)?.Pos + Vector2.One ?? Spawn);
-                    delivery.Inventory.Slots = overflow / delivery.Inventory.StackSize + 1;
-                    delivery.Inventory.Add(order.Item, overflow);
-                }
+                var delivery = Add("grave", Find(order.Signpost)?.Pos + Vector2.One ?? Spawn);
+                delivery.Inventory.Slots = overflow / delivery.Inventory.StackOf(item) + 1;
+                delivery.Inventory.Add(item, overflow);
             }
-            else { S.Coins += order.Value; if (order.Item == "steel_tools") S.Milestones.Add("sold_steel"); }
-            S.Orders.Remove(order); Say(order.Buying ? $"Cart returned with {order.Quantity} {Data.Name(order.Item)}." : $"Cart returned with {order.Value:0.0} coins.");
+            if (!order.Buying && order.Item == "steel_tools") S.Milestones.Add("sold_steel");
+            S.Orders.Remove(order); Say(order.Buying ? $"Cart returned with {order.Quantity} {Data.Name(order.Item)}." : $"Cart returned with {quantity} coins.");
         }
         S.Things.RemoveAll(t => t.Kind == "grave" && t.Inventory.Count == 0 || t.Kind == "wolf_corpse" && t.Remaining <= 0);
         foreach (var t in S.Things.ToArray())
@@ -590,9 +617,14 @@ public sealed class World
                 t.Burn = Math.Max(0, t.Burn - dt);
                 if (t.Burn < 30 && t.Inventory.Remove("wood", 1) > 0) t.Burn += 90;
             }
-            if (t.Kind == "reinforced") t.Heat = Math.Max(0, t.Heat - dt * 3.2f);
+            if (t.Kind == "reinforced")
+            {
+                // Once a working crew has the forge hot, they keep it at or above the clear bar between strokes.
+                bool crewed = S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt <= 0);
+                t.Heat = Math.Max(crewed && t.Heat >= SteelHeat ? SteelHeat : 0, t.Heat - dt * 3.2f);
+            }
             if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) continue;
-            bool hot = t.Kind != "reinforced" || t.Heat >= 80;
+            bool hot = t.Kind != "reinforced" || t.Heat >= SteelHeat;
             bool atAnvil = t.Kind != "anvil" || Near(t) || S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt == 0 && w.Pos.DistanceTo(t.Pos) < 1.8f);
             if (!t.Processing && hot && atAnvil && t.Inventory.Has(BatchCost(t)))
             {
@@ -640,8 +672,9 @@ public sealed class World
                 Say("A wolf is prowling nearby. Stay by fire or shelter; Space swings your axe.");
             }
         }
+        bool lit = Protected(Player), inside = S.Sheltered != 0;
         // A wounded player away from fire and shelter invites a leap for the throat.
-        if (!Downed && S.Health <= 50 && !Protected(Player) && S.Wolves.All(w => w.Leap <= 0))
+        if (!Downed && S.Health <= 50 && !lit && !inside && S.Wolves.All(w => w.Leap <= 0))
         {
             var hunter = S.Wolves.Where(w => !Protected(w.Pos) && w.Pos.DistanceTo(Player) < LeapRange).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
             if (hunter != null) { hunter.Leap = LeapSeconds; Say("A wolf leaps for your throat!"); }
@@ -656,7 +689,7 @@ public sealed class World
                 var landing = Player + (wolf.Pos - Player).Normalized() * PinDistance;
                 wolf.Pos = wolf.Pos.MoveToward(landing, wolf.Pos.DistanceTo(landing) * Math.Min(1, dt / wolf.Leap));
                 wolf.Leap = Math.Max(0, wolf.Leap - dt);
-                if (wolf.Leap == 0) { wolf.Feeding = wolf.Pinning = true; S.Mauled = true; Say("You are pinned. The pack closes in."); }
+                if (wolf.Leap == 0) { wolf.Feeding = wolf.Pinning = true; S.Mauled = true; Say(S.Wolves.Count > 1 ? "You are pinned. The pack closes in." : "You are pinned."); }
             }
             else if (S.Mauled)
             {
@@ -665,9 +698,11 @@ public sealed class World
                 wolf.Pos = wolf.Pos.MoveToward(seat, dt * FeastSpeed);
                 wolf.Feeding = wolf.Pos.DistanceTo(seat) < .05f;
             }
-            else if (Protected(wolf.Pos) || Protected(Player)) wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + (wolf.Pos - Player).Normalized() * 3, dt * 3);
+            // A wolf already on the player's heels follows briefly into firelight, but backs off from a cabin at once.
+            else if (inside || (lit || Protected(wolf.Pos)) && wolf.Chase <= 0) { wolf.Chase = 0; wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + (wolf.Pos - Player).Normalized() * 3, dt * 3); }
             else
             {
+                wolf.Chase = lit || Protected(wolf.Pos) ? wolf.Chase - dt : ChaseSeconds;
                 wolf.Pos = wolf.Pos.MoveToward(Player, dt * speed);
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; }
             }
@@ -694,11 +729,11 @@ public sealed class World
     {
         0 => ("A place to begin", "Hold right mouse near trees and stones. You carry an iron axe. B opens building plans."),
         1 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A cabin and campfire make nights safer."),
-        2 => ("The first iron", "Pick up loose rusty ore below the iron cliff. Load the furnace with ore + wood. Collect iron bars."),
+        2 => ("The first iron", "Explore for a rust-streaked cliff and pick up the loose ore below it. Load the furnace with ore + wood. Collect iron bars."),
         3 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. Keep smelting for a pickaxe and bellows furnace."),
         4 => ("Beneath the surface", "At the anvil, forge an iron pickaxe: 3 bars + 2 wood. It opens coal and iron deposits."),
-        5 => ("Hotter than fire", "Mine coal at the foot of the dark cliff; the landmark guide points the way. Build a bellows furnace: 20 stone, 5 iron bars, 8 wood."),
-        6 => ("Make steel", "Load iron + mined coal into the bellows furnace. Pump regularly to stay above 80°. Each bar costs 2 iron + 3 coal incl. fuel."),
+        5 => ("Hotter than fire", "Explore for a dark cliff and mine coal at its foot. Build a bellows furnace: 20 stone, 5 iron bars, 8 wood."),
+        6 => ("Make steel", "Load iron + mined coal into the bellows furnace. Keep the heat above the clear bar; steel only progresses there. Each bar costs 2 iron + 3 coal incl. fuel."),
         7 => ("Tools for the village", "At the anvil choose Steel tools. Load 2 steel bars + 2 wood, then collect your tools."),
         8 => ("The road to Bramblewick", "Build a village signpost. Sell steel tools. The cart returns with payment after 30 seconds."),
         9 => ("Many hands", "At the signpost hire a worker for 24 coins. Reserve 8 coins per worker for each dawn."),
@@ -714,6 +749,7 @@ public sealed class World
         var slots = loaded.HotbarSlots ?? new();
         loaded.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.Buildings.ContainsKey(id)) ? id : "").ToList();
         loaded.ActiveHotbar = Math.Clamp(loaded.ActiveHotbar, 0, 8);
+        if (!loaded.Things.Any(t => t.Id == loaded.Sheltered && t.Kind == "hut")) loaded.Sheltered = 0;
         S = loaded; gatherClock = 0; Say("Settlement loaded.");
     }
 }
