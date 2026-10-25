@@ -338,7 +338,7 @@ public partial class Game
             await KeyStroke(Key.B); UIRequire(page == "build" && panel.Visible, "B must open the building plans.");
             var plan = Named("build_chest"); UIRequire(plan != null, "Building plans must expose storage construction.");
             plan!.EmitSignal(Control.SignalName.MouseEntered); await Frames();
-            UIRequire(HasLabel(panel, "Needs: Wood") && HasLabel(panel, "18 slots"), "Hovering a plan must show its description and required resources.");
+            UIRequire(HasLabel(panel, "Needs: Wood") && HasLabel(panel, "5 slots"), "Hovering a plan must show its description and required resources.");
             plan.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(view.BuildMode == "chest" && !panel.Visible, "Choosing a plan must enter placement mode.");
             Vector2 place = Vector2.Zero;

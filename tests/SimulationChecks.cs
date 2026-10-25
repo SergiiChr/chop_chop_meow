@@ -1401,6 +1401,7 @@ public static class SimulationChecks
         world.S.Backpack.Add("wood", 40);
         var pile = world.Build("pile", origin);
         Require(pile != null && world.S.Backpack["wood"] == 32 && pile!.Inventory.Slots == World.PileStacks, "a pile should cost 8 wood and hold 14 stacks");
+        Require(world.Add("chest", origin + new Vector2(0, 8)).Inventory.Slots == 5, "a chest should hold a third of a pile, 5 stacks");
         Require(world.Snap("pile", origin + new Vector2(3.4f, .4f)) == origin + new Vector2(3, 0) && world.Snap("pile", origin + new Vector2(9, 0)) == origin + new Vector2(9, 0),
                 "a pile placed beside another should snap edge to edge, and one far away should not");
         var east = world.Build("pile", origin + new Vector2(3.3f, 0)) ?? throw new InvalidOperationException("a pile beside another should build");

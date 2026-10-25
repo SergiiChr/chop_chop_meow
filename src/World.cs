@@ -264,6 +264,7 @@ public sealed partial class World
         if (kind == "mine") { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
         if (kind == "toolstation") t.Inventory.Slots = 12;
         if (kind == "pile") t.Inventory.Slots = PileStacks;
+        if (kind == "chest") t.Inventory.Slots = ChestStacks;
         if (kind == "farm") t.Inventory.Slots = Data.Farm.Sow.Keys.Union(Data.Farm.Yield.Keys).Count();
         S.Things.Add(t); return t;
     }
@@ -342,6 +343,8 @@ public sealed partial class World
     public static bool IsZone(string kind) => kind is "pile" or "farm";
     public const float ZoneSize = 3;
     public const int PileStacks = 14;
+    /// <summary>A third of a pile, rounded to the nearest stack.</summary>
+    public const int ChestStacks = (PileStacks + 1) / 3;
     /// <summary>Snaps a mine to its cliff and a yard to the grid of the nearest yard close enough to touch it.</summary>
     public Vector2 Snap(string kind, Vector2 p)
     {
