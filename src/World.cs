@@ -294,7 +294,7 @@ public sealed partial class World
         for (int placed = 0, tried = 0; placed < count && tried < tries; tried++)
         {
             var p = new Vector2(rng.Next(3, MapSize - 3), rng.Next(3, MapSize - 3));
-            if (p.DistanceTo(Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f)) continue;
+            if (p.DistanceTo(Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InSpur(p, 2.5f)) continue;
             if (rng.NextDouble() > chance(p) || Crowded(p)) continue;
             var t = Add(kind, p, remaining); placed++;
             if (!near.TryGetValue(Cell(p), out var cellList)) near[Cell(p)] = cellList = new();
@@ -302,8 +302,8 @@ public sealed partial class World
         }
     }
     public bool CanStand(Vector2 p) => Open(p) && !S.Things.Any(t => Blocks(t, p));
-    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls.</summary>
-    private static bool Open(Vector2 p) => Terrain.Open(p) && !Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth);
+    /// <summary>Walkable ground ignoring buildings: inside the valley, off the water and clear of cliff walls and their spurs.</summary>
+    private static bool Open(Vector2 p) => Terrain.Open(p) && !Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth) && !InSpur(p);
     private static bool Blocks(Thing t, Vector2 p) => !t.IsResource && t.Kind is not "campfire" and not "grave" and not "signpost" and not "mine" && t.Pos.DistanceTo(p) < Footprint(t.Kind);
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);

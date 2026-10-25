@@ -18,8 +18,14 @@ public sealed partial class World
     public static Cliff CliffAt(Vector2 p) => Cliffs.MinBy(c => c.DistanceTo(p));
     /// <summary>The way out of a mine: along its cliff toward the sea, since the adit is cut into the cliff's seaward end, which faces the camera.</summary>
     public static Vector2 MineOut(Cliff c) => c.Along * Math.Sign(c.Along.Dot(Terrain.Seaward));
-    /// <summary>A mine's spot: on open ground past the cliff's seaward end, where the cart stands at the end of the rails.</summary>
-    public static Vector2 MineSpot(Cliff c) => c.Center + MineOut(c) * (c.HalfLength + 3);
+    /// <summary>
+    /// A mine's spot: on open ground in front of the rock spur at the cliff's seaward end, where the cart stands at the end of the rails.
+    /// It sits a little toward the valley, since some cliffs end where the valley's edge already climbs into the mountains.
+    /// </summary>
+    public static Vector2 MineSpot(Cliff c) => c.Center + MineOut(c) * (c.HalfLength + 6.7f) + c.Face * 2.5f;
+    /// <summary>The middle of the spur the adit is driven into; it blocks walking like the cliff, whether or not it is mined.</summary>
+    private static Vector2 SpurCenter(Cliff c) => MineSpot(c) - MineOut(c) * 4.2f;
+    private static bool InSpur(Vector2 p, float margin = 0) => Cliffs.Any(c => p.DistanceTo(SpurCenter(c)) < 2 + margin);
     /// <summary>Where diggers and miners stand: at the entrance, against the rock.</summary>
     public static Vector2 MineDoor(Thing mine) => mine.Pos - MineOut(CliffAt(mine.Pos)) * 1.4f;
     /// <summary>Where a plan placed at <paramref name="p"/> goes: a mine near a cliff snaps to that cliff's spot.</summary>
