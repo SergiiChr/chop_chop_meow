@@ -46,8 +46,18 @@ public sealed class Inventory {
     public int ShownSlots => Capacity > 0 ? Math.Min(Slots, UsedSlots + Math.Max(0, Capacity - Count)) : Slots;
 
     /// <summary>Each item split into full stacks followed by its remainder.</summary>
-    public IEnumerable<(string Item, int Count)> Stacks() => Items.SelectMany(pair =>
-        Enumerable.Range(0, SlotsFor(pair.Key, pair.Value)).Select(i => (pair.Key, Math.Min(StackOf(pair.Key), pair.Value - i * StackOf(pair.Key)))));
+    public IEnumerable<(string Item, int Count)> Stacks() {
+        var stacks = new List<(string, int)>();
+        FillStacks(stacks);
+        return stacks;
+    }
+
+    /// <summary>Fills <paramref name="stacks"/> with <see cref="Stacks"/>, without allocating, for panels that refresh while open.</summary>
+    public void FillStacks(List<(string Item, int Count)> stacks) {
+        stacks.Clear();
+        foreach (var (item, quantity) in Items)
+            for (int i = 0; i < SlotsFor(item, quantity); i++) stacks.Add((item, Math.Min(StackOf(item), quantity - i * StackOf(item))));
+    }
 
     public bool Accepts(string item) => InputFilter.Count == 0 || InputFilter.Contains(item);
     public bool AllowsWithdrawal(string item) => OutputFilter.Count == 0 || OutputFilter.Contains(item);

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Godot;
 
 namespace ChopChopMeow;
@@ -13,7 +14,7 @@ public partial class Game {
         foreach (var group in world.HandRecipes.GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key)) {
             var (tool, tier) = group.Key;
             CraftSection(tool, tier, () => tool == "" ? null : world.BestTool(tool, null, tier), group, details, null,
-                id => Act(() => world.Craft(id)), _ => false, id => world.CraftBlock(id) == null);
+                id => Act(() => world.Craft(id)), _ => false, world.CanCraft);
         }
         content.AddChild(details);
         CraftQueue();
@@ -32,20 +33,32 @@ public partial class Game {
         var progress = new ProgressBar { MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 10), Name = "craft_progress" };
         content.AddChild(progress);
         var status = Label("", 13, Muted); content.AddChild(status);
+        var statusText = new LiveText(shown => status.Text = shown);
+        // Each cell redraws only when the recipe queued in it changes.
+        var drawn = new string?[cells.Length];
+        bool first = true;
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(progress)) return;
             var queue = world.S.Crafting;
             for (int i = 0; i < cells.Length; i++) {
                 var (cell, count) = cells[i];
-                var r = i < queue.Count ? world.Data.Recipes[queue[i]] : null;
+                string? queued = i < queue.Count ? queue[i] : null;
+                if (!first && queued == drawn[i]) continue;
+                drawn[i] = queued;
+                var r = queued == null ? null : world.Data.Recipes[queued];
                 cell.Visible = r != null || i == 0;
                 cell.Icon = r == null ? null : HotbarIcon(r.Output);
                 count.Text = r is { Amount: > 1 } ? r.Amount.ToString() : "";
                 cell.TooltipText = r == null ? "" : $"{r.Name}\nClick to cancel and get the materials back.";
             }
-            var first = queue.Count > 0 ? world.Data.Recipes[queue[0]] : null;
-            progress.Value = first == null ? 0 : world.S.CraftTime / first.Seconds;
-            status.Text = first == null ? "Nothing in the works." : world.CraftRate > 0 ? $"{first.Name} · {(first.Seconds - world.S.CraftTime) / world.CraftRate:0}s left" : $"{first.Name} · waiting for a {first.Tool} in your backpack";
+            first = false;
+            var making = queue.Count > 0 ? world.Data.Recipes[queue[0]] : null;
+            progress.Value = making == null ? 0 : world.S.CraftTime / making.Seconds;
+            var text = statusText.Clear();
+            if (making == null) text.Append("Nothing in the works.");
+            else if (world.CraftRate > 0) text.Append($"{making.Name} · {(making.Seconds - world.S.CraftTime) / world.CraftRate:0}s left");
+            else text.Append($"{making.Name} · waiting for a {making.Tool} in your backpack");
+            statusText.Show();
         });
     }
 
@@ -85,9 +98,13 @@ public partial class Game {
         cell.Drag = () => world.BenchTool(bench, tool) is string held ? new ItemDrag(held, 1, bench.Tools, bench) : null;
         cell.CanTake = drag => drag.From == world.S.Backpack && world.Data.Items.GetValueOrDefault(drag.Item)?.Tool == tool;
         cell.Take = drag => { Act(() => world.SlotTool(bench, drag.Item)); RefreshLive(); return 0; };
+        // Redrawn only when the slotted tool changes.
+        string? drawn = null; bool first = true;
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(cell)) return;
             string? held = world.BenchTool(bench, tool);
+            if (!first && held == drawn) return;
+            first = false; drawn = held;
             cell.Icon = HotbarIcon(held ?? plainest);
             cell.SelfModulate = held != null ? Colors.White : new Color(1, .35f, .3f, .45f);
             cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\nClick: take it back" : $"Empty {tool} slot\nDrag a {tool} here from your backpack";
@@ -128,9 +145,13 @@ public partial class Game {
             string name = world.Data.ToolName(tool, tier);
             var badge = new TextureRect { Name = "badge", Texture = HotbarIcon(plainest), CustomMinimumSize = new Vector2(26, 26), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered };
             heading.AddChild(badge);
+            // Redrawn only when the tool in use changes.
+            string? drawn = null; bool first = true;
             live.Add(() => {
                 if (!GodotObject.IsInstanceValid(badge)) return;
                 string? inUse = held();
+                if (!first && inUse == drawn) return;
+                first = false; drawn = inUse;
                 if (inUse != null) badge.Texture = HotbarIcon(inUse);
                 badge.Modulate = inUse != null ? Colors.White : new Color(1, .25f, .2f);
                 badge.TooltipText = inUse != null
@@ -149,12 +170,18 @@ public partial class Game {
             if (chosen(id)) cell.AddThemeStyleboxOverride("normal", Box(new Color("7c8550"), 4, 3));
             cell.Pressed += () => { click(id); RefreshLive(); };
             float Time() => r.Seconds / ((station?.Kind == "bench" ? world.Data.BenchSpeed : 1) * (held() is string inUse ? world.Data.Items[inUse].Speed : 1));
-            string Describe() => $"{r.Name}{(r.Amount > 1 ? $" ×{r.Amount}" : "")}\nNeeds: {Needs(r.Inputs)}\n{Time():0.#}s";
+            void Describe(StringBuilder text) {
+                text.Append(r.Name);
+                if (r.Amount > 1) text.Append($" ×{r.Amount}");
+                text.Append("\nNeeds: "); AppendNeeds(text, r.Inputs);
+                text.Append($"\n{Time():0.#}s");
+            }
             cell.Popup = () => RecipePopup(r, Time());
-            cell.MouseEntered += () => details.Text = Describe();
+            cell.MouseEntered += () => details.Text = Text(Describe);
+            var tooltip = new LiveText(shown => cell.TooltipText = shown);
             live.Add(() => {
                 if (!GodotObject.IsInstanceValid(cell)) return;
-                cell.TooltipText = Describe();
+                Describe(tooltip.Clear()); tooltip.Show();
                 cell.Modulate = ready(id) ? Colors.White : new Color(1, .7f, .65f);
             });
             grid.AddChild(cell);

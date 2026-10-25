@@ -17,7 +17,11 @@ public partial class Game {
         middle.AddChild(progress); row.AddChild(middle);
         // Leftovers from an earlier recipe or fuel choice get their own output slots so they stay reachable.
         foreach (var item in world.Leftovers(t).Append(recipe.Output).Distinct()) row.AddChild(MachineSlot(t, item, false));
-        Dynamic(() => $"Batch: {Cost(world.BatchCost(t))}\n{(t.Processing ? $"Working · {t.Progress:0.0}/{recipe.Seconds:0}s" : "Waiting for ingredients / temperature")}", 14, Muted);
+        Dynamic(text => {
+            text.Append("Batch: "); AppendCost(text, world.BatchCost(t));
+            if (t.Processing) text.Append($"\nWorking · {t.Progress:0.0}/{recipe.Seconds:0}s");
+            else text.Append("\nWaiting for ingredients / temperature");
+        }, 14, Muted);
     }
 
     /// <summary>Switches a wood-or-coal station's fuel between batches.</summary>
@@ -25,14 +29,32 @@ public partial class Game {
         if (t.Kind is not ("furnace" or "cooktable" or "cannery")) return;
         // A guest's switch comes back with the host's next update, so the label follows the building rather than the click.
         var fuel = Button("", () => world.SetFuel(t, t.Fuel == "wood" ? "coal" : "wood")); content.AddChild(fuel);
-        live.Add(() => { if (GodotObject.IsInstanceValid(fuel)) fuel.Text = $"Fuel: {world.Data.Name(t.Fuel)} · click to switch"; });
+        var label = new LiveText(shown => fuel.Text = shown);
+        live.Add(() => {
+            if (!GodotObject.IsInstanceValid(fuel)) return;
+            label.Clear().Append($"Fuel: {world.Data.Name(t.Fuel)} · click to switch"); label.Show();
+        });
     }
 
     /// <summary>Bellows furnace temperature with the clear bar that steel needs.</summary>
     private void HeatGauge(Thing t) {
-        Dynamic(() => $"HEAT  {t.Heat:0}°  ·  {(t.Heat >= World.SteelHeat ? "steel progressing" : t.Processing ? $"burning coal · pump above {World.SteelHeat:0}°" : $"pump above {World.SteelHeat:0}°")}", 15, new Color("edc17c"));
+        Dynamic(text => {
+            text.Append($"HEAT  {t.Heat:0}°  ·  ");
+            if (t.Heat >= World.SteelHeat) {
+                text.Append("steel progressing");
+            } else {
+                if (t.Processing) text.Append("burning coal · ");
+                text.Append($"pump above {World.SteelHeat:0}°");
+            }
+        }, 15, new Color("edc17c"));
         var gauge = new HeatBar { Level = () => t.Heat, CustomMinimumSize = new Vector2(0, 22), Name = "heat" };
-        content.AddChild(gauge); live.Add(() => { if (GodotObject.IsInstanceValid(gauge)) gauge.QueueRedraw(); });
+        // Redrawn only when the heat moves a tenth of a degree.
+        int drawn = int.MinValue;
+        content.AddChild(gauge);
+        live.Add(() => {
+            if (!GodotObject.IsInstanceValid(gauge) || (int)(t.Heat * 10) == drawn) return;
+            drawn = (int)(t.Heat * 10); gauge.QueueRedraw();
+        });
     }
 
     /// <summary>The item's icon above a box showing what the station holds.</summary>
@@ -50,8 +72,12 @@ public partial class Game {
             };
         }
         string hint = input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: collect";
+        // Redrawn only when the amount held changes.
+        int drawn = -1;
         live.Add(() => {
             int held = t.Inventory[item];
+            if (held == drawn) return;
+            drawn = held;
             cell.Icon = held > 0 ? HotbarIcon(item) : null;
             count.Text = held > 0 ? held.ToString() : "";
             cell.TooltipText = $"{world.Data.Name(item)} · {held}/{t.Inventory.StackSize}\n{hint}";

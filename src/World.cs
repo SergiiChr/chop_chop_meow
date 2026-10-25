@@ -593,9 +593,9 @@ public sealed partial class World {
         bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = S.Thirst - SecondsToDawn * Data.ThirstPerSecond <= 0;
         if (hungry || thirsty) return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : "You are too thirsty to sleep.";
         // The night passes for everyone at once, so the others have to be inside and fed too.
-        var others = S.Players.Where(p => p != S.Actor).ToList();
-        if (others.Any(p => p.Sheltered == 0)) return "Everyone has to be inside a cabin to sleep.";
-        if (others.Any(p => p.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0 || p.Thirst - SecondsToDawn * Data.ThirstPerSecond <= 0)) return "Someone is too hungry or thirsty to sleep.";
+        foreach (var p in S.Players) if (p != S.Actor && p.Sheltered == 0) return "Everyone has to be inside a cabin to sleep.";
+        foreach (var p in S.Players)
+            if (p != S.Actor && (p.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0 || p.Thirst - SecondsToDawn * Data.ThirstPerSecond <= 0)) return "Someone is too hungry or thirsty to sleep.";
         return null;
     }
     public void Sleep(Thing hut) {
@@ -808,7 +808,11 @@ public sealed partial class World {
     /// <summary>Hand recipes for the personal crafting menu.</summary>
     public IEnumerable<string> HandRecipes => Data.Recipes.Where(p => p.Value.Hand).Select(p => p.Key);
     /// <summary>Why a recipe cannot be queued from the backpack now, or null.</summary>
+    /// <summary>Whether a hand recipe can be queued now; <see cref="CraftBlock"/> says why not.</summary>
+    public bool CanCraft(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand && !Downed &&
+        (r.Tool == "" || BestTool(r.Tool, null, r.Tier) != null) && S.Backpack.Has(r.Inputs) && S.Crafting.Count < 8;
     public string? CraftBlock(string recipe) {
+        if (CanCraft(recipe)) return null;
         if (!Data.Recipes.TryGetValue(recipe, out var r) || !r.Hand) return "This can only be made at a station.";
         if (Downed) return "You are still recovering.";
         if (r.Tool != "" && BestTool(r.Tool, null, r.Tier) == null) return $"Needs a {Data.ToolName(r.Tool, r.Tier)} in your backpack.";
@@ -871,12 +875,13 @@ public sealed partial class World {
         if (bench.Tools.TransferTo(S.Backpack, item, 1) == 0 && bench.Tools[item] > 0) Say("Backpack full.");
     }
     public string? FetchBlock(Thing sign) {
-        var crew = S.Workers.Where(w => w.Assignment == sign.Id).ToList();
-        if (crew.Count == 0) return "No worker assigned.";
+        bool assigned = false, working = false;
+        foreach (var w in S.Workers) if (w.Assignment == sign.Id) { assigned = true; working |= w.WageDebt <= 0; }
+        if (!assigned) return "No worker assigned.";
         if (Dusk) return "Your workers have signed out until morning.";
         if (Lunch) return "Your workers are at lunch.";
-        if (crew.FirstOrDefault(w => w.Away > 0) is Worker away) return $"{away.Name} is already on the way.";
-        return crew.Any(w => w.WageDebt <= 0) ? null : "The assigned worker is on strike.";
+        foreach (var w in S.Workers) if (w.Assignment == sign.Id && w.Away > 0) return Phrase(w.Name, " is already on the way.");
+        return working ? null : "The assigned worker is on strike.";
     }
     /// <summary>Sends the post's worker to the village; the price sheet refreshes when they return.</summary>
     public bool FetchPrices(Thing sign) {
@@ -943,7 +948,10 @@ public sealed partial class World {
         if (pile.Compost) {
             foreach (var item in compostables ??= Data.Items.Keys.Where(Compostable).ToArray()) inv.InputFilter.Add(item);
             inv.OutputFilter.Add("fertilizer");
-        } else if (inv.First() is string item) { inv.InputFilter.Add(item); inv.OutputFilter.Add(item); }
+        } else if (inv.First() is string item) {
+            inv.InputFilter.Add(item);
+            inv.OutputFilter.Add(item);
+        }
     }
     /// <summary>Compost turns 4 units of whatever it holds into 1 fertilizer each in-game hour.</summary>
     public const int CompostBatch = 4;
@@ -1335,7 +1343,10 @@ public sealed partial class World {
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
             using (ActAs(p)) {
-                if (!Night) { nightSpawn = 0; if (!Dead) S.Mauled = false; } else if (!sleeping) {
+                if (!Night) {
+                    nightSpawn = 0;
+                    if (!Dead) S.Mauled = false;
+                } else if (!sleeping) {
                     hunting.Clear();
                     foreach (var w in S.Wolves) if (w.Target == p.Id) hunting.Add(w);
                     TickWolves(dt, hunting);

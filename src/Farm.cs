@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 
 namespace ChopChopMeow;
 
@@ -67,9 +68,22 @@ public sealed partial class World {
         Harvest(farm, dt);
     }
 
-    public string FarmStatus(Thing farm) => farm.Stage switch {
-        FarmRipe => $"Ripe · harvested {farm.Progress / HarvestSeconds * 100:0}%. Hold right mouse on the plot to harvest.",
-        FarmGrowing => $"Growing · ripe in {(GrowSeconds - farm.Progress) / Data.DaySeconds * 24:0} hours",
-        _ => $"Fallow · sow it with {string.Join(" and ", Data.Farm.Sow.Select(p => $"{p.Value} {Data.Name(p.Key)}"))}"
-    };
+    public string FarmStatus(Thing farm) {
+        var text = new StringBuilder();
+        WriteFarmStatus(farm, text);
+        return text.ToString();
+    }
+
+    /// <summary>Writes <see cref="FarmStatus"/> into a reused buffer, for a panel that refreshes while open.</summary>
+    public void WriteFarmStatus(Thing farm, StringBuilder text) {
+        if (farm.Stage == FarmRipe) { text.Append($"Ripe · harvested {farm.Progress / HarvestSeconds * 100:0}%. Hold right mouse on the plot to harvest."); return; }
+        if (farm.Stage == FarmGrowing) { text.Append($"Growing · ripe in {(GrowSeconds - farm.Progress) / Data.DaySeconds * 24:0} hours"); return; }
+        text.Append("Fallow · sow it with ");
+        bool first = true;
+        foreach (var (item, amount) in Data.Farm.Sow) {
+            if (!first) text.Append(" and ");
+            first = false;
+            text.Append($"{amount} {Data.Name(item)}");
+        }
+    }
 }
