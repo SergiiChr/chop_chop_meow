@@ -407,22 +407,12 @@ public static class WorldModels
     private static void Cannery(Prop prop)
     {
         var body = prop.Body;
-        var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var steel = Mat("b9c3c6", .4f, .3f); var dark = Mat("45494c", .5f, .6f); var tin = Mat("d4d9d6", .35f, .4f);
-        Box(body, new Vector3(.46f, .5f, .5f), new Vector3(-.27f, .25f, 0), dark);
-        Box(body, new Vector3(.24f, .18f, .03f), new Vector3(-.27f, .16f, .25f), Mat("2b2522"));
-        prop.Glow = Box(body, new Vector3(.2f, .14f, .03f), new Vector3(-.27f, .14f, .255f), Flat(new Color("ff7a24")));
-        Cylinder(body, .2f, .2f, .34f, new Vector3(-.27f, .67f, 0), steel, null, 16);
-        Cylinder(body, .21f, .21f, .03f, new Vector3(-.27f, .85f, 0), dark, null, 16);
-        Post(body, .03f, .03f, .06f, new Vector3(-.27f, .86f, 0), dark, 8);
-        Post(body, .06f, .06f, .55f, new Vector3(-.44f, .5f, -.18f), dark);
+        Add(body, CanneryShape.Stove, CanneryShape.Iron, Vector3.Zero);
+        Add(body, CanneryShape.Timber, CanneryShape.Wood, Vector3.Zero);
+        Add(body, CanneryShape.Pot, CanneryShape.Steel, Vector3.Zero);
+        Add(body, CanneryShape.Press, CanneryShape.Steel, Vector3.Zero);
+        prop.Glow = Add(body, CanneryShape.Fire, CanneryShape.Flame, Vector3.Zero);
         prop.Vent = new Vector3(-.44f, 1.1f, -.18f);
-        foreach (var (x, z) in new[] { (.02f, -.22f), (.5f, -.22f), (.02f, .22f), (.5f, .22f) }) Box(body, new Vector3(.06f, .56f, .06f), new Vector3(x, .28f, z), post);
-        Box(body, new Vector3(.56f, .05f, .54f), new Vector3(.26f, .58f, 0), plank);
-        foreach (var (x, z, y) in new[] { (.14f, .12f, 0f), (.26f, .14f, 0f), (.2f, .13f, .12f), (.36f, .02f, 0f) })
-            Cylinder(body, .05f, .05f, .11f, new Vector3(x, .66f + y, z), tin, null, 10);
-        Box(body, new Vector3(.14f, .03f, .14f), new Vector3(.38f, .62f, -.14f), steel);
-        Post(body, .025f, .025f, .4f, new Vector3(.44f, .6f, -.18f), steel, 8);
-        Box(body, new Vector3(.3f, .03f, .03f), new Vector3(.32f, .98f, -.16f), steel, new Vector3(0, 0, -15));
         prop.Light = Light(body, new Vector3(-.27f, .25f, .55f), 2f);
     }
 

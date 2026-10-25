@@ -19,3 +19,5 @@ Both PNG atlases were generated with the built-in image generation tool for this
 `sounds/` holds the sound effects as 320 kbps MP3, converted from the supplied files and peak-normalised, with variants of one sound matched in loudness. A numbered suffix marks variants of one sound. Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com)).
 
 `CookShape` caches the cooking table’s recessed masonry hearth, bevelled timber joinery, grill and open stew pot, hollow mortar with fitted pestle, and fire mesh. `WorldModels.CookingTable` preserves the independently visible `Glow` and `Mortar` handles, the light and smoke vent, and its existing hit volumes.
+
+`CanneryShape` caches the cannery’s bevelled steel stove with an open firebox and flue, fitted timber counter, shaped stockpot and lid with open handles, and hand press with cans. Bevels are limited to broad edges; simplified can profiles and omitted covered caps keep the lit model at 1,057 triangles across five visible mesh instances. The existing fire, light and smoke controls remain on `WorldModels.Cannery`.
