@@ -646,7 +646,7 @@ public partial class WorldView : Node3D
                 prop.Light!.LightEnergy = night > .45f ? .9f : 0;
                 break;
             case "mine":
-                // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty and unlit.
+                // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty, and the lantern is out.
                 float stageShare = Math.Clamp(t.Progress / World.MineStageSeconds, 0, 1);
                 bool finished = t.Stage == World.MineOpen;
                 prop.Outline!.Visible = !finished;
@@ -655,18 +655,14 @@ public partial class WorldView : Node3D
                 prop.Supplies!.Visible = t.Stage == World.MineSupplied;
                 prop.Frame!.Visible = finished || t.Stage == World.MineSupplied && stageShare > 0;
                 prop.Frame.Scale = new Vector3(1, finished ? 1 : Math.Max(.05f, stageShare), 1);
-                prop.Rails!.Visible = prop.Cart!.Visible = finished;
                 bool mining = finished && World.Sees(t.Pos) && World.S.Workers.Any(w => w.Assignment == t.Id && w.WorkState == WorkerWorkState.Underground);
-                // The cart runs a round trip into the dark every few seconds while miners are inside.
-                float cartTrip = (Elapsed / 7 + WorldModels.Jitter(t.Id, 3)) % 1;
-                prop.Open = mining ? World.TripLeg(cartTrip) : Mathf.MoveToward(prop.Open, 0, dt * .4f);
-                // Deep in, the cart fades into the dark of the tunnel.
-                float depth = Ease(prop.Open) * (-WorldModels.MineDoor + WorldModels.MineDepth - .4f);
-                prop.Cart.Position = new Vector3(0, 0, -depth);
-                SetFade(prop.Cart, Math.Clamp((depth + WorldModels.MineDoor) / (WorldModels.MineDepth - .8f), 0, 1));
-                prop.Load!.Visible = (t.Output?.Count ?? 0) > 0 && (!mining || cartTrip > .5f);
-                prop.Glow!.Visible = mining;
-                prop.Light!.LightEnergy = mining ? (1.3f + flicker * .2f) * (.5f + night) : 0;
+                prop.Rails!.Visible = finished;
+                prop.Cart!.Visible = finished && !mining;
+                prop.Load!.Visible = (t.Output?.Count ?? 0) > 0;
+                prop.Glow!.Visible = prop.Fire!.Visible = mining;
+                // The lantern lights its surroundings like a held torch.
+                if (mining) prop.Fire.Scale = new Vector3(1, .9f + flicker * .1f, 1);
+                prop.Light!.LightEnergy = mining ? (1 + flicker * .25f) * (.3f + night * 1.3f) : 0;
                 break;
             case "signpost":
                 bool waiting = World.S.Orders.Any(o => o.Signpost == t.Id);
