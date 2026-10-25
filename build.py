@@ -236,10 +236,11 @@ def lag_proxy(stop: threading.Event, delay: float = 0.08, loss: float = 0.05) ->
                 [front, *upstreams.values()], [], [], max(0, min(wait, 0.05))
             )
             for sock in ready:
+                # A port that is not listening yet or any more refuses; the game resends what matters.
                 try:
                     data, sender = sock.recvfrom(65536)
                 except ConnectionRefusedError:
-                    continue  # The host is not listening yet; the guest retries.
+                    continue
                 if sock is front:
                     if sender not in upstreams:
                         upstreams[sender] = socket.socket(
@@ -257,10 +258,13 @@ def lag_proxy(stop: threading.Event, delay: float = 0.08, loss: float = 0.05) ->
                     heapq.heappush(queue, (due, next(order), target, client, data))
             while queue and queue[0][0] <= time.monotonic():
                 _, _, target, client, data = heapq.heappop(queue)
-                if client:
-                    target.sendto(data, client)
-                else:
-                    target.send(data)
+                try:
+                    if client:
+                        target.sendto(data, client)
+                    else:
+                        target.send(data)
+                except ConnectionRefusedError:
+                    pass
     for upstream in upstreams.values():
         upstream.close()
 

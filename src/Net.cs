@@ -12,12 +12,11 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>What the host sends: the world, everyone in it, and what the workers are doing, which saves leave out.</summary>
-internal sealed class Snapshot
+/// <summary>The fog the host has uncovered so far, which a joining guest starts from; after that each machine works it out itself.</summary>
+internal sealed class Fog
 {
-    public SaveState State { get; set; } = new();
-    public List<PlayerState> Players { get; set; } = new();
-    public Dictionary<int, WorkerWorkState> Work { get; set; } = new();
+    public byte[] Explored { get; set; } = [];
+    public Dictionary<int, Thing> Remembered { get; set; } = new();
 }
 
 /// <summary>
@@ -27,6 +26,7 @@ internal sealed class Snapshot
 /// A guest merges them into its copy in place, so open panels and the view keep their objects, and glides what moves.
 /// A guest walks its own player and streams where it stands; any other action goes to the host as a <see cref="Command"/>.
 /// Joining sends the guest's player as saved on its machine, which the host checks before letting it in.
+/// Leaving asks the host for the guest's player as the host last had it, so nothing in flight is lost or kept twice.
 /// </summary>
 public partial class Net : Node
 {
@@ -39,13 +39,19 @@ public partial class Net : Node
     private const float SnapshotInterval = .1f, InputInterval = .05f;
     private const int HostId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 2;
+    private const int Protocol = 3;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember; a guest that confirmed none of the last this many gets the whole world again.</summary>
     private const int History = 64;
     /// <summary>Largest update sent unreliably; ENet splits anything bigger, and losing any piece loses all of it.</summary>
     private const int PacketSize = 1200;
+    /// <summary>A guest saves its player this often while it changes, so a crash loses little.</summary>
+    private const float SaveInterval = 2;
+    /// <summary>How long leaving waits for the host to hand back the guest's player.</summary>
+    private const int FarewellMsec = 2000;
+    // Updates and the steady streams go on their own channels: unreliable messages wait behind a lost reliable one on the same channel.
+    private const int StreamChannel = 1, BulkChannel = 2;
 
     public World World = null!;
     /// <summary>Put in front of the guest save file names, so checks never touch a player's saves.</summary>
@@ -59,13 +65,18 @@ public partial class Net : Node
     public event Action<string>? Failed;
 
     private string address = "";
-    private bool welcomed;
-    private float sendClock;
+    private bool welcomed, leaving, unsaved;
+    private float sendClock, saveClock;
+    private string? farewell;
+    // Guest: counts what it sends, so the host can tell a position report from before an action.
+    private int stamp;
     private SceneTreeTimer? connectTimer;
     // A guest's copy glides workers, wolves and the other players toward where the host last put them.
     private readonly Dictionary<object, Vector2> goals = new();
     // The host glides each guest toward where it says it stands, while no respawn or other move by the simulation has come since.
     private readonly Dictionary<int, (Vector2 At, int Warp)> walks = new();
+    // Host: the latest stamp heard from each guest.
+    private readonly Dictionary<int, int> heard = new();
     // Host: the world by entry as each recent update had it, and the last update each guest confirmed.
     private int sequence;
     private readonly Dictionary<int, Dictionary<string, string>> sent = new();
@@ -94,11 +105,15 @@ public partial class Net : Node
     /// <summary>Kept apart from IsServer, which errors once a lost connection has closed the peer.</summary>
     public bool Hosting { get; private set; }
     public bool Connecting => Online && !Hosting && !welcomed;
+    /// <summary>The host's address as typed, set once joined, for the popup to offer next time.</summary>
+    public string Address { get; private set; } = "";
     public int Guests => Hosting ? World.S.Players.Count - 1 : 0;
 
     public override void _Ready()
     {
-        Multiplayer.PeerDisconnected += id => { walks.Remove((int)id); acked.Remove((int)id); World.RemoveGuest((int)id); };
+        // Guests only hear about each other from the host's messages and updates.
+        if (Multiplayer is SceneMultiplayer scene) scene.ServerRelay = false;
+        Multiplayer.PeerDisconnected += id => { if (Hosting) Forget((int)id); };
         Multiplayer.ConnectedToServer += () => { connectTimer = null; RpcId(HostId, MethodName.Hello, Protocol, LoadGuest()); };
         Multiplayer.ConnectionFailed += () => Fail("Could not reach the host.");
         Multiplayer.ServerDisconnected += () => End("Lost the connection to the host.");
@@ -127,23 +142,38 @@ public partial class Net : Node
         if (error != Error.Ok) return error;
         if (peer.GetPeer(HostId) is { } host) TolerateLag(host);
         Multiplayer.MultiplayerPeer = peer;
-        address = $"{ip}:{port}";
+        address = $"{ip}:{port}"; Address = ip;
         // The connect attempt itself would wait out the whole lag timeout; a host that never answers fails sooner.
         var timer = GetTree().CreateTimer(ConnectTimeout); connectTimer = timer;
         timer.Timeout += () => { if (timer == connectTimer && Connecting) Fail($"The host didn't answer within {ConnectTimeout:0} seconds."); };
         return Error.Ok;
     }
 
-    /// <summary>Ends hosting or a joined game; a guest saves its player first.</summary>
+    /// <summary>Ends hosting or a joined game; a guest saves its player first, as the host has it when the line still works.</summary>
     public void Leave()
     {
-        SaveGuest();
+        if (leaving) return;
+        leaving = true;
+        if (welcomed && Multiplayer.MultiplayerPeer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Connected)
+        {
+            // Actions already sent arrive before this, so the player that comes back has them all.
+            farewell = null; RpcId(HostId, MethodName.Bye);
+            for (ulong until = Time.GetTicksMsec() + FarewellMsec; farewell == null && Time.GetTicksMsec() < until; OS.DelayMsec(5)) Multiplayer.Poll();
+        }
+        SaveGuest(farewell);
         if (Hosting) foreach (var guest in World.S.Players.Where(p => p != World.Me).ToList()) World.RemoveGuest(guest.Id);
         if (Online) Multiplayer.MultiplayerPeer.Close();
         Multiplayer.MultiplayerPeer = new OfflineMultiplayerPeer(); Hosting = false;
         World.Host = null; World.Relay = null; World.LocalId = 1;
-        welcomed = false; connectTimer = null; goals.Clear(); walks.Clear();
+        welcomed = unsaved = false; connectTimer = null; farewell = null; stamp = 0; goals.Clear(); walks.Clear(); heard.Clear();
         sequence = 0; sent.Clear(); acked.Clear(); received.Clear(); applied = new(); appliedSequence = 0; work = new();
+        leaving = false;
+    }
+
+    /// <summary>Host: a guest has gone, by saying goodbye or losing the line.</summary>
+    private void Forget(int id)
+    {
+        walks.Remove(id); acked.Remove(id); heard.Remove(id); World.RemoveGuest(id);
     }
 
     private void Fail(string reason) { Leave(); Failed?.Invoke(reason); }
@@ -158,11 +188,13 @@ public partial class Net : Node
     private string LoadGuest() => Godot.FileAccess.FileExists(GuestPath) ? Godot.FileAccess.GetFileAsString(GuestPath) : "";
 
     /// <summary>A guest keeps its own player, and what it carries, for the next time it joins this host.</summary>
-    public void SaveGuest()
+    /// <param name="player">The player as the host exported it; without it, as this machine's copy has it.</param>
+    public void SaveGuest(string? player = null)
     {
         if (!welcomed || !World.Remote) return;
         using var file = Godot.FileAccess.Open(GuestPath, Godot.FileAccess.ModeFlags.Write);
-        file?.StoreString(World.ExportPlayer(World.Me));
+        file?.StoreString(player ?? World.ExportPlayer(World.Me));
+        unsaved = false; saveClock = 0;
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -172,22 +204,39 @@ public partial class Net : Node
         if (!Hosting || World.S.Players.Any(p => p.Id == id)) return;
         if (protocol != Protocol) { RpcId(id, MethodName.Refused, "The host runs a different version of the game."); return; }
         World.AddGuest(id, saved == "" ? null : saved);
-        RpcId(id, MethodName.Welcome, id, Pack(Compact));
+        // The welcome is the guest's first update, which later ones build on.
+        var entries = Entries();
+        sent[++sequence] = entries; acked[id] = sequence;
+        RpcId(id, MethodName.Welcome, id, sequence, Delta(entries, null), Pack(new Fog { Explored = World.S.Explored, Remembered = World.S.Remembered }));
     }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void Refused(string reason) => Fail(reason);
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Welcome(int id, byte[] packed)
+    private void Welcome(int id, int update, byte[] packed, byte[] fog)
     {
-        var snapshot = Unpack(packed);
-        World.Mirror(snapshot.State, snapshot.Players, id);
-        work = snapshot.Work; Work();
-        World.Host = Send;
+        var uncovered = Unpack<Fog>(fog);
+        // An empty world with a stand-in for this player, which the first update fills in.
+        var state = new SaveState { Explored = uncovered.Explored, Remembered = uncovered.Remembered };
+        state.Players[0].Id = id;
+        World.Mirror(state, state.Players, id);
         welcomed = true;
+        Take(update, 0, packed);
+        World.Host = Send;
         Joined?.Invoke();
     }
+
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void Bye()
+    {
+        if (!Hosting || Guest() is not PlayerState p) return;
+        RpcId(p.Id, MethodName.Farewell, World.ExportPlayer(p));
+        Forget(p.Id);
+    }
+
+    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void Farewell(string player) => farewell = player;
 
     // ---------- Running ----------
 
@@ -195,15 +244,11 @@ public partial class Net : Node
     {
         if (!Online) return;
         float dt = Math.Min((float)delta, .1f);
-        foreach (var (owner, goal) in goals)
-        {
-            if (owner is PlayerState p) p.Pos = Glide(p.Pos, goal, dt);
-            else if (owner is Worker w) w.Pos = Glide(w.Pos, goal, dt);
-            else if (owner is Wolf wolf) wolf.Pos = Glide(wolf.Pos, goal, dt);
-        }
+        foreach (var (owner, goal) in goals) Place(owner, Glide(Position(owner), goal, dt));
         foreach (var p in World.S.Players)
             if (walks.TryGetValue(p.Id, out var walk) && walk.Warp == p.Warp) World.As(p, () => World.MoveTo(Glide(p.Pos, walk.At, dt)));
         if (World.Remote) World.Look();
+        if (unsaved && (saveClock += dt) >= SaveInterval) SaveGuest();
         sendClock += dt;
         if (Hosting && sendClock >= SnapshotInterval)
         {
@@ -214,33 +259,49 @@ public partial class Net : Node
         {
             sendClock = 0;
             var me = World.Me;
-            RpcId(HostId, MethodName.Walked, me.Pos, me.Warp, me.GatherTarget, me.Held, appliedSequence);
+            RpcId(HostId, MethodName.Walked, ++stamp, me.Pos, me.Warp, me.GatherTarget, me.Held, appliedSequence);
         }
     }
 
     /// <summary>Most of the way there each frame, so ten updates a second read as steady movement; a long way off is a jump.</summary>
     private static Vector2 Glide(Vector2 from, Vector2 to, float dt) => from.DistanceTo(to) > MaxStep ? to : from.Lerp(to, 1 - MathF.Exp(-dt * 12));
 
-    private void Send(Command c) => RpcId(HostId, MethodName.Do, c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
+    /// <summary>Sends an action with where this player stands, so the host checks its reach from there rather than from a position still gliding in.</summary>
+    private void Send(Command c) => RpcId(HostId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
 
     private PlayerState? Guest() => World.S.Players.Find(p => p.Id == Multiplayer.GetRemoteSenderId() && p != World.Me);
 
-    // Unreliable messages wait behind a lost reliable one on the same channel, so the steady streams get their own.
-    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = 1)]
-    private void Walked(Vector2 at, int warp, int gathering, string held, int seen)
+    [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = StreamChannel)]
+    private void Walked(int order, Vector2 at, int warp, int gathering, string held, int seen)
     {
         if (!Hosting || Guest() is not PlayerState p) return;
         if (sent.ContainsKey(seen) && seen > acked.GetValueOrDefault(p.Id)) acked[p.Id] = seen;
-        // A guest that has not yet seen its respawn still walks where it died.
-        // A long way from the last report, after a stall on the line, is still where the guest stands: the glide jumps there.
-        if (warp == p.Warp) walks[p.Id] = (at, warp);
+        // An action on the other channel may have overtaken this report and already put the guest further along.
+        if (order < heard.GetValueOrDefault(p.Id)) return;
+        heard[p.Id] = order;
+        Stand(p, at, warp);
         p.GatherTarget = gathering; p.Held = held;
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Do(string verb, int target, int other, string item, int count, Vector2 at)
+    private void Do(int order, Vector2 standing, int warp, string verb, int target, int other, string item, int count, Vector2 at)
     {
-        if (Hosting && Guest() is PlayerState p) World.Run(p, new Command(verb, target, other, item, count, at));
+        if (!Hosting || Guest() is not PlayerState p) return;
+        heard[p.Id] = Math.Max(order, heard.GetValueOrDefault(p.Id));
+        // The action happened where the guest stood, so it goes there at once.
+        if (Stand(p, standing, warp)) World.As(p, () => World.MoveTo(standing));
+        World.Run(p, new Command(verb, target, other, item, count, at));
+    }
+
+    /// <summary>
+    /// Where a guest says it stands, unless a respawn or other move by the simulation came since.
+    /// A long way from the last report, after a stall on the line, is still where it stands: the glide jumps there.
+    /// </summary>
+    private bool Stand(PlayerState p, Vector2 at, int warp)
+    {
+        if (warp != p.Warp) return false;
+        walks[p.Id] = (at, warp);
+        return true;
     }
 
     /// <summary>Host: passes a message on to one guest, or all of them.</summary>
@@ -258,7 +319,7 @@ public partial class Net : Node
         if (Hosting) Rpc(MethodName.Hear, sound, at);
     }
 
-    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable, TransferChannel = 1)]
+    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable, TransferChannel = StreamChannel)]
     private void Hear(string sound, Vector2 at) { if (welcomed) Heard?.Invoke(sound, at); }
 
     /// <summary>Host: lets the guests see a player swing, pump or light a torch.</summary>
@@ -267,23 +328,22 @@ public partial class Net : Node
         if (Hosting) Rpc(MethodName.See, player, (int)action, at);
     }
 
-    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable, TransferChannel = 1)]
+    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable, TransferChannel = StreamChannel)]
     private void See(int player, int action, Vector2 at) { if (welcomed) Acted?.Invoke(player, (ActorAction)action, at); }
 
-    // ---------- Snapshots ----------
+    // ---------- Updates ----------
 
-    private byte[] Pack(JsonSerializerOptions options)
+    private static byte[] Pack<T>(T value)
     {
-        var snapshot = new Snapshot { State = World.S, Players = World.S.Players, Work = World.S.Workers.ToDictionary(w => w.Id, w => w.WorkState) };
         using var output = new MemoryStream();
-        using (var brotli = new BrotliStream(output, CompressionLevel.Fastest)) JsonSerializer.Serialize(brotli, snapshot, options);
+        using (var brotli = new BrotliStream(output, CompressionLevel.Fastest)) JsonSerializer.Serialize(brotli, value, Compact);
         return output.ToArray();
     }
 
-    private static Snapshot Unpack(byte[] packed)
+    private static T Unpack<T>(byte[] packed)
     {
         using var brotli = new BrotliStream(new MemoryStream(packed), CompressionMode.Decompress);
-        return JsonSerializer.Deserialize<Snapshot>(brotli, Compact) ?? throw new InvalidDataException("Empty snapshot");
+        return JsonSerializer.Deserialize<T>(brotli, Compact) ?? throw new InvalidDataException("Empty message");
     }
 
     private void Work()
@@ -291,24 +351,20 @@ public partial class Net : Node
         foreach (var w in World.S.Workers) w.WorkState = work.GetValueOrDefault(w.Id);
     }
 
-    // ---------- Updates ----------
-
-    /// <summary>
-    /// The world as entries a guest can compare one by one: each thing, worker and player under its id, and the rest in a few larger entries.
-    /// Wolves and trade orders have no ids and few members, so each list is one entry.
-    /// </summary>
+    /// <summary>The world as entries a guest can compare one by one: each thing, worker, wolf, trade order and player under its id, and the rest in two shared entries.</summary>
     private Dictionary<string, string> Entries()
     {
         var s = World.S;
+        World.NumberWolvesAndOrders();
         var entries = new Dictionary<string, string>
         {
             ["state"] = JsonSerializer.Serialize(s, Rest),
-            ["wolves"] = JsonSerializer.Serialize(s.Wolves, Compact),
-            ["orders"] = JsonSerializer.Serialize(s.Orders, Compact),
             ["work"] = JsonSerializer.Serialize(s.Workers.ToDictionary(w => w.Id, w => w.WorkState), Compact)
         };
         foreach (var t in s.Things) entries[$"t:{t.Id}"] = JsonSerializer.Serialize(t, Compact);
         foreach (var w in s.Workers) entries[$"w:{w.Id}"] = JsonSerializer.Serialize(w, Compact);
+        foreach (var w in s.Wolves) entries[$"f:{w.Id}"] = JsonSerializer.Serialize(w, Compact);
+        foreach (var o in s.Orders) entries[$"o:{o.Id}"] = JsonSerializer.Serialize(o, Compact);
         foreach (var p in s.Players) entries[$"p:{p.Id}"] = JsonSerializer.Serialize(p, Compact);
         return entries;
     }
@@ -324,6 +380,7 @@ public partial class Net : Node
             var known = sent.GetValueOrDefault(baseline);
             var delta = Delta(entries, known);
             if (known != null && delta.Length <= PacketSize) { RpcId(p.Id, MethodName.Refresh, sequence, baseline, delta); continue; }
+            // Big updates go on their own reliable channel, so messages and actions never queue behind them.
             RpcId(p.Id, MethodName.RefreshReliably, sequence, known == null ? 0 : baseline, delta);
             // The whole world is sure to arrive, so later updates build on it rather than sending it again until the guest confirms it.
             if (known == null) acked[p.Id] = sequence;
@@ -369,11 +426,11 @@ public partial class Net : Node
     }
 
     /// <param name="baseline">The update the changes are against, which this guest confirmed; zero when they are the whole world.</param>
-    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = 1)]
+    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = StreamChannel)]
     private void Refresh(int update, int baseline, byte[] packed) => Take(update, baseline, packed);
 
-    /// <summary>The whole world, or a change too big for one packet; on the default channel, so it comes after the welcome.</summary>
-    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    /// <summary>The whole world again after a long stall, or a change too big for one packet.</summary>
+    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable, TransferChannel = BulkChannel)]
     private void RefreshReliably(int update, int baseline, byte[] packed) => Take(update, baseline, packed);
 
     private void Take(int update, int baseline, byte[] packed)
@@ -400,25 +457,21 @@ public partial class Net : Node
         var s = World.S;
         string? Changed(string key) => entries.TryGetValue(key, out var value) && applied.GetValueOrDefault(key) != value ? value : null;
         if (Changed("state") is string state) CopyExcept(s, Read<SaveState>(state), Shared);
+        void Glides(object o, Vector2 from) { goals[o] = Position(o); Place(o, from); }
         Sync(s.Things, "t:", t => t.Id, entries, null);
-        Sync(s.Workers, "w:", w => w.Id, entries, (w, from) => { goals[w] = w.Pos; w.Pos = from; });
-        if (Changed("wolves") is string wolves)
-        {
-            var pool = s.Wolves.ToList();
-            Merge(s.Wolves, Read<List<Wolf>>(wolves), w => Claim(pool, o => o.Pos.DistanceTo(w.Pos) < MaxStep, o => o.Pos.DistanceSquaredTo(w.Pos)), (w, from) => { goals[w] = w.Pos; w.Pos = from; });
-        }
-        if (Changed("orders") is string orders)
-        {
-            var pool = s.Orders.ToList();
-            Merge(s.Orders, Read<List<TradeOrder>>(orders), o => Claim(pool, f => f.Signpost == o.Signpost && f.Buying == o.Buying && f.Crates == o.Crates && Math.Abs(f.Elapsed - o.Elapsed) < 2, f => Math.Abs(f.Elapsed - o.Elapsed)));
-        }
+        Sync(s.Workers, "w:", w => w.Id, entries, Glides);
+        Sync(s.Wolves, "f:", w => w.Id, entries, Glides);
+        Sync(s.Orders, "o:", o => o.Id, entries, null);
         if (Changed("work") is string working) work = Read<Dictionary<int, WorkerWorkState>>(working);
         var me = World.Me;
         // This machine walks its own player and keeps its hotbar; only a move the simulation made, such as a respawn, comes back.
+        // The welcome's first update brings all of it, over the stand-in this copy started with.
+        bool joining = applied.Count == 0;
         var own = (me.Pos, me.Warp, me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held);
-        Sync(s.Players, "p:", p => p.Id, entries, (p, from) => { if (p != me) { goals[p] = p.Pos; p.Pos = from; } });
-        if (me.Warp == own.Warp) me.Pos = own.Pos;
-        (me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held) = (own.HotbarSlots, own.ActiveHotbar, own.GatherTarget, own.Held);
+        unsaved |= Changed($"p:{me.Id}") != null;
+        Sync(s.Players, "p:", p => p.Id, entries, (p, from) => { if (p != me) Glides(p, from); });
+        if (!joining && me.Warp == own.Warp) me.Pos = own.Pos;
+        if (!joining) (me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held) = (own.HotbarSlots, own.ActiveHotbar, own.GatherTarget, own.Held);
         foreach (var gone in goals.Keys.Where(o => o is Worker w ? !s.Workers.Contains(w) : o is Wolf wolf ? !s.Wolves.Contains(wolf) : o is PlayerState p && !s.Players.Contains(p)).ToList()) goals.Remove(gone);
         s.Actor = me;
         Work();
@@ -438,7 +491,7 @@ public partial class Net : Node
     /// Updates the members of <paramref name="list"/> whose entries changed, in place, adds new ones and drops those without an entry.
     /// <paramref name="moved"/> sees each updated member with its position before the update.
     /// </summary>
-    private void Sync<T>(List<T> list, string prefix, Func<T, int> id, Dictionary<string, string> entries, Action<T, Vector2>? moved) where T : class
+    private void Sync<T>(List<T> list, string prefix, Func<T, int> id, Dictionary<string, string> entries, Action<object, Vector2>? moved) where T : class
     {
         var have = list.ToDictionary(t => prefix + id(t));
         list.RemoveAll(t => !entries.ContainsKey(prefix + id(t)));
@@ -455,34 +508,12 @@ public partial class Net : Node
 
     // ---------- Merging into a guest's copy ----------
 
-
-    /// <summary>The first match left in <paramref name="pool"/>, the closest by <paramref name="distance"/>, taken out of it.</summary>
-    private static T? Claim<T>(List<T> pool, Func<T, bool> matches, Func<T, float> distance) where T : class
-    {
-        var found = pool.Where(matches).MinBy(distance);
-        if (found != null) pool.Remove(found);
-        return found;
-    }
-
-    /// <summary>
-    /// Makes <paramref name="target"/> hold what <paramref name="source"/> holds, reusing the objects it already had for the same things.
-    /// <paramref name="moved"/> sees each reused object with its position before the update.
-    /// </summary>
-    private static void Merge<T>(List<T> target, List<T> source, Func<T, T?> previous, Action<T, Vector2>? moved = null) where T : class
-    {
-        var merged = new List<T>(source.Count);
-        foreach (var item in source)
-        {
-            if (previous(item) is not T old) { merged.Add(item); continue; }
-            var from = Position(old);
-            CopyExcept(old, item, null);
-            moved?.Invoke(old, from);
-            merged.Add(old);
-        }
-        target.Clear(); target.AddRange(merged);
-    }
-
     private static Vector2 Position(object o) => o switch { Worker w => w.Pos, Wolf w => w.Pos, PlayerState p => p.Pos, _ => Vector2.Zero };
+
+    private static void Place(object o, Vector2 at)
+    {
+        if (o is Worker w) w.Pos = at; else if (o is Wolf wolf) wolf.Pos = at; else if (o is PlayerState p) p.Pos = at;
+    }
 
     private static readonly Dictionary<Type, PropertyInfo[]> properties = new();
 

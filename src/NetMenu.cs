@@ -39,7 +39,7 @@ public partial class Game
     private void ShowJoin(Action back, bool inGame)
     {
         OpenScreen("JOIN A GAME", () => { if (net.Connecting) net.Leave(); back(); });
-        var address = new LineEdit { Name = "address", PlaceholderText = "Host address, such as 192.168.1.20", CustomMinimumSize = new Vector2(0, 38) };
+        var address = new LineEdit { Name = "address", Text = Setting("net", "address", ""), PlaceholderText = "Host address, such as 192.168.1.20", CustomMinimumSize = new Vector2(0, 38) };
         var port = new LineEdit { Name = "port", Text = Net.DefaultPort.ToString(), CustomMinimumSize = new Vector2(0, 38) };
         foreach (var (text, field) in new[] { ("Address", address), ("Port", port) })
         {
@@ -64,6 +64,7 @@ public partial class Game
 
     private void OnJoined()
     {
+        StoreSetting("net", "address", net.Address);
         slot = 0; selected = 0; workerId = 0; gathering = null; entering = null; lifting = null; assigningWorker = 0; endingSeen = false;
         view.BuildMode = ""; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
         HideScreen(); menu.Visible = false; ending.Visible = false; ClosePanel();

@@ -92,6 +92,8 @@ public sealed class TradeOrder
     public int Signpost { get; set; }
     /// <summary>Crates on the cart: sold crates on the way out, bought boxes on the way back.</summary>
     public int Crates { get; set; }
+    /// <summary>Tells carts apart for other machines; zero until <see cref="World.NumberWolvesAndOrders"/>.</summary>
+    public int Id { get; set; }
 }
 public sealed class Wolf
 {
@@ -115,6 +117,8 @@ public sealed class Wolf
     public float Flee { get; set; }
     /// <summary>Id of the player this wolf hunts; each player draws their own pack.</summary>
     public int Target { get; set; }
+    /// <summary>Tells wolves apart for other machines; zero until <see cref="World.NumberWolvesAndOrders"/>.</summary>
+    public int Id { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
 }
 /// <summary>
@@ -572,7 +576,7 @@ public sealed partial class World
         asleep = true;
         while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
         asleep = false;
-        S.Wolves.Clear(); Say(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
+        S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
     /// <summary>Burning campfires keep wolves out of their light, unless a wolf is already chasing the player.</summary>
     public bool Protected(Vector2 p) => S.Things.Any(t => t.Kind == "campfire" && t.Burn > 0 && t.Pos.DistanceTo(p) < 5.3f);
@@ -632,7 +636,7 @@ public sealed partial class World
     private void PutOutTorch()
     {
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
-        foreach (var w in S.Wolves.Where(w => w.Target == S.Actor.Id)) w.Scared = false;
+        foreach (var w in Hunters) w.Scared = false;
     }
     public void Attack()
     {
@@ -657,14 +661,14 @@ public sealed partial class World
     public void Die()
     {
         // After a mauling the box lands past the feet, away from the wolf at the throat, so the feeding stays visible.
-        var killer = S.Mauled ? S.Wolves.FirstOrDefault(w => w.Pinning) : null;
+        var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
         var box = Add("grave", killer == null ? Player : Player + (Player - killer.Pos).Normalized() * 1.5f); box.Inventory = S.Backpack;
         S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
         if (S.Mauled)
         {
             // The pack eats every scrap of food and stays to feed until the player respawns.
             foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
-            Say($"{(S.Wolves.Count > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.");
+            Say($"{(Hunters.Count() > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.");
             return;
         }
         S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
@@ -1158,9 +1162,16 @@ public sealed partial class World
         if (!Pay((int)w.WageDebt)) { Say("Not enough coins in your backpack to settle wages."); return; }
         w.WageDebt = 0;
     }
-    public void Tick(float dt, bool sleeping = false)
+    /// <summary>The wolves hunting the acting player.</summary>
+    private IEnumerable<Wolf> Hunters => S.Wolves.Where(w => w.Target == S.Actor.Id);
+    /// <summary>
+    /// Advances the world. It runs as the world's own player, whoever's action started it, such as a guest's sleep:
+    /// wages come out of that player's backpack, and each player's own part runs as that player.
+    /// </summary>
+    public void Tick(float dt, bool sleeping = false) => As(S.Players[0], () => TickWorld(dt, sleeping));
+    private void TickWorld(float dt, bool sleeping)
     {
-        bool wasDusk = Dusk, wasLunch = Lunch, wasEveryone = everyone;
+        bool wasDusk = Dusk, wasLunch = Lunch;
         everyone = true;
         S.Time += dt;
         if (!sleeping) S.PlaySeconds += dt;
@@ -1283,7 +1294,7 @@ public sealed partial class World
                 if (!Dead && S.Health <= 0) Die();
                 playerBusy = false;
             });
-        everyone = wasEveryone;
+        everyone = false;
         Look();
         UpdateGoal();
     }

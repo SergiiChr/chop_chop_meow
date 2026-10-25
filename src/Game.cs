@@ -446,9 +446,9 @@ public partial class Game : Node
         try
         {
             if (!SlotUsed(n)) { Notify($"{SlotName(n)} is empty."); return false; }
+            using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Read); world.Deserialize(file.GetAsText());
             // Another world ends the game the guests are in.
             net.Leave();
-            using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Read); world.Deserialize(file.GetAsText());
             slot = n; selected = 0; workerId = 0; gathering = null; entering = null; assigningWorker = 0; view.BuildMode = ""; view.Selected = 0; view.SelectedWorker = 0; OpenPage("inventory");
             return true;
         }
@@ -474,7 +474,7 @@ public partial class Game : Node
                 case Key.Tab: if (page == "help") ClosePanel(); else OpenPage("help"); break;
                 // Until a numbered slot is chosen, quick save and load ask which slot to use.
                 case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (slot > 0) Save(slot); else ShowSlots(true, HideScreen); break;
-                case Key.F9: if (slot > 0) Load(slot); else ShowSlots(false, HideScreen); break;
+                case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (slot > 0) Load(slot); else ShowSlots(false, HideScreen); break;
                 case Key.Key1: SelectHotbar(0); break;
                 case Key.Key2: SelectHotbar(1); break;
                 case Key.Key3: SelectHotbar(2); break;
@@ -588,15 +588,17 @@ public partial class Game : Node
             world.Me.Held = ActiveHotbarItem() ?? "";
         }
         // Menus pause only a game nobody else is in.
-        if (!paused || net.Online)
+        bool running = !paused || net.Hosting || world.Remote;
+        if (running)
         {
             float health = world.Remote ? shownHealth : world.S.Health;
             if (!world.Remote) world.Tick(dt);
             ShowEndingOnce(); autosave += dt;
             DamageFlash(health - world.S.Health); shownHealth = world.S.Health;
-            if (autosave >= AutosaveSeconds) { if (world.Remote) net.SaveGuest(); else Save(0); autosave = 0; }
+            // A guest saves its player whenever it changes instead; the world is the host's to save.
+            if (autosave >= AutosaveSeconds) { if (!world.Remote) Save(0); autosave = 0; }
         }
-        view.Paused = paused; view.SelectedTool = ActiveHotbarItem();
+        view.Paused = !running; view.SelectedTool = ActiveHotbarItem();
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }

@@ -44,7 +44,7 @@ public partial class WorldView : Node3D
     private string playerShirt = "";
     /// <summary>The other players in the game, keyed by their id.</summary>
     private readonly Dictionary<int, Avatar> others = new();
-    // The host keeps the original teal; guests take these in the order they joined.
+    // The host keeps the original teal; each guest keeps the first one free when it joined.
     private static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
     private readonly Dictionary<int, (ActorRig Rig, ActorState State)> crew = new();
     private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
@@ -174,7 +174,7 @@ public partial class WorldView : Node3D
 
     public bool ShowsPlayer(int id) => others.ContainsKey(id);
 
-    private string ShirtOf(PlayerState p) => Shirts[Math.Max(0, World.S.Players.IndexOf(p)) % Shirts.Length];
+    private static string ShirtOf(PlayerState p) => Shirts[p.Shirt % Shirts.Length];
 
     public ActorAction PlayerAnimation => player.Action;
     public float PlayerAnimationTime => player.Time;

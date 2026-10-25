@@ -162,9 +162,12 @@ public static class MultiplayerChecks
         guest.Hunger = 1;
         Require(world.SleepBlock() == "Someone is too hungry or thirsty to sleep.", "sleeping should wait for a hungry guest");
         guest.Hunger = 100;
+        world.S.Workers.Add(new Worker { Id = world.S.NextId++, Name = "Paid", Wage = 10, Pos = World.Spawn });
+        world.S.Backpack.Add(Inventory.Coins, 50); guest.Backpack.Add(Inventory.Coins, 50);
         int day = world.Day;
-        world.Sleep(hut);
-        Require(world.Day == day + 1 && !world.Night && guest.Hunger < 100, "with everyone inside, the night should pass for all of them");
+        world.Run(guest, new Command("sleep", hut.Id, 0, "", 0, default));
+        Require(world.Day == day + 1 && !world.Night && guest.Hunger < 100, "with everyone inside, a guest's sleep should pass the night for all of them");
+        Require(world.S.Backpack[Inventory.Coins] == 40 && guest.Backpack[Inventory.Coins] == 50, "the host's backpack should pay the wages even when a guest sleeps");
     }
 
     private static void CheckGuestSaveRoundTrip(GameData data)

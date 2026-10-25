@@ -8,7 +8,7 @@ public partial class Game
 {
     private PanelContainer menu = null!;
     private VBoxContainer goals = null!;
-    private Button hostButton = null!, joinButton = null!, saveButton = null!;
+    private Button hostButton = null!, joinButton = null!, saveButton = null!, loadButton = null!;
     private Label netLine = null!;
 
     private Button MenuIcon(string icon, string tooltip, Action action)
@@ -36,6 +36,7 @@ public partial class Game
         {
             var button = Button(text, action); button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; files.AddChild(button);
             if (text == "Save") saveButton = button;
+            if (text == "Load") loadButton = button;
         }
         var online = new HBoxContainer(); column.AddChild(online);
         hostButton = Button("Host", HostGame); hostButton.Name = "host";
@@ -66,7 +67,8 @@ public partial class Game
         string yesterday = world.S.Profits.Count > 0 ? $"yesterday {world.S.Profits[^1]}" : "no day finished yet";
         goals.AddChild(Label($"Profit is sale coins minus wages. {Math.Min(world.ProfitStreak, target.ProfitDays)}/{target.ProfitDays} days · {yesterday} · today's sales {world.S.DayRevenue}", 14, Muted));
         hostButton.Disabled = net.Online; hostButton.Text = net.Hosting ? "Hosting" : "Host";
-        joinButton.Text = world.Remote ? "Leave game" : "Join"; saveButton.Disabled = world.Remote;
+        // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.
+        joinButton.Text = world.Remote ? "Leave game" : "Join"; joinButton.Disabled = net.Hosting; saveButton.Disabled = loadButton.Disabled = world.Remote;
         netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
         menu.Visible = true; paused = true;
     }

@@ -88,8 +88,7 @@ public partial class Game
         picker.Selected = Array.IndexOf(Resolutions, SavedResolution());
         picker.ItemSelected += index =>
         {
-            var config = new ConfigFile(); config.Load(SettingsPath);
-            config.SetValue("display", "resolution", Resolutions[index]); config.Save(SettingsPath);
+            StoreSetting("display", "resolution", Resolutions[index]);
             ApplyResolution(Resolutions[index]);
         };
         row.AddChild(picker);
@@ -97,11 +96,19 @@ public partial class Game
     }
 
     /// <summary>The stored window size, or the project's default size before the player picks one.</summary>
-    private static Vector2I SavedResolution()
+    private static Vector2I SavedResolution() => Setting("display", "resolution",
+        new Vector2I(ProjectSettings.GetSetting("display/window/size/viewport_width").AsInt32(), ProjectSettings.GetSetting("display/window/size/viewport_height").AsInt32()));
+
+    private static T Setting<[MustBeVariant] T>(string section, string key, T fallback)
     {
         var config = new ConfigFile(); config.Load(SettingsPath);
-        var fallback = new Vector2I(ProjectSettings.GetSetting("display/window/size/viewport_width").AsInt32(), ProjectSettings.GetSetting("display/window/size/viewport_height").AsInt32());
-        return config.GetValue("display", "resolution", fallback).AsVector2I();
+        return config.GetValue(section, key, Variant.From(fallback)).As<T>();
+    }
+
+    private static void StoreSetting<[MustBeVariant] T>(string section, string key, T value)
+    {
+        var config = new ConfigFile(); config.Load(SettingsPath);
+        config.SetValue(section, key, Variant.From(value)); config.Save(SettingsPath);
     }
 
     private void ApplyResolution(Vector2I size)

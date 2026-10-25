@@ -11,7 +11,7 @@ namespace ChopChopMeow;
 /// </summary>
 public partial class Game
 {
-    private static readonly Vector2 NetOre = World.Spawn + new Vector2(2.5f, 0), NetCoal = World.Spawn + new Vector2(-1.5f, 3.5f), NetChest = World.Spawn + new Vector2(.5f, 3);
+    private static readonly Vector2 NetOre = World.Spawn + new Vector2(2.5f, 0), NetCoal = World.Spawn + new Vector2(-1.5f, 3.5f), NetChest = World.Spawn + new Vector2(.5f, 3), NetHut = World.Spawn + new Vector2(-3.5f, -3);
 
     private async Task Until(Func<bool> done, string what, double seconds = 60)
     {
@@ -57,7 +57,7 @@ public partial class Game
         await Click(FindButton(screen, "New game")!); ClosePanel();
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(World.Spawn) < 6);
         world.Add("loose_iron", NetOre, 2); world.Add("loose_coal", NetCoal, 2);
-        var chest = world.Add("chest", NetChest);
+        var chest = world.Add("chest", NetChest); var hut = world.Add("hut", NetHut);
         await KeyStroke(Key.Escape);
         await Click(hostButton);
         UIRequire(net.Hosting && !menu.Visible && !paused, "Host in the pause menu must open the current game to guests and close the menu.");
@@ -72,6 +72,7 @@ public partial class Game
         await Until(() => view.ShowsPlayer(Guest().Id), "the guest's figure appearing");
         await Until(() => chest.Inventory["iron_ore"] == 2 && Guest().Backpack["coal"] == 2, "the guest gathering loose ore and coal and storing the ore", 90);
         UIRequire(world.S.Backpack["iron_ore"] == 0 && world.S.Backpack["coal"] == 0, "What the guest gathers must not reach the host's backpack.");
+        await Until(() => Guest().Sheltered == hut.Id, "the guest walking into the cabin with one click");
         await Until(() => world.S.Players.Count == 1, "the guest leaving");
         await Until(() => world.S.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest coming back with its coal");
         await Until(() => world.S.Players.Count == 1, "the guest leaving again");
@@ -96,6 +97,9 @@ public partial class Game
         UIRequire(page == "inspect" && world.Find(selected)?.Kind == "chest" && world.Near(world.Find(selected)!), "Clicking the chest beside the coal must open it.");
         await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("iron_ore"))));
         await Until(() => world.Find(selected)!.Inventory["iron_ore"] == 2 && world.S.Backpack["iron_ore"] == 0, "the stored ore showing up in the host's chest");
+        // The host checks reach from where the guest stood when it clicked, not from where its glide has got to.
+        ClosePanel(); await Click(view.Screen(NetHut, .8f));
+        await Until(() => world.S.Sheltered == world.S.Things.Single(t => t.Kind == "hut").Id, "the host letting the guest into the cabin it walked to");
 
         await LeaveGame();
         await JoinFromStart();
@@ -122,7 +126,10 @@ public partial class Game
             var port = (LineEdit)screen.FindChild("port", true, false);
             UIRequire(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
             port.Text = CheckPort.ToString();
-            await Type("127.0.0.1");
+            var address = (LineEdit)screen.FindChild("address", true, false);
+            // The popup offers the address of the last game joined.
+            if (address.Text == "") await Type("127.0.0.1");
+            else UIRequire(address.Text == "127.0.0.1", "The join popup must offer the last address joined.");
             await Click(FindButton(screen, "Join")!);
             for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && joinStatus.Text == "Connecting…";) await Frames(1);
             if (!world.Remote) { await Click(FindButton(screen, "Back · Esc")!); await Seconds(1); }

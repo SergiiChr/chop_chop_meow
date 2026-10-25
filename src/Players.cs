@@ -45,6 +45,8 @@ public sealed class PlayerState
     public float TorchFlare { get; set; }
     /// <summary>Counts moves the simulation made, such as a respawn; a guest only takes its own position from the host when it changes.</summary>
     public int Warp { get; set; }
+    /// <summary>Which shirt colour tells this player apart: 0 for the host, and the first free one for each guest.</summary>
+    public int Shirt { get; set; }
     /// <summary>Contents of the packed crates in the backpack; only a guest's own save carries them.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public Dictionary<int, Inventory>? Crates { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(PlayerX, PlayerY); set { PlayerX = value.X; PlayerY = value.Y; } }
@@ -196,6 +198,13 @@ public sealed partial class World
         chest.Inventory.InputFilter.Clear(); chest.Inventory.OutputFilter.Clear();
     }
 
+    /// <summary>Gives new wolves and trade carts ids, which other machines tell them apart by.</summary>
+    public void NumberWolvesAndOrders()
+    {
+        foreach (var w in S.Wolves.Where(w => w.Id == 0)) w.Id = S.NextId++;
+        foreach (var o in S.Orders.Where(o => o.Id == 0)) o.Id = S.NextId++;
+    }
+
     /// <summary>Host: puts a guest where their own machine walked them, as <see cref="MovePlayer"/> does for the host.</summary>
     public void MoveTo(Vector2 p)
     {
@@ -210,7 +219,7 @@ public sealed partial class World
     public PlayerState AddGuest(int id, string? saved)
     {
         var p = Adopt(saved) ?? new PlayerState();
-        p.Id = id; p.Warp++;
+        p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(1, 3).First(i => S.Players.All(o => o.Shirt != i));
         S.Players.Add(p);
         SayToAll("A neighbor joined the settlement.");
         return p;
@@ -227,7 +236,8 @@ public sealed partial class World
         bool valid = p.Backpack.Items.All(pair => pair.Value > 0 && (Known(pair.Key) || crates.ContainsKey(PackedId(pair.Key))))
             && crates.Values.All(box => box?.Items != null && box.Items.All(pair => pair.Value > 0 && Known(pair.Key)) && box.Count <= Data.CrateCapacity)
             && p.Crafting.All(id => Data.Recipes.TryGetValue(id, out var r) && r.Hand)
-            && p.Health is > 0 and <= 100 && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
+            // A player who left while dead comes back still waiting to respawn.
+            && (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
             && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
         var backpack = new Inventory { Slots = 24 };
         if (!valid || !backpack.Fits(p.Backpack.Items)) return null;
