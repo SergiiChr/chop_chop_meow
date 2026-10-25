@@ -14,4 +14,6 @@ Both PNG atlases were generated with the built-in image generation tool for this
 
 ## Sounds
 
+`music/` holds the ambient music as 192 kbps MP3: `path_to_lake_land.mp3` for the day and `forest.mp3` for the night. Every ambient track is normalised to -18 LUFS integrated loudness with true peaks below -1 dBTP, so tracks switch without a jump in volume. Credits: Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov)) and Augmentality (Brandon Morris).
+
 `sounds/` holds the sound effects as 320 kbps MP3, converted from the supplied files and peak-normalised, with variants of one sound matched in loudness. A numbered suffix marks variants of one sound. Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com)).
