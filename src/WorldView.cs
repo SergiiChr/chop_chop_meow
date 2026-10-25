@@ -429,7 +429,7 @@ public partial class WorldView : Node3D
     private string FootstepSound(Vector2 p)
     {
         if (Terrain.InLake(p, 1)) return "footsteps_water";
-        bool rocky = World.Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 3) || World.S.Things.Any(t => t.Kind is "stone" or "iron" or "coal" && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f);
+        bool rocky = World.Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 3) || World.S.Things.Any(t => (t.Kind == "stone" || t.IsDeposit) && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f);
         return rocky ? "footsteps_rocks" : "footsteps_default";
     }
 
@@ -472,8 +472,8 @@ public partial class WorldView : Node3D
                 Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
                 Burst(To3(subject.Pos, 3.6f), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
-            case "stone" or "iron" or "coal":
-                var color = subject.Kind == "stone" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : "26282b";
+            case "stone" or "iron" or "coal" or "tin":
+                var color = subject.Kind == "stone" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : subject.Kind == "tin" ? "b9bbb4" : "26282b";
                 Burst(side + Vector3.Up * .5f, Mat(color), 6, 2.4f, .5f, 9, .07f);
                 Burst(side + Vector3.Up * .4f, Flat(new Color(.8f, .78f, .7f, .45f)), 3, .5f, .9f, -.3f, .16f, 1.5f);
                 if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Flat(new Color("ffd27a")), 5, 3.2f, .3f, 4, .025f);
@@ -541,7 +541,7 @@ public partial class WorldView : Node3D
                 sway.Visible = prop.Fall < 1.7f;
                 prop.Stump!.Visible = true;
                 break;
-            case "stone" or "iron" or "coal" or "loose_iron" or "loose_coal":
+            case "stone" or "iron" or "coal" or "tin" or "loose_iron" or "loose_coal":
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);

@@ -11,10 +11,18 @@ public sealed class ItemDef
     public string Name { get; set; } = "";
     public float Price { get; set; }
     public string Color { get; set; } = "ffffff";
-    /// <summary>The kind of tool this item is (axe, pickaxe, hammer or chisel), or empty for materials.</summary>
+    /// <summary>The kind of tool this item is (axe, pickaxe, hammer, chisel, rake or mortar), or empty for materials.</summary>
     public string Tool { get; set; } = "";
     /// <summary>How fast the tool works compared with the plainest tool of its kind.</summary>
     public float Speed { get; set; } = 1;
+    /// <summary>The tool's material grade: 0 for wood and stone, 1 for iron, 2 for steel.</summary>
+    public int Tier { get; set; }
+    /// <summary>Wolves eat it and compost takes it, cooked or not; only items that restore hunger or thirst can be eaten.</summary>
+    public bool Food { get; set; }
+    /// <summary>What eating or drinking one restores.</summary>
+    public float Hunger { get; set; }
+    public float Thirst { get; set; }
+    public float Health { get; set; }
 }
 public sealed class BuildingDef
 {
@@ -32,6 +40,8 @@ public sealed class RecipeDef
     public float Seconds { get; set; }
     /// <summary>The tool kind the recipe needs: carried for crafting by hand, slotted at a bench.</summary>
     public string Tool { get; set; } = "";
+    /// <summary>The lowest <see cref="ItemDef.Tier"/> of that tool that will do; a better one always does.</summary>
+    public int Tier { get; set; }
     /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
     public bool Hand { get; set; }
 }
@@ -107,19 +117,25 @@ public sealed class GameData
                 if (!Items.ContainsKey(cost.Key) || cost.Value <= 0) throw new InvalidOperationException($"Invalid cost for {building.Key}: {cost.Key}.");
         foreach (var recipe in Recipes)
         {
-            bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool);
+            bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool && i.Tier >= recipe.Value.Tier);
             if (!(recipe.Value.Station == "" ? recipe.Value.Hand : Buildings.ContainsKey(recipe.Value.Station)) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
             foreach (var input in recipe.Value.Inputs)
                 if (!Items.ContainsKey(input.Key) || input.Value <= 0) throw new InvalidOperationException($"Invalid input for {recipe.Key}: {input.Key}.");
         }
-        if (Items.Values.Any(i => i.Speed <= 0) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
+        if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Health < 0 || i.Hunger > 0 && !i.Food) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in data/game.json.");
     }
+    /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
+    public bool IsConsumable(string item) => Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
+    public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
+    /// <summary>The plainest tool of a kind that meets a tier, for naming what a recipe needs.</summary>
+    public string ToolName(string tool, int tier) => Items.Values.Where(i => i.Tool == tool && i.Tier >= tier).MinBy(i => i.Tier) is ItemDef def && tier > 0 ? def.Name.ToLowerInvariant() : tool;
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch
     {
         "tree" => "Tree",
         "iron" => "Iron deposit",
+        "tin" => "Tin deposit",
         "loose_iron" => "Loose iron ore",
         "loose_coal" => "Loose coal",
         "grave" => "Recovery box",

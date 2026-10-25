@@ -68,7 +68,7 @@ public static class EconomyChecks
         }
         float cost = data.HireOffers.Average(o => o.Wage + o.Upfront / HireDays);
         // Meat comes from wolves at night, so no worker can be hired to produce it.
-        var earnings = data.Market.Sells.Keys.Where(id => id != "raw_meat" && id != "cooked_meat")
+        var earnings = data.Market.Sells.Keys.Where(id => id != "raw_meat" && id != "burnt_steak")
             .Select(id => (Item: id, Depth: Depth(data, id), PerDay: data.Items[id].Price / Labor(id))).OrderBy(e => e.Depth).ToList();
         GD.Print($"Economy: a worker-day costs {cost:0.0} coins; gathered per day {string.Join(", ", gathered.Select(p => $"{p.Key} {p.Value:0}"))}; made per day {string.Join(", ", made.Select(p => $"{p.Key} {p.Value:0}"))}");
         foreach (var e in earnings) GD.Print($"Economy: {e.Item,-13} {Labor(e.Item):0.000} worker-days each, {e.PerDay:0} coins per worker-day ({e.PerDay / cost:0.0}x pay)");
@@ -83,7 +83,7 @@ public static class EconomyChecks
     private static void CheckBasketIsSustainable(GameData data)
     {
         var sells = data.Market.Sells;
-        Require(sells.Where(p => World.IsFood(p.Key)).All(food => sells.Where(p => data.Items[p.Key].Tool != "").All(tool => food.Value.Drop < tool.Value.Drop)),
+        Require(sells.Where(p => data.IsFood(p.Key)).All(food => sells.Where(p => data.Items[p.Key].Tool != "").All(tool => food.Value.Drop < tool.Value.Drop)),
                 "food demand should be steadier than tool demand");
         var world = new World(data, false);
         var sign = world.Add("signpost", new Vector2(20, 20));
