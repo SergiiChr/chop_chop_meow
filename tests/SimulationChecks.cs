@@ -960,11 +960,14 @@ public static class SimulationChecks
         // Older saves kept coins outside the backpack and one item per order.
         var json = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;
         json["Coins"] = 30;
+        var post = json["Things"]!.AsArray().First(t => t!["Id"]!.GetValue<int>() == sign.Id)!;
+        post["Output"] = null; post["Inventory"]!["Slots"] = 18;
         var order = json["Orders"]![0]!;
         order["Goods"] = new System.Text.Json.Nodes.JsonObject(); order["Item"] = "wood"; order["Quantity"] = 4;
         var loaded = EmptyWorld(data);
         loaded.Deserialize(json.ToJsonString());
         Require(loaded.Coins == 30 && loaded.S.Coins == null, "coins from an older save should move into the backpack");
+        Require(loaded.Find(sign.Id) is { Output.Slots: World.MarketSlots, Inventory.Slots: World.MarketSlots }, "an older signpost should get its market boxes");
         Require(loaded.S.Orders.Single().Goods.GetValueOrDefault("wood") == 4 && loaded.S.Orders.Single().Item == null, "an older single-item order should keep its goods");
         Require(!loaded.Serialize().Contains("\"Item\"") && !loaded.Serialize().Contains("\"Coins\""), "migrated fields should not be written back");
     }

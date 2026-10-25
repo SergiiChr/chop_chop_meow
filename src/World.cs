@@ -823,7 +823,8 @@ public sealed class World
         loaded.Prices ??= new();
         if (loaded.Coins is float coins) { loaded.Backpack.Add(Inventory.Coins, (int)coins); loaded.Coins = null; }
         foreach (var order in loaded.Orders.Where(o => o.Item != null && o.Goods.Count == 0)) { order.Goods[order.Item!] = order.Quantity; order.Item = null; order.Quantity = 0; }
-        foreach (var sign in loaded.Things.Where(t => t.Kind == "signpost")) sign.Output ??= new() { Slots = MarketSlots };
+        // Signposts from older saves had no market, so they get its boxes on load.
+        foreach (var sign in loaded.Things.Where(t => t.Kind == "signpost" && t.Output == null)) { sign.Inventory.Slots = MarketSlots; sign.Output = new() { Slots = MarketSlots }; }
         S = loaded; gatherClock = 0; Say("Settlement loaded.");
     }
 }
