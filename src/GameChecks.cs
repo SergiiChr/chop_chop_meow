@@ -238,6 +238,10 @@ public partial class Game
             UIRequire(picker.Selected == Array.IndexOf(Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
             picker.Select(0); picker.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
             UIRequire(SavedResolution() == Resolutions[0], "Choosing a resolution must store it in the settings file.");
+            var musicSlider = (HSlider)screen.FindChild("music", true, false);
+            UIRequire(musicSlider.Value == 100, "Music must start at full volume.");
+            musicSlider.Value = 40; await Frames();
+            UIRequire(Mathf.IsEqualApprox(SavedMusicVolume(), .4f) && Mathf.IsEqualApprox(sounds.MusicVolume, .4f), "The music slider must set and store the music volume.");
             await KeyStroke(Key.Escape);
             UIRequire(FindButton(screen, "New game") != null, "Esc in options must return to the start menu.");
             await Click(FindButton(screen, "Load game")!);
@@ -260,6 +264,17 @@ public partial class Game
             UIRequire(Sounds.Names.All(name => sounds.VariantCount(name) > 0) && sounds.VariantCount("footsteps_default") == 3 && sounds.VariantCount("chop_tree") == 1, "Every sound must load, with numbered files grouped as variants.");
             var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
             UIRequire(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
+            float musicDay = world.S.Time; sounds.UpdateMusic(Sounds.MusicFadeSeconds);
+            UIRequire(sounds.DayMusicPlaying && !sounds.NightMusicPlaying, "Daytime must play the day music only.");
+            world.S.Time = world.Data.DaySeconds * (world.Data.NightStarts + .02f); sounds.UpdateMusic(Sounds.MusicFadeSeconds / 2);
+            UIRequire(sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Nightfall must crossfade the day music into the night music.");
+            sounds.UpdateMusic(Sounds.MusicFadeSeconds); await Seconds(.5f);
+            UIRequire(!sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Day music must stop once faded out.");
+            world.S.Time = musicDay; sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2); float stoppedAt = sounds.NightMusicPosition;
+            UIRequire(!sounds.NightMusicPlaying && sounds.DayMusicPlaying && stoppedAt > .2f, "Dawn must stop the night music, keep its position and bring the day music back.");
+            world.S.Time = world.Data.DaySeconds * (1 + world.Data.NightStarts + .02f); sounds.UpdateMusic(.1f);
+            UIRequire(sounds.NightMusicPlaying && sounds.NightMusicPosition >= stoppedAt, "The next night must resume the music where it stopped.");
+            world.S.Time = musicDay; sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2);
             int heard = sounds.Played; sounds.Play("anvil_work", world.Player + Vector2.One * 40);
             UIRequire(view.OffScreen(world.Player) == 0 && view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach && sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
             var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == World.Spawn + new Vector2(5, 0));

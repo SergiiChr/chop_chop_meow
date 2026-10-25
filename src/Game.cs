@@ -52,7 +52,7 @@ public partial class Game : Node
             if (OS.GetCmdlineUserArgs().Contains("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             world.Notify = Notify;
             LoadHotbarAtlases();
-            sounds = new Sounds { World = world }; AddChild(sounds);
+            sounds = new Sounds { World = world, MusicVolume = SavedMusicVolume() }; AddChild(sounds);
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
             world.Sound = (name, at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
