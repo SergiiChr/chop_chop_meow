@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
@@ -36,6 +37,7 @@ public static class SimulationChecks
         CheckSleepNeedsFoodAndWater(data);
         CheckCabinAndChaseIntoLight(data);
         CheckCoinStacks(data);
+        CheckLegacySave(data);
         CheckCrewKeepsForgeHot(data);
         CheckActualProgression(data);
         GD.Print("SELF-TEST PASS");
@@ -988,6 +990,23 @@ public static class SimulationChecks
         Require(!world.Buy(sign, Inventory.Coins, 1), "coins themselves cannot be bought");
     }
 
+    private static void CheckLegacySave(GameData data)
+    {
+        var old = EmptyWorld(data);
+        var sign = old.Add("signpost", new Vector2(10, 10));
+        old.S.Orders.Add(new TradeOrder { Buying = true, Value = 8, Signpost = sign.Id });
+        // Older saves kept coins outside the backpack and one item per order.
+        var json = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;
+        json["Coins"] = 30;
+        var order = json["Orders"]![0]!;
+        order["Goods"] = new System.Text.Json.Nodes.JsonObject(); order["Item"] = "wood"; order["Quantity"] = 4;
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(json.ToJsonString());
+        Require(loaded.Coins == 30 && loaded.S.Coins == null, "coins from an older save should move into the backpack");
+        Require(loaded.S.Orders.Single().Goods.GetValueOrDefault("wood") == 4 && loaded.S.Orders.Single().Item == null, "an older single-item order should keep its goods");
+        Require(!loaded.Serialize().Contains("\"Item\"") && !loaded.Serialize().Contains("\"Coins\""), "migrated fields should not be written back");
+    }
+
     private static void CheckCrewKeepsForgeHot(GameData data)
     {
         var world = EmptyWorld(data);
@@ -998,8 +1017,20 @@ public static class SimulationChecks
         world.S.Workers[0].Job = "building";
         SafeTick(world, 4);
         Require(furnace.Heat >= World.SteelHeat, "a working crew should keep the forge at or above the clear bar");
+        var crew = world.S.Workers[0];
+        crew.WageDebt = crew.Wage;
+        SafeTick(world, 5);
+        Require(furnace.Heat < World.SteelHeat, "a striking crew should let the forge cool below the clear bar");
         world.S.Workers.Clear();
         SafeTick(world, 5);
         Require(furnace.Heat < World.SteelHeat, "without a crew the forge should cool below the clear bar");
+
+        var sign = world.Add("signpost", new Vector2(10, 10));
+        var runner = AddWorker(world, sign.Pos);
+        world.Player = sign.Pos; world.Assign(runner, sign);
+        Require(world.FetchPrices(sign), "the assigned worker should set off for prices");
+        SafeTick(world, data.TradeSeconds / 4);
+        world.Assign(runner, null);
+        Require(runner.Away == 0, "reassigning a runner should call off the errand rather than freeze them on the road");
     }
 }

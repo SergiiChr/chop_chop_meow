@@ -29,8 +29,8 @@ public sealed class RecipeDef
 /// <summary>A hiring deal: a larger payment up front buys a lower daily wage.</summary>
 public sealed class HireOffer
 {
-    public float Upfront { get; set; }
-    public float Wage { get; set; }
+    public int Upfront { get; set; }
+    public int Wage { get; set; }
 }
 public sealed class GameData
 {

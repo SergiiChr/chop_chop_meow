@@ -54,7 +54,7 @@ public sealed class Worker
     public float Timer { get; set; }
     public float WageDebt { get; set; }
     /// <summary>Coins due at each dawn, fixed by the hiring offer.</summary>
-    public float Wage { get; set; } = 8;
+    public int Wage { get; set; } = 8;
     /// <summary>Seconds until the worker returns from fetching village prices; while away they are off the map.</summary>
     public float Away { get; set; }
     [JsonIgnore] public List<Vector2> Route { get; } = new();
@@ -65,6 +65,9 @@ public sealed class Worker
 public sealed class TradeOrder
 {
     public Dictionary<string, int> Goods { get; set; } = new();
+    /// <summary>Single-item orders from older saves; moved into <see cref="Goods"/> on load.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public string? Item { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Quantity { get; set; }
     public bool Buying { get; set; }
     public float Value { get; set; }
     public float Elapsed { get; set; }
@@ -97,6 +100,8 @@ public sealed class SaveState
     public Dictionary<string, float> Demand { get; set; } = new();
     /// <summary>Sale prices as last reported by someone arriving from the village, and when that was.</summary>
     public Dictionary<string, float> Prices { get; set; } = new();
+    /// <summary>Coins from older saves, which kept them outside the backpack; moved into it on load.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public float? Coins { get; set; }
     public float PricesTime { get; set; }
     public HashSet<string> Milestones { get; set; } = new();
     public float PlayerX { get; set; } = 23;
@@ -478,7 +483,7 @@ public sealed class World
     {
         if (!Near(sign) || sign.Kind != "signpost") return null;
         if (S.Workers.Count >= 8) { Say("The POC supports eight workers."); return null; }
-        if (!Pay((int)offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from your backpack."); return null; }
+        if (!Pay(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from your backpack."); return null; }
         string[] names = { "Rowan", "Hazel", "Milo", "Fern", "Jasper", "Willow", "Clover", "Ash" };
         string name = names.FirstOrDefault(n => S.Workers.All(w => w.Name != n)) ?? "Neighbor";
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
@@ -486,7 +491,8 @@ public sealed class World
     }
     public void Assign(Worker w, Thing? target)
     {
-        w.Assignment = target?.Id ?? 0; w.Job = target == null ? "idle" : target.IsResource ? "gather" : "building"; w.WorkState = WorkerWorkState.Idle;
+        // Reassigning calls off a price errand, so the worker never freezes on the road.
+        w.Assignment = target?.Id ?? 0; w.Away = 0; w.Job = target == null ? "idle" : target.IsResource ? "gather" : "building"; w.WorkState = WorkerWorkState.Idle;
         w.Destination = 0; w.Timer = 0; w.Status = target == null ? "Available" : "Starting work";
         if (target != null && target.Kind != "signpost") S.Milestones.Add("assigned");
     }
@@ -642,7 +648,7 @@ public sealed class World
         {
             // A striking worker does not work, so no further wages are added until the strike is settled.
             if (w.WageDebt > 0) continue;
-            if (!Pay((int)w.Wage)) { float due = w.WageDebt = w.Wage; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the signpost."); }
+            if (!Pay(w.Wage)) { float due = w.WageDebt = w.Wage; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the signpost."); }
         }
     }
     public void SettleDebt(Worker w)
@@ -696,7 +702,8 @@ public sealed class World
             if (t.Kind == "reinforced")
             {
                 // Once a working crew has the forge hot, they keep it at or above the clear bar between strokes.
-                bool crewed = S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt <= 0);
+                // A crew that is striking or stuck on a blocked path is not working, so the forge cools.
+                bool crewed = S.Workers.Any(w => w.Assignment == t.Id && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked);
                 t.Heat = Math.Max(crewed && t.Heat >= SteelHeat ? SteelHeat : 0, t.Heat - dt * 3.2f);
             }
             if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) continue;
@@ -835,6 +842,8 @@ public sealed class World
         loaded.ActiveHotbar = Math.Clamp(loaded.ActiveHotbar, 0, 8);
         if (!loaded.Things.Any(t => t.Id == loaded.Sheltered && t.Kind == "hut")) loaded.Sheltered = 0;
         loaded.Prices ??= new();
+        if (loaded.Coins is float coins) { loaded.Backpack.Add(Inventory.Coins, (int)coins); loaded.Coins = null; }
+        foreach (var order in loaded.Orders.Where(o => o.Item != null && o.Goods.Count == 0)) { order.Goods[order.Item!] = order.Quantity; order.Item = null; order.Quantity = 0; }
         foreach (var sign in loaded.Things.Where(t => t.Kind == "signpost")) sign.Output ??= new() { Slots = MarketSlots };
         S = loaded; gatherClock = 0; Say("Settlement loaded.");
     }
