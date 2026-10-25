@@ -94,12 +94,12 @@ public static class WorldModels {
         var body = prop.Body;
         switch (t.Kind) {
             case "tree": Tree(prop, t.Id); break;
-            case "stone": Rocks(body, t.Id, new[] { "8d918e", "a3a7a3", "7c807d" }, null); break;
-            case "iron": Rocks(body, t.Id, new[] { "7d5b45", "8f6a50", "6e4f3c" }, "b4622a"); break;
-            case "coal": Rocks(body, t.Id, new[] { "2d2f33", "3a3c40", "26282b" }, "15161a"); break;
-            case "tin": Rocks(body, t.Id, new[] { "8e918c", "a2a59f", "7b7e79" }, "e6e8e2"); break;
-            case "loose_iron": LooseOre(body, t.Id, "a35a2e", "8b4f2b"); break;
-            case "loose_coal": LooseOre(body, t.Id, "2d2f33", "1d1e21"); break;
+            case "stone": Rocks(body, t.Kind, t.Id, "8d918e"); break;
+            case "iron": Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
+            case "coal": Rocks(body, t.Kind, t.Id, "505257", "121316", "15161a"); break;
+            case "tin": Rocks(body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
+            case "loose_iron": LooseOre(body, t.Kind, t.Id, "a35a2e", "8b4f2b"); break;
+            case "loose_coal": LooseOre(body, t.Kind, t.Id, "2d2f33", "1d1e21"); break;
             case "wolf_corpse": Carcass(prop); break;
             case "berries": Bush(prop, t.Id); break;
             case "water": break; // The lake is the drinking spot; this thing only provides the hit area.
@@ -139,56 +139,24 @@ public static class WorldModels {
         prop.Sway = sway; // the whole tree shakes and falls about its base
         float scale = .9f + Jitter(id, 2) * .22f;
         sway.Scale = Vector3.One * scale;
-        switch (id % TreeVariants) {
-            case 1: // Norway spruce: stacked dark cones on a short trunk
-                Post(sway, .24f, .12f, 1.6f, Vector3.Zero, Mat("5b3f2a"));
-                (float Radius, float Height, float Y, string Color)[] tiers = { (1.45f, 2.1f, 1.1f, "2f5a3a"), (1.15f, 1.8f, 2.3f, "35643f"), (.85f, 1.5f, 3.4f, "2f5a3a"), (.5f, 1.2f, 4.4f, "3a6b44") };
-                foreach (var tier in tiers) Post(sway, tier.Radius, 0, tier.Height, new Vector3(0, tier.Y, 0), Mat(tier.Color), 9);
-                break;
-            case 2: // Silver birch: slender pale trunk with an airy crown
-                Post(sway, .16f, .09f, 4.4f, Vector3.Zero, Mat("e6e2d6", .9f));
-                for (int i = 0; i < 6; i++) Box(sway, new Vector3(.12f, .04f, .02f), new Vector3(0, .5f + i * .55f + Jitter(id, 10 + i) * .2f, .14f - i * .004f), Mat("2b2b2b"), new Vector3(0, i * 57, 0));
-                Box(sway, new Vector3(.05f, .9f, .05f), new Vector3(.3f, 3.2f, 0), Mat("d8d2c4"), new Vector3(0, 0, -35));
-                (Vector3 At, float Radius)[] leaves = { (new(0, 3.4f, 0), .95f), (new(.6f, 3f, .3f), .7f), (new(-.5f, 3.1f, -.3f), .72f), (new(.2f, 4.2f, -.2f), .8f), (new(-.3f, 4f, .5f), .65f), (new(.5f, 3.8f, -.5f), .6f) };
-                for (int i = 0; i < leaves.Length; i++) Sphere(sway, leaves[i].Radius, leaves[i].At, Mat(i % 2 == 0 ? "7a9a42" : "6d8c3c"), new Vector3(1, .85f, 1), 8);
-                break;
-            default: // Broadleaf oak: thick trunk, two limbs and a broad clustered crown
-                Post(sway, .34f, .2f, 2.7f, Vector3.Zero, Mat("6b4a32"));
-                Cylinder(sway, .12f, .07f, 1.1f, new Vector3(.35f, 2.4f, 0), Mat("6b4a32"), new Vector3(0, 0, -40), 6);
-                Cylinder(sway, .11f, .07f, 1f, new Vector3(-.3f, 2.5f, .1f), Mat("6b4a32"), new Vector3(20, 0, 38), 6);
-                (Vector3 At, float Radius, string Color)[] crown = { (new(0, 3.9f, 0), 1.35f, "4a6f2f"), (new(.85f, 3.5f, .2f), 1f, "426528"), (new(-.8f, 3.6f, -.2f), 1.05f, "527d35"), (new(.1f, 3.4f, .85f), .95f, "476b2c"), (new(-.1f, 3.5f, -.85f), .95f, "426528"), (new(.2f, 4.6f, -.1f), .9f, "5a8838") };
-                foreach (var c in crown) Sphere(sway, c.Radius, c.At, Mat(c.Color), new Vector3(1, .82f, 1), 10);
-                break;
-        }
-        var stump = Pivot(prop.Root, Vector3.Zero);
-        Post(stump, .3f, .26f, .32f, Vector3.Zero, Mat("6b4a32"));
-        Post(stump, .25f, .25f, .02f, new Vector3(0, .32f, 0), Mat("c9a477"));
+        int variant = (id / TreeVariants) % NatureShape.Variants;
+        Add(sway, (id % TreeVariants) switch { 1 => NatureShape.Spruce(variant), 2 => NatureShape.Birch(variant), _ => NatureShape.Oak(variant) }, NatureShape.Natural, Vector3.Zero);
+        var stump = Add(prop.Root, NatureShape.Stump, NatureShape.Natural, Vector3.Zero);
         stump.Visible = false;
         prop.Stump = stump;
     }
 
-    private static void Rocks(Node3D body, int id, string[] colors, string? veins) {
-        var pile = Pivot(body, Vector3.Zero);
-        (Vector3 At, float Radius, Vector3 Scale)[] rocks = { (new(0, .35f, 0), .55f, new(1.1f, .95f, 1)), (new(.5f, .2f, .25f), .36f, new(1, .8f, 1.1f)), (new(-.45f, .2f, .3f), .32f, new(1.2f, .75f, 1)), (new(-.15f, .15f, -.5f), .3f, new(1, .7f, 1.2f)), (new(.35f, .12f, -.4f), .22f, Vector3.One) };
-        for (int i = 0; i < rocks.Length; i++) {
-            var rock = Sphere(pile, rocks[i].Radius, rocks[i].At, Mat(colors[i % colors.Length], .9f), rocks[i].Scale, 6);
-            rock.RotationDegrees = new Vector3(Jitter(id, 20 + i) * 30, Jitter(id, 30 + i) * 360, 0);
-        }
-        if (veins == null) return;
-        for (int i = 0; i < 7; i++) {
-            float angle = i * 1.7f + Jitter(id, 40 + i);
-            var at = new Vector3(MathF.Cos(angle) * .45f, .25f + Jitter(id, 50 + i) * .45f, MathF.Sin(angle) * .45f);
-            Box(pile, new Vector3(.1f, .08f, .1f), at, Mat(veins, .5f, veins == "15161a" ? .3f : 0), new Vector3(30, angle * 50, 20));
-        }
+    /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows veins across the rock faces and ore chunks set into it.</summary>
+    private static void Rocks(Node3D body, string kind, int id, string stone, string? vein = null, string? chunks = null) {
+        int variant = id % NatureShape.Variants;
+        Add(body, NatureShape.Rocks(kind, new Color(stone), variant, vein == null ? null : false), NatureShape.Natural, Vector3.Zero);
+        if (vein == null || chunks == null) return;
+        Add(body, NatureShape.Rocks(kind, new Color(vein), variant, true), NatureShape.Mineral, Vector3.Zero);
+        Add(body, NatureShape.Insertions(kind, new Color(chunks), variant), NatureShape.Mineral, Vector3.Zero);
     }
 
-    private static void LooseOre(Node3D body, int id, string light, string dark) {
-        for (int i = 0; i < 4; i++) {
-            float angle = i * 1.6f + Jitter(id, 60 + i);
-            var at = new Vector3(MathF.Cos(angle) * .22f, .08f, MathF.Sin(angle) * .22f);
-            Sphere(body, .13f + Jitter(id, 70 + i) * .06f, at, Mat(i % 2 == 0 ? light : dark, .95f), new Vector3(1, .7f, 1.1f), 6);
-        }
-    }
+    private static void LooseOre(Node3D body, string kind, int id, string light, string dark) =>
+        Add(body, NatureShape.Loose(kind, new Color(light), new Color(dark), id % NatureShape.Variants), NatureShape.Natural, Vector3.Zero);
 
     private static void Carcass(Prop prop) {
         prop.Pool = Cylinder(prop.Body, .55f, .55f, .004f, new Vector3(.1f, .006f, 0), Flat(new Color(.36f, .05f, .05f, .75f), true), null, 14);
@@ -197,14 +165,10 @@ public static class WorldModels {
     }
 
     private static void Bush(Prop prop, int id) {
-        (Vector3 At, float Radius)[] clumps = { (new(0, .5f, 0), .5f), (new(.38f, .35f, .15f), .38f), (new(-.35f, .38f, .1f), .4f), (new(.05f, .35f, .4f), .36f), (new(0, .4f, -.38f), .38f) };
-        foreach (var c in clumps) Sphere(prop.Body, c.Radius, c.At, Mat("4c7a33"), new Vector3(1, .9f, 1), 8);
+        int variant = id % NatureShape.Variants;
+        Add(prop.Body, NatureShape.Bush(variant), NatureShape.Natural, Vector3.Zero);
         var fruit = Pivot(prop.Body, Vector3.Zero);
-        for (int i = 0; i < 16; i++) {
-            float angle = i * 2.4f, lift = .25f + Jitter(id, 80 + i) * .55f;
-            float reach = .5f - Math.Abs(lift - .5f) * .5f;
-            Sphere(fruit, .055f, new Vector3(MathF.Cos(angle) * reach, lift, MathF.Sin(angle) * reach), Mat("c0283a", .4f), null, 6);
-        }
+        Add(fruit, NatureShape.Berries(variant), NatureShape.Glossy, Vector3.Zero);
         prop.Fruit = fruit;
     }
 
