@@ -45,8 +45,9 @@ public partial class Game : Node
             sounds = new Sounds { World = world }; AddChild(sounds);
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
-            world.Sound = (name, at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 18 : Sounds.Range);
+            world.Sound = (name, at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
             view = new WorldView { World = world, Sounds = sounds }; AddChild(view);
+            sounds.OffScreen = view.OffScreen;
             var layer = new CanvasLayer(); AddChild(layer);
             ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
             SetTheme(); BuildHud();

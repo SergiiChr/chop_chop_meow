@@ -13,10 +13,10 @@ namespace ChopChopMeow;
 public partial class Sounds : Node
 {
     private const string Folder = "res://assets/sounds";
-    // Sounds within this many tiles of the player play at full volume and fade out to silence at the play's range.
-    // The default range is about half the screen's height, so only work near the player is heard.
-    private const float FullVolume = 2;
-    public const float Range = 9;
+    // Audibility follows the camera, so zooming out lets the player hear further.
+    // On-screen sounds play at full volume; past the screen edge they drop to a faint level and fade out over the play's reach.
+    private const float EdgeVolume = .3f;
+    public const float Reach = 5;
     // Variants share a loudness, and these levels set each sound's place in the mix: quiet steps, then impacts and handling, then alerts.
     private static readonly Dictionary<string, float> Levels = new()
     {
@@ -49,6 +49,8 @@ public partial class Sounds : Node
     private readonly Dictionary<string, int> previous = new();
     private readonly Random random = new();
     public World World = null!;
+    /// <summary>How many tiles a world position lies outside the visible screen; zero when on screen.</summary>
+    public Func<Vector2, float> OffScreen = _ => 0;
     /// <summary>Counts every sound started, so a caller can tell whether an action already made one.</summary>
     public int Played { get; private set; }
     public string Last { get; private set; } = "";
@@ -65,14 +67,13 @@ public partial class Sounds : Node
         _ => "moving_leather_in_inventory"
     };
 
-    /// <summary>Plays a sound; one with a world position fades with distance from the player and is silent beyond <paramref name="range"/> tiles.</summary>
-    public void Play(string name, Vector2? at = null, float range = Range)
+    /// <summary>Plays a sound; one with a world position is faint off screen and silent beyond <paramref name="reach"/> tiles past the screen edge.</summary>
+    public void Play(string name, Vector2? at = null, float reach = Reach)
     {
         var streams = Variants(name);
         if (streams.Length == 0) return;
-        float fade = at is Vector2 p ? 1 - Math.Clamp((p.DistanceTo(World.Player) - FullVolume) / (range - FullVolume), 0, 1) : 1;
-        // Squaring drops volume quickly past arm's reach, closer to how loudness falls off with distance.
-        fade *= fade;
+        float outside = at is Vector2 p ? OffScreen(p) : 0;
+        float fade = outside <= 0 ? 1 : EdgeVolume * MathF.Pow(1 - Math.Min(1, outside / reach), 2);
         if (fade <= 0) return;
         int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
         if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
