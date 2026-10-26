@@ -11,6 +11,15 @@ internal static class ActorShape {
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
     private static readonly StandardMaterial3D Surface = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .85f };
 
+    private static readonly Ring[] backpack = {
+        new(.18f, .025f, .025f, new Color("6c7849")), new(.16f, .115f, .07f, new Color("6c7849")),
+        new(.11f, .145f, .09f, new Color("6c7849")), new(-.1f, .14f, .09f, new Color("6c7849")),
+        new(-.16f, .11f, .065f, new Color("6c7849")), new(-.18f, .025f, .025f, new Color("6c7849"))
+    };
+
+    /// <summary>The same cached canvas body on the player's back and on dropped inventory.</summary>
+    public static void Backpack(Node3D parent) => Add(parent, backpack);
+
     /// <summary>A cloth panel fitted to the shared torso profile, with no separate block over the shirt.</summary>
     public static void Bib(Node3D parent, string color) {
         if (!meshes.TryGetValue("bib", out var mesh)) {

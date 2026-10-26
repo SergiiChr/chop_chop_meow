@@ -102,12 +102,8 @@ public sealed class ActorRig {
                 new Vector3(side * .14f, .205f, .04f), new Vector3(side * .15f, .21f, -.04f),
                 new Vector3(side * .115f, .22f, -.15f) });
         }
-        var canvas = new Color("6c7849");
         var pack = Pivot(torso, new Vector3(0, .32f, -.17f));
-        ActorShape.Add(pack, new[] {
-            new Ring(.18f, .025f, .025f, canvas), new Ring(.16f, .115f, .07f, canvas),
-            new Ring(.11f, .145f, .09f, canvas), new Ring(-.1f, .14f, .09f, canvas),
-            new Ring(-.16f, .11f, .065f, canvas), new Ring(-.18f, .025f, .025f, canvas) });
+        ActorShape.Backpack(pack);
     }
 
     private void BuildFace(string skinTone, string hair) {

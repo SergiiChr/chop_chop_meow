@@ -108,8 +108,8 @@ public static class WorldModels {
             case "furnace": BlockFurnace(prop); break;
             case "reinforced": DrumForge(prop); break;
             case "hut": Cabin(prop); break;
-            case "chest": StorageBox(prop, "c9a46e", "9d7a4c", "2f3133"); break;
-            case "grave": StorageBox(prop, "e2701e", "c45b12", "f2f2ea"); break;
+            case "chest": Chest(prop); break;
+            case "grave": DroppedBackpack(prop); break;
             case "anvil": Anvil(prop); break;
             case "crate": Crate(prop); break;
             case "bench": Workbench(prop); break;
@@ -345,30 +345,26 @@ public static class WorldModels {
         prop.Light = Light(body, new Vector3(.55f, 1.65f, 1.4f), 2.5f);
     }
 
-    private static void StorageBox(Prop prop, string panel, string edge, string fittings) {
+    private static void Chest(Prop prop) {
         var body = prop.Body;
-        if (prop.Kind == "chest") {
-            Add(body, ChestShape.Body, ChestShape.Wood, Vector3.Zero);
-            Add(body, ChestShape.Frame, ChestShape.Metal, Vector3.Zero);
-            var hinge = Pivot(body, new Vector3(0, .49f, -.275f));
-            Add(hinge, ChestShape.Lid, ChestShape.Wood, Vector3.Zero);
-            Add(hinge, ChestShape.LidFrame, ChestShape.Metal, Vector3.Zero);
-            prop.Lid = hinge;
-            return;
-        }
-        bool tote = panel == "e2701e";
-        var size = tote ? new Vector3(.75f, .36f, .5f) : new Vector3(.85f, .45f, .55f);
-        Box(body, size, new Vector3(0, size.Y / 2 + .04f, 0), Mat(panel, tote ? .5f : .9f));
-        if (!tote) {
-            foreach (var (x, z) in new[] { (-.4f, -.25f), (.4f, -.25f), (-.4f, .25f), (.4f, .25f) }) Box(body, new Vector3(.07f, .5f, .07f), new Vector3(x, .27f, z), Mat(fittings, .5f, .6f));
-            Box(body, new Vector3(.87f, .06f, .57f), new Vector3(0, .07f, 0), Mat(edge));
-            Box(body, new Vector3(.2f, .05f, .04f), new Vector3(.25f, .3f, .29f), Mat(fittings, .5f, .6f));
-            Box(body, new Vector3(.2f, .05f, .04f), new Vector3(-.25f, .3f, .29f), Mat(fittings, .5f, .6f));
-        } else Box(body, new Vector3(.77f, .05f, .52f), new Vector3(0, .25f, 0), Mat(fittings, .4f));
-        var lid = Pivot(body, new Vector3(0, size.Y + .04f, -size.Z / 2));
-        Box(lid, new Vector3(size.X + .04f, .06f, size.Z + .04f), new Vector3(0, .03f, size.Z / 2), Mat(tote ? edge : edge, tote ? .5f : .85f));
-        Box(lid, new Vector3(.12f, .04f, .03f), new Vector3(0, .02f, size.Z + .03f), Mat(fittings, .5f, .6f));
-        prop.Lid = lid;
+        Add(body, ChestShape.Body, ChestShape.Wood, Vector3.Zero);
+        Add(body, ChestShape.Frame, ChestShape.Metal, Vector3.Zero);
+        var hinge = Pivot(body, new Vector3(0, .49f, -.275f));
+        Add(hinge, ChestShape.Lid, ChestShape.Wood, Vector3.Zero);
+        Add(hinge, ChestShape.LidFrame, ChestShape.Metal, Vector3.Zero);
+        prop.Lid = hinge;
+    }
+
+    /// <summary>The player's shared canvas pack laid on its straps, with an animated access flap.</summary>
+    private static void DroppedBackpack(Prop prop) {
+        var dropped = Pivot(prop.Body, Vector3.Zero, new Vector3(0, -18, 0));
+        var pack = Pivot(dropped, new Vector3(0, .145f, 0), new Vector3(90, 0, 0));
+        pack.Scale = Vector3.One * 1.5f;
+        ActorShape.Backpack(pack);
+        Add(dropped, BackpackShape.Details, BackpackShape.Canvas, Vector3.Zero);
+        var flap = Pivot(dropped, new Vector3(0, .235f, -.15f));
+        Add(flap, BackpackShape.Flap, BackpackShape.Canvas, Vector3.Zero);
+        prop.Lid = flap;
     }
 
     /// <summary>A hollow slatted crate with a separately hinged lid and shared wood geometry.</summary>
