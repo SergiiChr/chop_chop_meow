@@ -465,7 +465,11 @@ public static class WorldModels {
         prop.StackKey = key;
         for (int i = 0; i < prop.Stacks.Length; i++) {
             prop.Stacks[i].Visible = i < stacks.Count;
-            if (i < stacks.Count) PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : PileShape.Fallback);
+            if (i < stacks.Count) {
+                PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : PileShape.Fallback);
+                // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
+                prop.Stacks[i].Rotation = new Vector3(0, stacks[i] == "coal" ? i * 2.399963f : 0, 0);
+            }
         }
     }
 

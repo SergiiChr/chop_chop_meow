@@ -16,18 +16,32 @@ internal static class FurnaceShape {
 
     private static ArrayMesh BuildCoalPile() {
         var surface = new SurfaceTool(); surface.Begin(Mesh.PrimitiveType.Triangles);
-        foreach (var (x, y, z, radius, tint) in new[] {
-            (-.08f, .07f, -.16f, .09f, "292c30"), (.07f, .065f, -.13f, .085f, "3a3c40"),
-            (-.09f, .06f, .015f, .085f, "34373b"), (.075f, .07f, .045f, .095f, "26282b"),
-            (-.04f, .07f, .19f, .09f, "303338"), (0f, .16f, -.015f, .095f, "3a3c40") }) {
+        // Broken slabs have broad fracture faces and unequal edges rather than pointed crystal tips.
+        Vector2[] outline = { new(-.72f, -.66f), new(.38f, -.86f), new(1, -.23f),
+            new(.64f, .65f), new(-.4f, .84f), new(-.94f, .18f) };
+        foreach (var (x, y, z, radius, angle, tint) in new[] {
+            (-.08f, .025f, -.16f, .095f, .2f, "292c30"), (.075f, .015f, -.13f, .085f, 1.1f, "3a3c40"),
+            (-.09f, .01f, .015f, .085f, 2.4f, "34373b"), (.075f, .02f, .045f, .095f, -.5f, "26282b"),
+            (-.04f, .015f, .19f, .09f, .8f, "303338"), (0f, .105f, -.015f, .095f, -1.2f, "3a3c40") }) {
             surface.SetColor(new Color(tint));
+            var rotation = new Basis(Vector3.Up, angle);
             var center = new Vector3(x, y, z);
+            var lower = new Vector3[6]; var upper = new Vector3[6];
             for (int i = 0; i < 6; i++) {
-                float a = i * Mathf.Tau / 6, b = (i + 1) * Mathf.Tau / 6;
-                var first = center + new Vector3(MathF.Cos(a) * radius, 0, MathF.Sin(a) * radius);
-                var second = center + new Vector3(MathF.Cos(b) * radius, 0, MathF.Sin(b) * radius);
-                Triangle(surface, first, second, center + new Vector3(.015f, radius * .8f, -.01f), (first + second) / 2 - center + Vector3.Up * radius);
-                Triangle(surface, first, center - Vector3.Up * radius * .65f, second, (first + second) / 2 - center - Vector3.Up * radius);
+                lower[i] = center + rotation * new Vector3(outline[i].X * radius, 0, outline[i].Y * radius);
+                // A sloping broken top, offset from the base, keeps the pieces from reading as cut blocks.
+                upper[i] = center + rotation * new Vector3((outline[i].X * .73f + .12f) * radius,
+                    (i is 0 or 1 ? 1.12f : i is 2 or 5 ? .88f : .64f) * radius,
+                    (outline[i].Y * .78f - .08f) * radius);
+            }
+            for (int i = 0; i < 6; i++) {
+                int next = (i + 1) % 6;
+                var outward = (lower[i] + lower[next]) / 2 - center;
+                Quad(surface, lower[i], lower[next], upper[next], upper[i], outward);
+            }
+            for (int i = 1; i < 5; i++) {
+                Triangle(surface, lower[0], lower[i], lower[i + 1], Vector3.Down);
+                Triangle(surface, upper[0], upper[i], upper[i + 1], Vector3.Up);
             }
         }
         return surface.Commit();
