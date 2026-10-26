@@ -341,8 +341,8 @@ public partial class WorldView : Node3D {
     }
 
     private static string? HeldTool(string? selected, Inventory backpack) => selected switch {
-        "iron_axe" or "iron_pick" or "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
-        "wood_hammer" or "iron_hammer" or "steel_hammer" when backpack[selected] > 0 => "hammer",
+        "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
+        "wood_hammer" or "steel_hammer" when backpack[selected] > 0 => "hammer",
         _ => null
     };
 
@@ -616,7 +616,7 @@ public partial class WorldView : Node3D {
                 sway.Visible = prop.Fall < 1.7f;
                 prop.Stump!.Visible = true;
                 break;
-            case "stone" or "iron" or "coal" or "tin" or "loose_iron" or "loose_coal" or "leaves":
+            case "stone" or "iron" or "coal" or "tin" or "loose_coal" or "leaves":
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);

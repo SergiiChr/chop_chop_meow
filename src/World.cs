@@ -36,7 +36,7 @@ public sealed class Thing {
     /// <summary>Ore at the foot of a cliff, mined with a pickaxe.</summary>
     [JsonIgnore] public bool IsDeposit => Kind is "iron" or "coal" or "tin";
     /// <summary>Loose pieces are picked up whole in one go and vanish, instead of being worked down like a deposit.</summary>
-    [JsonIgnore] public bool IsLoose => Kind is "loose_iron" or "loose_coal";
+    [JsonIgnore] public bool IsLoose => Kind is "loose_coal";
     [JsonIgnore] public bool IsStorage => Kind is "chest" or "grave" or "crate" or "toolstation" or "pile";
 }
 /// <summary>An impassable rock face whose ore deposits sit at its foot, with loose pieces scattered toward the clearing.</summary>
@@ -194,8 +194,8 @@ public sealed partial class World {
     private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f, ChaseSeconds = 3;
     /// <summary>Minimum bellows furnace temperature: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
-    // Rock faces at the foot of both ranges, facing into the valley; the first iron and coal cliffs are the nearer ones, with loose pieces below them.
-    // Tin has no loose pieces: it waits for a pickaxe, further inland.
+    // Rock faces at the foot of both ranges, facing into the valley; the first iron and coal cliffs are the nearer ones, with loose coal below the coal cliff.
+    // Iron and tin have no loose pieces: they wait for a pickaxe.
     public static readonly Cliff[] Cliffs = { FootCliff("iron", 172, 1), FootCliff("coal", 140, -1), FootCliff("tin", 108, 1), FootCliff("iron", 80, -1), FootCliff("coal", 62, 1) };
     private static Cliff FootCliff(string ore, float along, int side) =>
         new(ore, Terrain.Point(along, side * (Terrain.HalfWidth(along, side) + .6f)), Terrain.Sideways * -side, 4.5f);
@@ -279,18 +279,17 @@ public sealed partial class World {
     }
     public void NewGame() {
         S = new SaveState();
-        S.Backpack.Add("iron_axe", 1); S.Backpack.Add("berries", 10); S.Backpack.Add("wood", 6);
+        S.Backpack.Add("steel_axe", 1); S.Backpack.Add("berries", 10); S.Backpack.Add("wood", 6);
         var rng = new Random(4271);
         foreach (var cliff in Cliffs) {
             foreach (float along in new[] { -2.8f, 0, 2.8f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, 400);
-            if (cliff != CliffOf(cliff.Ore) || cliff.Ore == "tin") continue;
-            // Loose pieces roll well out past the deposits of the nearer cliff, so collecting them takes a search.
-            // Iron is the tool-free bootstrap: 20 ore covers the anvil and pickaxe but not a bellows furnace too.
-            (string kind, int count) = cliff.Ore == "iron" ? ("loose_iron", 10) : ("loose_coal", 6);
-            for (int placed = 0; placed < count;) {
+            if (cliff != CliffOf(cliff.Ore) || cliff.Ore != "coal") continue;
+            // Loose coal rolls well out past the deposits of the nearer coal cliff, so collecting it takes a search.
+            // Iron has no loose pieces: the first pickaxe is bought with berry money.
+            for (int placed = 0; placed < 6;) {
                 var p = cliff.Center + cliff.Face * (4.2f + (float)rng.NextDouble() * 6.5f) + cliff.Along * ((float)rng.NextDouble() * 2 - 1) * (cliff.HalfLength + 4);
                 if (!CanStand(p) || S.Things.Any(t => t.Pos.DistanceTo(p) < 2)) continue;
-                Add(kind, p, 2); placed++;
+                Add("loose_coal", p, 2); placed++;
             }
         }
         // Rocks and berry bushes stand alone on the plains, far from the clearing and each other, so more of them means exploring.
@@ -401,10 +400,10 @@ public sealed partial class World {
     }
     private float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
     public void MovePlayer(Vector2 delta) {
-        if (Downed) return;
+        // Inside a cabin the player stays put until they step outside on purpose.
+        if (Downed || S.Sheltered != 0) return;
         if (delta == Vector2.Zero) return;
         playerBusy = true;
-        if (S.Sheltered != 0) S.Sheltered = 0;
         var p = Player + delta;
         if (CanStand(p)) Player = p;
         else { if (CanStand(Player + new Vector2(delta.X, 0))) Player += new Vector2(delta.X, 0); if (CanStand(Player + new Vector2(0, delta.Y))) Player += new Vector2(0, delta.Y); }
@@ -416,13 +415,13 @@ public sealed partial class World {
         // Workers fetch their tools from a tool station instead of needing them carried.
         if (worker || ToolKind(t) is not string kind || BestTool(kind) != null) return null;
         return kind switch {
-            "axe" => "An axe is needed. Recover your belongings or craft one at a bench.",
+            "axe" => "An axe is needed. Recover your belongings or buy one at the village signpost.",
             "rake" => "Raking leaves needs a rake. Craft one at a bench.",
-            _ => t.Kind == "tin" ? "Mining tin needs a pickaxe." : "Craft a pickaxe at a bench. Loose rusty ore nearby can be picked up by hand."
+            _ => "Mining needs a pickaxe. Sell crates of berries at the village signpost and buy one."
         };
     }
     public static string ResourceItem(Thing t) => ResourceItem(t.Kind);
-    public static string ResourceItem(string kind) => kind switch { "tree" => "wood", "iron" or "loose_iron" => "iron_ore", "tin" => "tin_ore", "loose_coal" => "coal", "wolf_corpse" => "raw_meat", _ => kind };
+    public static string ResourceItem(string kind) => kind switch { "tree" => "wood", "iron" => "iron_ore", "tin" => "tin_ore", "loose_coal" => "coal", "wolf_corpse" => "raw_meat", _ => kind };
     public void Gather(Thing t, float dt) {
         // A loose piece is a single pick-up; anything else the host works on for as long as the player holds on to it.
         if (t.IsLoose ? Forwarded("pick_up", t.Id) : Remote) { S.Actor.GatherTarget = t.IsLoose ? 0 : t.Id; return; }
@@ -704,8 +703,19 @@ public sealed partial class World {
         Say($"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
     }
     private void Respawn() {
-        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = Spawn; S.Actor.Warp++; S.Mauled = false; S.Sheltered = 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
-        Say("You wake in the clearing. Recover your belongings from the box.");
+        // The player wakes inside the cabin nearest to where they fell, or in the clearing without one.
+        Thing? cabin = null;
+        foreach (var t in S.Things) if (t.Kind == "hut" && (cabin == null || t.Pos.DistanceTo(Player) < cabin.Pos.DistanceTo(Player))) cabin = t;
+        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Spawn : Doorstep(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
+        Say(cabin == null ? "You wake in the clearing. Recover your belongings from the box." : "You wake in the cabin. Recover your belongings from the box.");
+    }
+    /// <summary>Open ground just outside a cabin's walls, where its occupant stands when they step out.</summary>
+    private Vector2 Doorstep(Thing cabin) {
+        for (int i = 0; i < 8; i++) {
+            var p = cabin.Pos + Vector2.Down.Rotated(i * MathF.PI / 4) * (Footprint("hut") + .6f);
+            if (CanStand(p)) return p;
+        }
+        return cabin.Pos + Vector2.Down * (Footprint("hut") + .6f);
     }
     // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.
     public float UnitPrice(string item, bool buying) => Data.Items[item].Price * (buying ? 1.25f : Math.Min(1, Demand(item)));
@@ -1282,7 +1292,9 @@ public sealed partial class World {
                 delivery.Inventory.Slots = overflow / delivery.Inventory.StackOf(item) + 1;
                 delivery.Inventory.Add(item, overflow);
             }
+            if (!order.Buying) S.Milestones.Add("sold");
             if (!order.Buying && order.Goods.Keys.Any(id => id.StartsWith("steel_") && Data.Items[id].Tool != "")) S.Milestones.Add("sold_steel");
+            if (order.Buying && order.Goods.Keys.Any(id => Data.Items[id].Tool == "pickaxe")) S.Milestones.Add("pick");
             // Played at the player, not the signpost, so a payment is heard wherever the player is.
             if (!order.Buying) { Play("payment_from_village_arrives", Player); S.DayRevenue += (int)order.Value; }
             S.Orders.Remove(order); UpdatePrices();
@@ -1441,12 +1453,17 @@ public sealed partial class World {
             // A torch draws the whole pack in, but slowly.
             if (nightSpawn <= 0 && hunters.Count < (S.TorchLit ? 6 : Math.Min(6, 2 + Day))) {
                 nightSpawn = S.TorchLit ? 25 : 15; float angle = S.Time * 2.4f;
-                // Wolves come out of the woods, never the sea or the mountains: turn until open ground is found.
+                // Wolves come out of the woods, never the sea or the mountains, and just beyond every player's sight, so none appears on screen.
+                // Without such a spot this time, the wolf comes on a later try.
                 var p = Player;
-                for (int turn = 0; turn < 12 && !Open(p); turn++) p = Player + new Vector2(MathF.Cos(angle + turn * .52f), MathF.Sin(angle + turn * .52f)) * 11;
-                if (p == Player) p += new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 11;
-                var wolf = new Wolf { Pos = p, Health = 4 + Day * .4f, Target = S.Actor.Id }; S.Wolves.Add(wolf); hunters.Add(wolf);
-                Play("wolf_growl_distance", p);
+                for (int turn = 0; turn < 24 && p == Player; turn++) {
+                    var at = Player + new Vector2(MathF.Cos(angle + turn * .52f), MathF.Sin(angle + turn * .52f)) * (Data.SightRadius + 2 + turn / 12 * 4);
+                    if (Open(at) && Unseen(at)) p = at;
+                }
+                if (p != Player) {
+                    var wolf = new Wolf { Pos = p, Health = 4 + Day * .4f, Target = S.Actor.Id }; S.Wolves.Add(wolf); hunters.Add(wolf);
+                    Play("wolf_growl_distance", p);
+                } else nightSpawn = 1;
             }
         }
         bool lit = Protected(Player), inside = S.Sheltered != 0;
@@ -1477,11 +1494,11 @@ public sealed partial class World {
                 wolf.Feeding = wolf.Pos.DistanceTo(seat) < .05f;
             } else if (wolf.Flee > 0) {
                 wolf.Flee -= dt; wolf.Chase = 0;
-                wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + (wolf.Pos - Player).Normalized() * 3, dt * speed);
+                wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + AwayFromPlayer(wolf) * 3, dt * speed);
             } else if (wary && wolf.Scared) {
                 // Each scared wolf keeps its bearing at the edge of the torchlight, so a growing pack surrounds the player.
                 wolf.Chase = 0;
-                var away = wolf.Pos == Player ? Vector2.Right : (wolf.Pos - Player).Normalized();
+                var away = AwayFromPlayer(wolf);
                 wolf.Pos = wolf.Pos.MoveToward(Player + away * StalkDistance, dt * speed * .6f);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
             } else if (wary) {
@@ -1491,13 +1508,17 @@ public sealed partial class World {
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
             }
               // A wolf already on the player's heels follows briefly into firelight, but backs off from a cabin at once.
-              else if (inside || (lit || Protected(wolf.Pos)) && wolf.Chase <= 0) { wolf.Chase = 0; wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + (wolf.Pos - Player).Normalized() * 3, dt * 3); } else {
+              else if (inside || (lit || Protected(wolf.Pos)) && wolf.Chase <= 0) { wolf.Chase = 0; wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + AwayFromPlayer(wolf) * 3, dt * 3); } else {
                 wolf.Chase = lit || Protected(wolf.Pos) ? wolf.Chase - dt : ChaseSeconds;
                 wolf.Pos = wolf.Pos.MoveToward(Player, dt * speed);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
             }
         }
+        // A sheltered player's pack gives up once it has backed out of sight, instead of waiting at the cabin.
+        if (inside)
+            for (int i = hunters.Count - 1; i >= 0; i--)
+                if (hunters[i].Pos.DistanceTo(Player) > Data.SightRadius) { S.Wolves.Remove(hunters[i]); hunters.RemoveAt(i); }
         // Feeding wolves crowd around the player without stacking on one spot.
         for (int i = 0; i < hunters.Count; i++) for (int j = i + 1; j < hunters.Count; j++) {
             var a = hunters[i]; var b = hunters[j]; var offset = a.Pos - b.Pos;
@@ -1511,11 +1532,17 @@ public sealed partial class World {
             S.Health -= dt * (16 + 8 * feeding);
         }
     }
+    /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>
+    private Vector2 AwayFromPlayer(Wolf wolf) => wolf.Pos == Player ? Vector2.Right : (wolf.Pos - Player).Normalized();
+    private bool Unseen(Vector2 p) {
+        foreach (var player in S.Players) if (player.Pos.DistanceTo(p) <= Data.SightRadius) return false;
+        return true;
+    }
     private static bool AnyLeaping(List<Wolf> wolves) {
         foreach (var w in wolves) if (w.Leap > 0) return true;
         return false;
     }
-    private static readonly string[] Milestones = { "gather", "furnace", "iron_bar", "anvil", "bench", "pick", "reinforced", "steel_bar", "steel_tool", "sold_steel", "hired", "assigned" };
+    private static readonly string[] Milestones = { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" };
     public bool GoalComplete => S.Goal >= Milestones.Length;
     private void UpdateGoal() {
         while (!GoalComplete && S.Milestones.Contains(Milestones[S.Goal])) S.Goal++;
@@ -1523,18 +1550,20 @@ public sealed partial class World {
     public static int GoalCount => Milestones.Length;
     public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
     public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch {
-        0 => ("A place to begin", "Hold right mouse near trees and stones. You carry an iron axe. B opens building plans."),
-        1 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A cabin and campfire make nights safer."),
-        2 => ("The first iron", "Explore for a rust-streaked cliff and pick up the loose ore below it. Load the furnace with ore + wood. Collect iron bars."),
-        3 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. Keep smelting for a pickaxe and bellows furnace."),
-        4 => ("A workbench", "Press C to craft. Knap a stone chisel from 2 stone, split wood into planks, then build a crafting bench: 10 planks."),
-        5 => ("Beneath the surface", "Hammer 2 iron parts at the anvil. Make a wooden mallet by hand, slot it in the bench and craft an iron pickaxe: 2 iron parts + 1 wood parts."),
-        6 => ("Hotter than fire", "Explore for a dark cliff and mine coal at its foot. Build a bellows furnace: 20 stone, 5 iron bars, 8 wood."),
-        7 => ("Make steel", "Load iron + mined coal into the bellows furnace. Keep the heat above the clear bar; steel only progresses there. Each bar costs 2 iron + 3 coal incl. fuel."),
-        8 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),
-        9 => ("The road to Bramblewick", "Build a village signpost. Craft a crate at the bench (6 planks, hammer slotted), place it, pack your steel tools, pick it up and put it in the market. Sell, then collect the coins."),
-        10 => ("Many hands", "At the signpost pick a hiring offer: more coins up front means a lower daily wage. Keep wages in your backpack for each dawn."),
-        11 => ("Your first automation", "Build storage, and a tool station holding a spare axe or pickaxe for woodcutters and miners. Select a worker → Work → click a resource. Or select a furnace → Assign."),
+        0 => ("A place to begin", "Hold right mouse near trees, stones and berry bushes. You carry a steel axe. B opens building plans."),
+        1 => ("A workbench", "Press C to craft. Knap a stone chisel from 2 stone, split wood into planks, then build a crafting bench: 10 planks."),
+        2 => ("Something to carry", "Carve a wooden mallet by hand and slot it in the bench beside the chisel. Craft a crate there: 6 planks."),
+        3 => ("The road to Bramblewick", "Build a village signpost: 10 wood + 4 stone. Place a crate, fill it with berries, pick it up and put it in the market. Sell, then collect the coins."),
+        4 => ("Beneath the surface", "Buy a steel pickaxe from the price sheet at the signpost. The cart brings it back in a crate."),
+        5 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A cabin and campfire make nights safer."),
+        6 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore + wood. Collect iron bars."),
+        7 => ("Hotter than fire", "Explore for a dark cliff and mine coal at its foot. Build a bellows furnace: 20 stone, 5 iron bars, 8 wood."),
+        8 => ("Make steel", "Load iron + mined coal into the bellows furnace. Keep the heat above the clear bar; steel only progresses there. 2 iron bars + 3 coal incl. fuel make 2 steel bars."),
+        9 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. It hammers steel bars into steel parts."),
+        10 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),
+        11 => ("Steel for sale", "Pack steel tools into a crate and sell it at the signpost, then collect the coins."),
+        12 => ("Many hands", "At the signpost pick a hiring offer: more coins up front means a lower daily wage. Keep wages in your backpack for each dawn."),
+        13 => ("Your first automation", "Build storage, and a tool station holding a spare axe or pickaxe for woodcutters and miners. Select a worker → Work → click a resource. Or select a furnace → Assign."),
         _ => ("A settlement of your own", "The starter goals are done. Work toward the end goals: a mine on every ore and a week of steady profit.")
     };
     // ---------- End goals ----------
@@ -1556,6 +1585,8 @@ public sealed partial class World {
         // Steel tools became steel parts; carried ones that were the only axe or pickaxe become those tools so the save stays playable.
         bool legacyTools = json.Contains("\"steel_tools\"");
         json = json.Replace("\"steel_tools\"", "\"steel_parts\"").Replace("\"cooked_meat\"", "\"burnt_steak\"");
+        // Iron tools and parts left the game: older saves get the steel ones instead.
+        json = json.Replace("\"iron_axe\"", "\"steel_axe\"").Replace("\"iron_pick\"", "\"steel_pick\"").Replace("\"iron_hammer\"", "\"steel_hammer\"").Replace("\"iron_parts\"", "\"steel_parts\"");
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version < 4) throw new InvalidOperationException("This save is from an older, smaller map and cannot be loaded. Start a new game.");
         if (loaded.Version != 4 || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
@@ -1573,6 +1604,9 @@ public sealed partial class World {
         // Saves from before the fog start unexplored.
         if (loaded.Explored?.Length != MapSize * MapSize) loaded.Explored = new byte[MapSize * MapSize];
         loaded.Remembered ??= new();
+        // Loose iron left the game too.
+        loaded.Things.RemoveAll(t => t.Kind == "loose_iron");
+        foreach (var id in loaded.Remembered.Where(p => p.Value.Kind == "loose_iron").Select(p => p.Key).ToList()) loaded.Remembered.Remove(id);
         loaded.Crates ??= new(); loaded.Crafting ??= new(); loaded.Profits ??= new();
         loaded.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
         foreach (var t in loaded.Things) {

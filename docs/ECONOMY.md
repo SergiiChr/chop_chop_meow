@@ -13,8 +13,8 @@ Every item has a `price`. For goods the village trades, it is the trade price; f
 | Step | Markup | Recipes |
 |---|---|---|
 | 1 | 50% | iron bar, tin bar, burnt steak, planks, wood parts, stone chisel, torch, mortar and pestle, crushed berries, flour, meat stew |
-| 2 | 40% | steel bar, iron parts, crate, wooden mallet, tin cans, berry jam, dough |
-| 3 | 30% | steel parts, iron axe, iron pickaxe, iron hammer, bread, canned meat stew, canned jam, canned food |
+| 2 | 40% | steel bar, crate, wooden mallet, tin cans, berry jam, dough |
+| 3 | 30% | steel parts, bread, canned meat stew, canned jam, canned food |
 | 4 | 20% | steel axe, steel pickaxe, steel hammer, steel chisel, rake |
 
 Canned food, which the village also sells, is canned raw meat and now costs 5.35 instead of 4.

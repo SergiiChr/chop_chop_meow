@@ -55,7 +55,7 @@ public static class AllocationChecks {
         world.Add("chest", at + new Vector2(2, -2));
         chest.Inventory.Add("iron_bar", 20); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_ore", 20); chest.Inventory.Add("wood", 30);
         var rack = world.Add("toolstation", at + new Vector2(-2, 0));
-        rack.Inventory.Add("iron_axe", 2);
+        rack.Inventory.Add("steel_axe", 2);
         var fire = world.Add("campfire", at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
         var furnace = world.Add("furnace", at + new Vector2(3, 3));
         var forge = world.Add("reinforced", at + new Vector2(-3, 3)); forge.Heat = 90;

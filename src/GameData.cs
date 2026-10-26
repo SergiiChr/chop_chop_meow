@@ -168,7 +168,6 @@ public sealed class GameData {
         "tree" => "Tree",
         "iron" => "Iron deposit",
         "tin" => "Tin deposit",
-        "loose_iron" => "Iron ore",
         "loose_coal" => "Coal",
         "grave" => "Recovery box",
         "wolf_corpse" => "Wolf carcass",

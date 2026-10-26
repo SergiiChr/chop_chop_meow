@@ -319,8 +319,13 @@ public partial class Game {
     private async Task CheckCabinAndCanopy() {
         ClosePanel(); await Frames();
         var hut = world.Add("hut", world.Player + new Vector2(0, 4));
+        // The click lands while the player is still walking, as when running from a wolf.
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
+        await Seconds(.1);
         await Click(view.Screen(hut.Pos, 1.5f)); await Seconds(1.5);
-        UIRequire(world.S.Sheltered == hut.Id && page == "inspect" && selected == hut.Id, "Clicking a cabin must walk the player inside and open it.");
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
+        await Frames();
+        UIRequire(world.S.Sheltered == hut.Id && page == "inspect" && selected == hut.Id, "Clicking a cabin while walking must walk the player inside and open it.");
         float dayTime = world.S.Time;
         world.S.Time = world.Data.DaySeconds * (world.Data.NightStarts + .02f); world.S.Hunger = 5; RefreshLive();
         var sleep = Named("sleep");
@@ -330,12 +335,14 @@ public partial class Game {
         await Seconds(.2);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = false });
         await Frames();
-        UIRequire(world.S.Sheltered == 0, "Moving must step the player back out of the cabin.");
+        UIRequire(world.S.Sheltered == hut.Id, "Moving must not step the player out of the cabin.");
+        await Click(FindButton(panel, "Step outside")!);
+        UIRequire(world.S.Sheltered == 0, "Step outside must leave the cabin.");
         world.S.Things.Remove(hut); ClosePanel(); await Frames();
 
         // A loose piece far enough behind a tree sits under its crown on screen; it must still be the one picked.
         var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == World.Spawn + new Vector2(5, 0));
-        var hidden = world.Add("loose_iron", tree.Pos - new Vector2(3.3f, 3.3f), 2);
+        var hidden = world.Add("loose_coal", tree.Pos - new Vector2(3.3f, 3.3f), 2);
         var point = view.Screen(hidden.Pos, .15f);
         UIRequire(view.Pick(point)?.Id == hidden.Id, "A tree crown must not steal the click from a loose piece behind it.");
         world.S.Things.Remove(hidden);
@@ -417,7 +424,7 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
             await Frames(3);
             await ToSignal(GetTree().CreateTimer(4), SceneTreeTimer.SignalName.Timeout);
-            UIRequire(view.PlayerAnimation == ActorAction.Chop, "RMB gathering with the starting axe must select the axe stroke.");
+            UIRequire(view.PlayerAnimation == ActorAction.SteelChop, "RMB gathering with the starting axe must select the steel axe stroke.");
             UIRequire(sounds.Last == "chop_tree", "Axe strokes on a tree must play the chop sound.");
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
             await Frames(); UIRequire(world.S.Backpack["wood"] > wood, "Holding RMB must approach and gather a real resource.");
@@ -470,7 +477,7 @@ public partial class Game {
             UIRequire(chest != null && view.BuildMode == "" && selected == chest.Id, "A ground click must construct and select the chest.");
             var deposit = FindButton(panel, "Deposit all materials (keep tools)"); UIRequire(deposit != null, "Chest context must expose deposit action.");
             deposit!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
-            UIRequire(chest!.Inventory["wood"] > 0 && world.S.Backpack["iron_axe"] == 1, "Manual deposit must move materials and retain equipped tools.");
+            UIRequire(chest!.Inventory["wood"] > 0 && world.S.Backpack["steel_axe"] == 1, "Manual deposit must move materials and retain equipped tools.");
             int storedWood = chest.Inventory["wood"]; RefreshLive();
             await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), Cell(1, c => c.TooltipText == ""));
             UIRequire(chest.Inventory["wood"] == 0 && world.S.Backpack["wood"] == storedWood, "Dragging a chest stack onto the backpack must move it.");
@@ -554,7 +561,7 @@ public partial class Game {
             await CheckCabinAndCanopy();
             await CheckSignpost();
 
-            world.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "bench", "pick", "reinforced", "steel_bar", "steel_tool", "sold_steel", "hired", "assigned" });
+            world.S.Milestones.UnionWith(new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" });
             await Frames(3);
             UIRequire(!ending.Visible && !paused, "The starter goal chain alone must not end the game.");
             await CheckMine();
@@ -615,7 +622,7 @@ public partial class Game {
             foregroundTree.Pos = world.Player + new Vector2(8, -8);
             UIRequire(!view.TreeCanopyCoversThing(foregroundTree, occluded), "A distant tree must not fade for a building.");
             ClosePanel(); selected = 0;
-            world.S.Backpack.Remove("iron_axe", 99); world.S.Backpack.Remove("steel_axe", 99);
+            world.S.Backpack.Remove("steel_axe", 99);
             await KeyStroke(Key.Space);
             UIRequire(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
             await ToSignal(GetTree().CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
@@ -624,8 +631,8 @@ public partial class Game {
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(gatheringPosition) < 12);
             world.Player = gatheringPosition;
             // Far enough that the player has to keep walking after the button is released.
-            var looseOre = world.Add("loose_iron", gatheringPosition + new Vector2(2, 0), 2);
-            int oreBefore = world.S.Backpack["iron_ore"];
+            var looseOre = world.Add("loose_coal", gatheringPosition + new Vector2(2, 0), 2);
+            int oreBefore = world.S.Backpack["coal"];
             await Frames();
             point = view.Screen(looseOre.Pos) - new Vector2(0, 12) * view.Zoom;
             UIRequire(view.Pick(point)?.Id == looseOre.Id, "The loose ore fixture must be selectable.");
@@ -635,7 +642,7 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
             bool harvestAnimation = false;
             for (int i = 0; i < 120 && world.Find(looseOre.Id) != null; i++) { await Frames(); harvestAnimation |= view.PlayerAnimation == ActorAction.Gather; }
-            UIRequire(world.Find(looseOre.Id) == null && world.S.Backpack["iron_ore"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
+            UIRequire(world.Find(looseOre.Id) == null && world.S.Backpack["coal"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
             UIRequire(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
             await CheckCraftingAndTorch();
             await CheckCrateOverflow();

@@ -77,7 +77,7 @@ public static class MineChecks {
 
         // Workers take their tools from a tool station by the storage.
         var station = world.Add("toolstation", chest.Pos + cliff.Along * 2);
-        station.Inventory.Add("iron_pick", 1);
+        station.Inventory.Add("steel_pick", 1);
         float started = world.S.Time;
         Work(world, data.DaySeconds * 3, () => mine.Stage > 0);
         Require(mine.Stage == World.MineDug && world.S.Time - started >= world.MineStageSeconds && world.S.Time - started < data.DaySeconds * 2, $"one worker must dig the entrance in about one working day: stage {mine.Stage}, {world.S.Time - started:0}s, progress {mine.Progress:0}, {worker.Status}");
@@ -89,7 +89,7 @@ public static class MineChecks {
 
         Work(world, 30);
         Require(mine.Stage == World.MineSupplied && mine.Progress == 0 && worker.Status.Contains("hammer"), "fitting the frame must wait for a hammer");
-        Require(station.Inventory["iron_pick"] == 1, "a worker hauling materials needs no pickaxe and puts it back");
+        Require(station.Inventory["steel_pick"] == 1, "a worker hauling materials needs no pickaxe and puts it back");
         station.Inventory.Add("wood_hammer", 1);
         started = world.S.Time;
         Work(world, data.DaySeconds * 3, () => mine.Stage == World.MineOpen);
@@ -111,7 +111,7 @@ public static class MineChecks {
         var cliff = World.CliffAt(mine.Pos);
         var chest = world.Add("chest", mine.Pos + cliff.Face * 3);
         var crew = Enumerable.Range(0, 4).Select(_ => AddWorker(world, chest.Pos + cliff.Along)).ToList();
-        foreach (var w in crew) { w.Tool = "iron_pick"; world.Assign(w, mine); }
+        foreach (var w in crew) { w.Tool = "steel_pick"; world.Assign(w, mine); }
         Require(crew.Take(3).All(w => w.Assignment == mine.Id) && crew[3].Assignment == 0, "a mine must take three workers and refuse a fourth");
 
         Work(world, 20);
@@ -159,7 +159,7 @@ public static class MineChecks {
             if (mining) { source = MarkMine(world); source.Stage = World.MineOpen; } else source = world.Add("iron", World.MineSpot(cliff), 400);
             var chest = world.Add("chest", source.Pos + cliff.Face * 2.5f);
             var worker = AddWorker(world, chest.Pos);
-            worker.Tool = "iron_pick";
+            worker.Tool = "steel_pick";
             world.Assign(worker, source);
             Work(world, 300);
             return chest.Inventory["iron_ore"] + worker.Bag["iron_ore"] + (source.Output?["iron_ore"] ?? 0);

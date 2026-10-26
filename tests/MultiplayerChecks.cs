@@ -45,23 +45,23 @@ public static class MultiplayerChecks {
         var (world, guest, heard) = Hosted(data);
         Require(heard.Contains("A neighbor joined the settlement."), "everyone should hear that a guest joined");
         Require(guest.Backpack.Count == 0 && guest.Pos == World.Spawn && guest.Warp == 1, "a guest without a saved player should start with an empty backpack at the clearing");
-        var ore = world.Add("loose_iron", World.Spawn + new Vector2(5, 0), 2);
+        var lump = world.Add("loose_coal", World.Spawn + new Vector2(5, 0), 2);
         var chest = world.Add("chest", World.Spawn + new Vector2(5, 2));
-        int hostOre = world.S.Backpack["iron_ore"];
+        int hostCoal = world.S.Backpack["coal"];
         string? hostHeard = null; world.Notify = message => hostHeard = message;
 
-        world.Run(guest, new Command("pick_up", ore.Id, 0, "", 0, default));
-        Require(guest.Backpack["iron_ore"] == 0 && world.Find(ore.Id) != null, "the host should refuse a pick-up the guest cannot reach");
-        world.As(guest, () => world.MoveTo(ore.Pos + new Vector2(.5f, 0)));
-        world.Run(guest, new Command("pick_up", ore.Id, 0, "", 0, default));
-        Require(guest.Backpack["iron_ore"] == 2 && world.S.Backpack["iron_ore"] == hostOre && world.Find(ore.Id) == null, "a guest's pick-up should go into the guest's backpack only");
-        Require(heard.Contains($"+2 {data.Name("iron_ore")}.") && hostHeard == null, "what a guest's action says should reach the guest, not the host");
+        world.Run(guest, new Command("pick_up", lump.Id, 0, "", 0, default));
+        Require(guest.Backpack["coal"] == 0 && world.Find(lump.Id) != null, "the host should refuse a pick-up the guest cannot reach");
+        world.As(guest, () => world.MoveTo(lump.Pos + new Vector2(.5f, 0)));
+        world.Run(guest, new Command("pick_up", lump.Id, 0, "", 0, default));
+        Require(guest.Backpack["coal"] == 2 && world.S.Backpack["coal"] == hostCoal && world.Find(lump.Id) == null, "a guest's pick-up should go into the guest's backpack only");
+        Require(heard.Contains($"+2 {data.Name("coal")}.") && hostHeard == null, "what a guest's action says should reach the guest, not the host");
 
-        world.Run(guest, new Command("transfer", 0, chest.Id * World.BoxCodes + 1, "iron_ore", 99, default));
-        Require(chest.Inventory["iron_ore"] == 2 && guest.Backpack["iron_ore"] == 0, "a guest should store into a chest within reach");
+        world.Run(guest, new Command("transfer", 0, chest.Id * World.BoxCodes + 1, "coal", 99, default));
+        Require(chest.Inventory["coal"] == 2 && guest.Backpack["coal"] == 0, "a guest should store into a chest within reach");
         world.Player = chest.Pos + new Vector2(1, 0);
-        Require(world.Transfer(chest.Inventory, world.S.Backpack, "iron_ore", 99) == 2 && world.S.Backpack["iron_ore"] == hostOre + 2, "the host should take what a guest stored");
-        world.Run(guest, new Command("transfer", chest.Id * World.BoxCodes + 2, 0, "iron_ore", 99, default));
+        Require(world.Transfer(chest.Inventory, world.S.Backpack, "coal", 99) == 2 && world.S.Backpack["coal"] == hostCoal + 2, "the host should take what a guest stored");
+        world.Run(guest, new Command("transfer", chest.Id * World.BoxCodes + 2, 0, "coal", 99, default));
         world.Run(guest, new Command("hire", chest.Id, 0, "", 99, default));
         Require(guest.Backpack.Count == 0 && world.S.Workers.Count == 0, "commands naming boxes or offers that do not exist should do nothing");
 
@@ -98,7 +98,7 @@ public static class MultiplayerChecks {
     private static void CheckGuestGathersAndHammers(GameData data) {
         var (world, guest, _) = Hosted(data);
         var tree = world.Add("tree", World.Spawn + new Vector2(4, 0), 40);
-        guest.Backpack.Add("iron_axe", 1);
+        guest.Backpack.Add("steel_axe", 1);
         world.As(guest, () => world.MoveTo(tree.Pos + new Vector2(.8f, 0)));
         guest.GatherTarget = tree.Id;
         Tick(world, data.GatherSeconds * 2 + .5f);
@@ -106,14 +106,14 @@ public static class MultiplayerChecks {
         guest.GatherTarget = 0;
 
         var anvil = world.Add("anvil", World.Spawn + new Vector2(-6, 0));
-        world.SetRecipe(anvil, "iron_parts");
-        anvil.Inventory.Add("iron_bar", 1);
+        world.SetRecipe(anvil, "steel_parts");
+        anvil.Inventory.Add("steel_bar", 1);
         world.Player = World.Spawn + new Vector2(20, 0);
         Tick(world, 1);
         Require(!anvil.Processing, "an anvil nobody stands at should not start");
         world.As(guest, () => world.MoveTo(anvil.Pos + new Vector2(1, 0)));
-        Tick(world, data.Recipes["iron_parts"].Seconds + 1);
-        Require(anvil.Inventory["iron_parts"] == 1, "a guest standing at an anvil should hammer it");
+        Tick(world, data.Recipes["steel_parts"].Seconds + 1);
+        Require(anvil.Inventory["steel_parts"] == 1, "a guest standing at an anvil should hammer it");
     }
 
     private static void CheckEachPlayerHasTheirOwnPack(GameData data) {
@@ -122,11 +122,14 @@ public static class MultiplayerChecks {
         var far = Enumerable.Range(0, 63).Select(i => World.Spawn + Vector2.Right.Rotated(i * .1f) * 35).First(world.CanStand);
         world.As(guest, () => world.MoveTo(far));
         world.S.Time = data.DaySeconds * (data.NightStarts + .02f);
-        for (int i = 0; i < 4; i++) { world.Tick(.25f); world.S.Health = 100; guest.Health = 100; }
+        world.Tick(.25f);
+        Require(world.S.Wolves.Count > 0 && world.S.Wolves.All(w => world.S.Players.All(p => p.Pos.DistanceTo(w.Pos) > data.SightRadius - 1)),
+                "wolves should come out beyond every player's sight, never on screen");
+        for (int i = 0; i < 3; i++) { world.Tick(.25f); world.S.Health = 100; guest.Health = 100; }
         var hostPack = world.S.Wolves.Where(w => w.Target == world.Me.Id).ToList();
         var guestPack = world.S.Wolves.Where(w => w.Target == GuestId).ToList();
         Require(hostPack.Count > 0 && guestPack.Count > 0, "each player out at night should draw their own wolves");
-        Require(guestPack.All(w => w.Pos.DistanceTo(guest.Pos) < 13) && hostPack.All(w => w.Pos.DistanceTo(world.Player) < 13), "wolves should come out near the player they hunt");
+        Require(guestPack.All(w => w.Pos.DistanceTo(guest.Pos) < data.SightRadius + 8) && hostPack.All(w => w.Pos.DistanceTo(world.Player) < data.SightRadius + 8), "wolves should come out near the player they hunt");
 
         guest.Backpack.Add("stone", 2); guest.Health = -1;
         world.Tick(.25f);
