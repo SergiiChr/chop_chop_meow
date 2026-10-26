@@ -204,6 +204,8 @@ public partial class Game {
         UIRequire(hired!.Away > 0, "Fetching must send the assigned worker to the village.");
         await Click(Named("prices")!);
         UIRequire(!sheet.Visible && panel.OffsetLeft == PanelLeft, "The price sheet icon must close the sheet again.");
+        await Click(Named("prices")!); await Click(Named("sheet_close")!);
+        UIRequire(!sheet.Visible && panel.Visible, "The price sheet's close button must close it and leave the panel open.");
         world.S.Workers.Remove(hired); world.S.Orders.Clear(); world.S.Things.Remove(sign); world.S.Backpack.Remove(Inventory.Coins, 999);
         signpostTab = "market"; sheetOpen = true; ClosePanel(); await Frames();
     }
@@ -547,6 +549,9 @@ public partial class Game {
             await Click((Control)bag.FindChild("bag_close", true, false));
             Named("filters")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(!bag.Visible && panel.Visible, "The backpack drawer's close button must hide it while the building's page stays open and refreshes.");
+            Named("filters")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            await Click(Named("filters_close")!);
+            UIRequire(!filterOpen && panel.Visible, "The filter window's close button must close it and leave the panel open.");
             await KeyStroke(Key.Tab);
             UIRequire(page == "inventory" && bag.Visible && FindButton(panel, "Assign hotbar slots") == null, "Tab must open the backpack drawer, with no separate hotbar assignment.");
             await KeyStroke(Key.B);

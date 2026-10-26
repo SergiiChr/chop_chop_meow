@@ -144,6 +144,7 @@ public partial class Game {
         fetch.AddThemeConstantOverride("icon_max_width", 18); var fetchLook = Style.Pill(Style.Enamel); Style.Skin(fetch, fetchLook.Item1, fetchLook.Item2);
         fetch.Pressed += () => { Act(() => world.FetchPrices(sign)); RefreshLive(); };
         top.AddChild(fetch);
+        top.AddChild(HeaderButton("close", "Close the price sheet", () => { sheetOpen = false; OpenPage("inspect"); }, Style.CloseRound, "sheet_close"));
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(fetch)) return;
             string? blocked = world.FetchBlock(sign);

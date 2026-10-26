@@ -200,9 +200,10 @@ public partial class Game : Node {
         var label = new VBoxContainer { CustomMinimumSize = new Vector2(40, 0) }; label.AddThemeConstantOverride("separation", 4); drawer.AddChild(label);
         label.AddChild(Style.Glyph("line_bag", 30, Style.Rim));
         bagFill = Style.Text("", 13, Style.Beige); bagFill.HorizontalAlignment = HorizontalAlignment.Center; label.AddChild(bagFill);
-        var hide = HeaderButton("close", "Hide the backpack", () => { bagHidden = true; bag.Visible = false; }, Style.CloseRound, "bag_close");
-        hide.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter; hide.SizeFlagsVertical = Control.SizeFlags.ShrinkEnd | Control.SizeFlags.Expand; label.AddChild(hide);
         bagContent = new VBoxContainer(); drawer.AddChild(bagContent);
+        // Every closable window keeps its close button in its top right corner.
+        var hide = HeaderButton("close", "Hide the backpack", () => { bagHidden = true; bag.Visible = false; }, Style.CloseRound, "bag_close");
+        hide.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin; drawer.AddChild(hide);
         deathLabel = Outlined(Label("", 26)); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
         // Raised above the centred player so a downed body stays visible under the message.
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
