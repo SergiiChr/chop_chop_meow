@@ -158,7 +158,7 @@ public sealed partial class World {
                 if (mineFullReported.Add(mine.Id)) Say($"The {MineName(mine)} is full with no output available.");
             } else if (FirstFreeHands(crew) == w) {
                 w.Status = Phrase("Bringing out ", Data.Name(full));
-                if (Walk(w, MineDoor(mine), dt, .5f)) { w.Bag.StackSize = mine.Output.StackSize; mine.Output.TransferTo(w.Bag, full, mine.Output.StackSize); w.Destination = dest.Id; }
+                if (Walk(w, MineDoor(mine), dt, .5f)) { w.Hands(mine.Output.StackSize); mine.Output.TransferTo(w.Bag, full, mine.Output.StackSize); w.Destination = dest.Id; }
                 return true;
             } else w.Status = "Waiting · the mine output is full";
         } else {

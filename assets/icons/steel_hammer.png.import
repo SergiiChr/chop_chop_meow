@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ba1hmkd1wt23p"
-path="res://.godot/imported/stone_chisel.svg-650b9108f19b1c3f3dcf045e57254ee4.ctex"
+uid="uid://dtsyel8lnqity"
+path="res://.godot/imported/steel_hammer.png-d9a77f3a103066881a5ba67cd54f39c9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/stone_chisel.svg"
-dest_files=["res://.godot/imported/stone_chisel.svg-650b9108f19b1c3f3dcf045e57254ee4.ctex"]
+source_file="res://assets/icons/steel_hammer.png"
+dest_files=["res://.godot/imported/steel_hammer.png-d9a77f3a103066881a5ba67cd54f39c9.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

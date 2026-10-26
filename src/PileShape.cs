@@ -13,14 +13,15 @@ internal static class PileShape {
 
     private static readonly Dictionary<string, Mesh> contents = new();
 
-    private static readonly string[] families = { "logs", "stone", "ore", "coal", "planks", "bars", "fallback" };
+    private static readonly string[] families = { "logs", "stone", "ore", "coal", "planks", "parts", "bars", "fallback" };
 
     private static string Family(string item) => item switch {
         "wood" => "logs",
         "stone" => "stone",
         "iron_ore" or "tin_ore" => "ore",
         "coal" => "coal",
-        "planks" or "wood_parts" => "planks",
+        "planks" => "planks",
+        "wood_parts" => "parts",
         "iron_bar" or "steel_bar" or "tin_bar" => "bars",
         _ => "fallback"
     };
@@ -106,6 +107,23 @@ internal static class PileShape {
                 foreach (float x in new[] { -.075f, .075f }) {
                     var log = ModelKit.Cylinder(source, .11f, .11f, .9f, new(x * 1.5f, 0, 0), ModelKit.Mat("8a5f3c"), new Vector3(90, 0, 0), 7);
                     CopyLog(log.Mesh, log.Transform);
+                }
+            } else if (family == "parts") {
+                // A long tool handle with a knob, a thick grip and two pointed pegs, lying side by side.
+                var wood = ModelKit.Mat("b98552");
+                var turned = new Vector3(0, 0, 90);
+                var shapes = new[] {
+                    ModelKit.Cylinder(source, .03f, .038f, .6f, new(0, .038f, -.2f), wood, turned, 8),
+                    ModelKit.Cylinder(source, .05f, .05f, .05f, new(-.32f, .05f, -.2f), wood, turned, 8),
+                    ModelKit.Cylinder(source, .055f, .055f, .22f, new(-.1f, .055f, .02f), wood, turned, 8),
+                    ModelKit.Cylinder(source, .045f, .045f, .03f, new(.025f, .045f, .02f), wood, turned, 8),
+                    ModelKit.Cylinder(source, .045f, .045f, .03f, new(-.225f, .045f, .02f), wood, turned, 8),
+                };
+                foreach (var shape in shapes) Copy(shape.Mesh, shape.Transform);
+                foreach (float z in new[] { .19f, .29f }) {
+                    var peg = ModelKit.Cylinder(source, .028f, .028f, .2f, new(.05f, .028f, z), wood, turned, 8);
+                    var point = ModelKit.Cylinder(source, .028f, .004f, .06f, new(.18f, .028f, z), wood, new Vector3(0, 0, -90), 8);
+                    Copy(peg.Mesh, peg.Transform); Copy(point.Mesh, point.Transform);
                 }
             } else
                 for (int i = 0; i < 3; i++) {
