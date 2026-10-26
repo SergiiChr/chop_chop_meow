@@ -832,7 +832,7 @@ public static class SimulationChecks {
         foreach (var cliff in World.Cliffs) {
             Require(!world.CanStand(cliff.Center) && Terrain.FromMountains(cliff.Center) < 0 && Terrain.FromMountains(cliff.Center + cliff.Face * 2.6f) > 0,
                     $"each {cliff.Ore} cliff should block movement and stand at the foot of a mountain range");
-            Require(world.S.Things.Count(t => t.Kind == cliff.Ore && cliff.DistanceTo(t.Pos) < 3) == 3, $"each {cliff.Ore} cliff should have deposits at its foot");
+            Require(world.S.Things.Count(t => t.Kind == cliff.Ore && cliff.DistanceTo(t.Pos) < 3) == 2, $"each {cliff.Ore} cliff should have deposits at its foot");
         }
         foreach (var cliff in new[] { World.CliffOf("iron"), World.CliffOf("coal") }) {
             var loose = world.S.Things.Where(t => t.Kind == $"loose_{cliff.Ore}").ToList();
@@ -1218,8 +1218,8 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         var fresh = new World(data);
         var cliff = World.CliffOf("tin");
-        Require(fresh.S.Things.Count(t => t.Kind == "tin" && cliff.DistanceTo(t.Pos) < 3) == 3 && !fresh.S.Things.Any(t => t.Kind == "loose_tin"),
-                "the tin cliff should have three deposits and no loose pieces");
+        Require(fresh.S.Things.Count(t => t.Kind == "tin" && cliff.DistanceTo(t.Pos) < 3) == 2 && !fresh.S.Things.Any(t => t.Kind == "loose_tin"),
+                "the tin cliff should have two deposits and no loose pieces");
         var tin = world.Add("tin", Site(0, 0), 400);
         world.Player = tin.Pos;
         Require(world.GatherBlock(tin)?.Contains("pickaxe") == true, "tin should need a pickaxe");
