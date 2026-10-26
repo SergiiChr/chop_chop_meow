@@ -477,11 +477,7 @@ public static class WorldModels {
 
     /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>
     private static void LeafLitter(Node3D body, int id) {
-        string[] colors = { "c08a3a", "a8652c", "d0a347", "8e5a2a", "b8753a" };
-        for (int i = 0; i < 26; i++) {
-            float angle = i * 2.4f + Jitter(id, 80 + i) * 2, r = .15f + Jitter(id, 110 + i) * .55f;
-            Box(body, new Vector3(.16f, .012f, .1f), new Vector3(MathF.Cos(angle) * r, .01f + i * .002f, MathF.Sin(angle) * r), Mat(colors[i % colors.Length], .95f), new Vector3(Jitter(id, 140 + i) * 12, Jitter(id, 170 + i) * 360, 0));
-        }
+        Add(body, LeafShape.For(id), NatureShape.Natural, Vector3.Zero);
     }
 
     /// <summary>Anvil bolted to a welded square-tube stand.</summary>
