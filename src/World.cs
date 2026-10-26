@@ -127,8 +127,8 @@ public sealed class SaveState {
     [JsonIgnore] public List<PlayerState> Players { get; set; }
     [JsonIgnore] public PlayerState Actor { get; set; }
     public SaveState() { Players = new() { new PlayerState() }; Actor = Players[0]; }
-    /// <summary>4 is the valley map; earlier versions come from smaller maps and are refused.</summary>
-    public int Version { get; set; } = 4;
+    /// <summary>5 aligns mine entrances with their cliff faces; version 4 saves migrate on load.</summary>
+    public int Version { get; set; } = 5;
     public List<Thing> Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -282,7 +282,8 @@ public sealed partial class World {
         S.Backpack.Add("steel_axe", 1); S.Backpack.Add("berries", 10); S.Backpack.Add("wood", 6);
         var rng = new Random(4271);
         foreach (var cliff in Cliffs) {
-            foreach (float along in new[] { -2.8f, 0, 2.8f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, 400);
+            // Two deposits flank the mine's mouth in the middle of the cliff, holding what three did before.
+            foreach (float along in new[] { -3.5f, 3.5f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, 600);
             if (cliff != CliffOf(cliff.Ore) || cliff.Ore != "coal") continue;
             // Loose coal rolls well out past the deposits of the nearer coal cliff, so collecting it takes a search.
             // Iron has no loose pieces: the first pickaxe is bought with berry money.
@@ -1589,7 +1590,7 @@ public sealed partial class World {
         json = json.Replace("\"iron_axe\"", "\"steel_axe\"").Replace("\"iron_pick\"", "\"steel_pick\"").Replace("\"iron_hammer\"", "\"steel_hammer\"").Replace("\"iron_parts\"", "\"steel_parts\"");
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version < 4) throw new InvalidOperationException("This save is from an older, smaller map and cannot be loaded. Start a new game.");
-        if (loaded.Version != 4 || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Version is not (4 or 5) || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
         // Edited or older saves may hold missing, extra or unknown hotbar entries.
         var slots = loaded.HotbarSlots ?? new();
         loaded.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.Buildings.ContainsKey(id)) ? id : "").ToList();
@@ -1604,6 +1605,7 @@ public sealed partial class World {
         // Saves from before the fog start unexplored.
         if (loaded.Explored?.Length != MapSize * MapSize) loaded.Explored = new byte[MapSize * MapSize];
         loaded.Remembered ??= new();
+        if (loaded.Version == 4) AlignMines(loaded);
         // Loose iron left the game too.
         loaded.Things.RemoveAll(t => t.Kind == "loose_iron");
         foreach (var id in loaded.Remembered.Where(p => p.Value.Kind == "loose_iron").Select(p => p.Key).ToList()) loaded.Remembered.Remove(id);

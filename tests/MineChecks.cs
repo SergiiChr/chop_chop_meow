@@ -9,6 +9,7 @@ public static class MineChecks {
     private const float Step = .25f;
 
     public static void Run(GameData data) {
+        CheckAlignmentAndLegacySave(data);
         CheckMarking(data);
         CheckConstruction(data);
         CheckMiningAndFullOutput(data);
@@ -46,6 +47,44 @@ public static class MineChecks {
         var cliff = World.CliffOf(ore);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
         return world.Build("mine", World.MineSpot(cliff) + cliff.Along + cliff.Face) ?? throw new InvalidOperationException($"Mine check failed: a mine should be marked at the {ore} cliff");
+    }
+
+    private static void CheckAlignmentAndLegacySave(GameData data) {
+        var world = EmptyWorld(data); var expected = new Dictionary<int, Vector2>();
+        foreach (var cliff in World.Cliffs) {
+            Require(World.CliffAt(World.MineSpot(cliff)) == cliff, "each aligned site must belong to its own cliff");
+            var marking = EmptyWorld(data); marking.Player = World.MineSpot(cliff) + cliff.Face * 3;
+            Require(marking.Build("mine", World.MineSpot(cliff) + cliff.Along + cliff.Face)?.Pos == World.MineSpot(cliff), "every aligned site must remain markable and snap correctly");
+            var outward = World.MineOut(cliff);
+            var basis = Basis.FromEuler(WorldModels.MineYaw(World.MineSpot(cliff)));
+            var renderedOut = basis * Vector3.Back;
+            var renderedHeader = basis * Vector3.Right;
+            Require(outward.Dot(cliff.Face) > .999f && Math.Abs(outward.Dot(cliff.Along)) < .001f,
+                "a mine must face outward from its own cliff rather than a common camera direction");
+            Require(new Vector2(renderedOut.X, renderedOut.Z).Dot(outward) > .999f && Math.Abs(new Vector2(renderedHeader.X, renderedHeader.Z).Dot(cliff.Along)) > .999f,
+                "the rendered portal must follow the cliff and its rails must face out from it");
+            var oldAlong = cliff.Along * Math.Sign(cliff.Along.Dot(Terrain.Seaward));
+            var end = cliff.Center + oldAlong * (cliff.HalfLength + 6.7f);
+            var oldSpot = end + cliff.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
+            Require(World.MineSpot(cliff).IsEqualApprox(cliff.Center + cliff.Face * 4.2f), "each new entrance must project directly from its cliff center");
+            var mine = world.Add("mine", oldSpot); expected[mine.Id] = World.MineSpot(cliff); mine.Stage = World.MineOpen; mine.Progress = 2;
+            mine.Inventory.Add("wood", 7); mine.Output!.Add(World.MineOre(mine), 12);
+            world.S.Remembered[mine.Id] = new Thing { Id = mine.Id, Kind = "mine", Pos = oldSpot, Stage = World.MineOpen };
+            var worker = AddWorker(world, oldSpot + cliff.Face * 3); worker.Assignment = mine.Id;
+        }
+        world.S.Version = 4;
+        var loaded = EmptyWorld(data); loaded.Deserialize(world.Serialize());
+        Require(loaded.S.Version == 5, "version 4 valley saves must upgrade to the current mine layout");
+        foreach (var mine in loaded.S.Things.Where(t => t.Kind == "mine")) {
+            Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
+                "saved mines and their fog memories must use the aligned site");
+            Require(mine.Stage == World.MineOpen && mine.Progress == 2 && mine.Inventory["wood"] == 7 && mine.Output![World.MineOre(mine)] == 12 && loaded.S.Workers.Any(w => w.Assignment == mine.Id),
+                "aligning an older mine must preserve construction, stock, output and assigned workers");
+        }
+        Require(loaded.S.Things.Where(t => t.Kind == "mine").Select(t => t.Pos).Distinct().Count() == World.Cliffs.Length, "migrating all cliffs must keep distinct mine sites");
+        var restored = EmptyWorld(data); restored.Deserialize(loaded.Serialize());
+        Require(restored.S.Things.Where(t => t.Kind == "mine").All(m => m.Pos.IsEqualApprox(loaded.Find(m.Id)!.Pos)),
+            "loading an aligned save must not move its mines again");
     }
 
     private static void CheckMarking(GameData data) {

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 using static ChopChopMeow.ModelKit;
 
@@ -85,7 +86,7 @@ public static class WorldModels {
         "leaves" => new[] { new Hit(.6f, 0, .15f) },
         "grave" => new[] { new Hit(.45f, 0, .55f) },
         "anvil" => new[] { new Hit(.45f, 0, .85f) },
-        "signpost" => new[] { new Hit(.5f, 0, 1.9f) },
+        "signpost" => new[] { new Hit(1.02f, 0, 1.98f) },
         "campfire" => new[] { new Hit(.55f, 0, .7f) },
         "mine" => new[] { new Hit(.9f, 0, 1.8f) },
         _ => new[] { new Hit(.5f, 0, .8f) },
@@ -325,25 +326,11 @@ public static class WorldModels {
         prop.Lid = lid;
     }
 
-    /// <summary>A slatted wood crate with darker corner battens and a slatted lid.</summary>
+    /// <summary>A hollow slatted crate with a separately hinged lid and shared wood geometry.</summary>
     private static void Crate(Prop prop) {
-        var body = prop.Body;
-        var size = new Vector3(.6f, .42f, .46f);
-        var board = Mat("c9a46e"); var batten = Mat("8f6a3f"); var gap = Mat("4a3420");
-        Box(body, size - new Vector3(.02f, .02f, .02f), new Vector3(0, size.Y / 2, 0), gap);
-        // Three slats a side leave dark gaps between them.
-        for (int i = 0; i < 3; i++) {
-            float y = .07f + i * .14f;
-            Box(body, new Vector3(size.X, .11f, .02f), new Vector3(0, y, size.Z / 2), board);
-            Box(body, new Vector3(size.X, .11f, .02f), new Vector3(0, y, -size.Z / 2), board);
-            Box(body, new Vector3(.02f, .11f, size.Z), new Vector3(size.X / 2, y, 0), board);
-            Box(body, new Vector3(.02f, .11f, size.Z), new Vector3(-size.X / 2, y, 0), board);
-        }
-        foreach (var (x, z) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) }) Box(body, new Vector3(.05f, size.Y, .05f), new Vector3(x * (size.X / 2 - .01f), size.Y / 2, z * (size.Z / 2 - .01f)), batten);
-        var lid = Pivot(body, new Vector3(0, size.Y, -size.Z / 2));
-        for (int i = 0; i < 3; i++) Box(lid, new Vector3(size.X + .03f, .035f, size.Z / 3 - .015f), new Vector3(0, .018f, size.Z / 6 + i * size.Z / 3), board);
-        Box(lid, new Vector3(.05f, .045f, size.Z + .02f), new Vector3(size.X / 2 - .05f, .03f, size.Z / 2), batten);
-        Box(lid, new Vector3(.05f, .045f, size.Z + .02f), new Vector3(-size.X / 2 + .05f, .03f, size.Z / 2), batten);
+        Add(prop.Body, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
+        var lid = Pivot(prop.Body, new Vector3(0, .42f, -.23f));
+        Add(lid, CrateShape.Lid, CrateShape.Timber, Vector3.Zero);
         prop.Lid = lid;
     }
 
@@ -367,28 +354,13 @@ public static class WorldModels {
     /// <summary>A stone firebox under a steel grill with a stew pot, beside a plank counter where the slotted mortar and pestle sits.</summary>
     private static void CookingTable(Prop prop) {
         var body = prop.Body;
-        var stone = Mat("9b9c98", .95f); var joint = Mat("7b7c78", 1); var plank = Mat("d2a26a"); var post = Mat("8a6a48");
-        var steel = Mat("b9c3c6", .4f, .3f); var dark = Mat("45494c", .5f, .6f);
-        Box(body, new Vector3(.62f, .6f, .62f), new Vector3(-.33f, .3f, 0), stone);
-        for (int row = 1; row < 3; row++) {
-            Box(body, new Vector3(.63f, .015f, .01f), new Vector3(-.33f, row * .2f, .311f), joint);
-            Box(body, new Vector3(.01f, .015f, .63f), new Vector3(-.019f, row * .2f, 0), joint);
-        }
-        Box(body, new Vector3(.32f, .24f, .03f), new Vector3(-.33f, .17f, .31f), Mat("2b2522"));
-        prop.Glow = Box(body, new Vector3(.26f, .18f, .03f), new Vector3(-.33f, .14f, .315f), Flat(new Color("ff7a24")));
-        // The grill: a steel rim with bars across it, raised a little off the firebox.
-        foreach (float z in new[] { -.3f, .3f }) Box(body, new Vector3(.66f, .04f, .04f), new Vector3(-.33f, .63f, z), steel);
-        foreach (float x in new[] { -.64f, -.02f }) Box(body, new Vector3(.04f, .04f, .64f), new Vector3(x, .63f, 0), steel);
-        for (int i = 0; i < 7; i++) Box(body, new Vector3(.02f, .02f, .58f), new Vector3(-.57f + i * .08f, .64f, 0), steel);
-        Cylinder(body, .15f, .16f, .16f, new Vector3(-.36f, .73f, -.04f), dark, null, 14);
-        Cylinder(body, .02f, .02f, .2f, new Vector3(-.15f, .78f, -.04f), dark, new Vector3(0, 0, 90), 6);
-        Post(body, .07f, .07f, .75f, new Vector3(-.56f, .6f, -.24f), dark);
+        Add(body, CookShape.Masonry, CookShape.Stone, Vector3.Zero);
+        Add(body, CookShape.Timber, CookShape.Wood, Vector3.Zero);
+        Add(body, CookShape.Metal, CookShape.Steel, Vector3.Zero);
+        prop.Glow = Add(body, CookShape.Fire, CookShape.Flame, Vector3.Zero);
         prop.Vent = new Vector3(-.56f, 1.4f, -.24f);
-        foreach (var (x, z) in new[] { (.06f, -.24f), (.6f, -.24f), (.06f, .24f), (.6f, .24f) }) Box(body, new Vector3(.06f, .6f, .06f), new Vector3(x, .3f, z), post);
-        Box(body, new Vector3(.64f, .05f, .6f), new Vector3(.33f, .62f, 0), plank);
         var mortar = Pivot(body, new Vector3(.36f, .645f, .06f));
-        Cylinder(mortar, .07f, .1f, .1f, new Vector3(0, .05f, 0), Mat("9aa29f", .9f), null, 12);
-        Cylinder(mortar, .025f, .02f, .2f, new Vector3(.03f, .14f, 0), Mat("c4c8c3", .9f), new Vector3(0, 0, -25), 8);
+        Add(mortar, CookShape.Mortar, CookShape.Ceramic, Vector3.Zero);
         prop.Mortar = mortar;
         prop.Light = Light(body, new Vector3(-.33f, .3f, .6f), 2.2f);
     }
@@ -396,22 +368,12 @@ public static class WorldModels {
     /// <summary>A steel stove with a lidded canning pot, beside a plank table with tin cans and a lever press.</summary>
     private static void Cannery(Prop prop) {
         var body = prop.Body;
-        var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var steel = Mat("b9c3c6", .4f, .3f); var dark = Mat("45494c", .5f, .6f); var tin = Mat("d4d9d6", .35f, .4f);
-        Box(body, new Vector3(.46f, .5f, .5f), new Vector3(-.27f, .25f, 0), dark);
-        Box(body, new Vector3(.24f, .18f, .03f), new Vector3(-.27f, .16f, .25f), Mat("2b2522"));
-        prop.Glow = Box(body, new Vector3(.2f, .14f, .03f), new Vector3(-.27f, .14f, .255f), Flat(new Color("ff7a24")));
-        Cylinder(body, .2f, .2f, .34f, new Vector3(-.27f, .67f, 0), steel, null, 16);
-        Cylinder(body, .21f, .21f, .03f, new Vector3(-.27f, .85f, 0), dark, null, 16);
-        Post(body, .03f, .03f, .06f, new Vector3(-.27f, .86f, 0), dark, 8);
-        Post(body, .06f, .06f, .55f, new Vector3(-.44f, .5f, -.18f), dark);
+        Add(body, CanneryShape.Stove, CanneryShape.Iron, Vector3.Zero);
+        Add(body, CanneryShape.Timber, CanneryShape.Wood, Vector3.Zero);
+        Add(body, CanneryShape.Pot, CanneryShape.Steel, Vector3.Zero);
+        Add(body, CanneryShape.Press, CanneryShape.Steel, Vector3.Zero);
+        prop.Glow = Add(body, CanneryShape.Fire, CanneryShape.Flame, Vector3.Zero);
         prop.Vent = new Vector3(-.44f, 1.1f, -.18f);
-        foreach (var (x, z) in new[] { (.02f, -.22f), (.5f, -.22f), (.02f, .22f), (.5f, .22f) }) Box(body, new Vector3(.06f, .56f, .06f), new Vector3(x, .28f, z), post);
-        Box(body, new Vector3(.56f, .05f, .54f), new Vector3(.26f, .58f, 0), plank);
-        foreach (var (x, z, y) in new[] { (.14f, .12f, 0f), (.26f, .14f, 0f), (.2f, .13f, .12f), (.36f, .02f, 0f) })
-            Cylinder(body, .05f, .05f, .11f, new Vector3(x, .66f + y, z), tin, null, 10);
-        Box(body, new Vector3(.14f, .03f, .14f), new Vector3(.38f, .62f, -.14f), steel);
-        Post(body, .025f, .025f, .4f, new Vector3(.44f, .6f, -.18f), steel, 8);
-        Box(body, new Vector3(.3f, .03f, .03f), new Vector3(.32f, .98f, -.16f), steel, new Vector3(0, 0, -15));
         prop.Light = Light(body, new Vector3(-.27f, .25f, .55f), 2f);
     }
 
@@ -419,79 +381,56 @@ public static class WorldModels {
     private static void ToolRack(Prop prop) {
         // Turned to face down the valley, toward the camera, so the hanging tools show.
         var body = Pivot(prop.Body, Vector3.Zero, new Vector3(0, 45, 0));
-        var plank = Mat("d2a26a"); var post = Mat("8a6a48"); var block = Mat("9a9d99", .95f); var handle = Mat("e0b07a"); var steel = Mat("b9c3c6", .4f, .3f);
-        Box(body, new Vector3(1.1f, .22f, .36f), new Vector3(0, .11f, 0), block);
-        foreach (float x in new[] { -.48f, .48f }) Box(body, new Vector3(.1f, 1.45f, .1f), new Vector3(x, .9f, 0), post);
-        Box(body, new Vector3(1.05f, .9f, .04f), new Vector3(0, 1.0f, -.03f), plank);
-        Box(body, new Vector3(1.15f, .06f, .2f), new Vector3(0, 1.5f, 0), post);
-        foreach (float x in new[] { -.3f, 0, .3f }) Box(body, new Vector3(.03f, .03f, .1f), new Vector3(x, 1.32f, .05f), post);
-        // Each tool hangs from its peg by the head, handle down along the board.
-        Node3D Hang(float x) {
+        Add(body, RackShape.Feet, RackShape.Concrete, Vector3.Zero);
+        Add(body, RackShape.Frame, RackShape.Timber, Vector3.Zero);
+        Node3D Hang(float x, Mesh mesh) {
             var hook = Pivot(body, new Vector3(x, 1.3f, .06f));
-            Box(hook, new Vector3(.04f, .72f, .04f), new Vector3(0, -.36f, 0), handle);
+            Add(hook, mesh, RackShape.Tool, Vector3.Zero);
             return hook;
         }
-        var axe = Hang(-.3f); Box(axe, new Vector3(.22f, .12f, .03f), new Vector3(.08f, -.04f, 0), steel);
-        var pick = Hang(0); Box(pick, new Vector3(.38f, .05f, .04f), new Vector3(0, -.02f, 0), steel, new Vector3(0, 0, 8));
-        var rake = Hang(.3f);
-        Box(rake, new Vector3(.3f, .04f, .04f), new Vector3(0, -.74f, 0), steel);
-        for (int i = 0; i < 5; i++) Box(rake, new Vector3(.015f, .12f, .015f), new Vector3(-.12f + i * .06f, -.82f, 0), steel);
-        prop.Racked = new() { ["axe"] = axe, ["pickaxe"] = pick, ["rake"] = rake };
+        prop.Racked = new() { ["axe"] = Hang(-.3f, RackShape.Axe), ["pickaxe"] = Hang(0, RackShape.Pick), ["rake"] = Hang(.3f, RackShape.Rake) };
     }
 
     /// <summary>A 3×3 yard of packed earth edged with logs, with fourteen stack blocks in a 9-4-1 pyramid that the view shows as the pile fills.</summary>
     private static void Pile(Prop prop) {
         var body = prop.Body;
-        Yard(body);
+        Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
         var stacks = new List<MeshInstance3D>();
         foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
             for (int x = 0; x < count; x++)
                 for (int z = 0; z < count; z++) {
                     float step = .82f, offset = (count - 1) * step / 2;
-                    var block = Box(body, new Vector3(.74f, .4f, .74f), new Vector3(x * step - offset, y, z * step - offset), Mat("b0a58a"));
+                    var block = Add(body, PileShape.Stack, Mat("b0a58a", .95f), new Vector3(x * step - offset, y, z * step - offset));
                     block.Visible = false; stacks.Add(block);
                 }
         prop.Stacks = stacks.ToArray();
     }
 
-    /// <summary>A pile's and a farm plot's base: a bare dirt pad edged with logs.</summary>
-    private static void Yard(Node3D body) {
-        Box(body, new Vector3(2.9f, .02f, 2.9f), new Vector3(0, .01f, 0), Mat("7a6548", 1));
-        var log = Mat("8a6a48");
-        foreach (float s in new[] { -1.42f, 1.42f }) {
-            Cylinder(body, .09f, .09f, 2.9f, new Vector3(s, .09f, 0), log, new Vector3(90, 0, 0), 6);
-            Cylinder(body, .09f, .09f, 2.9f, new Vector3(0, .09f, s), log, new Vector3(0, 0, 90), 6);
+    /// <summary>Refresh only visible inventory memory; the view guards this call with the existing sight check.</summary>
+    public static void SyncPile(Prop prop, Thing t, GameData data) {
+        var stacks = t.Inventory.Stacks().Select(s => s.Item).ToList();
+        string key = string.Join(",", stacks);
+        if (key == prop.StackKey) return;
+        prop.StackKey = key;
+        for (int i = 0; i < prop.Stacks.Length; i++) {
+            prop.Stacks[i].Visible = i < stacks.Count;
+            if (i < stacks.Count) PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : PileShape.Fallback);
         }
     }
 
     /// <summary>A farm plot: an empty pile's yard that, once sown, shows dark tilled rows and then the wheat growing on them.</summary>
     private static void Farm(Prop prop, int id) {
         var body = prop.Body;
-        Yard(body);
+        Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
+        int variant = id % 3;
         var soil = Pivot(body, Vector3.Zero);
-        Box(soil, new Vector3(2.7f, .03f, 2.7f), new Vector3(0, .025f, 0), Mat("4f3a28", 1));
-        for (int row = 0; row < 5; row++) Box(soil, new Vector3(2.6f, .06f, .22f), new Vector3(0, .05f, -1.08f + row * .54f), Mat("5e4630", 1));
-        // Each look is a full field of plants on the rows, shifted a little at random so the field is not a perfect grid.
-        Node3D Field(Action<Node3D, Vector3, int> plant) {
+        Add(soil, FarmShape.Soil, FarmShape.Earth, Vector3.Zero);
+        Node3D Field(int stage) {
             var field = Pivot(body, Vector3.Zero);
-            for (int row = 0; row < 5; row++)
-                for (int i = 0; i < 7; i++) {
-                    int n = row * 7 + i;
-                    plant(field, new Vector3(-1.14f + i * .38f + (Jitter(id, n) - .5f) * .1f, .08f, -1.08f + row * .54f), n);
-                }
+            Add(field, FarmShape.Crop(stage, variant), FarmShape.Foliage, Vector3.Zero);
             return field;
         }
-        var sprout = Mat("7fae45"); var leaf = Mat("4f8a34"); var straw = Mat("d6b354"); var ear = Mat("e2c25b");
-        var straws = Field((f, at, n) => { for (int k = -1; k <= 1; k += 2) Box(f, new Vector3(.02f, .16f, .02f), at + new Vector3(k * .03f, .08f, 0), sprout, new Vector3(0, n * 37, k * 12)); });
-        var plants = Field((f, at, n) => { for (int k = -1; k <= 1; k++) Box(f, new Vector3(.03f, .5f, .03f), at + new Vector3(k * .05f, .25f, 0), leaf, new Vector3(0, n * 37, k * 14)); });
-        var wheat = Field((f, at, n) => {
-            for (int k = -1; k <= 1; k++) {
-                var stalk = Pivot(f, at, new Vector3(0, n * 37, k * 10));
-                Box(stalk, new Vector3(.025f, .7f, .025f), new Vector3(0, .35f, 0), straw);
-                Box(stalk, new Vector3(.06f, .18f, .06f), new Vector3(0, .78f, 0), ear);
-            }
-        });
-        prop.Crops = new[] { soil, straws, plants, wheat };
+        prop.Crops = new[] { soil, Field(0), Field(1), Field(2) };
         foreach (var crop in prop.Crops) crop.Visible = false;
     }
 
@@ -515,20 +454,30 @@ public static class WorldModels {
         prop.Vent = new Vector3(0, .86f, 0);
     }
 
-    /// <summary>A 4x4 post with a painted market sign and a mailbox whose flag rises while an order is out.</summary>
+    /// <summary>A village market post with a mailbox, framed chalkboard and shipping storage.</summary>
     private static void Signpost(Prop prop) {
         var body = prop.Body;
-        Box(body, new Vector3(.12f, 1.95f, .12f), new Vector3(0, .975f, 0), Mat("8a6a48"));
-        Box(body, new Vector3(.95f, .42f, .04f), new Vector3(.3f, 1.55f, .08f), Mat("2f5d4a", .7f));
-        Box(body, new Vector3(.55f, .08f, .01f), new Vector3(.25f, 1.55f, .105f), Mat("f2efe6", .6f));
-        Cylinder(body, .1f, 0, .16f, new Vector3(.6f, 1.55f, .105f), Mat("f2efe6", .6f), new Vector3(0, 0, -90), 3);
-        Box(body, new Vector3(.45f, .04f, .06f), new Vector3(-.2f, .95f, 0), Mat("8a6a48"));
-        Box(body, new Vector3(.24f, .22f, .38f), new Vector3(-.36f, 1.08f, 0), Mat("2b2d30", .5f, .5f));
+        Add(body, SignpostShape.Timber, SignpostShape.Wood, Vector3.Zero);
+        Add(body, SignpostShape.Mailbox, SignpostShape.Steel, Vector3.Zero);
         var flag = Pivot(body, new Vector3(-.49f, 1.0f, .1f));
-        Box(flag, new Vector3(.02f, .2f, .04f), new Vector3(0, .1f, 0), Mat("c62828", .5f));
-        Box(flag, new Vector3(.02f, .06f, .1f), new Vector3(0, .18f, .05f), Mat("c62828", .5f));
+        Add(flag, SignpostShape.Flag, SignpostShape.Steel, Vector3.Zero);
         prop.Flag = flag;
-        Box(body, new Vector3(.3f, .06f, .3f), new Vector3(0, .03f, 0), Mat("9a9b97"));
+        var crate = Pivot(body, new Vector3(-.63f, .07f, .02f));
+        Add(crate, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
+        Add(crate, CrateShape.Lid, CrateShape.Timber, new Vector3(0, .42f, -.23f));
+        var openCrate = Pivot(body, new Vector3(-.61f, .55f, -.015f), new Vector3(0, -8, 0));
+        openCrate.Scale = Vector3.One * .72f;
+        Add(openCrate, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
+        body.AddChild(new Label3D {
+            Text = "PRICES\n$  -  $$\n$$ - $$$\n$  -  $$",
+            Position = new Vector3(.43f, .9f, .112f),
+            FontSize = 40,
+            PixelSize = .0017f,
+            Modulate = new Color("e2e5cf"),
+            OutlineSize = 0,
+            NoDepthTest = false,
+            Shaded = true
+        });
     }
 
     /// <summary>Fire pit made from an old steel wheel rim, with a log teepee and flickering flames.</summary>
@@ -569,28 +518,14 @@ public static class WorldModels {
     public const float MineDepth = 3;
 
     /// <summary>
-    /// The rock spur at a cliff's seaward end, built in a mine's local frame: rock to both sides of and over a cave mouth, so a mine's tunnel can run into it.
+    /// The rock site beside a cliff, built in that cliff's face-aligned mine frame: rock to both sides of and over a cave mouth, so a mine's tunnel can run into it.
     /// Part of the scenery, so every cliff has one whether or not it is mined.
     /// </summary>
     public static void MineSpur(Node3D parent, Cliff cliff, string[] rock) {
         var spot = World.MineSpot(cliff);
         var spur = Pivot(parent, new Vector3(spot.X, 0, spot.Y));
         spur.Rotation = MineYaw(spot);
-        var rng = new Random((int)(cliff.Center.X * 31 + cliff.Center.Y));
-        float R() => (float)rng.NextDouble();
-        Material Rock() => Mat(rock[rng.Next(rock.Length)], .95f);
-        // Side masses stay outside the tunnel's walls, and the cap stays above its roof.
-        for (int i = 0; i < 3; i++)
-            foreach (int side in new[] { -1, 1 }) {
-                float height = 2.3f + R() * .7f;
-                Cylinder(spur, 1.05f, .65f + R() * .15f, height, new Vector3(side * 1.75f, height / 2, MineDoor - .45f - i * 1.15f), Rock(), new Vector3(0, R() * 72, 0), 5);
-            }
-        for (int i = 0; i < 3; i++)
-            for (int x = -1; x <= 1; x++)
-                Sphere(spur, .85f + R() * .15f, new Vector3(x * .95f, 2.4f + R() * .25f, MineDoor - .7f - i * 1.15f), Rock(), new Vector3(1.3f, .6f, 1.2f), 5);
-        Cylinder(spur, 1, .7f, 2.8f, new Vector3(0, 1.4f, MineDoor - MineDepth - .6f), Rock(), null, 5);
-        for (int i = 0; i < 6; i++)
-            Sphere(spur, .16f + R() * .14f, new Vector3((i % 2 == 0 ? -1 : 1) * (1.1f + R() * .9f), .06f, MineDoor + .3f + R() * 1.2f), Rock(), new Vector3(1.2f, .6f, 1), 5);
+        Add(spur, MineRockShape.Mesh(cliff, rock), MineRockShape.Rock, Vector3.Zero);
     }
 
     /// <summary>A timbered adit into the cliff's spur, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>
@@ -600,24 +535,13 @@ public static class WorldModels {
         // The marking: a see-through green footprint and portal, shown until the mine is finished.
         var outline = Pivot(body, Vector3.Zero);
         var green = Flat(new Color(.45f, .95f, .4f, .45f));
-        foreach (float x in new[] { -.8f, .8f }) Box(outline, new Vector3(.06f, .03f, 3.3f), new Vector3(x, .02f, Door + 1.65f), green);
-        foreach (float z in new[] { Door, Door + 3.3f }) Box(outline, new Vector3(1.66f, .03f, .06f), new Vector3(0, .02f, z), green);
-        foreach (float x in new[] { -.7f, .7f }) Box(outline, new Vector3(.08f, 1.75f, .08f), new Vector3(x, .88f, Door), green);
-        Box(outline, new Vector3(1.56f, .08f, .08f), new Vector3(0, 1.75f, Door), green);
+        Add(outline, MineShape.Outline, green, Vector3.Zero);
         prop.Outline = outline;
         // The dug tunnel: unlit floor, walls and roof that darken step by step to black, so the light never reaches its end.
         // It deepens from the portal as the entrance is dug; a spoil patch lies in front.
         var hole = Pivot(body, new Vector3(0, 0, Door));
-        const int Steps = 6;
-        for (int i = 0; i < Steps; i++) {
-            float z = -(i + .5f) * MineDepth / Steps, length = MineDepth / Steps + .01f;
-            var dark = Dark("3a332c", i);
-            Box(hole, new Vector3(1.5f, .02f, length), new Vector3(0, .01f, z), dark);
-            foreach (float x in new[] { -.74f, .74f }) Box(hole, new Vector3(.04f, 1.78f, length), new Vector3(x, .89f, z), Dark("3f3830", i));
-            Box(hole, new Vector3(1.52f, .04f, length), new Vector3(0, 1.78f, z), Dark("362f28", i));
-        }
-        Box(hole, new Vector3(1.5f, 1.8f, .04f), new Vector3(0, .9f, -MineDepth), Flat(Colors.Black));
-        Box(hole, new Vector3(1.6f, .03f, 1.4f), new Vector3(0, .015f, .7f), Mat("5d564c", 1));
+        Add(hole, MineShape.Tunnel, MineShape.Unlit, Vector3.Zero);
+        Add(hole, MineShape.Pad, MineShape.Timber, Vector3.Zero);
         prop.Hole = hole;
         // Delivered materials wait beside the entrance: a log pile, stones and a few iron bars.
         var supplies = Pivot(body, Vector3.Zero);
@@ -627,18 +551,8 @@ public static class WorldModels {
         prop.Supplies = supplies;
         // Rough timber sets: a weathered portal with a plank hood and a warning board, then sets down the tunnel fading into the dark.
         var frame = Pivot(body, new Vector3(0, 0, Door));
-        var timber = Mat("8a7a62", .95f); var plank = Mat("6f6150", .95f);
-        foreach (float x in new[] { -.7f, .7f }) Box(frame, new Vector3(.2f, 1.82f, .2f), new Vector3(x, .91f, .08f), timber, new Vector3(0, 0, x > 0 ? 2 : -2));
-        Box(frame, new Vector3(1.8f, .2f, .26f), new Vector3(0, 1.88f, .08f), timber);
-        for (int i = 0; i < 5; i++) Box(frame, new Vector3(1.9f, .05f, .2f), new Vector3(0, 2.02f, .2f - i * .19f), plank, new Vector3(-6, 0, 0));
-        Box(frame, new Vector3(.5f, .32f, .03f), new Vector3(-1.1f, 1.15f, .25f), Mat("e8e2d2", .8f), new Vector3(0, 0, -3));
-        Box(frame, new Vector3(.4f, .06f, .031f), new Vector3(-1.1f, 1.22f, .25f), Mat("b3261e", .7f), new Vector3(0, 0, -3));
-        Box(frame, new Vector3(.06f, .9f, .06f), new Vector3(-1.1f, .5f, .2f), timber);
-        for (int i = 1; i < Steps; i += 2) {
-            float z = -i * MineDepth / Steps;
-            foreach (float x in new[] { -.64f, .64f }) Box(frame, new Vector3(.12f, 1.72f, .12f), new Vector3(x, .86f, z), Dark("6f6150", i));
-            Box(frame, new Vector3(1.4f, .12f, .14f), new Vector3(0, 1.7f, z), Dark("6f6150", i));
-        }
+        Add(frame, MineShape.Portal, MineShape.Timber, Vector3.Zero);
+        Add(frame, MineShape.Supports, MineShape.Unlit, Vector3.Zero);
         // A lantern hangs from the header on a hook; its flame and light burn only while someone works.
         var lantern = Pivot(frame, new Vector3(.55f, 1.46f, .32f));
         var iron = Mat("2f3134", .5f, .6f);
@@ -654,33 +568,20 @@ public static class WorldModels {
         prop.Frame = frame;
         // Rails from the front of the spoil patch all the way in, the inner lengths darkening with the tunnel.
         var rails = Pivot(body, Vector3.Zero);
-        var steel = Mat("6c7175", .4f, .7f); var sleeper = Mat("6e4a2e");
-        foreach (float x in new[] { -.28f, .28f }) Box(rails, new Vector3(.05f, .05f, -Door + 1), new Vector3(x, .07f, (Door + 1) / 2), steel);
-        for (int i = 0; i < 6; i++) Box(rails, new Vector3(.8f, .04f, .14f), new Vector3(0, .025f, Door + .2f + i * .55f), sleeper);
-        for (int i = 0; i < Steps; i++) {
-            float z = Door - (i + .5f) * MineDepth / Steps;
-            foreach (float x in new[] { -.28f, .28f }) Box(rails, new Vector3(.05f, .05f, MineDepth / Steps + .01f), new Vector3(x, .07f, z), Dark("8a8f93", i));
-            Box(rails, new Vector3(.8f, .04f, .14f), new Vector3(0, .045f, z), Dark("5a4030", i));
-        }
+        Add(rails, MineShape.Rails, MineShape.Steel, Vector3.Zero);
+        Add(rails, MineShape.Sleepers, MineShape.Timber, Vector3.Zero);
+        Add(rails, MineShape.DeepRails, MineShape.Unlit, Vector3.Zero);
         prop.Rails = rails;
         // The cart rests at the end of the rails, loaded once there is output; it is underground with the miners while they work.
         var cart = Pivot(body, Vector3.Zero);
-        var tub = Mat("4f5a5e", .5f, .6f);
-        Box(cart, new Vector3(.66f, .06f, .86f), new Vector3(0, .3f, 0), tub);
-        foreach (float x in new[] { -.33f, .33f }) Box(cart, new Vector3(.05f, .38f, .86f), new Vector3(x, .5f, 0), tub, new Vector3(0, 0, x > 0 ? -8 : 8));
-        foreach (float z in new[] { -.43f, .43f }) Box(cart, new Vector3(.72f, .38f, .05f), new Vector3(0, .5f, z), tub);
-        foreach (var (x, z) in new[] { (-.3f, -.28f), (.3f, -.28f), (-.3f, .28f), (.3f, .28f) }) Cylinder(cart, .12f, .12f, .05f, new Vector3(x, .14f, z), Mat("2b2d30", .5f, .6f), new Vector3(0, 0, 90), 10);
+        Add(cart, MineShape.Cart, MineShape.Steel, Vector3.Zero);
         var load = Pivot(cart, Vector3.Zero);
-        var lump = Mat(OreColor(ore), .8f);
-        foreach (var (x, z, r) in new[] { (0f, 0f, .3f), (-.16f, .2f, .18f), (.15f, -.22f, .17f), (.12f, .18f, .15f), (-.12f, -.18f, .16f) }) Sphere(load, r, new Vector3(x, .62f, z), lump, new Vector3(1, .6f, 1), 6);
+        Add(load, MineShape.Load, Mat(OreColor(ore), .8f), Vector3.Zero);
         prop.Load = load;
         prop.Cart = cart;
         // Lamplight deep inside while someone works underground: a faint warm haze at the dark end.
         prop.Glow = Box(body, new Vector3(1.4f, 1.7f, .02f), new Vector3(0, .86f, Door - 2.5f), Flat(new Color(1, .55f, .2f, .25f)));
     }
-
-    /// <summary>An unlit tunnel color for step <paramref name="step"/> of the tunnel, darker the deeper it is and black at the far end.</summary>
-    private static StandardMaterial3D Dark(string hex, int step) => Flat(new Color(hex).Lerp(Colors.Black, MathF.Pow((step + 1) / 6f, .45f)));
 
     private static OmniLight3D Light(Node3D parent, Vector3 at, float range) {
         var light = new OmniLight3D { Position = at, OmniRange = range, LightColor = new Color("ff9a45"), LightEnergy = 0, ShadowEnabled = false, OmniAttenuation = 1.4f };

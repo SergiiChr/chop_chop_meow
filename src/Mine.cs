@@ -19,26 +19,46 @@ public sealed partial class World {
         foreach (var c in Cliffs) if (c.DistanceTo(p) < nearest.DistanceTo(p)) nearest = c;
         return nearest;
     }
-    /// <summary>The way out of a mine: along its cliff toward the sea, since the adit is cut into the cliff's seaward end, which faces the camera.</summary>
-    public static Vector2 MineOut(Cliff c) => c.Along * Math.Sign(c.Along.Dot(Terrain.Seaward));
-    /// <summary>
-    /// A mine's spot: on open ground in front of the rock spur at the cliff's seaward end, where the cart stands at the end of the rails.
-    /// It sits toward the valley, far enough from the foot of the range that the slopes in front of the camera do not hide the entrance.
-    /// </summary>
-    public static Vector2 MineSpot(Cliff c) {
-        var end = c.Center + MineOut(c) * (c.HalfLength + 6.7f);
+    /// <summary>The outward normal of this cliff: each portal follows its own rock face, with rails toward the valley.</summary>
+    public static Vector2 MineOut(Cliff c) => c.Face;
+    /// <summary>The cart's spot, outward from the cliff center, with the portal projecting from the mountain foot.</summary>
+    public static Vector2 MineSpot(Cliff c) => c.Center + MineOut(c) * 4.2f;
+    /// <summary>The earlier end-facing cart position, retained for loading old settlements.</summary>
+    private static Vector2 LegacyMineSpot(Cliff c) {
+        var along = c.Along * Math.Sign(c.Along.Dot(Terrain.Seaward));
+        var end = c.Center + along * (c.HalfLength + 6.7f);
         return end + c.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
     }
-    /// <summary>The middle of the spur the adit is driven into; it blocks walking like the cliff, whether or not it is mined.</summary>
-    private static Vector2 SpurCenter(Cliff c) => MineSpot(c) - MineOut(c) * 4.2f;
+    /// <summary>Whether a point lies within the solid rock skin; the tunnel approach at depth -1.4 stays open.</summary>
     private static bool InSpur(Vector2 p, float margin = 0) {
-        foreach (var c in Cliffs) if (p.DistanceTo(SpurCenter(c)) < 2 + margin) return true;
+        foreach (var c in Cliffs) {
+            var offset = p - MineSpot(c);
+            float depth = offset.Dot(MineOut(c));
+            // The margin reaches twice as far out in front, so scattered trees and rocks also stay off the rails and cart.
+            if (depth > -2.28f + margin * 2) continue;
+            float across = Math.Abs(offset.Dot(c.Along));
+            float width = depth >= -4.2f ? 2.55f + (depth + 2.28f) * (2.8f - 2.55f) / (-4.2f + 2.28f)
+                : depth >= -6 ? 2.8f + (depth + 4.2f) * (3.35f - 2.8f) / (-6 + 4.2f)
+                : depth >= -32 ? 3.35f + (depth + 6) * (4.6f - 3.35f) / (-32 + 6)
+                : 4.6f;
+            if (across < width + margin) return true;
+        }
         return false;
+    }
+
+    /// <summary>Old saves keep mine inventories, stages and worker assignments while the cart snaps to the aligned entrance.</summary>
+    private static void AlignMines(SaveState state) {
+        foreach (var mine in state.Things.Concat(state.Remembered.Values).Where(t => t.Kind == "mine")) {
+            var cliff = Cliffs.MinBy(c => mine.Pos.DistanceSquaredTo(LegacyMineSpot(c)));
+            mine.Pos = MineSpot(cliff);
+        }
+        state.Version = 5;
     }
     /// <summary>Where diggers and miners stand: at the entrance, against the rock.</summary>
     public static Vector2 MineDoor(Thing mine) => mine.Pos - MineOut(CliffAt(mine.Pos)) * 1.4f;
     /// <summary>Where a plan placed at <paramref name="p"/> goes: a mine near a cliff snaps to that cliff's spot.</summary>
-    private static Vector2 SnapMine(Vector2 p) => CliffAt(p) is var c && c.DistanceTo(p) <= MineReach ? MineSpot(c) : p;
+    private static bool NearMineSite(Cliff cliff, Vector2 p) => cliff.DistanceTo(p) <= MineReach || p.DistanceTo(MineSpot(cliff)) <= 2.5f;
+    private static Vector2 SnapMine(Vector2 p) => CliffAt(p) is var c && NearMineSite(c, p) ? MineSpot(c) : p;
     public static string MineOre(Thing mine) => ResourceItem(CliffAt(mine.Pos).Ore);
     public static string MineName(Thing mine) => CliffAt(mine.Pos).Ore switch { "iron" => "iron mine", "coal" => "coal mine", "tin" => "tin mine", var ore => $"{ore} mine" };
     public float MineStageSeconds => Data.Mine.StageWorkdays * Data.WorkdaySeconds;
@@ -55,6 +75,7 @@ public sealed partial class World {
         if (!mineWants.TryGetValue(mine.Id, out var cached) || cached.Key != key) mineWants[mine.Id] = cached = (key, $"Needs {Goods(MineNeeds(mine))} in output-enabled storage");
         return cached.Text;
     }
+
     /// <summary>Mining stops as soon as either the ore or the rock slot holds a full stack.</summary>
     public bool MineFull(Thing mine) => mine.Output is Inventory output && (output[MineOre(mine)] >= output.StackSize || output["stone"] >= output.StackSize);
     /// <summary>The tool a stage needs each worker to have, or null for the stage where materials are hauled in.</summary>
@@ -62,7 +83,7 @@ public sealed partial class World {
 
     private string? MineBlock(Vector2 p) {
         var cliff = CliffAt(p);
-        if (cliff.DistanceTo(p) > MineReach) return "Mark a mine at the foot of an ore cliff.";
+        if (!NearMineSite(cliff, p)) return "Mark a mine at the foot of an ore cliff.";
         if (S.Things.Any(t => t.Kind == "mine" && t.Pos.DistanceTo(MineSpot(cliff)) < .1f)) return "This cliff already has a mine.";
         return Player.DistanceTo(MineSpot(cliff)) > 8 ? "Walk closer to the cliff." : null;
     }

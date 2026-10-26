@@ -666,7 +666,9 @@ public partial class Game : Node {
         world.S.Time = world.Data.DaySeconds * (args.Contains("--night") ? .55f : .2f);
         for (int i = 0; i < 80; i++) world.Tick(.25f);
         if (args.Contains("--panel")) Select(mine); else ClosePanel();
-        view.Zoom = 1.6f;
+        // Review from between the cart and portal, so either cliff-facing orientation fits in view.
+        world.Player = mine.Pos - World.MineOut(cliff) * .8f;
+        view.Zoom = 1.25f;
     }
     private void Showcase() {
         foreach (var t in world.S.Things.Where(t => t.Pos.DistanceTo(World.Spawn) < 8).ToArray()) world.S.Things.Remove(t);
