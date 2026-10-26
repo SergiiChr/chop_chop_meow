@@ -23,9 +23,9 @@ public partial class Game {
         Texture2D? atlas = null; int cell = -1, columns = 4, rows = 3;
         // Items added after the illustrated atlas have hand-written SVG icons named by their id.
         if (ResourceLoader.Exists($"res://assets/ui/{id}.svg")) return hotbarIcons[id] = GD.Load<Texture2D>($"res://assets/ui/{id}.svg");
-        if (id is "iron_axe" or "iron_pick" or "iron_bar" or "steel_bar" or "wood" or "stone" or "iron_ore" or "coal" or "berries" or "water") {
+        if (id is "iron_bar" or "steel_bar" or "wood" or "stone" or "iron_ore" or "coal" or "berries" or "water") {
             atlas = itemAtlas;
-            cell = id switch { "iron_axe" => 0, "iron_pick" => 1, "iron_bar" => 3, "steel_bar" => 4, "wood" => 5, "stone" => 6, "iron_ore" => 7, "coal" => 8, "berries" => 9, "water" => 10, _ => 11 };
+            cell = id switch { "iron_bar" => 3, "steel_bar" => 4, "wood" => 5, "stone" => 6, "iron_ore" => 7, "coal" => 8, "berries" => 9, "water" => 10, _ => 11 };
         } else {
             atlas = worldAtlas;
             cell = id switch { "furnace" => 5, "reinforced" => 6, "hut" => 7, "chest" => 8, "anvil" => 9, "signpost" => 10, "campfire" => 11, _ => -1 };

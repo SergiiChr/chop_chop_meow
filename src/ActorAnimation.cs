@@ -76,10 +76,8 @@ public static class ActorAnimation {
 
     /// <summary>The tool mesh an action shows in the right hand, or null for empty hands.</summary>
     public static string? Tool(ActorAction action) => action switch {
-        ActorAction.Chop => "iron_axe",
-        ActorAction.SteelChop => "steel_axe",
-        ActorAction.Mine => "iron_pick",
-        ActorAction.SteelMine => "steel_pick",
+        ActorAction.Chop or ActorAction.SteelChop => "steel_axe",
+        ActorAction.Mine or ActorAction.SteelMine => "steel_pick",
         ActorAction.Hammer => "hammer",
         _ => null
     };
@@ -198,16 +196,8 @@ public static class ActorAnimation {
         string[]? family = resourceKind == "tree" ? Axes : resourceKind is "stone" or "iron" or "coal" or "tin" ? Picks : null;
         string? tool = family == null ? null : BestTool(backpack, selectedTool, family);
         return resourceKind switch {
-            "tree" => tool switch {
-                "steel_axe" => ActorAction.SteelChop,
-                "iron_axe" => ActorAction.Chop,
-                _ => ActorAction.Gather
-            },
-            "stone" or "iron" or "coal" or "tin" => tool switch {
-                "steel_pick" => ActorAction.SteelMine,
-                "iron_pick" => ActorAction.Mine,
-                _ => ActorAction.Gather
-            },
+            "tree" => tool == null ? ActorAction.Gather : ActorAction.SteelChop,
+            "stone" or "iron" or "coal" or "tin" => tool == null ? ActorAction.Gather : ActorAction.SteelMine,
             "berries" or "water" or "wolf_corpse" or "leaves" => ActorAction.Gather,
             _ => ActorAction.Idle
         };
@@ -235,7 +225,7 @@ public static class ActorAnimation {
     }
 
     // Best first.
-    private static readonly string[] Axes = { "steel_axe", "iron_axe" }, Picks = { "steel_pick", "iron_pick" };
+    private static readonly string[] Axes = { "steel_axe" }, Picks = { "steel_pick" };
 
     /// <summary>The carried tool of a family the player would use on a resource, preferring the selected hotbar tool, then the best one.</summary>
     public static string? BestTool(Inventory backpack, string? selectedTool, string[] family) {

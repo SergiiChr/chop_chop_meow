@@ -199,8 +199,7 @@ public sealed class ActorRig {
     /// <summary>Tools hang from the right fist along the forearm; blades face local -Z, the direction of a downward stroke.</summary>
     private void BuildTools() {
         foreach (var (name, handle, head, metal) in new[] {
-            ("iron_axe", "8a5a32", "5b5f62", .45f), ("steel_axe", "e87d1e", "c9d3d8", .85f),
-            ("iron_pick", "8a5a32", "5b5f62", .45f), ("steel_pick", "e87d1e", "c9d3d8", .85f), ("hammer", "8a5a32", "4a4d50", .5f) }) {
+            ("steel_axe", "e87d1e", "c9d3d8", .85f), ("steel_pick", "e87d1e", "c9d3d8", .85f), ("hammer", "8a5a32", "4a4d50", .5f) }) {
             var tool = Pivot(elbowR, new Vector3(0, -.27f, .01f));
             bool hammer = name == "hammer";
             float length = hammer ? .38f : .72f;

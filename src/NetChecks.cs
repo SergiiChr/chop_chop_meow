@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 /// Both drive their menus and the world through Input.ParseInputEvent, and each prints its own pass marker.
 /// </summary>
 public partial class Game {
-    private static readonly Vector2 NetOre = World.Spawn + new Vector2(2.5f, 0), NetCoal = World.Spawn + new Vector2(-1.5f, 3.5f), NetChest = World.Spawn + new Vector2(.5f, 3), NetHut = World.Spawn + new Vector2(-3.5f, -3);
+    private static readonly Vector2 NetOre = World.Spawn + new Vector2(2.5f, 2), NetCoal = World.Spawn + new Vector2(-1.5f, 3.5f), NetChest = World.Spawn + new Vector2(.5f, 3), NetHut = World.Spawn + new Vector2(-3.5f, -3);
 
     private async Task Until(Func<bool> done, string what, double seconds = 60) {
         for (ulong until = Time.GetTicksMsec() + (ulong)(seconds * 1000); !done();) {
@@ -46,7 +46,7 @@ public partial class Game {
         RemoveCheckFiles(); await Frames(4);
         await Click(FindButton(screen, "New game")!); ClosePanel();
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(World.Spawn) < 6);
-        world.Add("loose_iron", NetOre, 2); world.Add("loose_coal", NetCoal, 2);
+        world.Add("loose_coal", NetOre, 2); world.Add("loose_coal", NetCoal, 2);
         var chest = world.Add("chest", NetChest); var hut = world.Add("hut", NetHut);
         await KeyStroke(Key.Escape);
         await Click(hostButton);
@@ -60,8 +60,8 @@ public partial class Game {
         await Until(() => world.S.Players.Count == 2, "a guest joining", 45);
         UIRequire(Guest().Backpack.Count == 0 && Guest().Pos == World.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
         await Until(() => view.ShowsPlayer(Guest().Id), "the guest's figure appearing");
-        await Until(() => chest.Inventory["iron_ore"] == 2 && Guest().Backpack["coal"] == 2, "the guest gathering loose ore and coal and storing the ore", 90);
-        UIRequire(world.S.Backpack["iron_ore"] == 0 && world.S.Backpack["coal"] == 0, "What the guest gathers must not reach the host's backpack.");
+        await Until(() => chest.Inventory["coal"] == 2 && Guest().Backpack["coal"] == 2, "the guest storing the first loose coal and gathering the second", 90);
+        UIRequire(world.S.Backpack["coal"] == 0, "What the guest gathers must not reach the host's backpack.");
         await Until(() => Guest().Sheltered == hut.Id, "the guest walking into the cabin with one click");
         await Until(() => world.S.Players.Count == 1, "the guest leaving");
         await Until(() => world.S.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest coming back with its coal");
@@ -79,13 +79,13 @@ public partial class Game {
         await Until(() => view.ShowsPlayer(1), "the host's figure appearing");
 
         await RightClick(NetOre);
-        await Until(() => world.S.Backpack["iron_ore"] == 2 && world.S.Things.All(t => t.Pos != NetOre), "the host handing over the loose ore the guest walked to");
-        await RightClick(NetCoal);
-        await Until(() => world.S.Backpack["coal"] == 2, "the host handing over the loose coal");
+        await Until(() => world.S.Backpack["coal"] == 2 && world.S.Things.All(t => t.Pos != NetOre), "the host handing over the loose coal the guest walked to");
         await Click(view.Screen(NetChest, .3f));
         UIRequire(page == "inspect" && world.Find(selected)?.Kind == "chest" && world.Near(world.Find(selected)!), "Clicking the chest beside the coal must open it.");
-        await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("iron_ore"))));
-        await Until(() => world.Find(selected)!.Inventory["iron_ore"] == 2 && world.S.Backpack["iron_ore"] == 0, "the stored ore showing up in the host's chest");
+        await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
+        await Until(() => world.Find(selected)!.Inventory["coal"] == 2 && world.S.Backpack["coal"] == 0, "the stored coal showing up in the host's chest");
+        ClosePanel(); await RightClick(NetCoal);
+        await Until(() => world.S.Backpack["coal"] == 2, "the host handing over the second loose coal");
         // The host checks reach from where the guest stood when it clicked, not from where its glide has got to.
         ClosePanel(); await Click(view.Screen(NetHut, .8f));
         await Until(() => world.S.Sheltered == world.S.Things.Single(t => t.Kind == "hut").Id, "the host letting the guest into the cabin it walked to");

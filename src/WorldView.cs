@@ -341,8 +341,8 @@ public partial class WorldView : Node3D {
     }
 
     private static string? HeldTool(string? selected, Inventory backpack) => selected switch {
-        "iron_axe" or "iron_pick" or "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
-        "wood_hammer" or "iron_hammer" or "steel_hammer" when backpack[selected] > 0 => "hammer",
+        "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
+        "wood_hammer" or "steel_hammer" when backpack[selected] > 0 => "hammer",
         _ => null
     };
 
@@ -616,7 +616,7 @@ public partial class WorldView : Node3D {
                 sway.Visible = prop.Fall < 1.7f;
                 prop.Stump!.Visible = true;
                 break;
-            case "stone" or "iron" or "coal" or "tin" or "loose_iron" or "loose_coal" or "leaves":
+            case "stone" or "iron" or "coal" or "tin" or "loose_coal" or "leaves":
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
@@ -829,6 +829,12 @@ public partial class WorldView : Node3D {
 
     /// <summary>Fully drawn for the first part of a trip, then fading to nothing at the turn.</summary>
     private static float TripFade(float leg) => Math.Clamp((leg - .35f) / .55f, 0, 1);
+    // The cart walks at a steady pace until it is well down the valley, waits there out of view, and walks back for the return; the trade delay is unchanged.
+    private const float CartSpeed = 2.2f, CartDistance = 16;
+    /// <summary>How far out a cart is, from 0 at the signpost to 1 where it has gone from view.</summary>
+    private float CartLeg(float elapsed) => Math.Clamp(Math.Min(elapsed, World.Data.TradeSeconds - elapsed) * CartSpeed / CartDistance, 0, 1);
+    /// <summary>Fully drawn for most of the walk, fading out over its last quarter.</summary>
+    private static float CartFade(float leg) => Math.Clamp((leg - .75f) / .25f, 0, 1);
     private readonly Dictionary<Node, float> fades = new();
     /// <summary>Applies a fade only when it changes, since it walks every mesh under the node.</summary>
     private void Fade(Node node, float transparency) {
@@ -842,8 +848,8 @@ public partial class WorldView : Node3D {
             var sign = World.Find(order.Signpost);
             float phase = order.Elapsed / World.Data.TradeSeconds;
             // The cart sets off down the valley and fades out on its way to Bramblewick, then fades back in on return.
-            float leg = World.TripLeg(phase);
-            var pos = (sign?.Pos ?? World.Spawn) + Terrain.Seaward * World.TripDistance * leg;
+            float leg = CartLeg(order.Elapsed);
+            var pos = (sign?.Pos ?? World.Spawn) + Terrain.Seaward * CartDistance * leg;
             if (!carts.TryGetValue(order, out var cart)) {
                 cart = new WorldModels.CartModel { Last = pos };
                 scene.AddChild(cart.Root); carts[order] = cart;
@@ -854,7 +860,7 @@ public partial class WorldView : Node3D {
             cart.Last = pos;
             cart.Root.Position = To3(pos);
             cart.Root.Visible = World.Sees(pos) && leg < 1;
-            Fade(cart.Root, TripFade(leg));
+            Fade(cart.Root, CartFade(leg));
             cart.Root.Rotation = new Vector3(0, cart.Yaw, 0);
             cart.Roll(cart.Distance);
             // The courier walks with arms trailing back to the cart handle.
