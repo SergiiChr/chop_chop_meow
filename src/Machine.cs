@@ -17,6 +17,7 @@ public partial class Game {
         middle.AddChild(progress); row.AddChild(middle);
         // Leftovers from an earlier recipe or fuel choice get their own output slots so they stay reachable.
         foreach (var item in world.Leftovers(t).Append(recipe.Output).Distinct()) row.AddChild(MachineSlot(t, item, false));
+        FuelToggle(t);
         Dynamic(text => {
             text.Append("Batch: "); AppendCost(text, world.BatchCost(t));
             if (t.Processing) text.Append($"\nWorking · {t.Progress:0.0}/{recipe.Seconds:0}s");

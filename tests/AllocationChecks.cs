@@ -24,6 +24,11 @@ public static class AllocationChecks {
         // A store taking an item it has not held before grows its table once; that rare event is the one byte per tick allowed here (measured 0.2 to 0.5).
         Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 1, warmup: 1200);
 
+        var mine = WorkingMine(data, out var shaft);
+        // Emptying the output each tick keeps the crew digging underground instead of hauling.
+        Check("tick: miners underground", () => { mine.Tick(1 / 60f); Fed(mine); shaft.Output!.Items.Clear(); }, warmup: 1200);
+        if (mine.S.Workers.Any(w => w.WorkState != WorkerWorkState.Underground)) throw new InvalidOperationException("Allocation check failed: the mine crew should be underground.");
+
         var night = new World(data);
         night.S.Time = data.DaySeconds * (data.NightStarts + .05f);
         // Long enough for the pack to gather around the player; the player is kept on their feet so the hunt never ends.
@@ -46,6 +51,21 @@ public static class AllocationChecks {
 
     private static void Fed(World world) { world.S.Hunger = 100; world.S.Thirst = 100; world.S.Health = 100; }
 
+    /// <summary>An open iron mine with a full crew of pickaxe-carrying miners and a chest beside it.</summary>
+    private static World WorkingMine(GameData data, out Thing mine) {
+        var world = new World(data, false);
+        world.S.Time = data.DaySeconds * .3f;
+        var cliff = World.CliffOf("iron");
+        world.Player = World.MineSpot(cliff) + cliff.Face * 3;
+        mine = world.Add("mine", World.MineSpot(cliff)); mine.Stage = World.MineOpen;
+        world.Add("chest", mine.Pos + cliff.Face * 3);
+        for (int i = 0; i < data.Mine.Workers; i++) {
+            var w = new Worker { Id = world.S.NextId++, Name = $"Miner {i + 1}", Pos = mine.Pos + cliff.Face * 2, Tool = "steel_pick" };
+            world.S.Workers.Add(w); world.Assign(w, mine);
+        }
+        return world;
+    }
+
     /// <summary>A daytime camp in the generated valley: woodcutters, a bellows crew at a hot forge, a furnace, a campfire and storage.</summary>
     private static World Settlement(GameData data) {
         var world = new World(data);
@@ -55,7 +75,7 @@ public static class AllocationChecks {
         world.Add("chest", at + new Vector2(2, -2));
         chest.Inventory.Add("iron_bar", 20); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_ore", 20); chest.Inventory.Add("wood", 30);
         var rack = world.Add("toolstation", at + new Vector2(-2, 0));
-        rack.Inventory.Add("iron_axe", 2);
+        rack.Inventory.Add("steel_axe", 2);
         var fire = world.Add("campfire", at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
         var furnace = world.Add("furnace", at + new Vector2(3, 3));
         var forge = world.Add("reinforced", at + new Vector2(-3, 3)); forge.Heat = 90;

@@ -74,7 +74,6 @@ public partial class Game {
                 id => { world.SetRecipe(bench, id); OpenPage("inspect"); }, id => bench.Recipe == id, id => world.S.Backpack.Has(world.Data.Recipes[id].Inputs));
         }
         content.AddChild(details);
-        FuelToggle(bench);
         if (bench.Recipe != "") {
             Machine(bench);
             var row = Row(); row.AddChild(Button("Load 1 batch", () => world.LoadBatch(bench))); row.AddChild(Button("Load 5", () => world.LoadBatch(bench, 5))); row.AddChild(Button("Collect", () => world.Collect(bench)));

@@ -35,43 +35,34 @@ public static class AnimationChecks {
 
     private static void CheckPlayerActions() {
         var bag = new Inventory();
-        bag.Add("iron_axe", 1);
-        bag.Add("iron_pick", 1);
         bag.Add("steel_axe", 1);
         bag.Add("steel_pick", 1);
-        var ironTools = new Inventory();
-        ironTools.Add("iron_axe", 1);
-        ironTools.Add("iron_pick", 1);
 
-        Require(ActorAnimation.PlayerAction("tree", true, true, bag, "iron_axe") == ActorAction.Walk,
+        Require(ActorAnimation.PlayerAction("tree", true, true, bag, "steel_axe") == ActorAction.Walk,
             "movement toward a resource should animate as walking");
-        Require(ActorAnimation.PlayerAction("tree", true, false, bag, "iron_axe") == ActorAction.Chop,
-            "a stationary player with an iron axe should chop a tree");
         Require(ActorAnimation.PlayerAction("tree", true, false, bag, "steel_axe") == ActorAction.SteelChop,
-            "selected carried steel tools should use the steel chopping action");
-        Require(ActorAnimation.PlayerAction("iron", true, false, bag, "iron_pick") == ActorAction.Mine,
-            "selected carried iron pick should mine iron deposits");
-        Require(ActorAnimation.PlayerAction("iron", true, false, ironTools, "iron_axe") == ActorAction.Mine,
-            "an irrelevant default axe selection should fall back to a carried pick for iron");
-        Require(ActorAnimation.PlayerAction("coal", true, false, bag, "steel_pick") == ActorAction.SteelMine,
-            "selected carried steel tools should use steel mining action");
-        Require(ActorAnimation.PlayerAction("stone", true, false, bag, "iron_axe") == ActorAction.SteelMine,
-            "steel tools should use the steel mining action on stone");
-        Require(ActorAnimation.PlayerAction("tree", true, false, ironTools, "iron_pick") == ActorAction.Chop,
+            "a stationary player with a steel axe should chop a tree");
+        Require(ActorAnimation.PlayerAction("iron", true, false, bag, "steel_pick") == ActorAction.SteelMine,
+            "a carried steel pick should mine iron deposits");
+        Require(ActorAnimation.PlayerAction("iron", true, false, bag, "steel_axe") == ActorAction.SteelMine,
+            "an irrelevant axe selection should fall back to a carried pick for iron");
+        Require(ActorAnimation.PlayerAction("stone", true, false, bag, "steel_axe") == ActorAction.SteelMine,
+            "a carried pick should mine stone");
+        Require(ActorAnimation.PlayerAction("tree", true, false, bag, "steel_pick") == ActorAction.SteelChop,
             "an irrelevant selected pick should fall back to the carried axe for trees");
 
         var empty = new Inventory();
-        Require(ActorAnimation.PlayerAction("tree", true, false, empty, "iron_axe") == ActorAction.Gather,
+        Require(ActorAnimation.PlayerAction("tree", true, false, empty, "steel_axe") == ActorAction.Gather,
             "selected tools not carried should not animate as tool use");
         var axeOnly = new Inventory();
-        axeOnly.Add("iron_axe", 1);
-        Require(ActorAnimation.PlayerAction("coal", true, false, axeOnly, "iron_axe") == ActorAction.Gather,
+        axeOnly.Add("steel_axe", 1);
+        Require(ActorAnimation.PlayerAction("coal", true, false, axeOnly, "steel_axe") == ActorAction.Gather,
             "a carried but unsuitable axe should not animate as mining");
         Require(ActorAnimation.PlayerAction("berries", true, false, empty, null) == ActorAction.Gather,
             "hand gathering berries should use the gather action");
         Require(ActorAnimation.PlayerAction("wolf_corpse", true, false, empty, null) == ActorAction.Gather,
             "butchering a carcass should use the crouched gather action");
-        Require(ActorAnimation.PlayerAction("tree", false, false, bag, "iron_axe") == ActorAction.Idle,
+        Require(ActorAnimation.PlayerAction("tree", false, false, bag, "steel_axe") == ActorAction.Idle,
             "inactive gathering should leave the player idle");
     }
 
@@ -99,8 +90,13 @@ public static class AnimationChecks {
             "anvil work should select hammering animation");
         worker.Status = "On strike · wages owed";
         worker.WorkState = WorkerWorkState.Idle;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, false) == ActorAction.Idle,
-            "striking workers should remain idle");
+        worker.WageDebt = worker.Wage;
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, false) == ActorAction.Protest
+                && ActorAnimation.Tool(ActorAction.Protest) == "protest_sign",
+            "striking workers should stand holding the protest sign instead of working");
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, true) == ActorAction.Walk,
+            "a striking worker heading home should walk, not protest");
+        worker.WageDebt = 0;
         worker.Status = "Gathering wood";
         worker.WorkState = WorkerWorkState.Blocked;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "tree" }, false) == ActorAction.Idle,
