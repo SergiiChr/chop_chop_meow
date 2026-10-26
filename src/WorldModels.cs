@@ -638,10 +638,15 @@ public static class WorldModels {
     public sealed class WolfModel {
         public readonly Node3D Root = new();
         public readonly Node3D Body;
+        /// <summary>Shoulder and hip pivots: front left, front right, hind left, hind right.</summary>
         public readonly Node3D[] Legs = new Node3D[4];
         public readonly Node3D Head, Tail;
         public float Stride, Yaw;
         public Vector2 Last;
+        // Each leg bends once: the front wrist folds the paw back and the hind hock folds it forward.
+        private readonly Skeleton3D[] shins = new Skeleton3D[4];
+        private readonly Skeleton3D tailTip;
+        private static readonly Vector3[] Hips = { new(.11f, .5f, .32f), new(-.11f, .5f, .32f), new(.11f, .5f, -.32f), new(-.11f, .5f, -.32f) };
 
         public WolfModel() {
             Body = Pivot(Root, Vector3.Zero);
@@ -655,62 +660,118 @@ public static class WorldModels {
                 Sphere(Head, .012f, new Vector3(side * .111f, .05f, .136f), Mat("d49a50", .4f, 0, .5f), null, 8);
                 Post(Head, .012f, 0, .045f, new Vector3(side * .035f, -.09f, .31f), Mat("f2efe6", .4f), 4).RotationDegrees = new Vector3(180, 0, 0);
             }
-            Tail = Pivot(Body, new Vector3(0, .7f, -.48f), new Vector3(-130, 0, 0));
-            WolfShape.Tail(Tail);
-            int index = 0;
-            foreach (var (x, z) in new[] { (.11f, .32f), (-.11f, .32f), (.11f, -.32f), (-.11f, -.32f) }) {
-                Legs[index] = Pivot(Body, new Vector3(x, .5f, z));
-                WolfShape.Leg(Legs[index], index >= 2);
-                index++;
+            Tail = Pivot(Body, new Vector3(0, .7f, -.48f));
+            tailTip = WolfShape.Tail(Tail);
+            for (int i = 0; i < 4; i++) {
+                Legs[i] = Pivot(Body, Hips[i]);
+                shins[i] = WolfShape.Leg(Legs[i], i >= 2);
             }
         }
 
-        /// <summary>Front legs take <paramref name="front"/> degrees and hind legs <paramref name="hind"/>; positive swings a foot back.</summary>
-        private void Pose(float front, float hind, float head, float tail, float lift = 0, float pitch = 0, float roll = 0, float shift = 0) {
+        /// <summary>
+        /// Front legs swing <paramref name="front"/> degrees and hind legs <paramref name="hind"/>; positive swings a foot back.
+        /// The bends fold each front paw back at the wrist and each hind paw forward at the hock.
+        /// </summary>
+        private void Pose(float front, float hind, float head, float tail, float lift = 0, float pitch = 0, float roll = 0, float shift = 0, float frontBend = 8, float hindBend = 10) {
             Body.Position = new Vector3(shift, lift, 0);
             Body.RotationDegrees = new Vector3(pitch, 0, roll);
-            for (int i = 0; i < 4; i++) {
-                Legs[i].Position = Legs[i].Position with { Y = .5f };
-                Legs[i].RotationDegrees = new Vector3(i < 2 ? front : hind, 0, 0);
-            }
+            for (int i = 0; i < 4; i++) Leg(i, i < 2 ? front : hind, i < 2 ? frontBend : hindBend);
             Head.RotationDegrees = new Vector3(head, 0, 0);
-            Tail.RotationDegrees = new Vector3(tail, 0, 0);
+            TailAt(tail, 0, 0);
         }
 
-        public void Trot(float stride, bool running) {
-            Pose(0, 0, 0, 0);
-            float swing = running ? MathF.Sin(stride) * 34 : 0;
-            for (int i = 0; i < 4; i++) Legs[i].RotationDegrees = new Vector3(i is 0 or 3 ? swing : -swing, 0, 0);
+        private void Leg(int i, float swing, float bend) {
+            Legs[i].Position = Hips[i];
+            Legs[i].RotationDegrees = new Vector3(swing, 0, 0);
+            float fold = Mathf.DegToRad(i < 2 ? Math.Max(0, bend) : -Math.Max(0, bend));
+            shins[i].SetBonePoseRotation(1, new Quaternion(Vector3.Right, fold));
+        }
+
+        /// <summary><paramref name="lift"/> is the tail's angle from hanging straight down; the tip curls on by <paramref name="curl"/>.</summary>
+        private void TailAt(float lift, float wag, float curl) {
+            Tail.RotationDegrees = new Vector3(lift + 180, wag, 0);
+            tailTip.SetBonePoseRotation(1, new Quaternion(Vector3.Right, Mathf.DegToRad(curl)));
+        }
+
+        /// <summary>Standing: slow breaths, the head looking about and the tail swaying; <paramref name="time"/> is offset per wolf.</summary>
+        public void Idle(float time) {
+            float breath = MathF.Sin(time * 2.4f);
+            Pose(-2, 4, MathF.Sin(time * .55f) * 6 - 4 + breath, -128, .004f * breath, breath * .6f, 0, 0, 6, 12);
+            Head.RotationDegrees += new Vector3(0, MathF.Sin(time * .37f) * 22 + MathF.Sin(time * 1.3f) * 4, MathF.Sin(time * .37f) * 4);
+            // Weight shifts from one hind leg to the other now and then.
+            float settle = MathF.Sin(time * .23f) * 4;
+            Leg(2, 4 + settle, 12 + Math.Max(0, settle) * 3); Leg(3, 4 - settle, 12 + Math.Max(0, -settle) * 3);
+            TailAt(-128 + MathF.Sin(time * .8f) * 4, MathF.Sin(time * 1.1f) * 9, 14 + MathF.Sin(time * 1.1f + .8f) * 8);
+        }
+
+        /// <summary>A trot for stalking and roaming: diagonal pairs swing together and fold their paws as they come forward.</summary>
+        public void Trot(float stride) {
+            float bob = MathF.Cos(stride * 2);
+            Pose(0, 0, 9 + bob * 3, -118, .012f + .012f * bob, bob * 1.5f, MathF.Sin(stride) * 2.5f);
+            for (int i = 0; i < 4; i++) {
+                // Front left with hind right, front right with hind left.
+                float beat = stride + (i is 0 or 3 ? 0 : Mathf.Pi), lift = Math.Max(0, -MathF.Cos(beat));
+                Leg(i, MathF.Sin(beat) * 30, i < 2 ? 10 + lift * 70 : 12 + lift * 55);
+            }
             // A running wolf carries its head low and level, like it is hunting.
-            Head.RotationDegrees = new Vector3(running ? 10 + MathF.Sin(stride * 2) * 4 : MathF.Sin(stride * .5f) * 6 - 4, 0, 0);
-            Tail.RotationDegrees = new Vector3(-130 + MathF.Sin(stride * 1.3f) * 8, MathF.Sin(stride) * 10, 0);
+            Head.RotationDegrees += new Vector3(0, MathF.Sin(stride) * 3, 0);
+            TailAt(-118 + bob * 4, MathF.Sin(stride) * 12, 18 + MathF.Sin(stride + .8f) * 10);
+        }
+
+        /// <summary>A bounding gallop for a chase: forelegs reach as the hind legs drive, the back rocking and the body lifting between strides.</summary>
+        public void Gallop(float stride) {
+            float rock = MathF.Cos(stride), flight = Math.Max(0, MathF.Sin(stride));
+            // The head stays level against the rocking spine.
+            Pose(0, 0, 18 - rock * 7, -96 + rock * 10, .03f + flight * .09f, rock * 10, MathF.Sin(stride * .5f) * 1.5f);
+            for (int i = 0; i < 4; i++) {
+                // Each pair lands a beat apart, left before right.
+                float beat = stride + (i % 2) * .5f;
+                if (i < 2) Leg(i, -MathF.Sin(beat) * 52, 12 + Math.Max(0, MathF.Cos(beat)) * 95);
+                else Leg(i, MathF.Sin(beat + .9f) * 48, 14 + Math.Max(0, -MathF.Cos(beat + .9f)) * 70);
+            }
+            TailAt(-96 + rock * 10, MathF.Sin(stride * .5f) * 6, 8 - rock * 10);
         }
 
         /// <summary>A leap at the throat: <paramref name="progress"/> runs 0 to 1 from take-off to landing.</summary>
         public void Leap(float progress) {
-            float t = Math.Clamp(progress, 0, 1);
-            Pose(-70 + t * 20, 65 - t * 35, -10 + t * 30, -95, MathF.Sin(t * Mathf.Pi) * .75f, Mathf.Lerp(-28, 26, t));
+            float t = Math.Clamp(progress, 0, 1), arc = MathF.Sin(t * Mathf.Pi);
+            // Hind legs drive out straight at take-off, the forelegs tuck, then reach out with the jaws for the landing.
+            float reach = Ease(Math.Clamp((t - .15f) / .6f, 0, 1));
+            Pose(Mathf.Lerp(-40, -85, reach), Mathf.Lerp(70, 40, t), Mathf.Lerp(-18, 30, Ease(t)), -88 + arc * 10, arc * .75f, Mathf.Lerp(-28, 26, t),
+                0, 0, Mathf.Lerp(110, 12, reach), Mathf.Lerp(4, 60, Ease(Math.Clamp((t - .3f) / .7f, 0, 1))));
+            TailAt(-88 + arc * 10, 0, -10 + arc * 15);
         }
 
         /// <summary>Head down and tearing, legs braced; <paramref name="time"/> drives the shaking.</summary>
         public void Feed(float time) {
-            Pose(-14, 22, 48 + MathF.Sin(time * 9) * 12, -150, -.1f, 14);
-            Head.RotationDegrees += new Vector3(0, MathF.Sin(time * 13) * 18, 0);
+            // A hard pull back every so often, with quicker shakes of the head between.
+            float pull = MathF.Pow(Math.Max(0, MathF.Sin(time * 2.6f)), 3);
+            Pose(-14 + pull * 6, 22 - pull * 10, 48 + MathF.Sin(time * 9) * 10 - pull * 14, -150, -.1f, 14 - pull * 6, MathF.Sin(time * 4.5f) * 2, 0, 30, 34 + pull * 16);
+            Body.Position += new Vector3(0, 0, -.05f * pull);
+            Head.RotationDegrees += new Vector3(0, MathF.Sin(time * 13) * 18 * (1 - pull * .6f), MathF.Sin(time * 13) * 6);
+            TailAt(-150 + MathF.Sin(time * 1.7f) * 5, MathF.Sin(time * 2.1f) * 14, 10);
             // Plant each paw while the chest pitches down; the upper profiles stay buried in the shoulders/hips.
-            foreach (var leg in Legs) {
-                float lowest = Math.Min(
-                    (Body.Transform * (leg.Transform * new Vector3(0, -.49f, -.03f))).Y,
-                    (Body.Transform * (leg.Transform * new Vector3(0, -.49f, .12f))).Y);
-                leg.Position += Vector3.Up * ((.01f - lowest) / Body.Basis.Y.Y);
+            for (int i = 0; i < 4; i++) {
+                float lowest = Math.Min(Paw(i, new Vector3(0, -.49f, -.03f)).Y, Paw(i, new Vector3(0, -.49f, .12f)).Y);
+                Legs[i].Position += Vector3.Up * ((.01f - lowest) / Body.Basis.Y.Y);
             }
+        }
+
+        /// <summary>A point on a leg's paw, in the root's space after the wrist or hock bend.</summary>
+        private Vector3 Paw(int i, Vector3 point) {
+            float joint = WolfShape.Joint(i >= 2);
+            var bone = new Transform3D(new Basis(shins[i].GetBonePoseRotation(1)), new Vector3(0, -joint, 0));
+            return Body.Transform * (Legs[i].Transform * (bone * (point + new Vector3(0, joint, 0))));
         }
 
         /// <summary>A killed wolf buckles, then rolls onto its side with stiff legs as <paramref name="progress"/> runs 0 to 1.</summary>
         public void Fall(float progress) {
             float buckle = Ease(Math.Clamp(progress / .35f, 0, 1)), roll = Ease(Math.Clamp((progress - .25f) / .5f, 0, 1));
-            float fold = 45 * buckle * (1 - roll);
+            float fold = 45 * buckle * (1 - roll), twitch = progress < 1 ? MathF.Sin(progress * 40) * 6 * roll * (1 - roll) : 0;
             // Rolling about the ground point would sink the body, so it shifts back over its old footprint as it goes.
-            Pose(-fold - 22 * roll, fold + 26 * roll, 35 * buckle - 15 * roll, -150 + 40 * roll, -.22f * buckle * (1 - roll) + .2f * roll, 0, 90 * roll, .62f * roll);
+            Pose(-fold - 22 * roll + twitch, fold + 26 * roll - twitch, 35 * buckle - 15 * roll, -150 + 40 * roll, -.22f * buckle * (1 - roll) + .2f * roll, 0, 90 * roll, .62f * roll,
+                8 + 70 * buckle * (1 - roll), 10 + 60 * buckle * (1 - roll));
+            TailAt(-150 + 40 * roll, 0, 10 + 20 * buckle * (1 - roll));
         }
 
         private static float Ease(float t) => t * t * (3 - 2 * t);

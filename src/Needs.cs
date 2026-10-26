@@ -52,10 +52,12 @@ public partial class Game {
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); ui.AddChild(damageEdges);
     }
 
-    /// <summary>Flashes the screen edges on a hit; a pinned player keeps a steady glow while the wolves feed.</summary>
+    /// <summary>Flashes the screen edges on a hit; a pinned player keeps a steady glow while the wolves feed, and a hungry or thirsty one a faint pulse.</summary>
     private void DamageFlash(float lost) {
         if (lost >= 3) damageEdges.Strength = 1;
         if (world.S.Mauled && !world.Dead) damageEdges.Strength = Math.Max(damageEdges.Strength, .55f);
+        // Food or drink under 15% keeps the edges pulsing faintly until the player eats or drinks.
+        else if (!world.Dead && (world.S.Hunger < GameData.LowNeed || world.S.Thirst < GameData.LowNeed)) damageEdges.Strength = Math.Max(damageEdges.Strength, .5f + .15f * MathF.Sin(runTime * 4));
     }
 
     // The rounded values the tooltips show, so their text is built only when one changes.
@@ -93,6 +95,13 @@ public partial class DamageEdges : Control {
         Band(new(Size.X, 0), new(Size.X, Size.Y), new(Size.X - x, Size.Y - y), new(Size.X - x, y), edge, clear);
     }
 
-    private void Band(Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color edge, Color clear) =>
-        DrawPolygon(new[] { a, b, c, d }, new[] { edge, edge, clear, clear });
+    // Reused, as a low food or drink pulse redraws the edges every frame.
+    private readonly Vector2[] corners = new Vector2[4];
+    private readonly Color[] shades = new Color[4];
+
+    private void Band(Vector2 a, Vector2 b, Vector2 c, Vector2 d, Color edge, Color clear) {
+        (corners[0], corners[1], corners[2], corners[3]) = (a, b, c, d);
+        (shades[0], shades[1], shades[2], shades[3]) = (edge, edge, clear, clear);
+        DrawPolygon(corners, shades);
+    }
 }

@@ -37,7 +37,9 @@ public static class SimulationChecks {
         CheckSleepAdvancesWorld(data);
         CheckWageSlot(data);
         CheckSleepNeedsFoodAndWater(data);
+        CheckSprintBurnsFood(data);
         CheckCabinAndChaseIntoLight(data);
+        CheckSprintOutrunsWolf(data);
         CheckCoinStacks(data);
         CheckLegacySave(data);
         CheckCrewKeepsForgeHot(data);
@@ -1594,6 +1596,34 @@ public static class SimulationChecks {
             Require(world.S.Time == time && world.SleepBlock()?.Contains(reason) == true,
                     $"sleep must be refused when the player is too {reason} to last until morning");
         }
+    }
+
+    private static void CheckSprintBurnsFood(GameData data) {
+        (float Hunger, float Thirst) Burned(bool sprinting) {
+            var world = new World(data);
+            world.Me.Sprinting = sprinting;
+            for (int i = 0; i < 10; i++) world.Tick(1);
+            return (100 - world.S.Hunger, 100 - world.S.Thirst);
+        }
+        var (walking, sprinting) = (Burned(false), Burned(true));
+        Require(Math.Abs(sprinting.Hunger / walking.Hunger - data.SprintDrain) < .001f && Math.Abs(sprinting.Thirst / walking.Thirst - data.SprintDrain) < .001f,
+                "sprinting must drain food and drink sprintDrain times as fast");
+    }
+
+    private static void CheckSprintOutrunsWolf(GameData data) {
+        // Fleeing straight away from a wolf four tiles behind for two seconds: walking loses ground, sprinting slowly gains it.
+        float Gap(bool sprinting) {
+            var world = NightWorld(data);
+            var wolf = new Wolf { Pos = world.Player + new Vector2(-4, 0) };
+            world.S.Wolves.Add(wolf);
+            world.Me.Sprinting = sprinting;
+            var start = world.Player;
+            for (int i = 0; i < 40; i++) { world.MovePlayer(Vector2.Right * .05f * data.WalkSpeed * (sprinting ? data.SprintSpeed : 1)); world.Tick(.05f); }
+            Require(world.Player.DistanceTo(start) > 7, "the open ground east of the test spot must let the player flee");
+            return wolf.Pos.DistanceTo(world.Player);
+        }
+        Require(Gap(false) < 3, "a chasing wolf must be faster than a walking player");
+        Require(Gap(true) > 4.1f, "a sprinting player must outrun a chasing wolf");
     }
 
     private static void CheckCabinAndChaseIntoLight(GameData data) {

@@ -392,10 +392,27 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
             await Frames(); UIRequire(world.Player.DistanceTo(start) > .25f, "WASD must move the player through Godot input.");
             UIRequire(sounds.Last == "footsteps_default", "Walking on grass must play grass footsteps.");
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = true });
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = true });
+            await ToSignal(GetTree().CreateTimer(.3), SceneTreeTimer.SignalName.Timeout);
+            UIRequire(world.Me.Sprinting && view.PlayerAnimation == ActorAction.Run, "Shift while moving must sprint with the running cycle.");
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
+            await Frames();
+            UIRequire(!world.Me.Sprinting, "Shift alone must not sprint once the player stops.");
+            float drink = world.S.Thirst; world.S.Thirst = 10;
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = true });
+            await Frames();
+            UIRequire(!world.Me.Sprinting && view.PlayerAnimation == ActorAction.Walk, "Under 15% drink the player must be too weak to sprint.");
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
+            world.S.Thirst = drink;
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = false });
             // Measured about 115 B a frame: this check's own await of each frame and the memory of things seen for the first time on a straight walk.
             // The budget leaves a third more, so a change that adds garbage to every frame fails it.
             await CheckWalkingFrames(150);
             await CheckPanelRefresh();
+            float fed = world.S.Hunger; world.S.Hunger = 10; await Frames();
+            UIRequire(damageEdges.Strength >= .15f, "Food under 15% must keep the screen edges glowing.");
+            world.S.Hunger = fed;
             UIRequire(Sounds.Names.All(name => sounds.VariantCount(name) > 0) && sounds.VariantCount("footsteps_default") == 3 && sounds.VariantCount("chop_tree") == 1, "Every sound must load, with numbered files grouped as variants.");
             var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
             UIRequire(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");

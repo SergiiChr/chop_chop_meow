@@ -354,7 +354,7 @@ public partial class WorldView : Node3D {
             playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
         }
         bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
-        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, SelectedTool);
+        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, SelectedTool, World.Me.Sprinting);
         Vector2 target = Gathering && GatheringTarget != null ? GatheringTarget.Pos : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
@@ -367,9 +367,9 @@ public partial class WorldView : Node3D {
         } else downedFor = 0;
         player.Update(World.Player, action, target, dt);
         // A foot lands at each extreme of the stride.
-        if (action == ActorAction.Walk && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
+        if (action is ActorAction.Walk or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
-        string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool(SelectedTool, World.S.Backpack) : null);
+        string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.S.Torch > 0 && !World.Dead;
         Pose(playerRig, player, tool, torch);
         Torch(playerRig, player, World.S.TorchLit, World.TorchFlare, null);
@@ -453,14 +453,14 @@ public partial class WorldView : Node3D {
             bool moving = p.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var target = World.Find(p.GatherTarget);
             bool gathering = target != null && p.Pos.DistanceTo(target.Pos) < 2.5f;
-            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Held);
+            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Held, p.Sprinting);
             var facing = gathering ? target!.Pos : p.Pos;
             if (!moving && other.PulseRemaining > 0) { action = other.Pulse; facing = other.PulseTarget; }
             if (p.Mauled) action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
             state.Update(p.Pos, action, facing, dt);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
-            if (action == ActorAction.Walk && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
-            Pose(other.Rig, state, ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk ? HeldTool(p.Held, p.Backpack) : null), p.Torch > 0 && p.RespawnIn <= 0);
+            if (action is ActorAction.Walk or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
+            Pose(other.Rig, state, ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(p.Held, p.Backpack) : null), p.Torch > 0 && p.RespawnIn <= 0);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, gathering ? target : null);
@@ -496,7 +496,7 @@ public partial class WorldView : Node3D {
         rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
         var pose = ActorAnimation.PoseAt(state.Action, state.Time, state.Moving);
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
-        if (torch && state.Action is ActorAction.Idle or ActorAction.Walk) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
+        if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
         rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
     }
 
@@ -808,8 +808,9 @@ public partial class WorldView : Node3D {
                 scene.AddChild(model.Root); wolves[wolf] = model;
             }
             var moved = wolf.Pos - model.Last;
-            bool running = moved.LengthSquared() > 1e-6f && !wolf.Feeding;
-            model.Stride += running ? moved.Length() * 5 : dt * 2;
+            bool running = moved.LengthSquared() > 1e-6f && !wolf.Feeding, galloping = running && wolf.Chase > 0;
+            // A gallop covers more ground a stride than a trot.
+            model.Stride += running ? moved.Length() * (galloping ? 2.6f : 5) : 0;
             model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(running ? moved : World.Player - wolf.Pos, model.Yaw), Math.Min(1, dt * 10));
             model.Last = wolf.Pos;
             model.Root.Position = To3(wolf.Pos);
@@ -817,7 +818,9 @@ public partial class WorldView : Node3D {
             model.Root.Rotation = new Vector3(0, model.Yaw, 0);
             if (wolf.Leap > 0) model.Leap(1 - wolf.Leap / World.LeapSeconds);
             else if (wolf.Feeding) model.Feed(Elapsed + wolf.GetHashCode() % 7);
-            else model.Trot(model.Stride, running);
+            else if (galloping) model.Gallop(model.Stride);
+            else if (running) model.Trot(model.Stride);
+            else model.Idle(Elapsed + wolf.GetHashCode() % 7);
         }
         foreach (var (wolf, model) in wolves)
             if (!World.S.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }

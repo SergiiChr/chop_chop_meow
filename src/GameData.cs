@@ -99,6 +99,16 @@ public sealed class GameData {
     public float TradeSeconds { get; set; } = 30;
     public List<HireOffer> HireOffers { get; set; } = new();
     public float GatherSeconds { get; set; } = 1.5f;
+    /// <summary>Tiles a second the player walks.</summary>
+    public float WalkSpeed { get; set; } = 4.2f;
+    /// <summary>How many times faster than walking a wolf chases: above 1 so walking never outpaces it, below <see cref="SprintSpeed"/> so sprinting does.</summary>
+    public float WolfChase { get; set; } = 1.5f;
+    /// <summary>How many times faster the player moves with Shift held.</summary>
+    public float SprintSpeed { get; set; } = 1.6f;
+    /// <summary>How many times faster food and drink drain while sprinting.</summary>
+    public float SprintDrain { get; set; } = 1.7f;
+    /// <summary>Food or drink percentage below which the player is too weak to sprint and the screen edges warn.</summary>
+    public const float LowNeed = 15;
     public float RespawnSeconds { get; set; } = 30;
     /// <summary>In-game hours a picked-clean berry bush takes to fruit again.</summary>
     public float BerryRegrowHours { get; set; } = 24;
@@ -134,7 +144,7 @@ public sealed class GameData {
         return data;
     }
     public void Validate() {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || !Items.ContainsKey("crate"))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || !Items.ContainsKey("crate"))
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)

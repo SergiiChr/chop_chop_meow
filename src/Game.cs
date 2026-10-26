@@ -255,7 +255,7 @@ public partial class Game : Node {
     }
     private void Help() {
         AddLabel("MOVE & WORK", 16);
-        AddLabel("WASD / arrows: move in screen directions\nHold right mouse: approach and gather\nLeft click: select resource, building, crate or worker; on open ground, use the item in hand\nE: inspect nearest object\nSpace: use carried tool; at selected bellows furnace, pump\nMouse wheel: zoom\n1–9 or click a slot: put it in hand (plans and crates go to placement)\nHold right mouse on a placed crate: pick it up\nB: build   I: inventory   C: crafting   Tab: guide\nF5: save   F9: load   Esc: cancel / pause");
+        AddLabel("WASD / arrows: move in screen directions\nShift: sprint, which burns food and drink faster\nHold right mouse: approach and gather\nLeft click: select resource, building, crate or worker; on open ground, use the item in hand\nE: inspect nearest object\nSpace: use carried tool; at selected bellows furnace, pump\nMouse wheel: zoom\n1–9 or click a slot: put it in hand (plans and crates go to placement)\nHold right mouse on a placed crate: pick it up\nB: build   I: inventory   C: crafting   Tab: guide\nF5: save   F9: load   Esc: cancel / pause");
         AddLabel("IRON → STEEL", 16);
         AddLabel("Mining iron and coal needs a pickaxe: buy your first at the village signpost. Smelt 2 ore + 1 wood/coal per iron bar. Steel needs the reinforced furnace: 2 iron bars + 2 mined coal make 2 steel bars, plus 1 mined coal as fuel. Pump regularly above 80°. The anvil turns steel bars into steel parts.", 15, Muted);
         AddLabel("CRAFTING", 16);
@@ -609,10 +609,12 @@ public partial class Game : Node {
                 }
             } else { lifting = null; liftClock = 0; }
             view.Lifting = lifting?.Id ?? 0; view.LiftProgress = liftClock / LiftSeconds;
-            world.MovePlayer(direction * dt * 4.2f); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
+            // Under 15% food or drink the player is too weak to sprint.
+            world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.S.Hunger >= GameData.LowNeed && world.S.Thirst >= GameData.LowNeed;
+            world.MovePlayer(direction * dt * world.Data.WalkSpeed * (world.Me.Sprinting ? world.Data.SprintSpeed : 1)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
             view.GatheringTarget = view.Gathering ? gathering : null;
             world.Me.Held = ActiveHotbarItem() ?? "";
-        }
+        } else world.Me.Sprinting = false;
         // Menus pause only a game nobody else is in.
         bool running = !paused || net.Hosting || world.Remote;
         if (running) {
