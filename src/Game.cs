@@ -200,6 +200,8 @@ public partial class Game : Node {
         var label = new VBoxContainer { CustomMinimumSize = new Vector2(40, 0) }; label.AddThemeConstantOverride("separation", 4); drawer.AddChild(label);
         label.AddChild(Style.Glyph("line_bag", 30, Style.Rim));
         bagFill = Style.Text("", 13, Style.Beige); bagFill.HorizontalAlignment = HorizontalAlignment.Center; label.AddChild(bagFill);
+        var hide = HeaderButton("close", "Hide the backpack", () => { bagHidden = true; bag.Visible = false; }, Style.CloseRound, "bag_close");
+        hide.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter; hide.SizeFlagsVertical = Control.SizeFlags.ShrinkEnd | Control.SizeFlags.Expand; label.AddChild(hide);
         bagContent = new VBoxContainer(); drawer.AddChild(bagContent);
         deathLabel = Outlined(Label("", 26)); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
         // Raised above the centred player so a downed body stays visible under the message.
@@ -267,7 +269,7 @@ public partial class Game : Node {
     }
     private void OpenPage(string name) {
         // A different page or building closes the job list and the filter window that belonged to the last one.
-        if (name != page || name == "inspect" && (selected, workerId) != shownInspect) { openJob = ""; filterOpen = false; filterPicking = false; }
+        if (name != page || name == "inspect" && (selected, workerId) != shownInspect) { openJob = ""; filterOpen = false; filterPicking = false; bagHidden = false; }
         shownInspect = (selected, workerId);
         page = name; live.Clear(); pagesOpened++; panel.Visible = true; view.PanelOpen = true;
         foreach (var child in panel.GetChildren()) { panel.RemoveChild(child); child.QueueFree(); }
@@ -309,8 +311,10 @@ public partial class Game : Node {
     private void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
         var host = content; content = bagContent;
         AddInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns);
-        content = host; bag.Visible = true;
+        content = host; bag.Visible = !bagHidden;
     }
+    /// <summary>Set by the drawer's close button; the drawer stays hidden until another page or building opens.</summary>
+    private bool bagHidden;
     private void ClosePanel() { panel.Visible = false; bag.Visible = false; view.PanelOpen = false; page = ""; live.Clear(); pagesOpened++; }
     // Counts pages opened and closed, so a refresh notices when an update replaced the page under it.
     private int pagesOpened;
@@ -378,6 +382,7 @@ public partial class Game : Node {
         if (world.S.Backpack[item] == 0) { Notify("No empty crate in your backpack. Craft one at a bench."); return; }
         placingCrate = item; view.BuildMode = "crate"; assigningWorker = 0; ClosePanel(); Notify($"Place {world.Describe(item)}.");
     }
+    private bool CanPlaceAgain() => view.BuildMode == "crate" ? world.S.Backpack[placingCrate] > 0 : world.S.Backpack.Has(world.Data.Buildings[view.BuildMode].Cost);
     private void Select(Worker w) { workerId = w.Id; selected = 0; view.Selected = 0; view.SelectedWorker = w.Id; OpenPage("inspect"); }
     private void Inspect() {
         if (workerId > 0) { WorkerPanel(world.S.Workers.FirstOrDefault(w => w.Id == workerId)); return; }
@@ -580,6 +585,7 @@ public partial class Game : Node {
             string plainest = world.Data.Items.Where(p => p.Value.Tool == kind).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
             var (cell, count) = IconCell($"rack_{kind}"); cell.Icon = HotbarIcon(plainest); row.AddChild(cell);
             cell.Pressed += () => { if (world.BestTool(kind, t.Inventory) is string best) { Act(() => MoveStack(t.Inventory, world.S.Backpack, best, t)); RefreshLive(); } };
+            cell.Drag = () => world.BestTool(kind, t.Inventory) is string best ? new ItemDrag(best, t.Inventory[best], t.Inventory, t) : null;
             row.AddChild(new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
             var outPill = Style.Pill("", Style.Tag(Style.Enamel), Style.Rim, 12); outPill.MouseFilter = Control.MouseFilterEnum.Pass; row.AddChild(outPill);
             var waitPill = Style.Pill("", Style.Tag(Style.Brick), Style.Rim, 12); waitPill.MouseFilter = Control.MouseFilterEnum.Pass; row.AddChild(waitPill);
@@ -798,9 +804,10 @@ public partial class Game : Node {
                 if (view.BuildMode != "") {
                     var at = view.ToWorld(mouse.Position).Round();
                     var built = view.BuildMode == "crate" ? world.PlaceCrate(placingCrate, at) : world.Build(view.BuildMode, at);
-                    if (built != null) { view.BuildMode = ""; Select(built); }
-                    // A guest's building goes up on the host; one the guest's copy allows has been sent.
-                    else if (world.Remote && world.PlacementBlock(view.BuildMode, world.Snap(view.BuildMode, at), view.BuildMode == "crate" ? placingCrate : null) == null) view.BuildMode = "";
+                    // Placement stays on without opening what was placed, so several go down in a row until the materials or crates run out.
+                    // A guest's building goes up on the host, so the guest stays in placement until Esc.
+                    // A mine opens its panel instead, since each cliff takes only one.
+                    if (built?.Kind == "mine") { view.BuildMode = ""; Select(built); } else if (built != null && !CanPlaceAgain()) view.BuildMode = "";
                     return;
                 }
                 var t = view.Pick(mouse.Position);

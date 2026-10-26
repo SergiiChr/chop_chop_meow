@@ -80,14 +80,16 @@ public partial class Game {
         if (bench.Kind == "bench") headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
         var groups = world.Data.Recipes.Where(p => p.Value.Station == bench.Kind).Select(p => p.Key).GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
         RecipeBoard(groups, group => group.Tool == "" ? null : world.BenchTool(bench, group.Tool, group.Tier), bench,
-            id => { world.SetRecipe(bench, id); OpenPage("inspect"); }, id => bench.Recipe == id, id => world.S.Backpack.Has(world.Data.Recipes[id].Inputs));
+            id => { world.SetRecipe(bench, id); OpenPage("inspect"); }, id => bench.Recipe == id, id => world.S.Backpack.Has(world.Data.Recipes[id].Inputs),
+            // A double click also loads one batch of inputs from the backpack.
+            id => Act(() => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(bench, item, amount); }));
         if (bench.Recipe != "") Machine(bench);
         else AddLabel("Choose what to make.", 14, Muted);
         var slotted = World.SlotKinds(bench.Kind);
         BagGrid(id => {
             if (slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(bench, world.Data.Items[id].Tool) == null) world.SlotTool(bench, id);
-            else world.LoadInput(bench, id, MoveAll ? world.S.Backpack[id] : world.S.Backpack.StackSize);
-        }, "Click: slot a tool, or fill an input slot · Drag onto a slot",
+            else world.LoadInput(bench, id, MoveAll ? world.S.Backpack[id] : 1);
+        }, "Click: slot a tool, or add one · Ctrl: all of it · Drag onto a slot",
             wanted: id => bench.Recipe != "" && world.BatchCost(bench).ContainsKey(id) || slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(bench, world.Data.Items[id].Tool) == null);
         JobButtons(bench);
     }
@@ -135,7 +137,7 @@ public partial class Game {
     /// The recipe board: a column of round tabs, one per tool the recipes need (red while that tool is missing), beside the chosen tab's plates.
     /// <paramref name="held"/> names the tool in use for a group, or null when it is missing or none is needed; <paramref name="station"/> is null when crafting by hand.
     /// </summary>
-    private void RecipeBoard(List<IGrouping<(string Tool, int Tier), string>> groups, Func<(string Tool, int Tier), string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready) {
+    private void RecipeBoard(List<IGrouping<(string Tool, int Tier), string>> groups, Func<(string Tool, int Tier), string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready, Action<string>? twice = null) {
         // A board opens on the tab of the recipe its station makes, otherwise the first.
         if (groups.All(g => GroupKey(g.Key) != craftTab))
             craftTab = groups.FirstOrDefault(g => g.Any(chosen)) is { } making ? GroupKey(making.Key) : groups.Count > 0 ? GroupKey(groups[0].Key) : "";
@@ -171,12 +173,12 @@ public partial class Game {
                 });
             }
             if (!open) continue;
-            foreach (string id in group) plates.AddChild(Plate(id, () => held(group.Key), station, click, chosen, ready));
+            foreach (string id in group) plates.AddChild(Plate(id, () => held(group.Key), station, click, chosen, ready, twice));
         }
     }
 
     /// <summary>A recipe plate: the product big, with what it makes in a pill, and its inputs small underneath.</summary>
-    private ItemSlot Plate(string id, Func<string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready) {
+    private ItemSlot Plate(string id, Func<string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready, Action<string>? twice) {
         var r = world.Data.Recipes[id];
         var (cell, count) = IconCell($"craft_{id}");
         cell.CustomMinimumSize = new Vector2(78, 84);
@@ -193,6 +195,7 @@ public partial class Game {
         }
         count.Text = r.Amount > 1 ? $"×{r.Amount}" : ""; count.MoveToFront();
         cell.Pressed += () => { click(id); RefreshLive(); };
+        if (twice != null) cell.DoubleClicked = () => { twice(id); RefreshLive(); };
         float Time() => r.Seconds / ((station?.Kind == "bench" ? world.Data.BenchSpeed : 1) * (held() is string inUse ? world.Data.Items[inUse].Speed : 1));
         void Describe(StringBuilder text) {
             text.Append(r.Name);

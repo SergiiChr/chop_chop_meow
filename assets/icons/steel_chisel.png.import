@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://deu4q58den2ci"
-path="res://.godot/imported/steel_chisel.svg-b9b81edc92c26aaac7b0ab12c5be3d5a.ctex"
+uid="uid://cohkbdueobq0s"
+path="res://.godot/imported/steel_chisel.png-002b0c16115683ac224d7e95ede695d2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/steel_chisel.svg"
-dest_files=["res://.godot/imported/steel_chisel.svg-b9b81edc92c26aaac7b0ab12c5be3d5a.ctex"]
+source_file="res://assets/icons/steel_chisel.png"
+dest_files=["res://.godot/imported/steel_chisel.png-002b0c16115683ac224d7e95ede695d2.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

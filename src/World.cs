@@ -610,10 +610,12 @@ public sealed partial class World {
         return true;
     }
     public void Leave() { if (!Forwarded("leave")) S.Sheltered = 0; }
+    /// <summary>Bedtime comes a little before night falls, so the player can turn in without waiting for the dark.</summary>
+    public const int SleepHour = 22;
     public float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
     /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
     public string? SleepBlock() {
-        if (!Night) return "You can sleep at night. Keep food and water for the morning.";
+        if (Hour is >= 6 and < SleepHour) return "You can sleep after 10 pm. Keep food and water for the morning.";
         bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = S.Thirst - SecondsToDawn * Data.ThirstPerSecond <= 0;
         if (hungry || thirsty) return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : "You are too thirsty to sleep.";
         // The night passes for everyone at once, so the others have to be inside and fed too.

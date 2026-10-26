@@ -15,7 +15,7 @@ public partial class Game {
         if (t.Recipe != "") Machine(t);
         else AddLabel("Choose what to make.", 14, Muted);
         if (t.Kind == "reinforced") Bellows(t);
-        BagGrid(id => world.LoadInput(t, id, MoveAll ? world.S.Backpack[id] : world.S.Backpack.StackSize), "Click: fill its slot · Ctrl: all of it · Drag onto a slot",
+        BagGrid(id => world.LoadInput(t, id, MoveAll ? world.S.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot",
             wanted: id => t.Recipe != "" && (world.BatchCost(t).ContainsKey(id) || t.Burner != null && World.FuelFits(t, id)));
         JobButtons(t);
     }

@@ -342,9 +342,15 @@ public partial class WorldView : Node3D {
         overlay.QueueRedraw();
     }
 
+    /// <summary>The hammer model for a hammering action: the grade in hand or carried, and steel for someone with none, such as an anvil worker.</summary>
+    private static string? Grade(string? tool, string? held, Inventory? carried) =>
+        tool != "hammer" ? tool
+        : held is "wood_hammer" or "steel_hammer" ? held
+        : carried != null && carried["wood_hammer"] > 0 && carried["steel_hammer"] == 0 ? "wood_hammer" : "steel_hammer";
+
     private static string? HeldTool(string? selected, Inventory backpack) => selected switch {
         "steel_axe" or "steel_pick" when backpack[selected] > 0 => selected,
-        "wood_hammer" or "steel_hammer" when backpack[selected] > 0 => "hammer",
+        "wood_hammer" or "steel_hammer" when backpack[selected] > 0 => selected,
         _ => null
     };
 
@@ -372,7 +378,7 @@ public partial class WorldView : Node3D {
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.S.Torch > 0 && !World.Dead;
-        Pose(playerRig, player, tool, torch);
+        Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch);
         Torch(playerRig, player, World.S.TorchLit, World.TorchFlare, null);
         if (World.S.Mauled) {
             // Tip backwards about the feet, then slide forward so the body lies centred on the player's tile.
@@ -399,7 +405,7 @@ public partial class WorldView : Node3D {
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment is { Kind: "mine" } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
-            Pose(entry.Rig, state, ActorAnimation.Tool(work));
+            Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, null));
             entry.Rig.Root.Visible = World.Sees(worker);
             float trip = worker.Away > 0 ? World.TripLeg(1 - worker.Away / World.Data.TradeSeconds) : worker.Commute / (World.Data.TradeSeconds / 2);
             Fade(entry.Rig.Root, TripFade(trip));
@@ -461,7 +467,7 @@ public partial class WorldView : Node3D {
             state.Update(p.Pos, action, facing, dt);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
             if (action is ActorAction.Walk or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
-            Pose(other.Rig, state, ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(p.Held, p.Backpack) : null), p.Torch > 0 && p.RespawnIn <= 0);
+            Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(p.Held, p.Backpack) : null), p.Held, p.Backpack), p.Torch > 0 && p.RespawnIn <= 0);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, gathering ? target : null);
@@ -501,6 +507,15 @@ public partial class WorldView : Node3D {
         rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
     }
 
+    /// <summary>Shows a bench slot's model of the slotted tool's grade: the first child for the lower grade, the second for steel.</summary>
+    private static void ShowSlotted(Node3D slot, string? tool) {
+        slot.Visible = tool != null;
+        if (tool == null) return;
+        bool steel = tool.StartsWith("steel");
+        slot.GetChild<Node3D>(0).Visible = !steel;
+        slot.GetChild<Node3D>(1).Visible = steel;
+    }
+
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
     private void Work(ActorState actor, Thing? subject) {
         if (subject == null) return;
@@ -519,7 +534,12 @@ public partial class WorldView : Node3D {
         if (impact < 0 || !actor.Struck(impact) || !props.TryGetValue(subject.Id, out var prop)) return;
         prop.Shake = 1;
         // A bench knocks wood on wood, so it borrows the axe's knock.
-        if (subject.Kind is "tree" or "anvil" or "bench") Sounds?.Play(subject.Kind == "anvil" ? "anvil_work" : "chop_tree", subject.Pos);
+        string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
+            : action == ActorAction.Pump ? "bellows_pump"
+            : subject.Kind == "anvil" ? "anvil_work"
+            : subject.Kind is "tree" or "bench" ? "chop_tree"
+            : null;
+        if (sound != null) Sounds?.Play(sound, subject.Pos);
         var toward = (actor.Position - subject.Pos).Normalized();
         var side = To3(subject.Pos + toward * .35f);
         switch (subject.Kind) {
@@ -673,8 +693,8 @@ public partial class WorldView : Node3D {
             case "bench":
                 // Slotted tools lie on the bench top.
                 if (!World.Sees(t.Pos)) break;
-                prop.Chisel!.Visible = t.Tools != null && World.BenchTool(t, "chisel") != null;
-                prop.Hammer!.Visible = t.Tools != null && World.BenchTool(t, "hammer") != null;
+                ShowSlotted(prop.Chisel!, World.BenchTool(t, "chisel"));
+                ShowSlotted(prop.Hammer!, World.BenchTool(t, "hammer"));
                 prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
                 break;
             case "pile":
@@ -703,6 +723,10 @@ public partial class WorldView : Node3D {
                 if (dt > 0 && (open ? prop.Open == 0 : prop.Open == 1)) Sounds?.Play(open ? "open_chest" : "close_chest", t.Pos);
                 prop.Open = Mathf.MoveToward(prop.Open, open ? 1 : 0, dt * 4);
                 prop.Lid!.RotationDegrees = new Vector3(-80 * Ease(prop.Open), 0, 0);
+                if (prop.Marker != null) {
+                    prop.Marker.Position = new Vector3(0, 1.2f + .08f * MathF.Sin(Elapsed * 2.5f), 0);
+                    prop.Marker.Rotation = new Vector3(0, Elapsed * 1.5f, 0);
+                }
                 // A crate being lifted rises and rocks before it goes into the backpack.
                 float lifted = t.Id == Lifting ? Ease(LiftProgress) : 0;
                 if (t.Kind == "crate") { prop.Body.Position = new Vector3(0, lifted * .35f, 0); prop.Body.RotationDegrees = new Vector3(lifted * 9 * MathF.Sin(Elapsed * 18), 0, lifted * 6 * MathF.Cos(Elapsed * 15)); }

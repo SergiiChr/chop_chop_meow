@@ -123,6 +123,16 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
         await Frames();
     }
+    /// <summary>Two presses, the second flagged as a double click the way Godot reports one.</summary>
+    private async Task DoubleClick(Control control) {
+        var at = await At(control);
+        foreach (bool second in new[] { false, true }) {
+            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true, DoubleClick = second });
+            await Frames();
+            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
+            await Frames();
+        }
+    }
     /// <summary>A real mouse drag: press, move in steps past the drag threshold, release over the target.</summary>
     private async Task DragTo(Control from, Control to) {
         var start = await At(from); var end = await At(to);
@@ -283,7 +293,16 @@ public partial class Game {
         world.S.Backpack.Add("crate", 1); world.S.HotbarSlots[8] = "crate"; world.S.ActiveHotbar = 8; ClosePanel(); await Frames();
         await Click(view.Screen(crate.Pos, .4f));
         UIRequire(!anomaly.Visible && selected == crate.Id && crate.Inventory.Count == 0 && world.S.Backpack["crate"] == 1, "Clicking a crate with a crate in hand must open it without the nesting alert.");
-        world.S.Backpack.Remove("crate", 1); world.S.HotbarSlots[8] = lastSlot; world.S.ActiveHotbar = active;
+        world.S.HotbarSlots[8] = lastSlot; world.S.ActiveHotbar = active;
+        // Two empty crates go down one after the other without opening, and placement ends with the last.
+        world.S.Backpack.Add("crate", 1); PlaceCrate("crate");
+        for (int placed = 1; placed <= 2; placed++) {
+            var spot = Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()))
+                .First(p => world.PlacementBlock("crate", p, "crate") == null);
+            await Click(view.Screen(spot));
+            UIRequire(world.S.Backpack["crate"] == 2 - placed && !panel.Visible && view.BuildMode == (placed == 1 ? "crate" : ""), "Placing a crate must not open it and must stay in placement while crates remain.");
+        }
+        world.S.Things.RemoveAll(t => t.Kind == "crate" && t != crate && t.Inventory.Count == 0);
         Select(crate); await Frames();
         await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
         UIRequire(anomaly.Visible && anomalyWarning.Visible && world.S.Backpack[packed] == 1 && crate.Inventory.Count == 0, "A crate dragged into a crate must stop at the warning.");
@@ -498,7 +517,9 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = windowPoint, Pressed = false });
             await Frames();
             var chest = world.S.Things.LastOrDefault(t => t.Kind == "chest");
-            UIRequire(chest != null && view.BuildMode == "" && selected == chest.Id, "A ground click must construct and select the chest.");
+            UIRequire(chest != null && view.BuildMode == (world.S.Backpack.Has(world.Data.Buildings["chest"].Cost) ? "chest" : "") && selected != chest.Id && !panel.Visible,
+                "A ground click must construct the chest without opening it, staying in placement while another can be afforded.");
+            view.BuildMode = ""; Select(chest!);
             var deposit = Named("deposit"); UIRequire(deposit != null, "Chest context must expose deposit action.");
             deposit!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(chest!.Inventory["wood"] > 0 && world.S.Backpack["steel_axe"] == 1, "Manual deposit must move materials and retain equipped tools.");
@@ -523,6 +544,9 @@ public partial class Game {
             UIRequire(chest.Inventory.InputFilter.Contains("wood") && chest.Inventory["wood"] == storedWood, "Dropping an item on a filter row must add it to that filter without moving it.");
             ((Button)panel.FindChild("filter_in_wood", true, false)).EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(!chest.Inventory.InputFilter.Contains("wood"), "Clicking an item in a filter row must take it off.");
+            await Click((Control)bag.FindChild("bag_close", true, false));
+            Named("filters")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            UIRequire(!bag.Visible && panel.Visible, "The backpack drawer's close button must hide it while the building's page stays open and refreshes.");
             await KeyStroke(Key.Tab);
             UIRequire(page == "inventory" && bag.Visible && FindButton(panel, "Assign hotbar slots") == null, "Tab must open the backpack drawer, with no separate hotbar assignment.");
             await KeyStroke(Key.B);
@@ -597,6 +621,15 @@ public partial class Game {
             await Frames(3);
             UIRequire(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
             ClosePanel();
+            var workbench = world.Add("bench", world.Player + new Vector2(-1, 0)); world.SetRecipe(workbench, "crate");
+            Select(workbench); world.S.Backpack.Add("planks", 6); RefreshLive(); await Frames(2);
+            await Click(bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(c => c.TooltipText.StartsWith("Wood planks")));
+            UIRequire(workbench.Inventory["planks"] == 1 && world.S.Backpack["planks"] == 5, "Clicking a backpack item at the bench must load just one.");
+            await DoubleClick(Named("craft_crate")!);
+            UIRequire(workbench.Inventory["planks"] == 6 && world.S.Backpack["planks"] == 0, "Double-clicking a bench recipe must load one batch of its inputs.");
+            await SplitTo(Named("input_planks")!, bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(c => c.TooltipText == ""));
+            UIRequire(workbench.Inventory["planks"] == 3 && world.S.Backpack["planks"] == 3, "Right-clicking a bench input must pick up half of it.");
+            world.S.Things.Remove(workbench); world.S.Backpack.Remove("planks", 3); ClosePanel();
             var furnace = world.Add("reinforced", world.Player + new Vector2(1, 0));
             Select(furnace);
             UIRequire(Named("input_iron_bar") != null && Named("input_coal") != null && Named("output_steel_bar") != null, "The steel furnace must show one slot per input and output.");
@@ -606,7 +639,7 @@ public partial class Game {
             await DragTo(Cell(0, c => c.TooltipText.StartsWith("Mined coal")), Named("input_iron_bar")!);
             UIRequire(furnace.Inventory["coal"] == 0, "An input slot must reject a different item.");
             await Click(Cell(0, c => c.TooltipText.StartsWith("Mined coal")));
-            UIRequire(furnace.Inventory["coal"] == furnace.Inventory.StackSize, "Clicking a backpack item must fill its input slot up to one stack.");
+            UIRequire(furnace.Inventory["coal"] == 1, "Clicking a backpack item must add one to its input slot.");
             await Click(Named("input_iron_bar")!);
             UIRequire(furnace.Inventory["iron_bar"] == 0 && world.S.Backpack["iron_bar"] == 5, "Clicking an input slot must return its stack.");
             await KeyStroke(Key.Space);

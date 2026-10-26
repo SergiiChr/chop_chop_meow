@@ -1702,6 +1702,12 @@ public static class SimulationChecks {
             Require(world.S.Time == time && world.SleepBlock()?.Contains(reason) == true,
                     $"sleep must be refused when the player is too {reason} to last until morning");
         }
+        var early = NightWorld(data);
+        early.Add("hut", early.Player + new Vector2(2, 0));
+        early.S.Time = data.DaySeconds * (World.SleepHour - 6 + .2f) / 24;
+        Require(!early.Night && early.SleepBlock() == null, "sleep must be allowed from 10 pm, before night falls");
+        early.S.Time = data.DaySeconds * (World.SleepHour - 6 - .2f) / 24;
+        Require(early.SleepBlock()?.Contains("10 pm") == true, "sleep must be refused before 10 pm");
     }
 
     private static void CheckSprintBurnsFood(GameData data) {

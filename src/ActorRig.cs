@@ -147,7 +147,7 @@ public sealed class ActorRig {
 
     /// <summary>Tools hang from the right fist along the forearm; blades face local -Z, the direction of a downward stroke.</summary>
     private void BuildTools() {
-        foreach (var name in new[] { "steel_axe", "steel_pick", "hammer", "protest_sign" }) {
+        foreach (var name in new[] { "steel_axe", "steel_pick", "wood_hammer", "steel_hammer", "protest_sign" }) {
             var tool = name == "protest_sign" ? ProtestSign() : Tool(name);
             tool.Position = new Vector3(0, -.27f, .01f);
             elbowR.AddChild(tool);
@@ -158,7 +158,9 @@ public sealed class ActorRig {
 
     /// <summary>A held tool gripped at the origin, handle down along -Y and blade toward -Z; the icon renderer shows it on its own.</summary>
     public static Node3D Tool(string name) {
-        bool steelTool = name.StartsWith("steel"), hammer = name == "hammer";
+        if (name is "steel_hammer" or "wood_hammer") return Hammer(name == "steel_hammer");
+        if (name is "stone_chisel" or "steel_chisel") return Chisel(name == "steel_chisel");
+        bool steelTool = name.StartsWith("steel"), hammer = false;
         string handle = steelTool ? "e87d1e" : "8a5a32", head = steelTool ? "c9d3d8" : hammer ? "4a4d50" : "5b5f62";
         float metal = steelTool ? .85f : hammer ? .5f : .45f;
         var tool = new Node3D();
@@ -174,6 +176,51 @@ public sealed class ActorRig {
         } else {
             Cylinder(tool, .035f, 0, .3f, new Vector3(0, end, -.15f), steel, new Vector3(-90, 0, 0), 6);
             Cylinder(tool, .035f, 0, .22f, new Vector3(0, end, .11f), steel, new Vector3(90, 0, 0), 6);
+        }
+        return tool;
+    }
+
+    /// <summary>
+    /// A claw hammer with a rubber grip, or a wooden mallet with a banded barrel head, gripped at the origin with the striking face toward -Z.
+    /// </summary>
+    private static Node3D Hammer(bool steel) {
+        var tool = new Node3D();
+        const float length = .38f, end = .06f - length;
+        Cylinder(tool, .02f, .024f, length, new Vector3(0, .08f - length / 2, 0), Mat(steel ? "e87d1e" : "8a5a32", .7f));
+        if (steel) {
+            var metal = Mat("c9d3d8", .35f, .85f);
+            Cylinder(tool, .027f, .027f, .12f, new Vector3(0, -.01f, 0), Mat("222222"));
+            Cylinder(tool, .028f, .028f, .1f, new Vector3(0, end, -.03f), metal, new Vector3(90, 0, 0), 8);
+            Cylinder(tool, .034f, .034f, .02f, new Vector3(0, end, -.085f), metal, new Vector3(90, 0, 0), 8);
+            // The claw tapers away from the face and curves down toward the handle.
+            Cylinder(tool, .024f, .006f, .1f, new Vector3(0, end - .015f, .06f), metal, new Vector3(110, 0, 0), 6).Scale = new Vector3(.6f, 1, 1);
+        } else {
+            Cylinder(tool, .052f, .052f, .15f, new Vector3(0, end, 0), Mat("b98552", .8f), new Vector3(90, 0, 0), 10);
+            foreach (float z in new[] { -.06f, .06f }) Cylinder(tool, .055f, .055f, .016f, new Vector3(0, end, z), Mat("7a5233", .8f), new Vector3(90, 0, 0), 10);
+        }
+        return tool;
+    }
+
+    /// <summary>
+    /// A steel chisel with a capped handle and flat blade, or a knapped stone blade bound into a wooden handle with cord.
+    /// It is gripped at the origin with the blade along -Y, wide along Z and thin along X, so it lies flat when turned onto its side.
+    /// </summary>
+    private static Node3D Chisel(bool steel) {
+        var tool = new Node3D();
+        if (steel) {
+            var metal = Mat("c9d3d8", .3f, .85f);
+            Cylinder(tool, .02f, .025f, .14f, Vector3.Zero, Mat("e87d1e", .7f), sides: 8);
+            Cylinder(tool, .026f, .026f, .02f, new Vector3(0, .075f, 0), Mat("222222"), sides: 8);
+            Cylinder(tool, .021f, .021f, .02f, new Vector3(0, -.08f, 0), metal, sides: 8);
+            Box(tool, new Vector3(.016f, .1f, .016f), new Vector3(0, -.14f, 0), metal);
+            Box(tool, new Vector3(.012f, .06f, .05f), new Vector3(0, -.21f, 0), metal);
+            Box(tool, new Vector3(.005f, .016f, .05f), new Vector3(0, -.248f, 0), Mat("e9eef0", .25f, .85f));
+        } else {
+            var stone = Mat("9aa29f", .9f);
+            Cylinder(tool, .02f, .024f, .18f, new Vector3(0, -.01f, 0), Mat("8a5a32", .8f), sides: 8);
+            // The blade's butt sits in the split handle end under the cord wrap.
+            Cylinder(tool, .014f, .032f, .12f, new Vector3(0, -.15f, 0), stone, sides: 5).Scale = new Vector3(.45f, 1, 1);
+            Cylinder(tool, .028f, .028f, .05f, new Vector3(0, -.1f, 0), Mat("c9b48a", .95f), sides: 8);
         }
         return tool;
     }
