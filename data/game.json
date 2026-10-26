@@ -11,6 +11,7 @@
   "campfireHours": 4,
   "gatherSeconds": 2.0,
   "sprintSpeed": 1.6,
+  "sprintDrain": 1.7,
   "respawnSeconds": 30,
   "berryRegrowHours": 24,
   "sightRadius": 20,

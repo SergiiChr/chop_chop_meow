@@ -53,7 +53,7 @@ Everyone shares the world, the market and the workers. Sleep needs every player 
 | Input | Action |
 | --- | --- |
 | WASD or arrow keys | Move in screen directions |
-| Shift while moving | Sprint 1.6× as fast; food drains 1.6 × 1.1 times as fast |
+| Shift while moving | Sprint 1.6× as fast; food and drink drain 1.7× as fast; not under 15% food or drink |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
 | Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you inside; on open ground, use the item in hand (swing a tool or torch, eat, drink) |

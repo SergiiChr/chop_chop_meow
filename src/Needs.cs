@@ -39,7 +39,6 @@ public partial class Game {
     private NeedGauge health = null!;
     private NeedGauge hunger = null!;
     private NeedGauge thirst = null!;
-    private const float LowNeed = 15;
     private DamageEdges damageEdges = null!;
 
     private void BuildNeeds() {
@@ -58,7 +57,7 @@ public partial class Game {
         if (lost >= 3) damageEdges.Strength = 1;
         if (world.S.Mauled && !world.Dead) damageEdges.Strength = Math.Max(damageEdges.Strength, .55f);
         // Food or drink under 15% keeps the edges pulsing faintly until the player eats or drinks.
-        else if (!world.Dead && (world.S.Hunger < LowNeed || world.S.Thirst < LowNeed)) damageEdges.Strength = Math.Max(damageEdges.Strength, .3f + .12f * MathF.Sin(runTime * 4));
+        else if (!world.Dead && (world.S.Hunger < GameData.LowNeed || world.S.Thirst < GameData.LowNeed)) damageEdges.Strength = Math.Max(damageEdges.Strength, .5f + .15f * MathF.Sin(runTime * 4));
     }
 
     // The rounded values the tooltips show, so their text is built only when one changes.

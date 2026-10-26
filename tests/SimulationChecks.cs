@@ -1598,13 +1598,15 @@ public static class SimulationChecks {
     }
 
     private static void CheckSprintBurnsFood(GameData data) {
-        float Burned(bool sprinting) {
+        (float Hunger, float Thirst) Burned(bool sprinting) {
             var world = new World(data);
             world.Me.Sprinting = sprinting;
             for (int i = 0; i < 10; i++) world.Tick(1);
-            return 100 - world.S.Hunger;
+            return (100 - world.S.Hunger, 100 - world.S.Thirst);
         }
-        Require(Math.Abs(Burned(true) / Burned(false) - data.SprintSpeed * 1.1f) < .001f, "sprinting must burn food at the sprint speed times the walking rate plus a tenth");
+        var (walking, sprinting) = (Burned(false), Burned(true));
+        Require(Math.Abs(sprinting.Hunger / walking.Hunger - data.SprintDrain) < .001f && Math.Abs(sprinting.Thirst / walking.Thirst - data.SprintDrain) < .001f,
+                "sprinting must drain food and drink sprintDrain times as fast");
     }
 
     private static void CheckCabinAndChaseIntoLight(GameData data) {

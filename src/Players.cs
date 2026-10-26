@@ -40,7 +40,7 @@ public sealed class PlayerState {
     public int GatherTarget { get; set; }
     /// <summary>The item in hand, so other machines can show it.</summary>
     public string Held { get; set; } = "";
-    /// <summary>Moving with Shift held, which burns food faster; carried so other machines show the run.</summary>
+    /// <summary>Moving with Shift held, which drains food and drink faster; carried so other machines show the run.</summary>
     public bool Sprinting { get; set; }
     /// <summary>Seconds left of the brighter flare that follows a torch swing.</summary>
     public float TorchFlare { get; set; }

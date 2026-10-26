@@ -399,6 +399,12 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
             await Frames();
             UIRequire(!world.Me.Sprinting, "Shift alone must not sprint once the player stops.");
+            float drink = world.S.Thirst; world.S.Thirst = 10;
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = true });
+            await Frames();
+            UIRequire(!world.Me.Sprinting && view.PlayerAnimation == ActorAction.Walk, "Under 15% drink the player must be too weak to sprint.");
+            Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
+            world.S.Thirst = drink;
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = false });
             // Measured about 115 B a frame: this check's own await of each frame and the memory of things seen for the first time on a straight walk.
             // The budget leaves a third more, so a change that adds garbage to every frame fails it.
