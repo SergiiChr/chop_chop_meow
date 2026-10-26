@@ -7,6 +7,7 @@ namespace ChopChopMeow;
 /// <summary>Inventory-driven pile appearance refreshes without changing stock or sharing visibility state.</summary>
 public static class PileModelChecks {
     public static void Run(GameData data) {
+        PileShape.Warm(data);
         var thing = new Thing { Kind = "pile", Inventory = new Inventory { Slots = 14 } };
         var first = WorldModels.Build(thing); var second = WorldModels.Build(thing);
         try {

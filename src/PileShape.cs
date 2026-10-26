@@ -13,20 +13,36 @@ internal static class PileShape {
 
     private static readonly Dictionary<string, Mesh> contents = new();
 
+    private static readonly string[] families = { "logs", "stone", "ore", "coal", "planks", "bars", "fallback" };
+
+    private static string Family(string item) => item switch {
+        "wood" => "logs",
+        "stone" => "stone",
+        "iron_ore" or "tin_ore" => "ore",
+        "coal" => "coal",
+        "planks" or "wood_parts" => "planks",
+        "iron_bar" or "steel_bar" or "tin_bar" => "bars",
+        _ => "fallback"
+    };
+
+    private static StandardMaterial3D Material(string family, string color) =>
+        ModelKit.Mat(family == "coal" ? "292c30" : color, family == "bars" ? .45f : .95f, family == "bars" ? .5f : 0);
+
+    /// <summary>Builds every stock mesh and item material while loading, so a pile showing a new item mid-game swaps cached resources only.</summary>
+    public static void Warm(GameData data) {
+        foreach (var family in families) if (!contents.ContainsKey(family)) contents[family] = BuildStock(family);
+        foreach (var (id, item) in data.Items) Material(Family(id), item.Color);
+        Material("fallback", Fallback);
+    }
+
+    /// <summary>The color of an item the data does not know.</summary>
+    public const string Fallback = "b0a58a";
+
     /// <summary>Reuse small stock/resource meshes without duplicating nodes or changing inventory slot order.</summary>
     public static void SetStock(MeshInstance3D slot, string item, string color) {
-        string family = item switch {
-            "wood" => "logs",
-            "stone" => "stone",
-            "iron_ore" or "tin_ore" => "ore",
-            "coal" => "coal",
-            "planks" or "wood_parts" => "planks",
-            "iron_bar" or "steel_bar" or "tin_bar" => "bars",
-            _ => "fallback"
-        };
-        if (!contents.TryGetValue(family, out var mesh)) contents[family] = mesh = BuildStock(family);
-        slot.Mesh = mesh;
-        slot.MaterialOverride = ModelKit.Mat(family == "coal" ? "292c30" : color, family == "bars" ? .45f : .95f, family == "bars" ? .5f : 0);
+        string family = Family(item);
+        slot.Mesh = contents[family];
+        slot.MaterialOverride = Material(family, color);
     }
 
     private static Mesh BuildStock(string family) {
