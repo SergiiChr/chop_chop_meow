@@ -43,29 +43,35 @@ public sealed partial class World {
     /// A farm hand carries out the harvest, keeping seed for two more sowings, fetches what the next sowing lacks,
     /// waits by the plot while the wheat grows, and harvests it when ripe.
     /// </summary>
-    private void FarmWork(Worker w, Thing farm, float dt) {
-        // Each pass ends with a return, so the transfer never changes the stacks while they are still being walked.
-        foreach (var (item, count) in farm.Inventory.Items) {
-            int spare = count - Data.Farm.Sow.GetValueOrDefault(item) * 2;
-            if (spare <= 0 || DepositFor(item, farm.Pos) is not Thing dest) continue;
-            w.Status = Phrase("Carrying out ", Data.Name(item));
-            if (Walk(w, farm.Pos, dt)) { farm.Inventory.TransferTo(w.Bag, item, Math.Min(spare, w.Bag.StackSize), true); w.Destination = dest.Id; }
-            return;
-        }
-        if (farm.Stage == FarmFallow)
-            foreach (var (item, amount) in Data.Farm.Sow) {
-                if (farm.Inventory[item] >= amount) continue;
-                var source = SourceFor(item, w.Pos);
-                if (source == null) { w.Status = Phrase("Needs ", Data.Name(item), " in output-enabled storage"); return; }
-                w.Status = Phrase("Fetching ", Data.Name(item));
-                if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, item, amount - farm.Inventory[item], true); w.Destination = farm.Id; }
-                return;
+    /// <summary>A farmer harvests the ripe wheat; a hauler carries out what is beyond two sowings and fetches what the next sowing lacks.</summary>
+    private bool FarmWork(Worker w, Thing farm, float dt) {
+        if (HasDuty(w, farm.Id, "haul")) {
+            // Each pass ends with a return, so the transfer never changes the stacks while they are still being walked.
+            foreach (var (item, count) in farm.Inventory.Items) {
+                int spare = count - Data.Farm.Sow.GetValueOrDefault(item) * 2;
+                if (spare <= 0 || DepositFor(item, farm.Pos) is not Thing dest) continue;
+                w.Status = Phrase("Carrying out ", Data.Name(item));
+                if (Walk(w, farm.Pos, dt)) { farm.Inventory.TransferTo(w.Bag, item, Math.Min(spare, w.Bag.StackSize), true); w.Destination = dest.Id; }
+                return true;
             }
-        if (farm.Stage != FarmRipe) { w.Status = "Waiting for the wheat to grow"; Walk(w, farm.Pos, dt); return; }
+            if (farm.Stage == FarmFallow)
+                foreach (var (item, amount) in Data.Farm.Sow) {
+                    if (farm.Inventory[item] >= amount) continue;
+                    var source = SourceFor(item, w.Pos);
+                    if (source == null) { w.Status = Phrase("Needs ", Data.Name(item), " in output-enabled storage"); return false; }
+                    w.Status = Phrase("Fetching ", Data.Name(item));
+                    if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, item, amount - farm.Inventory[item], true); w.Destination = farm.Id; }
+                    return true;
+                }
+        }
+        bool farms = HasDuty(w, farm.Id, "farm");
+        if (farm.Stage != FarmRipe) { w.Status = "Waiting for the wheat to grow"; if (farms) Walk(w, farm.Pos, dt); return false; }
+        if (!farms) { w.Status = "Waiting for the harvest"; return false; }
         w.Status = Phrase("Harvesting wheat · ", Number(farm.Progress / HarvestSeconds * 100), "%");
-        if (!Walk(w, farm.Pos, dt)) return;
+        if (!Walk(w, farm.Pos, dt)) return true;
         w.WorkState = WorkerWorkState.Gathering;
         Harvest(farm, dt);
+        return true;
     }
 
     public string FarmStatus(Thing farm) {

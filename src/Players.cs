@@ -120,6 +120,7 @@ public sealed partial class World {
             case "cancel_craft": CancelCraft(c.Count); break;
             case "transfer": if (Resolve(c.Target) is Inventory from && Resolve(c.Other) is Inventory to) Transfer(from, to, c.Item, c.Count); break;
             case "assign": if (w != null) Assign(w, t); break;
+            case "duty": if (w != null && t != null) SetDuty(w, t, c.Item, c.Count != 0); break;
             case "fire": if (w != null) Fire(w); break;
             case "settle": if (w != null) SettleDebt(w); break;
         }
@@ -134,6 +135,7 @@ public sealed partial class World {
             case "set_filter": SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
             case "clear_filters": ClearFilters(t); break;
             case "set_compost": SetCompost(t, c.Count != 0); break;
+            case "skip_food": SetSkipFood(t, c.Count != 0); break;
             case "supply_mine": SupplyMine(t); break;
             case "load_batch": LoadBatch(t, Math.Clamp(c.Count, 1, 5)); break;
             case "load_input": LoadInput(t, c.Item, c.Count); break;
@@ -194,6 +196,12 @@ public sealed partial class World {
         if (!chest.IsStorage || !Data.Items.ContainsKey(item) || Forwarded("set_filter", chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         var filter = output ? chest.Inventory.OutputFilter : chest.Inventory.InputFilter;
         if (allowed) filter.Add(item); else filter.Remove(item);
+    }
+
+    /// <summary>Stops or restarts workers bringing food to a compost.</summary>
+    public void SetSkipFood(Thing pile, bool skip) {
+        if (!pile.Compost || Forwarded("skip_food", pile.Id, count: skip ? 1 : 0)) return;
+        pile.SkipFood = skip;
     }
 
     public void ClearFilters(Thing chest) {

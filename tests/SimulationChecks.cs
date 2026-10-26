@@ -53,6 +53,7 @@ public static class SimulationChecks {
         CheckRaking(data);
         CheckPilesAndCompost(data);
         CheckCookingAndCanning(data);
+        CheckWorkerDuties(data);
         CheckFarmPlot(data);
         CheckNewFoodsAndRename(data);
         CheckMarketTakesOnlyCrates(data);
@@ -111,6 +112,80 @@ public static class SimulationChecks {
         var worker = new Worker { Id = world.S.NextId++, Name = $"Worker {world.S.Workers.Count + 1}", Pos = position };
         world.S.Workers.Add(worker);
         return worker;
+    }
+
+    /// <summary>
+    /// Workers take jobs one at a time: a worker with jobs at two places takes turns at them, haulers and crafters split a bench's work,
+    /// a stocker fills the tool rack from storage, a tender feeds compost without food when told to, and a runner carries deliveries in.
+    /// </summary>
+    private static void CheckWorkerDuties(GameData data) {
+        var world = EmptyWorld(data);
+        float morning = world.S.Time;
+        var chest = world.Add("chest", new Vector2(20, 20));
+        chest.Inventory.Add("wood", 20);
+        var rock = world.Add("stone", new Vector2(24, 20), 30);
+        var fire = world.Add("campfire", new Vector2(20, 24));
+        var both = AddWorker(world, new Vector2(22, 22));
+        world.SetDuty(both, rock, "gather", true);
+        world.SetDuty(both, fire, "fuel", true);
+        Require(both.Duties.Count == 2 && both.Assignment == rock.Id, "a worker should keep jobs at two places and start at the first");
+        SafeTick(world, 60);
+        Require(rock.Remaining < 30 && fire.Burn + fire.Inventory["wood"] * world.Data.CampfireSeconds > 0,
+                "a worker with jobs at two places should take turns: gathering stone and feeding the fire");
+        world.SetDuty(both, fire, "fuel", false);
+        Require(both.Duties.Count == 1 && World.HasDuty(both, rock.Id, "gather"), "taking one job away should keep the other");
+        world.Assign(both, null);
+
+        world.S.Time = morning;
+        // A bench hauler only stocks it; the work itself waits for a crafter.
+        var bench = world.Add("bench", new Vector2(28, 24));
+        bench.Tools!.Add("stone_chisel", 1);
+        world.SetRecipe(bench, "planks");
+        var hauler = AddWorker(world, new Vector2(27, 23));
+        world.SetDuty(hauler, bench, "haul", true);
+        SafeTick(world, 20);
+        Require(bench.Inventory["wood"] > 0 && bench.Inventory["planks"] == 0 && !bench.Processing,
+                "a bench hauler should stock the bench without working it");
+        var crafter = AddWorker(world, new Vector2(28, 25));
+        world.SetDuty(crafter, bench, "craft", true);
+        SafeTick(world, 20);
+        Require(bench.Inventory["planks"] + chest.Inventory["planks"] > 0, "a crafter should work the stocked bench");
+        world.Assign(hauler, null); world.Assign(crafter, null);
+
+        world.S.Time = morning;
+        // A stocker brings tools from storage to the rack.
+        var rack = world.Add("toolstation", new Vector2(16, 20));
+        chest.Inventory.Add("steel_axe", 1);
+        var stocker = AddWorker(world, new Vector2(18, 20));
+        world.SetDuty(stocker, rack, "stock", true);
+        SafeTick(world, 20);
+        Require(rack.Inventory["steel_axe"] == 1 && chest.Inventory["steel_axe"] == 0, "a stocker should bring a stored tool to the rack");
+        world.Assign(stocker, null);
+
+        world.S.Time = morning;
+        // A tender feeds compost from storage, skipping food when told to, and carries its fertilizer back.
+        var compost = world.Add("pile", new Vector2(16, 24));
+        Require(world.SetCompost(compost, true), "an empty pile should turn into compost");
+        world.SetSkipFood(compost, true);
+        compost.Inventory.Add("fertilizer", 2);
+        chest.Inventory.Add("leaves", 8); chest.Inventory.Add("berries", 6);
+        var tender = AddWorker(world, new Vector2(17, 22));
+        world.SetDuty(tender, compost, "tend", true);
+        SafeTick(world, 40);
+        Require(chest.Inventory["fertilizer"] == 2 && compost.Inventory["leaves"] > 0 && chest.Inventory["berries"] == 6 && compost.Inventory["berries"] == 0,
+                "a tender should carry fertilizer to storage and bring leaves, but no food when food deliveries are skipped");
+        world.Assign(tender, null);
+
+        world.S.Time = morning;
+        // A trading post's runner carries what the cart delivered, other than coins, to storage.
+        var store = world.Add("chest", new Vector2(26, 28));
+        var sign = world.Add("signpost", new Vector2(24, 26));
+        sign.Output!.Add("tin_bar", 3); sign.Output.Add(Inventory.Coins, 20);
+        var runner = AddWorker(world, new Vector2(24, 25));
+        world.SetDuty(runner, sign, "deliveries", true);
+        SafeTick(world, 20);
+        Require(store.Inventory["tin_bar"] == 3 && sign.Output["tin_bar"] == 0 && sign.Output[Inventory.Coins] == 20,
+                "a runner should carry deliveries into storage and leave the coins");
     }
 
     private static void CheckInventoryFilters(GameData data) {
