@@ -60,7 +60,7 @@ public static class AllocationChecks {
         mine = world.Add("mine", World.MineSpot(cliff)); mine.Stage = World.MineOpen;
         world.Add("chest", mine.Pos + cliff.Face * 3);
         for (int i = 0; i < data.Mine.Workers; i++) {
-            var w = new Worker { Id = world.S.NextId++, Name = $"Miner {i + 1}", Pos = mine.Pos + cliff.Face * 2, Tool = "iron_pick" };
+            var w = new Worker { Id = world.S.NextId++, Name = $"Miner {i + 1}", Pos = mine.Pos + cliff.Face * 2, Tool = "steel_pick" };
             world.S.Workers.Add(w); world.Assign(w, mine);
         }
         return world;
@@ -75,7 +75,7 @@ public static class AllocationChecks {
         world.Add("chest", at + new Vector2(2, -2));
         chest.Inventory.Add("iron_bar", 20); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_ore", 20); chest.Inventory.Add("wood", 30);
         var rack = world.Add("toolstation", at + new Vector2(-2, 0));
-        rack.Inventory.Add("iron_axe", 2);
+        rack.Inventory.Add("steel_axe", 2);
         var fire = world.Add("campfire", at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
         var furnace = world.Add("furnace", at + new Vector2(3, 3));
         var forge = world.Add("reinforced", at + new Vector2(-3, 3)); forge.Heat = 90;

@@ -158,7 +158,7 @@ public static class EconomyChecks {
         var chest = world.Add("chest", new Vector2(22.5f, 20));
         // Workers take plain iron tools from a station beside the chest, so the measure stays the baseline output.
         var station = world.Add("toolstation", new Vector2(22.5f, 22));
-        station.Inventory.Add("iron_axe", 1); station.Inventory.Add("iron_pick", 1);
+        station.Inventory.Add("steel_axe", 1); station.Inventory.Add("steel_pick", 1);
         Hire(world, source);
         Pass(world, days * data.DaySeconds);
         return chest.Inventory[World.ResourceItem(source)] / (float)days;

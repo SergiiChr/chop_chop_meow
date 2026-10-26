@@ -68,7 +68,7 @@ public static class WorldModels {
         },
         "stone" => new[] { new Hit(.75f, 0, .9f) },
         "iron" or "coal" or "tin" => new[] { new Hit(.8f, 0, 1) },
-        "loose_iron" or "loose_coal" => new[] { new Hit(.45f, 0, .35f) },
+        "loose_coal" => new[] { new Hit(.45f, 0, .35f) },
         "wolf_corpse" => new[] { new Hit(.65f, 0, .5f) },
         "berries" => new[] { new Hit(.65f, 0, 1) },
         "water" => new[] { new Hit(1.2f, 0, .5f) },
@@ -101,7 +101,6 @@ public static class WorldModels {
             case "iron": Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case "coal": Rocks(body, t.Kind, t.Id, "505257", "121316", "15161a"); break;
             case "tin": Rocks(body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
-            case "loose_iron": LooseOre(body, t.Kind, t.Id, "a35a2e", "8b4f2b"); break;
             case "loose_coal": LooseOre(body, t.Kind, t.Id, "2d2f33", "1d1e21"); break;
             case "wolf_corpse": Carcass(prop); break;
             case "berries": Bush(prop, t.Id); break;
