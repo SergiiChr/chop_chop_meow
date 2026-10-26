@@ -44,6 +44,16 @@ public sealed class Prop {
 /// <summary>Code-built low-poly models for every world object: natural, modern and DIY rather than fantasy.</summary>
 public static class WorldModels {
     public const int TreeVariants = 3;
+
+    /// <summary>
+    /// Builds the shared meshes and outfit palettes of models that first appear mid-game while the world loads.
+    /// A trade cart with its courier, a dropped backpack and fresh leaf patches then only add nodes over cached resources.
+    /// </summary>
+    public static void Warm() {
+        new CartModel().Root.Free();
+        _ = BackpackShape.Details; _ = BackpackShape.Flap;
+        for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
+    }
     /// <summary>Full deposit sizes from world generation; piles shrink toward half size as they are worked.</summary>
     public static float Fullness(Thing t) => t.Kind switch {
         "stone" => t.Remaining / 64f,

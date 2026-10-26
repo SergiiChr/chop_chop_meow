@@ -11,10 +11,6 @@ internal static class CartShape {
     public static Mesh Payment => payment ??= BuildPayment();
     public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .65f, Metallic = .35f };
     public static readonly StandardMaterial3D WheelSurface = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f };
-    /// <summary>Build cart geometry during world loading, before the first trade order arrives.</summary>
-    public static void Warm() {
-        _ = Frame; _ = Wheel; _ = Payment; _ = CrateShape.Cargo;
-    }
 
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 

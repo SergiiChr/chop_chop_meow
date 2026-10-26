@@ -5,13 +5,14 @@ namespace ChopChopMeow;
 
 /// <summary>Three cached, vertex-coloured autumn leaf scatters for rakeable leaf patches.</summary>
 internal static class LeafShape {
-    private static readonly ArrayMesh?[] variants = new ArrayMesh[3];
+    public const int Variants = 3;
+    private static readonly ArrayMesh?[] variants = new ArrayMesh[Variants];
     private static readonly Color[] palette = {
         new("c08a3a"), new("a8652c"), new("d0a347"), new("8e5a2a"), new("b8753a")
     };
 
     public static Mesh For(int id) {
-        int variant = ((id % variants.Length) + variants.Length) % variants.Length;
+        int variant = ((id % Variants) + Variants) % Variants;
         return variants[variant] ??= Build(variant);
     }
 

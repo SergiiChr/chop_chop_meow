@@ -110,7 +110,7 @@ public partial class WorldView : Node3D {
         BuildGround(scene);
         BuildEffects(scene);
         PileShape.Warm(World.Data);
-        CartShape.Warm();
+        WorldModels.Warm();
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
         selectRing = Ring(new Color(.95f, .82f, .4f, .85f));
         hoverRing = Ring(new Color(1, .95f, .75f, .55f));
