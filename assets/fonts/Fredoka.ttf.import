@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://dw4pux0hyyud4"
-path="res://.godot/imported/BarlowSemiCondensed-Bold.ttf-e78b886af166e871ad44dbd47c1e0c7f.fontdata"
+uid="uid://b5xnd1lsrvbyv"
+path="res://.godot/imported/Fredoka.ttf-38db4f924b441151c6642ef65fe93e1f.fontdata"
 
 [deps]
 
-source_file="res://assets/fonts/BarlowSemiCondensed-Bold.ttf"
-dest_files=["res://.godot/imported/BarlowSemiCondensed-Bold.ttf-e78b886af166e871ad44dbd47c1e0c7f.fontdata"]
+source_file="res://assets/fonts/Fredoka.ttf"
+dest_files=["res://.godot/imported/Fredoka.ttf-38db4f924b441151c6642ef65fe93e1f.fontdata"]
 
 [params]
 

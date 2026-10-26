@@ -472,33 +472,39 @@ public static class SimulationChecks {
     private static void CheckFuelAndHeatGates(GameData data) {
         var world = EmptyWorld(data);
         var basic = world.Add("furnace", new Vector2(10, 10));
-        var woodCost = world.BatchCost(basic);
-        Require(woodCost.TryGetValue("wood", out var basicWood) && basicWood == 1 && !woodCost.ContainsKey("coal"),
-                "basic furnace should accept wood as its initial fuel");
-        basic.Fuel = "coal";
-        var coalCost = world.BatchCost(basic);
-        Require(coalCost.TryGetValue("coal", out var basicCoal) && basicCoal == 1 && !coalCost.ContainsKey("wood"),
-                "basic furnace should also accept coal as fuel");
+        Require(world.FuelOf(basic) == "wood" && !world.BatchCost(basic).ContainsKey("wood") && basic.Burner != null,
+                "basic furnace should burn wood from its own fuel slot by default, apart from its ingredients");
+        basic.Burner!.Add("coal", 4);
+        Require(world.FuelOf(basic) == "coal" && world.FuelBlock(basic, "wood") != null,
+                "basic furnace should burn the coal in its fuel slot and take one kind of fuel at a time");
 
         var reinforced = world.Add("reinforced", new Vector2(15, 10));
         reinforced.Fuel = "wood"; // Even malformed or edited state must not make wood a valid steel fuel.
+        Require(world.FuelOf(reinforced) == "coal" && world.FuelBlock(reinforced, "wood") != null,
+                "the high-temp furnace should only ever burn coal, even if Fuel is tampered with");
         var steelCost = world.BatchCost(reinforced);
-        Require(steelCost.TryGetValue("coal", out var steelCoal) && steelCoal == 3 && !steelCost.ContainsKey("wood"),
-                "reinforced steel batches should always require coal, including fuel, even if Fuel is tampered with");
+        Require(steelCost["coal"] == 2 && steelCost["iron_bar"] == 2 && steelCost.Count == 2,
+                "a steel batch's ingredients should be iron and coal, with its fuel coal in the fuel slot");
         reinforced.Inventory.Add("iron_bar", 2);
-        reinforced.Inventory.Add("coal", 3);
+        reinforced.Inventory.Add("coal", 2);
         world.Player = reinforced.Pos;
-        SafeTick(world, 12);
-        Require(!reinforced.Processing && reinforced.Progress == 0 && reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 3,
-                "reinforced furnace must leave a complete steel batch untouched while below 80 degrees");
         reinforced.Heat = 100;
         SafeTick(world, .25f);
-        Require(reinforced.Processing && reinforced.Inventory["iron_bar"] == 0 && reinforced.Inventory["coal"] == 0,
-                "once hot enough, the reinforced furnace should consume the retained batch inputs");
-        reinforced.Inventory.Add("coal", 3);
+        Require(!reinforced.Processing && reinforced.Inventory["iron_bar"] == 2,
+                "a steel batch must wait for fuel in the fuel slot, even with coal among its ingredients");
+        reinforced.Heat = 0;
+        reinforced.Burner!.Add("coal", 1);
+        SafeTick(world, 12);
+        Require(!reinforced.Processing && reinforced.Progress == 0 && reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 2 && reinforced.Burner["coal"] == 1,
+                "the high-temp furnace must leave a complete steel batch untouched while below the steel heat");
+        reinforced.Heat = 100;
+        SafeTick(world, .25f);
+        Require(reinforced.Processing && reinforced.Inventory["iron_bar"] == 0 && reinforced.Inventory["coal"] == 0 && reinforced.Burner["coal"] == 0,
+                "once hot enough, the high-temp furnace should consume the batch's ingredients and one coal of fuel");
+        reinforced.Burner.Add("coal", 3);
         SafeTick(world, 30);
-        Require(reinforced.Processing && reinforced.Progress < data.Recipes["steel_bar"].Seconds && reinforced.Inventory["coal"] == 1,
-                "a cooled forge should keep burning coal while the steel batch stops progressing");
+        Require(reinforced.Processing && reinforced.Progress < data.Recipes["steel_bar"].Seconds && reinforced.Burner["coal"] == 1,
+                "a cooled forge should keep burning coal from its fuel slot while the steel batch stops progressing");
     }
 
     private static void CheckAnvilNeedsHammering(GameData data) {
@@ -955,8 +961,8 @@ public static class SimulationChecks {
         GatherUntil(world, coal, "coal", 6);
         var furnace = BuildAt(world, "furnace", Site(25, 25));
         world.LoadBatch(furnace, 11);
-        Require(furnace.Inventory["iron_ore"] == 22 && furnace.Inventory["wood"] == 11,
-                "loading the furnace should transfer the recipe inputs and one fuel per batch");
+        Require(furnace.Inventory["iron_ore"] == 22 && furnace.Burner!["wood"] == 11,
+                "loading the furnace should transfer the recipe inputs, and one fuel per batch into its fuel slot");
         CompleteBatches(world, furnace, "iron_bar", 11);
         world.Player = furnace.Pos;
         world.Collect(furnace);
@@ -967,8 +973,8 @@ public static class SimulationChecks {
         world.Player = reinforced.Pos;
         int bars = world.S.Backpack["iron_bar"];
         world.LoadBatch(reinforced, 1);
-        Require(reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 3,
-                "reinforced furnace should load iron plus mined coal and coal fuel");
+        Require(reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 2 && reinforced.Burner!["coal"] == 1,
+                "the high-temp furnace should load iron plus mined coal, and coal fuel into its fuel slot");
         CompleteBatches(world, reinforced, "steel_bar", 2, true);
         world.Player = reinforced.Pos;
         world.Collect(reinforced);
@@ -1410,23 +1416,23 @@ public static class SimulationChecks {
         world.Collect(table);
         world.SetRecipe(table, "berry_jam");
         table.Fuel = "coal"; world.S.Backpack.Add("coal", 1);
-        Require(world.BatchCost(table).SequenceEqual(new Dictionary<string, int> { ["crushed_berries"] = 2, ["coal"] = 1 }), "jam should take crushed berries and the chosen fuel");
+        Require(world.BatchCost(table).SequenceEqual(new Dictionary<string, int> { ["crushed_berries"] = 2 }) && world.FuelOf(table) == "coal", "jam should take crushed berries and burn the chosen fuel");
         world.LoadBatch(table);
         world.Player = new Vector2(40, 40);
         SafeTick(world, data.Recipes["berry_jam"].Seconds + 1);
-        Require(table.Inventory["berry_jam"] == 1 && table.Inventory["coal"] == 0, "jam should cook on its own over the fire");
+        Require(table.Inventory["berry_jam"] == 1 && table.Burner!["coal"] == 0, "jam should cook on its own over the fire");
         world.SetRecipe(table, "dough");
         Require(world.BatchCost(table).Keys.Order().SequenceEqual(new[] { "flour", "water" }), "dough should need no fire");
 
         var cannery = world.Add("cannery", new Vector2(24, 20));
         world.SetRecipe(cannery, "canned_meat_stew");
-        cannery.Inventory.Add("meat_stew", 1); cannery.Inventory.Add("tin_can", 1); cannery.Inventory.Add("wood", 1);
+        cannery.Inventory.Add("meat_stew", 1); cannery.Inventory.Add("tin_can", 1); cannery.Burner!.Add("wood", 1);
         SafeTick(world, data.Recipes["canned_meat_stew"].Seconds + 1);
-        Require(cannery.Inventory["canned_meat_stew"] == 1 && cannery.Inventory.Count == 1, "the canning station should seal stew into a can over wood");
+        Require(cannery.Inventory["canned_meat_stew"] == 1 && cannery.Inventory.Count == 1 && cannery.Burner.Count == 0, "the canning station should seal stew into a can over wood");
 
         var furnace = world.Add("furnace", new Vector2(28, 20));
         world.SetRecipe(furnace, "bread");
-        Require(world.BatchCost(furnace).Keys.Order().SequenceEqual(new[] { "dough", "wood" }), "bread should bake from dough in the furnace");
+        Require(world.BatchCost(furnace).Keys.SequenceEqual(new[] { "dough" }) && world.FuelOf(furnace) == "wood", "bread should bake from dough over the furnace's fire");
 
         // By hand, the mortar is carried like any other tool.
         world.Player = table.Pos + new Vector2(1, 0);

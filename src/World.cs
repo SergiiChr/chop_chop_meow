@@ -25,6 +25,8 @@ public sealed class Thing {
     public Inventory? Output { get; set; }
     /// <summary>A signpost's one stack of coins for wages: sale coins land here first, and dawn wages come out of it before any backpack.</summary>
     public Inventory? Wages { get; set; }
+    /// <summary>A fuel-burning station's one stack of fuel, apart from what it smelts or cooks; what it holds is what it burns.</summary>
+    public Inventory? Burner { get; set; }
     /// <summary>A crafting bench's chisel and hammer slots; automation never touches them.</summary>
     public Inventory? Tools { get; set; }
     /// <summary>Building stages finished, for buildings put up in stages: a mine counts up to <see cref="World.MineOpen"/>.</summary>
@@ -59,6 +61,8 @@ public sealed class Worker {
     /// <summary>Units of one stack a worker carries; a miner bringing out a full mine output carries the whole stack.</summary>
     public const int BagStack = 5;
     public Inventory Bag { get; set; } = new() { Slots = 1, StackSize = BagStack };
+    /// <summary>The bag holds fuel for the destination's burner rather than ingredients.</summary>
+    public bool Fueling { get; set; }
     /// <summary>The tool taken from a tool station for the current job, or empty; it goes back to a station when the job no longer needs it.</summary>
     public string Tool { get; set; } = "";
     /// <summary>The tool kind the worker last reported missing, so the message is said once rather than every tick.</summary>
@@ -269,6 +273,7 @@ public sealed partial class World {
         if (kind == "reinforced") { t.Recipe = "steel_bar"; t.Fuel = "coal"; }
         if (kind == "signpost") { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; t.Wages = NewWageSlot(); }
         if (SlotKinds(kind).Length > 0) t.Tools = NewToolSlots(kind);
+        if (Burns(kind)) t.Burner = NewBurner();
         if (kind == "crate") t.Inventory = NewCrate();
         if (kind == "mine") { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
         if (kind == "toolstation") t.Inventory.Slots = 12;
@@ -525,43 +530,51 @@ public sealed partial class World {
         if (Data.Recipes.TryGetValue(recipe, out var r) && r.Station == t.Kind) { t.Recipe = recipe; t.Progress = 0; }
     }
     /// <summary>The fuel a station burns: coal in the reinforced furnace, otherwise its selection, falling back to wood for anything unknown.</summary>
-    public static string BurnedFuel(Thing t) => t.Kind == "reinforced" ? "coal" : t.Fuel is "wood" or "coal" ? t.Fuel : "wood";
-    // A batch's cost depends only on its recipe and fuel, so each is built once.
-    private readonly Dictionary<(string, string), Dictionary<string, int>> batchCosts = new();
-    /// <summary>One batch's inputs and fuel. Shared between stations, so read it without changing it.</summary>
+    public static string BurnedFuel(Thing t) => t.Kind == "reinforced" ? "coal" : t.Burner?.First() is "wood" or "coal" ? t.Burner.First()! : t.Fuel is "wood" or "coal" ? t.Fuel : "wood";
+    /// <summary>The fuel one batch of the station's recipe burns, or null when it burns none.</summary>
+    public string? FuelOf(Thing t) => Data.Recipes.TryGetValue(t.Recipe, out var r) && r.Fuel ? BurnedFuel(t) : null;
+    // A batch's cost depends only on its recipe, so each is built once.
+    private readonly Dictionary<string, Dictionary<string, int>> batchCosts = new();
+    /// <summary>One batch's inputs, without the fuel, which has a slot of its own. Shared between stations, so read it without changing it.</summary>
     public Dictionary<string, int> BatchCost(Thing t) {
-        var key = (t.Recipe, BurnedFuel(t));
-        if (!batchCosts.TryGetValue(key, out var cost)) batchCosts[key] = cost = NewBatchCost(t);
+        if (!batchCosts.TryGetValue(t.Recipe, out var cost)) batchCosts[t.Recipe] = cost = Data.Recipes.TryGetValue(t.Recipe, out var r) ? new(r.Inputs) : new();
         return cost;
     }
-    private Dictionary<string, int> NewBatchCost(Thing t) {
-        var cost = new Dictionary<string, int>();
-        if (!Data.Recipes.TryGetValue(t.Recipe, out var r)) return cost;
-        foreach (var p in r.Inputs) cost[p.Key] = p.Value;
-        if (r.Fuel) {
-            string fuel = BurnedFuel(t);
-            cost[fuel] = cost.GetValueOrDefault(fuel) + 1;
-        }
-        return cost;
-    }
+    /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it.</summary>
+    private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (FuelOf(t) is not string fuel || t.Burner?[fuel] > 0);
     public void LoadBatch(Thing t, int batches = 1) {
         if (!Near(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded("load_batch", t.Id, count: batches)) return;
         var cost = BatchCost(t);
         if (cost.Count == 0) { Say("Choose a recipe first."); return; }
+        string? fuel = FuelOf(t);
         for (int i = 0; i < batches; i++) {
-            if (!S.Backpack.Has(cost)) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
-            if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize)) { Say("Input slots are full."); break; }
+            if (!S.Backpack.Has(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
+            if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || FuelBlock(t, fuel) != null)) { Say("Input slots are full."); break; }
             foreach (var pair in cost) S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
+            if (fuel != null) S.Backpack.TransferTo(t.Burner!, fuel, 1);
         }
     }
     /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
     public int LoadInput(Thing t, string item, int quantity) {
         if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
+        // Fuel nothing smelts goes to the fuel slot; coal at the high-temp furnace fills the ingredient slot, and the fuel slot is filled by dragging.
+        if (!BatchCost(t).ContainsKey(item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
         if (!BatchCost(t).ContainsKey(item)) { Say($"{Data.Name(item)} is not used by this recipe."); return 0; }
         if (Forwarded("load_input", t.Id, item: item, count: quantity)) return 0;
         int moved = S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, t.Inventory.StackSize - t.Inventory[item]));
         if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(item)} slot is full.");
+        return moved;
+    }
+    /// <summary>Manual loading of the fuel slot, which holds one kind of fuel at a time.</summary>
+    public int LoadFuel(Thing t, string item, int quantity) {
+        if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
+        if (t.Burner == null) return 0;
+        if (FuelBlock(t, item) is string refused) { Say(refused); return 0; }
+        if (Forwarded("load_fuel", t.Id, item: item, count: quantity)) return 0;
+        int moved = S.Backpack.TransferTo(t.Burner, item, Math.Min(quantity, t.Burner.StackOf(item) - t.Burner[item]));
+        if (moved > 0) t.Fuel = item;
+        else Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : "The fuel slot is full.");
         return moved;
     }
     public void Collect(Thing t) {
@@ -729,9 +742,23 @@ public sealed partial class World {
     /// <summary>The whole coins one purchase costs, crate included for boxed goods.</summary>
     public int LotPrice(string item) => (int)MathF.Ceiling(1.25f * (Data.Items[item].Price * Lot(item) + (Lot(item) > 1 ? Data.Items["crate"].Price : 0)));
     public const int MarketSlots = 6;
+    private static Inventory NewBurner() => new() { Slots = 1 };
+    // Stations with a recipe that burns fuel, worked out once from the data.
+    private HashSet<string>? burning;
+    /// <summary>Whether a kind of building has a fuel slot.</summary>
+    public bool Burns(string kind) => (burning ??= Data.Recipes.Values.Where(r => r.Fuel).Select(r => r.Station).ToHashSet()).Contains(kind);
+    /// <summary>Items a station's fuel slot takes: coal at the high-temp furnace, wood or coal elsewhere.</summary>
+    public static bool FuelFits(Thing t, string item) => t.Kind == "reinforced" ? item == "coal" : item is "wood" or "coal";
     private static Inventory NewWageSlot() => new() { Slots = 1, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins.</summary>
-    public string? BoxBlock(Thing t, Inventory box, string item) => box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." : box == t.Inventory ? HoldBlock(t, item) : null;
+    public string? BoxBlock(Thing t, Inventory box, string item) =>
+        box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
+        box == t.Burner ? FuelBlock(t, item) :
+        box == t.Inventory ? HoldBlock(t, item) : null;
+    /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
+    public string? FuelBlock(Thing t, string item) =>
+        !FuelFits(t, item) ? (t.Kind == "reinforced" ? "The high-temp furnace burns only mined coal." : "The fuel slot takes wood or coal.") :
+        t.Burner?.First() is string held && held != item ? $"The fuel slot holds {Data.Name(held).ToLowerInvariant()}. Take it out first." : null;
     /// <summary>Coins kept for wages in every signpost's wage slot.</summary>
     public int WageCoins => S.Things.Sum(t => t.Wages?[Inventory.Coins] ?? 0);
     /// <summary>Pays wages from the signposts' wage slots first, then the acting player's backpack, or nothing if together they fall short.</summary>
@@ -1120,11 +1147,14 @@ public sealed partial class World {
             // Re-evaluate rules every tick, including filters changed while a worker is carrying goods.
             // A mine site takes only what it still needs, so a surplus goes back to storage.
             int wanted = dest?.Kind == "mine" ? MineNeed(dest, item) : int.MaxValue;
-            if (dest == null || wanted == 0 || dest.Inventory.Room(item) == 0 || !dest.Inventory.Accepts(item) || (dest.Id == target?.Id && w.Job != "building")) dest = DepositFor(item, w.Pos);
+            // Fuel for a station goes into its fuel slot; once that is full or gone, it goes to storage like anything else.
+            var into = w.Fueling && dest?.Burner != null && FuelBlock(dest, item) == null ? dest.Burner : dest?.Inventory;
+            if (dest == null || into == null || wanted == 0 || into.Room(item) == 0 || !into.Accepts(item) || (dest.Id == target?.Id && w.Job != "building")) { dest = DepositFor(item, w.Pos); into = dest?.Inventory; w.Fueling = false; }
             if (dest == null) { w.Status = Phrase("Holding ", Data.Name(item), " · no accepting storage"); return; }
             w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
             if (Walk(w, dest.Pos, dt)) {
-                w.Bag.TransferTo(dest.Inventory, item, dest.Kind == "mine" ? MineNeed(dest, item) : w.Bag[item], true); w.Destination = 0;
+                w.Bag.TransferTo(into!, item, dest.Kind == "mine" ? MineNeed(dest, item) : w.Bag[item], true); w.Destination = 0;
+                if (w.Bag.Count == 0) w.Fueling = false;
                 if (w.Bag.Count == 0) w.Bag.StackSize = Worker.BagStack;
             }
             return;
@@ -1183,6 +1213,12 @@ public sealed partial class World {
             if (source == null) continue;
             w.Status = Phrase("Fetching ", Data.Name(pair.Key));
             if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, pair.Key, pair.Value * 2 - target.Inventory[pair.Key], true); w.Destination = target.Id; }
+            return;
+        }
+        // Then two batches' worth of fuel for the fuel slot.
+        if ((!Worked(target) || !target.Processing) && FuelOf(target) is string fuel && target.Burner![fuel] < 2 && FuelBlock(target, fuel) == null && SourceFor(fuel, w.Pos) is Thing fuelSource) {
+            w.Status = Phrase("Fetching ", Data.Name(fuel), " for the fire");
+            if (Walk(w, fuelSource.Pos, dt)) { fuelSource.Inventory.TransferTo(w.Bag, fuel, 2 - target.Burner[fuel], true); w.Destination = target.Id; w.Fueling = true; }
             return;
         }
         // Only one worker ever pumps: a lone worker pumps between loads, while extra crew only haul.
@@ -1329,15 +1365,16 @@ public sealed partial class World {
             string? tool = t.Tools != null && recipe.Tool != "" ? BenchTool(t, recipe.Tool, recipe.Tier) : null;
             if (t.Tools != null && recipe.Tool != "" && tool == null) atAnvil = false;
             float rate = (t.Kind == "bench" ? Data.BenchSpeed : 1) * Speed(tool);
-            if (!t.Processing && hot && atAnvil && t.Inventory.Has(BatchCost(t))) {
+            if (!t.Processing && hot && atAnvil && Stocked(t)) {
                 t.Inventory.Spend(BatchCost(t)); t.Processing = true; t.Progress = 0;
+                if (FuelOf(t) is string fuel) t.Burner!.Remove(fuel, 1);
                 if (recipe.Fuel && !burning) Play("start_fire", t.Pos);
             }
             if (t.Processing && !hot) {
                 // A cold forge mid-batch keeps burning coal from its slot at the batch fuel rate, but the steel waits for heat.
                 // Burn is the campfire's fuel clock, reused here to time the next coal.
                 t.Burn = Math.Min(recipe.Seconds, t.Burn + dt);
-                if (t.Burn >= recipe.Seconds && t.Inventory.Remove("coal", 1) > 0) t.Burn = 0;
+                if (t.Burn >= recipe.Seconds && t.Burner?.Remove("coal", 1) > 0) t.Burn = 0;
             }
             if (t.Processing && hot && atAnvil) {
                 t.Progress = Math.Min(recipe.Seconds, t.Progress + dt * rate);
@@ -1617,6 +1654,12 @@ public sealed partial class World {
             // Anvils of older saves may still be set to tools that are now made at the bench.
             if (t.Recipe != "" && (!Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Station != t.Kind)) { t.Recipe = ""; t.Processing = false; t.Progress = 0; }
             if (SlotKinds(t.Kind).Length > 0) t.Tools ??= NewToolSlots(t.Kind);
+            // Stations used to keep their fuel with the ingredients; fuel nothing smelts moves to the fuel slot.
+            if (Burns(t.Kind) && t.Burner == null) {
+                t.Burner = NewBurner();
+                string fuel = BurnedFuel(t);
+                if (!BatchCost(t).ContainsKey(fuel)) t.Inventory.TransferTo(t.Burner, fuel, t.Inventory[fuel]);
+            }
         }
         if (legacyTools) {
             foreach (var (tool, made) in new[] { ("axe", "steel_axe"), ("pickaxe", "steel_pick") })
