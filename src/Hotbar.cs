@@ -34,12 +34,12 @@ public partial class Game {
         button.Pressed += () => SelectHotbar(slot);
         button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.Buildings.ContainsKey(drag.Item);
         button.Take = drag => { SetHotbar(slot, drag.Item); return 0; };
-        button.CustomMinimumSize = new Vector2(62, 62);
-        Style.Skin(button, Style.SocketNormal, Style.SocketHover, Style.SocketPressed);
+        button.CustomMinimumSize = new Vector2(56, 56);
+        Style.Skin(button, Style.CupNormal, Style.CupHover, Style.CupPressed);
         button.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
         button.Text = "";
         button.ExpandIcon = true;
-        button.AddThemeConstantOverride("icon_max_width", 44);
+        button.AddThemeConstantOverride("icon_max_width", 40);
         button.IconAlignment = HorizontalAlignment.Center;
         button.VerticalIconAlignment = VerticalAlignment.Center;
         button.TooltipText = $"Hotbar slot {slot + 1}";
@@ -48,29 +48,17 @@ public partial class Game {
             MouseFilter = Control.MouseFilterEnum.Ignore,
             AnchorRight = 1,
             AnchorBottom = 1,
-            OffsetLeft = 4,
-            OffsetTop = 2,
-            OffsetRight = -42,
-            OffsetBottom = -42
+            OffsetLeft = 6,
+            OffsetTop = 3,
+            OffsetRight = -38,
+            OffsetBottom = -38
         };
-        number.AddThemeFontOverride("font", Style.Bold); number.AddThemeFontSizeOverride("font_size", 12);
-        number.AddThemeColorOverride("font_color", Style.Muted);
+        number.AddThemeFontOverride("font", Style.Bold); number.AddThemeFontSizeOverride("font_size", 10);
+        number.AddThemeColorOverride("font_color", Style.Tan);
         button.AddChild(number);
-        var count = new Label {
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            AnchorLeft = 0,
-            AnchorTop = 0,
-            AnchorRight = 1,
-            AnchorBottom = 1,
-            OffsetLeft = 28,
-            OffsetTop = 41,
-            OffsetRight = -4,
-            OffsetBottom = -2
-        };
-        count.AddThemeFontOverride("font", Style.Bold); count.AddThemeFontSizeOverride("font_size", 14);
-        count.AddThemeColorOverride("font_color", Style.Cream);
-        count.AddThemeColorOverride("font_outline_color", Style.Socket); count.AddThemeConstantOverride("outline_size", 4);
+        // The count sits on a pill at the cup's corner, as on every other cup.
+        var count = Style.Corner(Style.Pill("", Style.CountPill, Style.Rim, 12), 1, 1);
+        count.Visible = false;
         button.AddChild(count);
         hotbarCounts.Add(count);
         hotbarButtons.Add(button);
@@ -96,8 +84,9 @@ public partial class Game {
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · assign from Inventory" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
             bool active = world.S.ActiveHotbar == slot;
             // The item in hand gets an orange rim.
-            button.AddThemeStyleboxOverride("normal", active ? Style.SocketWanted : Style.SocketNormal);
-            button.AddThemeStyleboxOverride("disabled", active ? Style.SocketWanted : Style.SocketNormal);
+            button.AddThemeStyleboxOverride("normal", active ? Style.CupWanted : Style.CupNormal);
+            button.AddThemeStyleboxOverride("disabled", active ? Style.CupWanted : Style.CupNormal);
+            hotbarCounts[slot].Visible = hotbarCounts[slot].Text != "";
         }
     }
 

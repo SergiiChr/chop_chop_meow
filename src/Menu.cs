@@ -10,19 +10,17 @@ public partial class Game {
     private Button hostButton = null!, joinButton = null!, saveButton = null!, loadButton = null!;
     private Label netLine = null!;
 
-    /// <summary>A round badge with an icon, and a keycap when a key opens the same page.</summary>
-    private Button MenuIcon(string icon, string tooltip, Action action, string key = "") {
+    /// <summary>A round enamel badge with a line icon, and a key pill when a key opens the same page.</summary>
+    private Button MenuIcon(string glyph, string tooltip, Action action, string key, Color color) {
         var button = Button("", action);
-        button.Name = icon; button.TooltipText = key == "" ? tooltip : $"{tooltip} · {key}";
-        button.Icon = GD.Load<Texture2D>($"res://assets/ui/{icon}.svg");
+        button.Name = glyph; button.TooltipText = key == "" ? tooltip : $"{tooltip} · {key}";
+        button.Icon = GD.Load<Texture2D>($"res://assets/ui/line_{glyph}.svg");
         button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center; button.VerticalIconAlignment = VerticalAlignment.Center;
-        button.CustomMinimumSize = new Vector2(56, 56); button.AddThemeConstantOverride("icon_max_width", 34);
+        button.CustomMinimumSize = new Vector2(56, 56); button.AddThemeConstantOverride("icon_max_width", 28);
+        button.AddThemeColorOverride("icon_normal_color", Style.Rim); button.AddThemeColorOverride("icon_hover_color", Style.Rim); button.AddThemeColorOverride("icon_pressed_color", Style.Rim);
         button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        Style.Skin(button, Style.RoundNormal, Style.RoundHover, Style.RoundPressed);
-        if (key != "") {
-            var cap = Style.Keycap(key); cap.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomRight); cap.GrowHorizontal = Control.GrowDirection.Begin; cap.GrowVertical = Control.GrowDirection.Begin;
-            cap.OffsetRight = 4; cap.OffsetBottom = 4; button.AddChild(cap);
-        }
+        var look = Style.Round(color, 28); Style.Skin(button, look.Item1, look.Item2);
+        if (key != "") button.AddChild(Style.Corner(Style.Pill(key, Style.KeyPill, Style.Line, 10), 1, 1, 8));
         return button;
     }
 
@@ -32,7 +30,7 @@ public partial class Game {
         menu.GrowHorizontal = Control.GrowDirection.Both; menu.GrowVertical = Control.GrowDirection.Both;
         ui.AddChild(menu);
         var column = new VBoxContainer(); menu.AddChild(column);
-        var title = Label("PAUSED", 22); title.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(title);
+        var title = Style.Heading("Paused", 24); title.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(title);
         goals = new VBoxContainer(); goals.AddThemeConstantOverride("separation", 3); column.AddChild(goals);
         var resume = Button("Resume · Esc", CloseMenu); resume.Name = "resume"; column.AddChild(resume);
         var files = new HBoxContainer(); column.AddChild(files);

@@ -207,6 +207,8 @@ public sealed partial class World {
     private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f, ChaseSeconds = 3;
     /// <summary>Minimum bellows furnace temperature: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
+    /// <summary>Heat as degrees Celsius for display: the steel line sits where steel forms, 1450 °C.</summary>
+    public static int Celsius(float heat) => (int)MathF.Round(heat * 1450 / SteelHeat / 10) * 10;
     // Rock faces at the foot of both ranges, facing into the valley; the first iron and coal cliffs are the nearer ones, with loose coal below the coal cliff.
     // Iron and tin have no loose pieces: they wait for a pickaxe.
     public static readonly Cliff[] Cliffs = { FootCliff("iron", 172, 1), FootCliff("coal", 140, -1), FootCliff("tin", 108, 1), FootCliff("iron", 80, -1), FootCliff("coal", 62, 1) };
@@ -288,7 +290,7 @@ public sealed partial class World {
         if (kind == "toolstation") t.Inventory.Slots = 12;
         if (kind == "pile") t.Inventory.Slots = PileStacks;
         if (kind == "chest") t.Inventory.Slots = ChestStacks;
-        if (kind == "farm") t.Inventory.Slots = Data.Farm.Sow.Keys.Union(Data.Farm.Yield.Keys).Count();
+        if (kind == "farm") { t.Inventory.Slots = Data.Farm.Sow.Count; t.Output = new() { Slots = Data.Farm.Yield.Count }; }
         S.Things.Add(t); return t;
     }
     public void NewGame() {
@@ -413,7 +415,7 @@ public sealed partial class World {
             if (Data.Items.TryGetValue(pair.Key, out var def) && def.Tool == tool && def.Tier >= tier && (best == null || def.Speed > speed)) { best = pair.Key; speed = def.Speed; }
         return best;
     }
-    private float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
+    public float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
     public void MovePlayer(Vector2 delta) {
         // Inside a cabin the player stays put until they step outside on purpose.
         if (Downed || S.Sheltered != 0) return;
@@ -446,7 +448,7 @@ public sealed partial class World {
         var blocked = GatherBlock(t);
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
-        if (t.Kind == "farm") { Harvest(t, dt); if (t.Stage == FarmFallow) Say("Harvested. Take the wheat, seeds and grass from the plot."); return; }
+        if (t.Kind == "farm") { Harvest(t, dt); if (t.Stage == FarmFallow) Say("Harvested. Take the wheat and grass from the plot; it keeps seed for sowing."); return; }
         gatherClock += dt;
         string? tool = t.Kind == "stone" ? BestTool("pickaxe") : ToolKind(t) is string kind ? BestTool(kind) : null;
         float seconds = Data.GatherSeconds / Speed(tool);
@@ -524,7 +526,7 @@ public sealed partial class World {
     public void Pump(Thing t) {
         if (!Near(t) || t.Kind != "reinforced" || Forwarded("pump", t.Id)) return;
         playerBusy = true;
-        t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos); Say($"Bellows: {t.Heat:0}° / {SteelHeat:0}° needed for steel.");
+        t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos); Say($"Bellows: {Celsius(t.Heat)} °C / {Celsius(SteelHeat)} °C needed for steel.");
     }
     public void FuelFire(Thing t) {
         if (!Near(t) || Forwarded("fuel_fire", t.Id)) return;
@@ -608,7 +610,7 @@ public sealed partial class World {
         return true;
     }
     public void Leave() { if (!Forwarded("leave")) S.Sheltered = 0; }
-    private float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
+    public float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
     /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
     public string? SleepBlock() {
         if (!Night) return "You can sleep at night. Keep food and water for the morning.";
@@ -763,6 +765,7 @@ public sealed partial class World {
     public string? BoxBlock(Thing t, Inventory box, string item) =>
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
+        box == t.Output ? "Things only come out of here." :
         box == t.Inventory ? HoldBlock(t, item) : null;
     /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
     public string? FuelBlock(Thing t, string item) =>
@@ -1012,7 +1015,7 @@ public sealed partial class World {
         "toolstation" when !(Data.Items.TryGetValue(item, out var def) && def.Tool != "") => HoldRefusal.ToolsOnly,
         "pile" when t.Compost && !Compostable(item) && item != "fertilizer" => HoldRefusal.CompostOnly,
         "pile" when !t.Compost && HeldOtherThan(t.Inventory, item) != null => HoldRefusal.OtherResource,
-        "farm" when !FarmItem(item) => HoldRefusal.FarmOnly,
+        "farm" when !Data.Farm.Sow.ContainsKey(item) => HoldRefusal.FarmOnly,
         _ => HoldRefusal.None
     };
     /// <summary>Whether storage takes an item, without building the reason; workers ask on every tick.</summary>
@@ -1801,6 +1804,12 @@ public sealed partial class World {
             if (t.Recipe != "" && (!Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Station != t.Kind)) { t.Recipe = ""; t.Processing = false; t.Progress = 0; }
             if (SlotKinds(t.Kind).Length > 0) t.Tools ??= NewToolSlots(t.Kind);
             // Stations used to keep their fuel with the ingredients; fuel nothing smelts moves to the fuel slot.
+            // Plots used to keep their harvest with the seed; the harvest moves to its own slots.
+            if (t.Kind == "farm" && t.Output == null) {
+                t.Output = new() { Slots = Data.Farm.Yield.Count };
+                foreach (var item in t.Inventory.Items.Keys.Where(i => !Data.Farm.Sow.ContainsKey(i)).ToList()) t.Inventory.TransferTo(t.Output, item, t.Inventory[item]);
+                t.Inventory.Slots = Data.Farm.Sow.Count;
+            }
             if (Burns(t.Kind) && t.Burner == null) {
                 t.Burner = NewBurner();
                 string fuel = BurnedFuel(t);

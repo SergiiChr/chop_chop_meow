@@ -4,106 +4,122 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The workshop look shared by every panel: dark stained plywood with a birch-ply top edge, recessed sockets for items,
-/// safety orange for what is active or wanted, a stencil face for headings and chalk on the trading post's board.
-/// Style boxes and fonts are made once, since creating a resource allocates.
+/// The enamel camp-gear look shared by every panel: speckled slate-blue enamel with a cream rim, beige wells,
+/// cream cups for items with a count pill on their corner, and rounded buttons in muted brick, sage and mustard.
+/// Style boxes, fonts and the enamel texture are made once, since creating a resource allocates.
 /// </summary>
 public static class Style {
-    public static readonly Color Ply = new("2b2119");
-    public static readonly Color Raised = new("3c2f24");
-    public static readonly Color Hover = new("4f3d2d");
-    public static readonly Color Socket = new("16100b");
-    public static readonly Color Edge = new("c08d52");
-    public static readonly Color Cream = new("f3e6c9");
-    public static readonly Color Muted = new("b9a68a");
-    public static readonly Color Orange = new("f28c28");
-    public static readonly Color Gold = new("f2c14e");
-    public static readonly Color Short = new("f29a8a");
-    public static readonly Color Good = new("9cc46a");
-    public static readonly Color Slate = new("2e3a34");
-    public static readonly Color Chalk = new("eef0e6");
+    public static readonly Color Enamel = new("3b5470");
+    public static readonly Color Line = new("263849");
+    public static readonly Color Rim = new("efe6d2");
+    public static readonly Color Beige = new("e3d5b8");
+    public static readonly Color CupFill = new("f6f0e2");
+    public static readonly Color Ink = new("4a3d2e");
+    public static readonly Color Tan = new("6d5b45");
+    public static readonly Color Brick = new("b65a43");
+    public static readonly Color Mustard = new("c9a14f");
+    public static readonly Color Sage = new("6b8a6e");
+    public static readonly Color Sky = new("6fa3c4");
+    public static readonly Color Ember = new("d98a4e");
+    /// <summary>Text on enamel that warns: a cost the bank cannot cover, a count the backpack is short of.</summary>
+    public static readonly Color Warn = new("f2937c");
+    public static readonly Color Rise = new("4f7a55");
 
-    public static readonly Font Body = GD.Load<Font>("res://assets/fonts/BarlowSemiCondensed-SemiBold.ttf");
-    public static readonly Font Bold = GD.Load<Font>("res://assets/fonts/BarlowSemiCondensed-Bold.ttf");
-    public static readonly Font Stencil = GD.Load<Font>("res://assets/fonts/SairaStencilOne-Regular.ttf");
-    public static readonly Font ChalkHand = GD.Load<Font>("res://assets/fonts/Kalam-Bold.ttf");
+    public static readonly Font Head = Weighted("res://assets/fonts/Fredoka.ttf", 600);
+    public static readonly Font Body = Weighted("res://assets/fonts/Nunito.ttf", 700);
+    public static readonly Font Bold = Weighted("res://assets/fonts/Nunito.ttf", 800);
 
-    /// <summary>A plywood board: the ply's laminated edge shows as a light band along the top.</summary>
-    public static readonly StyleBoxFlat Board = Make(Ply, 6, 16, top: 5, edge: Edge, shadow: 12);
-    /// <summary>The HUD's smaller boards.</summary>
-    public static readonly StyleBoxFlat Plate = Make(Ply, 6, 8, top: 4, edge: Edge, shadow: 8);
-    /// <summary>A darker well inside a board, holding a station's process line or a group of slots.</summary>
-    public static readonly StyleBoxFlat Well = Make(new Color(0, 0, 0, .22f), 8, 10);
-    public static readonly StyleBoxFlat ButtonNormal = Make(Raised, 8, 9, bottom: 3, edge: new Color("1d150f"));
-    public static readonly StyleBoxFlat ButtonHover = Make(Hover, 8, 9, bottom: 3, edge: new Color("1d150f"));
-    public static readonly StyleBoxFlat ButtonPressed = Make(Orange, 8, 9, bottom: 3, edge: new Color("9a5212"));
-    public static readonly StyleBoxFlat ButtonDisabled = Make(new Color("2f251c"), 8, 9);
-    /// <summary>The one call to action on a page, such as sending the cart.</summary>
-    public static readonly StyleBoxFlat Primary = Make(Orange, 8, 9, bottom: 4, edge: new Color("9a5212"));
-    public static readonly StyleBoxFlat PrimaryHover = Make(new Color("ff9d3d"), 8, 9, bottom: 4, edge: new Color("9a5212"));
-    /// <summary>A recessed item socket; its dark rim reads as depth against the plywood.</summary>
-    public static readonly StyleBoxFlat SocketNormal = Make(Socket, 7, 3, all: 1, edge: new Color("44352a"));
-    public static readonly StyleBoxFlat SocketHover = Make(new Color("221810"), 7, 3, all: 2, edge: Gold);
-    public static readonly StyleBoxFlat SocketPressed = Make(new Color("2c2015"), 7, 3, all: 2, edge: Orange);
-    /// <summary>A socket whose item the open station or market takes, or the item in hand.</summary>
-    public static readonly StyleBoxFlat SocketWanted = Make(Socket, 7, 3, all: 2, edge: Orange, glow: Orange);
-    /// <summary>The trading post's wage jar.</summary>
-    public static readonly StyleBoxFlat SocketWage = Make(Socket, 7, 3, all: 2, edge: Gold);
-    /// <summary>A station's output socket, rimmed so it reads as where the result lands.</summary>
-    public static readonly StyleBoxFlat SocketOutput = Make(Socket, 7, 3, all: 2, edge: new Color("6a5440"));
-    /// <summary>A recipe tile on the pegboard.</summary>
-    public static readonly StyleBoxFlat Tile = Make(new Color("241a12"), 8, 6, bottom: 3, edge: new Color("120c08"));
-    public static readonly StyleBoxFlat TileHover = Make(new Color("33261a"), 8, 6, all: 2, edge: Gold);
-    public static readonly StyleBoxFlat TileChosen = Make(new Color("3c2a1a"), 8, 6, all: 3, edge: Orange);
-    public static readonly StyleBoxFlat Pegboard = Make(new Color("3a2d22"), 8, 8);
-    /// <summary>The tool tab beside a pegboard row, joined to it.</summary>
-    public static readonly StyleBoxFlat Rail = Make(Raised, 8, 8);
-    public static readonly StyleBoxFlat ChalkBoard = Make(Slate, 6, 16, all: 7, edge: new Color("6b4a2c"));
-    public static readonly StyleBoxFlat ChalkButton = Make(new Color(1, 1, 1, .06f), 14, 4, all: 2, edge: new Color(.93f, .94f, .9f, .5f));
-    public static readonly StyleBoxFlat ChalkButtonHover = Make(new Color(1, 1, 1, .16f), 14, 4, all: 2, edge: Chalk);
-    public static readonly StyleBoxFlat Tooltip = Make(Socket, 8, 10, all: 2, edge: Gold, shadow: 8);
-    public static readonly StyleBoxFlat BarBack = Make(Socket, 6, 0);
-    public static readonly StyleBoxFlat BarFill = Make(Orange, 6, 0);
-    public static readonly StyleBoxFlat RoundNormal = Make(Raised, 28, 6, bottom: 3, edge: new Color("1d150f"));
-    public static readonly StyleBoxFlat RoundHover = Make(Hover, 28, 6, bottom: 3, edge: new Color("1d150f"));
-    public static readonly StyleBoxFlat RoundPressed = Make(Orange, 28, 6, bottom: 3, edge: new Color("9a5212"));
-    /// <summary>The worker chip's round initials badge.</summary>
-    public static readonly StyleBoxFlat Badge = Make(Gold, 15, 0);
-    public static readonly StyleBoxFlat Key = Make(Cream, 4, 3, bottom: 2, edge: new Color("9d8a6a"));
+    private static Font Weighted(string path, int weight) {
+        var font = new FontVariation { BaseFont = GD.Load<FontFile>(path) };
+        font.VariationOpentype = new Godot.Collections.Dictionary { { TextServerManager.GetPrimaryInterface().NameToTag("wght"), weight } };
+        return font;
+    }
 
-    private static StyleBoxFlat Make(Color bg, int radius, int margin, int top = 0, int bottom = 0, int all = 0, Color? edge = null, int shadow = 0, Color? glow = null) {
-        var box = new StyleBoxFlat { BgColor = bg, BorderColor = edge ?? Colors.Transparent, ContentMarginLeft = margin, ContentMarginRight = margin, ContentMarginTop = margin + top, ContentMarginBottom = margin };
+    // Built before the boards that use it, since static fields start in the order they are written.
+    private static readonly Texture2D EnamelTexture = MakeEnamel();
+    /// <summary>The enamel board every panel sits on: a cream rim with a dark outline around speckled enamel.</summary>
+    public static readonly StyleBoxTexture Board = EnamelBox(20, 18);
+    /// <summary>The HUD's smaller enamel plates.</summary>
+    public static readonly StyleBoxTexture Plate = EnamelBox(14, 10);
+    /// <summary>A beige well inside a board, holding a station's process row or a group of slots.</summary>
+    public static readonly StyleBoxFlat Well = Flat(Beige, 14, 16);
+    /// <summary>The trading post's price sign: beige enamel in a slate frame.</summary>
+    public static readonly StyleBoxFlat Sign = Flat(Beige, 16, 16, Enamel, 5);
+    /// <summary>The worker list that drops down from a job button.</summary>
+    public static readonly StyleBoxFlat Dropdown = Flat(Beige, 12, 8, Line, 2);
+    public static readonly StyleBoxFlat Tooltip = Flat(Line, 10, 10, Rim, 2);
+    public static readonly StyleBoxFlat ButtonNormal = Flat(new Color("4b6582"), 20, 10, Rim, 3);
+    public static readonly StyleBoxFlat ButtonHover = Flat(new Color("5a7593"), 20, 10, Rim, 3);
+    public static readonly StyleBoxFlat ButtonPressed = Flat(Brick, 20, 10, Rim, 3);
+    public static readonly StyleBoxFlat ButtonDisabled = Flat(new Color("40536a"), 20, 10, new Color(Rim, .5f), 3);
+    public static readonly StyleBoxFlat CupNormal = Flat(CupFill, 14, 3, Line, 2);
+    public static readonly StyleBoxFlat CupHover = Flat(CupFill, 14, 3, Mustard, 3);
+    public static readonly StyleBoxFlat CupPressed = Flat(new Color("ece2cc"), 14, 3, Brick, 3);
+    /// <summary>A cup whose item the open page takes, a station's output, or the item in hand.</summary>
+    public static readonly StyleBoxFlat CupWanted = Flat(CupFill, 14, 3, Brick, 3);
+    public static readonly StyleBoxFlat CupFuel = Flat(CupFill, 14, 3, Ember, 3);
+    public static readonly StyleBoxFlat CupBank = Flat(CupFill, 28, 3, Line, 2);
+    /// <summary>A recipe plate: a larger cup; the recipe a station makes is ringed in mustard.</summary>
+    public static readonly StyleBoxFlat PlateNormal = Flat(CupFill, 16, 6, Line, 2), PlateHover = Flat(CupFill, 16, 6, Mustard, 3), PlateChosen = Flat(CupFill, 16, 6, Mustard, 4);
+    /// <summary>The pill on a cup's corner that counts what it holds.</summary>
+    public static readonly StyleBoxFlat CountPill = Flat(Line, 9, 0, Rim, 2, horizontal: 5);
+    /// <summary>The count beside a job's name, and a menu badge's key.</summary>
+    public static readonly StyleBoxFlat BeigePill = Flat(Beige, 12, 0, horizontal: 6);
+    public static readonly StyleBoxFlat KeyPill = Flat(Beige, 9, 0, Line, 2, horizontal: 5);
+    public static readonly StyleBoxFlat TagPill = Tag(Sage), BlueTag = Tag(Enamel);
+    /// <summary>A flat pill for a short label, with room either side of its text.</summary>
+    public static StyleBoxFlat Tag(Color bg) => Flat(bg, 13, 0, horizontal: 10);
+    public static readonly StyleBoxFlat BarBack = Flat(Line, 7, 0);
+    public static readonly StyleBoxFlat BarFill = Flat(Mustard, 7, 0);
+    public static readonly StyleBoxFlat BarGrow = Flat(Sage, 7, 0);
+    public static readonly StyleBoxEmpty None = new();
+
+    /// <summary>The colours a job button comes in; the first is for the main job of a place, the next for hauling.</summary>
+    public static readonly Color[] JobColors = { Brick, Sage, new("b08a45"), new("5f8aa6") };
+    /// <summary>Round buttons in a panel's header: close in brick, an action in sage, filters in beige.</summary>
+    public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) CloseRound = Round(Brick, 18), ActionRound = Round(Sage, 18), FilterRound = Round(Beige, 18);
+    public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) TabRound = Round(Line, 24), TabActive = Round(Brick, 24);
+
+    private static StyleBoxFlat Flat(Color bg, int radius, int margin, Color? edge = null, int border = 0, int horizontal = -1) {
+        var box = new StyleBoxFlat { BgColor = bg, BorderColor = edge ?? Colors.Transparent, AntiAliasing = true };
         box.SetCornerRadiusAll(radius);
-        if (all > 0) box.SetBorderWidthAll(all);
-        if (top > 0) box.BorderWidthTop = top;
-        if (bottom > 0) box.BorderWidthBottom = bottom;
-        if (shadow > 0) { box.ShadowColor = new Color(0, 0, 0, .45f); box.ShadowSize = shadow; box.ShadowOffset = new Vector2(0, 4); }
-        if (glow is Color g) { box.ShadowColor = g with { A = .5f }; box.ShadowSize = 6; }
+        if (border > 0) box.SetBorderWidthAll(border);
+        box.ContentMarginTop = box.ContentMarginBottom = margin;
+        box.ContentMarginLeft = box.ContentMarginRight = horizontal >= 0 ? horizontal : margin;
         return box;
     }
 
-    /// <summary>Sets a button's four states to the given boxes.</summary>
-    public static void Skin(Button button, StyleBox normal, StyleBox hover, StyleBox pressed) {
+    public static (StyleBoxFlat, StyleBoxFlat) Round(Color bg, int radius) => (Flat(bg, radius, 0, Rim, 3), Flat(bg.Lightened(.12f), radius, 0, Mustard, 3));
+
+    /// <summary>A rounded job or action button's colours: its fill with the cream rim, and a lighter fill on hover.</summary>
+    public static (StyleBoxFlat, StyleBoxFlat) Pill(Color bg) => (Flat(bg, 24, 0, Rim, 3, horizontal: 14), Flat(bg.Lightened(.1f), 24, 0, Mustard, 3, horizontal: 14));
+
+    /// <summary>Sets a button's states to the given boxes.</summary>
+    public static void Skin(Button button, StyleBox normal, StyleBox hover, StyleBox? pressed = null) {
         button.AddThemeStyleboxOverride("normal", normal); button.AddThemeStyleboxOverride("hover", hover);
-        button.AddThemeStyleboxOverride("pressed", pressed); button.AddThemeStyleboxOverride("disabled", normal);
-        button.AddThemeStyleboxOverride("focus", new StyleBoxEmpty());
+        button.AddThemeStyleboxOverride("pressed", pressed ?? hover); button.AddThemeStyleboxOverride("hover_pressed", pressed ?? hover);
+        button.AddThemeStyleboxOverride("disabled", normal); button.AddThemeStyleboxOverride("focus", None);
     }
 
-    public static Label Heading(string text, int size = 22) {
-        var label = new Label { Text = text };
-        label.AddThemeFontOverride("font", Stencil); label.AddThemeFontSizeOverride("font_size", size);
-        label.AddThemeColorOverride("font_color", Cream);
+    public static Label Heading(string text, int size = 23) {
+        var label = new Label { Text = text, VerticalAlignment = VerticalAlignment.Center };
+        label.AddThemeFontOverride("font", Head); label.AddThemeFontSizeOverride("font_size", size);
+        label.AddThemeColorOverride("font_color", Rim);
         return label;
     }
 
-    /// <summary>A small cream keycap naming the key that does the same thing.</summary>
-    public static PanelContainer Keycap(string key) {
-        var cap = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore, CustomMinimumSize = new Vector2(20, 0) };
-        cap.AddThemeStyleboxOverride("panel", Key);
-        var label = new Label { Text = key, HorizontalAlignment = HorizontalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
-        label.AddThemeFontOverride("font", Bold); label.AddThemeFontSizeOverride("font_size", 12); label.AddThemeColorOverride("font_color", Ply);
-        cap.AddChild(label);
-        return cap;
+    /// <summary>Plain text in the given colour, the body face by default.</summary>
+    public static Label Text(string text, int size, Color color, Font? font = null) {
+        var label = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.Off, VerticalAlignment = VerticalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
+        label.AddThemeFontOverride("font", font ?? Bold); label.AddThemeFontSizeOverride("font_size", size); label.AddThemeColorOverride("font_color", color);
+        return label;
+    }
+
+    /// <summary>A small pill with a key or count on it.</summary>
+    public static Label Pill(string text, StyleBox box, Color color, int size = 12) {
+        var label = Text(text, size, color);
+        label.AddThemeStyleboxOverride("normal", box); label.HorizontalAlignment = HorizontalAlignment.Center;
+        return label;
     }
 
     public static TextureRect Icon(Texture2D? texture, float size) => new() {
@@ -113,48 +129,96 @@ public static class Style {
         StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered,
         MouseFilter = Control.MouseFilterEnum.Ignore
     };
+
+    /// <summary>A line icon from <c>assets/ui</c>, tinted for the background it sits on.</summary>
+    public static TextureRect Glyph(string name, float size, Color tint) {
+        var icon = Icon(GD.Load<Texture2D>($"res://assets/ui/{name}.svg"), size);
+        icon.SelfModulate = tint;
+        return icon;
+    }
+
+    /// <summary>Lays a control on a parent's corner: <paramref name="x"/> and <paramref name="y"/> are 0 or 1 for the side, the offset pushes it past the edge.</summary>
+    public static T Corner<T>(T control, float x, float y, float offset = 6) where T : Control {
+        control.AnchorLeft = control.AnchorRight = x; control.AnchorTop = control.AnchorBottom = y;
+        control.GrowHorizontal = x > .5f ? Control.GrowDirection.Begin : Control.GrowDirection.End;
+        control.GrowVertical = y > .5f ? Control.GrowDirection.Begin : Control.GrowDirection.End;
+        control.OffsetLeft = control.OffsetRight = x > .5f ? offset : -offset;
+        control.OffsetTop = control.OffsetBottom = y > .5f ? offset : -offset;
+        control.MouseFilter = Control.MouseFilterEnum.Ignore;
+        return control;
+    }
+
+    /// <summary>A board's texture: a rounded square with an outline, a cream rim and speckled enamel, sliced so the rim stays put and the enamel tiles.</summary>
+    private static StyleBoxTexture EnamelBox(int horizontal, int vertical) => new() {
+        Texture = EnamelTexture,
+        TextureMarginLeft = 24,
+        TextureMarginRight = 24,
+        TextureMarginTop = 24,
+        TextureMarginBottom = 24,
+        AxisStretchHorizontal = StyleBoxTexture.AxisStretchMode.TileFit,
+        AxisStretchVertical = StyleBoxTexture.AxisStretchMode.TileFit,
+        ContentMarginLeft = horizontal,
+        ContentMarginRight = horizontal,
+        ContentMarginTop = vertical,
+        ContentMarginBottom = vertical
+    };
+
+    private static Texture2D MakeEnamel() {
+        const int Size = 96; const float Radius = 18;
+        var image = Image.CreateEmpty(Size, Size, false, Image.Format.Rgba8);
+        var random = new Random(7);
+        var speckles = new bool[Size * Size];
+        for (int i = 0; i < 70; i++) speckles[random.Next(Size) + random.Next(Size) * Size] = true;
+        for (int y = 0; y < Size; y++)
+            for (int x = 0; x < Size; x++) {
+                // Distance inside the rounded square's edge, so each band blends a pixel wide.
+                float dx = Math.Max(Radius - x - .5f, x + .5f - (Size - Radius)), dy = Math.Max(Radius - y - .5f, y + .5f - (Size - Radius));
+                float outside = dx > 0 && dy > 0 ? MathF.Sqrt(dx * dx + dy * dy) - Radius : Math.Max(dx, dy) - Radius;
+                float depth = -outside;
+                Color c = depth < 2 ? Line : depth < 6 ? Rim : speckles[x + y * Size] ? Enamel.Lerp(Colors.White, .22f) : Enamel;
+                if (depth > 1.5f && depth < 2.5f) c = Line.Lerp(Rim, depth - 1.5f);
+                if (depth > 5.5f && depth < 6.5f) c = Rim.Lerp(Enamel, depth - 5.5f);
+                image.SetPixel(x, y, c with { A = Math.Clamp(depth + .5f, 0, 1) });
+            }
+        return ImageTexture.CreateFromImage(image);
+    }
 }
 
 /// <summary>
-/// The bellows furnace's heat as a dial like the gauge on the forge itself: a dark arc, a warm band from the steel line up, and a needle.
+/// The high-temp furnace's heat as a round stovetop dial in degrees Celsius: a dark track, a brick band where steel forms, and a needle.
 /// </summary>
 public partial class HeatDial : Control {
     public Func<float> Level { get; set; } = () => 0;
+    private const float Sweep = Mathf.Pi * 1.5f, Start = Mathf.Pi * .75f;
 
     public override void _Draw() {
-        var centre = new Vector2(Size.X / 2, Size.Y - 12);
-        float radius = Math.Min(Size.X / 2 - 12, Size.Y - 24), heat = Mathf.Clamp(Level(), 0, 100);
-        float Angle(float level) => Mathf.Pi + level / 100 * Mathf.Pi;
-        DrawArc(centre, radius, Mathf.Pi, Mathf.Tau, 32, Style.Socket, 20, true);
-        DrawArc(centre, radius, Mathf.Pi, Angle(World.SteelHeat), 24, new Color("6b3d26"), 12, true);
-        DrawArc(centre, radius, Angle(World.SteelHeat), Mathf.Tau, 12, heat >= World.SteelHeat ? new Color("ff8a2a") : new Color("8a4a26"), 12, true);
-        var tip = centre + Vector2.FromAngle(Angle(heat)) * (radius + 4);
-        DrawLine(centre, tip, Style.Cream, 4, true);
-        DrawCircle(centre, 7, Style.Cream);
-        var font = Style.Stencil;
-        string text = HeatText((int)heat);
-        var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, 24);
-        DrawString(font, centre + new Vector2(-size.X / 2, -radius * .35f), text, HorizontalAlignment.Left, -1, 24, Style.Cream);
+        var centre = Size / 2;
+        float radius = Math.Min(Size.X, Size.Y) / 2 - 3;
+        DrawCircle(centre, radius, Style.CupFill);
+        DrawArc(centre, radius, 0, Mathf.Tau, 48, Style.Line, 3, true);
+        float track = radius - 8;
+        DrawArc(centre, track, Start, Start + Sweep, 40, new Color(Style.Line, .3f), 2, true);
+        DrawArc(centre, track, Start + Sweep * World.SteelHeat / 100, Start + Sweep, 12, Style.Brick, 8, true);
+        float heat = Mathf.Clamp(Level(), 0, 100);
+        DrawLine(centre, centre + Vector2.FromAngle(Start + Sweep * heat / 100) * (track - 4), Style.Enamel, 4, true);
+        DrawCircle(centre, 6, Style.Enamel);
     }
-
-    // Degrees as text, made once per whole degree so redraws reuse them.
-    private static readonly string[] Degrees = new string[101];
-    private static string HeatText(int heat) => Degrees[heat] ??= $"{heat}°";
 }
 
-/// <summary>Time of day as the sun's (or moon's) way along an arc.</summary>
+/// <summary>Time of day as the sun's (or moon's) way along an arc from dawn to dawn.</summary>
 public partial class DayDial : Control {
     public Func<float> Phase { get; set; } = () => 0;
     public Func<bool> Night { get; set; } = () => false;
 
     public override void _Draw() {
-        var centre = new Vector2(Size.X / 2, Size.Y - 2);
-        float radius = Math.Min(Size.X / 2 - 8, Size.Y - 8), phase = Mathf.Clamp(Phase(), 0, 1);
-        DrawArc(centre, radius, Mathf.Pi, Mathf.Tau, 32, Style.Socket, 8, true);
-        DrawArc(centre, radius, Mathf.Pi, Mathf.Pi + phase * Mathf.Pi, 32, Night() ? new Color("8fa6d9") : Style.Gold, 3, true);
+        var centre = new Vector2(Size.X / 2, Size.Y - 6);
+        float radius = Math.Min(Size.X / 2 - 12, Size.Y - 14), phase = Mathf.Clamp(Phase(), 0, 1);
+        DrawArc(centre, radius, Mathf.Pi, Mathf.Tau, 32, Style.Line, 8, true);
+        var tint = Night() ? new Color("8fa6c4") : Style.Mustard;
+        DrawArc(centre, radius, Mathf.Pi, Mathf.Pi + Math.Max(.02f, phase) * Mathf.Pi, 32, tint, 8, true);
         var at = centre + Vector2.FromAngle(Mathf.Pi + phase * Mathf.Pi) * radius;
-        DrawCircle(at, 7, Night() ? new Color("dfe6f2") : new Color("f9d66b"));
-        DrawArc(at, 7, 0, Mathf.Tau, 16, Style.Ply, 2, true);
+        DrawCircle(at, 9, Style.Rim);
+        DrawCircle(at, 7, Night() ? new Color("dfe6f2") : Style.Mustard);
     }
 }
 
@@ -165,14 +229,13 @@ public partial class CartRoad : Control {
     public readonly System.Collections.Generic.List<float> Trips = new();
 
     public override void _Draw() {
-        float y = Size.Y / 2 + 4;
-        for (float x = 0; x < Size.X; x += 10) DrawLine(new Vector2(x, y), new Vector2(Math.Min(x + 4, Size.X), y), Style.Muted, 3);
+        float y = Size.Y / 2;
+        for (float x = 0; x < Size.X; x += 10) DrawLine(new Vector2(x, y), new Vector2(Math.Min(x + 4, Size.X), y), new Color(Style.Rim, .5f), 3);
         if (Cart == null) return;
         foreach (float trip in Trips) {
             // A cart drives out over the first half of its trip and back over the second.
             float along = trip < .5f ? trip * 2 : 2 - trip * 2;
-            var rect = new Rect2((Size.X - 30) * along, y - 24, 30, 30);
-            DrawTextureRect(Cart, rect, false);
+            DrawTextureRect(Cart, new Rect2((Size.X - 30) * along, y - 15, 30, 30), false, Style.Mustard);
         }
     }
 }

@@ -18,10 +18,11 @@ public sealed partial class World {
         FarmGrowing => 1 + Math.Min(2, (int)(farm.Progress / growSeconds * 3)),
         _ => 0
     };
-    private bool FarmItem(string item) => Data.Farm.Sow.ContainsKey(item) || Data.Farm.Yield.ContainsKey(item);
 
     /// <summary>A fallow plot sows itself once it holds seeds and fertilizer; growing wheat ripens after its days.</summary>
     private void FarmTick(Thing farm, float dt) {
+        // The plot keeps seed from its harvest for two more sowings.
+        if (farm.Output != null) foreach (var (item, amount) in Data.Farm.Sow) if (farm.Inventory[item] < amount * 2 && farm.Output[item] > 0) farm.Output.TransferTo(farm.Inventory, item, amount * 2 - farm.Inventory[item]);
         if (farm.Stage == FarmFallow && farm.Inventory.Has(Data.Farm.Sow)) { farm.Inventory.Spend(Data.Farm.Sow); farm.Stage = FarmGrowing; farm.Progress = 0; }
         if (farm.Stage == FarmGrowing && (farm.Progress += dt) >= GrowSeconds) { farm.Stage = FarmRipe; farm.Progress = 0; }
     }
@@ -34,8 +35,9 @@ public sealed partial class World {
         if (farm.Stage != FarmRipe) return;
         farm.Progress = Math.Min(HarvestSeconds, farm.Progress + dt);
         if (farm.Progress < HarvestSeconds) return;
-        foreach (var pair in Data.Farm.Yield) if (farm.Inventory.Room(pair.Key) < pair.Value) return;
-        foreach (var (item, amount) in Data.Farm.Yield) farm.Inventory.Add(item, amount);
+        var yield = farm.Output ?? farm.Inventory;
+        foreach (var pair in Data.Farm.Yield) if (yield.Room(pair.Key) < pair.Value) return;
+        foreach (var (item, amount) in Data.Farm.Yield) yield.Add(item, amount);
         farm.Stage = FarmFallow; farm.Progress = 0;
     }
 
@@ -47,11 +49,10 @@ public sealed partial class World {
     private bool FarmWork(Worker w, Thing farm, float dt) {
         if (HasDuty(w, farm.Id, "haul")) {
             // Each pass ends with a return, so the transfer never changes the stacks while they are still being walked.
-            foreach (var (item, count) in farm.Inventory.Items) {
-                int spare = count - Data.Farm.Sow.GetValueOrDefault(item) * 2;
-                if (spare <= 0 || DepositFor(item, farm.Pos) is not Thing dest) continue;
+            if (farm.Output != null) foreach (var (item, count) in farm.Output.Items) {
+                if (DepositFor(item, farm.Pos) is not Thing dest) continue;
                 w.Status = Phrase("Carrying out ", Data.Name(item));
-                if (Walk(w, farm.Pos, dt)) { farm.Inventory.TransferTo(w.Bag, item, Math.Min(spare, w.Bag.StackSize), true); w.Destination = dest.Id; }
+                if (Walk(w, farm.Pos, dt)) { farm.Output.TransferTo(w.Bag, item, Math.Min(count, w.Bag.StackSize), true); w.Destination = dest.Id; }
                 return true;
             }
             if (farm.Stage == FarmFallow)

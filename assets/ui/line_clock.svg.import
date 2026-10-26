@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bqoaoiqoypg7g"
-path="res://.godot/imported/mailbox.svg-1a0a5b4c000e1086dd53e23be37bb88b.ctex"
+uid="uid://djxv513p0sc2m"
+path="res://.godot/imported/line_clock.svg-cbc468f2ea0925af98d41f87a0657369.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/mailbox.svg"
-dest_files=["res://.godot/imported/mailbox.svg-1a0a5b4c000e1086dd53e23be37bb88b.ctex"]
+source_file="res://assets/ui/line_clock.svg"
+dest_files=["res://.godot/imported/line_clock.svg-cbc468f2ea0925af98d41f87a0657369.ctex"]
 
 [params]
 

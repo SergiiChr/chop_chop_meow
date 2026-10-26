@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cv20tyikqbqgh"
-path="res://.godot/imported/bellows.svg-21a59691977c8749a415f5c848dedbf0.ctex"
+uid="uid://bh254dimwe8tf"
+path="res://.godot/imported/line_leaf.svg-6440bc127992593f083cc3538fb6eab7.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/bellows.svg"
-dest_files=["res://.godot/imported/bellows.svg-21a59691977c8749a415f5c848dedbf0.ctex"]
+source_file="res://assets/ui/line_leaf.svg"
+dest_files=["res://.godot/imported/line_leaf.svg-6440bc127992593f083cc3538fb6eab7.ctex"]
 
 [params]
 

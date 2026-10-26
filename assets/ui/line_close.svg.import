@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://btvbxjcsofa2r"
-path="res://.godot/imported/village.svg-33f5a903afd08a2692f92d626b0c1767.ctex"
+uid="uid://dyjxn2q1suiqt"
+path="res://.godot/imported/line_close.svg-e8065100557cad335adb925e131cbdd9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/village.svg"
-dest_files=["res://.godot/imported/village.svg-33f5a903afd08a2692f92d626b0c1767.ctex"]
+source_file="res://assets/ui/line_close.svg"
+dest_files=["res://.godot/imported/line_close.svg-e8065100557cad335adb925e131cbdd9.ctex"]
 
 [params]
 

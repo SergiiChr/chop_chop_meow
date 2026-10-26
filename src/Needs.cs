@@ -31,26 +31,95 @@ public partial class NeedGauge : Control {
         // Clip the outline to the part below the current level, so the icon empties like a vessel.
         var below = new[] { new Vector2(-1, Size.Y * (1 - level)), new Vector2(Size.X + 1, Size.Y * (1 - level)), new Vector2(Size.X + 1, Size.Y + 1), new Vector2(-1, Size.Y + 1) };
         foreach (var part in Geometry2D.IntersectPolygons(outline, below)) DrawColoredPolygon(part, Fill);
-        DrawPolyline(outline.Append(outline[0]).ToArray(), level <= .25f ? Style.Short : Style.Cream, 2, true);
+        DrawPolyline(outline.Append(outline[0]).ToArray(), level <= .25f ? Style.Brick : Style.Rim, 2, true);
+    }
+}
+
+/// <summary>A cream capsule that fills from the bottom with a need's level; faded, it shows a level to come.</summary>
+public partial class Vial : Control {
+    public Color Fill { get; set; }
+    public float Level { get; set; } = 100;
+    public bool Faded { get; set; }
+    /// <summary>Rims the capsule in brick: the level runs out.</summary>
+    public bool Warn { get; set; }
+
+    public Vial() { CustomMinimumSize = new Vector2(22, 56); MouseFilter = MouseFilterEnum.Pass; }
+
+    public override void _Draw() {
+        var rect = new Rect2(Vector2.Zero, Size);
+        DrawStyleBox(Warn ? WarnBox : Box, rect);
+        float inner = Size.Y - 6, height = inner * Math.Clamp(Level, 0, 100) / 100;
+        if (height > 1) DrawStyleBox(FillBox(Faded ? Fill with { A = .55f } : Fill), new Rect2(3, 3 + inner - height, Size.X - 6, height));
+    }
+
+    private static readonly StyleBoxFlat Box = Round(Style.CupFill, Style.Line), WarnBox = Round(Style.CupFill, Style.Brick);
+    private static StyleBoxFlat Round(Color bg, Color edge) {
+        var box = new StyleBoxFlat { BgColor = bg, BorderColor = edge, AntiAliasing = true };
+        box.SetCornerRadiusAll(11); box.SetBorderWidthAll(2);
+        return box;
+    }
+    // One box per colour, made the first time it is drawn.
+    private static readonly System.Collections.Generic.Dictionary<Color, StyleBoxFlat> fills = new();
+    private static StyleBoxFlat FillBox(Color color) {
+        if (!fills.TryGetValue(color, out var box)) { fills[color] = box = new StyleBoxFlat { BgColor = color, AntiAliasing = true }; box.SetCornerRadiusAll(8); }
+        return box;
     }
 }
 
 public partial class Game {
-    private NeedGauge health = null!;
-    private NeedGauge hunger = null!;
-    private NeedGauge thirst = null!;
+    private Vial health = null!;
+    private Vial hunger = null!;
+    private Vial thirst = null!;
     private DamageEdges damageEdges = null!;
+    private Label bankDue = null!;
+    private Badge bankCount = null!;
+    private ItemSlot bankCup = null!;
 
+    /// <summary>
+    /// The top left plate: health, hunger and thirst as capsules that drain, each over its icon, and the bank:
+    /// coins kept for wages at the trading posts, with the day's wages, in red while they come to more than the bank holds.
+    /// </summary>
     private void BuildNeeds() {
-        // Top left, away from the clock and the panel that opens under it.
-        var box = new PanelContainer { OffsetLeft = 16, OffsetTop = 14 };
+        var box = new PanelContainer { OffsetLeft = 20, OffsetTop = 18 };
         box.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(box);
-        var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; row.AddThemeConstantOverride("separation", 12); box.AddChild(row);
-        hunger = new NeedGauge { Name = "hunger", Shape = NeedGauge.Stomach, Fill = new Color("f2a65a"), Level = () => world.S.Hunger, CustomMinimumSize = new Vector2(40, 40) };
-        thirst = new NeedGauge { Name = "thirst", Shape = NeedGauge.Droplet, Fill = new Color("5bb4e5"), Level = () => world.S.Thirst, CustomMinimumSize = new Vector2(34, 40) };
-        health = new NeedGauge { Name = "health", Shape = NeedGauge.Heart, Fill = new Color("e5534b"), Level = () => world.S.Health, CustomMinimumSize = new Vector2(40, 40) };
-        row.AddChild(health); row.AddChild(hunger); row.AddChild(thirst);
+        var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); box.AddChild(row);
+        (Vial, NeedGauge) Need(string name, Vector2[] shape, Color color, Func<float> level) {
+            var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 6); row.AddChild(column);
+            var vial = new Vial { Name = name, Fill = color }; vial.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter; column.AddChild(vial);
+            var icon = new NeedGauge { Shape = shape, Fill = color, Level = () => 100, CustomMinimumSize = new Vector2(22, 20), MouseFilter = Control.MouseFilterEnum.Ignore };
+            column.AddChild(icon);
+            return (vial, icon);
+        }
+        health = Need("health", NeedGauge.Heart, Style.Brick, () => world.S.Health).Item1;
+        hunger = Need("hunger", NeedGauge.Stomach, Style.Mustard, () => world.S.Hunger).Item1;
+        thirst = Need("thirst", NeedGauge.Droplet, Style.Sky, () => world.S.Thirst).Item1;
+        row.AddChild(new ColorRect { Color = new Color(Style.Beige, .7f), CustomMinimumSize = new Vector2(3, 0) });
+        var bank = new VBoxContainer(); bank.AddThemeConstantOverride("separation", 8); row.AddChild(bank);
+        bank.AddChild(Style.Heading("Bank", 13));
+        var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 12); bank.AddChild(line);
+        var (cup, count) = IconCell("bank", 56);
+        bankCup = cup; bankCount = count;
+        Style.Skin(cup, Style.CupBank, Style.Round(Style.CupFill, 28).Item2);
+        cup.Icon = HotbarIcon(Inventory.Coins);
+        cup.TooltipText = "Coins kept at the trading posts for wages; sales land here first.\nDrop coins here at a trading post to bank them · click to take some out";
+        cup.CanTake = drag => drag.Item == Inventory.Coins && drag.From == world.S.Backpack;
+        cup.Take = drag => {
+            if (NearPost() is not Thing post) { Notify("Bank coins at a trading post."); return drag.Count; }
+            int left = 0; Act(() => left = MoveDrag(drag, post.Wages!, post)); RefreshLive(); return left;
+        };
+        cup.Pressed += () => {
+            if (NearPost() is not Thing post) { Notify("Take coins out at a trading post."); return; }
+            Act(() => MoveStack(post.Wages!, world.S.Backpack, Inventory.Coins, post)); RefreshLive();
+        };
+        line.AddChild(cup);
+        bankDue = Style.Text("", 14, Style.Beige); line.AddChild(bankDue);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); ui.AddChild(damageEdges);
+    }
+
+    /// <summary>The trading post within reach that has coins or room for them, or null.</summary>
+    private Thing? NearPost() {
+        foreach (var t in world.S.Things) if (t.Kind == "signpost" && t.Wages != null && world.Near(t)) return t;
+        return null;
     }
 
     /// <summary>Flashes the screen edges on a hit; a pinned player keeps a steady glow while the wolves feed, and a hungry or thirsty one a faint pulse.</summary>
@@ -63,13 +132,24 @@ public partial class Game {
 
     // The rounded values the tooltips show, so their text is built only when one changes.
     private (int Health, int Hunger, int Thirst) shownNeeds = (-1, -1, -1);
+    private (int Bank, int Due) shownBank = (-1, -1);
     private void RefreshNeeds() {
         var needs = ((int)MathF.Round(world.S.Health, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Hunger, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Thirst, MidpointRounding.AwayFromZero));
         if (needs != shownNeeds) {
             shownNeeds = needs;
             health.TooltipText = $"Health {world.S.Health:0}%"; hunger.TooltipText = $"Hunger {world.S.Hunger:0}%"; thirst.TooltipText = $"Thirst {world.S.Thirst:0}%";
-            // Redrawing clips each outline to its level, which allocates, so a gauge redraws only when its level moves a whole percent.
+            health.Level = world.S.Health; hunger.Level = world.S.Hunger; thirst.Level = world.S.Thirst;
+            health.Warn = world.S.Health <= 25; hunger.Warn = world.S.Hunger <= 25; thirst.Warn = world.S.Thirst <= 25;
             health.QueueRedraw(); hunger.QueueRedraw(); thirst.QueueRedraw();
+        }
+        var bank = (world.WageCoins, DailyWages());
+        if (bank != shownBank) {
+            shownBank = bank;
+            bankCount.Text = bank.WageCoins > 0 ? bank.WageCoins.ToString() : "";
+            bankCup.AddThemeColorOverride(IconNormal, bank.WageCoins > 0 ? Colors.White : Ghost);
+            bankDue.Text = bank.Item2 > 0 ? $"−{bank.Item2} /day" : "";
+            bankDue.AddThemeColorOverride("font_color", bank.Item2 > bank.WageCoins ? Style.Warn : Style.Beige);
+            bankDue.TooltipText = bank.Item2 > bank.WageCoins ? "More than the bank holds; the rest comes from your backpack at dawn" : "Paid from the bank at dawn";
         }
     }
 }

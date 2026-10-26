@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://csf8c47ynb21"
-path="res://.godot/imported/prices.svg-4c8b837661e7c02c40d21d9304f46267.ctex"
+uid="uid://hgbu8vb3jve8"
+path="res://.godot/imported/line_tunnel.svg-7146eee343214b9a1dbfe90482514c40.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/prices.svg"
-dest_files=["res://.godot/imported/prices.svg-4c8b837661e7c02c40d21d9304f46267.ctex"]
+source_file="res://assets/ui/line_tunnel.svg"
+dest_files=["res://.godot/imported/line_tunnel.svg-7146eee343214b9a1dbfe90482514c40.ctex"]
 
 [params]
 

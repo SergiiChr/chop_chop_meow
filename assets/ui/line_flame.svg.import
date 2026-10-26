@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b2wxt7rksv83i"
-path="res://.godot/imported/cart.svg-833e576773a5a691c29fef655de6e05a.ctex"
+uid="uid://dwbcuoxplem4o"
+path="res://.godot/imported/line_flame.svg-32fa94d9882a6fa3e78996cf45151957.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/cart.svg"
-dest_files=["res://.godot/imported/cart.svg-833e576773a5a691c29fef655de6e05a.ctex"]
+source_file="res://assets/ui/line_flame.svg"
+dest_files=["res://.godot/imported/line_flame.svg-32fa94d9882a6fa3e78996cf45151957.ctex"]
 
 [params]
 

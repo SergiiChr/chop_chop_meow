@@ -36,6 +36,6 @@ public partial class Game {
         selected = 0; workerId = 0; gathering = null; assigningWorker = 0; slot = 0; autosave = 0;
         view.BuildMode = ""; view.Selected = 0; view.SelectedWorker = 0;
         ending.Visible = false; paused = false; OpenPage("welcome");
-        Notify("Welcome. WASD to move; hold right mouse to approach and gather. Tab shows the field guide.");
+        Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
     }
 }
