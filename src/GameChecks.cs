@@ -554,6 +554,10 @@ public partial class Game {
             UIRequire(!filterOpen && panel.Visible, "The filter window's close button must close it and leave the panel open.");
             await KeyStroke(Key.Tab);
             UIRequire(page == "inventory" && bag.Visible && FindButton(panel, "Assign hotbar slots") == null, "Tab must open the backpack drawer, with no separate hotbar assignment.");
+            await Click((Control)bag.FindChild("bag_close", true, false));
+            UIRequire(!bag.Visible && page == "", "On the backpack page the drawer's close button must close the page.");
+            await KeyStroke(Key.Tab);
+            UIRequire(page == "inventory" && bag.Visible, "Tab must open the backpack again after it was closed.");
             await KeyStroke(Key.B);
             int carriedBeforeAssignment = world.S.Backpack.Count;
             await DragTo(Named("build_hut")!, hotbarButtons[0]);

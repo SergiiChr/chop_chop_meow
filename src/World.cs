@@ -1227,7 +1227,11 @@ public sealed partial class World {
         }
         string? need = target is { IsResource: true } && HasDuty(w, target.Id, "gather") ? ToolKind(target) : target is { Kind: "mine" } ? MineTool(w, target) : null;
         if (need == null) w.Missing = "";
-        if (w.Tool != "" && Data.Items[w.Tool].Tool != need && !ReturnTool(w, dt)) return;
+        if (w.Tool != "" && Data.Items[w.Tool].Tool != need) {
+            if (!ReturnTool(w, dt)) return;
+            // With no room in a tool station the tool stays in hand, and a job that needs another kind waits for room.
+            if (w.Tool != "" && need != null) { w.Status = Phrase("No room to put back the ", Lower(Data.Name(w.Tool))); return; }
+        }
         if (target == null) { w.Status = "Available"; return; }
         // With nothing to do here, a worker with jobs elsewhere moves on to the next place.
         if (!WorkAt(w, target, need, dt)) NextPlace(w);

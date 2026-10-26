@@ -165,7 +165,7 @@ How they are framed:
 - Tools are seen from the side, head up and to the right.
   Everything else is seen from the game camera's angle under the game's sunlight.
 - Chisels and hammers have a model per grade.
-  The bench shows the slotted grade lying on its top, and a held hammer is drawn as the steel one.
+  The bench shows the slotted grade lying on its top, and a held hammer shows its own grade.
 
 ### Item atlas
 

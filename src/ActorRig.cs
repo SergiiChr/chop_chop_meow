@@ -160,17 +160,16 @@ public sealed class ActorRig {
     public static Node3D Tool(string name) {
         if (name is "steel_hammer" or "wood_hammer") return Hammer(name == "steel_hammer");
         if (name is "stone_chisel" or "steel_chisel") return Chisel(name == "steel_chisel");
-        bool steelTool = name.StartsWith("steel"), hammer = false;
-        string handle = steelTool ? "e87d1e" : "8a5a32", head = steelTool ? "c9d3d8" : hammer ? "4a4d50" : "5b5f62";
-        float metal = steelTool ? .85f : hammer ? .5f : .45f;
+        bool steelTool = name.StartsWith("steel");
+        string handle = steelTool ? "e87d1e" : "8a5a32", head = steelTool ? "c9d3d8" : "5b5f62";
+        float metal = steelTool ? .85f : .45f;
         var tool = new Node3D();
-        float length = hammer ? .38f : .72f;
+        const float length = .72f;
         Cylinder(tool, .022f, .022f, length, new Vector3(0, .08f - length / 2, 0), Mat(handle, .7f));
         if (steelTool) Cylinder(tool, .027f, .027f, .16f, new Vector3(0, -.02f, 0), Mat("222222"));
         float end = .06f - length;
         var steel = Mat(head, .35f, metal);
-        if (hammer) Box(tool, new Vector3(.06f, .07f, .17f), new Vector3(0, end, -.02f), steel);
-        else if (name.EndsWith("axe")) {
+        if (name.EndsWith("axe")) {
             Box(tool, new Vector3(.045f, .1f, .15f), new Vector3(0, end, -.05f), steel);
             Box(tool, new Vector3(.03f, .17f, .05f), new Vector3(0, end, -.14f), Mat(steelTool ? "e9eef0" : "8d9294", .3f, metal));
         } else {

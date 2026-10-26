@@ -342,7 +342,7 @@ public partial class WorldView : Node3D {
         overlay.QueueRedraw();
     }
 
-    /// <summary>The hammer model for a hammering action: the grade in hand or carried, and steel for someone with none, such as an anvil worker.</summary>
+    /// <summary>The hammer model for a hammering action: the grade in hand, carried or slotted in the worked bench, and steel for someone with none, such as an anvil worker.</summary>
     private static string? Grade(string? tool, string? held, Inventory? carried) =>
         tool != "hammer" ? tool
         : held is "wood_hammer" or "steel_hammer" ? held
@@ -405,7 +405,7 @@ public partial class WorldView : Node3D {
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
                 : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment is { Kind: "mine" } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
-            Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, null));
+            Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
             entry.Rig.Root.Visible = World.Sees(worker);
             float trip = worker.Away > 0 ? World.TripLeg(1 - worker.Away / World.Data.TradeSeconds) : worker.Commute / (World.Data.TradeSeconds / 2);
             Fade(entry.Rig.Root, TripFade(trip));

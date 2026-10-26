@@ -202,7 +202,7 @@ public partial class Game : Node {
         bagFill = Style.Text("", 13, Style.Beige); bagFill.HorizontalAlignment = HorizontalAlignment.Center; label.AddChild(bagFill);
         bagContent = new VBoxContainer(); drawer.AddChild(bagContent);
         // Every closable window keeps its close button in its top right corner.
-        var hide = HeaderButton("close", "Hide the backpack", () => { bagHidden = true; bag.Visible = false; }, Style.CloseRound, "bag_close");
+        var hide = HeaderButton("close", "Hide the backpack", () => { if (page == "inventory") ClosePanel(); else { bagHidden = true; bag.Visible = false; } }, Style.CloseRound, "bag_close");
         hide.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin; drawer.AddChild(hide);
         deathLabel = Outlined(Label("", 26)); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
         // Raised above the centred player so a downed body stays visible under the message.
@@ -806,9 +806,10 @@ public partial class Game : Node {
                     var at = view.ToWorld(mouse.Position).Round();
                     var built = view.BuildMode == "crate" ? world.PlaceCrate(placingCrate, at) : world.Build(view.BuildMode, at);
                     // Placement stays on without opening what was placed, so several go down in a row until the materials or crates run out.
-                    // A guest's building goes up on the host, so the guest stays in placement until Esc.
+                    // A guest's building goes up on the host, so the guest stays in placement until Esc, except after a mine the host was sent.
                     // A mine opens its panel instead, since each cliff takes only one.
                     if (built?.Kind == "mine") { view.BuildMode = ""; Select(built); } else if (built != null && !CanPlaceAgain()) view.BuildMode = "";
+                    else if (world.Remote && view.BuildMode == "mine" && world.PlacementBlock("mine", world.Snap("mine", at)) == null) view.BuildMode = "";
                     return;
                 }
                 var t = view.Pick(mouse.Position);

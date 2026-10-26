@@ -171,7 +171,7 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `hungerHours` and `thirstHours` in `data/game.json` set how many in-game hours a full bar lasts.
 
-Sleeping in a cabin advances time toward dawn.
+Sleeping in a cabin advances time toward dawn. It is allowed from `World.SleepHour` (22:00), a little before night falls.
 It is refused if hunger or thirst would run out first.
 
 #### Sprinting
@@ -182,7 +182,7 @@ Under 15% food or drink (`GameData.LowNeed`) the player cannot sprint and the sc
 
 #### Death and recovery boxes
 
-Death moves carried items to a recovery box and respawns the player at the clearing after a 30-second timer.
+Death moves carried items to a recovery box and respawns the player after a 30-second timer in the cabin nearest to where they fell, or at the clearing without one.
 Recovery boxes are never automation storage and disappear once empty.
 
 ### Sight and fog of war

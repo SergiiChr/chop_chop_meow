@@ -1402,6 +1402,19 @@ public static class SimulationChecks {
         SafeTick(world, 10);
         Require(rock.Remaining < 400, "stone needs no tool");
 
+        // A full station leaves a worker holding the wrong tool, who must wait rather than mine with an axe.
+        var iron = world.Add("iron", new Vector2(18, 14), 400);
+        var miner = AddWorker(world, iron.Pos + Vector2.One); miner.Tool = "steel_axe";
+        station.Inventory.Add("steel_pick", station.Inventory.Room("steel_pick"));
+        world.Assign(miner, iron);
+        SafeTick(world, 10);
+        Require(miner.Tool == "steel_axe" && iron.Remaining == 400 && miner.Status == "No room to put back the steel axe",
+                "a worker who cannot put back the wrong tool should wait instead of mining with it");
+        station.Inventory.Remove("steel_pick", 1);
+        for (int i = 0; i < 120 && miner.Tool != "steel_pick"; i++) SafeTick(world, .25f);
+        Require(miner.Tool == "steel_pick" && station.Inventory["steel_axe"] == 2, "with room again the worker should swap the axe for a pickaxe");
+        world.S.Workers.Remove(miner); station.Inventory.Remove("steel_pick", 99); station.Inventory.Remove("steel_axe", 1);
+
         world.Assign(worker, tree);
         SafeTick(world, 10);
         Require(worker.Tool == "steel_axe", "back on the tree the worker should fetch the axe again");

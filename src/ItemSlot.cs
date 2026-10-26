@@ -15,8 +15,6 @@ public partial class ItemSlot : Button {
     // Godot drag data must be a Variant, so the C# payload rides alongside it for the drag's lifetime.
     private static ItemDrag? dragging;
     public Func<ItemDrag?>? Drag { get; set; }
-    /// <summary>What a right click picks up, carried until a left click drops it; without its own, half of what <see cref="Drag"/> would take.</summary>
-    public Func<ItemDrag?>? Half { get; set; }
     public Func<ItemDrag, bool>? CanTake { get; set; }
     /// <summary>Drops the drag here and returns the units that did not fit, which stay on the cursor.</summary>
     public Func<ItemDrag, int>? Take { get; set; }
@@ -36,10 +34,12 @@ public partial class ItemSlot : Button {
 
     public override void _GuiInput(InputEvent ev) {
         if (ev is not InputEventMouseButton { Pressed: true } click) return;
-        // The click that drops a split half would also press this slot, whose own action could move the items straight back.
         if (click.ButtonIndex == MouseButton.Left && click.DoubleClick) DoubleClicked?.Invoke();
+        // The click that drops a split half would also press this slot, whose own action could move the items straight back.
         if (click.ButtonIndex == MouseButton.Left && GetViewport().GuiIsDragging()) AcceptEvent();
-        else if (click.ButtonIndex == MouseButton.Right && (Half != null ? Half() : Drag?.Invoke() is { Count: > 0 } whole ? whole with { Count = (whole.Count + 1) / 2 } : null) is ItemDrag half) {
+        // A right click picks up half of what a drag would take, carried until a left click drops it.
+        else if (click.ButtonIndex == MouseButton.Right && Drag?.Invoke() is { Count: > 0 } whole) {
+            var half = whole with { Count = (whole.Count + 1) / 2 };
             dragging = half;
             ForceDrag(half.Item, Preview());
             AcceptEvent();
