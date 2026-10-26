@@ -556,7 +556,7 @@ public static class SimulationChecks {
         var reinforced = world.Add("reinforced", new Vector2(15, 10));
         reinforced.Fuel = "wood"; // Even malformed or edited state must not make wood a valid steel fuel.
         Require(world.FuelOf(reinforced) == "coal" && world.FuelBlock(reinforced, "wood") != null,
-                "the high-temp furnace should only ever burn coal, even if Fuel is tampered with");
+                "the reinforced furnace should only ever burn coal, even if Fuel is tampered with");
         var steelCost = world.BatchCost(reinforced);
         Require(steelCost["coal"] == 2 && steelCost["iron_bar"] == 2 && steelCost.Count == 2,
                 "a steel batch's ingredients should be iron and coal, with its fuel coal in the fuel slot");
@@ -571,11 +571,11 @@ public static class SimulationChecks {
         reinforced.Burner!.Add("coal", 1);
         SafeTick(world, 12);
         Require(!reinforced.Processing && reinforced.Progress == 0 && reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 2 && reinforced.Burner["coal"] == 1,
-                "the high-temp furnace must leave a complete steel batch untouched while below the steel heat");
+                "the reinforced furnace must leave a complete steel batch untouched while below the steel heat");
         reinforced.Heat = 100;
         SafeTick(world, .25f);
         Require(reinforced.Processing && reinforced.Inventory["iron_bar"] == 0 && reinforced.Inventory["coal"] == 0 && reinforced.Burner["coal"] == 0,
-                "once hot enough, the high-temp furnace should consume the batch's ingredients and one coal of fuel");
+                "once hot enough, the reinforced furnace should consume the batch's ingredients and one coal of fuel");
         reinforced.Burner.Add("coal", 3);
         SafeTick(world, 30);
         Require(reinforced.Processing && reinforced.Progress < data.Recipes["steel_bar"].Seconds && reinforced.Burner["coal"] == 1,
@@ -1049,7 +1049,7 @@ public static class SimulationChecks {
         int bars = world.S.Backpack["iron_bar"];
         world.LoadBatch(reinforced, 1);
         Require(reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 2 && reinforced.Burner!["coal"] == 1,
-                "the high-temp furnace should load iron plus mined coal, and coal fuel into its fuel slot");
+                "the reinforced furnace should load iron plus mined coal, and coal fuel into its fuel slot");
         CompleteBatches(world, reinforced, "steel_bar", 2, true);
         world.Player = reinforced.Pos;
         world.Collect(reinforced);
@@ -1541,6 +1541,13 @@ public static class SimulationChecks {
         Require(looks.SequenceEqual(new[] { 1, 2, 3 }) && farm.Stage == World.FarmRipe && World.CropLook(farm, world.GrowSeconds) == 4,
                 $"wheat should grow through soil, straws and green plants to ripe in {data.Farm.GrowDays} days: {string.Join(",", looks)}");
 
+        // A plot harvested with nobody to haul keeps its seed in the output: nothing sows it back on its own.
+        var lone = world.Add("farm", origin + new Vector2(0, -6));
+        lone.Stage = World.FarmRipe; world.Player = lone.Pos;
+        world.Gather(lone, world.HarvestSeconds); world.Tick(1);
+        Require(lone.Stage == World.FarmFallow && lone.Output!["wheat_seeds"] == data.Farm.Yield["wheat_seeds"] && lone.Inventory["wheat_seeds"] == 0, "harvested seed should wait in the output until someone moves it into the plot");
+        world.S.Things.Remove(lone);
+
         world.Player = farm.Pos;
         world.Gather(farm, world.HarvestSeconds / 2);
         Require(farm.Stage == World.FarmRipe && Math.Abs(farm.Progress - world.HarvestSeconds / 2) < .01f, "the player should harvest by hand, without a tool");
@@ -1552,12 +1559,14 @@ public static class SimulationChecks {
         var hut = world.Add("hut", new Vector2(40, 40));
         world.Player = hut.Pos + new Vector2(0, 2); world.S.Sheltered = hut.Id;
         for (int i = 0; i < 4 * data.DaySeconds && farm.Stage == World.FarmRipe; i++) SafeTick(world, 1);
-        Require(farm.Stage == World.FarmFallow && farm.Inventory["wheat_seeds"] == 2, "a worker should finish the shared harvest and keep the seeds in the plot");
+        Require(farm.Stage == World.FarmFallow && farm.Output!["wheat_seeds"] + farm.Inventory["wheat_seeds"] == data.Farm.Yield["wheat_seeds"], "a worker should finish the shared harvest into the plot");
         SafeTick(world, 30);
+        Require(farm.Inventory["wheat_seeds"] == data.Farm.Sow["wheat_seeds"] && chest.Inventory["wheat_seeds"] == data.Farm.Yield["wheat_seeds"] - data.Farm.Sow["wheat_seeds"],
+                "the hauler should move one sowing's seeds from the output into the plot and carry the rest to storage");
         Require(chest.Inventory["wheat"] == data.Farm.Yield["wheat"] && compost.Inventory["wheat"] == 0 && compost.Inventory["grass"] == 1, "the wheat should go to storage rather than rot, and the grass to the compost");
         chest.Inventory.Add("fertilizer", 1);
         SafeTick(world, 60);
-        Require(farm.Stage == World.FarmGrowing && farm.Inventory["wheat_seeds"] == 1 && chest.Inventory["fertilizer"] == 0, "the worker should bring fertilizer and sow again from the kept seeds");
+        Require(farm.Stage == World.FarmGrowing && farm.Inventory["wheat_seeds"] == 0 && chest.Inventory["fertilizer"] == 0, "the worker should bring fertilizer and sow again from the seeds moved back in");
     }
 
     /// <summary>Foods restore what their data says, raw ones only say they need cooking, and saves from before the rename keep their cooked meat.</summary>

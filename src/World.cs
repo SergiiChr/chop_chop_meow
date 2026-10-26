@@ -569,7 +569,7 @@ public sealed partial class World {
     /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
     public int LoadInput(Thing t, string item, int quantity) {
         if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
-        // Fuel nothing smelts goes to the fuel slot; coal at the high-temp furnace fills the ingredient slot, and the fuel slot is filled by dragging.
+        // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the ingredient slot, and the fuel slot is filled by dragging.
         if (!BatchCost(t).ContainsKey(item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
         if (!BatchCost(t).ContainsKey(item)) { Say($"{Data.Name(item)} is not used by this recipe."); return 0; }
         if (Forwarded("load_input", t.Id, item: item, count: quantity)) return 0;
@@ -758,7 +758,7 @@ public sealed partial class World {
     private HashSet<string>? burning;
     /// <summary>Whether a kind of building has a fuel slot.</summary>
     public bool Burns(string kind) => (burning ??= Data.Recipes.Values.Where(r => r.Fuel).Select(r => r.Station).ToHashSet()).Contains(kind);
-    /// <summary>Items a station's fuel slot takes: coal at the high-temp furnace, wood or coal elsewhere.</summary>
+    /// <summary>Items a station's fuel slot takes: coal at the reinforced furnace, wood or coal elsewhere.</summary>
     public static bool FuelFits(Thing t, string item) => t.Kind == "reinforced" ? item == "coal" : item is "wood" or "coal";
     private static Inventory NewWageSlot() => new() { Slots = 1, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins.</summary>
@@ -769,7 +769,7 @@ public sealed partial class World {
         box == t.Inventory ? HoldBlock(t, item) : null;
     /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
     public string? FuelBlock(Thing t, string item) =>
-        !FuelFits(t, item) ? (t.Kind == "reinforced" ? "The high-temp furnace burns only mined coal." : "The fuel slot takes wood or coal.") :
+        !FuelFits(t, item) ? (t.Kind == "reinforced" ? "The reinforced furnace burns only mined coal." : "The fuel slot takes wood or coal.") :
         t.Burner?.First() is string held && held != item ? $"The fuel slot holds {Data.Name(held).ToLowerInvariant()}. Take it out first." : null;
     /// <summary>Coins kept for wages in every signpost's wage slot.</summary>
     public int WageCoins => S.Things.Sum(t => t.Wages?[Inventory.Coins] ?? 0);
@@ -1299,7 +1299,7 @@ public sealed partial class World {
         }
         return pumps || target.Processing || Stocked(target);
     }
-    /// <summary>The worker who pumps a high-temp furnace's bellows: the first on duty with the bellows job, or null.</summary>
+    /// <summary>The worker who pumps a reinforced furnace's bellows: the first on duty with the bellows job, or null.</summary>
     private Worker? Pumper(Thing t) {
         if (t.Kind != "reinforced") return null;
         foreach (var o in coworkers) if (HasDuty(o, t.Id, "bellows")) return o;
@@ -1746,7 +1746,7 @@ public sealed partial class World {
         4 => ("Beneath the surface", "Buy a steel pickaxe from the price sheet at the signpost. The cart brings it back in a crate."),
         5 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A cabin and campfire make nights safer."),
         6 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore + wood. Collect iron bars."),
-        7 => ("Hotter than fire", "Explore for a dark cliff and mine coal at its foot. Build a high-temp furnace: 20 stone, 5 iron bars, 8 wood."),
+        7 => ("Hotter than fire", "Explore for a dark cliff and mine coal at its foot. Build a reinforced furnace: 20 stone, 5 iron bars, 8 wood."),
         8 => ("Make steel", "Load iron + mined coal into the bellows furnace. Keep the heat above the clear bar; steel only progresses there. 2 iron bars + 3 coal incl. fuel make 2 steel bars."),
         9 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. It hammers steel bars into steel parts."),
         10 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),

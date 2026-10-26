@@ -22,7 +22,7 @@ public partial class Game {
             ("key:Hold RMB", "Walk over and gather. On a placed crate, pick it up with what is inside."),
             ("key:LMB", "Select. On open ground, use what is in hand: swing, eat, drink."),
             ("key:E", "Inspect what is nearest."),
-            ("key:Space", "Swing the tool in hand, or pump a selected high-temp furnace."),
+            ("key:Space", "Swing the tool in hand, or pump a selected reinforced furnace."),
             ("key:1–9", "Put a hotbar slot in hand. Drag an item or plan onto a slot to assign it."),
             ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Your crew."), ("key:I", "This guide."),
             ("key:Ctrl-click", "Move all of an item. A plain click moves one stack; right-click picks up half."),
@@ -33,8 +33,8 @@ public partial class Game {
             ("steel_pick", "Buy your first pickaxe at a trading post with crates of berries."),
             ("iron_ore", "Mine iron and coal at the foot of the cliffs with a pickaxe; loose coal needs no tool."),
             ("iron_bar", "Stone furnace: 2 ore and 1 wood or coal make an iron bar."),
-            ("steel_bar", "High-temp furnace: 2 iron bars and 2 mined coal make 2 steel bars, with coal in its fuel slot."),
-            ("line_flame", "Pump the bellows: steel melts at 1450+ °C."),
+            ("steel_bar", "Reinforced furnace: 2 iron bars and 2 mined coal make 2 steel bars, with coal in its fuel slot."),
+            ("line_flame", "Pump the bellows: steel requires 1450+ °C."),
             ("steel_parts", "The anvil hammers steel bars into steel parts while someone works it.")
         },
         ["craft"] = new[] {

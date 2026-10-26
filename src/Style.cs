@@ -189,7 +189,7 @@ public static class Style {
 }
 
 /// <summary>
-/// The high-temp furnace's heat as a round stovetop dial in degrees Celsius: a dark track, a brick band where steel forms, and a needle.
+/// The reinforced furnace's heat as a round stovetop dial in degrees Celsius: a dark track, a brick band where steel forms, and a needle.
 /// </summary>
 public partial class HeatDial : Control {
     public Func<float> Level { get; set; } = () => 0;

@@ -21,8 +21,6 @@ public sealed partial class World {
 
     /// <summary>A fallow plot sows itself once it holds seeds and fertilizer; growing wheat ripens after its days.</summary>
     private void FarmTick(Thing farm, float dt) {
-        // The plot keeps seed from its harvest for two more sowings.
-        if (farm.Output != null) foreach (var (item, amount) in Data.Farm.Sow) if (farm.Inventory[item] < amount * 2 && farm.Output[item] > 0) farm.Output.TransferTo(farm.Inventory, item, amount * 2 - farm.Inventory[item]);
         if (farm.Stage == FarmFallow && farm.Inventory.Has(Data.Farm.Sow)) { farm.Inventory.Spend(Data.Farm.Sow); farm.Stage = FarmGrowing; farm.Progress = 0; }
         if (farm.Stage == FarmGrowing && (farm.Progress += dt) >= GrowSeconds) { farm.Stage = FarmRipe; farm.Progress = 0; }
     }
@@ -42,12 +40,19 @@ public sealed partial class World {
     }
 
     /// <summary>
-    /// A farm hand carries out the harvest, keeping seed for two more sowings, fetches what the next sowing lacks,
-    /// waits by the plot while the wheat grows, and harvests it when ripe.
+    /// A farmer harvests the ripe wheat.
+    /// A hauler first moves seed from the plot's own harvest into its sowing slots, then carries the rest of the harvest out and fetches what the next sowing still lacks.
+    /// Nothing sows from the harvest on its own: seed only goes back in by a hauler's or the player's hand.
     /// </summary>
-    /// <summary>A farmer harvests the ripe wheat; a hauler carries out what is beyond two sowings and fetches what the next sowing lacks.</summary>
     private bool FarmWork(Worker w, Thing farm, float dt) {
         if (HasDuty(w, farm.Id, "haul")) {
+            if (farm.Output != null) foreach (var (item, amount) in Data.Farm.Sow) {
+                int missing = amount - farm.Inventory[item];
+                if (missing <= 0 || farm.Output[item] == 0) continue;
+                w.Status = Phrase("Sowing back ", Data.Name(item));
+                if (Walk(w, farm.Pos, dt)) farm.Output.TransferTo(farm.Inventory, item, missing);
+                return true;
+            }
             // Each pass ends with a return, so the transfer never changes the stacks while they are still being walked.
             if (farm.Output != null) foreach (var (item, count) in farm.Output.Items) {
                 if (DepositFor(item, farm.Pos) is not Thing dest) continue;

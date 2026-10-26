@@ -357,7 +357,7 @@
       "description": "Crafts planks, crates and tools twice as fast as by hand. Slot a chisel and a hammer; someone has to work at it."
     },
     "reinforced": {
-      "name": "High-temp furnace",
+      "name": "Reinforced furnace",
       "cost": {
         "stone": 20,
         "iron_bar": 5,
