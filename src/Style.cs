@@ -25,6 +25,11 @@ public static class Style {
     public static readonly Color Warn = new("f2937c");
     public static readonly Color Rise = new("4f7a55");
 
+    // Boxes by colour are made once and shared, since creating a resource allocates; declared first so the boxes below can use them.
+    private static readonly System.Collections.Generic.Dictionary<Color, StyleBoxFlat> tags = new();
+    private static readonly System.Collections.Generic.Dictionary<Color, (StyleBoxFlat, StyleBoxFlat)> pills = new();
+    private static readonly System.Collections.Generic.Dictionary<(Color, int), (StyleBoxFlat, StyleBoxFlat)> rounds = new();
+
     public static readonly Font Head = Weighted("res://assets/fonts/Fredoka.ttf", 600);
     public static readonly Font Body = Weighted("res://assets/fonts/Nunito.ttf", 700);
     public static readonly Font Bold = Weighted("res://assets/fonts/Nunito.ttf", 800);
@@ -43,6 +48,8 @@ public static class Style {
     public static readonly StyleBoxTexture Plate = EnamelBox(14, 10);
     /// <summary>A beige well inside a board, holding a station's process row or a group of slots.</summary>
     public static readonly StyleBoxFlat Well = Flat(Beige, 14, 16);
+    /// <summary>A goal still to do on the pause board: an empty ring.</summary>
+    public static readonly StyleBoxFlat GoalTodo = Flat(Beige, 12, 0, Tan, 3);
     /// <summary>A job chip on a worker card: a small cream pill with a thin outline.</summary>
     public static readonly StyleBoxFlat Chip = Flat(CupFill, 13, 2, Line, 2, horizontal: 8);
     /// <summary>The ring a clickable well, such as a worker card, gets on hover.</summary>
@@ -72,7 +79,10 @@ public static class Style {
     public static readonly StyleBoxFlat KeyPill = Flat(Beige, 9, 0, Line, 2, horizontal: 5);
     public static readonly StyleBoxFlat TagPill = Tag(Sage), BlueTag = Tag(Enamel);
     /// <summary>A flat pill for a short label, with room either side of its text.</summary>
-    public static StyleBoxFlat Tag(Color bg) => Flat(bg, 13, 0, horizontal: 10);
+    public static StyleBoxFlat Tag(Color bg) {
+        if (!tags.TryGetValue(bg, out var box)) tags[bg] = box = Flat(bg, 13, 0, horizontal: 10);
+        return box;
+    }
     public static readonly StyleBoxFlat BarBack = Flat(Line, 7, 0);
     public static readonly StyleBoxFlat BarFill = Flat(Mustard, 7, 0);
     public static readonly StyleBoxFlat BarGrow = Flat(Sage, 7, 0);
@@ -93,10 +103,16 @@ public static class Style {
         return box;
     }
 
-    public static (StyleBoxFlat, StyleBoxFlat) Round(Color bg, int radius) => (Flat(bg, radius, 0, Rim, 3), Flat(bg.Lightened(.12f), radius, 0, Mustard, 3));
+    public static (StyleBoxFlat, StyleBoxFlat) Round(Color bg, int radius) {
+        if (!rounds.TryGetValue((bg, radius), out var look)) rounds[(bg, radius)] = look = (Flat(bg, radius, 0, Rim, 3), Flat(bg.Lightened(.12f), radius, 0, Mustard, 3));
+        return look;
+    }
 
     /// <summary>A rounded job or action button's colours: its fill with the cream rim, and a lighter fill on hover.</summary>
-    public static (StyleBoxFlat, StyleBoxFlat) Pill(Color bg) => (Flat(bg, 24, 0, Rim, 3, horizontal: 14), Flat(bg.Lightened(.1f), 24, 0, Mustard, 3, horizontal: 14));
+    public static (StyleBoxFlat, StyleBoxFlat) Pill(Color bg) {
+        if (!pills.TryGetValue(bg, out var look)) pills[bg] = look = (Flat(bg, 24, 0, Rim, 3, horizontal: 14), Flat(bg.Lightened(.1f), 24, 0, Mustard, 3, horizontal: 14));
+        return look;
+    }
 
     /// <summary>Sets a button's states to the given boxes.</summary>
     public static void Skin(Button button, StyleBox normal, StyleBox hover, StyleBox? pressed = null) {
@@ -213,16 +229,17 @@ public partial class HeatDial : Control {
 public partial class DayDial : Control {
     public Func<float> Phase { get; set; } = () => 0;
     public Func<bool> Night { get; set; } = () => false;
+    private static readonly Color NightArc = new("8fa6c4"), Moon = new("dfe6f2");
 
     public override void _Draw() {
         var centre = new Vector2(Size.X / 2, Size.Y - 6);
         float radius = Math.Min(Size.X / 2 - 12, Size.Y - 14), phase = Mathf.Clamp(Phase(), 0, 1);
         DrawArc(centre, radius, Mathf.Pi, Mathf.Tau, 32, Style.Line, 8, true);
-        var tint = Night() ? new Color("8fa6c4") : Style.Mustard;
+        var tint = Night() ? NightArc : Style.Mustard;
         DrawArc(centre, radius, Mathf.Pi, Mathf.Pi + Math.Max(.02f, phase) * Mathf.Pi, 32, tint, 8, true);
         var at = centre + Vector2.FromAngle(Mathf.Pi + phase * Mathf.Pi) * radius;
         DrawCircle(at, 9, Style.Rim);
-        DrawCircle(at, 7, Night() ? new Color("dfe6f2") : Style.Mustard);
+        DrawCircle(at, 7, Night() ? Moon : Style.Mustard);
     }
 }
 

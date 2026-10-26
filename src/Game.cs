@@ -357,7 +357,8 @@ public partial class Game : Node {
     /// <summary>The backpack is only the drawer; the side panel stays hidden while it shows.</summary>
     private void Backpack() {
         BagGrid(UseFromBag, UseHint);
-        panel.Visible = false;
+        // Only the drawer shows, so the camera keeps the player centred.
+        panel.Visible = false; view.PanelOpen = false;
     }
     private const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
     private void UseFromBag(string id) {
@@ -500,15 +501,6 @@ public partial class Game : Node {
         button.AddThemeFontSizeOverride("font_size", 17);
         return button;
     }
-    private void AppendItems(StringBuilder text, Inventory inv) {
-        if (inv.Count == 0) { text.Append("nothing"); return; }
-        bool first = true;
-        foreach (var (item, count) in inv.Items) {
-            if (!first) text.Append(", ");
-            first = false;
-            text.Append($"{count} {world.Data.Name(item)}");
-        }
-    }
     private void Storage(Thing t) {
         switch (t.Kind) {
             case "crate": Crate(t); return;
@@ -578,8 +570,10 @@ public partial class Game : Node {
         }, Style.ActionRound, "deposit");
         FilterButton(t);
         var rows = Well(new VBoxContainer()); rows.AddThemeConstantOverride("separation", 0);
-        string[] kinds = { "axe", "pickaxe", "rake", "hammer" };
-        for (int k = 0; k < kinds.Length; k++) {
+        // The four kinds workers fetch always have a row; any other tool hung here, such as a chisel, gets one too.
+        var kinds = new List<string> { "axe", "pickaxe", "rake", "hammer" };
+        foreach (var id in t.Inventory.Items.Keys) if (world.Data.Items.TryGetValue(id, out var def) && def.Tool != "" && !kinds.Contains(def.Tool)) kinds.Add(def.Tool);
+        for (int k = 0; k < kinds.Count; k++) {
             string kind = kinds[k];
             if (k > 0) rows.AddChild(new HSeparator { CustomMinimumSize = new Vector2(0, 14) });
             var row = new HBoxContainer { CustomMinimumSize = new Vector2(0, 60) }; row.AddThemeConstantOverride("separation", 12); rows.AddChild(row);
@@ -681,7 +675,7 @@ public partial class Game : Node {
             for (int i = 0; i < 3; i++) links[i].Color = i < at ? Style.Sage : Style.Line;
             var line = ripeText.Clear();
             if (hours >= 0) line.Append("ripe in ").Append(hours / 24).Append(" d ").Append(hours % 24).Append(" h");
-            else line.Append(farm.Stage == World.FarmRipe ? "ripe · hold right mouse on the plot to harvest" : "sows itself with seeds and fertilizer");
+            else line.Append(farm.Stage == World.FarmRipe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in");
             ripeText.Show();
         });
         var output = farm.Output ?? farm.Inventory;
@@ -698,11 +692,15 @@ public partial class Game : Node {
         });
         var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => FarmCup(farm, farm.Inventory, k, true, $"×{world.Data.Farm.Sow[k]}"));
         Process(inputs, $"{world.Data.Farm.GrowDays:0} d", () => farm.Stage == World.FarmGrowing ? farm.Progress / world.GrowSeconds : farm.Stage == World.FarmRipe ? 1 : 0,
-            FuelRow("line_leaf", new Color("8fae7e"), Detached(fertilizer.GetChild<Control>(0)), lasts), main, side);
+            FuelRow("line_leaf", new Color("8fae7e"), FuelCup(fertilizer), lasts), main, side);
         BagGrid(id => MoveStack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move", wanted: id => world.Holds(farm, id));
         JobButtons(farm);
     }
-    private static Control Detached(Control control) { control.GetParent()?.RemoveChild(control); return control; }
+    /// <summary>Takes a cup out of the column it was built in, for the fuel row, and frees the column.</summary>
+    private static Control FuelCup(Control column) {
+        var cup = column.GetChild<Control>(0); column.RemoveChild(cup); column.QueueFree();
+        return cup;
+    }
     /// <summary>A cup bound to one item of a farm's sowing or harvest slots, with what one crop takes or gives under it.</summary>
     private VBoxContainer FarmCup(Thing farm, Inventory box, string item, bool input, string perBatch, float size = 52, StyleBoxFlat? look = null) {
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
@@ -712,7 +710,8 @@ public partial class Game : Node {
         cell.Pressed += () => { Act(() => MoveStack(box, world.S.Backpack, item, farm)); RefreshLive(); };
         cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, farm) : null;
         if (input) {
-            cell.CanTake = drag => drag.From == world.S.Backpack && drag.Item == item;
+            // Seed comes back in from the plot's own harvest as well as from the backpack.
+            cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == farm.Output) && drag.Item == item;
             cell.Take = drag => { int left = 0; Act(() => left = MoveDrag(drag, box, farm)); RefreshLive(); return left; };
         }
         int drawn = -1;
@@ -722,7 +721,7 @@ public partial class Game : Node {
             drawn = held;
             cell.AddThemeColorOverride(IconNormal, held > 0 ? Colors.White : Ghost);
             count.Text = held > 0 ? held.ToString() : "";
-            cell.TooltipText = $"{world.Data.Name(item)} · {held}\n{(input ? "Click: take back · Drag one here to sow" : "Click: take")}";
+            cell.TooltipText = $"{world.Data.Name(item)} · {held}\n{(input ? "Click: take back · Drag seeds here from the harvest or backpack to sow" : "Click: take · Drag seeds to the sowing slot")}";
         });
         column.AddChild(cell);
         if (perBatch != "") column.AddChild(PerBatch(perBatch));
@@ -809,7 +808,7 @@ public partial class Game : Node {
                     var worker = world.S.Workers.FirstOrDefault(w => w.Id == assigningWorker);
                     if (worker != null && t?.IsResource == true) {
                         string? blocked = world.GatherBlock(t, true);
-                        if (blocked != null) Notify(blocked); else { world.Assign(worker, t); assigningWorker = 0; Select(worker); }
+                        if (blocked != null) Notify(blocked); else { world.SetDuty(worker, t, "gather", true); assigningWorker = 0; Select(worker); }
                     } else Notify("Choose a tree, leaves, stone, ore, coal, berry bush or water source.");
                     return;
                 }

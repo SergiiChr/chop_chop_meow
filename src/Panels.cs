@@ -163,7 +163,7 @@ public partial class Game {
         "craft" => "Works the station; it only makes progress while someone works it.",
         "deliveries" => "Fetches fresh prices on request and carries deliveries to storage.",
         "fuel" => "Keeps the fire fed with wood from storage.",
-        "farm" => "Harvests the ripe wheat; the plot sows itself.",
+        "farm" => "Harvests the ripe wheat.",
         "build" => "Digs the entrance and fits the frame. Needs a pickaxe, then a hammer.",
         "mine" => $"Mines ore and stone underground with a pickaxe. Up to {world.Data.Mine.Workers} workers.",
         "stock" => "Brings tools from storage to the rack.",

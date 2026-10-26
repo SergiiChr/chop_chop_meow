@@ -22,7 +22,7 @@ public partial class Game {
             var now = (world.S.Workers.Count, DailyWages());
             if (now == shown) return;
             shown = now;
-            countText.Clear().Append(now.Item1).Append(" / 8"); countText.Show();
+            countText.Clear().Append(now.Item1).Append(" / ").Append(World.MaxWorkers); countText.Show();
             wagesText.Clear().Append('−').Append(now.Item2).Append(" /day"); wagesText.Show();
         });
         if (world.S.Workers.Count == 0) {

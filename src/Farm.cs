@@ -19,7 +19,7 @@ public sealed partial class World {
         _ => 0
     };
 
-    /// <summary>A fallow plot sows itself once it holds seeds and fertilizer; growing wheat ripens after its days.</summary>
+    /// <summary>A fallow plot sows once seeds and fertilizer are put in its sowing slots; growing wheat ripens after its days.</summary>
     private void FarmTick(Thing farm, float dt) {
         if (farm.Stage == FarmFallow && farm.Inventory.Has(Data.Farm.Sow)) { farm.Inventory.Spend(Data.Farm.Sow); farm.Stage = FarmGrowing; farm.Progress = 0; }
         if (farm.Stage == FarmGrowing && (farm.Progress += dt) >= GrowSeconds) { farm.Stage = FarmRipe; farm.Progress = 0; }

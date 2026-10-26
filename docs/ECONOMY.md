@@ -43,7 +43,7 @@ Measured with the current data:
 | Mining ore or coal, chopping wood | 320 units |
 | Picking berries | 24 berries |
 | Stone furnace, iron bars | 62 |
-| Bellows furnace, steel bars | 90 |
+| Reinforced furnace, steel bars | 90 |
 | Anvil, steel parts | 57 |
 | Bench, wood parts | 114 |
 | Bench, steel tools | 58 |
@@ -61,7 +61,7 @@ Measured with the current data:
 | Steel hammer | 0.086 | 220 | 8.8× |
 | Steel axe or pickaxe | 0.145 | 255 | 10.2× |
 
-These are for a crew sized so no one waits. A starter crew of one worker per job (ore, coal, wood, stone furnace, bellows furnace, anvil and bench) is held back by the anvil: about 28 axes or 57 hammers a day, around 150 coins per worker-day, still about 6 times pay.
+These are for a crew sized so no one waits. A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced furnace, anvil and bench) is held back by the anvil: about 28 axes or 57 hammers a day, around 150 coins per worker-day, still about 6 times pay.
 
 ## 3. Demand
 

@@ -67,8 +67,7 @@ public partial class Game {
     }
 
     private static Label GoalMark(bool done, bool current) {
-        var mark = Style.Pill(done ? "✓" : "", done ? Style.Round(Style.Sage, 12).Item1 : current ? Style.Round(Style.Mustard, 12).Item1 : Style.Round(Style.Beige, 12).Item1, Style.Rim, 13);
-        if (!done && !current) ((StyleBoxFlat)mark.GetThemeStylebox("normal")).BorderColor = Style.Tan;
+        var mark = Style.Pill(done ? "✓" : "", done ? Style.Round(Style.Sage, 12).Item1 : current ? Style.Round(Style.Mustard, 12).Item1 : Style.GoalTodo, Style.Rim, 13);
         mark.CustomMinimumSize = new Vector2(24, 24); mark.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; mark.VerticalAlignment = VerticalAlignment.Center;
         return mark;
     }

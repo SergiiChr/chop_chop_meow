@@ -131,7 +131,6 @@ public sealed partial class World {
             case "fuel_fire": FuelFire(t); break;
             case "drink": Drink(t); break;
             case "set_recipe": SetRecipe(t, c.Item); break;
-            case "set_fuel": SetFuel(t, c.Item); break;
             case "set_filter": SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
             case "clear_filters": ClearFilters(t); break;
             case "set_compost": SetCompost(t, c.Count != 0); break;
@@ -185,11 +184,6 @@ public sealed partial class World {
         if (lake.Kind != "water" || !Near(lake)) { Say("Walk closer to the lake."); return; }
         if (Forwarded("drink", lake.Id)) return;
         S.Thirst = 100; Say("Cool, fresh water."); Play("gather_water", Player);
-    }
-
-    public void SetFuel(Thing furnace, string fuel) {
-        if (furnace.Kind is not ("furnace" or "cooktable" or "cannery") || furnace.Processing || fuel is not "wood" and not "coal" || Forwarded("set_fuel", furnace.Id, item: fuel)) return;
-        furnace.Fuel = fuel;
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {

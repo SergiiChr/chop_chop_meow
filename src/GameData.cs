@@ -41,7 +41,7 @@ public sealed class RecipeDef {
     public int Tier { get; set; }
     /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
     public bool Hand { get; set; }
-    /// <summary>Each batch burns one wood or coal, whichever the station is set to; the bellows furnace burns coal.</summary>
+    /// <summary>Each batch burns one wood or coal, from the station's fuel slot; the reinforced furnace burns coal.</summary>
     public bool Fuel { get; set; }
 }
 /// <summary>How the village's appetite for a good it takes moves with sales.</summary>

@@ -762,7 +762,7 @@ public partial class WorldView : Node3D {
         return false;
     }
 
-    // Campfire, furnace and bellows furnace smoke: the coal forge's plume is darker, denser and wider.
+    // Campfire, furnace and reinforced furnace smoke: the coal forge's plume is darker, denser and wider.
     private readonly record struct SmokeStyle(float Every, Color Color, float Size, float Grow);
     private static readonly SmokeStyle CampfireSmoke = new(.5f, new Color(.62f, .62f, .6f, .38f), .14f, 2.2f);
     private static readonly SmokeStyle FurnaceSmoke = new(.3f, new Color(.58f, .58f, .56f, .42f), .14f, 2.4f);
@@ -939,7 +939,7 @@ public partial class WorldView : Node3D {
             overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), new Color("2b4135"));
             overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), new Color("e5bf68"));
         }
-        // Forge heat under each bellows furnace, with a tick at the clear bar steel needs.
+        // Forge heat under each reinforced furnace, with a tick at the clear bar steel needs.
         foreach (var t in World.S.Things) {
             if (t.Kind != "reinforced" || !World.Sees(t.Pos)) continue;
             var p = Screen(t.Pos) + new Vector2(-28, 18);

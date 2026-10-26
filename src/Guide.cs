@@ -52,7 +52,7 @@ public partial class Game {
             ("coins", "Unpaid workers strike until paid or dismissed.")
         },
         ["survive"] = new[] {
-            ("berries", "A full stomach lasts a day, a full water bottle half a day."),
+            ("berries", "A full stomach lasts a day, a full water droplet half a day."),
             ("water", "Drink at the lake up the valley. The sea is salt."),
             ("campfire", "Wolves hunt at night and keep out of fire light. A log burns about 4 hours."),
             ("torch", "Click to light a torch, click to swing it. Four quick swings put it out."),

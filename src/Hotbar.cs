@@ -80,7 +80,7 @@ public partial class Game {
             hotbarCounts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : HotbarIcon(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
-            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · assign from Inventory" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
+            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · drag an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
             bool active = world.S.ActiveHotbar == slot;
             // The item in hand gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.CupWanted : Style.CupNormal);

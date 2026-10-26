@@ -186,6 +186,21 @@ public static class SimulationChecks {
         SafeTick(world, 20);
         Require(store.Inventory["tin_bar"] == 3 && sign.Output["tin_bar"] == 0 && sign.Output[Inventory.Coins] == 20,
                 "a runner should carry deliveries into storage and leave the coins");
+
+        // A tool station's output filter keeps workers from taking a tool it does not let out.
+        world.S.Time = morning;
+        foreach (var other in world.S.Things.Where(t => t.Kind == "toolstation")) other.Inventory = new Inventory { Slots = other.Inventory.Slots, StackSize = other.Inventory.StackSize };
+        var heldRack = world.Add("toolstation", new Vector2(30, 20));
+        heldRack.Inventory.Add("steel_axe", 1);
+        world.SetFilter(heldRack, "steel_pick", true, true);
+        var oak = world.Add("tree", new Vector2(32, 22), 5);
+        var cutter = AddWorker(world, new Vector2(30, 22));
+        world.Assign(cutter, oak);
+        SafeTick(world, 10);
+        Require(cutter.Tool == "" && cutter.Missing == "axe" && heldRack.Inventory["steel_axe"] == 1, "a worker should not take a tool the station's output filter holds back");
+        world.SetFilter(heldRack, "steel_pick", true, false);
+        SafeTick(world, 10);
+        Require(cutter.Tool == "steel_axe", "with the filter cleared, the worker should take the axe");
     }
 
     private static void CheckInventoryFilters(GameData data) {
