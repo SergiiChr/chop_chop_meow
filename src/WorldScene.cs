@@ -170,7 +170,7 @@ public partial class WorldView {
         Add(parent, fan.Commit(), material, center);
     }
 
-    /// <summary>Scattered grass tufts and a few wildflowers, drawn as two multimeshes.</summary>
+    /// <summary>Grass, wildflowers and lightweight leafy shrubs, each drawn in one MultiMesh.</summary>
     private void BuildTufts(Node3D parent) {
         var rng = new Random(4271);
         var blades = new List<(Transform3D At, Color Color)>();
@@ -215,13 +215,13 @@ public partial class WorldView {
         }
         Scatter(parent, tuft.Commit(), blades);
         Scatter(parent, new SphereMesh { Radius = .045f, Height = .07f, RadialSegments = 6, Rings = 3 }, flowers);
-        Scatter(parent, new SphereMesh { Radius = 1, Height = 2, RadialSegments = 7, Rings = 4 }, bushes);
+        Scatter(parent, NatureShape.Scrub, bushes, twoSided: false);
     }
 
-    private static void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items) {
+    private static void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items, bool twoSided = true) {
         var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = mesh, InstanceCount = items.Count };
         for (int i = 0; i < items.Count; i++) { multi.SetInstanceTransform(i, items[i].At); multi.SetInstanceColor(i, items[i].Color); }
-        var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1, CullMode = BaseMaterial3D.CullModeEnum.Disabled, VertexColorIsSrgb = true };
+        var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1, CullMode = twoSided ? BaseMaterial3D.CullModeEnum.Disabled : BaseMaterial3D.CullModeEnum.Back, VertexColorIsSrgb = true };
         parent.AddChild(new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 

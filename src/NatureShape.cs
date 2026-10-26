@@ -277,6 +277,44 @@ internal static class NatureShape {
         return clumps.ToArray();
     }
 
+    /// <summary>The same folded leaf construction is used for resource bushes and lightweight scenery lobes.</summary>
+    private static void BushLeaves(SurfaceTool s, Vector3 at, Vector3 radii, Vector3[] points,
+        Func<Vector3, Vector3, Color> tint, float phase, int count = 8, float size = 1) {
+        for (int leaf = 0; leaf < count; leaf++) {
+            float angle = leaf * 2.39996f + phase;
+            var outward = new Vector3(MathF.Cos(angle), .35f + (leaf % 3) * .3f, MathF.Sin(angle)).Normalized();
+            var anchor = points[0]; float best = float.NegativeInfinity;
+            foreach (var point in points) {
+                float score = ((point - at) / radii).Normalized().Dot(outward);
+                if (score > best) { best = score; anchor = point; }
+            }
+            var leafNormal = ((anchor - at) / (radii * radii)).Normalized();
+            var along = (Vector3.Up - leafNormal * leafNormal.Y).Normalized();
+            along = along.Rotated(leafNormal, angle * .7f);
+            var side = leafNormal.Cross(along).Normalized();
+            var basePoint = anchor + leafNormal * (.002f * size);
+            var tip = anchor + along * (.18f * size) + leafNormal * (.025f * size);
+            var middle = basePoint.Lerp(tip, .45f) - leafNormal * (.012f * size);
+            var left = middle + side * (.06f * size); var right = middle - side * (.06f * size);
+            void LeafFace(Vector3 a, Vector3 b, Vector3 c) {
+                var normal = (c - a).Cross(b - a).Normalized();
+                if (normal.Dot(leafNormal) < 0) { (b, c) = (c, b); normal = -normal; }
+                var color = tint(anchor, normal).Lightened((leaf % 3) * .035f);
+                s.SetNormal(normal); s.SetColor(color); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);
+                s.SetNormal(-normal); s.SetColor(color.Darkened(.15f)); s.AddVertex(a); s.AddVertex(c); s.AddVertex(b);
+            }
+            LeafFace(basePoint, left, tip); LeafFace(basePoint, tip, right);
+        }
+    }
+
+    /// <summary>A lightweight neutral shrub lobe tinted by the scenery MultiMesh's existing per-instance colors.</summary>
+    public static Mesh Scrub => Cached("scrub", s => {
+        var tint = Leafy(new Color("a0a0a0"), new Color("d5d5d5"), Colors.White, 391);
+        Blob(s, Vector3.Zero, Vector3.One, 0, 391, 4, .18f, .04f, -.46f, false, tint);
+        var (points, _) = Shape(Vector3.Zero, Vector3.One, 0, 391, 4, .18f, .04f, -.46f, 0);
+        BushLeaves(s, Vector3.Zero, Vector3.One, points, tint, .4f, 7, 2.1f);
+    });
+
     /// <summary>Shared leafy clumps with short branching stems and folded leaf tips breaking up the silhouette.</summary>
     public static Mesh Bush(int variant) => Cached($"bush{variant}", s => {
         var tint = Leafy(new Color("2c4d22"), new Color("4c7a33"), new Color("6e9c45"), variant);
@@ -295,31 +333,7 @@ internal static class NatureShape {
             int seed = 311 + variant * 11 + i;
             Blob(s, at, radii, 1, seed, 4, .3f, .06f, .02f, false, tint);
             var (points, _) = Shape(at, radii, 1, seed, 4, .3f, .06f, .02f, 0);
-            for (int leaf = 0; leaf < 8; leaf++) {
-                float angle = leaf * 2.39996f + i * .7f + variant;
-                var outward = new Vector3(MathF.Cos(angle), .35f + (leaf % 3) * .3f, MathF.Sin(angle)).Normalized();
-                var anchor = points[0]; float best = float.NegativeInfinity;
-                foreach (var point in points) {
-                    float score = ((point - at) / radii).Normalized().Dot(outward);
-                    if (score > best) { best = score; anchor = point; }
-                }
-                var leafNormal = ((anchor - at) / (radii * radii)).Normalized();
-                var along = (Vector3.Up - leafNormal * leafNormal.Y).Normalized();
-                along = along.Rotated(leafNormal, angle * .7f);
-                var side = leafNormal.Cross(along).Normalized();
-                var basePoint = anchor + leafNormal * .002f;
-                var tip = anchor + along * .18f + leafNormal * .025f;
-                var middle = basePoint.Lerp(tip, .45f) - leafNormal * .012f;
-                var left = middle + side * .06f; var right = middle - side * .06f;
-                void LeafFace(Vector3 a, Vector3 b, Vector3 c) {
-                    var normal = (c - a).Cross(b - a).Normalized();
-                    if (normal.Dot(leafNormal) < 0) { (b, c) = (c, b); normal = -normal; }
-                    var color = tint(anchor, normal).Lightened((leaf % 3) * .035f);
-                    s.SetNormal(normal); s.SetColor(color); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);
-                    s.SetNormal(-normal); s.SetColor(color.Darkened(.15f)); s.AddVertex(a); s.AddVertex(c); s.AddVertex(b);
-                }
-                LeafFace(basePoint, left, tip); LeafFace(basePoint, tip, right);
-            }
+            BushLeaves(s, at, radii, points, tint, i * .7f + variant);
         }
     });
 
