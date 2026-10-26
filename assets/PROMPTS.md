@@ -1,6 +1,6 @@
 # Icon generation prompts
 
-Generated with the built-in image generation tool, with transparent background requested. The illustrated direction board in `docs/art/illustrated-sample.png` was the style reference. The item atlas now supplies only the iron and steel bar and water icons; the world itself uses code-built 3D models. No image service is used when building or playing.
+Generated with the built-in image generation tool, with transparent background requested. The illustrated direction board in `docs/art/illustrated-sample.png` was the style reference. The item atlas now supplies only the water icon; the world itself uses code-built 3D models. No image service is used when building or playing.
 
 ## item-atlas.png
 

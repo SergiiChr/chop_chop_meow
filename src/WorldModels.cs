@@ -132,11 +132,11 @@ public static class WorldModels {
 
     /// <summary>
     /// The model an icon shows for an item or building plan, or null when the game has no model of its own for it.
-    /// Items borrow the part of a model that shows them in the world; buildings show as placed, with a finished mine, a ripe farm and a full pile.
-    /// Berries show on their bush, which is how the game shows them.
+    /// Items borrow the part of a model that shows them in the world; buildings show as placed, with a finished mine, a ripe farm and a pile full of logs.
+    /// Berries show as a small heap of the bush's berries; planks, parts and bars as the stock a storage pile shows.
     /// Hammers and chisels share one model between grades, so they keep their drawn icons.
     /// </summary>
-    public static Node3D? IconModel(string id, bool building) {
+    public static Node3D? IconModel(string id, bool building, GameData data) {
         Node3D Part(string kind, Func<Prop, Node3D> part) {
             var prop = Build(new Thing { Kind = kind });
             var node = part(prop);
@@ -151,7 +151,12 @@ public static class WorldModels {
             case "wood": return Part("furnace", p => p.WoodPile!);
             case "rake": return Part("toolstation", p => p.Racked["rake"]);
             case "mortar": return Part("cooktable", p => p.Mortar!);
-            case "berries" or "stone" or "leaves" or "crate": return Build(new Thing { Kind = id }).Root;
+            case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
+            case "planks" or "wood_parts" or "iron_bar" or "steel_bar" or "tin_bar": {
+                    var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
+                    return stock;
+                }
+            case "stone" or "leaves" or "crate": return Build(new Thing { Kind = id }).Root;
             case "iron_ore" or "coal" or "tin_ore": return Build(new Thing { Kind = id switch { "iron_ore" => "loose_iron", "coal" => "loose_coal", _ => "tin" } }).Root;
             case "mine": {
                     var prop = new Prop { Kind = id };
@@ -164,7 +169,7 @@ public static class WorldModels {
         var built = Build(new Thing { Kind = id });
         if (built.Glow != null) built.Glow.Visible = false;
         if (id == "farm") { built.Crops[0].Visible = built.Crops[^1].Visible = true; }
-        foreach (var stack in built.Stacks) stack.Visible = true;
+        foreach (var stack in built.Stacks) { stack.Visible = true; PileShape.SetStock(stack, "wood", data.Items["wood"].Color); }
         return built.Root;
     }
 

@@ -15,21 +15,32 @@ internal static class PileShape {
 
     /// <summary>Reuse small stock/resource meshes without duplicating nodes or changing inventory slot order.</summary>
     public static void SetStock(MeshInstance3D slot, string item, string color) {
-        string family = item switch {
-            "wood" => "logs",
-            "stone" => "stone",
-            "iron_ore" or "tin_ore" => "ore",
-            "coal" => "coal",
-            "planks" or "wood_parts" => "planks",
-            "iron_bar" or "steel_bar" or "tin_bar" => "bars",
-            _ => "fallback"
-        };
-        if (!contents.TryGetValue(family, out var mesh)) contents[family] = mesh = BuildStock(family);
+        string family = Family(item);
+        if (!contents.TryGetValue(family, out var mesh)) contents[family] = mesh = BuildStock(family, true);
         slot.Mesh = mesh;
-        slot.MaterialOverride = ModelKit.Mat(family == "coal" ? "292c30" : color, family == "bars" ? .45f : .95f, family == "bars" ? .5f : 0);
+        slot.MaterialOverride = Material(family, color);
     }
 
-    private static Mesh BuildStock(string family) {
+    /// <summary>The stock an item's pile slot shows, in its own proportions rather than fitted to the slot; icons show it this way.</summary>
+    public static MeshInstance3D Stock(string item, string color) {
+        string family = Family(item);
+        return new MeshInstance3D { Mesh = BuildStock(family, false), MaterialOverride = Material(family, color) };
+    }
+
+    private static StandardMaterial3D Material(string family, string color) =>
+        ModelKit.Mat(family == "coal" ? "292c30" : color, family == "bars" ? .45f : .95f, family == "bars" ? .5f : 0);
+
+    private static string Family(string item) => item switch {
+        "wood" => "logs",
+        "stone" => "stone",
+        "iron_ore" or "tin_ore" => "ore",
+        "coal" => "coal",
+        "planks" or "wood_parts" => "planks",
+        "iron_bar" or "steel_bar" or "tin_bar" => "bars",
+        _ => "fallback"
+    };
+
+    private static Mesh BuildStock(string family, bool fit) {
         if (family == "fallback") return Stack;
         var faces = new List<Vector3>();
         void Copy(Mesh mesh, Transform3D transform) {
@@ -97,7 +108,7 @@ internal static class PileShape {
         // Fit the stock to its existing slot. All families sit on the same support plane in the 9–4–1 stack.
         var min = faces[0]; var max = min;
         foreach (var point in faces) { min = min.Min(point); max = max.Max(point); }
-        var center = (min + max) / 2; var scale = new Vector3(.72f, .4f, .72f) / (max - min);
+        var center = (min + max) / 2; var scale = fit ? new Vector3(.72f, .4f, .72f) / (max - min) : Vector3.One;
         var s = Begin();
         for (int i = 0; i < faces.Count; i += 3) {
             var a = (faces[i] - center) * scale; var b = (faces[i + 1] - center) * scale; var c = (faces[i + 2] - center) * scale;

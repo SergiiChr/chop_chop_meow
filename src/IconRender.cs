@@ -38,7 +38,7 @@ public partial class IconRender : Node {
         foreach (var id in Data.Buildings.Keys) ids.Add((id, true));
         int count = 0;
         foreach (var (id, building) in ids) {
-            if (WorldModels.IconModel(id, building) is not Node3D model) continue;
+            if (WorldModels.IconModel(id, building, Data) is not Node3D model) continue;
             var holder = new Node3D { Basis = Pose(id) };
             holder.AddChild(model);
             viewport.AddChild(holder);

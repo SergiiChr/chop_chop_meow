@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c3120r8jjfd5y"
-path="res://.godot/imported/planks.svg-a7f9215d84eeaa706add1acc52afb662.ctex"
+uid="uid://bxcwamlfk8jlb"
+path="res://.godot/imported/steel_bar.png-b773b3b6646b0f3f1838c299a58ead67.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/planks.svg"
-dest_files=["res://.godot/imported/planks.svg-a7f9215d84eeaa706add1acc52afb662.ctex"]
+source_file="res://assets/icons/steel_bar.png"
+dest_files=["res://.godot/imported/steel_bar.png-b773b3b6646b0f3f1838c299a58ead67.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

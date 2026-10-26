@@ -21,7 +21,7 @@ public partial class Game {
         // Icons rendered from the game's own models come first; items without a model have drawn icons named by their id.
         foreach (var path in new[] { $"res://assets/icons/{id}.png", $"res://assets/ui/{id}.svg" })
             if (ResourceLoader.Exists(path)) return hotbarIcons[id] = GD.Load<Texture2D>(path);
-        int cell = id switch { "iron_bar" => 3, "steel_bar" => 4, "water" => 10, _ => -1 };
+        int cell = id == "water" ? 10 : -1;
         if (itemAtlas == null || cell < 0) return null;
         const int Columns = 4, Rows = 3;
         float width = itemAtlas.GetWidth() / (float)Columns, height = itemAtlas.GetHeight() / (float)Rows;

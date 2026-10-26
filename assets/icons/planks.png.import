@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://m3krwcq2gxbo"
-path="res://.godot/imported/wood_parts.svg-e0576ad9e2c18b46dd56e9a027a0c024.ctex"
+uid="uid://d3xphtvqvs402"
+path="res://.godot/imported/planks.png-5c86fcfd78eef05cb833155a4bbfbc12.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/wood_parts.svg"
-dest_files=["res://.godot/imported/wood_parts.svg-e0576ad9e2c18b46dd56e9a027a0c024.ctex"]
+source_file="res://assets/icons/planks.png"
+dest_files=["res://.godot/imported/planks.png-5c86fcfd78eef05cb833155a4bbfbc12.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false
