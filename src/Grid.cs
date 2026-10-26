@@ -60,7 +60,6 @@ public partial class Game {
             var cell = cells[i].Cell;
             cell.Pressed += () => { if (stacks[slot] is (string id, _)) { Act(() => click(id)); RefreshLive(); } };
             cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container) : null;
-            cell.Half = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, (count + 1) / 2, inventory(), container) : null;
             cell.CanTake = accepts ?? (drag => drag.From != null && drag.From != inventory());
             cell.Take = drag => { int left = 0; Act(() => left = MoveDrag(drag, inventory(), container)); RefreshLive(); return left; };
             grid.AddChild(cell);

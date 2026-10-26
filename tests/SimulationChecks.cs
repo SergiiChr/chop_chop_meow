@@ -63,7 +63,7 @@ public static class SimulationChecks {
         CheckNoToolDeadlocks(data);
         CheckTorch(data);
         CheckTorchAndWolves(data);
-        CheckWaterStacksOnlyInCrates(data);
+        CheckStacking(data);
         MineChecks.Run(data);
         CheckActualProgression(data);
         MultiplayerChecks.Run(data);
@@ -454,10 +454,11 @@ public static class SimulationChecks {
         int lot = data.CrateCapacity;
         Require(world.Buy(sign, "steel_axe", lot), "market should accept a large affordable purchase of tools");
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(sign.Output!["steel_axe"] == lot && !sign.Output.Items.Keys.Any(World.IsCrate), "tools should arrive one by one, not in a crate");
-        sign.Output.TransferTo(world.S.Backpack, "steel_axe", lot);
+        // Tools take a slot each, so what the output boxes cannot hold waits in a box beside the post.
+        int delivered = sign.Output!["steel_axe"] + world.S.Things.Where(t => t.Kind == "grave").Sum(t => t.Inventory["steel_axe"]);
+        Require(delivered == lot && sign.Output["steel_axe"] == World.MarketSlots && !sign.Output.Items.Keys.Any(World.IsCrate), "tools should arrive one by one, not in a crate, overflowing into a box");
+        sign.Output.Remove("steel_axe", World.MarketSlots); world.S.Things.RemoveAll(t => t.Kind == "grave");
         string crate = PackCrate(world, ("steel_axe", lot));
-        world.S.Backpack.Remove("steel_axe", lot);
         world.Player = sign.Pos;
         Require(world.S.Backpack.TransferTo(sign.Inventory, crate, 1) == 1 && world.Sell(sign), "market should accept the purchased tools back in a crate");
         SafeTick(world, data.TradeSeconds + .1f);
@@ -1278,14 +1279,18 @@ public static class SimulationChecks {
         Require(pack.S.Health < 100, $"{World.PackSize} wolves around a torch should attack together");
     }
 
-    private static void CheckWaterStacksOnlyInCrates(GameData data) {
+    private static void CheckStacking(GameData data) {
         var world = EmptyWorld(data);
-        world.S.Backpack.Add("water", 3);
-        Require(world.S.Backpack.UsedSlots == 3, "loose water bottles should take a slot each");
-        var crate = world.NewCrate(); crate.Add("water", data.CrateCapacity);
-        Require(crate.UsedSlots == 1 && crate.ShownSlots == 1, "water bottles should stack inside a crate");
+        world.S.Backpack.Add("water", 3); world.S.Backpack.Add("steel_axe", 2);
+        Require(world.S.Backpack.UsedSlots == 3, "water bottles should share a stack and each tool take its own slot");
+        var crate = world.NewCrate();
+        Require(crate.Add("steel_pick", data.CrateCapacity) == data.CrateCapacity && crate.UsedSlots == data.CrateCapacity, "a crate should hold a full crate of single tools");
         var chest = world.Add("chest", new Vector2(10, 10));
-        Require(crate.TransferTo(chest.Inventory, "water", 5) == 5 && chest.Inventory.UsedSlots == 5, "unpacked water should spread over one slot per bottle");
+        Require(crate.TransferTo(chest.Inventory, "steel_pick", 8) == World.ChestStacks, "a chest should take one tool per slot");
+        var hands = new Worker().Bag;
+        Require(hands.Add("steel_axe", 9) == Worker.BagStack && hands.Add("wood", 1) == 0, "a worker should carry five tools, one per slot");
+        var mixed = new Worker().Bag;
+        Require(mixed.Add("wood", 3) == 3 && mixed.Add("stone", 1) == 1 && mixed.Add("steel_pick", 1) == 1 && mixed.Add("coal", 1) == 0, "a worker should carry five things in all, of any kinds");
     }
 
     private static void CheckBenchTools(GameData data) {
@@ -1397,6 +1402,19 @@ public static class SimulationChecks {
         Require(worker.Tool == "" && station.Inventory["steel_axe"] == 1, "a worker moved to stone, which needs no tool, should put the axe back");
         SafeTick(world, 10);
         Require(rock.Remaining < 400, "stone needs no tool");
+
+        // A full station leaves a worker holding the wrong tool, who must wait rather than mine with an axe.
+        var iron = world.Add("iron", new Vector2(18, 14), 400);
+        var miner = AddWorker(world, iron.Pos + Vector2.One); miner.Tool = "steel_axe";
+        station.Inventory.Add("steel_pick", station.Inventory.Room("steel_pick"));
+        world.Assign(miner, iron);
+        SafeTick(world, 10);
+        Require(miner.Tool == "steel_axe" && iron.Remaining == 400 && miner.Status == "No room to put back the steel axe",
+                "a worker who cannot put back the wrong tool should wait instead of mining with it");
+        station.Inventory.Remove("steel_pick", 1);
+        for (int i = 0; i < 120 && miner.Tool != "steel_pick"; i++) SafeTick(world, .25f);
+        Require(miner.Tool == "steel_pick" && station.Inventory["steel_axe"] == 2, "with room again the worker should swap the axe for a pickaxe");
+        world.S.Workers.Remove(miner); station.Inventory.Remove("steel_pick", 99); station.Inventory.Remove("steel_axe", 1);
 
         world.Assign(worker, tree);
         SafeTick(world, 10);
@@ -1703,6 +1721,12 @@ public static class SimulationChecks {
             Require(world.S.Time == time && world.SleepBlock()?.Contains(reason) == true,
                     $"sleep must be refused when the player is too {reason} to last until morning");
         }
+        var early = NightWorld(data);
+        early.Add("hut", early.Player + new Vector2(2, 0));
+        early.S.Time = data.DaySeconds * (World.SleepHour - 6 + .2f) / 24;
+        Require(!early.Night && early.SleepBlock() == null, "sleep must be allowed from 10 pm, before night falls");
+        early.S.Time = data.DaySeconds * (World.SleepHour - 6 - .2f) / 24;
+        Require(early.SleepBlock()?.Contains("10 pm") == true, "sleep must be refused before 10 pm");
     }
 
     private static void CheckSprintBurnsFood(GameData data) {

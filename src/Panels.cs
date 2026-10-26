@@ -212,6 +212,7 @@ public partial class Game {
         top.AddChild(Style.Glyph("line_filter", 28, Style.Rim));
         var title = Style.Heading("Filters", 22); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);
         top.AddChild(Style.Icon(HotbarIcon(t.Kind), 32));
+        top.AddChild(HeaderButton("close", "Close the filters", () => { filterOpen = false; filterPicking = false; OpenPage("inspect"); }, Style.CloseRound, "filters_close"));
         foreach (bool output in new[] { false, true }) {
             var filter = output ? t.Inventory.OutputFilter : t.Inventory.InputFilter;
             var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); board.AddChild(well);

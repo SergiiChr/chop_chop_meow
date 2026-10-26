@@ -13,7 +13,7 @@ public readonly record struct Hit(float Radius, float Bottom, float Top);
 public sealed class Prop {
     public readonly Node3D Root = new();
     public readonly Node3D Body;
-    public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer, Mortar;
+    public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer, Mortar, Marker;
     /// <summary>A mine's parts, shown stage by stage: the marked outline, the dug hole, the delivered materials, the timber frame, the rails and the cart with its load.</summary>
     public Node3D? Outline, Hole, Supplies, Frame, Rails, Cart, Load;
     /// <summary>A tool station's hanging tools by kind, each shown while the station holds one.</summary>
@@ -94,7 +94,7 @@ public static class WorldModels {
         "pile" => new[] { new Hit(1.5f, 0, .5f) },
         "farm" => new[] { new Hit(1.5f, 0, .5f) },
         "leaves" => new[] { new Hit(.6f, 0, .15f) },
-        "grave" => new[] { new Hit(.45f, 0, .55f) },
+        "grave" => new[] { new Hit(.65f, 0, 1.5f) },
         "anvil" => new[] { new Hit(.45f, 0, .85f) },
         "signpost" => new[] { new Hit(1.02f, 0, 1.98f) },
         "campfire" => new[] { new Hit(.55f, 0, .7f) },
@@ -143,7 +143,6 @@ public static class WorldModels {
     /// The model an icon shows for an item or building plan, or null when the game has no model of its own for it.
     /// Items borrow the part of a model that shows them in the world; buildings show as placed, with a finished mine, a ripe farm and a pile full of logs.
     /// Berries show as a small heap of the bush's berries; planks, parts and bars as the stock a storage pile shows.
-    /// Hammers and chisels share one model between grades, so they keep their drawn icons.
     /// </summary>
     public static Node3D? IconModel(string id, bool building, GameData data) {
         Node3D Part(string kind, Func<Prop, Node3D> part) {
@@ -155,7 +154,7 @@ public static class WorldModels {
             return node;
         }
         switch (id) {
-            case "steel_axe" or "steel_pick": return ActorRig.Tool(id);
+            case "steel_axe" or "steel_pick" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
             case "wood": return Part("furnace", p => p.WoodPile!);
             case "rake": return Part("toolstation", p => p.Racked["rake"]);
@@ -369,9 +368,13 @@ public static class WorldModels {
         prop.Lid = hinge;
     }
 
-    /// <summary>The player's shared canvas pack laid on its straps, with an animated access flap.</summary>
+    /// <summary>
+    /// The player's shared canvas pack laid on its straps, with an animated access flap.
+    /// It is drawn larger than the worn pack, and a glowing gem bobs above it, so it stands out from grass and shows at night.
+    /// </summary>
     private static void DroppedBackpack(Prop prop) {
         var dropped = Pivot(prop.Body, Vector3.Zero, new Vector3(0, -18, 0));
+        dropped.Scale = Vector3.One * 1.4f;
         var pack = Pivot(dropped, new Vector3(0, .145f, 0), new Vector3(90, 0, 0));
         pack.Scale = Vector3.One * 1.5f;
         ActorShape.Backpack(pack);
@@ -379,6 +382,11 @@ public static class WorldModels {
         var flap = Pivot(dropped, new Vector3(0, .235f, -.15f));
         Add(flap, BackpackShape.Flap, BackpackShape.Canvas, Vector3.Zero);
         prop.Lid = flap;
+        var marker = Pivot(prop.Root, new Vector3(0, 1.2f, 0));
+        var gold = Mat("f2b33d", .4f, 0, 1.4f);
+        Cylinder(marker, .13f, 0, .09f, new Vector3(0, .045f, 0), gold, sides: 4);
+        Cylinder(marker, 0, .13f, .24f, new Vector3(0, -.12f, 0), gold, sides: 4);
+        prop.Marker = marker;
     }
 
     /// <summary>A hollow slatted crate with a separately hinged lid and shared wood geometry.</summary>
@@ -392,18 +400,23 @@ public static class WorldModels {
     /// <summary>A plank-topped workbench with a lower shelf and a vise; slotted tools lie on the top.</summary>
     private static void Workbench(Prop prop) {
         var body = prop.Body;
-        var wood = Mat("b98552"); var steel = Mat("4a4d50", .4f, .6f);
+        var steel = Mat("4a4d50", .4f, .6f);
         Add(body, BenchShape.Wood, BenchShape.Timber, Vector3.Zero);
         Add(body, BenchShape.Vise, BenchShape.Steel, Vector3.Zero);
         Cylinder(body, .014f, .014f, .19f, new Vector3(.35f, .86f, .37f), steel, new Vector3(90, 0, 0), 10);
         Cylinder(body, .012f, .012f, .15f, new Vector3(.35f, .86f, .46f), steel, sides: 10);
-        var chisel = Pivot(body, new Vector3(-.25f, .83f, .05f), new Vector3(0, 30, 0));
-        Box(chisel, new Vector3(.24f, .03f, .06f), Vector3.Zero, Mat("9aa29f"));
-        prop.Chisel = chisel;
-        var hammer = Pivot(body, new Vector3(.15f, .83f, -.1f), new Vector3(0, -20, 0));
-        Box(hammer, new Vector3(.34f, .03f, .035f), Vector3.Zero, wood);
-        Box(hammer, new Vector3(.06f, .06f, .14f), new Vector3(.17f, .02f, 0), steel);
-        prop.Hammer = hammer;
+        // Each slot holds both grades of its tool turned onto its side, the lower grade first; the view shows the one slotted.
+        Node3D Slot(Vector3 at, float yaw, params (string Tool, float Lift)[] grades) {
+            var slot = Pivot(body, at, new Vector3(0, yaw, 0));
+            foreach (var (tool, lift) in grades) {
+                var model = ActorRig.Tool(tool);
+                model.Position = new Vector3(0, lift, 0); model.RotationDegrees = new Vector3(0, 0, 90);
+                slot.AddChild(model);
+            }
+            return slot;
+        }
+        prop.Chisel = Slot(new Vector3(-.3f, .815f, .05f), 30, ("stone_chisel", .02f), ("steel_chisel", .02f));
+        prop.Hammer = Slot(new Vector3(.05f, .815f, -.1f), -20, ("wood_hammer", .052f), ("steel_hammer", .034f));
     }
 
     /// <summary>A stone firebox under a steel grill with a stew pot, beside a plank counter where the slotted mortar and pestle sits.</summary>

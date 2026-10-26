@@ -141,6 +141,8 @@ public sealed class GameData {
         using var file = Godot.FileAccess.Open("res://data/game.json", Godot.FileAccess.ModeFlags.Read);
         var data = JsonSerializer.Deserialize<GameData>(file.GetAsText(), Json) ?? throw new InvalidOperationException("Missing game data");
         data.Validate();
+        Inventory.Unstacked.Clear();
+        foreach (var (id, item) in data.Items) if (item.Tool != "") Inventory.Unstacked.Add(id);
         return data;
     }
     public void Validate() {
