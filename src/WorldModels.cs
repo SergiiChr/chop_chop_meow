@@ -484,18 +484,10 @@ public static class WorldModels {
     /// <summary>Fire pit made from an old steel wheel rim, with a log teepee and flickering flames.</summary>
     private static void FirePit(Prop prop) {
         var body = prop.Body;
-        var rim = Mat("3d3f42", .55f, .6f);
-        Cylinder(body, .46f, .44f, .22f, new Vector3(0, .11f, 0), rim, null, 16);
-        Torus(body, .42f, .5f, new Vector3(0, .22f, 0), rim);
-        Cylinder(body, .4f, .4f, .02f, new Vector3(0, .23f, 0), Mat("4d4440", 1), null, 14);
-        for (int i = 0; i < 4; i++) {
-            var log = Pivot(body, new Vector3(0, .25f, 0), new Vector3(0, i * 90 + 20, 0));
-            Cylinder(log, .05f, .045f, .55f, new Vector3(0, .17f, .14f), Mat(i % 2 == 0 ? "6e4a2e" : "5d3f28"), new Vector3(-28, 0, 0), 6);
-        }
+        Add(body, FirePitShape.Rim, FirePitShape.Steel, Vector3.Zero);
+        Add(body, FirePitShape.Fuel, FirePitShape.Wood, Vector3.Zero);
         var fire = Pivot(body, new Vector3(0, .26f, 0));
-        Post(fire, .2f, 0, .55f, Vector3.Zero, Flat(new Color("ff8a2a", .9f)), 7);
-        Post(fire, .13f, 0, .42f, new Vector3(.07f, 0, .05f), Flat(new Color("ffc24a", .95f)), 7);
-        Post(fire, .1f, 0, .32f, new Vector3(-.08f, 0, -.04f), Flat(new Color("ffe08a", .95f)), 7);
+        Add(fire, FirePitShape.Flames, FirePitShape.Flame, Vector3.Zero);
         prop.Fire = fire;
         prop.Vent = new Vector3(0, .8f, 0);
         prop.Light = Light(body, new Vector3(0, .8f, 0), 7);
