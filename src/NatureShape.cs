@@ -14,9 +14,23 @@ internal static class NatureShape {
     public const int Variants = 3;
     public static readonly StandardMaterial3D Natural = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .92f };
     public static readonly StandardMaterial3D Glossy = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .4f };
-    public static readonly StandardMaterial3D Carbon = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .58f };
-    public static readonly StandardMaterial3D Mineral = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .4f, Metallic = .3f };
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
+
+    private static readonly Dictionary<(string Color, float Roughness, float Metallic), StandardMaterial3D> oreMaterials = new();
+
+    /// <summary>Cached ore palettes tint shared neutral geometry without copying meshes between resource kinds.</summary>
+    public static StandardMaterial3D OreMaterial(string color, float roughness, float metallic) {
+        var key = (color, roughness, metallic);
+        if (!oreMaterials.TryGetValue(key, out var material))
+            oreMaterials[key] = material = new StandardMaterial3D {
+                AlbedoColor = new Color(color),
+                VertexColorUseAsAlbedo = true,
+                VertexColorIsSrgb = true,
+                Roughness = roughness,
+                Metallic = metallic
+            };
+        return material;
+    }
 
     private static Mesh Cached(string key, Action<SurfaceTool> build) {
         if (meshes.TryGetValue(key, out var mesh)) return mesh;
@@ -364,13 +378,13 @@ internal static class NatureShape {
 
     /// <summary>
     /// A faceted boulder group pressed into the ground: lighter tops, darker undersides and a little per-face variation.
-    /// An ore deposit builds the same faces twice, once with <paramref name="veins"/> false for the plain rock and once true for the vein faces,
-    /// so the veins can take a mineral sheen while staying flush with the rock.
+    /// Ore deposits share neutral host/seam meshes by variant; palette materials distinguish their resource kind.
+    /// The <paramref name="veins"/> flag selects complementary faces clipped at continuous bedding planes.
     /// </summary>
-    public static Mesh Rocks(string kind, Color color, int variant, bool? veins = null) => Cached($"rocks{kind}{variant}{veins}", s => {
+    public static Mesh Rocks(string kind, Color color, int variant, bool? veins = null) => Cached($"rocks{(veins is bool && kind is "coal" or "iron" or "tin" ? "ore" : kind)}{variant}{veins}", s => {
         foreach (var (at, radii, seed) in Boulders(variant)) {
             var (points, triangles) = Boulder(at, radii, seed);
-            if (kind == "coal" && veins is bool coal) { CoalFaces(s, points, triangles, at, color, coal, seed); continue; }
+            if (kind is "coal" or "iron" or "tin" && veins is bool seam) { OreFaces(s, points, triangles, at, seam, seed); continue; }
             Faces(s, points, triangles, at, (p, normal) => {
                 var shade = normal.Y > 0 ? color.Lightened(normal.Y * .12f) : color.Darkened(-normal.Y * .3f);
                 return shade.Lightened(Noise(p * 5, seed) * .03f);
@@ -378,8 +392,8 @@ internal static class NatureShape {
         }
     });
 
-    /// <summary>Split existing boulder faces at continuous bedding planes, so coal seams wrap flush around the rock.</summary>
-    private static void CoalFaces(SurfaceTool surface, Vector3[] points, List<int> triangles, Vector3 center, Color color, bool coal, int seed) {
+    /// <summary>Split existing boulder faces at continuous bedding planes, so ore seams wrap flush around the rock.</summary>
+    private static void OreFaces(SurfaceTool surface, Vector3[] points, List<int> triangles, Vector3 center, bool seam, int seed) {
         float Bed(Vector3 p) => p.Y + p.X * .16f - p.Z * .08f;
         List<Vector3> Clip(List<Vector3> polygon, float plane, bool above) {
             var result = new List<Vector3>();
@@ -392,7 +406,7 @@ internal static class NatureShape {
             }
             return result;
         }
-        var bands = coal ? new[] { (.08f, .24f), (.34f, .53f) } : new[] { (-2f, .08f), (.24f, .34f), (.53f, 2f) };
+        var bands = seam ? new[] { (.08f, .24f), (.34f, .53f) } : new[] { (-2f, .08f), (.24f, .34f), (.53f, 2f) };
         for (int i = 0; i < triangles.Count; i += 3) {
             var a = points[triangles[i]]; var b = points[triangles[i + 1]]; var c = points[triangles[i + 2]];
             foreach (var (low, high) in bands) {
@@ -404,7 +418,7 @@ internal static class NatureShape {
                     face = face.Normalized();
                     if (face.Dot((p + q + r) / 3 - center) < 0) { (q, r) = (r, q); face = -face; }
                     surface.SetNormal(face);
-                    var shade = color.Lightened(Math.Max(0, face.Y) * .12f).Darkened(Math.Max(0, -face.Y) * .3f);
+                    var shade = Colors.White.Darkened(.04f + Math.Max(0, -face.Y) * .3f);
                     surface.SetColor(shade.Lightened(Noise((p + q + r) * 2, seed) * .025f));
                     surface.AddVertex(p); surface.AddVertex(q); surface.AddVertex(r);
                 }
@@ -416,7 +430,7 @@ internal static class NatureShape {
     /// Angular ore chunks set into the boulder group, half buried where a ray from inside leaves the outermost rock face.
     /// Rays are cast against the real faces rather than the boulder ellipsoids, because the cutting planes shave the rock inside them.
     /// </summary>
-    public static Mesh Insertions(string kind, Color color, int variant) => Cached($"insertions{kind}{variant}", s => {
+    public static Mesh Insertions(string kind, Color color, int variant) => Cached($"insertions{(kind is "coal" or "iron" or "tin" ? "ore" : kind)}{variant}", s => {
         var faces = new List<(Vector3, Vector3, Vector3)>();
         foreach (var (at, radii, seed) in Boulders(variant)) {
             var (points, triangles) = Boulder(at, radii, seed);
@@ -434,10 +448,10 @@ internal static class NatureShape {
             var basis = Basis.FromEuler(new Vector3((float)random.NextDouble() * 1.2f - .6f, (float)random.NextDouble() * Mathf.Tau, (float)random.NextDouble() * 1.2f - .6f));
             var size = new Vector3(.13f, .1f, .12f) * (.85f + (float)random.NextDouble() * .4f);
             var transform = new Transform3D(basis, origin + direction * (reach - .01f));
-            if (kind == "coal") {
+            if (kind is "coal" or "iron" or "tin") {
                 var (points, triangles) = Shape(Vector3.Zero, size * .7f, 0, 631 + variant * 7 + i, 0, 0, .1f, -1, 3);
                 for (int point = 0; point < points.Length; point++) points[point] = transform * points[point];
-                Faces(s, points, triangles, transform.Origin, (_, normal) => color.Lightened(Math.Max(0, normal.Y) * .12f));
+                Faces(s, points, triangles, transform.Origin, (_, normal) => Colors.White.Darkened(.025f + Math.Max(0, -normal.Y) * .2f));
             } else Chunk(s, transform, size, color);
         }
     });
