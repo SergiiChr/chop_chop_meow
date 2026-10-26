@@ -1,5 +1,7 @@
 # 3D models instead of sprites
 
+This is the description of the pull request that moved the game to 3D, kept as a record. Some details have changed since: the pond is now a lake in a larger valley, there are no iron tools, the signpost is called the trading post, and icons are rendered from the models. See [README.md](../README.md) and [DESIGN.md](DESIGN.md) for the current game.
+
 ## Summary
 
 The world is now a 3D scene under an orthographic isometric camera, and every object in the POC is a low-poly model built in code from Godot primitive meshes. There are no world or character sprite sheets left to maintain; changing a model means editing its builder in `src/WorldModels.cs` or `src/ActorRig.cs`.

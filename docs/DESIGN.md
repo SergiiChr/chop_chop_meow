@@ -2,7 +2,7 @@
 
 The prototype is an isometric woodland survival and production game.
 It is rendered in 3D with code-built low-poly models: natural woodland, modern DIY buildings and no fantasy styling.
-The 2D art comparison boards in `docs/art/` are historical samples; only the interface icons still use that illustrated art.
+The 2D art comparison boards in `docs/art/` are historical samples; of that illustrated art, only the water flask icon is still used.
 
 ## Architecture
 
