@@ -69,7 +69,10 @@ public sealed class Worker {
     public string Status { get; set; } = "Available";
     /// <summary>Units of one stack a worker carries; a miner bringing out a full mine output carries the whole stack.</summary>
     public const int BagStack = 5;
-    public Inventory Bag { get; set; } = new() { Slots = 1, StackSize = BagStack };
+    /// <summary>A worker's hands hold <see cref="BagStack"/> items like a crate: one stack of them or that many different items.</summary>
+    public Inventory Bag { get; set; } = new() { Slots = BagStack, StackSize = BagStack, Capacity = BagStack };
+    /// <summary>Sizes the hands for a load: a full stack hauled out of a mine or the market, or <see cref="BagStack"/> for a normal load.</summary>
+    public void Hands(int load) { Bag.StackSize = load; Bag.Capacity = load; }
     /// <summary>The bag holds fuel for the destination's burner rather than ingredients.</summary>
     public bool Fueling { get; set; }
     /// <summary>The tool taken from a tool station for the current job, or empty; it goes back to a station when the job no longer needs it.</summary>
@@ -1015,7 +1018,7 @@ public sealed partial class World {
     }
     public void Fire(Worker w) {
         if (Forwarded("fire", other: w.Id)) return;
-        if (w.Bag.Count > 0 || w.Tool != "") { var box = Add("grave", w.Pos); box.Inventory = w.Bag; box.Inventory.Slots++; box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1); }
+        if (w.Bag.Count > 0 || w.Tool != "") { var box = Add("grave", w.Pos); box.Inventory = w.Bag; box.Inventory.Capacity = 0; box.Inventory.Slots = box.Inventory.UsedSlots + 1; box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1); }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
     private enum HoldRefusal { None, ToolsOnly, CompostOnly, OtherResource, FarmOnly }
@@ -1218,7 +1221,7 @@ public sealed partial class World {
             w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
             if (Walk(w, dest.Pos, dt)) {
                 w.Bag.TransferTo(into!, item, dest.Kind == "mine" ? MineNeed(dest, item) : w.Bag[item], true); w.Destination = 0;
-                if (w.Bag.Count == 0) { w.Fueling = false; w.Bag.StackSize = Worker.BagStack; NextPlace(w); }
+                if (w.Bag.Count == 0) { w.Fueling = false; w.Hands(Worker.BagStack); NextPlace(w); }
             }
             return;
         }
@@ -1327,7 +1330,7 @@ public sealed partial class World {
             foreach (var pair in sign.Output.Items) {
                 if (pair.Key == Inventory.Coins || DepositFor(pair.Key, sign.Pos) is not Thing dest) continue;
                 w.Status = Phrase("Carrying in ", Data.Name(pair.Key));
-                if (Walk(w, sign.Pos + Vector2.One, dt)) { w.Bag.StackSize = Math.Max(Worker.BagStack, sign.Output.StackOf(pair.Key)); sign.Output.TransferTo(w.Bag, pair.Key, w.Bag.StackSize); w.Destination = dest.Id; }
+                if (Walk(w, sign.Pos + Vector2.One, dt)) { w.Hands(Math.Max(Worker.BagStack, sign.Output.StackOf(pair.Key))); sign.Output.TransferTo(w.Bag, pair.Key, w.Bag.StackSize); w.Destination = dest.Id; }
                 return true;
             }
         w.Status = "Minding the trading post"; Walk(w, sign.Pos + Vector2.One, dt); return false;

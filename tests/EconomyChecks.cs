@@ -179,7 +179,8 @@ public static class EconomyChecks {
         supply.Inventory.Slots = 60;
         foreach (var item in BatchCost(world, recipe).Keys) { supply.Inventory.Add(item, 600); supply.Inventory.OutputFilter.Add(item); }
         var store = world.Add("chest", new Vector2(20, 23));
-        store.Inventory.InputFilter.Add(r.Output);
+        // Room for a whole day's tools, which take a slot each.
+        store.Inventory.Slots = 60; store.Inventory.InputFilter.Add(r.Output);
         Hire(world, station);
         Pass(world, data.DaySeconds);
         return store.Inventory[r.Output] + station.Inventory[r.Output];

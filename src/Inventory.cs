@@ -30,10 +30,10 @@ public sealed class Inventory {
     }
     public int this[string item] => Items.GetValueOrDefault(item);
 
-    /// <summary>Water bottles stack only inside a crate, which is the only container with a capacity.</summary>
-    public const string Water = "water";
-    /// <summary>Coins stack to 1000 in any container, packed crates never stack and loose water bottles take a slot each; every other item uses the container's stack size.</summary>
-    public int StackOf(string item) => item == Coins ? 1000 : item.StartsWith(World.PackedPrefix) || item == Water && Capacity == 0 ? 1 : StackSize;
+    /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
+    public static readonly HashSet<string> Unstacked = new();
+    /// <summary>Coins stack to 1000 in any container, packed crates and tools never stack; every other item uses the container's stack size.</summary>
+    public int StackOf(string item) => item == Coins ? 1000 : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) ? 1 : StackSize;
     private int SlotsFor(string item, int quantity) => (quantity + StackOf(item) - 1) / StackOf(item);
 
     /// <summary>Units of an item that still fit: empty slots plus the unfilled part of its last stack.</summary>
