@@ -22,7 +22,7 @@
     "workers": 3
   },
   "farm": { "sow": { "wheat_seeds": 1, "fertilizer": 1 }, "growDays": 3, "harvestWorkdays": 1, "yield": { "wheat": 4, "wheat_seeds": 2, "grass": 1 } },
-  "goals": { "dailyProfit": 900, "profitDays": 7 },
+  "goals": { "dailyProfit": 1300, "profitDays": 7 },
   "market": {
     "sells": {
       "raw_meat": { "daily": 24, "steady": 24, "drop": 0.05 },
