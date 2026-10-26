@@ -3,44 +3,54 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A salvaged wheel rim with open ventilation slots and fitted split firewood.</summary>
+/// <summary>A hand-packed ring of fieldstones with an ash bed and fitted split firewood.</summary>
 internal static class FirePitShape {
-    private static ArrayMesh? rim, fuel, flames;
-    public static Mesh Rim => rim ??= BuildRim();
+    private static ArrayMesh? stones, fuel, flames;
+    public static Mesh Stones => stones ??= BuildStones();
     public static Mesh Fuel => fuel ??= BuildFuel();
     public static Mesh Flames => flames ??= BuildFlames();
-    public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .65f, Metallic = .55f };
+    public static readonly StandardMaterial3D Stone = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = 1 };
     public static readonly StandardMaterial3D Wood = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = 1 };
     public static readonly StandardMaterial3D Flame = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
     private static Vector3 Ring(float radius, float y, float angle) => new(MathF.Cos(angle) * radius, y, MathF.Sin(angle) * radius);
 
-    private static ArrayMesh BuildRim() {
+    private static ArrayMesh BuildStones() {
         var s = Begin();
-        // Closed cross-section: lower bead, recessed barrel, flared top bead and soot-dark inner bowl.
-        Vector2[] profile = { new(.46f, .025f), new(.48f, .045f), new(.48f, .066f), new(.435f, .09f), new(.435f, .12f), new(.435f, .175f), new(.435f, .2f), new(.48f, .235f), new(.48f, .26f), new(.451f, .26f), new(.407f, .207f), new(.407f, .175f), new(.407f, .12f), new(.407f, .085f), new(.435f, .047f), new(.46f, .025f) };
-        for (int i = 0; i < 16; i++) {
-            float a = i * MathF.Tau / 16, b = (i + 1) * MathF.Tau / 16;
-            for (int j = 0; j < profile.Length - 1; j++) {
-                // Eight actual air slots cross the barrel, bounded by the same inner and outer surfaces.
-                if ((j == 4 || j == 11) && i % 2 == 0) continue;
-                var p = profile[j]; var q = profile[j + 1];
-                var outward = new Vector3(MathF.Cos((a + b) / 2) * (q.Y - p.Y), p.X - q.X, MathF.Sin((a + b) / 2) * (q.Y - p.Y));
-                Quad(s, Ring(p.X, p.Y, a), Ring(p.X, p.Y, b), Ring(q.X, q.Y, b), Ring(q.X, q.Y, a), outward, j >= 9 ? "303336" : j == 7 || j == 8 ? "777d80" : i % 5 == 0 ? "63534a" : "4c5358");
-            }
-            if (i % 2 != 0) continue;
-            foreach (float angle in new[] { a, b })
-                Quad(s, Ring(.435f, .12f, angle), Ring(.435f, .175f, angle), Ring(.407f, .175f, angle), Ring(.407f, .12f, angle), new Vector3(-MathF.Sin(angle), 0, MathF.Cos(angle)) * (angle == a ? 1 : -1), "45494b");
-            Quad(s, Ring(.435f, .12f, a), Ring(.407f, .12f, a), Ring(.407f, .12f, b), Ring(.435f, .12f, b), Vector3.Up, "64696b");
-            Quad(s, Ring(.435f, .175f, a), Ring(.435f, .175f, b), Ring(.407f, .175f, b), Ring(.407f, .175f, a), Vector3.Down, "33383b");
+        // Eleven individually faceted fieldstones meet around the hearth, all in one shared mesh.
+        string[] shades = { "85877a", "999587", "777e7b", "a39e8b", "878980" };
+        for (int rock = 0; rock < 11; rock++) {
+            float angle = rock * MathF.Tau / 11;
+            var center = Ring(.414f + MathF.Sin(rock * 7.1f) * .009f, 0, angle);
+            var radial = Ring(1, 0, angle); var tangent = Ring(1, 0, angle + MathF.PI / 2);
+            float height = .205f + .025f * MathF.Sin(rock * 4.3f);
+            var points = new Vector3[3, 7];
+            for (int layer = 0; layer < 3; layer++)
+                for (int i = 0; i < 7; i++) {
+                    float a = i * MathF.Tau / 7 + rock * .17f;
+                    float bulge = layer == 0 ? .84f : layer == 1 ? 1 : .66f;
+                    float rough = 1 + .1f * MathF.Sin(rock * 13 + i * 7);
+                    float y = layer == 0 ? .014f : layer == 1 ? height * .48f : height + .012f * MathF.Sin(i * 3 + rock);
+                    points[layer, i] = center + radial * (MathF.Cos(a) * .108f * bulge * rough) + tangent * (MathF.Sin(a) * .133f * bulge * rough) + Vector3.Up * y;
+                }
+            string tint = shades[rock % shades.Length];
+            for (int layer = 0; layer < 2; layer++)
+                for (int i = 0; i < 7; i++) {
+                    int next = (i + 1) % 7;
+                    var outward = (points[layer, i] + points[layer, next]) / 2 - center;
+                    outward.Y = layer == 0 ? -.035f : .08f;
+                    Quad(s, points[layer, i], points[layer, next], points[layer + 1, next], points[layer + 1, i], outward, tint);
+                }
+            for (int i = 1; i < 6; i++)
+                Triangle(s, points[2, 0], points[2, i], points[2, i + 1], Vector3.Up, tint);
         }
         return s.Commit();
     }
 
     private static ArrayMesh BuildFuel() {
         var s = Begin();
-        // Ash settles below the ventilation slots; logs rest inside the rim rather than on a lid.
-        for (int i = 0; i < 16; i++) Triangle(s, Vector3.Up * .07f, Ring(.405f, .07f, i * MathF.Tau / 16), Ring(.405f, .07f, (i + 1) * MathF.Tau / 16), Vector3.Up, i % 3 == 0 ? "55514a" : "393732");
+        // Ash settles inside the fieldstones; the logs rest in the hearth.
+        for (int i = 0; i < 16; i++) Triangle(s, Vector3.Up * .07f, Ring(.335f, .07f, i * MathF.Tau / 16), Ring(.335f, .07f, (i + 1) * MathF.Tau / 16), Vector3.Up, i % 3 == 0 ? "55514a" : "393732");
         for (int log = 0; log < 4; log++) {
             float angle = log * MathF.Tau / 4 + .35f;
             var bottom = Ring(.28f, .135f, angle); var top = Ring(.075f, .46f + log % 2 * .035f, angle);

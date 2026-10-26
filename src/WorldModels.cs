@@ -481,10 +481,10 @@ public static class WorldModels {
         });
     }
 
-    /// <summary>Fire pit made from an old steel wheel rim, with a log teepee and flickering flames.</summary>
+    /// <summary>Campfire enclosed by hand-packed fieldstones, with split firewood and flickering flames.</summary>
     private static void FirePit(Prop prop) {
         var body = prop.Body;
-        Add(body, FirePitShape.Rim, FirePitShape.Steel, Vector3.Zero);
+        Add(body, FirePitShape.Stones, FirePitShape.Stone, Vector3.Zero);
         Add(body, FirePitShape.Fuel, FirePitShape.Wood, Vector3.Zero);
         var fire = Pivot(body, new Vector3(0, .26f, 0));
         Add(fire, FirePitShape.Flames, FirePitShape.Flame, Vector3.Zero);
