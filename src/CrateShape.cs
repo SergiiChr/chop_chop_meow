@@ -4,9 +4,11 @@ namespace ChopChopMeow;
 
 /// <summary>Shared hollow slatted shipping crate; the lid uses the existing rear hinge frame.</summary>
 internal static class CrateShape {
-    private static ArrayMesh? body, lid;
+    private static ArrayMesh? body, lid, cargo;
     public static Mesh Body => body ??= BuildBody();
     public static Mesh Lid => lid ??= BuildLid();
+    /// <summary>A compact closed transport crate for cart loads, without the full crate's hollow interior and hardware.</summary>
+    public static Mesh Cargo => cargo ??= BuildCargo();
     public static readonly StandardMaterial3D Timber = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f };
 
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
@@ -46,6 +48,37 @@ internal static class CrateShape {
             Board(s, .63f, .032f, .143f, new(0, .018f, .0765f + i * .153f), i == 1 ? "c9a46e" : "c19a63", caps: true);
         foreach (float x in new[] { -.25f, .25f })
             Box(s, new(.046f, .025f, .475f), new(x, .046f, .23f), "8f6a3f");
+        return s.Commit();
+    }
+
+    private static ArrayMesh BuildCargo() {
+        var s = Begin();
+        // Three simple slats on each side; the overlapping corner battens hide their ends.
+        string[] shades = { "c29a62", "c9a46e", "bf965d" };
+        const float width = .63f, depth = .44f, height = .45f;
+        const float rowHeight = .13f, gap = .01f;
+        float rowStep = rowHeight + gap;
+        for (int row = 0; row < 3; row++) {
+            float y0 = .035f + row * rowStep, y1 = y0 + rowHeight;
+            float z = depth / 2, x = width / 2;
+            Quad(s, new(-width / 2, y0, -z), new(width / 2, y0, -z), new(width / 2, y1, -z), new(-width / 2, y1, -z), Vector3.Forward, shades[row]);
+            Quad(s, new(width / 2, y0, z), new(-width / 2, y0, z), new(-width / 2, y1, z), new(width / 2, y1, z), Vector3.Back, shades[row]);
+            Quad(s, new(-x, y0, z), new(-x, y0, -z), new(-x, y1, -z), new(-x, y1, z), Vector3.Left, shades[row]);
+            Quad(s, new(x, y0, -z), new(x, y0, z), new(x, y1, z), new(x, y1, -z), Vector3.Right, shades[row]);
+        }
+        // Four square corner battens provide the frame and cover the slat ends (48 triangles).
+        foreach (float x in new[] { -width / 2 + .022f, width / 2 - .022f })
+            foreach (float z in new[] { -depth / 2 + .022f, depth / 2 - .022f })
+                Box(s, new(.044f, height, .044f), new(x, height / 2, z), "8f6a3f");
+
+        // A single underside face and three top-plank faces keep the crate closed at cart scale.
+        Quad(s, new(-width / 2, .03f, -depth / 2), new(width / 2, .03f, -depth / 2),
+            new(width / 2, .03f, depth / 2), new(-width / 2, .03f, depth / 2), Vector3.Down, "84603c");
+        for (int plank = 0; plank < 3; plank++) {
+            float z0 = -depth / 2 + plank * depth / 3, z1 = -depth / 2 + (plank + 1) * depth / 3;
+            Quad(s, new(-width / 2, height, z0), new(width / 2, height, z0),
+                new(width / 2, height, z1), new(-width / 2, height, z1), Vector3.Up, shades[plank]);
+        }
         return s.Commit();
     }
 

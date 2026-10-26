@@ -719,33 +719,24 @@ public static class WorldModels {
             Root.AddChild(Courier.Root);
             Courier.Root.Position = new Vector3(0, 0, .55f);
             var cart = Pivot(Root, new Vector3(0, 0, -.45f));
-            var green = Mat("3f6b3a", .55f, .3f);
-            Box(cart, new Vector3(.7f, .3f, .85f), new Vector3(0, .5f, 0), green);
-            Box(cart, new Vector3(.62f, .02f, .78f), new Vector3(0, .66f, 0), Mat("2d4a2a", .7f));
+            Add(cart, CartShape.Frame, CartShape.Steel, Vector3.Zero);
             for (int i = 0; i < 2; i++) {
                 wheels[i] = Pivot(cart, new Vector3(i == 0 ? .42f : -.42f, .26f, 0));
-                Cylinder(wheels[i], .26f, .26f, .1f, Vector3.Zero, Mat("222222", .9f), new Vector3(0, 0, 90), 12);
-                Cylinder(wheels[i], .1f, .1f, .12f, Vector3.Zero, Mat("c9ced2", .4f, .7f), new Vector3(0, 0, 90), 8);
+                Add(wheels[i], CartShape.Wheel, CartShape.WheelSurface, Vector3.Zero);
             }
-            Cylinder(cart, .02f, .02f, .7f, new Vector3(.2f, .62f, .7f), Mat("c9ced2", .4f, .7f), new Vector3(70, 0, 0), 6);
-            Cylinder(cart, .02f, .02f, .7f, new Vector3(-.2f, .62f, .7f), Mat("c9ced2", .4f, .7f), new Vector3(70, 0, 0), 6);
-            Cylinder(cart, .025f, .025f, .46f, new Vector3(0, .74f, 1.02f), Mat("222222"), new Vector3(0, 0, 90), 6);
-            Goods = Pivot(cart, new Vector3(0, .68f, 0));
-            Box(Goods, new Vector3(.4f, .28f, .32f), new Vector3(-.08f, .14f, .18f), Mat("c9a46e"));
-            Box(Goods, new Vector3(.36f, .24f, .3f), new Vector3(.1f, .12f, -.2f), Mat("b8925c"));
-            Box(Goods, new Vector3(.3f, .22f, .26f), new Vector3(.05f, .39f, .05f), Mat("c9a46e"));
+            Goods = Pivot(cart, new Vector3(0, .415f, 0));
+            foreach (var (position, scale) in new[] {
+                (new Vector3(-.08f,0,.18f),new Vector3(.63f,.6f,.7f)),
+                (new Vector3(.1f,0,-.19f),new Vector3(.55f,.52f,.65f)),
+                (new Vector3(.05f,.27f,.05f),new Vector3(.45f,.46f,.58f)) })
+                Add(Goods, CrateShape.Cargo, CrateShape.Timber, position, scale: scale);
             for (int i = 0; i < Crates.Length; i++) {
-                // Small gaps and dark corner battens keep each crate countable at a glance.
-                var at = i < 4 ? new Vector3(i % 2 == 0 ? -.15f : .15f, 0, i < 2 ? .2f : -.2f) : new Vector3(i == 4 ? -.15f : .15f, .25f, i == 4 ? .08f : -.12f);
-                Crates[i] = Pivot(cart, new Vector3(0, .68f, 0) + at, new Vector3(0, i * 23 % 13 - 6, 0));
-                Box(Crates[i], new Vector3(.25f, .22f, .32f), new Vector3(0, .11f, 0), Mat("d4b07a"));
-                foreach (var (x, z) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) }) Box(Crates[i], new Vector3(.035f, .225f, .035f), new Vector3(x * .11f, .112f, z * .15f), Mat("6e4f2c"));
-                Box(Crates[i], new Vector3(.255f, .025f, .325f), new Vector3(0, .21f, 0), Mat("8f6a3f"));
+                var at = i < 4 ? new Vector3(i % 2 == 0 ? -.15f : .15f, 0, i < 2 ? .17f : -.17f) : new Vector3(i == 4 ? -.15f : .15f, .225f, i == 4 ? .08f : -.12f);
+                Crates[i] = Pivot(cart, new Vector3(0, .415f, 0) + at);
+                Add(Crates[i], CrateShape.Cargo, CrateShape.Timber, Vector3.Zero, scale: new Vector3(.4f, .5f, .727f));
             }
-            Cash = Pivot(cart, new Vector3(0, .68f, 0));
-            Box(Cash, new Vector3(.36f, .2f, .26f), new Vector3(0, .1f, .1f), Mat("4a5258", .4f, .7f));
-            Sphere(Cash, .14f, new Vector3(.12f, .12f, -.2f), Mat("c9a227", .5f), new Vector3(1, .9f, 1), 8);
-            Sphere(Cash, .12f, new Vector3(-.14f, .1f, -.22f), Mat("b89120", .5f), new Vector3(1, .9f, 1), 8);
+            Cash = Pivot(cart, new Vector3(0, .4f, 0));
+            Add(Cash, CartShape.Payment, CartShape.Steel, Vector3.Zero);
         }
 
         /// <summary>Shows exactly <paramref name="crates"/> crates, or loose goods, or the cash box.</summary>
