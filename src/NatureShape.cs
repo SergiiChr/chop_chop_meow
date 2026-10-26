@@ -14,6 +14,7 @@ internal static class NatureShape {
     public const int Variants = 3;
     public static readonly StandardMaterial3D Natural = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .92f };
     public static readonly StandardMaterial3D Glossy = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .4f };
+    public static readonly StandardMaterial3D Carbon = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .58f };
     public static readonly StandardMaterial3D Mineral = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .4f, Metallic = .3f };
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
 
@@ -369,12 +370,47 @@ internal static class NatureShape {
     public static Mesh Rocks(string kind, Color color, int variant, bool? veins = null) => Cached($"rocks{kind}{variant}{veins}", s => {
         foreach (var (at, radii, seed) in Boulders(variant)) {
             var (points, triangles) = Boulder(at, radii, seed);
+            if (kind == "coal" && veins is bool coal) { CoalFaces(s, points, triangles, at, color, coal, seed); continue; }
             Faces(s, points, triangles, at, (p, normal) => {
                 var shade = normal.Y > 0 ? color.Lightened(normal.Y * .12f) : color.Darkened(-normal.Y * .3f);
                 return shade.Lightened(Noise(p * 5, seed) * .03f);
             }, veins is bool vein ? p => Noise(p * 3.1f, seed + 9) > .3f == vein : null);
         }
     });
+
+    /// <summary>Split existing boulder faces at continuous bedding planes, so coal seams wrap flush around the rock.</summary>
+    private static void CoalFaces(SurfaceTool surface, Vector3[] points, List<int> triangles, Vector3 center, Color color, bool coal, int seed) {
+        float Bed(Vector3 p) => p.Y + p.X * .16f - p.Z * .08f;
+        List<Vector3> Clip(List<Vector3> polygon, float plane, bool above) {
+            var result = new List<Vector3>();
+            for (int i = 0; i < polygon.Count; i++) {
+                var a = polygon[i]; var b = polygon[(i + 1) % polygon.Count];
+                float da = Bed(a) - plane, db = Bed(b) - plane;
+                bool insideA = above ? da >= 0 : da <= 0, insideB = above ? db >= 0 : db <= 0;
+                if (insideA) result.Add(a);
+                if (insideA != insideB) result.Add(a.Lerp(b, da / (da - db)));
+            }
+            return result;
+        }
+        var bands = coal ? new[] { (.08f, .24f), (.34f, .53f) } : new[] { (-2f, .08f), (.24f, .34f), (.53f, 2f) };
+        for (int i = 0; i < triangles.Count; i += 3) {
+            var a = points[triangles[i]]; var b = points[triangles[i + 1]]; var c = points[triangles[i + 2]];
+            foreach (var (low, high) in bands) {
+                var polygon = Clip(Clip(new List<Vector3> { a, b, c }, low, true), high, false);
+                for (int corner = 1; corner < polygon.Count - 1; corner++) {
+                    var p = polygon[0]; var q = polygon[corner]; var r = polygon[corner + 1];
+                    var face = (r - p).Cross(q - p);
+                    if (face.LengthSquared() < 1e-12f) continue;
+                    face = face.Normalized();
+                    if (face.Dot((p + q + r) / 3 - center) < 0) { (q, r) = (r, q); face = -face; }
+                    surface.SetNormal(face);
+                    var shade = color.Lightened(Math.Max(0, face.Y) * .12f).Darkened(Math.Max(0, -face.Y) * .3f);
+                    surface.SetColor(shade.Lightened(Noise((p + q + r) * 2, seed) * .025f));
+                    surface.AddVertex(p); surface.AddVertex(q); surface.AddVertex(r);
+                }
+            }
+        }
+    }
 
     /// <summary>
     /// Angular ore chunks set into the boulder group, half buried where a ray from inside leaves the outermost rock face.
@@ -397,7 +433,12 @@ internal static class NatureShape {
             if (reach <= 0) continue;
             var basis = Basis.FromEuler(new Vector3((float)random.NextDouble() * 1.2f - .6f, (float)random.NextDouble() * Mathf.Tau, (float)random.NextDouble() * 1.2f - .6f));
             var size = new Vector3(.13f, .1f, .12f) * (.85f + (float)random.NextDouble() * .4f);
-            Chunk(s, new Transform3D(basis, origin + direction * (reach - .01f)), size, color);
+            var transform = new Transform3D(basis, origin + direction * (reach - .01f));
+            if (kind == "coal") {
+                var (points, triangles) = Shape(Vector3.Zero, size * .7f, 0, 631 + variant * 7 + i, 0, 0, .1f, -1, 3);
+                for (int point = 0; point < points.Length; point++) points[point] = transform * points[point];
+                Faces(s, points, triangles, transform.Origin, (_, normal) => color.Lightened(Math.Max(0, normal.Y) * .12f));
+            } else Chunk(s, transform, size, color);
         }
     });
 
