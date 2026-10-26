@@ -59,10 +59,9 @@ public sealed class ActorRig {
                 Add(head, CourierShape.Cap, CourierShape.CapMaterial, Vector3.Zero);
                 break;
         }
-        crate = Pivot(torso, new Vector3(0, .16f, .33f));
-        Box(crate, new Vector3(.42f, .28f, .3f), Vector3.Zero, Mat("c9a46e"));
-        Box(crate, new Vector3(.44f, .04f, .32f), new Vector3(0, .1f, 0), Mat("a9824f"));
-        Box(crate, new Vector3(.44f, .04f, .32f), new Vector3(0, -.1f, 0), Mat("a9824f"));
+        crate = Pivot(torso, new Vector3(0, .37f, .33f));
+        // Reuse the compact shipping crate, fitted to the existing centered carry volume.
+        Add(crate, CrateShape.Cargo, CrateShape.Timber, new Vector3(0, -.14f, 0), scale: new Vector3(.7f, .62f, .73f));
         // A low boulder to sit on, under the hips.
         rock = Pivot(Root, Vector3.Zero);
         Sphere(rock, .24f, new Vector3(0, .1f, -.04f), Mat("8d918c"), new Vector3(1.15f, .85f, 1));

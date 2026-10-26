@@ -109,7 +109,7 @@ public static class WorldModels {
             case "tree": Tree(prop, t.Id); break;
             case "stone": Rocks(body, t.Kind, t.Id, "8d918e"); break;
             case "iron": Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
-            case "coal": Rocks(body, t.Kind, t.Id, "505257", "121316", "15161a"); break;
+            case "coal": Rocks(body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
             case "tin": Rocks(body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
             case "loose_coal": LooseOre(body, t.Kind, t.Id, "2d2f33", "1d1e21"); break;
             case "wolf_corpse": Carcass(prop); break;
@@ -205,10 +205,14 @@ public static class WorldModels {
     /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows veins across the rock faces and ore chunks set into it.</summary>
     private static void Rocks(Node3D body, string kind, int id, string stone, string? vein = null, string? chunks = null) {
         int variant = id % NatureShape.Variants;
-        Add(body, NatureShape.Rocks(kind, new Color(stone), variant, vein == null ? null : false), NatureShape.Natural, Vector3.Zero);
-        if (vein == null || chunks == null) return;
-        Add(body, NatureShape.Rocks(kind, new Color(vein), variant, true), NatureShape.Mineral, Vector3.Zero);
-        Add(body, NatureShape.Insertions(kind, new Color(chunks), variant), NatureShape.Mineral, Vector3.Zero);
+        if (vein == null || chunks == null) {
+            Add(body, NatureShape.Rocks(kind, new Color(stone), variant), NatureShape.Natural, Vector3.Zero);
+            return;
+        }
+        Add(body, NatureShape.Ore(variant, false), NatureShape.OreMaterial(stone, .92f, 0), Vector3.Zero);
+        float roughness = kind == "coal" ? .58f : .4f, metallic = kind == "coal" ? 0 : .3f;
+        Add(body, NatureShape.Ore(variant, true), NatureShape.OreMaterial(vein, roughness, metallic), Vector3.Zero);
+        Add(body, NatureShape.OreChips(variant), NatureShape.OreMaterial(chunks, roughness, metallic), Vector3.Zero);
     }
 
     private static void LooseOre(Node3D body, string kind, int id, string light, string dark) =>
@@ -478,7 +482,11 @@ public static class WorldModels {
         prop.StackKey = key;
         for (int i = 0; i < prop.Stacks.Length; i++) {
             prop.Stacks[i].Visible = i < stacks.Count;
-            if (i < stacks.Count) PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : PileShape.Fallback);
+            if (i < stacks.Count) {
+                PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : PileShape.Fallback);
+                // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
+                prop.Stacks[i].Rotation = new Vector3(0, stacks[i] == "coal" ? i * 2.399963f : 0, 0);
+            }
         }
     }
 

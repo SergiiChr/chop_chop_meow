@@ -101,7 +101,7 @@ public static class ActorAnimation {
                 return new Pose(Lean: 14, Head: -6, RaiseL: 20 - wave * 50, OutL: 10, ElbowL: 85, RaiseR: 20 + wave * 50, OutR: 10, ElbowR: 85,
                     SwingL: wave * 42, KneeL: 14 + Math.Max(0, push) * 70, SwingR: -wave * 42, KneeR: 14 + Math.Max(0, -push) * 70);
             case ActorAction.Carry:
-                var carry = new Pose(Lean: -4, RaiseL: 62, OutL: -6, ElbowL: 62, RaiseR: 62, OutR: -6, ElbowR: 62);
+                var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
                 return moving ? Stride(wave, p) with { Lean = carry.Lean, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
             case ActorAction.Chop or ActorAction.SteelChop:
                 var ready = Stance with { Lean = 6, RaiseL = 50, OutL = -24, ElbowL = 35, RaiseR = 55, OutR = -16, ElbowR = 25 };

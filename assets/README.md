@@ -62,7 +62,7 @@ Visible geometry counts, excluding props being carried or sat upon:
 
 - `src/CabinShape.cs` — the cabin's shared sloped wall shell with door and window openings, its continuous corrugated roof, and a simple interior.
   The interior has contrasting wall lining, a wooden floor and a sleeping platform, visible through the open doorway.
-- `src/FurnaceShape.cs` — shared bevelled block faces, a recessed firebox, a shaped steel coping plate and a coal pile.
+- `src/FurnaceShape.cs` — shared bevelled block faces, a recessed firebox, a shaped steel coping plate and a coal pile of irregular broken slabs with broad fracture faces.
   The furnace's outdoor pile shows its selected stocked fuel and disappears when that slot is empty.
 - `src/ForgeShape.cs` — the reinforced forge's continuous rounded tank shell, fitted steel bands, recessed refractory chamber and continuous teardrop bellows boards.
   Its shared meshes keep separate animated bellows pivots and heat glow.
@@ -83,12 +83,14 @@ Visible geometry counts, excluding props being carried or sat upon:
 - `PileShape` — caches a pile-only dirt pad with fitted log edging, and stock shapes reused from existing resources.
   - Sources: the mine supply log outline, nature boulders and loose-ore nuggets, furnace coal lumps, and the bench/mine stock-board and bar primitives.
   - Connected lumps are extracted whole and logs omit redundant cylinder rings; source meshes stay unchanged.
+  - Coal slots reuse the furnace's 20-triangle closed chunk with varied rotations.
+    The furnace's six-chunk scatter uses 120 triangles in one mesh.
   - Families share one baked mesh across piles, fitted to the existing fourteen 9–4–1 slot positions.
     Items without a suitable source keep a color-tinted block.
   - `WorldModels.SyncPile` changes mesh and material with inventory, while `WorldView` keeps its sight guard, preserving remembered stock in fog.
   - The farm yard stays unchanged.
   - An empty pile uses 108 triangles and one mesh instance.
-    Full piles use fifteen instances and vary by material: wood 780 triangles, stone 1,228, coal 276, iron ore 388.
+    Full piles use fifteen instances and vary by material: wood 780 triangles, stone 1,228, coal 388, iron ore 388.
 - `FarmShape` — caches the farm's shaped soil rows and three seeded variants of sprouts, green plants and ripe wheat.
   - Tapered two-sided leaves, triangular stems and shaped grain heads replace separate boxes.
   - One crop mesh is shown per growth stage under the existing `Crops` handles.
@@ -131,6 +133,10 @@ Visible geometry counts, excluding props being carried or sat upon:
   - The six crate slots, loose-goods/cash visibility, wheel pivots and courier animation remain independent.
   - The fully loaded cart uses 1,020 triangles across nine visible mesh instances, compared with 804 across forty-five before.
     The courier's separate shared human rig adds 2,634 triangles and seventeen instances.
+- Carried goods on all human roles reuse the same cached `CrateShape.Cargo` mesh as cart loads.
+  - It is fitted to the centered carry volume and shared visibility handle.
+  - The carried crate uses 80 triangles and one mesh instance, replacing the prior 36-triangle, three-instance solid box.
+  - All roles cradle the load from below, with horizontal forearms and the crate seated above the palms; inventory behavior is unchanged.
 
 ### Nature
 
@@ -138,8 +144,21 @@ Visible geometry counts, excluding props being carried or sat upon:
   - Lumpy leaf canopies under one light gradient.
   - Lathed trunks with root flares, and spruce tiers.
   - Birch bark marks drawn into the trunk.
-  - Berries set on the bush surface.
-  - Faceted boulders pressed into the ground, whose ore veins are flush faces with a mineral sheen.
+  - Faceted boulders pressed into the ground.
+- `NatureShape.Bush` — seven seeded foliage clumps with short branching stems and folded, two-sided leaves.
+  - Berries are positioned against that variant's actual cached foliage surface and keep their separate harvest visibility pivot.
+  - Each of the three variants uses 1,200 triangles across two visible mesh instances when ripe, or 880 triangles in one mesh when harvested.
+  - The separate berry-heap icon stays unchanged.
+- `NatureShape.Ore` and `NatureShape.OreChips` — color-neutral host/seam and fractured chip geometry shared by coal, iron and tin deposits for each of three seeded variants.
+  - Cached material palettes distinguish black coal, rusty iron and pale tin; coal chips use near-black `0c0e10` without lightened grey tops.
+  - The existing four-boulder profiles stay unchanged, with seams clipped flush into their faces along continuous bedding planes.
+  - All three ore kinds use 863, 878 and 882 triangles across three mesh instances by variant.
+  - Mining scale, empty-state visibility and picking volumes remain unchanged.
+  - The tin-ore icon is rendered from the updated deposit; coal and iron inventory icons use their separate loose-ore models.
+- `NatureShape.Scrub` — decorative plain bushes as a lightweight lobe that reuses the resource bush's folded-leaf builder.
+  - Its neutral shading takes the existing MultiMesh colors.
+  - The original 900 seeded lobe transforms, colors and mine-approach clearance remain unchanged, in one MultiMesh batch with no new per-frame work.
+  - Each lobe uses 48 triangles instead of the previous sphere's 70, reducing the full shrub scatter from 63,000 to 43,200 triangles.
 - `LeafShape` — replaces the leaf patch's 26 box instances with one shared mesh of twenty-four pointed, folded autumn leaves and tapered stems.
   - Three fixed seeded layouts keep variation alongside the existing ID-based yaw.
   - Each full or partially raked patch uses 264 triangles and one visible mesh instance, compared with 312 across twenty-six before.
