@@ -22,7 +22,8 @@ public enum ActorAction {
     Sit,
     Perch,
     Mauled,
-    Devoured
+    Devoured,
+    Protest
 }
 
 /// <summary>
@@ -62,6 +63,7 @@ public static class ActorAnimation {
         ActorAction.Sit or ActorAction.Perch => 4,
         ActorAction.Mauled => .5f,
         ActorAction.Devoured => 1.4f,
+        ActorAction.Protest => 1.6f,
         _ => 1
     };
 
@@ -81,6 +83,7 @@ public static class ActorAnimation {
         ActorAction.Chop or ActorAction.SteelChop => "steel_axe",
         ActorAction.Mine or ActorAction.SteelMine => "steel_pick",
         ActorAction.Hammer => "hammer",
+        ActorAction.Protest => "protest_sign",
         _ => null
     };
 
@@ -168,6 +171,12 @@ public static class ActorAnimation {
                 float tug = .7f * MathF.Sin(p * Mathf.Tau + .5f) + .3f * MathF.Sin(p * Mathf.Tau * 2 + 1.1f);
                 return new Pose(Head: -38 + tug * 4, Twist: tug * 5, RaiseL: 18 + tug * 6, OutL: 62, ElbowL: 20, RaiseR: 14 - tug * 5, OutR: 58, ElbowR: 26,
                     SwingL: 10 + tug * 3, KneeL: 18, SwingR: 4, KneeR: 10 - tug * 3);
+            case ActorAction.Protest:
+                // The right forearm stays level, so the pole stays upright while the sign is shaken up and down.
+                // The left hand crosses over to grip the pole below the right.
+                float shake = (wave + 1) / 2;
+                return new Pose(Lean: -3, Head: 4 - shake * 3, RaiseR: 30 + shake * 22, OutR: -4, ElbowR: 60 - shake * 22,
+                    RaiseL: 34 + shake * 10, OutL: -34, ElbowL: 46 - shake * 6);
             default:
                 float breath = wave;
                 return new Pose(Lean: 1 + breath * .8f, Head: breath * 1.5f, OutL: 7 + breath, OutR: 7 + breath);
@@ -212,6 +221,8 @@ public static class ActorAnimation {
     }
 
     public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving) {
+        // The sign hides any load in the worker's bag, which stays there until the strike ends.
+        if (worker.WageDebt > 0 && !moving) return ActorAction.Protest;
         // Every other worker sits on a rock rather than the ground.
         if (worker.WorkState == WorkerWorkState.Resting && !moving) return worker.Id % 2 == 0 ? ActorAction.Perch : ActorAction.Sit;
         if (worker.Bag.Count > 0) return ActorAction.Carry;

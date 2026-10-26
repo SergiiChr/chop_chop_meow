@@ -761,6 +761,11 @@ public partial class Game : Node {
             for (int i = 0; i < 60; i++) world.Tick(.25f);
             OpenPage("workers");
         }
+        if (OS.GetCmdlineUserArgs().Contains("--strike")) {
+            // Strike review: the whole crew owes wages and stands holding protest signs.
+            foreach (var w in world.S.Workers) w.WageDebt = w.Wage;
+            world.Player = sign.Pos + new Vector2(2.5f, 1.5f); world.Tick(.25f); ClosePanel(); view.Zoom = 2.2f;
+        }
         if (OS.GetCmdlineUserArgs().Contains("--mine")) MineReview(sign);
         if (!OS.GetCmdlineUserArgs().Contains("--wolves")) return;
         // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
