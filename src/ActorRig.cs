@@ -206,8 +206,8 @@ public sealed class ActorRig {
 
     /// <summary>Tools hang from the right fist along the forearm; blades face local -Z, the direction of a downward stroke.</summary>
     private void BuildTools() {
-        foreach (var name in new[] { "steel_axe", "steel_pick", "hammer" }) {
-            var tool = Tool(name);
+        foreach (var name in new[] { "steel_axe", "steel_pick", "hammer", "protest_sign" }) {
+            var tool = name == "protest_sign" ? ProtestSign() : Tool(name);
             tool.Position = new Vector3(0, -.27f, .01f);
             elbowR.AddChild(tool);
             tool.Visible = false;
@@ -235,6 +235,29 @@ public sealed class ActorRig {
             Cylinder(tool, .035f, 0, .22f, new Vector3(0, end, .11f), steel, new Vector3(90, 0, 0), 6);
         }
         return tool;
+    }
+
+    /// <summary>
+    /// A cardboard sign on a pole gripped at the origin, pole along +Z like the torch, so a level forearm holds it upright.
+    /// The board faces local -Y, which is forward in that pose, and reads the same from behind.
+    /// </summary>
+    private static Node3D ProtestSign() {
+        var sign = new Node3D();
+        Cylinder(sign, .02f, .02f, 1.3f, new Vector3(0, .033f, .45f), Mat("8a5a32", .8f), new Vector3(90, 0, 0), 6);
+        Box(sign, new Vector3(.72f, .025f, .4f), new Vector3(0, 0, 1.08f), Mat("d9c49a", .95f));
+        foreach (float side in new[] { -1f, 1f })
+            sign.AddChild(new Label3D {
+                Text = "No pay -\nno work",
+                // Text faces the label's +Z, so each side turns it out of the board with its top along the pole.
+                Transform = new Transform3D(new Basis(new Vector3(-side, 0, 0), new Vector3(0, 0, 1), new Vector3(0, side, 0)), new Vector3(0, side * .014f, 1.08f)),
+                FontSize = 40,
+                PixelSize = .003f,
+                Modulate = new Color("2b211b"),
+                OutlineSize = 0,
+                DoubleSided = false,
+                Shaded = true
+            });
+        return sign;
     }
 
     public void Show(Pose pose, string? tool, bool carrying, bool onRock = false, bool lit = false) {

@@ -90,8 +90,13 @@ public static class AnimationChecks {
             "anvil work should select hammering animation");
         worker.Status = "On strike · wages owed";
         worker.WorkState = WorkerWorkState.Idle;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, false) == ActorAction.Idle,
-            "striking workers should remain idle");
+        worker.WageDebt = worker.Wage;
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, false) == ActorAction.Protest
+                && ActorAnimation.Tool(ActorAction.Protest) == "protest_sign",
+            "striking workers should stand holding the protest sign instead of working");
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, true) == ActorAction.Walk,
+            "a striking worker heading home should walk, not protest");
+        worker.WageDebt = 0;
         worker.Status = "Gathering wood";
         worker.WorkState = WorkerWorkState.Blocked;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "tree" }, false) == ActorAction.Idle,
