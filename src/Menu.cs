@@ -10,12 +10,19 @@ public partial class Game {
     private Button hostButton = null!, joinButton = null!, saveButton = null!, loadButton = null!;
     private Label netLine = null!;
 
-    private Button MenuIcon(string icon, string tooltip, Action action) {
+    /// <summary>A round badge with an icon, and a keycap when a key opens the same page.</summary>
+    private Button MenuIcon(string icon, string tooltip, Action action, string key = "") {
         var button = Button("", action);
-        button.Name = icon; button.TooltipText = tooltip;
+        button.Name = icon; button.TooltipText = key == "" ? tooltip : $"{tooltip} · {key}";
         button.Icon = GD.Load<Texture2D>($"res://assets/ui/{icon}.svg");
         button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center; button.VerticalIconAlignment = VerticalAlignment.Center;
-        button.CustomMinimumSize = new Vector2(62, 62); button.AddThemeConstantOverride("icon_max_width", 40);
+        button.CustomMinimumSize = new Vector2(56, 56); button.AddThemeConstantOverride("icon_max_width", 34);
+        button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        Style.Skin(button, Style.RoundNormal, Style.RoundHover, Style.RoundPressed);
+        if (key != "") {
+            var cap = Style.Keycap(key); cap.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.BottomRight); cap.GrowHorizontal = Control.GrowDirection.Begin; cap.GrowVertical = Control.GrowDirection.Begin;
+            cap.OffsetRight = 4; cap.OffsetBottom = 4; button.AddChild(cap);
+        }
         return button;
     }
 

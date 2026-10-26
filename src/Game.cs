@@ -16,6 +16,13 @@ public partial class Game : Node {
     private Label stats = null!;
     private Label toast = null!;
     private Label modeLabel = null!;
+    private DayDial dayDial = null!;
+    private PanelContainer bag = null!;
+    private VBoxContainer bagContent = null!;
+    private Label bagFill = null!;
+    private ScrollContainer scroll = null!;
+    private TextureRect headingIcon = null!;
+    private Label headingTitle = null!;
     private Label deathLabel = null!;
     private readonly List<Action> live = new();
     private string page = "welcome";
@@ -45,9 +52,13 @@ public partial class Game : Node {
     /// <summary>Left column of the side panel; only the signpost's price sheet uses it.</summary>
     private VBoxContainer sheet = null!;
     /// <summary>Left edge of the side panel and the clock above it, measured from the right of the screen.</summary>
-    private const int PanelLeft = -338;
-    private static readonly Color Cream = new("f2e8cf");
-    private static readonly Color Muted = new("b7c6ae");
+    private const int PanelLeft = -462;
+    /// <summary>Top of the side panel, below the clock.</summary>
+    private const int PanelTop = 112;
+    /// <summary>Bottom of the backpack drawer, measured up from the bottom of the screen, just above the hotbar.</summary>
+    private const int BagBottom = 112;
+    private static readonly Color Cream = Style.Cream;
+    private static readonly Color Muted = Style.Muted;
     public override void _Ready() {
         try {
             var data = GameData.Load(); world = new World(data);
@@ -80,24 +91,27 @@ public partial class Game : Node {
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
     private void SetTheme() {
-        var theme = new Theme();
-        theme.DefaultFontSize = 15;
-        var box = Box(new Color("263e34"), 10, 14);
-        theme.SetStylebox("panel", "PanelContainer", box);
-        theme.SetStylebox("normal", "Button", Box(new Color("405b47"), 5, 9));
-        theme.SetStylebox("hover", "Button", Box(new Color("597252"), 5, 9));
-        theme.SetStylebox("pressed", "Button", Box(new Color("7c8550"), 5, 9));
-        theme.SetStylebox("disabled", "Button", Box(new Color("34483c"), 5, 9));
+        var theme = new Theme { DefaultFont = Style.Body };
+        theme.DefaultFontSize = 16;
+        theme.SetStylebox("panel", "PanelContainer", Style.Board);
+        theme.SetStylebox("normal", "Button", Style.ButtonNormal);
+        theme.SetStylebox("hover", "Button", Style.ButtonHover);
+        theme.SetStylebox("pressed", "Button", Style.ButtonPressed);
+        theme.SetStylebox("disabled", "Button", Style.ButtonDisabled);
+        theme.SetStylebox("hover_pressed", "Button", Style.ButtonPressed);
+        theme.SetStylebox("focus", "Button", new StyleBoxEmpty());
+        theme.SetColor("font_hover_pressed_color", "Button", Style.Ply);
         theme.SetColor("font_color", "Label", Cream); theme.SetColor("font_color", "Button", Cream);
-        theme.SetColor("font_disabled_color", "Button", new Color("82917e"));
+        theme.SetColor("font_hover_color", "Button", Cream); theme.SetColor("font_pressed_color", "Button", Style.Ply);
+        theme.SetColor("font_disabled_color", "Button", new Color("7d6d58"));
         theme.SetColor("font_color", "CheckBox", Cream);
-        theme.SetConstant("separation", "VBoxContainer", 9);
+        theme.SetConstant("separation", "VBoxContainer", 10);
         theme.SetConstant("separation", "HBoxContainer", 8);
-        theme.SetStylebox("normal", "OptionButton", Box(new Color("405b47"), 5, 10));
+        theme.SetStylebox("normal", "OptionButton", Style.ButtonNormal);
+        theme.SetStylebox("background", "ProgressBar", Style.BarBack);
+        theme.SetStylebox("fill", "ProgressBar", Style.BarFill);
         // Tooltips read as solid popups with a bright edge rather than a translucent wash over the scene.
-        var tip = Box(new Color("1b2b24"), 6, 10); tip.BorderColor = new Color("e9d9a6"); tip.SetBorderWidthAll(2);
-        tip.ShadowColor = new Color(0, 0, 0, .45f); tip.ShadowSize = 6;
-        theme.SetStylebox("panel", "TooltipPanel", tip);
+        theme.SetStylebox("panel", "TooltipPanel", Style.Tooltip);
         theme.SetColor("font_color", "TooltipLabel", Cream);
         ui.Theme = theme;
     }
@@ -117,6 +131,11 @@ public partial class Game : Node {
     private Label Label(string text, int size = 15, Color? color = null) {
         var l = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart };
         l.AddThemeFontSizeOverride("font_size", size); if (color != null) l.AddThemeColorOverride("font_color", color.Value); return l;
+    }
+    /// <summary>Text over the world gets a dark outline so it reads on grass by day and night.</summary>
+    private static Label Outlined(Label label) {
+        label.AddThemeColorOverride("font_outline_color", Style.Socket); label.AddThemeConstantOverride("outline_size", 6);
+        return label;
     }
     private Button Button(string text, Action action, bool disabled = false) {
         var b = new Button { Text = text, Disabled = disabled, MouseDefaultCursorShape = Control.CursorShape.PointingHand, CustomMinimumSize = new Vector2(0, 34), FocusMode = Control.FocusModeEnum.None };
@@ -164,20 +183,33 @@ public partial class Game : Node {
         var text = new StringBuilder(); write(text); return text.ToString();
     }
     private void BuildHud() {
-        var clock = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = PanelLeft, OffsetRight = -16, OffsetTop = 14, OffsetBottom = 52, MouseFilter = Control.MouseFilterEnum.Ignore };
-        clock.AddThemeStyleboxOverride("panel", Box(new Color(.14f, .23f, .18f, .89f), 8, 9)); ui.AddChild(clock);
-        stats = Label("", 15); stats.HorizontalAlignment = HorizontalAlignment.Center; clock.AddChild(stats);
-        modeLabel = Label("", 15); modeLabel.OffsetLeft = 20; modeLabel.OffsetTop = 18; modeLabel.OffsetRight = 550; modeLabel.OffsetBottom = 73; modeLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(modeLabel);
-        var bottom = new PanelContainer { AnchorTop = 1, AnchorBottom = 1, AnchorRight = 1, OffsetLeft = 16, OffsetRight = -16, OffsetTop = -92, OffsetBottom = -14 }; ui.AddChild(bottom);
-        var slots = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; bottom.AddChild(slots);
-        slots.AddChild(MenuIcon("hammer", "Build · B", () => OpenPage("build"))); slots.AddChild(MenuIcon("backpack", "Inventory · I", () => OpenPage("inventory")));
-        slots.AddChild(MenuIcon("stone_chisel", "Crafting · C", () => OpenPage("craft"))); slots.AddChild(MenuIcon("hardhat", "Workers", () => OpenPage("workers"))); slots.AddChild(MenuIcon("book", "Guide · Tab", () => OpenPage("help")));
-        slots.AddChild(new VSeparator { CustomMinimumSize = new Vector2(24, 0) });
+        // The day dial and clock share a plate in the top right corner; the side panel opens below it.
+        var clock = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = -186, OffsetRight = -16, OffsetTop = 14, OffsetBottom = 14, MouseFilter = Control.MouseFilterEnum.Ignore };
+        clock.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(clock);
+        var dial = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddThemeConstantOverride("separation", 0); clock.AddChild(dial);
+        dayDial = new DayDial { Phase = () => world.DayPhase, Night = () => world.Night, CustomMinimumSize = new Vector2(0, 44), MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddChild(dayDial);
+        stats = Style.Heading("", 17); stats.HorizontalAlignment = HorizontalAlignment.Center; dial.AddChild(stats);
+        modeLabel = Outlined(Label("", 17)); modeLabel.AnchorLeft = .5f; modeLabel.AnchorRight = .5f; modeLabel.OffsetTop = 18; modeLabel.GrowHorizontal = Control.GrowDirection.Both; modeLabel.HorizontalAlignment = HorizontalAlignment.Center; modeLabel.AutowrapMode = TextServer.AutowrapMode.Off; modeLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(modeLabel);
+        // Menu badges and the hotbar sit on one board centred along the bottom, like a tool belt.
+        var bottom = new PanelContainer { AnchorLeft = .5f, AnchorRight = .5f, AnchorTop = 1, AnchorBottom = 1, OffsetTop = -14, OffsetBottom = -14, GrowHorizontal = Control.GrowDirection.Both, GrowVertical = Control.GrowDirection.Begin }; ui.AddChild(bottom);
+        bottom.AddThemeStyleboxOverride("panel", Style.Plate);
+        var slots = new HBoxContainer(); bottom.AddChild(slots);
+        slots.AddChild(MenuIcon("hammer", "Build", () => OpenPage("build"), "B")); slots.AddChild(MenuIcon("backpack", "Inventory", () => OpenPage("inventory"), "I"));
+        slots.AddChild(MenuIcon("stone_chisel", "Crafting", () => OpenPage("craft"), "C")); slots.AddChild(MenuIcon("hardhat", "Workers", () => OpenPage("workers"))); slots.AddChild(MenuIcon("book", "Guide", () => OpenPage("help"), "Tab"));
+        slots.AddChild(new VSeparator { CustomMinimumSize = new Vector2(18, 0) });
         for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
-        toast = Label("", 15); toast.AnchorTop = 1; toast.AnchorBottom = 1; toast.OffsetLeft = 22; toast.OffsetTop = -140; toast.OffsetRight = 850; toast.OffsetBottom = -100; toast.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(toast);
-        panel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, AnchorBottom = 1, OffsetLeft = PanelLeft, OffsetRight = -16, OffsetTop = 64, OffsetBottom = -106 };
+        toast = Outlined(Label("", 17)); toast.AnchorLeft = .5f; toast.AnchorRight = .5f; toast.OffsetTop = 50; toast.GrowHorizontal = Control.GrowDirection.Both; toast.HorizontalAlignment = HorizontalAlignment.Center; toast.AutowrapMode = TextServer.AutowrapMode.Off; toast.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(toast);
+        // The side panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
+        panel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = PanelLeft, OffsetRight = -16, OffsetTop = PanelTop, OffsetBottom = PanelTop };
         ui.AddChild(panel);
-        deathLabel = Label("", 26); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.AddThemeConstantOverride("outline_size", 8); deathLabel.AddThemeColorOverride("font_outline_color", new Color("1c2b24")); deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
+        // The backpack opens as a drawer above the hotbar whenever a page works with it, always in the same place.
+        bag = new PanelContainer { Name = "bag", Visible = false, AnchorTop = 1, AnchorBottom = 1, OffsetLeft = 16, OffsetTop = -BagBottom, OffsetBottom = -BagBottom, GrowVertical = Control.GrowDirection.Begin }; ui.AddChild(bag);
+        var drawer = new HBoxContainer(); drawer.AddThemeConstantOverride("separation", 12); bag.AddChild(drawer);
+        var label = new VBoxContainer { CustomMinimumSize = new Vector2(46, 0) }; label.AddThemeConstantOverride("separation", 2); drawer.AddChild(label);
+        label.AddChild(Style.Icon(HotbarIcon("backpack"), 40));
+        bagFill = Label("", 14, Muted); bagFill.HorizontalAlignment = HorizontalAlignment.Center; label.AddChild(bagFill);
+        bagContent = new VBoxContainer(); drawer.AddChild(bagContent);
+        deathLabel = Outlined(Label("", 26)); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
         // Raised above the centred player so a downed body stays visible under the message.
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
@@ -197,7 +229,8 @@ public partial class Game : Node {
         if (clock != shownClock) {
             shownClock = clock;
             int hour = (int)world.Hour;
-            stats.Text = $"Day {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}  {(world.Night ? "NIGHT" : "DAYLIGHT")}";
+            stats.Text = $"DAY {world.Day} · {hour:00}:{(int)(world.DayPhase * 1440) % 60:00}";
+            dayDial.QueueRedraw();
         }
         int feeding = 0;
         foreach (var w in world.S.Wolves) if (w.Feeding) feeding++;
@@ -214,19 +247,48 @@ public partial class Game : Node {
         // An update can open another page, which replaces the list; the old page's remaining updates are then dropped.
         int opened = pagesOpened;
         for (int i = 0; i < live.Count && opened == pagesOpened; i++) live[i]();
-        RefreshHotbar(); RefreshNeeds();
+        RefreshHotbar(); RefreshNeeds(); RefreshBag();
+    }
+    private (int Used, int Slots) shownFill = (-1, -1);
+    private void RefreshBag() {
+        if (!bag.Visible) return;
+        var fill = (world.S.Backpack.UsedSlots, world.S.Backpack.Slots);
+        if (fill == shownFill) return;
+        shownFill = fill;
+        bagFill.Text = $"{fill.UsedSlots}/{fill.Slots}";
+    }
+    /// <summary>Sizes the panel's scroll area to what it shows, up to the room between the clock and the hotbar.</summary>
+    private void FitPanel() {
+        if (!panel.Visible || !GodotObject.IsInstanceValid(scroll)) return;
+        float room = Math.Max(160, ui.Size.Y - PanelTop - 150 - 60);
+        float want = Math.Min(content.GetCombinedMinimumSize().Y, room);
+        if (sheet.Visible && GodotObject.IsInstanceValid(sheetScroll)) {
+            // The board reaches further left than the panel, over the backpack drawer, so it stops above the drawer.
+            float clear = bag.Visible ? ui.Size.Y - PanelTop - BagBottom - bag.Size.Y - 40 : room;
+            float rows = Math.Min(sheetRows!.GetCombinedMinimumSize().Y, Math.Min(room, clear) - 110);
+            if (Math.Abs(sheetScroll.CustomMinimumSize.Y - rows) > .5f) sheetScroll.CustomMinimumSize = new Vector2(0, rows);
+        }
+        if (Math.Abs(scroll.CustomMinimumSize.Y - want) < .5f) return;
+        // A control grows to its minimum size but never shrinks back on its own, so the panel is reset to it.
+        scroll.CustomMinimumSize = new Vector2(0, want);
+        panel.OffsetBottom = PanelTop;
     }
     private void OpenPage(string name) {
         page = name; live.Clear(); pagesOpened++; panel.Visible = true; view.PanelOpen = true;
         foreach (var child in panel.GetChildren()) { panel.RemoveChild(child); child.QueueFree(); }
+        foreach (var child in bagContent.GetChildren()) { bagContent.RemoveChild(child); child.QueueFree(); }
+        bag.Visible = false; shownFill = (-1, -1);
         panel.OffsetLeft = PanelLeft;
         var frame = new HBoxContainer(); frame.AddThemeConstantOverride("separation", 16); panel.AddChild(frame);
-        sheet = new VBoxContainer { Visible = false, CustomMinimumSize = new Vector2(SheetWidth - 16, 0) }; frame.AddChild(sheet);
-        var outer = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; frame.AddChild(outer);
-        var heading = new HBoxContainer(); outer.AddChild(heading);
-        var title = Label(name switch { "welcome" => "A NEW BEGINNING", "build" => "BUILDING PLANS", "inventory" => "YOUR BACKPACK", "hotbar" => "HOTBAR ASSIGNMENT", "help" => "FIELD GUIDE", "workers" => "YOUR NEIGHBORS", "filters" => "STORAGE FILTERS", "craft" => "CRAFTING", _ => "INSPECT" }, 20);
-        title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; heading.AddChild(title); heading.AddChild(Button("×", ClosePanel));
-        var scroll = new ScrollContainer { SizeFlagsVertical = Control.SizeFlags.ExpandFill, HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
+        var board = new PanelContainer { Visible = false }; board.AddThemeStyleboxOverride("panel", Style.ChalkBoard); frame.AddChild(board);
+        sheet = new VBoxContainer { Visible = false, CustomMinimumSize = new Vector2(SheetWidth - 48, 0) }; sheet.AddThemeConstantOverride("separation", 6); board.AddChild(sheet);
+        var outer = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; outer.AddThemeConstantOverride("separation", 14); frame.AddChild(outer);
+        var heading = new HBoxContainer(); heading.AddThemeConstantOverride("separation", 12); outer.AddChild(heading);
+        headingIcon = Style.Icon(null, 52); headingIcon.Visible = false; headingIcon.MouseFilter = Control.MouseFilterEnum.Pass; heading.AddChild(headingIcon);
+        headingTitle = Style.Heading(name switch { "welcome" => "A NEW BEGINNING", "build" => "BUILDING PLANS", "inventory" => "BACKPACK", "hotbar" => "HOTBAR", "help" => "FIELD GUIDE", "workers" => "YOUR NEIGHBORS", "filters" => "STORAGE FILTERS", "craft" => "CRAFTING", _ => "INSPECT" }, 24);
+        headingTitle.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; headingTitle.VerticalAlignment = VerticalAlignment.Center; headingTitle.AutowrapMode = TextServer.AutowrapMode.WordSmart; heading.AddChild(headingTitle);
+        var close = Button("", ClosePanel); close.Name = "close"; close.TooltipText = "Close · Esc"; close.Icon = GD.Load<Texture2D>("res://assets/ui/close.svg"); close.ExpandIcon = true; close.AddThemeConstantOverride("icon_max_width", 16); close.CustomMinimumSize = new Vector2(38, 38); close.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin; heading.AddChild(close);
+        scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
         content = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; scroll.AddChild(content);
         switch (name) {
             case "welcome": Welcome(); break;
@@ -241,7 +303,19 @@ public partial class Game : Node {
         }
         RefreshLive();
     }
-    private void ClosePanel() { panel.Visible = false; view.PanelOpen = false; page = ""; live.Clear(); pagesOpened++; }
+    /// <summary>Names the page after the building it shows, with the building's own icon; its description becomes the icon's tooltip.</summary>
+    private void Headline(string kind) {
+        headingTitle.Text = world.Data.Name(kind).ToUpperInvariant();
+        headingIcon.Texture = HotbarIcon(kind); headingIcon.Visible = headingIcon.Texture != null;
+        headingIcon.TooltipText = world.Data.Buildings.TryGetValue(kind, out var def) ? def.Description : "";
+    }
+    /// <summary>Shows the backpack drawer with a grid that works with the open page: <paramref name="wanted"/> lights up what it takes.</summary>
+    private void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
+        var host = content; content = bagContent;
+        AddInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns);
+        content = host; bag.Visible = true;
+    }
+    private void ClosePanel() { panel.Visible = false; bag.Visible = false; view.PanelOpen = false; page = ""; live.Clear(); pagesOpened++; }
     // Counts pages opened and closed, so a refresh notices when an update replaced the page under it.
     private int pagesOpened;
     private void Welcome() {
@@ -300,8 +374,12 @@ public partial class Game : Node {
     }
     private void Backpack() {
         Dynamic(text => text.Append($"Health {world.S.Health:0}\nCapacity {world.S.Backpack.UsedSlots}/{world.S.Backpack.Slots} slots   Daily wages {DailyWages():0}"), 15);
-        AddInventoryGrid(() => world.S.Backpack, null, id => { if (world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero); }, "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.");
+        BagGrid(UseFromBag, UseHint);
         AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
+    }
+    private const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
+    private void UseFromBag(string id) {
+        if (world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
     }
     private int DailyWages() {
         int wages = 0;
@@ -322,11 +400,8 @@ public partial class Game : Node {
         if (workerId > 0) { WorkerPanel(world.S.Workers.FirstOrDefault(w => w.Id == workerId)); return; }
         var t = world.Find(selected);
         if (t == null) { AddLabel("Select a building or resource in the world."); return; }
-        AddLabel(world.Data.Name(t.Kind), 23);
-        Dynamic(text => {
-            if (world.Near(t)) text.Append("Within reach");
-            else text.Append($"{world.Player.DistanceTo(t.Pos):0.0} tiles away · walk closer");
-        }, 13, Muted);
+        Headline(t.Kind);
+        Reach(t);
         if (t.IsResource) {
             Dynamic(text => text.Append($"{t.Remaining} remaining\n{world.GatherBlock(t) ?? (t.IsLoose ? "Right-click to walk over and pick it up." : "Hold right mouse on this resource to gather.")}"), 15);
             if (t.Kind == "water") AddButton("Drink from the lake", () => world.Drink(t));
@@ -341,22 +416,43 @@ public partial class Game : Node {
         if (t.Kind == "campfire") {
             Dynamic(text => { text.Append("Light remaining: "); AppendGameHours(text, t.Burn); text.Append("\nProtection radius: 5 tiles"); }, 16); AddButton($"Feed fire · 1 wood / +{world.Data.CampfireHours:0}h", () => world.FuelFire(t)); Assignment(t); return;
         }
-        if (world.Data.Buildings.TryGetValue(t.Kind, out var bd)) AddLabel(bd.Description, 14, Muted);
-        var recipes = world.Data.Recipes.Where(p => p.Value.Station == t.Kind).ToList();
-        if (recipes.Count > 1) {
-            var opt = new OptionButton { CustomMinimumSize = new Vector2(0, 38), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
-            foreach (var r in recipes) opt.AddItem(r.Value.Name);
-            opt.Selected = recipes.FindIndex(p => p.Key == t.Recipe);
-            opt.ItemSelected += index => { world.SetRecipe(t, recipes[(int)index].Key); OpenPage("inspect"); }; content.AddChild(opt);
-        } else if (recipes.Count == 1) AddLabel(recipes[0].Value.Name.ToUpperInvariant(), 16);
-        if (t.Recipe != "") {
-            Machine(t);
-            var row = Row(); row.AddChild(Button("Load 1 batch", () => world.LoadBatch(t))); row.AddChild(Button("Load 5", () => world.LoadBatch(t, 5))); row.AddChild(Button("Collect", () => world.Collect(t)));
-        } else if (recipes.Count > 1) AddLabel("Choose a recipe.", 14, Muted);
-        if (t.Kind == "reinforced") { HeatGauge(t); AddButton("Pump bellows · Space", () => { if (paused) Notify("Resume before operating the bellows."); else world.Pump(t); }); }
-        AddLabel("BACKPACK", 14);
-        AddInventoryGrid(() => world.S.Backpack, null, id => world.LoadInput(t, id, Input.IsKeyPressed(Key.Shift) ? world.S.Backpack[id] : world.S.Backpack.StackSize), "Click: fill its input slot · Drag onto a slot");
+        var recipes = world.Data.Recipes.Where(p => p.Value.Station == t.Kind).Select(p => p.Key).ToList();
+        if (recipes.Count > 1) RecipePicker(t, recipes);
+        if (t.Recipe != "") Machine(t);
+        else if (recipes.Count > 1) AddLabel("Choose what to make.", 14, Muted);
+        if (t.Kind == "reinforced") Bellows(t);
+        BagGrid(id => world.LoadInput(t, id, Input.IsKeyPressed(Key.Shift) ? world.S.Backpack[id] : world.S.Backpack.StackSize), "Click: fill its input slot · Drag onto a slot",
+            wanted: id => t.Recipe != "" && world.BatchCost(t).ContainsKey(id));
         Assignment(t);
+    }
+    /// <summary>A tick when the building is within reach, or how far away it is.</summary>
+    private void Reach(Thing t) {
+        var label = Label("", 14, Style.Good); label.AutowrapMode = TextServer.AutowrapMode.Off; content.AddChild(label);
+        var text = new LiveText(shown => label.Text = shown);
+        // Rewritten only when the distance moves a tenth of a tile or the building comes into reach.
+        int drawn = int.MinValue;
+        live.Add(() => {
+            if (!GodotObject.IsInstanceValid(label)) return;
+            int tenths = world.Near(t) ? -1 : (int)(world.Player.DistanceTo(t.Pos) * 10);
+            if (tenths == drawn) return;
+            drawn = tenths;
+            label.AddThemeColorOverride("font_color", tenths < 0 ? Style.Good : Style.Short);
+            if (tenths < 0) text.Clear().Append("✓ in reach");
+            else text.Clear().Append(tenths / 10).Append('.').Append(tenths % 10).Append(" tiles away · walk closer");
+            text.Show();
+        });
+    }
+    /// <summary>A station's recipes as a row of their products; the one it makes is lit.</summary>
+    private void RecipePicker(Thing t, System.Collections.Generic.List<string> recipes) {
+        var row = Row(); row.AddThemeConstantOverride("separation", 6);
+        foreach (string id in recipes) {
+            var r = world.Data.Recipes[id];
+            var pick = Button("", () => { world.SetRecipe(t, id); OpenPage("inspect"); }); pick.Name = $"recipe_{id}";
+            pick.Icon = HotbarIcon(r.Output); pick.ExpandIcon = true; pick.AddThemeConstantOverride("icon_max_width", 36); pick.CustomMinimumSize = new Vector2(52, 50);
+            pick.TooltipText = r.Name;
+            if (id == t.Recipe) pick.AddThemeStyleboxOverride("normal", Style.ButtonPressed);
+            row.AddChild(pick);
+        }
     }
     private void Cabin(Thing hut) {
         Dynamic(text => text.Append(world.S.Sheltered == hut.Id ? "You are inside. Wolves keep their distance. Press Step outside to leave." : "Click the cabin to step inside and escape wolves."), 14, Muted);
@@ -385,8 +481,7 @@ public partial class Game : Node {
             else text.Append($"{t.Inventory.UsedSlots}/{t.Inventory.Slots} slots");
         }, 14, Muted);
         AddInventoryGrid(() => t.Inventory, t, id => MoveStack(t.Inventory, world.S.Backpack, id, t), "Click: take a stack · Shift: take all · Drag to move");
-        AddLabel("BACKPACK", 14);
-        AddInventoryGrid(() => world.S.Backpack, null, id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Shift: store all · Drag to move");
+        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Shift: store all · Drag to move");
         if (t.Kind == "chest") AddButton("Input / output filters", () => OpenPage("filters"));
         if (t.Kind == "toolstation") {
             AddLabel("Workers take an axe for trees, a pickaxe for ore and coal, and a rake for leaves, and put it back when they finish or go home. Stone, berries and loose coal need no tool.", 13, Muted);
@@ -428,8 +523,7 @@ public partial class Game : Node {
         AddLabel(world.Data.Buildings["farm"].Description, 14, Muted);
         Dynamic(text => world.WriteFarmStatus(farm, text), 15);
         AddInventoryGrid(() => farm.Inventory, farm, id => MoveStack(farm.Inventory, world.S.Backpack, id, farm), "Click: take a stack · Drag to move");
-        AddLabel("BACKPACK", 14);
-        AddInventoryGrid(() => world.S.Backpack, null, id => MoveStack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move");
+        BagGrid(id => MoveStack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move");
         Assignment(farm);
         AddLabel("An assigned worker brings seeds and fertilizer from storage, harvests the ripe wheat and carries the yield to storage. Several workers share one harvest.", 13, Muted);
     }
@@ -448,18 +542,24 @@ public partial class Game : Node {
         AddButton("Clear both filters (allow everything)", () => { world.ClearFilters(t); OpenPage("filters"); });
         AddButton("Back to chest", () => OpenPage("inspect"));
     }
+    /// <summary>The crew: a chip per villager, lit while assigned here; the tooltip says where the others work.</summary>
     private void Assignment(Thing t) {
-        AddLabel("ASSIGN VILLAGERS", 16);
-        if (world.S.Workers.Count == 0) { AddLabel("Hire villagers at a village signpost.", 14, Muted); return; }
+        var row = new HFlowContainer(); row.AddThemeConstantOverride("h_separation", 6); row.AddThemeConstantOverride("v_separation", 6); content.AddChild(row);
+        var crew = Style.Icon(HotbarIcon("hardhat"), 30); crew.MouseFilter = Control.MouseFilterEnum.Pass; row.AddChild(crew);
+        crew.TooltipText = t.Kind switch {
+            "signpost" => "A villager assigned here minds the post and can fetch fresh prices from the village.",
+            "reinforced" => "Only one worker pumps: the first assigned operates the bellows and the rest haul. A lone worker alternates pumping and hauling.",
+            _ => "Assign villagers to work here"
+        };
+        if (world.S.Workers.Count == 0) { row.AddChild(Label("Hire villagers at a village signpost.", 14, Muted)); return; }
         foreach (var w in world.S.Workers) {
             var worker = w; var current = world.Find(w.Assignment);
-            var check = new CheckBox { Text = $"{w.Name} · {(current == null ? "available" : world.Data.Name(current.Kind))}", ButtonPressed = w.Assignment == t.Id, FocusMode = Control.FocusModeEnum.None };
-            // A full mine refuses the worker, so the box shows what actually happened.
-            check.Toggled += on => { world.Assign(worker, on ? t : null); check.SetPressedNoSignal(worker.Assignment == t.Id); RefreshLive(); };
-            content.AddChild(check);
+            var chip = Button(w.Name, () => { }); chip.ToggleMode = true; chip.ButtonPressed = w.Assignment == t.Id; chip.Name = $"crew_{w.Id}";
+            chip.TooltipText = current == null ? "Available" : $"Working at the {world.Data.Name(current.Kind).ToLowerInvariant()}";
+            // A full mine refuses the worker, so the chip shows what actually happened.
+            chip.Toggled += on => { world.Assign(worker, on ? t : null); chip.SetPressedNoSignal(worker.Assignment == t.Id); RefreshLive(); };
+            row.AddChild(chip);
         }
-        if (t.Kind == "signpost") AddLabel("A villager assigned here minds the post and can fetch fresh prices from the village.", 13, Muted);
-        if (t.Kind == "reinforced") AddLabel("Only one worker pumps: the first assigned operates the bellows and the rest haul. A lone worker alternates pumping and hauling.", 13, Muted);
     }
     private void WorkerPanel(Worker? w) {
         if (w == null) { AddLabel("This worker has left."); return; }
@@ -629,6 +729,8 @@ public partial class Game : Node {
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }
+        // Every frame, so a page that just opened takes its size once its wrapped text has a width.
+        FitPanel();
         toastClock -= dt; if (toastClock <= 0 && toast != null) toast.Text = "";
         var args = launchArgs;
         if (args.Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
@@ -707,6 +809,7 @@ public partial class Game : Node {
         if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
         if (OS.GetCmdlineUserArgs().Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
         if (OS.GetCmdlineUserArgs().Contains("--craft")) OpenPage("craft");
+        if (OS.GetCmdlineUserArgs().Contains("--furnace")) { world.Player = bellows.Pos + Vector2.One; Select(bellows); }
         if (OS.GetCmdlineUserArgs().Contains("--piles")) {
             var at = World.Spawn + new Vector2(-3, 9);
             foreach (var (item, stacks, dx) in new[] { ("stone", 14, 0), ("wood", 6, 3), ("leaves", 3, 6) }) {

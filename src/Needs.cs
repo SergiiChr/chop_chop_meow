@@ -31,7 +31,7 @@ public partial class NeedGauge : Control {
         // Clip the outline to the part below the current level, so the icon empties like a vessel.
         var below = new[] { new Vector2(-1, Size.Y * (1 - level)), new Vector2(Size.X + 1, Size.Y * (1 - level)), new Vector2(Size.X + 1, Size.Y + 1), new Vector2(-1, Size.Y + 1) };
         foreach (var part in Geometry2D.IntersectPolygons(outline, below)) DrawColoredPolygon(part, Fill);
-        DrawPolyline(outline.Append(outline[0]).ToArray(), level <= .25f ? new Color("e0705a") : new Color("f2e8cf"), 2, true);
+        DrawPolyline(outline.Append(outline[0]).ToArray(), level <= .25f ? Style.Short : Style.Cream, 2, true);
     }
 }
 
@@ -42,12 +42,13 @@ public partial class Game {
     private DamageEdges damageEdges = null!;
 
     private void BuildNeeds() {
-        var box = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = PanelLeft - 118, OffsetRight = PanelLeft - 10, OffsetTop = 14, OffsetBottom = 52 };
-        box.AddThemeStyleboxOverride("panel", Box(new Color(.14f, .23f, .18f, .89f), 8, 4)); ui.AddChild(box);
-        var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; box.AddChild(row);
-        hunger = new NeedGauge { Name = "hunger", Shape = NeedGauge.Stomach, Fill = new Color("d99a5b"), Level = () => world.S.Hunger, CustomMinimumSize = new Vector2(30, 30) };
-        thirst = new NeedGauge { Name = "thirst", Shape = NeedGauge.Droplet, Fill = new Color("6db6df"), Level = () => world.S.Thirst, CustomMinimumSize = new Vector2(26, 30) };
-        health = new NeedGauge { Name = "health", Shape = NeedGauge.Heart, Fill = new Color("d9534f"), Level = () => world.S.Health, CustomMinimumSize = new Vector2(30, 30) };
+        // Top left, away from the clock and the panel that opens under it.
+        var box = new PanelContainer { OffsetLeft = 16, OffsetTop = 14 };
+        box.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(box);
+        var row = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; row.AddThemeConstantOverride("separation", 12); box.AddChild(row);
+        hunger = new NeedGauge { Name = "hunger", Shape = NeedGauge.Stomach, Fill = new Color("f2a65a"), Level = () => world.S.Hunger, CustomMinimumSize = new Vector2(40, 40) };
+        thirst = new NeedGauge { Name = "thirst", Shape = NeedGauge.Droplet, Fill = new Color("5bb4e5"), Level = () => world.S.Thirst, CustomMinimumSize = new Vector2(34, 40) };
+        health = new NeedGauge { Name = "health", Shape = NeedGauge.Heart, Fill = new Color("e5534b"), Level = () => world.S.Health, CustomMinimumSize = new Vector2(40, 40) };
         row.AddChild(health); row.AddChild(hunger); row.AddChild(thirst);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); ui.AddChild(damageEdges);
     }

@@ -34,7 +34,8 @@ public partial class Game {
         button.Pressed += () => SelectHotbar(slot);
         button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.Buildings.ContainsKey(drag.Item);
         button.Take = drag => { SetHotbar(slot, drag.Item); return 0; };
-        button.CustomMinimumSize = new Vector2(66, 62);
+        button.CustomMinimumSize = new Vector2(62, 62);
+        Style.Skin(button, Style.SocketNormal, Style.SocketHover, Style.SocketPressed);
         button.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
         button.Text = "";
         button.ExpandIcon = true;
@@ -52,8 +53,8 @@ public partial class Game {
             OffsetRight = -42,
             OffsetBottom = -42
         };
-        number.AddThemeFontSizeOverride("font_size", 12);
-        number.AddThemeColorOverride("font_color", new Color("f2e8cf"));
+        number.AddThemeFontOverride("font", Style.Bold); number.AddThemeFontSizeOverride("font_size", 12);
+        number.AddThemeColorOverride("font_color", Style.Muted);
         button.AddChild(number);
         var count = new Label {
             MouseFilter = Control.MouseFilterEnum.Ignore,
@@ -67,24 +68,17 @@ public partial class Game {
             OffsetRight = -4,
             OffsetBottom = -2
         };
-        count.AddThemeFontSizeOverride("font_size", 11);
-        count.AddThemeColorOverride("font_color", new Color("f2e8cf"));
+        count.AddThemeFontOverride("font", Style.Bold); count.AddThemeFontSizeOverride("font_size", 14);
+        count.AddThemeColorOverride("font_color", Style.Cream);
+        count.AddThemeColorOverride("font_outline_color", Style.Socket); count.AddThemeConstantOverride("outline_size", 4);
         button.AddChild(count);
         hotbarCounts.Add(count);
         hotbarButtons.Add(button);
         return button;
     }
 
-    private static readonly StyleBoxFlat ActiveSlotStyle = ActiveSlot();
-    private static StyleBoxFlat ActiveSlot() {
-        var style = new StyleBoxFlat { BgColor = new Color("3d5446"), BorderColor = new Color("ffe08a"), ContentMarginLeft = 4, ContentMarginRight = 4, ContentMarginTop = 4, ContentMarginBottom = 4 };
-        style.SetBorderWidthAll(3); style.SetCornerRadiusAll(6);
-        return style;
-    }
-
     // What each slot shows, so a slot is redrawn only when its item, count or selection changes: redrawing builds text and styles.
     private readonly System.Collections.Generic.Dictionary<int, (ItemSlot Button, string Id, int Count, bool Active)> shownSlots = new();
-    private static readonly string[] SlotStates = { "normal", "hover", "pressed", "disabled" };
     private void RefreshHotbar() {
         for (int slot = 0; slot < hotbarButtons.Count; slot++) {
             var button = hotbarButtons[slot];
@@ -101,11 +95,9 @@ public partial class Game {
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · assign from Inventory" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
             bool active = world.S.ActiveHotbar == slot;
-            button.Modulate = active ? new Color("f2d98b") : Colors.White;
-            // The item in hand gets a bright outline; the others fall back to the theme.
-            foreach (string state in SlotStates)
-                if (active) button.AddThemeStyleboxOverride(state, ActiveSlotStyle);
-                else button.RemoveThemeStyleboxOverride(state);
+            // The item in hand gets an orange rim.
+            button.AddThemeStyleboxOverride("normal", active ? Style.SocketWanted : Style.SocketNormal);
+            button.AddThemeStyleboxOverride("disabled", active ? Style.SocketWanted : Style.SocketNormal);
         }
     }
 

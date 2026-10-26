@@ -6,21 +6,21 @@ namespace ChopChopMeow;
 
 /// <summary>Icon cells shared by inventory, storage, station and build pages.</summary>
 public partial class Game {
-    private const int GridColumns = 6;
+    private const int GridColumns = 7;
+    /// <summary>The backpack drawer is two rows of twelve.</summary>
+    private const int BagColumns = 12;
 
     private (ItemSlot Cell, Label Count) IconCell(string name) {
         var cell = new ItemSlot {
             Name = name,
-            CustomMinimumSize = new Vector2(44, 44),
+            CustomMinimumSize = new Vector2(50, 50),
             ExpandIcon = true,
             IconAlignment = HorizontalAlignment.Center,
             VerticalIconAlignment = VerticalAlignment.Center,
             FocusMode = Control.FocusModeEnum.None,
             MouseDefaultCursorShape = Control.CursorShape.PointingHand
         };
-        // Tighter padding than regular buttons so the icon fills most of the cell.
-        foreach (var (state, color) in new[] { ("normal", "34483c"), ("hover", "597252"), ("pressed", "7c8550"), ("disabled", "34483c") })
-            cell.AddThemeStyleboxOverride(state, Box(new Color(color), 4, 3));
+        Style.Skin(cell, Style.SocketNormal, Style.SocketHover, Style.SocketPressed);
         var count = new Label {
             MouseFilter = Control.MouseFilterEnum.Ignore,
             HorizontalAlignment = HorizontalAlignment.Right,
@@ -30,17 +30,17 @@ public partial class Game {
             OffsetRight = -3,
             OffsetBottom = 1
         };
-        count.AddThemeFontSizeOverride("font_size", 12);
-        count.AddThemeColorOverride("font_outline_color", new Color("1c2b24"));
+        count.AddThemeFontOverride("font", Style.Bold); count.AddThemeFontSizeOverride("font_size", 14);
+        count.AddThemeColorOverride("font_outline_color", Style.Socket);
         count.AddThemeConstantOverride("outline_size", 4);
         cell.AddChild(count);
         // A packed crate shows what it holds in the corner.
-        cell.AddChild(new TextureRect { Name = "badge", Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore, Position = new Vector2(2, 22), Size = new Vector2(20, 20), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered });
+        cell.AddChild(new TextureRect { Name = "badge", Visible = false, MouseFilter = Control.MouseFilterEnum.Ignore, Position = new Vector2(2, 26), Size = new Vector2(22, 22), ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, StretchMode = TextureRect.StretchModeEnum.KeepAspectCentered });
         return (cell, count);
     }
 
-    private GridContainer AddGrid() {
-        var grid = new GridContainer { Columns = GridColumns };
+    private GridContainer AddGrid(int columns = GridColumns) {
+        var grid = new GridContainer { Columns = columns };
         grid.AddThemeConstantOverride("h_separation", 4);
         grid.AddThemeConstantOverride("v_separation", 4);
         content.AddChild(grid);
@@ -52,9 +52,10 @@ public partial class Game {
     /// An inventory with a capacity shows only <see cref="Inventory.ShownSlots"/>; cells grow in and shrink away as that changes.
     /// Cells drag their stack out, or half of it on a right click, and accept stacks dragged in from another inventory, unless <paramref name="accepts"/> narrows that.
     /// The inventory is re-read on each refresh because death replaces the backpack object.
+    /// With <paramref name="wanted"/>, stacks it names are rimmed in orange and the rest fade, so what the open page takes stands out.
     /// </summary>
-    private void AddInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null) {
-        var grid = AddGrid();
+    private GridContainer AddInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null, int columns = GridColumns) {
+        var grid = AddGrid(columns);
         var stacks = new (string Item, int Count)?[inventory().Slots];
         var cells = Enumerable.Range(0, stacks.Length).Select(i => IconCell($"slot_{i}")).ToArray();
         var shown = new bool[cells.Length];
@@ -92,6 +93,7 @@ public partial class Game {
             }
             first = false;
         });
+        return grid;
         void Redraw(ItemSlot cell, Label count, (string Item, int Count)? stack, Inventory held) {
             cell.Icon = stack is (string id, _) ? HotbarIcon(id) : null;
             var contents = stack is (string crate, _) ? world.Packed(crate) : null;
@@ -99,9 +101,17 @@ public partial class Game {
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = HotbarIcon(contents.Items.OrderByDescending(p => p.Value).First().Key);
             count.Text = contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
+            if (wanted != null) {
+                bool takes = stack is (string item, _) && wanted(item);
+                cell.AddThemeStyleboxOverride("normal", takes ? Style.SocketWanted : Style.SocketNormal);
+                cell.AddThemeColorOverride(IconNormal, stack == null || takes ? Colors.White : Faded);
+            }
             cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}\n{hint}" : "";
         }
     }
+
+    private static readonly Color Faded = new(1, 1, 1, .4f);
+    private static readonly StringName IconNormal = "icon_normal_color";
 
     /// <summary>A slot that springs open with a slight overshoot, or shrinks and fades before it leaves the grid.</summary>
     private static void GrowCell(Control cell, bool open, float delay) {

@@ -150,7 +150,10 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
         await Frames();
     }
-    private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false)[grid].GetChildren().OfType<ItemSlot>().First(match);
+    /// <summary>The panel's grids in order, then the backpack drawer's.</summary>
+    private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false).Concat(bag.FindChildren("*", "GridContainer", true, false))
+        .ElementAt(grid).GetChildren().OfType<ItemSlot>().First(match);
+    private System.Collections.Generic.IEnumerable<Button> Slots() => panel.FindChildren("slot_*", "Button", true, false).Concat(bag.FindChildren("slot_*", "Button", true, false)).OfType<Button>();
     private static void UIRequire(bool okay, string message) {
         if (!okay) throw new InvalidOperationException("UI check failed: " + message);
     }
@@ -460,7 +463,7 @@ public partial class Game {
             await KeyStroke(Key.Key3);
             UIRequire(view.BuildMode == "chest", "A building-plan hotkey must enter placement mode.");
             await KeyStroke(Key.Key8);
-            UIRequire(world.S.ActiveHotbar == 7 && world.S.Backpack["berries"] == berries && hotbarButtons[7].HasThemeStyleboxOverride("normal") && !hotbarButtons[2].HasThemeStyleboxOverride("normal"),
+            UIRequire(world.S.ActiveHotbar == 7 && world.S.Backpack["berries"] == berries && hotbarButtons[7].GetThemeStylebox("normal") == Style.SocketWanted && hotbarButtons[2].GetThemeStylebox("normal") != Style.SocketWanted,
                 "Key 8 must put the berries in hand with an outline, without eating them.");
             UIRequire(view.BuildMode == "", "Selecting an item must clear any previously selected building plan.");
             int played = sounds.Played;
@@ -544,7 +547,7 @@ public partial class Game {
             UIRequire(!backdrop.Visible && !menu.Visible && !paused && world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the save and resume.");
             UIRequire(HasLabel(panel, "Health") && HasLabel(panel, "Capacity") && HasLabel(panel, "Daily wages"), "Inventory must contain health, capacity and wages.");
             world.S.Backpack.Add(Inventory.Coins, 1200); RefreshLive();
-            UIRequire(panel.FindChildren("slot_*", "Button", true, false).OfType<Button>().Count(c => c.TooltipText.StartsWith("Coins")) == 2, "Carried coins must show as backpack cells stacking to 1000.");
+            UIRequire(Slots().Count(c => c.TooltipText.StartsWith("Coins")) == 2, "Carried coins must show as backpack cells stacking to 1000.");
             world.S.Backpack.Remove(Inventory.Coins, 1200);
             float healthBefore = world.S.Health; world.S.Health -= 12; RefreshLive(); DamageFlash(healthBefore - world.S.Health);
             UIRequire(health.TooltipText == $"Health {world.S.Health:0}%" && damageEdges.Strength > 0, "The HUD heart must track health and a hit must flash the screen edges.");
@@ -552,9 +555,9 @@ public partial class Game {
             UIRequire(!HasLabel(panel, "Hunger") && !HasLabel(panel, "Thirst"), "Hunger and thirst belong to the HUD icons, not the inventory.");
             world.S.Hunger = 40; world.S.Thirst = 70; RefreshLive();
             UIRequire(hunger.Visible && thirst.Visible && hunger.TooltipText == "Hunger 40%" && thirst.TooltipText == "Thirst 70%", "The HUD stomach and droplet must track hunger and thirst.");
-            UIRequire(panel.FindChildren("slot_*", "Button", true, false).Count == world.S.Backpack.Slots, "The backpack must show one grid cell per slot.");
+            UIRequire(Slots().Count() == world.S.Backpack.Slots, "The backpack must show one grid cell per slot.");
             world.S.Backpack.Add("berries", 2); RefreshLive();
-            var berryCell = panel.FindChildren("slot_*", "Button", true, false).OfType<Button>().FirstOrDefault(c => c.TooltipText.StartsWith("Berries"));
+            var berryCell = Slots().FirstOrDefault(c => c.TooltipText.StartsWith("Berries"));
             int berriesBeforeClick = world.S.Backpack["berries"];
             UIRequire(berryCell != null, "Carried berries must appear as a grid cell.");
             berryCell!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
@@ -617,7 +620,7 @@ public partial class Game {
             await KeyStroke(Key.Space);
             UIRequire(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "Space must not pump or attack while paused.");
             Select(furnace);
-            var pumpButton = FindButton(panel, "Pump bellows · Space");
+            var pumpButton = Named("pump");
             UIRequire(pumpButton != null, "The selected furnace should still expose its pump control while paused.");
             pumpButton!.EmitSignal(BaseButton.SignalName.Pressed);
             await Frames();
