@@ -30,7 +30,7 @@ internal static class PileShape {
 
     /// <summary>Builds every stock mesh and item material while loading, so a pile showing a new item mid-game swaps cached resources only.</summary>
     public static void Warm(GameData data) {
-        foreach (var family in families) if (!contents.ContainsKey(family)) contents[family] = BuildStock(family);
+        foreach (var family in families) if (!contents.ContainsKey(family)) contents[family] = BuildStock(family, true);
         foreach (var (id, item) in data.Items) Material(Family(id), item.Color);
         Material("fallback", Fallback);
     }
@@ -45,7 +45,13 @@ internal static class PileShape {
         slot.MaterialOverride = Material(family, color);
     }
 
-    private static Mesh BuildStock(string family) {
+    /// <summary>The stock an item's pile slot shows, in its own proportions rather than fitted to the slot; icons show it this way.</summary>
+    public static MeshInstance3D Stock(string item, string color) {
+        string family = Family(item);
+        return new MeshInstance3D { Mesh = BuildStock(family, false), MaterialOverride = Material(family, color) };
+    }
+
+    private static Mesh BuildStock(string family, bool fit) {
         if (family == "fallback") return Stack;
         var faces = new List<Vector3>();
         void Copy(Mesh mesh, Transform3D transform) {
@@ -113,7 +119,7 @@ internal static class PileShape {
         // Fit the stock to its existing slot. All families sit on the same support plane in the 9–4–1 stack.
         var min = faces[0]; var max = min;
         foreach (var point in faces) { min = min.Min(point); max = max.Max(point); }
-        var center = (min + max) / 2; var scale = new Vector3(.72f, .4f, .72f) / (max - min);
+        var center = (min + max) / 2; var scale = fit ? new Vector3(.72f, .4f, .72f) / (max - min) : Vector3.One;
         var s = Begin();
         for (int i = 0; i < faces.Count; i += 3) {
             var a = (faces[i] - center) * scale; var b = (faces[i + 1] - center) * scale; var c = (faces[i + 2] - center) * scale;

@@ -4,13 +4,13 @@ The world is rendered with code-built low-poly 3D models; there are no world or 
 
 The art direction is natural and modern rather than fantasy. Buildings are DIY: a cinder-block furnace with a steel stovepipe, a propane-tank forge on an angle-iron stand fed by a plywood lever bellows with a heat gauge, an OSB cabin on block piers with a corrugated shed roof and solar panel, a plywood storage box, an orange recovery tote, an anvil on a welded stand, a crafting bench with its slotted chisel and hammer, slatted wood crates, a market post with a mailbox, and a steel wheel-rim fire pit. Trees come in three variants chosen by object id: broadleaf oak, spruce and silver birch.
 
-The 2D images that remain are interface icons and are unchanged:
+The 2D images that remain are interface icons:
 
-- `item-atlas.png` is a 4×3 sheet of hotbar inventory icons (axe, pickaxe, an unused steel tools cell, iron, steel, wood, stone, iron ore, coal, berries, water, empty).
-- `world-atlas.png` is a 4×3 sheet (362 × 362 px cells) whose building cells supply the building-plan and hotbar icons.
-- `ui/` holds hand-written SVG toolbar icons: hammer (build), backpack (inventory), hard hat (workers) and open book (guide). Items added after the atlas also have hand-written SVG icons named by item id, which the hotbar prefers over the atlas: planks, wood and steel parts, stone and steel chisels, mallet, steel hammer, steel axe and pickaxe, rake, mortar and pestle, crate, torch, the crafting bench, tin ore, bars and cans, leaves, grass, fertilizer, wheat seeds, wheat, flour, dough, and the foods: raw meat, burnt steak, bread, crushed berries, berry jam, meat stew and the canned goods.
+- `icons/` holds icons rendered from the game's own models by `./build.py icons`, which the hotbar prefers over everything else: the steel axe and pickaxe, torch, rake, mortar, crate, wood, planks, wood parts, stone, iron ore, coal, tin ore, iron, steel and tin bars, berries, leaves and every building. Items show the part of a model that shows them in the world, such as the furnace's log pile; planks, parts and bars show as the stock a storage pile holds, berries as a small heap of the bush's berries, and buildings as placed, with a finished mine, a ripe farm and a pile full of logs. Tools are seen from the side, head up and to the right; everything else from the game camera's angle under the game's sunlight. Hammers and chisels share one model between grades, so they keep their drawn icons. Rerun the command after changing a model.
+- `item-atlas.png` is a 4×3 sheet of inventory icons that still supplies the water flask; its other cells are unused.
+- `ui/` holds hand-written SVG toolbar icons: hammer (build), backpack (inventory), hard hat (workers) and open book (guide). Items without a model of their own also have hand-written SVG icons named by item id: steel parts, stone and steel chisels, mallet, steel hammer, tin cans, grass, fertilizer, wheat seeds, wheat, flour, dough, and the foods: raw meat, burnt steak, bread, crushed berries, berry jam, meat stew and the canned goods.
 
-Both PNG atlases were generated with the built-in image generation tool for this project; no external copyrighted game art or third-party packs are used. Their prompts are preserved in [PROMPTS.md](PROMPTS.md).
+The item atlas was generated with the built-in image generation tool for this project; no external copyrighted game art or third-party packs are used. Its prompt is preserved in [PROMPTS.md](PROMPTS.md).
 
 ## Sounds
 

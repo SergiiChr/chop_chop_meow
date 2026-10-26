@@ -52,6 +52,7 @@ public partial class Game : Node {
         try {
             var data = GameData.Load(); world = new World(data);
             if (OS.GetCmdlineUserArgs().Contains("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
+            if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--render-icons") is int icons and >= 0) { AddChild(new IconRender { Data = data, Folder = OS.GetCmdlineUserArgs()[icons + 1] }); return; }
             world.Notify = Notify;
             LoadHotbarAtlases();
             sounds = new Sounds { World = world, MusicVolume = SavedMusicVolume() }; AddChild(sounds);

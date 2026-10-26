@@ -7,6 +7,7 @@
   ./build.py test    Run the simulation, UI and two-process network checks headlessly.
   ./build.py build   Test, export, and smoke-test build/ChopChopMeow.x86_64.
   ./build.py lint    Compile the C# project and verify its formatting.
+  ./build.py icons   Render item and building icons from their models into assets/icons.
 
 Godot, .NET, and export templates are kept under .tools/. Set GODOT_BIN to use an
 existing Godot 4.7.2 .NET executable.
@@ -329,7 +330,7 @@ def main() -> int:
     if action in {"-h", "--help", "help"}:
         print(__doc__)
         return 0
-    if action in {"play", "run", "editor", "setup", "test", "build", "lint"}:
+    if action in {"play", "run", "editor", "setup", "test", "build", "lint", "icons"}:
         env = setup()
         if action in {"play", "run"}:
             forwarded = sys.argv[2:]
@@ -387,6 +388,16 @@ def main() -> int:
                 ],
                 env=env,
             )
+        elif action == "icons":
+            # Rendering needs a real window; the headless renderer draws nothing.
+            run_godot(
+                "icons",
+                [GODOT, "--path", ROOT, "--", "--render-icons", ROOT / "assets/icons"],
+                env,
+                timeout=300,
+                success_marker="ICONS RENDERED",
+            )
+            run_godot("import", [GODOT, "--headless", "--path", ROOT, "--import"], env)
         elif action == "setup":
             print("Ready. Run ./build.py play to launch the game.")
         return 0
