@@ -130,6 +130,44 @@ public static class WorldModels {
         return prop;
     }
 
+    /// <summary>
+    /// The model an icon shows for an item or building plan, or null when the game has no model of its own for it.
+    /// Items borrow the part of a model that shows them in the world; buildings show as placed, with a finished mine, a ripe farm and a full pile.
+    /// Berries show on their bush, which is how the game shows them.
+    /// Hammers and chisels share one model between grades, so they keep their drawn icons.
+    /// </summary>
+    public static Node3D? IconModel(string id, bool building) {
+        Node3D Part(string kind, Func<Prop, Node3D> part) {
+            var prop = Build(new Thing { Kind = kind });
+            var node = part(prop);
+            node.GetParent().RemoveChild(node);
+            node.Visible = true;
+            prop.Root.Free();
+            return node;
+        }
+        switch (id) {
+            case "iron_axe" or "steel_axe" or "iron_pick" or "steel_pick": return ActorRig.Tool(id);
+            case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
+            case "wood": return Part("furnace", p => p.WoodPile!);
+            case "rake": return Part("toolstation", p => p.Racked["rake"]);
+            case "mortar": return Part("cooktable", p => p.Mortar!);
+            case "berries" or "stone" or "leaves" or "crate": return Build(new Thing { Kind = id }).Root;
+            case "iron_ore" or "coal" or "tin_ore": return Build(new Thing { Kind = id switch { "iron_ore" => "loose_iron", "coal" => "loose_coal", _ => "tin" } }).Root;
+            case "mine": {
+                    var prop = new Prop { Kind = id };
+                    Mine(prop, "iron");
+                    prop.Outline!.Visible = prop.Supplies!.Visible = prop.Glow!.Visible = prop.Fire!.Visible = false;
+                    return prop.Root;
+                }
+        }
+        if (!building) return null;
+        var built = Build(new Thing { Kind = id });
+        if (built.Glow != null) built.Glow.Visible = false;
+        if (id == "farm") { built.Crops[0].Visible = built.Crops[^1].Visible = true; }
+        foreach (var stack in built.Stacks) stack.Visible = true;
+        return built.Root;
+    }
+
     /// <summary>The outdoor pile represents stocked fuel, excluding fuel already burning in a batch.</summary>
     public static void SyncFuel(Prop prop, Thing t) {
         string fuel = World.BurnedFuel(t);

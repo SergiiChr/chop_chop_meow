@@ -133,7 +133,16 @@ public sealed class ActorRig {
     /// The flame leans back by the forearm's angle in the holding pose, so it burns upright while the arm is raised.
     /// </summary>
     private (Node3D Torch, Node3D Flame, OmniLight3D Light) BuildTorch() {
-        var holder = Pivot(elbowL, new Vector3(0, -.27f, .01f));
+        var (holder, flame, light) = Torch();
+        holder.Position = new Vector3(0, -.27f, .01f);
+        elbowL.AddChild(holder);
+        holder.Visible = false;
+        return (holder, flame, light);
+    }
+
+    /// <summary>A torch gripped at the origin, shaft along +Z, with its unlit flame light; the icon renderer shows it on its own.</summary>
+    public static (Node3D Torch, Node3D Flame, OmniLight3D Light) Torch() {
+        var holder = new Node3D();
         Cylinder(holder, .024f, .03f, .52f, new Vector3(0, 0, .12f), Mat("6e4a2e", .8f), new Vector3(90, 0, 0), 6);
         Cylinder(holder, .045f, .04f, .1f, new Vector3(0, 0, .37f), Mat("3a2a20", .9f), new Vector3(90, 0, 0), 7);
         var flame = Pivot(holder, new Vector3(0, 0, .42f), new Vector3(90, 0, 0));
@@ -141,7 +150,6 @@ public sealed class ActorRig {
         Post(flame, .045f, 0, .17f, new Vector3(.015f, 0, .01f), Flat(new Color("ffd36a", .95f)), 7);
         var light = new OmniLight3D { Position = new Vector3(0, .2f, 0), OmniRange = 5, LightColor = new Color("ff9a45"), LightEnergy = 0, ShadowEnabled = false, OmniAttenuation = 1.4f };
         flame.AddChild(light);
-        holder.Visible = false;
         return (holder, flame, light);
     }
 
@@ -198,27 +206,35 @@ public sealed class ActorRig {
 
     /// <summary>Tools hang from the right fist along the forearm; blades face local -Z, the direction of a downward stroke.</summary>
     private void BuildTools() {
-        foreach (var (name, handle, head, metal) in new[] {
-            ("iron_axe", "8a5a32", "5b5f62", .45f), ("steel_axe", "e87d1e", "c9d3d8", .85f),
-            ("iron_pick", "8a5a32", "5b5f62", .45f), ("steel_pick", "e87d1e", "c9d3d8", .85f), ("hammer", "8a5a32", "4a4d50", .5f) }) {
-            var tool = Pivot(elbowR, new Vector3(0, -.27f, .01f));
-            bool hammer = name == "hammer";
-            float length = hammer ? .38f : .72f;
-            Cylinder(tool, .022f, .022f, length, new Vector3(0, .08f - length / 2, 0), Mat(handle, .7f));
-            if (handle == "e87d1e") Cylinder(tool, .027f, .027f, .16f, new Vector3(0, -.02f, 0), Mat("222222"));
-            float end = .06f - length;
-            var steel = Mat(head, .35f, metal);
-            if (hammer) Box(tool, new Vector3(.06f, .07f, .17f), new Vector3(0, end, -.02f), steel);
-            else if (name.EndsWith("axe")) {
-                Box(tool, new Vector3(.045f, .1f, .15f), new Vector3(0, end, -.05f), steel);
-                Box(tool, new Vector3(.03f, .17f, .05f), new Vector3(0, end, -.14f), Mat(name == "steel_axe" ? "e9eef0" : "8d9294", .3f, metal));
-            } else {
-                Cylinder(tool, .035f, 0, .3f, new Vector3(0, end, -.15f), steel, new Vector3(-90, 0, 0), 6);
-                Cylinder(tool, .035f, 0, .22f, new Vector3(0, end, .11f), steel, new Vector3(90, 0, 0), 6);
-            }
+        foreach (var name in new[] { "iron_axe", "steel_axe", "iron_pick", "steel_pick", "hammer" }) {
+            var tool = Tool(name);
+            tool.Position = new Vector3(0, -.27f, .01f);
+            elbowR.AddChild(tool);
             tool.Visible = false;
             tools[name] = tool;
         }
+    }
+
+    /// <summary>A held tool gripped at the origin, handle down along -Y and blade toward -Z; the icon renderer shows it on its own.</summary>
+    public static Node3D Tool(string name) {
+        bool steelTool = name.StartsWith("steel"), hammer = name == "hammer";
+        string handle = steelTool ? "e87d1e" : "8a5a32", head = steelTool ? "c9d3d8" : hammer ? "4a4d50" : "5b5f62";
+        float metal = steelTool ? .85f : hammer ? .5f : .45f;
+        var tool = new Node3D();
+        float length = hammer ? .38f : .72f;
+        Cylinder(tool, .022f, .022f, length, new Vector3(0, .08f - length / 2, 0), Mat(handle, .7f));
+        if (steelTool) Cylinder(tool, .027f, .027f, .16f, new Vector3(0, -.02f, 0), Mat("222222"));
+        float end = .06f - length;
+        var steel = Mat(head, .35f, metal);
+        if (hammer) Box(tool, new Vector3(.06f, .07f, .17f), new Vector3(0, end, -.02f), steel);
+        else if (name.EndsWith("axe")) {
+            Box(tool, new Vector3(.045f, .1f, .15f), new Vector3(0, end, -.05f), steel);
+            Box(tool, new Vector3(.03f, .17f, .05f), new Vector3(0, end, -.14f), Mat(steelTool ? "e9eef0" : "8d9294", .3f, metal));
+        } else {
+            Cylinder(tool, .035f, 0, .3f, new Vector3(0, end, -.15f), steel, new Vector3(-90, 0, 0), 6);
+            Cylinder(tool, .035f, 0, .22f, new Vector3(0, end, .11f), steel, new Vector3(90, 0, 0), 6);
+        }
+        return tool;
     }
 
     public void Show(Pose pose, string? tool, bool carrying, bool onRock = false, bool lit = false) {

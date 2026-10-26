@@ -1,6 +1,6 @@
 # Chop Chop Meow
 
-An isometric woodland survival and production prototype. Gather nearby materials, build a small settlement, craft parts and tools, pack steel tools into crates and sell them, then hire workers to automate resource gathering and furnace work, alone or with up to three friends at home or over the internet. The world is rendered in 3D with code-built low-poly models under an orthographic isometric camera: natural woodland, modern DIY buildings and readable silhouettes. Hotbar and toolbar icons are the original illustrated set; the earlier 2D art directions are kept in [docs/art](docs/art/README.md).
+An isometric woodland survival and production prototype. Gather nearby materials, build a small settlement, craft parts and tools, pack steel tools into crates and sell them, then hire workers to automate resource gathering and furnace work, alone or with up to three friends at home or over the internet. The world is rendered in 3D with code-built low-poly models under an orthographic isometric camera: natural woodland, modern DIY buildings and readable silhouettes. Item and building icons are rendered from the same models, and the rest are drawn icons; the earlier 2D art directions are kept in [docs/art](docs/art/README.md).
 
 ## Run on Linux
 
@@ -18,6 +18,7 @@ The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates, an
 ./build.py test     # run headless simulation and input/UI checks
 ./build.py build    # test, export, and smoke-test build/ChopChopMeow.x86_64
 ./build.py lint     # verify C# formatting and compile
+./build.py icons    # re-render item and building icons from their models (opens a window)
 ```
 
 `build` also produces `build/ChopChopMeow-linux-x86_64.tar.gz`. Extract it and run `ChopChopMeow/ChopChopMeow.x86_64`; keep the adjacent `.pck` and runtime folder together. The bundle includes the .NET runtime and does not need the SDK. The extracted bundle is smoke-tested without the development SDK in its environment.

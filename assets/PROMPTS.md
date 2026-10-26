@@ -1,10 +1,6 @@
 # Icon generation prompts
 
-Generated with the built-in image generation tool, with transparent background requested. The illustrated direction board in `docs/art/illustrated-sample.png` was the style reference. These atlases now supply interface icons only; the world itself uses code-built 3D models. No image service is used when building or playing.
-
-## world-atlas.png
-
-Create a PRODUCTION GAME SPRITE ATLAS matching the illustrated woodland style in the reference. Output 1536x1152 landscape, EXACTLY 4 columns and 3 rows of equal 384x384 cells. Transparent background throughout. One isolated object centered in each cell, all its art fits within 80% of cell, NOTHING crossing cell boundaries. NO TEXT, NO LABELS, NO GRID LINES, no ground diamonds, no cast shadows outside cell. Orthographic isometric camera looking downward 30 degrees. Smooth painterly readable indie-game sprites, natural warm palette, no pixel art. Objects by row left to right: ROW1: leafy mature woodland tree; grey rocky stone outcrop; rusty orange iron ore outcrop; black mined coal outcrop. ROW2: green bush with red berries; primitive stone furnace with arched glowing fire opening and short chimney like reference; reinforced stone furnace with dark iron bands and visible large leather bellows attached on right; wooden hut with thatched roof and front door. ROW3: wooden storage chest; iron anvil on tree stump; wooden village direction signpost with two arrows; small campfire with logs and warm orange flames. Every cell a single distinct object. Top-left lighting consistent. These are ACTUAL usable separate sprites in an atlas, correct equal placement is essential. No people.
+Generated with the built-in image generation tool, with transparent background requested. The illustrated direction board in `docs/art/illustrated-sample.png` was the style reference. The item atlas now supplies only the iron and steel bar and water icons; the world itself uses code-built 3D models. No image service is used when building or playing.
 
 ## item-atlas.png
 

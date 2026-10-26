@@ -10,33 +10,22 @@ public partial class Game {
     private readonly System.Collections.Generic.List<Label> hotbarCounts = new();
     private readonly System.Collections.Generic.Dictionary<string, Texture2D> hotbarIcons = new();
     private Texture2D? itemAtlas;
-    private Texture2D? worldAtlas;
 
     private void LoadHotbarAtlases() {
         if (ResourceLoader.Exists("res://assets/item-atlas.png")) itemAtlas = GD.Load<Texture2D>("res://assets/item-atlas.png");
-        if (ResourceLoader.Exists("res://assets/world-atlas.png")) worldAtlas = GD.Load<Texture2D>("res://assets/world-atlas.png");
     }
 
     private Texture2D? HotbarIcon(string id) {
         if (World.IsCrate(id)) id = "crate";
         if (hotbarIcons.TryGetValue(id, out var cached)) return cached;
-        Texture2D? atlas = null; int cell = -1, columns = 4, rows = 3;
-        // Items added after the illustrated atlas have hand-written SVG icons named by their id.
-        if (ResourceLoader.Exists($"res://assets/ui/{id}.svg")) return hotbarIcons[id] = GD.Load<Texture2D>($"res://assets/ui/{id}.svg");
-        if (id is "iron_axe" or "iron_pick" or "iron_bar" or "steel_bar" or "wood" or "stone" or "iron_ore" or "coal" or "berries" or "water") {
-            atlas = itemAtlas;
-            cell = id switch { "iron_axe" => 0, "iron_pick" => 1, "iron_bar" => 3, "steel_bar" => 4, "wood" => 5, "stone" => 6, "iron_ore" => 7, "coal" => 8, "berries" => 9, "water" => 10, _ => 11 };
-        } else {
-            atlas = worldAtlas;
-            cell = id switch { "furnace" => 5, "reinforced" => 6, "hut" => 7, "chest" => 8, "anvil" => 9, "signpost" => 10, "campfire" => 11, _ => -1 };
-        }
-        if (atlas == null || cell < 0) return null;
-        var icon = new AtlasTexture {
-            Atlas = atlas,
-            Region = new Rect2(cell % columns * atlas.GetWidth() / (float)columns, cell / columns * atlas.GetHeight() / (float)rows, atlas.GetWidth() / (float)columns, atlas.GetHeight() / (float)rows)
-        };
-        hotbarIcons[id] = icon;
-        return icon;
+        // Icons rendered from the game's own models come first; items without a model have drawn icons named by their id.
+        foreach (var path in new[] { $"res://assets/icons/{id}.png", $"res://assets/ui/{id}.svg" })
+            if (ResourceLoader.Exists(path)) return hotbarIcons[id] = GD.Load<Texture2D>(path);
+        int cell = id switch { "iron_bar" => 3, "steel_bar" => 4, "water" => 10, _ => -1 };
+        if (itemAtlas == null || cell < 0) return null;
+        const int Columns = 4, Rows = 3;
+        float width = itemAtlas.GetWidth() / (float)Columns, height = itemAtlas.GetHeight() / (float)Rows;
+        return hotbarIcons[id] = new AtlasTexture { Atlas = itemAtlas, Region = new Rect2(cell % Columns * width, cell / Columns * height, width, height) };
     }
 
     /// <summary>A hotbar slot; dropping an item or building plan on it assigns that reference.</summary>
