@@ -286,6 +286,18 @@ internal static class NatureShape {
         }
     });
 
+    /// <summary>A small heap of the bush's berries, for the berries icon, rounder than on the bush since they are seen up close: a ring of seven around one with three more on top.</summary>
+    public static Mesh BerryHeap => Cached("berry_heap", s => {
+        Color[] reds = { new("c0283a"), new("a3202f"), new("d23a45") };
+        var berries = new List<Vector3> { new(0, .05f, 0) };
+        for (int i = 0; i < 7; i++) berries.Add(new(MathF.Cos(i * Mathf.Tau / 7) * .1f, .05f, MathF.Sin(i * Mathf.Tau / 7) * .1f));
+        for (int i = 0; i < 3; i++) berries.Add(new(MathF.Cos(i * Mathf.Tau / 3 + .5f) * .055f, .13f, MathF.Sin(i * Mathf.Tau / 3 + .5f) * .055f));
+        for (int i = 0; i < berries.Count; i++) {
+            var color = reds[i % reds.Length];
+            Blob(s, berries[i], Vector3.One * .05f, 1, 0, 0, 0, 0, -1, false, (_, _) => color);
+        }
+    });
+
     private static (Vector3 At, Vector3 Radii, int Seed)[] Boulders(int variant) {
         var random = new Random(501 + variant);
         float R(float spread) => ((float)random.NextDouble() * 2 - 1) * spread;
