@@ -20,7 +20,7 @@ public sealed class PlayerState {
     public float Hunger { get; set; } = 100;
     public float Thirst { get; set; } = 100;
     public Inventory Backpack { get; set; } = new() { Slots = 24 };
-    public List<string> HotbarSlots { get; set; } = new() { "iron_axe", "iron_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", "water" };
+    public List<string> HotbarSlots { get; set; } = new() { "steel_axe", "steel_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", "water" };
     public int ActiveHotbar { get; set; }
     /// <summary>Recipes queued in the personal crafting menu; their inputs are already taken from the backpack.</summary>
     public List<string> Crafting { get; set; } = new();
@@ -203,8 +203,8 @@ public sealed partial class World {
 
     /// <summary>Host: puts a guest where their own machine walked them, as <see cref="MovePlayer"/> does for the host.</summary>
     public void MoveTo(Vector2 p) {
-        if (Downed || p == Player) return;
-        playerBusy = true; S.Sheltered = 0; Player = p;
+        if (Downed || S.Sheltered != 0 || p == Player) return;
+        playerBusy = true; Player = p;
     }
 
     /// <summary>

@@ -74,7 +74,7 @@ public static class MineChecks {
         }
         world.S.Version = 4;
         var loaded = EmptyWorld(data); loaded.Deserialize(world.Serialize());
-        Require(loaded.S.Version == 6, "version 4 valley saves must upgrade to the current mine layout");
+        Require(loaded.S.Version == 5, "version 4 valley saves must upgrade to the current mine layout");
         foreach (var mine in loaded.S.Things.Where(t => t.Kind == "mine")) {
             Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
                 "saved mines and their fog memories must use the aligned site");
@@ -85,31 +85,6 @@ public static class MineChecks {
         var restored = EmptyWorld(data); restored.Deserialize(loaded.Serialize());
         Require(restored.S.Things.Where(t => t.Kind == "mine").All(m => m.Pos.IsEqualApprox(loaded.Find(m.Id)!.Pos)),
             "loading an aligned save must not move its mines again");
-
-        // Version 5 had already moved each mine to the old spur anchor. Loading it must select by that
-        // intermediate position, then preserve the same completed mine and fog-memory state.
-        var v5 = EmptyWorld(data);
-        var v5Expected = new Dictionary<int, Vector2>();
-        foreach (var cliff in World.Cliffs) {
-            var oldAlong = cliff.Along * Math.Sign(cliff.Along.Dot(Terrain.Seaward));
-            var end = cliff.Center + oldAlong * (cliff.HalfLength + 6.7f);
-            var legacy = end + cliff.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
-            var oldV5Spot = legacy - oldAlong * 4.2f + cliff.Face * 4.2f;
-            var mine = v5.Add("mine", oldV5Spot); mine.Stage = World.MineOpen; mine.Progress = 3;
-            mine.Inventory.Add("wood", 9); mine.Output!.Add(World.MineOre(mine), 14);
-            v5Expected[mine.Id] = World.MineSpot(cliff);
-            v5.S.Remembered[mine.Id] = new Thing { Id = mine.Id, Kind = "mine", Pos = oldV5Spot, Stage = World.MineOpen };
-            var worker = AddWorker(v5, oldV5Spot + cliff.Face * 3); worker.Assignment = mine.Id;
-        }
-        v5.S.Version = 5;
-        var migratedV5 = EmptyWorld(data); migratedV5.Deserialize(v5.Serialize());
-        Require(migratedV5.S.Version == 6, "version 5 mine saves must upgrade to version 6");
-        foreach (var mine in migratedV5.S.Things.Where(t => t.Kind == "mine")) {
-            Require(mine.Pos.IsEqualApprox(v5Expected[mine.Id]) && migratedV5.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
-                "version 5 mines and their fog memories must move from the intermediate anchor");
-            Require(mine.Stage == World.MineOpen && mine.Progress == 3 && mine.Inventory["wood"] == 9 && mine.Output![World.MineOre(mine)] == 14 && migratedV5.S.Workers.Any(w => w.Assignment == mine.Id),
-                "version 5 migration must preserve mine stage, progress, stock, output and assigned workers");
-        }
     }
 
     private static void CheckMarking(GameData data) {
@@ -141,7 +116,7 @@ public static class MineChecks {
 
         // Workers take their tools from a tool station by the storage.
         var station = world.Add("toolstation", chest.Pos + cliff.Along * 2);
-        station.Inventory.Add("iron_pick", 1);
+        station.Inventory.Add("steel_pick", 1);
         float started = world.S.Time;
         Work(world, data.DaySeconds * 3, () => mine.Stage > 0);
         Require(mine.Stage == World.MineDug && world.S.Time - started >= world.MineStageSeconds && world.S.Time - started < data.DaySeconds * 2, $"one worker must dig the entrance in about one working day: stage {mine.Stage}, {world.S.Time - started:0}s, progress {mine.Progress:0}, {worker.Status}");
@@ -153,7 +128,7 @@ public static class MineChecks {
 
         Work(world, 30);
         Require(mine.Stage == World.MineSupplied && mine.Progress == 0 && worker.Status.Contains("hammer"), "fitting the frame must wait for a hammer");
-        Require(station.Inventory["iron_pick"] == 1, "a worker hauling materials needs no pickaxe and puts it back");
+        Require(station.Inventory["steel_pick"] == 1, "a worker hauling materials needs no pickaxe and puts it back");
         station.Inventory.Add("wood_hammer", 1);
         started = world.S.Time;
         Work(world, data.DaySeconds * 3, () => mine.Stage == World.MineOpen);
@@ -175,7 +150,7 @@ public static class MineChecks {
         var cliff = World.CliffAt(mine.Pos);
         var chest = world.Add("chest", mine.Pos + cliff.Face * 3);
         var crew = Enumerable.Range(0, 4).Select(_ => AddWorker(world, chest.Pos + cliff.Along)).ToList();
-        foreach (var w in crew) { w.Tool = "iron_pick"; world.Assign(w, mine); }
+        foreach (var w in crew) { w.Tool = "steel_pick"; world.Assign(w, mine); }
         Require(crew.Take(3).All(w => w.Assignment == mine.Id) && crew[3].Assignment == 0, "a mine must take three workers and refuse a fourth");
 
         Work(world, 20);
@@ -223,7 +198,7 @@ public static class MineChecks {
             if (mining) { source = MarkMine(world); source.Stage = World.MineOpen; } else source = world.Add("iron", World.MineSpot(cliff), 400);
             var chest = world.Add("chest", source.Pos + cliff.Face * 2.5f);
             var worker = AddWorker(world, chest.Pos);
-            worker.Tool = "iron_pick";
+            worker.Tool = "steel_pick";
             world.Assign(worker, source);
             Work(world, 300);
             return chest.Inventory["iron_ore"] + worker.Bag["iron_ore"] + (source.Output?["iron_ore"] ?? 0);

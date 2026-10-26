@@ -206,7 +206,7 @@ public sealed class ActorRig {
 
     /// <summary>Tools hang from the right fist along the forearm; blades face local -Z, the direction of a downward stroke.</summary>
     private void BuildTools() {
-        foreach (var name in new[] { "iron_axe", "steel_axe", "iron_pick", "steel_pick", "hammer" }) {
+        foreach (var name in new[] { "steel_axe", "steel_pick", "hammer" }) {
             var tool = Tool(name);
             tool.Position = new Vector3(0, -.27f, .01f);
             elbowR.AddChild(tool);

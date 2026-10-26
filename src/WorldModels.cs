@@ -68,7 +68,7 @@ public static class WorldModels {
         },
         "stone" => new[] { new Hit(.75f, 0, .9f) },
         "iron" or "coal" or "tin" => new[] { new Hit(.8f, 0, 1) },
-        "loose_iron" or "loose_coal" => new[] { new Hit(.45f, 0, .35f) },
+        "loose_coal" => new[] { new Hit(.45f, 0, .35f) },
         "wolf_corpse" => new[] { new Hit(.65f, 0, .5f) },
         "berries" => new[] { new Hit(.65f, 0, 1) },
         "water" => new[] { new Hit(1.2f, 0, .5f) },
@@ -101,7 +101,6 @@ public static class WorldModels {
             case "iron": Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case "coal": Rocks(body, t.Kind, t.Id, "505257", "121316", "15161a"); break;
             case "tin": Rocks(body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
-            case "loose_iron": LooseOre(body, t.Kind, t.Id, "a35a2e", "8b4f2b"); break;
             case "loose_coal": LooseOre(body, t.Kind, t.Id, "2d2f33", "1d1e21"); break;
             case "wolf_corpse": Carcass(prop); break;
             case "berries": Bush(prop, t.Id); break;
@@ -146,7 +145,7 @@ public static class WorldModels {
             return node;
         }
         switch (id) {
-            case "iron_axe" or "steel_axe" or "iron_pick" or "steel_pick": return ActorRig.Tool(id);
+            case "steel_axe" or "steel_pick": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
             case "wood": return Part("furnace", p => p.WoodPile!);
             case "rake": return Part("toolstation", p => p.Racked["rake"]);
@@ -157,7 +156,9 @@ public static class WorldModels {
                     return stock;
                 }
             case "stone" or "leaves" or "crate": return Build(new Thing { Kind = id }).Root;
-            case "iron_ore" or "coal" or "tin_ore": return Build(new Thing { Kind = id switch { "iron_ore" => "loose_iron", "coal" => "loose_coal", _ => "tin" } }).Root;
+            // Loose iron left the world, but its lump still makes the iron ore icon.
+            case "iron_ore": { var lump = new Node3D(); LooseOre(lump, "loose_iron", 0, "a35a2e", "8b4f2b"); return lump; }
+            case "coal" or "tin_ore": return Build(new Thing { Kind = id == "coal" ? "loose_coal" : "tin" }).Root;
             case "mine": {
                     var prop = new Prop { Kind = id };
                     Mine(prop, "iron");
@@ -458,7 +459,7 @@ public static class WorldModels {
         prop.StackKey = key;
         for (int i = 0; i < prop.Stacks.Length; i++) {
             prop.Stacks[i].Visible = i < stacks.Count;
-            if (i < stacks.Count) PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : "b0a58a");
+            if (i < stacks.Count) PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : PileShape.Fallback);
         }
     }
 

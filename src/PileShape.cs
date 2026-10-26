@@ -13,22 +13,7 @@ internal static class PileShape {
 
     private static readonly Dictionary<string, Mesh> contents = new();
 
-    /// <summary>Reuse small stock/resource meshes without duplicating nodes or changing inventory slot order.</summary>
-    public static void SetStock(MeshInstance3D slot, string item, string color) {
-        string family = Family(item);
-        if (!contents.TryGetValue(family, out var mesh)) contents[family] = mesh = BuildStock(family, true);
-        slot.Mesh = mesh;
-        slot.MaterialOverride = Material(family, color);
-    }
-
-    /// <summary>The stock an item's pile slot shows, in its own proportions rather than fitted to the slot; icons show it this way.</summary>
-    public static MeshInstance3D Stock(string item, string color) {
-        string family = Family(item);
-        return new MeshInstance3D { Mesh = BuildStock(family, false), MaterialOverride = Material(family, color) };
-    }
-
-    private static StandardMaterial3D Material(string family, string color) =>
-        ModelKit.Mat(family == "coal" ? "292c30" : color, family == "bars" ? .45f : .95f, family == "bars" ? .5f : 0);
+    private static readonly string[] families = { "logs", "stone", "ore", "coal", "planks", "bars", "fallback" };
 
     private static string Family(string item) => item switch {
         "wood" => "logs",
@@ -39,6 +24,32 @@ internal static class PileShape {
         "iron_bar" or "steel_bar" or "tin_bar" => "bars",
         _ => "fallback"
     };
+
+    private static StandardMaterial3D Material(string family, string color) =>
+        ModelKit.Mat(family == "coal" ? "292c30" : color, family == "bars" ? .45f : .95f, family == "bars" ? .5f : 0);
+
+    /// <summary>Builds every stock mesh and item material while loading, so a pile showing a new item mid-game swaps cached resources only.</summary>
+    public static void Warm(GameData data) {
+        foreach (var family in families) if (!contents.ContainsKey(family)) contents[family] = BuildStock(family, true);
+        foreach (var (id, item) in data.Items) Material(Family(id), item.Color);
+        Material("fallback", Fallback);
+    }
+
+    /// <summary>The color of an item the data does not know.</summary>
+    public const string Fallback = "b0a58a";
+
+    /// <summary>Reuse small stock/resource meshes without duplicating nodes or changing inventory slot order.</summary>
+    public static void SetStock(MeshInstance3D slot, string item, string color) {
+        string family = Family(item);
+        slot.Mesh = contents[family];
+        slot.MaterialOverride = Material(family, color);
+    }
+
+    /// <summary>The stock an item's pile slot shows, in its own proportions rather than fitted to the slot; icons show it this way.</summary>
+    public static MeshInstance3D Stock(string item, string color) {
+        string family = Family(item);
+        return new MeshInstance3D { Mesh = BuildStock(family, false), MaterialOverride = Material(family, color) };
+    }
 
     private static Mesh BuildStock(string family, bool fit) {
         if (family == "fallback") return Stack;
