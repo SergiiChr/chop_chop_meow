@@ -1611,7 +1611,7 @@ public static class SimulationChecks {
     }
 
     private static void CheckSprintOutrunsWolf(GameData data) {
-        // Fleeing straight away from a wolf four tiles behind for two seconds: walking loses ground, sprinting gains it.
+        // Fleeing straight away from a wolf four tiles behind for two seconds: walking loses ground, sprinting slowly gains it.
         float Gap(bool sprinting) {
             var world = NightWorld(data);
             var wolf = new Wolf { Pos = world.Player + new Vector2(-4, 0) };
@@ -1623,7 +1623,7 @@ public static class SimulationChecks {
             return wolf.Pos.DistanceTo(world.Player);
         }
         Require(Gap(false) < 3, "a chasing wolf must be faster than a walking player");
-        Require(Gap(true) > 5, "a sprinting player must outrun a chasing wolf");
+        Require(Gap(true) > 4.1f, "a sprinting player must outrun a chasing wolf");
     }
 
     private static void CheckCabinAndChaseIntoLight(GameData data) {

@@ -102,7 +102,7 @@ public sealed class GameData {
     /// <summary>Tiles a second the player walks.</summary>
     public float WalkSpeed { get; set; } = 4.2f;
     /// <summary>How many times faster than walking a wolf chases: above 1 so walking never outpaces it, below <see cref="SprintSpeed"/> so sprinting does.</summary>
-    public float WolfChase { get; set; } = 1.3f;
+    public float WolfChase { get; set; } = 1.5f;
     /// <summary>How many times faster the player moves with Shift held.</summary>
     public float SprintSpeed { get; set; } = 1.6f;
     /// <summary>How many times faster food and drink drain while sprinting.</summary>
