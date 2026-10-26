@@ -43,6 +43,10 @@ public static class Style {
     public static readonly StyleBoxTexture Plate = EnamelBox(14, 10);
     /// <summary>A beige well inside a board, holding a station's process row or a group of slots.</summary>
     public static readonly StyleBoxFlat Well = Flat(Beige, 14, 16);
+    /// <summary>A job chip on a worker card: a small cream pill with a thin outline.</summary>
+    public static readonly StyleBoxFlat Chip = Flat(CupFill, 13, 2, Line, 2, horizontal: 8);
+    /// <summary>The ring a clickable well, such as a worker card, gets on hover.</summary>
+    public static readonly StyleBoxFlat CardHover = Flat(Colors.Transparent, 14, 0, Mustard, 3);
     /// <summary>The trading post's price sign: beige enamel in a slate frame.</summary>
     public static readonly StyleBoxFlat Sign = Flat(Beige, 16, 16, Enamel, 5);
     /// <summary>The worker list that drops down from a job button.</summary>

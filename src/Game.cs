@@ -323,20 +323,6 @@ public partial class Game : Node {
         AddButton("Into the clearing", ClosePanel);
         AddLabel("10–15 minute POC · up to four players · Linux", 13, Muted);
     }
-    private void Help() {
-        AddLabel("MOVE & WORK", 16);
-        AddLabel("WASD / arrows: move in screen directions\nShift: sprint, which burns food and drink faster\nHold right mouse: approach and gather\nLeft click: select resource, building, crate or worker; on open ground, use the item in hand\nE: inspect nearest object\nSpace: use carried tool; at a selected high-temp furnace, pump\nMouse wheel: zoom\n1–9 or click a slot: put it in hand (plans and crates go to placement)\nHold right mouse on a placed crate: pick it up\nB: build   Tab: backpack   C: crafting   H: crew   I: guide\nClick: move a stack   Ctrl-click: move all of it\nF5: save   F9: load   Esc: cancel / pause");
-        AddLabel("IRON → STEEL", 16);
-        AddLabel("Mining iron and coal needs a pickaxe: buy your first at the village signpost. Smelt 2 ore + 1 wood/coal per iron bar. Steel needs the high-temp furnace: 2 iron bars + 2 mined coal make 2 steel bars, plus 1 mined coal in its fuel slot. Pump the bellows: steel melts at 1450+ °C. The anvil turns steel bars into steel parts.", 15, Muted);
-        AddLabel("CRAFTING", 16);
-        AddLabel("Press C to craft on the go; each recipe takes about 10 seconds. Knap a stone chisel from 2 stone, then carve planks, wood parts, a mallet and torches. Planks build a crafting bench, which works twice as fast and makes tools and crates: put a chisel and a hammer in its slots. A small steel tool takes 1 steel part and a big one 2, plus 1 wood part for the handle.", 15, Muted);
-        AddLabel("VILLAGERS & STORAGE", 16);
-        AddLabel("Hire at a signpost: more coins up front means a lower daily wage. Worker → Work → click a resource. Building → Assign → select named villagers. Put inputs in storage for hauling. One furnace worker alternates hauling and pumping; with two, the first pumps while the second hauls. No accepting chest means work pauses safely. Workers break for lunch at noon around the nearest campfire, sign out at dusk and walk back in at dawn; their assignments and loads stay as they were.", 15, Muted);
-        AddLabel("Empty filters allow everything. Input filters control worker deposits; output filters control worker withdrawals. Workers prefer explicitly matching input-filter chests before the nearest general chest. Manual transfers ignore automation filters. Hold Shift while transferring to move a full stack.", 15, Muted);
-        AddLabel("STAY ALIVE", 16);
-        AddLabel("A full stomach lasts a day and a full water droplet half a day. Wolves are fast and avoid campfire light (5-tile radius), though a wolf already chasing you follows briefly into it. Click a cabin to step inside; wolves back off at once. Step outside from its panel. At half health or less, a nearby wolf leaps for your throat and the pack joins the feast; a wolf kill also destroys the food in your recovery box. Slain wolves leave a carcass: hold right mouse to butcher it for raw meat, then cook it in a stone furnace before eating. A burning campfire keeps wolves away; feed it wood, and each log burns about 4 hours. A torch burns as long, once: click to strike it alight, then click to swing it. Swinging four times in 2 seconds puts it out. A lone wolf creeps in on a torch until you swing at it; then it follows at the light's edge. Once five gather, they attack together. Sleep in a cabin at night if your food and water will last until morning; production, hunger, trade and wages advance. Death leaves your inventory in a recovery box and returns you to the original clearing. Unpaid workers strike until paid or dismissed.", 15, Muted);
-        AddLabel("Crates hold 12 items. Click a placed crate to open it; hold right mouse to pick it up with everything inside. Water bottles only stack inside a crate. Never put a crate inside a crate. At a signpost, load crates of meat, berries or steel tools into the market and press Sell; the village takes nothing loose, and bought supplies arrive in crates; the cart returns in 30 seconds and leaves coins in the market's wage slot, which pays wages at dawn, and the rest in its output. Right-click a stack to pick up half of it, then click a slot to drop it. Buy from the price sheet. The sheet only shows prices as last heard from the village: it updates when a cart returns or when a worker assigned to the signpost fetches fresh prices. Prices fall when you sell and slowly recover. Your world autosaves every 5 minutes; F5 saves immediately. Host in the pause menu lets others join; Join game connects to a host's address.", 15, Muted);
-    }
     private string Needs(Dictionary<string, int> cost) => Text(text => AppendNeeds(text, cost));
     private string Cost(Dictionary<string, int> cost) => Text(text => AppendCost(text, cost));
     /// <summary>Each input with how many the backpack holds of how many are needed.</summary>
@@ -741,52 +727,6 @@ public partial class Game : Node {
         column.AddChild(cell);
         if (perBatch != "") column.AddChild(PerBatch(perBatch));
         return column;
-    }
-    private void WorkerPanel(Worker? w) {
-        if (w == null) { AddLabel("This worker has left."); return; }
-        headingTitle.Text = w.Name; headingIcon.Texture = GD.Load<Texture2D>("res://assets/ui/hardhat.svg"); headingIcon.Visible = true;
-        var well = Well(new VBoxContainer()); well.AddThemeConstantOverride("separation", 8);
-        var status = Style.Text("", 15, Style.Ink); status.AutowrapMode = TextServer.AutowrapMode.WordSmart; well.AddChild(status);
-        var text = new LiveText(shown => status.Text = shown);
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(status)) return;
-            var line = text.Clear().Append(w.Status).Append("\nCarrying ");
-            if (w.Bag.Count == 0) line.Append("nothing"); else line.Append(w.Bag.Count).Append(' ').Append(world.Data.Name(w.Bag.First()!));
-            line.Append(" · ").Append(w.Wage).Append(" coins a day");
-            if (w.WageDebt > 0) line.Append(" · owed ").Append((int)w.WageDebt);
-            text.Show();
-        });
-        // Each job as a chip with the place's icon; clicking one takes it away.
-        var jobs = new HFlowContainer(); jobs.AddThemeConstantOverride("h_separation", 8); jobs.AddThemeConstantOverride("v_separation", 8); content.AddChild(jobs);
-        foreach (var d in w.Duties.ToArray()) {
-            if (world.Find(d.Thing) is not Thing at) continue;
-            var duty = d;
-            var chip = Button(JobName(d.Job), () => { world.SetDuty(w, at, duty.Job, false); OpenPage("inspect"); });
-            chip.Icon = HotbarIcon(at.IsResource ? World.ResourceItem(at) : at.Kind); chip.ExpandIcon = true; chip.AddThemeConstantOverride("icon_max_width", 24);
-            chip.TooltipText = $"{world.Data.Name(at.Kind)} · {JobName(d.Job).ToLowerInvariant()}\nClick to take this job away";
-            jobs.AddChild(chip);
-        }
-        if (w.Duties.Count == 0) jobs.AddChild(Style.Text("No jobs. Give one at a building, or send them to gather.", 14, Style.Beige));
-        var row = Row(); row.AddThemeConstantOverride("separation", 12);
-        row.AddChild(BigButton("Gather…", Style.Sage, () => { assigningWorker = w.Id; view.BuildMode = ""; ClosePanel(); RefreshLive(); }));
-        row.AddChild(BigButton("Clear jobs", Style.Enamel, () => world.Assign(w, null)));
-        if (w.WageDebt > 0) AddButton("Pay outstanding wages", () => world.SettleDebt(w));
-        AddButton("Dismiss worker", () => { world.Fire(w); OpenPage("workers"); });
-    }
-    private void Workers() {
-        Dynamic(text => text.Append(world.S.Workers.Count).Append(" of 8 villagers · ").Append(DailyWages()).Append(" coins a day"), 15, Muted);
-        if (world.S.Workers.Count == 0) AddLabel("Build a trading post to hire help. Your first steel-tool sale can cover hiring and wages.", 15, Muted);
-        foreach (var w in world.S.Workers) {
-            var worker = w;
-            var button = Button("", () => Select(worker)); button.CustomMinimumSize = new Vector2(0, 52); button.Alignment = HorizontalAlignment.Left; content.AddChild(button);
-            button.Icon = GD.Load<Texture2D>("res://assets/ui/hardhat.svg"); button.ExpandIcon = true; button.AddThemeConstantOverride("icon_max_width", 28);
-            var text = new LiveText(shown => button.Text = shown);
-            live.Add(() => {
-                if (!GodotObject.IsInstanceValid(button)) return;
-                text.Clear().Append(worker.Name).Append(" · ").Append(worker.Duties.Count).Append(worker.Duties.Count == 1 ? " job · " : " jobs · ").Append(worker.Status);
-                text.Show();
-            });
-        }
     }
     /// <summary>Burn time as in-game hours and minutes.</summary>
     private StringBuilder AppendGameHours(StringBuilder text, float seconds) {
