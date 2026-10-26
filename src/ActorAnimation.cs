@@ -7,6 +7,7 @@ namespace ChopChopMeow;
 public enum ActorAction {
     Idle,
     Walk,
+    Run,
     Chop,
     Mine,
     SteelChop,
@@ -51,6 +52,7 @@ public static class ActorAnimation {
     public static float Duration(ActorAction action) => action switch {
         ActorAction.Idle => 3,
         ActorAction.Walk or ActorAction.Carry => .8f,
+        ActorAction.Run => .55f,
         ActorAction.SteelChop or ActorAction.SteelMine => .8f,
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
@@ -90,6 +92,11 @@ public static class ActorAnimation {
         switch (action) {
             case ActorAction.Walk:
                 return Stride(wave, p) with { RaiseL = 6 - wave * 26, RaiseR = 6 + wave * 26, ElbowL = 20, ElbowR = 20 };
+            case ActorAction.Run:
+                // A longer, quicker stride pitched forward, with bent arms pumping against the legs.
+                float push = MathF.Cos(p * Mathf.Tau);
+                return new Pose(Lean: 14, Head: -6, RaiseL: 20 - wave * 50, OutL: 10, ElbowL: 85, RaiseR: 20 + wave * 50, OutR: 10, ElbowR: 85,
+                    SwingL: wave * 42, KneeL: 14 + Math.Max(0, push) * 70, SwingR: -wave * 42, KneeR: 14 + Math.Max(0, -push) * 70);
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 62, OutL: -6, ElbowL: 62, RaiseR: 62, OutR: -6, ElbowR: 62);
                 return moving ? Stride(wave, p) with { Lean = carry.Lean, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
@@ -189,8 +196,9 @@ public static class ActorAnimation {
         bool gathering,
         bool moving,
         Inventory backpack,
-        string? selectedTool) {
-        if (moving) return ActorAction.Walk;
+        string? selectedTool,
+        bool sprinting = false) {
+        if (moving) return sprinting ? ActorAction.Run : ActorAction.Walk;
         if (!gathering || string.IsNullOrEmpty(resourceKind)) return ActorAction.Idle;
 
         string[]? family = resourceKind == "tree" ? Axes : resourceKind is "stone" or "iron" or "coal" or "tin" ? Picks : null;

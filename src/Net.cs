@@ -241,7 +241,7 @@ public partial class Net : Node {
         } else if (welcomed && sendClock >= InputInterval) {
             sendClock = 0;
             var me = World.Me;
-            RpcId(HostId, MethodName.Walked, ++stamp, me.Pos, me.Warp, me.GatherTarget, me.Held, appliedSequence);
+            RpcId(HostId, MethodName.Walked, ++stamp, me.Pos, me.Warp, me.GatherTarget, me.Held, me.Sprinting, appliedSequence);
         }
     }
 
@@ -254,14 +254,14 @@ public partial class Net : Node {
     private PlayerState? Guest() => World.S.Players.Find(p => p.Id == Multiplayer.GetRemoteSenderId() && p != World.Me);
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = StreamChannel)]
-    private void Walked(int order, Vector2 at, int warp, int gathering, string held, int seen) {
+    private void Walked(int order, Vector2 at, int warp, int gathering, string held, bool sprinting, int seen) {
         if (!Hosting || Guest() is not PlayerState p) return;
         if (sent.ContainsKey(seen) && seen > acked.GetValueOrDefault(p.Id)) acked[p.Id] = seen;
         // An action on the other channel may have overtaken this report and already put the guest further along.
         if (order < heard.GetValueOrDefault(p.Id)) return;
         heard[p.Id] = order;
         Stand(p, at, warp);
-        p.GatherTarget = gathering; p.Held = held;
+        p.GatherTarget = gathering; p.Held = held; p.Sprinting = sprinting;
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -428,11 +428,11 @@ public partial class Net : Node {
         // This machine walks its own player and keeps its hotbar; only a move the simulation made, such as a respawn, comes back.
         // The welcome's first update brings all of it, over the stand-in this copy started with.
         bool joining = applied.Count == 0;
-        var own = (me.Pos, me.Warp, me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held);
+        var own = (me.Pos, me.Warp, me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held, me.Sprinting);
         unsaved |= Changed($"p:{me.Id}") != null;
         Sync(s.Players, "p:", p => p.Id, entries, (p, from) => { if (p != me) Glides(p, from); });
         if (!joining && me.Warp == own.Warp) me.Pos = own.Pos;
-        if (!joining) (me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held) = (own.HotbarSlots, own.ActiveHotbar, own.GatherTarget, own.Held);
+        if (!joining) (me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held, me.Sprinting) = (own.HotbarSlots, own.ActiveHotbar, own.GatherTarget, own.Held, own.Sprinting);
         foreach (var gone in goals.Keys.Where(o => o is Worker w ? !s.Workers.Contains(w) : o is Wolf wolf ? !s.Wolves.Contains(wolf) : o is PlayerState p && !s.Players.Contains(p)).ToList()) goals.Remove(gone);
         s.Actor = me;
         Work();

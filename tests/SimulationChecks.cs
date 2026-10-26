@@ -37,6 +37,7 @@ public static class SimulationChecks {
         CheckSleepAdvancesWorld(data);
         CheckWageSlot(data);
         CheckSleepNeedsFoodAndWater(data);
+        CheckSprintBurnsFood(data);
         CheckCabinAndChaseIntoLight(data);
         CheckCoinStacks(data);
         CheckLegacySave(data);
@@ -1594,6 +1595,16 @@ public static class SimulationChecks {
             Require(world.S.Time == time && world.SleepBlock()?.Contains(reason) == true,
                     $"sleep must be refused when the player is too {reason} to last until morning");
         }
+    }
+
+    private static void CheckSprintBurnsFood(GameData data) {
+        float Burned(bool sprinting) {
+            var world = new World(data);
+            world.Me.Sprinting = sprinting;
+            for (int i = 0; i < 10; i++) world.Tick(1);
+            return 100 - world.S.Hunger;
+        }
+        Require(Math.Abs(Burned(true) / Burned(false) - data.SprintSpeed * 1.1f) < .001f, "sprinting must burn food at the sprint speed times the walking rate plus a tenth");
     }
 
     private static void CheckCabinAndChaseIntoLight(GameData data) {

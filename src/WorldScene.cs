@@ -289,7 +289,7 @@ public partial class WorldView {
 
     private static readonly (string Name, ActorSkin Skin, ActorAction Action)[] ReviewClips =
     {
-        ("player walk", ActorSkin.Player, ActorAction.Walk), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop),
+        ("player walk", ActorSkin.Player, ActorAction.Walk), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop),
         ("player pick", ActorSkin.Player, ActorAction.Mine), ("player steel pick", ActorSkin.Player, ActorAction.SteelMine), ("player gather", ActorSkin.Player, ActorAction.Gather),
         ("player hammer", ActorSkin.Player, ActorAction.Hammer), ("player pump", ActorSkin.Player, ActorAction.Pump), ("player punch", ActorSkin.Player, ActorAction.Attack),
         ("player idle", ActorSkin.Player, ActorAction.Idle), ("worker walk", ActorSkin.Worker, ActorAction.Walk), ("worker axe", ActorSkin.Worker, ActorAction.Chop),
