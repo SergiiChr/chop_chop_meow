@@ -347,27 +347,12 @@ public static class WorldModels
         prop.Lid = lid;
     }
 
-    /// <summary>A slatted wood crate with darker corner battens and a slatted lid.</summary>
+    /// <summary>A hollow slatted crate with a separately hinged lid and shared wood geometry.</summary>
     private static void Crate(Prop prop)
     {
-        var body = prop.Body;
-        var size = new Vector3(.6f, .42f, .46f);
-        var board = Mat("c9a46e"); var batten = Mat("8f6a3f"); var gap = Mat("4a3420");
-        Box(body, size - new Vector3(.02f, .02f, .02f), new Vector3(0, size.Y / 2, 0), gap);
-        // Three slats a side leave dark gaps between them.
-        for (int i = 0; i < 3; i++)
-        {
-            float y = .07f + i * .14f;
-            Box(body, new Vector3(size.X, .11f, .02f), new Vector3(0, y, size.Z / 2), board);
-            Box(body, new Vector3(size.X, .11f, .02f), new Vector3(0, y, -size.Z / 2), board);
-            Box(body, new Vector3(.02f, .11f, size.Z), new Vector3(size.X / 2, y, 0), board);
-            Box(body, new Vector3(.02f, .11f, size.Z), new Vector3(-size.X / 2, y, 0), board);
-        }
-        foreach (var (x, z) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) }) Box(body, new Vector3(.05f, size.Y, .05f), new Vector3(x * (size.X / 2 - .01f), size.Y / 2, z * (size.Z / 2 - .01f)), batten);
-        var lid = Pivot(body, new Vector3(0, size.Y, -size.Z / 2));
-        for (int i = 0; i < 3; i++) Box(lid, new Vector3(size.X + .03f, .035f, size.Z / 3 - .015f), new Vector3(0, .018f, size.Z / 6 + i * size.Z / 3), board);
-        Box(lid, new Vector3(.05f, .045f, size.Z + .02f), new Vector3(size.X / 2 - .05f, .03f, size.Z / 2), batten);
-        Box(lid, new Vector3(.05f, .045f, size.Z + .02f), new Vector3(-size.X / 2 + .05f, .03f, size.Z / 2), batten);
+        Add(prop.Body, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
+        var lid = Pivot(prop.Body, new Vector3(0, .42f, -.23f));
+        Add(lid, CrateShape.Lid, CrateShape.Timber, Vector3.Zero);
         prop.Lid = lid;
     }
 
