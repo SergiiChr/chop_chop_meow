@@ -59,7 +59,7 @@ public sealed class ActorRig {
                 Add(head, CourierShape.Cap, CourierShape.CapMaterial, Vector3.Zero);
                 break;
         }
-        crate = Pivot(torso, new Vector3(0, .16f, .33f));
+        crate = Pivot(torso, new Vector3(0, .37f, .33f));
         // Reuse the compact shipping crate, fitted to the existing centered carry volume.
         Add(crate, CrateShape.Cargo, CrateShape.Timber, new Vector3(0, -.14f, 0), scale: new Vector3(.7f, .62f, .73f));
         // A low boulder to sit on, under the hips.
