@@ -254,20 +254,64 @@ internal static class NatureShape {
         }
         float top = R(3);
         clumps.Add((new(MathF.Cos(top) * .15f, .7f + R(.04f), MathF.Sin(top) * .15f), new(.27f, .23f, .27f)));
+        // Lift the low foliage enough to expose the shrub's short woody stems.
+        for (int i = 0; i < clumps.Count; i++) {
+            var (at, radii) = clumps[i];
+            clumps[i] = (at + Vector3.Up * .14f, radii * new Vector3(1, .78f, 1));
+        }
         return clumps.ToArray();
     }
 
-    /// <summary>A low mound of leaf clumps resting on the ground under one shared light gradient.</summary>
+    /// <summary>Shared leafy clumps with short branching stems and folded leaf tips breaking up the silhouette.</summary>
     public static Mesh Bush(int variant) => Cached($"bush{variant}", s => {
         var tint = Leafy(new Color("2c4d22"), new Color("4c7a33"), new Color("6e9c45"), variant);
         var clumps = BushClumps(variant);
-        for (int i = 0; i < clumps.Length; i++)
-            Blob(s, clumps[i].At, clumps[i].Radii, 1, 311 + variant * 11 + i, 4, .3f, .06f, .02f, false, tint);
+        for (int i = 0; i < clumps.Length; i++) {
+            var (at, radii) = clumps[i];
+            if (i < 6) {
+                var start = new Vector3(0, .015f, 0);
+                var direction = at - start;
+                var axis = Vector3.Up.Cross(direction.Normalized());
+                var basis = axis.LengthSquared() > .00001f ? new Basis(axis.Normalized(), Vector3.Up.AngleTo(direction)) : Basis.Identity;
+                Lathe(s, new Transform3D(basis, start), new Step[] {
+                    new(0, i == 0 ? .045f : .025f, new Color("62452d")),
+                    new(direction.Length(), .012f, new Color("80603b")) }, 4);
+            }
+            int seed = 311 + variant * 11 + i;
+            Blob(s, at, radii, 1, seed, 4, .3f, .06f, .02f, false, tint);
+            var (points, _) = Shape(at, radii, 1, seed, 4, .3f, .06f, .02f, 0);
+            for (int leaf = 0; leaf < 8; leaf++) {
+                float angle = leaf * 2.39996f + i * .7f + variant;
+                var outward = new Vector3(MathF.Cos(angle), .35f + (leaf % 3) * .3f, MathF.Sin(angle)).Normalized();
+                var anchor = points[0]; float best = float.NegativeInfinity;
+                foreach (var point in points) {
+                    float score = ((point - at) / radii).Normalized().Dot(outward);
+                    if (score > best) { best = score; anchor = point; }
+                }
+                var leafNormal = ((anchor - at) / (radii * radii)).Normalized();
+                var along = (Vector3.Up - leafNormal * leafNormal.Y).Normalized();
+                along = along.Rotated(leafNormal, angle * .7f);
+                var side = leafNormal.Cross(along).Normalized();
+                var basePoint = anchor + leafNormal * .002f;
+                var tip = anchor + along * .18f + leafNormal * .025f;
+                var middle = basePoint.Lerp(tip, .45f) - leafNormal * .012f;
+                var left = middle + side * .06f; var right = middle - side * .06f;
+                void LeafFace(Vector3 a, Vector3 b, Vector3 c) {
+                    var normal = (c - a).Cross(b - a).Normalized();
+                    if (normal.Dot(leafNormal) < 0) { (b, c) = (c, b); normal = -normal; }
+                    var color = tint(anchor, normal).Lightened((leaf % 3) * .035f);
+                    s.SetNormal(normal); s.SetColor(color); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);
+                    s.SetNormal(-normal); s.SetColor(color.Darkened(.15f)); s.AddVertex(a); s.AddVertex(c); s.AddVertex(b);
+                }
+                LeafFace(basePoint, left, tip); LeafFace(basePoint, tip, right);
+            }
+        }
     });
 
-    /// <summary>Berries spread over the upper and outer surface of <see cref="Bush"/>, each set where its ray leaves the outermost clump.</summary>
+    /// <summary>Berries spread over the upper and outer surface of <see cref="Bush"/>, each set where its ray leaves the actual foliage mesh.</summary>
     public static Mesh Berries(int variant) => Cached($"berries{variant}", s => {
-        var clumps = BushClumps(variant);
+        // Intersect the actual cached foliage, including its leaf tips, rather than ideal ellipsoids.
+        var foliage = Bush(variant).GetFaces();
         var random = new Random(401 + variant);
         Color[] reds = { new("c0283a"), new("a3202f"), new("d23a45") };
         var origin = new Vector3(0, .3f, 0);
@@ -276,13 +320,18 @@ internal static class NatureShape {
             float y = .85f - 1.05f * (i + .5f) / count, ring = MathF.Sqrt(1 - y * y), angle = i * 2.39996f + (float)random.NextDouble() * .6f;
             var direction = new Vector3(MathF.Cos(angle) * ring, y, MathF.Sin(angle) * ring);
             float reach = 0;
-            foreach (var (at, radii) in clumps) {
-                var o = (origin - at) / radii; var d = direction / radii;
-                float a = d.Dot(d), b = o.Dot(d), c = o.Dot(o) - 1, root = b * b - a * c;
-                if (root >= 0) reach = Math.Max(reach, (-b + MathF.Sqrt(root)) / a);
+            for (int face = 0; face < foliage.Length; face += 3) {
+                var edge1 = foliage[face + 1] - foliage[face]; var edge2 = foliage[face + 2] - foliage[face];
+                var cross = direction.Cross(edge2); float determinant = edge1.Dot(cross);
+                if (MathF.Abs(determinant) < 1e-7f) continue;
+                var from = origin - foliage[face]; float u = from.Dot(cross) / determinant;
+                if (u < 0 || u > 1) continue;
+                var across = from.Cross(edge1); float v = direction.Dot(across) / determinant;
+                if (v < 0 || u + v > 1) continue;
+                reach = Math.Max(reach, edge2.Dot(across) / determinant);
             }
             var color = reds[random.Next(reds.Length)];
-            Blob(s, origin + direction * (reach + .015f), Vector3.One * .05f, 0, 0, 0, 0, 0, -1, false, (_, _) => color);
+            Blob(s, origin + direction * (reach + .025f), Vector3.One * .05f, 0, 0, 0, 0, 0, -1, false, (_, _) => color);
         }
     });
 
