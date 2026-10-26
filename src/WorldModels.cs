@@ -210,10 +210,10 @@ public static class WorldModels {
             Add(body, NatureShape.Rocks(kind, new Color(stone), variant), NatureShape.Natural, Vector3.Zero);
             return;
         }
-        Add(body, NatureShape.Rocks(kind, Colors.White, variant, false), NatureShape.OreMaterial(stone, .92f, 0), Vector3.Zero);
+        Add(body, NatureShape.Ore(variant, false), NatureShape.OreMaterial(stone, .92f, 0), Vector3.Zero);
         float roughness = kind == "coal" ? .58f : .4f, metallic = kind == "coal" ? 0 : .3f;
-        Add(body, NatureShape.Rocks(kind, Colors.White, variant, true), NatureShape.OreMaterial(vein, roughness, metallic), Vector3.Zero);
-        Add(body, NatureShape.Insertions(kind, Colors.White, variant), NatureShape.OreMaterial(chunks, roughness, metallic), Vector3.Zero);
+        Add(body, NatureShape.Ore(variant, true), NatureShape.OreMaterial(vein, roughness, metallic), Vector3.Zero);
+        Add(body, NatureShape.OreChips(variant), NatureShape.OreMaterial(chunks, roughness, metallic), Vector3.Zero);
     }
 
     private static void LooseOre(Node3D body, string kind, int id, string light, string dark) =>

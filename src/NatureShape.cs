@@ -112,6 +112,11 @@ internal static class NatureShape {
     private static void Blob(SurfaceTool surface, Vector3 center, Vector3 radii, int detail, int seed, int lumps, float bulge, float jitter,
         float floor, bool faceted, Func<Vector3, Vector3, Color> tint) {
         var (shaped, triangles) = Shape(center, radii, detail, seed, lumps, bulge, jitter, floor, 0);
+        Blob(surface, center, shaped, triangles, faceted, tint);
+    }
+
+    private static void Blob(SurfaceTool surface, Vector3 center, Vector3[] shaped, List<int> triangles,
+        bool faceted, Func<Vector3, Vector3, Color> tint) {
         if (faceted) { Faces(surface, shaped, triangles, center, tint); return; }
         var normals = new Vector3[shaped.Length];
         for (int i = 0; i < triangles.Count; i += 3) {
@@ -310,8 +315,8 @@ internal static class NatureShape {
     /// <summary>A lightweight neutral shrub lobe tinted by the scenery MultiMesh's existing per-instance colors.</summary>
     public static Mesh Scrub => Cached("scrub", s => {
         var tint = Leafy(new Color("a0a0a0"), new Color("d5d5d5"), Colors.White, 391);
-        Blob(s, Vector3.Zero, Vector3.One, 0, 391, 4, .18f, .04f, -.46f, false, tint);
-        var (points, _) = Shape(Vector3.Zero, Vector3.One, 0, 391, 4, .18f, .04f, -.46f, 0);
+        var (points, triangles) = Shape(Vector3.Zero, Vector3.One, 0, 391, 4, .18f, .04f, -.46f, 0);
+        Blob(s, Vector3.Zero, points, triangles, false, tint);
         BushLeaves(s, Vector3.Zero, Vector3.One, points, tint, .4f, 7, 2.1f);
     });
 
@@ -331,8 +336,8 @@ internal static class NatureShape {
                     new(direction.Length(), .012f, new Color("80603b")) }, 4);
             }
             int seed = 311 + variant * 11 + i;
-            Blob(s, at, radii, 1, seed, 4, .3f, .06f, .02f, false, tint);
-            var (points, _) = Shape(at, radii, 1, seed, 4, .3f, .06f, .02f, 0);
+            var (points, triangles) = Shape(at, radii, 1, seed, 4, .3f, .06f, .02f, 0);
+            Blob(s, at, points, triangles, false, tint);
             BushLeaves(s, at, radii, points, tint, i * .7f + variant);
         }
     });
@@ -350,14 +355,8 @@ internal static class NatureShape {
             var direction = new Vector3(MathF.Cos(angle) * ring, y, MathF.Sin(angle) * ring);
             float reach = 0;
             for (int face = 0; face < foliage.Length; face += 3) {
-                var edge1 = foliage[face + 1] - foliage[face]; var edge2 = foliage[face + 2] - foliage[face];
-                var cross = direction.Cross(edge2); float determinant = edge1.Dot(cross);
-                if (MathF.Abs(determinant) < 1e-7f) continue;
-                var from = origin - foliage[face]; float u = from.Dot(cross) / determinant;
-                if (u < 0 || u > 1) continue;
-                var across = from.Cross(edge1); float v = direction.Dot(across) / determinant;
-                if (v < 0 || u + v > 1) continue;
-                reach = Math.Max(reach, edge2.Dot(across) / determinant);
+                if (Hit(origin, direction, foliage[face], foliage[face + 1], foliage[face + 2]) is float distance)
+                    reach = Math.Max(reach, distance);
             }
             var color = reds[random.Next(reds.Length)];
             Blob(s, origin + direction * (reach + .025f), Vector3.One * .05f, 0, 0, 0, 0, 0, -1, false, (_, _) => color);
@@ -390,19 +389,22 @@ internal static class NatureShape {
 
     private static (Vector3[] Points, List<int> Triangles) Boulder(Vector3 at, Vector3 radii, int seed) => Shape(at, radii, 1, seed, 3, .2f, .06f, 0, 11);
 
-    /// <summary>
-    /// A faceted boulder group pressed into the ground: lighter tops, darker undersides and a little per-face variation.
-    /// Ore deposits share neutral host/seam meshes by variant; palette materials distinguish their resource kind.
-    /// The <paramref name="veins"/> flag selects complementary faces clipped at continuous bedding planes.
-    /// </summary>
-    public static Mesh Rocks(string kind, Color color, int variant, bool? veins = null) => Cached($"rocks{(veins is bool && kind is "coal" or "iron" or "tin" ? "ore" : kind)}{variant}{veins}", s => {
+    /// <summary>A faceted stone group pressed into the ground, with lighter tops and per-face color variation.</summary>
+    public static Mesh Rocks(string kind, Color color, int variant) => Cached($"rocks{kind}{variant}", s => {
         foreach (var (at, radii, seed) in Boulders(variant)) {
             var (points, triangles) = Boulder(at, radii, seed);
-            if (kind is "coal" or "iron" or "tin" && veins is bool seam) { OreFaces(s, points, triangles, at, seam, seed); continue; }
             Faces(s, points, triangles, at, (p, normal) => {
                 var shade = normal.Y > 0 ? color.Lightened(normal.Y * .12f) : color.Darkened(-normal.Y * .3f);
                 return shade.Lightened(Noise(p * 5, seed) * .03f);
-            }, veins is bool vein ? p => Noise(p * 3.1f, seed + 9) > .3f == vein : null);
+            });
+        }
+    });
+
+    /// <summary>Neutral host rock or seam faces shared across all ore palettes for one seeded variant.</summary>
+    public static Mesh Ore(int variant, bool seam) => Cached($"ore{variant}{seam}", s => {
+        foreach (var (at, radii, seed) in Boulders(variant)) {
+            var (points, triangles) = Boulder(at, radii, seed);
+            OreFaces(s, points, triangles, at, seam, seed);
         }
     });
 
@@ -444,7 +446,7 @@ internal static class NatureShape {
     /// Angular ore chunks set into the boulder group, half buried where a ray from inside leaves the outermost rock face.
     /// Rays are cast against the real faces rather than the boulder ellipsoids, because the cutting planes shave the rock inside them.
     /// </summary>
-    public static Mesh Insertions(string kind, Color color, int variant) => Cached($"insertions{(kind is "coal" or "iron" or "tin" ? "ore" : kind)}{variant}", s => {
+    public static Mesh OreChips(int variant) => Cached($"orechips{variant}", s => {
         var faces = new List<(Vector3, Vector3, Vector3)>();
         foreach (var (at, radii, seed) in Boulders(variant)) {
             var (points, triangles) = Boulder(at, radii, seed);
@@ -462,11 +464,9 @@ internal static class NatureShape {
             var basis = Basis.FromEuler(new Vector3((float)random.NextDouble() * 1.2f - .6f, (float)random.NextDouble() * Mathf.Tau, (float)random.NextDouble() * 1.2f - .6f));
             var size = new Vector3(.13f, .1f, .12f) * (.85f + (float)random.NextDouble() * .4f);
             var transform = new Transform3D(basis, origin + direction * (reach - .01f));
-            if (kind is "coal" or "iron" or "tin") {
-                var (points, triangles) = Shape(Vector3.Zero, size * .7f, 0, 631 + variant * 7 + i, 0, 0, .1f, -1, 3);
-                for (int point = 0; point < points.Length; point++) points[point] = transform * points[point];
-                Faces(s, points, triangles, transform.Origin, (_, normal) => Colors.White.Darkened(.025f + Math.Max(0, -normal.Y) * .2f));
-            } else Chunk(s, transform, size, color);
+            var (points, triangles) = Shape(Vector3.Zero, size * .7f, 0, 631 + variant * 7 + i, 0, 0, .1f, -1, 3);
+            for (int point = 0; point < points.Length; point++) points[point] = transform * points[point];
+            Faces(s, points, triangles, transform.Origin, (_, normal) => Colors.White.Darkened(.025f + Math.Max(0, -normal.Y) * .2f));
         }
     });
 
@@ -481,23 +481,6 @@ internal static class NatureShape {
         var q = offset.Cross(ab);
         float v = direction.Dot(q) / det, t = ac.Dot(q) / det;
         return v < 0 || u + v > 1 || t <= 0 ? null : t;
-    }
-
-    /// <summary>A box placed by <paramref name="at"/>, flat-shaded with tops a little lighter.</summary>
-    private static void Chunk(SurfaceTool surface, Transform3D at, Vector3 size, Color color) {
-        var half = size / 2;
-        foreach (var axis in new[] { Vector3.Right, Vector3.Left, Vector3.Up, Vector3.Down, Vector3.Back, Vector3.Forward }) {
-            Vector3 u = axis.X != 0 ? Vector3.Up : Vector3.Right, v = axis.Cross(u);
-            Vector3 Corner(float x, float y) => at * ((axis + u * x + v * y) * half);
-            var normal = (at.Basis * axis).Normalized();
-            var shade = color.Lightened(Math.Max(0, normal.Y) * .12f).Darkened(Math.Max(0, -normal.Y) * .3f);
-            Vector3 a = Corner(-1, -1), b = Corner(1, -1), c = Corner(1, 1), d = Corner(-1, 1);
-            // Godot treats clockwise triangles as front faces; flip both halves when this face's corners run the other way.
-            if ((c - a).Cross(b - a).Dot(normal) < 0) (b, d) = (d, b);
-            foreach (var corner in new[] { a, b, c, a, c, d }) {
-                surface.SetNormal(normal); surface.SetColor(shade); surface.AddVertex(corner);
-            }
-        }
     }
 
     /// <summary>A few loose lumps lying on the ground, each a faceted nugget seated flat.</summary>
