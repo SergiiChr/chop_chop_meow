@@ -25,12 +25,12 @@ internal static class LeafShape {
         ];
         Span<Vector3> points = stackalloc Vector3[10];
 
-        for (int leaf = 0; leaf < 18; leaf++) {
+        for (int leaf = 0; leaf < 24; leaf++) {
             float angle = (float)random.NextDouble() * Mathf.Tau;
-            float radius = .43f * MathF.Pow((float)random.NextDouble(), 1.5f);
+            float radius = .46f * MathF.Pow((float)random.NextDouble(), .75f);
             float yaw = (float)random.NextDouble() * Mathf.Tau;
             float size = .82f + (float)random.NextDouble() * .18f;
-            float baseY = .008f + (float)random.NextDouble() * .028f;
+            float baseY = .008f + (float)random.NextDouble() * .035f;
             float sin = MathF.Sin(yaw), cos = MathF.Cos(yaw);
             var center = new Vector3(MathF.Cos(angle) * radius, baseY, MathF.Sin(angle) * radius);
             Vector3 Point(Vector2 p, float y) {
