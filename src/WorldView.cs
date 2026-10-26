@@ -394,13 +394,15 @@ public partial class WorldView : Node3D {
             var work = ActorAnimation.WorkerAction(worker, assignment, walking);
             if (work == ActorAction.Hammer && assignment?.Processing != true && assignment?.Kind != "mine") work = ActorAction.Idle;
             // At a mine the worker faces the rock past the entrance, not the cart out front.
-            var facing = work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment is { Kind: "mine" } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
+            // A protester turns the sign toward the camera.
+            var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
+                : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment is { Kind: "mine" } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, ActorAnimation.Tool(work));
             entry.Rig.Root.Visible = World.Sees(worker);
             float trip = worker.Away > 0 ? World.TripLeg(1 - worker.Away / World.Data.TradeSeconds) : worker.Commute / (World.Data.TradeSeconds / 2);
             Fade(entry.Rig.Root, TripFade(trip));
-            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch ? null : assignment);
+            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest ? null : assignment);
         }
         // Removing while walking a dictionary is allowed, so no copy of its keys is needed.
         foreach (var (id, entry) in crew) {
