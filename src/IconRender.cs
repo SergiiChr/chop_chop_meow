@@ -28,6 +28,7 @@ public partial class IconRender : Node {
             AmbientLightEnergy = .32f,
         };
         viewport.AddChild(new WorldEnvironment { Environment = environment });
+        PileShape.Warm(Data);
         Render();
     }
 

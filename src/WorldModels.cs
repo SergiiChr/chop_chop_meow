@@ -44,6 +44,16 @@ public sealed class Prop {
 /// <summary>Code-built low-poly models for every world object: natural, modern and DIY rather than fantasy.</summary>
 public static class WorldModels {
     public const int TreeVariants = 3;
+
+    /// <summary>
+    /// Builds the shared meshes and outfit palettes of models that first appear mid-game while the world loads.
+    /// A trade cart with its courier, a dropped backpack and fresh leaf patches then only add nodes over cached resources.
+    /// </summary>
+    public static void Warm() {
+        new CartModel().Root.Free();
+        _ = BackpackShape.Details; _ = BackpackShape.Flap;
+        for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
+    }
     /// <summary>Full deposit sizes from world generation; piles shrink toward half size as they are worked.</summary>
     public static float Fullness(Thing t) => t.Kind switch {
         "stone" => t.Remaining / 64f,
@@ -108,8 +118,8 @@ public static class WorldModels {
             case "furnace": BlockFurnace(prop); break;
             case "reinforced": DrumForge(prop); break;
             case "hut": Cabin(prop); break;
-            case "chest": StorageBox(prop, "c9a46e", "9d7a4c", "2f3133"); break;
-            case "grave": StorageBox(prop, "e2701e", "c45b12", "f2f2ea"); break;
+            case "chest": Chest(prop); break;
+            case "grave": DroppedBackpack(prop); break;
             case "anvil": Anvil(prop); break;
             case "crate": Crate(prop); break;
             case "bench": Workbench(prop); break;
@@ -345,30 +355,26 @@ public static class WorldModels {
         prop.Light = Light(body, new Vector3(.55f, 1.65f, 1.4f), 2.5f);
     }
 
-    private static void StorageBox(Prop prop, string panel, string edge, string fittings) {
+    private static void Chest(Prop prop) {
         var body = prop.Body;
-        if (prop.Kind == "chest") {
-            Add(body, ChestShape.Body, ChestShape.Wood, Vector3.Zero);
-            Add(body, ChestShape.Frame, ChestShape.Metal, Vector3.Zero);
-            var hinge = Pivot(body, new Vector3(0, .49f, -.275f));
-            Add(hinge, ChestShape.Lid, ChestShape.Wood, Vector3.Zero);
-            Add(hinge, ChestShape.LidFrame, ChestShape.Metal, Vector3.Zero);
-            prop.Lid = hinge;
-            return;
-        }
-        bool tote = panel == "e2701e";
-        var size = tote ? new Vector3(.75f, .36f, .5f) : new Vector3(.85f, .45f, .55f);
-        Box(body, size, new Vector3(0, size.Y / 2 + .04f, 0), Mat(panel, tote ? .5f : .9f));
-        if (!tote) {
-            foreach (var (x, z) in new[] { (-.4f, -.25f), (.4f, -.25f), (-.4f, .25f), (.4f, .25f) }) Box(body, new Vector3(.07f, .5f, .07f), new Vector3(x, .27f, z), Mat(fittings, .5f, .6f));
-            Box(body, new Vector3(.87f, .06f, .57f), new Vector3(0, .07f, 0), Mat(edge));
-            Box(body, new Vector3(.2f, .05f, .04f), new Vector3(.25f, .3f, .29f), Mat(fittings, .5f, .6f));
-            Box(body, new Vector3(.2f, .05f, .04f), new Vector3(-.25f, .3f, .29f), Mat(fittings, .5f, .6f));
-        } else Box(body, new Vector3(.77f, .05f, .52f), new Vector3(0, .25f, 0), Mat(fittings, .4f));
-        var lid = Pivot(body, new Vector3(0, size.Y + .04f, -size.Z / 2));
-        Box(lid, new Vector3(size.X + .04f, .06f, size.Z + .04f), new Vector3(0, .03f, size.Z / 2), Mat(tote ? edge : edge, tote ? .5f : .85f));
-        Box(lid, new Vector3(.12f, .04f, .03f), new Vector3(0, .02f, size.Z + .03f), Mat(fittings, .5f, .6f));
-        prop.Lid = lid;
+        Add(body, ChestShape.Body, ChestShape.Wood, Vector3.Zero);
+        Add(body, ChestShape.Frame, ChestShape.Metal, Vector3.Zero);
+        var hinge = Pivot(body, new Vector3(0, .49f, -.275f));
+        Add(hinge, ChestShape.Lid, ChestShape.Wood, Vector3.Zero);
+        Add(hinge, ChestShape.LidFrame, ChestShape.Metal, Vector3.Zero);
+        prop.Lid = hinge;
+    }
+
+    /// <summary>The player's shared canvas pack laid on its straps, with an animated access flap.</summary>
+    private static void DroppedBackpack(Prop prop) {
+        var dropped = Pivot(prop.Body, Vector3.Zero, new Vector3(0, -18, 0));
+        var pack = Pivot(dropped, new Vector3(0, .145f, 0), new Vector3(90, 0, 0));
+        pack.Scale = Vector3.One * 1.5f;
+        ActorShape.Backpack(pack);
+        Add(dropped, BackpackShape.Details, BackpackShape.Canvas, Vector3.Zero);
+        var flap = Pivot(dropped, new Vector3(0, .235f, -.15f));
+        Add(flap, BackpackShape.Flap, BackpackShape.Canvas, Vector3.Zero);
+        prop.Lid = flap;
     }
 
     /// <summary>A hollow slatted crate with a separately hinged lid and shared wood geometry.</summary>
@@ -481,11 +487,7 @@ public static class WorldModels {
 
     /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>
     private static void LeafLitter(Node3D body, int id) {
-        string[] colors = { "c08a3a", "a8652c", "d0a347", "8e5a2a", "b8753a" };
-        for (int i = 0; i < 26; i++) {
-            float angle = i * 2.4f + Jitter(id, 80 + i) * 2, r = .15f + Jitter(id, 110 + i) * .55f;
-            Box(body, new Vector3(.16f, .012f, .1f), new Vector3(MathF.Cos(angle) * r, .01f + i * .002f, MathF.Sin(angle) * r), Mat(colors[i % colors.Length], .95f), new Vector3(Jitter(id, 140 + i) * 12, Jitter(id, 170 + i) * 360, 0));
-        }
+        Add(body, LeafShape.For(id), NatureShape.Natural, Vector3.Zero);
     }
 
     /// <summary>Anvil bolted to a welded square-tube stand.</summary>
@@ -525,21 +527,13 @@ public static class WorldModels {
         });
     }
 
-    /// <summary>Fire pit made from an old steel wheel rim, with a log teepee and flickering flames.</summary>
+    /// <summary>Campfire enclosed by hand-packed fieldstones, with split firewood and flickering flames.</summary>
     private static void FirePit(Prop prop) {
         var body = prop.Body;
-        var rim = Mat("3d3f42", .55f, .6f);
-        Cylinder(body, .46f, .44f, .22f, new Vector3(0, .11f, 0), rim, null, 16);
-        Torus(body, .42f, .5f, new Vector3(0, .22f, 0), rim);
-        Cylinder(body, .4f, .4f, .02f, new Vector3(0, .23f, 0), Mat("4d4440", 1), null, 14);
-        for (int i = 0; i < 4; i++) {
-            var log = Pivot(body, new Vector3(0, .25f, 0), new Vector3(0, i * 90 + 20, 0));
-            Cylinder(log, .05f, .045f, .55f, new Vector3(0, .17f, .14f), Mat(i % 2 == 0 ? "6e4a2e" : "5d3f28"), new Vector3(-28, 0, 0), 6);
-        }
+        Add(body, FirePitShape.Stones, FirePitShape.Stone, Vector3.Zero);
+        Add(body, FirePitShape.Fuel, FirePitShape.Wood, Vector3.Zero);
         var fire = Pivot(body, new Vector3(0, .26f, 0));
-        Post(fire, .2f, 0, .55f, Vector3.Zero, Flat(new Color("ff8a2a", .9f)), 7);
-        Post(fire, .13f, 0, .42f, new Vector3(.07f, 0, .05f), Flat(new Color("ffc24a", .95f)), 7);
-        Post(fire, .1f, 0, .32f, new Vector3(-.08f, 0, -.04f), Flat(new Color("ffe08a", .95f)), 7);
+        Add(fire, FirePitShape.Flames, FirePitShape.Flame, Vector3.Zero);
         prop.Fire = fire;
         prop.Vent = new Vector3(0, .8f, 0);
         prop.Light = Light(body, new Vector3(0, .8f, 0), 7);
@@ -792,33 +786,24 @@ public static class WorldModels {
             Root.AddChild(Courier.Root);
             Courier.Root.Position = new Vector3(0, 0, .55f);
             var cart = Pivot(Root, new Vector3(0, 0, -.45f));
-            var green = Mat("3f6b3a", .55f, .3f);
-            Box(cart, new Vector3(.7f, .3f, .85f), new Vector3(0, .5f, 0), green);
-            Box(cart, new Vector3(.62f, .02f, .78f), new Vector3(0, .66f, 0), Mat("2d4a2a", .7f));
+            Add(cart, CartShape.Frame, CartShape.Steel, Vector3.Zero);
             for (int i = 0; i < 2; i++) {
                 wheels[i] = Pivot(cart, new Vector3(i == 0 ? .42f : -.42f, .26f, 0));
-                Cylinder(wheels[i], .26f, .26f, .1f, Vector3.Zero, Mat("222222", .9f), new Vector3(0, 0, 90), 12);
-                Cylinder(wheels[i], .1f, .1f, .12f, Vector3.Zero, Mat("c9ced2", .4f, .7f), new Vector3(0, 0, 90), 8);
+                Add(wheels[i], CartShape.Wheel, CartShape.WheelSurface, Vector3.Zero);
             }
-            Cylinder(cart, .02f, .02f, .7f, new Vector3(.2f, .62f, .7f), Mat("c9ced2", .4f, .7f), new Vector3(70, 0, 0), 6);
-            Cylinder(cart, .02f, .02f, .7f, new Vector3(-.2f, .62f, .7f), Mat("c9ced2", .4f, .7f), new Vector3(70, 0, 0), 6);
-            Cylinder(cart, .025f, .025f, .46f, new Vector3(0, .74f, 1.02f), Mat("222222"), new Vector3(0, 0, 90), 6);
-            Goods = Pivot(cart, new Vector3(0, .68f, 0));
-            Box(Goods, new Vector3(.4f, .28f, .32f), new Vector3(-.08f, .14f, .18f), Mat("c9a46e"));
-            Box(Goods, new Vector3(.36f, .24f, .3f), new Vector3(.1f, .12f, -.2f), Mat("b8925c"));
-            Box(Goods, new Vector3(.3f, .22f, .26f), new Vector3(.05f, .39f, .05f), Mat("c9a46e"));
+            Goods = Pivot(cart, new Vector3(0, .415f, 0));
+            foreach (var (position, scale) in new[] {
+                (new Vector3(-.08f,0,.18f),new Vector3(.63f,.6f,.7f)),
+                (new Vector3(.1f,0,-.19f),new Vector3(.55f,.52f,.65f)),
+                (new Vector3(.05f,.27f,.05f),new Vector3(.45f,.46f,.58f)) })
+                Add(Goods, CrateShape.Cargo, CrateShape.Timber, position, scale: scale);
             for (int i = 0; i < Crates.Length; i++) {
-                // Small gaps and dark corner battens keep each crate countable at a glance.
-                var at = i < 4 ? new Vector3(i % 2 == 0 ? -.15f : .15f, 0, i < 2 ? .2f : -.2f) : new Vector3(i == 4 ? -.15f : .15f, .25f, i == 4 ? .08f : -.12f);
-                Crates[i] = Pivot(cart, new Vector3(0, .68f, 0) + at, new Vector3(0, i * 23 % 13 - 6, 0));
-                Box(Crates[i], new Vector3(.25f, .22f, .32f), new Vector3(0, .11f, 0), Mat("d4b07a"));
-                foreach (var (x, z) in new[] { (-1, -1), (1, -1), (-1, 1), (1, 1) }) Box(Crates[i], new Vector3(.035f, .225f, .035f), new Vector3(x * .11f, .112f, z * .15f), Mat("6e4f2c"));
-                Box(Crates[i], new Vector3(.255f, .025f, .325f), new Vector3(0, .21f, 0), Mat("8f6a3f"));
+                var at = i < 4 ? new Vector3(i % 2 == 0 ? -.15f : .15f, 0, i < 2 ? .17f : -.17f) : new Vector3(i == 4 ? -.15f : .15f, .225f, i == 4 ? .08f : -.12f);
+                Crates[i] = Pivot(cart, new Vector3(0, .415f, 0) + at);
+                Add(Crates[i], CrateShape.Cargo, CrateShape.Timber, Vector3.Zero, scale: new Vector3(.4f, .5f, .727f));
             }
-            Cash = Pivot(cart, new Vector3(0, .68f, 0));
-            Box(Cash, new Vector3(.36f, .2f, .26f), new Vector3(0, .1f, .1f), Mat("4a5258", .4f, .7f));
-            Sphere(Cash, .14f, new Vector3(.12f, .12f, -.2f), Mat("c9a227", .5f), new Vector3(1, .9f, 1), 8);
-            Sphere(Cash, .12f, new Vector3(-.14f, .1f, -.22f), Mat("b89120", .5f), new Vector3(1, .9f, 1), 8);
+            Cash = Pivot(cart, new Vector3(0, .4f, 0));
+            Add(Cash, CartShape.Payment, CartShape.Steel, Vector3.Zero);
         }
 
         /// <summary>Shows exactly <paramref name="crates"/> crates, or loose goods, or the cash box.</summary>

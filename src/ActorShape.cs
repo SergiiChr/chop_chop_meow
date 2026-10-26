@@ -6,10 +6,19 @@ namespace ChopChopMeow;
 
 /// <summary>Smooth elliptical profiles, with optional two-bone weights across a limb's joint.</summary>
 internal static class ActorShape {
-    internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0);
+    internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0, float Tone = 0);
 
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
     private static readonly StandardMaterial3D Surface = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .85f };
+
+    private static readonly Ring[] backpack = {
+        new(.18f, .025f, .025f, new Color("6c7849")), new(.16f, .115f, .07f, new Color("6c7849")),
+        new(.11f, .145f, .09f, new Color("6c7849")), new(-.1f, .14f, .09f, new Color("6c7849")),
+        new(-.16f, .11f, .065f, new Color("6c7849")), new(-.18f, .025f, .025f, new Color("6c7849"))
+    };
+
+    /// <summary>The same cached canvas body on the player's back and on dropped inventory.</summary>
+    public static void Backpack(Node3D parent) => Add(parent, backpack);
 
     /// <summary>A cloth panel fitted to the shared torso profile, with no separate block over the shirt.</summary>
     public static void Bib(Node3D parent, string color) {
@@ -105,6 +114,7 @@ internal static class ActorShape {
                 var down = new Vector3((below.Width - above.Width) * x + below.Sideways - above.Sideways, -height, (below.Depth - above.Depth) * z + below.Forward - above.Forward);
                 surface.SetNormal(tangent.Cross(down).Normalized());
                 surface.SetColor(ring.Color);
+                surface.SetUV(new Vector2(ring.Tone, .5f));
                 if (joint > 0) {
                     float weight = Mathf.SmoothStep(joint - .065f, joint + .065f, -ring.Y);
                     surface.SetBones(new[] { 0, 1, 0, 0 });
@@ -126,6 +136,7 @@ internal static class ActorShape {
             var ring = rings[row];
             surface.SetNormal(end == 0 ? Vector3.Up : Vector3.Down);
             surface.SetColor(ring.Color);
+            surface.SetUV(new Vector2(ring.Tone, .5f));
             if (joint > 0) {
                 surface.SetBones(new[] { 0, 1, 0, 0 });
                 float weight = Mathf.SmoothStep(joint - .065f, joint + .065f, -ring.Y);
@@ -141,7 +152,7 @@ internal static class ActorShape {
         return surface.Commit();
     }
 
-    public static void Add(Node3D parent, Ring[] rings, float joint = 0, Material? material = null) {
+    public static MeshInstance3D Add(Node3D parent, Ring[] rings, float joint = 0, Material? material = null) {
         string key = $"profile|{joint}|{string.Join("|", rings)}";
         if (!meshes.TryGetValue(key, out var profile)) meshes[key] = profile = BuildProfile(rings, joint);
         var mesh = new MeshInstance3D { Mesh = profile, MaterialOverride = material ?? Surface };
@@ -153,9 +164,10 @@ internal static class ActorShape {
             mesh.Skeleton = new NodePath("..");
         }
         parent.AddChild(mesh);
+        return mesh;
     }
 
-    public static Skeleton3D Limb(Node3D parent, Ring[] rings, float joint) {
+    public static Skeleton3D Limb(Node3D parent, Ring[] rings, float joint, Material? material = null) {
         var skeleton = new Skeleton3D();
         parent.AddChild(skeleton);
         skeleton.AddBone("upper"); skeleton.AddBone("lower");
@@ -163,7 +175,7 @@ internal static class ActorShape {
         skeleton.SetBoneRest(0, Transform3D.Identity);
         skeleton.SetBoneRest(1, new Transform3D(Basis.Identity, new Vector3(0, -joint, 0)));
         skeleton.ResetBonePoses();
-        Add(skeleton, rings, joint);
+        Add(skeleton, rings, joint, material);
         return skeleton;
     }
 }

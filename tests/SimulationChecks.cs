@@ -11,6 +11,7 @@ public static class SimulationChecks {
     public static void Run(GameData data) {
         EconomyChecks.Run(data);
         AnimationChecks.Run();
+        HumanModelChecks.Run();
         PileModelChecks.Run(data);
         MineRockChecks.Run();
         WorkerStateChecks.Run(data);
