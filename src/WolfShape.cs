@@ -85,9 +85,13 @@ internal static class WolfShape {
         s.AddIndex(index); s.AddIndex(index + 1); s.AddIndex(index + 2); index += 3;
     }
 
-    public static void Leg(Node3D parent, bool hind) {
+    /// <summary>How far down the leg its one bend sits: the front wrist, or the hind hock.</summary>
+    public static float Joint(bool hind) => hind ? .25f : .3f;
+
+    /// <summary>A leg hanging from its shoulder or hip, skinned to bend at <see cref="Joint"/>.</summary>
+    public static Skeleton3D Leg(Node3D parent, bool hind) {
         Color fur = new("777d72"), pale = new("a8ad9d"), dark = new("5d655c");
-        ActorShape.Add(parent, new[] {
+        return ActorShape.Limb(parent, new[] {
             new ActorShape.Ring(.13f, hind ? .10f : .075f, .11f, fur),
             new ActorShape.Ring(.035f, hind ? .105f : .075f, .105f, fur),
             new ActorShape.Ring(-.10f, .065f, .075f, fur, hind ? .065f : -.015f),
@@ -96,17 +100,18 @@ internal static class WolfShape {
             new ActorShape.Ring(-.405f, .034f, .04f, pale, hind ? -.035f : .015f),
             new ActorShape.Ring(-.44f, .055f, .085f, dark, .04f),
             new ActorShape.Ring(-.485f, .06f, .09f, dark, .045f),
-            new ActorShape.Ring(-.49f, .048f, .072f, dark, .045f) });
+            new ActorShape.Ring(-.49f, .048f, .072f, dark, .045f) }, Joint(hind));
     }
 
-    public static void Tail(Node3D parent) {
+    /// <summary>The tail hanging down from its root, skinned so the outer half can curl.</summary>
+    public static Skeleton3D Tail(Node3D parent) {
         Color grey = new("777d72"), dark = new("4e574e");
-        ActorShape.Add(parent, new[] {
-            new ActorShape.Ring(.51f, .008f, .008f, dark, .035f),
-            new ActorShape.Ring(.46f, .04f, .04f, dark, .025f),
-            new ActorShape.Ring(.35f, .075f, .065f, grey, .01f),
-            new ActorShape.Ring(.22f, .085f, .075f, grey),
-            new ActorShape.Ring(.08f, .065f, .06f, grey),
-            new ActorShape.Ring(0, .045f, .045f, grey) });
+        return ActorShape.Limb(parent, new[] {
+            new ActorShape.Ring(0, .045f, .045f, grey),
+            new ActorShape.Ring(-.08f, .065f, .06f, grey),
+            new ActorShape.Ring(-.22f, .085f, .075f, grey),
+            new ActorShape.Ring(-.35f, .075f, .065f, grey, -.01f),
+            new ActorShape.Ring(-.46f, .04f, .04f, dark, -.025f),
+            new ActorShape.Ring(-.51f, .008f, .008f, dark, -.035f) }, .22f);
     }
 }

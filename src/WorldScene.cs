@@ -297,11 +297,13 @@ public partial class WorldView {
         ("worker hammer", ActorSkin.Worker, ActorAction.Hammer), ("worker pump", ActorSkin.Worker, ActorAction.Pump), ("worker idle", ActorSkin.Worker, ActorAction.Idle),
         ("worker sit", ActorSkin.Worker, ActorAction.Sit), ("worker sit on rock", ActorSkin.Worker, ActorAction.Perch),
     };
+    private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall" };
     private readonly List<ActorRig> reviewRigs = new();
+    private readonly List<WorldModels.WolfModel> reviewWolves = new();
     private Node3D? review;
     private static readonly Vector3 ScreenRight = new Vector3(1, 0, -1).Normalized(), ScreenDown = new Vector3(1, 0, 1).Normalized();
     private static Vector3 ReviewCenter => new(0, 1, 0);
-    private static Vector3 ReviewSpot(int index) => ScreenRight * ((index % 6 - 2.5f) * 2.2f) + ScreenDown * ((index / 6 - 1.4f) * 3.3f);
+    private static Vector3 ReviewSpot(int index) => ScreenRight * ((index % 7 - 3) * 2f) + ScreenDown * ((index / 7 - 1.4f) * 3.3f);
 
     private void UpdateReview() {
         if (review == null) {
@@ -313,7 +315,16 @@ public partial class WorldView {
                 review.AddChild(rig.Root); rig.Root.Position = ReviewSpot(i);
                 reviewRigs.Add(rig);
             }
+            for (int i = 0; i < ReviewWolves.Length; i++) {
+                var wolf = new WorldModels.WolfModel();
+                review.AddChild(wolf.Root); wolf.Root.Position = ReviewSpot(ReviewClips.Length + i);
+                reviewWolves.Add(wolf);
+            }
         }
+        // Moving wolves stride as they would at their speed in the world: a trot at 3 tiles a second and a gallop at a chase's 5.5.
+        reviewWolves[0].Idle(Elapsed); reviewWolves[1].Trot(Elapsed * 3 * 5); reviewWolves[2].Gallop(Elapsed * 5.5f * 2.6f);
+        reviewWolves[3].Leap(Elapsed % 1.2f / World.LeapSeconds); reviewWolves[4].Feed(Elapsed); reviewWolves[5].Fall(Elapsed % 3 / 1.5f);
+        foreach (var wolf in reviewWolves) wolf.Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
         for (int i = 0; i < ReviewClips.Length; i++) {
             var action = ReviewClips[i].Action;
             reviewRigs[i].Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
@@ -327,6 +338,11 @@ public partial class WorldView {
             var at = camera.UnprojectPosition(ReviewSpot(i));
             var size = font.GetStringSize(ReviewClips[i].Name, HorizontalAlignment.Left, -1, 17);
             overlay.DrawString(font, at + new Vector2(-size.X / 2, 30), ReviewClips[i].Name, HorizontalAlignment.Left, -1, 17, new Color("f2e8cf"));
+        }
+        for (int i = 0; i < ReviewWolves.Length; i++) {
+            var at = camera.UnprojectPosition(ReviewSpot(ReviewClips.Length + i));
+            var size = font.GetStringSize(ReviewWolves[i], HorizontalAlignment.Left, -1, 17);
+            overlay.DrawString(font, at + new Vector2(-size.X / 2, 30), ReviewWolves[i], HorizontalAlignment.Left, -1, 17, new Color("f2e8cf"));
         }
     }
 }

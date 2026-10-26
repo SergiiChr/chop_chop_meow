@@ -106,7 +106,7 @@ public sealed class Wolf {
     public bool Pinning { get; set; }
     /// <summary>The wolf has growled at the player while closing in; it growls only once.</summary>
     [JsonIgnore] public bool Growled { get; set; }
-    /// <summary>Seconds a chasing wolf keeps following the player into firelight before it gives up.</summary>
+    /// <summary>Seconds a chasing wolf keeps following the player into firelight before it gives up; above zero the wolf gallops.</summary>
     public float Chase { get; set; }
     /// <summary>A torch swing toward this wolf made it keep its distance; it lasts while the torch burns.</summary>
     public bool Scared { get; set; }
@@ -1480,7 +1480,8 @@ public sealed partial class World {
                 if (!Protected(w.Pos) && w.Flee <= 0 && w.Pos.DistanceTo(Player) < LeapRange && (hunter == null || w.Pos.DistanceTo(Player) < hunter.Pos.DistanceTo(Player))) hunter = w;
             if (hunter != null) { hunter.Leap = LeapSeconds; Say("A wolf leaps for your throat!"); }
         }
-        float speed = Math.Min(3.8f, 3 + Day * .1f);
+        // Stalking and backing off speed up a little each day; a chase always outpaces a walk but not a sprint.
+        float speed = Math.Min(3.8f, 3 + Day * .1f), chase = Data.WalkSpeed * Data.WolfChase;
         foreach (var wolf in hunters) {
             wolf.Attack -= dt;
             if (wolf.Leap > 0) {
@@ -1512,7 +1513,7 @@ public sealed partial class World {
               // A wolf already on the player's heels follows briefly into firelight, but backs off from a cabin at once.
               else if (inside || (lit || Protected(wolf.Pos)) && wolf.Chase <= 0) { wolf.Chase = 0; wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + AwayFromPlayer(wolf) * 3, dt * 3); } else {
                 wolf.Chase = lit || Protected(wolf.Pos) ? wolf.Chase - dt : ChaseSeconds;
-                wolf.Pos = wolf.Pos.MoveToward(Player, dt * speed);
+                wolf.Pos = wolf.Pos.MoveToward(Player, dt * chase);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
             }

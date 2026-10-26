@@ -611,7 +611,7 @@ public partial class Game : Node {
             view.Lifting = lifting?.Id ?? 0; view.LiftProgress = liftClock / LiftSeconds;
             // Under 15% food or drink the player is too weak to sprint.
             world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.S.Hunger >= GameData.LowNeed && world.S.Thirst >= GameData.LowNeed;
-            world.MovePlayer(direction * dt * 4.2f * (world.Me.Sprinting ? world.Data.SprintSpeed : 1)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
+            world.MovePlayer(direction * dt * world.Data.WalkSpeed * (world.Me.Sprinting ? world.Data.SprintSpeed : 1)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
             view.GatheringTarget = view.Gathering ? gathering : null;
             world.Me.Held = ActiveHotbarItem() ?? "";
         } else world.Me.Sprinting = false;

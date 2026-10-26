@@ -806,8 +806,9 @@ public partial class WorldView : Node3D {
                 scene.AddChild(model.Root); wolves[wolf] = model;
             }
             var moved = wolf.Pos - model.Last;
-            bool running = moved.LengthSquared() > 1e-6f && !wolf.Feeding;
-            model.Stride += running ? moved.Length() * 5 : dt * 2;
+            bool running = moved.LengthSquared() > 1e-6f && !wolf.Feeding, galloping = running && wolf.Chase > 0;
+            // A gallop covers more ground a stride than a trot.
+            model.Stride += running ? moved.Length() * (galloping ? 2.6f : 5) : 0;
             model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(running ? moved : World.Player - wolf.Pos, model.Yaw), Math.Min(1, dt * 10));
             model.Last = wolf.Pos;
             model.Root.Position = To3(wolf.Pos);
@@ -815,7 +816,9 @@ public partial class WorldView : Node3D {
             model.Root.Rotation = new Vector3(0, model.Yaw, 0);
             if (wolf.Leap > 0) model.Leap(1 - wolf.Leap / World.LeapSeconds);
             else if (wolf.Feeding) model.Feed(Elapsed + wolf.GetHashCode() % 7);
-            else model.Trot(model.Stride, running);
+            else if (galloping) model.Gallop(model.Stride);
+            else if (running) model.Trot(model.Stride);
+            else model.Idle(Elapsed + wolf.GetHashCode() % 7);
         }
         foreach (var (wolf, model) in wolves)
             if (!World.S.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
