@@ -177,8 +177,8 @@ public static class WorldModels {
     /// <summary>The outdoor pile represents stocked fuel, excluding fuel already burning in a batch.</summary>
     public static void SyncFuel(Prop prop, Thing t) {
         string fuel = World.BurnedFuel(t);
-        prop.WoodPile!.Visible = fuel == "wood" && t.Inventory["wood"] > 0;
-        prop.CoalPile!.Visible = fuel == "coal" && t.Inventory["coal"] > 0;
+        prop.WoodPile!.Visible = fuel == "wood" && t.Burner?["wood"] > 0;
+        prop.CoalPile!.Visible = fuel == "coal" && t.Burner?["coal"] > 0;
     }
 
     private static void Tree(Prop prop, int id) {

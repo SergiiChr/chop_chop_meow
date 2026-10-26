@@ -25,7 +25,7 @@ A new recipe gets its price from this rule. The check fails if any recipe loses 
 
 A worker-day costs the daily wage plus the up-front payment spread over 10 days. All offers cost about the same over that time (24 to 26 coins); more up front means a lower wage, so a worker kept longer is cheaper, and the dearest wage needs nothing up front.
 
-Wages are paid at dawn from the signposts' wage slots first, where sale coins land, and then from the backpack. The slot holds one stack (1000 coins); sale coins beyond it go to the market output and are not touched by wages.
+Wages are paid at dawn from the trading posts' wage slots first, where sale coins land, and then from the backpack. The slot holds one stack (1000 coins); sale coins beyond it go to the market output and are not touched by wages.
 
 Worker output is measured by running one worker through a whole day: walking, hauling, lunch and the commute included, with chests 2.5 tiles away and steel tools at the bench. A product's worker-days are its materials' worker-days plus one over its station's daily output.
 
@@ -43,7 +43,7 @@ Measured with the current data:
 | Mining ore or coal, chopping wood | 320 units |
 | Picking berries | 24 berries |
 | Stone furnace, iron bars | 62 |
-| Bellows furnace, steel bars | 90 |
+| Reinforced furnace, steel bars | 90 |
 | Anvil, steel parts | 57 |
 | Bench, wood parts | 114 |
 | Bench, steel tools | 58 |
@@ -61,7 +61,7 @@ Measured with the current data:
 | Steel hammer | 0.086 | 220 | 8.8× |
 | Steel axe or pickaxe | 0.145 | 255 | 10.2× |
 
-These are for a crew sized so no one waits. A starter crew of one worker per job (ore, coal, wood, stone furnace, bellows furnace, anvil and bench) is held back by the anvil: about 28 axes or 57 hammers a day, around 150 coins per worker-day, still about 6 times pay.
+These are for a crew sized so no one waits. A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced furnace, anvil and bench) is held back by the anvil: about 28 axes or 57 hammers a day, around 150 coins per worker-day, still about 6 times pay.
 
 ## 3. Demand
 

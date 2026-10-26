@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b5is7w15mhnwc"
-path="res://.godot/imported/backpack.svg-2356acc0b5fb583e741ce54467ed8832.ctex"
+uid="uid://b7smr4ubkj3ca"
+path="res://.godot/imported/line_moon.svg-72abac57bd257e95367d056b4475ad79.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/ui/backpack.svg"
-dest_files=["res://.godot/imported/backpack.svg-2356acc0b5fb583e741ce54467ed8832.ctex"]
+source_file="res://assets/ui/line_moon.svg"
+dest_files=["res://.godot/imported/line_moon.svg-72abac57bd257e95367d056b4475ad79.ctex"]
 
 [params]
 

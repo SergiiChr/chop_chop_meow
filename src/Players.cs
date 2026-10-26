@@ -120,6 +120,7 @@ public sealed partial class World {
             case "cancel_craft": CancelCraft(c.Count); break;
             case "transfer": if (Resolve(c.Target) is Inventory from && Resolve(c.Other) is Inventory to) Transfer(from, to, c.Item, c.Count); break;
             case "assign": if (w != null) Assign(w, t); break;
+            case "duty": if (w != null && t != null) SetDuty(w, t, c.Item, c.Count != 0); break;
             case "fire": if (w != null) Fire(w); break;
             case "settle": if (w != null) SettleDebt(w); break;
         }
@@ -130,13 +131,14 @@ public sealed partial class World {
             case "fuel_fire": FuelFire(t); break;
             case "drink": Drink(t); break;
             case "set_recipe": SetRecipe(t, c.Item); break;
-            case "set_fuel": SetFuel(t, c.Item); break;
             case "set_filter": SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
             case "clear_filters": ClearFilters(t); break;
             case "set_compost": SetCompost(t, c.Count != 0); break;
+            case "skip_food": SetSkipFood(t, c.Count != 0); break;
             case "supply_mine": SupplyMine(t); break;
             case "load_batch": LoadBatch(t, Math.Clamp(c.Count, 1, 5)); break;
             case "load_input": LoadInput(t, c.Item, c.Count); break;
+            case "load_fuel": LoadFuel(t, c.Item, c.Count); break;
             case "collect": Collect(t); break;
             case "enter": Enter(t); break;
             case "sleep": Sleep(t); break;
@@ -162,8 +164,8 @@ public sealed partial class World {
         return -1;
     }
 
-    public const int BoxCodes = 5;
-    private static Inventory?[] Boxes(Thing t) => [t.Inventory, t.Output, t.Tools, t.Wages];
+    public const int BoxCodes = 6;
+    private static Inventory?[] Boxes(Thing t) => [t.Inventory, t.Output, t.Tools, t.Wages, t.Burner];
     private Inventory? Resolve(int at) => at == 0 ? S.Backpack : Find(at / BoxCodes) is not Thing t || at % BoxCodes == 0 ? null : Boxes(t)[at % BoxCodes - 1];
 
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
@@ -172,7 +174,10 @@ public sealed partial class World {
         if (a < 0 || b < 0 || Forwarded("transfer", a, b, item, quantity)) return 0;
         if (new[] { a, b }.Where(at => at > 0).Any(at => !Near(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
         if (b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
-        return from.TransferTo(to, item, quantity);
+        int moved = from.TransferTo(to, item, quantity);
+        // What goes into a fuel slot becomes the fuel workers keep it stocked with.
+        if (moved > 0 && b > 0 && Find(b / BoxCodes) is Thing station && to == station.Burner) station.Fuel = item;
+        return moved;
     }
 
     public void Drink(Thing lake) {
@@ -181,15 +186,16 @@ public sealed partial class World {
         S.Thirst = 100; Say("Cool, fresh water."); Play("gather_water", Player);
     }
 
-    public void SetFuel(Thing furnace, string fuel) {
-        if (furnace.Kind is not ("furnace" or "cooktable" or "cannery") || furnace.Processing || fuel is not "wood" and not "coal" || Forwarded("set_fuel", furnace.Id, item: fuel)) return;
-        furnace.Fuel = fuel;
-    }
-
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
         if (!chest.IsStorage || !Data.Items.ContainsKey(item) || Forwarded("set_filter", chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         var filter = output ? chest.Inventory.OutputFilter : chest.Inventory.InputFilter;
         if (allowed) filter.Add(item); else filter.Remove(item);
+    }
+
+    /// <summary>Stops or restarts workers bringing food to a compost.</summary>
+    public void SetSkipFood(Thing pile, bool skip) {
+        if (!pile.Compost || Forwarded("skip_food", pile.Id, count: skip ? 1 : 0)) return;
+        pile.SkipFood = skip;
     }
 
     public void ClearFilters(Thing chest) {

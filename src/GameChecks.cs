@@ -150,7 +150,10 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
         await Frames();
     }
-    private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false)[grid].GetChildren().OfType<ItemSlot>().First(match);
+    /// <summary>The panel's grids in order, then the backpack drawer's.</summary>
+    private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false).Concat(bag.FindChildren("*", "GridContainer", true, false))
+        .ElementAt(grid).GetChildren().OfType<ItemSlot>().First(match);
+    private System.Collections.Generic.IEnumerable<Button> Slots() => panel.FindChildren("slot_*", "Button", true, false).Concat(bag.FindChildren("slot_*", "Button", true, false)).OfType<Button>();
     private static void UIRequire(bool okay, string message) {
         if (!okay) throw new InvalidOperationException("UI check failed: " + message);
     }
@@ -168,14 +171,13 @@ public partial class Game {
         var berries = world.Add("crate", world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); world.PickUpCrate(berries);
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         await Click(view.Screen(sign.Pos, .8f));
-        UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A signpost must open the market with its icon buttons.");
-        await Click(Cell(3, c => c.TooltipText.StartsWith("Wood ·")));
+        UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A trading post must open the market with its icon buttons.");
+        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·")));
         UIRequire(sign.Inventory.Count == 0 && world.S.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
-        await Click(Cell(3, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));
+        await Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));
         UIRequire(sign.Inventory[packed] == 1 && world.S.Backpack[packed] == 0, "Clicking a packed crate must load it into the market input.");
         await Click(Named("sell")!);
         UIRequire(world.S.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
-        await Click(Named("prices")!);
         var fetch = Named("fetch");
         UIRequire(sheet.Visible && panel.OffsetLeft == PanelLeft - SheetWidth && fetch != null && fetch.Disabled && fetch.TooltipText == "No worker assigned.", "The price sheet must open beside the panel and explain why no one can fetch prices.");
         UIRequire(Named("buy_wood") == null && Named("buy_berries") == null && Named("buy_water") != null, "The price sheet must only offer what the village sells.");
@@ -193,7 +195,7 @@ public partial class Game {
         await Click(Named("prices")!);
         UIRequire(!sheet.Visible && panel.OffsetLeft == PanelLeft, "The price sheet icon must close the sheet again.");
         world.S.Workers.Remove(hired); world.S.Orders.Clear(); world.S.Things.Remove(sign); world.S.Backpack.Remove(Inventory.Coins, 999);
-        signpostTab = "market"; ClosePanel(); await Frames();
+        signpostTab = "market"; sheetOpen = true; ClosePanel(); await Frames();
     }
     /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
     private async Task CheckMine() {
@@ -209,7 +211,8 @@ public partial class Game {
             await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
             var mine = world.S.Things.LastOrDefault(t => t.Kind == "mine");
             UIRequire(mine != null && mine.Pos == spot && selected == mine.Id && view.BuildMode == "", $"A click near the {ore} cliff must mark a mine on its spot and select it.");
-            UIRequire(HasLabel(panel, "Stage 1 · Dig the entrance") && HasLabel(panel, "Stage 2 · Shore it up") && HasLabel(panel, "Stage 3 · Fit the frame and rails"), "The mine panel must list its three stages.");
+            UIRequire(new[] { "Stage 1 · Dig the entrance", "Stage 2 · Shore it up", "Stage 3 · Fit the frame and rails" }.Select((title, i) => panel.FindChild($"stage_{i + 1}", true, false) is Control node && node.TooltipText.StartsWith(title)).All(found => found),
+                "The mine panel must show its three stages.");
         }
         world.Player = home; ClosePanel();
         await KeyStroke(Key.Escape);
@@ -228,13 +231,16 @@ public partial class Game {
         ClosePanel(); world.S.Backpack.Remove("stone_chisel", 99); world.S.Backpack.Add("stone", 2); world.S.Backpack.Add("wood", 3);
         await KeyStroke(Key.C);
         UIRequire(page == "craft", "C must open the crafting menu.");
-        var badge = (TextureRect)panel.FindChild("section_chisel", true, false).FindChild("badge", true, false);
+        // The page rebuilds when the queue moves on, so the badge is looked up afresh.
+        TextureRect ChiselBadge() => (TextureRect)panel.FindChild("section_chisel", true, false).FindChild("badge", true, false);
+        var badge = ChiselBadge();
         UIRequire(badge.Modulate != Colors.White && badge.TooltipText.Contains("Needs a chisel"), "A missing chisel must show a red badge with a hint.");
         await Click(Named("craft_stone_chisel")!);
         UIRequire(world.S.Crafting.SequenceEqual(new[] { "stone_chisel" }) && world.S.Backpack["stone"] == 0, "Clicking a recipe must queue it and take its materials.");
         world.S.CraftTime = world.Data.Recipes["stone_chisel"].Seconds - .05f; await Frames(10); RefreshLive(); await Frames();
-        UIRequire(world.S.Backpack["stone_chisel"] == 1 && badge.Modulate == Colors.White, "The chisel must arrive and turn its badge back to normal.");
+        UIRequire(world.S.Backpack["stone_chisel"] == 1 && ChiselBadge().Modulate == Colors.White, "The chisel must arrive and turn its badge back to normal.");
         int wood = world.S.Backpack["wood"];
+        await Click(Named("section_chisel")!);
         await Click(Named("craft_torch")!);
         world.S.CraftTime = world.Data.Recipes["torch"].Seconds - .05f; await Frames(10);
         UIRequire(world.S.Backpack["torch"] == 1 && world.S.Backpack["wood"] == wood - 3, "A torch must be made by hand from 3 wood.");
@@ -306,7 +312,8 @@ public partial class Game {
         float zoom = view.Zoom;
         foreach (var page in new[] { "inventory", "build", "craft", "help" }) {
             OpenPage(page); await Frames(3);
-            var box = panel.GetGlobalRect();
+            // The backpack shows only its drawer, so the wheel goes over that.
+            var box = page == "inventory" ? bag.GetGlobalRect() : panel.GetGlobalRect();
             foreach (var spot in new[] { box.GetCenter(), box.Position + new Vector2(30, 30), box.End - new Vector2(30, 30) }) await Wheel(spot);
             UIRequire(view.Zoom == zoom, $"The mouse wheel over the {page} panel must not zoom the world.");
         }
@@ -460,7 +467,7 @@ public partial class Game {
             await KeyStroke(Key.Key3);
             UIRequire(view.BuildMode == "chest", "A building-plan hotkey must enter placement mode.");
             await KeyStroke(Key.Key8);
-            UIRequire(world.S.ActiveHotbar == 7 && world.S.Backpack["berries"] == berries && hotbarButtons[7].HasThemeStyleboxOverride("normal") && !hotbarButtons[2].HasThemeStyleboxOverride("normal"),
+            UIRequire(world.S.ActiveHotbar == 7 && world.S.Backpack["berries"] == berries && hotbarButtons[7].GetThemeStylebox("normal") == Style.CupWanted && hotbarButtons[2].GetThemeStylebox("normal") != Style.CupWanted,
                 "Key 8 must put the berries in hand with an outline, without eating them.");
             UIRequire(view.BuildMode == "", "Selecting an item must clear any previously selected building plan.");
             int played = sounds.Played;
@@ -492,7 +499,7 @@ public partial class Game {
             await Frames();
             var chest = world.S.Things.LastOrDefault(t => t.Kind == "chest");
             UIRequire(chest != null && view.BuildMode == "" && selected == chest.Id, "A ground click must construct and select the chest.");
-            var deposit = FindButton(panel, "Deposit all materials (keep tools)"); UIRequire(deposit != null, "Chest context must expose deposit action.");
+            var deposit = Named("deposit"); UIRequire(deposit != null, "Chest context must expose deposit action.");
             deposit!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(chest!.Inventory["wood"] > 0 && world.S.Backpack["steel_axe"] == 1, "Manual deposit must move materials and retain equipped tools.");
             int storedWood = chest.Inventory["wood"]; RefreshLive();
@@ -510,19 +517,19 @@ public partial class Game {
             RefreshLive();
             await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
             UIRequire(chest.Inventory["wood"] == storedWood, "The split half must go back into the chest.");
-            var filters = FindButton(panel, "Input / output filters"); filters!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
-            UIRequire(page == "filters", "Chest filters must be reachable from the live context UI.");
-            await KeyStroke(Key.I);
-            FindButton(panel, "Assign hotbar slots")!.EmitSignal(BaseButton.SignalName.Pressed);
-            await Frames();
-            UIRequire(page == "hotbar", "Inventory must expose hotbar assignment.");
-            FindButton(panel, "1")!.EmitSignal(BaseButton.SignalName.Pressed);
-            await Frames();
+            Named("filters")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            UIRequire(filterOpen && sheet.Visible && panel.FindChild("filter_in", true, false) != null && panel.FindChild("filter_out", true, false) != null, "Chest filters must open in the filter window beside the panel.");
+            await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), (Control)panel.FindChild("filter_add_in", true, false));
+            UIRequire(chest.Inventory.InputFilter.Contains("wood") && chest.Inventory["wood"] == storedWood, "Dropping an item on a filter row must add it to that filter without moving it.");
+            ((Button)panel.FindChild("filter_in_wood", true, false)).EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            UIRequire(!chest.Inventory.InputFilter.Contains("wood"), "Clicking an item in a filter row must take it off.");
+            await KeyStroke(Key.Tab);
+            UIRequire(page == "inventory" && bag.Visible && FindButton(panel, "Assign hotbar slots") == null, "Tab must open the backpack drawer, with no separate hotbar assignment.");
+            await KeyStroke(Key.B);
             int carriedBeforeAssignment = world.S.Backpack.Count;
-            Named("assign_hut")!.EmitSignal(BaseButton.SignalName.Pressed);
-            await Frames();
-            UIRequire(world.S.HotbarSlots[0] == "hut" && world.S.Backpack.Count == carriedBeforeAssignment, "Rebinding a hotbar slot must store a plan reference without creating items.");
-            await KeyStroke(Key.Tab); UIRequire(page == "help", "Tab must open the field guide.");
+            await DragTo(Named("build_hut")!, hotbarButtons[0]);
+            UIRequire(world.S.HotbarSlots[0] == "hut" && world.S.Backpack.Count == carriedBeforeAssignment, "Dragging a plan onto the hotbar must store a plan reference without creating items.");
+            await KeyStroke(Key.I); UIRequire(page == "help", "I must open the field guide.");
             var savedPosition = world.Player;
             var savedSlots = world.S.HotbarSlots.ToArray(); int savedActiveSlot = world.S.ActiveHotbar;
             await KeyStroke(Key.F5);
@@ -542,9 +549,8 @@ public partial class Game {
             UIRequire(FindButton(screen, "Slot 2 · empty")!.Disabled, "The load screen must disable empty slots.");
             await Click(screen.GetChildren().OfType<Button>().First(b => b.Text.StartsWith("Slot 1 · ")));
             UIRequire(!backdrop.Visible && !menu.Visible && !paused && world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the save and resume.");
-            UIRequire(HasLabel(panel, "Health") && HasLabel(panel, "Capacity") && HasLabel(panel, "Daily wages"), "Inventory must contain health, capacity and wages.");
             world.S.Backpack.Add(Inventory.Coins, 1200); RefreshLive();
-            UIRequire(panel.FindChildren("slot_*", "Button", true, false).OfType<Button>().Count(c => c.TooltipText.StartsWith("Coins")) == 2, "Carried coins must show as backpack cells stacking to 1000.");
+            UIRequire(Slots().Count(c => c.TooltipText.StartsWith("Coins")) == 2, "Carried coins must show as backpack cells stacking to 1000.");
             world.S.Backpack.Remove(Inventory.Coins, 1200);
             float healthBefore = world.S.Health; world.S.Health -= 12; RefreshLive(); DamageFlash(healthBefore - world.S.Health);
             UIRequire(health.TooltipText == $"Health {world.S.Health:0}%" && damageEdges.Strength > 0, "The HUD heart must track health and a hit must flash the screen edges.");
@@ -552,9 +558,9 @@ public partial class Game {
             UIRequire(!HasLabel(panel, "Hunger") && !HasLabel(panel, "Thirst"), "Hunger and thirst belong to the HUD icons, not the inventory.");
             world.S.Hunger = 40; world.S.Thirst = 70; RefreshLive();
             UIRequire(hunger.Visible && thirst.Visible && hunger.TooltipText == "Hunger 40%" && thirst.TooltipText == "Thirst 70%", "The HUD stomach and droplet must track hunger and thirst.");
-            UIRequire(panel.FindChildren("slot_*", "Button", true, false).Count == world.S.Backpack.Slots, "The backpack must show one grid cell per slot.");
+            UIRequire(Slots().Count() == world.S.Backpack.Slots, "The backpack must show one grid cell per slot.");
             world.S.Backpack.Add("berries", 2); RefreshLive();
-            var berryCell = panel.FindChildren("slot_*", "Button", true, false).OfType<Button>().FirstOrDefault(c => c.TooltipText.StartsWith("Berries"));
+            var berryCell = Slots().FirstOrDefault(c => c.TooltipText.StartsWith("Berries"));
             int berriesBeforeClick = world.S.Backpack["berries"];
             UIRequire(berryCell != null, "Carried berries must appear as a grid cell.");
             berryCell!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
@@ -617,7 +623,7 @@ public partial class Game {
             await KeyStroke(Key.Space);
             UIRequire(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "Space must not pump or attack while paused.");
             Select(furnace);
-            var pumpButton = FindButton(panel, "Pump bellows · Space");
+            var pumpButton = Named("pump");
             UIRequire(pumpButton != null, "The selected furnace should still expose its pump control while paused.");
             pumpButton!.EmitSignal(BaseButton.SignalName.Pressed);
             await Frames();

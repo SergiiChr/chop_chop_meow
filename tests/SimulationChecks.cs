@@ -53,6 +53,7 @@ public static class SimulationChecks {
         CheckRaking(data);
         CheckPilesAndCompost(data);
         CheckCookingAndCanning(data);
+        CheckWorkerDuties(data);
         CheckFarmPlot(data);
         CheckNewFoodsAndRename(data);
         CheckMarketTakesOnlyCrates(data);
@@ -111,6 +112,95 @@ public static class SimulationChecks {
         var worker = new Worker { Id = world.S.NextId++, Name = $"Worker {world.S.Workers.Count + 1}", Pos = position };
         world.S.Workers.Add(worker);
         return worker;
+    }
+
+    /// <summary>
+    /// Workers take jobs one at a time: a worker with jobs at two places takes turns at them, haulers and crafters split a bench's work,
+    /// a stocker fills the tool rack from storage, a tender feeds compost without food when told to, and a runner carries deliveries in.
+    /// </summary>
+    private static void CheckWorkerDuties(GameData data) {
+        var world = EmptyWorld(data);
+        float morning = world.S.Time;
+        var chest = world.Add("chest", new Vector2(20, 20));
+        chest.Inventory.Add("wood", 20);
+        var rock = world.Add("stone", new Vector2(24, 20), 30);
+        var fire = world.Add("campfire", new Vector2(20, 24));
+        var both = AddWorker(world, new Vector2(22, 22));
+        world.SetDuty(both, rock, "gather", true);
+        world.SetDuty(both, fire, "fuel", true);
+        Require(both.Duties.Count == 2 && both.Assignment == rock.Id, "a worker should keep jobs at two places and start at the first");
+        SafeTick(world, 60);
+        Require(rock.Remaining < 30 && fire.Burn + fire.Inventory["wood"] * world.Data.CampfireSeconds > 0,
+                "a worker with jobs at two places should take turns: gathering stone and feeding the fire");
+        world.SetDuty(both, fire, "fuel", false);
+        Require(both.Duties.Count == 1 && World.HasDuty(both, rock.Id, "gather"), "taking one job away should keep the other");
+        world.Assign(both, null);
+
+        world.S.Time = morning;
+        // A bench hauler only stocks it; the work itself waits for a crafter.
+        var bench = world.Add("bench", new Vector2(28, 24));
+        bench.Tools!.Add("stone_chisel", 1);
+        world.SetRecipe(bench, "planks");
+        var hauler = AddWorker(world, new Vector2(27, 23));
+        world.SetDuty(hauler, bench, "haul", true);
+        SafeTick(world, 20);
+        Require(bench.Inventory["wood"] > 0 && bench.Inventory["planks"] == 0 && !bench.Processing,
+                "a bench hauler should stock the bench without working it");
+        var crafter = AddWorker(world, new Vector2(28, 25));
+        world.SetDuty(crafter, bench, "craft", true);
+        SafeTick(world, 20);
+        Require(bench.Inventory["planks"] + chest.Inventory["planks"] > 0, "a crafter should work the stocked bench");
+        world.Assign(hauler, null); world.Assign(crafter, null);
+
+        world.S.Time = morning;
+        // A stocker brings tools from storage to the rack.
+        var rack = world.Add("toolstation", new Vector2(16, 20));
+        chest.Inventory.Add("steel_axe", 1);
+        var stocker = AddWorker(world, new Vector2(18, 20));
+        world.SetDuty(stocker, rack, "stock", true);
+        SafeTick(world, 20);
+        Require(rack.Inventory["steel_axe"] == 1 && chest.Inventory["steel_axe"] == 0, "a stocker should bring a stored tool to the rack");
+        world.Assign(stocker, null);
+
+        world.S.Time = morning;
+        // A tender feeds compost from storage, skipping food when told to, and carries its fertilizer back.
+        var compost = world.Add("pile", new Vector2(16, 24));
+        Require(world.SetCompost(compost, true), "an empty pile should turn into compost");
+        world.SetSkipFood(compost, true);
+        compost.Inventory.Add("fertilizer", 2);
+        chest.Inventory.Add("leaves", 8); chest.Inventory.Add("berries", 6);
+        var tender = AddWorker(world, new Vector2(17, 22));
+        world.SetDuty(tender, compost, "tend", true);
+        SafeTick(world, 40);
+        Require(chest.Inventory["fertilizer"] == 2 && compost.Inventory["leaves"] > 0 && chest.Inventory["berries"] == 6 && compost.Inventory["berries"] == 0,
+                "a tender should carry fertilizer to storage and bring leaves, but no food when food deliveries are skipped");
+        world.Assign(tender, null);
+
+        world.S.Time = morning;
+        // A trading post's runner carries what the cart delivered, other than coins, to storage.
+        var store = world.Add("chest", new Vector2(26, 28));
+        var sign = world.Add("signpost", new Vector2(24, 26));
+        sign.Output!.Add("tin_bar", 3); sign.Output.Add(Inventory.Coins, 20);
+        var runner = AddWorker(world, new Vector2(24, 25));
+        world.SetDuty(runner, sign, "deliveries", true);
+        SafeTick(world, 20);
+        Require(store.Inventory["tin_bar"] == 3 && sign.Output["tin_bar"] == 0 && sign.Output[Inventory.Coins] == 20,
+                "a runner should carry deliveries into storage and leave the coins");
+
+        // A tool station's output filter keeps workers from taking a tool it does not let out.
+        world.S.Time = morning;
+        foreach (var other in world.S.Things.Where(t => t.Kind == "toolstation")) other.Inventory = new Inventory { Slots = other.Inventory.Slots, StackSize = other.Inventory.StackSize };
+        var heldRack = world.Add("toolstation", new Vector2(30, 20));
+        heldRack.Inventory.Add("steel_axe", 1);
+        world.SetFilter(heldRack, "steel_pick", true, true);
+        var oak = world.Add("tree", new Vector2(32, 22), 5);
+        var cutter = AddWorker(world, new Vector2(30, 22));
+        world.Assign(cutter, oak);
+        SafeTick(world, 10);
+        Require(cutter.Tool == "" && cutter.Missing == "axe" && heldRack.Inventory["steel_axe"] == 1, "a worker should not take a tool the station's output filter holds back");
+        world.SetFilter(heldRack, "steel_pick", true, false);
+        SafeTick(world, 10);
+        Require(cutter.Tool == "steel_axe", "with the filter cleared, the worker should take the axe");
     }
 
     private static void CheckInventoryFilters(GameData data) {
@@ -472,33 +562,39 @@ public static class SimulationChecks {
     private static void CheckFuelAndHeatGates(GameData data) {
         var world = EmptyWorld(data);
         var basic = world.Add("furnace", new Vector2(10, 10));
-        var woodCost = world.BatchCost(basic);
-        Require(woodCost.TryGetValue("wood", out var basicWood) && basicWood == 1 && !woodCost.ContainsKey("coal"),
-                "basic furnace should accept wood as its initial fuel");
-        basic.Fuel = "coal";
-        var coalCost = world.BatchCost(basic);
-        Require(coalCost.TryGetValue("coal", out var basicCoal) && basicCoal == 1 && !coalCost.ContainsKey("wood"),
-                "basic furnace should also accept coal as fuel");
+        Require(world.FuelOf(basic) == "wood" && !world.BatchCost(basic).ContainsKey("wood") && basic.Burner != null,
+                "basic furnace should burn wood from its own fuel slot by default, apart from its ingredients");
+        basic.Burner!.Add("coal", 4);
+        Require(world.FuelOf(basic) == "coal" && world.FuelBlock(basic, "wood") != null,
+                "basic furnace should burn the coal in its fuel slot and take one kind of fuel at a time");
 
         var reinforced = world.Add("reinforced", new Vector2(15, 10));
         reinforced.Fuel = "wood"; // Even malformed or edited state must not make wood a valid steel fuel.
+        Require(world.FuelOf(reinforced) == "coal" && world.FuelBlock(reinforced, "wood") != null,
+                "the reinforced furnace should only ever burn coal, even if Fuel is tampered with");
         var steelCost = world.BatchCost(reinforced);
-        Require(steelCost.TryGetValue("coal", out var steelCoal) && steelCoal == 3 && !steelCost.ContainsKey("wood"),
-                "reinforced steel batches should always require coal, including fuel, even if Fuel is tampered with");
+        Require(steelCost["coal"] == 2 && steelCost["iron_bar"] == 2 && steelCost.Count == 2,
+                "a steel batch's ingredients should be iron and coal, with its fuel coal in the fuel slot");
         reinforced.Inventory.Add("iron_bar", 2);
-        reinforced.Inventory.Add("coal", 3);
+        reinforced.Inventory.Add("coal", 2);
         world.Player = reinforced.Pos;
-        SafeTick(world, 12);
-        Require(!reinforced.Processing && reinforced.Progress == 0 && reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 3,
-                "reinforced furnace must leave a complete steel batch untouched while below 80 degrees");
         reinforced.Heat = 100;
         SafeTick(world, .25f);
-        Require(reinforced.Processing && reinforced.Inventory["iron_bar"] == 0 && reinforced.Inventory["coal"] == 0,
-                "once hot enough, the reinforced furnace should consume the retained batch inputs");
-        reinforced.Inventory.Add("coal", 3);
+        Require(!reinforced.Processing && reinforced.Inventory["iron_bar"] == 2,
+                "a steel batch must wait for fuel in the fuel slot, even with coal among its ingredients");
+        reinforced.Heat = 0;
+        reinforced.Burner!.Add("coal", 1);
+        SafeTick(world, 12);
+        Require(!reinforced.Processing && reinforced.Progress == 0 && reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 2 && reinforced.Burner["coal"] == 1,
+                "the reinforced furnace must leave a complete steel batch untouched while below the steel heat");
+        reinforced.Heat = 100;
+        SafeTick(world, .25f);
+        Require(reinforced.Processing && reinforced.Inventory["iron_bar"] == 0 && reinforced.Inventory["coal"] == 0 && reinforced.Burner["coal"] == 0,
+                "once hot enough, the reinforced furnace should consume the batch's ingredients and one coal of fuel");
+        reinforced.Burner.Add("coal", 3);
         SafeTick(world, 30);
-        Require(reinforced.Processing && reinforced.Progress < data.Recipes["steel_bar"].Seconds && reinforced.Inventory["coal"] == 1,
-                "a cooled forge should keep burning coal while the steel batch stops progressing");
+        Require(reinforced.Processing && reinforced.Progress < data.Recipes["steel_bar"].Seconds && reinforced.Burner["coal"] == 1,
+                "a cooled forge should keep burning coal from its fuel slot while the steel batch stops progressing");
     }
 
     private static void CheckAnvilNeedsHammering(GameData data) {
@@ -955,8 +1051,8 @@ public static class SimulationChecks {
         GatherUntil(world, coal, "coal", 6);
         var furnace = BuildAt(world, "furnace", Site(25, 25));
         world.LoadBatch(furnace, 11);
-        Require(furnace.Inventory["iron_ore"] == 22 && furnace.Inventory["wood"] == 11,
-                "loading the furnace should transfer the recipe inputs and one fuel per batch");
+        Require(furnace.Inventory["iron_ore"] == 22 && furnace.Burner!["wood"] == 11,
+                "loading the furnace should transfer the recipe inputs, and one fuel per batch into its fuel slot");
         CompleteBatches(world, furnace, "iron_bar", 11);
         world.Player = furnace.Pos;
         world.Collect(furnace);
@@ -967,8 +1063,8 @@ public static class SimulationChecks {
         world.Player = reinforced.Pos;
         int bars = world.S.Backpack["iron_bar"];
         world.LoadBatch(reinforced, 1);
-        Require(reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 3,
-                "reinforced furnace should load iron plus mined coal and coal fuel");
+        Require(reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 2 && reinforced.Burner!["coal"] == 1,
+                "the reinforced furnace should load iron plus mined coal, and coal fuel into its fuel slot");
         CompleteBatches(world, reinforced, "steel_bar", 2, true);
         world.Player = reinforced.Pos;
         world.Collect(reinforced);
@@ -1410,23 +1506,23 @@ public static class SimulationChecks {
         world.Collect(table);
         world.SetRecipe(table, "berry_jam");
         table.Fuel = "coal"; world.S.Backpack.Add("coal", 1);
-        Require(world.BatchCost(table).SequenceEqual(new Dictionary<string, int> { ["crushed_berries"] = 2, ["coal"] = 1 }), "jam should take crushed berries and the chosen fuel");
+        Require(world.BatchCost(table).SequenceEqual(new Dictionary<string, int> { ["crushed_berries"] = 2 }) && world.FuelOf(table) == "coal", "jam should take crushed berries and burn the chosen fuel");
         world.LoadBatch(table);
         world.Player = new Vector2(40, 40);
         SafeTick(world, data.Recipes["berry_jam"].Seconds + 1);
-        Require(table.Inventory["berry_jam"] == 1 && table.Inventory["coal"] == 0, "jam should cook on its own over the fire");
+        Require(table.Inventory["berry_jam"] == 1 && table.Burner!["coal"] == 0, "jam should cook on its own over the fire");
         world.SetRecipe(table, "dough");
         Require(world.BatchCost(table).Keys.Order().SequenceEqual(new[] { "flour", "water" }), "dough should need no fire");
 
         var cannery = world.Add("cannery", new Vector2(24, 20));
         world.SetRecipe(cannery, "canned_meat_stew");
-        cannery.Inventory.Add("meat_stew", 1); cannery.Inventory.Add("tin_can", 1); cannery.Inventory.Add("wood", 1);
+        cannery.Inventory.Add("meat_stew", 1); cannery.Inventory.Add("tin_can", 1); cannery.Burner!.Add("wood", 1);
         SafeTick(world, data.Recipes["canned_meat_stew"].Seconds + 1);
-        Require(cannery.Inventory["canned_meat_stew"] == 1 && cannery.Inventory.Count == 1, "the canning station should seal stew into a can over wood");
+        Require(cannery.Inventory["canned_meat_stew"] == 1 && cannery.Inventory.Count == 1 && cannery.Burner.Count == 0, "the canning station should seal stew into a can over wood");
 
         var furnace = world.Add("furnace", new Vector2(28, 20));
         world.SetRecipe(furnace, "bread");
-        Require(world.BatchCost(furnace).Keys.Order().SequenceEqual(new[] { "dough", "wood" }), "bread should bake from dough in the furnace");
+        Require(world.BatchCost(furnace).Keys.SequenceEqual(new[] { "dough" }) && world.FuelOf(furnace) == "wood", "bread should bake from dough over the furnace's fire");
 
         // By hand, the mortar is carried like any other tool.
         world.Player = table.Pos + new Vector2(1, 0);
@@ -1460,6 +1556,13 @@ public static class SimulationChecks {
         Require(looks.SequenceEqual(new[] { 1, 2, 3 }) && farm.Stage == World.FarmRipe && World.CropLook(farm, world.GrowSeconds) == 4,
                 $"wheat should grow through soil, straws and green plants to ripe in {data.Farm.GrowDays} days: {string.Join(",", looks)}");
 
+        // A plot harvested with nobody to haul keeps its seed in the output: nothing sows it back on its own.
+        var lone = world.Add("farm", origin + new Vector2(0, -6));
+        lone.Stage = World.FarmRipe; world.Player = lone.Pos;
+        world.Gather(lone, world.HarvestSeconds); world.Tick(1);
+        Require(lone.Stage == World.FarmFallow && lone.Output!["wheat_seeds"] == data.Farm.Yield["wheat_seeds"] && lone.Inventory["wheat_seeds"] == 0, "harvested seed should wait in the output until someone moves it into the plot");
+        world.S.Things.Remove(lone);
+
         world.Player = farm.Pos;
         world.Gather(farm, world.HarvestSeconds / 2);
         Require(farm.Stage == World.FarmRipe && Math.Abs(farm.Progress - world.HarvestSeconds / 2) < .01f, "the player should harvest by hand, without a tool");
@@ -1471,12 +1574,14 @@ public static class SimulationChecks {
         var hut = world.Add("hut", new Vector2(40, 40));
         world.Player = hut.Pos + new Vector2(0, 2); world.S.Sheltered = hut.Id;
         for (int i = 0; i < 4 * data.DaySeconds && farm.Stage == World.FarmRipe; i++) SafeTick(world, 1);
-        Require(farm.Stage == World.FarmFallow && farm.Inventory["wheat_seeds"] == 2, "a worker should finish the shared harvest and keep the seeds in the plot");
+        Require(farm.Stage == World.FarmFallow && farm.Output!["wheat_seeds"] + farm.Inventory["wheat_seeds"] == data.Farm.Yield["wheat_seeds"], "a worker should finish the shared harvest into the plot");
         SafeTick(world, 30);
+        Require(farm.Inventory["wheat_seeds"] == data.Farm.Sow["wheat_seeds"] && chest.Inventory["wheat_seeds"] == data.Farm.Yield["wheat_seeds"] - data.Farm.Sow["wheat_seeds"],
+                "the hauler should move one sowing's seeds from the output into the plot and carry the rest to storage");
         Require(chest.Inventory["wheat"] == data.Farm.Yield["wheat"] && compost.Inventory["wheat"] == 0 && compost.Inventory["grass"] == 1, "the wheat should go to storage rather than rot, and the grass to the compost");
         chest.Inventory.Add("fertilizer", 1);
         SafeTick(world, 60);
-        Require(farm.Stage == World.FarmGrowing && farm.Inventory["wheat_seeds"] == 1 && chest.Inventory["fertilizer"] == 0, "the worker should bring fertilizer and sow again from the kept seeds");
+        Require(farm.Stage == World.FarmGrowing && farm.Inventory["wheat_seeds"] == 0 && chest.Inventory["fertilizer"] == 0, "the worker should bring fertilizer and sow again from the seeds moved back in");
     }
 
     /// <summary>Foods restore what their data says, raw ones only say they need cooking, and saves from before the rename keep their cooked meat.</summary>

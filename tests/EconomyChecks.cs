@@ -24,8 +24,12 @@ public static class EconomyChecks {
     }
 
     /// <summary>What one batch of a recipe takes, with the cheapest fuel its station burns.</summary>
-    private static Dictionary<string, int> BatchCost(World world, string recipe) =>
-        world.BatchCost(new Thing { Kind = world.Data.Recipes[recipe].Station, Recipe = recipe, Fuel = "wood" });
+    private static Dictionary<string, int> BatchCost(World world, string recipe) {
+        var station = new Thing { Kind = world.Data.Recipes[recipe].Station, Recipe = recipe, Fuel = "wood" };
+        var cost = new Dictionary<string, int>(world.BatchCost(station));
+        if (world.FuelOf(station) is string fuel) cost[fuel] = cost.GetValueOrDefault(fuel) + 1;
+        return cost;
+    }
 
     private static float Value(GameData data, Dictionary<string, int> goods) => goods.Sum(p => data.Items[p.Key].Price * p.Value);
 

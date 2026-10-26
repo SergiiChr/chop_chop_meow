@@ -357,7 +357,7 @@
       "description": "Crafts planks, crates and tools twice as fast as by hand. Slot a chisel and a hammer; someone has to work at it."
     },
     "reinforced": {
-      "name": "Bellows furnace",
+      "name": "Reinforced furnace",
       "cost": {
         "stone": 20,
         "iron_bar": 5,
@@ -410,7 +410,7 @@
       "description": "Seals stew, jam or meat into tin cans over a wood or coal fire. Canned goods keep and sell for the most."
     },
     "signpost": {
-      "name": "Village signpost",
+      "name": "Trading post",
       "cost": {
         "wood": 10,
         "stone": 4

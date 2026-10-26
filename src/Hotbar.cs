@@ -5,7 +5,6 @@ using Godot;
 namespace ChopChopMeow;
 
 public partial class Game {
-    private int hotbarAssignSlot;
     private readonly System.Collections.Generic.List<ItemSlot> hotbarButtons = new();
     private readonly System.Collections.Generic.List<Label> hotbarCounts = new();
     private readonly System.Collections.Generic.Dictionary<string, Texture2D> hotbarIcons = new();
@@ -34,11 +33,12 @@ public partial class Game {
         button.Pressed += () => SelectHotbar(slot);
         button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.Buildings.ContainsKey(drag.Item);
         button.Take = drag => { SetHotbar(slot, drag.Item); return 0; };
-        button.CustomMinimumSize = new Vector2(66, 62);
+        button.CustomMinimumSize = new Vector2(56, 56);
+        Style.Skin(button, Style.CupNormal, Style.CupHover, Style.CupPressed);
         button.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter;
         button.Text = "";
         button.ExpandIcon = true;
-        button.AddThemeConstantOverride("icon_max_width", 44);
+        button.AddThemeConstantOverride("icon_max_width", 40);
         button.IconAlignment = HorizontalAlignment.Center;
         button.VerticalIconAlignment = VerticalAlignment.Center;
         button.TooltipText = $"Hotbar slot {slot + 1}";
@@ -47,44 +47,25 @@ public partial class Game {
             MouseFilter = Control.MouseFilterEnum.Ignore,
             AnchorRight = 1,
             AnchorBottom = 1,
-            OffsetLeft = 4,
-            OffsetTop = 2,
-            OffsetRight = -42,
-            OffsetBottom = -42
+            OffsetLeft = 6,
+            OffsetTop = 3,
+            OffsetRight = -38,
+            OffsetBottom = -38
         };
-        number.AddThemeFontSizeOverride("font_size", 12);
-        number.AddThemeColorOverride("font_color", new Color("f2e8cf"));
+        number.AddThemeFontOverride("font", Style.Bold); number.AddThemeFontSizeOverride("font_size", 10);
+        number.AddThemeColorOverride("font_color", Style.Tan);
         button.AddChild(number);
-        var count = new Label {
-            MouseFilter = Control.MouseFilterEnum.Ignore,
-            HorizontalAlignment = HorizontalAlignment.Right,
-            AnchorLeft = 0,
-            AnchorTop = 0,
-            AnchorRight = 1,
-            AnchorBottom = 1,
-            OffsetLeft = 28,
-            OffsetTop = 41,
-            OffsetRight = -4,
-            OffsetBottom = -2
-        };
-        count.AddThemeFontSizeOverride("font_size", 11);
-        count.AddThemeColorOverride("font_color", new Color("f2e8cf"));
+        // The count sits on a pill at the cup's corner, as on every other cup.
+        var count = Style.Corner(Style.Pill("", Style.CountPill, Style.Rim, 12), 1, 1);
+        count.Visible = false;
         button.AddChild(count);
         hotbarCounts.Add(count);
         hotbarButtons.Add(button);
         return button;
     }
 
-    private static readonly StyleBoxFlat ActiveSlotStyle = ActiveSlot();
-    private static StyleBoxFlat ActiveSlot() {
-        var style = new StyleBoxFlat { BgColor = new Color("3d5446"), BorderColor = new Color("ffe08a"), ContentMarginLeft = 4, ContentMarginRight = 4, ContentMarginTop = 4, ContentMarginBottom = 4 };
-        style.SetBorderWidthAll(3); style.SetCornerRadiusAll(6);
-        return style;
-    }
-
     // What each slot shows, so a slot is redrawn only when its item, count or selection changes: redrawing builds text and styles.
     private readonly System.Collections.Generic.Dictionary<int, (ItemSlot Button, string Id, int Count, bool Active)> shownSlots = new();
-    private static readonly string[] SlotStates = { "normal", "hover", "pressed", "disabled" };
     private void RefreshHotbar() {
         for (int slot = 0; slot < hotbarButtons.Count; slot++) {
             var button = hotbarButtons[slot];
@@ -99,13 +80,12 @@ public partial class Game {
             hotbarCounts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : HotbarIcon(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
-            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · assign from Inventory" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
+            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · drag an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
             bool active = world.S.ActiveHotbar == slot;
-            button.Modulate = active ? new Color("f2d98b") : Colors.White;
-            // The item in hand gets a bright outline; the others fall back to the theme.
-            foreach (string state in SlotStates)
-                if (active) button.AddThemeStyleboxOverride(state, ActiveSlotStyle);
-                else button.RemoveThemeStyleboxOverride(state);
+            // The item in hand gets an orange rim.
+            button.AddThemeStyleboxOverride("normal", active ? Style.CupWanted : Style.CupNormal);
+            button.AddThemeStyleboxOverride("disabled", active ? Style.CupWanted : Style.CupNormal);
+            hotbarCounts[slot].Visible = hotbarCounts[slot].Text != "";
         }
     }
 
@@ -145,38 +125,11 @@ public partial class Game {
         else world.Attack();
     }
 
-    private void HotbarAssignment() {
-        AddLabel("Choose a slot, then assign an item or building plan, or drag one onto the hotbar. A slot stores a reference; it does not duplicate anything.", 14, Muted);
-        var row = Row();
-        for (int i = 0; i < 9; i++) {
-            int slot = i;
-            string assigned = HotbarId(i);
-            var slotButton = Button($"{i + 1}", () => { hotbarAssignSlot = slot; OpenPage("hotbar"); });
-            slotButton.TooltipText = string.IsNullOrEmpty(assigned) ? $"Slot {i + 1} · empty" : $"Slot {i + 1} · {world.Data.Name(assigned)}";
-            slotButton.CustomMinimumSize = new Vector2(0, 36);
-            slotButton.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-            if (slot == hotbarAssignSlot) slotButton.Modulate = new Color("f2d98b");
-            row.AddChild(slotButton);
-            if (i == 2 || i == 5) row = Row();
-        }
-        string current = HotbarId(hotbarAssignSlot);
-        AddLabel($"Assigning slot {hotbarAssignSlot + 1} · {(string.IsNullOrEmpty(current) ? "Empty" : world.Data.Name(current))}", 16);
-        var grid = AddGrid();
-        foreach (var id in world.Data.Items.Keys.Concat(world.Data.Buildings.Keys)) {
-            var (cell, _) = IconCell($"assign_{id}"); cell.Icon = HotbarIcon(id); DragReference(cell, id);
-            cell.TooltipText = world.Data.Buildings.ContainsKey(id) ? $"Plan: {world.Data.Name(id)}" : world.Data.Name(id);
-            cell.Pressed += () => SetHotbar(hotbarAssignSlot, id);
-            grid.AddChild(cell);
-        }
-        AddButton("Clear selected slot", () => SetHotbar(hotbarAssignSlot, ""));
-        AddButton("Back to inventory", () => OpenPage("inventory"));
-    }
-
     private void SetHotbar(int slot, string id) {
         world.S.HotbarSlots[slot] = id;
         world.S.ActiveHotbar = slot;
         if (id != "") sounds.Play("putting_items_on_hotbar");
         Notify(id == "" ? $"Cleared hotbar slot {slot + 1}." : $"Slot {slot + 1}: {world.Data.Name(id)}.");
-        if (page == "hotbar") OpenPage("hotbar"); else RefreshLive();
+        RefreshLive();
     }
 }
