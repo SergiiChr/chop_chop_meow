@@ -33,19 +33,22 @@ public partial class Game {
 
     private void Market(Thing sign) {
         var output = sign.Output!;
-        var ship = Well(new HBoxContainer()); ship.AddThemeConstantOverride("separation", 14);
+        var outbound = Well(new VBoxContainer()); outbound.AddThemeConstantOverride("separation", 8);
+        outbound.AddChild(WellLabel("Outbound"));
+        var ship = new HBoxContainer(); ship.AddThemeConstantOverride("separation", 14); outbound.AddChild(ship);
         var host = content; content = new VBoxContainer();
         var crates = AddInventoryGrid(() => sign.Inventory, sign, id => MoveStack(sign.Inventory, world.S.Backpack, id, sign), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item), columns: 3);
         content.RemoveChild(crates); content.QueueFree(); content = host;
         ship.AddChild(crates);
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
         var sell = Button("", () => { var load = sign.Inventory.Items.Keys.OrderByDescending(id => sign.Inventory[id]).FirstOrDefault(); if (world.Sell(sign) && load != null) sounds.Play(Sounds.ForItem(load)); });
-        sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = GD.Load<Texture2D>("res://assets/ui/line_cart.svg"); sell.ExpandIcon = true;
-        sell.AddThemeConstantOverride("icon_max_width", 28); sell.CustomMinimumSize = new Vector2(0, 56); sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; sell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = GD.Load<Texture2D>("res://assets/ui/line_cart.svg"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
+        sell.AddThemeConstantOverride("icon_max_width", 32); sell.CustomMinimumSize = new Vector2(0, 56); sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; sell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         var look = Style.Pill(Style.Brick); Style.Skin(sell, look.Item1, look.Item2);
         sell.AddThemeColorOverride("icon_normal_color", Style.Rim); sell.AddThemeColorOverride("icon_hover_color", Style.Rim);
         ship.AddChild(sell);
-        var worth = new LiveText(shown => sell.Text = shown);
+        var revenue = Style.Text("", 14, Style.Ink); outbound.AddChild(revenue);
+        var worth = new LiveText(shown => revenue.Text = shown);
         int counted = -1;
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(sell)) return;
@@ -53,11 +56,14 @@ public partial class Game {
             if (count == counted) return;
             counted = count;
             int value = SaleWorth(sign);
-            if (value > 0) worth.Clear().Append("≈ ").Append(value); else worth.Clear();
+            if (value > 0) worth.Clear().Append("Approximate revenue: ").Append(value); else worth.Clear();
+            revenue.Visible = value > 0;
             worth.Show();
         });
         Road(sign);
-        var mail = Well(new HBoxContainer()); mail.AddThemeConstantOverride("separation", 14);
+        var inbound = Well(new VBoxContainer()); inbound.AddThemeConstantOverride("separation", 8);
+        inbound.AddChild(WellLabel("Inbound"));
+        var mail = new HBoxContainer(); mail.AddThemeConstantOverride("separation", 14); inbound.AddChild(mail);
         var glyph = Style.Glyph("line_mail", 30, Style.Ink); glyph.MouseFilter = Control.MouseFilterEnum.Pass; glyph.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(glyph);
         host = content; content = new VBoxContainer();
         var boxes = AddInventoryGrid(() => output, sign, id => MoveStack(output, world.S.Backpack, id, sign), "Click or drag: take", _ => false, columns: 5);
@@ -144,9 +150,9 @@ public partial class Game {
             fetch.Disabled = blocked != null; fetch.TooltipText = blocked ?? "The worker managing deliveries walks to Bramblewick and back with fresh prices.";
         });
         board.AddChild(new ColorRect { Color = Style.Enamel, CustomMinimumSize = new Vector2(0, 3) });
-        var header = new HBoxContainer(); board.AddChild(header);
-        header.AddChild(new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
-        foreach (var (column, width) in new[] { ("PAYS", 70), ("SELLS", 88) }) { var cell = Style.Text(column, 11, Style.Tan); cell.CustomMinimumSize = new Vector2(width, 0); cell.HorizontalAlignment = HorizontalAlignment.Right; header.AddChild(cell); }
+        var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 6); board.AddChild(header);
+        header.AddChild(new Control { CustomMinimumSize = new Vector2(32, 0) });
+        foreach (string column in new[] { "Sell price", "Buy price" }) { var cell = Style.Text(column, 13, Style.Tan); cell.CustomMinimumSize = new Vector2(PriceColumn, 0); cell.HorizontalAlignment = HorizontalAlignment.Center; header.AddChild(cell); }
         var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; rows.AddThemeConstantOverride("separation", 0);
         sheetScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; sheetScroll.AddChild(rows); board.AddChild(sheetScroll); sheetRows = rows;
         var coins = HotbarIcon(Inventory.Coins);
@@ -156,9 +162,9 @@ public partial class Game {
             row.AddThemeConstantOverride("separation", 6); rows.AddChild(row);
             var icon = Style.Icon(HotbarIcon(id), 32); row.AddChild(icon);
             if (world.Lot(id) > 1) icon.AddChild(Style.Corner(Style.Pill($"×{world.Lot(id)}", Style.Round(Style.Enamel, 7).Item1, Style.Rim, 10), 1, 1, 8));
-            row.AddChild(new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
-            var trend = Style.Text("", 18, Style.Brick, Style.Head); trend.CustomMinimumSize = new Vector2(20, 0); trend.HorizontalAlignment = HorizontalAlignment.Center; row.AddChild(trend);
-            var sellPrice = Style.Text("", 17, Style.Ink, Style.Head); sellPrice.CustomMinimumSize = new Vector2(44, 0); sellPrice.HorizontalAlignment = HorizontalAlignment.Right; row.AddChild(sellPrice);
+            var sellColumn = new HBoxContainer { CustomMinimumSize = new Vector2(PriceColumn, 0), Alignment = BoxContainer.AlignmentMode.Center }; sellColumn.AddThemeConstantOverride("separation", 4); row.AddChild(sellColumn);
+            var sellPrice = Style.Text("", 17, Style.Ink, Style.Head); sellPrice.CustomMinimumSize = new Vector2(40, 0); sellPrice.HorizontalAlignment = HorizontalAlignment.Right; sellColumn.AddChild(sellPrice);
+            var trend = Style.Text("", 18, Style.Brick, Style.Head); trend.CustomMinimumSize = new Vector2(20, 0); trend.HorizontalAlignment = HorizontalAlignment.Center; sellColumn.AddChild(trend);
             if (sells) {
                 var price = new LiveText(shown => sellPrice.Text = shown);
                 int shownTenths = -1;
@@ -174,7 +180,7 @@ public partial class Game {
                     trend.AddThemeColorOverride("font_color", known < full ? Style.Brick : Style.Rise);
                 });
             }
-            var buySlot = new CenterContainer { CustomMinimumSize = new Vector2(88, 36) }; row.AddChild(buySlot);
+            var buySlot = new CenterContainer { CustomMinimumSize = new Vector2(PriceColumn, 36) }; row.AddChild(buySlot);
             // Goods the village does not take show no sell price, and goods it does not sell no buy button.
             if (!buys) continue;
             var buy = new Button { Name = $"buy_{id}", Text = $"{world.LotPrice(id)}", Icon = coins, ExpandIcon = true, IconAlignment = HorizontalAlignment.Right, CustomMinimumSize = new Vector2(80, 30), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
@@ -185,4 +191,9 @@ public partial class Game {
             buySlot.AddChild(buy);
         }
     }
+
+    private const float PriceColumn = 104;
+
+    /// <summary>A small heading at the top of a well.</summary>
+    private static Label WellLabel(string text) => Style.Text(text, 13, Style.Tan, Style.Head);
 }

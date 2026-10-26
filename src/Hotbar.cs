@@ -5,7 +5,6 @@ using Godot;
 namespace ChopChopMeow;
 
 public partial class Game {
-    private int hotbarAssignSlot;
     private readonly System.Collections.Generic.List<ItemSlot> hotbarButtons = new();
     private readonly System.Collections.Generic.List<Label> hotbarCounts = new();
     private readonly System.Collections.Generic.Dictionary<string, Texture2D> hotbarIcons = new();
@@ -126,38 +125,11 @@ public partial class Game {
         else world.Attack();
     }
 
-    private void HotbarAssignment() {
-        AddLabel("Choose a slot, then assign an item or building plan, or drag one onto the hotbar. A slot stores a reference; it does not duplicate anything.", 14, Muted);
-        var row = Row();
-        for (int i = 0; i < 9; i++) {
-            int slot = i;
-            string assigned = HotbarId(i);
-            var slotButton = Button($"{i + 1}", () => { hotbarAssignSlot = slot; OpenPage("hotbar"); });
-            slotButton.TooltipText = string.IsNullOrEmpty(assigned) ? $"Slot {i + 1} · empty" : $"Slot {i + 1} · {world.Data.Name(assigned)}";
-            slotButton.CustomMinimumSize = new Vector2(0, 36);
-            slotButton.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-            if (slot == hotbarAssignSlot) slotButton.Modulate = new Color("f2d98b");
-            row.AddChild(slotButton);
-            if (i == 2 || i == 5) row = Row();
-        }
-        string current = HotbarId(hotbarAssignSlot);
-        AddLabel($"Assigning slot {hotbarAssignSlot + 1} · {(string.IsNullOrEmpty(current) ? "Empty" : world.Data.Name(current))}", 16);
-        var grid = AddGrid();
-        foreach (var id in world.Data.Items.Keys.Concat(world.Data.Buildings.Keys)) {
-            var (cell, _) = IconCell($"assign_{id}"); cell.Icon = HotbarIcon(id); DragReference(cell, id);
-            cell.TooltipText = world.Data.Buildings.ContainsKey(id) ? $"Plan: {world.Data.Name(id)}" : world.Data.Name(id);
-            cell.Pressed += () => SetHotbar(hotbarAssignSlot, id);
-            grid.AddChild(cell);
-        }
-        AddButton("Clear selected slot", () => SetHotbar(hotbarAssignSlot, ""));
-        AddButton("Back to inventory", () => OpenPage("inventory"));
-    }
-
     private void SetHotbar(int slot, string id) {
         world.S.HotbarSlots[slot] = id;
         world.S.ActiveHotbar = slot;
         if (id != "") sounds.Play("putting_items_on_hotbar");
         Notify(id == "" ? $"Cleared hotbar slot {slot + 1}." : $"Slot {slot + 1}: {world.Data.Name(id)}.");
-        if (page == "hotbar") OpenPage("hotbar"); else RefreshLive();
+        RefreshLive();
     }
 }

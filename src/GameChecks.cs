@@ -310,7 +310,8 @@ public partial class Game {
         float zoom = view.Zoom;
         foreach (var page in new[] { "inventory", "build", "craft", "help" }) {
             OpenPage(page); await Frames(3);
-            var box = panel.GetGlobalRect();
+            // The backpack shows only its drawer, so the wheel goes over that.
+            var box = page == "inventory" ? bag.GetGlobalRect() : panel.GetGlobalRect();
             foreach (var spot in new[] { box.GetCenter(), box.Position + new Vector2(30, 30), box.End - new Vector2(30, 30) }) await Wheel(spot);
             UIRequire(view.Zoom == zoom, $"The mouse wheel over the {page} panel must not zoom the world.");
         }
@@ -521,15 +522,11 @@ public partial class Game {
             ((Button)panel.FindChild("filter_in_wood", true, false)).EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(!chest.Inventory.InputFilter.Contains("wood"), "Clicking an item in a filter row must take it off.");
             await KeyStroke(Key.Tab);
-            FindButton(panel, "Assign hotbar slots")!.EmitSignal(BaseButton.SignalName.Pressed);
-            await Frames();
-            UIRequire(page == "hotbar", "Inventory must expose hotbar assignment.");
-            FindButton(panel, "1")!.EmitSignal(BaseButton.SignalName.Pressed);
-            await Frames();
+            UIRequire(page == "inventory" && bag.Visible && FindButton(panel, "Assign hotbar slots") == null, "Tab must open the backpack drawer, with no separate hotbar assignment.");
+            await KeyStroke(Key.B);
             int carriedBeforeAssignment = world.S.Backpack.Count;
-            Named("assign_hut")!.EmitSignal(BaseButton.SignalName.Pressed);
-            await Frames();
-            UIRequire(world.S.HotbarSlots[0] == "hut" && world.S.Backpack.Count == carriedBeforeAssignment, "Rebinding a hotbar slot must store a plan reference without creating items.");
+            await DragTo(Named("build_hut")!, hotbarButtons[0]);
+            UIRequire(world.S.HotbarSlots[0] == "hut" && world.S.Backpack.Count == carriedBeforeAssignment, "Dragging a plan onto the hotbar must store a plan reference without creating items.");
             await KeyStroke(Key.I); UIRequire(page == "help", "I must open the field guide.");
             var savedPosition = world.Player;
             var savedSlots = world.S.HotbarSlots.ToArray(); int savedActiveSlot = world.S.ActiveHotbar;
@@ -550,7 +547,6 @@ public partial class Game {
             UIRequire(FindButton(screen, "Slot 2 · empty")!.Disabled, "The load screen must disable empty slots.");
             await Click(screen.GetChildren().OfType<Button>().First(b => b.Text.StartsWith("Slot 1 · ")));
             UIRequire(!backdrop.Visible && !menu.Visible && !paused && world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the save and resume.");
-            UIRequire(page == "inventory" && bag.Visible && FindButton(panel, "Assign hotbar slots") != null, "The inventory must show the backpack drawer and hotbar assignment.");
             world.S.Backpack.Add(Inventory.Coins, 1200); RefreshLive();
             UIRequire(Slots().Count(c => c.TooltipText.StartsWith("Coins")) == 2, "Carried coins must show as backpack cells stacking to 1000.");
             world.S.Backpack.Remove(Inventory.Coins, 1200);

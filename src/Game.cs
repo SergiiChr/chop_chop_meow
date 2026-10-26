@@ -280,7 +280,7 @@ public partial class Game : Node {
         var outer = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; outer.AddThemeConstantOverride("separation", 16); frame.AddChild(outer);
         heading = new HBoxContainer(); heading.AddThemeConstantOverride("separation", 12); outer.AddChild(heading);
         headingIcon = Style.Icon(null, 44); headingIcon.Visible = false; headingIcon.MouseFilter = Control.MouseFilterEnum.Pass; heading.AddChild(headingIcon);
-        headingTitle = Style.Heading(name switch { "welcome" => "A new beginning", "build" => "Building plans", "inventory" => "Backpack", "hotbar" => "Hotbar", "help" => "Field guide", "workers" => "Your crew", "craft" => "Crafting", _ => "Inspect" });
+        headingTitle = Style.Heading(name switch { "welcome" => "A new beginning", "build" => "Building plans", "inventory" => "Backpack", "help" => "Field guide", "workers" => "Your crew", "craft" => "Crafting", _ => "Inspect" });
         headingTitle.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; heading.AddChild(headingTitle);
         heading.AddChild(HeaderButton("close", "Close · Esc", ClosePanel, Style.CloseRound, "close"));
         scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
@@ -292,7 +292,6 @@ public partial class Game : Node {
             case "help": Help(); break;
             case "build": BuildingPlans(); break;
             case "inventory": Backpack(); break;
-            case "hotbar": HotbarAssignment(); break;
             case "workers": Workers(); break;
             case "craft": CraftMenu(); break;
             default: Inspect(); break;
@@ -369,9 +368,10 @@ public partial class Game : Node {
         }
         content.AddChild(details);
     }
+    /// <summary>The backpack is only the drawer; the side panel stays hidden while it shows.</summary>
     private void Backpack() {
         BagGrid(UseFromBag, UseHint);
-        AddButton("Assign hotbar slots", () => OpenPage("hotbar"));
+        panel.Visible = false;
     }
     private const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
     private void UseFromBag(string id) {
@@ -817,7 +817,7 @@ public partial class Game : Node {
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
                 case Key.Escape:
-                    if (view.BuildMode != "" || assigningWorker > 0) { view.BuildMode = ""; assigningWorker = 0; } else if (panel.Visible) ClosePanel(); else OpenMenu();
+                    if (view.BuildMode != "" || assigningWorker > 0) { view.BuildMode = ""; assigningWorker = 0; } else if (panel.Visible || bag.Visible) ClosePanel(); else OpenMenu();
                     RefreshLive(); break;
                 case Key.B: OpenPage("build"); break;
                 case Key.I: if (page == "help") ClosePanel(); else OpenPage("help"); break;

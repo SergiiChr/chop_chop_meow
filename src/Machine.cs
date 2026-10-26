@@ -80,11 +80,11 @@ public partial class Game {
     /// <summary>The high-temp furnace's heat dial in degrees Celsius, with the bellows' pump and its key.</summary>
     private void Bellows(Thing t) {
         var row = Row(); row.AddThemeConstantOverride("separation", 18);
-        var dial = new HeatDial { Level = () => t.Heat, CustomMinimumSize = new Vector2(132, 132), Name = "heat", TooltipText = $"Steel forms from {World.Celsius(World.SteelHeat)} °C" };
+        var dial = new HeatDial { Level = () => t.Heat, CustomMinimumSize = new Vector2(132, 132), Name = "heat", TooltipText = $"Steel melts at {World.Celsius(World.SteelHeat)}+ °C" };
         row.AddChild(dial);
         var column = new VBoxContainer { SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; column.AddThemeConstantOverride("separation", 8); row.AddChild(column);
         var degrees = Style.Heading("", 30); column.AddChild(degrees);
-        column.AddChild(Style.Text($"steel from {World.Celsius(World.SteelHeat)} °C", 14, Style.Beige));
+        column.AddChild(Style.Text($"Steel melts at {World.Celsius(World.SteelHeat)}+ °C", 14, Style.Beige));
         var pumpRow = new HBoxContainer(); pumpRow.AddThemeConstantOverride("separation", 8); column.AddChild(pumpRow);
         var pump = Button("Pump", () => { if (paused) Notify("Resume before operating the bellows."); else world.Pump(t); });
         pump.Name = "pump"; pump.TooltipText = "Pump the bellows · Space"; pump.CustomMinimumSize = new Vector2(84, 38);
