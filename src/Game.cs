@@ -318,7 +318,7 @@ public partial class Game : Node {
         AddLabel("The woods are quiet. For now.", 21);
         AddLabel("A small settlement begins with your own two hands. Sell berries for your first pickaxe, master the bellows, and send your first crate of steel tools to the village.", 16, Muted);
         AddLabel("FIRST STEPS", 14);
-        AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Pick berries, craft a crate and sell them at a village signpost for a pickaxe.\n4  Press Esc any time to see your current goal.");
+        AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Pick berries, craft a crate and sell them at a trading post for a pickaxe.\n4  Press Esc any time to see your current goal.");
         AddLabel("You begin with a steel axe, 10 berries and 6 wood. Drink at the lake up the valley; gather water to carry. The sea is salt and cannot be drunk. A fire and cabin protect you after dark.", 15, Muted);
         AddButton("Into the clearing", ClosePanel);
         AddLabel("10–15 minute POC · up to four players · Linux", 13, Muted);
@@ -607,17 +607,17 @@ public partial class Game : Node {
     }
     private static string A(string word) => "aeiou".Contains(word[0]) ? $"an {word}" : $"a {word}";
     /// <summary>
-    /// A dump: fourteen stacks of the one resource it holds, filled left to right and top to bottom, and a switch that turns it into compost.
+    /// A pile: fourteen stacks of the one resource it holds, filled left to right and top to bottom, and a switch that turns it into compost.
     /// Compost shows the same grid; under its bar is what it is composting and how long that lasts, and the fertilizer it makes.
     /// </summary>
     private void Pile(Thing t) {
-        headingTitle.Text = t.Compost ? "Compost" : t.Inventory.First() is string held ? $"Dump · {world.Data.Name(held).ToLowerInvariant()}" : "Dump";
+        headingTitle.Text = t.Compost ? "Compost" : t.Inventory.First() is string held ? $"Pile · {world.Data.Name(held).ToLowerInvariant()}" : "Pile";
         if (t.Compost) { headingIcon.Texture = HotbarIcon("leaves"); headingIcon.Visible = true; }
         var compost = new CheckButton { ButtonPressed = t.Compost, FocusMode = Control.FocusModeEnum.None, TooltipText = "Compost: turns leaves, grass and food into fertilizer", Name = "compost" };
         compost.Toggled += on => { if (!world.SetCompost(t, on)) compost.SetPressedNoSignal(t.Compost); else OpenPage("inspect"); };
         heading.AddChild(compost); heading.MoveChild(compost, heading.GetChildCount() - 2);
         if (t.Compost) FilterButton(t);
-        else HeaderAction("stash", "Dump everything this pile takes", () => StoreAll(t), Style.ActionRound, "deposit");
+        else HeaderAction("stash", "Store everything this pile takes", () => StoreAll(t), Style.ActionRound, "deposit");
         Well(new VBoxContainer()).AddChild(StorageGrid(t, 7, 44));
         if (!t.Compost) {
             Dynamic(text => text.Append(t.Inventory.UsedSlots).Append(" of ").Append(t.Inventory.Slots).Append(" stacks"), 14, Muted);

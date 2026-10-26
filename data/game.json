@@ -410,7 +410,7 @@
       "description": "Seals stew, jam or meat into tin cans over a wood or coal fire. Canned goods keep and sell for the most."
     },
     "signpost": {
-      "name": "Village signpost",
+      "name": "Trading post",
       "cost": {
         "wood": 10,
         "stone": 4

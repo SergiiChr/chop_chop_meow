@@ -171,7 +171,7 @@ public partial class Game {
         var berries = world.Add("crate", world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); world.PickUpCrate(berries);
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         await Click(view.Screen(sign.Pos, .8f));
-        UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A signpost must open the market with its icon buttons.");
+        UIRequire(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A trading post must open the market with its icon buttons.");
         await Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·")));
         UIRequire(sign.Inventory.Count == 0 && world.S.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
         await Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));

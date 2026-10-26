@@ -432,9 +432,9 @@ public sealed partial class World {
         // Workers fetch their tools from a tool station instead of needing them carried.
         if (worker || ToolKind(t) is not string kind || BestTool(kind) != null) return null;
         return kind switch {
-            "axe" => "An axe is needed. Recover your belongings or buy one at the village signpost.",
+            "axe" => "An axe is needed. Recover your belongings or buy one at the trading post.",
             "rake" => "Raking leaves needs a rake. Craft one at a bench.",
-            _ => "Mining needs a pickaxe. Sell crates of berries at the village signpost and buy one."
+            _ => "Mining needs a pickaxe. Sell crates of berries at the trading post and buy one."
         };
     }
     public static string ResourceItem(Thing t) => ResourceItem(t.Kind);
@@ -794,7 +794,7 @@ public sealed partial class World {
     private void UpdatePrices() {
         S.Prices = Data.Market.Sells.Keys.ToDictionary(item => item, item => UnitPrice(item, false)); S.PricesTime = S.Time;
     }
-    private string? CartBlock(Thing sign) => !Near(sign) || sign.Kind != "signpost" ? "Walk closer to the signpost." : S.Orders.Count >= 3 ? "All three village carts are busy." : null;
+    private string? CartBlock(Thing sign) => !Near(sign) || sign.Kind != "signpost" ? "Walk closer to the trading post." : S.Orders.Count >= 3 ? "All three village carts are busy." : null;
     /// <summary>Sends every acceptable crate in the market input on one cart; the coins come back into the market output.</summary>
     public bool Sell(Thing sign) {
         if (CartBlock(sign) is string blocked) { Say(blocked); return false; }
@@ -1425,7 +1425,7 @@ public sealed partial class World {
         foreach (var w in S.Workers) {
             // A striking worker does not work, so no further wages are added until the strike is settled.
             if (w.WageDebt > 0) continue;
-            if (!PayWage(w.Wage)) { float due = w.WageDebt = w.Wage; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the signpost."); }
+            if (!PayWage(w.Wage)) { float due = w.WageDebt = w.Wage; Say($"{w.Name} is on strike: {due:0} coins owed. Pay or dismiss them at the trading post."); }
         }
     }
     public void SettleDebt(Worker w) {
@@ -1750,16 +1750,16 @@ public sealed partial class World {
         0 => ("A place to begin", "Hold right mouse near trees, stones and berry bushes. You carry a steel axe. B opens building plans."),
         1 => ("A workbench", "Press C to craft. Knap a stone chisel from 2 stone, split wood into planks, then build a crafting bench: 10 planks."),
         2 => ("Something to carry", "Carve a wooden mallet by hand and slot it in the bench beside the chisel. Craft a crate there: 6 planks."),
-        3 => ("The road to Bramblewick", "Build a village signpost: 10 wood + 4 stone. Place a crate, fill it with berries, pick it up and put it in the market. Sell, then collect the coins."),
-        4 => ("Beneath the surface", "Buy a steel pickaxe from the price sheet at the signpost. The cart brings it back in a crate."),
+        3 => ("The road to Bramblewick", "Build a trading post: 10 wood + 4 stone. Place a crate, fill it with berries, pick it up and put it in the market. Sell, then collect the coins."),
+        4 => ("Beneath the surface", "Buy a steel pickaxe from the price sheet at the trading post. The cart brings it back in a crate."),
         5 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A cabin and campfire make nights safer."),
         6 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore + wood. Collect iron bars."),
         7 => ("Hotter than fire", "Explore for a dark cliff and mine coal at its foot. Build a reinforced furnace: 20 stone, 5 iron bars, 8 wood."),
         8 => ("Make steel", "Load iron + mined coal into the reinforced furnace and coal into its fuel slot. Pump the bellows: steel requires 1450+ °C. 2 iron bars + 2 coal make 2 steel bars."),
         9 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. It hammers steel bars into steel parts."),
         10 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),
-        11 => ("Steel for sale", "Pack steel tools into a crate and sell it at the signpost, then collect the coins."),
-        12 => ("Many hands", "At the signpost pick a hiring offer: more coins up front means a lower daily wage. Keep wages in your backpack for each dawn."),
+        11 => ("Steel for sale", "Pack steel tools into a crate and sell it at the trading post, then collect the coins."),
+        12 => ("Many hands", "At the trading post pick a hiring offer: more coins up front means a lower daily wage. Keep wages in your backpack for each dawn."),
         13 => ("Your first automation", "Build storage, and a tool station holding a spare axe or pickaxe for woodcutters and miners. Give a worker the Gather job from their panel, or a job with the job buttons at a building."),
         _ => ("A settlement of your own", "The starter goals are done. Work toward the end goals: a mine on every ore and a week of steady profit.")
     };

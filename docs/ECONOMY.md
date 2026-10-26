@@ -25,7 +25,7 @@ A new recipe gets its price from this rule. The check fails if any recipe loses 
 
 A worker-day costs the daily wage plus the up-front payment spread over 10 days. All offers cost about the same over that time (24 to 26 coins); more up front means a lower wage, so a worker kept longer is cheaper, and the dearest wage needs nothing up front.
 
-Wages are paid at dawn from the signposts' wage slots first, where sale coins land, and then from the backpack. The slot holds one stack (1000 coins); sale coins beyond it go to the market output and are not touched by wages.
+Wages are paid at dawn from the trading posts' wage slots first, where sale coins land, and then from the backpack. The slot holds one stack (1000 coins); sale coins beyond it go to the market output and are not touched by wages.
 
 Worker output is measured by running one worker through a whole day: walking, hauling, lunch and the commute included, with chests 2.5 tiles away and steel tools at the bench. A product's worker-days are its materials' worker-days plus one over its station's daily output.
 
