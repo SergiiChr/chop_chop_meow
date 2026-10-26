@@ -5,12 +5,10 @@ using ChopChopMeow;
 using Godot;
 
 /// <summary>Simulation checks for mines and the end goals.</summary>
-public static class MineChecks
-{
+public static class MineChecks {
     private const float Step = .25f;
 
-    public static void Run(GameData data)
-    {
+    public static void Run(GameData data) {
         CheckAlignmentAndLegacySave(data);
         CheckMarking(data);
         CheckConstruction(data);
@@ -19,49 +17,41 @@ public static class MineChecks
         CheckDailyProfitAndEndGoals(data);
     }
 
-    private static void Require(bool condition, string message)
-    {
+    private static void Require(bool condition, string message) {
         if (!condition) throw new InvalidOperationException($"Mine check failed: {message}");
     }
 
     /// <summary>An empty map with coins enough to pay every wage, so no worker strikes.</summary>
-    private static World EmptyWorld(GameData data)
-    {
+    private static World EmptyWorld(GameData data) {
         var world = new World(data, false);
         world.S.Backpack.Add(Inventory.Coins, 1000);
         return world;
     }
 
-    private static Worker AddWorker(World world, Vector2 position)
-    {
+    private static Worker AddWorker(World world, Vector2 position) {
         var worker = new Worker { Id = world.S.NextId++, Name = $"Miner {world.S.Workers.Count + 1}", Pos = position };
         world.S.Workers.Add(worker);
         return worker;
     }
 
     /// <summary>Runs the world with the player fed and out of the wolves' way, through nights as well, until a condition holds.</summary>
-    private static void Work(World world, float seconds, Func<bool>? until = null)
-    {
-        for (; seconds > 0 && until?.Invoke() != true; seconds -= Step)
-        {
+    private static void Work(World world, float seconds, Func<bool>? until = null) {
+        for (; seconds > 0 && until?.Invoke() != true; seconds -= Step) {
             world.S.Hunger = world.S.Thirst = world.S.Health = 100;
             world.Tick(Step, true);
         }
     }
 
     /// <summary>A mine marked at the first cliff of an ore, with the player standing in front of it.</summary>
-    private static Thing MarkMine(World world, string ore = "iron")
-    {
+    private static Thing MarkMine(World world, string ore = "iron") {
         var cliff = World.CliffOf(ore);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
         return world.Build("mine", World.MineSpot(cliff) + cliff.Along + cliff.Face) ?? throw new InvalidOperationException($"Mine check failed: a mine should be marked at the {ore} cliff");
     }
 
-    private static void CheckAlignmentAndLegacySave(GameData data)
-    {
+    private static void CheckAlignmentAndLegacySave(GameData data) {
         var world = EmptyWorld(data); var expected = new Dictionary<int, Vector2>();
-        foreach (var cliff in World.Cliffs)
-        {
+        foreach (var cliff in World.Cliffs) {
             Require(World.CliffAt(World.MineSpot(cliff)) == cliff, "each aligned site must belong to its own cliff");
             var marking = EmptyWorld(data); marking.Player = World.MineSpot(cliff) + cliff.Face * 3;
             Require(marking.Build("mine", World.MineSpot(cliff) + cliff.Along + cliff.Face)?.Pos == World.MineSpot(cliff), "every aligned site must remain markable and snap correctly");
@@ -85,8 +75,7 @@ public static class MineChecks
         world.S.Version = 4;
         var loaded = EmptyWorld(data); loaded.Deserialize(world.Serialize());
         Require(loaded.S.Version == 6, "version 4 valley saves must upgrade to the current mine layout");
-        foreach (var mine in loaded.S.Things.Where(t => t.Kind == "mine"))
-        {
+        foreach (var mine in loaded.S.Things.Where(t => t.Kind == "mine")) {
             Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
                 "saved mines and their fog memories must use the aligned site");
             Require(mine.Stage == World.MineOpen && mine.Progress == 2 && mine.Inventory["wood"] == 7 && mine.Output![World.MineOre(mine)] == 12 && loaded.S.Workers.Any(w => w.Assignment == mine.Id),
@@ -101,8 +90,7 @@ public static class MineChecks
         // intermediate position, then preserve the same completed mine and fog-memory state.
         var v5 = EmptyWorld(data);
         var v5Expected = new Dictionary<int, Vector2>();
-        foreach (var cliff in World.Cliffs)
-        {
+        foreach (var cliff in World.Cliffs) {
             var oldAlong = cliff.Along * Math.Sign(cliff.Along.Dot(Terrain.Seaward));
             var end = cliff.Center + oldAlong * (cliff.HalfLength + 6.7f);
             var legacy = end + cliff.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
@@ -116,8 +104,7 @@ public static class MineChecks
         v5.S.Version = 5;
         var migratedV5 = EmptyWorld(data); migratedV5.Deserialize(v5.Serialize());
         Require(migratedV5.S.Version == 6, "version 5 mine saves must upgrade to version 6");
-        foreach (var mine in migratedV5.S.Things.Where(t => t.Kind == "mine"))
-        {
+        foreach (var mine in migratedV5.S.Things.Where(t => t.Kind == "mine")) {
             Require(mine.Pos.IsEqualApprox(v5Expected[mine.Id]) && migratedV5.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
                 "version 5 mines and their fog memories must move from the intermediate anchor");
             Require(mine.Stage == World.MineOpen && mine.Progress == 3 && mine.Inventory["wood"] == 9 && mine.Output![World.MineOre(mine)] == 14 && migratedV5.S.Workers.Any(w => w.Assignment == mine.Id),
@@ -125,8 +112,7 @@ public static class MineChecks
         }
     }
 
-    private static void CheckMarking(GameData data)
-    {
+    private static void CheckMarking(GameData data) {
         var world = EmptyWorld(data);
         var cliff = World.CliffOf("iron");
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
@@ -141,8 +127,7 @@ public static class MineChecks
         Require(World.MineOre(coal) == "coal" && World.MineOre(mine) == "iron_ore", "each mine must yield the ore of its own cliff");
     }
 
-    private static void CheckConstruction(GameData data)
-    {
+    private static void CheckConstruction(GameData data) {
         var world = EmptyWorld(data);
         var mine = MarkMine(world);
         var cliff = World.CliffAt(mine.Pos);
@@ -183,8 +168,7 @@ public static class MineChecks
         Require(other.Inventory["wood"] == data.Mine.Materials["wood"] && other.Inventory["stone"] == 10 && world.S.Backpack["wood"] == 10, "delivering from the backpack must hand over only what the mine still needs");
     }
 
-    private static void CheckMiningAndFullOutput(GameData data)
-    {
+    private static void CheckMiningAndFullOutput(GameData data) {
         var world = EmptyWorld(data);
         var mine = MarkMine(world);
         mine.Stage = World.MineOpen;
@@ -231,15 +215,12 @@ public static class MineChecks
         Require(world.S.Things.Any(t => t.Kind == "grave" && t.Inventory["stone"] == mine.Output.StackSize), "dismissing a miner must not lose the stack they carry");
     }
 
-    private static void CheckMiningIsSlowerThanDeposits(GameData data)
-    {
-        int Gathered(bool mining)
-        {
+    private static void CheckMiningIsSlowerThanDeposits(GameData data) {
+        int Gathered(bool mining) {
             var world = EmptyWorld(data);
             var cliff = World.CliffOf("iron");
             Thing source;
-            if (mining) { source = MarkMine(world); source.Stage = World.MineOpen; }
-            else source = world.Add("iron", World.MineSpot(cliff), 400);
+            if (mining) { source = MarkMine(world); source.Stage = World.MineOpen; } else source = world.Add("iron", World.MineSpot(cliff), 400);
             var chest = world.Add("chest", source.Pos + cliff.Face * 2.5f);
             var worker = AddWorker(world, chest.Pos);
             worker.Tool = "iron_pick";
@@ -252,8 +233,7 @@ public static class MineChecks
         Require(mined > 0 && mined < dug, "a mine must be slower than working a deposit, at the gain of never running out");
     }
 
-    private static void CheckDailyProfitAndEndGoals(GameData data)
-    {
+    private static void CheckDailyProfitAndEndGoals(GameData data) {
         var world = EmptyWorld(data);
         var worker = AddWorker(world, new Vector2(30, 30));
         worker.Wage = 26;

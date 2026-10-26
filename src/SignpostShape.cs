@@ -4,8 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Cached timber sign, framed chalkboard and curved sheet-metal mailbox.</summary>
-internal static class SignpostShape
-{
+internal static class SignpostShape {
     private static ArrayMesh? timber, mailbox, flag;
     public static Mesh Timber => timber ??= BuildTimber();
     public static Mesh Mailbox => mailbox ??= BuildMailbox();
@@ -14,8 +13,7 @@ internal static class SignpostShape
     public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .55f, Metallic = .35f };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
-    private static ArrayMesh BuildTimber()
-    {
+    private static ArrayMesh BuildTimber() {
         var s = Begin();
         Bevel(s, new(.12f, 1.95f, .12f), new(0, .975f, 0), .012f, "8a6a48");
         Bevel(s, new(.3f, .06f, .3f), new(0, .03f, 0), .012f, "9a9b97");
@@ -41,14 +39,12 @@ internal static class SignpostShape
         return s.Commit();
     }
 
-    private static ArrayMesh BuildMailbox()
-    {
+    private static ArrayMesh BuildMailbox() {
         var s = Begin();
         // One swept shell: square lower sides roll into an arched roof.
         Vector2[] outline = { new(-.125f, 0), new(.125f, 0), new(.125f, .13f), new(.108f, .1925f), new(.0625f, .2383f), new(0, .255f), new(-.0625f, .2383f), new(-.108f, .1925f), new(-.125f, .13f) };
         Vector3 P(int i, float z) => new(-.36f + outline[i].X, .97f + outline[i].Y, z);
-        for (int i = 0; i < outline.Length; i++)
-        {
+        for (int i = 0; i < outline.Length; i++) {
             int next = (i + 1) % outline.Length;
             Quad(s, P(i, -.2f), P(next, -.2f), P(next, .2f), P(i, .2f), new(outline[i].X + outline[next].X, i == 0 ? -1 : .3f, 0), "454b4d");
         }
@@ -61,15 +57,13 @@ internal static class SignpostShape
         return s.Commit();
     }
 
-    private static ArrayMesh BuildFlag()
-    {
+    private static ArrayMesh BuildFlag() {
         var s = Begin();
         Box(s, new(.016f, .195f, .025f), new(0, .0975f, 0), "b72f2b");
         Box(s, new(.016f, .066f, .093f), new(0, .174f, .042f), "cd3b32");
         return s.Commit();
     }
-    private static void Bevel(SurfaceTool s, Vector3 size, Vector3 center, float bevel, string tint, Vector3 rotation = default)
-    {
+    private static void Bevel(SurfaceTool s, Vector3 size, Vector3 center, float bevel, string tint, Vector3 rotation = default) {
         // Four-corner rings chamfer the horizontal edges without subdividing every vertical corner.
         var basis = Basis.FromEuler(rotation * (Mathf.Pi / 180));
         float x = size.X / 2, z = size.Z / 2, y = size.Y / 2;
@@ -79,8 +73,7 @@ internal static class SignpostShape
         Vector3[][] rings = { Ring(x - bevel, z - bevel, -y), Ring(x, z, -y + bevel),
             Ring(x, z, y - bevel), Ring(x - bevel, z - bevel, y) };
         for (int row = 0; row < rings.Length - 1; row++)
-            for (int i = 0; i < 4; i++)
-            {
+            for (int i = 0; i < 4; i++) {
                 int next = (i + 1) % 4;
                 var outward = (rings[row][i] + rings[row][next]) / 2 - center; outward.Y = 0;
                 Quad(s, rings[row][i], rings[row][next], rings[row + 1][next], rings[row + 1][i], outward, tint);
@@ -89,24 +82,20 @@ internal static class SignpostShape
         Quad(s, rings[3][0], rings[3][1], rings[3][2], rings[3][3], Vector3.Up, tint);
     }
 
-    private static void Box(SurfaceTool s, Vector3 size, Vector3 center, string tint, Vector3 rotation = default)
-    {
+    private static void Box(SurfaceTool s, Vector3 size, Vector3 center, string tint, Vector3 rotation = default) {
         var basis = Basis.FromEuler(rotation * (Mathf.Pi / 180));
-        foreach (var axis in new[] { Vector3.Right, Vector3.Left, Vector3.Up, Vector3.Down, Vector3.Back, Vector3.Forward })
-        {
+        foreach (var axis in new[] { Vector3.Right, Vector3.Left, Vector3.Up, Vector3.Down, Vector3.Back, Vector3.Forward }) {
             var u = axis.X != 0 ? Vector3.Up : Vector3.Right; var v = axis.Cross(u);
             Vector3 Corner(float x, float y) => center + basis * ((axis + u * x + v * y) * size / 2);
             Quad(s, Corner(-1, -1), Corner(1, -1), Corner(1, 1), Corner(-1, 1), basis * axis, tint);
         }
     }
 
-    private static void Quad(SurfaceTool s, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward, string tint)
-    {
+    private static void Quad(SurfaceTool s, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward, string tint) {
         Triangle(s, a, b, c, outward, tint); Triangle(s, a, c, d, outward, tint);
     }
 
-    private static void Triangle(SurfaceTool s, Vector3 a, Vector3 b, Vector3 c, Vector3 outward, string tint)
-    {
+    private static void Triangle(SurfaceTool s, Vector3 a, Vector3 b, Vector3 c, Vector3 outward, string tint) {
         var normal = (c - a).Cross(b - a).Normalized();
         if (normal.Dot(outward) < 0) { (b, c) = (c, b); normal = -normal; }
         s.SetColor(new Color(tint)); s.SetNormal(normal); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);

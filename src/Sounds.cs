@@ -11,16 +11,14 @@ namespace ChopChopMeow;
 /// Each play picks a variant other than the previous one and nudges its pitch and volume, so repeated actions do not sound mechanical.
 /// Day and night music crossfade when the time of day changes, and each resumes where it last stopped.
 /// </summary>
-public partial class Sounds : Node
-{
+public partial class Sounds : Node {
     private const string Folder = "res://assets/sounds";
     // Audibility follows the camera, so zooming out lets the player hear further.
     // On-screen sounds play at full volume; past the screen edge they drop to a faint level and fade out over the play's reach.
     private const float EdgeVolume = .3f;
     public const float Reach = 5;
     // Variants share a loudness, and these levels set each sound's place in the mix: quiet steps, then impacts and handling, then alerts.
-    private static readonly Dictionary<string, float> Levels = new()
-    {
+    private static readonly Dictionary<string, float> Levels = new() {
         ["footsteps_default"] = -13,
         ["footsteps_rocks"] = -17,
         ["footsteps_water"] = -15,
@@ -71,8 +69,13 @@ public partial class Sounds : Node
     public bool NightMusicPlaying => night.Player.Playing;
     public float NightMusicPosition => night.Position;
 
-    public override void _Ready()
-    {
+    // Players made while loading and reused in turn, so a sound instantiates nothing mid-game.
+    private readonly List<AudioStreamPlayer> voices = new();
+    private const int VoiceCount = 24;
+    private int nextVoice;
+
+    public override void _Ready() {
+        for (int i = 0; i < VoiceCount; i++) { var voice = new AudioStreamPlayer(); AddChild(voice); voices.Add(voice); }
         day = new Track(this, "path_to_lake_land", "mystic_theme");
         night = new Track(this, "forest");
     }
@@ -80,16 +83,14 @@ public partial class Sounds : Node
     public override void _Process(double delta) => UpdateMusic((float)delta);
 
     /// <summary>Fades the track for the current time of day in and the other out.</summary>
-    public void UpdateMusic(float dt)
-    {
+    public void UpdateMusic(float dt) {
         float volume = MusicDb + Mathf.LinearToDb(Math.Max(MusicVolume, .0001f));
         day.Update(!World.Night, dt, volume);
         night.Update(World.Night, dt, volume);
     }
 
     /// <summary>The inventory sound for moving an item by hand.</summary>
-    public static string ForItem(string item) => item switch
-    {
+    public static string ForItem(string item) => item switch {
         Inventory.Coins => "move_coins_inventory",
         "raw_meat" or "burnt_steak" or "meat_stew" => "meat_inventory",
         "wood" or "stone" or "iron_ore" or "coal" or "tin_ore" or "leaves" or "planks" or "wood_parts" or "wood_hammer" or "stone_chisel" or "torch" => "wood_rocks_inventory",
@@ -99,8 +100,7 @@ public partial class Sounds : Node
     };
 
     /// <summary>Plays a sound; one with a world position is faint off screen and silent beyond <paramref name="reach"/> tiles past the screen edge.</summary>
-    public void Play(string name, Vector2? at = null, float reach = Reach)
-    {
+    public void Play(string name, Vector2? at = null, float reach = Reach) {
         var streams = Variants(name);
         if (streams.Length == 0 || silenced) return;
         float outside = at is Vector2 p ? OffScreen(p) : 0;
@@ -109,16 +109,25 @@ public partial class Sounds : Node
         int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
         if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
         previous[name] = pick;
-        var player = new AudioStreamPlayer
-        {
-            Stream = streams[pick],
-            PitchScale = 1 + (float)(random.NextDouble() * .12 - .06),
-            VolumeDb = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f
-        };
-        AddChild(player);
-        player.Finished += player.QueueFree;
+        var player = FreeVoice();
+        player.Stream = streams[pick];
+        player.PitchScale = 1 + (float)(random.NextDouble() * .12 - .06);
+        player.VolumeDb = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
         player.Play();
         Played++; Last = name;
+    }
+
+    /// <summary>The next idle player in turn; with all of them busy, the next in turn is cut off.</summary>
+    private AudioStreamPlayer FreeVoice() {
+        for (int i = 0; i < voices.Count; i++) {
+            var voice = voices[(nextVoice + i) % voices.Count];
+            if (voice.Playing) continue;
+            nextVoice = (nextVoice + i + 1) % voices.Count;
+            return voice;
+        }
+        var oldest = voices[nextVoice];
+        nextVoice = (nextVoice + 1) % voices.Count;
+        return oldest;
     }
 
     private bool silenced;
@@ -127,8 +136,7 @@ public partial class Sounds : Node
     /// Stops every sound, music included, for good ahead of quitting.
     /// The audio thread releases a stopped stream only on its next mix, so quitting must wait a moment after this, or Godot reports the stream as leaked.
     /// </summary>
-    public void StopAll()
-    {
+    public void StopAll() {
         silenced = true;
         ProcessMode = ProcessModeEnum.Disabled;
         foreach (var player in GetChildren().OfType<AudioStreamPlayer>()) player.Stop();
@@ -138,16 +146,14 @@ public partial class Sounds : Node
     /// A music playlist that stops once faded out and keeps its place, so it carries on next time.
     /// Its tracks play in order and wrap to the first after the last; a single track loops seamlessly.
     /// </summary>
-    private sealed class Track
-    {
+    private sealed class Track {
         public readonly AudioStreamPlayer Player;
         private readonly AudioStreamMP3[] streams;
         private float level, at;
         public int Index { get; private set; }
         public float Position => Player.Playing ? Player.GetPlaybackPosition() : at;
 
-        public Track(Node parent, params string[] names)
-        {
+        public Track(Node parent, params string[] names) {
             streams = names.Select(name => GD.Load<AudioStreamMP3>($"res://assets/music/{name}.mp3")).ToArray();
             streams[0].Loop = streams.Length == 1;
             Player = new AudioStreamPlayer { Stream = streams[0] };
@@ -155,8 +161,7 @@ public partial class Sounds : Node
             parent.AddChild(Player);
         }
 
-        public void Update(bool wanted, float dt, float volume)
-        {
+        public void Update(bool wanted, float dt, float volume) {
             level = Mathf.MoveToward(level, wanted ? 1 : 0, dt / MusicFadeSeconds);
             if (level > 0 && !Player.Playing) Player.Play(at);
             else if (level == 0 && Player.Playing) { at = Player.GetPlaybackPosition(); Player.Stop(); }
@@ -164,8 +169,7 @@ public partial class Sounds : Node
         }
     }
 
-    private AudioStream[] Variants(string name)
-    {
+    private AudioStream[] Variants(string name) {
         if (variants.TryGetValue(name, out var cached)) return cached;
         string single = $"{Folder}/{name}.mp3";
         var found = ResourceLoader.Exists(single)

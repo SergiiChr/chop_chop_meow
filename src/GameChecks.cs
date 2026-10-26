@@ -5,48 +5,118 @@ using Godot;
 
 namespace ChopChopMeow;
 
-public partial class Game
-{
-    private async Task Frames(int count = 2)
-    {
+public partial class Game {
+    private async Task Frames(int count = 2) {
         for (int i = 0; i < count; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
     }
     private async Task Seconds(double seconds) => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
-    private async Task KeyStroke(Key key)
-    {
+    private async Task KeyStroke(Key key) {
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = true });
         await Frames();
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = false });
         await Frames();
     }
-    private Button? FindButton(Node parent, string text)
-    {
-        foreach (var child in parent.GetChildren())
-        {
+    /// <summary>
+    /// Walking for a few hundred real frames, through Godot input, allocates no more than its budget on the main thread:
+    /// every byte is garbage the runtime collects later, in a pause that stalls a frame.
+    /// </summary>
+    private async Task CheckWalkingFrames(long maxBytesPerFrame) {
+        var key = new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true };
+        Input.ParseInputEvent(key);
+        await Frames(120);
+        long before = GC.GetAllocatedBytesForCurrentThread(); ulong first = Engine.GetProcessFrames();
+        await Frames(300);
+        long bytes = GC.GetAllocatedBytesForCurrentThread() - before; ulong played = Math.Max(1, Engine.GetProcessFrames() - first);
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = false });
+        await Frames();
+        string report = $"frames: walking: {bytes} B over {played} frames, {bytes / (double)played:0.#} B per frame (budget {maxBytesPerFrame} B)";
+        GD.Print(report);
+        UIRequire(bytes <= maxBytesPerFrame * (long)played, $"Allocation budget exceeded: {report}");
+    }
+    /// <summary>
+    /// Every panel page, refreshed again and again while what it shows stays the same, allocates nothing:
+    /// the panel refreshes several times a second while it is open.
+    /// </summary>
+    private async Task CheckPanelRefresh() {
+        var at = world.Player;
+        var chest = world.Add("chest", at + new Vector2(2, 0)); chest.Inventory.Add("wood", 40); chest.Inventory.Add("coal", 12);
+        var pile = world.Add("pile", at + new Vector2(-4, 2)); pile.Inventory.Add("stone", 9);
+        var forge = world.Add("reinforced", at + new Vector2(-2, 0)); forge.Inventory.Add("iron_bar", 4); forge.Inventory.Add("coal", 6); forge.Heat = 85; forge.Processing = true; forge.Progress = 2;
+        var furnace = world.Add("furnace", at + new Vector2(0, 2)); furnace.Inventory.Add("iron_ore", 4);
+        var fire = world.Add("campfire", at + new Vector2(0, -2)); fire.Burn = 120;
+        var hut = world.Add("hut", at + new Vector2(4, -3));
+        var sign = world.Add("signpost", at + new Vector2(-4, -3));
+        var farm = world.Add("farm", at + new Vector2(5, 3));
+        var tree = world.S.Things.Where(t => t.Kind == "tree").MinBy(t => t.Pos.DistanceTo(at))!;
+        var worker = new Worker { Id = world.S.NextId++, Name = "Panel Check", Pos = at + Vector2.One, Wage = 5 };
+        world.S.Workers.Add(worker); world.Assign(worker, forge); worker.Bag.Add("coal", 2);
+        bool wasPaused = paused; paused = true;
+        var pages = new (string Name, Action Open)[] {
+            ("inventory", () => OpenPage("inventory")), ("craft", () => OpenPage("craft")), ("workers", () => OpenPage("workers")),
+            ("chest", () => Select(chest)), ("pile", () => Select(pile)), ("bellows furnace", () => Select(forge)), ("furnace", () => Select(furnace)),
+            ("campfire", () => Select(fire)), ("cabin", () => Select(hut)), ("signpost", () => Select(sign)), ("farm", () => Select(farm)),
+            ("tree", () => Select(tree)), ("worker", () => Select(worker)),
+        };
+        foreach (var (name, open) in pages) {
+            open(); await Frames();
+            // .NET first runs new code unoptimized, which boxes numbers written into text, and recompiles it optimized once it has been
+            // called often, as it does a few seconds after a panel opens. So the page is refreshed in rounds until one allocates nothing;
+            // garbage the code itself makes never gets there.
+            long bytes = 0; int rounds = 0;
+            while (rounds++ < 10) {
+                long before = GC.GetAllocatedBytesForCurrentThread();
+                for (int i = 0; i < 50; i++) RefreshLive();
+                bytes = GC.GetAllocatedBytesForCurrentThread() - before;
+                if (bytes == 0) break;
+                await Seconds(.2);
+            }
+            string report = $"panel: {name}: {bytes} B over 50 refreshes after {rounds} rounds (budget 0 B)";
+            GD.Print(report);
+            UIRequire(bytes == 0, $"Allocation budget exceeded: {report}");
+        }
+        ClosePanel(); paused = wasPaused;
+        world.S.Workers.Remove(worker);
+        foreach (var t in new[] { chest, pile, forge, furnace, fire, hut, sign, farm }) world.S.Things.Remove(t);
+        await Frames();
+    }
+    /// <summary>
+    /// A new game reuses the ids of the last one, so the models the view keeps for them must be built anew:
+    /// an old one would carry the last game's state, such as a felled tree faded out.
+    /// </summary>
+    private async Task CheckFreshModelsAfterRestart() {
+        var tree = world.S.Things.Where(t => t.Kind == "tree").MinBy(t => t.Pos.DistanceTo(world.Player))!;
+        await Frames();
+        var old = view.PropOf(tree.Id);
+        UIRequire(old != null, "Every tree must have its model once the world has loaded.");
+        old!.Fade = .68f; old.Fall = 9;
+        Restart(); await Frames(2);
+        var fresh = view.PropOf(tree.Id);
+        UIRequire(world.Find(tree.Id)?.Kind == "tree" && fresh != null && fresh != old && fresh.Fade == 0 && fresh.Fall < 0,
+            "A new game must build fresh models rather than keep the last game's, faded or fallen.");
+        ClosePanel();
+    }
+    private Button? FindButton(Node parent, string text) {
+        foreach (var child in parent.GetChildren()) {
             if (child is Button b && b.Text == text) return b;
             var found = FindButton(child, text); if (found != null) return found;
         }
         return null;
     }
     private Button? Named(string name) => panel.FindChild(name, true, false) as Button;
-    private bool HasLabel(Node parent, string text)
-    {
-        foreach (var child in parent.GetChildren())
-        {
+    private bool HasLabel(Node parent, string text) {
+        foreach (var child in parent.GetChildren()) {
             if (child is Label label && label.Text.Contains(text, StringComparison.OrdinalIgnoreCase)) return true;
             if (HasLabel(child, text)) return true;
         }
         return false;
     }
     /// <summary>Window position of a control's centre, scrolled into view first.</summary>
-    private async Task<Vector2> At(Control control)
-    {
+    private async Task<Vector2> At(Control control) {
         for (Node? n = control.GetParent(); n != null; n = n.GetParent()) if (n is ScrollContainer scroll) scroll.EnsureControlVisible(control);
         await Frames();
         return GetViewport().GetFinalTransform() * control.GetGlobalRect().GetCenter();
     }
-    private async Task Click(Control control)
-    {
+    private async Task Click(Control control) {
         var at = await At(control);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
         await Frames();
@@ -54,13 +124,11 @@ public partial class Game
         await Frames();
     }
     /// <summary>A real mouse drag: press, move in steps past the drag threshold, release over the target.</summary>
-    private async Task DragTo(Control from, Control to)
-    {
+    private async Task DragTo(Control from, Control to) {
         var start = await At(from); var end = await At(to);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = start, GlobalPosition = start, Pressed = true });
         await Frames();
-        for (int i = 1; i <= 8; i++)
-        {
+        for (int i = 1; i <= 8; i++) {
             var at = start.Lerp(end, i / 8f);
             Input.ParseInputEvent(new InputEventMouseMotion { ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Relative = (end - start) / 8 });
             await Frames(1);
@@ -69,8 +137,7 @@ public partial class Game
         await Frames();
     }
     /// <summary>A right click on a stack, a move to the target and a left click there.</summary>
-    private async Task SplitTo(Control from, Control to)
-    {
+    private async Task SplitTo(Control from, Control to) {
         var start = await At(from); var end = await At(to);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = start, GlobalPosition = start, Pressed = true });
         await Frames();
@@ -84,20 +151,17 @@ public partial class Game
         await Frames();
     }
     private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false)[grid].GetChildren().OfType<ItemSlot>().First(match);
-    private static void UIRequire(bool okay, string message)
-    {
+    private static void UIRequire(bool okay, string message) {
         if (!okay) throw new InvalidOperationException("UI check failed: " + message);
     }
-    private async Task Click(Vector2 point)
-    {
+    private async Task Click(Vector2 point) {
         var at = GetViewport().GetFinalTransform() * point;
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
         await Frames();
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
         await Frames();
     }
-    private async Task CheckSignpost()
-    {
+    private async Task CheckSignpost() {
         ClosePanel(); await Frames();
         var sign = world.Add("signpost", world.Player + new Vector2(2, 0));
         world.S.Backpack.Add("wood", 5); world.S.Backpack.Add(Inventory.Coins, 100);
@@ -132,11 +196,9 @@ public partial class Game
         signpostTab = "market"; ClosePanel(); await Frames();
     }
     /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
-    private async Task CheckMine()
-    {
+    private async Task CheckMine() {
         var home = world.Player;
-        foreach (string ore in World.MineOres)
-        {
+        foreach (string ore in World.MineOres) {
             var cliff = World.CliffOf(ore);
             var spot = World.MineSpot(cliff);
             world.Player = spot + cliff.Face * 3; await Frames(4);
@@ -155,16 +217,14 @@ public partial class Game
         await KeyStroke(Key.Escape);
     }
     /// <summary>Clicks open ground beside the player, so the click uses the item in hand instead of selecting something.</summary>
-    private async Task ClickGround()
-    {
+    private async Task ClickGround() {
         await Frames();
         var open = Enumerable.Range(1, 6).SelectMany(r => Enumerable.Range(0, 8).Select(a => world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r))
             .Select(p => view.Screen(p)).First(p => view.Pick(p) == null && view.PickWorker(p) == null && GetViewport().GetVisibleRect().HasPoint(p) && p.Y < GetViewport().GetVisibleRect().Size.Y - 120);
         await Click(open);
     }
 
-    private async Task CheckCraftingAndTorch()
-    {
+    private async Task CheckCraftingAndTorch() {
         ClosePanel(); world.S.Backpack.Remove("stone_chisel", 99); world.S.Backpack.Add("stone", 2); world.S.Backpack.Add("wood", 3);
         await KeyStroke(Key.C);
         UIRequire(page == "craft", "C must open the crafting menu.");
@@ -190,8 +250,7 @@ public partial class Game
     }
 
     /// <summary>A stack bigger than a crate's room fills it and the rest stays on the cursor until it is dropped elsewhere.</summary>
-    private async Task CheckCrateOverflow()
-    {
+    private async Task CheckCrateOverflow() {
         world.S.Backpack.Remove("wood", world.S.Backpack["wood"]);
         UIRequire(world.S.Backpack.Add("wood", 64) == 64, "The backpack must have room for a stack of wood.");
         var crates = new[] { world.Add("crate", world.Player + new Vector2(-1, 0)), world.Add("crate", world.Player + new Vector2(0, -1)) };
@@ -209,8 +268,7 @@ public partial class Game
         ClosePanel(); await Frames();
     }
 
-    private async Task CheckCrateInCrate()
-    {
+    private async Task CheckCrateInCrate() {
         var crate = world.Add("crate", world.Player + new Vector2(1, 0));
         var box = world.Add("crate", world.Player); box.Inventory.Add("berries", 3); world.PickUpCrate(box);
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
@@ -229,8 +287,7 @@ public partial class Game
         UIRequire(!anomaly.Visible && backdrop.Visible && FindButton(screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
     }
 
-    private async Task CheckCabinAndCanopy()
-    {
+    private async Task CheckCabinAndCanopy() {
         ClosePanel(); await Frames();
         var hut = world.Add("hut", world.Player + new Vector2(0, 4));
         await Click(view.Screen(hut.Pos, 1.5f)); await Seconds(1.5);
@@ -255,14 +312,11 @@ public partial class Game
         world.S.Things.Remove(hidden);
         UIRequire(view.Pick(point)?.Id == tree.Id, "With nothing behind it, the crown must still select its tree.");
     }
-    private static void RemoveCheckFiles()
-    {
+    private static void RemoveCheckFiles() {
         foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
     }
-    private async void RunUIChecks()
-    {
-        try
-        {
+    private async void RunUIChecks() {
+        try {
             // A failed earlier run may have left saves behind, which would enable Continue.
             RemoveCheckFiles(); ShowStart(); await Frames(4);
             UIRequire(backdrop.Visible && paused && FindButton(screen, "New game") != null && FindButton(screen, "Continue")!.Disabled, "Launch must open the start menu, hold the world and offer no save to continue.");
@@ -273,6 +327,12 @@ public partial class Game
             UIRequire(picker.Selected == Array.IndexOf(Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
             picker.Select(0); picker.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
             UIRequire(SavedResolution() == Resolutions[0], "Choosing a resolution must store it in the settings file.");
+            var limits = (OptionButton)screen.FindChild("frame_limit", true, false);
+            UIRequire(limits.Selected == 0 && limits.GetItemText(0) == "Off" && Engine.MaxFps == 0, "The frame rate limit must start off.");
+            limits.Select(2); limits.EmitSignal(OptionButton.SignalName.ItemSelected, 2L); await Frames();
+            UIRequire(SavedFrameLimit() == 90 && Engine.MaxFps == 90, "Choosing a frame rate limit must store it and cap the frame rate.");
+            limits.Select(0); limits.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
+            UIRequire(SavedFrameLimit() == 0 && Engine.MaxFps == 0, "Turning the frame rate limit off must store it and lift the cap.");
             var musicSlider = (HSlider)screen.FindChild("music", true, false);
             UIRequire(musicSlider.Value == 100, "Music must start at full volume.");
             musicSlider.Value = 40; await Frames();
@@ -296,6 +356,10 @@ public partial class Game
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
             await Frames(); UIRequire(world.Player.DistanceTo(start) > .25f, "WASD must move the player through Godot input.");
             UIRequire(sounds.Last == "footsteps_default", "Walking on grass must play grass footsteps.");
+            // Measured about 115 B a frame: this check's own await of each frame and the memory of things seen for the first time on a straight walk.
+            // The budget leaves a third more, so a change that adds garbage to every frame fails it.
+            await CheckWalkingFrames(150);
+            await CheckPanelRefresh();
             UIRequire(Sounds.Names.All(name => sounds.VariantCount(name) > 0) && sounds.VariantCount("footsteps_default") == 3 && sounds.VariantCount("chop_tree") == 1, "Every sound must load, with numbered files grouped as variants.");
             var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
             UIRequire(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
@@ -362,8 +426,7 @@ public partial class Game
             plan.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             UIRequire(view.BuildMode == "chest" && !panel.Visible, "Choosing a plan must enter placement mode.");
             Vector2 place = Vector2.Zero;
-            for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++)
-            {
+            for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) {
                 var candidate = world.Player.Round() + new Vector2(x, y);
                 if (world.Player.DistanceTo(candidate) <= 3 && world.PlacementBlock("chest", candidate) == null) place = candidate;
             }
@@ -548,8 +611,8 @@ public partial class Game
             await CheckCrateOverflow();
             await CheckCrateInCrate();
             RemoveCheckFiles();
+            await CheckFreshModelsAfterRestart();
             GD.Print("UI-TEST PASS"); Quit();
-        }
-        catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
+        } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 }

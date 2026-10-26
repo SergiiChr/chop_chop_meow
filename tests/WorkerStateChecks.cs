@@ -4,10 +4,8 @@ using ChopChopMeow;
 using Godot;
 
 /// <summary>Simulation checks for worker animation state transitions.</summary>
-public static class WorkerStateChecks
-{
-    public static void Run(GameData data)
-    {
+public static class WorkerStateChecks {
+    public static void Run(GameData data) {
         CheckGatherAndReassign(data);
         CheckStrikeResetsWorkState(data);
         CheckBlockedPath(data);
@@ -15,22 +13,19 @@ public static class WorkerStateChecks
         CheckSaveRoundTrip(data);
     }
 
-    private static void Require(bool condition, string message)
-    {
+    private static void Require(bool condition, string message) {
         if (!condition) throw new InvalidOperationException($"Worker state check failed: {message}");
     }
 
     private static World EmptyWorld(GameData data) => new(data, false);
 
-    private static Worker AddWorker(World world, Vector2 position)
-    {
+    private static Worker AddWorker(World world, Vector2 position) {
         var worker = new Worker { Id = world.S.NextId++, Name = "State check worker", Pos = position };
         world.S.Workers.Add(worker);
         return worker;
     }
 
-    private static void CheckGatherAndReassign(GameData data)
-    {
+    private static void CheckGatherAndReassign(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add("tree", new Vector2(10, 10), 12);
         world.Add("chest", new Vector2(12, 10));
@@ -50,8 +45,7 @@ public static class WorkerStateChecks
                 "an available worker should remain idle after its next simulation tick");
     }
 
-    private static void CheckStrikeResetsWorkState(GameData data)
-    {
+    private static void CheckStrikeResetsWorkState(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add("tree", new Vector2(10, 10), 12);
         world.Add("chest", new Vector2(12, 10));
@@ -66,8 +60,7 @@ public static class WorkerStateChecks
                 "a worker on strike should have no active work animation state");
     }
 
-    private static void CheckBlockedPath(GameData data)
-    {
+    private static void CheckBlockedPath(GameData data) {
         var world = EmptyWorld(data);
         // Off the map's edge: the tree is out of reach.
         var tree = world.Add("tree", Vector2.One * (World.MapSize - 1), 12);
@@ -81,8 +74,7 @@ public static class WorkerStateChecks
                 "a worker with no valid route to its destination should enter blocked state through Walk");
     }
 
-    private static void CheckFurnacePumping(GameData data)
-    {
+    private static void CheckFurnacePumping(GameData data) {
         var world = EmptyWorld(data);
         var furnace = world.Add("reinforced", new Vector2(20, 20));
         var bellowsWorker = AddWorker(world, furnace.Pos + World.BellowsStand);
@@ -97,8 +89,7 @@ public static class WorkerStateChecks
         // Idle haulers with nothing to fetch used to pump too; extra crew must never join the operator.
         var thirdWorker = AddWorker(world, furnace.Pos);
         world.Assign(thirdWorker, furnace);
-        for (int i = 0; i < 40; i++)
-        {
+        for (int i = 0; i < 40; i++) {
             world.Tick(.25f);
             Require(world.S.Workers.Count(w => w.WorkState == WorkerWorkState.Pumping) <= 1,
                     "at most one worker should pump the bellows at a time");
@@ -107,8 +98,7 @@ public static class WorkerStateChecks
                 "the first assigned worker should keep operating the bellows with extra crew assigned");
     }
 
-    private static void CheckSaveRoundTrip(GameData data)
-    {
+    private static void CheckSaveRoundTrip(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add("tree", new Vector2(10, 10), 12);
         world.Add("chest", new Vector2(12, 10));

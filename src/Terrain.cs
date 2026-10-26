@@ -7,8 +7,7 @@ namespace ChopChopMeow;
 /// The fixed landscape: a valley that opens onto the sea, with mountain ranges closing in from both sides toward its inland end and a lake in the middle.
 /// The valley runs along the map's diagonal, so on screen the sea is at the bottom, the ranges on the left and right, and the inland end at the top.
 /// </summary>
-public static class Terrain
-{
+public static class Terrain {
     public const int Size = 216;
     // Declared first: the points below are built from these directions, and static fields initialise in order.
     /// <summary>Unit step down the valley toward the sea; caravans and errand runners set off this way.</summary>
@@ -33,8 +32,7 @@ public static class Terrain
     public static float Coast(float across) => CoastLine + 5 * MathF.Sin(across * .07f) + 3 * MathF.Sin(across * .17f + 1.3f);
 
     /// <summary>How far inside the valley a point is from the foot of the nearer range; negative in the mountains.</summary>
-    public static float FromMountains(Vector2 p)
-    {
+    public static float FromMountains(Vector2 p) {
         float along = Along(p), across = Across(p);
         return Math.Min(HalfWidth(along, Math.Sign(across)) - Math.Abs(across), along - 14);
     }
@@ -44,8 +42,7 @@ public static class Terrain
     public static bool Beach(Vector2 p) => Along(p) > Coast(Across(p)) - 5;
     /// <summary>The lake's irregular shore as a distance from its centre; the water and the walkable edge share it.</summary>
     public static float Shore(float angle) => LakeRadius * (.9f + .05f * MathF.Sin(angle * 3 + 1) + .04f * MathF.Sin(angle * 5 + 2.3f) + .05f * MathF.Sin(angle * 2 + .4f));
-    public static bool InLake(Vector2 p, float margin = 0)
-    {
+    public static bool InLake(Vector2 p, float margin = 0) {
         var offset = p - Lake;
         return offset.Length() < Shore(MathF.Atan2(offset.Y, offset.X)) + margin;
     }

@@ -4,8 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Shared fitted canning stove, stockpot and hand-operated can seamer beside a timber counter.</summary>
-internal static class CanneryShape
-{
+internal static class CanneryShape {
     private static ArrayMesh? stove, timber, pot, press, fire;
     public static Mesh Stove => stove ??= BuildStove();
     public static Mesh Timber => timber ??= BuildTimber();
@@ -19,8 +18,7 @@ internal static class CanneryShape
     private static StandardMaterial3D Material(float roughness, float metallic = 0) => new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = roughness, Metallic = metallic };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
-    private static ArrayMesh BuildStove()
-    {
+    private static ArrayMesh BuildStove() {
         var s = Begin();
         // Folded steel sides and a real firebox opening, with a soot-dark inner back.
         foreach (float x in new[] { -.485f, -.055f })
@@ -38,16 +36,14 @@ internal static class CanneryShape
         return s.Commit();
     }
 
-    private static ArrayMesh BuildTimber()
-    {
+    private static ArrayMesh BuildTimber() {
         var s = Begin();
         foreach (float x in new[] { .025f, .495f })
             foreach (float z in new[] { -.215f, .215f })
                 Box(s, new(.07f, .55f, .07f), new(x, .275f, z), "8a6a48");
         foreach (float z in new[] { -.22f, .22f })
             Box(s, new(.52f, .1f, .045f), new(.26f, .5f, z), "99744d");
-        foreach (float x in new[] { .025f, .495f })
-        {
+        foreach (float x in new[] { .025f, .495f }) {
             Box(s, new(.045f, .1f, .43f), new(x, .5f, 0), "99744d");
             Box(s, new(.045f, .055f, .43f), new(x, .17f, 0), "8a6a48");
         }
@@ -56,16 +52,14 @@ internal static class CanneryShape
         return s.Commit();
     }
 
-    private static ArrayMesh BuildPot()
-    {
+    private static ArrayMesh BuildPot() {
         var s = Begin();
         Lathe(s, new(-.27f, 0, 0), new[] { new Vector2(.155f, .5f), new(.19f, .525f), new(.19f, .832f), new(.197f, .845f) }, "b9c3c6", 16);
         // A shallow domed lid nests on the rolled rim instead of overhanging as a flat disc.
         Lathe(s, new(-.27f, 0, 0), new[] { new Vector2(.2f, .847f), new(.2f, .86f), new(.065f, .893f), new(0, .893f) }, "777f83", 16);
         Lathe(s, new(-.27f, 0, 0), new[] { new Vector2(.026f, .89f), new(.032f, .9f), new(.032f, .921f), new(0, .934f) }, "343a3e", 6);
         // Side handles return to sockets on the shell, leaving an open grip.
-        foreach (float x in new[] { -.475f, -.065f })
-        {
+        foreach (float x in new[] { -.475f, -.065f }) {
             foreach (float z in new[] { -.055f, .055f })
                 Box(s, new(.065f, .028f, .026f), new(x, .772f, z), "61696d");
             Box(s, new(.025f, .028f, .135f), new(x + (x < -.27f ? -.03f : .03f), .772f, 0), "454b4f");
@@ -73,8 +67,7 @@ internal static class CanneryShape
         return s.Commit();
     }
 
-    private static ArrayMesh BuildPress()
-    {
+    private static ArrayMesh BuildPress() {
         var s = Begin();
         Bevel(s, new(.18f, .025f, .19f), new(.39f, .6175f, -.14f), .006f, "7b888d");
         Box(s, new(.045f, .34f, .055f), new(.475f, .795f, -.18f), "808d92");
@@ -90,12 +83,10 @@ internal static class CanneryShape
         return s.Commit();
     }
 
-    private static ArrayMesh BuildFire()
-    {
+    private static ArrayMesh BuildFire() {
         var s = Begin();
         foreach (var (x, height) in new[] { (-.35f, .13f), (-.26f, .18f), (-.18f, .115f) })
-            for (int i = 0; i < 5; i++)
-            {
+            for (int i = 0; i < 5; i++) {
                 float a = i * Mathf.Tau / 5, b = (i + 1) * Mathf.Tau / 5;
                 var baseAt = new Vector3(x, .075f, .13f);
                 Triangle(s, baseAt + new Vector3(MathF.Cos(a) * .045f, 0, MathF.Sin(a) * .055f), baseAt + new Vector3(MathF.Cos(b) * .045f, 0, MathF.Sin(b) * .055f), baseAt + new Vector3(.01f, height, 0), new Vector3(MathF.Cos(a), .2f, MathF.Sin(a)), i % 2 == 0 ? "ffb447" : "ef7024");
@@ -103,12 +94,10 @@ internal static class CanneryShape
         return s.Commit();
     }
 
-    private static void Lathe(SurfaceTool s, Vector3 center, Vector2[] profile, string tint, int sides)
-    {
+    private static void Lathe(SurfaceTool s, Vector3 center, Vector2[] profile, string tint, int sides) {
         Vector3 Point(Vector2 p, float angle) => center + new Vector3(MathF.Cos(angle) * p.X, p.Y, MathF.Sin(angle) * p.X);
         for (int row = 0; row < profile.Length - 1; row++)
-            for (int i = 0; i < sides; i++)
-            {
+            for (int i = 0; i < sides; i++) {
                 float a = i * Mathf.Tau / sides, b = (i + 1) * Mathf.Tau / sides;
                 var p = profile[row]; var q = profile[row + 1];
                 var outward = new Vector3(MathF.Cos((a + b) / 2) * (q.Y - p.Y), p.X - q.X, MathF.Sin((a + b) / 2) * (q.Y - p.Y));
@@ -117,8 +106,7 @@ internal static class CanneryShape
             }
     }
 
-    private static void Bevel(SurfaceTool s, Vector3 size, Vector3 center, float bevel, string tint)
-    {
+    private static void Bevel(SurfaceTool s, Vector3 size, Vector3 center, float bevel, string tint) {
         // Four-corner rings chamfer the horizontal edges without subdividing every vertical corner.
         float x = size.X / 2, z = size.Z / 2, y = size.Y / 2;
         Vector3[] Ring(float width, float depth, float height) => new[] {
@@ -127,8 +115,7 @@ internal static class CanneryShape
         Vector3[][] rings = { Ring(x - bevel, z - bevel, -y), Ring(x, z, -y + bevel),
             Ring(x, z, y - bevel), Ring(x - bevel, z - bevel, y) };
         for (int row = 0; row < rings.Length - 1; row++)
-            for (int i = 0; i < 4; i++)
-            {
+            for (int i = 0; i < 4; i++) {
                 int next = (i + 1) % 4;
                 var outward = (rings[row][i] + rings[row][next]) / 2 - center; outward.Y = 0;
                 Quad(s, rings[row][i], rings[row][next], rings[row + 1][next], rings[row + 1][i], outward, tint);
@@ -137,8 +124,7 @@ internal static class CanneryShape
         Quad(s, rings[3][0], rings[3][1], rings[3][2], rings[3][3], Vector3.Up, tint);
     }
 
-    private static void Box(SurfaceTool s, Vector3 size, Vector3 center, string tint)
-    {
+    private static void Box(SurfaceTool s, Vector3 size, Vector3 center, string tint) {
         var half = size / 2;
         var a = center + new Vector3(-half.X, -half.Y, -half.Z); var b = center + new Vector3(half.X, -half.Y, -half.Z);
         var c = center + new Vector3(half.X, -half.Y, half.Z); var d = center + new Vector3(-half.X, -half.Y, half.Z);
@@ -148,13 +134,11 @@ internal static class CanneryShape
         Quad(s, a, d, d + up, a + up, Vector3.Left, tint); Quad(s, b, b + up, c + up, c, Vector3.Right, tint);
     }
 
-    private static void Quad(SurfaceTool s, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward, string tint)
-    {
+    private static void Quad(SurfaceTool s, Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward, string tint) {
         Triangle(s, a, b, c, outward, tint); Triangle(s, a, c, d, outward, tint);
     }
 
-    private static void Triangle(SurfaceTool s, Vector3 a, Vector3 b, Vector3 c, Vector3 outward, string tint)
-    {
+    private static void Triangle(SurfaceTool s, Vector3 a, Vector3 b, Vector3 c, Vector3 outward, string tint) {
         var normal = (c - a).Cross(b - a).Normalized();
         if (normal.Dot(outward) < 0) { (b, c) = (c, b); normal = -normal; }
         s.SetColor(new Color(tint)); s.SetNormal(normal); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);

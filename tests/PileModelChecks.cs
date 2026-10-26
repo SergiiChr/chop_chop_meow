@@ -5,14 +5,11 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Inventory-driven pile appearance refreshes without changing stock or sharing visibility state.</summary>
-public static class PileModelChecks
-{
-    public static void Run(GameData data)
-    {
+public static class PileModelChecks {
+    public static void Run(GameData data) {
         var thing = new Thing { Kind = "pile", Inventory = new Inventory { Slots = 14 } };
         var first = WorldModels.Build(thing); var second = WorldModels.Build(thing);
-        try
-        {
+        try {
             thing.Inventory.Add("wood", 14 * 64);
             WorldModels.SyncPile(first, thing, data);
             WorldModels.SyncPile(second, thing, data);
@@ -37,12 +34,10 @@ public static class PileModelChecks
             thing.Inventory.Items.Clear();
             WorldModels.SyncPile(first, thing, data);
             Require(first.Stacks.All(s => !s.Visible), "emptying a pile must hide all contents");
-        }
-        finally { first.Root.Free(); second.Root.Free(); }
+        } finally { first.Root.Free(); second.Root.Free(); }
     }
 
-    private static void Require(bool condition, string message)
-    {
+    private static void Require(bool condition, string message) {
         if (!condition) throw new InvalidOperationException(message);
     }
 }

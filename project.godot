@@ -4,7 +4,7 @@ config_version=5
 [application]
 config/name="Chop Chop Meow"
 run/main_scene="res://scenes/Main.tscn"
-config/features=PackedStringArray("4.7", "C#")
+config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 
 [dotnet]
 project/assembly_name="ChopChopMeow"
@@ -16,5 +16,4 @@ window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 
 [rendering]
-renderer/rendering_method="gl_compatibility"
-renderer/rendering_method.mobile="gl_compatibility"
+renderer/rendering_method="forward_plus"
