@@ -23,46 +23,55 @@ public partial class Game {
         BagGrid(UseFromBag, UseHint, wanted: id => world.HandRecipes.Any(r => world.Data.Recipes[r].Inputs.ContainsKey(id)));
     }
 
-    /// <summary>What is being made by hand: the first entry shows its progress; clicking any entry cancels it and returns its materials.</summary>
+    /// <summary>
+    /// What is being made by hand, in the stations' process row: its materials on the left, the time over the bar and the product on the right.
+    /// The rest of the queue waits in a row under it; clicking the product or a waiting recipe cancels it and returns its materials.
+    /// </summary>
     private void CraftQueue() {
-        var well = Well(new VBoxContainer()); well.AddThemeConstantOverride("separation", 12);
-        var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", CupGap); well.AddChild(row);
-        var cells = Enumerable.Range(0, 6).Select(i => IconCell($"queue_{i}", 44)).ToArray();
-        for (int i = 0; i < cells.Length; i++) {
-            int index = i;
-            cells[i].Cell.Pressed += () => { Act(() => world.CancelCraft(index)); RefreshLive(); };
-            row.AddChild(cells[i].Cell);
-        }
-        var progress = new ProgressBar { MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(0, 14), Name = "craft_progress" };
-        well.AddChild(progress);
-        var status = Style.Text("", 14, Style.Ink); well.AddChild(status);
-        var statusText = new LiveText(shown => status.Text = shown);
-        // Each cell redraws only when the recipe queued in it changes.
-        var drawn = new string?[cells.Length];
-        bool first = true;
+        var queue = world.S.Crafting;
+        string? head = queue.Count > 0 ? queue[0] : null;
+        int queued = queue.Count;
+        // The row shows one recipe, so the page is rebuilt once when the queue moves on or grows.
+        bool rebuilding = false;
         live.Add(() => {
-            if (!GodotObject.IsInstanceValid(progress)) return;
-            var queue = world.S.Crafting;
-            for (int i = 0; i < cells.Length; i++) {
-                var (cell, count) = cells[i];
-                string? queued = i < queue.Count ? queue[i] : null;
-                if (!first && queued == drawn[i]) continue;
-                drawn[i] = queued;
-                var r = queued == null ? null : world.Data.Recipes[queued];
-                cell.Visible = r != null || i == 0;
-                cell.Icon = r == null ? null : HotbarIcon(r.Output);
-                count.Text = r is { Amount: > 1 } ? r.Amount.ToString() : "";
-                cell.TooltipText = r == null ? "" : $"{r.Name}\nClick to cancel and get the materials back.";
-            }
-            first = false;
-            var making = queue.Count > 0 ? world.Data.Recipes[queue[0]] : null;
-            progress.Value = making == null ? 0 : world.S.CraftTime / making.Seconds;
-            var text = statusText.Clear();
-            if (making == null) text.Append("Nothing in the works.");
-            else if (world.CraftRate > 0) text.Append($"{making.Name} · {(making.Seconds - world.S.CraftTime) / world.CraftRate:0} s left");
-            else text.Append($"{making.Name} · waiting for a {making.Tool} in your backpack");
-            statusText.Show();
+            if (rebuilding || (queue.Count > 0 ? queue[0] : null) == head && queue.Count == queued) return;
+            rebuilding = true; Callable.From(() => { if (page == "craft") OpenPage("craft"); }).CallDeferred();
         });
+        if (head == null) { Well(new VBoxContainer()).AddChild(Style.Text("Nothing in the works. Click a recipe to make it.", 14, Style.Ink)); return; }
+        var making = world.Data.Recipes[head];
+        var inputs = making.Inputs.Select(p => (Control)RecipeCup($"queue_input_{p.Key}", p.Key, $"×{p.Value}", 52, null));
+        var product = RecipeCup("queue_0", making.Output, $"×{making.Amount}", 64, () => world.CancelCraft(0));
+        var waiting = new List<Control>();
+        for (int i = 1; i < queue.Count; i++) {
+            int index = i;
+            var r = world.Data.Recipes[queue[i]];
+            waiting.Add(RecipeCup($"queue_{i}", r.Output, "", 44, () => world.CancelCraft(index)));
+        }
+        Process(inputs, Text(text => AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))), () => making.Seconds > 0 ? world.S.CraftTime / making.Seconds : 0, null, product, waiting);
+        if (making.Tool != "") {
+            var status = Style.Text("", 14, Style.Warn); content.AddChild(status);
+            bool shown = false;
+            live.Add(() => {
+                if (!GodotObject.IsInstanceValid(status)) return;
+                bool stalled = world.CraftRate <= 0;
+                if (stalled == shown) return;
+                shown = stalled; status.Text = stalled ? $"Waiting for a {making.Tool} in your backpack" : "";
+            });
+        }
+    }
+
+    /// <summary>A cup in the craft queue's row with what one batch takes or makes under it; with a cancel action, clicking it cancels that entry.</summary>
+    private VBoxContainer RecipeCup(string name, string item, string perBatch, float size, Action? cancel) {
+        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
+        var (cell, _) = IconCell(name, size); cell.Icon = HotbarIcon(item);
+        cell.TooltipText = cancel == null ? world.Data.Name(item) : $"{world.Data.Name(item)}\nClick to cancel and get the materials back.";
+        if (cancel != null) {
+            cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
+            cell.Pressed += () => { Act(cancel); RefreshLive(); };
+        }
+        column.AddChild(cell);
+        if (perBatch != "") column.AddChild(PerBatch(perBatch));
+        return column;
     }
 
     private void Bench(Thing bench) {

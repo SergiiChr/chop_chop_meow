@@ -325,9 +325,9 @@ public partial class Game : Node {
     }
     private void Help() {
         AddLabel("MOVE & WORK", 16);
-        AddLabel("WASD / arrows: move in screen directions\nShift: sprint, which burns food and drink faster\nHold right mouse: approach and gather\nLeft click: select resource, building, crate or worker; on open ground, use the item in hand\nE: inspect nearest object\nSpace: use carried tool; at selected bellows furnace, pump\nMouse wheel: zoom\n1–9 or click a slot: put it in hand (plans and crates go to placement)\nHold right mouse on a placed crate: pick it up\nB: build   I: inventory   C: crafting   Tab: guide\nF5: save   F9: load   Esc: cancel / pause");
+        AddLabel("WASD / arrows: move in screen directions\nShift: sprint, which burns food and drink faster\nHold right mouse: approach and gather\nLeft click: select resource, building, crate or worker; on open ground, use the item in hand\nE: inspect nearest object\nSpace: use carried tool; at a selected high-temp furnace, pump\nMouse wheel: zoom\n1–9 or click a slot: put it in hand (plans and crates go to placement)\nHold right mouse on a placed crate: pick it up\nB: build   Tab: backpack   C: crafting   H: crew   I: guide\nClick: move a stack   Ctrl-click: move all of it\nF5: save   F9: load   Esc: cancel / pause");
         AddLabel("IRON → STEEL", 16);
-        AddLabel("Mining iron and coal needs a pickaxe: buy your first at the village signpost. Smelt 2 ore + 1 wood/coal per iron bar. Steel needs the reinforced furnace: 2 iron bars + 2 mined coal make 2 steel bars, plus 1 mined coal as fuel. Pump regularly above 80°. The anvil turns steel bars into steel parts.", 15, Muted);
+        AddLabel("Mining iron and coal needs a pickaxe: buy your first at the village signpost. Smelt 2 ore + 1 wood/coal per iron bar. Steel needs the high-temp furnace: 2 iron bars + 2 mined coal make 2 steel bars, plus 1 mined coal in its fuel slot. Pump the bellows: steel melts at 1450+ °C. The anvil turns steel bars into steel parts.", 15, Muted);
         AddLabel("CRAFTING", 16);
         AddLabel("Press C to craft on the go; each recipe takes about 10 seconds. Knap a stone chisel from 2 stone, then carve planks, wood parts, a mallet and torches. Planks build a crafting bench, which works twice as fast and makes tools and crates: put a chisel and a hammer in its slots. A small steel tool takes 1 steel part and a big one 2, plus 1 wood part for the handle.", 15, Muted);
         AddLabel("VILLAGERS & STORAGE", 16);
@@ -1019,6 +1019,10 @@ public partial class Game : Node {
         if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
         if (OS.GetCmdlineUserArgs().Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
         if (OS.GetCmdlineUserArgs().Contains("--craft")) OpenPage("craft");
+        if (OS.GetCmdlineUserArgs().Contains("--crew")) OpenPage("workers");
+        if (OS.GetCmdlineUserArgs().Contains("--worker")) Select(world.S.Workers[0]);
+        if (OS.GetCmdlineUserArgs().Contains("--guide")) OpenPage("help");
+        if (OS.GetCmdlineUserArgs().Contains("--menu")) { ClosePanel(); OpenMenu(); }
         if (OS.GetCmdlineUserArgs().Contains("--furnace")) { world.Player = bellows.Pos + Vector2.One; Select(bellows); }
         if (OS.GetCmdlineUserArgs().Contains("--piles")) {
             var at = World.Spawn + new Vector2(-3, 9);

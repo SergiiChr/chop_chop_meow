@@ -1746,7 +1746,7 @@ public sealed partial class World {
         4 => ("Beneath the surface", "Buy a steel pickaxe from the price sheet at the signpost. The cart brings it back in a crate."),
         5 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A cabin and campfire make nights safer."),
         6 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore + wood. Collect iron bars."),
-        7 => ("Hotter than fire", "Explore for a dark cliff and mine coal at its foot. Build a bellows furnace: 20 stone, 5 iron bars, 8 wood."),
+        7 => ("Hotter than fire", "Explore for a dark cliff and mine coal at its foot. Build a high-temp furnace: 20 stone, 5 iron bars, 8 wood."),
         8 => ("Make steel", "Load iron + mined coal into the bellows furnace. Keep the heat above the clear bar; steel only progresses there. 2 iron bars + 3 coal incl. fuel make 2 steel bars."),
         9 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. It hammers steel bars into steel parts."),
         10 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),

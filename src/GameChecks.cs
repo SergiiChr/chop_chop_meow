@@ -231,12 +231,14 @@ public partial class Game {
         ClosePanel(); world.S.Backpack.Remove("stone_chisel", 99); world.S.Backpack.Add("stone", 2); world.S.Backpack.Add("wood", 3);
         await KeyStroke(Key.C);
         UIRequire(page == "craft", "C must open the crafting menu.");
-        var badge = (TextureRect)panel.FindChild("section_chisel", true, false).FindChild("badge", true, false);
+        // The page rebuilds when the queue moves on, so the badge is looked up afresh.
+        TextureRect ChiselBadge() => (TextureRect)panel.FindChild("section_chisel", true, false).FindChild("badge", true, false);
+        var badge = ChiselBadge();
         UIRequire(badge.Modulate != Colors.White && badge.TooltipText.Contains("Needs a chisel"), "A missing chisel must show a red badge with a hint.");
         await Click(Named("craft_stone_chisel")!);
         UIRequire(world.S.Crafting.SequenceEqual(new[] { "stone_chisel" }) && world.S.Backpack["stone"] == 0, "Clicking a recipe must queue it and take its materials.");
         world.S.CraftTime = world.Data.Recipes["stone_chisel"].Seconds - .05f; await Frames(10); RefreshLive(); await Frames();
-        UIRequire(world.S.Backpack["stone_chisel"] == 1 && badge.Modulate == Colors.White, "The chisel must arrive and turn its badge back to normal.");
+        UIRequire(world.S.Backpack["stone_chisel"] == 1 && ChiselBadge().Modulate == Colors.White, "The chisel must arrive and turn its badge back to normal.");
         int wood = world.S.Backpack["wood"];
         await Click(Named("section_chisel")!);
         await Click(Named("craft_torch")!);
