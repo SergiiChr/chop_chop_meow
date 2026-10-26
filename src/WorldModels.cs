@@ -88,7 +88,7 @@ public static class WorldModels
         "leaves" => new[] { new Hit(.6f, 0, .15f) },
         "grave" => new[] { new Hit(.45f, 0, .55f) },
         "anvil" => new[] { new Hit(.45f, 0, .85f) },
-        "signpost" => new[] { new Hit(.5f, 0, 1.9f) },
+        "signpost" => new[] { new Hit(1.02f, 0, 1.98f) },
         "campfire" => new[] { new Hit(.55f, 0, .7f) },
         "mine" => new[] { new Hit(.9f, 0, 1.8f) },
         _ => new[] { new Hit(.5f, 0, .8f) },
@@ -490,21 +490,32 @@ public static class WorldModels
         prop.Vent = new Vector3(0, .86f, 0);
     }
 
-    /// <summary>A 4x4 post with a painted market sign and a mailbox whose flag rises while an order is out.</summary>
+    /// <summary>A village market post with a mailbox, framed chalkboard and shipping storage.</summary>
     private static void Signpost(Prop prop)
     {
         var body = prop.Body;
-        Box(body, new Vector3(.12f, 1.95f, .12f), new Vector3(0, .975f, 0), Mat("8a6a48"));
-        Box(body, new Vector3(.95f, .42f, .04f), new Vector3(.3f, 1.55f, .08f), Mat("2f5d4a", .7f));
-        Box(body, new Vector3(.55f, .08f, .01f), new Vector3(.25f, 1.55f, .105f), Mat("f2efe6", .6f));
-        Cylinder(body, .1f, 0, .16f, new Vector3(.6f, 1.55f, .105f), Mat("f2efe6", .6f), new Vector3(0, 0, -90), 3);
-        Box(body, new Vector3(.45f, .04f, .06f), new Vector3(-.2f, .95f, 0), Mat("8a6a48"));
-        Box(body, new Vector3(.24f, .22f, .38f), new Vector3(-.36f, 1.08f, 0), Mat("2b2d30", .5f, .5f));
+        Add(body, SignpostShape.Timber, SignpostShape.Wood, Vector3.Zero);
+        Add(body, SignpostShape.Mailbox, SignpostShape.Steel, Vector3.Zero);
         var flag = Pivot(body, new Vector3(-.49f, 1.0f, .1f));
-        Box(flag, new Vector3(.02f, .2f, .04f), new Vector3(0, .1f, 0), Mat("c62828", .5f));
-        Box(flag, new Vector3(.02f, .06f, .1f), new Vector3(0, .18f, .05f), Mat("c62828", .5f));
+        Add(flag, SignpostShape.Flag, SignpostShape.Steel, Vector3.Zero);
         prop.Flag = flag;
-        Box(body, new Vector3(.3f, .06f, .3f), new Vector3(0, .03f, 0), Mat("9a9b97"));
+        var crate = Pivot(body, new Vector3(-.63f, .07f, .02f));
+        Add(crate, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
+        Add(crate, CrateShape.Lid, CrateShape.Timber, new Vector3(0, .42f, -.23f));
+        var openCrate = Pivot(body, new Vector3(-.61f, .55f, -.015f), new Vector3(0, -8, 0));
+        openCrate.Scale = Vector3.One * .72f;
+        Add(openCrate, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
+        body.AddChild(new Label3D
+        {
+            Text = "PRICES\n$  -  $$\n$$ - $$$\n$  -  $$",
+            Position = new Vector3(.43f, .9f, .112f),
+            FontSize = 40,
+            PixelSize = .0017f,
+            Modulate = new Color("e2e5cf"),
+            OutlineSize = 0,
+            NoDepthTest = false,
+            Shaded = true
+        });
     }
 
     /// <summary>Fire pit made from an old steel wheel rim, with a log teepee and flickering flames.</summary>
