@@ -152,7 +152,7 @@ public partial class Game {
         });
         board.AddChild(new ColorRect { Color = Style.Enamel, CustomMinimumSize = new Vector2(0, 3) });
         var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 6); board.AddChild(header);
-        header.AddChild(new Control { CustomMinimumSize = new Vector2(32, 0) });
+        header.AddChild(new Control { CustomMinimumSize = new Vector2(GoodsColumn, 0) });
         foreach (string column in new[] { "Sell price", "Buy price" }) { var cell = Style.Text(column, 13, Style.Tan); cell.CustomMinimumSize = new Vector2(PriceColumn, 0); cell.HorizontalAlignment = HorizontalAlignment.Center; header.AddChild(cell); }
         var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; rows.AddThemeConstantOverride("separation", 0);
         sheetScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; sheetScroll.AddChild(rows); board.AddChild(sheetScroll); sheetRows = rows;
@@ -161,8 +161,10 @@ public partial class Game {
             bool sells = world.Data.Market.Sells.ContainsKey(id), buys = world.Data.Market.Buys.ContainsKey(id);
             var row = new HBoxContainer { CustomMinimumSize = new Vector2(0, 40), TooltipText = world.Lot(id) > 1 ? $"{world.Lot(id)} {world.Data.Name(id)}" : world.Data.Name(id), MouseFilter = Control.MouseFilterEnum.Pass };
             row.AddThemeConstantOverride("separation", 6); rows.AddChild(row);
-            var icon = Style.Icon(HotbarIcon(id), 32); row.AddChild(icon);
-            if (world.Lot(id) > 1) icon.AddChild(Style.Corner(Style.Pill($"×{world.Lot(id)}", Style.Round(Style.Enamel, 7).Item1, Style.Rim, 10), 1, 1, 8));
+            // Goods sold by the crate show its size beside the icon, so every row keeps the same height and columns.
+            var goods = new HBoxContainer { CustomMinimumSize = new Vector2(GoodsColumn, 0) }; goods.AddThemeConstantOverride("separation", 2); row.AddChild(goods);
+            goods.AddChild(Style.Icon(HotbarIcon(id), 32));
+            if (world.Lot(id) > 1) { var lot = Style.Text($"×{world.Lot(id)}", 13, Style.Tan, Style.Head); lot.VerticalAlignment = VerticalAlignment.Center; goods.AddChild(lot); }
             var sellColumn = new HBoxContainer { CustomMinimumSize = new Vector2(PriceColumn, 0), Alignment = BoxContainer.AlignmentMode.Center }; sellColumn.AddThemeConstantOverride("separation", 4); row.AddChild(sellColumn);
             var sellPrice = Style.Text("", 17, Style.Ink, Style.Head); sellPrice.CustomMinimumSize = new Vector2(40, 0); sellPrice.HorizontalAlignment = HorizontalAlignment.Right; sellColumn.AddChild(sellPrice);
             var trend = Style.Text("", 18, Style.Brick, Style.Head); trend.CustomMinimumSize = new Vector2(20, 0); trend.HorizontalAlignment = HorizontalAlignment.Center; sellColumn.AddChild(trend);
@@ -194,6 +196,8 @@ public partial class Game {
     }
 
     private const float PriceColumn = 104;
+    /// <summary>Room for a good's icon and the size of the crate it comes in.</summary>
+    private const float GoodsColumn = 64;
 
     /// <summary>A small heading at the top of a well.</summary>
     private static Label WellLabel(string text) => Style.Text(text, 13, Style.Tan, Style.Head);

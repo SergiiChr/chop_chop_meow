@@ -94,8 +94,12 @@ public sealed class GameData {
     public float NightStarts { get; set; } = .7f;
     /// <summary>Day phase where the light starts to fade, a tenth of a day before night; workers sign out then.</summary>
     public float DuskStarts => NightStarts - .1f;
+    /// <summary>Day phase where the sun sets and the moon rises, halfway through the fading light.</summary>
+    public float Sunset => (DuskStarts + NightStarts) / 2;
     /// <summary>Clock hour when workers break for an hour of lunch; the day starts at 06:00.</summary>
     public float LunchHour { get; set; } = 12;
+    /// <summary>Days from one full moon to the next; new-moon nights are the darkest.</summary>
+    public float MoonCycleDays { get; set; } = 8;
     public float TradeSeconds { get; set; } = 30;
     public List<HireOffer> HireOffers { get; set; } = new();
     public float GatherSeconds { get; set; } = 1.5f;
@@ -147,7 +151,7 @@ public sealed class GameData {
         return data;
     }
     public void Validate() {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)

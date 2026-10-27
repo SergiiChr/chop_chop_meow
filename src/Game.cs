@@ -14,7 +14,8 @@ public partial class Game : Node {
     private PanelContainer panel = null!;
     private VBoxContainer content = null!;
     private Label stats = null!;
-    private Label toast = null!;
+    private MessageStack messages = null!;
+    private PanelContainer needsPlate = null!;
     private Label waterWarning = null!;
     private float waterWarningClock;
     private Label modeLabel = null!;
@@ -45,7 +46,6 @@ public partial class Game : Node {
     private string placingCrate = "";
     private bool paused;
     private float uiClock;
-    private float toastClock;
     private float autosave;
     private const float AutosaveSeconds = 300;
     private Net net = null!;
@@ -181,7 +181,7 @@ public partial class Game : Node {
         var clock = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = -200, OffsetRight = -20, OffsetTop = 18, OffsetBottom = 18, MouseFilter = Control.MouseFilterEnum.Ignore };
         clock.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(clock);
         var dial = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddThemeConstantOverride("separation", 6); clock.AddChild(dial);
-        dayDial = new DayDial { Phase = () => world.DayPhase, Night = () => world.Night, CustomMinimumSize = new Vector2(0, 62), MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddChild(dayDial);
+        dayDial = new DayDial { Arc = () => world.SkyArc, Night = () => world.MoonUp, CustomMinimumSize = new Vector2(0, 62), MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddChild(dayDial);
         stats = Style.Heading("", 16); stats.HorizontalAlignment = HorizontalAlignment.Center; dial.AddChild(stats);
         modeLabel = Outlined(Label("", 17)); modeLabel.AnchorLeft = .5f; modeLabel.AnchorRight = .5f; modeLabel.OffsetTop = 18; modeLabel.GrowHorizontal = Control.GrowDirection.Both; modeLabel.HorizontalAlignment = HorizontalAlignment.Center; modeLabel.AutowrapMode = TextServer.AutowrapMode.Off; modeLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(modeLabel);
         // Menu badges and the hotbar sit on one plate centred along the bottom, like a tool belt.
@@ -192,7 +192,8 @@ public partial class Game : Node {
         slots.AddChild(MenuIcon("craft", "Crafting", () => OpenPage("craft"), "C", new Color("b08a45"))); slots.AddChild(MenuIcon("crew", "Crew", () => OpenPage("workers"), "H", new Color("5f8aa6"))); slots.AddChild(MenuIcon("guide", "Field guide", () => OpenPage("help"), "I", new Color("7d6488")));
         var divider = new ColorRect { Color = new Color(Style.Beige, .6f), CustomMinimumSize = new Vector2(3, 46), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; slots.AddChild(divider);
         for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
-        toast = Outlined(Label("", 17)); toast.AnchorLeft = .5f; toast.AnchorRight = .5f; toast.OffsetTop = 56; toast.GrowHorizontal = Control.GrowDirection.Both; toast.HorizontalAlignment = HorizontalAlignment.Center; toast.AutowrapMode = TextServer.AutowrapMode.Off; toast.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(toast);
+        // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
+        messages = new MessageStack(() => Outlined(Label("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
         // The side panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         panel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = PanelLeft, OffsetRight = -20, OffsetTop = PanelTop, OffsetBottom = PanelTop };
         ui.AddChild(panel);
@@ -219,7 +220,7 @@ public partial class Game : Node {
         BuildNeeds(); BuildEnding(); BuildMenu(); BuildScreens(); BuildAnomaly(); RefreshLive();
     }
     private void Notify(string message) {
-        if (message == Water.FullBottleWarning && waterWarning != null) { waterWarning.Text = message; waterWarningClock = 7; } else if (toast != null) { toast.Text = message; toastClock = 7; }
+        if (message == Water.FullBottleWarning && waterWarning != null) { waterWarning.Text = message; waterWarningClock = 7; } else messages?.Post(message);
         GD.Print(message);
     }
     // What the labels show, so their text is built only when it changes: building it allocates.
@@ -388,7 +389,7 @@ public partial class Game : Node {
     /// <summary>Enters placement for a crate from the backpack.</summary>
     private void PlaceCrate(string item) {
         if (world.S.Backpack[item] == 0) { Notify("No empty crate in your backpack. Craft one at a bench."); return; }
-        placingCrate = item; view.BuildMode = "crate"; assigningWorker = 0; ClosePanel(); Notify($"Place {world.Describe(item)}.");
+        placingCrate = item; view.BuildMode = "crate"; assigningWorker = 0; ClosePanel();
     }
     private bool CanPlaceAgain() => view.BuildMode == "crate" ? world.S.Backpack[placingCrate] > 0 : world.S.Backpack.Has(world.Data.Buildings[view.BuildMode].Cost);
     private void Select(Worker w) { workerId = w.Id; selected = 0; view.Selected = 0; view.SelectedWorker = w.Id; OpenPage("inspect"); }
@@ -835,10 +836,10 @@ public partial class Game : Node {
                     if (t.Kind == "hut") entering = t;
                     // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
                     if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item) && !(t.Kind == "crate" && World.IsCrate(item))) {
-                        if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote) Notify(moved > 0 ? $"Stored {moved} {world.Data.Name(item)}." : $"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
+                        if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
                     }
                     Select(t);
-                } else if (ActiveHotbarItem() is string held && UseOf(held) != null) UseHeld(view.ToWorld(mouse.Position));
+                } else if (ActiveHotbarItem() is string held && HasUse(held)) UseHeld(view.ToWorld(mouse.Position));
                 else ClosePanel();
             }
         }
@@ -864,7 +865,11 @@ public partial class Game : Node {
                     world.Gather(gathering, dt);
                     if (world.Find(gathering.Id) == null && selected == gathering.Id) { selected = 0; view.Selected = 0; }
                     gathering = null;
-                } else { world.Gather(gathering, dt); if (world.GatherBlock(gathering) is string blocked) { Notify(blocked); gathering = null; } }
+                } else {
+                    // Emptying it shows on the stump or bare bush; a target that was already empty or out of reach still says why.
+                    bool had = gathering.Remaining > 0; world.Gather(gathering, dt);
+                    if (world.GatherBlock(gathering) is string blocked) { if (!had || gathering.Remaining > 0) Notify(blocked); gathering = null; }
+                }
             } else { world.ResetGather(); if (!right || gathering?.IsLoose == true) gathering = null; }
             // A held right click walks to a crate and lifts it once the button has been held long enough.
             if (lifting != null && right && direction == Vector2.Zero && entering == null && world.Find(lifting.Id) != null) {
@@ -900,7 +905,9 @@ public partial class Game : Node {
         FitPanel();
         if (waterWarningClock > 0) waterWarning.Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : ui.Size.Y - 148);
         waterWarningClock -= dt; if (waterWarningClock <= 0 && waterWarning != null) waterWarning.Text = "";
-        toastClock -= dt; if (toastClock <= 0 && toast != null) toast.Text = "";
+        // The needs plate grows with the bank count, and an open side panel would cover the messages' right end.
+        float messagesLeft = needsPlate.GetRect().End.X + 24, messagesRight = panel.Visible ? PanelLeft - 16 : -messagesLeft;
+        if (messages.OffsetLeft != messagesLeft || messages.OffsetRight != messagesRight) { messages.OffsetLeft = messagesLeft; messages.OffsetRight = messagesRight; }
         var args = launchArgs;
         if (args.Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
         int shot = Array.IndexOf(args, "--screenshot");

@@ -2,6 +2,7 @@
   "daySeconds": 840,
   "nightStarts": 0.7,
   "lunchHour": 12,
+  "moonCycleDays": 8,
   "tradeSeconds": 30,
   "hireOffers": [
     { "upfront": 60, "wage": 18 },

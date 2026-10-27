@@ -58,6 +58,8 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 The game opens on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit.
 
+The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
+
 Options holds a window resolution picker, a frame rate limit (off, 60 or 90 fps) and a music volume slider. The resolution and frame rate choices are stored in `settings.cfg` and applied at launch.
 
 ## Controls
@@ -78,7 +80,7 @@ Options holds a window resolution picker, a frame rate limit (off, 60 or 90 fps)
 | 1–9 or click a hotbar slot | Put that slot in hand, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
 | Space | Swing axe, or pump the selected nearby reinforced furnace |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
-| Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load and options |
+| Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
 | Click / Ctrl-click an item cell | Move one item / all of that item (Shift works like Ctrl); this applies across inventory and station panels |
 | Drag a cell | Move its stack to another inventory or a station input slot; drop an item or building plan on the hotbar to assign it |
@@ -91,7 +93,9 @@ Health, hunger and thirst are three upright vials in the top-left corner with a 
 
 Beside them the bank shows the coins in the trading post's wage slot and the wages due each day, in red when they exceed the bank. Drop coins on it to pay in, or click it beside a trading post to take them out.
 
-The day dial in the top-right corner moves the sun or moon along an arc. A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
+The day dial in the top-right corner shows the sun crossing its arc from sunrise to sunset; then the moon crosses the same arc until dawn. A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
+
+Messages stack at the top of the screen, up to four at a time; each fades out after 7 seconds. A message repeated while it still shows restarts its time instead of stacking again, and a full stack drops the one closest to fading. Actions whose result shows by itself, such as gathering, crafting, building or filling a bottle, post no message; warnings, refusals and news do. With a side panel open they keep to the space left of it.
 
 ### Bottom bar and hotbar
 
@@ -274,7 +278,7 @@ The tool station (8 planks, 4 stone) is a rack that holds only tools. Workers ne
 - a rake to rake leaves;
 - a hammer to fit a mine.
 
-Stone, berries and loose coal need no tool. A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed. They put it back when reassigned or when heading home at dusk. If there is none, the worker waits, the corner message says once what they need, and they carry on as soon as one is put in.
+Stone, berries and loose coal need no tool. A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed. They put it back when reassigned or when heading home at dusk. If there is none, the worker waits, a message says once what they need, and they carry on as soon as one is put in.
 
 A worker on the station's Stock job brings tools from other storage to the rack.
 
@@ -360,7 +364,7 @@ Workers take the pickaxe and hammer from a tool station.
 
 A finished mine takes up to 3 workers with pickaxes, who mine out of sight underground. The cart goes underground with them, and the lantern on the frame lights the area like a torch. When nobody is working, the cart stands outside, loaded once there is output.
 
-Each miner brings out one ore and one rock every 1.6 seconds, about half what a worker gets from a deposit, but a mine never runs out. Output fills two slots, ore and rocks, of one stack each. When either is full, mining stops and a miner carries the full stack out to the nearest storage that takes it. With none, a corner message says the mine is full with no output available.
+Each miner brings out one ore and one rock every 1.6 seconds, about half what a worker gets from a deposit, but a mine never runs out. Output fills two slots, ore and rocks, of one stack each. When either is full, mining stops and a miner carries the full stack out to the nearest storage that takes it. With none, a message says the mine is full with no output available.
 
 ## Wolves and night
 
@@ -438,7 +442,7 @@ A manually exported or otherwise normally launched Godot build uses Godot's stan
 
 The environment uses a shared human scale, low-poly mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones. Meadow grass and wildflowers grow in patches; fern colonies, shrubs and fallen twigs follow woodland groups. Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas. A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
 
-Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack. Night is lit by the sun, ambient light and real fire light from campfires, furnaces and cabin windows. Trees in front of the player, a worker or a structure turn see-through.
+Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack. The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset. The moon takes the same path at night and waxes and wanes over a cycle of `moonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by. Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows. Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 

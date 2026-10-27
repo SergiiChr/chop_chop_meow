@@ -101,7 +101,8 @@ public static class MultiplayerChecks {
         world.As(guest, () => world.MoveTo(lump.Pos + new Vector2(.5f, 0)));
         world.Run(guest, new Command("pick_up", lump.Id, 0, "", 0, default));
         Require(guest.Backpack["coal"] == 2 && world.S.Backpack["coal"] == hostCoal && world.Find(lump.Id) == null, "a guest's pick-up should go into the guest's backpack only");
-        Require(heard.Contains($"+2 {data.Name("coal")}.") && hostHeard == null, "what a guest's action says should reach the guest, not the host");
+        world.Run(guest, new Command("consume", 0, 0, "raw_meat", 0, default));
+        Require(heard.Contains($"{data.Name("raw_meat")} needs cooking first.") && hostHeard == null, "what a guest's action says should reach the guest, not the host");
 
         world.Run(guest, new Command("transfer", 0, chest.Id * World.BoxCodes + 1, "coal", 99, default));
         Require(chest.Inventory["coal"] == 2 && guest.Backpack["coal"] == 0, "a guest should store into a chest within reach");
