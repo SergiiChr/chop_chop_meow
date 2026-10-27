@@ -37,6 +37,7 @@ public static class SimulationChecks {
         CheckToolGatesAndPlacement(data);
         CheckCliffsAndLoosePickup(data);
         CheckStoneYieldWithSteelTools(data);
+        CheckSkyAndMoon(data);
         CheckNightAndSurvival(data);
         CheckWolfHuntAndMeat(data);
         CheckWolfThroatLeap(data);
@@ -705,6 +706,24 @@ public static class SimulationChecks {
 
         Require(world.S.Backpack["stone"] == 4,
                 "a steel pickaxe should yield the full stone amount at its faster pace");
+    }
+
+    /// <summary>The sun crosses the sky from dawn to sunset, the moon from sunset to dawn, and the moon's light comes and goes over its cycle.</summary>
+    private static void CheckSkyAndMoon(GameData data) {
+        var sky = EmptyWorld(data);
+        float day = data.DaySeconds;
+        sky.S.Time = 0;
+        Require(!sky.MoonUp && sky.SkyArc == 0 && sky.Moonlight > .99f, "a new game should start at sunrise under a full moon");
+        sky.S.Time = day * data.Sunset - .1f;
+        Require(!sky.MoonUp && sky.SkyArc > .99f, "the sun should reach the far end of its arc just before sunset");
+        sky.S.Time = day * data.Sunset + .1f;
+        Require(sky.MoonUp && sky.SkyArc < .01f, "the moon should start its arc at sunset");
+        sky.S.Time = day - .1f;
+        Require(sky.MoonUp && sky.SkyArc > .99f, "the moon should reach the far end of its arc just before dawn");
+        sky.S.Time = day * data.MoonCycleDays / 2;
+        Require(sky.Moonlight < .01f, "halfway through its cycle the moon should be new and give no light");
+        sky.S.Time = day * data.MoonCycleDays;
+        Require(sky.Moonlight > .99f, "the moon should be full again after a whole cycle");
     }
 
     private static void CheckNightAndSurvival(GameData data) {

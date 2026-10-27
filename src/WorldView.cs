@@ -945,29 +945,33 @@ public partial class WorldView : Node3D {
     private static readonly Vector2 NoonHeading = new Vector2(1, -.45f).Normalized();
     /// <summary>Positions the sun or moon takes on its way across the sky.</summary>
     private const float SunSteps = 600;
-    /// <summary>Moonlight is faint, so night stays dark with barely a shadow.</summary>
+    /// <summary>Full moonlight is faint, so night stays dark with barely a shadow.</summary>
     private const float MoonEnergy = .05f;
+    /// <summary>Night's ambient light without a moon: dark enough that fires and torches matter.</summary>
+    private const float NewMoonAmbient = .1f;
 
     private void UpdateLighting() {
         // The sun rises at dawn and sets halfway through dusk, then the moon takes the same path until dawn.
         // Each fades out near the horizon, so the hand-over at sunset moves no visible shadow.
-        float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts, sunset = (dusk + World.Data.NightStarts) / 2;
+        float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts, sunset = World.Data.Sunset;
         // Dusk deepens into full night soon after sunset and dawn fades out, so neither boundary jumps in brightness.
         night = dayPhase >= dusk ? Mathf.SmoothStep(dusk, sunset + .02f, dayPhase) : dayPhase < .05f ? 1 - dayPhase / .05f : 0;
-        bool moon = dayPhase >= sunset;
-        float arc = moon ? (dayPhase - sunset) / (1 - sunset) : dayPhase / sunset;
+        bool moon = World.MoonUp;
+        float arc = World.SkyArc;
         float height = MathF.Sin(MathF.PI * arc);
         // Shadow edges crawl while their light turns, so the direction moves in steps of about a quarter degree; brightness and colour stay smooth.
         float step = MathF.Round(arc * SunSteps) / SunSteps, stepHeight = MathF.Sin(MathF.PI * step);
         float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, step)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 50, stepHeight));
         var heading = NoonHeading.Rotated(swing);
         sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
-        sun.LightEnergy = (moon ? MoonEnergy : Mathf.Lerp(.8f, .08f, night)) * Mathf.SmoothStep(0, .25f, height);
+        // The moon waxes and wanes over the month: a full moon lights the night sky, a new moon leaves only firelight to see by.
+        float moonlight = World.Moonlight;
+        sun.LightEnergy = (moon ? MoonEnergy * moonlight : Mathf.Lerp(.8f, .08f, night)) * Mathf.SmoothStep(0, .25f, height);
         // A low sun gives warm light at sunrise and sunset.
         float low = moon ? 0 : 1 - Mathf.SmoothStep(.1f, .45f, height);
         sun.LightColor = NoonLight.Lerp(LowSunLight, low).Lerp(MoonLight, night);
         environment.AmbientLightColor = DayAmbient.Lerp(LowSunAmbient, low * .6f).Lerp(NightAmbient, night);
-        environment.AmbientLightEnergy = Mathf.Lerp(.32f, .3f, night);
+        environment.AmbientLightEnergy = Mathf.Lerp(.32f, Mathf.Lerp(NewMoonAmbient, .3f, moonlight), night);
         environment.BackgroundColor = DayGround.Lerp(NightGround, night);
     }
 

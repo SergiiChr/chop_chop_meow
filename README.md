@@ -93,7 +93,7 @@ Health, hunger and thirst are three upright vials in the top-left corner with a 
 
 Beside them the bank shows the coins in the trading post's wage slot and the wages due each day, in red when they exceed the bank. Drop coins on it to pay in, or click it beside a trading post to take them out.
 
-The day dial in the top-right corner moves the sun or moon along an arc. A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
+The day dial in the top-right corner shows the sun crossing its arc from sunrise to sunset; then the moon crosses the same arc until dawn. A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
 
 Messages stack at the top of the screen, up to four at a time; each fades out after 7 seconds. A message repeated while it still shows restarts its time instead of stacking again, and a full stack drops the one closest to fading. Actions whose result shows by itself, such as gathering, crafting, building or filling a bottle, post no message; warnings, refusals and news do. With a side panel open they keep to the space left of it.
 
@@ -442,7 +442,7 @@ A manually exported or otherwise normally launched Godot build uses Godot's stan
 
 The environment uses a shared human scale, low-poly mountain ranges, a sandy shore and sea, an irregular lake with reeds and lily pads, and a grass valley with scattered tufts, bushes and wildflowers. A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
 
-Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack. The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset. The moon takes the same path at night. Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows. Trees in front of the player, a worker or a structure turn see-through.
+Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack. The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset. The moon takes the same path at night and waxes and wanes over a cycle of `moonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by. Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows. Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 

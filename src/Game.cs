@@ -181,7 +181,7 @@ public partial class Game : Node {
         var clock = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = -200, OffsetRight = -20, OffsetTop = 18, OffsetBottom = 18, MouseFilter = Control.MouseFilterEnum.Ignore };
         clock.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(clock);
         var dial = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddThemeConstantOverride("separation", 6); clock.AddChild(dial);
-        dayDial = new DayDial { Phase = () => world.DayPhase, Night = () => world.Night, CustomMinimumSize = new Vector2(0, 62), MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddChild(dayDial);
+        dayDial = new DayDial { Arc = () => world.SkyArc, Night = () => world.MoonUp, CustomMinimumSize = new Vector2(0, 62), MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddChild(dayDial);
         stats = Style.Heading("", 16); stats.HorizontalAlignment = HorizontalAlignment.Center; dial.AddChild(stats);
         modeLabel = Outlined(Label("", 17)); modeLabel.AnchorLeft = .5f; modeLabel.AnchorRight = .5f; modeLabel.OffsetTop = 18; modeLabel.GrowHorizontal = Control.GrowDirection.Both; modeLabel.HorizontalAlignment = HorizontalAlignment.Center; modeLabel.AutowrapMode = TextServer.AutowrapMode.Off; modeLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(modeLabel);
         // Menu badges and the hotbar sit on one plate centred along the bottom, like a tool belt.

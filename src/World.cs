@@ -231,6 +231,12 @@ public sealed partial class World {
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
     public float DayPhase => S.Time % Data.DaySeconds / Data.DaySeconds;
     public bool Night => DayPhase >= Data.NightStarts;
+    /// <summary>Whether the moon rather than the sun is in the sky, from sunset until dawn.</summary>
+    public bool MoonUp => DayPhase >= Data.Sunset;
+    /// <summary>How far the sun, or the moon after sunset, has crossed the sky, from 0 where it rises to 1 where it sets.</summary>
+    public float SkyArc => MoonUp ? (DayPhase - Data.Sunset) / (1 - Data.Sunset) : DayPhase / Data.Sunset;
+    /// <summary>How much of the moon is lit, from 0 at new moon to 1 at full; a new game starts near full moon so the first night is not the darkest.</summary>
+    public float Moonlight => (1 + MathF.Cos(MathF.Tau * S.Time / Data.DaySeconds / Data.MoonCycleDays)) / 2;
     /// <summary>Clock hour, with the day starting at 06:00.</summary>
     public float Hour => (DayPhase * 24 + 6) % 24;
     /// <summary>From the first fading light until dawn; workers are off duty.</summary>
