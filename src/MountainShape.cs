@@ -7,6 +7,17 @@ namespace ChopChopMeow;
 /// <summary>The mountain height used by both the landscape mesh and rock outcrops embedded into it.</summary>
 internal static class MountainShape {
     private static readonly FastNoiseLite Ridges = new() { NoiseType = FastNoiseLite.NoiseTypeEnum.Simplex, Frequency = .018f, FractalType = FastNoiseLite.FractalTypeEnum.Ridged, FractalOctaves = 4, Seed = 31 };
+    private static readonly FastNoiseLite TintNoise = new() { NoiseType = FastNoiseLite.NoiseTypeEnum.Simplex, Frequency = .05f, Seed = 5 };
+    private static readonly Color[] Grass = { new("56663a"), new("5e6c3e"), new("67703f"), new("6d6a3c") },
+        Scrub = { new("6b6a43"), new("5f5e3d"), new("74703f"), new("62603f") },
+        Rock = { new("55524c"), new("5f5b54"), new("4b4945"), new("68635b") }, Crest = { new("8a8984"), new("7c7b76") };
+    /// <summary>The hillside and embedded outcrops share one height/slope palette at their join.</summary>
+    public static Color ColorAt(Vector2 p, Vector3 normal, float top) {
+        var palette = top > 40 ? Crest : top < 24 && normal.Y > .6f ? Grass : top < 30 && normal.Y > .35f ? Scrub : Rock;
+        float shade = TintNoise.GetNoise2D(p.X, p.Y);
+        return palette[(int)((shade + 1) * 1.99f * palette.Length / 2) % palette.Length];
+    }
+
     public static float Height(Vector2 p) {
         float depth = -Terrain.FromMountains(p);
         if (depth <= 0) return 0;

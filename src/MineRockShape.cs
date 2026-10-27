@@ -25,17 +25,33 @@ internal static class MineRockShape {
             for (int i = 0; i < 8; i++) {
                 float x = section[i].X * width[row], ground = MountainShape.Surface(WorldPoint(x, depth[row]));
                 float y = row == 3 ? Math.Min(section[i].Y * 4.3f, ground - .8f) : i == 0 || i == 7 ? -.12f : section[i].Y * crown[row];
-                rings[row][i] = new(x, y, depth[row]);
+                // Slightly broken strata avoid a regular extruded arch while the aperture stays precisely aligned.
+                float stagger = row < 3 ? MathF.Sin(i * 2.31f + row * 1.7f) * .18f : 0;
+                if (row < 3 && i != 0 && i != 7) {
+                    x += MathF.Sin(i * 1.73f + row * 2.41f) * .12f;
+                    y = Math.Min(4.3f, y + MathF.Sin(i * 2.07f + row) * .12f);
+                }
+                rings[row][i] = new(x, y, depth[row] + stagger);
             }
         }
         var s = new SurfaceTool(); s.Begin(Godot.Mesh.PrimitiveType.Triangles);
         void Triangle(Vector3 a, Vector3 b, Vector3 c, Vector3 outward, int tint) {
             var normal = (c - a).Cross(b - a).Normalized();
             if (normal.Dot(outward) < 0) { (b, c) = (c, b); normal = -normal; }
-            s.SetColor(new Color(palette[Math.Abs(tint) % palette.Length])); s.SetNormal(normal); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);
+            var ore = new Color(palette[Math.Abs(tint) % palette.Length]);
+            void Vertex(Vector3 point) {
+                var at = WorldPoint(point.X, point.Z);
+                float blend = Math.Clamp((-point.Z - 3.4f) / (-root - 3.4f), 0, 1);
+                blend = blend * blend * (3 - 2 * blend);
+                var hillside = MountainShape.ColorAt(at, normal, MountainShape.Surface(at));
+                s.SetColor(ore.Lerp(hillside, blend)); s.SetNormal(normal); s.AddVertex(point);
+            }
+            Vertex(a); Vertex(b); Vertex(c);
         }
         void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Vector3 outward, int tint) {
-            Triangle(a, b, c, outward, tint); Triangle(a, c, d, outward, tint);
+            var middle = (a + b + c + d) / 4 + outward.Normalized() * .055f;
+            Triangle(a, b, middle, outward, tint); Triangle(b, c, middle, outward, tint);
+            Triangle(c, d, middle, outward, tint); Triangle(d, a, middle, outward, tint);
         }
         // Open-backed skin: the whole rear edge is buried below the same mountain triangles it joins.
         for (int row = 0; row < 3; row++)
@@ -50,6 +66,37 @@ internal static class MineRockShape {
             int next = (i + 1) % 8;
             Quad(rings[0][i], rings[0][next], mouth[next], mouth[i], Vector3.Back, i / 2);
         }
+        // Small, subdued talus stones sit on the sampled mountain triangles and soften the spur's lower seam.
+        // They stay outside the aperture and are part of this cached mesh, so they add no scene nodes or collisions.
+        void TalusTriangle(Vector3 a, Vector3 b, Vector3 c, Vector3 outward, Color color) {
+            var normal = (c - a).Cross(b - a).Normalized();
+            if (normal.Dot(outward) < 0) { (b, c) = (c, b); normal = -normal; }
+            s.SetColor(color); s.SetNormal(normal); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);
+        }
+        Color[] talus = { new("62614f"), new("696653"), new("58584b") };
+        Span<Vector3> baseRing = stackalloc Vector3[5];
+        for (int side = -1; side <= 1; side += 2)
+            for (int i = 0; i < 6; i++) {
+                float x = side * (2.95f + i * .34f), z = -2.45f - i * .48f + (i % 2) * .22f;
+                float radius = .34f + (i % 3) * .07f, peak = .24f + (i % 2) * .11f;
+                Vector3 Ground(float px, float pz) => new(px, MountainShape.Surface(WorldPoint(px, pz)) + .025f, pz);
+                var center = Ground(x, z); var tip = center + Vector3.Up * peak;
+                if (tip.Y > 4.3f) continue;
+                for (int j = 0; j < baseRing.Length; j++) {
+                    float angle = j * Mathf.Tau / baseRing.Length + i * .73f + side * .19f;
+                    float scale = radius * (j % 2 == 0 ? 1 : .76f);
+                    baseRing[j] = Ground(x + MathF.Cos(angle) * scale, z + MathF.Sin(angle) * scale);
+                }
+                float low = baseRing[0].Y, high = low;
+                foreach (var point in baseRing) { low = Math.Min(low, point.Y); high = Math.Max(high, point.Y); }
+                // A stone on a steep face stretches into a sliver that pokes out above the spur.
+                if (high > 4.3f || high - low > radius) continue;
+                var shade = talus[(i + (side > 0 ? 1 : 0)) % talus.Length];
+                for (int j = 0; j < baseRing.Length; j++) {
+                    var a = baseRing[j]; var b = baseRing[(j + 1) % baseRing.Length];
+                    TalusTriangle(a, b, tip, new Vector3(a.X + b.X - 2 * x, .8f, a.Z + b.Z - 2 * z), shade);
+                }
+            }
         return meshes[cliff] = s.Commit();
     }
 }
