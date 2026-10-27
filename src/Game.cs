@@ -389,7 +389,7 @@ public partial class Game : Node {
     /// <summary>Enters placement for a crate from the backpack.</summary>
     private void PlaceCrate(string item) {
         if (world.S.Backpack[item] == 0) { Notify("No empty crate in your backpack. Craft one at a bench."); return; }
-        placingCrate = item; view.BuildMode = "crate"; assigningWorker = 0; ClosePanel(); Notify($"Place {world.Describe(item)}.");
+        placingCrate = item; view.BuildMode = "crate"; assigningWorker = 0; ClosePanel();
     }
     private bool CanPlaceAgain() => view.BuildMode == "crate" ? world.S.Backpack[placingCrate] > 0 : world.S.Backpack.Has(world.Data.Buildings[view.BuildMode].Cost);
     private void Select(Worker w) { workerId = w.Id; selected = 0; view.Selected = 0; view.SelectedWorker = w.Id; OpenPage("inspect"); }
@@ -836,7 +836,7 @@ public partial class Game : Node {
                     if (t.Kind == "hut") entering = t;
                     // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
                     if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item) && !(t.Kind == "crate" && World.IsCrate(item))) {
-                        if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote) Notify(moved > 0 ? $"Stored {moved} {world.Data.Name(item)}." : $"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
+                        if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
                     }
                     Select(t);
                 } else if (ActiveHotbarItem() is string held && HasUse(held)) UseHeld(view.ToWorld(mouse.Position));
@@ -865,7 +865,7 @@ public partial class Game : Node {
                     world.Gather(gathering, dt);
                     if (world.Find(gathering.Id) == null && selected == gathering.Id) { selected = 0; view.Selected = 0; }
                     gathering = null;
-                } else { world.Gather(gathering, dt); if (world.GatherBlock(gathering) is string blocked) { Notify(blocked); gathering = null; } }
+                } else { world.Gather(gathering, dt); if (world.GatherBlock(gathering) is string blocked) { if (gathering.Remaining > 0) Notify(blocked); gathering = null; } }
             } else { world.ResetGather(); if (!right || gathering?.IsLoose == true) gathering = null; }
             // A held right click walks to a crate and lifts it once the button has been held long enough.
             if (lifting != null && right && direction == Vector2.Zero && entering == null && world.Find(lifting.Id) != null) {

@@ -93,7 +93,7 @@ Beside them the bank shows the coins in the trading post's wage slot and the wag
 
 The day dial in the top-right corner moves the sun or moon along an arc. A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
 
-Messages stack at the top of the screen, up to four at a time; each fades out after 7 seconds. A message repeated while it still shows restarts its time instead of stacking again, and a full stack drops the one closest to fading. With a side panel open they keep to the space left of it.
+Messages stack at the top of the screen, up to four at a time; each fades out after 7 seconds. A message repeated while it still shows restarts its time instead of stacking again, and a full stack drops the one closest to fading. Actions whose result shows by itself, such as gathering, crafting, building or filling a bottle, post no message; warnings, refusals and news do. With a side panel open they keep to the space left of it.
 
 ### Bottom bar and hotbar
 
