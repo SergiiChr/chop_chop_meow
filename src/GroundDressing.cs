@@ -1,4 +1,5 @@
 using System;
+using System.Threading.Tasks;
 using Godot;
 using static ChopChopMeow.ModelKit;
 
@@ -13,15 +14,15 @@ public partial class WorldView {
     private readonly byte[] woodland = new byte[Terrain.Size * Terrain.Size];
     private Image disturbanceImage = null!;
     private ImageTexture disturbanceTexture = null!;
-    private ShaderMaterial dressingMaterial = null!;
+    private ShaderMaterial dressingMaterial = null!, solidDressingMaterial = null!;
     private static readonly StringName Disturbance = "disturbance";
 
-    private const string GroundShader = """
+    private static readonly string GroundShader = $$"""
         shader_type spatial;
         uniform sampler2D ground_colors : source_color, filter_linear, repeat_disable;
         uniform sampler2D disturbance : filter_linear, repeat_disable;
         varying vec2 world_uv;
-        void vertex() { world_uv = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz / 216.0; }
+        void vertex() { world_uv = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz / {{Terrain.Size}}.0; }
         void fragment() {
             float wear = texture(disturbance, world_uv).r;
             vec3 grass = texture(ground_colors, world_uv).rgb;
@@ -29,25 +30,27 @@ public partial class WorldView {
             ROUGHNESS = 1.0;
         }
         """;
-    private const string DressingShader = """
+    /// <summary>Plants shrink away on worn ground; wear is read at each plant's origin so the whole plant scales evenly.</summary>
+    private static readonly string DressingShader = $$"""
         shader_type spatial;
         render_mode cull_disabled;
         uniform sampler2D disturbance : filter_linear, repeat_disable;
-        varying float wear;
         varying vec3 tint;
         void vertex() {
-            vec2 uv = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz / 216.0;
-            wear = texture(disturbance, uv).r;
+            float wear = texture(disturbance, MODEL_MATRIX[3].xz / {{Terrain.Size}}.0).r;
             VERTEX *= 1.0 - smoothstep(0.12, 0.65, wear);
-            // Match the sRGB vertex/instance colors used by the other nature materials.
-            tint = pow(COLOR.rgb, vec3(2.2));
+            // The same sRGB to linear conversion StandardMaterial3D applies to sRGB vertex colors.
+            tint = COLOR.rgb;
+            if (!OUTPUT_IS_SRGB) {
+                tint = mix(pow((tint + vec3(0.055)) * (1.0 / 1.055), vec3(2.4)), tint * (1.0 / 12.92), lessThan(tint, vec3(0.04045)));
+            }
         }
         void fragment() {
-            if (wear > 0.64) { discard; }
             ALBEDO = tint;
             ROUGHNESS = 1.0;
         }
         """;
+    private static readonly Color Lush = new("7f9462"), Dry = new("a2a273"), Shade = new("646d46");
 
     private float Meadow(Vector2 p) => Math.Clamp((meadowNoise.GetNoise2D(p.X, p.Y) + .28f) * 1.7f, 0, 1);
     private float Woodland(Vector2 p) {
@@ -71,16 +74,19 @@ public partial class WorldView {
             Stamp(woodland, tree.Pos, 3.5f, .7f);
         }
         const int resolution = Terrain.Size * 4;
-        var image = Image.CreateEmpty(resolution, resolution, false, Image.Format.Rgb8);
-        for (int y = 0; y < resolution; y++)
+        var pixels = new byte[resolution * resolution * 3];
+        // Rows are independent and the noise lookups are read-only, so the ground fills on all cores.
+        Parallel.For(0, resolution, y => {
             for (int x = 0; x < resolution; x++) {
                 var p = new Vector2(x * .25f, y * .25f);
                 float meadow = Meadow(p), woods = Woodland(p), variation = soilNoise.GetNoise2D(p.X, p.Y);
-                var tint = new Color("7f9462").Lerp(new Color("a2a273"), (1 - meadow) * .8f);
-                tint = tint.Lerp(new Color("646d46"), woods * .65f);
+                var tint = Lush.Lerp(Dry, (1 - meadow) * .8f).Lerp(Shade, woods * .65f);
                 tint = tint.Lightened(variation * .12f + grainNoise.GetNoise2D(p.X, p.Y) * .13f);
-                image.SetPixel(x, y, tint);
+                int at = (y * resolution + x) * 3;
+                pixels[at] = (byte)tint.R8; pixels[at + 1] = (byte)tint.G8; pixels[at + 2] = (byte)tint.B8;
             }
+        });
+        var image = Image.CreateFromData(resolution, resolution, false, Image.Format.Rgb8, pixels);
         disturbanceImage = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.R8, disturbed);
         disturbanceTexture = ImageTexture.CreateFromImage(disturbanceImage);
         var ground = new ShaderMaterial { Shader = new Shader { Code = GroundShader } };
@@ -88,6 +94,9 @@ public partial class WorldView {
         ground.SetShaderParameter(Disturbance, disturbanceTexture);
         dressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader } };
         dressingMaterial.SetShaderParameter(Disturbance, disturbanceTexture);
+        // Closed shapes such as shrubs keep back faces culled, or their unlit insides show where they meet a slope.
+        solidDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader.Replace("cull_disabled", "cull_back") } };
+        solidDressingMaterial.SetShaderParameter(Disturbance, disturbanceTexture);
         const float span = Terrain.Size * 4;
         Add(parent, new PlaneMesh { Size = new Vector2(span, span) }, ground, new Vector3(Terrain.Size / 2f, 0, Terrain.Size / 2f));
     }

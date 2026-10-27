@@ -202,12 +202,13 @@ public partial class WorldView {
         }
         for (int colony = 0; colony < 650; colony++) {
             var p = new Vector2(R() * Terrain.Size, R() * Terrain.Size);
-            if (!DressingGround(p) || p.DistanceTo(World.Spawn) < 9 || R() > Woodland(p) * .8f + Meadow(p) * .12f) continue;
+            // Shrubs sit flat, so they keep clear of the rising mountain foot rather than sinking into it.
+            if (!DressingGround(p) || Terrain.FromMountains(p) < 3 || p.DistanceTo(World.Spawn) < 9 || R() > Woodland(p) * .8f + Meadow(p) * .12f) continue;
             var color = new Color("526a3b").Lerp(new Color("78844c"), R());
             for (int i = 0; i < 3 + rng.Next(3); i++) {
                 float angle = R() * Mathf.Tau, reach = R() * 1.5f, size = .25f + R() * .42f;
                 var q = p + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * reach;
-                if (!DressingGround(q)) continue;
+                if (!DressingGround(q) || Terrain.FromMountains(q) < 3) continue;
                 bushes.Add((new Transform3D(new Basis(Vector3.Up, R() * Mathf.Tau).Scaled(new Vector3(size, size * (.6f + R() * .4f), size)), To3(q, size * .25f)), color));
             }
         }
@@ -236,15 +237,15 @@ public partial class WorldView {
         }
         ScatterDressing(parent, tuft.Commit(), blades);
         ScatterDressing(parent, new SphereMesh { Radius = .04f, Height = .055f, RadialSegments = 5, Rings = 3 }, flowers);
-        ScatterDressing(parent, NatureShape.Scrub, bushes);
+        ScatterDressing(parent, NatureShape.Scrub, bushes, solidDressingMaterial);
         ScatterDressing(parent, FernMesh(), ferns);
         ScatterDressing(parent, TwigMesh(), twigs);
     }
 
-    private void ScatterDressing(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items) {
+    private void ScatterDressing(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items, ShaderMaterial? material = null) {
         var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = mesh, InstanceCount = items.Count };
         for (int i = 0; i < items.Count; i++) { multi.SetInstanceTransform(i, items[i].At); multi.SetInstanceColor(i, items[i].Color); }
-        parent.AddChild(new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = dressingMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        parent.AddChild(new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material ?? dressingMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
     // ---------- Particles: chips, leaves, sparks, splashes, embers and smoke ----------

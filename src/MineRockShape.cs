@@ -87,7 +87,10 @@ internal static class MineRockShape {
                     float scale = radius * (j % 2 == 0 ? 1 : .76f);
                     baseRing[j] = Ground(x + MathF.Cos(angle) * scale, z + MathF.Sin(angle) * scale);
                 }
-                if (baseRing[0].Y > 4.3f || baseRing[1].Y > 4.3f || baseRing[2].Y > 4.3f || baseRing[3].Y > 4.3f || baseRing[4].Y > 4.3f) continue;
+                float low = baseRing[0].Y, high = low;
+                foreach (var point in baseRing) { low = Math.Min(low, point.Y); high = Math.Max(high, point.Y); }
+                // A stone on a steep face stretches into a sliver that pokes out above the spur.
+                if (high > 4.3f || high - low > radius) continue;
                 var shade = talus[(i + (side > 0 ? 1 : 0)) % talus.Length];
                 for (int j = 0; j < baseRing.Length; j++) {
                     var a = baseRing[j]; var b = baseRing[(j + 1) % baseRing.Length];
