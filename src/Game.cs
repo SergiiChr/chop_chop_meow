@@ -920,7 +920,9 @@ public partial class Game : Node {
     }
     private async void Quit(int code = 0) {
         if (quitting) return;
-        quitting = true; net.Leave(); sounds.StopAll(); await Seconds(.2); GetTree().Quit(code);
+        quitting = true; net.Leave(); sounds.StopAll(); await Seconds(.2);
+        // Godot objects left to the finalizer must be released before the engine shuts down, or a late finalizer aborts the exit.
+        GC.Collect(); GC.WaitForPendingFinalizers(); GetTree().Quit(code);
     }
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {

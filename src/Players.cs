@@ -209,7 +209,13 @@ public sealed partial class World {
         from.EnsureLayout();
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
         if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
-        int moved = from.MoveSlotTo(sourceSlot, to, targetSlot, quantity);
+        to.EnsureLayout();
+        // A drop on another item's cell in another inventory still stores the stack wherever it fits.
+        int moved;
+        if (from != to && to.Layout[targetSlot].Item is var there && there != "" && there != item) {
+            from.PreferredSlot = sourceSlot;
+            try { moved = from.TransferTo(to, item, quantity); } finally { from.PreferredSlot = -1; }
+        } else moved = from.MoveSlotTo(sourceSlot, to, targetSlot, quantity);
         if (moved > 0 && b > 0 && Find(b / BoxCodes) is Thing station && to == station.Burner) station.Fuel = item;
         return moved;
     }
