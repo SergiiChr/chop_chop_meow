@@ -142,10 +142,18 @@ Visible geometry counts, excluding props being carried or sat upon:
 
 ### Nature
 
+- Optional Tree3D trial: `./build.py play -- --showcase --trees --tree3d` previews baked Tree3D 1.1.0 geometry; `--tree3d` also works in the playable forest.
+  - `src/Tree3DShape.cs` loads shared tree and berry-bush meshes and alpha-cutout foliage materials.
+  - Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes --tree3d`. Berries attach to actual foliage-card twigs and retain their independent harvest visibility. Decorative scenery shrubs keep their inexpensive MultiMesh.
+  - `assets/models/tree3d/` contains the baked meshes, original SVG leaf/bark textures, triangle manifest and upstream license notices.
+  - Regenerate with `./tools/tree3d.py`; native authoring binaries stay in ignored `.tools/tree3d` and are unnecessary to play. See [trial details and compatibility](../docs/art/TREES.md).
+
 - `src/NatureShape.cs` — trees, berry bushes, rocks, ore deposits and loose ore as shared vertex-coloured meshes, with three seeded shape variants each.
-  - Lumpy leaf canopies under one light gradient.
-  - Lathed trunks with root flares, and spruce tiers.
-  - Birch bark marks drawn into the trunk.
+  - Oaks have root buttresses, exposed scaffold limbs and smaller leafy boughs with folded leaf edges.
+  - Spruces have a tapered leader and irregular whorls of folded, serrated needle sprays with gaps between boughs.
+  - Birches have marked pale bark, fine dark twigs and separate hanging foliage clusters.
+  - Each code-built standing tree uses one shared mesh and material, drawn by one visible instance and one shadow-only instance. The original shadow survives canopy fading; both instances share the shake/fall pivot. All geometry is generated during loading, and the existing stump handle remains.
+  - Review the three species with `./build.py play -- --showcase --trees`; external generator research is in [docs/art/TREES.md](../docs/art/TREES.md).
   - Faceted boulders pressed into the ground.
 - `NatureShape.Bush` — seven seeded foliage clumps with short branching stems and folded, two-sided leaves.
   - Berries are positioned against that variant's actual cached foliage surface and keep their separate harvest visibility pivot.

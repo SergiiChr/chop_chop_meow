@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
@@ -88,12 +89,71 @@ public partial class Game {
         await Frames();
         var old = view.PropOf(tree.Id);
         UIRequire(old != null, "Every tree must have its model once the world has loaded.");
+        CheckTreeCanopyShadows(old!);
         old!.Fade = .68f; old.Fall = 9;
         Restart(); await Frames(2);
         var fresh = view.PropOf(tree.Id);
         UIRequire(world.Find(tree.Id)?.Kind == "tree" && fresh != null && fresh != old && fresh.Fade == 0 && fresh.Fall < 0,
             "A new game must build fresh models rather than keep the last game's, faded or fallen.");
         ClosePanel();
+    }
+    /// <summary>Canopy fades use separate shadow-only meshes so the original cutout shadows survive alpha blending.</summary>
+    private void CheckTreeCanopyShadows(Prop prop) {
+        UIRequire(prop.SwayParts.Length > 0, "A tree canopy must expose its visible meshes for fading.");
+        var allMeshes = new List<MeshInstance3D>();
+        void Gather(Node at) {
+            if (at is MeshInstance3D mesh) allMeshes.Add(mesh);
+            foreach (var child in at.GetChildren()) Gather(child);
+        }
+        Gather(prop.Sway!);
+        var shadows = allMeshes.Where(mesh => mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.ShadowsOnly).ToArray();
+        UIRequire(shadows.Length == prop.SwayParts.Length, "Each visible tree canopy mesh must have exactly one shadow-only proxy.");
+        var originals = new StandardMaterial3D[prop.SwayParts.Length];
+        var proxies = new MeshInstance3D[prop.SwayParts.Length];
+        var proxyMaterials = new StandardMaterial3D[prop.SwayParts.Length];
+        var proxyAlphas = new float[prop.SwayParts.Length];
+        var proxyTransparencies = new BaseMaterial3D.TransparencyEnum[prop.SwayParts.Length];
+        for (int i = 0; i < prop.SwayParts.Length; i++) {
+            var (mesh, material) = prop.SwayParts[i];
+            originals[i] = material;
+            UIRequire(mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off,
+                "Visible tree canopy meshes must leave shadow casting to their proxies.");
+            UIRequire(ReferenceEquals(mesh.MaterialOverride, material),
+                "A visible tree canopy mesh must start with its original material.");
+            MeshInstance3D? proxy = null;
+            foreach (var candidate in shadows) {
+                if (ReferenceEquals(candidate.GetParent(), mesh.GetParent()) && ReferenceEquals(candidate.Mesh, mesh.Mesh) &&
+                    ReferenceEquals(candidate.MaterialOverride, material) && candidate.Transform.Equals(mesh.Transform)) {
+                    proxy = candidate; break;
+                }
+            }
+            UIRequire(proxy != null, "Each tree canopy shadow proxy must share its mesh, material and transform with the visible mesh.");
+            proxies[i] = proxy!;
+            proxyMaterials[i] = (StandardMaterial3D)proxy!.MaterialOverride!;
+            proxyAlphas[i] = proxyMaterials[i].AlbedoColor.A;
+            proxyTransparencies[i] = proxyMaterials[i].Transparency;
+            UIRequire(Mathf.IsEqualApprox(proxyAlphas[i], 1), "A tree shadow proxy must keep fully opaque foliage alpha.");
+        }
+        UIRequire(prop.SwayParts.All(part => part.Mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.ShadowsOnly),
+            "Shadow-only proxies must be excluded from the tree canopy fade parts.");
+        ModelKit.SetFade(prop.SwayParts, .68f);
+        for (int i = 0; i < prop.SwayParts.Length; i++) {
+            var mesh = prop.SwayParts[i].Mesh;
+            UIRequire(mesh.MaterialOverride is StandardMaterial3D faded &&
+                faded.Transparency == BaseMaterial3D.TransparencyEnum.Alpha && faded.AlbedoColor.A < originals[i].AlbedoColor.A &&
+                mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off,
+                "Fading a tree canopy must change only the visible mesh material and retain proxy shadow casting.");
+            var proxy = proxies[i];
+            UIRequire(ReferenceEquals(proxy.MaterialOverride, originals[i]) &&
+                Mathf.IsEqualApprox(proxyMaterials[i].AlbedoColor.A, proxyAlphas[i]) && proxyMaterials[i].Transparency == proxyTransparencies[i],
+                "A tree shadow proxy must retain the original material opacity while the visible mesh fades.");
+        }
+        ModelKit.SetFade(prop.SwayParts, 0);
+        for (int i = 0; i < prop.SwayParts.Length; i++) {
+            var mesh = prop.SwayParts[i].Mesh;
+            UIRequire(ReferenceEquals(mesh.MaterialOverride, originals[i]) && mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off,
+                "Restoring a tree canopy must restore the original visible material while proxies keep casting shadows.");
+        }
     }
     private Button? FindButton(Node parent, string text) {
         foreach (var child in parent.GetChildren()) {
@@ -748,6 +808,23 @@ public partial class Game {
             for (int i = 0; i < 120 && world.Find(looseOre.Id) != null; i++) { await Frames(); harvestAnimation |= view.PlayerAnimation == ActorAction.Gather; }
             UIRequire(world.Find(looseOre.Id) == null && world.S.Backpack["coal"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
             UIRequire(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
+            // Exercise the rendered bush's independent fruit handle through real gathering input.
+            var berryBush = world.Add("berries", world.Player + new Vector2(1, -1), 4);
+            world.S.Backpack.Remove("berries", 99);
+            await Frames(2);
+            var bushProp = view.PropOf(berryBush.Id)!;
+            UIRequire(bushProp.Fruit is { Visible: true }, "A ripe berry bush must display its fruit.");
+            point = view.Screen(berryBush.Pos, .35f);
+            UIRequire(view.Pick(point)?.Id == berryBush.Id, "The bush foliage must select its berry resource.");
+            windowPoint = GetViewport().GetFinalTransform() * point;
+            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
+            await Seconds(world.Data.GatherSeconds + .3f);
+            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
+            await Frames(2);
+            UIRequire(berryBush.Remaining == 0 && world.S.Backpack["berries"] == 4 && !bushProp.Fruit!.Visible && bushProp.Body.Visible,
+                "Harvesting must collect the berries and hide only the fruit, leaving the bush visible.");
+            berryBush.Remaining = 4; await Frames(2);
+            UIRequire(bushProp.Fruit!.Visible, "A replenished bush must show its fruit again.");
             await CheckCraftingAndTorch();
             await CheckCrateOverflow();
             await CheckSurvivalInventoryUI();

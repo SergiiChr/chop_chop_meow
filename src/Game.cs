@@ -954,6 +954,38 @@ public partial class Game : Node {
         view.Zoom = 1.25f;
     }
     private void Showcase() {
+        if (OS.GetCmdlineUserArgs().Contains("--bushes")) {
+            // A clean three-bush comparison row, with one picked-clean bush to show its persistent model.
+            var at = World.Spawn + new Vector2(9, 9);
+            world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
+            // Bush variants are selected from the id; start the row at variant zero and include all three.
+            world.S.NextId += (3 - world.S.NextId % 3) % 3;
+            world.Add("berries", at + new Vector2(-2.25f, 2.25f), 24);
+            world.Add("berries", at + new Vector2(-.75f, .75f), 24);
+            world.Add("berries", at + new Vector2(.75f, -.75f), 24);
+            world.Add("berries", at + new Vector2(2.25f, -2.25f), 0);
+            world.S.Time = world.Data.DaySeconds * .2f;
+            world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
+            world.Player = at + new Vector2(-1, -.5f);
+            world.Tick(0); view.Zoom = 1.8f;
+            ClosePanel(); return;
+        }
+        if (OS.GetCmdlineUserArgs().Contains("--trees")) {
+            // A clean three-tree comparison row, placed beyond the settlement showcase.
+            var at = World.Spawn + new Vector2(9, 9);
+            world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
+            // Tree variants are selected from the id: align the first id to oak, then add spruce and birch.
+            world.S.NextId += (3 - world.S.NextId % 3) % 3;
+            world.Add("tree", at + new Vector2(-3, 3), 42);
+            world.Add("tree", at, 42);
+            world.Add("tree", at + new Vector2(3, -3), 42);
+            world.S.Time = world.Data.DaySeconds * .2f;
+            world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
+            world.Player = at + new Vector2(1, -1);
+            if (OS.GetCmdlineUserArgs().Contains("--tree-shadow")) world.Player = at - Vector2.One * 2;
+            world.Tick(0); view.Zoom = 1;
+            ClosePanel(); return;
+        }
         foreach (var t in world.S.Things.Where(t => t.Pos.DistanceTo(World.Spawn) < 8).ToArray()) world.S.Things.Remove(t);
         var hut = world.Add("hut", World.Spawn + new Vector2(-2, -2)); var fire = world.Add("campfire", World.Spawn + new Vector2(1, -3)); fire.Burn = 200;
         var f = world.Add("furnace", World.Spawn + new Vector2(4, -2)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);

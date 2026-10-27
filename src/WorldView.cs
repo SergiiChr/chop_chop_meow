@@ -577,6 +577,7 @@ public partial class WorldView : Node3D {
         // Another world, loaded or started, starts from fresh models: the old ones carry the state of things with the same ids.
         if (builtFor != World.S) {
             builtFor = World.S;
+            thingsCounted = -1;
             foreach (var (_, old) in props) old.Root.QueueFree();
             props.Clear();
             foreach (var t in World.S.Things) Show(PropFor(t), false);
@@ -594,6 +595,7 @@ public partial class WorldView : Node3D {
         // Things leave the world rarely, so their models are looked for only when the count changes.
         if (thingsCounted != World.S.Things.Count) {
             thingsCounted = World.S.Things.Count;
+            RefreshDressing();
             gone.Clear();
             foreach (var (id, _) in props) if (!seen.Contains(id) && World.Find(id) == null) gone.Add(id);
             foreach (int id in gone) { props[id].Root.QueueFree(); props.Remove(id); }
