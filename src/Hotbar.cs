@@ -112,19 +112,16 @@ public partial class Game {
         assigningWorker = 0;
         if (string.IsNullOrEmpty(id)) Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
         else if (world.Data.Buildings.ContainsKey(id)) { view.BuildMode = id; ClosePanel(); Notify($"Place {world.Data.Name(id)}."); } else if (id == "crate") PlaceCrate(id);
-        else if (UseOf(id) is string use) Notify($"{world.Data.Name(id)} in hand. Left click to {use}.");
-        else Notify($"{world.Data.Name(id)} in hand.");
         RefreshLive();
     }
 
-    /// <summary>What a left click does with an item in hand, or null when it has no use.</summary>
-    private string? UseOf(string id) => Water.IsBottle(id) ? "drink" : world.Data.IsConsumable(id) ? "eat"
-        : id == "torch" ? world.S.TorchLit ? "swing it" : "light it"
-        : (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer" ? "swing" : null;
+    /// <summary>Whether a left click on the ground does something with this item in hand: drink, eat, light or swing.</summary>
+    private bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || id == "torch"
+        || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer";
 
     /// <summary>Uses the item in hand toward a point on the ground; items without a use do nothing.</summary>
     private void UseHeld(Vector2 at) {
-        if (ActiveHotbarItem() is not string id || UseOf(id) == null) return;
+        if (ActiveHotbarItem() is not string id || !HasUse(id)) return;
         if (paused) { Notify("Resume before using items."); return; }
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) Act(() => world.Consume(id));
         else if (id == "torch") world.UseTorch(at - world.Player);

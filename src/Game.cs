@@ -839,7 +839,7 @@ public partial class Game : Node {
                         if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote) Notify(moved > 0 ? $"Stored {moved} {world.Data.Name(item)}." : $"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
                     }
                     Select(t);
-                } else if (ActiveHotbarItem() is string held && UseOf(held) != null) UseHeld(view.ToWorld(mouse.Position));
+                } else if (ActiveHotbarItem() is string held && HasUse(held)) UseHeld(view.ToWorld(mouse.Position));
                 else ClosePanel();
             }
         }

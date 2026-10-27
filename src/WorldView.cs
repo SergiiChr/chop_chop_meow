@@ -943,6 +943,8 @@ public partial class WorldView : Node3D {
     private static readonly Color DayGround = new("879c69"), NightGround = new("1b2733");
     /// <summary>The noon light's heading across the ground, from the upper left and slightly behind so shadows fall to the right.</summary>
     private static readonly Vector2 NoonHeading = new Vector2(1, -.45f).Normalized();
+    /// <summary>Positions the sun or moon takes on its way across the sky.</summary>
+    private const float SunSteps = 600;
 
     private void UpdateLighting() {
         // Dusk deepens into full night and dawn fades out, so neither boundary jumps in brightness.
@@ -955,7 +957,9 @@ public partial class WorldView : Node3D {
         bool moon = dayPhase >= sunset;
         float arc = moon ? (dayPhase - sunset) / (1 - sunset) : dayPhase / sunset;
         float height = MathF.Sin(MathF.PI * arc);
-        float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, arc)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 50, height));
+        // Shadow edges crawl while their light turns, so the direction moves in steps of about a quarter degree; brightness and colour stay smooth.
+        float step = MathF.Round(arc * SunSteps) / SunSteps, stepHeight = MathF.Sin(MathF.PI * step);
+        float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, step)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 50, stepHeight));
         var heading = NoonHeading.Rotated(swing);
         sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
         sun.LightEnergy = Mathf.Lerp(.8f, .08f, night) * Mathf.SmoothStep(0, .25f, height);
