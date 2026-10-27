@@ -554,7 +554,7 @@ public sealed partial class World {
         t.Burn += Data.CampfireSeconds; Say($"Campfire fed: +{Data.CampfireHours:0} hours of light.");
     }
     public void SetRecipe(Thing t, string recipe) {
-        if (t.Processing) { Say("Wait until the current batch finishes."); return; }
+        if (t.Processing) return;
         if (Forwarded("set_recipe", t.Id, item: recipe)) return;
         if (Data.Recipes.TryGetValue(recipe, out var r) && r.Station == t.Kind) { t.Recipe = recipe; t.Progress = 0; }
     }
