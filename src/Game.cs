@@ -865,7 +865,11 @@ public partial class Game : Node {
                     world.Gather(gathering, dt);
                     if (world.Find(gathering.Id) == null && selected == gathering.Id) { selected = 0; view.Selected = 0; }
                     gathering = null;
-                } else { world.Gather(gathering, dt); if (world.GatherBlock(gathering) is string blocked) { if (gathering.Remaining > 0) Notify(blocked); gathering = null; } }
+                } else {
+                    // Emptying it shows on the stump or bare bush; a target that was already empty or out of reach still says why.
+                    bool had = gathering.Remaining > 0; world.Gather(gathering, dt);
+                    if (world.GatherBlock(gathering) is string blocked) { if (!had || gathering.Remaining > 0) Notify(blocked); gathering = null; }
+                }
             } else { world.ResetGather(); if (!right || gathering?.IsLoose == true) gathering = null; }
             // A held right click walks to a crate and lifts it once the button has been held long enough.
             if (lifting != null && right && direction == Vector2.Zero && entering == null && world.Find(lifting.Id) != null) {

@@ -949,6 +949,9 @@ public partial class WorldView : Node3D {
     private const float MoonEnergy = .05f;
     /// <summary>Night's ambient light without a moon: dark enough that fires and torches matter.</summary>
     private const float NewMoonAmbient = .1f;
+    /// <summary>Where the light was last pointed, so it is turned only when it moves on.</summary>
+    private float skyStep = -1;
+    private bool skyMoon;
 
     private void UpdateLighting() {
         // The sun rises at dawn and sets halfway through dusk, then the moon takes the same path until dawn.
@@ -961,9 +964,13 @@ public partial class WorldView : Node3D {
         float height = MathF.Sin(MathF.PI * arc);
         // Shadow edges crawl while their light turns, so the direction moves in steps of about an eighth of a degree; brightness and colour stay smooth.
         float step = MathF.Round(arc * SunSteps) / SunSteps, stepHeight = MathF.Sin(MathF.PI * step);
-        float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, step)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 50, stepHeight));
-        var heading = NoonHeading.Rotated(swing);
-        sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
+        // The light only moves when it reaches the next step: a transform change makes the engine redo the light's work.
+        if (step != skyStep || moon != skyMoon) {
+            skyStep = step; skyMoon = moon;
+            float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, step)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 50, stepHeight));
+            var heading = NoonHeading.Rotated(swing);
+            sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
+        }
         // The moon waxes and wanes over the month: a full moon lights the night sky, a new moon leaves only firelight to see by.
         float moonlight = World.Moonlight;
         sun.LightEnergy = (moon ? MoonEnergy * moonlight : Mathf.Lerp(.8f, .08f, night)) * Mathf.SmoothStep(0, .25f, height);
