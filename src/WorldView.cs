@@ -29,6 +29,7 @@ public partial class WorldView : Node3D {
     public bool AnimationReview;
     /// <summary>Fixed daylight landscape fixture for matching environment trial screenshots.</summary>
     public bool EnvironmentReview;
+    public Vector2? EnvironmentCenter;
     public float Elapsed;
     public bool PanelOpen;
     public Sounds? Sounds;
@@ -208,7 +209,7 @@ public partial class WorldView : Node3D {
         camera.Size = (AnimationReview ? 9.5f : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         var back = new Vector3(across, MathF.Sin(pitch), across);
-        var target = AnimationReview ? ReviewCenter : To3(World.Player);
+        var target = AnimationReview ? ReviewCenter : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
         camera.Position = target + back * 60;
         float unitsPerPixel = camera.Size / Math.Max(1, size.Y);
@@ -585,7 +586,7 @@ public partial class WorldView : Node3D {
             foreach (var t in World.S.Things) Show(PropFor(t), false);
         }
         seen.Clear();
-        World.CollectKnown(known);
+        if (EnvironmentReview && EnvironmentCenter.HasValue) { known.Clear(); known.AddRange(World.S.Things); } else World.CollectKnown(known);
         foreach (var t in known) {
             seen.Add(t.Id);
             var prop = PropFor(t);

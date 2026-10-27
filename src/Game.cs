@@ -951,7 +951,7 @@ public partial class Game : Node {
         if (environmentAt >= 0) {
             string location = environmentAt + 1 < launchArgs.Length ? launchArgs[environmentAt + 1] : "forest";
             world.Player = location switch {
-                "lake" => Terrain.Lake + Terrain.Seaward * 3,
+                "lake" => Terrain.WaterPoint(Terrain.Lake + Terrain.Seaward) + Terrain.Seaward,
                 "terrain" => Terrain.Point(125, -18),
                 _ => World.Spawn,
             };
@@ -959,6 +959,7 @@ public partial class Game : Node {
             world.S.Workers.Clear(); world.S.Orders.Clear();
             world.Tick(0);
             view.EnvironmentReview = true;
+            view.EnvironmentCenter = location switch { "lake" => Terrain.Lake + Terrain.Seaward * 3, "terrain" => Terrain.Point(125, -18), _ => null };
             view.Zoom = location switch { "lake" => .44f, "terrain" => .24f, _ => .75f };
             ClosePanel(); ui.Visible = false; paused = true;
             return;

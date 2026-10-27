@@ -41,3 +41,31 @@ Capture either view with the same camera and lighting:
 The comparison fixture freezes simulation at daylight, hides interface and fog,
 and uses the same world seed, camera, zoom and viewport (1440×900). It is a
 visual-review fixture, not evidence of a complete gameplay playthrough.
+
+## 2. Lake appearance
+
+```sh
+./build.py play -- --tree3d --proton-scatter --lake-water
+```
+
+The lake uses a bounded shader adapted from Boujie's Gerstner normal and
+Fresnel equations, pinned to source commit
+`25f3c2da458e0a4f65bdb5903dc068b050930c06` under MIT. The surface stays at the
+existing water height and follows `Terrain.Shore`. Its shallow teal edge,
+deeper blue center, animated ripple normals and broken foam replace the three
+flat water discs. Banks, reeds, stones and lily pads retain their positions.
+This is an adaptation of shader math, not installation of Boujie's ocean
+plugin. The radial depth colors are authored; no real lake bed, refraction,
+fluid simulation or buoyancy is added. See `assets/environment/lake/README.md`.
+
+| Before | After |
+| --- | --- |
+| ![Original lake](../reviews/environment/02-lake-before.png) | ![Lake shader](../reviews/environment/02-lake-after.png) |
+
+```sh
+./build.py play -- --showcase --environment-review lake --tree3d --proton-scatter --screenshot /absolute/path/before.png
+./build.py play -- --showcase --environment-review lake --tree3d --proton-scatter --lake-water --screenshot /absolute/path/after.png
+```
+
+Both frames show the entire surrounding resource layout with the player on
+the dry bank. Shader time is fixed to 1.25 seconds in the review fixture.

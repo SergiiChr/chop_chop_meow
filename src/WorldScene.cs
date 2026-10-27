@@ -130,10 +130,13 @@ public partial class WorldView {
         float Shore(float angle) => Terrain.Shore(angle);
         Blob(parent, at + new Vector3(0, .005f, 0), a => Shore(a) + 1.4f + .3f * MathF.Sin(a * 4), Mat("7f7556", 1));
         Blob(parent, at + new Vector3(0, .012f, 0), a => Shore(a) + .3f, Mat("5d5540", 1));
-        var water = new StandardMaterial3D { AlbedoColor = new Color("3f6f72"), Roughness = .06f, Metallic = .3f, MetallicSpecular = .9f };
-        Blob(parent, at + new Vector3(0, .025f, 0), Shore, water);
-        Blob(parent, at + new Vector3(0, .028f, 0), a => Shore(a) * .7f, Flat(new Color(.12f, .27f, .3f, .4f), true));
-        Blob(parent, at + new Vector3(0, .03f, 0), a => Shore(a) * .4f, Flat(new Color(.08f, .2f, .24f, .4f), true));
+        if (OS.GetCmdlineUserArgs().Contains("--lake-water")) LakeAppearance.BuildLakeAppearance(parent);
+        else {
+            var water = new StandardMaterial3D { AlbedoColor = new Color("3f6f72"), Roughness = .06f, Metallic = .3f, MetallicSpecular = .9f };
+            Blob(parent, at + new Vector3(0, .025f, 0), Shore, water);
+            Blob(parent, at + new Vector3(0, .028f, 0), a => Shore(a) * .7f, Flat(new Color(.12f, .27f, .3f, .4f), true));
+            Blob(parent, at + new Vector3(0, .03f, 0), a => Shore(a) * .4f, Flat(new Color(.08f, .2f, .24f, .4f), true));
+        }
         var rng = new Random(77);
         const int stones = 150;
         for (int i = 0; i < stones; i++) {
