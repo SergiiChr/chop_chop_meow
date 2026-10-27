@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 public partial class Game {
     private PanelContainer menu = null!;
     private VBoxContainer goals = null!;
-    private Button hostButton = null!, joinButton = null!, saveButton = null!, loadButton = null!;
+    private Button hostButton = null!, joinButton = null!, saveButton = null!, loadButton = null!, newGameButton = null!;
     private Label netLine = null!;
 
     /// <summary>A round enamel badge with a line icon, and a key pill when a key opens the same page.</summary>
@@ -41,10 +41,14 @@ public partial class Game {
         goals = new VBoxContainer(); goals.AddThemeConstantOverride("separation", 6); well.AddChild(goals);
         var side = new VBoxContainer { CustomMinimumSize = new Vector2(220, 0) }; side.AddThemeConstantOverride("separation", 12); body.AddChild(side);
         var resume = BigButton("Resume · Esc", Style.Brick, CloseMenu); resume.Name = "resume"; side.AddChild(resume);
-        foreach (var (text, action) in new (string, Action)[] { ("Save", () => ShowSlots(true, BackToPause)), ("Load", () => ShowSlots(false, BackToPause)), ("Options", () => ShowOptions(BackToPause)) }) {
-            var button = MenuButton(text, Style.Enamel, action); side.AddChild(button);
+        foreach (var (text, action) in new (string, Action)[] {
+            ("Save", () => ShowSlots(true, BackToPause)), ("Load", () => ShowSlots(false, BackToPause)), ("Options", () => ShowOptions(BackToPause)),
+            ("New game", () => ConfirmLeave("NEW GAME", "Start a new game", () => { HideScreen(); Restart(); })), ("Quit", () => ConfirmLeave("QUIT", "Quit to desktop", () => Quit())),
+        }) {
+            var button = MenuButton(text, Style.Enamel, action); button.Name = text.ToLowerInvariant().Replace(' ', '_'); side.AddChild(button);
             if (text == "Save") saveButton = button;
             if (text == "Load") loadButton = button;
+            if (text == "New game") newGameButton = button;
         }
         side.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill });
         hostButton = MenuButton("Host", Style.Sage, HostGame); hostButton.Name = "host"; side.AddChild(hostButton);
@@ -108,10 +112,19 @@ public partial class Game {
         goals.AddChild(profit);
         hostButton.Disabled = net.Online; hostButton.Text = net.Hosting ? "Hosting" : "Host";
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.
-        joinButton.Text = world.Remote ? "Leave game" : "Join"; joinButton.Disabled = net.Hosting; saveButton.Disabled = loadButton.Disabled = world.Remote;
+        joinButton.Text = world.Remote ? "Leave game" : "Join"; joinButton.Disabled = net.Hosting; saveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = world.Remote;
         netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
         menu.Visible = true; paused = true;
     }
 
     private void CloseMenu() { menu.Visible = false; paused = false; }
+
+    /// <summary>Asks before leaving the settlement, since anything done after the last save would be lost.</summary>
+    private void ConfirmLeave(string heading, string confirm, Action leave) {
+        OpenScreen(heading, BackToPause);
+        var note = Label(net.Hosting ? "Progress since the last save is lost, and your guests are disconnected." : "Progress since the last save is lost.", 14);
+        note.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(note);
+        AddScreenButton(confirm, leave);
+        AddScreenButton("Back · Esc", BackToPause);
+    }
 }

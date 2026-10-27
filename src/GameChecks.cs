@@ -434,6 +434,21 @@ public partial class Game {
             ClosePanel();
             await KeyStroke(Key.Escape);
             UIRequire(menu.Visible && paused && HasLabel(menu, World.ObjectiveFor(world.S.Goal).Title), "Esc must open the pause menu with the current goal.");
+            // New game and Quit ask first, and Esc or Back returns to the pause menu.
+            world.Player = World.Spawn + new Vector2(6, 0);
+            await Click(FindButton(menu, "New game")!);
+            UIRequire(backdrop.Visible && FindButton(screen, "Start a new game") != null && world.Player != World.Spawn, "New game must ask before leaving the settlement.");
+            await KeyStroke(Key.Escape);
+            UIRequire(!backdrop.Visible && menu.Visible && paused, "Esc on the new game question must return to the pause menu.");
+            await Click(FindButton(menu, "Quit")!);
+            UIRequire(backdrop.Visible && FindButton(screen, "Quit to desktop") != null, "Quit must ask before closing the game.");
+            await Click(FindButton(screen, "Back · Esc")!);
+            UIRequire(menu.Visible && paused, "Back on the quit question must return to the pause menu.");
+            await Click(FindButton(menu, "New game")!);
+            await Click(FindButton(screen, "Start a new game")!);
+            UIRequire(!backdrop.Visible && !menu.Visible && !paused && page == "welcome" && world.Player == World.Spawn, "Confirming a new game must start a fresh settlement.");
+            ClosePanel();
+            await KeyStroke(Key.Escape);
             await KeyStroke(Key.Escape);
             UIRequire(!menu.Visible && !paused, "Esc must close the pause menu and resume.");
             var start = world.Player;

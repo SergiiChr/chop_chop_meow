@@ -58,6 +58,8 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 The game opens on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit.
 
+The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
+
 Options holds a window resolution picker, a frame rate limit (off, 60 or 90 fps) and a music volume slider. The resolution and frame rate choices are stored in `settings.cfg` and applied at launch.
 
 ## Controls
@@ -78,7 +80,7 @@ Options holds a window resolution picker, a frame rate limit (off, 60 or 90 fps)
 | 1–9 or click a hotbar slot | Put that slot in hand, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
 | Space | Swing axe, or pump the selected nearby reinforced furnace |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
-| Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load and options |
+| Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
 | Click / Ctrl-click an item cell | Move one item / all of that item (Shift works like Ctrl); this applies across inventory and station panels |
 | Drag a cell | Move its stack to another inventory or a station input slot; drop an item or building plan on the hotbar to assign it |
