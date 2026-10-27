@@ -56,6 +56,12 @@ public static class MultiplayerChecks {
         Require(sent.Select(c => c.Verb).SequenceEqual(new[] { "transfer_slot", "sort_bag" }) && copy.S.Backpack.Layout[0].Count == 10,
             "a guest copy must forward layout actions without changing its local mirror");
 
+        var dropper = new World(data, false); var shelf = dropper.Add("chest", dropper.Player + new Vector2(1, 0));
+        shelf.Inventory.Add("stone", 1); dropper.S.Backpack.Add("wood", 3);
+        int woodSlot = dropper.S.Backpack.Layout.FindIndex(slot => slot.Item == "wood");
+        Require(dropper.TransferSlot(dropper.S.Backpack, shelf.Inventory, woodSlot, 0, "wood", 3) == 3 && shelf.Inventory["wood"] == 3 && shelf.Inventory.Layout[0].Item == "stone",
+            "a drop on another item's cell in a chest should store the stack in a free cell");
+
         guest.RespawnIn = 20; world.S.Time = data.DaySeconds * .9f;
         float time = world.S.Time;
         world.Run(guest, new Command("skip_morning", 0, 0, "", 0, default));

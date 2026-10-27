@@ -887,7 +887,7 @@ public sealed partial class World {
     private static bool NeedsFullBottle(Dictionary<string, int> cost, Inventory bag) =>
         cost.TryGetValue("water", out int needed) && bag["water"] < needed &&
         (bag["water_2"] > 0 || bag["water_1"] > 0 || bag["empty_bottle"] > 0);
-    private enum CraftRefusal { FullBottle, None, StationOnly, Recovering, NoTool, NoInputs, QueueFull }
+    private enum CraftRefusal { None, StationOnly, Recovering, NoTool, NoInputs, QueueFull, FullBottle }
     /// <summary>The one place the hand-crafting rules live; <see cref="CanCraft"/> and <see cref="CraftBlock"/> both read it.</summary>
     private CraftRefusal CraftCheck(string recipe) {
         if (!Data.Recipes.TryGetValue(recipe, out var r) || !r.Hand) return CraftRefusal.StationOnly;
