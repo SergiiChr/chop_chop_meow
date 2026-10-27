@@ -222,7 +222,7 @@ internal static class NatureShape {
     /// <summary>Small foliage masses with folded, two-sided leaves breaking their edges; all baked into one shared mesh.</summary>
     private static void TreeClump(SurfaceTool s, Vector3 at, Vector3 radii, int seed,
         Func<Vector3, Vector3, Color> tint, float leafSize = 1) {
-        var (points, triangles) = Shape(at, radii, 1, seed, 5, .32f, .09f, at.Y - radii.Y, 0);
+        var (points, triangles) = Shape(at, radii, 0, seed, 5, .32f, .09f, at.Y - radii.Y, 0);
         Blob(s, at, points, triangles, false, tint);
         BushLeaves(s, at, radii, points, tint, seed * .7f, 13, leafSize);
     }
@@ -260,12 +260,13 @@ internal static class NatureShape {
         Func<Vector3, Vector3, Color> tint) {
         var along = to - from;
         var side = along.Cross(Vector3.Up).Normalized();
-        for (int segment = 0; segment < 5; segment++) {
-            float t0 = segment / 5f, t1 = (segment + 1) / 5f;
+        const int Segments = 3;
+        for (int segment = 0; segment < Segments; segment++) {
+            float t0 = segment / (float)Segments, t1 = (segment + 1) / (float)Segments;
             var a = from + along * t0 + Vector3.Up * MathF.Sin(t0 * Mathf.Pi) * width * .35f;
             var b = from + along * t1 + Vector3.Up * MathF.Sin(t1 * Mathf.Pi) * width * .35f;
             float w0 = segment == 0 ? width * .24f : width * (1 - t0) * (segment % 2 == 0 ? .8f : 1.2f);
-            float w1 = segment == 4 ? 0 : width * (1 - t1) * (segment % 2 == 0 ? 1.2f : .8f);
+            float w1 = segment == Segments - 1 ? 0 : width * (1 - t1) * (segment % 2 == 0 ? 1.2f : .8f);
             for (int sign = -1; sign <= 1; sign += 2) {
                 var c = from + along * t0 + side * (w0 * sign);
                 var d = from + along * t1 + side * (w1 * sign);
@@ -276,7 +277,7 @@ internal static class NatureShape {
                     s.SetColor(color); s.SetNormal(normal); s.AddVertex(p); s.AddVertex(q); s.AddVertex(r);
                     s.SetColor(color.Darkened(.2f)); s.SetNormal(-normal); s.AddVertex(p); s.AddVertex(r); s.AddVertex(q);
                 }
-                Face(a, c, d); if (segment != 4) Face(a, d, b);
+                Face(a, c, d); if (segment != Segments - 1) Face(a, d, b);
             }
         }
     }
