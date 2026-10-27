@@ -12,13 +12,7 @@ public partial class WorldView {
     private float Jitter() => (float)effectRandom.NextDouble();
 
     private void BuildGround(Node3D parent) {
-        // Fine grass grain with occasional bare-earth flecks at the top of the ramp.
-        var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
-        var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
-        var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
-        const float span = Terrain.Size * 4;
-        var ground = new StandardMaterial3D { AlbedoTexture = grass, Roughness = 1, Uv1Scale = new Vector3(span / 9, span / 9, 1) };
-        Add(parent, new PlaneMesh { Size = new Vector2(span, span) }, ground, new Vector3(Terrain.Size / 2f, 0, Terrain.Size / 2f));
+        BuildMeadowGround(parent);
         // The arrival clearing: overlapping translucent discs soften into the grass.
         for (int ring = 0; ring < 4; ring++)
             Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(World.Spawn.X, .003f + ring * .0005f, World.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
@@ -65,14 +59,12 @@ public partial class WorldView {
 
     /// <summary>Both ranges as one flat-shaded height field that rises from the valley's edge into ridged peaks.</summary>
     private static void BuildMountains(Node3D parent) {
-        var tint = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Simplex, Frequency = .05f, Seed = 5 };
         float Height(Vector2 p) => MountainShape.Height(p);
         const float step = 2, from = -110, to = Terrain.Size + 110;
         int count = (int)((to - from) / step) + 1;
         var heights = new float[count, count];
         for (int y = 0; y < count; y++)
             for (int x = 0; x < count; x++) heights[x, y] = Height(new Vector2(from + x * step, from + y * step));
-        Color[] grass = { new("56663a"), new("5e6c3e"), new("67703f"), new("6d6a3c") }, scrub = { new("6b6a43"), new("5f5e3d"), new("74703f"), new("62603f") }, rock = { new("55524c"), new("5f5b54"), new("4b4945"), new("68635b") }, crest = { new("8a8984"), new("7c7b76") };
         var tool = new SurfaceTool();
         tool.Begin(Mesh.PrimitiveType.Triangles);
         for (int y = 0; y + 1 < count; y++)
@@ -83,10 +75,8 @@ public partial class WorldView {
                     if (p.Y + q.Y + r.Y <= 0) continue;
                     var normal = (r - p).Cross(q - p).Normalized();
                     if (normal.Y < 0) normal = -normal;
-                    float top = Math.Max(p.Y, Math.Max(q.Y, r.Y)), shade = tint.GetNoise2D(p.X, p.Z);
-                    // Gentle, low ground stays grassy and lower slopes scrubby; steep or high faces are bare rock, and the highest pale.
-                    var palette = top > 40 ? crest : top < 24 && normal.Y > .6f ? grass : top < 30 && normal.Y > .35f ? scrub : rock;
-                    var color = palette[(int)((shade + 1) * 1.99f * palette.Length / 2) % palette.Length];
+                    float top = Math.Max(p.Y, Math.Max(q.Y, r.Y));
+                    var color = MountainShape.ColorAt(new Vector2(p.X, p.Z), normal, top);
                     tool.SetColor(color); tool.SetNormal(normal);
                     MountainShape.AddCarvedTriangle(tool, p + Vector3.Down * .03f, q + Vector3.Down * .03f, r + Vector3.Down * .03f);
                 }
@@ -134,11 +124,19 @@ public partial class WorldView {
         Blob(parent, at + new Vector3(0, .028f, 0), a => Shore(a) * .7f, Flat(new Color(.12f, .27f, .3f, .4f), true));
         Blob(parent, at + new Vector3(0, .03f, 0), a => Shore(a) * .4f, Flat(new Color(.08f, .2f, .24f, .4f), true));
         var rng = new Random(77);
-        const int stones = 150;
-        for (int i = 0; i < stones; i++) {
-            float angle = i * Mathf.Tau / stones + (float)rng.NextDouble() * .03f, r = Shore(angle) + .2f + (float)rng.NextDouble() * .5f;
-            var stone = Sphere(parent, .1f + (float)rng.NextDouble() * .14f, at + new Vector3(MathF.Cos(angle) * r, .03f, MathF.Sin(angle) * r), Mat(i % 3 == 0 ? "a3a7a3" : "8d918e", .9f), new Vector3(1.2f, .5f, 1), 6);
-            stone.RotationDegrees = new Vector3(0, i * 47, 0);
+        // Pockets of pebbles collect along a few banks, leaving broad stretches of bare shore.
+        // A continuous evenly spaced necklace made the lake look landscaped rather than natural.
+        for (int pocket = 0; pocket < 25; pocket++) {
+            float center = (float)rng.NextDouble() * Mathf.Tau;
+            int stones = 3 + rng.Next(6);
+            for (int i = 0; i < stones; i++) {
+                float angle = center + ((float)rng.NextDouble() - .5f) * .15f;
+                float r = Shore(angle) + .05f + (float)rng.NextDouble() * .9f;
+                float size = .055f + (float)rng.NextDouble() * .17f;
+                Add(parent, NatureShape.Rocks("bank", new Color("939584"), pocket % NatureShape.Variants), NatureShape.Natural,
+                    at + new Vector3(MathF.Cos(angle) * r, .02f, MathF.Sin(angle) * r),
+                    new Vector3(0, (float)rng.NextDouble() * 360, 0), new Vector3(size * 1.6f, size, size));
+            }
         }
         // Reed clumps with cattails along the banks, lily pads near the shore.
         for (float angle = .2f; angle < Mathf.Tau; angle += .45f + (float)rng.NextDouble() * .5f) {
@@ -170,59 +168,83 @@ public partial class WorldView {
         Add(parent, fan.Commit(), material, center);
     }
 
-    /// <summary>Grass, wildflowers and lightweight leafy shrubs, each drawn in one MultiMesh.</summary>
+    /// <summary>Grass in meadow drifts, woodland shrubs and flowers grouped into small colonies.</summary>
     private void BuildTufts(Node3D parent) {
         var rng = new Random(4271);
+        float R() => (float)rng.NextDouble();
         var blades = new List<(Transform3D At, Color Color)>();
         var flowers = new List<(Transform3D At, Color Color)>();
-        Color[] petals = { new("f2efe0"), new("e9cf5a"), new("b68ad6") };
         var bushes = new List<(Transform3D At, Color Color)>();
-        Color[] leaves = { new("4f6b35"), new("5b7a3c"), new("466130") };
-        while (bushes.Count < 900) {
-            // Plain bushes dot the open valley, a few leafy lumps each; berry bushes are resources and drawn with them.
-            var p = new Vector2((float)rng.NextDouble() * Terrain.Size, (float)rng.NextDouble() * Terrain.Size);
-            if (!Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 1.5f) || p.DistanceTo(World.Spawn) < 6 || Terrain.FromMountains(p) < 3) continue;
-            for (int i = 0; i < 3; i++) {
-                float size = .35f + (float)rng.NextDouble() * .3f;
-                var at = new Vector3(p.X + ((float)rng.NextDouble() - .5f) * .7f, size * .35f, p.Y + ((float)rng.NextDouble() - .5f) * .7f);
-                bushes.Add((new Transform3D(Basis.Identity.Scaled(new Vector3(size, size * .75f, size)), at), leaves[rng.Next(leaves.Length)]));
+        var ferns = new List<(Transform3D At, Color Color)>();
+        var twigs = new List<(Transform3D At, Color Color)>();
+        Color[] petals = { new("eee5bd"), new("d7b44c"), new("ae91ba") };
+        // Sample a fixed budget rather than filling to a uniform density: some places remain deliberately quiet.
+        for (int sample = 0; sample < 105000; sample++) {
+            var p = new Vector2(R() * Terrain.Size, R() * Terrain.Size);
+            if (!DressingGround(p)) continue;
+            float meadow = Meadow(p), woods = Woodland(p);
+            if (R() > .10f + meadow * .85f) continue;
+            float height = .48f + meadow * .65f + R() * .4f;
+            var basis = new Basis(Vector3.Up, R() * Mathf.Tau).Scaled(new Vector3(.7f + R() * .5f, height, .7f + R() * .5f));
+            var tint = new Color("6e8348").Lerp(new Color("a4aa6a"), meadow * .55f + R() * .22f).Lerp(new Color("526445"), woods * .45f);
+            blades.Add((new Transform3D(basis, To3(p)), tint));
+        }
+        for (int colony = 0; colony < 1000; colony++) {
+            var p = new Vector2(R() * Terrain.Size, R() * Terrain.Size);
+            if (!DressingGround(p) || Meadow(p) < .53f || Woodland(p) > .65f) continue;
+            var color = petals[rng.Next(petals.Length)];
+            for (int i = 0; i < 5 + rng.Next(8); i++) {
+                float angle = R() * Mathf.Tau, reach = R() * .95f;
+                var q = p + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * reach;
+                if (!DressingGround(q)) continue;
+                flowers.Add((new Transform3D(Basis.Identity.Scaled(Vector3.One * (.8f + R() * .5f)), To3(q, .16f + R() * .08f)), color));
             }
         }
-        while (blades.Count < 32000) {
-            var p = new Vector2((float)rng.NextDouble() * Terrain.Size, (float)rng.NextDouble() * Terrain.Size);
-            if (!Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, .8f)) continue;
-            var basis = new Basis(Vector3.Up, (float)rng.NextDouble() * Mathf.Tau).Scaled(Vector3.One * (.7f + (float)rng.NextDouble() * .7f));
-            blades.Add((new Transform3D(basis, new Vector3(p.X, 0, p.Y)), new Color("5f7d43").Lerp(new Color("8ea75f"), (float)rng.NextDouble())));
-            if (rng.NextDouble() < .07) flowers.Add((new Transform3D(Basis.Identity, new Vector3(p.X + .12f, .14f, p.Y + .05f)), petals[rng.Next(petals.Length)]));
+        for (int colony = 0; colony < 650; colony++) {
+            var p = new Vector2(R() * Terrain.Size, R() * Terrain.Size);
+            if (!DressingGround(p) || p.DistanceTo(World.Spawn) < 9 || R() > Woodland(p) * .8f + Meadow(p) * .12f) continue;
+            var color = new Color("526a3b").Lerp(new Color("78844c"), R());
+            for (int i = 0; i < 3 + rng.Next(3); i++) {
+                float angle = R() * Mathf.Tau, reach = R() * 1.5f, size = .25f + R() * .42f;
+                var q = p + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * reach;
+                if (!DressingGround(q)) continue;
+                bushes.Add((new Transform3D(new Basis(Vector3.Up, R() * Mathf.Tau).Scaled(new Vector3(size, size * (.6f + R() * .4f), size)), To3(q, size * .25f)), color));
+            }
         }
-        // Clear only the cave and rail approaches after sampling, keeping all other seeded vegetation unchanged.
-        bool AtMine(Vector3 at) => World.Cliffs.Any(cliff => {
-            var offset = new Vector2(at.X, at.Z) - World.MineSpot(cliff);
-            float depth = offset.Dot(World.MineOut(cliff));
-            return Math.Abs(offset.Dot(cliff.Along)) < 2.8f && depth > -6 && depth < 1.3f;
-        });
-        blades.RemoveAll(item => AtMine(item.At.Origin));
-        flowers.RemoveAll(item => AtMine(item.At.Origin));
-        bushes.RemoveAll(item => AtMine(item.At.Origin));
+        // Distinct woodland silhouettes: fern colonies and fallen twigs sit with tree groups, not in every meadow gap.
+        foreach (var tree in World.S.Things) {
+            if (tree.Kind != "tree" || R() > .34f) continue;
+            float angle = R() * Mathf.Tau;
+            for (int i = 0; i < 3; i++) {
+                var p = tree.Pos + new Vector2(MathF.Cos(angle + i * .55f), MathF.Sin(angle + i * .55f)) * (1.1f + R() * 1.1f);
+                if (!DressingGround(p) || p.DistanceTo(World.Spawn) < 8) continue;
+                float size = .65f + R() * .65f;
+                ferns.Add((new Transform3D(new Basis(Vector3.Up, R() * Mathf.Tau).Scaled(Vector3.One * size), To3(p)),
+                    new Color("527442").Lerp(new Color("849253"), R() * .6f)));
+            }
+            var twigAt = tree.Pos + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * 1.8f;
+            if (DressingGround(twigAt)) twigs.Add((new Transform3D(new Basis(Vector3.Up, angle).Scaled(Vector3.One * (.8f + R() * .6f)), To3(twigAt, .012f)), new Color("8a785b")));
+        }
         var tuft = new SurfaceTool();
         tuft.Begin(Mesh.PrimitiveType.Triangles);
-        for (int i = 0; i < 4; i++) {
-            float angle = i * 1.7f; var lean = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle));
-            var side = new Vector3(-lean.Z, 0, lean.X) * .035f;
-            tuft.SetNormal(Vector3.Up); tuft.AddVertex(-side + lean * .02f);
-            tuft.SetNormal(Vector3.Up); tuft.AddVertex(side + lean * .02f);
-            tuft.SetNormal(Vector3.Up); tuft.AddVertex(lean * .1f + new Vector3(0, .22f + i * .03f, 0));
+        for (int i = 0; i < 5; i++) {
+            float angle = i * 2.39996f; var lean = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle));
+            var side = new Vector3(-lean.Z, 0, lean.X) * .025f;
+            tuft.SetNormal(Vector3.Up); tuft.AddVertex(-side + lean * .015f);
+            tuft.SetNormal(Vector3.Up); tuft.AddVertex(side + lean * .015f);
+            tuft.SetNormal(Vector3.Up); tuft.AddVertex(lean * .13f + new Vector3(0, .18f + i * .025f, 0));
         }
-        Scatter(parent, tuft.Commit(), blades);
-        Scatter(parent, new SphereMesh { Radius = .045f, Height = .07f, RadialSegments = 6, Rings = 3 }, flowers);
-        Scatter(parent, NatureShape.Scrub, bushes, twoSided: false);
+        ScatterDressing(parent, tuft.Commit(), blades);
+        ScatterDressing(parent, new SphereMesh { Radius = .04f, Height = .055f, RadialSegments = 5, Rings = 3 }, flowers);
+        ScatterDressing(parent, NatureShape.Scrub, bushes);
+        ScatterDressing(parent, FernMesh(), ferns);
+        ScatterDressing(parent, TwigMesh(), twigs);
     }
 
-    private static void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items, bool twoSided = true) {
+    private void ScatterDressing(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items) {
         var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = mesh, InstanceCount = items.Count };
         for (int i = 0; i < items.Count; i++) { multi.SetInstanceTransform(i, items[i].At); multi.SetInstanceColor(i, items[i].Color); }
-        var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1, CullMode = twoSided ? BaseMaterial3D.CullModeEnum.Disabled : BaseMaterial3D.CullModeEnum.Back, VertexColorIsSrgb = true };
-        parent.AddChild(new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        parent.AddChild(new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = dressingMaterial, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
     // ---------- Particles: chips, leaves, sparks, splashes, embers and smoke ----------

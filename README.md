@@ -436,7 +436,7 @@ A manually exported or otherwise normally launched Godot build uses Godot's stan
 
 ### Environment
 
-The environment uses a shared human scale, low-poly mountain ranges, a sandy shore and sea, an irregular lake with reeds and lily pads, and a grass valley with scattered tufts, bushes and wildflowers. A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
+The environment uses a shared human scale, low-poly mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones. Meadow grass and wildflowers grow in patches; fern colonies, shrubs and fallen twigs follow woodland groups. Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas. A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
 
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack. Night is lit by the sun, ambient light and real fire light from campfires, furnaces and cabin windows. Trees in front of the player, a worker or a structure turn see-through.
 
