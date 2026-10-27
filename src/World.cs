@@ -257,7 +257,8 @@ public sealed partial class World {
         foreach (var t in S.Remembered.Values) if (!Sees(t.Pos)) known.Add(t);
     }
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
-    public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(t.Pos) <= radius;
+    public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind == "water" ? Terrain.WaterPoint(from) : t.Pos;
+    public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(GatherAt(t, Player)) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
     /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
     public bool Pay(int amount) => amount <= Coins && S.Backpack.Remove(Inventory.Coins, amount) == amount;
@@ -299,6 +300,7 @@ public sealed partial class World {
     public void NewGame() {
         S = new SaveState();
         S.Backpack.Add("steel_axe", 1); S.Backpack.Add("berries", 10); S.Backpack.Add("wood", 6);
+        S.Backpack.Add("empty_bottle", 1);
         var rng = new Random(4271);
         foreach (var cliff in Cliffs) {
             // Two deposits flank the mine's mouth in the middle of the cliff, holding what three did before.
@@ -429,6 +431,7 @@ public sealed partial class World {
         else { if (CanStand(Player + new Vector2(delta.X, 0))) Player += new Vector2(delta.X, 0); if (CanStand(Player + new Vector2(0, delta.Y))) Player += new Vector2(0, delta.Y); }
     }
     public string? GatherBlock(Thing t, bool worker = false) {
+        if (t.Kind == "water" && !worker && Water.FindBottle(S.Backpack) == "water") return "Your bottles are full. Take a sip before refilling.";
         if (t.Kind == "farm") return t.Stage switch { FarmRipe => null, FarmGrowing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (!t.IsResource) return "Select a natural resource.";
         if (t.Remaining <= 0) return t.Kind switch { "berries" => Phrase("Picked clean. The bush fruits again in ", Number(Data.BerryRegrowHours), " hours."), "tree" => "Only a stump is left. Find another tree.", "leaves" => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
@@ -457,12 +460,16 @@ public sealed partial class World {
         float seconds = Data.GatherSeconds / Speed(tool);
         if (gatherClock < seconds) return;
         gatherClock = 0;
+        if (t.Kind == "water") {
+            var result = Water.CollectWater(this, t);
+            if (result != WaterCollectResult.NoChange) { S.Milestones.Add("water"); Say(result == WaterCollectResult.RefilledBottle ? "Bottle filled · 3 sips." : "Drank from the pond · one sip."); Play("gather_water", Player); }
+            return;
+        }
         bool small = t.Kind == "wolf_corpse" || t.Kind == "stone" && tool == null;
         int amount = Math.Min(t.Remaining, small ? 2 : 4);
         amount = S.Backpack.Add(ResourceItem(t), amount); t.Remaining -= amount;
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
         else Say($"+{amount} {Data.Name(ResourceItem(t))} · {t.Remaining} left here.");
-        if (t.Kind == "water") { S.Thirst = Math.Min(100, S.Thirst + 15); t.Remaining = 9999; Play("gather_water", t.Pos); }
         if (amount > 0) S.Milestones.Add("gather");
     }
     private void PickUp(Thing t) {
@@ -520,7 +527,12 @@ public sealed partial class World {
         S.Milestones.Add(kind); Say(kind == "mine" ? $"Marked the {MineName(t)} site. Assign a worker to dig the entrance; they need a pickaxe." : $"Built {Data.Name(kind)}."); return t;
     }
     public void Consume(string item) {
-        if (Downed || !Data.Items.TryGetValue(item, out var def) || Forwarded("consume", item: item)) return;
+        if (Downed || !Data.Items.TryGetValue(item, out var def) || Forwarded("consume", item: item, count: S.Backpack.PreferredSlot)) return;
+        if (Water.IsBottle(item)) {
+            if (Water.SipBottle(this, item)) Say("Drank one sip.");
+            else Say("Your bottle is empty. Collect water at the pond to refill it.");
+            return;
+        }
         if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
         if (S.Backpack.Remove(item, 1) == 0) { Say($"No {def.Name} in your backpack."); return; }
         S.Hunger = Math.Min(100, S.Hunger + def.Hunger); S.Thirst = Math.Min(100, S.Thirst + def.Thirst); S.Health = Math.Min(100, S.Health + def.Health);
@@ -562,6 +574,7 @@ public sealed partial class World {
         var cost = BatchCost(t);
         if (cost.Count == 0) { Say("Choose a recipe first."); return; }
         string? fuel = FuelOf(t);
+        if (NeedsFullBottle(cost, S.Backpack)) { Say(Water.FullBottleWarning); return; }
         for (int i = 0; i < batches; i++) {
             if (!S.Backpack.Has(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
             if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || FuelBlock(t, fuel) != null)) { Say("Input slots are full."); break; }
@@ -572,6 +585,7 @@ public sealed partial class World {
     /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
     public int LoadInput(Thing t, string item, int quantity) {
         if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
+        if (PartialRecipeBottle(t, item)) { Say(Water.FullBottleWarning); return 0; }
         // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the ingredient slot, and the fuel slot is filled by dragging.
         if (!BatchCost(t).ContainsKey(item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
         if (!BatchCost(t).ContainsKey(item)) { Say($"{Data.Name(item)} is not used by this recipe."); return 0; }
@@ -689,7 +703,7 @@ public sealed partial class World {
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
             wolf.Health -= 1; wolf.Flee = FleeSeconds; wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f;
             if (wolf.Health <= 0) {
-                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * 45), 4);
+                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
                 Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
             }
         }
@@ -772,7 +786,7 @@ public sealed partial class World {
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
         box == t.Output ? "Things only come out of here." :
-        box == t.Inventory ? HoldBlock(t, item) : null;
+        box == t.Inventory ? (PartialRecipeBottle(t, item) ? Water.FullBottleWarning : HoldBlock(t, item)) : null;
     /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
     public string? FuelBlock(Thing t, string item) =>
         !FuelFits(t, item) ? (t.Kind == "reinforced" ? "The reinforced furnace burns only mined coal." : "The fuel slot takes wood or coal.") :
@@ -869,12 +883,17 @@ public sealed partial class World {
     // ---------- Crafting ----------
     /// <summary>Hand recipes for the personal crafting menu.</summary>
     public IEnumerable<string> HandRecipes => Data.Recipes.Where(p => p.Value.Hand).Select(p => p.Key);
-    private enum CraftRefusal { None, StationOnly, Recovering, NoTool, NoInputs, QueueFull }
+    private bool PartialRecipeBottle(Thing t, string item) => item != "water" && Water.IsBottle(item) && BatchCost(t).ContainsKey("water");
+    private static bool NeedsFullBottle(Dictionary<string, int> cost, Inventory bag) =>
+        cost.TryGetValue("water", out int needed) && bag["water"] < needed &&
+        (bag["water_2"] > 0 || bag["water_1"] > 0 || bag["empty_bottle"] > 0);
+    private enum CraftRefusal { FullBottle, None, StationOnly, Recovering, NoTool, NoInputs, QueueFull }
     /// <summary>The one place the hand-crafting rules live; <see cref="CanCraft"/> and <see cref="CraftBlock"/> both read it.</summary>
     private CraftRefusal CraftCheck(string recipe) {
         if (!Data.Recipes.TryGetValue(recipe, out var r) || !r.Hand) return CraftRefusal.StationOnly;
         if (Downed) return CraftRefusal.Recovering;
         if (r.Tool != "" && BestTool(r.Tool, null, r.Tier) == null) return CraftRefusal.NoTool;
+        if (NeedsFullBottle(r.Inputs, S.Backpack)) return CraftRefusal.FullBottle;
         if (!S.Backpack.Has(r.Inputs)) return CraftRefusal.NoInputs;
         return S.Crafting.Count >= 8 ? CraftRefusal.QueueFull : CraftRefusal.None;
     }
@@ -882,6 +901,7 @@ public sealed partial class World {
     public bool CanCraft(string recipe) => CraftCheck(recipe) == CraftRefusal.None;
     /// <summary>Why a recipe cannot be queued from the backpack now, or null.</summary>
     public string? CraftBlock(string recipe) => CraftCheck(recipe) switch {
+        CraftRefusal.FullBottle => Water.FullBottleWarning,
         CraftRefusal.StationOnly => "This can only be made at a station.",
         CraftRefusal.Recovering => "You are still recovering.",
         CraftRefusal.NoTool => $"Needs a {Data.ToolName(Data.Recipes[recipe].Tool, Data.Recipes[recipe].Tier)} in your backpack.",
@@ -916,6 +936,7 @@ public sealed partial class World {
         // A full backpack holds the finished item back rather than losing it.
         if (S.CraftTime < r.Seconds || S.Backpack.Room(r.Output) < r.Amount) return;
         S.Backpack.Add(r.Output, r.Amount); S.Crafting.RemoveAt(0); S.CraftTime = 0;
+        if (r.Inputs.TryGetValue("water", out int usedWater)) Give("empty_bottle", usedWater);
         Crafted(r.Output); Play(Sounds.ForItem(r.Output), Player); Say($"Made {r.Amount} {Data.Name(r.Output)}.");
     }
     private void Crafted(string output) {
@@ -1208,6 +1229,9 @@ public sealed partial class World {
         if (Lunch) { EatLunch(w, dt); return; }
         TidyDuties(w);
         var target = Find(w.Assignment);
+        if (target?.Kind == "water" && w.Destination == target.Id && Water.FindBottle(w.Bag) is string bottle && bottle != "water") {
+            WaterWork(w, target, dt); return;
+        }
         if (w.Bag.Count > 0) {
             string item = w.Bag.First()!;
             var dest = Find(w.Destination);
@@ -1238,6 +1262,7 @@ public sealed partial class World {
     }
     /// <summary>Works the worker's jobs at one place and tells whether there was anything to do.</summary>
     private bool WorkAt(Worker w, Thing target, string? need, float dt) {
+        if (target.Kind == "water") return WaterWork(w, target, dt);
         if (target.IsResource) {
             string? blocked = GatherBlock(target, true);
             if (blocked != null) { w.Status = blocked; return false; }
@@ -1250,7 +1275,6 @@ public sealed partial class World {
             w.Timer += dt;
             if (target.IsLoose || w.Timer >= Data.GatherSeconds * 1.6f / Speed(w.Tool == "" ? null : w.Tool)) {
                 w.Timer = 0; target.Remaining -= w.Bag.Add(item, target.Remaining);
-                if (target.Kind == "water") target.Remaining = 9999;
                 if (target.IsLoose && target.Remaining <= 0) S.Things.Remove(target);
             }
             return true;
@@ -1533,6 +1557,7 @@ public sealed partial class World {
             float rate = (t.Kind == "bench" ? Data.BenchSpeed : 1) * Speed(tool);
             if (!t.Processing && hot && atAnvil && Stocked(t)) {
                 t.Inventory.Spend(BatchCost(t)); t.Processing = true; t.Progress = 0;
+                if (recipe.Inputs.TryGetValue("water", out int usedWater)) t.Inventory.Add("empty_bottle", usedWater);
                 if (FuelOf(t) is string fuel) t.Burner!.Remove(fuel, 1);
                 if (recipe.Fuel && !wasBurning) Play("start_fire", t.Pos);
             }
@@ -1748,7 +1773,10 @@ public sealed partial class World {
         foreach (var w in wolves) if (w.Leap > 0) return true;
         return false;
     }
-    private static readonly string[] Milestones = { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" };
+    private static readonly string[] Milestones = {
+        "water", "hut", "campfire", "gather", "bench", "crate", "sold", "pick",
+        "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned"
+    };
     public bool GoalComplete => S.Goal >= Milestones.Length;
     private void UpdateGoal() {
         while (!GoalComplete && S.Milestones.Contains(Milestones[S.Goal])) S.Goal++;
@@ -1756,21 +1784,24 @@ public sealed partial class World {
     public static int GoalCount => Milestones.Length;
     public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
     public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch {
-        0 => ("A place to begin", "Hold right mouse near trees, stones and berry bushes. You carry a steel axe. B opens building plans."),
-        1 => ("A workbench", "Press C to craft. Knap a stone chisel from 2 stone, split wood into planks, then build a crafting bench: 10 planks."),
-        2 => ("Something to carry", "Carve a wooden mallet by hand and slot it in the bench beside the chisel. Craft a crate there: 6 planks."),
-        3 => ("The road to Bramblewick", "Build a trading post: 10 wood + 4 stone. Place a crate, fill it with berries, pick it up and put it in the market. Sell, then collect the coins."),
-        4 => ("Beneath the surface", "Buy a steel pickaxe from the price sheet at the trading post. The cart brings it back in a crate."),
-        5 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. A cabin and campfire make nights safer."),
-        6 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore + wood. Collect iron bars."),
-        7 => ("Hotter than fire", "Explore for a dark cliff and mine coal at its foot. Build a reinforced furnace: 20 stone, 5 iron bars, 8 wood."),
-        8 => ("Make steel", "Load iron + mined coal into the reinforced furnace and coal into its fuel slot. Pump the bellows: steel requires 1450+ °C. 2 iron bars + 2 coal make 2 steel bars."),
-        9 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. It hammers steel bars into steel parts."),
-        10 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),
-        11 => ("Steel for sale", "Pack steel tools into a crate and sell it at the trading post, then collect the coins."),
-        12 => ("Many hands", "At the trading post pick a hiring offer: more coins up front means a lower daily wage. Keep wages in your backpack for each dawn."),
-        13 => ("Your first automation", "Build storage, and a tool station holding a spare axe or pickaxe for woodcutters and miners. Give a worker the Gather job from their panel, or a job with the job buttons at a building."),
-        _ => ("A settlement of your own", "The starter goals are done. Work toward the end goals: a mine on every ore and a week of steady profit.")
+        0 => ("Carry fresh water", "Collect water around the pond shore. It holds three sips and stays with you when empty; without a bottle, drink at the source."),
+        1 => ("A safe place", "Gather wood and stone, then build a cabin before night. Step inside to shelter from wolves."),
+        2 => ("Keep the fire lit", "Build and light a campfire. Firelight keeps wolves away; feed it wood to keep it burning."),
+        3 => ("Gather by hand", "You start with a steel axe. Hold right mouse on trees to fell them; gather stone and berries by hand."),
+        4 => ("A workbench", "Press C to craft. Knap a stone chisel from 2 stone, carve planks, then build a crafting bench: 10 planks."),
+        5 => ("Something to carry", "Carve a wooden mallet by hand and slot it in the bench beside the chisel. Craft a crate there: 6 planks."),
+        6 => ("The road to Bramblewick", "Build a trading post: 10 wood + 4 stone. Put berries in a crate and load it at the market. Sell, then collect the coins."),
+        7 => ("Beneath the surface", "Buy your first steel pickaxe from the trading post price sheet. The cart delivers it to the trading post."),
+        8 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. Smelt iron ore with wood or coal."),
+        9 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore and fuel; collect iron bars."),
+        10 => ("Hotter than fire", "Explore for a dark cliff and mine coal. Build a reinforced furnace: 20 stone, 5 iron bars, 8 wood."),
+        11 => ("Make steel", "Load iron and mined coal into the reinforced furnace and coal into its fuel slot. Pump the bellows: steel requires 1450+ °C."),
+        12 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. It hammers steel bars into steel parts."),
+        13 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),
+        14 => ("Steel for sale", "Pack steel tools into a crate and sell it at the trading post, then collect the coins."),
+        15 => ("Many hands", "At the trading post pick a hiring offer: more coins up front means a lower daily wage. Keep coins in the trading post wage slot for each dawn."),
+        16 => ("Your first automation", "Build storage and a tool station with a spare axe or pickaxe. Assign a worker to Gather from their panel or use a building's job buttons."),
+        _ => ("A settlement of your own", "The starter goals are done. Work toward the end goals: a working mine on every ore and a week of steady profit.")
     };
     // ---------- End goals ----------
     /// <summary>Ores found in the valley's cliffs; the end goal wants a working mine on each.</summary>
@@ -1841,6 +1872,7 @@ public sealed partial class World {
         // The goal chain gained steps, so the current goal is worked out again from the milestones.
         loaded.Goal = 0;
         S = loaded;
+        NormalizeBottleStorage();
         // Saves from before raking have no leaf litter.
         if (!S.Things.Any(t => t.Kind == "leaves")) DropLeaves();
         UpdateGoal(); gatherClock = 0; ExploredRevision++; Look(); Say("Settlement loaded.");

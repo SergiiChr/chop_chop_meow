@@ -160,7 +160,9 @@ public static class WorldModels {
             case "rake": return Part("toolstation", p => p.Racked["rake"]);
             case "mortar": return Part("cooktable", p => p.Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
-            case "planks" or "wood_parts" or "iron_bar" or "steel_bar" or "tin_bar": {
+            case "water" or "water_2" or "water_1" or "empty_bottle": return BottleShape.Create(Water.BottleSips(id));
+            case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id);
+            case "planks" or "wood_parts": {
                     var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
                     return stock;
                 }

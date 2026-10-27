@@ -125,6 +125,8 @@ internal static class PileShape {
                     var point = ModelKit.Cylinder(source, .028f, .004f, .06f, new(.18f, .028f, z), wood, new Vector3(0, 0, -90), 8);
                     Copy(peg.Mesh, peg.Transform); Copy(point.Mesh, point.Transform);
                 }
+            } else if (family == "bars") {
+                Copy(IngotShape.Mesh, Transform3D.Identity);
             } else
                 for (int i = 0; i < 3; i++) {
                     var part = family == "bars"

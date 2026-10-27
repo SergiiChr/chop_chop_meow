@@ -2,7 +2,7 @@
 
 The prototype is an isometric woodland survival and production game.
 It is rendered in 3D with code-built low-poly models: natural woodland, modern DIY buildings and no fantasy styling.
-The 2D art comparison boards in `docs/art/` are historical samples; of that illustrated art, only the water flask icon is still used.
+The 2D art comparison boards in `docs/art/` are historical samples; item icons now use the same low-poly models as the game, including the refillable tin water bottle.
 
 ## Architecture
 
@@ -136,19 +136,23 @@ Pausing freezes animation and effects.
 
 ### Player loop
 
-The intended fresh-start loop starts with the steel axe the player carries:
+The intended fresh-start loop starts by securing water, shelter and fire, then uses the steel axe the player carries:
 
-1. Gather wood, stone and berries.
-2. Knap a stone chisel, then carve planks and a mallet.
-3. Build a crafting bench and make crates there.
-4. Build a trading post and sell crates of berries for a steel pickaxe.
-5. Mine iron and coal, and smelt iron in a stone furnace.
-6. Build and operate a reinforced furnace (`reinforced`) to make steel.
-7. Hammer steel into steel parts at the anvil and make steel tools.
-8. Pack a steel tool into a crate, sell it through the trading post and use the proceeds to hire and assign a worker.
+1. Collect water, wood, stone and berries; build a cabin and campfire before night.
+2. Fell trees with the starting steel axe; gather stone and berries by hand.
+3. Knap a stone chisel, then carve planks and a mallet.
+4. Build a crafting bench and make crates there.
+5. Build a trading post and sell crates of berries for a steel pickaxe.
+6. Mine iron and coal, and smelt iron in a stone furnace.
+7. Build and operate a reinforced furnace (`reinforced`) to make steel.
+8. Hammer steel into steel parts at the anvil and make steel tools.
+9. Pack a steel tool into a crate, sell it through the trading post and use the proceeds to hire and assign a worker.
 
 There are no iron tools; iron bars only go into buildings and steel.
-The 10–15 minute duration is a pacing target, subject to hands-on UI and exported-build review.
+
+Water rules: the player starts with one refillable bottle. It remains in the inventory when empty and holds three sips, each restoring one third of a full water gauge. A full gauge lasts one in-game day. Filling the bottle at a fresh water source takes one `GatherSeconds`; drinking directly from the source without a bottle gives one sip and takes the same time. An empty bottle can be crafted at a bench from one tin bar and one wood part, using the same steel hammer as tin cans. Empty or filled replacements can be purchased individually. Recipes require a full water bottle; attempting to load an empty or partial bottle shows “Requires full water bottle” at the bottom left. Partial bottles remain drinkable and can be stored normally. Water used by cooking returns the empty bottle; it never destroys the container. All points on the pond shore are collection targets.
+
+During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”. It advances normal simulation through dawn, including needs, trades, production and wages. In multiplayer it is available only when everyone is downed; a living player prevents a shared time skip.
 
 ### Goals
 
@@ -307,7 +311,10 @@ Once an active crew has the forge hot, it never falls below the bar while they a
 ### Storage, filters and automation
 
 Inventories are slot grids with stacks of 64.
-Tools (items with a `tool` kind, listed in `Inventory.Unstacked` when the data loads) and packed crates take a slot each everywhere.
+Across item cells, click moves one item and Ctrl-click moves all of that item; Shift-click is equivalent to Ctrl-click. Right-click picks up half where a panel supports dragging.
+Tools, packed crates, and bottles in all fill states take a slot each everywhere. The layout is saved and synchronized: removing one stack never shifts unrelated cells. Dragging moves a stack to its exact destination, merging compatible stacks or swapping cells within one inventory. Sort is an explicit player action which packs partial stacks and groups by item type.
+
+**Enforced input rule:** an ordinary item-cell click transfers exactly one item, in either direction, for storage and stations. Ctrl-click transfers all available units; Shift is an equivalent shortcut. Dragging carries a stack or a split portion. Bulk buttons and recipe batch actions must explicitly identify their bulk behavior.
 A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (5) items in all, one stack or up to five kinds; `Worker.Hands` widens them for a full mine or market stack.
 
 #### Chests
@@ -402,7 +409,8 @@ A sale pays for the contents unit by unit plus the crate.
 | Goods | Lot |
 | --- | --- |
 | steel tools | singly |
-| canned food, water | crates of 12 |
+| canned food | crates of 12 |
+| filled bottle, empty bottle | one bottle |
 | wheat seeds, fertilizer | crates of 4 |
 
 #### Demand and prices

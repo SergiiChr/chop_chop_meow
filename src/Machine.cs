@@ -111,10 +111,10 @@ public partial class Game {
         cell.Pressed += () => { Act(() => MoveStack(box, world.S.Backpack, item, t)); RefreshLive(); };
         cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, t) : null;
         if (input) {
-            cell.CanTake = drag => drag.From == world.S.Backpack && drag.Item == item;
+            cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || item == "water" && Water.IsBottle(drag.Item));
             cell.Take = drag => {
                 int left = world.Near(t) ? Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
-                Act(() => world.LoadInput(t, item, drag.Count)); RefreshLive(); return left;
+                Act(() => world.LoadInput(t, drag.Item, drag.Count)); RefreshLive(); return drag.Item == item ? left : 0;
             };
         }
         string hint = input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";

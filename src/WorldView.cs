@@ -278,7 +278,11 @@ public partial class WorldView : Node3D {
             }
             if (RayHits(screen, t.Pos, hits, out float d) && d < nearest) { nearest = d; best = t; }
         }
-        return best ?? crown;
+        if (best != null) return best;
+        var point = ToWorld(screen);
+        if (Terrain.WaterRing(point) && World.Sees(point))
+            foreach (var thing in World.S.Things) if (thing.Kind == "water") return thing;
+        return crown;
     }
 
     private static readonly Hit[] PersonHit = { new(.38f, 0, 1.75f) };
@@ -362,7 +366,7 @@ public partial class WorldView : Node3D {
         }
         bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
         ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, SelectedTool, World.Me.Sprinting);
-        Vector2 target = Gathering && GatheringTarget != null ? GatheringTarget.Pos : World.Player;
+        Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
         if (action == ActorAction.Idle && StationToHammer() is Thing anvil) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
@@ -459,9 +463,9 @@ public partial class WorldView : Node3D {
             var state = other.State;
             bool moving = p.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var target = World.Find(p.GatherTarget);
-            bool gathering = target != null && p.Pos.DistanceTo(target.Pos) < 2.5f;
+            bool gathering = target != null && p.Pos.DistanceTo(World.GatherAt(target, p.Pos)) < 2.5f;
             var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Held, p.Sprinting);
-            var facing = gathering ? target!.Pos : p.Pos;
+            var facing = gathering ? World.GatherAt(target!, p.Pos) : p.Pos;
             if (!moving && other.PulseRemaining > 0) { action = other.Pulse; facing = other.PulseTarget; }
             if (p.Mauled) action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
             state.Update(p.Pos, action, facing, dt);
@@ -540,8 +544,9 @@ public partial class WorldView : Node3D {
             : subject.Kind is "tree" or "bench" ? "chop_tree"
             : null;
         if (sound != null) Sounds?.Play(sound, subject.Pos);
-        var toward = (actor.Position - subject.Pos).Normalized();
-        var side = To3(subject.Pos + toward * .35f);
+        var impactAt = World.GatherAt(subject, actor.Position);
+        var toward = (actor.Position - impactAt).Normalized();
+        var side = To3(impactAt + toward * .35f);
         switch (subject.Kind) {
             case "tree":
                 Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
@@ -930,7 +935,7 @@ public partial class WorldView : Node3D {
         float smallest = float.MaxValue;
         foreach (var hit in HitsOf(t)) smallest = Math.Min(smallest, hit.Radius);
         float radius = Math.Min(1.7f, smallest + .25f);
-        ring.Position = To3(t.Pos, .02f + lift);
+        ring.Position = To3(t.Kind == "water" ? Terrain.WaterPoint(ring == hoverRing ? ToWorld(GetViewport().GetMousePosition()) : World.Player) : t.Pos, .02f + lift);
         ring.Scale = new Vector3(radius, 1, radius);
     }
 
@@ -977,7 +982,7 @@ public partial class WorldView : Node3D {
         if (hovered != null) {
             float top = 0;
             foreach (var hit in HitsOf(hovered)) top = Math.Max(top, hit.Top);
-            Tag(Screen(hovered.Pos, top + .2f) - new Vector2(0, 8), World.Data.Name(hovered.Kind));
+            Tag(Screen(hovered.Kind == "water" ? Terrain.WaterPoint(ToWorld(GetViewport().GetMousePosition())) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == "water" ? "Collect water" : World.Data.Name(hovered.Kind));
         }
         foreach (var w in World.S.Workers)
             if (World.Sees(w) && (w.Id == HoverWorker || w.Id == SelectedWorker)) Tag(Screen(w.Pos, 2.05f), w.Name);

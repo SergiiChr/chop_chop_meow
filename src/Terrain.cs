@@ -46,6 +46,15 @@ public static class Terrain {
         var offset = p - Lake;
         return offset.Length() < Shore(MathF.Atan2(offset.Y, offset.X)) + margin;
     }
+
+    /// <summary>The dry collecting point on the pond's irregular shore in this direction.</summary>
+    public static Vector2 WaterPoint(Vector2 from) {
+        var offset = from - Lake;
+        float angle = MathF.Atan2(offset.Y, offset.X);
+        return Lake + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (Shore(angle) + .35f);
+    }
+
+    public static bool WaterRing(Vector2 p) => p.DistanceTo(WaterPoint(p)) <= 1.6f;
     /// <summary>Dry valley ground inside the map, ignoring anything built or growing on it.</summary>
     public static bool Open(Vector2 p) =>
         p.X >= 1 && p.Y >= 1 && p.X <= Size - 2 && p.Y <= Size - 2 && FromMountains(p) > 0 && !Sea(p) && !InLake(p);

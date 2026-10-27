@@ -77,7 +77,7 @@ public partial class Game {
             var id = HotbarId(slot);
             int count = world.S.Backpack[id];
             bool building = world.Data.Buildings.ContainsKey(id);
-            hotbarCounts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : count.ToString();
+            hotbarCounts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : Water.IsBottle(id) ? $"{Water.BottleSips(id)}/3" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : HotbarIcon(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · drag an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
@@ -90,7 +90,13 @@ public partial class Game {
     }
 
     // World.Deserialize keeps nine known entries, so reads need no repair here.
-    private string HotbarId(int slot) => world.S.HotbarSlots[slot];
+    private string HotbarId(int slot) {
+        string id = world.S.HotbarSlots[slot];
+        if (!Water.IsBottle(id)) return id;
+        foreach (var bottle in DrinkingBottles) if (world.S.Backpack[bottle] > 0) return bottle;
+        return "empty_bottle";
+    }
+    private static readonly string[] DrinkingBottles = { "water_1", "water_2", "water", "empty_bottle" };
 
     private string? ActiveHotbarItem() => world.Data.Items.ContainsKey(HotbarId(world.S.ActiveHotbar)) ? HotbarId(world.S.ActiveHotbar) : null;
 
@@ -112,7 +118,7 @@ public partial class Game {
     }
 
     /// <summary>What a left click does with an item in hand, or null when it has no use.</summary>
-    private string? UseOf(string id) => world.Data.IsConsumable(id) ? id == "water" ? "drink" : "eat"
+    private string? UseOf(string id) => Water.IsBottle(id) ? "drink" : world.Data.IsConsumable(id) ? "eat"
         : id == "torch" ? world.S.TorchLit ? "swing it" : "light it"
         : (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer" ? "swing" : null;
 
@@ -120,7 +126,7 @@ public partial class Game {
     private void UseHeld(Vector2 at) {
         if (ActiveHotbarItem() is not string id || UseOf(id) == null) return;
         if (paused) { Notify("Resume before using items."); return; }
-        if (world.Data.IsConsumable(id)) Act(() => world.Consume(id));
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) Act(() => world.Consume(id));
         else if (id == "torch") world.UseTorch(at - world.Player);
         else world.Attack();
     }

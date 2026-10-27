@@ -4,9 +4,18 @@
   "lunchHour": 12,
   "tradeSeconds": 30,
   "hireOffers": [
-    { "upfront": 60, "wage": 18 },
-    { "upfront": 30, "wage": 22 },
-    { "upfront": 0, "wage": 26 }
+    {
+      "upfront": 60,
+      "wage": 18
+    },
+    {
+      "upfront": 30,
+      "wage": 22
+    },
+    {
+      "upfront": 0,
+      "wage": 26
+    }
   ],
   "campfireHours": 4,
   "gatherSeconds": 2.0,
@@ -20,35 +29,99 @@
   "crateCapacity": 12,
   "benchSpeed": 2,
   "mine": {
-    "materials": { "wood": 50, "iron_bar": 10, "stone": 50 },
+    "materials": {
+      "wood": 50,
+      "iron_bar": 10,
+      "stone": 50
+    },
     "stageWorkdays": 1,
     "seconds": 1.6,
     "workers": 3
   },
-  "farm": { "sow": { "wheat_seeds": 1, "fertilizer": 1 }, "growDays": 3, "harvestWorkdays": 1, "yield": { "wheat": 4, "wheat_seeds": 2, "grass": 1 } },
-  "goals": { "dailyProfit": 1300, "profitDays": 7 },
+  "farm": {
+    "sow": {
+      "wheat_seeds": 1,
+      "fertilizer": 1
+    },
+    "growDays": 3,
+    "harvestWorkdays": 1,
+    "yield": {
+      "wheat": 4,
+      "wheat_seeds": 2,
+      "grass": 1
+    }
+  },
+  "goals": {
+    "dailyProfit": 1300,
+    "profitDays": 7
+  },
   "market": {
     "sells": {
-      "raw_meat": { "daily": 24, "steady": 24, "drop": 0.05 },
-      "burnt_steak": { "daily": 24, "steady": 24, "drop": 0.05 },
-      "berries": { "daily": 36, "steady": 36, "drop": 0.05 },
-      "bread": { "daily": 24, "steady": 24, "drop": 0.05 },
-      "berry_jam": { "daily": 24, "steady": 24, "drop": 0.05 },
-      "meat_stew": { "daily": 24, "steady": 24, "drop": 0.05 },
-      "canned_jam": { "daily": 24, "steady": 24, "drop": 0.05 },
-      "canned_meat_stew": { "daily": 24, "steady": 24, "drop": 0.05 },
-      "steel_axe": { "daily": 12, "steady": 0, "drop": 0.5 },
-      "steel_pick": { "daily": 12, "steady": 0, "drop": 0.5 },
-      "steel_hammer": { "daily": 12, "steady": 0, "drop": 0.5 }
+      "raw_meat": {
+        "daily": 24,
+        "steady": 24,
+        "drop": 0.05
+      },
+      "burnt_steak": {
+        "daily": 24,
+        "steady": 24,
+        "drop": 0.05
+      },
+      "berries": {
+        "daily": 36,
+        "steady": 36,
+        "drop": 0.05
+      },
+      "bread": {
+        "daily": 24,
+        "steady": 24,
+        "drop": 0.05
+      },
+      "berry_jam": {
+        "daily": 24,
+        "steady": 24,
+        "drop": 0.05
+      },
+      "meat_stew": {
+        "daily": 24,
+        "steady": 24,
+        "drop": 0.05
+      },
+      "canned_jam": {
+        "daily": 24,
+        "steady": 24,
+        "drop": 0.05
+      },
+      "canned_meat_stew": {
+        "daily": 24,
+        "steady": 24,
+        "drop": 0.05
+      },
+      "steel_axe": {
+        "daily": 12,
+        "steady": 0,
+        "drop": 0.5
+      },
+      "steel_pick": {
+        "daily": 12,
+        "steady": 0,
+        "drop": 0.5
+      },
+      "steel_hammer": {
+        "daily": 12,
+        "steady": 0,
+        "drop": 0.5
+      }
     },
     "buys": {
       "steel_axe": 1,
       "steel_pick": 1,
       "steel_hammer": 1,
       "canned_food": 12,
-      "water": 12,
+      "water": 1,
       "wheat_seeds": 4,
-      "fertilizer": 4
+      "fertilizer": 4,
+      "empty_bottle": 1
     }
   },
   "items": {
@@ -148,9 +221,26 @@
     },
     "water": {
       "name": "Water bottle",
-      "price": 2,
+      "price": 11.45,
       "color": "88cbe0",
-      "thirst": 28
+      "thirst": 33.333336
+    },
+    "water_2": {
+      "name": "Water bottle (2 sips)",
+      "price": 10.7833,
+      "color": "88cbe0",
+      "thirst": 33.333336
+    },
+    "water_1": {
+      "name": "Water bottle (1 sip)",
+      "price": 10.1167,
+      "color": "88cbe0",
+      "thirst": 33.333336
+    },
+    "empty_bottle": {
+      "name": "Empty bottle",
+      "price": 9.45,
+      "color": "a8bdc3"
     },
     "canned_food": {
       "name": "Canned food",
@@ -464,6 +554,20 @@
       "amount": 2,
       "seconds": 10
     },
+    "water_bottle": {
+      "name": "Tin water bottle",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "tier": 2,
+      "inputs": {
+        "tin_bar": 1,
+        "wood_parts": 1
+      },
+      "output": "empty_bottle",
+      "amount": 1,
+      "seconds": 10
+    },
     "steel_parts": {
       "name": "Steel parts",
       "station": "anvil",
@@ -743,5 +847,5 @@
     }
   },
   "hungerHours": 24,
-  "thirstHours": 12
+  "thirstHours": 24
 }

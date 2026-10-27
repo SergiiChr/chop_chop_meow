@@ -58,10 +58,15 @@ public partial class Game {
         for (int i = 0; i < cells.Length; i++) {
             int slot = i;
             var cell = cells[i].Cell;
-            cell.Pressed += () => { if (stacks[slot] is (string id, _)) { Act(() => click(id)); RefreshLive(); } };
-            cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container) : null;
-            cell.CanTake = accepts ?? (drag => drag.From != null && drag.From != inventory());
-            cell.Take = drag => { int left = 0; Act(() => left = MoveDrag(drag, inventory(), container)); RefreshLive(); return left; };
+            cell.Pressed += () => {
+                if (stacks[slot] is not (string id, _)) return;
+                var held = inventory(); held.PreferredSlot = slot;
+                try { Act(() => click(id)); } finally { held.PreferredSlot = -1; }
+                RefreshLive();
+            };
+            cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container, slot) : null;
+            cell.CanTake = accepts ?? (drag => drag.From != null);
+            cell.Take = drag => { int left = 0; Act(() => left = MoveDrag(drag, inventory(), container, slot)); RefreshLive(); return left; };
             grid.AddChild(cell);
         }
         // What each cell last drew: its stack and the inventory's total of that item. A cell is redrawn only when they change.
@@ -74,7 +79,7 @@ public partial class Game {
             for (int i = 0; i < cells.Length; i++) {
                 var (cell, count) = cells[i];
                 if (!GodotObject.IsInstanceValid(cell)) return;
-                stacks[i] = i < current.Count ? current[i] : null;
+                stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
                 var looks = stacks[i] is (string item, int n) ? (item, n, held[item]) : ((string?)null, 0, 0);
                 if (first || looks != drawn[i]) {
                     drawn[i] = looks;
@@ -94,7 +99,7 @@ public partial class Game {
             var badge = cell.GetNode<TextureRect>("badge");
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = HotbarIcon(contents.Items.OrderByDescending(p => p.Value).First().Key);
-            count.Text = contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
+            count.Text = stack is (string bottle, _) && Water.IsBottle(bottle) ? $"{Water.BottleSips(bottle)}/3" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
             if (wanted != null) {
                 bool takes = stack is (string item, _) && wanted(item);
                 cell.AddThemeStyleboxOverride("normal", takes ? Style.CupWanted : Style.CupNormal);
@@ -124,21 +129,26 @@ public partial class Game {
         }
     }
 
-    /// <summary>Whether a click moves every unit of an item rather than one stack: Ctrl, or Shift as before.</summary>
+    /// <summary>Whether a click moves every unit of an item rather than one item: Ctrl, or Shift as before.</summary>
     private static bool MoveAll => Input.IsKeyPressed(Key.Ctrl) || Input.IsKeyPressed(Key.Shift);
-    /// <summary>Moves one stack, or every unit of the item while Ctrl or Shift is held.</summary>
+    /// <summary>Moves one item, or every unit of the item while Ctrl or Shift is held.</summary>
     private void MoveStack(Inventory from, Inventory to, string item, Thing near) {
         if (!world.Near(near)) { Notify("Walk closer first."); return; }
         if (world.BoxBlock(near, to, item) is string refused) { Notify(refused); return; }
         if (CrateIntoCrate(near, to, item)) return;
-        world.Transfer(from, to, item, MoveAll ? from[item] : from.StackOf(item));
+        world.Transfer(from, to, item, MoveAll ? from[item] : 1);
     }
 
     /// <summary>Drops a dragged stack into an inventory and returns what did not fit; the building on either end must be within reach.</summary>
-    private int MoveDrag(ItemDrag drag, Inventory to, Thing? container) {
+    private int MoveDrag(ItemDrag drag, Inventory to, Thing? container, int target = -1) {
         if ((drag.Container ?? container) is Thing near && !world.Near(near)) { Notify("Walk closer first."); return 0; }
-        if (container != null && world.BoxBlock(container, to, drag.Item) is string refused) { Notify(refused); return 0; }
+        if (drag.From != to && container != null && world.BoxBlock(container, to, drag.Item) is string refused) { Notify(refused); return 0; }
         if (CrateIntoCrate(container, to, drag.Item) || drag.From == null) return 0;
+        if (target >= 0 && drag.SourceSlot >= 0) {
+            if (drag.From == to && drag.SourceSlot == target) return 0;
+            int moved = world.TransferSlot(drag.From, to, drag.SourceSlot, target, drag.Item, drag.Count);
+            return world.Remote ? 0 : Math.Max(0, drag.Count - moved);
+        }
         int left = Leftover(drag, to.Room(drag.Item));
         world.Transfer(drag.From, to, drag.Item, drag.Count);
         return left;

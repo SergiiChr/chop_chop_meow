@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 /// From is null for references, such as a building plan or a hotbar palette entry, which move no items.
 /// Container is the building the items come from; the backpack itself has none.
 /// </summary>
-public sealed record ItemDrag(string Item, int Count, Inventory? From, Thing? Container);
+public sealed record ItemDrag(string Item, int Count, Inventory? From, Thing? Container, int SourceSlot = -1);
 
 /// <summary>An icon button that can start an item drag and accept one.</summary>
 public partial class ItemSlot : Button {

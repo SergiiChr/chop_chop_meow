@@ -112,13 +112,21 @@ public sealed partial class World {
         switch (c.Verb) {
             case "build": Build(c.Item, c.At); break;
             case "place_crate": PlaceCrate(c.Item, c.At); break;
-            case "consume": Consume(c.Item); break;
+            case "consume": S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
             case "torch": UseTorch(c.At); break;
             case "attack": Attack(); break;
             case "leave": Leave(); break;
             case "craft": Craft(c.Item); break;
             case "cancel_craft": CancelCraft(c.Count); break;
-            case "transfer": if (Resolve(c.Target) is Inventory from && Resolve(c.Other) is Inventory to) Transfer(from, to, c.Item, c.Count); break;
+            case "transfer":
+                if (Resolve(c.Target) is Inventory from && Resolve(c.Other) is Inventory to) {
+                    from.PreferredSlot = c.At.Y == -1 ? (int)c.At.X : -1;
+                    try { Transfer(from, to, c.Item, c.Count); } finally { from.PreferredSlot = -1; }
+                }
+                break;
+            case "transfer_slot": if (Resolve(c.Target) is Inventory slotFrom && Resolve(c.Other) is Inventory slotTo) TransferSlot(slotFrom, slotTo, (int)c.At.X, (int)c.At.Y, c.Item, c.Count); break;
+            case "sort_bag": SortBackpack(); break;
+            case "skip_morning": SkipMorning(); break;
             case "assign": if (w != null) Assign(w, t); break;
             case "duty": if (w != null && t != null) SetDuty(w, t, c.Item, c.Count != 0); break;
             case "fire": if (w != null) Fire(w); break;
@@ -171,7 +179,7 @@ public sealed partial class World {
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {
         int a = Locate(from), b = Locate(to);
-        if (a < 0 || b < 0 || Forwarded("transfer", a, b, item, quantity)) return 0;
+        if (a < 0 || b < 0 || Forwarded("transfer", a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
         if (new[] { a, b }.Where(at => at > 0).Any(at => !Near(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
         if (b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
         int moved = from.TransferTo(to, item, quantity);
@@ -181,9 +189,29 @@ public sealed partial class World {
     }
 
     public void Drink(Thing lake) {
-        if (lake.Kind != "water" || !Near(lake)) { Say("Walk closer to the lake."); return; }
-        if (Forwarded("drink", lake.Id)) return;
-        S.Thirst = 100; Say("Cool, fresh water."); Play("gather_water", Player);
+        // Old saved commands must not restore thirst instantly. The held gather owns its timer.
+        if (lake.Kind != "water" || !Near(lake)) { Say("Walk closer to the pond."); return; }
+        Say("Collect water · hold right mouse on the pond shore.");
+    }
+
+    public void SortBackpack() {
+        if (Downed || Forwarded("sort_bag")) return;
+        S.Backpack.Sort();
+    }
+
+    public int TransferSlot(Inventory from, Inventory to, int sourceSlot, int targetSlot, string item, int quantity) {
+        int a = Locate(from), b = Locate(to);
+        if (a < 0 || b < 0 || Downed) return 0;
+        if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
+        if (Forwarded("transfer_slot", a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
+        if (a > 0 && !Near(Find(a / BoxCodes)!) || b > 0 && !Near(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
+        // Sync legacy inventories, then reject a stale drag rather than moving a different item.
+        from.EnsureLayout();
+        if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
+        if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
+        int moved = from.MoveSlotTo(sourceSlot, to, targetSlot, quantity);
+        if (moved > 0 && b > 0 && Find(b / BoxCodes) is Thing station && to == station.Burner) station.Fuel = item;
+        return moved;
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
@@ -223,6 +251,7 @@ public sealed partial class World {
         var p = Adopt(saved) ?? new PlayerState();
         p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(1, 3).First(i => S.Players.All(o => o.Shirt != i));
         S.Players.Add(p);
+        NormalizeBottleStorage();
         SayToAll("A neighbor joined the settlement.");
         return p;
     }
@@ -240,16 +269,29 @@ public sealed partial class World {
             && (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
             && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
         var backpack = new Inventory { Slots = 24 };
-        if (!valid || !backpack.Fits(p.Backpack.Items)) return null;
+        int legacySlots = p.Backpack.Items.Sum(pair => {
+            int stack = Water.IsBottle(pair.Key) ? 64 : backpack.StackOf(pair.Key);
+            return (pair.Value + stack - 1) / stack;
+        });
+        if (!valid || !backpack.Fits(p.Backpack.Items) && legacySlots > 24) return null;
+        backpack.Slots = Math.Max(24, p.Backpack.AggregateSlotsNeeded);
+        var renamed = new Dictionary<string, string>();
         // Packed crates get new numbers here, since the guest's old ones may be taken in this world.
         foreach (var (item, quantity) in p.Backpack.Items) {
             string id = item;
             if (crates.TryGetValue(PackedId(item), out var box)) {
                 var crate = NewCrate(); foreach (var (inside, count) in box.Items) crate.Add(inside, count);
                 id = Pack(crate); p.HotbarSlots = p.HotbarSlots.Select(slot => slot == item ? id : slot).ToList();
+                renamed[item] = id;
             }
             backpack.Add(id, quantity);
         }
+        p.Backpack.EnsureLayout();
+        backpack.Layout = p.Backpack.Layout.Select(slot => new Inventory.Slot {
+            Item = renamed.GetValueOrDefault(slot.Item, slot.Item),
+            Count = slot.Count
+        }).ToList();
+        backpack.Slots = 24;
         p.Backpack = backpack; p.Crates = null;
         p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.Buildings.ContainsKey(id) || p.Backpack[id] > 0) ? id : "").ToList();
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);

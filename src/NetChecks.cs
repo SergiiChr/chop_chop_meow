@@ -83,6 +83,10 @@ public partial class Game {
         await Click(view.Screen(NetChest, .3f));
         UIRequire(page == "inspect" && world.Find(selected)?.Kind == "chest" && world.Near(world.Find(selected)!), "Clicking the chest beside the coal must open it.");
         await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
+        await Until(() => world.Find(selected)!.Inventory["coal"] == 1 && world.S.Backpack["coal"] == 1, "a normal storage click moving exactly one coal");
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = true });
+        await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = false });
         await Until(() => world.Find(selected)!.Inventory["coal"] == 2 && world.S.Backpack["coal"] == 0, "the stored coal showing up in the host's chest");
         ClosePanel(); await RightClick(NetCoal);
         await Until(() => world.S.Backpack["coal"] == 2, "the host handing over the second loose coal");

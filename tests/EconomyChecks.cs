@@ -41,7 +41,9 @@ public static class EconomyChecks {
     private static void CheckValueLadder(GameData data) {
         var world = new World(data, false);
         var markups = data.Recipes.Select(p => {
-            float input = Value(data, BatchCost(world, p.Key)), output = data.Items[p.Value.Output].Price * p.Value.Amount;
+            // Water recipes return their reusable bottles; only the water is a consumed material.
+            float input = Value(data, BatchCost(world, p.Key)) - p.Value.Inputs.GetValueOrDefault("water") * data.Items["empty_bottle"].Price;
+            float output = data.Items[p.Value.Output].Price * p.Value.Amount;
             return (Recipe: p.Key, Depth: Depth(data, p.Value.Output), Markup: output / input - 1);
         }).ToList();
         foreach (var m in markups.OrderBy(m => m.Depth)) GD.Print($"Economy: {m.Recipe,-13} step {m.Depth} markup {m.Markup:P0}");

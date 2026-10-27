@@ -650,7 +650,7 @@ public partial class Game {
             await Click(Cell(0, c => c.TooltipText.StartsWith("Mined coal")));
             UIRequire(furnace.Inventory["coal"] == 1, "Clicking a backpack item must add one to its input slot.");
             await Click(Named("input_iron_bar")!);
-            UIRequire(furnace.Inventory["iron_bar"] == 0 && world.S.Backpack["iron_bar"] == 5, "Clicking an input slot must return its stack.");
+            UIRequire(furnace.Inventory["iron_bar"] == 4 && world.S.Backpack["iron_bar"] == 1, "Clicking an input slot must return exactly one item.");
             await KeyStroke(Key.Space);
             UIRequire(view.PlayerAnimation == ActorAction.Pump, "Manual bellows input must trigger its dedicated cycle.");
             await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
@@ -711,6 +711,7 @@ public partial class Game {
             UIRequire(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
             await CheckCraftingAndTorch();
             await CheckCrateOverflow();
+            await CheckSurvivalInventoryUI();
             await CheckCrateInCrate();
             RemoveCheckFiles();
             await CheckFreshModelsAfterRestart();
