@@ -174,18 +174,24 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
         await Frames();
     }
-    /// <summary>Messages stack oldest first, a repeat restarts its line instead of adding one, the oldest makes room, and each fades out.</summary>
-    private void CheckMessages() {
+    /// <summary>Messages keep clear of the HUD, stack, restart on a repeat, make room by dropping the stalest and fade out.</summary>
+    private async Task CheckMessages() {
+        ClosePanel(); await Frames();
+        UIRequire(messages.GetGlobalRect().Position.X > needsPlate.GetGlobalRect().End.X && messages.GetGlobalRect().End.X < ui.Size.X - needsPlate.GetGlobalRect().End.X + 1,
+            "Messages must keep clear of the needs plate and stay centred.");
+        OpenPage("craft"); await Frames();
+        UIRequire(messages.GetGlobalRect().End.X < panel.GetGlobalRect().Position.X, "Messages must keep to the left of an open side panel.");
+        ClosePanel();
         messages._Process(60);
         UIRequire(messages.Shown.Length == 0, "Old messages must be gone before the message check.");
         Notify("First"); Notify("Second"); messages._Process(3); Notify("First");
         UIRequire(messages.Shown.SequenceEqual(new[] { "First", "Second" }), "A repeated message must restart its line instead of stacking again.");
         messages._Process(4.5);
         UIRequire(messages.Shown.SequenceEqual(new[] { "First" }), "Each message must disappear after its own time.");
-        Notify("Third"); Notify("Fourth"); Notify("Fifth"); Notify("Sixth");
-        UIRequire(messages.Shown.SequenceEqual(new[] { "Third", "Fourth", "Fifth", "Sixth" }), "A full stack must drop its oldest message for a new one.");
+        Notify("Third"); messages._Process(1); Notify("First"); Notify("Fourth"); Notify("Fifth"); Notify("Sixth");
+        UIRequire(messages.Shown.SequenceEqual(new[] { "First", "Fourth", "Fifth", "Sixth" }), "A full stack must drop the message closest to fading, even when a repeat kept an older line.");
         var lines = messages.GetChildren().OfType<Label>().ToArray();
-        UIRequire(lines.Count(l => l.Visible) == 4 && lines[3].Text == "Sixth", "Every stacked message must show on its own line, newest last.");
+        UIRequire(lines.Count(l => l.Visible) == 4 && lines[3].Text == "Sixth" && lines.All(l => l.Modulate.A == 1), "Every stacked message must show at full strength on its own line, newest last.");
         messages._Process(6.5);
         UIRequire(lines[0].Modulate.A is > 0 and < 1, "A message must fade out over its last second.");
         messages._Process(1);
@@ -451,9 +457,9 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
             world.S.Thirst = drink;
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = false });
+            await CheckMessages();
             // Measured about 115 B a frame: this check's own await of each frame and the memory of things seen for the first time on a straight walk.
             // The budget leaves a third more, so a change that adds garbage to every frame fails it.
-            CheckMessages();
             await CheckWalkingFrames(150);
             await CheckPanelRefresh();
             float fed = world.S.Hunger; world.S.Hunger = 10; await Frames();

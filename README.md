@@ -93,7 +93,7 @@ Beside them the bank shows the coins in the trading post's wage slot and the wag
 
 The day dial in the top-right corner moves the sun or moon along an arc. A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
 
-Messages stack at the top of the screen, oldest first, up to four at a time; each fades out after 7 seconds. A message repeated while it still shows restarts its time instead of stacking again. With a side panel open they keep to the space left of it.
+Messages stack at the top of the screen, up to four at a time; each fades out after 7 seconds. A message repeated while it still shows restarts its time instead of stacking again, and a full stack drops the one closest to fading. With a side panel open they keep to the space left of it.
 
 ### Bottom bar and hotbar
 
@@ -276,7 +276,7 @@ The tool station (8 planks, 4 stone) is a rack that holds only tools. Workers ne
 - a rake to rake leaves;
 - a hammer to fit a mine.
 
-Stone, berries and loose coal need no tool. A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed. They put it back when reassigned or when heading home at dusk. If there is none, the worker waits, the corner message says once what they need, and they carry on as soon as one is put in.
+Stone, berries and loose coal need no tool. A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed. They put it back when reassigned or when heading home at dusk. If there is none, the worker waits, a message says once what they need, and they carry on as soon as one is put in.
 
 A worker on the station's Stock job brings tools from other storage to the rack.
 
@@ -362,7 +362,7 @@ Workers take the pickaxe and hammer from a tool station.
 
 A finished mine takes up to 3 workers with pickaxes, who mine out of sight underground. The cart goes underground with them, and the lantern on the frame lights the area like a torch. When nobody is working, the cart stands outside, loaded once there is output.
 
-Each miner brings out one ore and one rock every 1.6 seconds, about half what a worker gets from a deposit, but a mine never runs out. Output fills two slots, ore and rocks, of one stack each. When either is full, mining stops and a miner carries the full stack out to the nearest storage that takes it. With none, a corner message says the mine is full with no output available.
+Each miner brings out one ore and one rock every 1.6 seconds, about half what a worker gets from a deposit, but a mine never runs out. Output fills two slots, ore and rocks, of one stack each. When either is full, mining stops and a miner carries the full stack out to the nearest storage that takes it. With none, a message says the mine is full with no output available.
 
 ## Wolves and night
 

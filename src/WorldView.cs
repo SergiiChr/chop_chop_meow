@@ -946,20 +946,21 @@ public partial class WorldView : Node3D {
 
     private void UpdateLighting() {
         // Dusk deepens into full night and dawn fades out, so neither boundary jumps in brightness.
-        float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts, nightStarts = World.Data.NightStarts;
+        float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts;
         float darkness = World.Night ? .65f : dayPhase > dusk ? .02f + (dayPhase - dusk) / .1f * .63f : dayPhase < .05f ? .65f - dayPhase / .05f * .63f : .02f;
         night = Math.Clamp((darkness - .02f) / .63f, 0, 1);
-        // The sun crosses the sky from dawn until night falls, then the moon takes the same path.
-        // Each fades out near the horizon, so the hand-over at nightfall moves no visible shadow.
-        bool moon = World.Night;
-        float arc = moon ? (dayPhase - nightStarts) / (1 - nightStarts) : dayPhase / nightStarts;
+        // The sun rises at dawn and sets halfway through dusk, then the moon takes the same path until dawn.
+        // Each fades out near the horizon, so the hand-over at sunset moves no visible shadow.
+        float sunset = (dusk + World.Data.NightStarts) / 2;
+        bool moon = dayPhase >= sunset;
+        float arc = moon ? (dayPhase - sunset) / (1 - sunset) : dayPhase / sunset;
         float height = MathF.Sin(MathF.PI * arc);
         float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, arc)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 50, height));
         var heading = NoonHeading.Rotated(swing);
         sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
         sun.LightEnergy = Mathf.Lerp(.8f, .08f, night) * Mathf.SmoothStep(0, .25f, height);
         // A low sun gives warm light at sunrise and sunset.
-        float low = moon ? 0 : 1 - Mathf.SmoothStep(.2f, .65f, height);
+        float low = moon ? 0 : 1 - Mathf.SmoothStep(.1f, .45f, height);
         sun.LightColor = NoonLight.Lerp(LowSunLight, low).Lerp(MoonLight, night);
         environment.AmbientLightColor = DayAmbient.Lerp(LowSunAmbient, low * .6f).Lerp(NightAmbient, night);
         environment.AmbientLightEnergy = Mathf.Lerp(.32f, .3f, night);

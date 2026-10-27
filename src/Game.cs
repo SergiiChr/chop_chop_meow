@@ -15,6 +15,7 @@ public partial class Game : Node {
     private VBoxContainer content = null!;
     private Label stats = null!;
     private MessageStack messages = null!;
+    private PanelContainer needsPlate = null!;
     private Label waterWarning = null!;
     private float waterWarningClock;
     private Label modeLabel = null!;
@@ -191,8 +192,8 @@ public partial class Game : Node {
         slots.AddChild(MenuIcon("craft", "Crafting", () => OpenPage("craft"), "C", new Color("b08a45"))); slots.AddChild(MenuIcon("crew", "Crew", () => OpenPage("workers"), "H", new Color("5f8aa6"))); slots.AddChild(MenuIcon("guide", "Field guide", () => OpenPage("help"), "I", new Color("7d6488")));
         var divider = new ColorRect { Color = new Color(Style.Beige, .6f), CustomMinimumSize = new Vector2(3, 46), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; slots.AddChild(divider);
         for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
-        // Between the needs and bank plate on the left and the day dial on the right.
-        messages = new MessageStack(() => Outlined(Label("", 17))) { Name = "messages", AnchorRight = 1, OffsetLeft = 320, OffsetRight = -320, OffsetTop = 56 }; ui.AddChild(messages);
+        // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
+        messages = new MessageStack(() => Outlined(Label("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
         // The side panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         panel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = PanelLeft, OffsetRight = -20, OffsetTop = PanelTop, OffsetBottom = PanelTop };
         ui.AddChild(panel);
@@ -219,7 +220,7 @@ public partial class Game : Node {
         BuildNeeds(); BuildEnding(); BuildMenu(); BuildScreens(); BuildAnomaly(); RefreshLive();
     }
     private void Notify(string message) {
-        if (message == Water.FullBottleWarning && waterWarning != null) { waterWarning.Text = message; waterWarningClock = 7; } else messages?.Show(message);
+        if (message == Water.FullBottleWarning && waterWarning != null) { waterWarning.Text = message; waterWarningClock = 7; } else messages?.Post(message);
         GD.Print(message);
     }
     // What the labels show, so their text is built only when it changes: building it allocates.
@@ -900,9 +901,9 @@ public partial class Game : Node {
         FitPanel();
         if (waterWarningClock > 0) waterWarning.Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : ui.Size.Y - 148);
         waterWarningClock -= dt; if (waterWarningClock <= 0 && waterWarning != null) waterWarning.Text = "";
-        // An open side panel would cover the messages' right end, so they keep to the ground left of it.
-        float messagesRight = panel.Visible ? PanelLeft - 16 : -320;
-        if (messages.OffsetRight != messagesRight) messages.OffsetRight = messagesRight;
+        // The needs plate grows with the bank count, and an open side panel would cover the messages' right end.
+        float messagesLeft = needsPlate.GetRect().End.X + 24, messagesRight = panel.Visible ? PanelLeft - 16 : -messagesLeft;
+        if (messages.OffsetLeft != messagesLeft || messages.OffsetRight != messagesRight) { messages.OffsetLeft = messagesLeft; messages.OffsetRight = messagesRight; }
         var args = launchArgs;
         if (args.Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
         int shot = Array.IndexOf(args, "--screenshot");

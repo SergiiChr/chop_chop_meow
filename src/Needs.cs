@@ -80,7 +80,7 @@ public partial class Game {
     /// coins kept for wages at the trading posts, with the day's wages, in red while they come to more than the bank holds.
     /// </summary>
     private void BuildNeeds() {
-        var box = new PanelContainer { OffsetLeft = 20, OffsetTop = 18 };
+        var box = needsPlate = new PanelContainer { OffsetLeft = 20, OffsetTop = 18 };
         box.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(box);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); box.AddChild(row);
         (Vial, NeedGauge) Need(string name, Vector2[] shape, Color color, Func<float> level) {

@@ -29,9 +29,14 @@ public partial class MessageStack : VBoxContainer {
         }
     }
 
-    public void Show(string message) {
+    public void Post(string message) {
         for (int i = 0; i < count; i++) if (texts[i] == message) { clocks[i] = ShowSeconds; return; }
-        if (count == Lines) Remove(0);
+        // A full stack makes room by dropping the message closest to fading, which a repeat may have kept from being the oldest.
+        if (count == Lines) {
+            int stalest = 0;
+            for (int i = 1; i < count; i++) if (clocks[i] < clocks[stalest]) stalest = i;
+            Remove(stalest);
+        }
         texts[count] = message; clocks[count] = ShowSeconds; count++;
         Refresh();
     }
@@ -39,7 +44,7 @@ public partial class MessageStack : VBoxContainer {
     public override void _Process(double delta) {
         for (int i = count - 1; i >= 0; i--) {
             clocks[i] -= (float)delta;
-            if (clocks[i] <= 0) { Remove(i); Refresh(); } else labels[i].Modulate = new Color(1, 1, 1, Mathf.Min(1, clocks[i] / FadeSeconds));
+            if (clocks[i] <= 0) { Remove(i); Refresh(); } else labels[i].Modulate = Fade(i);
         }
     }
 
@@ -48,11 +53,14 @@ public partial class MessageStack : VBoxContainer {
         count--; texts[count] = "";
     }
 
+    private Color Fade(int index) => new(1, 1, 1, Mathf.Min(1, clocks[index] / FadeSeconds));
+
     /// <summary>Puts the texts back on the labels after the order changed; only on new or expired messages.</summary>
+    /// <remarks>Each label takes its new message's fade too, or it would show the next one with the faded alpha of the last for a frame.</remarks>
     private void Refresh() {
         for (int i = 0; i < Lines; i++) {
             labels[i].Visible = i < count;
-            if (i < count) labels[i].Text = texts[i];
+            if (i < count) { labels[i].Text = texts[i]; labels[i].Modulate = Fade(i); }
         }
     }
 }
