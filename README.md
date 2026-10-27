@@ -93,6 +93,8 @@ Beside them the bank shows the coins in the trading post's wage slot and the wag
 
 The day dial in the top-right corner moves the sun or moon along an arc. A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
 
+Messages stack at the top of the screen, oldest first, up to four at a time; each fades out after 7 seconds. A message repeated while it still shows restarts its time instead of stacking again. With a side panel open they keep to the space left of it.
+
 ### Bottom bar and hotbar
 
 The bottom bar holds round badges for building, the backpack, crafting, the crew and the field guide, each with its key, next to the hotbar.
@@ -438,7 +440,7 @@ A manually exported or otherwise normally launched Godot build uses Godot's stan
 
 The environment uses a shared human scale, low-poly mountain ranges, a sandy shore and sea, an irregular lake with reeds and lily pads, and a grass valley with scattered tufts, bushes and wildflowers. A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
 
-Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack. Night is lit by the sun, ambient light and real fire light from campfires, furnaces and cabin windows. Trees in front of the player, a worker or a structure turn see-through.
+Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack. The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset. The moon takes the same path at night. Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows. Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 

@@ -97,9 +97,8 @@ public partial class WorldView : Node3D {
             AmbientLightEnergy = .32f,
         };
         AddChild(new WorldEnvironment { Environment = environment });
-        // Light from the upper left and slightly behind, like the illustrated references, so shadows fall to the right.
+        // UpdateLighting moves it along the day's arc.
         sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = .8f };
-        sun.Basis = Basis.LookingAt(new Vector3(1, -1.25f, -.45f), Vector3.Up);
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
         explored = Image.CreateFromData(World.MapSize, World.MapSize, false, Image.Format.L8, World.S.Explored);
@@ -939,16 +938,32 @@ public partial class WorldView : Node3D {
         ring.Scale = new Vector3(radius, 1, radius);
     }
 
+    private static readonly Color NoonLight = new("fff1dc"), LowSunLight = new("ffb070"), MoonLight = new("8296d6");
+    private static readonly Color DayAmbient = new("c7d3dc"), LowSunAmbient = new("d9c3ad"), NightAmbient = new("33447a");
+    private static readonly Color DayGround = new("879c69"), NightGround = new("1b2733");
+    /// <summary>The noon light's heading across the ground, from the upper left and slightly behind so shadows fall to the right.</summary>
+    private static readonly Vector2 NoonHeading = new Vector2(1, -.45f).Normalized();
+
     private void UpdateLighting() {
         // Dusk deepens into full night and dawn fades out, so neither boundary jumps in brightness.
-        float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts;
+        float dayPhase = World.DayPhase, dusk = World.Data.DuskStarts, nightStarts = World.Data.NightStarts;
         float darkness = World.Night ? .65f : dayPhase > dusk ? .02f + (dayPhase - dusk) / .1f * .63f : dayPhase < .05f ? .65f - dayPhase / .05f * .63f : .02f;
         night = Math.Clamp((darkness - .02f) / .63f, 0, 1);
-        sun.LightEnergy = Mathf.Lerp(.8f, .08f, night);
-        sun.LightColor = new Color("fff1dc").Lerp(new Color("8296d6"), night);
-        environment.AmbientLightColor = new Color("c7d3dc").Lerp(new Color("33447a"), night);
+        // The sun crosses the sky from dawn until night falls, then the moon takes the same path.
+        // Each fades out near the horizon, so the hand-over at nightfall moves no visible shadow.
+        bool moon = World.Night;
+        float arc = moon ? (dayPhase - nightStarts) / (1 - nightStarts) : dayPhase / nightStarts;
+        float height = MathF.Sin(MathF.PI * arc);
+        float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, arc)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 50, height));
+        var heading = NoonHeading.Rotated(swing);
+        sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
+        sun.LightEnergy = Mathf.Lerp(.8f, .08f, night) * Mathf.SmoothStep(0, .25f, height);
+        // A low sun gives warm light at sunrise and sunset.
+        float low = moon ? 0 : 1 - Mathf.SmoothStep(.2f, .65f, height);
+        sun.LightColor = NoonLight.Lerp(LowSunLight, low).Lerp(MoonLight, night);
+        environment.AmbientLightColor = DayAmbient.Lerp(LowSunAmbient, low * .6f).Lerp(NightAmbient, night);
         environment.AmbientLightEnergy = Mathf.Lerp(.32f, .3f, night);
-        environment.BackgroundColor = new Color("879c69").Lerp(new Color("1b2733"), night);
+        environment.BackgroundColor = DayGround.Lerp(NightGround, night);
     }
 
     // ---------- 2D overlay: names, progress and forge heat ----------
