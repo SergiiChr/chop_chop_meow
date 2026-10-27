@@ -944,7 +944,7 @@ public partial class WorldView : Node3D {
     /// <summary>The noon light's heading across the ground, from the upper left and slightly behind so shadows fall to the right.</summary>
     private static readonly Vector2 NoonHeading = new Vector2(1, -.45f).Normalized();
     /// <summary>Positions the sun or moon takes on its way across the sky.</summary>
-    private const float SunSteps = 600;
+    private const float SunSteps = 1200;
     /// <summary>Full moonlight is faint, so night stays dark with barely a shadow.</summary>
     private const float MoonEnergy = .05f;
     /// <summary>Night's ambient light without a moon: dark enough that fires and torches matter.</summary>
@@ -959,7 +959,7 @@ public partial class WorldView : Node3D {
         bool moon = World.MoonUp;
         float arc = World.SkyArc;
         float height = MathF.Sin(MathF.PI * arc);
-        // Shadow edges crawl while their light turns, so the direction moves in steps of about a quarter degree; brightness and colour stay smooth.
+        // Shadow edges crawl while their light turns, so the direction moves in steps of about an eighth of a degree; brightness and colour stay smooth.
         float step = MathF.Round(arc * SunSteps) / SunSteps, stepHeight = MathF.Sin(MathF.PI * step);
         float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, step)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 50, stepHeight));
         var heading = NoonHeading.Rotated(swing);
