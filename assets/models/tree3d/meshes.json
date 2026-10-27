@@ -1,0 +1,170 @@
+[
+  {
+    "part": "trunk",
+    "size": "(1.968282, 3.826085, 2.019184)",
+    "species": "oak",
+    "triangles": 3444,
+    "variant": 0
+  },
+  {
+    "part": "leaves",
+    "size": "(3.5, 4.667733, 3.484584)",
+    "species": "oak",
+    "triangles": 768,
+    "variant": 0
+  },
+  {
+    "part": "trunk",
+    "size": "(1.752542, 3.320446, 2.119514)",
+    "species": "oak",
+    "triangles": 3444,
+    "variant": 1
+  },
+  {
+    "part": "leaves",
+    "size": "(3.024968, 4.9, 3.5)",
+    "species": "oak",
+    "triangles": 768,
+    "variant": 1
+  },
+  {
+    "part": "trunk",
+    "size": "(1.917843, 3.779123, 2.074949)",
+    "species": "oak",
+    "triangles": 3444,
+    "variant": 2
+  },
+  {
+    "part": "leaves",
+    "size": "(3.317894, 4.9, 3.5)",
+    "species": "oak",
+    "triangles": 768,
+    "variant": 2
+  },
+  {
+    "part": "trunk",
+    "size": "(1.285043, 4.38313, 1.593924)",
+    "species": "spruce",
+    "triangles": 8052,
+    "variant": 0
+  },
+  {
+    "part": "leaves",
+    "size": "(1.858971, 5.3, 2.198878)",
+    "species": "spruce",
+    "triangles": 1792,
+    "variant": 0
+  },
+  {
+    "part": "trunk",
+    "size": "(1.423594, 4.406898, 1.604823)",
+    "species": "spruce",
+    "triangles": 8052,
+    "variant": 1
+  },
+  {
+    "part": "leaves",
+    "size": "(2.047023, 5.3, 2.213735)",
+    "species": "spruce",
+    "triangles": 1792,
+    "variant": 1
+  },
+  {
+    "part": "trunk",
+    "size": "(1.432994, 4.360925, 1.55457)",
+    "species": "spruce",
+    "triangles": 8052,
+    "variant": 2
+  },
+  {
+    "part": "leaves",
+    "size": "(2.072093, 5.3, 2.206449)",
+    "species": "spruce",
+    "triangles": 1792,
+    "variant": 2
+  },
+  {
+    "part": "trunk",
+    "size": "(1.023694, 4.266401, 1.336137)",
+    "species": "birch",
+    "triangles": 5172,
+    "variant": 0
+  },
+  {
+    "part": "leaves",
+    "size": "(1.601121, 3.744291, 2.0)",
+    "species": "birch",
+    "triangles": 1152,
+    "variant": 0
+  },
+  {
+    "part": "trunk",
+    "size": "(1.038953, 4.257303, 1.304857)",
+    "species": "birch",
+    "triangles": 5172,
+    "variant": 1
+  },
+  {
+    "part": "leaves",
+    "size": "(1.809553, 3.880116, 2.0)",
+    "species": "birch",
+    "triangles": 1152,
+    "variant": 1
+  },
+  {
+    "part": "trunk",
+    "size": "(1.10391, 4.256898, 1.243759)",
+    "species": "birch",
+    "triangles": 5172,
+    "variant": 2
+  },
+  {
+    "part": "leaves",
+    "size": "(1.879881, 3.190512, 2.0)",
+    "species": "birch",
+    "triangles": 1152,
+    "variant": 2
+  },
+  {
+    "part": "trunk",
+    "size": "(0.488098, 0.422835, 0.686489)",
+    "species": "bush",
+    "triangles": 2292,
+    "variant": 0
+  },
+  {
+    "part": "leaves",
+    "size": "(0.98994, 0.9, 1.2)",
+    "species": "bush",
+    "triangles": 512,
+    "variant": 0
+  },
+  {
+    "part": "trunk",
+    "size": "(0.439314, 0.455222, 0.695408)",
+    "species": "bush",
+    "triangles": 2292,
+    "variant": 1
+  },
+  {
+    "part": "leaves",
+    "size": "(0.931914, 0.9, 1.2)",
+    "species": "bush",
+    "triangles": 512,
+    "variant": 1
+  },
+  {
+    "part": "trunk",
+    "size": "(0.452121, 0.519949, 0.694754)",
+    "species": "bush",
+    "triangles": 2292,
+    "variant": 2
+  },
+  {
+    "part": "leaves",
+    "size": "(0.886668, 0.9, 1.2)",
+    "species": "bush",
+    "triangles": 512,
+    "variant": 2
+  }
+]

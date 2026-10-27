@@ -97,7 +97,7 @@ public static class ModelKit {
     /// Copies are cached per tenth of transparency, so fading trees still share materials.
     /// </summary>
     public static void SetFade(Node node, float transparency) {
-        if (node is MeshInstance3D mesh && mesh.MaterialOverride is StandardMaterial3D current) {
+        if (node is MeshInstance3D mesh && mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.ShadowsOnly && mesh.MaterialOverride is StandardMaterial3D current) {
             if (!mesh.HasMeta(BaseMaterial)) mesh.SetMeta(BaseMaterial, current);
             SetFade(mesh, (StandardMaterial3D)mesh.GetMeta(BaseMaterial), transparency);
         }
@@ -114,7 +114,7 @@ public static class ModelKit {
     public static (MeshInstance3D Mesh, StandardMaterial3D Material)[] FadeParts(Node node) {
         var parts = new List<(MeshInstance3D, StandardMaterial3D)>();
         void Gather(Node at) {
-            if (at is MeshInstance3D mesh && mesh.MaterialOverride is StandardMaterial3D current)
+            if (at is MeshInstance3D mesh && mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.ShadowsOnly && mesh.MaterialOverride is StandardMaterial3D current)
                 parts.Add((mesh, mesh.HasMeta(BaseMaterial) ? (StandardMaterial3D)mesh.GetMeta(BaseMaterial) : current));
             foreach (var child in at.GetChildren()) Gather(child);
         }
@@ -126,6 +126,24 @@ public static class ModelKit {
 
     public static void SetFade((MeshInstance3D Mesh, StandardMaterial3D Material)[] parts, float transparency) {
         foreach (var (mesh, material) in parts) SetFade(mesh, material, transparency);
+    }
+
+    /// <summary>Keep original cutout shadows when camera occlusion fades the visible material to alpha blending.</summary>
+    public static void PreserveShadows(Node3D node) {
+        int count = node.GetChildCount();
+        for (int i = 0; i < count; i++) {
+            if (node.GetChild(i) is not Node3D child) continue;
+            PreserveShadows(child);
+            if (child is not MeshInstance3D mesh || mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.On) continue;
+            // Shares geometry/material; one shadow draw replaces the visible mesh's original shadow draw.
+            node.AddChild(new MeshInstance3D {
+                Mesh = mesh.Mesh,
+                MaterialOverride = mesh.MaterialOverride,
+                Transform = mesh.Transform,
+                CastShadow = GeometryInstance3D.ShadowCastingSetting.ShadowsOnly
+            });
+            mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        }
     }
 
     private static Material Faded(StandardMaterial3D original, int step) {
