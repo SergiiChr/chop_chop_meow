@@ -9,6 +9,9 @@ public static class SimulationChecks {
     private const float Step = .25f;
 
     public static void Run(GameData data) {
+        InventoryLayoutChecks.Run(data);
+        ChopChopMeow.Tests.WaterChecks.Run(data);
+        PondChecks.Run(data);
         EconomyChecks.Run(data);
         AnimationChecks.Run();
         HumanModelChecks.Run();
@@ -24,6 +27,7 @@ public static class SimulationChecks {
         CheckWorkerFurnaceCrew(data);
         CheckTradeAndWages(data);
         CheckMarketRoundTrip(data);
+        RecoveryChecks.Run(data);
         CheckRecoveryBoxesStayPrivate(data);
         CheckRecipeSwitchLeftovers(data);
         CheckDeathAndSaveState(data);
@@ -377,8 +381,8 @@ public static class SimulationChecks {
                 "cart must not deliver before the full 30-second trip");
         SafeTick(world, .2f);
         var box = output.Items.Keys.SingleOrDefault(World.IsCrate);
-        Require(world.S.Orders.Count == 0 && box != null && world.Packed(box)?["water"] == data.Market.Buys["water"] && world.S.Backpack["water"] == 0,
-                "cart should deliver bought water as one packed crate in the market output");
+        Require(world.S.Orders.Count == 0 && box == null && output["water"] == 1 && world.S.Backpack["water"] == 0,
+                "cart should deliver one refillable bottle directly to the market output");
 
         world.S.Backpack.Add("wood", 3);
         world.S.Backpack.TransferTo(sign.Inventory, "wood", 3);
@@ -993,7 +997,7 @@ public static class SimulationChecks {
     private static void CraftByHand(World world, string recipe, int times) {
         for (int i = 0; i < times; i++) Require(world.Craft(recipe), $"{recipe} should be craftable by hand: {world.CraftBlock(recipe)}");
         for (int limit = 400; world.S.Crafting.Count > 0 && limit > 0; limit--) SafeTick(world, .25f);
-        Require(world.S.Crafting.Count == 0, $"hand crafting {recipe} should finish");
+        Require(world.S.Crafting.Count == 0, $"hand crafting {recipe} should finish: rate={world.CraftRate}, progress={world.S.CraftTime}, slots={world.S.Backpack.UsedSlots}, items={string.Join(",", world.S.Backpack.Items.Select(p => p.Key + "=" + p.Value))}, room={world.S.Backpack.Room(world.Data.Recipes[recipe].Output)}");
     }
 
     /// <summary>A spot in the open middle of the valley, so the progression run has room to build.</summary>
@@ -1130,6 +1134,19 @@ public static class SimulationChecks {
         for (int i = 0; i < 480 && chest.Inventory["wood"] == 0; i++) SafeTick(world, .25f);
         Require(chest.Inventory["wood"] > 0 && worker.Bag["wood"] == 0,
                 "hired worker should gather actual wood and deliver it to a built chest");
+        // Reuse the worker's real gathered output after lending them the player's axe.
+        for (int i = 0; i < 8000 && chest.Inventory["wood"] < 26; i++) SafeTick(world, .25f);
+        world.Player = chest.Pos;
+        Require(chest.Inventory.TransferTo(world.S.Backpack, "wood", 26) == 26, "worker output should fund the shelter and fire");
+        GatherUntil(world, stone, "stone", 12);
+        var pond = world.Add("water", Terrain.WaterPoint(World.Spawn), 9999);
+        world.Player = Terrain.WaterPoint(World.Spawn);
+        world.Gather(pond, data.GatherSeconds);
+        world.Player = Site(3, 3);
+        Require(world.Build("hut", Site(5, 3)) != null, "gathered materials should build the opening shelter");
+        Require(world.Build("campfire", Site(3, 6)) != null, "gathered materials should build the opening fire");
+
+        world.Tick(.01f, true);
         Require(world.GoalComplete, "objective chain should reach the first automation milestone");
         GD.Print($"Progression simulation elapsed: {world.S.Time - startTime:0} seconds.");
     }
@@ -1266,6 +1283,15 @@ public static class SimulationChecks {
         WolfTick(hit, 1, close);
         Require(close.Health == 3 && close.Flee > 0 && close.Pos.DistanceTo(hit.Player) > struck + 1, "a direct torch hit should hurt the wolf and send it running");
 
+        var edge = TorchNight(data);
+        edge.Player = new Vector2(World.MapSize - 5, 20);
+        var doomed = new Wolf { Pos = edge.Player + new Vector2(1.8f, 0), Health = 1 };
+        edge.S.Wolves.Add(doomed);
+        edge.UseTorch(Vector2.Right);
+        var corpse = edge.S.Things.Single(t => t.Kind == "wolf_corpse");
+        Require(corpse.Pos.X == World.MapSize - 3 && corpse.Pos.X > 45,
+            "a wolf killed by a torch near the map edge should leave its corpse within current map bounds");
+
         var gathering = TorchNight(data);
         for (int i = 0; i < 100; i++) { gathering.S.Hunger = gathering.S.Thirst = 100; gathering.Tick(.1f); }
         Require(gathering.S.Wolves.Count < World.PackSize, "the pack should gather slowly");
@@ -1282,7 +1308,7 @@ public static class SimulationChecks {
     private static void CheckStacking(GameData data) {
         var world = EmptyWorld(data);
         world.S.Backpack.Add("water", 3); world.S.Backpack.Add("steel_axe", 2);
-        Require(world.S.Backpack.UsedSlots == 3, "water bottles should share a stack and each tool take its own slot");
+        Require(world.S.Backpack.UsedSlots == 5, "each refillable bottle and each tool should take its own slot");
         var crate = world.NewCrate();
         Require(crate.Add("steel_pick", data.CrateCapacity) == data.CrateCapacity && crate.UsedSlots == data.CrateCapacity, "a crate should hold a full crate of single tools");
         var chest = world.Add("chest", new Vector2(10, 10));
@@ -1671,7 +1697,7 @@ public static class SimulationChecks {
         Require(loaded.S.Backpack["steel_pick"] == 1 && loaded.S.Backpack["steel_hammer"] == 1 && !loaded.S.Things.Any(t => t.Kind == "loose_iron"),
                 "old iron tools become steel ones and loose iron is gone");
         Require(loaded.Find(anvil.Id)!.Recipe == "" && loaded.Find(anvil.Id)!.Inventory["iron_bar"] == 3, "an anvil set to a tool now made at the bench is reset and keeps its inputs");
-        Require(loaded.S.Goal == 1, "the goal should step back to the workbench goal");
+        Require(loaded.S.Goal == 0, "an older save should begin with the new collect-water survival goal");
     }
 
     /// <summary>
@@ -1680,7 +1706,7 @@ public static class SimulationChecks {
     /// </summary>
     private static void CheckNoToolDeadlocks(GameData data) {
         var fresh = new World(data);
-        var have = new HashSet<string>(fresh.S.Backpack.Items.Keys) { "stone", "berries", "water", "raw_meat" };
+        var have = new HashSet<string>(fresh.S.Backpack.Items.Keys) { "stone", "berries", "water", "water_1", "water_2", "raw_meat" };
         var built = new HashSet<string>();
         bool HasTool(string tool, int tier = 0) => have.Any(id => data.Items[id].Tool == tool && data.Items[id].Tier >= tier);
         for (bool grew = true; grew;) {
@@ -1710,8 +1736,8 @@ public static class SimulationChecks {
     }
 
     private static void CheckSleepNeedsFoodAndWater(GameData data) {
-        Require(Math.Abs(100 / data.HungerPerSecond - data.DaySeconds) < .01f && Math.Abs(100 / data.ThirstPerSecond - data.DaySeconds / 2) < .01f,
-                "a full stomach should last one in-game day and a full water droplet half a day");
+        Require(Math.Abs(100 / data.HungerPerSecond - data.DaySeconds) < .01f && Math.Abs(100 / data.ThirstPerSecond - data.DaySeconds) < .01f,
+                "a full stomach should last one in-game day and a full water droplet one day");
         foreach (var (hunger, thirst, reason) in new[] { (10f, 100f, "hungry"), (100f, 10f, "thirsty") }) {
             var world = NightWorld(data);
             var hut = world.Add("hut", world.Player + new Vector2(2, 0));
@@ -1855,7 +1881,8 @@ public static class SimulationChecks {
         Require(loaded.Coins == 30 && loaded.S.Coins == null, "coins from an older save should move into the backpack");
         Require(loaded.Find(sign.Id) is { Output.Slots: World.MarketSlots, Inventory.Slots: World.MarketSlots, Wages.Slots: 1 }, "an older signpost should get its market boxes");
         Require(loaded.S.Orders.Single().Goods.GetValueOrDefault("wood") == 4 && loaded.S.Orders.Single().Item == null, "an older single-item order should keep its goods");
-        Require(!loaded.Serialize().Contains("\"Item\"") && !loaded.Serialize().Contains("\"Coins\""), "migrated fields should not be written back");
+        var migrated = System.Text.Json.Nodes.JsonNode.Parse(loaded.Serialize())!;
+        Require(migrated["Coins"] == null && migrated["Orders"]!.AsArray().All(order => order!["Item"] == null), "migrated fields should not be written back");
 
         // Saves from the earlier, smaller maps would place the settlement in the mountains or the lake, so they are refused.
         var small = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;

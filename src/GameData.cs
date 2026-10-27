@@ -143,10 +143,11 @@ public sealed class GameData {
         data.Validate();
         Inventory.Unstacked.Clear();
         foreach (var (id, item) in data.Items) if (item.Tool != "") Inventory.Unstacked.Add(id);
+        foreach (var id in Water.BottleItems) Inventory.Unstacked.Add(id);
         return data;
     }
     public void Validate() {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || !Items.ContainsKey("crate"))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
         foreach (var building in Buildings)
             foreach (var cost in building.Value.Cost)
@@ -166,7 +167,7 @@ public sealed class GameData {
             throw new InvalidOperationException("Invalid farm in data/game.json.");
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
-    public bool IsConsumable(string item) => Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
+    public bool IsConsumable(string item) => Water.BottleSips(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>The plainest tool of a kind that meets a tier, for naming what a recipe needs.</summary>
     public string ToolName(string tool, int tier) {

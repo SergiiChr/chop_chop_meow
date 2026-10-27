@@ -46,9 +46,10 @@
       "steel_pick": 1,
       "steel_hammer": 1,
       "canned_food": 12,
-      "water": 12,
+      "water": 1,
       "wheat_seeds": 4,
-      "fertilizer": 4
+      "fertilizer": 4,
+      "empty_bottle": 1
     }
   },
   "items": {
@@ -148,9 +149,26 @@
     },
     "water": {
       "name": "Water bottle",
-      "price": 2,
+      "price": 11.45,
       "color": "88cbe0",
-      "thirst": 28
+      "thirst": 33.333336
+    },
+    "water_2": {
+      "name": "Water bottle (2 sips)",
+      "price": 10.7833,
+      "color": "88cbe0",
+      "thirst": 33.333336
+    },
+    "water_1": {
+      "name": "Water bottle (1 sip)",
+      "price": 10.1167,
+      "color": "88cbe0",
+      "thirst": 33.333336
+    },
+    "empty_bottle": {
+      "name": "Empty bottle",
+      "price": 9.45,
+      "color": "a8bdc3"
     },
     "canned_food": {
       "name": "Canned food",
@@ -464,6 +482,20 @@
       "amount": 2,
       "seconds": 10
     },
+    "water_bottle": {
+      "name": "Tin water bottle",
+      "station": "bench",
+      "hand": false,
+      "tool": "hammer",
+      "tier": 2,
+      "inputs": {
+        "tin_bar": 1,
+        "wood_parts": 1
+      },
+      "output": "empty_bottle",
+      "amount": 1,
+      "seconds": 10
+    },
     "steel_parts": {
       "name": "Steel parts",
       "station": "anvil",
@@ -743,5 +775,5 @@
     }
   },
   "hungerHours": 24,
-  "thirstHours": 12
+  "thirstHours": 24
 }

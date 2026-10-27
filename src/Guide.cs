@@ -25,7 +25,7 @@ public partial class Game {
             ("key:Space", "Swing the tool in hand, or pump a selected reinforced furnace."),
             ("key:1–9", "Put a hotbar slot in hand. Drag an item or plan onto a slot to assign it."),
             ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Your crew."), ("key:I", "This guide."),
-            ("key:Ctrl-click", "Move all of an item. A plain click moves one stack; right-click picks up half."),
+            ("key:Click / Ctrl-click", "Click moves one item; Ctrl-click moves all of an item. Right-click picks up half."),
             ("key:F5 · F9", "Quick save and load."),
             ("key:Esc", "Cancel, close a panel, or pause.")
         },
@@ -52,11 +52,11 @@ public partial class Game {
             ("coins", "Unpaid workers strike until paid or dismissed.")
         },
         ["survive"] = new[] {
-            ("berries", "A full stomach lasts a day, a full water droplet half a day."),
-            ("water", "Drink at the lake up the valley. The sea is salt."),
+            ("berries", "A full stomach lasts a day. Gather berries early to keep your strength up."),
+            ("water", "Your bottle holds three sips. Refill it at the lake; the sea is salt. Without a bottle, drink at the source."),
+            ("hut", "Build a cabin and campfire before night. A cabin shelters you; a lit fire keeps wolves away. Sleep inside after 10 pm if your food and water will last until dawn."),
             ("campfire", "Wolves hunt at night and keep out of fire light. A log burns about 4 hours."),
             ("torch", "Click to light a torch, click to swing it. Four quick swings put it out."),
-            ("hut", "Step into a cabin to lose the wolves. Sleep there if food and water last until morning."),
             ("raw_meat", "Butcher a slain wolf for raw meat and cook it before eating.")
         },
         ["trade"] = new[] {

@@ -80,7 +80,7 @@ Options holds a window resolution picker, a frame rate limit (off, 60 or 90 fps)
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load and options |
 | Mouse wheel | Zoom |
-| Click / Ctrl-click an inventory cell | Move one stack / every unit of that item (Shift works like Ctrl) |
+| Click / Ctrl-click an item cell | Move one item / all of that item (Shift works like Ctrl); this applies across inventory and station panels |
 | Drag a cell | Move its stack to another inventory or a station input slot; drop an item or building plan on the hotbar to assign it |
 
 ## Interface
@@ -103,7 +103,7 @@ Building plans are an icon grid; hovering a plan shows its description and what 
 
 ### Inventories
 
-Inventories are grids of slots. Every item stacks to 64 except coins (1000), and packed crates and tools, which take a slot each.
+Inventories are grids of slots. Every item stacks to 64 except coins (1000), and packed crates, tools, and refillable bottles, which take a slot each.
 
 | Inventory | Capacity |
 | --- | --- |
@@ -112,9 +112,10 @@ Inventories are grids of slots. Every item stacks to 64 except coins (1000), and
 | Worker | 5 items, like a crate: one stack of 5 or up to 5 different items |
 | Tool station | 12 slots |
 
+- Inventory cells retain their positions. Drag to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
 - Right-click a stack to pick up half of it, then left-click a slot to drop it there.
 - A dropped stack that does not all fit fills the slot, and the rest stays held until you drop it elsewhere or click somewhere it cannot go.
-- Clicking food or water in the backpack consumes one, clicking a torch lights it and clicking a crate starts placing it.
+- Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, and a crate click starts placement.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `data/game.json`.
 - A selected raw-material stack can be deposited by clicking a nearby chest.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
@@ -151,13 +152,13 @@ The crew button opens an overview with each worker's daily pay and the total abo
 
 ### Food, water and time
 
-A full stomach lasts one in-game day and a full droplet half a day; a day lasts 14 minutes. Raw meat cannot be eaten.
+A full stomach lasts one in-game day and a full water gauge lasts one day; a day lasts 14 minutes. Raw meat cannot be eaten. Your refillable bottle holds three sips, each restoring one third of the water gauge. Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one sip, taking the same gathering time. Filling a bottle takes the same time as one gather action. Empty or filled replacements can be bought individually. Craft an empty bottle at a bench from one tin bar and one wood part, with the same steel hammer used for tin cans. Cooking returns the empty bottle when it uses water.
 
 From 10 pm you can sleep until dawn, but only if your food and water will last until morning; otherwise the sleep button explains why.
 
 ### Death and recovery
 
-Death drops your backpack, coins included, in a recovery box marked by a bobbing gold gem. You respawn after 30 seconds inside the cabin nearest to where you fell, or in the clearing without one. Emptied boxes disappear, and workers never use them as storage.
+Death drops your backpack, coins included, in a recovery box marked by a bobbing gold gem. You respawn after 30 seconds inside the cabin nearest to where you fell, or in the clearing without one. Emptied boxes disappear, and workers never use them as storage. During the respawn countdown, if no cabin exists, “Skip to morning?” lets you advance the world to dawn. In multiplayer, every player must be downed before skipping.
 
 ### Fog of war
 
@@ -173,7 +174,7 @@ The plains have occasional rocks, bushes and berry bushes, and the trees thicken
 
 ## Progression
 
-The opening progression covers hand gathering, construction, food and water, day/night, shelter, mining, iron and steel production, village trade and worker hiring.
+The opening progression prioritizes water, shelter and fire, then hand gathering with the starting steel axe: chisel, planks, mallet, bench and crates; sell berries at a trading post for the first pickaxe; then work toward steel.
 
 ### Goals
 
@@ -320,7 +321,8 @@ The price sheet opens to the left of the panel and lists sell and buy prices wit
 | Goods | Sold by |
 | --- | --- |
 | Single steel tools | One |
-| Canned food, water | Crate of 12 |
+| Canned food | Crate of 12 |
+| Filled bottle, empty bottle | One bottle |
 | Wheat seeds, fertilizer | Crate of 4 |
 
 The sheet only shows sale prices as last heard from the village and says how many days old they are. It updates when a cart returns, or when a worker on Manage deliveries is sent to fetch fresh prices (a one-time errand down the road and back). That worker also carries what the cart brings back, other than coins, to storage. Errand runners only walk a short way down the valley before fading from view.

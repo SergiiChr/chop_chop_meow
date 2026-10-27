@@ -108,8 +108,8 @@ public sealed partial class World {
         }
     }
 
-    private Worker? FirstFreeHands(List<Worker> crew) {
-        foreach (var c in crew) if (c.Bag.Count == 0 && OnDuty(c)) return c;
+    private Worker? FirstFreeHands(List<Worker> crew, Thing mine) {
+        foreach (var c in crew) if (c.Assignment == mine.Id && HasDuty(c, mine.Id, "mine") && c.Tool != "" && Data.Items[c.Tool].Tool == "pickaxe" && c.Bag.Count == 0 && OnDuty(c)) return c;
         throw new InvalidOperationException("A mine crew member with free hands is the one asking.");
     }
 
@@ -156,7 +156,7 @@ public sealed partial class World {
             if (dest == null) {
                 w.Status = Phrase("Mine full · no storage takes ", Data.Name(full));
                 if (mineFullReported.Add(mine.Id)) Say($"The {MineName(mine)} is full with no output available.");
-            } else if (FirstFreeHands(crew) == w) {
+            } else if (FirstFreeHands(crew, mine) == w) {
                 w.Status = Phrase("Bringing out ", Data.Name(full));
                 if (Walk(w, MineDoor(mine), dt, .5f)) { w.Hands(mine.Output.StackSize); mine.Output.TransferTo(w.Bag, full, mine.Output.StackSize); w.Destination = dest.Id; }
                 return true;

@@ -15,6 +15,8 @@ public partial class Game : Node {
     private VBoxContainer content = null!;
     private Label stats = null!;
     private Label toast = null!;
+    private Label waterWarning = null!;
+    private float waterWarningClock;
     private Label modeLabel = null!;
     private DayDial dayDial = null!;
     private PanelContainer bag = null!;
@@ -200,10 +202,16 @@ public partial class Game : Node {
         var label = new VBoxContainer { CustomMinimumSize = new Vector2(40, 0) }; label.AddThemeConstantOverride("separation", 4); drawer.AddChild(label);
         label.AddChild(Style.Glyph("line_bag", 30, Style.Rim));
         bagFill = Style.Text("", 13, Style.Beige); bagFill.HorizontalAlignment = HorizontalAlignment.Center; label.AddChild(bagFill);
+        var sort = Button("Sort", () => { world.SortBackpack(); RefreshLive(); }); sort.Name = "sort_bag"; sort.TooltipText = "Stack loose items and sort by type"; label.AddChild(sort);
         bagContent = new VBoxContainer(); drawer.AddChild(bagContent);
         // Every closable window keeps its close button in its top right corner.
         var hide = HeaderButton("close", "Hide the backpack", () => { if (page == "inventory") ClosePanel(); else { bagHidden = true; bag.Visible = false; } }, Style.CloseRound, "bag_close");
         hide.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin; drawer.AddChild(hide);
+        waterWarning = Outlined(Label("", 17)); waterWarning.Name = "water_warning";
+        waterWarning.AnchorTop = 1; waterWarning.AnchorBottom = 1;
+        waterWarning.OffsetLeft = 20; waterWarning.OffsetRight = 650; waterWarning.OffsetTop = -250; waterWarning.OffsetBottom = -220;
+        waterWarning.AutowrapMode = TextServer.AutowrapMode.Off;
+        waterWarning.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(waterWarning);
         deathLabel = Outlined(Label("", 26)); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
         // Raised above the centred player so a downed body stays visible under the message.
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
@@ -211,7 +219,7 @@ public partial class Game : Node {
         BuildNeeds(); BuildEnding(); BuildMenu(); BuildScreens(); BuildAnomaly(); RefreshLive();
     }
     private void Notify(string message) {
-        if (toast != null) { toast.Text = message; toastClock = 7; }
+        if (message == Water.FullBottleWarning && waterWarning != null) { waterWarning.Text = message; waterWarningClock = 7; } else if (toast != null) { toast.Text = message; toastClock = 7; }
         GD.Print(message);
     }
     // What the labels show, so their text is built only when it changes: building it allocates.
@@ -321,12 +329,11 @@ public partial class Game : Node {
     private int pagesOpened;
     private void Welcome() {
         AddLabel("The woods are quiet. For now.", 21);
-        AddLabel("A small settlement begins with your own two hands. Sell berries for your first pickaxe, master the bellows, and send your first crate of steel tools to the village.", 16, Muted);
+        AddLabel("First, secure water, a cabin and a fire. Then use your steel axe and your hands to build a workshop, trade berries for a pickaxe, and work toward steel.", 16, Muted);
         AddLabel("FIRST STEPS", 14);
-        AddLabel("1  Hold right mouse on a tree or stone. You will walk over and gather.\n2  Press B to build your stone furnace.\n3  Pick berries, craft a crate and sell them at a trading post for a pickaxe.\n4  Press Esc any time to see your current goal.");
-        AddLabel("You begin with a steel axe, 10 berries and 6 wood. Drink at the lake up the valley; gather water to carry. The sea is salt and cannot be drunk. A fire and cabin protect you after dark.", 15, Muted);
+        AddLabel("1  Collect water at the pond and keep a bottle filled. The sea is salt.\n2  Gather wood and stone; build a cabin and campfire before night.\n3  With your steel axe, fell trees. Gather stone and berries by hand. Knap a chisel, carve planks and a mallet, then build a bench.\n4  Make crates, build a trading post and sell berries. Buy your first pickaxe, then mine toward iron and steel.\n5  Press Esc any time to see your current goal.");
+        AddLabel("A bottle holds three sips and can be refilled at the lake. Without one, drink at the source. Each gathering action takes time, so plan ahead.", 15, Muted);
         AddButton("Into the clearing", ClosePanel);
-        AddLabel("10–15 minute POC · up to four players · Linux", 13, Muted);
     }
     private string Needs(Dictionary<string, int> cost) => Text(text => AppendNeeds(text, cost));
     private string Cost(Dictionary<string, int> cost) => Text(text => AppendCost(text, cost));
@@ -367,7 +374,7 @@ public partial class Game : Node {
     }
     private const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
     private void UseFromBag(string id) {
-        if (world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
     }
     private int DailyWages() {
         int wages = 0;
@@ -390,6 +397,7 @@ public partial class Game : Node {
         var t = world.Find(selected);
         if (t == null) { AddLabel("Select a building or resource in the world."); return; }
         Headline(t.Kind);
+        if (t.Kind == "water") headingTitle.Text = "Collect water";
         Reach(t);
         if (t.IsResource) { Resource(t); return; }
         if (t.Kind == "hut") { Cabin(t); return; }
@@ -409,7 +417,7 @@ public partial class Game : Node {
         int drawn = int.MinValue;
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(label)) return;
-            int tenths = world.Near(t) ? -1 : (int)(world.Player.DistanceTo(t.Pos) * 10);
+            int tenths = world.Near(t) ? -1 : (int)(world.Player.DistanceTo(world.GatherAt(t, world.Player)) * 10);
             if (tenths == drawn) return;
             drawn = tenths;
             label.Visible = tenths >= 0;
@@ -428,7 +436,7 @@ public partial class Game : Node {
             line.Append(world.GatherBlock(t) ?? (t.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
             text.Show();
         });
-        if (t.Kind == "water") AddButton("Drink from the lake", () => world.Drink(t));
+        if (t.Kind == "water") AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Muted);
         JobButtons(t);
     }
     private void Campfire(Thing fire) {
@@ -517,12 +525,12 @@ public partial class Game : Node {
         HeaderAction("stash", "Store all materials · keeps tools", () => StoreAll(t), Style.ActionRound, "deposit");
         if (t.Kind == "chest") FilterButton(t);
         Well(new VBoxContainer()).AddChild(StorageGrid(t));
-        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Ctrl: store all · Drag to move");
+        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
     }
-    /// <summary>A storage's slots in a grid of cups; click takes a stack, Ctrl all of it.</summary>
+    /// <summary>A storage's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
     private GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) {
         var host = content; var column = new VBoxContainer(); content = column;
-        var grid = AddInventoryGrid(() => t.Inventory, t, id => MoveStack(t.Inventory, world.S.Backpack, id, t), "Click: take a stack · Ctrl: take all · Drag to move", columns: columns, size: size);
+        var grid = AddInventoryGrid(() => t.Inventory, t, id => MoveStack(t.Inventory, world.S.Backpack, id, t), "Click: take one · Ctrl: take all · Drag to move", columns: columns, size: size);
         content = host; column.RemoveChild(grid); column.QueueFree();
         return grid;
     }
@@ -559,13 +567,13 @@ public partial class Game : Node {
         Well(new VBoxContainer()).AddChild(StorageGrid(t));
         var hint = Row(); hint.AddThemeConstantOverride("separation", 8);
         hint.AddChild(Style.Text("Hold", 14, Style.Beige)); hint.AddChild(Style.Glyph("line_mouse", 24, Style.Rim)); hint.AddChild(Style.Text("to pick up", 14, Style.Beige));
-        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Ctrl: store all · Drag to move");
+        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
     }
     private void Recovery(Thing t) {
         headingTitle.Text = "Recovery box";
         Well(new VBoxContainer()).AddChild(StorageGrid(t, 5));
         var row = Row(); row.AddChild(BigButton("Take all", Style.Brick, () => TakeAll(t)));
-        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Drag to move");
+        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Drag to move");
     }
     /// <summary>A tool rack: a row per kind of tool workers use, with what hangs there, how many are out, and who waits for one.</summary>
     private void ToolRack(Thing t) {
@@ -653,7 +661,7 @@ public partial class Game : Node {
             content.AddChild(skip);
             JobButtons(t);
         }
-        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store a stack · Ctrl: store all · Drag to move", wanted: id => world.Holds(t, id));
+        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move", wanted: id => world.Holds(t, id));
     }
     /// <summary>
     /// A farm plot: its growth from bare soil to ripe wheat, then the process row: seeds in, fertilizer as its fuel, wheat out with seeds and grass beside.
@@ -827,7 +835,7 @@ public partial class Game : Node {
                     if (t.Kind == "hut") entering = t;
                     // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
                     if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item) && !(t.Kind == "crate" && World.IsCrate(item))) {
-                        if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, 999)); if (!world.Remote) Notify(moved > 0 ? $"Stored {moved} {world.Data.Name(item)}." : $"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
+                        if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote) Notify(moved > 0 ? $"Stored {moved} {world.Data.Name(item)}." : $"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
                     }
                     Select(t);
                 } else if (ActiveHotbarItem() is string held && UseOf(held) != null) UseHeld(view.ToWorld(mouse.Position));
@@ -851,7 +859,7 @@ public partial class Game : Node {
             // A loose piece needs only one click: the player keeps walking to it after the button is released.
             if (gathering != null && (right || gathering.IsLoose) && direction == Vector2.Zero && entering == null) {
                 // Step in close enough for the tool to reach the model; the lake edge keeps its wider reach.
-                if (!world.Near(gathering, gathering.Kind == "water" ? 2.5f : 1.35f)) direction = (gathering.Pos - world.Player).Normalized();
+                if (!world.Near(gathering, gathering.Kind == "water" ? 2.5f : 1.35f)) direction = (world.GatherAt(gathering, world.Player) - world.Player).Normalized();
                 else if (gathering.IsLoose) {
                     world.Gather(gathering, dt);
                     if (world.Find(gathering.Id) == null && selected == gathering.Id) { selected = 0; view.Selected = 0; }
@@ -887,8 +895,11 @@ public partial class Game : Node {
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }
+        RefreshRecoveryPrompt();
         // Every frame, so a page that just opened takes its size once its wrapped text has a width.
         FitPanel();
+        if (waterWarningClock > 0) waterWarning.Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : ui.Size.Y - 148);
+        waterWarningClock -= dt; if (waterWarningClock <= 0 && waterWarning != null) waterWarning.Text = "";
         toastClock -= dt; if (toastClock <= 0 && toast != null) toast.Text = "";
         var args = launchArgs;
         if (args.Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
@@ -909,7 +920,9 @@ public partial class Game : Node {
     }
     private async void Quit(int code = 0) {
         if (quitting) return;
-        quitting = true; net.Leave(); sounds.StopAll(); await Seconds(.2); GetTree().Quit(code);
+        quitting = true; net.Leave(); sounds.StopAll(); await Seconds(.2);
+        // Godot objects left to the finalizer must be released before the engine shuts down, or a late finalizer aborts the exit.
+        GC.Collect(); GC.WaitForPendingFinalizers(); GetTree().Quit(code);
     }
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {

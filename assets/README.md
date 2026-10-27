@@ -36,6 +36,8 @@ Models are assembled from code-built Godot meshes.
 - `src/WorldModels.cs` — world objects, wolf and trade cart.
 - `src/ActorRig.cs` — player, worker and courier.
 - `src/ModelKit.cs` — shared primitive, material and fade helpers.
+- `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
+- `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons and pile stock.
 
 ### People and animals
 
@@ -188,7 +190,7 @@ How they are framed:
 
 ### Item atlas
 
-`item-atlas.png` is a 4×3 sheet of inventory icons that still supplies the water flask.
+`item-atlas.png` is a historical 4×3 sheet of inventory icons. The refillable water bottle now uses individually rendered model icons.
 Its other cells are unused.
 
 ### SVG glyphs

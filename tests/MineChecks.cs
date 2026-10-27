@@ -13,6 +13,7 @@ public static class MineChecks {
         CheckMarking(data);
         CheckConstruction(data);
         CheckMiningAndFullOutput(data);
+        CheckOnlyAvailableMinersUnload(data);
         CheckMiningIsSlowerThanDeposits(data);
         CheckDailyProfitAndEndGoals(data);
     }
@@ -188,6 +189,28 @@ public static class MineChecks {
         var carrier = crew.First(w => w.Bag.Count > 0);
         world.Fire(carrier);
         Require(world.S.Things.Any(t => t.Kind == "grave" && t.Inventory["stone"] == mine.Output.StackSize), "dismissing a miner must not lose the stack they carry");
+    }
+
+    private static void CheckOnlyAvailableMinersUnload(GameData data) {
+        var world = EmptyWorld(data);
+        var mine = MarkMine(world); mine.Stage = World.MineOpen;
+        var cliff = World.CliffAt(mine.Pos);
+        var chest = world.Add("chest", mine.Pos + cliff.Face * 3);
+        var builder = AddWorker(world, mine.Pos);
+        world.SetDuty(builder, mine, "build", true);
+        var elsewhere = AddWorker(world, chest.Pos);
+        var tree = world.Add("tree", chest.Pos + cliff.Face * 3, 100);
+        world.SetDuty(elsewhere, tree, "gather", true);
+        world.SetDuty(elsewhere, mine, "mine", true);
+        // This earlier-hired miner remains at another job waiting for an axe.
+        var miner = AddWorker(world, World.MineDoor(mine)); miner.Tool = "steel_pick";
+        world.SetDuty(miner, mine, "mine", true);
+        mine.Output!.Add("iron_ore", mine.Output.StackSize);
+        Work(world, 15, () => chest.Inventory["iron_ore"] == mine.Output.StackSize);
+        Require(chest.Inventory["iron_ore"] == mine.Output.StackSize && miner.Bag.Count == 0,
+            "an active miner must unload even when earlier workers only build or have a mine duty while working elsewhere");
+        Require(builder.Bag.Count == 0 && elsewhere.Bag.Count == 0,
+            "workers without an active mining job must not take the full mine stack");
     }
 
     private static void CheckMiningIsSlowerThanDeposits(GameData data) {

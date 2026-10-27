@@ -20,10 +20,56 @@ public static class MultiplayerChecks {
         CheckSleepWaitsForEveryone(data);
         CheckGuestSaveRoundTrip(data);
         CheckBrokenGuestSavesStartEmpty(data);
+        CheckInventoryAndRecoveryCommands(data);
     }
 
     private static void Require(bool condition, string message) {
         if (!condition) throw new InvalidOperationException($"Multiplayer check failed: {message}");
+    }
+
+    private static void CheckInventoryAndRecoveryCommands(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        guest.Backpack.Add("wood", 10); guest.Backpack.Add("stone", 2);
+        world.Run(guest, new Command("transfer_slot", 0, 0, "wood", 4, new Vector2(0, 7)));
+        Require(guest.Backpack.Layout[7].Item == "wood" && guest.Backpack.Layout[7].Count == 4 && guest.Backpack["wood"] == 10,
+            "a guest's explicit slot move should preserve all units and land in the requested slot");
+        world.Run(guest, new Command("transfer_slot", 0, 0, "stone", 1, new Vector2(0, 8)));
+        Require(guest.Backpack.Layout[8].Item == "", "a stale drag must not move a different item now in its source slot");
+        world.Run(guest, new Command("sort_bag", 0, 0, "", 0, default));
+        Require(guest.Backpack.Layout[0].Item == "stone" && guest.Backpack.Layout[1].Item == "wood" && guest.Backpack.Layout[1].Count == 10,
+            "guest sorting should stack and sort only that player's backpack");
+        Require(world.S.Backpack.Count == 0, "a guest's inventory commands must not change the host's bag");
+        world.Run(guest, new Command("transfer_slot", 0, 0, "wood", 10, new Vector2(1, 9)));
+        var returningWorld = new World(data, false);
+        var returning = returningWorld.AddGuest(GuestId, world.ExportPlayer(guest));
+        Require(returning.Backpack.Layout[9].Item == "wood" && returning.Backpack.Layout[0].Item == "stone",
+            "a guest leaving and rejoining must retain their exact inventory positions");
+        var legacy = new PlayerState(); legacy.Backpack.Items["water"] = 64; legacy.Backpack.Items["wood"] = 1;
+        var legacyWorld = new World(data, false);
+        var migrated = legacyWorld.AddGuest(GuestId, System.Text.Json.JsonSerializer.Serialize(legacy, GameData.Json));
+        Require(migrated.Backpack["wood"] == 1 && migrated.Backpack["water"] + legacyWorld.S.Things.Where(t => t.Kind == "grave").Sum(t => t.Inventory["water"]) == 64,
+            "a legacy guest's stacked bottles must migrate without rejecting or losing the rest of their bag");
+
+        var copy = new World(data, false); copy.S.Backpack.Add("wood", 10);
+        var sent = new List<Command>(); copy.Host = sent.Add;
+        copy.TransferSlot(copy.S.Backpack, copy.S.Backpack, 0, 4, "wood", 3); copy.SortBackpack();
+        Require(sent.Select(c => c.Verb).SequenceEqual(new[] { "transfer_slot", "sort_bag" }) && copy.S.Backpack.Layout[0].Count == 10,
+            "a guest copy must forward layout actions without changing its local mirror");
+
+        var dropper = new World(data, false); var shelf = dropper.Add("chest", dropper.Player + new Vector2(1, 0));
+        shelf.Inventory.Add("stone", 1); dropper.S.Backpack.Add("wood", 3);
+        int woodSlot = dropper.S.Backpack.Layout.FindIndex(slot => slot.Item == "wood");
+        Require(dropper.TransferSlot(dropper.S.Backpack, shelf.Inventory, woodSlot, 0, "wood", 3) == 3 && shelf.Inventory["wood"] == 3 && shelf.Inventory.Layout[0].Item == "stone",
+            "a drop on another item's cell in a chest should store the stack in a free cell");
+
+        guest.RespawnIn = 20; world.S.Time = data.DaySeconds * .9f;
+        float time = world.S.Time;
+        world.Run(guest, new Command("skip_morning", 0, 0, "", 0, default));
+        Require(world.S.Time == time, "a guest must not skip the night while the host lives");
+        world.S.RespawnIn = 20;
+        world.Run(guest, new Command("skip_morning", 0, 0, "", 0, default));
+        Require(world.S.Time > time && guest.RespawnIn == 0 && world.S.RespawnIn == 0,
+            "a downed guest should be able to skip when the host is down too, in that guest's action context");
     }
 
     private static (World World, PlayerState Guest, List<string> Heard) Hosted(GameData data) {
