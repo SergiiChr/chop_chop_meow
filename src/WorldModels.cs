@@ -74,7 +74,7 @@ public static class WorldModels {
         "tree" => (t.Id % TreeVariants) switch {
             1 => new[] { new Hit(.3f, 0, 1.2f), new Hit(1.25f, 1.2f, 5.6f) },
             2 => new[] { new Hit(.25f, 0, 2.6f), new Hit(1.05f, 2.6f, 5.4f) },
-            _ => new[] { new Hit(.35f, 0, 2.5f), new Hit(1.45f, 2.5f, 5.3f) },
+            _ => new[] { new Hit(.35f, 0, 2.5f), new Hit(1.8f, 2.5f, 5.3f) },
         },
         "stone" => new[] { new Hit(.75f, 0, .9f) },
         "iron" or "coal" or "tin" => new[] { new Hit(.8f, 0, 1) },
@@ -198,7 +198,9 @@ public static class WorldModels {
         float scale = .9f + Jitter(id, 2) * .22f;
         sway.Scale = Vector3.One * scale;
         int variant = (id / TreeVariants) % NatureShape.Variants;
-        Add(sway, (id % TreeVariants) switch { 1 => NatureShape.Spruce(variant), 2 => NatureShape.Birch(variant), _ => NatureShape.Oak(variant) }, NatureShape.Natural, Vector3.Zero);
+        if (Tree3DShape.Enabled) Tree3DShape.Add(sway, id % TreeVariants, variant);
+        else Add(sway, (id % TreeVariants) switch { 1 => NatureShape.Spruce(variant), 2 => NatureShape.Birch(variant), _ => NatureShape.Oak(variant) }, NatureShape.Natural, Vector3.Zero);
+        PreserveShadows(sway);
         var stump = Add(prop.Root, NatureShape.Stump, NatureShape.Natural, Vector3.Zero);
         stump.Visible = false;
         prop.Stump = stump;
@@ -228,9 +230,11 @@ public static class WorldModels {
 
     private static void Bush(Prop prop, int id) {
         int variant = id % NatureShape.Variants;
-        Add(prop.Body, NatureShape.Bush(variant), NatureShape.Natural, Vector3.Zero);
+        Mesh? leaves = null;
+        if (Tree3DShape.Enabled) leaves = Tree3DShape.Add(prop.Body, 3, variant);
+        else Add(prop.Body, NatureShape.Bush(variant), NatureShape.Natural, Vector3.Zero);
         var fruit = Pivot(prop.Body, Vector3.Zero);
-        Add(fruit, NatureShape.Berries(variant), NatureShape.Glossy, Vector3.Zero);
+        Add(fruit, leaves != null ? NatureShape.CardBerries(leaves, variant) : NatureShape.Berries(variant), NatureShape.Glossy, Vector3.Zero);
         prop.Fruit = fruit;
     }
 
