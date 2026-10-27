@@ -947,6 +947,22 @@ public partial class Game : Node {
         view.Zoom = 1.25f;
     }
     private void Showcase() {
+        int environmentAt = Array.IndexOf(launchArgs, "--environment-review");
+        if (environmentAt >= 0) {
+            string location = environmentAt + 1 < launchArgs.Length ? launchArgs[environmentAt + 1] : "forest";
+            world.Player = location switch {
+                "lake" => Terrain.Lake + Terrain.Seaward * 3,
+                "terrain" => Terrain.Point(125, -18),
+                _ => World.Spawn,
+            };
+            world.S.Time = world.Data.DaySeconds * .2f;
+            world.S.Workers.Clear(); world.S.Orders.Clear();
+            world.Tick(0);
+            view.EnvironmentReview = true;
+            view.Zoom = location switch { "lake" => .44f, "terrain" => .24f, _ => .75f };
+            ClosePanel(); ui.Visible = false; paused = true;
+            return;
+        }
         if (OS.GetCmdlineUserArgs().Contains("--bushes")) {
             // A clean three-bush comparison row, with one picked-clean bush to show its persistent model.
             var at = World.Spawn + new Vector2(9, 9);

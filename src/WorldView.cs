@@ -27,6 +27,8 @@ public partial class WorldView : Node3D {
     public string? SelectedTool;
     public bool Paused;
     public bool AnimationReview;
+    /// <summary>Fixed daylight landscape fixture for matching environment trial screenshots.</summary>
+    public bool EnvironmentReview;
     public float Elapsed;
     public bool PanelOpen;
     public Sounds? Sounds;
@@ -140,7 +142,7 @@ public partial class WorldView : Node3D {
     // Made once: passing a plain string converts it to a new StringName on every call.
     private static readonly StringName FogPlayer = "player", FogRadius = "radius", FogMemory = "memory";
     private void UpdateFog() {
-        if (AnimationReview) { fog.SetShaderParameter(FogRadius, 1e6f); return; }
+        if (AnimationReview || EnvironmentReview) { fog.SetShaderParameter(FogRadius, 1e6f); return; }
         fog.SetShaderParameter(FogPlayer, World.Player);
         fog.SetShaderParameter(FogRadius, World.Data.SightRadius);
         fog.SetShaderParameter(FogMemory, new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
@@ -336,7 +338,7 @@ public partial class WorldView : Node3D {
         Elapsed += dt;
         SyncCamera();
         if (AnimationReview) { UpdateReview(); UpdateFog(); overlay.QueueRedraw(); return; }
-        if (dt > 0) UpdateActors(dt);
+        if (dt > 0 || EnvironmentReview) UpdateActors(dt);
         SyncThings(dt);
         if (dt > 0) { SyncWolves(dt); SyncCarts(dt); }
         UpdateEffects(dt);
@@ -904,6 +906,10 @@ public partial class WorldView : Node3D {
     }
 
     private void UpdateMarkers() {
+        if (EnvironmentReview) {
+            selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = placeTile.Visible = false;
+            return;
+        }
         Mark(selectRing, World.Find(Selected), 0);
         Mark(hoverRing, Hover != Selected ? World.Find(Hover) : null, .004f);
         Worker? worker = null;
@@ -961,6 +967,7 @@ public partial class WorldView : Node3D {
     }
 
     private void PaintOverlay() {
+        if (EnvironmentReview) return;
         if (World == null) return;
         if (AnimationReview) { PaintReview(); return; }
         foreach (var t in World.S.Things) {

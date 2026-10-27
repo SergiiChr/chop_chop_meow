@@ -40,7 +40,8 @@ public partial class WorldView {
         BuildLake(parent);
         BuildMountains(parent);
         foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
-        BuildTufts(parent);
+        if (OS.GetCmdlineUserArgs().Contains("--proton-scatter")) BuildPlacedEnvironment(parent);
+        else BuildTufts(parent);
     }
 
     /// <summary>Sea beyond a sandy shore along the valley's mouth; it runs past the map so the coast is its edge.</summary>
