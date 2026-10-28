@@ -104,6 +104,11 @@ public partial class Game {
             sounds.MusicVolume = (float)value / 100;
         };
         musicRow.AddChild(slider);
+        var taaRow = new HBoxContainer(); screen.AddChild(taaRow);
+        var taaLabel = Label("Temporal anti-aliasing"); taaLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; taaRow.AddChild(taaLabel);
+        var taa = new CheckButton { Name = "taa", ButtonPressed = SavedTaa(), FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
+        taa.Toggled += on => { StoreSetting("display", "taa", on); GetViewport().UseTaa = on; };
+        taaRow.AddChild(taa);
         AddScreenButton("Back · Esc", back);
     }
 
@@ -112,6 +117,7 @@ public partial class Game {
         new Vector2I(ProjectSettings.GetSetting("display/window/size/viewport_width").AsInt32(), ProjectSettings.GetSetting("display/window/size/viewport_height").AsInt32()));
 
     private static int SavedFrameLimit() => Setting("display", "frame_limit", 0);
+    private static bool SavedTaa() => Setting("display", "taa", true);
 
     private static T Setting<[MustBeVariant] T>(string section, string key, T fallback) {
         var config = new ConfigFile(); config.Load(SettingsPath);

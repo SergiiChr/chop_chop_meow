@@ -44,6 +44,8 @@ Play accepts Godot arguments after `--`:
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
 | `--screenshot /tmp/chop.png` | Capture the running view after startup and exit |
+| `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
+| `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--animation-review` | Show every actor action on rotating rigs |
 | `--animation-capture /tmp/directory` | Capture the animation review frames for visual inspection |
 
@@ -74,7 +76,9 @@ The game opens on a start menu with Continue (the most recent save), New game, L
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
 
-Options holds a window resolution picker, a frame rate limit (off, 60 or 90 fps) and a music volume slider. The resolution and frame rate choices are stored in `settings.cfg` and applied at launch.
+Options holds a window resolution picker, a frame rate limit (off, 60 or 90 fps), a temporal anti-aliasing switch (on by default) and a music volume slider. The display choices are stored in `settings.cfg` and applied at launch.
+
+Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player. Footpaths wear in where the player and workers walk and slowly grow back; they are not saved. Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), and world sounds pan with their place on screen. A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety. Shrubs, pebbles and twigs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading, and the meadow has soft lusher and drier patches.
 
 ## Controls
 

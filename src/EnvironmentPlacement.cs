@@ -50,28 +50,34 @@ public partial class WorldView {
                     float radius = (.35f + ((id + lobe * 3) % 7) * .05f) * size;
                     var offset = new Vector3(MathF.Cos(angle) * .23f, radius * .35f, MathF.Sin(angle) * .23f);
                     var shrubBasis = new Basis(Vector3.Up, angle).Scaled(new Vector3(radius, radius * .75f, radius));
-                    bushes.Add((new Transform3D(shrubBasis, To3(p) + offset), new Color("466130").Lerp(new Color("5b7a3c"), ((id + lobe) % 5) / 4f)));
+                    bushes.Add((new Transform3D(shrubBasis, To3(p) + offset), new Color("527238").Lerp(new Color("6a8a45"), ((id + lobe) % 5) / 4f)));
+                    ShadeScenery(p + new Vector2(offset.X, offset.Z), radius * 1.1f, .45f);
                 }
             }
             if (id % 127 == 0) {
                 stones.Add((new Transform3D(basis.Scaled(new Vector3(.24f, .12f, .19f)), To3(p, .06f)), new Color("939184")));
+                ShadeScenery(p, .3f * size, .6f);
             } else if (id % 293 == 0) {
                 branches.Add((new Transform3D(basis, To3(p, .06f)), new Color("78644a")));
+                ShadeScenery(p, .3f * size, .3f);
             } else if (id % 13 == 0 && density > .02f) {
                 ferns.Add((at, new Color("56783e").Lerp(new Color("829552"), (id % 7) / 7f)));
+                ShadeScenery(p, .45f * size, .35f);
             } else {
                 grass.Add((at, new Color("678049").Lerp(new Color("9aa46a"), (id % 11) / 11f)));
+                ShadeScenery(p, .3f * size, .45f);
                 if (id % 19 == 0 && density > .12f)
                     flowers.Add((new Transform3D(basis, To3(p, .26f)), id % 3 == 0 ? new Color("e7ca73") : new Color("d6c5df")));
             }
         }
-        Scatter(parent, MeadowMesh(), grass);
-        Scatter(parent, FernMesh(), ferns);
-        Scatter(parent, NatureShape.Scrub, bushes, false);
-        Scatter(parent, new SphereMesh { Radius = .055f, Height = .06f, RadialSegments = 5, Rings = 3 }, flowers);
-        Scatter(parent, new SphereMesh { Radius = 1, Height = 2, RadialSegments = 7, Rings = 4 }, stones, false);
+        Scatter(parent, MeadowMesh(), grass, dressingMaterial);
+        Scatter(parent, FernMesh(), ferns, dressingMaterial);
+        // All scenery darkens the baked ground shade; shrubs, pebbles and twigs are also few and large enough to cast real shadows.
+        Scatter(parent, NatureShape.Scrub, bushes, solidDressingMaterial, true);
+        Scatter(parent, new SphereMesh { Radius = .055f, Height = .06f, RadialSegments = 5, Rings = 3 }, flowers, dressingMaterial);
+        Scatter(parent, new SphereMesh { Radius = 1, Height = 2, RadialSegments = 7, Rings = 4 }, stones, stillDressingMaterial, true);
         Scatter(parent, new CylinderMesh { TopRadius = .045f, BottomRadius = .07f, Height = .8f, RadialSegments = 5 },
-            RotateBranches(branches), false);
+            RotateBranches(branches), stillDressingMaterial, true);
         GD.Print($"PROTON-SCATTER: {grass.Count} meadow patches, {ferns.Count} ferns, {bushes.Count / 3} bushes, {flowers.Count} flowers, {stones.Count} pebbles, {branches.Count} twigs (baked candidates: {index})");
     }
 

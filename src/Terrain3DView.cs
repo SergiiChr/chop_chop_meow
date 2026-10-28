@@ -9,7 +9,8 @@ public partial class WorldView {
     private Node3D? terrainTarget;
     // RenderingServer uniforms take RIDs, so retain the texture resource for their lifetime.
     private Texture2D? terrainGrass;
-    private static readonly StringName TerrainFogPlayer = "trial_player", TerrainFogRadius = "trial_radius", TerrainFogMemory = "trial_memory";
+    /// <summary>Soft noise over the whole map, about fifteen tiles a blob, for lusher and drier patches of meadow.</summary>
+    private readonly NoiseTexture2D terrainPatches = new() { Width = 256, Height = 256, Noise = new FastNoiseLite { Seed = 913, Frequency = .05f, FractalOctaves = 3 } };
 
     /// <summary>Native Terrain3D clipmaps render the existing valley, with its flat playable floor and mountain heights.</summary>
     private void BuildTerrain3D(Node3D parent, Texture2D grass) {
@@ -68,8 +69,10 @@ public partial class WorldView {
         terrainMaterialRid = material.Call("get_material_rid").AsRid();
         terrainGrass = grass;
         RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_grass", grass.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_patches", terrainPatches.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_disturbance", disturbanceTexture.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_explored", exploredTexture.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_shade", sceneryShadeTexture.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_contact", objectShadeTexture.GetRid());
         var mines = new Vector4[World.Cliffs.Length];
         for (int i = 0; i < mines.Length; i++) {
             var cliff = World.Cliffs[i]; var at = World.MineSpot(cliff);
@@ -79,11 +82,8 @@ public partial class WorldView {
         GD.Print($"TERRAIN3D: v1.1.0-rc1, 9 regions, {regionSize}² samples/region; playable floor {floor:0.000}");
     }
 
-    private void UpdateTerrainFog(float radius, Color memory) {
-        if (!terrainMaterialRid.IsValid) return;
-        terrainTarget!.Position = To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
-        RenderingServer.MaterialSetParam(terrainMaterialRid, TerrainFogPlayer, World.Player);
-        RenderingServer.MaterialSetParam(terrainMaterialRid, TerrainFogRadius, radius);
-        RenderingServer.MaterialSetParam(terrainMaterialRid, TerrainFogMemory, memory);
+    /// <summary>Keeps Terrain3D's finest detail under the view.</summary>
+    private void UpdateTerrainTarget() {
+        if (terrainTarget != null) terrainTarget.Position = To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
     }
 }

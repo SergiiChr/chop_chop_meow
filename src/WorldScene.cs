@@ -41,7 +41,7 @@ public partial class WorldView {
     }
 
     /// <summary>Sea and its feathered bank follow the coastline at the valley's mouth.</summary>
-    private void BuildSea(Node3D parent) => RegisterShoreline(ShorelineAppearance.BuildCoast(parent));
+    private void BuildSea(Node3D parent) => ShorelineAppearance.BuildCoast(parent);
 
     /// <summary>A jagged wall of faceted columns with ore seams on the face and scree at its foot.</summary>
     private static void BuildCliff(Node3D parent, Cliff cliff) {
@@ -75,7 +75,7 @@ public partial class WorldView {
         var at = To3(Terrain.Lake);
         // The bank and water follow the same shore line that bounds walking.
         float Shore(float angle) => Terrain.Shore(angle);
-        RegisterShoreline(ShorelineAppearance.BuildLakeBank(parent));
+        ShorelineAppearance.BuildLakeBank(parent);
         LakeAppearance.BuildLakeAppearance(parent);
         var rng = new Random(77);
         const int stones = 150;
@@ -103,13 +103,12 @@ public partial class WorldView {
         }
     }
 
-    private void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items, bool twoSided = true) {
+    private static void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items, ShaderMaterial material, bool castShadow = false) {
         var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = mesh, InstanceCount = items.Count };
         for (int i = 0; i < items.Count; i++) { multi.SetInstanceTransform(i, items[i].At); multi.SetInstanceColor(i, items[i].Color); }
-        var material = twoSided ? dressingMaterial : solidDressingMaterial;
-        var instance = new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        var shadow = castShadow ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.Off;
+        var instance = new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material, CastShadow = shadow };
         parent.AddChild(instance);
-        instance.MaterialOverlay = dressingFog;
     }
 
     // ---------- Particles: chips, leaves, sparks, splashes, embers and smoke ----------

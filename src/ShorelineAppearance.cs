@@ -21,7 +21,7 @@ internal static class ShorelineAppearance {
         tool.AddVertex(new Vector3(p.X, .013f, p.Y));
     }
 
-    public static MeshInstance3D BuildLakeBank(Node3D parent) {
+    public static void BuildLakeBank(Node3D parent) {
         var tool = new SurfaceTool(); tool.Begin(Mesh.PrimitiveType.Triangles);
         const int segments = 192, rings = 5;
         void At(float angle, float t) {
@@ -37,12 +37,10 @@ internal static class ShorelineAppearance {
                 At(a, inner); At(a, outer); At(b, outer);
                 At(a, inner); At(b, outer); At(b, inner);
             }
-        var bank = new MeshInstance3D { Name = "SoftLakeBank", Mesh = tool.Commit(), MaterialOverride = BankMaterial(false), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-        parent.AddChild(bank);
-        return bank;
+        parent.AddChild(new MeshInstance3D { Name = "SoftLakeBank", Mesh = tool.Commit(), MaterialOverride = BankMaterial(false), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
-    public static MeshInstance3D BuildCoast(Node3D parent) {
+    public static void BuildCoast(Node3D parent) {
         var bank = new SurfaceTool(); bank.Begin(Mesh.PrimitiveType.Triangles);
         const float step = .75f;
         void At(float across, float t) {
@@ -56,8 +54,7 @@ internal static class ShorelineAppearance {
                 At(across, a); At(across, b); At(across + step, b);
                 At(across, a); At(across + step, b); At(across + step, a);
             }
-        var bankInstance = new MeshInstance3D { Name = "SoftCoastalBank", Mesh = bank.Commit(), MaterialOverride = BankMaterial(true), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
-        parent.AddChild(bankInstance);
+        parent.AddChild(new MeshInstance3D { Name = "SoftCoastalBank", Mesh = bank.Commit(), MaterialOverride = BankMaterial(true), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 
         var water = new SurfaceTool(); water.Begin(Mesh.PrimitiveType.Triangles);
         float[] bands = { 0, .3f, 1, 2.5f, 6, 14, 40, 400 };
@@ -75,6 +72,5 @@ internal static class ShorelineAppearance {
         var material = LakeAppearance.CreateMaterial();
         material.SetShaderParameter("coastal", true);
         parent.AddChild(new MeshInstance3D { Name = "CoastalWater", Mesh = water.Commit(), MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
-        return bankInstance;
     }
 }

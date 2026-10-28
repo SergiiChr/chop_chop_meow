@@ -66,22 +66,28 @@ public partial class WorldView : Node3D {
     private static readonly StandardMaterial3D GhostValid = Flat(new Color(.55f, .95f, .45f, .45f));
     private static readonly StandardMaterial3D GhostBlocked = Flat(new Color(1, .35f, .3f, .5f));
     private static readonly StandardMaterial3D NightGlass = Mat("ffd58a", .3f, 0, 1.6f);
-    private readonly ShaderMaterial fog = new() { Shader = new Shader { Code = FogShader } };
+    private readonly ShaderMaterial fog = new() { Shader = new Shader { Code = FogShader }, RenderPriority = (int)Material.RenderPriorityMax };
     private Image explored = null!;
     private ImageTexture exploredTexture = null!;
     private int exploredRevision = -1;
-    // Drawn over every mesh: black where never explored, a grey wash over remembered ground, clear inside the sight circle.
+    // Drawn once over the whole screen after everything else: black where never explored, a grey wash over remembered ground, clear inside the sight circle.
+    // Each pixel's place comes from the depth buffer, so swaying leaves and grass and cut-out leaf cards are covered exactly as drawn.
     // Texel centres sit on whole tiles, matching where the simulation measures sight.
     private const string FogShader = """
         shader_type spatial;
-        render_mode unshaded, blend_mix, depth_draw_never, cull_disabled, shadows_disabled;
+        render_mode unshaded, blend_mix, depth_draw_never, depth_test_disabled, cull_disabled, shadows_disabled, fog_disabled;
+        uniform sampler2D depth : hint_depth_texture, filter_nearest;
         uniform sampler2D explored : filter_linear, repeat_disable;
         uniform vec2 player;
         uniform float radius;
         uniform float map_size;
         uniform vec3 memory : source_color;
+        void vertex() {
+            POSITION = vec4(VERTEX.xy, 1.0, 1.0);
+        }
         void fragment() {
-            vec2 at = (INV_VIEW_MATRIX * vec4(VERTEX, 1.0)).xz;
+            vec4 view = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, texture(depth, SCREEN_UV).r, 1.0);
+            vec2 at = (INV_VIEW_MATRIX * vec4(view.xyz / view.w, 1.0)).xz;
             float seen = texture(explored, (at + 0.5) / map_size).r;
             float live = 1.0 - smoothstep(radius - 1.5, radius, distance(at, player));
             ALBEDO = memory * seen;
@@ -99,19 +105,30 @@ public partial class WorldView : Node3D {
             BackgroundColor = new Color("879c69"),
             AmbientLightSource = Godot.Environment.AmbientSource.Color,
             AmbientLightColor = new Color("c7d3dc"),
-            AmbientLightEnergy = .32f,
+            AmbientLightEnergy = DayAmbientEnergy,
+            // Light bounced from what is on screen, such as firelight off the ground onto nearby walls.
+            SsilEnabled = true,
         };
         AddChild(new WorldEnvironment { Environment = environment });
         // UpdateLighting moves it along the day's arc.
-        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = .8f };
+        // One shadow map covers the whole view: split maps leave a seam across this tilted overhead view and their soft edges jump as the camera moves.
+        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, ShadowBias = .02f, ShadowNormalBias = .4f, LightAngularDistance = 2, LightEnergy = DaySun };
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
         explored = Image.CreateFromData(World.MapSize, World.MapSize, false, Image.Format.L8, World.S.Explored);
         exploredTexture = ImageTexture.CreateFromImage(explored);
         fog.SetShaderParameter("explored", exploredTexture);
         fog.SetShaderParameter("map_size", World.MapSize);
-        GetTree().NodeAdded += Fog;
+        // A screen-sized quad on the camera; its shader places it over the whole view, so it is never culled and casts no shadow.
+        camera.AddChild(new MeshInstance3D {
+            Mesh = new QuadMesh { Size = new Vector2(2, 2) },
+            MaterialOverride = fog,
+            Position = new Vector3(0, 0, -2),
+            ExtraCullMargin = 16384,
+            CastShadow = GeometryInstance3D.ShadowCastingSetting.Off
+        });
         BuildGround(scene);
+        BuildLook();
         BuildEffects(scene);
         PileShape.Warm(World.Data);
         WorldModels.Warm();
@@ -134,42 +151,15 @@ public partial class WorldView : Node3D {
         return ring;
     }
 
-    public override void _ExitTree() { World.PlayerActed -= PlayerActed; GetTree().NodeAdded -= Fog; }
-
-    /// <summary>Every mesh in the scene, including ones spawned later, takes the fog as its overlay.</summary>
-    private void Fog(Node node) {
-        if (node is GeometryInstance3D geometry && scene.IsAncestorOf(geometry)) geometry.MaterialOverlay = fog;
-    }
+    public override void _ExitTree() => World.PlayerActed -= PlayerActed;
 
     // Made once: passing a plain string converts it to a new StringName on every call.
     private static readonly StringName FogPlayer = "player", FogRadius = "radius", FogMemory = "memory";
-    private readonly List<ShaderMaterial> shoreMaterials = new(2);
-    private static readonly StringName ShorePlayer = "shore_player", ShoreRadius = "shore_radius", ShoreMemory = "shore_memory";
-
-    private void RegisterShoreline(MeshInstance3D bank) {
-        // A transparent bank must apply fog in its own pass; an opaque overlay cannot mask its feathered edge.
-        bank.MaterialOverlay = null;
-        var material = (ShaderMaterial)bank.MaterialOverride;
-        material.SetShaderParameter("shore_explored", exploredTexture);
-        shoreMaterials.Add(material);
-    }
 
     private void UpdateFog() {
         bool clearReview = AnimationReview || EnvironmentReview && !EnvironmentReviewFog;
-        float radius = clearReview ? 1e6f : World.Data.SightRadius;
-        var memory = new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night);
-        UpdateTerrainFog(radius, memory);
-        dressingFog.SetShaderParameter(FogPlayer, World.Player);
-        dressingFog.SetShaderParameter(FogRadius, radius);
-        dressingFog.SetShaderParameter(FogMemory, memory);
-        foreach (var shore in shoreMaterials) {
-            shore.SetShaderParameter(ShorePlayer, World.Player);
-            shore.SetShaderParameter(ShoreRadius, radius);
-            shore.SetShaderParameter(ShoreMemory, memory);
-        }
-        if (clearReview) { fog.SetShaderParameter(FogRadius, 1e6f); return; }
         fog.SetShaderParameter(FogPlayer, World.Player);
-        fog.SetShaderParameter(FogRadius, World.Data.SightRadius);
+        fog.SetShaderParameter(FogRadius, clearReview ? 1e6f : World.Data.SightRadius);
         fog.SetShaderParameter(FogMemory, new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
         if (exploredRevision == World.ExploredRevision) return;
         exploredRevision = World.ExploredRevision;
@@ -290,18 +280,19 @@ public partial class WorldView : Node3D {
     }
 
     private readonly List<Thing> picking = new();
+    private const float StumpHeight = 1.3f;
     /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit cylinders.</summary>
     public Thing? Pick(Vector2 screen) {
         SyncCamera();
-        Thing? best = null, crown = null; float nearest = float.MaxValue, nearestCrown = float.MaxValue;
+        Thing? best = null; float nearest = float.MaxValue;
         // Hits follow what is drawn, including memories, but only things that still exist can be picked.
         World.CollectKnown(picking);
         foreach (var drawn in picking) {
             if (drawn.Remaining <= 0 && drawn.IsResource && drawn.Kind != "berries" || World.Find(drawn.Id) is not Thing t) continue;
             var hits = HitsOf(drawn);
-            // A tree's first hit is its trunk; a crown only wins when nothing else is under the cursor, so things behind it stay clickable.
-            if (t.Kind == "tree" && !RayHits(screen, t.Pos, hits.AsSpan(0, Math.Min(1, hits.Length)), out _)) {
-                if (RayHits(screen, t.Pos, hits.AsSpan(Math.Min(1, hits.Length)), out float c) && c < nearestCrown) { nearestCrown = c; crown = t; }
+            // Only the foot of a tree's trunk, its first hit, picks the tree, so a click among the crowns of a forest reaches the ground and swings.
+            if (t.Kind == "tree") {
+                if (hits.Length > 0 && RayHits(screen, t.Pos, [hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) }], out float s) && s < nearest) { nearest = s; best = t; }
                 continue;
             }
             if (RayHits(screen, t.Pos, hits, out float d) && d < nearest) { nearest = d; best = t; }
@@ -310,7 +301,7 @@ public partial class WorldView : Node3D {
         var point = ToWorld(screen);
         if (Terrain.WaterRing(point) && World.Sees(point))
             foreach (var thing in World.S.Things) if (thing.Kind == "water") return thing;
-        return crown;
+        return null;
     }
 
     private static readonly Hit[] PersonHit = { new(.38f, 0, 1.75f) };
@@ -370,6 +361,7 @@ public partial class WorldView : Node3D {
         UpdateEffects(dt);
         UpdateMarkers();
         UpdateLighting();
+        UpdateLook(dt);
         UpdateFog();
         overlay.QueueRedraw();
     }
@@ -465,8 +457,9 @@ public partial class WorldView : Node3D {
     private void Torch(ActorRig rig, ActorState state, bool lit, float flare, Vector2? at) {
         rig.Flame.Visible = lit;
         if (lit) {
-            float flicker = MathF.Sin(Elapsed * 13) * .5f + MathF.Sin(Elapsed * 29 + 1) * .5f; flare /= .5f;
-            rig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + MathF.Abs(MathF.Sin(Elapsed * 11)) * .3f, 1 - flicker * .1f) * (1 + flare * .25f);
+            // A slow flicker: a fast one makes the shadows the torch casts jitter.
+            float slow = Elapsed / 3, flicker = MathF.Sin(slow * 13) * .5f + MathF.Sin(slow * 29 + 1) * .5f; flare /= .5f;
+            rig.Flame.Scale = new Vector3(1 + flicker * .1f, .85f + MathF.Abs(MathF.Sin(slow * 11)) * .3f, 1 - flicker * .1f) * (1 + flare * .25f);
             // A swing fans the flame: the lit circle grows by a fifth and settles back.
             rig.TorchLight.OmniRange = 5 * (1 + .2f * flare);
             rig.TorchLight.LightEnergy = (1 + flicker * .25f + flare * .3f) * (.3f + night * 1.3f);
@@ -973,20 +966,17 @@ public partial class WorldView : Node3D {
         ring.Scale = new Vector3(radius, 1, radius);
     }
 
-    private static readonly Color NoonLight = new("fff1dc"), LowSunLight = new("ffb070"), MoonLight = new("8296d6");
+    // Strong sun against weak ambient light keeps shaded sides and shadows dark enough to show shapes.
+    private const float DaySun = 1, DayAmbientEnergy = .22f;
+    private static readonly Color NoonLight = new("ffeccc"), LowSunLight = new("ffb070"), MoonLight = new("8296d6");
     private static readonly Color DayAmbient = new("c7d3dc"), LowSunAmbient = new("d9c3ad"), NightAmbient = new("33447a");
     private static readonly Color DayGround = new("879c69"), NightGround = new("1b2733");
     /// <summary>The noon light's heading across the ground, from the upper left and slightly behind so shadows fall to the right.</summary>
     private static readonly Vector2 NoonHeading = new Vector2(1, -.45f).Normalized();
-    /// <summary>Positions the sun or moon takes on its way across the sky.</summary>
-    private const float SunSteps = 1200;
     /// <summary>Full moonlight is faint, so night stays dark with barely a shadow.</summary>
     private const float MoonEnergy = .05f;
     /// <summary>Night's ambient light without a moon: dark enough that fires and torches matter.</summary>
     private const float NewMoonAmbient = .1f;
-    /// <summary>Where the light was last pointed, so it is turned only when it moves on.</summary>
-    private float skyStep = -1;
-    private bool skyMoon;
 
     private void UpdateLighting() {
         // The sun rises at dawn and sets halfway through dusk, then the moon takes the same path until dawn.
@@ -997,23 +987,18 @@ public partial class WorldView : Node3D {
         bool moon = World.MoonUp;
         float arc = World.SkyArc;
         float height = MathF.Sin(MathF.PI * arc);
-        // Shadow edges crawl while their light turns, so the direction moves in steps of about an eighth of a degree; brightness and colour stay smooth.
-        float step = MathF.Round(arc * SunSteps) / SunSteps, stepHeight = MathF.Sin(MathF.PI * step);
-        // The light only moves when it reaches the next step: a transform change makes the engine redo the light's work.
-        if (step != skyStep || moon != skyMoon) {
-            skyStep = step; skyMoon = moon;
-            float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, step)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 50, stepHeight));
-            var heading = NoonHeading.Rotated(swing);
-            sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
-        }
+        // The light turns a little every frame; the engine redraws the sun's shadows every frame anyway.
+        float swing = Mathf.DegToRad(Mathf.Lerp(-75, 75, arc)), elevation = Mathf.DegToRad(Mathf.Lerp(18, moon ? 35 : 40, height));
+        var heading = NoonHeading.Rotated(swing);
+        sun.Basis = Basis.LookingAt(new Vector3(heading.X * MathF.Cos(elevation), -MathF.Sin(elevation), heading.Y * MathF.Cos(elevation)), Vector3.Up);
         // The moon waxes and wanes over the month: a full moon lights the night sky, a new moon leaves only firelight to see by.
         float moonlight = World.Moonlight;
-        sun.LightEnergy = (moon ? MoonEnergy * moonlight : Mathf.Lerp(.8f, .08f, night)) * Mathf.SmoothStep(0, .25f, height);
+        sun.LightEnergy = (moon ? MoonEnergy * moonlight : Mathf.Lerp(DaySun, .08f, night)) * Mathf.SmoothStep(0, .25f, height);
         // A low sun gives warm light at sunrise and sunset.
         float low = moon ? 0 : 1 - Mathf.SmoothStep(.1f, .45f, height);
         sun.LightColor = NoonLight.Lerp(LowSunLight, low).Lerp(MoonLight, night);
         environment.AmbientLightColor = DayAmbient.Lerp(LowSunAmbient, low * .6f).Lerp(NightAmbient, night);
-        environment.AmbientLightEnergy = Mathf.Lerp(.32f, Mathf.Lerp(NewMoonAmbient, .3f, moonlight), night);
+        environment.AmbientLightEnergy = Mathf.Lerp(DayAmbientEnergy, Mathf.Lerp(NewMoonAmbient, .3f, moonlight), night);
         environment.BackgroundColor = DayGround.Lerp(NightGround, night);
     }
 

@@ -199,7 +199,7 @@ Snapshots are updated in place and keep only the look: no inventory, fire, heat 
 The view picks against what it draws but only returns things that still exist.
 
 `WorldView` hides wolves, workers and carts outside sight.
-It puts one overlay shader on every mesh: black on unexplored tiles, a grey wash on explored ones, clear inside the sight circle.
+It draws one screen-wide quad after everything else, placing each pixel in the world from the depth buffer: black on unexplored tiles, a grey wash on explored ones, clear inside the sight circle.
 
 ### Night and wolves
 

@@ -17,3 +17,14 @@ window/stretch/aspect="expand"
 
 [rendering]
 renderer/rendering_method="forward_plus"
+
+[shader_globals]
+
+wind={
+"type": "vec4",
+"value": Vector4(1, 0, 0, 0)
+}
+wind_push={
+"type": "vec4",
+"value": Vector4(0, 0, 0, 0)
+}

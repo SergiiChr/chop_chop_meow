@@ -22,7 +22,6 @@ vec3 N_DEG(float x, float z, float t, float steepness, float amplitude, float di
 }
 
 void vertex() {
-	// Keep the default vertex transform, exactly matching the exploration-fog overlay's depth.
 	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	// Mesh UVs are the normalized, lake-centred radius; 1 - length(UV) is shore distance.
 }

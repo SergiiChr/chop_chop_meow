@@ -83,6 +83,7 @@ public partial class Game : Node {
             var layer = new CanvasLayer(); AddChild(layer);
             ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
             SetTheme(); BuildHud();
+            GetViewport().UseTaa = SavedTaa();
             if (OS.GetCmdlineUserArgs().Contains("--showcase")) Showcase();
             else if (!OS.GetCmdlineUserArgs().Contains("--animation-review")) ShowStart();
             if (!OS.GetCmdlineUserArgs().Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { ApplyResolution(SavedResolution()); Engine.MaxFps = SavedFrameLimit(); }
@@ -1048,9 +1049,14 @@ public partial class Game : Node {
         var meat = world.Add("crate", world.Player); meat.Inventory.Add("burnt_steak", 12); world.PickUpCrate(meat);
         world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
         if (OS.GetCmdlineUserArgs().Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
+        // --day-phase sets the time of day from 0 at dawn, for comparing the light across the day.
+        int phase = Array.IndexOf(OS.GetCmdlineUserArgs(), "--day-phase");
+        if (phase >= 0) world.S.Time = world.Data.DaySeconds * float.Parse(OS.GetCmdlineUserArgs()[phase + 1], System.Globalization.CultureInfo.InvariantCulture);
         // A past walk toward the iron cliff leaves explored ground beyond the live sight circle.
         for (float d = 0; d <= 14; d += 2) { world.Player = World.Spawn + new Vector2(d * .5f, -d); world.Tick(0); }
         world.Player = World.Spawn; world.Tick(0); Select(bellows);
+        // --hide-ui leaves only the world in review screenshots.
+        if (OS.GetCmdlineUserArgs().Contains("--hide-ui")) ui.Visible = false;
         if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
         if (OS.GetCmdlineUserArgs().Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
         if (OS.GetCmdlineUserArgs().Contains("--craft")) OpenPage("craft");
