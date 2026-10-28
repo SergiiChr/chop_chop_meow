@@ -16,10 +16,10 @@ into the new mountains. The comparisons below record the original three trials.
 
 ProtonScatter generates 40,000 fixed-seed candidate transforms offline. The game
 loads the committed JSON once, filters wet ground, the clearing, cart trail,
-resource footprints and mine approaches, then builds five shared MultiMeshes:
-meadow patches, ferns, flowers, pebbles and twigs. These are decorative; resource
+resource footprints and mine approaches, then builds six shared MultiMeshes:
+meadow patches, ferns, ordinary bushes, flowers, pebbles and twigs. These are decorative; resource
 trees and berry bushes keep their simulation positions and gathering rules.
-The forest fixture contains 7,600 meadow patches, 331 ferns, 183 flowers,
+The forest fixture contains 7,600 meadow patches, 331 ferns, 269 bushes, 183 flowers,
 60 pebbles and 35 twigs. Existing default tufts are replaced only with the flag.
 The masks use the initial world layout; this trial does not clear individual
 decoration instances when a new building is placed during play.
@@ -34,6 +34,14 @@ See `assets/environment/proton_scatter/README.md` and its adjacent license.
 | Before | After |
 | --- | --- |
 | ![Original placement](../reviews/environment/01-placement-before.png) | ![ProtonScatter placement](../reviews/environment/01-placement-after.png) |
+
+The original trial omitted non-berry shrubs. The follow-up restores clustered
+shrubs with the same shared scrub mesh as the default scenery, sampled from the
+baked candidates without changing any other plant placements. It adds one
+MultiMesh during loading and no per-frame work. All appearance flags are enabled
+in this updated forest view:
+
+![Ordinary bushes restored](../reviews/environment/04-bushes-restored.png)
 
 Capture either view with the same camera and lighting:
 

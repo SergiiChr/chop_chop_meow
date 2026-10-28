@@ -12,6 +12,7 @@ public partial class WorldView {
         var grass = new List<(Transform3D At, Color Color)>();
         var flowers = new List<(Transform3D At, Color Color)>();
         var ferns = new List<(Transform3D At, Color Color)>();
+        var bushes = new List<(Transform3D At, Color Color)>();
         var stones = new List<(Transform3D At, Color Color)>();
         var branches = new List<(Transform3D At, Color Color)>();
         var patch = new FastNoiseLite { Seed = 671, Frequency = .18f, FractalOctaves = 2 };
@@ -41,6 +42,17 @@ public partial class WorldView {
             float yaw = point[2].GetSingle(), size = point[3].GetSingle();
             var basis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * size);
             var at = new Transform3D(basis, To3(p));
+            // Restore the ordinary shrubs alongside the new ground cover. Use the same
+            // dry-ground and access masks, and keep their sampling independent of other plants.
+            if (id % 31 == 0 && Terrain.FromMountains(p) >= 3 && p.DistanceTo(World.Spawn) >= 6) {
+                for (int lobe = 0; lobe < 3; lobe++) {
+                    float angle = yaw + lobe * Mathf.Tau / 3;
+                    float radius = (.35f + ((id + lobe * 3) % 7) * .05f) * size;
+                    var offset = new Vector3(MathF.Cos(angle) * .23f, radius * .35f, MathF.Sin(angle) * .23f);
+                    var shrubBasis = new Basis(Vector3.Up, angle).Scaled(new Vector3(radius, radius * .75f, radius));
+                    bushes.Add((new Transform3D(shrubBasis, To3(p) + offset), new Color("466130").Lerp(new Color("5b7a3c"), ((id + lobe) % 5) / 4f)));
+                }
+            }
             if (id % 127 == 0) {
                 stones.Add((new Transform3D(basis.Scaled(new Vector3(.24f, .12f, .19f)), To3(p, .06f)), new Color("939184")));
             } else if (id % 293 == 0) {
@@ -55,11 +67,12 @@ public partial class WorldView {
         }
         Scatter(parent, MeadowMesh(), grass);
         Scatter(parent, FernMesh(), ferns);
+        Scatter(parent, NatureShape.Scrub, bushes, false);
         Scatter(parent, new SphereMesh { Radius = .055f, Height = .06f, RadialSegments = 5, Rings = 3 }, flowers);
         Scatter(parent, new SphereMesh { Radius = 1, Height = 2, RadialSegments = 7, Rings = 4 }, stones, false);
         Scatter(parent, new CylinderMesh { TopRadius = .045f, BottomRadius = .07f, Height = .8f, RadialSegments = 5 },
             RotateBranches(branches), false);
-        GD.Print($"PROTON-SCATTER: {grass.Count} meadow patches, {ferns.Count} ferns, {flowers.Count} flowers, {stones.Count} pebbles, {branches.Count} twigs (baked candidates: {index})");
+        GD.Print($"PROTON-SCATTER: {grass.Count} meadow patches, {ferns.Count} ferns, {bushes.Count / 3} bushes, {flowers.Count} flowers, {stones.Count} pebbles, {branches.Count} twigs (baked candidates: {index})");
     }
 
     private static List<(Transform3D At, Color Color)> RotateBranches(List<(Transform3D At, Color Color)> branches) {
