@@ -1,9 +1,10 @@
 # Shoreline and mine blending
 
-Follow-up on `codex/terrain`. Use the existing trial flags:
+The shoreline and mine appearance changes are part of the default environment.
+The paired screenshots preserve historical before images for reference.
 
 ```sh
-./build.py play -- --tree3d --proton-scatter --lake-water --terrain3d
+./build.py play
 ```
 
 The lake and coast now share calm water shading. The coastline's uniform
@@ -43,23 +44,21 @@ cached site mesh during loading.
 ./tools/environment_review.py --shoreline
 ```
 
-This captures coast/lake before-and-after pairs and the current three mine
-views with fixed daylight, camera and shader time. Review fixtures now ignore
+This captures the current coast, lake-edge and three mine views with fixed
+daylight, camera and shader time. Review fixtures now ignore
 input so a mouse-wheel event cannot alter the comparison zoom. Mine before
 images were captured before the geometry edit and are retained as historical
 references. The fixture is for visual inspection, not a gameplay playthrough.
 
 For an individual view, use `--showcase --environment-review coast`,
 `--showcase --environment-review lake`, or
-`--showcase --environment-review mine --mine-ore iron`, along with the trial
-flags and `--screenshot /absolute/path.png`. Add `--review-fog` to inspect
-exploration fog. `--shoreline-baseline` restores the preceding waterline
-treatment for comparison.
+`--showcase --environment-review mine --mine-ore iron` with
+`--screenshot /absolute/path.png`. Add `--review-fog` to inspect exploration
+fog.
 
-Validation: compilation and C# formatting passed, as did the simulation,
-input/UI and two-process network checks. A separate input/UI run with all
-environment trials enabled passed at 109.3 bytes per walking frame against
-the existing 150-byte budget. Existing checks still enforce the low outcrop
+The historical validation recorded successful compilation and C# formatting,
+simulation, input/UI and two-process network checks. Existing checks still
+enforce the low outcrop
 height and fully buried rear edge. Forward+ screenshots cover both banks,
 all three ore sites and exploration-fog boundaries. Transparent banks apply
 fog in their own shader so they cannot reveal unexplored shorelines.

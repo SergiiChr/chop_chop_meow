@@ -14,12 +14,12 @@ public partial class WorldView {
     /// <summary>Native Terrain3D clipmaps render the existing valley, with its flat playable floor and mountain heights.</summary>
     private void BuildTerrain3D(Node3D parent, Texture2D grass) {
         const string extension = "res://addons/terrain_3d/terrain.gdextension";
-        if (!FileAccess.FileExists(extension)) throw new InvalidOperationException("Terrain3D is missing. Launch with ./build.py play -- --terrain3d to install the pinned runtime.");
+        if (!FileAccess.FileExists(extension)) throw new InvalidOperationException("Terrain3D is missing. Launch with ./build.py setup to install the pinned runtime.");
         var loaded = GDExtensionManager.LoadExtension(extension);
         if (loaded is not (GDExtensionManager.LoadStatus.Ok or GDExtensionManager.LoadStatus.AlreadyLoaded))
             throw new InvalidOperationException($"Terrain3D extension could not load: {loaded}");
         var terrain = (Node3D)ClassDB.Instantiate("Terrain3D").AsGodotObject()!;
-        terrain.Name = "Terrain3DTrial";
+        terrain.Name = "Landscape";
         terrainTarget = new Node3D { Name = "TerrainDetailTarget", Position = To3(World.Player) };
         parent.AddChild(terrainTarget);
         terrain.Set("clipmap_target", terrainTarget);

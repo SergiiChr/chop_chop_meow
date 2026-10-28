@@ -1,18 +1,17 @@
-# Environment trials
+# Default environment and historical trials
 
-All three trials are developed in sequence on `codex/terrain`. They are opt-in,
-and combine with the existing `--tree3d` vegetation trial. The ordinary launch
-keeps the existing landscape until the alternatives have been evaluated.
+The changes documented here began as separate trials on `codex/terrain` and are
+now part of the default game environment. The before/after images and trial
+notes below are historical records; the before images are retained for
+comparison and are not produced by the current capture script.
 
 The subsequent [shoreline and mine blending pass](SHORELINE_AND_MINES.md)
 extends the water shader to the coast, softens banks and blends the mine rock
-into the new mountains. The comparisons below record the original three trials.
+into the mountains.
 
 ## 1. Environment placement
 
-```sh
-./build.py play -- --tree3d --proton-scatter
-```
+Forest placement is enabled by default.
 
 ProtonScatter generates 40,000 fixed-seed candidate transforms offline. The game
 loads the committed JSON once, filters wet ground, the clearing, cart trail,
@@ -20,7 +19,8 @@ resource footprints and mine approaches, then builds six shared MultiMeshes:
 meadow patches, ferns, ordinary bushes, flowers, pebbles and twigs. These are decorative; resource
 trees and berry bushes keep their simulation positions and gathering rules.
 The forest fixture contains 7,600 meadow patches, 331 ferns, 269 bushes, 183 flowers,
-60 pebbles and 35 twigs. Existing default tufts are replaced only with the flag.
+60 pebbles and 35 twigs. The original trial's tufts were replaced by the baked
+placement set.
 The masks use the initial world layout; this trial does not clear individual
 decoration instances when a new building is placed during play.
 
@@ -38,16 +38,16 @@ See `assets/environment/proton_scatter/README.md` and its adjacent license.
 The original trial omitted non-berry shrubs. The follow-up restores clustered
 shrubs with the same shared scrub mesh as the default scenery, sampled from the
 baked candidates without changing any other plant placements. It adds one
-MultiMesh during loading and no per-frame work. All appearance flags are enabled
-in this updated forest view:
+MultiMesh during loading and no per-frame work. This updated forest view shows
+the current environment improvements:
 
 ![Ordinary bushes restored](../reviews/environment/04-bushes-restored.png)
 
-Capture either view with the same camera and lighting:
+The former placement screenshot above is retained as a historical reference.
+Capture the current default view with:
 
 ```sh
-./build.py play -- --showcase --environment-review forest --tree3d --screenshot /absolute/path/before.png
-./build.py play -- --showcase --environment-review forest --tree3d --proton-scatter --screenshot /absolute/path/after.png
+./build.py play -- --showcase --environment-review forest --screenshot /absolute/path/after.png
 ```
 
 The comparison fixture freezes simulation at daylight, hides interface and fog,
@@ -56,9 +56,7 @@ visual-review fixture, not evidence of a complete gameplay playthrough.
 
 ## 2. Lake appearance
 
-```sh
-./build.py play -- --tree3d --proton-scatter --lake-water
-```
+The lake shader is enabled by default.
 
 The lake uses a bounded shader adapted from Boujie's Gerstner normal and
 Fresnel equations, pinned to source commit
@@ -75,8 +73,7 @@ fluid simulation or buoyancy is added. See `assets/environment/lake/README.md`.
 | ![Original lake](../reviews/environment/02-lake-before.png) | ![Lake shader](../reviews/environment/02-lake-after.png) |
 
 ```sh
-./build.py play -- --showcase --environment-review lake --tree3d --proton-scatter --screenshot /absolute/path/before.png
-./build.py play -- --showcase --environment-review lake --tree3d --proton-scatter --lake-water --screenshot /absolute/path/after.png
+./build.py play -- --showcase --environment-review lake --screenshot /absolute/path/after.png
 ```
 
 Both frames show the entire surrounding resource layout with the player on
@@ -84,9 +81,7 @@ the dry bank. Shader time is fixed to 1.25 seconds in the review fixture.
 
 ## 3. Terrain3D
 
-```sh
-./build.py play -- --tree3d --proton-scatter --lake-water --terrain3d
-```
+Terrain3D rendering is enabled by default.
 
 Terrain3D's native clipmaps replace the original plane and faceted mountain
 mesh. Nine padded heightmap regions use the existing mountain height function;
@@ -99,10 +94,11 @@ by the simulation; this does not add walkable hills, sculpting UI or digging.
 
 The pinned upstream MIT release is `v1.1.0-rc1` (a release candidate), archive
 SHA-256 `549d0c1d45982ae2e30d90275f754a9c7174b8f57eb600bc93a8108b98d44636`.
-The launcher installs its Linux x86_64 libraries under ignored
-`addons/terrain_3d`; the archive stays in `.tools/terrain3d`. No external
+Setup installs its Linux x86_64 libraries under ignored
+`addons/terrain_3d`; the archive stays in `.tools/terrain3d`. This runtime
+requirement means the game setup currently targets Linux x86_64. No external
 checkout or incomplete generated C# wrapper classes are required. See
-`assets/environment/terrain3d/README.md` for provenance and the optional
+`assets/environment/terrain3d/README.md` for provenance and the
 isolated native API probe.
 
 | Before | After |
@@ -110,33 +106,29 @@ isolated native API probe.
 | ![Original terrain](../reviews/environment/03-terrain-before.png) | ![Terrain3D](../reviews/environment/03-terrain-after.png) |
 
 ```sh
-./build.py play -- --showcase --environment-review terrain --tree3d --proton-scatter --lake-water --screenshot /absolute/path/before.png
-./build.py play -- --showcase --environment-review terrain --tree3d --proton-scatter --lake-water --terrain3d --screenshot /absolute/path/after.png
+./build.py play -- --showcase --environment-review terrain --screenshot /absolute/path/after.png
 ```
 
 The wider terrain fixture moves the orthographic camera above the peaks in
-both images. Add `--review-fog` to a landscape fixture to inspect the normal
-exploration mask instead of revealing the whole view. All six comparisons
-can be regenerated in order with `./tools/environment_review.py`.
+both images. Add `--review-fog` to inspect the normal exploration mask instead
+of revealing the whole view. Regenerate the current forest, lake and terrain
+views with `./tools/environment_review.py`; it updates only the after images.
 
 ## Validation and practical limits
 
 - Fixed-seed ProtonScatter output matched across two independent bakes.
-- Compilation and C# formatting passed. The full `./build.py build --terrain3d`
-  passed simulation, real input/UI, two-process network checks, Linux export
-  and executable smoke test.
-- An additional UI run with all trials enabled passed, including walking
-  allocation checks: 109.5 bytes/frame against the existing 150-byte budget,
-  the same measured result as the normal renderer.
+- The original trial validation recorded successful compilation, formatting,
+  simulation, input/UI, network, Linux export and executable smoke checks.
 - All comparison frames were rendered with Forward+ and visually inspected.
   Additional mine and exploration-fog views checked native terrain alongside
   the existing objects. The exported executable also rendered all three
   trials together, including the baked placement JSON and native library.
-- The first Godot 4.7.2 import of Terrain3D exited with signal 11 after editor
+- The first Godot 4.7.2 import of Terrain3D can exit with signal 11 after editor
   initialization; the next import and game launch succeeded. The launcher
   preserves a log and retries once only for this specific native import exit
   with no engine errors. Repeated failures or engine errors still fail setup.
-- New buildings do not remove individual decoration instances. Lake depth is
+- No GPU frame-rate benchmark is claimed for these visual changes. New
+  buildings do not remove individual decoration instances. Lake depth is
   an authored visual approximation. Terrain3D preserves level-ground gameplay;
   native physics, player terrain editing and pathfinding on slopes are outside
   these appearance trials.

@@ -54,14 +54,14 @@ Play accepts Godot arguments after `--`:
 
 These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
-Three independent environment trials are available: `--proton-scatter` for
-baked environment placement, `--lake-water` for lake/coastal water and shorelines, and
-`--terrain3d` for native terrain rendering. Try them together with
-`./build.py play -- --tree3d --proton-scatter --lake-water --terrain3d`.
-The Terrain3D option downloads its pinned Linux runtime on first use. See
-[the trial notes and before/after screenshots](docs/art/ENVIRONMENT_TRIALS.md)
-for individual commands and limitations. Recreate all six comparison images
-with `./tools/environment_review.py`.
+The default environment uses baked forest placement, the lake and coastal water
+shaders, and Terrain3D rendering. `./build.py setup` downloads and installs the
+pinned Terrain3D Linux x86_64 runtime when needed. See
+[the environment notes and historical comparisons](docs/art/ENVIRONMENT_TRIALS.md)
+for provenance and limitations. Recreate the current landscape views with
+`./tools/environment_review.py` or the coast and mine views with
+`./tools/environment_review.py --shoreline`; historical before screenshots are
+preserved and are not regenerated.
 
 ## Start menu and options
 

@@ -30,8 +30,6 @@ public static class LakeAppearance {
         shader ??= GD.Load<Shader>(ShaderPath);
         var material = new ShaderMaterial { Shader = shader };
         if (HasEnvironmentReviewFlag()) material.SetShaderParameter("review_time", 1.25f);
-        foreach (string argument in OS.GetCmdlineUserArgs())
-            if (argument == "--shoreline-baseline") material.SetShaderParameter("soft_shore", false);
         return material;
     }
 

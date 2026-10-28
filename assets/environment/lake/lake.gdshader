@@ -5,7 +5,6 @@ render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform float review_time = -1.0;
 uniform bool coastal = false;
-uniform bool soft_shore = true;
 uniform float roughness : hint_range(0.0, 1.0) = 0.22;
 uniform float specular : hint_range(0.0, 1.0) = 0.7;
 varying vec3 world_position;
@@ -37,7 +36,7 @@ void fragment() {
 	vec3 shallow_water = vec3(0.08, 0.28, 0.26);
 	vec3 water_color = mix(deep_water, shallow_water, edge);
 	// A narrow wet transition connects water to the bank without widening the gameplay boundary.
-	if (soft_shore) water_color = mix(vec3(0.075, 0.14, 0.105), water_color, smoothstep(0.0, 0.65, shore_distance));
+	water_color = mix(vec3(0.075, 0.14, 0.105), water_color, smoothstep(0.0, 0.65, shore_distance));
 
 	// Two low-energy Gerstner normals animate small highlights without moving the shore.
 	vec3 wave_a = N_DEG(world_position.x, world_position.z, t, 0.30, 0.24, 28.0, 0.32, 0.72, 0.0);
@@ -52,7 +51,6 @@ void fragment() {
 		sin(world_position.x * 2.37 - world_position.z * 1.39 + t * 0.08);
 	float wash = coastal ? 0.14 + 0.06 * sin(world_position.x * 0.7 + t * 0.8) : 0.055;
 	float foam_line = 1.0 - smoothstep(wash, wash + (coastal ? 0.24 : 0.14), shore_distance);
-	if (!soft_shore) foam_line = 1.0 - smoothstep(0.004, 0.022, 1.0 - radial);
 	float broken_foam = foam_line * smoothstep(-0.10, 0.55, breakup);
 
 	ALBEDO = water_color + vec3(0.055, 0.105, 0.13) * fresnel;

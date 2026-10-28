@@ -1,14 +1,14 @@
-# Terrain3D landscape trial
+# Default Terrain3D landscape
 
-This opt-in trial replaces the broad landscape mesh with Terrain3D's native
-clipmap renderer. Launch it with:
+The default landscape uses Terrain3D's native clipmap renderer. Launch normally:
 
 ```sh
-./build.py play -- --terrain3d
+./build.py play
 ```
 
-`build.py setup` installs the pinned Linux runtime into the ignored
-`addons/terrain_3d/` folder when `--terrain3d` is forwarded. The install uses
+`build.py setup` installs the pinned Linux x86_64 runtime into the ignored
+`addons/terrain_3d/` folder. The game environment currently requires Linux
+x86_64. The install uses
 the official Terrain3D `v1.1.0-rc1` release archive and verifies its SHA-256:
 
 `549d0c1d45982ae2e30d90275f754a9c7174b8f57eb600bc93a8108b98d44636`
@@ -34,6 +34,11 @@ The shader insertion in `Terrain3DView` keeps the pinned generated Terrain3D
 shader core and adds project meadow/rock palette, exploration fog, and fragment
 clipping for the five mine openings so their separately modeled rock shells
 remain open.
+
+The first Godot 4.7.2 editor import after installing this native runtime may
+exit with signal 11 during editor shutdown. Setup preserves that log and retries
+once only when editor initialization completed and Godot reported no engine
+errors. A repeated crash or any engine error remains a setup failure.
 
 The runtime extension is accessed through `ClassDB.Instantiate` and dynamic
 `Set`/`Call` methods. Terrain3D's generated C# wrappers are incomplete for this

@@ -198,8 +198,7 @@ public static class WorldModels {
         float scale = .9f + Jitter(id, 2) * .22f;
         sway.Scale = Vector3.One * scale;
         int variant = (id / TreeVariants) % NatureShape.Variants;
-        if (Tree3DShape.Enabled) Tree3DShape.Add(sway, id % TreeVariants, variant);
-        else Add(sway, (id % TreeVariants) switch { 1 => NatureShape.Spruce(variant), 2 => NatureShape.Birch(variant), _ => NatureShape.Oak(variant) }, NatureShape.Natural, Vector3.Zero);
+        Tree3DShape.Add(sway, id % TreeVariants, variant);
         PreserveShadows(sway);
         var stump = Add(prop.Root, NatureShape.Stump, NatureShape.Natural, Vector3.Zero);
         stump.Visible = false;
@@ -230,11 +229,9 @@ public static class WorldModels {
 
     private static void Bush(Prop prop, int id) {
         int variant = id % NatureShape.Variants;
-        Mesh? leaves = null;
-        if (Tree3DShape.Enabled) leaves = Tree3DShape.Add(prop.Body, 3, variant);
-        else Add(prop.Body, NatureShape.Bush(variant), NatureShape.Natural, Vector3.Zero);
+        var leaves = Tree3DShape.Add(prop.Body, 3, variant);
         var fruit = Pivot(prop.Body, Vector3.Zero);
-        Add(fruit, leaves != null ? NatureShape.CardBerries(leaves, variant) : NatureShape.Berries(variant), NatureShape.Glossy, Vector3.Zero);
+        Add(fruit, NatureShape.CardBerries(leaves, variant), NatureShape.Glossy, Vector3.Zero);
         prop.Fruit = fruit;
     }
 

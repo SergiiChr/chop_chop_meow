@@ -229,10 +229,11 @@ def setup() -> dict[str, str]:
     BUILD.mkdir(exist_ok=True)
     (BUILD / ".gdignore").touch()
     fetch_godot()
-    if "--terrain3d" in sys.argv[2:]:
-        from tools import terrain3d
+    # Terrain3D is part of the default renderer, so every setup path (play,
+    # tests, and builds) must provision its pinned native runtime.
+    from tools import terrain3d
 
-        terrain3d.install_runtime()
+    terrain3d.install_runtime()
     env = ensure_dotnet()
     build_project(env)
     return env
