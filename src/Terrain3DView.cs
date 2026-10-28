@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Threading.Tasks;
 using Godot;
 
 namespace ChopChopMeow;
@@ -34,11 +35,12 @@ public partial class WorldView {
         // Padding regions cover both ranges beyond the 216-tile map, avoiding a visible terrain boundary.
         for (int rz = -1; rz <= 1; rz++)
             for (int rx = -1; rx <= 1; rx++) {
-                for (int z = 0; z < regionSize; z++)
-                    for (int x = 0; x < regionSize; x++) {
-                        var p = new Vector2(rx * regionSize + x, rz * regionSize + z);
-                        samples[z * regionSize + x] = Math.Max(0, MountainShape.Height(p) - .03f);
-                    }
+                // Rows are independent and the noise lookups are read-only, so the heights fill on all cores.
+                int originX = rx * regionSize, originZ = rz * regionSize;
+                Parallel.For(0, regionSize, z => {
+                    for (int x = 0; x < regionSize; x++)
+                        samples[z * regionSize + x] = Math.Max(0, MountainShape.Height(new Vector2(originX + x, originZ + z)) - .03f);
+                });
                 MemoryMarshal.AsBytes(samples.AsSpan()).CopyTo(bytes);
                 using var heights = Image.CreateFromData(regionSize, regionSize, false, Image.Format.Rf, bytes);
                 var region = data.Call("add_region_blank", new Vector2I(rx, rz), false).AsGodotObject()!;
@@ -70,6 +72,8 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_grass", grass.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_disturbance", disturbanceTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_explored", exploredTexture.GetRid());
+        // The shader's tunnel cut-outs hold exactly one entry per cliff.
+        if (World.Cliffs.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {World.Cliffs.Length}.");
         var mines = new Vector4[World.Cliffs.Length];
         for (int i = 0; i < mines.Length; i++) {
             var cliff = World.Cliffs[i]; var at = World.MineSpot(cliff);

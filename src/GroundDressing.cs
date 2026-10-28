@@ -40,10 +40,10 @@ public partial class WorldView {
         solidDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader.Replace("cull_disabled", "cull_back") } };
         solidDressingMaterial.SetShaderParameter("trial_disturbance", disturbanceTexture);
         // The fog pass must shrink the same vertices, or cleared shrubs leave silhouettes in remembered areas.
-        const string shrink = """
+        string shrink = $$"""
             uniform sampler2D trial_disturbance : filter_linear, repeat_disable;
             void vertex() {
-                float wear = texture(trial_disturbance, MODEL_MATRIX[3].xz / 216.0).r;
+                float wear = texture(trial_disturbance, MODEL_MATRIX[3].xz / {{Terrain.Size}}.0).r;
                 VERTEX *= 1.0 - smoothstep(0.12, 0.65, wear);
             }
             void fragment()
