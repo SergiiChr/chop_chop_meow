@@ -764,15 +764,16 @@ public static class WorldModels {
         }
 
         /// <summary>
-        /// Struck: the wolf flinches, ducking low and leaning away to one side with its head bowed and turned aside and its tail tucked, shudders,
+        /// Struck: the wolf flinches into a low bow, leaning away to one side with its head bowed and turned aside and its tail tucked, shudders,
         /// and straightens as <paramref name="progress"/> runs 0 to 1.
         /// </summary>
         public void Recoil(float progress) {
             float t = Math.Clamp(progress, 0, 1), flinch = t < .18f ? Ease(t / .18f) : 1 - Ease((t - .18f) / .82f);
             float shudder = MathF.Sin(t * 46) * (1 - t);
-            // Tipping the body nose-down swings the feet back, so they swing forward by as much to stay planted while the knees fold.
-            float pitch = 8 * flinch, tail = -160 * flinch - 118 * (1 - flinch);
-            Pose(-pitch, -pitch, 30 * flinch, tail, -.06f * flinch, pitch, 10 * flinch + shudder * 3, .05f * flinch, 8 + 26 * flinch, 10 + 30 * flinch);
+            // A low bow: the chest drops as the forelegs reach out ahead, while the hind legs stay nearly straight and keep the rear up.
+            // Tipping the body nose-down swings every foot back, so each leg swings forward by as much on top of its own reach.
+            float pitch = 16 * flinch, tail = -160 * flinch - 118 * (1 - flinch);
+            Pose(-pitch - 48 * flinch, -pitch, 30 * flinch, tail, -.06f * flinch, pitch, 6 * flinch + shudder * 3, .04f * flinch, 8 + 8 * flinch, 10 + 2 * flinch);
             Head.RotationDegrees += new Vector3(0, -32 * flinch + shudder * 8, -8 * flinch);
             TailAt(tail, shudder * 12, 30 * flinch);
         }
