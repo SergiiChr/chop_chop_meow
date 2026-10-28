@@ -376,7 +376,7 @@ A lone worker with both alternates.
 #### Worker tools
 
 A worker without the tool a job needs walks to the nearest station holding one, takes the best (`Worker.Tool`), and gathers at that tool's speed.
-With none available they wait, show what they need and say it once in the corner message.
+With none available they wait, show what they need and say it once in a message at the top of the screen.
 
 `World.ReturnTool` walks a tool the job no longer needs, or any tool at dusk, back to the nearest station with room.
 With no station the worker keeps it.

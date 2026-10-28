@@ -11,6 +11,7 @@ public partial class WorldView {
     private float Jitter() => (float)effectRandom.NextDouble();
 
     private void BuildGround(Node3D parent) {
+        InitializeDressing();
         // Fine grass grain with occasional bare-earth flecks at the top of the ramp.
         var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
         var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
@@ -102,11 +103,13 @@ public partial class WorldView {
         }
     }
 
-    private static void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items, bool twoSided = true) {
+    private void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items, bool twoSided = true) {
         var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = mesh, InstanceCount = items.Count };
         for (int i = 0; i < items.Count; i++) { multi.SetInstanceTransform(i, items[i].At); multi.SetInstanceColor(i, items[i].Color); }
-        var material = new StandardMaterial3D { VertexColorUseAsAlbedo = true, Roughness = 1, CullMode = twoSided ? BaseMaterial3D.CullModeEnum.Disabled : BaseMaterial3D.CullModeEnum.Back, VertexColorIsSrgb = true };
-        parent.AddChild(new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        var material = twoSided ? dressingMaterial : solidDressingMaterial;
+        var instance = new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+        parent.AddChild(instance);
+        instance.MaterialOverlay = dressingFog;
     }
 
     // ---------- Particles: chips, leaves, sparks, splashes, embers and smoke ----------

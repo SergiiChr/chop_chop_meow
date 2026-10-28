@@ -231,6 +231,12 @@ public sealed partial class World {
     public int Day => (int)(S.Time / Data.DaySeconds) + 1;
     public float DayPhase => S.Time % Data.DaySeconds / Data.DaySeconds;
     public bool Night => DayPhase >= Data.NightStarts;
+    /// <summary>Whether the moon rather than the sun is in the sky, from sunset until dawn.</summary>
+    public bool MoonUp => DayPhase >= Data.Sunset;
+    /// <summary>How far the sun, or the moon after sunset, has crossed the sky, from 0 where it rises to 1 where it sets.</summary>
+    public float SkyArc => MoonUp ? (DayPhase - Data.Sunset) / (1 - Data.Sunset) : DayPhase / Data.Sunset;
+    /// <summary>How much of the moon is lit, from 0 at new moon to 1 at full; a new game starts near full moon so the first night is not the darkest.</summary>
+    public float Moonlight => (1 + MathF.Cos(MathF.Tau * S.Time / Data.DaySeconds / Data.MoonCycleDays)) / 2;
     /// <summary>Clock hour, with the day starting at 06:00.</summary>
     public float Hour => (DayPhase * 24 + 6) % 24;
     /// <summary>From the first fading light until dawn; workers are off duty.</summary>
@@ -325,7 +331,6 @@ public sealed partial class World {
         Scatter(rng, "tree", int.MaxValue, 42, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
         DropLeaves();
         Look();
-        Say("Welcome to Bramblewick. Gather wood and stone; build a sheltered workshop.");
     }
     /// <summary>Leaves a rake gathers in one go from a patch, which fills again every day.</summary>
     public const int LeafPatch = 12;
@@ -462,14 +467,13 @@ public sealed partial class World {
         gatherClock = 0;
         if (t.Kind == "water") {
             var result = Water.CollectWater(this, t);
-            if (result != WaterCollectResult.NoChange) { S.Milestones.Add("water"); Say(result == WaterCollectResult.RefilledBottle ? "Bottle filled · 3 sips." : "Drank from the pond · one sip."); Play("gather_water", Player); }
+            if (result != WaterCollectResult.NoChange) { S.Milestones.Add("water"); Play("gather_water", Player); }
             return;
         }
         bool small = t.Kind == "wolf_corpse" || t.Kind == "stone" && tool == null;
         int amount = Math.Min(t.Remaining, small ? 2 : 4);
         amount = S.Backpack.Add(ResourceItem(t), amount); t.Remaining -= amount;
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
-        else Say($"+{amount} {Data.Name(ResourceItem(t))} · {t.Remaining} left here.");
         if (amount > 0) S.Milestones.Add("gather");
     }
     private void PickUp(Thing t) {
@@ -477,7 +481,7 @@ public sealed partial class World {
         int amount = S.Backpack.Add(item, t.Remaining); t.Remaining -= amount;
         if (amount == 0) { Say("Backpack full. Store or sell some supplies."); return; }
         if (t.Remaining <= 0) S.Things.Remove(t);
-        Say($"+{amount} {Data.Name(item)}."); S.Milestones.Add("gather"); Play("wood_rocks_inventory", t.Pos);
+        S.Milestones.Add("gather"); Play("wood_rocks_inventory", t.Pos);
     }
     public void ResetGather() { gatherClock = 0; S.Actor.GatherTarget = 0; }
     /// <summary>The player hammers an anvil while standing by it with nothing else to do.</summary>
@@ -524,13 +528,12 @@ public sealed partial class World {
         if (Forwarded("build", item: kind, at: p)) return null;
         S.Backpack.Spend(Data.Buildings[kind].Cost);
         var t = Add(kind, p); if (kind == "campfire") { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
-        S.Milestones.Add(kind); Say(kind == "mine" ? $"Marked the {MineName(t)} site. Assign a worker to dig the entrance; they need a pickaxe." : $"Built {Data.Name(kind)}."); return t;
+        S.Milestones.Add(kind); if (kind == "mine") Say($"Marked the {MineName(t)} site. Assign a worker to dig the entrance; they need a pickaxe."); return t;
     }
     public void Consume(string item) {
         if (Downed || !Data.Items.TryGetValue(item, out var def) || Forwarded("consume", item: item, count: S.Backpack.PreferredSlot)) return;
         if (Water.IsBottle(item)) {
-            if (Water.SipBottle(this, item)) Say("Drank one sip.");
-            else Say("Your bottle is empty. Collect water at the pond to refill it.");
+            if (!Water.SipBottle(this, item)) Say("Your bottle is empty. Collect water at the pond to refill it.");
             return;
         }
         if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
@@ -541,7 +544,7 @@ public sealed partial class World {
     public void Pump(Thing t) {
         if (!Near(t) || t.Kind != "reinforced" || Forwarded("pump", t.Id)) return;
         playerBusy = true;
-        t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos); Say($"Bellows: {Celsius(t.Heat)} °C / {Celsius(SteelHeat)} °C needed for steel.");
+        t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos);
     }
     public void FuelFire(Thing t) {
         if (!Near(t) || Forwarded("fuel_fire", t.Id)) return;
@@ -551,7 +554,7 @@ public sealed partial class World {
         t.Burn += Data.CampfireSeconds; Say($"Campfire fed: +{Data.CampfireHours:0} hours of light.");
     }
     public void SetRecipe(Thing t, string recipe) {
-        if (t.Processing) { Say("Wait until the current batch finishes."); return; }
+        if (t.Processing) return;
         if (Forwarded("set_recipe", t.Id, item: recipe)) return;
         if (Data.Recipes.TryGetValue(recipe, out var r) && r.Station == t.Kind) { t.Recipe = recipe; t.Progress = 0; }
     }
@@ -878,7 +881,7 @@ public sealed partial class World {
         bool empty = crate.Inventory.Count == 0;
         if (S.Backpack.Room(empty ? "crate" : PackedPrefix) == 0) { Say("Backpack full. Make room for the crate."); return false; }
         S.Backpack.Add(empty ? "crate" : Pack(crate.Inventory), 1); S.Things.Remove(crate);
-        Play("wood_rocks_inventory", crate.Pos); Say(empty ? "Picked up an empty crate." : "Picked up a packed crate."); return true;
+        Play("wood_rocks_inventory", crate.Pos); return true;
     }
     // ---------- Crafting ----------
     /// <summary>Hand recipes for the personal crafting menu.</summary>
@@ -937,7 +940,7 @@ public sealed partial class World {
         if (S.CraftTime < r.Seconds || S.Backpack.Room(r.Output) < r.Amount) return;
         S.Backpack.Add(r.Output, r.Amount); S.Crafting.RemoveAt(0); S.CraftTime = 0;
         if (r.Inputs.TryGetValue("water", out int usedWater)) Give("empty_bottle", usedWater);
-        Crafted(r.Output); Play(Sounds.ForItem(r.Output), Player); Say($"Made {r.Amount} {Data.Name(r.Output)}.");
+        Crafted(r.Output); Play(Sounds.ForItem(r.Output), Player);
     }
     private void Crafted(string output) {
         S.Milestones.Add(output);

@@ -225,15 +225,16 @@ public partial class HeatDial : Control {
     }
 }
 
-/// <summary>Time of day as the sun's (or moon's) way along an arc from dawn to dawn.</summary>
+/// <summary>Time of day as the sun's way along the arc from sunrise to sunset, then the moon's along the same arc until dawn.</summary>
 public partial class DayDial : Control {
-    public Func<float> Phase { get; set; } = () => 0;
+    /// <summary>How far the sun or moon has crossed the sky, from 0 to 1.</summary>
+    public Func<float> Arc { get; set; } = () => 0;
     public Func<bool> Night { get; set; } = () => false;
     private static readonly Color NightArc = new("8fa6c4"), Moon = new("dfe6f2");
 
     public override void _Draw() {
         var centre = new Vector2(Size.X / 2, Size.Y - 6);
-        float radius = Math.Min(Size.X / 2 - 12, Size.Y - 14), phase = Mathf.Clamp(Phase(), 0, 1);
+        float radius = Math.Min(Size.X / 2 - 12, Size.Y - 14), phase = Mathf.Clamp(Arc(), 0, 1);
         DrawArc(centre, radius, Mathf.Pi, Mathf.Tau, 32, Style.Line, 8, true);
         var tint = Night() ? NightArc : Style.Mustard;
         DrawArc(centre, radius, Mathf.Pi, Mathf.Pi + Math.Max(.02f, phase) * Mathf.Pi, 32, tint, 8, true);

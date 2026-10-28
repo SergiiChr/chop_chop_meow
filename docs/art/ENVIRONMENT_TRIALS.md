@@ -21,8 +21,10 @@ trees and berry bushes keep their simulation positions and gathering rules.
 The forest fixture contains 7,600 meadow patches, 331 ferns, 269 bushes, 183 flowers,
 60 pebbles and 35 twigs. The original trial's tufts were replaced by the baked
 placement set.
-The masks use the initial world layout; this trial does not clear individual
-decoration instances when a new building is placed during play.
+The initial placement masks use the loaded world layout. After merging main, a
+shared disturbance texture also clears plants around newly placed buildings,
+mine approaches and the cart trail, and shades worn soil on native terrain.
+It updates only when the world layout changes.
 
 Upstream is MIT, pinned to commit
 `7198cc00078ebde61307578137c3f35223c6e438`. Regenerate with
@@ -127,8 +129,8 @@ views with `./tools/environment_review.py`; it updates only the after images.
   initialization; the next import and game launch succeeded. The launcher
   preserves a log and retries once only for this specific native import exit
   with no engine errors. Repeated failures or engine errors still fail setup.
-- No GPU frame-rate benchmark is claimed for these visual changes. New
-  buildings do not remove individual decoration instances. Lake depth is
+- The [local performance run](PERFORMANCE.md) records measured frame times on
+  one development machine before the subsequent main merge. Lake depth is
   an authored visual approximation. Terrain3D preserves level-ground gameplay;
   native physics, player terrain editing and pathfinding on slopes are outside
   these appearance trials.

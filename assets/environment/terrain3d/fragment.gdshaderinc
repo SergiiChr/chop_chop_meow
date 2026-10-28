@@ -13,6 +13,9 @@
     float bare = max(smoothstep(18.0, 35.0, v_vertex.y), 1.0 - smoothstep(0.45, 0.82, w_normal.y));
     ALBEDO = mix(meadow, stone, bare);
     ALBEDO = mix(ALBEDO, vec3(0.24, 0.25, 0.23), smoothstep(38.0, 53.0, v_vertex.y) * 0.55);
+    // Keep main's worn building footprints on the native valley floor.
+    float wear = texture(trial_disturbance, v_vertex.xz / 216.0).r;
+    ALBEDO = mix(ALBEDO, vec3(0.23, 0.205, 0.14), wear * 0.45 * (1.0 - bare));
     ROUGHNESS = 1.0;
     SPECULAR = 0.12;
     NORMAL_MAP_DEPTH = 0.0;

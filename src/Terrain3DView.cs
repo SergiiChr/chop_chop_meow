@@ -68,6 +68,7 @@ public partial class WorldView {
         terrainMaterialRid = material.Call("get_material_rid").AsRid();
         terrainGrass = grass;
         RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_grass", grass.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_disturbance", disturbanceTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_explored", exploredTexture.GetRid());
         var mines = new Vector4[World.Cliffs.Length];
         for (int i = 0; i < mines.Length; i++) {

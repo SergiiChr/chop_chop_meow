@@ -234,6 +234,29 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
         await Frames();
     }
+    /// <summary>Messages keep clear of the HUD, stack, restart on a repeat, make room by dropping the stalest and fade out.</summary>
+    private async Task CheckMessages() {
+        ClosePanel(); await Frames();
+        UIRequire(messages.GetGlobalRect().Position.X > needsPlate.GetGlobalRect().End.X && messages.GetGlobalRect().End.X < ui.Size.X - needsPlate.GetGlobalRect().End.X + 1,
+            "Messages must keep clear of the needs plate and stay centred.");
+        OpenPage("craft"); await Frames();
+        UIRequire(messages.GetGlobalRect().End.X < panel.GetGlobalRect().Position.X, "Messages must keep to the left of an open side panel.");
+        ClosePanel();
+        messages._Process(60);
+        UIRequire(messages.Shown.Length == 0, "Old messages must be gone before the message check.");
+        Notify("First"); Notify("Second"); messages._Process(3); Notify("First");
+        UIRequire(messages.Shown.SequenceEqual(new[] { "First", "Second" }), "A repeated message must restart its line instead of stacking again.");
+        messages._Process(4.5);
+        UIRequire(messages.Shown.SequenceEqual(new[] { "First" }), "Each message must disappear after its own time.");
+        Notify("Third"); messages._Process(1); Notify("First"); Notify("Fourth"); Notify("Fifth"); Notify("Sixth");
+        UIRequire(messages.Shown.SequenceEqual(new[] { "First", "Fourth", "Fifth", "Sixth" }), "A full stack must drop the message closest to fading, even when a repeat kept an older line.");
+        var lines = messages.GetChildren().OfType<Label>().ToArray();
+        UIRequire(lines.Count(l => l.Visible) == 4 && lines[3].Text == "Sixth" && lines.All(l => l.Modulate.A == 1), "Every stacked message must show at full strength on its own line, newest last.");
+        messages._Process(6.5);
+        UIRequire(lines[0].Modulate.A is > 0 and < 1, "A message must fade out over its last second.");
+        messages._Process(1);
+        UIRequire(messages.Shown.Length == 0 && lines.All(l => !l.Visible), "Every message must disappear once its time is up.");
+    }
     private async Task CheckSignpost() {
         ClosePanel(); await Frames();
         var sign = world.Add("signpost", world.Player + new Vector2(2, 0));
@@ -471,6 +494,21 @@ public partial class Game {
             ClosePanel();
             await KeyStroke(Key.Escape);
             UIRequire(menu.Visible && paused && HasLabel(menu, World.ObjectiveFor(world.S.Goal).Title), "Esc must open the pause menu with the current goal.");
+            // New game and Quit ask first, and Esc or Back returns to the pause menu.
+            world.Player = World.Spawn + new Vector2(6, 0);
+            await Click(FindButton(menu, "New game")!);
+            UIRequire(backdrop.Visible && FindButton(screen, "Start a new game") != null && world.Player != World.Spawn, "New game must ask before leaving the settlement.");
+            await KeyStroke(Key.Escape);
+            UIRequire(!backdrop.Visible && menu.Visible && paused, "Esc on the new game question must return to the pause menu.");
+            await Click(FindButton(menu, "Quit")!);
+            UIRequire(backdrop.Visible && FindButton(screen, "Quit to desktop") != null, "Quit must ask before closing the game.");
+            await Click(FindButton(screen, "Back · Esc")!);
+            UIRequire(menu.Visible && paused, "Back on the quit question must return to the pause menu.");
+            await Click(FindButton(menu, "New game")!);
+            await Click(FindButton(screen, "Start a new game")!);
+            UIRequire(!backdrop.Visible && !menu.Visible && !paused && page == "welcome" && world.Player == World.Spawn, "Confirming a new game must start a fresh settlement.");
+            ClosePanel();
+            await KeyStroke(Key.Escape);
             await KeyStroke(Key.Escape);
             UIRequire(!menu.Visible && !paused, "Esc must close the pause menu and resume.");
             var start = world.Player;
@@ -494,6 +532,7 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
             world.S.Thirst = drink;
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = false });
+            await CheckMessages();
             // Measured about 115 B a frame: this check's own await of each frame and the memory of things seen for the first time on a straight walk.
             // The budget leaves a third more, so a change that adds garbage to every frame fails it.
             await CheckWalkingFrames(150);
