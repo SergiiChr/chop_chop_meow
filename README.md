@@ -63,6 +63,11 @@ for provenance and limitations. Recreate the current landscape views with
 `./tools/environment_review.py --shoreline`; historical before screenshots are
 preserved and are not regenerated.
 
+For a rendered walking/day-night and eight-worker production benchmark, run
+`./build.py play -- --performance-run /absolute/path/to/results`, then
+`python3 tools/performance_report.py /absolute/path/to/results`.
+See [local performance measurements and limitations](docs/art/PERFORMANCE.md).
+
 ## Start menu and options
 
 The game opens on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit.

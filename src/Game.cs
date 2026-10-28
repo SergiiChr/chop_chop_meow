@@ -66,7 +66,7 @@ public partial class Game : Node {
     private static readonly Color Muted = Style.Beige;
     public override void _Ready() {
         try {
-            var data = GameData.Load(); world = new World(data);
+            var data = GameData.Load(); world = launchArgs.Contains("--performance-run") ? PerformanceFixture.Create(data) : new World(data);
             if (OS.GetCmdlineUserArgs().Contains("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--render-icons") is int icons and >= 0) { AddChild(new IconRender { Data = data, Folder = OS.GetCmdlineUserArgs()[icons + 1] }); return; }
             world.Notify = Notify;
@@ -85,7 +85,8 @@ public partial class Game : Node {
             SetTheme(); BuildHud();
             if (OS.GetCmdlineUserArgs().Contains("--showcase")) Showcase();
             else if (!OS.GetCmdlineUserArgs().Contains("--animation-review")) ShowStart();
-            if (!OS.GetCmdlineUserArgs().Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review")) { ApplyResolution(SavedResolution()); Engine.MaxFps = SavedFrameLimit(); }
+            if (!OS.GetCmdlineUserArgs().Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { ApplyResolution(SavedResolution()); Engine.MaxFps = SavedFrameLimit(); }
+            StartPerformanceRun();
             if (OS.GetCmdlineUserArgs().Contains("--ui-test")) RunUIChecks();
             if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--net-check") is int check and >= 0) RunNetCheck(OS.GetCmdlineUserArgs().ElementAtOrDefault(check + 1) == "host");
             if (OS.GetCmdlineUserArgs().Contains("--animation-review")) {
@@ -890,7 +891,7 @@ public partial class Game : Node {
             ShowEndingOnce(); autosave += dt;
             DamageFlash(health - world.S.Health); shownHealth = world.S.Health;
             // A guest saves its player whenever it changes instead; the world is the host's to save.
-            if (autosave >= AutosaveSeconds) { if (!world.Remote) Save(0); autosave = 0; }
+            if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) Save(0); autosave = 0; }
         }
         view.Paused = !running; view.SelectedTool = ActiveHotbarItem();
         view.Mouse = GetViewport().GetMousePosition();
@@ -910,6 +911,7 @@ public partial class Game : Node {
         if (shot >= 0 && shot + 1 < args.Length && runTime > shotAt && !capturing) {
             capturing = true; Capture(args[shot + 1]);
         }
+        if (performanceRunning) SamplePerformance(delta);
     }
     private async void Capture(string path) {
         await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
