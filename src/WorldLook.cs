@@ -46,8 +46,8 @@ public partial class WorldView {
         trafficClock = 0;
         Tread(World.Player);
         foreach (var worker in World.S.Workers) Tread(worker.Pos);
-        // Grass takes back an unused path over an hour or so.
-        if (regrowClock > 20) {
+        // Grass takes back even a fully bare path within two game days.
+        if (regrowClock > World.Data.DaySeconds * 2 / 255) {
             regrowClock = 0;
             for (int i = 0; i < traffic.Length; i++) if (traffic[i] > 0) traffic[i]--;
             trafficChanged = true;

@@ -78,7 +78,7 @@ The pause menu also has New game and Quit; both ask first, since anything done s
 
 Options holds a window resolution picker, a frame rate limit (off, 60 or 90 fps), a temporal anti-aliasing switch (on by default) and a music volume slider. The display choices are stored in `settings.cfg` and applied at launch.
 
-Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player. Footpaths wear in where the player and workers walk and slowly grow back; they are not saved. Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), and world sounds pan with their place on screen. A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety. Shrubs, pebbles and twigs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading, and the meadow has soft lusher and drier patches.
+Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player. Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved. Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), and world sounds pan with their place on screen. A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety. Shrubs, pebbles and twigs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading, and the meadow has soft lusher and drier patches.
 
 ## Controls
 
