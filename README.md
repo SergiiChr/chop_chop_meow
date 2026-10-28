@@ -55,7 +55,7 @@ Play accepts Godot arguments after `--`:
 These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
 Three independent environment trials are available: `--proton-scatter` for
-baked environment placement, `--lake-water` for the lake shader, and
+baked environment placement, `--lake-water` for lake/coastal water and shorelines, and
 `--terrain3d` for native terrain rendering. Try them together with
 `./build.py play -- --tree3d --proton-scatter --lake-water --terrain3d`.
 The Terrain3D option downloads its pinned Linux runtime on first use. See

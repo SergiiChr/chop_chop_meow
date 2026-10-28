@@ -15,8 +15,7 @@ public static class LakeAppearance {
         shader ??= GD.Load<Shader>(ShaderPath);
         if (shader == null) throw new InvalidOperationException($"Could not load lake shader at {ShaderPath}");
 
-        var material = new ShaderMaterial { Shader = shader };
-        if (HasEnvironmentReviewFlag()) material.SetShaderParameter("review_time", 1.25f);
+        var material = CreateMaterial();
 
         var surface = new MeshInstance3D {
             Name = "lake_water_surface",
@@ -25,6 +24,15 @@ public static class LakeAppearance {
             Position = new Vector3(Terrain.Lake.X, .025f, Terrain.Lake.Y),
         };
         parent.AddChild(surface);
+    }
+
+    internal static ShaderMaterial CreateMaterial() {
+        shader ??= GD.Load<Shader>(ShaderPath);
+        var material = new ShaderMaterial { Shader = shader };
+        if (HasEnvironmentReviewFlag()) material.SetShaderParameter("review_time", 1.25f);
+        foreach (string argument in OS.GetCmdlineUserArgs())
+            if (argument == "--shoreline-baseline") material.SetShaderParameter("soft_shore", false);
+        return material;
     }
 
     private static bool HasEnvironmentReviewFlag() {

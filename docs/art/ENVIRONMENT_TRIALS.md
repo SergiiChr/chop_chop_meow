@@ -4,6 +4,10 @@ All three trials are developed in sequence on `codex/terrain`. They are opt-in,
 and combine with the existing `--tree3d` vegetation trial. The ordinary launch
 keeps the existing landscape until the alternatives have been evaluated.
 
+The subsequent [shoreline and mine blending pass](SHORELINE_AND_MINES.md)
+extends the water shader to the coast, softens banks and blends the mine rock
+into the new mountains. The comparisons below record the original three trials.
+
 ## 1. Environment placement
 
 ```sh

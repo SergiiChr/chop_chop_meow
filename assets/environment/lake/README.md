@@ -13,3 +13,11 @@ not read screen or depth textures.
 
 Run the game with `--environment-review` to freeze the shader's time input at
 1.25 seconds for comparable screenshots. Normal play uses Godot's `TIME`.
+
+The same `--lake-water` option now shades the coastline. Coast mesh UVs encode
+distance from its existing boundary, driving shallows and a narrow animated
+foam wash. `bank.gdshader` blends wet ground into sand/soil and then grass along
+irregular-width bank strips. Lake stones cluster in patches rather than an
+even ring. Water height and the shared walking/collection boundaries remain
+unchanged. `--shoreline-baseline` is a review switch for the preceding bank
+and coastline treatment.

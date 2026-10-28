@@ -54,6 +54,14 @@ CAPTURES = (
     ),
 )
 
+SHORELINE_CAPTURES = (
+    ("coast-before", "coast", ("--proton-scatter", "--lake-water", "--terrain3d", "--shoreline-baseline"), "shoreline/coast-before.png"),
+    ("coast-after", "coast", ("--proton-scatter", "--lake-water", "--terrain3d"), "shoreline/coast-after.png"),
+    ("lake-edge-before", "lake", ("--proton-scatter", "--lake-water", "--terrain3d", "--shoreline-baseline"), "shoreline/lake-before.png"),
+    ("lake-edge-after", "lake", ("--proton-scatter", "--lake-water", "--terrain3d"), "shoreline/lake-after.png"),
+    *((f"mine-{ore}-after", "mine", ("--proton-scatter", "--lake-water", "--terrain3d", "--mine-ore", ore), f"shoreline/{ore}-after.png") for ore in ("coal", "iron", "tin")),
+)
+
 
 def capture(
     env: dict[str, str],
@@ -63,6 +71,7 @@ def capture(
     filename: str,
 ) -> None:
     image = (OUTPUT / filename).resolve()
+    image.parent.mkdir(parents=True, exist_ok=True)
     args = [
         "--showcase",
         "--environment-review",
@@ -90,10 +99,11 @@ def main() -> None:
     terrain3d.install_runtime()
     env = build.setup()
 
-    for name, location, flags, filename in CAPTURES:
+    captures = SHORELINE_CAPTURES if "--shoreline" in sys.argv[1:] else CAPTURES
+    for name, location, flags, filename in captures:
         capture(env, name, location, flags, filename)
 
-    print("Environment review capture pass: 6 screenshots")
+    print(f"Environment review capture pass: {len(captures)} screenshots")
 
 
 if __name__ == "__main__":

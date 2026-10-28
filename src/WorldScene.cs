@@ -47,7 +47,11 @@ public partial class WorldView {
     }
 
     /// <summary>Sea beyond a sandy shore along the valley's mouth; it runs past the map so the coast is its edge.</summary>
-    private static void BuildSea(Node3D parent) {
+    private void BuildSea(Node3D parent) {
+        if (OS.GetCmdlineUserArgs().Contains("--lake-water") && !OS.GetCmdlineUserArgs().Contains("--shoreline-baseline")) {
+            RegisterShoreline(ShorelineAppearance.BuildCoast(parent));
+            return;
+        }
         var water = new StandardMaterial3D { AlbedoColor = new Color("2e5966"), Roughness = .08f, Metallic = .3f, MetallicSpecular = .9f };
         Band(parent, -1.2f, 400, .02f, water);
         Band(parent, -4.5f, .4f, .008f, Mat("bdb08a", 1));
@@ -106,6 +110,14 @@ public partial class WorldView {
             "tin" => (new[] { "7f827d", "8b8e88", "737671" }, Mat("e9ebe4", .35f), 37),
             _ => (new[] { "3a3c40", "45474c", "2d2f33" }, Mat("15161a", .5f, .3f), 23),
         };
+        if (OS.GetCmdlineUserArgs().Contains("--terrain3d")) {
+            // Host rock follows the mountain; ore remains in the seams rather than coloring the whole outcrop.
+            rock = cliff.Ore switch {
+                "iron" => new[] { "686650", "716b56", "5b5e4c" },
+                "tin" => new[] { "656d5d", "717665", "586252" },
+                _ => new[] { "535d4b", "606753", "495440" },
+            };
+        }
         // Local +Z is the face, so everything toward the camera and the deposits is built on the positive side.
         var wall = Pivot(parent, new Vector3(cliff.Center.X, 0, cliff.Center.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(cliff.Face.X, cliff.Face.Y)), 0));
         WorldModels.MineSpur(parent, cliff, rock);
@@ -126,23 +138,33 @@ public partial class WorldView {
         }
     }
 
-    private static void BuildLake(Node3D parent) {
+    private void BuildLake(Node3D parent) {
         var at = To3(Terrain.Lake);
         // The bank and water follow the same shore line that bounds walking.
         float Shore(float angle) => Terrain.Shore(angle);
-        Blob(parent, at + new Vector3(0, .005f, 0), a => Shore(a) + 1.4f + .3f * MathF.Sin(a * 4), Mat("7f7556", 1));
-        Blob(parent, at + new Vector3(0, .012f, 0), a => Shore(a) + .3f, Mat("5d5540", 1));
-        if (OS.GetCmdlineUserArgs().Contains("--lake-water")) LakeAppearance.BuildLakeAppearance(parent);
-        else {
-            var water = new StandardMaterial3D { AlbedoColor = new Color("3f6f72"), Roughness = .06f, Metallic = .3f, MetallicSpecular = .9f };
-            Blob(parent, at + new Vector3(0, .025f, 0), Shore, water);
-            Blob(parent, at + new Vector3(0, .028f, 0), a => Shore(a) * .7f, Flat(new Color(.12f, .27f, .3f, .4f), true));
-            Blob(parent, at + new Vector3(0, .03f, 0), a => Shore(a) * .4f, Flat(new Color(.08f, .2f, .24f, .4f), true));
+        bool lakeWater = OS.GetCmdlineUserArgs().Contains("--lake-water");
+        bool softShore = lakeWater && !OS.GetCmdlineUserArgs().Contains("--shoreline-baseline");
+        if (softShore) {
+            RegisterShoreline(ShorelineAppearance.BuildLakeBank(parent));
+            LakeAppearance.BuildLakeAppearance(parent);
+        } else {
+            Blob(parent, at + new Vector3(0, .005f, 0), a => Shore(a) + 1.4f + .3f * MathF.Sin(a * 4), Mat("7f7556", 1));
+            Blob(parent, at + new Vector3(0, .012f, 0), a => Shore(a) + .3f, Mat("5d5540", 1));
+            if (lakeWater) LakeAppearance.BuildLakeAppearance(parent);
+            else {
+                var water = new StandardMaterial3D { AlbedoColor = new Color("3f6f72"), Roughness = .06f, Metallic = .3f, MetallicSpecular = .9f };
+                Blob(parent, at + new Vector3(0, .025f, 0), Shore, water);
+                Blob(parent, at + new Vector3(0, .028f, 0), a => Shore(a) * .7f, Flat(new Color(.12f, .27f, .3f, .4f), true));
+                Blob(parent, at + new Vector3(0, .03f, 0), a => Shore(a) * .4f, Flat(new Color(.08f, .2f, .24f, .4f), true));
+            }
         }
         var rng = new Random(77);
         const int stones = 150;
         for (int i = 0; i < stones; i++) {
-            float angle = i * Mathf.Tau / stones + (float)rng.NextDouble() * .03f, r = Shore(angle) + .2f + (float)rng.NextDouble() * .5f;
+            float angle = i * Mathf.Tau / stones + (float)rng.NextDouble() * .03f;
+            // Stones collect in irregular patches instead of forming an evenly spaced border.
+            if (softShore && MathF.Sin(angle * 7 + 1.2f) + .55f * MathF.Sin(angle * 13) < -.05f) continue;
+            float r = Shore(angle) + (softShore ? .12f : .2f) + (float)rng.NextDouble() * (softShore ? .95f : .5f);
             var stone = Sphere(parent, .1f + (float)rng.NextDouble() * .14f, at + new Vector3(MathF.Cos(angle) * r, .03f, MathF.Sin(angle) * r), Mat(i % 3 == 0 ? "a3a7a3" : "8d918e", .9f), new Vector3(1.2f, .5f, 1), 6);
             stone.RotationDegrees = new Vector3(0, i * 47, 0);
         }

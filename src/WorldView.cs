@@ -144,9 +144,27 @@ public partial class WorldView : Node3D {
 
     // Made once: passing a plain string converts it to a new StringName on every call.
     private static readonly StringName FogPlayer = "player", FogRadius = "radius", FogMemory = "memory";
+    private readonly List<ShaderMaterial> shoreMaterials = new(2);
+    private static readonly StringName ShorePlayer = "shore_player", ShoreRadius = "shore_radius", ShoreMemory = "shore_memory";
+
+    private void RegisterShoreline(MeshInstance3D bank) {
+        // A transparent bank must apply fog in its own pass; an opaque overlay cannot mask its feathered edge.
+        bank.MaterialOverlay = null;
+        var material = (ShaderMaterial)bank.MaterialOverride;
+        material.SetShaderParameter("shore_explored", exploredTexture);
+        shoreMaterials.Add(material);
+    }
+
     private void UpdateFog() {
         bool clearReview = AnimationReview || EnvironmentReview && !EnvironmentReviewFog;
-        UpdateTerrainFog(clearReview ? 1e6f : World.Data.SightRadius, new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
+        float radius = clearReview ? 1e6f : World.Data.SightRadius;
+        var memory = new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night);
+        UpdateTerrainFog(radius, memory);
+        foreach (var shore in shoreMaterials) {
+            shore.SetShaderParameter(ShorePlayer, World.Player);
+            shore.SetShaderParameter(ShoreRadius, radius);
+            shore.SetShaderParameter(ShoreMemory, memory);
+        }
         if (clearReview) { fog.SetShaderParameter(FogRadius, 1e6f); return; }
         fog.SetShaderParameter(FogPlayer, World.Player);
         fog.SetShaderParameter(FogRadius, World.Data.SightRadius);

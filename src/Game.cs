@@ -764,6 +764,7 @@ public partial class Game : Node {
         } catch (Exception e) { Notify($"Load failed: {e.Message}"); return false; }
     }
     public override void _UnhandledInput(InputEvent ev) {
+        if (view?.EnvironmentReview == true) return;
         if (world == null || view == null || ending.Visible) return;
         if (anomaly.Visible) { if (anomalyWarning.Visible && ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) CancelAnomaly(); return; }
         if (backdrop.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) screenBack?.Invoke(); return; }
@@ -950,8 +951,15 @@ public partial class Game : Node {
         int environmentAt = Array.IndexOf(launchArgs, "--environment-review");
         if (environmentAt >= 0) {
             string location = environmentAt + 1 < launchArgs.Length ? launchArgs[environmentAt + 1] : "forest";
+            float coastAcross = Terrain.Across(World.Spawn);
+            var coastCenter = Terrain.Point(Terrain.Coast(coastAcross) - 2, coastAcross);
+            int oreAt = Array.IndexOf(launchArgs, "--mine-ore");
+            var reviewCliff = World.CliffOf(oreAt >= 0 && oreAt + 1 < launchArgs.Length ? launchArgs[oreAt + 1] : "coal");
+            var mineCenter = World.MineSpot(reviewCliff) - reviewCliff.Face * 1.4f;
             world.Player = location switch {
                 "lake" => Terrain.WaterPoint(Terrain.Lake + Terrain.Seaward) + Terrain.Seaward,
+                "coast" => coastCenter - Terrain.Seaward * 3,
+                "mine" => World.MineSpot(reviewCliff) + reviewCliff.Face,
                 "terrain" => Terrain.Point(125, -18),
                 _ => World.Spawn,
             };
@@ -960,10 +968,15 @@ public partial class Game : Node {
             world.Tick(0);
             view.EnvironmentReview = true;
             view.EnvironmentReviewFog = launchArgs.Contains("--review-fog");
-            view.EnvironmentCenter = location switch { "lake" => Terrain.Lake + Terrain.Seaward * 3, "terrain" => Terrain.Point(125, -18), _ => null };
+            view.EnvironmentCenter = location switch { "lake" => Terrain.Lake + Terrain.Seaward * 3, "terrain" => Terrain.Point(125, -18), "coast" => coastCenter, "mine" => mineCenter, _ => null };
+            if (location == "mine") {
+                var mine = world.Build("mine", World.MineSpot(reviewCliff))!;
+                mine.Stage = World.MineOpen;
+                mine.Output!.Add(World.MineOre(mine), 12);
+            }
             // The wide terrain camera must sit above the peaks rather than inside a near mountain face.
-            if (location == "terrain") view.EnvironmentCameraDistance = 140;
-            view.Zoom = location switch { "lake" => .44f, "terrain" => .24f, _ => .75f };
+            if (location is "terrain" or "coast" or "mine") view.EnvironmentCameraDistance = 140;
+            view.Zoom = location switch { "lake" => .44f, "terrain" => .24f, "coast" => .36f, "mine" => .85f, _ => .75f };
             ClosePanel(); ui.Visible = false; paused = true;
             return;
         }
