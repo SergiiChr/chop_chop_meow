@@ -2,9 +2,8 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Opt-in Tree3D 1.1.0 meshes baked offline by tools/tree3d.py, shared across the forest.</summary>
+/// <summary>Tree3D 1.1.0 meshes baked offline by tools/tree3d.py, shared across the forest.</summary>
 internal static class Tree3DShape {
-    public static readonly bool Enabled = System.Array.IndexOf(OS.GetCmdlineUserArgs(), "--tree3d") >= 0;
     private static readonly Mesh?[,] trunks = new Mesh?[4, 3], leaves = new Mesh?[4, 3];
     private static readonly StandardMaterial3D?[] bark = new StandardMaterial3D?[4], foliage = new StandardMaterial3D?[4];
     private static readonly string[] species = { "oak", "spruce", "birch", "bush" };

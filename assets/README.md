@@ -142,23 +142,13 @@ Visible geometry counts, excluding props being carried or sat upon:
 
 ### Nature
 
-- Optional Tree3D trial: `./build.py play -- --showcase --trees --tree3d` previews baked Tree3D 1.1.0 geometry; `--tree3d` also works in the playable forest.
+- Tree3D 1.1.0 supplies the default baked tree and berry-bush geometry. Preview it with `./build.py play -- --showcase --trees`.
   - `src/Tree3DShape.cs` loads shared tree and berry-bush meshes and alpha-cutout foliage materials.
-  - Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes --tree3d`. Berries attach to actual foliage-card twigs and retain their independent harvest visibility. Decorative scenery shrubs keep their inexpensive MultiMesh.
+  - Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes`. Berries attach to actual foliage-card twigs and retain their independent harvest visibility. Decorative scenery shrubs keep their inexpensive MultiMesh.
   - `assets/models/tree3d/` contains the baked meshes, original SVG leaf/bark textures, triangle manifest and upstream license notices.
   - Regenerate with `./tools/tree3d.py`; native authoring binaries stay in ignored `.tools/tree3d` and are unnecessary to play. See [trial details and compatibility](../docs/art/TREES.md).
 
-- `src/NatureShape.cs` — trees, berry bushes, rocks, ore deposits and loose ore as shared vertex-coloured meshes, with three seeded shape variants each.
-  - Oaks have root buttresses, exposed scaffold limbs and smaller leafy boughs with folded leaf edges.
-  - Spruces have a tapered leader and irregular whorls of folded, serrated needle sprays with gaps between boughs.
-  - Birches have marked pale bark, fine dark twigs and separate hanging foliage clusters.
-  - Each code-built standing tree uses one shared mesh and material, drawn by one visible instance and one shadow-only instance. The original shadow survives canopy fading; both instances share the shake/fall pivot. All geometry is generated during loading, and the existing stump handle remains.
-  - Review the three species with `./build.py play -- --showcase --trees`; external generator research is in [docs/art/TREES.md](../docs/art/TREES.md).
-  - Faceted boulders pressed into the ground.
-- `NatureShape.Bush` — seven seeded foliage clumps with short branching stems and folded, two-sided leaves.
-  - Berries are positioned against that variant's actual cached foliage surface and keep their separate harvest visibility pivot.
-  - Each of the three variants uses 1,200 triangles across two visible mesh instances when ripe, or 880 triangles in one mesh when harvested.
-  - The separate berry-heap icon stays unchanged.
+- `src/NatureShape.cs` supplies shared vertex-coloured meshes for stumps, decorative shrubs, fruit, rocks, ore deposits and loose ore. The former procedural tree and resource-bush generators have been retired.
 - `NatureShape.Ore` and `NatureShape.OreChips` — color-neutral host/seam and fractured chip geometry shared by coal, iron and tin deposits for each of three seeded variants.
   - Cached material palettes distinguish black coal, rusty iron and pale tin; coal chips use near-black `0c0e10` without lightened grey tops.
   - The existing four-boulder profiles stay unchanged, with seams clipped flush into their faces along continuous bedding planes.
@@ -167,8 +157,8 @@ Visible geometry counts, excluding props being carried or sat upon:
   - The tin-ore icon is rendered from the updated deposit; coal and iron inventory icons use their separate loose-ore models.
 - `NatureShape.Scrub` — decorative plain bushes as a lightweight lobe that reuses the resource bush's folded-leaf builder.
   - Its neutral shading takes the existing MultiMesh colors.
-  - The original 900 seeded lobe transforms, colors and mine-approach clearance remain unchanged, in one MultiMesh batch with no new per-frame work.
-  - Each lobe uses 48 triangles instead of the previous sphere's 70, reducing the full shrub scatter from 63,000 to 43,200 triangles.
+  - The default baked-placement fixture contains 269 three-lobe bushes, filtered away from water, trails, resources and mine approaches, in one MultiMesh batch with no per-frame work.
+  - Each lobe uses 48 triangles.
 - `LeafShape` — replaces the leaf patch's 26 box instances with one shared mesh of twenty-four pointed, folded autumn leaves and tapered stems.
   - Three fixed seeded layouts keep variation alongside the existing ID-based yaw.
   - Each full or partially raked patch uses 264 triangles and one visible mesh instance, compared with 312 across twenty-six before.

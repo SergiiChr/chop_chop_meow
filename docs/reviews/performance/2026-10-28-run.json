@@ -1,0 +1,191 @@
+{
+  "gpu": "NVIDIA GeForce RTX 4080 Laptop GPU",
+  "godot": "4.7.2-stable (official)",
+  "viewport": "1440x900",
+  "vsync": false,
+  "cycleClockMultiplier": 3.5,
+  "warmupSeconds": 15,
+  "measuredSeconds": 360,
+  "frames": 71396,
+  "walkedUnits": 1561.104874127719,
+  "events": [
+    {
+      "seconds": -14.914382,
+      "site": "forest",
+      "position": [
+        129,
+        146
+      ],
+      "phase": 0.12
+    },
+    {
+      "seconds": 30.002622000000002,
+      "site": "lake",
+      "position": [
+        135.30304,
+        115.504036
+      ],
+      "phase": 0.24494693
+    },
+    {
+      "seconds": 60.00774800000001,
+      "site": "coast",
+      "position": [
+        152.89093,
+        169.89093
+      ],
+      "phase": 0.37003705
+    },
+    {
+      "seconds": 90.000301,
+      "site": "iron",
+      "position": [
+        145.1499,
+        98.09484
+      ],
+      "phase": 0.49496263
+    },
+    {
+      "seconds": 120.00645700000001,
+      "site": "tin",
+      "position": [
+        97.06684,
+        55.668217
+      ],
+      "phase": 0.61998624
+    },
+    {
+      "seconds": 150.007467,
+      "site": "coal",
+      "position": [
+        78.365814,
+        119.624084
+      ],
+      "phase": 0.74501634
+    },
+    {
+      "seconds": 180.008602,
+      "site": "upper-valley",
+      "position": [
+        75.66042,
+        101.116264
+      ],
+      "phase": 0.87006325
+    },
+    {
+      "seconds": 210.00081,
+      "site": "forest-edge",
+      "position": [
+        143,
+        150
+      ],
+      "phase": 0.994988
+    },
+    {
+      "seconds": 240.000478,
+      "site": "forest",
+      "position": [
+        129,
+        146
+      ],
+      "phase": 0.22
+    }
+  ],
+  "stations": [
+    {
+      "Id": 676,
+      "Kind": "reinforced",
+      "Recipe": "steel_bar",
+      "batchesObserved": 21,
+      "Processing": true,
+      "Progress": 5.6503835,
+      "inventory": {
+        "iron_bar": 20,
+        "coal": 20
+      }
+    },
+    {
+      "Id": 677,
+      "Kind": "furnace",
+      "Recipe": "iron_bar",
+      "batchesObserved": 44,
+      "Processing": true,
+      "Progress": 1.4020759,
+      "inventory": {
+        "iron_ore": 2
+      }
+    },
+    {
+      "Id": 678,
+      "Kind": "furnace",
+      "Recipe": "iron_bar",
+      "batchesObserved": 44,
+      "Processing": true,
+      "Progress": 6.2253876,
+      "inventory": {
+        "iron_ore": 6
+      }
+    },
+    {
+      "Id": 679,
+      "Kind": "bench",
+      "Recipe": "planks",
+      "batchesObserved": 28,
+      "Processing": false,
+      "Progress": 0,
+      "inventory": {
+        "wood": 36
+      }
+    }
+  ],
+  "workers": [
+    {
+      "Name": "Forge keeper",
+      "workState": "Pumping",
+      "Status": "Operating bellows",
+      "WageDebt": 0
+    },
+    {
+      "Name": "Forge hauler",
+      "workState": "Idle",
+      "Status": "Carrying Steel bar \u2192 Storage chest",
+      "WageDebt": 0
+    },
+    {
+      "Name": "Smelter A",
+      "workState": "Idle",
+      "Status": "Carrying Iron ore \u2192 Stone furnace",
+      "WageDebt": 0
+    },
+    {
+      "Name": "Smelter A hauler",
+      "workState": "Idle",
+      "Status": "Carrying Iron bar \u2192 Storage chest",
+      "WageDebt": 0
+    },
+    {
+      "Name": "Smelter B",
+      "workState": "Idle",
+      "Status": "Waiting for the next load",
+      "WageDebt": 0
+    },
+    {
+      "Name": "Smelter B hauler",
+      "workState": "Idle",
+      "Status": "Waiting for the next load",
+      "WageDebt": 0
+    },
+    {
+      "Name": "Bench worker",
+      "workState": "Idle",
+      "Status": "Carrying Wood planks \u2192 Storage chest",
+      "WageDebt": 0
+    },
+    {
+      "Name": "Fire tender",
+      "workState": "Idle",
+      "Status": "Tending fire",
+      "WageDebt": 0
+    }
+  ]
+}

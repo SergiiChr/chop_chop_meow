@@ -27,6 +27,11 @@ public partial class WorldView : Node3D {
     public string? SelectedTool;
     public bool Paused;
     public bool AnimationReview;
+    /// <summary>Fixed daylight landscape fixture for matching environment trial screenshots.</summary>
+    public bool EnvironmentReview;
+    public bool EnvironmentReviewFog;
+    public Vector2? EnvironmentCenter;
+    public float EnvironmentCameraDistance = 60;
     public float Elapsed;
     public bool PanelOpen;
     public Sounds? Sounds;
@@ -138,8 +143,31 @@ public partial class WorldView : Node3D {
 
     // Made once: passing a plain string converts it to a new StringName on every call.
     private static readonly StringName FogPlayer = "player", FogRadius = "radius", FogMemory = "memory";
+    private readonly List<ShaderMaterial> shoreMaterials = new(2);
+    private static readonly StringName ShorePlayer = "shore_player", ShoreRadius = "shore_radius", ShoreMemory = "shore_memory";
+
+    private void RegisterShoreline(MeshInstance3D bank) {
+        // A transparent bank must apply fog in its own pass; an opaque overlay cannot mask its feathered edge.
+        bank.MaterialOverlay = null;
+        var material = (ShaderMaterial)bank.MaterialOverride;
+        material.SetShaderParameter("shore_explored", exploredTexture);
+        shoreMaterials.Add(material);
+    }
+
     private void UpdateFog() {
-        if (AnimationReview) { fog.SetShaderParameter(FogRadius, 1e6f); return; }
+        bool clearReview = AnimationReview || EnvironmentReview && !EnvironmentReviewFog;
+        float radius = clearReview ? 1e6f : World.Data.SightRadius;
+        var memory = new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night);
+        UpdateTerrainFog(radius, memory);
+        dressingFog.SetShaderParameter(FogPlayer, World.Player);
+        dressingFog.SetShaderParameter(FogRadius, radius);
+        dressingFog.SetShaderParameter(FogMemory, memory);
+        foreach (var shore in shoreMaterials) {
+            shore.SetShaderParameter(ShorePlayer, World.Player);
+            shore.SetShaderParameter(ShoreRadius, radius);
+            shore.SetShaderParameter(ShoreMemory, memory);
+        }
+        if (clearReview) { fog.SetShaderParameter(FogRadius, 1e6f); return; }
         fog.SetShaderParameter(FogPlayer, World.Player);
         fog.SetShaderParameter(FogRadius, World.Data.SightRadius);
         fog.SetShaderParameter(FogMemory, new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
@@ -205,9 +233,10 @@ public partial class WorldView : Node3D {
         camera.Size = (AnimationReview ? 9.5f : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         var back = new Vector3(across, MathF.Sin(pitch), across);
-        var target = AnimationReview ? ReviewCenter : To3(World.Player);
+        var target = AnimationReview ? ReviewCenter : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
-        camera.Position = target + back * 60;
+        camera.Position = target + back * (EnvironmentReview ? EnvironmentCameraDistance : 60);
+        if (EnvironmentReview && EnvironmentCameraDistance > 60) sun.DirectionalShadowMaxDistance = EnvironmentCameraDistance + 40;
         float unitsPerPixel = camera.Size / Math.Max(1, size.Y);
         camera.HOffset = (.5f - Center.X / Math.Max(1, size.X)) * size.X * unitsPerPixel;
         camera.VOffset = (Center.Y / Math.Max(1, size.Y) - .5f) * size.Y * unitsPerPixel;
@@ -335,7 +364,7 @@ public partial class WorldView : Node3D {
         Elapsed += dt;
         SyncCamera();
         if (AnimationReview) { UpdateReview(); UpdateFog(); overlay.QueueRedraw(); return; }
-        if (dt > 0) UpdateActors(dt);
+        if (dt > 0 || EnvironmentReview) UpdateActors(dt);
         SyncThings(dt);
         if (dt > 0) { SyncWolves(dt); SyncCarts(dt); }
         UpdateEffects(dt);
@@ -583,7 +612,7 @@ public partial class WorldView : Node3D {
             foreach (var t in World.S.Things) Show(PropFor(t), false);
         }
         seen.Clear();
-        World.CollectKnown(known);
+        if (EnvironmentReview && EnvironmentCenter.HasValue) { known.Clear(); known.AddRange(World.S.Things); } else World.CollectKnown(known);
         foreach (var t in known) {
             seen.Add(t.Id);
             var prop = PropFor(t);
@@ -905,6 +934,10 @@ public partial class WorldView : Node3D {
     }
 
     private void UpdateMarkers() {
+        if (EnvironmentReview) {
+            selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = placeTile.Visible = false;
+            return;
+        }
         Mark(selectRing, World.Find(Selected), 0);
         Mark(hoverRing, Hover != Selected ? World.Find(Hover) : null, .004f);
         Worker? worker = null;
@@ -994,6 +1027,7 @@ public partial class WorldView : Node3D {
     }
 
     private void PaintOverlay() {
+        if (EnvironmentReview) return;
         if (World == null) return;
         if (AnimationReview) { PaintReview(); return; }
         foreach (var t in World.S.Things) {

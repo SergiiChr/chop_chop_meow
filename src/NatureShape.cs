@@ -5,8 +5,8 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// Shared nature meshes: branched leaf crowns, lathed trunks and needle sprays, and faceted boulders and lumps pressed into the ground.
-/// Each variant is built once from a fixed seed and colored by vertex, so a forest shares a handful of meshes and one material.
+/// Shared nature meshes: stumps, decorative shrubs, fruit, faceted boulders and resource lumps.
+/// Each variant is built once from a fixed seed and colored by vertex. Standing trees and berry bushes use baked Tree3D meshes.
 /// </summary>
 internal static class NatureShape {
     internal readonly record struct Step(float Y, float Radius, Color Color);
@@ -205,158 +205,11 @@ internal static class NatureShape {
         return color.Lightened(Noise(p * 3, seed) * .05f);
     };
 
-    private static Transform3D Limb(Vector3 from, float tiltDegrees, float yawDegrees) =>
-        new(Basis.FromEuler(new Vector3(0, Mathf.DegToRad(yawDegrees), 0)) * Basis.FromEuler(new Vector3(0, 0, Mathf.DegToRad(-tiltDegrees))), from);
-
-    /// <summary>A tapered limb between two points, with a slightly bent middle and longitudinal bark facets.</summary>
-    private static void Branch(SurfaceTool s, Vector3 from, Vector3 to, float radius, Color bark, int seed) {
-        var direction = to - from;
-        var axis = Vector3.Up.Cross(direction.Normalized());
-        var basis = axis.LengthSquared() > .00001f ? new Basis(axis.Normalized(), Vector3.Up.AngleTo(direction)) : Basis.Identity;
-        Lathe(s, new Transform3D(basis, from), new Step[] {
-            new(0, radius, bark.Darkened(.12f)), new(direction.Length() * .45f, radius * .72f, bark),
-            new(direction.Length(), radius * .2f, bark.Lightened(.08f)) }, 6, seed, .12f,
-            (_, side) => side % 3 == 0 ? bark.Darkened(.18f) : null);
-    }
-
-    /// <summary>Small foliage masses with folded, two-sided leaves breaking their edges; all baked into one shared mesh.</summary>
-    private static void TreeClump(SurfaceTool s, Vector3 at, Vector3 radii, int seed,
-        Func<Vector3, Vector3, Color> tint, float leafSize = 1) {
-        var (points, triangles) = Shape(at, radii, 0, seed, 5, .32f, .09f, at.Y - radii.Y, 0);
-        Blob(s, at, points, triangles, false, tint);
-        BushLeaves(s, at, radii, points, tint, seed * .7f, 13, leafSize);
-    }
-
-    /// <summary>Oak: heavy root buttresses, spreading scaffold limbs and an uneven crown of separate leafy boughs.</summary>
-    public static Mesh Oak(int variant) => Cached($"oak{variant}", s => {
-        Color bark = new("705038"), dark = new("493523");
-        Lathe(s, Transform3D.Identity, new Step[] { new(0, .38f, dark), new(.22f, .28f, bark),
-            new(1.4f, .23f, bark), new(2.6f, .17f, bark), new(3.9f, .045f, bark) }, 9, 11 + variant, .13f,
-            (_, side) => side % 3 == 0 ? dark : null);
-        for (int i = 0; i < 5; i++) {
-            float angle = i * Mathf.Tau / 5 + variant;
-            Branch(s, new Vector3(MathF.Cos(angle) * .65f, .025f, MathF.Sin(angle) * .65f),
-                new Vector3(0, .65f, 0), .13f, bark, i);
-        }
-        var tint = Leafy(new Color("304b27"), new Color("527537"), new Color("7b9c4b"), variant);
-        for (int i = 0; i < 9; i++) {
-            float angle = i * 2.39996f + variant * .8f;
-            float reach = i < 6 ? 1.05f + .14f * MathF.Sin(i * 7 + variant) : .62f;
-            float y = i < 6 ? 3.35f + .18f * (i % 3) : 4.25f + .12f * (i % 2);
-            var radial = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle));
-            var fork = radial * (reach * .65f) + Vector3.Up * (y - .45f);
-            Branch(s, new Vector3(0, 1.9f + i * .12f, 0), fork, .12f - i * .007f, bark, i + variant * 9);
-            for (int j = 0; j < 3; j++) {
-                var end = radial * reach + Vector3.Up * y + new Vector3(MathF.Cos(angle + j * 2.1f), .18f * j, MathF.Sin(angle + j * 2.1f)) * .37f;
-                Branch(s, fork, end, .045f, bark, i * 3 + j);
-                TreeClump(s, end, new Vector3(.54f, .42f, .53f), 110 + variant * 31 + i * 3 + j, tint, 1.45f);
-            }
-        }
-        TreeClump(s, new Vector3(.05f, 4.65f, -.1f), new Vector3(.58f, .42f, .56f), 190 + variant, tint, 1.4f);
-    });
-
-    /// <summary>A folded evergreen spray with a central rib and an irregular saw-toothed needle outline.</summary>
-    private static void NeedleSpray(SurfaceTool s, Vector3 from, Vector3 to, float width, int seed,
-        Func<Vector3, Vector3, Color> tint) {
-        var along = to - from;
-        var side = along.Cross(Vector3.Up).Normalized();
-        const int Segments = 3;
-        for (int segment = 0; segment < Segments; segment++) {
-            float t0 = segment / (float)Segments, t1 = (segment + 1) / (float)Segments;
-            var a = from + along * t0 + Vector3.Up * MathF.Sin(t0 * Mathf.Pi) * width * .35f;
-            var b = from + along * t1 + Vector3.Up * MathF.Sin(t1 * Mathf.Pi) * width * .35f;
-            float w0 = segment == 0 ? width * .24f : width * (1 - t0) * (segment % 2 == 0 ? .8f : 1.2f);
-            float w1 = segment == Segments - 1 ? 0 : width * (1 - t1) * (segment % 2 == 0 ? 1.2f : .8f);
-            for (int sign = -1; sign <= 1; sign += 2) {
-                var c = from + along * t0 + side * (w0 * sign);
-                var d = from + along * t1 + side * (w1 * sign);
-                void Face(Vector3 p, Vector3 q, Vector3 r) {
-                    var normal = (r - p).Cross(q - p).Normalized();
-                    if (normal.Y < 0) { (q, r) = (r, q); normal = -normal; }
-                    var color = tint((p + q + r) / 3, normal).Darkened((seed % 4) * .025f);
-                    s.SetColor(color); s.SetNormal(normal); s.AddVertex(p); s.AddVertex(q); s.AddVertex(r);
-                    s.SetColor(color.Darkened(.2f)); s.SetNormal(-normal); s.AddVertex(p); s.AddVertex(r); s.AddVertex(q);
-                }
-                Face(a, c, d); if (segment != Segments - 1) Face(a, d, b);
-            }
-        }
-    }
-
-    /// <summary>Spruce: a visible leader and irregular whorls of drooping, serrated needle boughs with open gaps.</summary>
-    public static Mesh Spruce(int variant) => Cached($"spruce{variant}", s => {
-        Color bark = new("65503b");
-        Branch(s, Vector3.Zero, new Vector3(.06f, 5.45f, -.03f), .22f, bark, 21 + variant);
-        var tint = Leafy(new Color("203e32"), new Color("365f43"), new Color("587e51"), variant);
-        for (int tier = 0; tier < 8; tier++) {
-            float y = 1.1f + tier * .54f, reach = 1.48f * (1 - tier / 8.3f);
-            int count = tier < 4 ? 8 : 6;
-            for (int i = 0; i < count; i++) {
-                float angle = i * Mathf.Tau / count + tier * 1.7f + variant * .6f;
-                var radial = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle));
-                var across = radial.Cross(Vector3.Up);
-                float length = reach * (.88f + .12f * MathF.Sin(i * 13 + tier + variant));
-                var tip = radial * length + Vector3.Up * (y - .17f);
-                Branch(s, Vector3.Up * (y + .2f), tip, .04f * (1 - tier * .08f), bark, i + tier * 7);
-                for (int fan = -1; fan <= 1; fan++) {
-                    var start = radial * length * .22f + Vector3.Up * (y + .18f);
-                    var end = tip + across * (fan * length * .28f) + Vector3.Up * (fan == 0 ? .04f : -.08f);
-                    NeedleSpray(s, start, end, length * .28f, tier * 17 + i + variant, tint);
-                }
-            }
-        }
-        for (int i = 0; i < 5; i++) {
-            float angle = i * Mathf.Tau / 5;
-            NeedleSpray(s, new Vector3(.06f, 4.85f, -.03f),
-                new Vector3(MathF.Cos(angle) * .09f + .06f, 5.5f, MathF.Sin(angle) * .09f - .03f), .12f, i, tint);
-        }
-    });
-
-    /// <summary>Birch: a pale slender leader, fine dark twigs and light hanging sprays with space between them.</summary>
-    public static Mesh Birch(int variant) => Cached($"birch{variant}", s => {
-        Color pale = new("ddd9c7"), shade = new("b5b7a7"), mark = new("49483c");
-        var steps = new List<Step>();
-        for (int i = 0; i <= 18; i++) steps.Add(new(i * .27f, .16f * (1 - i / 22f), i < 2 ? shade : pale));
-        Lathe(s, Transform3D.Identity, steps.ToArray(), 8, 31 + variant, .08f,
-            (row, side) => Noise(new Vector3(row, side, 7), 31 + variant) > .45f ? mark : null);
-        var tint = Leafy(new Color("486330"), new Color("759448"), new Color("a2b968"), variant);
-        for (int i = 0; i < 10; i++) {
-            float angle = i * 2.39996f + variant;
-            float y = 2.85f + i * .19f, reach = .85f - i * .035f;
-            var radial = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle));
-            var fork = radial * reach * .65f + Vector3.Up * (y + .25f);
-            Branch(s, Vector3.Up * (y - .65f), fork, .045f, pale, i);
-            for (int j = 0; j < 2; j++) {
-                var end = radial * reach + Vector3.Up * (y - j * .3f) + new Vector3(MathF.Cos(angle + 1.5f), 0, MathF.Sin(angle + 1.5f)) * (j == 0 ? .22f : -.22f);
-                Branch(s, fork, end - Vector3.Up * .3f, .018f, mark, i * 2 + j);
-                TreeClump(s, end, new Vector3(.42f, .38f, .39f), 410 + variant * 23 + i * 2 + j, tint, 1.15f);
-            }
-        }
-        TreeClump(s, new Vector3(0, 4.85f, 0), new Vector3(.36f, .38f, .34f), 490 + variant, tint);
-    });
-
     /// <summary>A felled tree's stump: bark sides with root flare and a pale cut face.</summary>
     public static Mesh Stump => Cached("stump", s => {
         Color bark = new("6b4a32"), wood = new("c9a477");
         Lathe(s, Transform3D.Identity, new Step[] { new(0, .36f, new Color("4f3624")), new(.1f, .28f, bark), new(.32f, .26f, wood) }, 9, 5, .06f);
     });
-
-    private static (Vector3 At, Vector3 Radii)[] BushClumps(int variant) {
-        var random = new Random(301 + variant);
-        float R(float spread) => ((float)random.NextDouble() * 2 - 1) * spread;
-        var clumps = new List<(Vector3, Vector3)> { (new(R(.05f), .45f, R(.05f)), new(.42f, .36f, .42f)) };
-        for (int i = 0; i < 5; i++) {
-            float angle = i * Mathf.Tau / 5 + R(.4f), reach = .38f + R(.06f), radius = .31f + R(.04f);
-            clumps.Add((new(MathF.Cos(angle) * reach, radius * .85f, MathF.Sin(angle) * reach), new(radius, radius * .9f, radius)));
-        }
-        float top = R(3);
-        clumps.Add((new(MathF.Cos(top) * .15f, .7f + R(.04f), MathF.Sin(top) * .15f), new(.27f, .23f, .27f)));
-        // Lift the low foliage enough to expose the shrub's short woody stems.
-        for (int i = 0; i < clumps.Count; i++) {
-            var (at, radii) = clumps[i];
-            clumps[i] = (at + Vector3.Up * .14f, radii * new Vector3(1, .78f, 1));
-        }
-        return clumps.ToArray();
-    }
 
     /// <summary>The same folded leaf construction is used for resource bushes and lightweight scenery lobes.</summary>
     private static void BushLeaves(SurfaceTool s, Vector3 at, Vector3 radii, Vector3[] points,
@@ -394,49 +247,6 @@ internal static class NatureShape {
         var (points, triangles) = Shape(Vector3.Zero, Vector3.One, 0, 391, 4, .18f, .04f, -.46f, 0);
         Blob(s, Vector3.Zero, points, triangles, false, tint);
         BushLeaves(s, Vector3.Zero, Vector3.One, points, tint, .4f, 7, 2.1f);
-    });
-
-    /// <summary>Shared leafy clumps with short branching stems and folded leaf tips breaking up the silhouette.</summary>
-    public static Mesh Bush(int variant) => Cached($"bush{variant}", s => {
-        var tint = Leafy(new Color("2c4d22"), new Color("4c7a33"), new Color("6e9c45"), variant);
-        var clumps = BushClumps(variant);
-        for (int i = 0; i < clumps.Length; i++) {
-            var (at, radii) = clumps[i];
-            if (i < 6) {
-                var start = new Vector3(0, .015f, 0);
-                var direction = at - start;
-                var axis = Vector3.Up.Cross(direction.Normalized());
-                var basis = axis.LengthSquared() > .00001f ? new Basis(axis.Normalized(), Vector3.Up.AngleTo(direction)) : Basis.Identity;
-                Lathe(s, new Transform3D(basis, start), new Step[] {
-                    new(0, i == 0 ? .045f : .025f, new Color("62452d")),
-                    new(direction.Length(), .012f, new Color("80603b")) }, 4);
-            }
-            int seed = 311 + variant * 11 + i;
-            var (points, triangles) = Shape(at, radii, 1, seed, 4, .3f, .06f, .02f, 0);
-            Blob(s, at, points, triangles, false, tint);
-            BushLeaves(s, at, radii, points, tint, i * .7f + variant);
-        }
-    });
-
-    /// <summary>Berries spread over the upper and outer surface of <see cref="Bush"/>, each set where its ray leaves the actual foliage mesh.</summary>
-    public static Mesh Berries(int variant) => Cached($"berries{variant}", s => {
-        // Intersect the actual cached foliage, including its leaf tips, rather than ideal ellipsoids.
-        var foliage = Bush(variant).GetFaces();
-        var random = new Random(401 + variant);
-        Color[] reds = { new("c0283a"), new("a3202f"), new("d23a45") };
-        var origin = new Vector3(0, .3f, 0);
-        const int count = 16;
-        for (int i = 0; i < count; i++) {
-            float y = .85f - 1.05f * (i + .5f) / count, ring = MathF.Sqrt(1 - y * y), angle = i * 2.39996f + (float)random.NextDouble() * .6f;
-            var direction = new Vector3(MathF.Cos(angle) * ring, y, MathF.Sin(angle) * ring);
-            float reach = 0;
-            for (int face = 0; face < foliage.Length; face += 3) {
-                if (Hit(origin, direction, foliage[face], foliage[face + 1], foliage[face + 2]) is float distance)
-                    reach = Math.Max(reach, distance);
-            }
-            var color = reds[random.Next(reds.Length)];
-            Blob(s, origin + direction * (reach + .025f), Vector3.One * .05f, 0, 0, 0, 0, 0, -1, false, (_, _) => color);
-        }
     });
 
     /// <summary>Fruit clusters attached to the stems at the centers of actual Tree3D foliage cards, rather than their transparent edges.</summary>

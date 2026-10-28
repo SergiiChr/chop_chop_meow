@@ -54,6 +54,20 @@ Play accepts Godot arguments after `--`:
 
 These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
+The default environment uses baked forest placement, the lake and coastal water
+shaders, and Terrain3D rendering. `./build.py setup` downloads and installs the
+pinned Terrain3D Linux x86_64 runtime when needed. See
+[the environment notes and historical comparisons](docs/art/ENVIRONMENT_TRIALS.md)
+for provenance and limitations. Recreate the current landscape views with
+`./tools/environment_review.py` or the coast and mine views with
+`./tools/environment_review.py --shoreline`; historical before screenshots are
+preserved and are not regenerated.
+
+For a rendered walking/day-night and eight-worker production benchmark, run
+`./build.py play -- --performance-run /absolute/path/to/results`, then
+`python3 tools/performance_report.py /absolute/path/to/results`.
+See [local performance measurements and limitations](docs/art/PERFORMANCE.md).
+
 ## Start menu and options
 
 The game opens on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit.
@@ -440,7 +454,7 @@ A manually exported or otherwise normally launched Godot build uses Godot's stan
 
 ### Environment
 
-The environment uses a shared human scale, low-poly mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones. Meadow grass and wildflowers grow in patches; fern colonies, shrubs and fallen twigs follow woodland groups. Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas. A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
+The environment uses a shared human scale, Terrain3D mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones. Meadow grass and wildflowers grow in patches; ferns, ordinary shrubs and fallen twigs add woodland ground cover. Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas. A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
 
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack. The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset. The moon takes the same path at night and waxes and wanes over a cycle of `moonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by. Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows. Trees in front of the player, a worker or a structure turn see-through.
 
