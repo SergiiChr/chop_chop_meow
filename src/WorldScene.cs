@@ -18,7 +18,9 @@ public partial class WorldView {
         var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
         const float span = Terrain.Size * 4;
         var ground = new StandardMaterial3D { AlbedoTexture = grass, Roughness = 1, Uv1Scale = new Vector3(span / 9, span / 9, 1) };
-        Add(parent, new PlaneMesh { Size = new Vector2(span, span) }, ground, new Vector3(Terrain.Size / 2f, 0, Terrain.Size / 2f));
+        bool terrain3D = OS.GetCmdlineUserArgs().Contains("--terrain3d");
+        if (terrain3D) BuildTerrain3D(parent, grass);
+        else Add(parent, new PlaneMesh { Size = new Vector2(span, span) }, ground, new Vector3(Terrain.Size / 2f, 0, Terrain.Size / 2f));
         // The arrival clearing: overlapping translucent discs soften into the grass.
         for (int ring = 0; ring < 4; ring++)
             Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(World.Spawn.X, .003f + ring * .0005f, World.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
@@ -38,7 +40,7 @@ public partial class WorldView {
         }
         BuildSea(parent);
         BuildLake(parent);
-        BuildMountains(parent);
+        if (!terrain3D) BuildMountains(parent);
         foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
         if (OS.GetCmdlineUserArgs().Contains("--proton-scatter")) BuildPlacedEnvironment(parent);
         else BuildTufts(parent);

@@ -30,3 +30,6 @@ bin/
 obj/
 __pycache__/
 *.py[cod]
+
+# Pinned optional runtime installed by tools/terrain3d.py.
+/addons/terrain_3d/

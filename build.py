@@ -206,7 +206,21 @@ def build_project(env: dict[str, str]) -> None:
         ["dotnet", "build", "--nologo", "-v", "quiet", ROOT / "ChopChopMeow.csproj"],
         env=env,
     )
-    run_godot("import", [GODOT, "--headless", "--path", ROOT, "--import"], env)
+    import_args = [GODOT, "--headless", "--path", ROOT, "--import"]
+    try:
+        run_godot("import", import_args, env)
+    except SystemExit as error:
+        # Godot 4.7.2 can crash at shutdown after the first scan of this native
+        # extension. Preserve that failure and retry once, only for this exact
+        # exit after editor initialization, with no reported engine errors.
+        log = BUILD / "import.log"
+        text = log.read_text(errors="replace") if log.is_file() else ""
+        native = ROOT / "addons" / "terrain_3d" / "terrain.gdextension"
+        if "import failed (exit -11)" not in str(error) or not native.is_file() or "loading_editor_layout" not in text or ERRORS.search(text):
+            raise
+        shutil.copyfile(log, BUILD / "terrain3d-first-import.log")
+        print("Terrain3D first import crashed during editor shutdown; retrying once. See build/terrain3d-first-import.log.")
+        run_godot("import", import_args, env)
 
 
 def setup() -> dict[str, str]:
@@ -215,6 +229,10 @@ def setup() -> dict[str, str]:
     BUILD.mkdir(exist_ok=True)
     (BUILD / ".gdignore").touch()
     fetch_godot()
+    if "--terrain3d" in sys.argv[2:]:
+        from tools import terrain3d
+
+        terrain3d.install_runtime()
     env = ensure_dotnet()
     build_project(env)
     return env
@@ -325,6 +343,24 @@ def fetch_templates(env: dict[str, str]) -> None:
     archive.unlink(missing_ok=True)
 
 
+def package_linux() -> Path:
+    """Keep exported native extensions beside the executable in the portable bundle."""
+    paths = [
+        OUTPUT,
+        OUTPUT.with_suffix(".pck"),
+        BUILD / "data_ChopChopMeow_linuxbsd_x86_64",
+        ROOT / "README.md",
+        ROOT / "LICENSE",
+    ]
+    if (ROOT / "addons" / "terrain_3d" / "terrain.gdextension").is_file():
+        paths.append(BUILD / "libterrain.linux.release.x86_64.so")
+    archive = BUILD / "ChopChopMeow-linux-x86_64.tar.gz"
+    with tarfile.open(archive, "w:gz") as bundle:
+        for path in paths:
+            bundle.add(path, arcname=f"ChopChopMeow/{path.name}")
+    return archive
+
+
 def main() -> int:
     action = sys.argv[1] if len(sys.argv) > 1 else ""
     if action in {"-h", "--help", "help"}:
@@ -365,16 +401,7 @@ def main() -> int:
                 timeout=120,
                 success_marker="SMOKE-TEST PASS",
             )
-            archive = BUILD / "ChopChopMeow-linux-x86_64.tar.gz"
-            with tarfile.open(archive, "w:gz") as bundle:
-                for path in (
-                    OUTPUT,
-                    OUTPUT.with_suffix(".pck"),
-                    BUILD / "data_ChopChopMeow_linuxbsd_x86_64",
-                    ROOT / "README.md",
-                    ROOT / "LICENSE",
-                ):
-                    bundle.add(path, arcname=f"ChopChopMeow/{path.name}")
+            archive = package_linux()
             print(
                 f"Built {OUTPUT.relative_to(ROOT)}\nPortable bundle: {archive.relative_to(ROOT)}"
             )

@@ -69,3 +69,62 @@ fluid simulation or buoyancy is added. See `assets/environment/lake/README.md`.
 
 Both frames show the entire surrounding resource layout with the player on
 the dry bank. Shader time is fixed to 1.25 seconds in the review fixture.
+
+## 3. Terrain3D
+
+```sh
+./build.py play -- --tree3d --proton-scatter --lake-water --terrain3d
+```
+
+Terrain3D's native clipmaps replace the original plane and faceted mountain
+mesh. Nine padded heightmap regions use the existing mountain height function;
+the playable valley floor remains level, keeping the current movement,
+picking, building and shoreline rules. Terrain detail follows the viewed
+ground rather than the distant orthographic camera. The generated Terrain3D
+shader retains its height, normal and LOD paths, with project grass/rock colors,
+fog of war and cutouts below the five mine entrances. Collision remains owned
+by the simulation; this does not add walkable hills, sculpting UI or digging.
+
+The pinned upstream MIT release is `v1.1.0-rc1` (a release candidate), archive
+SHA-256 `549d0c1d45982ae2e30d90275f754a9c7174b8f57eb600bc93a8108b98d44636`.
+The launcher installs its Linux x86_64 libraries under ignored
+`addons/terrain_3d`; the archive stays in `.tools/terrain3d`. No external
+checkout or incomplete generated C# wrapper classes are required. See
+`assets/environment/terrain3d/README.md` for provenance and the optional
+isolated native API probe.
+
+| Before | After |
+| --- | --- |
+| ![Original terrain](../reviews/environment/03-terrain-before.png) | ![Terrain3D](../reviews/environment/03-terrain-after.png) |
+
+```sh
+./build.py play -- --showcase --environment-review terrain --tree3d --proton-scatter --lake-water --screenshot /absolute/path/before.png
+./build.py play -- --showcase --environment-review terrain --tree3d --proton-scatter --lake-water --terrain3d --screenshot /absolute/path/after.png
+```
+
+The wider terrain fixture moves the orthographic camera above the peaks in
+both images. Add `--review-fog` to a landscape fixture to inspect the normal
+exploration mask instead of revealing the whole view. All six comparisons
+can be regenerated in order with `./tools/environment_review.py`.
+
+## Validation and practical limits
+
+- Fixed-seed ProtonScatter output matched across two independent bakes.
+- Compilation and C# formatting passed. The full `./build.py build --terrain3d`
+  passed simulation, real input/UI, two-process network checks, Linux export
+  and executable smoke test.
+- An additional UI run with all trials enabled passed, including walking
+  allocation checks: 109.5 bytes/frame against the existing 150-byte budget,
+  the same measured result as the normal renderer.
+- All comparison frames were rendered with Forward+ and visually inspected.
+  Additional mine and exploration-fog views checked native terrain alongside
+  the existing objects. The exported executable also rendered all three
+  trials together, including the baked placement JSON and native library.
+- The first Godot 4.7.2 import of Terrain3D exited with signal 11 after editor
+  initialization; the next import and game launch succeeded. The launcher
+  preserves a log and retries once only for this specific native import exit
+  with no engine errors. Repeated failures or engine errors still fail setup.
+- New buildings do not remove individual decoration instances. Lake depth is
+  an authored visual approximation. Terrain3D preserves level-ground gameplay;
+  native physics, player terrain editing and pathfinding on slopes are outside
+  these appearance trials.

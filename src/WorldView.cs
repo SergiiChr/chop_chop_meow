@@ -29,7 +29,9 @@ public partial class WorldView : Node3D {
     public bool AnimationReview;
     /// <summary>Fixed daylight landscape fixture for matching environment trial screenshots.</summary>
     public bool EnvironmentReview;
+    public bool EnvironmentReviewFog;
     public Vector2? EnvironmentCenter;
+    public float EnvironmentCameraDistance = 60;
     public float Elapsed;
     public bool PanelOpen;
     public Sounds? Sounds;
@@ -143,7 +145,9 @@ public partial class WorldView : Node3D {
     // Made once: passing a plain string converts it to a new StringName on every call.
     private static readonly StringName FogPlayer = "player", FogRadius = "radius", FogMemory = "memory";
     private void UpdateFog() {
-        if (AnimationReview || EnvironmentReview) { fog.SetShaderParameter(FogRadius, 1e6f); return; }
+        bool clearReview = AnimationReview || EnvironmentReview && !EnvironmentReviewFog;
+        UpdateTerrainFog(clearReview ? 1e6f : World.Data.SightRadius, new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
+        if (clearReview) { fog.SetShaderParameter(FogRadius, 1e6f); return; }
         fog.SetShaderParameter(FogPlayer, World.Player);
         fog.SetShaderParameter(FogRadius, World.Data.SightRadius);
         fog.SetShaderParameter(FogMemory, new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
@@ -211,7 +215,8 @@ public partial class WorldView : Node3D {
         var back = new Vector3(across, MathF.Sin(pitch), across);
         var target = AnimationReview ? ReviewCenter : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
-        camera.Position = target + back * 60;
+        camera.Position = target + back * (EnvironmentReview ? EnvironmentCameraDistance : 60);
+        if (EnvironmentReview && EnvironmentCameraDistance > 60) sun.DirectionalShadowMaxDistance = EnvironmentCameraDistance + 40;
         float unitsPerPixel = camera.Size / Math.Max(1, size.Y);
         camera.HOffset = (.5f - Center.X / Math.Max(1, size.X)) * size.X * unitsPerPixel;
         camera.VOffset = (Center.Y / Math.Max(1, size.Y) - .5f) * size.Y * unitsPerPixel;

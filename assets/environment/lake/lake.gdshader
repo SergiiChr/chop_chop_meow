@@ -1,7 +1,7 @@
 // Adapted from the Gerstner wave, normal and Fresnel math in Chrisknyfe/boujie_water_shader.
 // This lake surface stays flat at the authored shore; wave motion changes its shading only.
 shader_type spatial;
-render_mode cull_disabled, diffuse_burley, specular_schlick_ggx, world_vertex_coords;
+render_mode cull_disabled, diffuse_burley, specular_schlick_ggx;
 
 uniform float review_time = -1.0;
 uniform float roughness : hint_range(0.0, 1.0) = 0.22;
@@ -21,7 +21,8 @@ vec3 N_DEG(float x, float z, float t, float steepness, float amplitude, float di
 }
 
 void vertex() {
-	world_position = VERTEX;
+	// Keep the default vertex transform, exactly matching the exploration-fog overlay's depth.
+	world_position = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	// Mesh UVs are the normalized, lake-centred radius; 1 - length(UV) is shore distance.
 }
 

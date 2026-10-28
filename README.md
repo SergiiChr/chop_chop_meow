@@ -54,6 +54,15 @@ Play accepts Godot arguments after `--`:
 
 These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
+Three independent environment trials are available: `--proton-scatter` for
+baked environment placement, `--lake-water` for the lake shader, and
+`--terrain3d` for native terrain rendering. Try them together with
+`./build.py play -- --tree3d --proton-scatter --lake-water --terrain3d`.
+The Terrain3D option downloads its pinned Linux runtime on first use. See
+[the trial notes and before/after screenshots](docs/art/ENVIRONMENT_TRIALS.md)
+for individual commands and limitations. Recreate all six comparison images
+with `./tools/environment_review.py`.
+
 ## Start menu and options
 
 The game opens on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit.

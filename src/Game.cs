@@ -959,7 +959,10 @@ public partial class Game : Node {
             world.S.Workers.Clear(); world.S.Orders.Clear();
             world.Tick(0);
             view.EnvironmentReview = true;
+            view.EnvironmentReviewFog = launchArgs.Contains("--review-fog");
             view.EnvironmentCenter = location switch { "lake" => Terrain.Lake + Terrain.Seaward * 3, "terrain" => Terrain.Point(125, -18), _ => null };
+            // The wide terrain camera must sit above the peaks rather than inside a near mountain face.
+            if (location == "terrain") view.EnvironmentCameraDistance = 140;
             view.Zoom = location switch { "lake" => .44f, "terrain" => .24f, _ => .75f };
             ClosePanel(); ui.Visible = false; paused = true;
             return;
