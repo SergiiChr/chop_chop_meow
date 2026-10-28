@@ -661,6 +661,9 @@ public static class WorldModels {
         public readonly Node3D Head, Tail;
         public float Stride, Yaw;
         public Vector2 Last;
+        /// <summary>The last stagger seen, so a new hit shows as a rise, and the gap the knockback slide closes.</summary>
+        public float Stagger;
+        public Vector2 Knock;
         // Each leg bends once: the front wrist folds the paw back and the hind hock folds it forward.
         private readonly Skeleton3D[] shins = new Skeleton3D[4];
         private readonly Skeleton3D tailTip;
@@ -758,6 +761,20 @@ public static class WorldModels {
             Pose(Mathf.Lerp(-40, -85, reach), Mathf.Lerp(70, 40, t), Mathf.Lerp(-18, 30, Ease(t)), -88 + arc * 10, arc * .75f, Mathf.Lerp(-28, 26, t),
                 0, 0, Mathf.Lerp(110, 12, reach), Mathf.Lerp(4, 60, Ease(Math.Clamp((t - .3f) / .7f, 0, 1))));
             TailAt(-88 + arc * 10, 0, -10 + arc * 15);
+        }
+
+        /// <summary>
+        /// Struck: the wolf rears off its forelegs onto its haunches with its head thrown aside and its tail tucked, shudders, and drops back onto all fours
+        /// as <paramref name="progress"/> runs 0 to 1.
+        /// </summary>
+        public void Recoil(float progress) {
+            float t = Math.Clamp(progress, 0, 1), rear = t < .18f ? Ease(t / .18f) : 1 - Ease((t - .18f) / .82f);
+            float shudder = MathF.Sin(t * 46) * (1 - t);
+            // Tipping the body nose-up swings the hind feet forward, so they swing back by as much to stay planted while the hocks fold.
+            float pitch = -22 * rear;
+            Pose(-pitch - 30 * rear, -pitch, -28 * rear, -165 * rear - 118 * (1 - rear), .06f * rear, pitch, shudder * 4, 0, 8 + 50 * rear, 10 + 55 * rear);
+            Head.RotationDegrees += new Vector3(0, 30 * rear + shudder * 10, 10 * rear);
+            TailAt(-165 * rear - 118 * (1 - rear), shudder * 12, 30 * rear);
         }
 
         /// <summary>Head down and tearing, legs braced; <paramref name="time"/> drives the shaking.</summary>

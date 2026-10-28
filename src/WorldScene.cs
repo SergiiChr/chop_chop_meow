@@ -129,7 +129,8 @@ public partial class WorldView {
     private const int MaxParticles = 400;
     private void BuildEffects(Node3D parent) {
         effects = new Node3D(); parent.AddChild(effects);
-        // The whole pool is made while loading, so a burst instantiates nothing mid-game.
+        // The whole pool and the dust's faded copies are made while loading, so a burst instantiates nothing mid-game.
+        WarmFades(plopDust);
         for (int i = 0; i < MaxParticles; i++) {
             var particle = new Particle { Node = new MeshInstance3D { Mesh = Mote, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off, Visible = false } };
             effects.AddChild(particle.Node); particles.Add(particle);
@@ -152,6 +153,24 @@ public partial class WorldView {
             particle.Velocity = direction * speed * (.6f + Jitter() * .6f);
             particle.Age = 0; particle.Life = life * (.7f + Jitter() * .6f); particle.Gravity = gravity; particle.Size = size; particle.Grow = grow;
             particle.Node.Scale = Vector3.One * size;
+        }
+    }
+
+    private readonly StandardMaterial3D plopDust = Flat(new Color(.8f, .76f, .68f, .7f));
+
+    /// <summary>A ring of dust puffing out along the ground from the base of something just put down, <paramref name="radius"/> from its centre.</summary>
+    private void Plop(Vector2 at, float radius) {
+        const int count = 18;
+        for (int i = 0; i < count; i++) {
+            if (FreeParticle() is not Particle particle) return;
+            float angle = (i + Jitter() * .6f) / count * Mathf.Tau;
+            var outward = new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle));
+            particle.Node.MaterialOverride = particle.Material = plopDust;
+            particle.Node.Position = To3(at, .12f) + outward * radius * .9f;
+            particle.Node.Visible = particle.Live = true;
+            particle.Velocity = outward * (1 + Jitter() * .6f) + Vector3.Up * (.35f + Jitter() * .35f);
+            particle.Age = 0; particle.Life = .7f + Jitter() * .4f; particle.Gravity = -.15f; particle.Size = .3f + Jitter() * .12f; particle.Grow = 1.8f;
+            particle.Node.Scale = Vector3.One * particle.Size;
         }
     }
 
@@ -182,15 +201,15 @@ public partial class WorldView {
         ("player idle", ActorSkin.Player, ActorAction.Idle), ("worker walk", ActorSkin.Worker, ActorAction.Walk), ("worker axe", ActorSkin.Worker, ActorAction.Chop),
         ("worker pick", ActorSkin.Worker, ActorAction.Mine), ("worker carry", ActorSkin.Worker, ActorAction.Carry), ("worker gather", ActorSkin.Worker, ActorAction.Gather),
         ("worker hammer", ActorSkin.Worker, ActorAction.Hammer), ("worker pump", ActorSkin.Worker, ActorAction.Pump), ("worker idle", ActorSkin.Worker, ActorAction.Idle),
-        ("worker sit", ActorSkin.Worker, ActorAction.Sit), ("worker sit on rock", ActorSkin.Worker, ActorAction.Perch),
+        ("worker sit", ActorSkin.Worker, ActorAction.Sit), ("worker sit on rock", ActorSkin.Worker, ActorAction.Perch), ("player pick up", ActorSkin.Player, ActorAction.PickUp),
     };
-    private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall" };
+    private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall", "wolf hit" };
     private readonly List<ActorRig> reviewRigs = new();
     private readonly List<WorldModels.WolfModel> reviewWolves = new();
     private Node3D? review;
     private static readonly Vector3 ScreenRight = new Vector3(1, 0, -1).Normalized(), ScreenDown = new Vector3(1, 0, 1).Normalized();
     private static Vector3 ReviewCenter => new(0, 1, 0);
-    private static Vector3 ReviewSpot(int index) => ScreenRight * ((index % 7 - 3) * 2f) + ScreenDown * ((index / 7 - 1.4f) * 3.3f);
+    private static Vector3 ReviewSpot(int index) => ScreenRight * ((index % 7 - 3) * 2f) + ScreenDown * ((index / 7 - 2f) * 3.3f);
 
     private void UpdateReview() {
         if (review == null) {
@@ -211,6 +230,7 @@ public partial class WorldView {
         // Moving wolves stride as they would at their speed in the world: a trot at 3 tiles a second and a gallop at a chase's 6.3.
         reviewWolves[0].Idle(Elapsed); reviewWolves[1].Trot(Elapsed * 3 * 5); reviewWolves[2].Gallop(Elapsed * 6.3f * 2.6f);
         reviewWolves[3].Leap(Elapsed % 1.2f / World.LeapSeconds); reviewWolves[4].Feed(Elapsed); reviewWolves[5].Fall(Elapsed % 3 / 1.5f);
+        reviewWolves[6].Recoil(Elapsed % 1.2f / World.StaggerSeconds);
         foreach (var wolf in reviewWolves) wolf.Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
         for (int i = 0; i < ReviewClips.Length; i++) {
             var action = ReviewClips[i].Action;
