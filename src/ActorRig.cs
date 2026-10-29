@@ -247,8 +247,9 @@ public sealed class ActorRig {
     }
 
     public void Show(Pose pose, string? tool, bool carrying, bool onRock = false, bool lit = false) {
-        torso.RotationDegrees = new Vector3(pose.Lean, pose.Twist, 0);
-        head.RotationDegrees = new Vector3(pose.Head - pose.Lean * .4f, -pose.Twist * .5f, 0);
+        torso.RotationDegrees = new Vector3(pose.Lean, pose.Twist, pose.Sway);
+        // The head stays nearer upright than the body under it.
+        head.RotationDegrees = new Vector3(pose.Head - pose.Lean * .4f, -pose.Twist * .5f, -pose.Sway * .6f);
         shoulderL.RotationDegrees = new Vector3(-pose.RaiseL, 0, pose.OutL);
         shoulderR.RotationDegrees = new Vector3(-pose.RaiseR, 0, -pose.OutR);
         elbowL.RotationDegrees = new Vector3(-pose.ElbowL, 0, 0);

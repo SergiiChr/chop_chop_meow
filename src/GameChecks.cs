@@ -348,6 +348,15 @@ public partial class Game {
         UIRequire(world.S.TorchLit, "The torch must catch after the lighting animation.");
         await ClickGround();
         UIRequire(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Clicking with a lit torch must swing it.");
+        // A swing made on the move plays out in full instead of giving way to the walk.
+        await Seconds(.7);
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
+        await Seconds(.15);
+        var from = world.Player;
+        await ClickGround(); await Seconds(.25);
+        bool swungWalking = view.PlayerAnimation == ActorAction.TorchSwing && world.Player.DistanceTo(from) > .3f;
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
+        UIRequire(swungWalking, "A torch swing made while walking must keep playing as the player walks on.");
     }
 
     /// <summary>A stack bigger than a crate's room fills it and the rest stays on the cursor until it is dropped elsewhere.</summary>

@@ -23,7 +23,8 @@ public enum ActorAction {
     Perch,
     Mauled,
     Devoured,
-    Protest
+    Protest,
+    PickUp
 }
 
 /// <summary>
@@ -32,19 +33,20 @@ public enum ActorAction {
 /// and Swing moves a thigh forward while Knee folds the shin back.
 /// Turn splays a thigh outward and Roll turns it about its own length, so a bent knee folds the shin sideways across the body.
 /// Seat is the hip height for sitting on the ground; zero keeps the lower foot on the ground instead.
+/// Sway tips the torso sideways over the hips; positive tips it toward the right side.
 /// </summary>
 public readonly record struct Pose(
     float Lean = 0, float Twist = 0, float Head = 0,
     float RaiseL = 6, float OutL = 7, float ElbowL = 12,
     float RaiseR = 6, float OutR = 7, float ElbowR = 12,
     float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0,
-    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Seat = 0) {
+    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Seat = 0, float Sway = 0) {
     public static Pose Lerp(Pose a, Pose b, float t) => new(
         Mathf.Lerp(a.Lean, b.Lean, t), Mathf.Lerp(a.Twist, b.Twist, t), Mathf.Lerp(a.Head, b.Head, t),
         Mathf.Lerp(a.RaiseL, b.RaiseL, t), Mathf.Lerp(a.OutL, b.OutL, t), Mathf.Lerp(a.ElbowL, b.ElbowL, t),
         Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
         Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t),
-        Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), Mathf.Lerp(a.Seat, b.Seat, t));
+        Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), Mathf.Lerp(a.Seat, b.Seat, t), Mathf.Lerp(a.Sway, b.Sway, t));
 }
 
 /// <summary>Pure actor animation selection, timing and keyframed poses.</summary>
@@ -64,6 +66,7 @@ public static class ActorAnimation {
         ActorAction.Mauled => .5f,
         ActorAction.Devoured => 1.4f,
         ActorAction.Protest => 1.6f,
+        ActorAction.PickUp => .9f,
         _ => 1
     };
 
@@ -88,17 +91,28 @@ public static class ActorAnimation {
     };
 
     private static readonly Pose Stance = new(SwingL: 16, KneeL: 16, SwingR: -10, KneeR: 10);
+    private static readonly Pose Crouch = new(Lean: 38, Head: 18, SwingL: 72, KneeL: 118, SwingR: 50, KneeR: 112);
+
+    /// <summary>Swings that play out in full on the move: the arms and body keep swinging while the legs keep walking.</summary>
+    public static bool SwingsOnTheMove(ActorAction action) => action is ActorAction.TorchSwing or ActorAction.Attack or ActorAction.Chop or ActorAction.SteelChop;
 
     public static Pose PoseAt(ActorAction action, float elapsed, bool moving) {
+        if (moving && SwingsOnTheMove(action)) {
+            var legs = PoseAt(ActorAction.Walk, elapsed, true);
+            return PoseAt(action, elapsed, false) with { SwingL = legs.SwingL, KneeL = legs.KneeL, SwingR = legs.SwingR, KneeR = legs.KneeR, Sway = legs.Sway };
+        }
         float p = Phase(action, elapsed);
         float wave = MathF.Sin(p * Mathf.Tau);
         switch (action) {
             case ActorAction.Walk:
-                return Stride(wave, p) with { RaiseL = 6 - wave * 26, RaiseR = 6 + wave * 26, ElbowL = 20, ElbowR = 20 };
+                // Loose arms trail the legs a little and fold at the elbow as they come forward; the shoulders turn with them.
+                float arm = MathF.Sin((p - .06f) * Mathf.Tau);
+                var loose = Stride(wave, p) with { Twist = wave * 7, RaiseL = 4 - arm * 30, OutL = 9 + Math.Max(0, arm) * 4, ElbowL = 14 + Math.Max(0, -arm) * 28 };
+                return loose with { RaiseR = 4 + arm * 30, OutR = 9 + Math.Max(0, -arm) * 4, ElbowR = 14 + Math.Max(0, arm) * 28 };
             case ActorAction.Run:
                 // A longer, quicker stride pitched forward, with bent arms pumping against the legs.
                 float push = MathF.Cos(p * Mathf.Tau);
-                return new Pose(Lean: 14, Head: -6, RaiseL: 20 - wave * 50, OutL: 10, ElbowL: 85, RaiseR: 20 + wave * 50, OutR: 10, ElbowR: 85,
+                return new Pose(Lean: 14, Head: -6, Twist: wave * 8, Sway: push * 2.5f, RaiseL: 20 - wave * 50, OutL: 10, ElbowL: 85, RaiseR: 20 + wave * 50, OutR: 10, ElbowR: 85,
                     SwingL: wave * 42, KneeL: 14 + Math.Max(0, push) * 70, SwingR: -wave * 42, KneeR: 14 + Math.Max(0, -push) * 70);
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
@@ -116,12 +130,17 @@ public static class ActorAnimation {
                     (.55f, guard with { Lean = 32, Head = 10, RaiseL = 34, OutL = -26, ElbowL = 10, RaiseR = 36, OutR = -12, ElbowR = 0, KneeL = 28, KneeR = 22 }),
                     (.68f, guard with { Lean = 30, Head = 10, RaiseL = 32, OutL = -26, ElbowL = 12, RaiseR = 34, OutR = -12, ElbowR = 2, KneeL = 26, KneeR = 20 }));
             case ActorAction.Gather:
-                var crouch = new Pose(Lean: 38, Head: 18, SwingL: 72, KneeL: 118, SwingR: 50, KneeR: 112);
                 // Reach with one hand, close it on the find and pull it in while the other hand reaches.
-                return Keys(p, (0, crouch with { RaiseR = 66, ElbowR = 6, OutR = -6, RaiseL = 24, ElbowL = 70 }),
-                    (.22f, crouch with { Lean = 44, RaiseR = 50, ElbowR = 34, OutR = -10, RaiseL = 30, ElbowL = 60 }),
-                    (.5f, crouch with { RaiseL = 66, ElbowL = 6, OutL = -6, RaiseR = 24, ElbowR = 70 }),
-                    (.72f, crouch with { Lean = 44, RaiseL = 50, ElbowL = 34, OutL = -10, RaiseR = 30, ElbowR = 60 }));
+                return Keys(p, (0, Crouch with { RaiseR = 66, ElbowR = 6, OutR = -6, RaiseL = 24, ElbowL = 70 }),
+                    (.22f, Crouch with { Lean = 44, RaiseR = 50, ElbowR = 34, OutR = -10, RaiseL = 30, ElbowL = 60 }),
+                    (.5f, Crouch with { RaiseL = 66, ElbowL = 6, OutL = -6, RaiseR = 24, ElbowR = 70 }),
+                    (.72f, Crouch with { Lean = 44, RaiseL = 50, ElbowL = 34, OutL = -10, RaiseR = 30, ElbowR = 60 }));
+            case ActorAction.PickUp:
+                // The gathering crouch once: drop down, reach, close the hand on the piece and stand with it held up to stow.
+                return Keys(p, (0, new Pose()),
+                    (.32f, Crouch with { Lean = 44, RaiseR = 64, ElbowR = 8, OutR = -6, RaiseL = 26, ElbowL = 60 }),
+                    (.48f, Crouch with { Lean = 42, RaiseR = 52, ElbowR = 40, OutR = -10, RaiseL = 26, ElbowL = 60 }),
+                    (.78f, new Pose(Lean: 4, Head: 8, RaiseR: 36, OutR: -14, ElbowR: 105)));
             case ActorAction.Pump:
                 var lever = Stance with { Lean = 16, RaiseL = 78, OutL = -12, ElbowL = 42, RaiseR = 78, OutR = -12, ElbowR = 42 };
                 // A quick shove down on the lever, a short hold, then a slower lift as the bellows refill.
@@ -183,9 +202,11 @@ public static class ActorAnimation {
         }
     }
 
+    /// <summary>The legs of a walk: the torso tips over the planted leg while the other knee folds to swing through, and dips forward at each step.</summary>
     private static Pose Stride(float wave, float phase) {
-        float lift = MathF.Cos(phase * Mathf.Tau);
-        return new Pose(Lean: 4, SwingL: wave * 26, SwingR: -wave * 26, KneeL: 8 + Math.Max(0, lift) * 34, KneeR: 8 + Math.Max(0, -lift) * 34);
+        float lift = MathF.Cos(phase * Mathf.Tau), step = MathF.Cos(phase * Mathf.Tau * 2);
+        return new Pose(Lean: 5 + step * 1.5f, Head: -step * 1.5f, Sway: lift * 3.5f,
+            SwingL: wave * 30, SwingR: -wave * 30, KneeL: 10 + Math.Max(0, lift) * 40, KneeR: 10 + Math.Max(0, -lift) * 40);
     }
 
     /// <summary>Loops smoothly through keys sorted by phase; the last key eases back into the first.</summary>

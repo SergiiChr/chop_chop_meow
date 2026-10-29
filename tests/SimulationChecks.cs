@@ -1299,6 +1299,9 @@ public static class SimulationChecks {
         hit.S.Wolves.Add(close);
         hit.UseTorch(Vector2.Right);
         float struck = close.Pos.DistanceTo(hit.Player);
+        Require(close.Stagger == World.StaggerSeconds && struck > 3, "a direct torch hit should knock the wolf back and stagger it");
+        WolfTick(hit, World.StaggerSeconds / 2, close);
+        Require(close.Pos.DistanceTo(hit.Player) == struck, "a staggering wolf should hold still");
         WolfTick(hit, 1, close);
         Require(close.Health == 3 && close.Flee > 0 && close.Pos.DistanceTo(hit.Player) > struck + 1, "a direct torch hit should hurt the wolf and send it running");
 

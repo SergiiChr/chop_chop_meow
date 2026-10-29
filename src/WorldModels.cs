@@ -661,6 +661,9 @@ public static class WorldModels {
         public readonly Node3D Head, Tail;
         public float Stride, Yaw;
         public Vector2 Last;
+        /// <summary>The last stagger seen, so a new hit shows as a rise, and the gap the knockback slide closes.</summary>
+        public float Stagger;
+        public Vector2 Knock;
         // Each leg bends once: the front wrist folds the paw back and the hind hock folds it forward.
         private readonly Skeleton3D[] shins = new Skeleton3D[4];
         private readonly Skeleton3D tailTip;
@@ -758,6 +761,21 @@ public static class WorldModels {
             Pose(Mathf.Lerp(-40, -85, reach), Mathf.Lerp(70, 40, t), Mathf.Lerp(-18, 30, Ease(t)), -88 + arc * 10, arc * .75f, Mathf.Lerp(-28, 26, t),
                 0, 0, Mathf.Lerp(110, 12, reach), Mathf.Lerp(4, 60, Ease(Math.Clamp((t - .3f) / .7f, 0, 1))));
             TailAt(-88 + arc * 10, 0, -10 + arc * 15);
+        }
+
+        /// <summary>
+        /// Struck: the wolf flinches into a low bow, leaning away to one side with its head bowed and turned aside and its tail tucked, shudders,
+        /// and straightens as <paramref name="progress"/> runs 0 to 1.
+        /// </summary>
+        public void Recoil(float progress) {
+            float t = Math.Clamp(progress, 0, 1), flinch = t < .18f ? Ease(t / .18f) : 1 - Ease((t - .18f) / .82f);
+            float shudder = MathF.Sin(t * 46) * (1 - t);
+            // A low bow: the chest drops as the forelegs reach out ahead, while the hind legs stay nearly straight and keep the rear up.
+            // Tipping the body nose-down swings every foot back, so each leg swings forward by as much on top of its own reach.
+            float pitch = 16 * flinch, tail = -160 * flinch - 118 * (1 - flinch);
+            Pose(-pitch - 48 * flinch, -pitch, 30 * flinch, tail, -.06f * flinch, pitch, 6 * flinch + shudder * 3, .04f * flinch, 8 + 8 * flinch, 10 + 2 * flinch);
+            Head.RotationDegrees += new Vector3(0, -32 * flinch + shudder * 8, -8 * flinch);
+            TailAt(tail, shudder * 12, 30 * flinch);
         }
 
         /// <summary>Head down and tearing, legs braced; <paramref name="time"/> drives the shaking.</summary>

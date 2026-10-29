@@ -230,7 +230,7 @@ public partial class WorldView : Node3D {
     /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
     private void SyncCamera() {
         var size = GetViewport().GetVisibleRect().Size;
-        camera.Size = (AnimationReview ? 9.5f : BaseSize) / Zoom;
+        camera.Size = (AnimationReview ? 11 : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         var back = new Vector3(across, MathF.Sin(pitch), across);
         var target = AnimationReview ? ReviewCenter : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
@@ -396,7 +396,7 @@ public partial class WorldView : Node3D {
         ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, SelectedTool, World.Me.Sprinting);
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
-        if (!moving && pulseRemaining > 0) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
+        if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
         if (action == ActorAction.Idle && StationToHammer() is Thing anvil) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
         if (World.S.Mauled) {
             mauledFrom = World.S.Wolves.FirstOrDefault(w => w.Pinning)?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
@@ -494,7 +494,7 @@ public partial class WorldView : Node3D {
             bool gathering = target != null && p.Pos.DistanceTo(World.GatherAt(target, p.Pos)) < 2.5f;
             var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Held, p.Sprinting);
             var facing = gathering ? World.GatherAt(target!, p.Pos) : p.Pos;
-            if (!moving && other.PulseRemaining > 0) { action = other.Pulse; facing = other.PulseTarget; }
+            if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; }
             if (p.Mauled) action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
             state.Update(p.Pos, action, facing, dt);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
@@ -600,6 +600,7 @@ public partial class WorldView : Node3D {
     private readonly List<Thing> known = new();
     private readonly List<int> gone = new();
     private SaveState? builtFor;
+    private bool loadingProps;
     private int thingsCounted = -1;
     private void SyncThings(float dt) {
         // Every model is built while a world loads, hidden until the player first sees it, so exploring builds nothing mid-game.
@@ -609,7 +610,9 @@ public partial class WorldView : Node3D {
             thingsCounted = -1;
             foreach (var (_, old) in props) old.Root.QueueFree();
             props.Clear();
+            loadingProps = true;
             foreach (var t in World.S.Things) Show(PropFor(t), false);
+            loadingProps = false;
         }
         seen.Clear();
         if (EnvironmentReview && EnvironmentCenter.HasValue) { known.Clear(); known.AddRange(World.S.Things); } else World.CollectKnown(known);
@@ -640,6 +643,8 @@ public partial class WorldView : Node3D {
     /// <summary>The model drawn for a thing, built when it has none or its kind changed.</summary>
     private Prop PropFor(Thing t) {
         if (props.TryGetValue(t.Id, out var prop) && prop.Kind == t.Kind) return prop;
+        // A building or crate put down in play lands with a puff of dust; a kind changing in place, such as a dug mine, does not.
+        if (prop == null && !loadingProps && (t.Kind == "crate" || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
         if (prop != null) prop.Root.QueueFree();
         prop = WorldModels.Build(t);
         scene.AddChild(prop.Root);
@@ -868,15 +873,20 @@ public partial class WorldView : Node3D {
                 scene.AddChild(model.Root); wolves[wolf] = model;
             }
             var moved = wolf.Pos - model.Last;
-            bool running = moved.LengthSquared() > 1e-6f && !wolf.Feeding, galloping = running && wolf.Chase > 0;
+            // A hit throws the wolf back at once in the world; the model slides there instead, fast at first and settling.
+            if (wolf.Stagger > model.Stagger) { model.Knock = -moved; moved = Vector2.Zero; FurAndEmbers(To3(model.Last, .6f)); }
+            model.Stagger = wolf.Stagger;
+            bool staggering = wolf.Stagger > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !staggering, galloping = running && wolf.Chase > 0;
             // A gallop covers more ground a stride than a trot.
             model.Stride += running ? moved.Length() * (galloping ? 2.6f : 5) : 0;
             model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(running ? moved : World.Player - wolf.Pos, model.Yaw), Math.Min(1, dt * 10));
             model.Last = wolf.Pos;
-            model.Root.Position = To3(wolf.Pos);
+            float recoil = 1 - wolf.Stagger / World.StaggerSeconds, slide = staggering ? MathF.Pow(1 - recoil, 3) : 0;
+            model.Root.Position = To3(wolf.Pos + model.Knock * slide);
             model.Root.Visible = World.Sees(wolf.Pos);
             model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-            if (wolf.Leap > 0) model.Leap(1 - wolf.Leap / World.LeapSeconds);
+            if (staggering) model.Recoil(recoil);
+            else if (wolf.Leap > 0) model.Leap(1 - wolf.Leap / World.LeapSeconds);
             else if (wolf.Feeding) model.Feed(Elapsed + wolf.GetHashCode() % 7);
             else if (galloping) model.Gallop(model.Stride);
             else if (running) model.Trot(model.Stride);
@@ -884,6 +894,12 @@ public partial class WorldView : Node3D {
         }
         foreach (var (wolf, model) in wolves)
             if (!World.S.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
+    }
+
+    /// <summary>Tufts of fur knocked loose by a hit, and embers off a burning torch.</summary>
+    private void FurAndEmbers(Vector3 at) {
+        Burst(at, Mat("6f746c"), 5, 1.8f, .5f, 6, .045f);
+        if (World.TorchFlare > 0) Burst(at, Flat(new Color("ffb347")), 9, 2.8f, .35f, 3, .03f);
     }
 
     /// <summary>Fully drawn for the first part of a trip, then fading to nothing at the turn.</summary>
