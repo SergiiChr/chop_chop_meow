@@ -6,7 +6,6 @@ from __future__ import annotations
 import hashlib
 import shutil
 import stat
-import subprocess
 import sys
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -16,10 +15,10 @@ sys.path.insert(0, str(ROOT))
 import build  # noqa: E402
 
 VERSION = "v1.1.0-rc1"
-URL = f"https://github.com/TokisanGames/Terrain3D/releases/download/{VERSION}/Terrain3D_v1.1.0-rc1.zip"
+URL = f"https://github.com/TokisanGames/Terrain3D/releases/download/{VERSION}/Terrain3D_{VERSION}.zip"
 SHA256 = "549d0c1d45982ae2e30d90275f754a9c7174b8f57eb600bc93a8108b98d44636"
 CACHE = ROOT / ".tools" / "terrain3d"
-ARCHIVE = CACHE / "Terrain3D_v1.1.0-rc1.zip"
+ARCHIVE = CACHE / f"Terrain3D_{VERSION}.zip"
 PROJECT = CACHE / "probe_project"
 ADDON = PROJECT / "addons" / "terrain_3d"
 RUNTIME = ROOT / "addons" / "terrain_3d"
@@ -235,30 +234,24 @@ def run_probe() -> None:
         raise SystemExit(
             f"Godot executable is missing: {godot}; run ./build.py setup first"
         )
-    dotnet = build.DOTNET_LOCAL / "dotnet"
-    subprocess.run(
-        [str(dotnet), "build", "--nologo", "-v", "quiet", "Terrain3DProbe.csproj"],
-        cwd=PROJECT,
+    build.command(
+        [
+            "dotnet",
+            "build",
+            "--nologo",
+            "-v",
+            "quiet",
+            PROJECT / "Terrain3DProbe.csproj",
+        ],
         env=env,
-        check=True,
     )
-    result = subprocess.run(
-        [str(godot), "--headless", "--path", str(PROJECT)],
-        cwd=PROJECT,
-        env=env,
-        text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
+    build.run_godot(
+        "terrain3d-probe",
+        [godot, "--headless", "--path", PROJECT],
+        env,
         timeout=120,
-        check=False,
+        success_marker="TERRAIN3D-PROBE PASS",
     )
-    print(result.stdout, end="")
-    if (
-        result.returncode != 0
-        or "TERRAIN3D-PROBE PASS" not in result.stdout
-        or "ERROR:" in result.stdout
-    ):
-        raise SystemExit(f"Terrain3D probe failed (exit {result.returncode})")
 
 
 def main() -> None:
