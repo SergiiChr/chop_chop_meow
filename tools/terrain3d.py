@@ -119,7 +119,6 @@ script = ExtResource("1")
 
 def install_runtime() -> None:
     """Install only the Linux runtime, icons, manifest and license, without editor scripts or C# wrappers."""
-    build.fetch_pinned(URL, ARCHIVE, SHA256)
     members = [
         "terrain.gdextension",
         "LICENSE.txt",
@@ -134,6 +133,7 @@ def install_runtime() -> None:
         and all((RUNTIME / name).is_file() for name in members)
     ):
         return
+    build.fetch_pinned(URL, ARCHIVE, SHA256)
     with zipfile.ZipFile(ARCHIVE) as archive:
         archive.extractall(ROOT, ["addons/terrain_3d/" + name for name in members])
     stamp.write_text(SHA256 + "\n")
