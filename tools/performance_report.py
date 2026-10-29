@@ -10,7 +10,7 @@ import math
 from pathlib import Path
 from statistics import mean
 
-# Columns summarize reads; allocation and GC counters are totals since the game started.
+# Columns summarize reads; allocation, GC and pipeline counters are totals since the game started.
 COLUMNS = {
     "frame_ms",
     "process_ms",
@@ -29,6 +29,7 @@ COLUMNS = {
     "site",
     "night",
     "settlement",
+    "pipelines_total",
 }
 
 
@@ -59,6 +60,8 @@ def summarize(rows: list[dict[str, str]]) -> dict[str, float | int]:
         "gen0": int(rows[-1]["gen0_total"]) - int(rows[0]["gen0_total"]),
         "gen1": int(rows[-1]["gen1_total"]) - int(rows[0]["gen1_total"]),
         "gen2": int(rows[-1]["gen2_total"]) - int(rows[0]["gen2_total"]),
+        "pipeline_compilations": int(rows[-1]["pipelines_total"])
+        - int(rows[0]["pipelines_total"]),
         "static_start_mb": float(rows[0]["static_bytes"]) / 1024**2,
         "static_end_mb": float(rows[-1]["static_bytes"]) / 1024**2,
         "static_peak_mb": max(float(row["static_bytes"]) for row in rows) / 1024**2,
