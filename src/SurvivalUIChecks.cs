@@ -43,7 +43,7 @@ public partial class Game {
             UIRequire(view.Pick(shorePoint)?.Kind == "water", "The visible shoreline ring must pick the water source.");
             var windowPoint = GetViewport().GetFinalTransform() * shorePoint;
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-            await Seconds(world.Data.GatherSeconds + .7);
+            await Until(() => world.S.Backpack["water"] == 1 && world.S.Backpack["empty_bottle"] == 0, world.Data.GatherSeconds + 3);
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
             await Frames(3);
             UIRequire(world.S.Backpack["water"] == 1 && world.S.Backpack["empty_bottle"] == 0, "Holding right mouse on the shoreline must fill the retained bottle.");

@@ -365,7 +365,8 @@ public partial class Game {
         await ClickGround();
         UIRequire(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Clicking with a lit torch must swing it.");
         // A swing made on the move plays out in full instead of giving way to the walk.
-        await Seconds(.7);
+        await Until(() => view.PlayerAnimation != ActorAction.TorchSwing, 2);
+        UIRequire(view.PlayerAnimation != ActorAction.TorchSwing, "A torch swing made standing still must end.");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.15);
         var from = world.Player;
@@ -553,7 +554,7 @@ public partial class Game {
             UIRequire(sounds.Last == "footsteps_default", "Walking on grass must play grass footsteps.");
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = true });
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = true });
-            await ToSignal(GetTree().CreateTimer(.3), SceneTreeTimer.SignalName.Timeout);
+            await Until(() => world.Me.Sprinting && view.PlayerAnimation == ActorAction.Run, 2);
             UIRequire(world.Me.Sprinting && view.PlayerAnimation == ActorAction.Run, "Shift while moving must sprint with the running cycle.");
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
             await Frames();
@@ -805,7 +806,7 @@ public partial class Game {
             UIRequire(view.PlayerAnimation == actionBeforePausedActions && Math.Abs(view.PlayerAnimationTime - pausedActionTime) < .001f, "Paused Space and pump-button input must not start an animation pulse.");
             ClosePanel();
             float animationTime = view.PlayerAnimationTime;
-            await ToSignal(GetTree().CreateTimer(.2), SceneTreeTimer.SignalName.Timeout);
+            await Seconds(.2);
             UIRequire(Math.Abs(view.PlayerAnimationTime - animationTime) < .001f, "Pausing must freeze actor animation clocks.");
             await KeyStroke(Key.Escape);
             UIRequire(!paused, "Escape must resume after animation pause check.");
