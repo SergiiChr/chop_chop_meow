@@ -89,8 +89,11 @@ def fetch_pinned(url: str, archive: Path, sha256: str) -> None:
     if not archive.is_file():
         print(f"Downloading {url}...")
         download(url, archive)
+    digest = hashlib.sha256()
     with archive.open("rb") as source:
-        actual = hashlib.file_digest(source, "sha256").hexdigest()
+        while block := source.read(1 << 20):
+            digest.update(block)
+    actual = digest.hexdigest()
     if actual != sha256:
         archive.unlink()
         raise SystemExit(
