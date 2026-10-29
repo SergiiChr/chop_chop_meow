@@ -62,11 +62,11 @@ public static class WorldModels {
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
         scorchTexture ??= ScorchTexture();
     }
-    /// <summary>Full deposit sizes from world generation; piles shrink toward half size as they are worked.</summary>
+    /// <summary>How full a resource is against its size from world generation; the view shrinks deposits toward 55% as they are worked.</summary>
     public static float Fullness(Thing t) => t.Kind switch {
-        "stone" => t.Remaining / 64f,
-        "iron" or "coal" or "tin" => t.Remaining / 400f,
-        "wolf_corpse" => t.Remaining / 4f,
+        "stone" => t.Remaining / (float)World.StonePile,
+        "iron" or "coal" or "tin" => t.Remaining / (float)World.DepositOre,
+        "wolf_corpse" => t.Remaining / (float)World.WolfMeat,
         "leaves" => t.Remaining / (float)World.LeafPatch,
         _ => 1
     };

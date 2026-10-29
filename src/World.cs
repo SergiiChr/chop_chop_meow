@@ -308,7 +308,7 @@ public sealed partial class World {
         var rng = new Random(4271);
         foreach (var cliff in Cliffs) {
             // Two deposits flank the mine's mouth in the middle of the cliff, holding what three did before.
-            foreach (float along in new[] { -3.5f, 3.5f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, 600);
+            foreach (float along in new[] { -3.5f, 3.5f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, DepositOre);
             if (cliff != CliffOf(cliff.Ore) || cliff.Ore != "coal") continue;
             // Loose coal rolls well out past the deposits of the nearer coal cliff, so collecting it takes a search.
             // Iron has no loose pieces: the first pickaxe is bought with berry money.
@@ -319,7 +319,7 @@ public sealed partial class World {
             }
         }
         // Rocks and berry bushes stand alone on the plains, far from the clearing and each other, so more of them means exploring.
-        Scatter(rng, "stone", 30, 64, 15, 9, _ => 1, 2000);
+        Scatter(rng, "stone", 30, StonePile, 15, 9, _ => 1, 2000);
         Scatter(rng, "berries", 24, 34, 14, 10, _ => 1, 2000);
         var shore = Terrain.Spawn - Terrain.Lake;
         Add("water", Terrain.Lake + shore.Normalized() * (Terrain.Shore(MathF.Atan2(shore.Y, shore.X)) + .2f), 9999);
@@ -332,6 +332,12 @@ public sealed partial class World {
     }
     /// <summary>Leaves a rake gathers in one go from a patch, which fills again every day.</summary>
     public const int LeafPatch = 12;
+    /// <summary>Ore in a full coal, iron or tin deposit at a cliff.</summary>
+    public const int DepositOre = 600;
+    /// <summary>Stone in a full boulder.</summary>
+    public const int StonePile = 64;
+    /// <summary>Meat on a fresh wolf carcass.</summary>
+    public const int WolfMeat = 4;
     public static readonly Vector2 LeafOffset = new(.9f, .9f);
     /// <summary>Leaf litter around every oak, the broadleaf one of the three tree variants picked by id; the patch sits off the trunk so both can be clicked.</summary>
     private void DropLeaves() {
@@ -729,7 +735,7 @@ public sealed partial class World {
     private void KnockBack(Wolf wolf) { wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f; wolf.Stagger = StaggerSeconds; }
     /// <summary>Leaves a carcass where a struck wolf fell, within the map.</summary>
     private void KillWolf(Wolf wolf) {
-        S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (Terrain.Size - 3)), 4);
+        S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (Terrain.Size - 3)), WolfMeat);
         Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
     }
     private void PutOutTorch() {
