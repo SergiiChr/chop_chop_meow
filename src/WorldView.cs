@@ -50,7 +50,7 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<int, Avatar> others = new();
     // The host keeps the original teal; each guest keeps the first one free when it joined.
     private static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
-    private readonly Dictionary<int, (ActorRig Rig, ActorState State, (MeshInstance3D Mesh, StandardMaterial3D Material)[] Parts)> crew = new();
+    private readonly Dictionary<int, (ActorRig Rig, ActorState State, (MeshInstance3D Mesh, Material Material)[] Parts)> crew = new();
     private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
     private readonly Dictionary<int, float> pumping = new();
@@ -921,7 +921,7 @@ public partial class WorldView : Node3D {
     }
 
     /// <summary>Fades a model through its gathered parts, which walks no nodes.</summary>
-    private void Fade((MeshInstance3D Mesh, StandardMaterial3D Material)[] parts, Node node, float transparency) {
+    private void Fade((MeshInstance3D Mesh, Material Material)[] parts, Node node, float transparency) {
         float step = MathF.Round(transparency * 10) / 10;
         if (fades.GetValueOrDefault(node) == step) return;
         fades[node] = step; SetFade(parts, step);
