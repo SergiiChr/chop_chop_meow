@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Godot;
 using static ChopChopMeow.ModelKit;
 
@@ -398,7 +397,7 @@ public partial class WorldView : Node3D {
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
         if (action == ActorAction.Idle && StationToHammer() is Thing anvil) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
         if (World.S.Mauled) {
-            mauledFrom = World.S.Wolves.FirstOrDefault(w => w.Pinning)?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
+            mauledFrom = PinningWolf()?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
             // Facing away from the wolf at the throat lays the head toward it once the rig tips onto its back.
             action = World.Dead ? ActorAction.Devoured : ActorAction.Mauled; target = World.Player * 2 - mauledFrom; subject = null;
             downedFor += dt;
@@ -814,6 +813,10 @@ public partial class WorldView : Node3D {
     // Lookups that would otherwise capture the thing in a lambda, which allocates on every call for every thing drawn.
     private WorldModels.WolfModel? Dying(Vector2 at) {
         foreach (var (wolf, model) in wolves) if (!World.S.Wolves.Contains(wolf) && model.Last.DistanceTo(at) < 2) return model;
+        return null;
+    }
+    private Wolf? PinningWolf() {
+        foreach (var w in World.S.Wolves) if (w.Pinning) return w;
         return null;
     }
     private bool AnyPlayerNear(Vector2 at, float radius) {
