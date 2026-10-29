@@ -1,0 +1,128 @@
+using System;
+using System.Collections.Generic;
+using Godot;
+
+/// <summary>Plays the real game window from a command file, so an agent can play without OS input tools.</summary>
+/// <remarks>
+/// It reads `cmd.txt` in its folder, runs each line through `Input.ParseInputEvent`, renames the file to `cmd-N.done` and writes `ready` to `status.txt`.
+/// Waits count real seconds, whatever `Engine.TimeScale` is.
+/// </remarks>
+public partial class ReviewDrive : Node {
+    public string Folder = "";
+    private readonly Queue<string> queue = new();
+    private readonly HashSet<Key> held = new();
+    private double waitLeft, poll;
+    private int batch;
+    private string status = "";
+
+    public override void _Ready() {
+        ProcessMode = ProcessModeEnum.Always;
+        System.IO.Directory.CreateDirectory(Folder);
+        Status("ready");
+    }
+
+    public override void _Process(double delta) {
+        double real = delta / Math.Max(Engine.TimeScale, 0.0001);
+        if (waitLeft > 0) { waitLeft -= real; return; }
+        if (queue.Count == 0) {
+            if ((poll -= real) > 0) return;
+            poll = 0.1;
+            string file = System.IO.Path.Combine(Folder, "cmd.txt");
+            if (!System.IO.File.Exists(file)) return;
+            foreach (string line in System.IO.File.ReadAllLines(file)) if (line.Trim() is { Length: > 0 } text && !text.StartsWith('#')) queue.Enqueue(text);
+            System.IO.File.Move(file, System.IO.Path.Combine(Folder, $"cmd-{++batch}.done"), true);
+            Status("busy");
+        }
+        while (queue.Count > 0 && waitLeft <= 0) Run(queue.Dequeue());
+        if (queue.Count == 0 && waitLeft <= 0) Status("ready");
+    }
+
+    private void Run(string line) {
+        string[] p = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        try {
+            switch (p[0]) {
+                case "key": Key(Parse(p[1]), p.Length < 3 ? "tap" : p[2]); break;
+                case "hold": Key(Parse(p[1]), "down"); queue.Enqueue($"key {p[1]} up"); Requeue(); waitLeft = double.Parse(p[2]); break;
+                case "move": Move(new Vector2(float.Parse(p[1]), float.Parse(p[2]))); break;
+                case "click": Click(p, true); Click(p, false); break;
+                case "down": Click(p, true); break;
+                case "up": Click(p, false); break;
+                case "wheel": Wheel(p); break;
+                case "wait": waitLeft = double.Parse(p[1]); break;
+                case "scale": Engine.TimeScale = double.Parse(p[1]); break;
+                case "shot": Shot(p[1]); break;
+                case "quit": GetTree().Quit(); break;
+                default: Log($"unknown command: {line}"); break;
+            }
+            Log($"ok {line}");
+        } catch (Exception e) { Log($"failed {line}: {e.Message}"); }
+    }
+
+    /// <summary>Moves the key release queued by `hold` ahead of the commands still waiting.</summary>
+    private void Requeue() {
+        var rest = queue.ToArray(); queue.Clear();
+        queue.Enqueue(rest[^1]);
+        for (int i = 0; i < rest.Length - 1; i++) queue.Enqueue(rest[i]);
+    }
+
+    /// <summary>Digits are `Key4`, not `4`, which Godot would read as keycode 4.</summary>
+    private static Key Parse(string name) => name.Length == 1 && char.IsDigit(name[0]) ? Enum.Parse<Key>("Key" + name) : Enum.Parse<Key>(name, true);
+
+    private void Key(Key key, string how) {
+        if (how is "tap" or "down") { Send(key, true); held.Add(key); }
+        if (how is "tap" or "up") { Send(key, false); held.Remove(key); }
+    }
+
+    private void Send(Key key, bool pressed) => Input.ParseInputEvent(new InputEventKey {
+        Keycode = key,
+        PhysicalKeycode = key,
+        Pressed = pressed,
+        CtrlPressed = held.Contains(Godot.Key.Ctrl),
+        ShiftPressed = held.Contains(Godot.Key.Shift),
+    });
+
+    /// <summary>`ParseInputEvent` does not move the OS cursor and the view reads `GetMousePosition()`, so warp it first.</summary>
+    private void Move(Vector2 at) {
+        Input.WarpMouse(at);
+        Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
+    }
+
+    /// <summary>`click|down|up X Y [left|right] [ctrl] [shift] [double]`.</summary>
+    private void Click(string[] p, bool pressed) {
+        var at = new Vector2(float.Parse(p[1]), float.Parse(p[2]));
+        if (pressed) Move(at);
+        var rest = p.AsSpan(3);
+        Input.ParseInputEvent(new InputEventMouseButton {
+            Position = at,
+            GlobalPosition = at,
+            Pressed = pressed,
+            ButtonIndex = rest.Contains("right") ? MouseButton.Right : MouseButton.Left,
+            ButtonMask = pressed ? (rest.Contains("right") ? MouseButtonMask.Right : MouseButtonMask.Left) : 0,
+            CtrlPressed = rest.Contains("ctrl"),
+            ShiftPressed = rest.Contains("shift"),
+            DoubleClick = pressed && rest.Contains("double"),
+        });
+    }
+
+    /// <summary>`wheel X Y up|down [steps]`.</summary>
+    private void Wheel(string[] p) {
+        var at = new Vector2(float.Parse(p[1]), float.Parse(p[2]));
+        var button = p[3] == "up" ? MouseButton.WheelUp : MouseButton.WheelDown;
+        for (int i = 0; i < (p.Length > 4 ? int.Parse(p[4]) : 1); i++) {
+            Input.ParseInputEvent(new InputEventMouseButton { Position = at, GlobalPosition = at, ButtonIndex = button, Pressed = true });
+            Input.ParseInputEvent(new InputEventMouseButton { Position = at, GlobalPosition = at, ButtonIndex = button, Pressed = false });
+        }
+    }
+
+    private void Shot(string name) {
+        var error = GetViewport().GetTexture().GetImage().SavePng(System.IO.Path.Combine(Folder, name + ".png"));
+        if (error != Error.Ok) throw new InvalidOperationException(error.ToString());
+    }
+
+    private void Status(string text) {
+        if (text == status) return;
+        status = text;
+        System.IO.File.WriteAllText(System.IO.Path.Combine(Folder, "status.txt"), text);
+    }
+    private void Log(string text) => System.IO.File.AppendAllText(System.IO.Path.Combine(Folder, "log.txt"), text + "\n");
+}

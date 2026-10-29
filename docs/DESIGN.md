@@ -1,8 +1,22 @@
 # Design and architecture
 
 The prototype is an isometric woodland survival and production game.
-It is rendered in 3D with code-built low-poly models: natural woodland, modern DIY buildings and no fantasy styling.
-The 2D art comparison boards in `docs/art/` are historical samples; item icons now use the same low-poly models as the game, including the refillable tin water bottle.
+It is rendered in 3D with low-poly models: natural woodland, modern DIY buildings and no fantasy styling.
+Item and building icons are rendered from the same models.
+
+## Confirmed design decisions
+
+These came from the user; change them only after asking.
+
+- **Platform and launch:** Linux first, one-command launch from a fresh checkout through the Python launcher.
+- **Look:** smooth isometric 3D, natural and lighthearted, with some of Terraria's approachable feel; no fantasy or industrial styling. Buildings are modern DIY, there are several tree species, and workers wear blue overalls over a cream shirt.
+- **Animation:** every core interaction has an animation, with a dedicated one for every tool.
+- **Progression:** see the progression rules in [CLAUDE.md](../CLAUDE.md#architecture). Charcoal cannot substitute for mined coal.
+- **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
+- **Market:** reached at a trading post; selling lowers a price, which recovers over time; deeper goods are worth more; orders settle after a visible 30-second cart trip.
+- **Workers:** hired individually, paid daily, assigned, reassigned and dismissed; they carry station inputs and outputs, preferring matching filtered storage.
+- **Pacing:** 10–15 minutes to the first goal is a target, not a measured playthrough.
+- **Out of scope:** pollution, vampires, terraforming, charcoal and technology beyond steel.
 
 ## Architecture
 
@@ -21,6 +35,7 @@ Simulation and data:
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
 | `src/Terrain.cs` | The fixed valley map |
+| `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
 | `src/Players.cs` | Per-player state, the command dispatcher and guest adoption |
 | `src/Net.cs` | The ENet connection, world updates and guest saves |
 
@@ -28,7 +43,11 @@ UI and input:
 
 | File | Owns |
 | --- | --- |
-| `src/Game.cs` | UI, input, save/load and the main game loop |
+| `src/Game.cs` | UI, input, save/load, the main game loop and command-line review flags |
+| `src/Menu.cs` | The pause menu with the goal chain, and the round menu badges |
+| `src/MessageStack.cs` | The fading message stack at the top of the screen |
+| `src/Recovery.cs` | The respawn countdown and "Skip to morning?" |
+| `src/MinePanel.cs` | The mine's building steps, miners and outputs |
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream cups, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
 | `src/Panels.cs` | Shared panel parts: header buttons, the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |
 | `src/Grid.cs` | Draws the icon-cell grids |
@@ -51,10 +70,23 @@ Rendering and sound:
 | --- | --- |
 | `src/WorldView.cs` | The 3D scene, orthographic camera, picking, lighting and world animation |
 | `src/WorldScene.cs` | Ground dressing, particles and the animation review |
-| `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs` | Build the models |
+| `src/Terrain3DView.cs` | Mountain and valley terrain through the Terrain3D plugin |
+| `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, flowers and shrubs from the baked placement, cleared around buildings and paths |
+| `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake surface and wet banks |
+| `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
+| `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
+| `src/IconRender.cs` | Renders item and building icons from the models (`./build.py icons`) |
 | `src/Sounds.cs` | Plays sound effects |
 
-`assets/` keeps only the illustrated icon atlases and SVG toolbar icons.
+Checks and review tools:
+
+| File | Owns |
+| --- | --- |
+| `tests/*.cs` | Simulation checks run by `./build.py test` (`SELF-TEST PASS`) |
+| `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
+| `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
+| `src/PerformanceRun.cs`, `src/PerformanceFixture.cs` | The rendered performance run |
+| `src/AnimationCapture.cs` | Captures the animation review |
 
 ### Simulation, view and UI
 
@@ -63,6 +95,7 @@ Keep rendering and input separate from state transitions, so headless checks can
 
 - `tests/SimulationChecks.cs` covers filters, worker routing, furnace work, trade, wages, recovery after death, saves and a material-driven progression run.
 - `tests/EconomyChecks.cs` measures real workers through a day and checks the economy rules.
+- `tests/AllocationChecks.cs` holds ticks to their allocation budgets.
 
 ### HUD and backpack
 
@@ -150,7 +183,12 @@ The intended fresh-start loop starts by securing water, shelter and fire, then u
 
 There are no iron tools; iron bars only go into buildings and steel.
 
-Water rules: the player starts with one refillable bottle. It remains in the inventory when empty and holds three sips, each restoring one third of a full water gauge. A full gauge lasts one in-game day. Filling the bottle at a fresh water source takes one `GatherSeconds`; drinking directly from the source without a bottle gives one sip and takes the same time. An empty bottle can be crafted at a bench from one tin bar and one wood part, using the same steel hammer as tin cans. Empty or filled replacements can be purchased individually. Recipes require a full water bottle; attempting to load an empty or partial bottle shows “Requires full water bottle” at the bottom left. Partial bottles remain drinkable and can be stored normally. Water used by cooking returns the empty bottle; it never destroys the container. All points on the pond shore are collection targets.
+#### Water
+
+The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
+Filling it or sipping straight from the source takes one `GatherSeconds`.
+Every point on the pond shore is a collection target.
+Recipes take only a full bottle, and cooking returns the empty bottle rather than destroying it.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”. It advances normal simulation through dawn, including needs, trades, production and wages. In multiplayer it is available only when everyone is downed; a living player prevents a shared time skip.
 
@@ -251,8 +289,9 @@ Tools carry a `tool` kind (axe, pickaxe, hammer, chisel, rake, mortar), a `speed
 | `tier` | Material |
 | --- | --- |
 | 0 | wood or stone |
-| 1 | iron |
 | 2 | steel |
+
+Tier 1 is unused, since there are no iron tools.
 
 `World.BestTool` picks the fastest carried tool at or above a tier.
 Recipes name the tool they need, the lowest `tier` that will do, and whether they can be made by hand (`hand`).
@@ -311,10 +350,18 @@ Once an active crew has the forge hot, it never falls below the bar while they a
 ### Storage, filters and automation
 
 Inventories are slot grids with stacks of 64.
-Across item cells, click moves one item and Ctrl-click moves all of that item; Shift-click is equivalent to Ctrl-click. Right-click picks up half where a panel supports dragging.
-Tools, packed crates, and bottles in all fill states take a slot each everywhere. The layout is saved and synchronized: removing one stack never shifts unrelated cells. Dragging moves a stack to its exact destination, merging compatible stacks or swapping cells within one inventory. Sort is an explicit player action which packs partial stacks and groups by item type.
+Tools, packed crates and bottles take a slot each everywhere.
+The layout is saved and synchronized: removing one stack never shifts unrelated cells.
+Sort is the only action that packs and regroups stacks.
 
-**Enforced input rule:** an ordinary item-cell click transfers exactly one item, in either direction, for storage and stations. Ctrl-click transfers all available units; Shift is an equivalent shortcut. Dragging carries a stack or a split portion. Bulk buttons and recipe batch actions must explicitly identify their bulk behavior.
+Input rule for every item cell, in storage and stations alike:
+
+- A click moves exactly one item, in either direction.
+- Ctrl-click, or Shift-click, moves all of that item.
+- Right-click picks up half where a panel supports dragging.
+- Dragging carries a stack or a split portion to its exact destination, merging compatible stacks or swapping cells.
+- Bulk buttons and recipe batch actions say what they move.
+
 A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (5) items in all, one stack or up to five kinds; `Worker.Hands` widens them for a full mine or market stack.
 
 #### Chests
@@ -404,14 +451,7 @@ Prices, wages and demand follow the rules in [ECONOMY.md](ECONOMY.md).
 The market only accepts packed crates of the goods in `market.sells`.
 A sale pays for the contents unit by unit plus the crate.
 
-`market.buys` lists what the village sells and in what lot:
-
-| Goods | Lot |
-| --- | --- |
-| steel tools | singly |
-| canned food | crates of 12 |
-| filled bottle, empty bottle | one bottle |
-| wheat seeds, fertilizer | crates of 4 |
+`market.buys` lists what the village sells and in what lot, as the [README price sheet](../README.md#price-sheet) shows.
 
 #### Demand and prices
 
@@ -471,10 +511,6 @@ The yield goes into the plot's `Thing.Output`; nothing moves seed back into the 
 - A worker on Farm harvests.
 - A worker on Haul first moves seed from the output into the sowing inventory, then carries out the rest and fetches what the next sowing lacks.
 
-### Out of scope
-
-Pollution, vampires and technology beyond steel are outside this POC.
-
 ## Sound and music
 
 ### Sound effects
@@ -514,19 +550,10 @@ Workers use grid detours around water and buildings.
 
 ## Development and verification
 
-Use the repository launcher from its root:
+[RELEASE.md](RELEASE.md) describes the development flow, and the [README](../README.md#launcher-commands) lists the launcher commands.
 
-```sh
-./build.py play
-./build.py test
-./build.py build
-```
-
-- `play` sets up Godot 4.7.2 .NET and the .NET 10 SDK locally when missing.
-- `test` runs the simulation checks with a 120-second limit and requires `SELF-TEST PASS`, followed by Godot input/UI checks requiring `UI-TEST PASS`. It then runs a host and a guest process on this machine, requiring `NET-HOST PASS` and `NET-GUEST PASS`; the guest joins through a relay in `build.py` that adds about 80 ms of delay and 5% packet loss each way.
+- `test` runs the simulation checks with a 120-second limit and requires `SELF-TEST PASS`, then the Godot input/UI checks requiring `UI-TEST PASS`. It then runs a host and a guest process on this machine, requiring `NET-HOST PASS` and `NET-GUEST PASS`; the guest joins through a relay in `build.py` that adds about 80 ms of delay and 5% packet loss each way.
 - `build` runs both, exports a Linux executable, smoke-tests it, and packages the executable, game pack and runtime into a tar archive.
-
-Tool downloads and build output remain under ignored project-local directories.
 
 ### Platform
 

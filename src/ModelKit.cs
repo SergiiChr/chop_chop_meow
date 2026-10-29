@@ -166,7 +166,19 @@ public static class ModelKit {
         copy.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
         copy.AlbedoColor = copy.AlbedoColor with { A = copy.AlbedoColor.A * (1 - step / 10f) };
         faded[key] = copy;
+        // Asking for the material's RID builds its shader now rather than on its first draw, which would stall that frame.
+        _ = copy.GetRid();
         return copy;
+    }
+
+    /// <summary>Builds the shaders of every material in a model now, while loading, rather than on its first draw.</summary>
+    public static void BuildShaders(Node node) {
+        if (node is MeshInstance3D mesh) {
+            _ = mesh.MaterialOverride?.GetRid();
+            if (mesh.Mesh is Mesh shape) for (int surface = 0; surface < shape.GetSurfaceCount(); surface++) _ = shape.SurfaceGetMaterial(surface)?.GetRid();
+        }
+        int count = node.GetChildCount();
+        for (int i = 0; i < count; i++) BuildShaders(node.GetChild(i));
     }
 
     public static void SetOverride(Node node, Material? material) {

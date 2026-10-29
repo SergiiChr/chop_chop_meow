@@ -2,7 +2,8 @@
 
 An isometric woodland survival and production prototype. Gather nearby materials, build a small settlement, craft parts and tools, pack steel tools into crates and sell them, then hire workers to automate resource gathering and furnace work. Play alone or with up to three friends at home or over the internet.
 
-The world is rendered in 3D with code-built low-poly models under an orthographic isometric camera: natural woodland, modern DIY buildings and readable silhouettes. Item and building icons are rendered from the same models, and the rest are drawn icons. The earlier 2D art directions are kept in [docs/art](docs/art/README.md).
+The world is rendered in 3D with low-poly models under an orthographic isometric camera: natural woodland, modern DIY buildings and readable silhouettes.
+Item and building icons are rendered from the same models, and the rest are drawn icons.
 
 ## Run on Linux
 
@@ -43,32 +44,27 @@ Play accepts Godot arguments after `--`:
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
-| `--screenshot /tmp/chop.png` | Capture the running view after startup and exit |
+| `--showcase --trees`, `--bushes` | Show the three tree species or the berry bushes |
+| `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
+| `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--animation-review` | Show every actor action on rotating rigs |
-| `--animation-capture /tmp/directory` | Capture the animation review frames for visual inspection |
+| `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection |
+| `--performance-run /absolute/directory` | Record a walking, day/night and staffed-settlement benchmark; summarise it with `python3 tools/performance_report.py /absolute/directory` |
+
+Other showcase flags are parsed in `src/Game.cs`.
+These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
 ```sh
 ./build.py play -- --showcase --screenshot /tmp/chop-chop-meow.png
 ./build.py play -- --animation-review --animation-capture /tmp/chop-chop-meow-animation
+./tools/environment_review.py             # landscape views, saved in build/environment-review/
+./tools/environment_review.py --shoreline # coast, lake edge and mine views
 ```
 
-These options are developer review tools; they do not represent a normal fresh-start playthrough.
-
-The default environment uses baked forest placement, the lake and coastal water
-shaders, and Terrain3D rendering. `./build.py setup` downloads and installs the
-pinned Terrain3D Linux x86_64 runtime when needed. See
-[the environment notes and historical comparisons](docs/art/ENVIRONMENT_TRIALS.md)
-for provenance and limitations. Recreate the current landscape views with
-`./tools/environment_review.py` or the coast and mine views with
-`./tools/environment_review.py --shoreline`; historical before screenshots are
-preserved and are not regenerated.
-
-For a rendered walking/day-night and eight-worker production benchmark, run
-`./build.py play -- --performance-run /absolute/path/to/results`, then
-`python3 tools/performance_report.py /absolute/path/to/results`.
-See [local performance measurements and limitations](docs/art/PERFORMANCE.md).
+`./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
+Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
 

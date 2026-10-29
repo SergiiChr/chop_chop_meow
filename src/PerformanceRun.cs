@@ -22,7 +22,7 @@ public partial class Game {
     private static readonly string[] PerformanceSites = { "forest", "lake", "coast", "iron", "tin", "coal", "upper-valley", "forest-edge" };
     private readonly record struct PerformanceSample(double Seconds, double FrameMs, double ProcessMs, double RenderCpuMs, double GpuMs,
         long Allocated, int Gen0, int Gen1, int Gen2, double StaticBytes, double VideoBytes, int DrawCalls, int Primitives,
-        int WorkersActive, int MachinesActive, int Site, bool Night, bool Settlement);
+        int WorkersActive, int MachinesActive, int Site, bool Night, bool Settlement, long Pipelines);
 
     private void StartPerformanceRun() {
         int at = Array.IndexOf(launchArgs, "--performance-run");
@@ -31,7 +31,7 @@ public partial class Game {
         Directory.CreateDirectory(performanceFolder);
         HideScreen(); ClosePanel(); paused = false;
         Engine.MaxFps = 0; DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
-        DisplayServer.WindowSetSize(new Vector2I(1440, 900));
+        DisplayServer.WindowSetSize(new Vector2I(2560, 1440));
         RenderingServer.ViewportSetMeasureRenderTime(GetViewport().GetViewportRid(), true);
         performanceSamples = new PerformanceSample[500_000];
         foreach (var thing in world.S.Things)
@@ -39,7 +39,7 @@ public partial class Game {
         performanceLastPosition = world.Player;
         performanceStart = performancePrevious = Time.GetTicksUsec();
         performanceRunning = true;
-        GD.Print($"PERFORMANCE START: 15s warmup, 240s complete day/night lighting cycle (clock 3.5x, simulation normal rate), 120s daytime production; 1440x900, uncapped, vsync off; GPU {RenderingServer.GetVideoAdapterName()}");
+        GD.Print($"PERFORMANCE START: 15s warmup, 240s complete day/night lighting cycle (clock 3.5x, simulation normal rate), 120s daytime production; 2560x1440, uncapped, vsync off; GPU {RenderingServer.GetVideoAdapterName()}");
     }
 
     // Called only for the developer benchmark, after the normal game update. Arrays and input events are prepared outside steady sampling.
@@ -99,7 +99,8 @@ public partial class Game {
                 GC.GetAllocatedBytesForCurrentThread(), GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2),
                 Performance.GetMonitor(Performance.Monitor.MemoryStatic), Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed),
                 (int)Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame), (int)Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame),
-                activeWorkers, activeMachines, performanceSite, world.Night, performanceSettlement);
+                activeWorkers, activeMachines, performanceSite, world.Night, performanceSettlement,
+                (long)(Performance.GetMonitor(Performance.Monitor.PipelineCompilationsCanvas) + Performance.GetMonitor(Performance.Monitor.PipelineCompilationsMesh) + Performance.GetMonitor(Performance.Monitor.PipelineCompilationsSurface) + Performance.GetMonitor(Performance.Monitor.PipelineCompilationsDraw) + Performance.GetMonitor(Performance.Monitor.PipelineCompilationsSpecialization)));
         }
         performancePrevious = now;
         int heartbeat = (int)(elapsed / 30);
@@ -113,10 +114,10 @@ public partial class Game {
         performanceRunning = false;
         if (performanceKey >= 0) Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = PerformanceKeys[performanceKey], Keycode = PerformanceKeys[performanceKey], Pressed = false });
         using (var csv = new StreamWriter(Path.Combine(performanceFolder, "frames.csv"))) {
-            csv.WriteLine("seconds,frame_ms,process_ms,render_cpu_ms,gpu_ms,allocated_total,gen0_total,gen1_total,gen2_total,static_bytes,video_bytes,draw_calls,primitives,workers_active,machines_active,site,night,settlement");
+            csv.WriteLine("seconds,frame_ms,process_ms,render_cpu_ms,gpu_ms,allocated_total,gen0_total,gen1_total,gen2_total,static_bytes,video_bytes,draw_calls,primitives,workers_active,machines_active,site,night,settlement,pipelines_total");
             for (int i = 0; i < performanceCount; i++) {
                 var s = performanceSamples[i];
-                csv.WriteLine(FormattableString.Invariant($"{s.Seconds:F6},{s.FrameMs:F4},{s.ProcessMs:F4},{s.RenderCpuMs:F4},{s.GpuMs:F4},{s.Allocated},{s.Gen0},{s.Gen1},{s.Gen2},{s.StaticBytes},{s.VideoBytes},{s.DrawCalls},{s.Primitives},{s.WorkersActive},{s.MachinesActive},{PerformanceSites[s.Site]},{s.Night},{s.Settlement}"));
+                csv.WriteLine(FormattableString.Invariant($"{s.Seconds:F6},{s.FrameMs:F4},{s.ProcessMs:F4},{s.RenderCpuMs:F4},{s.GpuMs:F4},{s.Allocated},{s.Gen0},{s.Gen1},{s.Gen2},{s.StaticBytes},{s.VideoBytes},{s.DrawCalls},{s.Primitives},{s.WorkersActive},{s.MachinesActive},{PerformanceSites[s.Site]},{s.Night},{s.Settlement},{s.Pipelines}"));
             }
         }
         var stations = world.S.Things.Where(t => performanceMachines.ContainsKey(t.Id)).Select(t => new {
@@ -131,7 +132,7 @@ public partial class Game {
         var result = new {
             gpu = RenderingServer.GetVideoAdapterName(),
             godot = Engine.GetVersionInfo()["string"].AsString(),
-            viewport = "1440x900",
+            viewport = "2560x1440",
             vsync = false,
             cycleClockMultiplier = 3.5,
             warmupSeconds = 15,
