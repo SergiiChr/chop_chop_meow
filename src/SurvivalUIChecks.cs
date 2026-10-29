@@ -2,17 +2,16 @@ using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Godot;
+using static Checks;
 
 namespace ChopChopMeow;
 
 public partial class Game {
     private async Task SurvivalReviewShot(string name) {
-        int option = Array.IndexOf(launchArgs, "--review-captures");
-        if (option < 0 || option + 1 >= launchArgs.Length) return;
-        string folder = launchArgs[option + 1];
+        if (LaunchValue("--review-captures") is not string folder) return;
         System.IO.Directory.CreateDirectory(folder);
         await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
-        UIRequire(GetViewport().GetTexture().GetImage().SavePng(System.IO.Path.Combine(folder, name + ".png")) == Error.Ok,
+        Require(GetViewport().GetTexture().GetImage().SavePng(System.IO.Path.Combine(folder, name + ".png")) == Error.Ok,
             "The rendered survival review capture must save successfully.");
     }
 
@@ -40,25 +39,25 @@ public partial class Game {
             world.Player = shore + (shore - Terrain.Lake).Normalized() * 1.8f;
             await Frames(4);
             var shorePoint = view.Screen(shore, .8f);
-            UIRequire(view.Pick(shorePoint)?.Kind == "water", "The visible shoreline ring must pick the water source.");
+            Require(view.Pick(shorePoint)?.Kind == "water", "The visible shoreline ring must pick the water source.");
             var windowPoint = GetViewport().GetFinalTransform() * shorePoint;
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
             await Until(() => world.S.Backpack["water"] == 1 && world.S.Backpack["empty_bottle"] == 0, world.Data.GatherSeconds + 3);
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
             await Frames(3);
-            UIRequire(world.S.Backpack["water"] == 1 && world.S.Backpack["empty_bottle"] == 0, "Holding right mouse on the shoreline must fill the retained bottle.");
+            Require(world.S.Backpack["water"] == 1 && world.S.Backpack["empty_bottle"] == 0, "Holding right mouse on the shoreline must fill the retained bottle.");
 
             OpenPage("inventory"); await Frames(3); await SurvivalReviewShot("filled-bottle"); ClosePanel();
 
             // Drinking through hotbar slot nine consumes one sip at a time and keeps the empty bottle.
             for (int expected = 3; expected >= 1; expected--) {
-                UIRequire(hotbarCounts[8].Text == $"{expected}/3", $"The bottle badge must show {expected}/3 before a sip.");
+                Require(hotbarCounts[8].Text == $"{expected}/3", $"The bottle badge must show {expected}/3 before a sip.");
                 await Click(hotbarButtons[8]);
                 await ClickGround();
                 RefreshHotbar();
-                UIRequire(hotbarCounts[8].Text == $"{expected - 1}/3", "A hotbar drink must remove exactly one sip.");
+                Require(hotbarCounts[8].Text == $"{expected - 1}/3", "A hotbar drink must remove exactly one sip.");
             }
-            UIRequire(world.S.Backpack["empty_bottle"] == 1, "Three hotbar sips must leave the empty bottle in inventory.");
+            Require(world.S.Backpack["empty_bottle"] == 1, "Three hotbar sips must leave the empty bottle in inventory.");
 
             // Seed distinct stacks so the slot drag can prove both the exact target and untouched cells.
             ClosePanel();
@@ -72,15 +71,15 @@ public partial class Game {
             var woodIndex = Array.IndexOf(bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().ToArray(), wood);
             ItemSlot target = bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().First(c => c.TooltipText == "");
             var targetIndex = Array.IndexOf(bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().ToArray(), target);
-            UIRequire(woodIndex >= 0 && targetIndex >= 0 && targetIndex != woodIndex, "The inventory must expose source and empty destination slots.");
+            Require(woodIndex >= 0 && targetIndex >= 0 && targetIndex != woodIndex, "The inventory must expose source and empty destination slots.");
             await DragTo(wood, target);
             bagItems.EnsureLayout();
-            UIRequire(bagItems.Layout[targetIndex].Item == "wood" && bagItems.Layout[targetIndex].Count == 7 && bagItems["stone"] == 3 && bagItems["berries"] == 5,
+            Require(bagItems.Layout[targetIndex].Item == "wood" && bagItems.Layout[targetIndex].Count == 7 && bagItems["stone"] == 3 && bagItems["berries"] == 5,
                 "Dragging a stack into an exact empty backpack slot must preserve its quantity and the other stacks.");
             await Click((Control)bag.FindChild("sort_bag", true, false));
             bagItems.EnsureLayout();
             var ordered = bagItems.Layout.Where(s => s.Item != "").Select(s => s.Item).ToArray();
-            UIRequire(ordered.SequenceEqual(ordered.OrderBy(id => id, StringComparer.Ordinal)), "The backpack Sort button must order stacks by item name.");
+            Require(ordered.SequenceEqual(ordered.OrderBy(id => id, StringComparer.Ordinal)), "The backpack Sort button must order stacks by item name.");
 
             await SurvivalReviewShot("sorted-inventory");
 
@@ -91,18 +90,18 @@ public partial class Game {
             chest.Inventory.Add("coal", 5);
             Select(chest); await Frames(3);
             await Click(Cell(0, c => c.TooltipText.StartsWith("Mined coal ·", StringComparison.Ordinal)));
-            UIRequire(chest.Inventory["coal"] == 4 && world.S.Backpack["coal"] == 6,
+            Require(chest.Inventory["coal"] == 4 && world.S.Backpack["coal"] == 6,
                 "Clicking a storage stack must move exactly one item from storage to the backpack.");
             Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = true });
             try { await Click(Cell(0, c => c.TooltipText.StartsWith("Mined coal ·", StringComparison.Ordinal))); } finally { Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = false }); }
-            UIRequire(chest.Inventory["coal"] == 0 && world.S.Backpack["coal"] == 10,
+            Require(chest.Inventory["coal"] == 0 && world.S.Backpack["coal"] == 10,
                 "Ctrl-clicking a storage stack must take all remaining units.");
             await Click(Cell(1, c => c.TooltipText.StartsWith("Mined coal ·", StringComparison.Ordinal)));
-            UIRequire(chest.Inventory["coal"] == 1 && world.S.Backpack["coal"] == 9,
+            Require(chest.Inventory["coal"] == 1 && world.S.Backpack["coal"] == 9,
                 "Clicking one unit in the backpack must store exactly one unit.");
             Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = true });
             try { await Click(Cell(1, c => c.TooltipText.StartsWith("Mined coal ·", StringComparison.Ordinal))); } finally { Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = false }); }
-            UIRequire(chest.Inventory["coal"] == 10 && world.S.Backpack["coal"] == 0,
+            Require(chest.Inventory["coal"] == 10 && world.S.Backpack["coal"] == 0,
                 "Ctrl-clicking a backpack stack must store all remaining units.");
 
             ClosePanel();
@@ -112,11 +111,11 @@ public partial class Game {
             world.SetRecipe(table, "dough");
             Select(table); await Frames(3);
             await Click(Cell(1, c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal)));
-            UIRequire(waterWarning.Text == Water.FullBottleWarning && waterWarning.GetGlobalRect().Position.X < 50 && waterWarning.Size.X > 300 && waterWarning.Size.Y < 50 && waterWarning.GetGlobalRect().End.Y < bag.GetGlobalRect().Position.Y,
+            Require(waterWarning.Text == Water.FullBottleWarning && waterWarning.GetGlobalRect().Position.X < 50 && waterWarning.Size.X > 300 && waterWarning.Size.Y < 50 && waterWarning.GetGlobalRect().End.Y < bag.GetGlobalRect().Position.Y,
                 "Trying a partial bottle must show the full-bottle warning at the bottom left.");
             var partial = Cell(1, c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal));
             await DragTo(partial, (Control)ui.FindChild("input_water", true, false));
-            UIRequire(table.Inventory["water_2"] == 0 && world.S.Backpack["water_2"] == 1 && waterWarning.Text == Water.FullBottleWarning,
+            Require(table.Inventory["water_2"] == 0 && world.S.Backpack["water_2"] == 1 && waterWarning.Text == Water.FullBottleWarning,
                 "Dragging a partial bottle onto a recipe water slot must warn without using it.");
             await SurvivalReviewShot("water-warning");
 
@@ -126,16 +125,16 @@ public partial class Game {
             world.S.Time = world.Data.DaySeconds * .9f;
             world.S.RespawnIn = 30;
             RefreshRecoveryPrompt(); RefreshLive(); await Frames(2);
-            UIRequire(recoveryPrompt is { Visible: true } && skipMorningButton is { Disabled: false }, "A downed player without a cabin must see an enabled Skip to morning prompt.");
+            Require(recoveryPrompt is { Visible: true } && skipMorningButton is { Disabled: false }, "A downed player without a cabin must see an enabled Skip to morning prompt.");
             await SurvivalReviewShot("recovery-prompt");
             float previousDay = world.Day;
             await Click(skipMorningButton!);
-            UIRequire(world.S.RespawnIn == 0 && world.Day > previousDay && world.S.Time % world.Data.DaySeconds < world.Data.DaySeconds * .1f,
+            Require(world.S.RespawnIn == 0 && world.Day > previousDay && world.S.Time % world.Data.DaySeconds < world.Data.DaySeconds * .1f,
                 "Skipping morning must advance the simulated world to dawn and complete respawn.");
             world.Add("hut", world.Player + Vector2.Right);
             world.S.RespawnIn = 30;
             RefreshRecoveryPrompt(); RefreshLive(); await Frames(2);
-            UIRequire(recoveryPrompt is { Visible: false }, "A downed player with a cabin must not be offered Skip to morning.");
+            Require(recoveryPrompt is { Visible: false }, "A downed player with a cabin must not be offered Skip to morning.");
         } finally {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Pressed = false });
             Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = false });
