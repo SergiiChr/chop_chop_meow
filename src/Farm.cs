@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace ChopChopMeow;
 
@@ -78,24 +77,5 @@ public sealed partial class World {
         w.WorkState = WorkerWorkState.Gathering;
         Harvest(farm, dt);
         return true;
-    }
-
-    public string FarmStatus(Thing farm) {
-        var text = new StringBuilder();
-        WriteFarmStatus(farm, text);
-        return text.ToString();
-    }
-
-    /// <summary>Writes <see cref="FarmStatus"/> into a reused buffer, for a panel that refreshes while open.</summary>
-    public void WriteFarmStatus(Thing farm, StringBuilder text) {
-        if (farm.Stage == FarmRipe) { text.Append($"Ripe · harvested {farm.Progress / HarvestSeconds * 100:0}%. Hold right mouse on the plot to harvest."); return; }
-        if (farm.Stage == FarmGrowing) { text.Append($"Growing · ripe in {(GrowSeconds - farm.Progress) / Data.DaySeconds * 24:0} hours"); return; }
-        text.Append("Fallow · sow it with ");
-        bool first = true;
-        foreach (var (item, amount) in Data.Farm.Sow) {
-            if (!first) text.Append(" and ");
-            first = false;
-            text.Append($"{amount} {Data.Name(item)}");
-        }
     }
 }

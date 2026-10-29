@@ -50,6 +50,7 @@ public static class SimulationChecks {
         CheckSprintOutrunsWolf(data);
         CheckCoinStacks(data);
         CheckLegacySave(data);
+        CheckSaveWithUnknownItemRefused(data);
         CheckCrewKeepsForgeHot(data);
         CheckWorkerSchedule(data);
         CheckFogOfWar(data);
@@ -898,12 +899,18 @@ public static class SimulationChecks {
                 "nighttime sleep should advance survival needs and clear wolves at dawn");
     }
 
+    private static List<Thing> Known(World world) {
+        var known = new List<Thing>();
+        world.CollectKnown(known);
+        return known;
+    }
+
     private static void CheckFogOfWar(GameData data) {
         var fresh = new World(data);
         var far = World.CliffOf("coal").Center;
         Require(fresh.Explored(World.Spawn) && !fresh.Explored(far),
                 "a new game should reveal only the clearing around the player");
-        Require(fresh.Known.All(t => t.Pos.DistanceTo(World.Spawn) <= data.SightRadius),
+        Require(Known(fresh).All(t => t.Pos.DistanceTo(World.Spawn) <= data.SightRadius),
                 "things beyond sight should stay unknown until seen");
 
         var world = EmptyWorld(data);
@@ -913,25 +920,25 @@ public static class SimulationChecks {
         var furnace = world.Add("furnace", new Vector2(9, 12));
         furnace.Processing = true;
         SafeTick(world, Step);
-        Require(world.Known.Contains(tree) && !world.Known.Any(t => t.Id == hidden.Id),
+        Require(Known(world).Contains(tree) && !Known(world).Any(t => t.Id == hidden.Id),
                 "only things within the sight circle should become known");
 
         world.Player = new Vector2(40, 10);
         SafeTick(world, Step);
         tree.Remaining = 0;
         world.S.Things.Remove(world.Add("chest", new Vector2(11, 11)));
-        var memory = world.Known.Single(t => t.Id == tree.Id);
-        Require(memory != tree && memory.Remaining == 42 && world.Explored(new Vector2(12, 10)) && !world.Known.Single(t => t.Id == furnace.Id).Processing,
+        var memory = Known(world).Single(t => t.Id == tree.Id);
+        Require(memory != tree && memory.Remaining == 42 && world.Explored(new Vector2(12, 10)) && !Known(world).Single(t => t.Id == furnace.Id).Processing,
                 "explored ground out of sight should keep the last seen look, not the live state or its activity");
 
         var loaded = EmptyWorld(data);
         loaded.Deserialize(world.Serialize());
-        Require(loaded.Explored(new Vector2(12, 10)) && !loaded.Explored(new Vector2(44, 44)) && loaded.Known.Single(t => t.Id == tree.Id).Remaining == 42,
+        Require(loaded.Explored(new Vector2(12, 10)) && !loaded.Explored(new Vector2(44, 44)) && Known(loaded).Single(t => t.Id == tree.Id).Remaining == 42,
                 "save/load should keep explored ground and remembered things");
 
         world.Player = new Vector2(10, 10);
         SafeTick(world, Step);
-        Require(world.Known.Single(t => t.Id == tree.Id).Remaining == 0,
+        Require(Known(world).Single(t => t.Id == tree.Id).Remaining == 0,
                 "looking again should replace the memory with the current state");
     }
 
@@ -1152,7 +1159,7 @@ public static class SimulationChecks {
         var workerTree = world.S.Things.FirstOrDefault(t => t.Kind == "tree" && t.Remaining > 0);
         Require(workerTree != null, "a remaining tree should be available for the hired worker");
         world.Assign(worker!, workerTree);
-        Require(worker!.Assignment == workerTree!.Id && worker.Job == "gather" && world.S.Milestones.Contains("assigned"),
+        Require(worker!.Assignment == workerTree!.Id && worker.Duties.Count == 1 && World.HasDuty(worker, workerTree.Id, "gather") && world.S.Milestones.Contains("assigned"),
                 "player should assign the hired worker to gather from a resource");
         // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning.
         for (int i = 0; i < 4000 && !world.OnDuty(worker); i++) { SafeTick(world, .25f); world.S.Health = 100; }
@@ -1893,6 +1900,21 @@ public static class SimulationChecks {
         Require(worker.WageDebt == worker.Wage && sign.Output![Inventory.Coins] == 7, "wages should not be taken from the market output");
     }
 
+    /// <summary>A save naming an item the game does not know, in the backpack or as a worker's tool, is refused with a clear reason instead of failing mid-game.</summary>
+    private static void CheckSaveWithUnknownItemRefused(GameData data) {
+        var world = EmptyWorld(data);
+        world.S.Backpack.Add("tin_can", 2);
+        var worker = AddWorker(world, new Vector2(12, 12));
+        worker.Tool = "steel_hammer"; worker.Bag.Add("wood", 2);
+        string json = world.Serialize();
+        EmptyWorld(data).Deserialize(json);
+        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"Tool\": \"steel_hammer\"", "\"Tool\": \"unobtainium\""), ("\"wood\": 2", "\"unobtainium\": 2") }) {
+            bool refused = false;
+            try { EmptyWorld(data).Deserialize(Patch(json, edit)); } catch (InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
+            Require(refused, $"a save with {edit.Item2} in place of {edit.Item1} should be refused with a clear reason");
+        }
+    }
+
     private static void CheckLegacySave(GameData data) {
         var old = EmptyWorld(data);
         var sign = old.Add("signpost", new Vector2(10, 10));
@@ -1925,8 +1947,7 @@ public static class SimulationChecks {
         var furnace = world.Add("reinforced", new Vector2(20, 20));
         furnace.Heat = World.SteelHeat + 5;
         // The worker starts far off, so the forge would cool past the bar before they arrive to pump.
-        AddWorker(world, new Vector2(30, 30)).Assignment = furnace.Id;
-        world.S.Workers[0].Job = "building";
+        world.Assign(AddWorker(world, new Vector2(30, 30)), furnace);
         SafeTick(world, 4);
         Require(furnace.Heat >= World.SteelHeat, "a working crew should keep the forge at or above the clear bar");
         var crew = world.S.Workers[0];

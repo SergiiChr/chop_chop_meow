@@ -137,7 +137,6 @@ public sealed partial class World {
             case "pick_up": if (t.IsLoose) Gather(t, 0); break;
             case "pump": Pump(t); break;
             case "fuel_fire": FuelFire(t); break;
-            case "drink": Drink(t); break;
             case "set_recipe": SetRecipe(t, c.Item); break;
             case "set_filter": SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
             case "clear_filters": ClearFilters(t); break;
@@ -188,12 +187,6 @@ public sealed partial class World {
         return moved;
     }
 
-    public void Drink(Thing lake) {
-        // Old saved commands must not restore thirst instantly. The held gather owns its timer.
-        if (lake.Kind != "water" || !Near(lake)) { Say("Walk closer to the pond."); return; }
-        Say("Collect water · hold right mouse on the pond shore.");
-    }
-
     public void SortBackpack() {
         if (Downed || Forwarded("sort_bag")) return;
         S.Backpack.Sort();
@@ -205,7 +198,7 @@ public sealed partial class World {
         if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
         if (Forwarded("transfer_slot", a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
         if (a > 0 && !Near(Find(a / BoxCodes)!) || b > 0 && !Near(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
-        // Sync legacy inventories, then reject a stale drag rather than moving a different item.
+        // Bring stacks in line with totals changed directly, then reject a stale drag rather than moving a different item.
         from.EnsureLayout();
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
         if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
@@ -249,6 +242,9 @@ public sealed partial class World {
         playerBusy = true; Player = p;
     }
 
+    /// <summary>Host: puts a guest where their own machine walked them, acting as that guest.</summary>
+    public void MoveTo(PlayerState p, Vector2 to) { using (ActAs(p)) MoveTo(to); }
+
     /// <summary>
     /// Host: brings a guest in with the player they saved on their machine.
     /// Anything missing, unknown or out of range gives them a new player instead: an empty backpack at the clearing.
@@ -265,21 +261,14 @@ public sealed partial class World {
     private PlayerState? Adopt(string? saved) {
         PlayerState? p;
         try { p = saved == null ? null : JsonSerializer.Deserialize<PlayerState>(saved, GameData.Json); } catch (JsonException) { return null; }
-        if (p?.Backpack?.Items == null || p.HotbarSlots == null || p.Crafting == null) return null;
-        var crates = p.Crates ?? new();
-        bool Known(string item) => Data.Items.ContainsKey(item) && !item.StartsWith(PackedPrefix);
-        bool valid = p.Backpack.Items.All(pair => pair.Value > 0 && (Known(pair.Key) || crates.ContainsKey(PackedId(pair.Key))))
-            && crates.Values.All(box => box?.Items != null && box.Items.All(pair => pair.Value > 0 && Known(pair.Key)) && box.Count <= Data.CrateCapacity)
-            && p.Crafting.All(id => Data.Recipes.TryGetValue(id, out var r) && r.Hand)
-            // A player who left while dead comes back still waiting to respawn.
-            && (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
-            && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
+        var crates = p?.Crates ?? new();
+        if (p == null || !ValidCrates(crates) || !ValidPlayer(p, crates)) return null;
         var backpack = new Inventory { Slots = 24 };
         int legacySlots = p.Backpack.Items.Sum(pair => {
             int stack = Water.IsBottle(pair.Key) ? 64 : backpack.StackOf(pair.Key);
             return (pair.Value + stack - 1) / stack;
         });
-        if (!valid || !backpack.Fits(p.Backpack.Items) && legacySlots > 24) return null;
+        if (!backpack.Fits(p.Backpack.Items) && legacySlots > 24) return null;
         backpack.Slots = Math.Max(24, p.Backpack.AggregateSlotsNeeded);
         var renamed = new Dictionary<string, string>();
         // Packed crates get new numbers here, since the guest's old ones may be taken in this world.

@@ -566,6 +566,7 @@ Launcher-managed saves are in `.tools/xdg-data/godot/app_userdata/Chop Chop Meow
 
 A manually exported or otherwise normally launched Godot build uses Godot's standard per-user application-data location instead.
 Saves from the earlier, smaller maps cannot be loaded.
+Nor can a save that names items the game does not know, or holds needs out of range; the game says why when loading fails.
 
 ## Look and sound
 

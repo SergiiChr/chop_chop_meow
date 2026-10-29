@@ -76,7 +76,7 @@ public static class MineChecks {
         foreach (var mine in loaded.S.Things.Where(t => t.Kind == "mine")) {
             Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
                 "saved mines and their fog memories must use the aligned site");
-            Require(mine.Stage == World.MineOpen && mine.Progress == 2 && mine.Inventory["wood"] == 7 && mine.Output![World.MineOre(mine)] == 12 && loaded.S.Workers.Any(w => w.Assignment == mine.Id),
+            Require(mine.Stage == World.MineOpen && mine.Progress == 2 && mine.Inventory["wood"] == 7 && mine.Output![World.MineOre(mine)] == 12 && loaded.S.Workers.Any(w => w.Assignment == mine.Id && World.HasDuty(w, mine.Id, "mine")),
                 "aligning an older mine must preserve construction, stock, output and assigned workers");
         }
         Require(loaded.S.Things.Where(t => t.Kind == "mine").Select(t => t.Pos).Distinct().Count() == World.Cliffs.Length, "migrating all cliffs must keep distinct mine sites");

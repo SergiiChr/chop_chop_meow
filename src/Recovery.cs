@@ -26,19 +26,7 @@ public sealed partial class World {
     /// <summary>Advance normal world simulation to dawn while the local player is waiting to respawn.</summary>
     public void SkipMorning() {
         if (Forwarded("skip_morning") || !CanSkipMorning) return;
-        float seconds = SecondsToDawn;
-        asleep = true;
-        try {
-            while (seconds > 0) {
-                float dt = Math.Min(1, seconds);
-                Tick(dt, true);
-                seconds -= dt;
-            }
-        } finally {
-            asleep = false;
-        }
-        S.Wolves.Clear();
-        SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
+        PassNight();
     }
 }
 

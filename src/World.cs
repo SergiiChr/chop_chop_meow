@@ -65,7 +65,6 @@ public sealed class Worker {
     /// <summary>The place the worker is at for one of their <see cref="Duties"/>; with jobs at several places they take turns.</summary>
     public int Assignment { get; set; }
     public List<Duty> Duties { get; set; } = new();
-    public string Job { get; set; } = "idle";
     public string Status { get; set; } = "Available";
     /// <summary>Units of one stack a worker carries; a miner bringing out a full mine output carries the whole stack.</summary>
     public const int BagStack = 5;
@@ -256,9 +255,7 @@ public sealed partial class World {
     public bool Sees(Vector2 p) => p.DistanceTo(Player) <= Data.SightRadius;
     /// <summary>Raised whenever newly seen tiles join the explored map.</summary>
     public int ExploredRevision { get; private set; }
-    /// <summary>Things as the player knows them: live within sight, as last seen elsewhere, and absent if never seen.</summary>
-    public IEnumerable<Thing> Known { get { var known = new List<Thing>(); CollectKnown(known); return known; } }
-    /// <summary>Fills <paramref name="known"/> with <see cref="Known"/>, without allocating, for code that runs every frame.</summary>
+    /// <summary>Fills <paramref name="known"/> with things as the player knows them: live within sight, as last seen elsewhere, and absent if never seen.</summary>
     public void CollectKnown(List<Thing> known) {
         known.Clear();
         foreach (var t in S.Things) if (Sees(t.Pos)) known.Add(t);
@@ -650,11 +647,17 @@ public sealed partial class World {
         if (!Near(hut)) return;
         if (SleepBlock() is string blocked) { Say(blocked); return; }
         if (Forwarded("sleep", hut.Id)) return;
-        // Time, wages, trades, hunger and production advance together; no frozen night exploit.
+        PassNight();
+    }
+    /// <summary>Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.</summary>
+    private void PassNight() {
         float seconds = SecondsToDawn;
         asleep = true;
-        while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
-        asleep = false;
+        try {
+            while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
+        } finally {
+            asleep = false;
+        }
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
     /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
@@ -709,10 +712,7 @@ public sealed partial class World {
         var wolf = S.Wolves.Where(w => w.Leap <= 0 && !w.Feeding).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
             wolf.Health -= 1; wolf.Flee = FleeSeconds; KnockBack(wolf);
-            if (wolf.Health <= 0) {
-                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
-                Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
-            }
+            if (wolf.Health <= 0) KillWolf(wolf);
         }
         // A wave of fire toward a wolf on its own makes it keep its distance; a pack closing in no longer cares.
         if (!pack)
@@ -721,6 +721,11 @@ public sealed partial class World {
     public const float StaggerSeconds = .45f;
     /// <summary>Throws a struck wolf back from the player; the view slides it there over the stagger.</summary>
     private void KnockBack(Wolf wolf) { wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f; wolf.Stagger = StaggerSeconds; }
+    /// <summary>Leaves a carcass where a struck wolf fell, within the map.</summary>
+    private void KillWolf(Wolf wolf) {
+        S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
+        Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
+    }
     private void PutOutTorch() {
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
         foreach (var w in Hunters) w.Scared = false;
@@ -736,10 +741,7 @@ public sealed partial class World {
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
             wolf.Health -= axe == null ? .5f : 1.5f * Speed(axe);
             KnockBack(wolf);
-            if (wolf.Health <= 0) {
-                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
-                Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
-            }
+            if (wolf.Health <= 0) KillWolf(wolf);
         }
     }
     public void Die() {
@@ -1043,7 +1045,7 @@ public sealed partial class World {
     }
     private void Started(Worker w, Thing? target) {
         // Reassigning calls off a price errand, so the worker never freezes on the road.
-        w.Assignment = target?.Id ?? 0; w.Away = 0; w.Job = target == null ? "idle" : target.IsResource ? "gather" : "building"; w.WorkState = WorkerWorkState.Idle;
+        w.Assignment = target?.Id ?? 0; w.Away = 0; w.WorkState = WorkerWorkState.Idle;
         w.Destination = 0; w.Timer = 0; w.Status = target == null ? "Available" : "Starting work";
         if (target != null && target.Kind != "signpost") S.Milestones.Add("assigned");
     }
@@ -1423,8 +1425,6 @@ public sealed partial class World {
     }
     /// <summary>Drops jobs at places that are gone, and points the worker at a place they still have a job at.</summary>
     private void TidyDuties(Worker w) {
-        // Older saves and fixtures set only the place; it carries every job there.
-        if (w.Duties.Count == 0 && w.Assignment > 0 && Find(w.Assignment) is Thing place) foreach (string job in Jobs(place)) w.Duties.Add(new Duty { Thing = place.Id, Job = job });
         for (int i = w.Duties.Count - 1; i >= 0; i--) if (Find(w.Duties[i].Thing) == null) w.Duties.RemoveAt(i);
         if (w.Duties.Count == 0) { w.Assignment = 0; return; }
         if (!HasDuty(w, w.Assignment)) w.Assignment = w.Duties[0].Thing;
@@ -1817,19 +1817,70 @@ public sealed partial class World {
     };
     // ---------- End goals ----------
     /// <summary>Ores found in the valley's cliffs; the end goal wants a working mine on each.</summary>
-    public static IEnumerable<string> MineOres => Cliffs.Select(c => c.Ore).Distinct();
-    public bool HasMine(string ore) => S.Things.Any(t => t.Kind == "mine" && t.Stage == MineOpen && CliffAt(t.Pos).Ore == ore);
+    public static readonly string[] MineOres = Cliffs.Select(c => c.Ore).Distinct().ToArray();
+    public bool HasMine(string ore) {
+        foreach (var t in S.Things) if (t.Kind == "mine" && t.Stage == MineOpen && CliffAt(t.Pos).Ore == ore) return true;
+        return false;
+    }
     /// <summary>Finished days in a row, up to today, whose profit reached the goal.</summary>
     public int ProfitStreak => S.Profits.AsEnumerable().Reverse().TakeWhile(p => p >= Data.Goals.DailyProfit).Count();
     /// <summary>Once reached, the week of profit stays reached even if later days fall short.</summary>
     public bool ProfitGoalMet => S.Milestones.Contains("profit_week");
     // The milestone comes first: it is a set lookup, and the game checks this every frame.
-    public bool EndGoalsComplete => ProfitGoalMet && MineOres.All(HasMine);
+    public bool EndGoalsComplete {
+        get {
+            if (!ProfitGoalMet) return false;
+            foreach (string ore in MineOres) if (!HasMine(ore)) return false;
+            return true;
+        }
+    }
     private void CloseDay(int wages) {
         S.Profits.Add(S.DayRevenue - wages); S.DayRevenue = 0;
         if (ProfitStreak >= Data.Goals.ProfitDays) S.Milestones.Add("profit_week");
     }
     public string Serialize() => JsonSerializer.Serialize(S, GameData.Json);
+    // ---------- Validation of saves and guests ----------
+    /// <summary>Whether an id names a known item, or a packed crate whose contents are in <paramref name="crates"/>.</summary>
+    private bool KnownItem(string item, Dictionary<int, Inventory> crates) => item.StartsWith(PackedPrefix) ? crates.ContainsKey(PackedId(item)) : Data.Items.ContainsKey(item);
+    /// <summary>Whether every entry is a positive count of a known item or of a packed crate in <paramref name="crates"/>.</summary>
+    private bool ValidInventory(Inventory? box, Dictionary<int, Inventory> crates) {
+        if (box?.Items == null) return false;
+        foreach (var (item, count) in box.Items) if (count <= 0 || !KnownItem(item, crates)) return false;
+        return true;
+    }
+    /// <summary>Whether each packed crate holds positive counts of known items, no other crates, and no more than a crate fits.</summary>
+    private bool ValidCrates(Dictionary<int, Inventory> crates) {
+        foreach (var box in crates.Values) {
+            if (box?.Items == null || box.Count > Data.CrateCapacity) return false;
+            foreach (var (item, count) in box.Items) if (count <= 0 || item.StartsWith(PackedPrefix) || !Data.Items.ContainsKey(item)) return false;
+        }
+        return true;
+    }
+    /// <summary>
+    /// Whether a player from a save or a joining guest carries only known items and has needs, torch and respawn timer within their limits.
+    /// The crafting queue must hold only recipes made by hand.
+    /// </summary>
+    private bool ValidPlayer(PlayerState p, Dictionary<int, Inventory> crates) {
+        if (p.HotbarSlots == null || p.Crafting == null || !ValidInventory(p.Backpack, crates)) return false;
+        foreach (string id in p.Crafting) if (!Data.Recipes.TryGetValue(id, out var r) || !r.Hand) return false;
+        // A player who left while dead comes back still waiting to respawn.
+        return (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
+            && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
+    }
+    /// <summary>Whether every building, worker and cart in a save holds only known items, and every worker's tool is a known item.</summary>
+    private bool ValidSettlement(SaveState save) {
+        foreach (var t in save.Things) {
+            if (t == null || !ValidInventory(t.Inventory, save.Crates)) return false;
+            foreach (var box in new[] { t.Output, t.Wages, t.Burner, t.Tools }) if (box != null && !ValidInventory(box, save.Crates)) return false;
+        }
+        foreach (var w in save.Workers)
+            if (w?.Duties == null || w.Tool == null || w.Tool != "" && !Data.Items.ContainsKey(w.Tool) || !ValidInventory(w.Bag, save.Crates)) return false;
+        foreach (var order in save.Orders) {
+            if (order?.Goods == null) return false;
+            foreach (var (item, count) in order.Goods) if (count <= 0 || !KnownItem(item, save.Crates)) return false;
+        }
+        return true;
+    }
     public void Deserialize(string json) {
         // Steel tools became steel parts; carried ones that were the only axe or pickaxe become those tools so the save stays playable.
         bool legacyTools = json.Contains("\"steel_tools\"");
@@ -1881,9 +1932,13 @@ public sealed partial class World {
                 if (BestTool(tool, loaded.Backpack) == null && loaded.Backpack.Remove("steel_parts", 1) == 1) loaded.Backpack.Add(made, 1);
             if (loaded.Milestones.Contains("steel_parts")) loaded.Milestones.Add("steel_tool");
         }
+        if (!ValidCrates(loaded.Crates) || !ValidPlayer(loaded.Actor, loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         // The goal chain gained steps, so the current goal is worked out again from the milestones.
         loaded.Goal = 0;
         S = loaded;
+        // Older saves set only a worker's place; it carries every job there.
+        foreach (var w in S.Workers)
+            if (w.Duties.Count == 0 && w.Assignment > 0 && Find(w.Assignment) is Thing place) foreach (string job in Jobs(place)) w.Duties.Add(new Duty { Thing = place.Id, Job = job });
         NormalizeBottleStorage();
         // Saves from before raking have no leaf litter.
         if (!S.Things.Any(t => t.Kind == "leaves")) DropLeaves();

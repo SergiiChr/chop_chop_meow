@@ -78,7 +78,6 @@ public sealed partial class World {
 
     /// <summary>Mining stops as soon as either the ore or the rock slot holds a full stack.</summary>
     public bool MineFull(Thing mine) => mine.Output is Inventory output && (output[MineOre(mine)] >= output.StackSize || output["stone"] >= output.StackSize);
-    /// <summary>The tool a stage needs each worker to have, or null for the stage where materials are hauled in.</summary>
 
     private string? MineBlock(Vector2 p) {
         var cliff = CliffAt(p);
