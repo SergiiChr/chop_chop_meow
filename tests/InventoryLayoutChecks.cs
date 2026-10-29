@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using static Checks;
 
 namespace ChopChopMeow;
 
@@ -78,9 +79,5 @@ public static class InventoryLayoutChecks {
         overflow.Slots = 1; overflow.EnsureLayout();
         Require(overflow["wood"] == 3 && overflow["stone"] == 2 && overflow.UsedSlots == 3, "shrinking slot limits must preserve every aggregate stack for overflow handling");
         Require(overflow.AggregateSlotsNeeded == 3 && overflow.Room("wood") == 0, "overflow stack requirements should be exposed without accepting more items");
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException(message);
     }
 }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>Simulation checks for mines and the end goals.</summary>
 public static class MineChecks {
@@ -16,10 +17,6 @@ public static class MineChecks {
         CheckOnlyAvailableMinersUnload(data);
         CheckMiningIsSlowerThanDeposits(data);
         CheckDailyProfitAndEndGoals(data);
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Mine check failed: {message}");
     }
 
     /// <summary>An empty map with coins enough to pay every wage, so no worker strikes.</summary>

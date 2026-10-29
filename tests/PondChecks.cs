@@ -1,6 +1,7 @@
 using System;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 public static class PondChecks {
     public static void Run(GameData data) {
@@ -11,17 +12,17 @@ public static class PondChecks {
             var pond = world.Add("water", Terrain.WaterPoint(World.Spawn), 9999);
             world.Player = Terrain.WaterPoint(Terrain.Lake + direction * 30) + direction;
             world.S.Backpack.Add("empty_bottle", 1);
-            if (!world.Near(pond) || !Terrain.WaterRing(world.Player)) throw new Exception("Every part of the pond shore must collect water.");
+            Require(world.Near(pond) && Terrain.WaterRing(world.Player), "Every part of the pond shore must collect water.");
             world.Gather(pond, data.GatherSeconds / 2);
-            if (world.S.Backpack["water"] != 0) throw new Exception("A bottle must take the whole gathering time to fill.");
+            Require(world.S.Backpack["water"] == 0, "A bottle must take the whole gathering time to fill.");
             world.Gather(pond, data.GatherSeconds / 2);
-            if (world.S.Backpack["water"] != 1 || world.S.Backpack.Count != 1) throw new Exception("Collecting must fill the existing bottle exactly once.");
+            Require(world.S.Backpack["water"] == 1 && world.S.Backpack.Count == 1, "Collecting must fill the existing bottle exactly once.");
             world.S.Backpack.Remove("water", 1); world.S.Thirst = 0;
             world.Gather(pond, data.GatherSeconds / 2);
-            if (world.S.Thirst != 0) throw new Exception("Direct drinking must take as long as filling a bottle.");
+            Require(world.S.Thirst == 0, "Direct drinking must take as long as filling a bottle.");
             world.Gather(pond, data.GatherSeconds / 2);
-            if (Math.Abs(world.S.Thirst - Water.SipThirst) > .01 || world.S.Backpack.Count != 0) throw new Exception("Direct drinking must grant one sip and no bottle.");
+            Require(Math.Abs(world.S.Thirst - Water.SipThirst) <= .01 && world.S.Backpack.Count == 0, "Direct drinking must grant one sip and no bottle.");
         }
-        if (Terrain.WaterRing(Terrain.Lake) || Terrain.WaterRing(World.Spawn)) throw new Exception("The collection ring must not cover the lake center or distant ground.");
+        Require(!Terrain.WaterRing(Terrain.Lake) && !Terrain.WaterRing(World.Spawn), "The collection ring must not cover the lake center or distant ground.");
     }
 }

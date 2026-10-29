@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>
 /// Deterministic checks for players sharing one world: guests act through commands the host runs as them,
@@ -21,10 +22,6 @@ public static class MultiplayerChecks {
         CheckGuestSaveRoundTrip(data);
         CheckBrokenGuestSavesStartEmpty(data);
         CheckInventoryAndRecoveryCommands(data);
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Multiplayer check failed: {message}");
     }
 
     private static void CheckInventoryAndRecoveryCommands(GameData data) {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>Focused checks for deterministic actor animation selection and timing.</summary>
 public static class AnimationChecks {
@@ -11,10 +12,6 @@ public static class AnimationChecks {
         CheckPlayerActions();
         CheckWorkerActions();
         CheckPoses();
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Animation check failed: {message}");
     }
 
     private static void CheckTiming() {

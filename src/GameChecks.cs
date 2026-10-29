@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 
@@ -240,9 +241,7 @@ public partial class Game {
     private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false).Concat(bag.FindChildren("*", "GridContainer", true, false))
         .ElementAt(grid).GetChildren().OfType<ItemSlot>().First(match);
     private System.Collections.Generic.IEnumerable<Button> Slots() => panel.FindChildren("slot_*", "Button", true, false).Concat(bag.FindChildren("slot_*", "Button", true, false)).OfType<Button>();
-    private static void UIRequire(bool okay, string message) {
-        if (!okay) throw new InvalidOperationException("UI check failed: " + message);
-    }
+    private static void UIRequire(bool okay, string message, [CallerFilePath] string file = "") => Checks.Require(okay, message, file);
     private async Task Click(Vector2 point) {
         var at = GetViewport().GetFinalTransform() * point;
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
@@ -365,7 +364,8 @@ public partial class Game {
         await ClickGround();
         UIRequire(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Clicking with a lit torch must swing it.");
         // A swing made on the move plays out in full instead of giving way to the walk.
-        await Seconds(.7);
+        await Until(() => view.PlayerAnimation != ActorAction.TorchSwing, 2);
+        UIRequire(view.PlayerAnimation != ActorAction.TorchSwing, "A torch swing made standing still must end.");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.15);
         var from = world.Player;
@@ -553,7 +553,7 @@ public partial class Game {
             UIRequire(sounds.Last == "footsteps_default", "Walking on grass must play grass footsteps.");
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = true });
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = true });
-            await ToSignal(GetTree().CreateTimer(.3), SceneTreeTimer.SignalName.Timeout);
+            await Until(() => world.Me.Sprinting && view.PlayerAnimation == ActorAction.Run, 2);
             UIRequire(world.Me.Sprinting && view.PlayerAnimation == ActorAction.Run, "Shift while moving must sprint with the running cycle.");
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
             await Frames();
@@ -700,12 +700,14 @@ public partial class Game {
             UIRequire(backdrop.Visible && FindButton(screen, "Slot 1 · empty") != null && FindButton(screen, "Autosave · empty") == null, "F5 in a new game must ask for a save slot and leave out the autosave.");
             await Click(FindButton(screen, "Slot 1 · empty")!);
             UIRequire(SlotUsed(1) && !backdrop.Visible && !paused, "Choosing a slot must write the save and resume.");
+            int savedWood = chest.Inventory["wood"];
+            UIRequire(savedWood > 0 && chest.Inventory.Remove("wood", 1) == 1, "The chest must hold wood to take out after saving.");
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
-            await ToSignal(GetTree().CreateTimer(.25), SceneTreeTimer.SignalName.Timeout);
+            await Seconds(.25);
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
             await Frames(); UIRequire(world.Player.DistanceTo(savedPosition) > .1f, "The player should move after saving.");
             await KeyStroke(Key.F9);
-            UIRequire(world.Player.DistanceTo(savedPosition) < .01f && world.S.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] > 0), "F9 must restore position and stored items from disk.");
+            UIRequire(world.Player.DistanceTo(savedPosition) < .01f && world.S.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] == savedWood), "F9 must restore position and stored items from disk.");
             UIRequire(world.S.HotbarSlots.SequenceEqual(savedSlots) && world.S.ActiveHotbar == savedActiveSlot, "F5 and F9 must preserve hotbar references and selection.");
             world.Player += Vector2.One; ClosePanel();
             await KeyStroke(Key.Escape);
@@ -803,7 +805,7 @@ public partial class Game {
             UIRequire(view.PlayerAnimation == actionBeforePausedActions && Math.Abs(view.PlayerAnimationTime - pausedActionTime) < .001f, "Paused Space and pump-button input must not start an animation pulse.");
             ClosePanel();
             float animationTime = view.PlayerAnimationTime;
-            await ToSignal(GetTree().CreateTimer(.2), SceneTreeTimer.SignalName.Timeout);
+            await Seconds(.2);
             UIRequire(Math.Abs(view.PlayerAnimationTime - animationTime) < .001f, "Pausing must freeze actor animation clocks.");
             await KeyStroke(Key.Escape);
             UIRequire(!paused, "Escape must resume after animation pause check.");

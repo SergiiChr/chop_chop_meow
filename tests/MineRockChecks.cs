@@ -1,5 +1,6 @@
 using System;
 using Godot;
+using static Checks;
 
 namespace ChopChopMeow;
 
@@ -22,9 +23,5 @@ public static class MineRockChecks {
             }
             Require(embedded > 0, "the cave must have an embedded rear edge");
         }
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException(message);
     }
 }

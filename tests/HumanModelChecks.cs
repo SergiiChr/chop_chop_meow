@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>Shared human geometry stays cached while outfit materials and rig state remain separate.</summary>
 public static class HumanModelChecks {
@@ -122,8 +123,5 @@ public static class HumanModelChecks {
     private static void Visit(Node node, List<MeshInstance3D> result) {
         if (node is MeshInstance3D mesh && mesh.Name.ToString().StartsWith("Human", StringComparison.Ordinal)) result.Add(mesh);
         for (int i = 0; i < node.GetChildCount(); i++) Visit(node.GetChild(i), result);
-    }
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Human model check failed: {message}");
     }
 }
