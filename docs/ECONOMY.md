@@ -16,8 +16,7 @@ For goods the village trades, it is the trade price; for the rest it is a refere
   - Leaves and grass are worth a quarter: they come by the handful and four make one fertilizer.
   - Wheat is 1.5.
 - A recipe's output is worth its inputs plus the cheapest fuel its station burns, plus a markup that shrinks with each step from raw goods: 50% for the first step, then 40%, 30% and 20%.
-- So lower tiers keep a bigger share of their price as profit, and deeper goods are worth more coins in total.
-  A steel axe earns 6 coins over its parts and an iron bar 2, though the bar's margin is far higher.
+- So lower tiers keep a bigger share of their price as profit, and deeper goods are worth more coins in total. A steel axe earns 6 coins over its parts and an iron bar 2, though the bar's margin is far higher.
 
 | Step | Markup | Recipes |
 |---|---|---|
@@ -26,7 +25,7 @@ For goods the village trades, it is the trade price; for the rest it is a refere
 | 3 | 30% | steel parts, bread, canned meat stew, canned jam, canned food |
 | 4 | 20% | steel axe, steel pickaxe, steel hammer, steel chisel, rake |
 
-Canned food, which the village also sells, is canned raw meat and now costs 5.35 instead of 4.
+Canned food, which the village also sells, is canned raw meat at 5.35.
 
 A new recipe gets its price from this rule.
 The check fails if any recipe loses value or a deeper recipe marks up more than a shallower one.
@@ -47,8 +46,7 @@ The slot holds one stack (1000 coins); sale coins beyond it go to the market out
 Worker output is measured by running one worker through a whole day: walking, hauling, lunch and the commute included, with chests 2.5 tiles away and steel tools at the bench.
 A product's worker-days are its materials' worker-days plus one over its station's daily output.
 
-- A hired berry picker barely breaks even: 0.9 to 1.25 times a worker-day's cost.
-  Bushes fruit once a day (`berryRegrowHours`), so one picker brings in two crates of berries a day, within what the village takes at the full price.
+- A hired berry picker barely breaks even: 0.9 to 1.25 times a worker-day's cost. Bushes fruit once a day (`berryRegrowHours`), so one picker brings in two crates of berries a day, within what the village takes at the full price.
 - A worker in a steel tool chain earns at least 4 times their pay.
 - A cook earns at least 1.5 times their pay.
 - A longer chain earns more per worker-day than a shorter one, comparing tools with tools and food with food.
@@ -90,8 +88,7 @@ A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced
 
 Each good the village takes has `daily`, `steady` and `drop` in `market.sells`:
 
-- The first `steady` units sell at the full price.
-  Past them, each crate's worth sold takes `drop` off the full price, down to a quarter of it.
+- The first `steady` units sell at the full price. Past them, each crate's worth sold takes `drop` off the full price, down to a quarter of it.
 - A day restores what selling `daily` units takes, so selling each good's daily amount every day is sustainable: the next day's sale pays the same.
 
 | Good | Daily | Steady | Drop per crate |
@@ -109,8 +106,6 @@ A day's basket sells for about 1,923 coins: 858 from tools, 1,002 from food and 
 
 ## 4. Trade
 
-- Buying costs 1.25 times the base price, crate included for boxed goods.
-  Sale prices never exceed the base, so buying to resell always loses.
-- A sale pays back each crate's price.
-  Count crates as packaging that pays for itself, not as profit.
+- Buying costs 1.25 times the base price, crate included for boxed goods. Sale prices never exceed the base, so buying to resell always loses.
+- A sale pays back each crate's price. Count crates as packaging that pays for itself, not as profit.
 - The cheapest way to recover a lost axe is still berries: a steel axe costs 46 coins, about four crates of berries.

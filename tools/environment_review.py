@@ -13,25 +13,23 @@ sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
 
-OUTPUT = ROOT / "docs" / "reviews" / "environment"
+OUTPUT = build.BUILD / "environment-review"
 
 CURRENT_CAPTURES = (
-    ("forest", "forest", (), "01-placement-after.png"),
-    ("lake", "lake", (), "02-lake-after.png"),
-    ("terrain", "terrain", (), "03-terrain-after.png"),
+    ("forest", "forest", ()),
+    ("lake", "lake", ()),
+    ("terrain", "terrain", ()),
 )
 
 SHORELINE_CAPTURES = (
-    ("coast", "coast", (), "shoreline/coast-after.png"),
-    ("lake-edge", "lake", (), "shoreline/lake-after.png"),
-    *((f"mine-{ore}", "mine", ("--mine-ore", ore), f"shoreline/{ore}-after.png") for ore in ("coal", "iron", "tin")),
+    ("coast", "coast", ()),
+    ("lake-edge", "lake", ()),
+    *((f"mine-{ore}", "mine", ("--mine-ore", ore)) for ore in ("coal", "iron", "tin")),
 )
 
 
-def capture(
-    env: dict[str, str], name: str, location: str, flags: tuple[str, ...], filename: str
-) -> None:
-    image = (OUTPUT / filename).resolve()
+def capture(env: dict[str, str], name: str, location: str, flags: tuple[str, ...]) -> None:
+    image = (OUTPUT / f"{name}.png").resolve()
     image.parent.mkdir(parents=True, exist_ok=True)
     args = [
         "--showcase",
@@ -65,10 +63,10 @@ def main() -> None:
     OUTPUT.mkdir(parents=True, exist_ok=True)
     env = build.setup()
     captures = SHORELINE_CAPTURES if options.shoreline else CURRENT_CAPTURES
-    for name, location, flags, filename in captures:
-        capture(env, name, location, flags, filename)
+    for name, location, flags in captures:
+        capture(env, name, location, flags)
 
-    print(f"Environment review capture pass: {len(captures)} current screenshots")
+    print(f"Environment review capture pass: {len(captures)} screenshots in {OUTPUT.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":
