@@ -10,12 +10,13 @@
    ln -s "$PWD/.tools" ../chop_chop_meow-<name>/.tools
    ```
 
-   The symlink reuses the downloaded Godot and .NET; don't commit it (`.gitignore` matches the `.tools/` folder, not a symlink). Leave the main checkout on whatever branch it is on.
+   The symlink reuses the downloaded Godot, .NET and Python tools and is ignored by git.
+   Leave the main checkout on whatever branch it is on.
 2. Make the change and update the docs it affects in the same commit.
-3. Run `./build.py lint` and `./build.py test`. For a visual change, also inspect a rendered screenshot.
+3. Run `./build.py check`. For a visual change, also inspect a rendered screenshot.
 4. Review the branch against `main` with the `self-review` skill and apply what improves it.
 5. Run `./build.py build` before opening the pull request.
-6. Open a pull request against `main`. Describe what changed, how it was checked and what was not checked.
+6. Open a pull request against `main`. Describe what changed, how it was checked and what was not checked. CI runs `./build.py check` on it.
 
 ## Release bundle
 

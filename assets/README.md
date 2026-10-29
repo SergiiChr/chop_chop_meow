@@ -2,7 +2,7 @@
 
 The world is rendered with code-built low-poly 3D models.
 There are no world or character sprite sheets.
-The only 2D images left are interface icons.
+The only 2D images are interface icons.
 
 ## Art direction
 
@@ -53,23 +53,10 @@ Models are assembled from code-built Godot meshes.
 
 ### People and animals
 
-- `src/HumanShape.cs` — the common neutral torso and continuous skinned limb profiles for players, workers and couriers.
-  - It shares five neutral mesh resources (hips, torso, leg, left arm and right arm) across all human roles and player shirt colors.
-  - Each actor keeps its own skeletons and pose.
-  - Cached three-color texture palettes preserve sleeve/skin, trousers/boots and sole transitions using the fade-compatible StandardMaterial3D path.
-- `src/ActorShape.cs` — profile, skinning and curved strap builders.
-  - Outfit colors use cached palette materials rather than duplicating body geometry.
-  - These meshes are cached across actors while each rig poses its own joints.
+- `src/HumanShape.cs` — the common neutral torso and continuous skinned limb profiles for players, workers and couriers. It shares five neutral mesh resources (hips, torso, leg, left arm and right arm) across all human roles and player shirt colors. Each actor keeps its own skeletons and pose. Cached three-color texture palettes preserve sleeve/skin, trousers/boots and sole transitions using the fade-compatible StandardMaterial3D path.
+- `src/ActorShape.cs` — profile, skinning and curved strap builders. Outfit colors use cached palette materials rather than duplicating body geometry. These meshes are cached across actors while each rig poses its own joints.
 - `CourierShape` — fits a reflective hi-vis vest and curved cap to the same core, with the common face details.
 - `src/WolfShape.cs` — cached continuous wolf body and muzzle profiles, shaped ears, tapered legs with hocks and paws, and a brush tail. It keeps the wolf and carcass animation rig.
-
-Visible geometry counts, excluding props being carried or sat upon:
-
-| Actor | Triangles | Mesh instances |
-|---|---|---|
-| Player | 3,084 | 19 |
-| Worker | 2,964 | 20 |
-| Courier | 2,634 | 17 |
 
 ### Buildings and stations
 
@@ -79,86 +66,34 @@ Visible geometry counts, excluding props being carried or sat upon:
 - `src/AnvilShape.cs` — the anvil's shared cast body with a curved waist, bevelled working face and swept horn.
 - `src/ChestShape.cs` — the hollow wooden chest: bevelled shell and lid, fitted corner guards, loop handles and rear hinge hardware.
 - `src/BenchShape.cs` — shared workbench planks with bevelled edges, fitted aprons and lower stretchers, and a mounted vise with separate jaws. The slotted chisel and hammer keep their visibility handles.
-- `CookShape` — caches the cooking table's recessed masonry hearth, bevelled timber joinery, grill and open stew pot, hollow mortar with fitted pestle, and fire mesh.
-  `WorldModels.CookingTable` holds the independently visible `Glow` and `Mortar` handles, the light and smoke vent, and the hit volumes.
-- `CanneryShape` — caches the cannery's bevelled steel stove with an open firebox and flue, fitted timber counter, shaped stockpot and lid with open handles, and hand press with cans.
-  - Bevels are limited to broad edges.
-  - Simplified can profiles and omitted covered caps keep the lit model at 1,057 triangles across five visible mesh instances.
-  - The fire, light and smoke controls are on `WorldModels.Cannery`.
-- `RackShape` — caches the tool station's fitted concrete feet, bevelled planks and cap, and shaped axe, pickaxe and rake.
-  - Each tool has its own `Racked` visibility pivot.
-  - Fully stocked it uses 504 triangles across five visible mesh instances; empty it uses 268 across two.
-- `PileShape` — caches a pile-only dirt pad with fitted log edging, and stock shapes reused from other models.
-  - Sources: the mine supply log outline, nature boulders and loose-ore nuggets, furnace coal lumps, and the bench/mine stock-board and bar primitives.
-  - Connected lumps are extracted whole and logs omit redundant cylinder rings.
-  - Coal slots reuse the furnace's 20-triangle closed chunk with varied rotations. The furnace's six-chunk scatter uses 120 triangles in one mesh.
-  - Families share one baked mesh across piles, fitted to the fourteen 9–4–1 slot positions. Items without a suitable source use a color-tinted block.
-  - `WorldModels.SyncPile` changes mesh and material with inventory, while `WorldView` keeps its sight guard, so remembered stock shows in fog.
-  - The farm yard uses `PileShape.Yard`.
-  - An empty pile uses 108 triangles and one mesh instance. Full piles use fifteen instances and vary by material: wood 780 triangles, stone 1,228, coal 388, iron ore 388.
-- `FarmShape` — caches the farm's shaped soil rows and three seeded variants of sprouts, green plants and ripe wheat.
-  - Leaves are tapered and two-sided, stems are triangular and grain heads are shaped.
-  - One crop mesh is shown per growth stage under the `Crops` handles.
-  - Ripe fields use 1,218 triangles across three visible mesh instances.
-- `MineShape` — caches the mine's plan outline, inward-facing tunnel shell, spoil pad, fitted portal and sloped board hood, inner supports and rail runs.
-  - The cart has a continuous flared tub, inner lining and rim, and axles and wheels seated on the rail tops. Its load reuses loose-ore geometry.
-  - Construction pivots, cart/load visibility, lantern fire/light and tunnel glow are independent.
-  - Each cave site rotates with its own cliff face, projecting from the mountain foot with a matching blocked rock footprint.
-  - Grass and decorative bushes are cleared only inside the cave/rail approaches.
-  - The loaded mine uses 1,134 triangles across fourteen visible mesh instances, excluding the scenery.
-- `MineRockShape` — a continuous 64-triangle, single-mesh outcrop at the cave mouth.
-  - Its rear is embedded beneath the mountain triangles sampled by `MountainShape`.
-  - The middle cliff columns are removed, and the mountain triangles are clipped around the tunnel to leave its interior clear.
-- `CrateShape` — shared hollow shipping-crate body and lid meshes: chamfered slats with real gaps, end handholds, fitted corner battens, nail heads, floor planks and two low runners.
-  - Each crate has its own rear lid hinge and lifting body transform.
-  - The crate uses 488 triangles and two mesh instances.
-- `SignpostShape` — the market post's shared fitted signboard, mounted blackboard, pallet, rounded sheet-metal mailbox and separate order flag.
-  - Two decorative storage crates reuse `CrateShape`.
-  - The chalkboard uses a static generic price label, without live market values.
-  - The mailbox flag animates with the order state.
-  - The assembly uses 1,231 triangles across six mesh instances, plus one text label. Its picking volume covers the board and storage.
-- `FirePitShape` — the campfire's shared ring of eleven irregular faceted fieldstones, ash bed and fitted split logs with charred ends.
-  - A separate shared flame mesh has the flicker pivot, smoke vent and day/night light handles.
-  - Recursive visible counts are 518 triangles across three mesh instances burning, and 443 across two cold.
+- `CookShape` — caches the cooking table's recessed masonry hearth, bevelled timber joinery, grill and open stew pot, hollow mortar with fitted pestle, and fire mesh. `WorldModels.CookingTable` holds the independently visible `Glow` and `Mortar` handles, the light and smoke vent, and the hit volumes.
+- `CanneryShape` — caches the cannery's bevelled steel stove with an open firebox and flue, fitted timber counter, shaped stockpot and lid with open handles, and hand press with cans. Bevels are limited to broad edges. Simplified can profiles and omitted covered caps keep the model light. The fire, light and smoke controls are on `WorldModels.Cannery`.
+- `RackShape` — caches the tool station's fitted concrete feet, bevelled planks and cap, and shaped axe, pickaxe and rake. Each tool has its own `Racked` visibility pivot.
+- `PileShape` — caches a pile-only dirt pad with fitted log edging, and stock shapes reused from other models. Sources are the mine supply log outline, nature boulders and loose-ore nuggets, furnace coal lumps, and the bench/mine stock-board and bar primitives. Connected lumps are extracted whole and logs omit redundant cylinder rings. Coal slots reuse the furnace's closed chunk with varied rotations. Families share one baked mesh across piles, fitted to the fourteen 9–4–1 slot positions. Items without a suitable source use a color-tinted block. `WorldModels.SyncPile` changes mesh and material with inventory, while `WorldView` keeps its sight guard, so remembered stock shows in fog. The farm yard uses `PileShape.Yard`.
+- `FarmShape` — caches the farm's shaped soil rows and three seeded variants of sprouts, green plants and ripe wheat. Leaves are tapered and two-sided, stems are triangular and grain heads are shaped. One crop mesh is shown per growth stage under the `Crops` handles.
+- `MineShape` — caches the mine's plan outline, inward-facing tunnel shell, spoil pad, fitted portal and sloped board hood, inner supports and rail runs. The cart has a continuous flared tub, inner lining and rim, and axles and wheels seated on the rail tops. Its load reuses loose-ore geometry. Construction pivots, cart/load visibility, lantern fire/light and tunnel glow are independent. Each cave site rotates with its own cliff face, projecting from the mountain foot with a matching blocked rock footprint. Grass and decorative bushes are cleared only inside the cave/rail approaches.
+- `MineRockShape` — a continuous single-mesh outcrop at the cave mouth. Its rear is embedded beneath the mountain triangles sampled by `MountainShape`. The middle cliff columns are removed, and the mountain triangles are clipped around the tunnel to leave its interior clear.
+- `CrateShape` — shared hollow shipping-crate body and lid meshes: chamfered slats with real gaps, end handholds, fitted corner battens, nail heads, floor planks and two low runners. Each crate has its own rear lid hinge and lifting body transform.
+- `SignpostShape` — the market post's shared fitted signboard, mounted blackboard, pallet, rounded sheet-metal mailbox and separate order flag. Two decorative storage crates reuse `CrateShape`. The chalkboard uses a static generic price label, without live market values. The mailbox flag animates with the order state. The picking volume covers the board and storage.
+- `FirePitShape` — the campfire's shared ring of eleven irregular faceted fieldstones, ash bed and fitted split logs with charred ends. A separate shared flame mesh has the flicker pivot, smoke vent and day/night light handles.
 
 ### Carried and dropped goods
 
-- `BackpackShape` — dropped inventory.
-  - The body reuses the player's cached six-ring canvas backpack profile through `ActorShape.Backpack`, laid on its back in a ground pose.
-  - `BackpackShape` adds ground-resting webbing: slack shoulder straps, a carry loop, a fitted dark opening and a separate curved access flap.
-  - The flap animates as the storage lid and has a fog-memory guard.
-  - The dropped pack uses 310 triangles across three visible mesh instances.
-- `CartShape` — caches the courier cart's hollow tapered tray with a folded rim, continuous pull frame and hand grip, fitted bed supports and axle, dished wheels and handled payment case.
-  - Cart loads reuse an 80-triangle `CrateShape.Cargo` version of the slatted crate, omitting hidden interiors and small hardware at this scale.
-  - The six crate slots, loose-goods/cash visibility, wheel pivots and courier animation are independent.
-  - The fully loaded cart uses 1,020 triangles across nine visible mesh instances. The courier's shared human rig adds 2,634 triangles and seventeen instances.
-- Carried goods on all human roles reuse the same cached `CrateShape.Cargo` mesh as cart loads.
-  - It is fitted to the centered carry volume and shared visibility handle.
-  - The carried crate uses 80 triangles and one mesh instance.
-  - All roles cradle the load from below, with horizontal forearms and the crate seated above the palms.
+- `BackpackShape` — dropped inventory. The body reuses the player's cached six-ring canvas backpack profile through `ActorShape.Backpack`, laid on its back in a ground pose. `BackpackShape` adds ground-resting webbing: slack shoulder straps, a carry loop, a fitted dark opening and a separate curved access flap. The flap animates as the storage lid and has a fog-memory guard.
+- `CartShape` — caches the courier cart's hollow tapered tray with a folded rim, continuous pull frame and hand grip, fitted bed supports and axle, dished wheels and handled payment case. Cart loads reuse a `CrateShape.Cargo` version of the slatted crate, omitting hidden interiors and small hardware at this scale. The six crate slots, loose-goods/cash visibility, wheel pivots and courier animation are independent. The courier uses the shared human rig.
+- Carried goods on all human roles reuse the same cached `CrateShape.Cargo` mesh as cart loads. It is fitted to the centered carry volume and shared visibility handle. All roles cradle the load from below, with horizontal forearms and the crate seated above the palms.
 
 ### Nature
 
 - Tree3D 1.1.0 supplies the baked tree and berry-bush geometry. Preview it with `./build.py play -- --showcase --trees`.
-  - `src/Tree3DShape.cs` loads shared tree and berry-bush meshes, and cutout foliage shader materials that sway in the wind (`src/Wind.cs`) and have a blended twin for fading.
-  - Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes`. Berries attach to foliage-card twigs and have their own harvest visibility. Decorative scenery shrubs use a MultiMesh.
-  - `assets/models/tree3d/` contains the baked meshes, SVG leaf/bark textures, triangle manifest and upstream license notices.
-  - Regenerate with `./tools/tree3d.py`. Native authoring binaries stay in ignored `.tools/tree3d` and are not needed to play. See [tree3d/README.md](models/tree3d/README.md).
+- `src/Tree3DShape.cs` loads shared tree and berry-bush meshes, and cutout foliage shader materials that sway in the wind (`src/Wind.cs`) and have a blended twin for fading.
+- Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes`. Berries attach to foliage-card twigs and have their own harvest visibility. Decorative scenery shrubs use a MultiMesh.
+- `assets/models/tree3d/` contains the baked meshes, SVG leaf/bark textures, triangle manifest and upstream license notices.
+- Regenerate Tree3D output with `./tools/tree3d.py`. Native authoring binaries stay in ignored `.tools/tree3d` and are not needed to play. See [tree3d/README.md](models/tree3d/README.md).
 - `src/NatureShape.cs` supplies shared vertex-coloured meshes for stumps, decorative shrubs, fruit, rocks, ore deposits and loose ore.
-- `NatureShape.Ore` and `NatureShape.OreChips` — color-neutral host/seam and fractured chip geometry shared by coal, iron and tin deposits for each of three seeded variants.
-  - Cached material palettes distinguish black coal, rusty iron and pale tin; coal chips use near-black `0c0e10` without lightened grey tops.
-  - Seams are clipped flush into the four-boulder profiles along continuous bedding planes.
-  - All three ore kinds use 863, 878 and 882 triangles across three mesh instances by variant.
-  - The tin-ore icon is rendered from the deposit; coal and iron inventory icons use their separate loose-ore models.
-- `NatureShape.Scrub` — decorative plain bushes as a lightweight lobe that reuses the resource bush's folded-leaf builder.
-  - Its neutral shading takes the MultiMesh colors.
-  - The baked-placement forest contains 269 three-lobe bushes, filtered away from water, trails, resources and mine approaches, in one MultiMesh batch with no per-frame work.
-  - Each lobe uses 48 triangles.
-- `LeafShape` — one shared mesh of twenty-four pointed, folded autumn leaves with tapered stems for the leaf patch.
-  - Three fixed seeded layouts add variation alongside the ID-based yaw.
-  - Each full or partially raked patch uses 264 triangles and one visible mesh instance.
-  - Fully raked patches stay hidden until the daily refill.
-  - All vertices fit inside the picking radius and height.
+- `NatureShape.Ore` and `NatureShape.OreChips` — color-neutral host/seam and fractured chip geometry shared by coal, iron and tin deposits for each of three seeded variants. Cached material palettes distinguish black coal, rusty iron and pale tin; coal chips use near-black `0c0e10` without lightened grey tops. Seams are clipped flush into the four-boulder profiles along continuous bedding planes. The tin-ore icon is rendered from the deposit; coal and iron inventory icons use their separate loose-ore models.
+- `NatureShape.Scrub` — decorative plain bushes as a lightweight lobe that reuses the resource bush's folded-leaf builder. Its neutral shading takes the MultiMesh colors. The baked-placement forest scatters three-lobe bushes, filtered away from water, trails, resources and mine approaches, in one MultiMesh batch with no per-frame work.
+- `LeafShape` — one shared mesh of twenty-four pointed, folded autumn leaves with tapered stems for the leaf patch. Three fixed seeded layouts add variation alongside the ID-based yaw. Fully raked patches stay hidden until the daily refill. All vertices fit inside the picking radius and height.
 
 ## Icons
 

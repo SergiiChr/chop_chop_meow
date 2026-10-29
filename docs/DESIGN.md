@@ -11,7 +11,12 @@ These came from the user; change them only after asking.
 - **Platform and launch:** Linux first, one-command launch from a fresh checkout through the Python launcher.
 - **Look:** smooth isometric 3D, natural and lighthearted, with some of Terraria's approachable feel; no fantasy or industrial styling. Buildings are modern DIY, there are several tree species, and workers wear blue overalls over a cream shirt.
 - **Animation:** every core interaction has an animation, with a dedicated one for every tool.
-- **Progression:** see the progression rules in [CLAUDE.md](../CLAUDE.md#architecture). Charcoal cannot substitute for mined coal.
+- **Progression:** the player starts with a steel axe and no pickaxe; there is no loose iron and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
+- **Mining:** coal, iron and tin deposits need a carried pickaxe; loose coal needs no tool. Charcoal cannot substitute for mined coal.
+- **Steel:** needs iron, mined coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
+- **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, rake for leaves, hammer for fitting a mine) from a tool station and put them back when reassigned or going home. Without one they wait and say so once.
+- **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. Piles set their own filters from what they hold. Manual transfers bypass automation filters.
+- **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
 - **Market:** reached at a trading post; selling lowers a price, which recovers over time; deeper goods are worth more; orders settle after a visible 30-second cart trip.
 - **Workers:** hired individually, paid daily, assigned, reassigned and dismissed; they carry station inputs and outputs, preferring matching filtered storage.
@@ -82,7 +87,7 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/*.cs` | Simulation checks run by `./build.py test` (`SELF-TEST PASS`) |
+| `tests/*.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`) |
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs` | The rendered performance run |
@@ -190,7 +195,9 @@ Filling it or sipping straight from the source takes one `GatherSeconds`.
 Every point on the pond shore is a collection target.
 Recipes take only a full bottle, and cooking returns the empty bottle rather than destroying it.
 
-During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”. It advances normal simulation through dawn, including needs, trades, production and wages. In multiplayer it is available only when everyone is downed; a living player prevents a shared time skip.
+During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
+It advances normal simulation through dawn, including needs, trades, production and wages.
+In multiplayer it is available only when everyone is downed; a living player prevents a shared time skip.
 
 ### Goals
 
@@ -213,7 +220,8 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `hungerHours` and `thirstHours` in `data/game.json` set how many in-game hours a full bar lasts.
 
-Sleeping in a cabin advances time toward dawn. It is allowed from `World.SleepHour` (22:00), a little before night falls.
+Sleeping in a cabin advances time toward dawn.
+It is allowed from `World.SleepHour` (22:00), a little before night falls.
 It is refused if hunger or thirst would run out first.
 
 #### Sprinting
@@ -550,10 +558,14 @@ Workers use grid detours around water and buildings.
 
 ## Development and verification
 
-[RELEASE.md](RELEASE.md) describes the development flow, and the [README](../README.md#launcher-commands) lists the launcher commands.
+[RELEASE.md](RELEASE.md) describes the development flow, and `./build.py check` runs every check:
 
-- `test` runs the simulation checks with a 120-second limit and requires `SELF-TEST PASS`, then the Godot input/UI checks requiring `UI-TEST PASS`. It then runs a host and a guest process on this machine, requiring `NET-HOST PASS` and `NET-GUEST PASS`; the guest joins through a relay in `build.py` that adds about 80 ms of delay and 5% packet loss each way.
-- `build` runs both, exports a Linux executable, smoke-tests it, and packages the executable, game pack and runtime into a tar archive.
+- C# compile with warnings as errors and `dotnet format --verify-no-changes`.
+- `mypy --strict` and `ruff` on `build.py` and `tools/`.
+- Simulation checks with a 120-second limit, requiring `SELF-TEST PASS`, then the Godot input/UI checks, requiring `UI-TEST PASS`.
+- A host and a guest process on this machine, requiring `NET-HOST PASS` and `NET-GUEST PASS`. The guest joins through a relay in `build.py` that adds about 80 ms of delay and 5% packet loss each way.
+
+`./build.py build` runs the checks, exports a Linux executable, smoke-tests it and packages the executable, game pack and runtime into a tar archive.
 
 ### Platform
 
