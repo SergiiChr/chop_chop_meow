@@ -256,9 +256,7 @@ public sealed partial class World {
     public bool Sees(Vector2 p) => p.DistanceTo(Player) <= Data.SightRadius;
     /// <summary>Raised whenever newly seen tiles join the explored map.</summary>
     public int ExploredRevision { get; private set; }
-    /// <summary>Things as the player knows them: live within sight, as last seen elsewhere, and absent if never seen.</summary>
-    public IEnumerable<Thing> Known { get { var known = new List<Thing>(); CollectKnown(known); return known; } }
-    /// <summary>Fills <paramref name="known"/> with <see cref="Known"/>, without allocating, for code that runs every frame.</summary>
+    /// <summary>Fills <paramref name="known"/> with things as the player knows them: live within sight, as last seen elsewhere, and absent if never seen.</summary>
     public void CollectKnown(List<Thing> known) {
         known.Clear();
         foreach (var t in S.Things) if (Sees(t.Pos)) known.Add(t);

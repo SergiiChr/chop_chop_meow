@@ -137,7 +137,6 @@ public sealed partial class World {
             case "pick_up": if (t.IsLoose) Gather(t, 0); break;
             case "pump": Pump(t); break;
             case "fuel_fire": FuelFire(t); break;
-            case "drink": Drink(t); break;
             case "set_recipe": SetRecipe(t, c.Item); break;
             case "set_filter": SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
             case "clear_filters": ClearFilters(t); break;
@@ -186,12 +185,6 @@ public sealed partial class World {
         // What goes into a fuel slot becomes the fuel workers keep it stocked with.
         if (moved > 0 && b > 0 && Find(b / BoxCodes) is Thing station && to == station.Burner) station.Fuel = item;
         return moved;
-    }
-
-    public void Drink(Thing lake) {
-        // Old saved commands must not restore thirst instantly. The held gather owns its timer.
-        if (lake.Kind != "water" || !Near(lake)) { Say("Walk closer to the pond."); return; }
-        Say("Collect water · hold right mouse on the pond shore.");
     }
 
     public void SortBackpack() {
