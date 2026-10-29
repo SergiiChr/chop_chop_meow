@@ -686,7 +686,7 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         var iron = world.Add("iron", new Vector2(10, 10), 20);
         world.S.Milestones.Add("pick");
-        Require(world.GatherBlock(iron) != null,
+        Require(world.GatherBlock(iron)?.Contains("pickaxe") == true,
                 "the player must still carry a usable pickaxe to mine after previously forging one");
         Require(world.GatherBlock(iron, true) == null,
                 "a worker's tools come from a tool station, so what the player carries does not block them");
@@ -695,7 +695,7 @@ public static class SimulationChecks {
                 "carrying a steel pickaxe should unlock player mining");
         world.S.Backpack.Remove("steel_pick", 1);
         world.S.Backpack.Add("steel_axe", 1);
-        Require(world.GatherBlock(iron) != null && world.GatherBlock(world.Add("tree", new Vector2(12, 12), 5)) == null,
+        Require(world.GatherBlock(iron)?.Contains("pickaxe") == true && world.GatherBlock(world.Add("tree", new Vector2(12, 12), 5)) == null,
                 "an axe should fell trees but not mine ore");
 
         world.S.Backpack.Add("wood", 8);
@@ -980,7 +980,7 @@ public static class SimulationChecks {
             Require(found.Count >= 15 && found.All(t => t.Pos.DistanceTo(World.Spawn) >= 9 && found.All(o => o == t || o.Pos.DistanceTo(t.Pos) >= spacing)),
                     $"{kind} should be scattered singly away from the clearing, so more of it takes exploring");
         }
-        Require(world.S.Things.Where(t => t.IsResource || !t.IsResource).All(t => Terrain.Open(t.Pos) || t.IsDeposit),
+        Require(world.S.Things.All(t => Terrain.Open(t.Pos) || t.IsDeposit),
                 "nothing should be placed in the sea, the lake or the mountains");
         var trees = world.S.Things.Where(t => t.Kind == "tree").ToList();
         float woods = trees.Count(t => Terrain.FromMountains(t.Pos) < 15), plains = trees.Count(t => Terrain.FromMountains(t.Pos) >= 30);
@@ -1043,7 +1043,7 @@ public static class SimulationChecks {
         var bush = world.Add("berries", Site(14, 8), 60);
         var iron = world.Add("iron", Site(12, 14), 120);
         var coal = world.Add("coal", Site(16, 8), 120);
-        Require(world.GatherBlock(iron) != null && world.GatherBlock(coal) != null, "deposits should wait for a pickaxe the player does not start with");
+        Require(world.GatherBlock(iron)?.Contains("pickaxe") == true && world.GatherBlock(coal)?.Contains("pickaxe") == true, "deposits should wait for a pickaxe the player does not start with");
         GatherUntil(world, tree, "wood", 64);
         GatherUntil(world, stone, "stone", 58);
         GatherUntil(world, bush, "berries", 48);
