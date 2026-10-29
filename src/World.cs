@@ -713,10 +713,7 @@ public sealed partial class World {
         var wolf = S.Wolves.Where(w => w.Leap <= 0 && !w.Feeding).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
             wolf.Health -= 1; wolf.Flee = FleeSeconds; KnockBack(wolf);
-            if (wolf.Health <= 0) {
-                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
-                Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
-            }
+            if (wolf.Health <= 0) KillWolf(wolf);
         }
         // A wave of fire toward a wolf on its own makes it keep its distance; a pack closing in no longer cares.
         if (!pack)
@@ -725,6 +722,11 @@ public sealed partial class World {
     public const float StaggerSeconds = .45f;
     /// <summary>Throws a struck wolf back from the player; the view slides it there over the stagger.</summary>
     private void KnockBack(Wolf wolf) { wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f; wolf.Stagger = StaggerSeconds; }
+    /// <summary>Leaves a carcass where a struck wolf fell, within the map.</summary>
+    private void KillWolf(Wolf wolf) {
+        S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
+        Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
+    }
     private void PutOutTorch() {
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
         foreach (var w in Hunters) w.Scared = false;
@@ -740,10 +742,7 @@ public sealed partial class World {
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
             wolf.Health -= axe == null ? .5f : 1.5f * Speed(axe);
             KnockBack(wolf);
-            if (wolf.Health <= 0) {
-                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
-                Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
-            }
+            if (wolf.Health <= 0) KillWolf(wolf);
         }
     }
     public void Die() {
