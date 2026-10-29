@@ -785,15 +785,7 @@ public partial class Game : Node {
                 // Until a numbered slot is chosen, quick save and load ask which slot to use.
                 case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (slot > 0) Save(slot); else ShowSlots(true, HideScreen); break;
                 case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (slot > 0) Load(slot); else ShowSlots(false, HideScreen); break;
-                case Key.Key1: SelectHotbar(0); break;
-                case Key.Key2: SelectHotbar(1); break;
-                case Key.Key3: SelectHotbar(2); break;
-                case Key.Key4: SelectHotbar(3); break;
-                case Key.Key5: SelectHotbar(4); break;
-                case Key.Key6: SelectHotbar(5); break;
-                case Key.Key7: SelectHotbar(6); break;
-                case Key.Key8: SelectHotbar(7); break;
-                case Key.Key9: SelectHotbar(8); break;
+                case >= Key.Key1 and <= Key.Key9: SelectHotbar((int)(key.PhysicalKeycode - Key.Key1)); break;
                 case Key.E:
                     var t = world.Find(selected);
                     if (t == null || !world.Near(t)) t = world.S.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
