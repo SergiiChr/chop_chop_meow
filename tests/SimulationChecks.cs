@@ -1934,7 +1934,7 @@ public static class SimulationChecks {
         var furnace = world.Add("reinforced", new Vector2(20, 20));
         furnace.Heat = World.SteelHeat + 5;
         // The worker starts far off, so the forge would cool past the bar before they arrive to pump.
-        AddWorker(world, new Vector2(30, 30)).Assignment = furnace.Id;
+        world.Assign(AddWorker(world, new Vector2(30, 30)), furnace);
         SafeTick(world, 4);
         Require(furnace.Heat >= World.SteelHeat, "a working crew should keep the forge at or above the clear bar");
         var crew = world.S.Workers[0];

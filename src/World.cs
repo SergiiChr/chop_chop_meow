@@ -1425,8 +1425,6 @@ public sealed partial class World {
     }
     /// <summary>Drops jobs at places that are gone, and points the worker at a place they still have a job at.</summary>
     private void TidyDuties(Worker w) {
-        // Older saves and fixtures set only the place; it carries every job there.
-        if (w.Duties.Count == 0 && w.Assignment > 0 && Find(w.Assignment) is Thing place) foreach (string job in Jobs(place)) w.Duties.Add(new Duty { Thing = place.Id, Job = job });
         for (int i = w.Duties.Count - 1; i >= 0; i--) if (Find(w.Duties[i].Thing) == null) w.Duties.RemoveAt(i);
         if (w.Duties.Count == 0) { w.Assignment = 0; return; }
         if (!HasDuty(w, w.Assignment)) w.Assignment = w.Duties[0].Thing;
@@ -1895,6 +1893,9 @@ public sealed partial class World {
         // The goal chain gained steps, so the current goal is worked out again from the milestones.
         loaded.Goal = 0;
         S = loaded;
+        // Older saves set only a worker's place; it carries every job there.
+        foreach (var w in S.Workers)
+            if (w.Duties.Count == 0 && w.Assignment > 0 && Find(w.Assignment) is Thing place) foreach (string job in Jobs(place)) w.Duties.Add(new Duty { Thing = place.Id, Job = job });
         NormalizeBottleStorage();
         // Saves from before raking have no leaf litter.
         if (!S.Things.Any(t => t.Kind == "leaves")) DropLeaves();
