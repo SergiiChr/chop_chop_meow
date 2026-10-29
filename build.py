@@ -15,6 +15,7 @@ existing Godot 4.7.2 .NET executable.
 
 from __future__ import annotations
 
+import hashlib
 import heapq
 import itertools
 import os
@@ -81,6 +82,20 @@ def download(url: str, target: Path) -> None:
                 raise SystemExit(f"Could not download {url}: {error}") from error
             print(f"Download failed ({error}); retrying...")
             time.sleep(2 * (attempt + 1))
+
+
+def fetch_pinned(url: str, archive: Path, sha256: str) -> None:
+    """Downloads url into archive unless it is already there, and deletes it and stops when its SHA-256 is not sha256."""
+    if not archive.is_file():
+        print(f"Downloading {url}...")
+        download(url, archive)
+    with archive.open("rb") as source:
+        actual = hashlib.file_digest(source, "sha256").hexdigest()
+    if actual != sha256:
+        archive.unlink()
+        raise SystemExit(
+            f"{archive.name} SHA-256 mismatch: expected {sha256}, got {actual}"
+        )
 
 
 def dotnet_env() -> dict[str, str]:
