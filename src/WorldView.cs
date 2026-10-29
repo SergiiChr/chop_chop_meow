@@ -26,7 +26,7 @@ public partial class WorldView : Node3D {
     public string? SelectedTool;
     public bool Paused;
     public bool AnimationReview;
-    /// <summary>Fixed daylight landscape fixture for matching environment trial screenshots.</summary>
+    /// <summary>A fixed daylight landscape view for <c>--environment-review</c>.</summary>
     public bool EnvironmentReview;
     public bool EnvironmentReviewFog;
     /// <summary>Holds the lake and sea waves at one moment, for environment review screenshots; set before the view enters the tree.</summary>

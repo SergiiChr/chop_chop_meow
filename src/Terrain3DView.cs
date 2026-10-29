@@ -70,11 +70,11 @@ public partial class WorldView {
         shader.Code = code.Insert(end, GD.Load<ShaderInclude>("res://assets/environment/terrain3d/fragment.gdshaderinc").Code);
         terrainMaterialRid = material.Call("get_material_rid").AsRid();
         terrainGrass = grass;
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_grass", grass.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_patches", terrainPatches.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_disturbance", disturbanceTexture.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_shade", sceneryShadeTexture.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_contact", objectShadeTexture.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "grass", grass.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "patches", terrainPatches.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "disturbance", disturbanceTexture.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "shade", sceneryShadeTexture.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "contact", objectShadeTexture.GetRid());
         // The shader's tunnel cut-outs hold exactly one entry per cliff.
         if (World.Cliffs.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {World.Cliffs.Length}.");
         var mines = new Vector4[World.Cliffs.Length];
@@ -82,7 +82,7 @@ public partial class WorldView {
             var cliff = World.Cliffs[i]; var at = World.MineSpot(cliff);
             mines[i] = new Vector4(at.X, at.Y, cliff.Face.X, cliff.Face.Y);
         }
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "trial_mines", mines);
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "mines", mines);
         GD.Print($"TERRAIN3D: v1.1.0-rc1, 9 regions, {regionSize}² samples/region; playable floor {floor:0.000}");
     }
 

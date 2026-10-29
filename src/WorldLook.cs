@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 /// <summary>Wind, worn footpaths and the sound listener.</summary>
 public partial class WorldView {
     private readonly AudioListener3D listener = new();
-    private static readonly StringName TerrainTraffic = "trial_traffic";
+    private static readonly StringName TerrainTraffic = "traffic";
 
     // Paths form where people walk: footfall wears a map at two texels a tile, which slowly grows back.
     private const int TrafficScale = 2, TrafficSize = Terrain.Size * TrafficScale;
