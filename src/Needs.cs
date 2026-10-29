@@ -4,7 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>An outlined icon whose fill drains from the top as its level falls.</summary>
+/// <summary>An outlined icon filled with its need's colour.</summary>
 public partial class NeedGauge : Control {
     // Outlines in units of the gauge height; x is centred afterwards.
     public static readonly Vector2[] Stomach =
@@ -22,16 +22,19 @@ public partial class NeedGauge : Control {
         .Select(p => new Vector2((p.X + 17) / 30, (12 - p.Y) / 30)).ToArray();
     public Vector2[] Shape { get; set; } = Droplet;
     public Color Fill { get; set; }
-    public Func<float> Level { get; set; } = () => 100;
+    private Vector2[] outline = Array.Empty<Vector2>(), rim = Array.Empty<Vector2>();
+    private Vector2 outlined;
 
     public override void _Draw() {
-        float scale = Size.Y, left = Shape.Min(p => p.X), width = (Shape.Max(p => p.X) - left) * scale;
-        var outline = Shape.Select(p => (p - new Vector2(left, 0)) * scale + new Vector2((Size.X - width) / 2, 0)).ToArray();
-        float level = Math.Clamp(Level(), 0, 100) / 100;
-        // Clip the outline to the part below the current level, so the icon empties like a vessel.
-        var below = new[] { new Vector2(-1, Size.Y * (1 - level)), new Vector2(Size.X + 1, Size.Y * (1 - level)), new Vector2(Size.X + 1, Size.Y + 1), new Vector2(-1, Size.Y + 1) };
-        foreach (var part in Geometry2D.IntersectPolygons(outline, below)) DrawColoredPolygon(part, Fill);
-        DrawPolyline(outline.Append(outline[0]).ToArray(), level <= .25f ? Style.Brick : Style.Rim, 2, true);
+        if (Size.Y <= 0) return;
+        if (Size != outlined) {
+            outlined = Size;
+            float scale = Size.Y, left = Shape.Min(p => p.X), width = (Shape.Max(p => p.X) - left) * scale;
+            outline = Shape.Select(p => (p - new Vector2(left, 0)) * scale + new Vector2((Size.X - width) / 2, 0)).ToArray();
+            rim = outline.Append(outline[0]).ToArray();
+        }
+        DrawColoredPolygon(outline, Fill);
+        DrawPolyline(rim, Style.Rim, 2, true);
     }
 }
 
@@ -83,16 +86,16 @@ public partial class Game {
         var box = needsPlate = new PanelContainer { OffsetLeft = 20, OffsetTop = 18 };
         box.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(box);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); box.AddChild(row);
-        (Vial, NeedGauge) Need(string name, Vector2[] shape, Color color, Func<float> level) {
+        Vial Need(string name, Vector2[] shape, Color color) {
             var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 6); row.AddChild(column);
             var vial = new Vial { Name = name, Fill = color }; vial.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter; column.AddChild(vial);
-            var icon = new NeedGauge { Shape = shape, Fill = color, Level = () => 100, CustomMinimumSize = new Vector2(22, 20), MouseFilter = Control.MouseFilterEnum.Ignore };
+            var icon = new NeedGauge { Shape = shape, Fill = color, CustomMinimumSize = new Vector2(22, 20), MouseFilter = Control.MouseFilterEnum.Ignore };
             column.AddChild(icon);
-            return (vial, icon);
+            return vial;
         }
-        health = Need("health", NeedGauge.Heart, Style.Brick, () => world.S.Health).Item1;
-        hunger = Need("hunger", NeedGauge.Stomach, Style.Mustard, () => world.S.Hunger).Item1;
-        thirst = Need("thirst", NeedGauge.Droplet, Style.Sky, () => world.S.Thirst).Item1;
+        health = Need("health", NeedGauge.Heart, Style.Brick);
+        hunger = Need("hunger", NeedGauge.Stomach, Style.Mustard);
+        thirst = Need("thirst", NeedGauge.Droplet, Style.Sky);
         row.AddChild(new ColorRect { Color = new Color(Style.Beige, .7f), CustomMinimumSize = new Vector2(3, 0) });
         var bank = new VBoxContainer(); bank.AddThemeConstantOverride("separation", 8); row.AddChild(bank);
         bank.AddChild(Style.Heading("Bank", 13));
