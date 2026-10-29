@@ -198,7 +198,7 @@ public sealed partial class World {
         if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
         if (Forwarded("transfer_slot", a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
         if (a > 0 && !Near(Find(a / BoxCodes)!) || b > 0 && !Near(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
-        // Sync legacy inventories, then reject a stale drag rather than moving a different item.
+        // Bring stacks in line with totals changed directly, then reject a stale drag rather than moving a different item.
         from.EnsureLayout();
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
         if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
