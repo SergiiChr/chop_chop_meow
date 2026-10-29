@@ -1868,8 +1868,8 @@ public sealed partial class World {
     /// <summary>Whether every building, worker and cart in a save holds only known items, and every worker's tool is a known item.</summary>
     private bool ValidSettlement(SaveState save) {
         foreach (var t in save.Things) {
-            if (t == null || !ValidInventory(t.Inventory, save.Crates)) return false;
-            foreach (var box in new[] { t.Output, t.Wages, t.Burner, t.Tools }) if (box != null && !ValidInventory(box, save.Crates)) return false;
+            if (t?.Inventory == null) return false;
+            foreach (var box in Boxes(t)) if (box != null && !ValidInventory(box, save.Crates)) return false;
         }
         foreach (var w in save.Workers)
             if (w?.Duties == null || w.Tool == null || w.Tool != "" && !Data.Items.ContainsKey(w.Tool) || !ValidInventory(w.Bag, save.Crates)) return false;
