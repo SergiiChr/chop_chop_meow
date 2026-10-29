@@ -35,7 +35,9 @@ public sealed class Prop {
     public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
     public string Kind = "";
     public float Fade, Fall = -1, Open, Shake, Puff;
-    public int LastCount, Tint = -1;
+    public int LastCount;
+    /// <summary>Whether a build-mode ghost is tinted as placeable, or null before its first tint.</summary>
+    public bool? Tint;
     public bool Seen;
     /// <summary>Whether a hut shows its night window glow and lamp.</summary>
     public bool Lit;

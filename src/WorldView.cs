@@ -55,7 +55,9 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
     private readonly Dictionary<int, float> pumping = new();
-    private readonly Dictionary<string, Prop> ghosts = new();
+    /// <summary>Build-mode ghosts by building kind, made hidden while loading; mines have one per cliff ore instead.</summary>
+    private readonly Dictionary<string, Prop> ghosts = new(), mineGhosts = new();
+    private Prop? ghost;
     private MeshInstance3D selectRing = null!, hoverRing = null!, workerRing = null!, playerRing = null!, placeTile = null!;
     private float pulseRemaining;
     private ActorAction pulseAction;
@@ -153,6 +155,7 @@ public partial class WorldView : Node3D {
         BuildEffects(scene);
         PileShape.Warm(World.Data);
         WorldModels.Warm();
+        BuildGhosts();
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
         selectRing = Ring(new Color(.95f, .82f, .4f, .85f));
         hoverRing = Ring(new Color(1, .95f, .75f, .55f));
@@ -993,21 +996,35 @@ public partial class WorldView : Node3D {
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
-        foreach (var (kind, ghost) in ghosts) ghost.Root.Visible = kind == BuildMode;
         placeTile.Visible = BuildMode != "";
-        if (BuildMode == "") return;
-        var at = World.Snap(BuildMode, ToWorld(Mouse).Round());
-        bool valid = World.PlacementBlock(BuildMode, at) == null;
-        if (!ghosts.TryGetValue(BuildMode, out var shown)) {
-            shown = WorldModels.Build(new Thing { Kind = BuildMode, Pos = at });
-            SetFade(shown.Root, .35f);
-            scene.AddChild(shown.Root); ghosts[BuildMode] = shown;
+        var at = BuildMode == "" ? Vector2.Zero : World.Snap(BuildMode, ToWorld(Mouse).Round());
+        var shown = BuildMode == "" ? null : BuildMode == "mine" ? mineGhosts[World.CliffAt(at).Ore] : ghosts[BuildMode];
+        if (shown != ghost) {
+            if (ghost != null) ghost.Root.Visible = false;
+            if (shown != null) shown.Root.Visible = true;
+            ghost = shown;
         }
-        if (shown.Tint != (valid ? 1 : 0)) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid ? 1 : 0; }
+        if (shown == null) return;
+        bool valid = World.PlacementBlock(BuildMode, at) == null;
+        if (shown.Tint != valid) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid; }
         shown.Root.Position = To3(at);
         if (BuildMode == "mine") shown.Body.Rotation = WorldModels.MineYaw(at);
         placeTile.Position = To3(at, .02f);
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
+    }
+
+    /// <summary>Builds a hidden, faded ghost of every building and of a crate, so picking one in build mode compiles nothing mid-game.</summary>
+    private void BuildGhosts() {
+        Prop Ghost(string kind, Vector2 at) {
+            var built = WorldModels.Build(new Thing { Kind = kind, Pos = at });
+            SetFade(built.Root, .35f);
+            built.Root.Visible = false;
+            scene.AddChild(built.Root);
+            return built;
+        }
+        foreach (var kind in World.Data.Buildings.Keys) if (kind != "mine") ghosts[kind] = Ghost(kind, Vector2.Zero);
+        ghosts["crate"] = Ghost("crate", Vector2.Zero);
+        foreach (var cliff in World.Cliffs) if (!mineGhosts.ContainsKey(cliff.Ore)) mineGhosts[cliff.Ore] = Ghost("mine", World.MineSpot(cliff));
     }
 
     private void Mark(MeshInstance3D ring, Thing? t, float lift) {
