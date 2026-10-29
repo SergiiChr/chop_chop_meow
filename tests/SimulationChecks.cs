@@ -1161,7 +1161,7 @@ public static class SimulationChecks {
         var workerTree = world.S.Things.FirstOrDefault(t => t.Kind == "tree" && t.Remaining > 0);
         Require(workerTree != null, "a remaining tree should be available for the hired worker");
         world.Assign(worker!, workerTree);
-        Require(worker!.Assignment == workerTree!.Id && worker.Job == "gather" && world.S.Milestones.Contains("assigned"),
+        Require(worker!.Assignment == workerTree!.Id && worker.Duties.Count == 1 && World.HasDuty(worker, workerTree.Id, "gather") && world.S.Milestones.Contains("assigned"),
                 "player should assign the hired worker to gather from a resource");
         // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning.
         for (int i = 0; i < 4000 && !world.OnDuty(worker); i++) { SafeTick(world, .25f); world.S.Health = 100; }
@@ -1935,7 +1935,6 @@ public static class SimulationChecks {
         furnace.Heat = World.SteelHeat + 5;
         // The worker starts far off, so the forge would cool past the bar before they arrive to pump.
         AddWorker(world, new Vector2(30, 30)).Assignment = furnace.Id;
-        world.S.Workers[0].Job = "building";
         SafeTick(world, 4);
         Require(furnace.Heat >= World.SteelHeat, "a working crew should keep the forge at or above the clear bar");
         var crew = world.S.Workers[0];

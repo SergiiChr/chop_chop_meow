@@ -65,7 +65,6 @@ public sealed class Worker {
     /// <summary>The place the worker is at for one of their <see cref="Duties"/>; with jobs at several places they take turns.</summary>
     public int Assignment { get; set; }
     public List<Duty> Duties { get; set; } = new();
-    public string Job { get; set; } = "idle";
     public string Status { get; set; } = "Available";
     /// <summary>Units of one stack a worker carries; a miner bringing out a full mine output carries the whole stack.</summary>
     public const int BagStack = 5;
@@ -1046,7 +1045,7 @@ public sealed partial class World {
     }
     private void Started(Worker w, Thing? target) {
         // Reassigning calls off a price errand, so the worker never freezes on the road.
-        w.Assignment = target?.Id ?? 0; w.Away = 0; w.Job = target == null ? "idle" : target.IsResource ? "gather" : "building"; w.WorkState = WorkerWorkState.Idle;
+        w.Assignment = target?.Id ?? 0; w.Away = 0; w.WorkState = WorkerWorkState.Idle;
         w.Destination = 0; w.Timer = 0; w.Status = target == null ? "Available" : "Starting work";
         if (target != null && target.Kind != "signpost") S.Milestones.Add("assigned");
     }
