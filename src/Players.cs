@@ -249,6 +249,9 @@ public sealed partial class World {
         playerBusy = true; Player = p;
     }
 
+    /// <summary>Host: puts a guest where their own machine walked them, acting as that guest.</summary>
+    public void MoveTo(PlayerState p, Vector2 to) { using (ActAs(p)) MoveTo(to); }
+
     /// <summary>
     /// Host: brings a guest in with the player they saved on their machine.
     /// Anything missing, unknown or out of range gives them a new player instead: an empty backpack at the clearing.
