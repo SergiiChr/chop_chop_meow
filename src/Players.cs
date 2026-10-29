@@ -261,21 +261,14 @@ public sealed partial class World {
     private PlayerState? Adopt(string? saved) {
         PlayerState? p;
         try { p = saved == null ? null : JsonSerializer.Deserialize<PlayerState>(saved, GameData.Json); } catch (JsonException) { return null; }
-        if (p?.Backpack?.Items == null || p.HotbarSlots == null || p.Crafting == null) return null;
-        var crates = p.Crates ?? new();
-        bool Known(string item) => Data.Items.ContainsKey(item) && !item.StartsWith(PackedPrefix);
-        bool valid = p.Backpack.Items.All(pair => pair.Value > 0 && (Known(pair.Key) || crates.ContainsKey(PackedId(pair.Key))))
-            && crates.Values.All(box => box?.Items != null && box.Items.All(pair => pair.Value > 0 && Known(pair.Key)) && box.Count <= Data.CrateCapacity)
-            && p.Crafting.All(id => Data.Recipes.TryGetValue(id, out var r) && r.Hand)
-            // A player who left while dead comes back still waiting to respawn.
-            && (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
-            && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
+        var crates = p?.Crates ?? new();
+        if (p == null || !ValidCrates(crates) || !ValidPlayer(p, crates)) return null;
         var backpack = new Inventory { Slots = 24 };
         int legacySlots = p.Backpack.Items.Sum(pair => {
             int stack = Water.IsBottle(pair.Key) ? 64 : backpack.StackOf(pair.Key);
             return (pair.Value + stack - 1) / stack;
         });
-        if (!valid || !backpack.Fits(p.Backpack.Items) && legacySlots > 24) return null;
+        if (!backpack.Fits(p.Backpack.Items) && legacySlots > 24) return null;
         backpack.Slots = Math.Max(24, p.Backpack.AggregateSlotsNeeded);
         var renamed = new Dictionary<string, string>();
         // Packed crates get new numbers here, since the guest's old ones may be taken in this world.

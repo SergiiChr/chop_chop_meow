@@ -1839,6 +1839,48 @@ public sealed partial class World {
         if (ProfitStreak >= Data.Goals.ProfitDays) S.Milestones.Add("profit_week");
     }
     public string Serialize() => JsonSerializer.Serialize(S, GameData.Json);
+    // ---------- Validation of saves and guests ----------
+    /// <summary>Whether an id names a known item, or a packed crate whose contents are in <paramref name="crates"/>.</summary>
+    private bool KnownItem(string item, Dictionary<int, Inventory> crates) => item.StartsWith(PackedPrefix) ? crates.ContainsKey(PackedId(item)) : Data.Items.ContainsKey(item);
+    /// <summary>Whether every entry is a positive count of a known item or of a packed crate in <paramref name="crates"/>.</summary>
+    private bool ValidInventory(Inventory? box, Dictionary<int, Inventory> crates) {
+        if (box?.Items == null) return false;
+        foreach (var (item, count) in box.Items) if (count <= 0 || !KnownItem(item, crates)) return false;
+        return true;
+    }
+    /// <summary>Whether each packed crate holds positive counts of known items, no other crates, and no more than a crate fits.</summary>
+    private bool ValidCrates(Dictionary<int, Inventory> crates) {
+        foreach (var box in crates.Values) {
+            if (box?.Items == null || box.Count > Data.CrateCapacity) return false;
+            foreach (var (item, count) in box.Items) if (count <= 0 || item.StartsWith(PackedPrefix) || !Data.Items.ContainsKey(item)) return false;
+        }
+        return true;
+    }
+    /// <summary>
+    /// Whether a player from a save or a joining guest carries only known items and has needs, torch and respawn timer within their limits.
+    /// The crafting queue must hold only recipes made by hand.
+    /// </summary>
+    private bool ValidPlayer(PlayerState p, Dictionary<int, Inventory> crates) {
+        if (p.HotbarSlots == null || p.Crafting == null || !ValidInventory(p.Backpack, crates)) return false;
+        foreach (string id in p.Crafting) if (!Data.Recipes.TryGetValue(id, out var r) || !r.Hand) return false;
+        // A player who left while dead comes back still waiting to respawn.
+        return (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
+            && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
+    }
+    /// <summary>Whether every building, worker and cart in a save holds only known items, and every worker's tool is a known item.</summary>
+    private bool ValidSettlement(SaveState save) {
+        foreach (var t in save.Things) {
+            if (t == null || !ValidInventory(t.Inventory, save.Crates)) return false;
+            foreach (var box in new[] { t.Output, t.Wages, t.Burner, t.Tools }) if (box != null && !ValidInventory(box, save.Crates)) return false;
+        }
+        foreach (var w in save.Workers)
+            if (w?.Duties == null || w.Tool == null || w.Tool != "" && !Data.Items.ContainsKey(w.Tool) || !ValidInventory(w.Bag, save.Crates)) return false;
+        foreach (var order in save.Orders) {
+            if (order?.Goods == null) return false;
+            foreach (var (item, count) in order.Goods) if (count <= 0 || !KnownItem(item, save.Crates)) return false;
+        }
+        return true;
+    }
     public void Deserialize(string json) {
         // Steel tools became steel parts; carried ones that were the only axe or pickaxe become those tools so the save stays playable.
         bool legacyTools = json.Contains("\"steel_tools\"");
@@ -1890,6 +1932,7 @@ public sealed partial class World {
                 if (BestTool(tool, loaded.Backpack) == null && loaded.Backpack.Remove("steel_parts", 1) == 1) loaded.Backpack.Add(made, 1);
             if (loaded.Milestones.Contains("steel_parts")) loaded.Milestones.Add("steel_tool");
         }
+        if (!ValidCrates(loaded.Crates) || !ValidPlayer(loaded.Actor, loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         // The goal chain gained steps, so the current goal is worked out again from the milestones.
         loaded.Goal = 0;
         S = loaded;

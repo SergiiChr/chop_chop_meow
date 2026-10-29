@@ -49,6 +49,7 @@ public static class SimulationChecks {
         CheckSprintOutrunsWolf(data);
         CheckCoinStacks(data);
         CheckLegacySave(data);
+        CheckSaveWithUnknownItemRefused(data);
         CheckCrewKeepsForgeHot(data);
         CheckWorkerSchedule(data);
         CheckFogOfWar(data);
@@ -1900,6 +1901,21 @@ public static class SimulationChecks {
         SetCoins(world, 0);
         world.PayWages();
         Require(worker.WageDebt == worker.Wage && sign.Output![Inventory.Coins] == 7, "wages should not be taken from the market output");
+    }
+
+    /// <summary>A save naming an item the game does not know, in the backpack or as a worker's tool, is refused with a clear reason instead of failing mid-game.</summary>
+    private static void CheckSaveWithUnknownItemRefused(GameData data) {
+        var world = EmptyWorld(data);
+        world.S.Backpack.Add("tin_can", 2);
+        var worker = AddWorker(world, new Vector2(12, 12));
+        worker.Tool = "steel_hammer"; worker.Bag.Add("wood", 2);
+        string json = world.Serialize();
+        EmptyWorld(data).Deserialize(json);
+        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"Tool\": \"steel_hammer\"", "\"Tool\": \"unobtainium\""), ("\"wood\": 2", "\"unobtainium\": 2") }) {
+            bool refused = false;
+            try { EmptyWorld(data).Deserialize(Patch(json, edit)); } catch (InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
+            Require(refused, $"a save with {edit.Item2} in place of {edit.Item1} should be refused with a clear reason");
+        }
     }
 
     private static void CheckLegacySave(GameData data) {
