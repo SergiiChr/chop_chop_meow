@@ -65,6 +65,19 @@ public partial class WorldView : Node3D {
     private static readonly StandardMaterial3D GhostValid = Flat(new Color(.55f, .95f, .45f, .45f));
     private static readonly StandardMaterial3D GhostBlocked = Flat(new Color(1, .35f, .3f, .5f));
     private static readonly StandardMaterial3D NightGlass = Mat("ffd58a", .3f, 0, 1.6f);
+    private static readonly StandardMaterial3D Sparks = Flat(new Color("ffd27a"));
+    private static readonly StandardMaterial3D GatherDust = Flat(new Color(.8f, .78f, .7f, .45f));
+    private static readonly StandardMaterial3D Splash = Flat(new Color(.7f, .88f, .95f, .8f));
+    private static readonly StandardMaterial3D Embers = Flat(new Color("ffb347"));
+    private static readonly StandardMaterial3D FallDust = Flat(new Color(.7f, .66f, .52f, .45f));
+    private static readonly StandardMaterial3D Cinders = Flat(new Color("ff9a3a"));
+    private static readonly StandardMaterial3D DayGlass = Mat("8fb4c4", .15f, .2f);
+    private static readonly Color TagText = new Color("f5ecd1");
+    private static readonly Color BarTrack = new Color("2b4135");
+    private static readonly Color BarFill = new Color("e5bf68");
+    private static readonly Color HeatReady = new Color("f0a03c");
+    private static readonly Color HeatLow = new Color("8a5a46");
+    private static readonly Color HeatTick = new Color("f2e8cf");
     private readonly ShaderMaterial fog = new() { Shader = new Shader { Code = FogShader }, RenderPriority = (int)Material.RenderPriorityMax };
     private Image explored = null!;
     private ImageTexture exploredTexture = null!;
@@ -474,7 +487,7 @@ public partial class WorldView : Node3D {
         }
         // Each strike of steel on flint throws a few sparks onto the torch head.
         if (state.Action == ActorAction.Kindle && (state.Struck(.1875f) || state.Struck(.4375f) || state.Struck(.6875f) || state.Struck(.9375f))) {
-            Burst(rig.Flame.GlobalPosition, Flat(new Color("ffd27a")), 7, 2.2f, .3f, 6, .022f);
+            Burst(rig.Flame.GlobalPosition, Sparks, 7, 2.2f, .3f, 6, .022f);
             Sounds?.Play("anvil_work", at);
         }
     }
@@ -584,15 +597,15 @@ public partial class WorldView : Node3D {
             case "stone" or "iron" or "coal" or "tin" or "mine":
                 var color = subject.Kind is "stone" or "mine" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : subject.Kind == "tin" ? "b9bbb4" : "26282b";
                 Burst(side + Vector3.Up * .5f, Mat(color), 6, 2.4f, .5f, 9, .07f);
-                Burst(side + Vector3.Up * .4f, Flat(new Color(.8f, .78f, .7f, .45f)), 3, .5f, .9f, -.3f, .16f, 1.5f);
-                if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Flat(new Color("ffd27a")), 5, 3.2f, .3f, 4, .025f);
+                Burst(side + Vector3.Up * .4f, GatherDust, 3, .5f, .9f, -.3f, .16f, 1.5f);
+                if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Sparks, 5, 3.2f, .3f, 4, .025f);
                 break;
             case "wolf_corpse": Burst(side + Vector3.Up * .3f, Mat("7a1414", .6f), 5, 1.4f, .45f, 8, .04f); break;
             case "berries": Burst(To3(subject.Pos, .7f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f); break;
-            case "water": Burst(side + Vector3.Up * .05f, Flat(new Color(.7f, .88f, .95f, .8f)), 6, 1.6f, .45f, 7, .045f); break;
-            case "anvil": Burst(To3(subject.Pos) + prop.Vent, Flat(new Color("ffd27a")), 10, 3, .35f, 5, .025f); break;
+            case "water": Burst(side + Vector3.Up * .05f, Splash, 6, 1.6f, .45f, 7, .045f); break;
+            case "anvil": Burst(To3(subject.Pos) + prop.Vent, Sparks, 10, 3, .35f, 5, .025f); break;
             case "reinforced":
-                if (subject.Heat > 10) Burst(To3(subject.Pos, .9f) + new Vector3(0, 0, .5f), Flat(new Color("ffb347")), 6, 1.4f, .6f, -1, .03f);
+                if (subject.Heat > 10) Burst(To3(subject.Pos, .9f) + new Vector3(0, 0, .5f), Embers, 6, 1.4f, .6f, -1, .03f);
                 break;
         }
     }
@@ -676,7 +689,7 @@ public partial class WorldView : Node3D {
                 float before = prop.Fall; prop.Fall += dt;
                 float drop = Math.Min(1, prop.Fall / 1.1f);
                 sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
-                if (before < 1.1f && prop.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, Flat(new Color(.7f, .66f, .52f, .45f)), 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
+                if (before < 1.1f && prop.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
                 SetFade(prop.SwayParts, Math.Clamp((prop.Fall - 1.2f) / .5f, 0, 1));
                 sway.Visible = prop.Fall < 1.7f;
                 prop.Stump!.Visible = true;
@@ -728,7 +741,7 @@ public partial class WorldView : Node3D {
                 prop.Fire.Scale = new Vector3(1 + flicker * .08f, .85f + MathF.Abs(MathF.Sin(Elapsed * 9 + t.Id)) * .3f, 1 - flicker * .08f);
                 prop.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
                 prop.Light!.LightEnergy = burning ? (1.2f + flicker * .3f) * (.35f + night * 1.4f) : 0;
-                if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Flat(new Color("ff9a3a")), 1, .5f, 1.1f, -1.4f, .025f);
+                if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Cinders, 1, .5f, 1.1f, -1.4f, .025f);
                 Smoke(prop, t, burning, dt, CampfireSmoke);
                 break;
             case "bench":
@@ -778,8 +791,12 @@ public partial class WorldView : Node3D {
                 if (dt > 0 && near && prop.Open == 0) Sounds?.Play(World.S.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
                 prop.Open = Mathf.MoveToward(prop.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
                 prop.Door!.RotationDegrees = new Vector3(0, -100 * Ease(prop.Open), 0);
-                prop.Window!.MaterialOverride = night > .45f ? NightGlass : Mat("8fb4c4", .15f, .2f);
-                prop.Light!.LightEnergy = night > .45f ? .9f : 0;
+                bool lit = night > .45f;
+                if (lit != prop.Lit) {
+                    prop.Lit = lit;
+                    prop.Window!.MaterialOverride = lit ? NightGlass : DayGlass;
+                    prop.Light!.LightEnergy = lit ? .9f : 0;
+                }
                 break;
             case "mine":
                 // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty, and the lantern is out.
@@ -904,7 +921,7 @@ public partial class WorldView : Node3D {
     /// <summary>Tufts of fur knocked loose by a hit, and embers off a burning torch.</summary>
     private void FurAndEmbers(Vector3 at) {
         Burst(at, Mat("6f746c"), 5, 1.8f, .5f, 6, .045f);
-        if (World.TorchFlare > 0) Burst(at, Flat(new Color("ffb347")), 9, 2.8f, .35f, 3, .03f);
+        if (World.TorchFlare > 0) Burst(at, Embers, 9, 2.8f, .35f, 3, .03f);
     }
 
     /// <summary>Fully drawn for the first part of a trip, then fading to nothing at the turn.</summary>
@@ -1043,7 +1060,7 @@ public partial class WorldView : Node3D {
     private void Tag(Vector2 at, string text) {
         var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, 14);
         overlay.DrawStyleBox(tagBox, new Rect2(at - new Vector2(size.X / 2 + 6, 18), size + new Vector2(12, 6)));
-        overlay.DrawString(font, at - new Vector2(size.X / 2, 0), text, HorizontalAlignment.Left, -1, 14, new Color("f5ecd1"));
+        overlay.DrawString(font, at - new Vector2(size.X / 2, 0), text, HorizontalAlignment.Left, -1, 14, TagText);
     }
 
     private void PaintOverlay() {
@@ -1053,16 +1070,16 @@ public partial class WorldView : Node3D {
         foreach (var t in World.S.Things) {
             if (!t.Processing || !World.Sees(t.Pos) || !World.Data.Recipes.TryGetValue(t.Recipe, out var r)) continue;
             var p = Screen(t.Pos);
-            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), new Color("2b4135"));
-            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), new Color("e5bf68"));
+            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), BarTrack);
+            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), BarFill);
         }
         // Forge heat under each reinforced furnace, with a tick at the clear bar steel needs.
         foreach (var t in World.S.Things) {
             if (t.Kind != "reinforced" || !World.Sees(t.Pos)) continue;
             var p = Screen(t.Pos) + new Vector2(-28, 18);
-            overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), new Color("2b4135"));
-            overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? new Color("f0a03c") : new Color("8a5a46"));
-            overlay.DrawLine(p + new Vector2(56 * World.SteelHeat / 100, -2), p + new Vector2(56 * World.SteelHeat / 100, 7), new Color("f2e8cf"), 2);
+            overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), BarTrack);
+            overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? HeatReady : HeatLow);
+            overlay.DrawLine(p + new Vector2(56 * World.SteelHeat / 100, -2), p + new Vector2(56 * World.SteelHeat / 100, 7), HeatTick, 2);
         }
         // Only the hovered object is named; the side panel already names the selection.
         var hovered = World.Find(Hover);

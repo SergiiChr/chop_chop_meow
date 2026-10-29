@@ -37,6 +37,8 @@ public sealed class Prop {
     public float Fade, Fall = -1, Open, Shake, Puff;
     public int LastCount, Tint = -1;
     public bool Seen;
+    /// <summary>Whether a hut shows its night window glow and lamp.</summary>
+    public bool Lit;
     /// <summary>Whether the model is drawn, kept here so it is set in Godot only when it changes.</summary>
     public bool Shown = true;
     public Prop() { Body = Pivot(Root, Vector3.Zero); }
