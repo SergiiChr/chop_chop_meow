@@ -86,7 +86,14 @@ public partial class WorldView : Node3D {
             POSITION = vec4(VERTEX.xy, 1.0, 1.0);
         }
         void fragment() {
-            vec4 view = INV_PROJECTION_MATRIX * vec4(SCREEN_UV * 2.0 - 1.0, texture(depth, SCREEN_UV).r, 1.0);
+            float depth_at = texture(depth, SCREEN_UV).r;
+            // OpenGL's depth runs from -1 to 1 like its screen coordinates; Vulkan's runs from 0 to 1.
+            #if CURRENT_RENDERER == RENDERER_COMPATIBILITY
+            vec3 ndc = vec3(SCREEN_UV, depth_at) * 2.0 - 1.0;
+            #else
+            vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, depth_at);
+            #endif
+            vec4 view = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
             vec2 at = (INV_VIEW_MATRIX * vec4(view.xyz / view.w, 1.0)).xz;
             float seen = texture(explored, (at + 0.5) / map_size).r;
             float live = 1.0 - smoothstep(radius - 1.5, radius, distance(at, player));
