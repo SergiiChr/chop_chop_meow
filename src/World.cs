@@ -128,6 +128,8 @@ public sealed class Wolf {
     public bool Scared { get; set; }
     /// <summary>Seconds left running away after a direct torch hit.</summary>
     public float Flee { get; set; }
+    /// <summary>Seconds left reeling from a hit, knocked back and holding still before it runs or attacks again.</summary>
+    public float Stagger { get; set; }
     /// <summary>Id of the player this wolf hunts; each player draws their own pack.</summary>
     public int Target { get; set; }
     /// <summary>Tells wolves apart for other machines; zero until <see cref="World.NumberWolvesAndOrders"/>.</summary>
@@ -481,7 +483,7 @@ public sealed partial class World {
         int amount = S.Backpack.Add(item, t.Remaining); t.Remaining -= amount;
         if (amount == 0) { Say("Backpack full. Store or sell some supplies."); return; }
         if (t.Remaining <= 0) S.Things.Remove(t);
-        S.Milestones.Add("gather"); Play("wood_rocks_inventory", t.Pos);
+        S.Milestones.Add("gather"); Play("wood_rocks_inventory", t.Pos); PlayerActed?.Invoke(ActorAction.PickUp, t.Pos);
     }
     public void ResetGather() { gatherClock = 0; S.Actor.GatherTarget = 0; }
     /// <summary>The player hammers an anvil while standing by it with nothing else to do.</summary>
@@ -706,7 +708,7 @@ public sealed partial class World {
         bool pack = PackAround >= PackSize;
         var wolf = S.Wolves.Where(w => w.Leap <= 0 && !w.Feeding).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
-            wolf.Health -= 1; wolf.Flee = FleeSeconds; wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f;
+            wolf.Health -= 1; wolf.Flee = FleeSeconds; KnockBack(wolf);
             if (wolf.Health <= 0) {
                 S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
                 Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
@@ -716,6 +718,9 @@ public sealed partial class World {
         if (!pack)
             foreach (var w in S.Wolves.Where(w => w.Pos.DistanceTo(Player) < ScareRange && (w.Pos - Player).Normalized().Dot(direction) > .7f)) w.Scared = true;
     }
+    public const float StaggerSeconds = .45f;
+    /// <summary>Throws a struck wolf back from the player; the view slides it there over the stagger.</summary>
+    private void KnockBack(Wolf wolf) { wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f; wolf.Stagger = StaggerSeconds; }
     private void PutOutTorch() {
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
         foreach (var w in Hunters) w.Scared = false;
@@ -730,7 +735,7 @@ public sealed partial class World {
         PlayerActed?.Invoke(action, target); Play("tool_air_swing", Player);
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
             wolf.Health -= axe == null ? .5f : 1.5f * Speed(axe);
-            wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f;
+            KnockBack(wolf);
             if (wolf.Health <= 0) {
                 S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
                 Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
@@ -883,7 +888,7 @@ public sealed partial class World {
         bool empty = crate.Inventory.Count == 0;
         if (S.Backpack.Room(empty ? "crate" : PackedPrefix) == 0) { Say("Backpack full. Make room for the crate."); return false; }
         S.Backpack.Add(empty ? "crate" : Pack(crate.Inventory), 1); S.Things.Remove(crate);
-        Play("wood_rocks_inventory", crate.Pos); return true;
+        Play("wood_rocks_inventory", crate.Pos); PlayerActed?.Invoke(ActorAction.PickUp, crate.Pos); return true;
     }
     // ---------- Crafting ----------
     /// <summary>Hand recipes for the personal crafting menu.</summary>
@@ -1710,7 +1715,7 @@ public sealed partial class World {
         if (!Downed && S.Health <= 50 && !lit && !inside && !wary && !AnyLeaping(hunters)) {
             Wolf? hunter = null;
             foreach (var w in hunters)
-                if (!Protected(w.Pos) && w.Flee <= 0 && w.Pos.DistanceTo(Player) < LeapRange && (hunter == null || w.Pos.DistanceTo(Player) < hunter.Pos.DistanceTo(Player))) hunter = w;
+                if (!Protected(w.Pos) && w.Flee <= 0 && w.Stagger <= 0 && w.Pos.DistanceTo(Player) < LeapRange && (hunter == null || w.Pos.DistanceTo(Player) < hunter.Pos.DistanceTo(Player))) hunter = w;
             if (hunter != null) { hunter.Leap = LeapSeconds; Say("A wolf leaps for your throat!"); }
         }
         // Stalking and backing off speed up a little each day; a chase always outpaces a walk but not a sprint.
@@ -1728,6 +1733,8 @@ public sealed partial class World {
                 var seat = Player + (wolf.Pos - Player).Normalized() * FeastSeat;
                 wolf.Pos = wolf.Pos.MoveToward(seat, dt * FeastSpeed);
                 wolf.Feeding = wolf.Pos.DistanceTo(seat) < .05f;
+            } else if (wolf.Stagger > 0) {
+                wolf.Stagger = Math.Max(0, wolf.Stagger - dt); wolf.Chase = 0;
             } else if (wolf.Flee > 0) {
                 wolf.Flee -= dt; wolf.Chase = 0;
                 wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + AwayFromPlayer(wolf) * 3, dt * speed);

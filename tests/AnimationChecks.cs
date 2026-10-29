@@ -141,6 +141,11 @@ public static class AnimationChecks {
         var strike = ActorAnimation.PoseAt(ActorAction.Chop, .52f, false);
         Require(windup.RaiseR > 150 && strike.RaiseR < 100, "the axe stroke should rise overhead and come down to the trunk");
         Require(ActorAnimation.PoseAt(ActorAction.Gather, .3f, false).KneeL > 80, "hand gathering should crouch");
+        Require(ActorAnimation.PoseAt(ActorAction.PickUp, .32f * ActorAnimation.Duration(ActorAction.PickUp), false).KneeL > 80, "picking up a loose piece should crouch for it");
+        var swingWalking = ActorAnimation.PoseAt(ActorAction.TorchSwing, .27f, true);
+        var swingStanding = ActorAnimation.PoseAt(ActorAction.TorchSwing, .27f, false);
+        Require(swingWalking.RaiseL == swingStanding.RaiseL && swingWalking.SwingL == ActorAnimation.PoseAt(ActorAction.Walk, .27f, true).SwingL,
+            "a torch swing on the move should keep the swinging arm while the legs keep walking");
         Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Seat is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Seat == 0,
             "a cross-legged worker should sit on the ground, and one on a rock should not");
         Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick" && ActorAnimation.Tool(ActorAction.Hammer) == "hammer" && ActorAnimation.Tool(ActorAction.Gather) == null,

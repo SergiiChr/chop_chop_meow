@@ -119,9 +119,13 @@ public static class ModelKit {
             foreach (var child in at.GetChildren()) Gather(child);
         }
         Gather(node);
-        // Every faded copy is made now, while loading, rather than the first time the model fades in play.
-        foreach (var (_, material) in parts) for (int step = 1; step <= 10; step++) Faded(material, step);
+        foreach (var (_, material) in parts) WarmFades(material);
         return parts.ToArray();
+    }
+
+    /// <summary>Makes every faded copy of a material now, while loading, rather than the first time it fades in play.</summary>
+    public static void WarmFades(Material material) {
+        for (int step = 1; step <= 10; step++) Faded(material, step);
     }
 
     public static void SetFade((MeshInstance3D Mesh, Material Material)[] parts, float transparency) {
