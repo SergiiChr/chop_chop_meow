@@ -50,7 +50,7 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<int, Avatar> others = new();
     // The host keeps the original teal; each guest keeps the first one free when it joined.
     private static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
-    private readonly Dictionary<int, (ActorRig Rig, ActorState State)> crew = new();
+    private readonly Dictionary<int, (ActorRig Rig, ActorState State, (MeshInstance3D Mesh, StandardMaterial3D Material)[] Parts)> crew = new();
     private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
     private readonly Dictionary<int, float> pumping = new();
@@ -424,7 +424,9 @@ public partial class WorldView : Node3D {
         UpdateOthers(dt);
         foreach (var worker in World.S.Workers) {
             if (!crew.TryGetValue(worker.Id, out var entry)) {
-                entry = (new ActorRig(ActorSkin.Worker), new ActorState { Position = worker.Pos });
+                var rig = new ActorRig(ActorSkin.Worker);
+                // Gathered and warmed now, so the first walk home at dusk makes no faded materials.
+                entry = (rig, new ActorState { Position = worker.Pos }, FadeParts(rig.Root));
                 scene.AddChild(entry.Rig.Root); crew.Add(worker.Id, entry);
             }
             var state = entry.State;
@@ -440,7 +442,7 @@ public partial class WorldView : Node3D {
             Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
             entry.Rig.Root.Visible = World.Sees(worker);
             float trip = worker.Away > 0 ? World.TripLeg(1 - worker.Away / World.Data.TradeSeconds) : worker.Commute / (World.Data.TradeSeconds / 2);
-            Fade(entry.Rig.Root, TripFade(trip));
+            Fade(entry.Parts, entry.Rig.Root, TripFade(trip));
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest ? null : assignment);
         }
         // Removing while walking a dictionary is allowed, so no copy of its keys is needed.
@@ -916,6 +918,13 @@ public partial class WorldView : Node3D {
         float step = MathF.Round(transparency * 10) / 10;
         if (fades.GetValueOrDefault(node) == step) return;
         fades[node] = step; SetFade(node, step);
+    }
+
+    /// <summary>Fades a model through its gathered parts, which walks no nodes.</summary>
+    private void Fade((MeshInstance3D Mesh, StandardMaterial3D Material)[] parts, Node node, float transparency) {
+        float step = MathF.Round(transparency * 10) / 10;
+        if (fades.GetValueOrDefault(node) == step) return;
+        fades[node] = step; SetFade(parts, step);
     }
 
     private void SyncCarts(float dt) {

@@ -78,7 +78,9 @@ Use multi-threading and offload the main thread wherever it does not change resu
 
 Do all instantiation and compilation during loading to avoid in-game stutter.
 `WorldView` builds every world object's model when a world loads and shows it once the player sees it; particles, sound players and faded material copies are made in setup.
-Building mid-game is for rare events: a new building, a hire, a wolf.
+Building mid-game is for rare events: a new building, a hire.
+A material builds its shader on its first draw, which stalls that frame, unless loading asks for its RID first (`ModelKit.BuildShaders`, faded copies in `ModelKit`).
+Sounds load when the game starts, and music pauses rather than stopping: starting an MP3 partway through decodes it from the beginning.
 
 Code that runs every frame or tick allocates nothing once warmed up: every byte is garbage the runtime collects later in a pause that stalls a frame.
 Allocation is fine while loading, setting up and on rare events.

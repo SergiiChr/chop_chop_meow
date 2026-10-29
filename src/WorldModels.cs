@@ -46,11 +46,11 @@ public static class WorldModels {
     public const int TreeVariants = 3;
 
     /// <summary>
-    /// Builds the shared meshes and outfit palettes of models that first appear mid-game while the world loads.
-    /// A trade cart with its courier, a dropped backpack and fresh leaf patches then only add nodes over cached resources.
+    /// Builds the shared meshes, outfit palettes and shaders of models that first appear mid-game while the world loads.
+    /// A trade cart with its courier, a wolf, a dropped backpack and fresh leaf patches then only add nodes over cached resources.
     /// </summary>
     public static void Warm() {
-        new CartModel().Root.Free();
+        foreach (var root in new[] { new CartModel().Root, new WolfModel().Root }) { ModelKit.BuildShaders(root); root.Free(); }
         _ = BackpackShape.Details; _ = BackpackShape.Flap;
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
     }

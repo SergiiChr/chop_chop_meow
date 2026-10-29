@@ -80,6 +80,8 @@ public partial class Sounds : Node {
         for (int i = 0; i < VoiceCount; i++) { var voice = new AudioStreamPlayer(); AddChild(voice); voices.Add(voice); }
         day = new Track(this, "path_to_lake_land", "mystic_theme");
         night = new Track(this, "forest");
+        // Loading a sound on its first play would stall that frame.
+        foreach (string name in Levels.Keys) Variants(name);
     }
 
     public override void _Process(double delta) => UpdateMusic((float)delta);
@@ -145,8 +147,9 @@ public partial class Sounds : Node {
     }
 
     /// <summary>
-    /// A music playlist that stops once faded out and keeps its place, so it carries on next time.
+    /// A music playlist that pauses once faded out, so it carries on from the same place next time.
     /// Its tracks play in order and wrap to the first after the last; a single track loops seamlessly.
+    /// It pauses rather than stopping because starting an MP3 partway through decodes it from the beginning, which stalls the frame for longer the further in it starts.
     /// </summary>
     private sealed class Track {
         public readonly AudioStreamPlayer Player;
@@ -165,8 +168,13 @@ public partial class Sounds : Node {
 
         public void Update(bool wanted, float dt, float volume) {
             level = Mathf.MoveToward(level, wanted ? 1 : 0, dt / MusicFadeSeconds);
-            if (level > 0 && !Player.Playing) Player.Play(at);
-            else if (level == 0 && Player.Playing) { at = Player.GetPlaybackPosition(); Player.Stop(); }
+            if (level > 0) {
+                if (Player.StreamPaused) Player.StreamPaused = false;
+                else if (!Player.Playing) Player.Play();
+            } else if (Player.Playing) {
+                at = Player.GetPlaybackPosition();
+                Player.StreamPaused = true;
+            }
             Player.VolumeDb = volume + Mathf.LinearToDb(Math.Max(level, .0001f));
         }
     }
