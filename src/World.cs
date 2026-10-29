@@ -1817,14 +1817,23 @@ public sealed partial class World {
     };
     // ---------- End goals ----------
     /// <summary>Ores found in the valley's cliffs; the end goal wants a working mine on each.</summary>
-    public static IEnumerable<string> MineOres => Cliffs.Select(c => c.Ore).Distinct();
-    public bool HasMine(string ore) => S.Things.Any(t => t.Kind == "mine" && t.Stage == MineOpen && CliffAt(t.Pos).Ore == ore);
+    public static readonly string[] MineOres = Cliffs.Select(c => c.Ore).Distinct().ToArray();
+    public bool HasMine(string ore) {
+        foreach (var t in S.Things) if (t.Kind == "mine" && t.Stage == MineOpen && CliffAt(t.Pos).Ore == ore) return true;
+        return false;
+    }
     /// <summary>Finished days in a row, up to today, whose profit reached the goal.</summary>
     public int ProfitStreak => S.Profits.AsEnumerable().Reverse().TakeWhile(p => p >= Data.Goals.DailyProfit).Count();
     /// <summary>Once reached, the week of profit stays reached even if later days fall short.</summary>
     public bool ProfitGoalMet => S.Milestones.Contains("profit_week");
     // The milestone comes first: it is a set lookup, and the game checks this every frame.
-    public bool EndGoalsComplete => ProfitGoalMet && MineOres.All(HasMine);
+    public bool EndGoalsComplete {
+        get {
+            if (!ProfitGoalMet) return false;
+            foreach (string ore in MineOres) if (!HasMine(ore)) return false;
+            return true;
+        }
+    }
     private void CloseDay(int wages) {
         S.Profits.Add(S.DayRevenue - wages); S.DayRevenue = 0;
         if (ProfitStreak >= Data.Goals.ProfitDays) S.Milestones.Add("profit_week");
