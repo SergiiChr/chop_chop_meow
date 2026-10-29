@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 /// Both drive their menus and the world through Input.ParseInputEvent, and each prints its own pass marker.
 /// </summary>
 public partial class Game {
-    private static readonly Vector2 NetOre = World.Spawn + new Vector2(2.5f, 2), NetCoal = World.Spawn + new Vector2(-1.5f, 3.5f), NetChest = World.Spawn + new Vector2(.5f, 3), NetHut = World.Spawn + new Vector2(-3.5f, -3);
+    private static readonly Vector2 NetOre = Terrain.Spawn + new Vector2(2.5f, 2), NetCoal = Terrain.Spawn + new Vector2(-1.5f, 3.5f), NetChest = Terrain.Spawn + new Vector2(.5f, 3), NetHut = Terrain.Spawn + new Vector2(-3.5f, -3);
 
     private async Task Until(Func<bool> done, string what, double seconds = 60) {
         for (ulong until = Time.GetTicksMsec() + (ulong)(seconds * 1000); !done();) {
@@ -45,7 +45,7 @@ public partial class Game {
     private async Task HostNetCheck() {
         RemoveCheckFiles(); await Frames(4);
         await Click(FindButton(screen, "New game")!); ClosePanel();
-        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(World.Spawn) < 6);
+        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
         world.Add("loose_coal", NetOre, 2); world.Add("loose_coal", NetCoal, 2);
         var chest = world.Add("chest", NetChest); var hut = world.Add("hut", NetHut);
         await KeyStroke(Key.Escape);
@@ -58,7 +58,7 @@ public partial class Game {
 
         PlayerState Guest() => world.S.Players.Single(p => p != world.Me);
         await Until(() => world.S.Players.Count == 2, "a guest joining", 45);
-        UIRequire(Guest().Backpack.Count == 0 && Guest().Pos == World.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
+        UIRequire(Guest().Backpack.Count == 0 && Guest().Pos == Terrain.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
         await Until(() => view.ShowsPlayer(Guest().Id), "the guest's figure appearing");
         await Until(() => chest.Inventory["coal"] == 2 && Guest().Backpack["coal"] == 2, "the guest storing the first loose coal and gathering the second", 90);
         UIRequire(world.S.Backpack["coal"] == 0, "What the guest gathers must not reach the host's backpack.");
@@ -67,7 +67,7 @@ public partial class Game {
         await Until(() => world.S.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest coming back with its coal");
         await Until(() => world.S.Players.Count == 1, "the guest leaving again");
         await Until(() => world.S.Players.Count == 2, "the guest coming back with a broken save");
-        UIRequire(Guest().Backpack.Count == 0 && Guest().Pos == World.Spawn, "A broken guest save must bring the guest in with an empty backpack at the clearing.");
+        UIRequire(Guest().Backpack.Count == 0 && Guest().Pos == Terrain.Spawn, "A broken guest save must bring the guest in with an empty backpack at the clearing.");
         await Until(() => world.S.Players.Count == 1, "the guest leaving for good");
     }
 
@@ -75,7 +75,7 @@ public partial class Game {
         RemoveCheckFiles(); DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(GuestSave)); await Frames(4);
         await JoinFromStart();
         UIRequire(!backdrop.Visible && world.S.Players.Count == 2 && world.S.Things.Any(t => t.Kind == "chest" && t.Pos == NetChest), "Joining must replace the start menu with the host's world.");
-        UIRequire(world.S.Backpack.Count == 0 && world.Player == World.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
+        UIRequire(world.S.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
         await Until(() => view.ShowsPlayer(1), "the host's figure appearing");
 
         await RightClick(NetOre);
@@ -100,7 +100,7 @@ public partial class Game {
         await LeaveGame();
         using (var file = Godot.FileAccess.Open(GuestSave, Godot.FileAccess.ModeFlags.Write)) file.StoreString("{ broken");
         await JoinFromStart();
-        UIRequire(world.S.Backpack.Count == 0 && world.Player == World.Spawn, "A broken save must bring the guest in with an empty backpack at the clearing.");
+        UIRequire(world.S.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A broken save must bring the guest in with an empty backpack at the clearing.");
         await LeaveGame();
     }
 

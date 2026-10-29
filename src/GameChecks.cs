@@ -478,7 +478,7 @@ public partial class Game {
         world.S.Things.Remove(hut); ClosePanel(); await Frames();
 
         // A loose piece far enough behind a tree sits under its crown on screen; it must still be the one picked.
-        var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == World.Spawn + new Vector2(5, 0));
+        var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == Terrain.Spawn + new Vector2(5, 0));
         var hidden = world.Add("loose_coal", tree.Pos - new Vector2(3.3f, 3.3f), 2);
         var point = view.Screen(hidden.Pos, .15f);
         UIRequire(view.Pick(point)?.Id == hidden.Id, "A tree crown must not steal the click from a loose piece behind it.");
@@ -528,9 +528,9 @@ public partial class Game {
             await KeyStroke(Key.Escape);
             UIRequire(menu.Visible && paused && HasLabel(menu, World.ObjectiveFor(world.S.Goal).Title), "Esc must open the pause menu with the current goal.");
             // New game and Quit ask first, and Esc or Back returns to the pause menu.
-            world.Player = World.Spawn + new Vector2(6, 0);
+            world.Player = Terrain.Spawn + new Vector2(6, 0);
             await Click(FindButton(menu, "New game")!);
-            UIRequire(backdrop.Visible && FindButton(screen, "Start a new game") != null && world.Player != World.Spawn, "New game must ask before leaving the settlement.");
+            UIRequire(backdrop.Visible && FindButton(screen, "Start a new game") != null && world.Player != Terrain.Spawn, "New game must ask before leaving the settlement.");
             await KeyStroke(Key.Escape);
             UIRequire(!backdrop.Visible && menu.Visible && paused, "Esc on the new game question must return to the pause menu.");
             await Click(FindButton(menu, "Quit")!);
@@ -539,7 +539,7 @@ public partial class Game {
             UIRequire(menu.Visible && paused, "Back on the quit question must return to the pause menu.");
             await Click(FindButton(menu, "New game")!);
             await Click(FindButton(screen, "Start a new game")!);
-            UIRequire(!backdrop.Visible && !menu.Visible && !paused && page == "welcome" && world.Player == World.Spawn, "Confirming a new game must start a fresh settlement.");
+            UIRequire(!backdrop.Visible && !menu.Visible && !paused && page == "welcome" && world.Player == Terrain.Spawn, "Confirming a new game must start a fresh settlement.");
             ClosePanel();
             await KeyStroke(Key.Escape);
             await KeyStroke(Key.Escape);
@@ -593,7 +593,7 @@ public partial class Game {
             world.S.Time = musicDay; sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2);
             int heard = sounds.Played; sounds.Play("anvil_work", world.Player + Vector2.One * 40);
             UIRequire(view.OffScreen(world.Player) == 0 && view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach && sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
-            var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == World.Spawn + new Vector2(5, 0));
+            var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == Terrain.Spawn + new Vector2(5, 0));
             int wood = world.S.Backpack["wood"];
             var point = view.Screen(tree.Pos) - new Vector2(0, 70);
             UIRequire(view.Pick(point)?.Id == tree.Id, "Illustrated tree hit area must select the visible resource.");
@@ -821,7 +821,7 @@ public partial class Game {
             await KeyStroke(Key.Space);
             UIRequire(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
             await Until(() => view.PlayerAnimation != ActorAction.Attack, 3);
-            var gatheringPosition = World.Spawn - new Vector2(30, 30);
+            var gatheringPosition = Terrain.Spawn - new Vector2(30, 30);
             // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(gatheringPosition) < 12);
             world.Player = gatheringPosition;

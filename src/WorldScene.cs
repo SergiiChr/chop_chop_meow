@@ -19,9 +19,9 @@ public partial class WorldView {
         BuildTerrain3D(parent, grass);
         // The arrival clearing: overlapping translucent discs soften into the grass.
         for (int ring = 0; ring < 4; ring++)
-            Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(World.Spawn.X, .003f + ring * .0005f, World.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
+            Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(Terrain.Spawn.X, .003f + ring * .0005f, Terrain.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
         // A narrow, worn trail from the clearing down the valley to the shore, the way the carts go.
-        float from = Terrain.Along(World.Spawn), across = Terrain.Across(World.Spawn);
+        float from = Terrain.Along(Terrain.Spawn), across = Terrain.Across(Terrain.Spawn);
         for (int layer = 3; layer > 0; layer--) {
             float width = .33f + layer * .12f;
             var strip = new SurfaceTool();

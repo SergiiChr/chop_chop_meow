@@ -49,7 +49,7 @@ public partial class WorldView {
                 region.Call("calc_height_range");
             }
         data.Call("update_maps");
-        float floor = data.Call("get_height", To3(World.Spawn)).AsSingle();
+        float floor = data.Call("get_height", To3(Terrain.Spawn)).AsSingle();
         if (!float.IsFinite(floor) || Math.Abs(floor) > .001f) throw new InvalidOperationException($"Terrain3D playable floor moved to {floor}");
         foreach (var p in new[] { new Vector2(-20, 80), new Vector2(70, 30), new Vector2(260, 150) }) {
             float expected = Math.Max(0, MountainShape.Height(p) - .03f), actual = data.Call("get_height", To3(p)).AsSingle();

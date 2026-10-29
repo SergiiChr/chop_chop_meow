@@ -61,11 +61,11 @@ public partial class Game {
             performanceSite = site;
             var target = site switch {
                 1 => Terrain.WaterPoint(Terrain.Lake + Terrain.Seaward) + Terrain.Seaward * 3,
-                2 => Terrain.Point(Terrain.Coast(Terrain.Across(World.Spawn)) - 6, Terrain.Across(World.Spawn)),
+                2 => Terrain.Point(Terrain.Coast(Terrain.Across(Terrain.Spawn)) - 6, Terrain.Across(Terrain.Spawn)),
                 3 or 4 or 5 => World.MineSpot(World.CliffOf(site == 3 ? "iron" : site == 4 ? "tin" : "coal")) + World.CliffOf(site == 3 ? "iron" : site == 4 ? "tin" : "coal").Face * 4,
                 6 => Terrain.Point(125, -18),
-                7 => World.Spawn + new Vector2(14, 4),
-                _ => World.Spawn,
+                7 => Terrain.Spawn + new Vector2(14, 4),
+                _ => Terrain.Spawn,
             };
             for (int ring = 0; ring < 10; ring++) {
                 var candidate = target + Terrain.Seaward * ring;

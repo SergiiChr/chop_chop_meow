@@ -949,14 +949,14 @@ public partial class Game : Node {
         for (int i = 0; i < 80; i++) world.Tick(.25f);
         if (args.Contains("--panel")) Select(mine); else ClosePanel();
         // Review from between the cart and portal, so either cliff-facing orientation fits in view.
-        world.Player = mine.Pos - World.MineOut(cliff) * .8f;
+        world.Player = mine.Pos - cliff.Face * .8f;
         view.Zoom = 1.25f;
     }
     private void Showcase() {
         int environmentAt = Array.IndexOf(launchArgs, "--environment-review");
         if (environmentAt >= 0) {
             string location = environmentAt + 1 < launchArgs.Length ? launchArgs[environmentAt + 1] : "forest";
-            float coastAcross = Terrain.Across(World.Spawn);
+            float coastAcross = Terrain.Across(Terrain.Spawn);
             var coastCenter = Terrain.Point(Terrain.Coast(coastAcross) - 2, coastAcross);
             int oreAt = Array.IndexOf(launchArgs, "--mine-ore");
             var reviewCliff = World.CliffOf(oreAt >= 0 && oreAt + 1 < launchArgs.Length ? launchArgs[oreAt + 1] : "coal");
@@ -966,7 +966,7 @@ public partial class Game : Node {
                 "coast" => coastCenter - Terrain.Seaward * 3,
                 "mine" => World.MineSpot(reviewCliff) + reviewCliff.Face,
                 "terrain" => Terrain.Point(125, -18),
-                _ => World.Spawn,
+                _ => Terrain.Spawn,
             };
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear();
@@ -987,7 +987,7 @@ public partial class Game : Node {
         }
         if (launchArgs.Contains("--bushes")) {
             // A clean three-bush comparison row, with one picked-clean bush to show its persistent model.
-            var at = World.Spawn + new Vector2(9, 9);
+            var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Bush variants are selected from the id; start the row at variant zero and include all three.
             world.S.NextId += (3 - world.S.NextId % 3) % 3;
@@ -1003,7 +1003,7 @@ public partial class Game : Node {
         }
         if (launchArgs.Contains("--trees")) {
             // A clean three-tree comparison row, placed beyond the settlement showcase.
-            var at = World.Spawn + new Vector2(9, 9);
+            var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Tree variants are selected from the id: align the first id to oak, then add spruce and birch.
             world.S.NextId += (3 - world.S.NextId % 3) % 3;
@@ -1017,17 +1017,17 @@ public partial class Game : Node {
             world.Tick(0); view.Zoom = 1;
             ClosePanel(); return;
         }
-        foreach (var t in world.S.Things.Where(t => t.Pos.DistanceTo(World.Spawn) < 8).ToArray()) world.S.Things.Remove(t);
-        var hut = world.Add("hut", World.Spawn + new Vector2(-2, -2)); var fire = world.Add("campfire", World.Spawn + new Vector2(1, -3)); fire.Burn = 200;
-        var f = world.Add("furnace", World.Spawn + new Vector2(4, -2)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);
-        var bellows = world.Add("reinforced", World.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
-        var chest = world.Add("chest", World.Spawn + new Vector2(2, 3)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
-        world.Add("anvil", World.Spawn + new Vector2(4, 4)); var sign = world.Add("signpost", World.Spawn + new Vector2(-1, 4));
+        foreach (var t in world.S.Things.Where(t => t.Pos.DistanceTo(Terrain.Spawn) < 8).ToArray()) world.S.Things.Remove(t);
+        var hut = world.Add("hut", Terrain.Spawn + new Vector2(-2, -2)); var fire = world.Add("campfire", Terrain.Spawn + new Vector2(1, -3)); fire.Burn = 200;
+        var f = world.Add("furnace", Terrain.Spawn + new Vector2(4, -2)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);
+        var bellows = world.Add("reinforced", Terrain.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
+        var chest = world.Add("chest", Terrain.Spawn + new Vector2(2, 3)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
+        world.Add("anvil", Terrain.Spawn + new Vector2(4, 4)); var sign = world.Add("signpost", Terrain.Spawn + new Vector2(-1, 4));
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("water", 4); world.S.Backpack.Add("steel_pick", 1);
-        var bench = world.Add("bench", World.Spawn + new Vector2(-4, 1.5f)); bench.Recipe = "crate"; bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
-        var rack = world.Add("toolstation", World.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1);
-        world.Add("leaves", World.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
-        var crate = world.Add("crate", World.Spawn + new Vector2(1.5f, 1.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
+        var bench = world.Add("bench", Terrain.Spawn + new Vector2(-4, 1.5f)); bench.Recipe = "crate"; bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
+        var rack = world.Add("toolstation", Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1);
+        world.Add("leaves", Terrain.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
+        var crate = world.Add("crate", Terrain.Spawn + new Vector2(1.5f, 1.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
         foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1), ("torch", 2) }) world.S.Backpack.Add(item, count);
         world.S.Milestones.UnionWith(new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool" });
         // The review fixture is deliberately separate from a fresh playable game.
@@ -1048,8 +1048,8 @@ public partial class Game : Node {
         int phase = Array.IndexOf(launchArgs, "--day-phase");
         if (phase >= 0) world.S.Time = world.Data.DaySeconds * float.Parse(launchArgs[phase + 1], System.Globalization.CultureInfo.InvariantCulture);
         // A past walk toward the iron cliff leaves explored ground beyond the live sight circle.
-        for (float d = 0; d <= 14; d += 2) { world.Player = World.Spawn + new Vector2(d * .5f, -d); world.Tick(0); }
-        world.Player = World.Spawn; world.Tick(0); Select(bellows);
+        for (float d = 0; d <= 14; d += 2) { world.Player = Terrain.Spawn + new Vector2(d * .5f, -d); world.Tick(0); }
+        world.Player = Terrain.Spawn; world.Tick(0); Select(bellows);
         // --hide-ui leaves only the world in review screenshots.
         if (launchArgs.Contains("--hide-ui")) ui.Visible = false;
         if (launchArgs.Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
@@ -1061,7 +1061,7 @@ public partial class Game : Node {
         if (launchArgs.Contains("--menu")) { ClosePanel(); OpenMenu(); }
         if (launchArgs.Contains("--furnace")) { world.Player = bellows.Pos + Vector2.One; Select(bellows); }
         if (launchArgs.Contains("--piles")) {
-            var at = World.Spawn + new Vector2(-3, 9);
+            var at = Terrain.Spawn + new Vector2(-3, 9);
             foreach (var (item, stacks, dx) in new[] { ("stone", 14, 0), ("wood", 6, 3), ("leaves", 3, 6) }) {
                 var pile = world.Add("pile", at + new Vector2(dx, 0)); pile.Inventory.Add(item, stacks * pile.Inventory.StackSize);
                 if (item == "leaves") { pile.Compost = true; pile.Inventory.Add("fertilizer", 20); }
@@ -1071,7 +1071,7 @@ public partial class Game : Node {
         }
         if (launchArgs.Contains("--farm")) {
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
-            var at = World.Spawn + new Vector2(-6, 9);
+            var at = Terrain.Spawn + new Vector2(-6, 9);
             for (int i = 0; i < 5; i++) {
                 var plot = world.Add("farm", at + new Vector2(i * World.ZoneSize, 0));
                 plot.Stage = i switch { 0 => World.FarmFallow, 4 => World.FarmRipe, _ => World.FarmGrowing };
@@ -1083,7 +1083,7 @@ public partial class Game : Node {
         }
         if (launchArgs.Contains("--kitchen")) {
             // The cooking table mid-stew beside a canning station sealing cans, with the mortar slotted.
-            var at = World.Spawn + new Vector2(-3, 8);
+            var at = Terrain.Spawn + new Vector2(-3, 8);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
             var table = world.Add("cooktable", at); table.Tools!.Add("mortar", 1); world.SetRecipe(table, "meat_stew");
             table.Inventory.Add("water", 2); table.Inventory.Add("raw_meat", 2); table.Burner!.Add("wood", 2);
@@ -1105,7 +1105,7 @@ public partial class Game : Node {
             var at = GetViewport().GetFinalTransform() * cell.GetGlobalRect().GetCenter();
             Input.WarpMouse(at); Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
         };
-        if (launchArgs.Contains("--torch")) { world.Player = World.Spawn + new Vector2(-5, 6); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!launchArgs.Contains("--kindle")) world.Tick(World.KindleSeconds); ClosePanel(); view.Zoom = 1.6f; }
+        if (launchArgs.Contains("--torch")) { world.Player = Terrain.Spawn + new Vector2(-5, 6); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!launchArgs.Contains("--kindle")) world.Tick(World.KindleSeconds); ClosePanel(); view.Zoom = 1.6f; }
         if (launchArgs.Contains("--crate")) { world.Player = crate.Pos + Vector2.One; Select(crate); }
         if (launchArgs.Contains("--anomaly")) { world.Player = crate.Pos + Vector2.One; CrateIntoCrate(crate, crate.Inventory, "crate"); }
         if (launchArgs.Contains("--collapse")) { world.Player = crate.Pos + Vector2.One; ClosePanel(); CrateIntoCrate(crate, crate.Inventory, "crate"); Collapse(crate); }
@@ -1123,7 +1123,7 @@ public partial class Game : Node {
         if (launchArgs.Contains("--mine")) MineReview(sign);
         if (!launchArgs.Contains("--wolves")) return;
         // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
-        var spot = World.Spawn + new Vector2(11, 8);
+        var spot = Terrain.Spawn + new Vector2(11, 8);
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(spot) < 6);
         world.S.Time = world.Data.DaySeconds * .78f; world.Player = spot; world.S.Health = 45;
         foreach (var offset in new[] { new Vector2(2.5f, -1), new Vector2(-6, 3), new Vector2(5, 5) }) world.S.Wolves.Add(new Wolf { Pos = spot + offset });

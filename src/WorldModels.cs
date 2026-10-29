@@ -595,7 +595,7 @@ public static class WorldModels {
 
     /// <summary>Turns a mine's local +Z along its rails, out of the cliff's end.</summary>
     public static Vector3 MineYaw(Vector2 p) {
-        var way = World.MineOut(World.CliffAt(p));
+        var way = World.CliffAt(p).Face;
         return new Vector3(0, MathF.Atan2(way.X, way.Y), 0);
     }
 

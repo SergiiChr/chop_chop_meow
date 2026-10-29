@@ -63,9 +63,9 @@ public static class WorkerStateChecks {
     private static void CheckBlockedPath(GameData data) {
         var world = EmptyWorld(data);
         // Off the map's edge: the tree is out of reach.
-        var tree = world.Add("tree", Vector2.One * (World.MapSize - 1), 12);
-        world.Add("chest", Vector2.One * (World.MapSize - 6));
-        var worker = AddWorker(world, Vector2.One * (World.MapSize - 8));
+        var tree = world.Add("tree", Vector2.One * (Terrain.Size - 1), 12);
+        world.Add("chest", Vector2.One * (Terrain.Size - 6));
+        var worker = AddWorker(world, Vector2.One * (Terrain.Size - 8));
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
 

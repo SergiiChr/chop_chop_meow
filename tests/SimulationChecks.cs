@@ -548,7 +548,7 @@ public static class SimulationChecks {
         SafeTick(world, data.RespawnSeconds - .5f);
         Require(world.Dead && world.Player == new Vector2(9, 12), "the player must stay down for the whole respawn timer");
         SafeTick(world, 1);
-        Require(!world.Dead && world.Player == World.Spawn && world.S.Health == 100,
+        Require(!world.Dead && world.Player == Terrain.Spawn && world.S.Health == 100,
                 "the player should respawn healthy at the clearing once the timer ends");
 
         var saved = EmptyWorld(data);
@@ -699,9 +699,9 @@ public static class SimulationChecks {
                 "an axe should fell trees but not mine ore");
 
         world.S.Backpack.Add("wood", 8);
-        Require(world.Build("chest", World.Spawn) == null,
+        Require(world.Build("chest", Terrain.Spawn) == null,
                 "building placement must reject the player arrival tile");
-        var chest = world.Build("chest", World.Spawn + new Vector2(2, 0));
+        var chest = world.Build("chest", Terrain.Spawn + new Vector2(2, 0));
         Require(chest != null && chest.Kind == "chest" && world.S.Backpack["wood"] == 0,
                 "building placement should accept a nearby clear tile and spend its cost");
     }
@@ -772,7 +772,7 @@ public static class SimulationChecks {
             Require(recovery != null && recovery.Pos == new Vector2(12, 13) && recovery.Inventory["berries"] == 2 && recovery.Inventory["water"] == 1,
                     $"{cause} death should recover the player's carried items at the collapse location");
             SafeTick(world, data.RespawnSeconds + .1f);
-            Require(world.Player == World.Spawn && world.S.Health == 100,
+            Require(world.Player == Terrain.Spawn && world.S.Health == 100,
                     $"{cause} death should respawn the player in a healthy state");
         }
     }
@@ -874,7 +874,7 @@ public static class SimulationChecks {
 
     private static void CheckSleepAdvancesWorld(GameData data) {
         var world = EmptyWorld(data);
-        world.Player = World.Spawn;
+        world.Player = Terrain.Spawn;
         world.S.Time = data.DaySeconds * (data.NightStarts + .01f);
         world.S.WageDay = world.Day;
         var hut = world.Add("hut", world.Player + new Vector2(2, 0));
@@ -904,9 +904,9 @@ public static class SimulationChecks {
     private static void CheckFogOfWar(GameData data) {
         var fresh = new World(data);
         var far = World.CliffOf("coal").Center;
-        Require(fresh.Explored(World.Spawn) && !fresh.Explored(far),
+        Require(fresh.Explored(Terrain.Spawn) && !fresh.Explored(far),
                 "a new game should reveal only the clearing around the player");
-        Require(fresh.Known.All(t => t.Pos.DistanceTo(World.Spawn) <= data.SightRadius),
+        Require(fresh.Known.All(t => t.Pos.DistanceTo(Terrain.Spawn) <= data.SightRadius),
                 "things beyond sight should stay unknown until seen");
 
         var world = EmptyWorld(data);
@@ -977,7 +977,7 @@ public static class SimulationChecks {
 
         foreach (var (kind, spacing) in new[] { ("stone", 15f), ("berries", 14f) }) {
             var found = world.S.Things.Where(t => t.Kind == kind).ToList();
-            Require(found.Count >= 15 && found.All(t => t.Pos.DistanceTo(World.Spawn) >= 9 && found.All(o => o == t || o.Pos.DistanceTo(t.Pos) >= spacing)),
+            Require(found.Count >= 15 && found.All(t => t.Pos.DistanceTo(Terrain.Spawn) >= 9 && found.All(o => o == t || o.Pos.DistanceTo(t.Pos) >= spacing)),
                     $"{kind} should be scattered singly away from the clearing, so more of it takes exploring");
         }
         Require(world.S.Things.Where(t => t.IsResource || !t.IsResource).All(t => Terrain.Open(t.Pos) || t.IsDeposit),
@@ -985,7 +985,7 @@ public static class SimulationChecks {
         var trees = world.S.Things.Where(t => t.Kind == "tree").ToList();
         float woods = trees.Count(t => Terrain.FromMountains(t.Pos) < 15), plains = trees.Count(t => Terrain.FromMountains(t.Pos) >= 30);
         Require(trees.Count > 400 && woods > plains * 3, $"trees should thicken toward the mountains ({trees.Count} in all, {woods} near them, {plains} on the plains)");
-        Require(world.S.Things.Count(t => t.Kind == "tree" && t.Pos.DistanceTo(World.Spawn) < 9) == 1,
+        Require(world.S.Things.Count(t => t.Kind == "tree" && t.Pos.DistanceTo(Terrain.Spawn) < 9) == 1,
                 "the clearing should keep only its one nearby tree");
 
         // Loose pieces need no tool and no gather time; the whole piece goes into the backpack.
@@ -1167,8 +1167,8 @@ public static class SimulationChecks {
         world.Player = chest.Pos;
         Require(chest.Inventory.TransferTo(world.S.Backpack, "wood", 26) == 26, "worker output should fund the shelter and fire");
         GatherUntil(world, stone, "stone", 12);
-        var pond = world.Add("water", Terrain.WaterPoint(World.Spawn), 9999);
-        world.Player = Terrain.WaterPoint(World.Spawn);
+        var pond = world.Add("water", Terrain.WaterPoint(Terrain.Spawn), 9999);
+        world.Player = Terrain.WaterPoint(Terrain.Spawn);
         world.Gather(pond, data.GatherSeconds);
         world.Player = Site(3, 3);
         Require(world.Build("hut", Site(5, 3)) != null, "gathered materials should build the opening shelter");
@@ -1315,12 +1315,12 @@ public static class SimulationChecks {
         Require(close.Health == 3 && close.Flee > 0 && close.Pos.DistanceTo(hit.Player) > struck + 1, "a direct torch hit should hurt the wolf and send it running");
 
         var edge = TorchNight(data);
-        edge.Player = new Vector2(World.MapSize - 5, 20);
+        edge.Player = new Vector2(Terrain.Size - 5, 20);
         var doomed = new Wolf { Pos = edge.Player + new Vector2(1.8f, 0), Health = 1 };
         edge.S.Wolves.Add(doomed);
         edge.UseTorch(Vector2.Right);
         var corpse = edge.S.Things.Single(t => t.Kind == "wolf_corpse");
-        Require(corpse.Pos.X == World.MapSize - 3 && corpse.Pos.X > 45,
+        Require(corpse.Pos.X == Terrain.Size - 3 && corpse.Pos.X > 45,
             "a wolf killed by a torch near the map edge should leave its corpse within current map bounds");
 
         var gathering = TorchNight(data);

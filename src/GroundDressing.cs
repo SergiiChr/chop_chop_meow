@@ -110,14 +110,14 @@ public partial class WorldView {
     private void RefreshDressing() {
         if (disturbanceTexture == null) return;
         Array.Clear(disturbed);
-        Stamp(disturbed, World.Spawn, 7.5f, .8f);
-        float across = Terrain.Across(World.Spawn);
-        for (float along = Terrain.Along(World.Spawn); along < Terrain.Coast(across); along += .8f) {
+        Stamp(disturbed, Terrain.Spawn, 7.5f, .8f);
+        float across = Terrain.Across(Terrain.Spawn);
+        for (float along = Terrain.Along(Terrain.Spawn); along < Terrain.Coast(across); along += .8f) {
             var at = Terrain.Point(along, across + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f);
             Stamp(disturbed, at, 1.25f, .85f);
         }
         foreach (var cliff in World.Cliffs) {
-            var at = World.MineSpot(cliff); var outwards = World.MineOut(cliff);
+            var at = World.MineSpot(cliff); var outwards = cliff.Face;
             for (float d = -3; d < 2; d += .75f) Stamp(disturbed, at + outwards * d, 2.6f, .95f);
         }
         foreach (var t in World.S.Things) {

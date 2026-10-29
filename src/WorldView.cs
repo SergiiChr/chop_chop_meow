@@ -138,10 +138,10 @@ public partial class WorldView : Node3D {
         sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, ShadowBias = .02f, ShadowNormalBias = .4f, LightAngularDistance = 2, LightEnergy = DaySun };
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
-        explored = Image.CreateFromData(World.MapSize, World.MapSize, false, Image.Format.L8, World.S.Explored);
+        explored = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.L8, World.S.Explored);
         exploredTexture = ImageTexture.CreateFromImage(explored);
         fog.SetShaderParameter("explored", exploredTexture);
-        fog.SetShaderParameter("map_size", World.MapSize);
+        fog.SetShaderParameter("map_size", Terrain.Size);
         // A screen-sized quad on the camera; its shader places it over the whole view, so it is never culled and casts no shadow.
         camera.AddChild(new MeshInstance3D {
             Mesh = new QuadMesh { Size = new Vector2(2, 2) },
@@ -187,7 +187,7 @@ public partial class WorldView : Node3D {
         fog.SetShaderParameter(FogMemory, new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
         if (exploredRevision == World.ExploredRevision) return;
         exploredRevision = World.ExploredRevision;
-        explored.SetData(World.MapSize, World.MapSize, false, Image.Format.L8, World.S.Explored);
+        explored.SetData(Terrain.Size, Terrain.Size, false, Image.Format.L8, World.S.Explored);
         exploredTexture.Update(explored);
     }
 
@@ -958,7 +958,7 @@ public partial class WorldView : Node3D {
             float phase = order.Elapsed / World.Data.TradeSeconds;
             // The cart sets off down the valley and fades out on its way to Bramblewick, then fades back in on return.
             float leg = CartLeg(order.Elapsed);
-            var pos = (sign?.Pos ?? World.Spawn) + Terrain.Seaward * CartDistance * leg;
+            var pos = (sign?.Pos ?? Terrain.Spawn) + Terrain.Seaward * CartDistance * leg;
             if (!carts.TryGetValue(order, out var cart)) {
                 cart = new WorldModels.CartModel { Last = pos };
                 scene.AddChild(cart.Root); carts[order] = cart;
