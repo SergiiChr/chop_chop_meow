@@ -498,21 +498,18 @@ public static class WorldModels {
     public static void SyncPile(Prop prop, Thing t, GameData data) {
         t.Inventory.FillStacks(pileSlots);
         var items = prop.StackItems;
-        int shown = 0;
-        bool changed = false;
-        foreach (var (item, _) in pileSlots) {
-            if (item == "" || shown == items.Length) continue;
-            if (items[shown] != item) { items[shown] = item; changed = true; }
-            shown++;
-        }
-        for (int i = shown; i < items.Length; i++) if (items[i] != "") { items[i] = ""; changed = true; }
-        if (!changed) return;
-        for (int i = 0; i < items.Length; i++) {
-            prop.Stacks[i].Visible = items[i] != "";
-            if (items[i] == "") continue;
-            PileShape.SetStock(prop.Stacks[i], items[i], data.Items.TryGetValue(items[i], out var def) ? def.Color : PileShape.Fallback);
+        // Each drawn stack shows the next filled slot, or nothing once the slots run out.
+        for (int i = 0, next = 0; i < items.Length; i++) {
+            string item = "";
+            while (item == "" && next < pileSlots.Count) item = pileSlots[next++].Item;
+            if (items[i] == item) continue;
+            items[i] = item;
+            var stack = prop.Stacks[i];
+            stack.Visible = item != "";
+            if (item == "") continue;
+            PileShape.SetStock(stack, item, data.Items.TryGetValue(item, out var def) ? def.Color : PileShape.Fallback);
             // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
-            prop.Stacks[i].Rotation = new Vector3(0, items[i] == "coal" ? i * 2.399963f : 0, 0);
+            stack.Rotation = new Vector3(0, item == "coal" ? i * 2.399963f : 0, 0);
         }
     }
 

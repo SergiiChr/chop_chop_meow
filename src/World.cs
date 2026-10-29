@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -384,8 +385,6 @@ public sealed partial class World {
         if (!IsZone(kind) || S.Things.Where(t => IsZone(t.Kind)).MinBy(t => t.Pos.DistanceSquaredTo(p)) is not Thing near || near.Pos.DistanceTo(p) > ZoneSize * 1.6f) return p;
         return near.Pos + ((p - near.Pos) / ZoneSize).Round() * ZoneSize;
     }
-    /// <summary>Tile centres a yard at <paramref name="p"/> covers.</summary>
-    private static IEnumerable<Vector2> ZoneTiles(Vector2 p) => Enumerable.Range(-1, 3).SelectMany(x => Enumerable.Range(-1, 3).Select(y => p + new Vector2(x, y)));
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
     public static float Footprint(string kind) => kind switch { "pile" or "farm" => 1.5f, "cooktable" => .6f, "cannery" => .5f, "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" or "toolstation" => .45f, _ => .35f };
@@ -505,17 +504,26 @@ public sealed partial class World {
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
         if (Player.DistanceTo(p) < 1.2f || Terrain.Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
         if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
-        if (S.Things.Any(t => t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + .65f : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource))) return "Leave room around resources and buildings.";
+        foreach (var t in S.Things)
+            if (t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + .65f : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
         if (crate ? item != null && S.Backpack[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
         return null;
     }
     private string? ZoneBlock(string kind, Vector2 p) {
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
-        if (ZoneTiles(p).Any(q => !CanStand(q) || Terrain.InLake(q, .8f) || Terrain.Spawn.DistanceTo(q) < 1)) return "Choose dry, open ground.";
+        // Every tile the yard covers.
+        for (int x = -1; x <= 1; x++)
+            for (int y = -1; y <= 1; y++) {
+                var q = p + new Vector2(x, y);
+                if (!CanStand(q) || Terrain.InLake(q, .8f) || Terrain.Spawn.DistanceTo(q) < 1) return "Choose dry, open ground.";
+            }
         float half = ZoneSize / 2;
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
-        bool Inside(Thing t, float margin) => Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin;
-        if (S.Things.Any(t => IsZone(t.Kind) ? Inside(t, half - .05f) : (t.Remaining > 0 || !t.IsResource) && Inside(t, t.IsResource ? .3f : Footprint(t.Kind) + .2f))) return "Leave room around resources and buildings.";
+        foreach (var t in S.Things) {
+            if (!IsZone(t.Kind) && t.IsResource && t.Remaining <= 0) continue;
+            float margin = IsZone(t.Kind) ? half - .05f : t.IsResource ? .3f : Footprint(t.Kind) + .2f;
+            if (Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin) return "Leave room around resources and buildings.";
+        }
         return S.Backpack.Has(Data.Buildings[kind].Cost) ? null : "Missing materials in your backpack.";
     }
     public Thing? Build(string kind, Vector2 p) {
@@ -1840,18 +1848,18 @@ public sealed partial class World {
     // ---------- Validation of saves and guests ----------
     /// <summary>Whether an id names a known item, or a packed crate whose contents are in <paramref name="crates"/>.</summary>
     private bool KnownItem(string item, Dictionary<int, Inventory> crates) => item.StartsWith(PackedPrefix) ? crates.ContainsKey(PackedId(item)) : Data.Items.ContainsKey(item);
+    /// <summary>No packed crates, for checking what a crate holds: a crate inside a crate is not a known item.</summary>
+    private static readonly Dictionary<int, Inventory> NoCrates = new();
     /// <summary>Whether every entry is a positive count of a known item or of a packed crate in <paramref name="crates"/>.</summary>
-    private bool ValidInventory(Inventory? box, Dictionary<int, Inventory> crates) {
-        if (box?.Items == null) return false;
-        foreach (var (item, count) in box.Items) if (count <= 0 || !KnownItem(item, crates)) return false;
+    private bool ValidCounts(Dictionary<string, int> items, Dictionary<int, Inventory> crates) {
+        foreach (var (item, count) in items) if (count <= 0 || !KnownItem(item, crates)) return false;
         return true;
     }
+    /// <summary>Whether a box exists and holds only positive counts of known items or of packed crates in <paramref name="crates"/>.</summary>
+    private bool ValidInventory([NotNullWhen(true)] Inventory? box, Dictionary<int, Inventory> crates) => box?.Items != null && ValidCounts(box.Items, crates);
     /// <summary>Whether each packed crate holds positive counts of known items, no other crates, and no more than a crate fits.</summary>
     private bool ValidCrates(Dictionary<int, Inventory> crates) {
-        foreach (var box in crates.Values) {
-            if (box?.Items == null || box.Count > Data.CrateCapacity) return false;
-            foreach (var (item, count) in box.Items) if (count <= 0 || item.StartsWith(PackedPrefix) || !Data.Items.ContainsKey(item)) return false;
-        }
+        foreach (var box in crates.Values) if (!ValidInventory(box, NoCrates) || box.Count > Data.CrateCapacity) return false;
         return true;
     }
     /// <summary>
@@ -1873,10 +1881,7 @@ public sealed partial class World {
         }
         foreach (var w in save.Workers)
             if (w?.Duties == null || w.Tool == null || w.Tool != "" && !Data.Items.ContainsKey(w.Tool) || !ValidInventory(w.Bag, save.Crates)) return false;
-        foreach (var order in save.Orders) {
-            if (order?.Goods == null) return false;
-            foreach (var (item, count) in order.Goods) if (count <= 0 || !KnownItem(item, save.Crates)) return false;
-        }
+        foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }
     public void Deserialize(string json) {

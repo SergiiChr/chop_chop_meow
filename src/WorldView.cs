@@ -26,11 +26,9 @@ public partial class WorldView : Node3D {
     public string? SelectedTool;
     public bool Paused;
     public bool AnimationReview;
-    /// <summary>A fixed daylight landscape view for <c>--environment-review</c>.</summary>
+    /// <summary>A fixed daylight landscape view with the lake and sea waves held at one moment, for <c>--environment-review</c>; set before the view enters the tree.</summary>
     public bool EnvironmentReview;
     public bool EnvironmentReviewFog;
-    /// <summary>Holds the lake and sea waves at one moment, for environment review screenshots; set before the view enters the tree.</summary>
-    public bool StillWater;
     public Vector2? EnvironmentCenter;
     public float EnvironmentCameraDistance = 60;
     public float Elapsed;
@@ -938,18 +936,21 @@ public partial class WorldView : Node3D {
     /// <summary>Fully drawn for most of the walk, fading out over its last quarter.</summary>
     private static float CartFade(float leg) => Math.Clamp((leg - .75f) / .25f, 0, 1);
     private readonly Dictionary<Node, float> fades = new();
+    /// <summary>Rounds a fade to tenths and records it for the node, returning false when the node already shows that step.</summary>
+    private bool FadeStep(Node node, float transparency, out float step) {
+        step = MathF.Round(transparency * 10) / 10;
+        if (fades.GetValueOrDefault(node) == step) return false;
+        fades[node] = step; return true;
+    }
+
     /// <summary>Applies a fade only when it changes, since it walks every mesh under the node.</summary>
     private void Fade(Node node, float transparency) {
-        float step = MathF.Round(transparency * 10) / 10;
-        if (fades.GetValueOrDefault(node) == step) return;
-        fades[node] = step; SetFade(node, step);
+        if (FadeStep(node, transparency, out float step)) SetFade(node, step);
     }
 
     /// <summary>Fades a model through its gathered parts, which walks no nodes.</summary>
     private void Fade((MeshInstance3D Mesh, Material Material)[] parts, Node node, float transparency) {
-        float step = MathF.Round(transparency * 10) / 10;
-        if (fades.GetValueOrDefault(node) == step) return;
-        fades[node] = step; SetFade(parts, step);
+        if (FadeStep(node, transparency, out float step)) SetFade(parts, step);
     }
 
     private void SyncCarts(float dt) {

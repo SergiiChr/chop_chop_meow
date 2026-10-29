@@ -76,12 +76,12 @@ public sealed partial class World {
 
     /// <summary>Mining stops as soon as either the ore or the rock slot holds a full stack.</summary>
     public bool MineFull(Thing mine) => mine.Output is Inventory output && (output[MineOre(mine)] >= output.StackSize || output["stone"] >= output.StackSize);
-
     private string? MineBlock(Vector2 p) {
         var cliff = CliffAt(p);
         if (!NearMineSite(cliff, p)) return "Mark a mine at the foot of an ore cliff.";
-        if (S.Things.Any(t => t.Kind == "mine" && t.Pos.DistanceTo(MineSpot(cliff)) < .1f)) return "This cliff already has a mine.";
-        return Player.DistanceTo(MineSpot(cliff)) > 8 ? "Walk closer to the cliff." : null;
+        var spot = MineSpot(cliff);
+        foreach (var t in S.Things) if (t.Kind == "mine" && t.Pos.DistanceTo(spot) < .1f) return "This cliff already has a mine.";
+        return Player.DistanceTo(spot) > 8 ? "Walk closer to the cliff." : null;
     }
 
     /// <summary>Hands the site whatever it still needs from the backpack.</summary>

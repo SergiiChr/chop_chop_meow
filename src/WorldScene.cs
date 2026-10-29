@@ -35,7 +35,7 @@ public partial class WorldView {
             Add(parent, strip.Commit(), Flat(new Color(.67f, .6f, .43f, layer == 1 ? .3f : .16f), true), Vector3.Zero);
         }
         // Sea and its feathered bank follow the coastline at the valley's mouth.
-        ShorelineAppearance.BuildCoast(parent, StillWater);
+        ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
         BuildLake(parent);
         foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
         BuildPlacedEnvironment(parent);
@@ -73,7 +73,7 @@ public partial class WorldView {
         var at = To3(Terrain.Lake);
         // The bank and water follow the same shore line that bounds walking.
         ShorelineAppearance.BuildLakeBank(parent);
-        LakeAppearance.BuildLakeAppearance(parent, StillWater);
+        LakeAppearance.BuildLakeAppearance(parent, EnvironmentReview);
         var rng = new Random(77);
         const int stones = 150;
         for (int i = 0; i < stones; i++) {

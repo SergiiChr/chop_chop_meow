@@ -23,7 +23,7 @@ public partial class Game {
 
     private void ShowEndingOnce() {
         // A guest's copy takes the host's flag with every update, so a guest remembers its own.
-        if (!world.EndGoalsComplete || (world.Remote ? endingSeen : world.S.EndingShown)) return;
+        if ((world.Remote ? endingSeen : world.S.EndingShown) || !world.EndGoalsComplete) return;
         world.S.EndingShown = endingSeen = true; paused = true; ClosePanel();
         int seconds = (int)world.S.PlaySeconds;
         endingStats.Text = $"Every ore in the valley has its mine, and the settlement cleared {world.Data.Goals.DailyProfit} coins a day for {world.Data.Goals.ProfitDays} days.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";

@@ -74,7 +74,7 @@ public partial class Game : Node {
             sounds = new Sounds { World = world, MusicVolume = SavedMusicVolume() }; AddChild(sounds);
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
-            view = new WorldView { World = world, Sounds = sounds, StillWater = launchArgs.Contains("--environment-review") }; AddChild(view);
+            view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = launchArgs.Contains("--environment-review") }; AddChild(view);
             net = new Net { Name = "Net", World = world, FilePrefix = FilePrefix }; AddChild(net);
             world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };
             world.PlayerActed += (action, at) => net.Echo(world.S.Actor.Id, action, at);
@@ -89,7 +89,7 @@ public partial class Game : Node {
             if (!launchArgs.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { ApplyResolution(SavedResolution()); Engine.MaxFps = SavedFrameLimit(); }
             StartPerformanceRun();
             if (launchArgs.Contains("--ui-test")) RunUIChecks();
-            if (Array.IndexOf(launchArgs, "--net-check") is int check and >= 0) RunNetCheck(launchArgs.ElementAtOrDefault(check + 1) == "host");
+            if (launchArgs.Contains("--net-check")) RunNetCheck(LaunchValue("--net-check") == "host");
             if (launchArgs.Contains("--animation-review")) {
                 ClosePanel(); ui.Visible = false; view.AnimationReview = true;
                 if (LaunchValue("--animation-capture") is string captures) CaptureAnimations(captures);
@@ -967,7 +967,6 @@ public partial class Game : Node {
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear();
             world.Tick(0);
-            view.EnvironmentReview = true;
             view.EnvironmentReviewFog = launchArgs.Contains("--review-fog");
             view.EnvironmentCenter = location switch { "lake" => Terrain.Lake + Terrain.Seaward * 3, "terrain" => Terrain.Point(125, -18), "coast" => coastCenter, "mine" => mineCenter, _ => null };
             if (location == "mine") {

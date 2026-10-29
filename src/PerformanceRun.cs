@@ -20,6 +20,16 @@ public partial class Game {
     private PerformanceSample[] performanceSamples = Array.Empty<PerformanceSample>();
     private static readonly Key[] PerformanceKeys = { Key.D, Key.S, Key.A, Key.W };
     private static readonly string[] PerformanceSites = { "forest", "lake", "coast", "iron", "tin", "coal", "upper-valley", "forest-edge" };
+    private static readonly Performance.Monitor[] PipelineMonitors = {
+        Performance.Monitor.PipelineCompilationsCanvas, Performance.Monitor.PipelineCompilationsMesh, Performance.Monitor.PipelineCompilationsSurface,
+        Performance.Monitor.PipelineCompilationsDraw, Performance.Monitor.PipelineCompilationsSpecialization,
+    };
+    /// <summary>Rendering pipelines compiled so far, summed over every compilation group.</summary>
+    private static long PipelineCompilations() {
+        double total = 0;
+        foreach (var monitor in PipelineMonitors) total += Performance.GetMonitor(monitor);
+        return (long)total;
+    }
     private readonly record struct PerformanceSample(double Seconds, double FrameMs, double ProcessMs, double RenderCpuMs, double GpuMs,
         long Allocated, int Gen0, int Gen1, int Gen2, double StaticBytes, double VideoBytes, int DrawCalls, int Primitives,
         int WorkersActive, int MachinesActive, int Site, bool Night, bool Settlement, long Pipelines);
@@ -99,7 +109,7 @@ public partial class Game {
                 Performance.GetMonitor(Performance.Monitor.MemoryStatic), Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed),
                 (int)Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame), (int)Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame),
                 activeWorkers, activeMachines, performanceSite, world.Night, performanceSettlement,
-                (long)(Performance.GetMonitor(Performance.Monitor.PipelineCompilationsCanvas) + Performance.GetMonitor(Performance.Monitor.PipelineCompilationsMesh) + Performance.GetMonitor(Performance.Monitor.PipelineCompilationsSurface) + Performance.GetMonitor(Performance.Monitor.PipelineCompilationsDraw) + Performance.GetMonitor(Performance.Monitor.PipelineCompilationsSpecialization)));
+                PipelineCompilations());
         }
         performancePrevious = now;
         int heartbeat = (int)(elapsed / 30);

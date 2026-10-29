@@ -89,13 +89,13 @@ public sealed partial class World {
     public T As<T>(PlayerState p, Func<T> action) { using (ActAs(p)) return action(); }
 
     /// <summary>Acts as another player until the returned scope ends; a struct, so code that runs every tick switches players without allocating.</summary>
-    private Acting ActAs(PlayerState p) {
+    internal Acting ActAs(PlayerState p) {
         var scope = new Acting(this, S.Actor, everyone);
         S.Actor = p; everyone = false;
         return scope;
     }
 
-    private readonly struct Acting(World world, PlayerState actor, bool everyone) : IDisposable {
+    internal readonly struct Acting(World world, PlayerState actor, bool everyone) : IDisposable {
         public void Dispose() { world.S.Actor = actor; world.everyone = everyone; }
     }
 
@@ -241,9 +241,6 @@ public sealed partial class World {
         if (Downed || S.Sheltered != 0 || p == Player) return;
         playerBusy = true; Player = p;
     }
-
-    /// <summary>Host: puts a guest where their own machine walked them, acting as that guest.</summary>
-    public void MoveTo(PlayerState p, Vector2 to) { using (ActAs(p)) MoveTo(to); }
 
     /// <summary>
     /// Host: brings a guest in with the player they saved on their machine.
