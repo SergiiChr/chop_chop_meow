@@ -12,7 +12,6 @@ sys.path.insert(0, str(ROOT))
 
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
-
 OUTPUT = build.BUILD / "environment-review"
 
 CURRENT_CAPTURES = (
@@ -28,7 +27,9 @@ SHORELINE_CAPTURES = (
 )
 
 
-def capture(env: dict[str, str], name: str, location: str, flags: tuple[str, ...]) -> None:
+def capture(
+    env: dict[str, str], name: str, location: str, flags: tuple[str, ...]
+) -> None:
     image = (OUTPUT / f"{name}.png").resolve()
     image.parent.mkdir(parents=True, exist_ok=True)
     args = [
@@ -66,7 +67,9 @@ def main() -> None:
     for name, location, flags in captures:
         capture(env, name, location, flags)
 
-    print(f"Environment review capture pass: {len(captures)} screenshots in {OUTPUT.relative_to(ROOT)}")
+    print(
+        f"Environment review capture pass: {len(captures)} screenshots in {OUTPUT.relative_to(ROOT)}"
+    )
 
 
 if __name__ == "__main__":

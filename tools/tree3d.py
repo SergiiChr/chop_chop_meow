@@ -15,11 +15,9 @@ import sys
 import zipfile
 from pathlib import Path, PurePosixPath
 
-
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
-
 
 RELEASE_URL = (
     "https://github.com/JekSun97/gdTree3D/releases/download/v1.1.0/"
@@ -32,7 +30,7 @@ ADDON = CACHE / "addons" / "Tree3D"
 BAKE_SCRIPT = ROOT / "tools" / "bake_trees.gd"
 OUTPUT = ROOT / "assets" / "models" / "tree3d"
 
-PROJECT_SOURCE = '''; Isolated temporary project used to bake Tree3D models.
+PROJECT_SOURCE = """; Isolated temporary project used to bake Tree3D models.
 config_version=5
 
 [application]
@@ -41,7 +39,7 @@ config/name="Tree3D Offline Baker"
 [rendering]
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
-'''
+"""
 
 FILES = (
     "Tree3D/Tree3D.gdextension",
@@ -89,12 +87,16 @@ def install_addon() -> None:
             validate_zip_member(info.filename.rstrip("/"))
             mode = info.external_attr >> 16
             if stat.S_ISLNK(mode):
-                raise SystemExit(f"Symlink in Tree3D archive is not allowed: {info.filename}")
+                raise SystemExit(
+                    f"Symlink in Tree3D archive is not allowed: {info.filename}"
+                )
             if not info.is_dir():
                 members[info.filename] = info
         missing = [name for name in FILES if name not in members]
         if missing:
-            raise SystemExit("Tree3D archive is missing required files: " + ", ".join(missing))
+            raise SystemExit(
+                "Tree3D archive is missing required files: " + ", ".join(missing)
+            )
 
         # Clear stale extraction products so the cache always reflects this exact release.
         if ADDON.exists():

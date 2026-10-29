@@ -20,7 +20,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
-
 COMMIT = "7198cc00078ebde61307578137c3f35223c6e438"
 ARCHIVE_URL = f"https://codeload.github.com/HungryProton/scatter/zip/{COMMIT}"
 ARCHIVE_SHA256 = "485295fa4a97cb54bcd20d1b1304ed8a2fc0b28fe3215a07be62d26df9208d5f"
@@ -30,7 +29,7 @@ ADDON = CACHE / "addons" / "proton_scatter"
 BAKE_SCRIPT = ROOT / "tools" / "bake_scatter.gd"
 OUTPUT = ROOT / "assets" / "environment" / "proton_scatter" / "placements.json"
 
-PROJECT_SOURCE = '''; Isolated project for the ProtonScatter offline placement bake.
+PROJECT_SOURCE = """; Isolated project for the ProtonScatter offline placement bake.
 config_version=5
 
 [application]
@@ -42,7 +41,7 @@ renderer/rendering_method.mobile="gl_compatibility"
 
 [filesystem]
 import/blender/enabled=false
-'''
+"""
 
 
 def sha256(path: Path) -> str:
@@ -90,7 +89,9 @@ def install_addon() -> None:
             safe_member(relative)
             files.append((relative, info))
         if not any(relative == "plugin.cfg" for relative, _ in files):
-            raise SystemExit("Pinned ProtonScatter archive has no addons/proton_scatter/plugin.cfg")
+            raise SystemExit(
+                "Pinned ProtonScatter archive has no addons/proton_scatter/plugin.cfg"
+            )
 
         if ADDON.exists():
             shutil.rmtree(ADDON)
@@ -98,6 +99,7 @@ def install_addon() -> None:
             destination = ADDON.joinpath(*safe_member(relative).parts)
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(archive.read(info))
+
 
 def main() -> None:
     if not BAKE_SCRIPT.is_file():

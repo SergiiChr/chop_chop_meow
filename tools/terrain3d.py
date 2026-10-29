@@ -24,7 +24,7 @@ PROJECT = CACHE / "probe_project"
 ADDON = PROJECT / "addons" / "terrain_3d"
 RUNTIME = ROOT / "addons" / "terrain_3d"
 
-PROJECT_GODOT = '''; Isolated Terrain3D runtime probe.
+PROJECT_GODOT = """; Isolated Terrain3D runtime probe.
 config_version=5
 
 [application]
@@ -34,9 +34,9 @@ config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 
 [dotnet]
 project/assembly_name="Terrain3DProbe"
-'''
+"""
 
-CSPROJ = '''<Project Sdk="Godot.NET.Sdk/4.7.2">
+CSPROJ = """<Project Sdk="Godot.NET.Sdk/4.7.2">
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <LangVersion>14</LangVersion>
@@ -48,9 +48,9 @@ CSPROJ = '''<Project Sdk="Godot.NET.Sdk/4.7.2">
     <Compile Remove="addons/terrain_3d/csharp/**/*.cs" />
   </ItemGroup>
 </Project>
-'''
+"""
 
-PROBE_CS = '''using Godot;
+PROBE_CS = """using Godot;
 
 public partial class Probe : Node
 {
@@ -109,15 +109,15 @@ public partial class Probe : Node
         GD.Print("TERRAIN3D-PROBE: ", message);
     }
 }
-'''
+"""
 
-TSCN = '''[gd_scene load_steps=2 format=3]
+TSCN = """[gd_scene load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://Probe.cs" id="1"]
 
 [node name="Probe" type="Node"]
 script = ExtResource("1")
-'''
+"""
 
 
 def file_sha256(path: Path) -> str:
@@ -132,7 +132,11 @@ def safe_member(name: str) -> PurePosixPath:
     if "\\" in name or "\x00" in name:
         raise SystemExit(f"Unsafe Terrain3D archive path: {name!r}")
     path = PurePosixPath(name.rstrip("/"))
-    if path.is_absolute() or not path.parts or any(part in ("", ".", "..") for part in path.parts):
+    if (
+        path.is_absolute()
+        or not path.parts
+        or any(part in ("", ".", "..") for part in path.parts)
+    ):
         raise SystemExit(f"Unsafe Terrain3D archive path: {name!r}")
     return path
 
@@ -145,18 +149,27 @@ def get_archive() -> None:
     actual = file_sha256(ARCHIVE)
     if actual != SHA256:
         ARCHIVE.unlink(missing_ok=True)
-        raise SystemExit(f"Terrain3D ZIP SHA-256 mismatch: expected {SHA256}, got {actual}")
+        raise SystemExit(
+            f"Terrain3D ZIP SHA-256 mismatch: expected {SHA256}, got {actual}"
+        )
 
 
 def install_runtime() -> None:
     """Install only the Linux runtime, icons, manifest and license, without editor scripts or C# wrappers."""
     get_archive()
     members = [
-        "terrain.gdextension", "LICENSE.txt", "icons/terrain3d.svg",
-        "bin/libterrain.linux.debug.x86_64.so", "bin/libterrain.linux.release.x86_64.so",
+        "terrain.gdextension",
+        "LICENSE.txt",
+        "icons/terrain3d.svg",
+        "bin/libterrain.linux.debug.x86_64.so",
+        "bin/libterrain.linux.release.x86_64.so",
     ]
     stamp = RUNTIME / ".release-sha256"
-    if stamp.is_file() and stamp.read_text().strip() == SHA256 and all((RUNTIME / name).is_file() for name in members):
+    if (
+        stamp.is_file()
+        and stamp.read_text().strip() == SHA256
+        and all((RUNTIME / name).is_file() for name in members)
+    ):
         return
     with zipfile.ZipFile(ARCHIVE) as archive:
         for name in members:
@@ -168,7 +181,9 @@ def install_runtime() -> None:
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_bytes(archive.read(info))
     stamp.write_text(SHA256 + "\n")
-    print(f"Installed verified Terrain3D {VERSION} Linux runtime into {RUNTIME.relative_to(ROOT)}")
+    print(
+        f"Installed verified Terrain3D {VERSION} Linux runtime into {RUNTIME.relative_to(ROOT)}"
+    )
 
 
 def install_addon() -> None:
@@ -177,11 +192,13 @@ def install_addon() -> None:
         chosen: dict[str, zipfile.ZipInfo] = {}
         prefix = "addons/terrain_3d/"
         for info in archive.infolist():
-            path = safe_member(info.filename)
+            safe_member(info.filename)
             if not info.is_dir() and info.filename.startswith(prefix):
                 mode = info.external_attr >> 16
                 if stat.S_ISLNK(mode):
-                    raise SystemExit(f"Symlink in Terrain3D archive is not allowed: {info.filename}")
+                    raise SystemExit(
+                        f"Symlink in Terrain3D archive is not allowed: {info.filename}"
+                    )
                 chosen[info.filename] = info
         expected = {
             prefix + "terrain.gdextension",
@@ -191,7 +208,9 @@ def install_addon() -> None:
         }
         missing = sorted(expected - chosen.keys())
         if missing:
-            raise SystemExit("Terrain3D release is missing required files: " + ", ".join(missing))
+            raise SystemExit(
+                "Terrain3D release is missing required files: " + ", ".join(missing)
+            )
 
         if ADDON.exists():
             shutil.rmtree(ADDON)
@@ -213,9 +232,16 @@ def run_probe() -> None:
     env = build.ensure_dotnet()
     godot = build.GODOT
     if not godot.is_file():
-        raise SystemExit(f"Godot executable is missing: {godot}; run ./build.py setup first")
+        raise SystemExit(
+            f"Godot executable is missing: {godot}; run ./build.py setup first"
+        )
     dotnet = build.DOTNET_LOCAL / "dotnet"
-    subprocess.run([str(dotnet), "build", "--nologo", "-v", "quiet", "Terrain3DProbe.csproj"], cwd=PROJECT, env=env, check=True)
+    subprocess.run(
+        [str(dotnet), "build", "--nologo", "-v", "quiet", "Terrain3DProbe.csproj"],
+        cwd=PROJECT,
+        env=env,
+        check=True,
+    )
     result = subprocess.run(
         [str(godot), "--headless", "--path", str(PROJECT)],
         cwd=PROJECT,
@@ -227,7 +253,11 @@ def run_probe() -> None:
         check=False,
     )
     print(result.stdout, end="")
-    if result.returncode != 0 or "TERRAIN3D-PROBE PASS" not in result.stdout or "ERROR:" in result.stdout:
+    if (
+        result.returncode != 0
+        or "TERRAIN3D-PROBE PASS" not in result.stdout
+        or "ERROR:" in result.stdout
+    ):
         raise SystemExit(f"Terrain3D probe failed (exit {result.returncode})")
 
 

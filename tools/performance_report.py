@@ -21,8 +21,8 @@ def summarize(rows: list[dict[str, str]]) -> dict[str, float | int]:
         "frames": len(rows),
         "fps": 1000 / mean(frames),
         "mean_ms": mean(frames),
-        "p95_ms": percentile(.95),
-        "p99_ms": percentile(.99),
+        "p95_ms": percentile(0.95),
+        "p99_ms": percentile(0.99),
         "max_ms": max(frames),
         "over_16_7ms": sum(value > 1000 / 60 for value in frames),
         "over_33_3ms": sum(value > 1000 / 30 for value in frames),
@@ -31,7 +31,10 @@ def summarize(rows: list[dict[str, str]]) -> dict[str, float | int]:
         "process_mean_ms": mean(float(row["process_ms"]) for row in rows),
         "render_cpu_mean_ms": mean(float(row["render_cpu_ms"]) for row in rows),
         "gpu_mean_ms": mean(float(row["gpu_ms"]) for row in rows),
-        "allocated_bytes_per_frame": (int(rows[-1]["allocated"]) - int(rows[0]["allocated"])) / max(1, len(rows) - 1),
+        "allocated_bytes_per_frame": (
+            int(rows[-1]["allocated"]) - int(rows[0]["allocated"])
+        )
+        / max(1, len(rows) - 1),
         "gen0": int(rows[-1]["gen0"]) - int(rows[0]["gen0"]),
         "gen1": int(rows[-1]["gen1"]) - int(rows[0]["gen1"]),
         "gen2": int(rows[-1]["gen2"]) - int(rows[0]["gen2"]),
@@ -43,7 +46,9 @@ def summarize(rows: list[dict[str, str]]) -> dict[str, float | int]:
         "primitives_max": max(int(row["primitives"]) for row in rows),
         "workers_active_max": max(int(row["workers_active"]) for row in rows),
         "machines_active_max": max(int(row["machines_active"]) for row in rows),
-        "frames_at_least_3_machines": sum(int(row["machines_active"]) >= 3 for row in rows),
+        "frames_at_least_3_machines": sum(
+            int(row["machines_active"]) >= 3 for row in rows
+        ),
     }
 
 
@@ -60,19 +65,26 @@ def main() -> None:
                 row[counter] = row[counter + "_total"]
     groups = {
         "all": rows,
-        "day-walking": [r for r in rows if r["settlement"] == "False" and r["night"] == "False"],
-        "night-walking": [r for r in rows if r["settlement"] == "False" and r["night"] == "True"],
+        "day-walking": [
+            r for r in rows if r["settlement"] == "False" and r["night"] == "False"
+        ],
+        "night-walking": [
+            r for r in rows if r["settlement"] == "False" and r["night"] == "True"
+        ],
         "production": [r for r in rows if r["settlement"] == "True"],
     }
     for site in sorted({r["site"] for r in rows}):
-        groups[site] = [r for r in rows if r["site"] == site and r["settlement"] == "False"]
+        groups[site] = [
+            r for r in rows if r["site"] == site and r["settlement"] == "False"
+        ]
     result = {name: summarize(group) for name, group in groups.items() if group}
-    result["slowest_frames"] = sorted(rows, key=lambda r: float(r["frame_ms"]), reverse=True)[:20]
-    (options.folder / "summary.json").write_text(json.dumps(result, indent=2) + "\n")
+    slowest = sorted(rows, key=lambda r: float(r["frame_ms"]), reverse=True)[:20]
+    summary = {**result, "slowest_frames": slowest}
+    (options.folder / "summary.json").write_text(json.dumps(summary, indent=2) + "\n")
     for name, stats in result.items():
-        if name == "slowest_frames":
-            continue
-        print(f"{name}: {stats['fps']:.1f} FPS, p95 {stats['p95_ms']:.2f} ms, p99 {stats['p99_ms']:.2f} ms, max {stats['max_ms']:.2f} ms; >50ms {stats['over_50ms']}, >100ms {stats['over_100ms']}; GPU {stats['gpu_mean_ms']:.2f} ms")
+        print(
+            f"{name}: {stats['fps']:.1f} FPS, p95 {stats['p95_ms']:.2f} ms, p99 {stats['p99_ms']:.2f} ms, max {stats['max_ms']:.2f} ms; >50ms {stats['over_50ms']}, >100ms {stats['over_100ms']}; GPU {stats['gpu_mean_ms']:.2f} ms"
+        )
 
 
 if __name__ == "__main__":

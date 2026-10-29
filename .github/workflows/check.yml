@@ -1,0 +1,27 @@
+name: check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # Godot, .NET, Terrain3D and the Python check tools download into .tools on a cold cache.
+      - uses: actions/cache@v4
+        with:
+          path: .tools
+          key: tools-${{ hashFiles('build.py', 'tools/terrain3d.py', 'requirements-dev.txt', 'global.json') }}
+      - run: ./build.py check
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs
+          path: build/*.log
