@@ -28,6 +28,7 @@ The project uses Godot's Forward+ renderer, which picks a discrete GPU over an i
 ./build.py setup    # prepare local tools, compile C#, and import assets
 ./build.py editor   # open the Godot editor
 ./build.py check    # run every check: C# and Python types and format, then all tests
+./build.py test     # run only the tests
 ./build.py build    # check, export, and smoke-test build/ChopChopMeow.x86_64
 ./build.py icons    # re-render item and building icons from their models (opens a window)
 ```
@@ -37,7 +38,8 @@ The project uses Godot's Forward+ renderer, which picks a discrete GPU over an i
 `build` also produces `build/ChopChopMeow-linux-x86_64.tar.gz`.
 Extract it and run `ChopChopMeow/ChopChopMeow.x86_64`; keep the adjacent `.pck` and runtime folder together.
 
-The bundle includes the .NET runtime and does not need the SDK. The extracted bundle is smoke-tested without the development SDK in its environment.
+The bundle includes the .NET runtime and does not need the SDK.
+The extracted bundle is smoke-tested without the development SDK in its environment.
 
 ### Developer review options
 

@@ -12,7 +12,7 @@ Project rules on top of the global coding guide.
 
 ## Python
 
-- `build.py` and `tools/` use only the standard library, so a fresh checkout plays with nothing but Python 3.
+- `build.py` and `tools/` use only the standard library and run on Python 3.10 or newer, so a fresh checkout plays with nothing but Python.
 - `mypy --strict` and `ruff` (check and format) run from versions pinned in `requirements-dev.txt`; `build.py` installs them into `.tools/python`.
 - Pinned downloads go through `build.fetch_pinned`, which checks the SHA-256 before anything is unpacked.
 
@@ -47,7 +47,7 @@ Use multi-threading and offload the main thread wherever it does not change resu
 
 Do all instantiation and compilation during loading to avoid in-game stutter.
 `WorldView` builds every world object's model when a world loads and shows it once the player sees it; particles, sound players and faded material copies are made in setup.
-Building mid-game is for rare events: a new building, a hire.
+Building mid-game is for rare events: a new building, a hire, a wolf.
 Build-mode placement previews and their faded materials are setup work, made while loading.
 A material builds its shader on its first draw, which stalls that frame, unless loading asks for its RID first (`ModelKit.BuildShaders`, faded copies in `ModelKit`).
 Sounds load when the game starts, and music pauses rather than stopping: starting an MP3 partway through decodes it from the beginning.
