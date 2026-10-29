@@ -20,7 +20,8 @@ public sealed class Prop {
     public Dictionary<string, Node3D> Racked = new();
     /// <summary>A pile's stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
     public MeshInstance3D[] Stacks = Array.Empty<MeshInstance3D>();
-    public string StackKey = "";
+    /// <summary>The item each pile stack shows, or "" for a hidden stack.</summary>
+    public string[] StackItems = Array.Empty<string>();
     /// <summary>A farm plot's looks by <see cref="World.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
     public Node3D[] Crops = Array.Empty<Node3D>();
     public Node3D[] Pleats = Array.Empty<Node3D>();
@@ -483,21 +484,31 @@ public static class WorldModels {
                     block.Visible = false; stacks.Add(block);
                 }
         prop.Stacks = stacks.ToArray();
+        prop.StackItems = new string[stacks.Count];
+        Array.Fill(prop.StackItems, "");
     }
+
+    private static readonly List<(string Item, int Count)> pileSlots = new();
 
     /// <summary>Refresh only visible inventory memory; the view guards this call with the existing sight check.</summary>
     public static void SyncPile(Prop prop, Thing t, GameData data) {
-        var stacks = t.Inventory.Stacks().Select(s => s.Item).ToList();
-        string key = string.Join(",", stacks);
-        if (key == prop.StackKey) return;
-        prop.StackKey = key;
-        for (int i = 0; i < prop.Stacks.Length; i++) {
-            prop.Stacks[i].Visible = i < stacks.Count;
-            if (i < stacks.Count) {
-                PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : PileShape.Fallback);
-                // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
-                prop.Stacks[i].Rotation = new Vector3(0, stacks[i] == "coal" ? i * 2.399963f : 0, 0);
-            }
+        t.Inventory.FillStacks(pileSlots);
+        var items = prop.StackItems;
+        int shown = 0;
+        bool changed = false;
+        foreach (var (item, _) in pileSlots) {
+            if (item == "" || shown == items.Length) continue;
+            if (items[shown] != item) { items[shown] = item; changed = true; }
+            shown++;
+        }
+        for (int i = shown; i < items.Length; i++) if (items[i] != "") { items[i] = ""; changed = true; }
+        if (!changed) return;
+        for (int i = 0; i < items.Length; i++) {
+            prop.Stacks[i].Visible = items[i] != "";
+            if (items[i] == "") continue;
+            PileShape.SetStock(prop.Stacks[i], items[i], data.Items.TryGetValue(items[i], out var def) ? def.Color : PileShape.Fallback);
+            // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
+            prop.Stacks[i].Rotation = new Vector3(0, items[i] == "coal" ? i * 2.399963f : 0, 0);
         }
     }
 
