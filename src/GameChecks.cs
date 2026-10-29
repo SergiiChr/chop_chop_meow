@@ -106,13 +106,24 @@ public partial class Game {
             foreach (var child in at.GetChildren()) Gather(child);
         }
         Gather(prop.Sway!);
-        var shadows = allMeshes.Where(mesh => mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.ShadowsOnly).ToArray();
+        // The solid core that fills a canopy's shadow is separate from the per-mesh proxies.
+        static bool Core(MeshInstance3D mesh) => mesh.MaterialOverride is ShaderMaterial { Shader: var shader } && shader == Tree3DShape.SolidFoliage;
+        UIRequire(allMeshes.Count(mesh => Core(mesh) && mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.ShadowsOnly) == 1,
+            "A tree canopy must have one shadow-only solid core.");
+        var shadows = allMeshes.Where(mesh => mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.ShadowsOnly && !Core(mesh)).ToArray();
         UIRequire(shadows.Length == prop.SwayParts.Length, "Each visible tree canopy mesh must have exactly one shadow-only proxy.");
-        var originals = new StandardMaterial3D[prop.SwayParts.Length];
+        // Code-built canopies fade a standard material's albedo alpha; Tree3D foliage swaps to a blended shader with an opacity.
+        static float Opacity(Material material) => material is ShaderMaterial shader
+            ? shader.Shader == Tree3DShape.FadingFoliage ? shader.GetShaderParameter(Tree3DShape.Opacity).AsSingle() : 1
+            : ((StandardMaterial3D)material).AlbedoColor.A;
+        static bool Blended(Material material) => material is ShaderMaterial shader
+            ? shader.Shader == Tree3DShape.FadingFoliage
+            : ((StandardMaterial3D)material).Transparency == BaseMaterial3D.TransparencyEnum.Alpha;
+        var originals = new Material[prop.SwayParts.Length];
         var proxies = new MeshInstance3D[prop.SwayParts.Length];
-        var proxyMaterials = new StandardMaterial3D[prop.SwayParts.Length];
+        var proxyMaterials = new Material[prop.SwayParts.Length];
         var proxyAlphas = new float[prop.SwayParts.Length];
-        var proxyTransparencies = new BaseMaterial3D.TransparencyEnum[prop.SwayParts.Length];
+        var proxyBlended = new bool[prop.SwayParts.Length];
         for (int i = 0; i < prop.SwayParts.Length; i++) {
             var (mesh, material) = prop.SwayParts[i];
             originals[i] = material;
@@ -129,9 +140,9 @@ public partial class Game {
             }
             UIRequire(proxy != null, "Each tree canopy shadow proxy must share its mesh, material and transform with the visible mesh.");
             proxies[i] = proxy!;
-            proxyMaterials[i] = (StandardMaterial3D)proxy!.MaterialOverride!;
-            proxyAlphas[i] = proxyMaterials[i].AlbedoColor.A;
-            proxyTransparencies[i] = proxyMaterials[i].Transparency;
+            proxyMaterials[i] = proxy!.MaterialOverride!;
+            proxyAlphas[i] = Opacity(proxyMaterials[i]);
+            proxyBlended[i] = Blended(proxyMaterials[i]);
             UIRequire(Mathf.IsEqualApprox(proxyAlphas[i], 1), "A tree shadow proxy must keep fully opaque foliage alpha.");
         }
         UIRequire(prop.SwayParts.All(part => part.Mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.ShadowsOnly),
@@ -139,13 +150,13 @@ public partial class Game {
         ModelKit.SetFade(prop.SwayParts, .68f);
         for (int i = 0; i < prop.SwayParts.Length; i++) {
             var mesh = prop.SwayParts[i].Mesh;
-            UIRequire(mesh.MaterialOverride is StandardMaterial3D faded &&
-                faded.Transparency == BaseMaterial3D.TransparencyEnum.Alpha && faded.AlbedoColor.A < originals[i].AlbedoColor.A &&
+            UIRequire(mesh.MaterialOverride is Material faded &&
+                Blended(faded) && Opacity(faded) < Opacity(originals[i]) &&
                 mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off,
                 "Fading a tree canopy must change only the visible mesh material and retain proxy shadow casting.");
             var proxy = proxies[i];
             UIRequire(ReferenceEquals(proxy.MaterialOverride, originals[i]) &&
-                Mathf.IsEqualApprox(proxyMaterials[i].AlbedoColor.A, proxyAlphas[i]) && proxyMaterials[i].Transparency == proxyTransparencies[i],
+                Mathf.IsEqualApprox(Opacity(proxyMaterials[i]), proxyAlphas[i]) && Blended(proxyMaterials[i]) == proxyBlended[i],
                 "A tree shadow proxy must retain the original material opacity while the visible mesh fades.");
         }
         ModelKit.SetFade(prop.SwayParts, 0);
@@ -466,7 +477,8 @@ public partial class Game {
         var point = view.Screen(hidden.Pos, .15f);
         UIRequire(view.Pick(point)?.Id == hidden.Id, "A tree crown must not steal the click from a loose piece behind it.");
         world.S.Things.Remove(hidden);
-        UIRequire(view.Pick(point)?.Id == tree.Id, "With nothing behind it, the crown must still select its tree.");
+        UIRequire(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
+        UIRequire(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
     }
     private static void RemoveCheckFiles() {
         foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
@@ -489,6 +501,12 @@ public partial class Game {
             UIRequire(SavedFrameLimit() == 90 && Engine.MaxFps == 90, "Choosing a frame rate limit must store it and cap the frame rate.");
             limits.Select(0); limits.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
             UIRequire(SavedFrameLimit() == 0 && Engine.MaxFps == 0, "Turning the frame rate limit off must store it and lift the cap.");
+            var taa = (CheckButton)screen.FindChild("taa", true, false);
+            UIRequire(taa.ButtonPressed && GetViewport().UseTaa, "Temporal anti-aliasing must start on.");
+            await Click(taa);
+            UIRequire(!SavedTaa() && !GetViewport().UseTaa, "Switching temporal anti-aliasing off must store it and apply it at once.");
+            await Click(taa);
+            UIRequire(SavedTaa() && GetViewport().UseTaa, "Switching temporal anti-aliasing back on must store it and apply it.");
             var musicSlider = (HSlider)screen.FindChild("music", true, false);
             UIRequire(musicSlider.Value == 100, "Music must start at full volume.");
             musicSlider.Value = 40; await Frames();

@@ -14,7 +14,8 @@ public partial class IconRender : Node {
     public string Folder = "";
     private const float GamePitch = 30;
     private readonly SubViewport viewport = new() { Size = new Vector2I(Size, Size), TransparentBg = true, OwnWorld3D = true, Msaa3D = Viewport.Msaa.Msaa8X, RenderTargetUpdateMode = SubViewport.UpdateMode.Always };
-    private readonly Camera3D camera = new() { Projection = Camera3D.ProjectionType.Orthogonal, Near = .1f, Far = 100, Current = true };
+    // Icons show the models alone, without ground marks.
+    private readonly Camera3D camera = new() { Projection = Camera3D.ProjectionType.Orthogonal, Near = .1f, Far = 100, Current = true, CullMask = 0xFFFFF & ~WorldModels.MarkLayer };
     private readonly DirectionalLight3D sun = new() { ShadowEnabled = true, DirectionalShadowMaxDistance = 30, LightEnergy = .8f, LightColor = new Color("fff1dc") };
 
     public override void _Ready() {

@@ -243,7 +243,8 @@ internal static class NatureShape {
 
     /// <summary>A lightweight neutral shrub lobe tinted by the scenery MultiMesh's existing per-instance colors.</summary>
     public static Mesh Scrub => Cached("scrub", s => {
-        var tint = Leafy(new Color("a0a0a0"), new Color("d5d5d5"), Colors.White, 391);
+        // A wide range from a dark underside to a pale top, so the shrub reads as round from above.
+        var tint = Leafy(new Color("5e5e5e"), new Color("c2c2c2"), Colors.White, 391);
         var (points, triangles) = Shape(Vector3.Zero, Vector3.One, 0, 391, 4, .18f, .04f, -.46f, 0);
         Blob(s, Vector3.Zero, points, triangles, false, tint);
         BushLeaves(s, Vector3.Zero, Vector3.One, points, tint, .4f, 7, 2.1f);

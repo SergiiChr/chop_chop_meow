@@ -3,10 +3,6 @@ render_mode cull_disabled, depth_draw_never;
 
 uniform vec4 dry_color : source_color;
 uniform vec4 wet_color : source_color;
-uniform sampler2D shore_explored : filter_linear, repeat_disable;
-uniform vec2 shore_player;
-uniform float shore_radius = 18.0;
-uniform vec3 shore_memory : source_color;
 varying vec2 world_at;
 
 void vertex() {
@@ -21,10 +17,4 @@ void fragment() {
     ALBEDO *= 0.985 + grain * 0.03;
     ROUGHNESS = mix(0.65, 1.0, smoothstep(0.0, 1.0, distance));
     ALPHA = smoothstep(-0.3, 0.06, distance) * (1.0 - smoothstep(max(0.1, UV.y - 0.65), UV.y, distance));
-    float seen = texture(shore_explored, (world_at + vec2(0.5)) / 216.0).r;
-    float live = 1.0 - smoothstep(shore_radius - 1.5, shore_radius, length(world_at - shore_player));
-    float fog_alpha = (1.0 - live) * mix(1.0, 0.62, seen);
-    ALBEDO *= 1.0 - fog_alpha;
-    EMISSION = shore_memory * seen * fog_alpha;
-    ALPHA *= max(live, seen);
 }

@@ -123,9 +123,10 @@ public sealed class ActorRig {
         Cylinder(holder, .024f, .03f, .52f, new Vector3(0, 0, .12f), Mat("6e4a2e", .8f), new Vector3(90, 0, 0), 6);
         Cylinder(holder, .045f, .04f, .1f, new Vector3(0, 0, .37f), Mat("3a2a20", .9f), new Vector3(90, 0, 0), 7);
         var flame = Pivot(holder, new Vector3(0, 0, .42f), new Vector3(90, 0, 0));
-        Post(flame, .07f, 0, .24f, Vector3.Zero, Flat(new Color("ff8a2a", .9f)), 7);
-        Post(flame, .045f, 0, .17f, new Vector3(.015f, 0, .01f), Flat(new Color("ffd36a", .95f)), 7);
-        var light = new OmniLight3D { Position = new Vector3(0, .2f, 0), OmniRange = 5, LightColor = new Color("ff9a45"), LightEnergy = 0, ShadowEnabled = false, OmniAttenuation = 1.4f };
+        // The flame wraps its own light, so it casts no shadow; everything else around the torch does.
+        Post(flame, .07f, 0, .24f, Vector3.Zero, Flat(new Color("ff8a2a", .9f)), 7).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        Post(flame, .045f, 0, .17f, new Vector3(.015f, 0, .01f), Flat(new Color("ffd36a", .95f)), 7).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
+        var light = new OmniLight3D { Position = new Vector3(0, .2f, 0), OmniRange = 5, LightColor = new Color("ff9a45"), LightEnergy = 0, ShadowEnabled = true, OmniAttenuation = 1.4f };
         flame.AddChild(light);
         return (holder, flame, light);
     }

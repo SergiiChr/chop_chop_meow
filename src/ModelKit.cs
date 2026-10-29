@@ -97,25 +97,25 @@ public static class ModelKit {
     /// Copies are cached per tenth of transparency, so fading trees still share materials.
     /// </summary>
     public static void SetFade(Node node, float transparency) {
-        if (node is MeshInstance3D mesh && mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.ShadowsOnly && mesh.MaterialOverride is StandardMaterial3D current) {
-            if (!mesh.HasMeta(BaseMaterial)) mesh.SetMeta(BaseMaterial, current);
-            SetFade(mesh, (StandardMaterial3D)mesh.GetMeta(BaseMaterial), transparency);
+        if (node is MeshInstance3D mesh && mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.ShadowsOnly && Fadeable(mesh.MaterialOverride)) {
+            if (!mesh.HasMeta(BaseMaterial)) mesh.SetMeta(BaseMaterial, mesh.MaterialOverride);
+            SetFade(mesh, (Material)mesh.GetMeta(BaseMaterial), transparency);
         }
         foreach (var child in node.GetChildren()) SetFade(child, transparency);
     }
 
     /// <summary>Fades one mesh whose own material is <paramref name="original"/>.</summary>
-    public static void SetFade(MeshInstance3D mesh, StandardMaterial3D original, float transparency) {
+    public static void SetFade(MeshInstance3D mesh, Material original, float transparency) {
         int step = (int)MathF.Round(Math.Clamp(transparency, 0, 1) * 10);
         mesh.MaterialOverride = step == 0 ? original : Faded(original, step);
     }
 
     /// <summary>A model's meshes with their own materials, gathered once so that fading it later walks no nodes: walking them each frame allocates.</summary>
-    public static (MeshInstance3D Mesh, StandardMaterial3D Material)[] FadeParts(Node node) {
-        var parts = new List<(MeshInstance3D, StandardMaterial3D)>();
+    public static (MeshInstance3D Mesh, Material Material)[] FadeParts(Node node) {
+        var parts = new List<(MeshInstance3D, Material)>();
         void Gather(Node at) {
-            if (at is MeshInstance3D mesh && mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.ShadowsOnly && mesh.MaterialOverride is StandardMaterial3D current)
-                parts.Add((mesh, mesh.HasMeta(BaseMaterial) ? (StandardMaterial3D)mesh.GetMeta(BaseMaterial) : current));
+            if (at is MeshInstance3D mesh && mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.ShadowsOnly && Fadeable(mesh.MaterialOverride))
+                parts.Add((mesh, mesh.HasMeta(BaseMaterial) ? (Material)mesh.GetMeta(BaseMaterial) : mesh.MaterialOverride));
             foreach (var child in at.GetChildren()) Gather(child);
         }
         Gather(node);
@@ -124,11 +124,11 @@ public static class ModelKit {
     }
 
     /// <summary>Makes every faded copy of a material now, while loading, rather than the first time it fades in play.</summary>
-    public static void WarmFades(StandardMaterial3D material) {
+    public static void WarmFades(Material material) {
         for (int step = 1; step <= 10; step++) Faded(material, step);
     }
 
-    public static void SetFade((MeshInstance3D Mesh, StandardMaterial3D Material)[] parts, float transparency) {
+    public static void SetFade((MeshInstance3D Mesh, Material Material)[] parts, float transparency) {
         foreach (var (mesh, material) in parts) SetFade(mesh, material, transparency);
     }
 
@@ -150,12 +150,21 @@ public static class ModelKit {
         }
     }
 
-    private static Material Faded(StandardMaterial3D original, int step) {
+    /// <summary>Standard materials and Tree3D foliage, the only shader material with a blended twin.</summary>
+    private static bool Fadeable(Material? material) => material is StandardMaterial3D || material is ShaderMaterial { Shader: var shader } && shader == Tree3DShape.Foliage;
+
+    private static Material Faded(Material original, int step) {
         var key = (original.GetInstanceId(), step);
         if (faded.TryGetValue(key, out var cached)) return cached;
+        if (original is ShaderMaterial foliage) {
+            var leaves = (ShaderMaterial)foliage.Duplicate();
+            leaves.Shader = Tree3DShape.FadingFoliage;
+            leaves.SetShaderParameter(Tree3DShape.Opacity, 1 - step / 10f);
+            return faded[key] = leaves;
+        }
         var copy = (StandardMaterial3D)original.Duplicate();
         copy.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
-        copy.AlbedoColor = original.AlbedoColor with { A = original.AlbedoColor.A * (1 - step / 10f) };
+        copy.AlbedoColor = copy.AlbedoColor with { A = copy.AlbedoColor.A * (1 - step / 10f) };
         faded[key] = copy;
         return copy;
     }

@@ -143,7 +143,7 @@ Visible geometry counts, excluding props being carried or sat upon:
 ### Nature
 
 - Tree3D 1.1.0 supplies the default baked tree and berry-bush geometry. Preview it with `./build.py play -- --showcase --trees`.
-  - `src/Tree3DShape.cs` loads shared tree and berry-bush meshes and alpha-cutout foliage materials.
+  - `src/Tree3DShape.cs` loads shared tree and berry-bush meshes, and cutout foliage shader materials that sway in the wind (`src/Wind.cs`) and have a blended twin for fading.
   - Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes`. Berries attach to actual foliage-card twigs and retain their independent harvest visibility. Decorative scenery shrubs keep their inexpensive MultiMesh.
   - `assets/models/tree3d/` contains the baked meshes, original SVG leaf/bark textures, triangle manifest and upstream license notices.
   - Regenerate with `./tools/tree3d.py`; native authoring binaries stay in ignored `.tools/tree3d` and are unnecessary to play. See [trial details and compatibility](../docs/art/TREES.md).

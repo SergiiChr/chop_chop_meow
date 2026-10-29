@@ -73,11 +73,18 @@ public partial class Sounds : Node {
 
     // Players made while loading and reused in turn, so a sound instantiates nothing mid-game.
     private readonly List<AudioStreamPlayer> voices = new();
+    // A sound with a world position plays from there and pans with its place on screen.
+    // Distance is left to the existing on-screen rule, so these players neither fade nor muffle with distance themselves.
+    private readonly List<AudioStreamPlayer3D> placedVoices = new();
     private const int VoiceCount = 24;
-    private int nextVoice;
+    private int nextVoice, nextPlacedVoice;
 
     public override void _Ready() {
         for (int i = 0; i < VoiceCount; i++) { var voice = new AudioStreamPlayer(); AddChild(voice); voices.Add(voice); }
+        for (int i = 0; i < VoiceCount; i++) {
+            var voice = new AudioStreamPlayer3D { AttenuationModel = AudioStreamPlayer3D.AttenuationModelEnum.Disabled, AttenuationFilterDb = 0, DopplerTracking = AudioStreamPlayer3D.DopplerTrackingEnum.Disabled };
+            AddChild(voice); placedVoices.Add(voice);
+        }
         day = new Track(this, "path_to_lake_land", "mystic_theme");
         night = new Track(this, "forest");
     }
@@ -111,24 +118,31 @@ public partial class Sounds : Node {
         int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
         if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
         previous[name] = pick;
-        var player = FreeVoice();
-        player.Stream = streams[pick];
-        player.PitchScale = 1 + (float)(random.NextDouble() * .12 - .06);
-        player.VolumeDb = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
-        player.Play();
+        float pitch = 1 + (float)(random.NextDouble() * .12 - .06);
+        float volume = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
+        if (at is Vector2 place) {
+            var placed = FreeVoice(placedVoices, ref nextPlacedVoice, static voice => voice.Playing);
+            placed.Position = new Vector3(place.X, 0, place.Y);
+            placed.Stream = streams[pick]; placed.PitchScale = pitch; placed.VolumeDb = volume;
+            placed.Play();
+        } else {
+            var player = FreeVoice(voices, ref nextVoice, static voice => voice.Playing);
+            player.Stream = streams[pick]; player.PitchScale = pitch; player.VolumeDb = volume;
+            player.Play();
+        }
         Played++; Last = name;
     }
 
     /// <summary>The next idle player in turn; with all of them busy, the next in turn is cut off.</summary>
-    private AudioStreamPlayer FreeVoice() {
-        for (int i = 0; i < voices.Count; i++) {
-            var voice = voices[(nextVoice + i) % voices.Count];
-            if (voice.Playing) continue;
-            nextVoice = (nextVoice + i + 1) % voices.Count;
+    private static T FreeVoice<T>(List<T> pool, ref int next, Func<T, bool> playing) {
+        for (int i = 0; i < pool.Count; i++) {
+            var voice = pool[(next + i) % pool.Count];
+            if (playing(voice)) continue;
+            next = (next + i + 1) % pool.Count;
             return voice;
         }
-        var oldest = voices[nextVoice];
-        nextVoice = (nextVoice + 1) % voices.Count;
+        var oldest = pool[next];
+        next = (next + 1) % pool.Count;
         return oldest;
     }
 
@@ -142,6 +156,7 @@ public partial class Sounds : Node {
         silenced = true;
         ProcessMode = ProcessModeEnum.Disabled;
         foreach (var player in GetChildren().OfType<AudioStreamPlayer>()) player.Stop();
+        foreach (var player in placedVoices) player.Stop();
     }
 
     /// <summary>

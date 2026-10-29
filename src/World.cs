@@ -657,9 +657,11 @@ public sealed partial class World {
         asleep = false;
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
+    /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
+    public const float FireReach = 5.3f;
     /// <summary>Burning campfires keep wolves out of their light, unless a wolf is already chasing the player.</summary>
     public bool Protected(Vector2 p) {
-        foreach (var t in S.Things) if (t.Kind == "campfire" && t.Burn > 0 && t.Pos.DistanceTo(p) < 5.3f) return true;
+        foreach (var t in S.Things) if (t.Kind == "campfire" && t.Burn > 0 && t.Pos.DistanceTo(p) < FireReach) return true;
         return false;
     }
     /// <summary>Wolves scared by a torch circle the player at this distance until enough gather to attack together.</summary>

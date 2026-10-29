@@ -31,7 +31,7 @@ public sealed class Prop {
     public Vector3 Vent;
     public Hit[] Hits = Array.Empty<Hit>();
     /// <summary>A tree crown's meshes and their own materials, for fading it without walking its nodes.</summary>
-    public (MeshInstance3D Mesh, StandardMaterial3D Material)[] SwayParts = Array.Empty<(MeshInstance3D, StandardMaterial3D)>();
+    public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
     public string Kind = "";
     public float Fade, Fall = -1, Open, Shake, Puff;
     public int LastCount, Tint = -1;
@@ -44,6 +44,8 @@ public sealed class Prop {
 /// <summary>Code-built low-poly models for every world object: natural, modern and DIY rather than fantasy.</summary>
 public static class WorldModels {
     public const int TreeVariants = 3;
+    /// <summary>The render layer of ground marks, which icon renders leave out.</summary>
+    public const uint MarkLayer = 1 << 12;
 
     /// <summary>
     /// Builds the shared meshes and outfit palettes of models that first appear mid-game while the world loads.
@@ -53,6 +55,7 @@ public static class WorldModels {
         new CartModel().Root.Free();
         _ = BackpackShape.Details; _ = BackpackShape.Flap;
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
+        scorchTexture ??= ScorchTexture();
     }
     /// <summary>Full deposit sizes from world generation; piles shrink toward half size as they are worked.</summary>
     public static float Fullness(Thing t) => t.Kind switch {
@@ -198,8 +201,9 @@ public static class WorldModels {
         float scale = .9f + Jitter(id, 2) * .22f;
         sway.Scale = Vector3.One * scale;
         int variant = (id / TreeVariants) % NatureShape.Variants;
-        Tree3DShape.Add(sway, id % TreeVariants, variant);
+        var leaves = Tree3DShape.Add(sway, id % TreeVariants, variant);
         PreserveShadows(sway);
+        Tree3DShape.AddShadowCore(sway, id % TreeVariants, leaves);
         var stump = Add(prop.Root, NatureShape.Stump, NatureShape.Natural, Vector3.Zero);
         stump.Visible = false;
         prop.Stump = stump;
@@ -253,7 +257,8 @@ public static class WorldModels {
         for (int i = 0; i < 3; i++)
             Cylinder(prop.WoodPile, .07f, .065f, .5f, new Vector3(.82f, .08f + (i == 2 ? .13f : 0), -.1f + (i == 2 ? .07f : i * .14f)), Mat(i == 1 ? "7a5235" : "8a5f3c"), new Vector3(90, 0, 0), 10);
         prop.CoalPile = Add(body, FurnaceShape.CoalPile, FurnaceShape.Concrete, new Vector3(.82f, 0, -.03f));
-        prop.Light = Light(body, new Vector3(0, .35f, .7f), 2.6f);
+        prop.Light = Light(body, new Vector3(0, .35f, .7f), 2);
+        Scorch(body, 1.9f);
     }
 
     /// <summary>A propane-tank forge on an angle-iron stand, fed by a hinged leather bellows with a heat gauge on top.</summary>
@@ -305,7 +310,8 @@ public static class WorldModels {
             float size = i % 2 == 0 ? .97f : .88f;
             Add(prop.Pleats[i], ForgeShape.Board, leather, new Vector3(0, -.03f + (i + 1) * .04f, 0), scale: new Vector3(size, 1, size));
         }
-        prop.Light = Light(body, new Vector3(0, .9f, .9f), 3);
+        prop.Light = Light(body, new Vector3(0, .9f, .9f), 2.2f);
+        Scorch(body, 1.6f);
     }
 
     /// <summary>Small OSB cabin on block piers with a corrugated shed roof, solar panel and rain barrel.</summary>
@@ -434,6 +440,7 @@ public static class WorldModels {
         Add(mortar, CookShape.Mortar, CookShape.Ceramic, Vector3.Zero);
         prop.Mortar = mortar;
         prop.Light = Light(body, new Vector3(-.33f, .3f, .6f), 2.2f);
+        Scorch(body, 1.3f);
     }
 
     /// <summary>A steel stove with a lidded canning pot, beside a plank table with tin cans and a lever press.</summary>
@@ -446,6 +453,7 @@ public static class WorldModels {
         prop.Glow = Add(body, CanneryShape.Fire, CanneryShape.Flame, Vector3.Zero);
         prop.Vent = new Vector3(-.44f, 1.1f, -.18f);
         prop.Light = Light(body, new Vector3(-.27f, .25f, .55f), 2f);
+        Scorch(body, 1.3f);
     }
 
     /// <summary>A plank pegboard on two posts set in a cinder-block footing, with an axe, a pickaxe and a rake hanging on it.</summary>
@@ -557,10 +565,14 @@ public static class WorldModels {
         Add(body, FirePitShape.Stones, FirePitShape.Stone, Vector3.Zero);
         Add(body, FirePitShape.Fuel, FirePitShape.Wood, Vector3.Zero);
         var fire = Pivot(body, new Vector3(0, .26f, 0));
-        Add(fire, FirePitShape.Flames, FirePitShape.Flame, Vector3.Zero);
+        Add(fire, FirePitShape.Flames, FirePitShape.Flame, Vector3.Zero).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         prop.Fire = fire;
         prop.Vent = new Vector3(0, .8f, 0);
-        prop.Light = Light(body, new Vector3(0, .8f, 0), 7);
+        // The firelight ends on the ground where the fire's safety from wolves ends, with a flat falloff so the edge reads; other lights stay small pools.
+        prop.Light = Light(body, new Vector3(0, .8f, 0), new Vector2(World.FireReach, .8f).Length());
+        prop.Light.OmniAttenuation = .5f;
+        prop.Light.ShadowEnabled = true;
+        Scorch(body, 2.6f);
     }
 
     /// <summary>Needle roll in degrees for a heat fraction: cold points left, full heat points right.</summary>
@@ -650,6 +662,29 @@ public static class WorldModels {
         var light = new OmniLight3D { Position = at, OmniRange = range, LightColor = new Color("ff9a45"), LightEnergy = 0, ShadowEnabled = false, OmniAttenuation = 1.4f };
         parent.AddChild(light);
         return light;
+    }
+
+    private static Texture2D? scorchTexture;
+    /// <summary>A soot stain on the ground under a fire, projected as a decal so it follows whatever lies beneath.</summary>
+    public static void Scorch(Node3D parent, float size) {
+        scorchTexture ??= ScorchTexture();
+        parent.AddChild(new Decal { Size = new Vector3(size, .5f, size), TextureAlbedo = scorchTexture, Modulate = new Color(1, 1, 1, .8f), Layers = MarkLayer });
+    }
+
+    /// <summary>A ragged dark blot that fades out toward its edge.</summary>
+    private static ImageTexture ScorchTexture() {
+        const int size = 128;
+        var noise = new FastNoiseLite { Seed = 5, Frequency = .045f, FractalOctaves = 3 };
+        var image = Image.CreateEmpty(size, size, true, Image.Format.Rgba8);
+        for (int y = 0; y < size; y++)
+            for (int x = 0; x < size; x++) {
+                float distance = new Vector2(x - size / 2f, y - size / 2f).Length() / (size / 2f);
+                float grain = noise.GetNoise2D(x, y);
+                float alpha = Mathf.Clamp((1 - distance + grain * .35f) * 1.8f - .2f, 0, 1);
+                image.SetPixel(x, y, new Color(.07f, .06f, .05f, alpha * (.75f + grain * .25f)));
+            }
+        image.GenerateMipmaps();
+        return ImageTexture.CreateFromImage(image);
     }
 
     /// <summary>Wolf with four hinged legs, built facing +Z; <see cref="Body"/> lifts and tilts for leaps, feeding and death.</summary>
