@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>Deterministic checks for the playable simulation, independent of the rendered scene.</summary>
 public static class SimulationChecks {
@@ -74,10 +75,6 @@ public static class SimulationChecks {
         MultiplayerChecks.Run(data);
         AllocationChecks.Run(data);
         GD.Print("SELF-TEST PASS");
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Simulation check failed: {message}");
     }
 
     /// <summary>Rewrites a save into an older form, failing when a text it rewrites is missing so the fixture cannot silently stop testing anything.</summary>

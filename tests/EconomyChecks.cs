@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>
 /// Checks the economy rules in docs/ECONOMY.md against data/game.json.
@@ -17,10 +18,6 @@ public static class EconomyChecks {
         CheckValueLadder(data);
         CheckHiringPays(data);
         CheckBasketIsSustainable(data);
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Economy check failed: {message}");
     }
 
     /// <summary>What one batch of a recipe takes, with the cheapest fuel its station burns.</summary>

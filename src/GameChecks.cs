@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 
@@ -240,9 +241,7 @@ public partial class Game {
     private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false).Concat(bag.FindChildren("*", "GridContainer", true, false))
         .ElementAt(grid).GetChildren().OfType<ItemSlot>().First(match);
     private System.Collections.Generic.IEnumerable<Button> Slots() => panel.FindChildren("slot_*", "Button", true, false).Concat(bag.FindChildren("slot_*", "Button", true, false)).OfType<Button>();
-    private static void UIRequire(bool okay, string message) {
-        if (!okay) throw new InvalidOperationException("UI check failed: " + message);
-    }
+    private static void UIRequire(bool okay, string message, [CallerFilePath] string file = "") => Checks.Require(okay, message, file);
     private async Task Click(Vector2 point) {
         var at = GetViewport().GetFinalTransform() * point;
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });

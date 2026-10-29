@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>Simulation checks for worker animation state transitions.</summary>
 public static class WorkerStateChecks {
@@ -11,10 +12,6 @@ public static class WorkerStateChecks {
         CheckBlockedPath(data);
         CheckFurnacePumping(data);
         CheckSaveRoundTrip(data);
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Worker state check failed: {message}");
     }
 
     private static World EmptyWorld(GameData data) => new(data, false);

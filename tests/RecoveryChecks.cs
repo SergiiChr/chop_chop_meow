@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using ChopChopMeow;
+using static Checks;
 
 /// <summary>Checks the no-cabin recovery path and its world-time effects.</summary>
 public static class RecoveryChecks {
@@ -59,9 +60,5 @@ public static class RecoveryChecks {
                 "dawn should charge wages through the regular wage slot");
         Require(furnace.Inventory["iron_bar"] > 0,
                 "furnace production should continue while the night advances");
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Recovery check failed: {message}");
     }
 }

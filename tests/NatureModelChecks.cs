@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>Ore deposits share cached geometry while each prop keeps independent visibility and fade state.</summary>
 public static class NatureModelChecks {
@@ -66,8 +67,4 @@ public static class NatureModelChecks {
         .ToArray();
 
     private static string PartName(int index) => index switch { 0 => "host", 1 => "seam", _ => "chip" };
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Nature model check failed: {message}");
-    }
 }
