@@ -554,6 +554,7 @@ The world is a fixed 216-tile valley defined in `src/Terrain.cs`:
 
 `World.Scatter` places resources with a seeded generator, trees more densely toward the mountains.
 Saves from earlier maps are refused.
+`World.Deserialize` upgrades older saves, then refuses one that names unknown items or holds player needs out of range, with the same checks `Adopt` applies to a joining guest.
 Workers use grid detours around water and buildings.
 
 ## Development and verification
