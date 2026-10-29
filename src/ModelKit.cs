@@ -101,7 +101,8 @@ public static class ModelKit {
             if (!mesh.HasMeta(BaseMaterial)) mesh.SetMeta(BaseMaterial, mesh.MaterialOverride);
             SetFade(mesh, (Material)mesh.GetMeta(BaseMaterial), transparency);
         }
-        foreach (var child in node.GetChildren()) SetFade(child, transparency);
+        int count = node.GetChildCount();
+        for (int i = 0; i < count; i++) SetFade(node.GetChild(i), transparency);
     }
 
     /// <summary>Fades one mesh whose own material is <paramref name="original"/>.</summary>
@@ -184,6 +185,7 @@ public static class ModelKit {
     public static void SetOverride(Node node, Material? material) {
         if (node is GeometryInstance3D geometry) geometry.MaterialOverlay = material;
         if (node is MeshInstance3D mesh && material != null) mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-        foreach (var child in node.GetChildren()) SetOverride(child, material);
+        int count = node.GetChildCount();
+        for (int i = 0; i < count; i++) SetOverride(node.GetChild(i), material);
     }
 }
