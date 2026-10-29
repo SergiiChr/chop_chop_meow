@@ -10,6 +10,27 @@ import math
 from pathlib import Path
 from statistics import mean
 
+# Columns summarize reads; allocation and GC counters are totals since the game started.
+COLUMNS = {
+    "frame_ms",
+    "process_ms",
+    "render_cpu_ms",
+    "gpu_ms",
+    "allocated_total",
+    "gen0_total",
+    "gen1_total",
+    "gen2_total",
+    "static_bytes",
+    "video_bytes",
+    "draw_calls",
+    "primitives",
+    "workers_active",
+    "machines_active",
+    "site",
+    "night",
+    "settlement",
+}
+
 
 def summarize(rows: list[dict[str, str]]) -> dict[str, float | int]:
     frames = sorted(float(row["frame_ms"]) for row in rows)
@@ -32,12 +53,12 @@ def summarize(rows: list[dict[str, str]]) -> dict[str, float | int]:
         "render_cpu_mean_ms": mean(float(row["render_cpu_ms"]) for row in rows),
         "gpu_mean_ms": mean(float(row["gpu_ms"]) for row in rows),
         "allocated_bytes_per_frame": (
-            int(rows[-1]["allocated"]) - int(rows[0]["allocated"])
+            int(rows[-1]["allocated_total"]) - int(rows[0]["allocated_total"])
         )
         / max(1, len(rows) - 1),
-        "gen0": int(rows[-1]["gen0"]) - int(rows[0]["gen0"]),
-        "gen1": int(rows[-1]["gen1"]) - int(rows[0]["gen1"]),
-        "gen2": int(rows[-1]["gen2"]) - int(rows[0]["gen2"]),
+        "gen0": int(rows[-1]["gen0_total"]) - int(rows[0]["gen0_total"]),
+        "gen1": int(rows[-1]["gen1_total"]) - int(rows[0]["gen1_total"]),
+        "gen2": int(rows[-1]["gen2_total"]) - int(rows[0]["gen2_total"]),
         "static_start_mb": float(rows[0]["static_bytes"]) / 1024**2,
         "static_end_mb": float(rows[-1]["static_bytes"]) / 1024**2,
         "static_peak_mb": max(float(row["static_bytes"]) for row in rows) / 1024**2,
@@ -56,13 +77,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("folder", type=Path)
     options = parser.parse_args()
-    with (options.folder / "frames.csv").open() as source:
-        rows = list(csv.DictReader(source))
-    # Normalize the initial local-run schema; all allocation/GC counters are cumulative.
-    for row in rows:
-        for counter in ("allocated", "gen0", "gen1", "gen2"):
-            if counter + "_total" in row:
-                row[counter] = row[counter + "_total"]
+    frames = options.folder / "frames.csv"
+    if not frames.is_file():
+        raise SystemExit(f"No {frames}: record one with --performance-run first.")
+    with frames.open() as source:
+        reader = csv.DictReader(source)
+        missing = sorted(COLUMNS - set(reader.fieldnames or ()))
+        if missing:
+            raise SystemExit(f"{frames} lacks columns: {', '.join(missing)}")
+        rows = list(reader)
     groups = {
         "all": rows,
         "day-walking": [
