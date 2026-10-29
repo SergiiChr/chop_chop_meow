@@ -149,7 +149,7 @@ This simulation uses floats and frame-length steps, so it is not deterministic, 
 Every world object is a low-poly model assembled from Godot primitive meshes in code.
 Meshes and materials are cached by parameters, so repeated objects share resources.
 One tile is one world unit and an adult is about 1.65 units tall.
-The camera is orthographic with a 30° pitch, matching the old 2:1 isometric footprint and actor scale.
+The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
 
 Picking, the hover ring and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`), so selection matches what is drawn.
 A tree crown only wins a click when nothing else is under the cursor, so objects behind a canopy stay selectable.
@@ -201,7 +201,7 @@ In multiplayer it is available only when everyone is downed; a living player pre
 
 ### Goals
 
-The end goals replace the old ending:
+The end goals:
 
 - a working mine on every ore in `World.Cliffs`;
 - `goals.profitDays` consecutive days of at least `goals.dailyProfit` profit.
@@ -485,7 +485,7 @@ Trades always use the live price, so the sheet can be out of date.
 A mine (`src/Mine.cs`, `mine` in `data/game.json`) is marked free and snaps to `World.MineSpot`, directly in front of an ore cliff, one per cliff.
 Each portal follows its own cliff face, its tunnel runs into the rock, and its rails point outward toward the valley.
 A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`World.InSpur`), and holds the tunnel, which `WorldModels.Mine` darkens step by step to black.
-Older valley saves move only the mine cart anchor to this aligned site, retaining stock, stages and worker assignments.
+Loading a save made on an older valley moves only the mine cart anchor to this site and keeps stock, stages and worker assignments.
 
 `Thing.Stage` counts finished stages:
 
@@ -559,14 +559,8 @@ Workers use grid detours around water and buildings.
 
 ## Development and verification
 
-[RELEASE.md](RELEASE.md) describes the development flow, and `./build.py check` runs every check:
-
-- C# compile with warnings as errors and `dotnet format --verify-no-changes`.
-- `mypy --strict` and `ruff` on `build.py` and `tools/`.
-- Simulation checks with a 120-second limit, requiring `SELF-TEST PASS`, then the Godot input/UI checks, requiring `UI-TEST PASS`.
-- A host and a guest process on this machine, requiring `NET-HOST PASS` and `NET-GUEST PASS`. The guest joins through a relay in `build.py` that adds about 80 ms of delay and 5% packet loss each way.
-
-`./build.py build` runs the checks, exports a Linux executable, smoke-tests it and packages the executable, game pack and runtime into a tar archive.
+[AGENTS.md](../AGENTS.md#checks) lists the checks and [RELEASE.md](RELEASE.md) the development flow.
+The network check's guest joins through a relay in `build.py` that adds about 80 ms of delay and 5% packet loss each way.
 
 ### Platform
 

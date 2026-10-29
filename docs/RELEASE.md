@@ -10,8 +10,7 @@
    ln -s "$PWD/.tools" ../chop_chop_meow-<name>/.tools
    ```
 
-   The symlink reuses the downloaded Godot, .NET and Python tools and is ignored by git.
-   Leave the main checkout on whatever branch it is on.
+   The symlink reuses the downloaded Godot, .NET and Python tools and is ignored by git. Leave the main checkout on whatever branch it is on: `git fetch origin main:main` fast-forwards `main` without switching to it.
 2. Make the change and update the docs it affects in the same commit.
 3. Run `./build.py check`. For a visual change, also inspect a rendered screenshot.
 4. Review the branch against `main` with the `self-review` skill and apply what improves it.
@@ -20,5 +19,4 @@
 
 ## Release bundle
 
-`./build.py build` produces `build/ChopChopMeow-linux-x86_64.tar.gz` with the executable, game pack and .NET runtime.
-The bundle is smoke-tested without the .NET SDK in its environment.
+`./build.py build` produces the portable bundle described in the [README](../README.md#release-bundle).

@@ -1891,7 +1891,7 @@ public sealed partial class World {
         return true;
     }
     public void Deserialize(string json) {
-        // Steel tools became steel parts; carried ones that were the only axe or pickaxe become those tools so the save stays playable.
+        // Older saves hold steel tools as one item: they load as steel parts, and a missing axe or pickaxe is made from one so the save stays playable.
         bool legacyTools = json.Contains("\"steel_tools\"");
         json = json.Replace("\"steel_tools\"", "\"steel_parts\"").Replace("\"cooked_meat\"", "\"burnt_steak\"");
         // Iron tools and parts left the game: older saves get the steel ones instead.
@@ -1920,16 +1920,16 @@ public sealed partial class World {
         loaded.Crates ??= new(); loaded.Crafting ??= new(); loaded.Profits ??= new();
         loaded.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
         foreach (var t in loaded.Things) {
-            // Anvils of older saves may still be set to tools that are now made at the bench.
+            // A station set to a recipe it doesn't make, as on older saves' anvils, is cleared.
             if (t.Recipe != "" && (!Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Station != t.Kind)) { t.Recipe = ""; t.Processing = false; t.Progress = 0; }
             if (SlotKinds(t.Kind).Length > 0) t.Tools ??= NewToolSlots(t.Kind);
-            // Stations used to keep their fuel with the ingredients; fuel nothing smelts moves to the fuel slot.
-            // Plots used to keep their harvest with the seed; the harvest moves to its own slots.
+            // A plot from an older save keeps its harvest with the seed; the harvest moves to its own slots.
             if (t.Kind == "farm" && t.Output == null) {
                 t.Output = new() { Slots = Data.Farm.Yield.Count };
                 foreach (var item in t.Inventory.Items.Keys.Where(i => !Data.Farm.Sow.ContainsKey(i)).ToList()) t.Inventory.TransferTo(t.Output, item, t.Inventory[item]);
                 t.Inventory.Slots = Data.Farm.Sow.Count;
             }
+            // A station from an older save keeps its fuel with the ingredients; fuel nothing smelts moves to the fuel slot.
             if (Burns(t.Kind) && t.Burner == null) {
                 t.Burner = NewBurner();
                 string fuel = BurnedFuel(t);
@@ -1942,7 +1942,7 @@ public sealed partial class World {
             if (loaded.Milestones.Contains("steel_parts")) loaded.Milestones.Add("steel_tool");
         }
         if (!ValidCrates(loaded.Crates) || !ValidPlayer(loaded.Actor, loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
-        // The goal chain gained steps, so the current goal is worked out again from the milestones.
+        // The current goal is worked out again from the milestones, so a save made with a shorter goal chain lands on the right step.
         loaded.Goal = 0;
         S = loaded;
         // Older saves set only a worker's place; it carries every job there.

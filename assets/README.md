@@ -147,6 +147,7 @@ Both are variable fonts weighted in code.
 - `forest.mp3` plays at night.
 
 Every ambient track is normalised to -18 LUFS integrated loudness with true peaks below -1 dBTP, so tracks switch without a jump in volume.
+Measure a new track with ffmpeg's `ebur128` filter, then apply the gain that brings it to the target.
 
 Credits: Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundcloud.com/alexandr-zhelanov)) and Augmentality (Brandon Morris).
 

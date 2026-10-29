@@ -35,6 +35,7 @@ Icons and models are committed; playing does not call an image-generation servic
 - Hand lower-complexity tasks to a cheaper, faster model or subagent; inspect and verify its result.
 - Continue until the requested goal is achieved. Ask about material design ambiguities rather than quietly changing the game.
 - Several agent sessions share the main checkout: do branch work in a worktree ([docs/RELEASE.md](docs/RELEASE.md)).
+- Keep tool downloads and build output ignored, and never depend on another local checkout.
 - Always run Godot through `./build.py`. The binary in `.tools/` picks up the system .NET and crashes when called directly; add a `build.py` action or pass flags after `./build.py play --` instead.
 - Docs describe the game as it is now. Update them in the same change as the code; git keeps the history.
 - For a visual change, look at a rendered screenshot (`./build.py play -- --showcase --screenshot /absolute/path.png`); headless checks cannot verify presentation.

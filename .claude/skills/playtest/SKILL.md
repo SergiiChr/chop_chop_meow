@@ -19,10 +19,8 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
    if (LaunchValue("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
    ```
 
-2. Start the game in the background with a folder in your scratchpad: `./build.py play -- --drive <dir>`.
-   Add `--showcase` and its flags for a late-game fixture instead of a fresh start.
-3. When done, remove both: `git checkout src/Game.cs && rm -f src/ReviewDrive.cs src/ReviewDrive.cs.uid`.
-   Never commit the driver.
+2. Start the game in the background with a folder in your scratchpad: `./build.py play -- --drive <dir>`. Add `--showcase` and its flags for a late-game fixture instead of a fresh start.
+3. When done, remove both: `git checkout src/Game.cs && rm -f src/ReviewDrive.cs src/ReviewDrive.cs.uid`. Never commit the driver.
 
 ## Drive
 
