@@ -67,14 +67,14 @@ public partial class Game : Node {
     public override void _Ready() {
         try {
             var data = GameData.Load(); world = launchArgs.Contains("--performance-run") ? PerformanceFixture.Create(data) : new World(data);
-            if (OS.GetCmdlineUserArgs().Contains("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
-            if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--render-icons") is int icons and >= 0) { AddChild(new IconRender { Data = data, Folder = OS.GetCmdlineUserArgs()[icons + 1] }); return; }
+            if (launchArgs.Contains("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
+            if (Array.IndexOf(launchArgs, "--render-icons") is int icons and >= 0) { AddChild(new IconRender { Data = data, Folder = launchArgs[icons + 1] }); return; }
             world.Notify = Notify;
             LoadHotbarAtlases();
             sounds = new Sounds { World = world, MusicVolume = SavedMusicVolume() }; AddChild(sounds);
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
-            view = new WorldView { World = world, Sounds = sounds }; AddChild(view);
+            view = new WorldView { World = world, Sounds = sounds, StillWater = launchArgs.Contains("--environment-review") }; AddChild(view);
             net = new Net { Name = "Net", World = world, FilePrefix = FilePrefix }; AddChild(net);
             world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };
             world.PlayerActed += (action, at) => net.Echo(world.S.Actor.Id, action, at);
@@ -84,16 +84,15 @@ public partial class Game : Node {
             ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
             SetTheme(); BuildHud();
             GetViewport().UseTaa = SavedTaa();
-            if (OS.GetCmdlineUserArgs().Contains("--showcase")) Showcase();
-            else if (!OS.GetCmdlineUserArgs().Contains("--animation-review")) ShowStart();
-            if (!OS.GetCmdlineUserArgs().Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { ApplyResolution(SavedResolution()); Engine.MaxFps = SavedFrameLimit(); }
+            if (launchArgs.Contains("--showcase")) Showcase();
+            else if (!launchArgs.Contains("--animation-review")) ShowStart();
+            if (!launchArgs.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { ApplyResolution(SavedResolution()); Engine.MaxFps = SavedFrameLimit(); }
             StartPerformanceRun();
-            if (OS.GetCmdlineUserArgs().Contains("--ui-test")) RunUIChecks();
-            if (Array.IndexOf(OS.GetCmdlineUserArgs(), "--net-check") is int check and >= 0) RunNetCheck(OS.GetCmdlineUserArgs().ElementAtOrDefault(check + 1) == "host");
-            if (OS.GetCmdlineUserArgs().Contains("--animation-review")) {
+            if (launchArgs.Contains("--ui-test")) RunUIChecks();
+            if (Array.IndexOf(launchArgs, "--net-check") is int check and >= 0) RunNetCheck(launchArgs.ElementAtOrDefault(check + 1) == "host");
+            if (launchArgs.Contains("--animation-review")) {
                 ClosePanel(); ui.Visible = false; view.AnimationReview = true;
-                var reviewArgs = OS.GetCmdlineUserArgs(); int capture = Array.IndexOf(reviewArgs, "--animation-capture");
-                if (capture >= 0 && capture + 1 < reviewArgs.Length) CaptureAnimations(reviewArgs[capture + 1]);
+                if (LaunchValue("--animation-capture") is string captures) CaptureAnimations(captures);
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
@@ -839,8 +838,18 @@ public partial class Game : Node {
             }
         }
     }
-    // Read once: fetching them from the engine every frame allocates a fresh array.
-    private readonly string[] launchArgs = OS.GetCmdlineUserArgs();
+    // Read once: fetching them from the engine allocates a fresh array each time.
+    private static readonly string[] launchArgs = OS.GetCmdlineUserArgs();
+    private static readonly bool smokeTest = launchArgs.Contains("--smoke-test");
+    private static readonly string? screenshotPath = LaunchValue("--screenshot");
+    private static readonly float shotDelay = float.TryParse(LaunchValue("--shot-delay"), System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
+    // Review fixtures and UI checks keep their own files so they never touch the player's saves or settings.
+    private static readonly string FilePrefix = launchArgs.Contains("--performance-run") ? "performance-" : launchArgs.Contains("--showcase") ? "review-" : launchArgs.Contains("--ui-test") ? "ui-check-" : launchArgs.Contains("--net-check") ? "net-check-" : "";
+    /// <summary>The launch argument after <paramref name="option"/>, or null when it is missing.</summary>
+    private static string? LaunchValue(string option) {
+        int at = Array.IndexOf(launchArgs, option);
+        return at >= 0 && at + 1 < launchArgs.Length ? launchArgs[at + 1] : null;
+    }
     public override void _Process(double delta) {
         if (world == null || view == null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;
@@ -903,14 +912,8 @@ public partial class Game : Node {
         // The needs plate grows with the bank count, and an open side panel would cover the messages' right end.
         float messagesLeft = needsPlate.GetRect().End.X + 24, messagesRight = panel.Visible ? PanelLeft - 16 : -messagesLeft;
         if (messages.OffsetLeft != messagesLeft || messages.OffsetRight != messagesRight) { messages.OffsetLeft = messagesLeft; messages.OffsetRight = messagesRight; }
-        var args = launchArgs;
-        if (args.Contains("--smoke-test") && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
-        int shot = Array.IndexOf(args, "--screenshot");
-        int delay = Array.IndexOf(args, "--shot-delay");
-        float shotAt = delay >= 0 && delay + 1 < args.Length && float.TryParse(args[delay + 1], System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
-        if (shot >= 0 && shot + 1 < args.Length && runTime > shotAt && !capturing) {
-            capturing = true; Capture(args[shot + 1]);
-        }
+        if (smokeTest && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
+        if (screenshotPath != null && runTime > shotDelay && !capturing) { capturing = true; Capture(screenshotPath); }
         if (performanceRunning) SamplePerformance(delta);
     }
     private async void Capture(string path) {
@@ -929,7 +932,7 @@ public partial class Game : Node {
     }
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
-        var args = OS.GetCmdlineUserArgs(); int at = Array.IndexOf(args, "--mine-stage");
+        var args = launchArgs; int at = Array.IndexOf(args, "--mine-stage");
         int stage = at >= 0 && at + 1 < args.Length && int.TryParse(args[at + 1], out int n) ? n : World.MineOpen;
         int ore = Array.IndexOf(args, "--mine-ore");
         var cliff = World.CliffOf(ore >= 0 && ore + 1 < args.Length ? args[ore + 1] : "iron");
@@ -982,7 +985,7 @@ public partial class Game : Node {
             ClosePanel(); ui.Visible = false; paused = true;
             return;
         }
-        if (OS.GetCmdlineUserArgs().Contains("--bushes")) {
+        if (launchArgs.Contains("--bushes")) {
             // A clean three-bush comparison row, with one picked-clean bush to show its persistent model.
             var at = World.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
@@ -998,7 +1001,7 @@ public partial class Game : Node {
             world.Tick(0); view.Zoom = 1.8f;
             ClosePanel(); return;
         }
-        if (OS.GetCmdlineUserArgs().Contains("--trees")) {
+        if (launchArgs.Contains("--trees")) {
             // A clean three-tree comparison row, placed beyond the settlement showcase.
             var at = World.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
@@ -1010,7 +1013,7 @@ public partial class Game : Node {
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
             world.Player = at + new Vector2(1, -1);
-            if (OS.GetCmdlineUserArgs().Contains("--tree-shadow")) world.Player = at - Vector2.One * 2;
+            if (launchArgs.Contains("--tree-shadow")) world.Player = at - Vector2.One * 2;
             world.Tick(0); view.Zoom = 1;
             ClosePanel(); return;
         }
@@ -1040,33 +1043,33 @@ public partial class Game : Node {
         world.S.Crafting.AddRange(new[] { "planks", "wood_parts" }); world.S.CraftTime = 6;
         var meat = world.Add("crate", world.Player); meat.Inventory.Add("burnt_steak", 12); world.PickUpCrate(meat);
         world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
-        if (OS.GetCmdlineUserArgs().Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
+        if (launchArgs.Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         // --day-phase sets the time of day from 0 at dawn, for comparing the light across the day.
-        int phase = Array.IndexOf(OS.GetCmdlineUserArgs(), "--day-phase");
-        if (phase >= 0) world.S.Time = world.Data.DaySeconds * float.Parse(OS.GetCmdlineUserArgs()[phase + 1], System.Globalization.CultureInfo.InvariantCulture);
+        int phase = Array.IndexOf(launchArgs, "--day-phase");
+        if (phase >= 0) world.S.Time = world.Data.DaySeconds * float.Parse(launchArgs[phase + 1], System.Globalization.CultureInfo.InvariantCulture);
         // A past walk toward the iron cliff leaves explored ground beyond the live sight circle.
         for (float d = 0; d <= 14; d += 2) { world.Player = World.Spawn + new Vector2(d * .5f, -d); world.Tick(0); }
         world.Player = World.Spawn; world.Tick(0); Select(bellows);
         // --hide-ui leaves only the world in review screenshots.
-        if (OS.GetCmdlineUserArgs().Contains("--hide-ui")) ui.Visible = false;
-        if (OS.GetCmdlineUserArgs().Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
-        if (OS.GetCmdlineUserArgs().Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
-        if (OS.GetCmdlineUserArgs().Contains("--craft")) OpenPage("craft");
-        if (OS.GetCmdlineUserArgs().Contains("--crew")) OpenPage("workers");
-        if (OS.GetCmdlineUserArgs().Contains("--worker")) Select(world.S.Workers[0]);
-        if (OS.GetCmdlineUserArgs().Contains("--guide")) OpenPage("help");
-        if (OS.GetCmdlineUserArgs().Contains("--menu")) { ClosePanel(); OpenMenu(); }
-        if (OS.GetCmdlineUserArgs().Contains("--furnace")) { world.Player = bellows.Pos + Vector2.One; Select(bellows); }
-        if (OS.GetCmdlineUserArgs().Contains("--piles")) {
+        if (launchArgs.Contains("--hide-ui")) ui.Visible = false;
+        if (launchArgs.Contains("--market")) { world.Player = sign.Pos + Vector2.One; sheetOpen = true; Select(sign); }
+        if (launchArgs.Contains("--bench")) { world.Player = bench.Pos + Vector2.One; Select(bench); }
+        if (launchArgs.Contains("--craft")) OpenPage("craft");
+        if (launchArgs.Contains("--crew")) OpenPage("workers");
+        if (launchArgs.Contains("--worker")) Select(world.S.Workers[0]);
+        if (launchArgs.Contains("--guide")) OpenPage("help");
+        if (launchArgs.Contains("--menu")) { ClosePanel(); OpenMenu(); }
+        if (launchArgs.Contains("--furnace")) { world.Player = bellows.Pos + Vector2.One; Select(bellows); }
+        if (launchArgs.Contains("--piles")) {
             var at = World.Spawn + new Vector2(-3, 9);
             foreach (var (item, stacks, dx) in new[] { ("stone", 14, 0), ("wood", 6, 3), ("leaves", 3, 6) }) {
                 var pile = world.Add("pile", at + new Vector2(dx, 0)); pile.Inventory.Add(item, stacks * pile.Inventory.StackSize);
                 if (item == "leaves") { pile.Compost = true; pile.Inventory.Add("fertilizer", 20); }
             }
             world.Player = at + new Vector2(3, -2.5f); world.Tick(0); view.Zoom = 1.4f;
-            if (OS.GetCmdlineUserArgs().Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == "pile")); else ClosePanel();
+            if (launchArgs.Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == "pile")); else ClosePanel();
         }
-        if (OS.GetCmdlineUserArgs().Contains("--farm")) {
+        if (launchArgs.Contains("--farm")) {
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
             var at = World.Spawn + new Vector2(-6, 9);
             for (int i = 0; i < 5; i++) {
@@ -1076,9 +1079,9 @@ public partial class Game : Node {
             }
             var wheat = world.Add("pile", at + new Vector2(0, World.ZoneSize)); wheat.Inventory.Add("wheat", 300);
             world.Player = at + new Vector2(6, 2.5f); world.Tick(0); view.Zoom = 1.2f;
-            if (OS.GetCmdlineUserArgs().Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == "farm")); else ClosePanel();
+            if (launchArgs.Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == "farm")); else ClosePanel();
         }
-        if (OS.GetCmdlineUserArgs().Contains("--kitchen")) {
+        if (launchArgs.Contains("--kitchen")) {
             // The cooking table mid-stew beside a canning station sealing cans, with the mortar slotted.
             var at = World.Spawn + new Vector2(-3, 8);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
@@ -1087,38 +1090,38 @@ public partial class Game : Node {
             var cannery = world.Add("cannery", at + new Vector2(2.2f, 0)); world.SetRecipe(cannery, "canned_meat_stew");
             cannery.Inventory.Add("meat_stew", 2); cannery.Inventory.Add("tin_can", 2); cannery.Burner!.Add("wood", 2);
             world.Player = at + new Vector2(1, 2.5f); world.Tick(.5f); view.Zoom = 1.7f;
-            if (OS.GetCmdlineUserArgs().Contains("--panel")) Select(table); else ClosePanel();
+            if (launchArgs.Contains("--panel")) Select(table); else ClosePanel();
         }
-        if (OS.GetCmdlineUserArgs().Contains("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (OS.GetCmdlineUserArgs().Contains("--panel")) Select(rack); else ClosePanel(); }
-        if (OS.GetCmdlineUserArgs().Contains("--tin")) { var cliff = World.CliffOf("tin"); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); ClosePanel(); }
-        if (OS.GetCmdlineUserArgs().Contains("--pantry")) {
+        if (launchArgs.Contains("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (launchArgs.Contains("--panel")) Select(rack); else ClosePanel(); }
+        if (launchArgs.Contains("--tin")) { var cliff = World.CliffOf("tin"); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); ClosePanel(); }
+        if (launchArgs.Contains("--pantry")) {
             foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
             OpenPage("inventory");
         }
         // Hovering a recipe shows its description below the grids and as a tooltip at the pointer.
-        if (OS.GetCmdlineUserArgs().Contains("--hover")) GetTree().CreateTimer(.5).Timeout += () => {
+        if (launchArgs.Contains("--hover")) GetTree().CreateTimer(.5).Timeout += () => {
             if (Named("craft_torch") is not Button cell) return;
             cell.EmitSignal(Control.SignalName.MouseEntered);
             var at = GetViewport().GetFinalTransform() * cell.GetGlobalRect().GetCenter();
             Input.WarpMouse(at); Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
         };
-        if (OS.GetCmdlineUserArgs().Contains("--torch")) { world.Player = World.Spawn + new Vector2(-5, 6); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!OS.GetCmdlineUserArgs().Contains("--kindle")) world.Tick(World.KindleSeconds); ClosePanel(); view.Zoom = 1.6f; }
-        if (OS.GetCmdlineUserArgs().Contains("--crate")) { world.Player = crate.Pos + Vector2.One; Select(crate); }
-        if (OS.GetCmdlineUserArgs().Contains("--anomaly")) { world.Player = crate.Pos + Vector2.One; CrateIntoCrate(crate, crate.Inventory, "crate"); }
-        if (OS.GetCmdlineUserArgs().Contains("--collapse")) { world.Player = crate.Pos + Vector2.One; ClosePanel(); CrateIntoCrate(crate, crate.Inventory, "crate"); Collapse(crate); }
-        if (OS.GetCmdlineUserArgs().Contains("--lunch")) {
+        if (launchArgs.Contains("--torch")) { world.Player = World.Spawn + new Vector2(-5, 6); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!launchArgs.Contains("--kindle")) world.Tick(World.KindleSeconds); ClosePanel(); view.Zoom = 1.6f; }
+        if (launchArgs.Contains("--crate")) { world.Player = crate.Pos + Vector2.One; Select(crate); }
+        if (launchArgs.Contains("--anomaly")) { world.Player = crate.Pos + Vector2.One; CrateIntoCrate(crate, crate.Inventory, "crate"); }
+        if (launchArgs.Contains("--collapse")) { world.Player = crate.Pos + Vector2.One; ClosePanel(); CrateIntoCrate(crate, crate.Inventory, "crate"); Collapse(crate); }
+        if (launchArgs.Contains("--lunch")) {
             // Lunch review: the crew has walked over and sat down around the campfire, with the pay overview open.
             world.S.Time = (world.Data.LunchHour - 6) / 24 * world.Data.DaySeconds;
             for (int i = 0; i < 60; i++) world.Tick(.25f);
             OpenPage("workers");
         }
-        if (OS.GetCmdlineUserArgs().Contains("--strike")) {
+        if (launchArgs.Contains("--strike")) {
             // Strike review: the whole crew owes wages and stands holding protest signs.
             foreach (var w in world.S.Workers) w.WageDebt = w.Wage;
             world.Player = sign.Pos + new Vector2(2.5f, 1.5f); world.Tick(.25f); ClosePanel(); view.Zoom = 2.2f;
         }
-        if (OS.GetCmdlineUserArgs().Contains("--mine")) MineReview(sign);
-        if (!OS.GetCmdlineUserArgs().Contains("--wolves")) return;
+        if (launchArgs.Contains("--mine")) MineReview(sign);
+        if (!launchArgs.Contains("--wolves")) return;
         // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
         var spot = World.Spawn + new Vector2(11, 8);
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(spot) < 6);

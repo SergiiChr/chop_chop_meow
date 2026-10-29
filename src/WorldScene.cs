@@ -41,7 +41,7 @@ public partial class WorldView {
     }
 
     /// <summary>Sea and its feathered bank follow the coastline at the valley's mouth.</summary>
-    private void BuildSea(Node3D parent) => ShorelineAppearance.BuildCoast(parent);
+    private void BuildSea(Node3D parent) => ShorelineAppearance.BuildCoast(parent, StillWater);
 
     /// <summary>A jagged wall of faceted columns with ore seams on the face and scree at its foot.</summary>
     private static void BuildCliff(Node3D parent, Cliff cliff) {
@@ -76,7 +76,7 @@ public partial class WorldView {
         // The bank and water follow the same shore line that bounds walking.
         float Shore(float angle) => Terrain.Shore(angle);
         ShorelineAppearance.BuildLakeBank(parent);
-        LakeAppearance.BuildLakeAppearance(parent);
+        LakeAppearance.BuildLakeAppearance(parent, StillWater);
         var rng = new Random(77);
         const int stones = 150;
         for (int i = 0; i < stones; i++) {

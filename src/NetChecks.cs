@@ -105,7 +105,7 @@ public partial class Game {
     }
 
     /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
-    private static int CheckPort => Array.IndexOf(OS.GetCmdlineUserArgs(), "--port") is int at and >= 0 ? int.Parse(OS.GetCmdlineUserArgs()[at + 1]) : Net.DefaultPort;
+    private static int CheckPort => LaunchValue("--port") is string port ? int.Parse(port) : Net.DefaultPort;
 
     private static string GuestSave => $"user://{FilePrefix}guest-127-0-0-1-{CheckPort}.json";
 

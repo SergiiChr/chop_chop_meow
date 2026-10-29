@@ -16,8 +16,6 @@ public partial class Game {
     /// <summary>Numbered slot that F5 and F9 use; 0 until the player saves to or loads one.</summary>
     private int slot;
 
-    // Review fixtures and UI checks keep their own files so they never touch the player's saves or settings.
-    private static string FilePrefix => OS.GetCmdlineUserArgs().Contains("--performance-run") ? "performance-" : OS.GetCmdlineUserArgs().Contains("--showcase") ? "review-" : OS.GetCmdlineUserArgs().Contains("--ui-test") ? "ui-check-" : OS.GetCmdlineUserArgs().Contains("--net-check") ? "net-check-" : "";
     private static string SettingsPath => $"user://{FilePrefix}settings.cfg";
     // Slot 0 is the autosave; slot 1 keeps the original single-save file name, so older saves load as slot 1.
     private static string SlotPath(int n) => $"user://{FilePrefix}{(n == 0 ? "autosave" : n == 1 ? "settlement" : $"settlement-{n}")}.json";

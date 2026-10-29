@@ -29,6 +29,8 @@ public partial class WorldView : Node3D {
     /// <summary>Fixed daylight landscape fixture for matching environment trial screenshots.</summary>
     public bool EnvironmentReview;
     public bool EnvironmentReviewFog;
+    /// <summary>Holds the lake and sea waves at one moment, for environment review screenshots; set before the view enters the tree.</summary>
+    public bool StillWater;
     public Vector2? EnvironmentCenter;
     public float EnvironmentCameraDistance = 60;
     public float Elapsed;
