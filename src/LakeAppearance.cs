@@ -11,11 +11,11 @@ public static class LakeAppearance {
     private static Shader? shader;
 
     /// <summary>Adds the lake's single water surface. Banks and shoreline props stay with the caller.</summary>
-    public static void BuildLakeAppearance(Node3D parent) {
+    public static void BuildLakeAppearance(Node3D parent, bool still) {
         shader ??= GD.Load<Shader>(ShaderPath);
         if (shader == null) throw new InvalidOperationException($"Could not load lake shader at {ShaderPath}");
 
-        var material = CreateMaterial();
+        var material = CreateMaterial(still);
 
         var surface = new MeshInstance3D {
             Name = "lake_water_surface",
@@ -26,17 +26,12 @@ public static class LakeAppearance {
         parent.AddChild(surface);
     }
 
-    internal static ShaderMaterial CreateMaterial() {
+    /// <summary>The water material; <paramref name="still"/> holds its waves at one moment.</summary>
+    internal static ShaderMaterial CreateMaterial(bool still) {
         shader ??= GD.Load<Shader>(ShaderPath);
         var material = new ShaderMaterial { Shader = shader };
-        if (HasEnvironmentReviewFlag()) material.SetShaderParameter("review_time", 1.25f);
+        if (still) material.SetShaderParameter("review_time", 1.25f);
         return material;
-    }
-
-    private static bool HasEnvironmentReviewFlag() {
-        foreach (string argument in OS.GetCmdlineUserArgs())
-            if (argument == "--environment-review") return true;
-        return false;
     }
 
     private static ArrayMesh BuildSurface() {

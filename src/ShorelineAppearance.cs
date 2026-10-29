@@ -40,7 +40,7 @@ internal static class ShorelineAppearance {
         parent.AddChild(new MeshInstance3D { Name = "SoftLakeBank", Mesh = tool.Commit(), MaterialOverride = BankMaterial(false), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
-    public static void BuildCoast(Node3D parent) {
+    public static void BuildCoast(Node3D parent, bool still) {
         var bank = new SurfaceTool(); bank.Begin(Mesh.PrimitiveType.Triangles);
         const float step = .75f;
         void At(float across, float t) {
@@ -69,7 +69,7 @@ internal static class ShorelineAppearance {
                 WaterAt(across, a); WaterAt(across + step, b); WaterAt(across, b);
                 WaterAt(across, a); WaterAt(across + step, a); WaterAt(across + step, b);
             }
-        var material = LakeAppearance.CreateMaterial();
+        var material = LakeAppearance.CreateMaterial(still);
         material.SetShaderParameter("coastal", true);
         parent.AddChild(new MeshInstance3D { Name = "CoastalWater", Mesh = water.Commit(), MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }

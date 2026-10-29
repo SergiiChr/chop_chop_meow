@@ -53,7 +53,6 @@ public partial class Game {
         // A flat button over the whole card takes the click and rings it on hover.
         var open = new Button { Flat = false, FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand, Name = $"crew_{w.Id}" };
         Style.Skin(open, Style.None, Style.CardHover); open.Pressed += () => Select(w); card.AddChild(open);
-        var statusText = new LiveText(shown => status.Text = shown);
         (string Status, int Carried, string Tool, int Duties) drawn = ("", -1, "", -1);
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(status)) return;
@@ -62,13 +61,19 @@ public partial class Game {
             // A job given or taken elsewhere changes the chips, so the page is rebuilt.
             if (drawn.Duties >= 0 && now.Item4 != drawn.Duties) { drawn = now; Callable.From(() => { if (page == "workers") OpenPage("workers"); }).CallDeferred(); return; }
             drawn = now;
-            statusText.Clear().Append(now.Item1); statusText.Show();
-            string? item = now.Item2 > 0 ? w.Bag.First() : null;
-            carry.Icon = item == null ? null : HotbarIcon(item); carried.Text = now.Item2 > 1 ? now.Item2.ToString() : ""; carry.Visible = item != null;
-            carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {now.Item2} {world.Data.Name(item)}";
-            tool.Icon = now.Item3 == "" ? null : HotbarIcon(now.Item3); tool.Visible = now.Item3 != "";
-            tool.TooltipText = now.Item3 == "" ? "No tool in hand" : world.Data.Name(now.Item3);
+            status.Text = now.Item1;
+            ShowKit(w, carry, carried, tool);
         });
+    }
+
+    /// <summary>Shows what a worker carries and the tool they hold in their two icon cells.</summary>
+    private void ShowKit(Worker w, ItemSlot carry, Badge carried, ItemSlot tool) {
+        int count = w.Bag.Count;
+        string? item = count > 0 ? w.Bag.First() : null;
+        carry.Icon = item == null ? null : HotbarIcon(item); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
+        carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {count} {world.Data.Name(item)}";
+        tool.Icon = w.Tool == "" ? null : HotbarIcon(w.Tool); tool.Visible = w.Tool != "";
+        tool.TooltipText = w.Tool == "" ? "No tool in hand" : world.Data.Name(w.Tool);
     }
 
     /// <summary>A job as a small chip: the place's icon and the job's name.</summary>
@@ -94,7 +99,6 @@ public partial class Game {
         var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; text.AddThemeConstantOverride("separation", 2); well.AddChild(text);
         var status = Style.Text("", 15, Style.Ink); status.AutowrapMode = TextServer.AutowrapMode.WordSmart; text.AddChild(status);
         var owed = Style.Text("", 13, Style.Brick, Style.Bold); text.AddChild(owed);
-        var statusText = new LiveText(shown => status.Text = shown);
         var owedText = new LiveText(shown => { owed.Text = shown; owed.Visible = shown != ""; });
         (string Status, int Carried, string Tool, int Owed) drawn = ("", -1, "", -1);
         live.Add(() => {
@@ -102,12 +106,8 @@ public partial class Game {
             var now = (w.Status, w.Bag.Count, w.Tool, (int)w.WageDebt);
             if (now == drawn) return;
             drawn = now;
-            statusText.Clear().Append(now.Item1); statusText.Show();
-            string? item = now.Item2 > 0 ? w.Bag.First() : null;
-            carry.Icon = item == null ? null : HotbarIcon(item); carried.Text = now.Item2 > 1 ? now.Item2.ToString() : ""; carry.Visible = item != null;
-            carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {now.Item2} {world.Data.Name(item)}";
-            tool.Icon = now.Item3 == "" ? null : HotbarIcon(now.Item3); tool.Visible = now.Item3 != "";
-            tool.TooltipText = now.Item3 == "" ? "No tool in hand" : world.Data.Name(now.Item3);
+            status.Text = now.Item1;
+            ShowKit(w, carry, carried, tool);
             if (now.Item4 > 0) owedText.Clear().Append("Owed ").Append(now.Item4).Append(" coins · on strike"); else owedText.Clear();
             owedText.Show();
         });

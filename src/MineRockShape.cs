@@ -11,7 +11,7 @@ internal static class MineRockShape {
 
     public static Mesh Mesh(Cliff cliff, string[] palette) {
         if (meshes.TryGetValue(cliff, out var mesh)) return mesh;
-        var spot = World.MineSpot(cliff); var outwards = World.MineOut(cliff); var across = new Vector2(outwards.Y, -outwards.X);
+        var spot = World.MineSpot(cliff); var outwards = cliff.Face; var across = new Vector2(outwards.Y, -outwards.X);
         Vector2 WorldPoint(float x, float z) => spot + across * x + outwards * z;
         float root = -7;
         while (root > -32 && (Terrain.FromMountains(WorldPoint(-4.6f, root)) > -6 || Terrain.FromMountains(WorldPoint(0, root)) > -6 || Terrain.FromMountains(WorldPoint(4.6f, root)) > -6)) root -= 1;

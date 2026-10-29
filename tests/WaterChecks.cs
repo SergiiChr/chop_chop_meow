@@ -117,7 +117,7 @@ public static class WaterChecks {
             "cooking must use the water and return its reusable container");
 
         world = new World(data, false);
-        var shore = Terrain.WaterPoint(World.Spawn);
+        var shore = Terrain.WaterPoint(Terrain.Spawn);
         var outward = (shore - Terrain.Lake).Normalized();
         var pond = world.Add("water", shore, 9999);
         var chest = world.Add("chest", shore + outward * 5); chest.Inventory.Add("empty_bottle", 1);

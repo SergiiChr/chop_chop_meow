@@ -29,11 +29,11 @@ public partial class WorldView {
             int id = index++;
             var p = new Vector2(point[0].GetSingle(), point[1].GetSingle());
             if (!Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 1.1f) || Terrain.FromMountains(p) < 2 || blocked[(int)p.X, (int)p.Y]) continue;
-            float along = Terrain.Along(p), across = Terrain.Across(p), path = Terrain.Across(World.Spawn) + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f;
-            if (p.DistanceTo(World.Spawn) < 4.5f || along > Terrain.Along(World.Spawn) - 1 && Math.Abs(across - path) < 1.1f) continue;
+            float along = Terrain.Along(p), across = Terrain.Across(p), path = Terrain.Across(Terrain.Spawn) + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f;
+            if (p.DistanceTo(Terrain.Spawn) < 4.5f || along > Terrain.Along(Terrain.Spawn) - 1 && Math.Abs(across - path) < 1.1f) continue;
             bool mineApproach = false;
             foreach (var cliff in World.Cliffs) {
-                var offset = p - World.MineSpot(cliff); float depth = offset.Dot(World.MineOut(cliff));
+                var offset = p - World.MineSpot(cliff); float depth = offset.Dot(cliff.Face);
                 if (Math.Abs(offset.Dot(cliff.Along)) < 3 && depth > -6 && depth < 2) { mineApproach = true; break; }
             }
             if (mineApproach) continue;
@@ -44,7 +44,7 @@ public partial class WorldView {
             var at = new Transform3D(basis, To3(p));
             // Restore the ordinary shrubs alongside the new ground cover. Use the same
             // dry-ground and access masks, and keep their sampling independent of other plants.
-            if (id % 31 == 0 && Terrain.FromMountains(p) >= 3 && p.DistanceTo(World.Spawn) >= 6) {
+            if (id % 31 == 0 && Terrain.FromMountains(p) >= 3 && p.DistanceTo(Terrain.Spawn) >= 6) {
                 for (int lobe = 0; lobe < 3; lobe++) {
                     float angle = yaw + lobe * Mathf.Tau / 3;
                     float radius = (.35f + ((id + lobe * 3) % 7) * .05f) * size;

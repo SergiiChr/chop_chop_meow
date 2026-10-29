@@ -19,10 +19,8 @@ public sealed partial class World {
         foreach (var c in Cliffs) if (c.DistanceTo(p) < nearest.DistanceTo(p)) nearest = c;
         return nearest;
     }
-    /// <summary>The outward normal of this cliff: each portal follows its own rock face, with rails toward the valley.</summary>
-    public static Vector2 MineOut(Cliff c) => c.Face;
     /// <summary>The cart's spot, outward from the cliff center, with the portal projecting from the mountain foot.</summary>
-    public static Vector2 MineSpot(Cliff c) => c.Center + MineOut(c) * 4.2f;
+    public static Vector2 MineSpot(Cliff c) => c.Center + c.Face * 4.2f;
     /// <summary>The earlier end-facing cart position, retained for loading old settlements.</summary>
     private static Vector2 LegacyMineSpot(Cliff c) {
         var along = c.Along * Math.Sign(c.Along.Dot(Terrain.Seaward));
@@ -33,7 +31,7 @@ public sealed partial class World {
     private static bool InSpur(Vector2 p, float margin = 0) {
         foreach (var c in Cliffs) {
             var offset = p - MineSpot(c);
-            float depth = offset.Dot(MineOut(c));
+            float depth = offset.Dot(c.Face);
             // The margin reaches twice as far out in front, so scattered trees and rocks also stay off the rails and cart.
             if (depth > -2.28f + margin * 2) continue;
             float across = Math.Abs(offset.Dot(c.Along));
@@ -55,7 +53,7 @@ public sealed partial class World {
         state.Version = 5;
     }
     /// <summary>Where diggers and miners stand: at the entrance, against the rock.</summary>
-    public static Vector2 MineDoor(Thing mine) => mine.Pos - MineOut(CliffAt(mine.Pos)) * 1.4f;
+    public static Vector2 MineDoor(Thing mine) => mine.Pos - CliffAt(mine.Pos).Face * 1.4f;
     /// <summary>Where a plan placed at <paramref name="p"/> goes: a mine near a cliff snaps to that cliff's spot.</summary>
     private static bool NearMineSite(Cliff cliff, Vector2 p) => cliff.DistanceTo(p) <= MineReach || p.DistanceTo(MineSpot(cliff)) <= 2.5f;
     private static Vector2 SnapMine(Vector2 p) => CliffAt(p) is var c && NearMineSite(c, p) ? MineSpot(c) : p;

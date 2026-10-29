@@ -35,31 +35,27 @@ public static class AnimationChecks {
         bag.Add("steel_axe", 1);
         bag.Add("steel_pick", 1);
 
-        Require(ActorAnimation.PlayerAction("tree", true, true, bag, "steel_axe") == ActorAction.Walk,
+        Require(ActorAnimation.PlayerAction("tree", true, true, bag) == ActorAction.Walk,
             "movement toward a resource should animate as walking");
-        Require(ActorAnimation.PlayerAction("tree", true, false, bag, "steel_axe") == ActorAction.SteelChop,
+        Require(ActorAnimation.PlayerAction("tree", true, false, bag) == ActorAction.SteelChop,
             "a stationary player with a steel axe should chop a tree");
-        Require(ActorAnimation.PlayerAction("iron", true, false, bag, "steel_pick") == ActorAction.SteelMine,
+        Require(ActorAnimation.PlayerAction("iron", true, false, bag) == ActorAction.SteelMine,
             "a carried steel pick should mine iron deposits");
-        Require(ActorAnimation.PlayerAction("iron", true, false, bag, "steel_axe") == ActorAction.SteelMine,
-            "an irrelevant axe selection should fall back to a carried pick for iron");
-        Require(ActorAnimation.PlayerAction("stone", true, false, bag, "steel_axe") == ActorAction.SteelMine,
+        Require(ActorAnimation.PlayerAction("stone", true, false, bag) == ActorAction.SteelMine,
             "a carried pick should mine stone");
-        Require(ActorAnimation.PlayerAction("tree", true, false, bag, "steel_pick") == ActorAction.SteelChop,
-            "an irrelevant selected pick should fall back to the carried axe for trees");
 
         var empty = new Inventory();
-        Require(ActorAnimation.PlayerAction("tree", true, false, empty, "steel_axe") == ActorAction.Gather,
-            "selected tools not carried should not animate as tool use");
+        Require(ActorAnimation.PlayerAction("tree", true, false, empty) == ActorAction.Gather,
+            "tools not carried should not animate as tool use");
         var axeOnly = new Inventory();
         axeOnly.Add("steel_axe", 1);
-        Require(ActorAnimation.PlayerAction("coal", true, false, axeOnly, "steel_axe") == ActorAction.Gather,
+        Require(ActorAnimation.PlayerAction("coal", true, false, axeOnly) == ActorAction.Gather,
             "a carried but unsuitable axe should not animate as mining");
-        Require(ActorAnimation.PlayerAction("berries", true, false, empty, null) == ActorAction.Gather,
+        Require(ActorAnimation.PlayerAction("berries", true, false, empty) == ActorAction.Gather,
             "hand gathering berries should use the gather action");
-        Require(ActorAnimation.PlayerAction("wolf_corpse", true, false, empty, null) == ActorAction.Gather,
+        Require(ActorAnimation.PlayerAction("wolf_corpse", true, false, empty) == ActorAction.Gather,
             "butchering a carcass should use the crouched gather action");
-        Require(ActorAnimation.PlayerAction("tree", false, false, bag, "steel_axe") == ActorAction.Idle,
+        Require(ActorAnimation.PlayerAction("tree", false, false, bag) == ActorAction.Idle,
             "inactive gathering should leave the player idle");
     }
 

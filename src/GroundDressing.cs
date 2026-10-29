@@ -26,14 +26,14 @@ public partial class WorldView {
     private static readonly string DressingShader = $$"""
         shader_type spatial;
         render_mode cull_disabled;
-        uniform sampler2D trial_disturbance : filter_linear, repeat_disable;
+        uniform sampler2D disturbance : filter_linear, repeat_disable;
         // Footpaths worn by walking.
         uniform sampler2D traffic : filter_linear, repeat_disable;
         varying vec3 tint;
         {{Wind.ShaderCode}}
         void vertex() {
             vec2 uv = MODEL_MATRIX[3].xz / {{Terrain.Size}}.0;
-            float wear = max(texture(trial_disturbance, uv).r, texture(traffic, uv).r);
+            float wear = max(texture(disturbance, uv).r, texture(traffic, uv).r);
             VERTEX *= 1.0 - smoothstep(0.12, 0.65, wear);
             #ifndef STILL
             vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
@@ -56,12 +56,12 @@ public partial class WorldView {
         disturbanceImage = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.R8, disturbed);
         disturbanceTexture = ImageTexture.CreateFromImage(disturbanceImage);
         dressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader } };
-        dressingMaterial.SetShaderParameter("trial_disturbance", disturbanceTexture);
+        dressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
         // Closed shapes such as shrubs keep back faces culled, or their unlit insides show where they meet a slope.
         solidDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader.Replace("cull_disabled", "cull_back") } };
-        solidDressingMaterial.SetShaderParameter("trial_disturbance", disturbanceTexture);
+        solidDressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
         stillDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader.Replace("cull_disabled;", "cull_back;\n#define STILL") } };
-        stillDressingMaterial.SetShaderParameter("trial_disturbance", disturbanceTexture);
+        stillDressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
         sceneryShadeImage = Image.CreateFromData(ShadeSize, ShadeSize, false, Image.Format.R8, sceneryShade);
         sceneryShadeTexture = ImageTexture.CreateFromImage(sceneryShadeImage);
         objectShadeImage = Image.CreateFromData(ContactSize, ContactSize, false, Image.Format.Rg8, objectShade);
@@ -110,14 +110,14 @@ public partial class WorldView {
     private void RefreshDressing() {
         if (disturbanceTexture == null) return;
         Array.Clear(disturbed);
-        Stamp(disturbed, World.Spawn, 7.5f, .8f);
-        float across = Terrain.Across(World.Spawn);
-        for (float along = Terrain.Along(World.Spawn); along < Terrain.Coast(across); along += .8f) {
+        Stamp(disturbed, Terrain.Spawn, 7.5f, .8f);
+        float across = Terrain.Across(Terrain.Spawn);
+        for (float along = Terrain.Along(Terrain.Spawn); along < Terrain.Coast(across); along += .8f) {
             var at = Terrain.Point(along, across + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f);
             Stamp(disturbed, at, 1.25f, .85f);
         }
         foreach (var cliff in World.Cliffs) {
-            var at = World.MineSpot(cliff); var outwards = World.MineOut(cliff);
+            var at = World.MineSpot(cliff); var outwards = cliff.Face;
             for (float d = -3; d < 2; d += .75f) Stamp(disturbed, at + outwards * d, 2.6f, .95f);
         }
         foreach (var t in World.S.Things) {

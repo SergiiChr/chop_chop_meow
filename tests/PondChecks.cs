@@ -9,7 +9,7 @@ public static class PondChecks {
             float angle = side * MathF.Tau / 24;
             var direction = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
             var world = new World(data, false);
-            var pond = world.Add("water", Terrain.WaterPoint(World.Spawn), 9999);
+            var pond = world.Add("water", Terrain.WaterPoint(Terrain.Spawn), 9999);
             world.Player = Terrain.WaterPoint(Terrain.Lake + direction * 30) + direction;
             world.S.Backpack.Add("empty_bottle", 1);
             Require(world.Near(pond) && Terrain.WaterRing(world.Player), "Every part of the pond shore must collect water.");
@@ -23,6 +23,6 @@ public static class PondChecks {
             world.Gather(pond, data.GatherSeconds / 2);
             Require(Math.Abs(world.S.Thirst - Water.SipThirst) <= .01 && world.S.Backpack.Count == 0, "Direct drinking must grant one sip and no bottle.");
         }
-        Require(!Terrain.WaterRing(Terrain.Lake) && !Terrain.WaterRing(World.Spawn), "The collection ring must not cover the lake center or distant ground.");
+        Require(!Terrain.WaterRing(Terrain.Lake) && !Terrain.WaterRing(Terrain.Spawn), "The collection ring must not cover the lake center or distant ground.");
     }
 }
