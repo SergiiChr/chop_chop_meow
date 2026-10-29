@@ -13,13 +13,6 @@ namespace ChopChopMeow;
 public partial class Game {
     private static readonly Vector2 NetOre = Terrain.Spawn + new Vector2(2.5f, 2), NetCoal = Terrain.Spawn + new Vector2(-1.5f, 3.5f), NetChest = Terrain.Spawn + new Vector2(.5f, 3), NetHut = Terrain.Spawn + new Vector2(-3.5f, -3);
 
-    private async Task Until(Func<bool> done, string what, double seconds = 60) {
-        for (ulong until = Time.GetTicksMsec() + (ulong)(seconds * 1000); !done();) {
-            Require(Time.GetTicksMsec() <= until, $"{what} never happened.");
-            await Frames(1);
-        }
-    }
-
     private async Task Type(string text) {
         foreach (char c in text) {
             Input.ParseInputEvent(new InputEventKey { Keycode = (Key)c, Unicode = c, Pressed = true });
@@ -113,7 +106,7 @@ public partial class Game {
     /// <summary>Join game on the start menu, the address typed into the popup and the port as it comes; tried again until the host is up.</summary>
     private async Task JoinFromStart() {
         for (ulong until = Time.GetTicksMsec() + 45000; !world.Remote;) {
-            if (Time.GetTicksMsec() > until) throw new TimeoutException($"Network check failed: could not join: {joinStatus?.Text}");
+            if (Time.GetTicksMsec() > until) Require(false, $"joining the host never happened: {joinStatus.Text}");
             await Click(FindButton(screen, "Join game")!);
             var port = (LineEdit)screen.FindChild("port", true, false);
             Require(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
