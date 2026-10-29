@@ -11,6 +11,11 @@ public partial class Game {
         for (int i = 0; i < count; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
     }
     private async Task Seconds(double seconds) => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
+    /// <summary>Waits frame by frame until <paramref name="done"/> holds or <paramref name="limit"/> real seconds pass; the check after it reports a timeout.</summary>
+    private async Task Until(Func<bool> done, double limit) {
+        ulong end = Time.GetTicksMsec() + (ulong)(limit * 1000);
+        while (!done() && Time.GetTicksMsec() < end) await Frames(1);
+    }
     private async Task KeyStroke(Key key) {
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = true });
         await Frames();
@@ -355,7 +360,7 @@ public partial class Game {
         UIRequire(world.S.Torch == 0, "Selecting a torch must not light it.");
         await ClickGround();
         UIRequire(world.S.TorchKindling > 0 && world.S.Backpack["torch"] == 0 && view.PlayerAnimation == ActorAction.Kindle, "The first click must strike flint and steel with the torch in hand.");
-        await Seconds(World.KindleSeconds + .3);
+        await Until(() => world.S.TorchLit, World.KindleSeconds + 2);
         UIRequire(world.S.TorchLit, "The torch must catch after the lighting animation.");
         await ClickGround();
         UIRequire(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Clicking with a lit torch must swing it.");
@@ -417,7 +422,7 @@ public partial class Game {
         await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
         await Click((Control)anomaly.FindChild("anomaly_yes", true, false));
         UIRequire(collapse.Visible && !anomalyWarning.Visible, "Yes must open the black hole.");
-        for (int i = 0; i < 40 && !(singularity.Visible && singularity.Modulate.A > .99f); i++) await Seconds(.25);
+        await Until(() => singularity.Visible && singularity.Modulate.A > .99f, 10);
         UIRequire(singularity.Visible, "The collapse must end on the game over screen.");
         await Click((Control)singularity.FindChild("menu_after_collapse", true, false));
         UIRequire(!anomaly.Visible && backdrop.Visible && FindButton(screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
@@ -453,7 +458,8 @@ public partial class Game {
         // The click lands while the player is still walking, as when running from a wolf.
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.1);
-        await Click(view.Screen(hut.Pos, 1.5f)); await Seconds(1.5);
+        await Click(view.Screen(hut.Pos, 1.5f));
+        await Until(() => world.S.Sheltered == hut.Id && page == "inspect" && selected == hut.Id, 4);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
         UIRequire(world.S.Sheltered == hut.Id && page == "inspect" && selected == hut.Id, "Clicking a cabin while walking must walk the player inside and open it.");
@@ -540,7 +546,7 @@ public partial class Game {
             UIRequire(!menu.Visible && !paused, "Esc must close the pause menu and resume.");
             var start = world.Player;
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
-            await ToSignal(GetTree().CreateTimer(.3), SceneTreeTimer.SignalName.Timeout);
+            await Until(() => view.PlayerAnimation == ActorAction.Walk && world.Player.DistanceTo(start) > .25f && sounds.Last == "footsteps_default", 2);
             UIRequire(view.PlayerAnimation == ActorAction.Walk, "Movement must select the full walking cycle.");
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
             await Frames(); UIRequire(world.Player.DistanceTo(start) > .25f, "WASD must move the player through Godot input.");
@@ -593,8 +599,7 @@ public partial class Game {
             UIRequire(view.Pick(point)?.Id == tree.Id, "Illustrated tree hit area must select the visible resource.");
             var windowPoint = GetViewport().GetFinalTransform() * point;
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-            await Frames(3);
-            await ToSignal(GetTree().CreateTimer(4), SceneTreeTimer.SignalName.Timeout);
+            await Until(() => view.PlayerAnimation == ActorAction.SteelChop && sounds.Last == "chop_tree" && world.S.Backpack["wood"] > wood, 8);
             UIRequire(view.PlayerAnimation == ActorAction.SteelChop, "RMB gathering with the starting axe must select the steel axe stroke.");
             UIRequire(sounds.Last == "chop_tree", "Axe strokes on a tree must play the chop sound.");
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
@@ -604,7 +609,7 @@ public partial class Game {
             var farmPoint = GetViewport().GetFinalTransform() * view.Screen(farm.Pos);
             UIRequire(view.Pick(view.Screen(farm.Pos))?.Id == farm.Id, "A farm plot must be picked where it is drawn.");
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = farmPoint, GlobalPosition = farmPoint, Pressed = true });
-            await ToSignal(GetTree().CreateTimer(3), SceneTreeTimer.SignalName.Timeout);
+            await Until(() => farm.Progress > 0, 6);
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = farmPoint, Pressed = false });
             await Frames(); UIRequire(farm.Progress > 0 && farm.Stage == World.FarmRipe, "Holding RMB on a ripe farm plot must walk over and harvest by hand.");
             world.S.Things.Remove(farm);
@@ -734,9 +739,9 @@ public partial class Game {
             await Frames();
             UIRequire(world.Player == pinnedAt && view.PlayerAnimation == ActorAction.Mauled && deathLabel.Text == "", "A pinned player must not move, must show the mauled struggle and leaves the message to the pinned notice.");
             world.S.Mauled = false; world.S.Wolves.Clear(); world.S.Time = dayTime; world.S.Health = 100;
-            world.S.Health = -1; await Seconds(.3);
+            world.S.Health = -1; await Until(() => world.Dead && deathLabel.Text.Contains("Respawning in"), 2);
             UIRequire(world.Dead && deathLabel.Text.Contains("Respawning in"), "Death must show the respawn countdown.");
-            world.S.RespawnIn = .01f; await Seconds(.3);
+            world.S.RespawnIn = .01f; await Until(() => !world.Dead && deathLabel.Text == "", 2);
             UIRequire(!world.Dead && deathLabel.Text == "", "The countdown must clear once the player respawns.");
 
             await CheckWheelOverPanel();
@@ -779,8 +784,7 @@ public partial class Game {
             UIRequire(furnace.Inventory["iron_bar"] == 4 && world.S.Backpack["iron_bar"] == 1, "Clicking an input slot must return exactly one item.");
             await KeyStroke(Key.Space);
             UIRequire(view.PlayerAnimation == ActorAction.Pump, "Manual bellows input must trigger its dedicated cycle.");
-            await ToSignal(GetTree().CreateTimer(1.2), SceneTreeTimer.SignalName.Timeout);
-            await Frames();
+            await Until(() => view.PlayerAnimation != ActorAction.Pump, 3);
             UIRequire(view.PlayerAnimation != ActorAction.Pump, "The bellows action pulse should finish before pause checks.");
             ClosePanel();
             await KeyStroke(Key.Escape);
@@ -816,7 +820,7 @@ public partial class Game {
             world.S.Backpack.Remove("steel_axe", 99);
             await KeyStroke(Key.Space);
             UIRequire(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
-            await ToSignal(GetTree().CreateTimer(1.1), SceneTreeTimer.SignalName.Timeout);
+            await Until(() => view.PlayerAnimation != ActorAction.Attack, 3);
             var gatheringPosition = World.Spawn - new Vector2(30, 30);
             // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(gatheringPosition) < 12);
@@ -845,7 +849,7 @@ public partial class Game {
             UIRequire(view.Pick(point)?.Id == berryBush.Id, "The bush foliage must select its berry resource.");
             windowPoint = GetViewport().GetFinalTransform() * point;
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
-            await Seconds(world.Data.GatherSeconds + .3f);
+            await Until(() => berryBush.Remaining == 0, world.Data.GatherSeconds + 3);
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
             await Frames(2);
             UIRequire(berryBush.Remaining == 0 && world.S.Backpack["berries"] == 4 && !bushProp.Fruit!.Visible && bushProp.Body.Visible,

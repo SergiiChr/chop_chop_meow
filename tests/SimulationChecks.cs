@@ -80,6 +80,15 @@ public static class SimulationChecks {
         if (!condition) throw new InvalidOperationException($"Simulation check failed: {message}");
     }
 
+    /// <summary>Rewrites a save into an older form, failing when a text it rewrites is missing so the fixture cannot silently stop testing anything.</summary>
+    private static string Patch(string json, params (string Old, string New)[] edits) {
+        foreach (var (old, replacement) in edits) {
+            Require(json.Contains(old), $"save fixture text {old} is missing");
+            json = json.Replace(old, replacement);
+        }
+        return json;
+    }
+
     private static void SetCoins(World world, int coins) {
         world.S.Backpack.Remove(Inventory.Coins, world.Coins);
         world.S.Backpack.Add(Inventory.Coins, coins);
@@ -1668,7 +1677,7 @@ public static class SimulationChecks {
         var furnace = old.Add("furnace", new Vector2(10, 10));
         furnace.Recipe = "burnt_steak"; furnace.Inventory.Add("burnt_steak", 2);
         old.S.Backpack.Add("burnt_steak", 3);
-        var json = old.Serialize().Replace("\"burnt_steak\"", "\"cooked_meat\"");
+        var json = Patch(old.Serialize(), ("\"burnt_steak\"", "\"cooked_meat\""));
         var loaded = EmptyWorld(data);
         loaded.Deserialize(json);
         Require(loaded.S.Backpack["burnt_steak"] == 3 && loaded.Find(furnace.Id) is { Recipe: "burnt_steak" } f && f.Inventory["burnt_steak"] == 2,
@@ -1711,7 +1720,7 @@ public static class SimulationChecks {
         old.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "pick" });
         old.S.Goal = 5;
         // Older saves had steel tools as one item, and iron tools and loose iron that have since left the game.
-        var json = old.Serialize().Replace("\"iron_bar\": 2", "\"steel_tools\": 3").Replace("\"steel_pick\"", "\"iron_pick\"").Replace("\"steel_hammer\"", "\"iron_hammer\"").Replace("\"stone\"", "\"loose_iron\"");
+        var json = Patch(old.Serialize(), ("\"iron_bar\": 2", "\"steel_tools\": 3"), ("\"steel_pick\"", "\"iron_pick\""), ("\"steel_hammer\"", "\"iron_hammer\""), ("\"stone\"", "\"loose_iron\""));
         var loaded = EmptyWorld(data);
         loaded.Deserialize(json);
         Require(loaded.S.Backpack["steel_axe"] == 1 && loaded.S.Backpack["steel_parts"] == 2,
