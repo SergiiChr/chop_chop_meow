@@ -68,7 +68,7 @@ public partial class Game : Node {
         try {
             var data = GameData.Load(); world = launchArgs.Contains("--performance-run") ? PerformanceFixture.Create(data) : new World(data);
             if (launchArgs.Contains("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
-            if (Array.IndexOf(launchArgs, "--render-icons") is int icons and >= 0) { AddChild(new IconRender { Data = data, Folder = launchArgs[icons + 1] }); return; }
+            if (LaunchValue("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
             world.Notify = Notify;
             LoadHotbarAtlases();
             sounds = new Sounds { World = world, MusicVolume = SavedMusicVolume() }; AddChild(sounds);
@@ -932,10 +932,8 @@ public partial class Game : Node {
     }
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
-        var args = launchArgs; int at = Array.IndexOf(args, "--mine-stage");
-        int stage = at >= 0 && at + 1 < args.Length && int.TryParse(args[at + 1], out int n) ? n : World.MineOpen;
-        int ore = Array.IndexOf(args, "--mine-ore");
-        var cliff = World.CliffOf(ore >= 0 && ore + 1 < args.Length ? args[ore + 1] : "iron");
+        int stage = int.TryParse(LaunchValue("--mine-stage"), out int n) ? n : World.MineOpen;
+        var cliff = World.CliffOf(LaunchValue("--mine-ore") ?? "iron");
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
         var mine = world.Build("mine", World.MineSpot(cliff))!;
         mine.Stage = stage; mine.Progress = stage is 0 or World.MineSupplied ? world.MineStageSeconds / 2 : 0;
@@ -943,23 +941,21 @@ public partial class Game : Node {
         world.Add("chest", mine.Pos + cliff.Face * 3 + cliff.Along * 2);
         foreach (var w in world.S.Workers.ToArray()) world.Assign(w, null);
         foreach (var w in world.S.Workers.Take(stage == World.MineOpen ? 3 : 1)) { w.Pos = world.Player; world.Assign(w, mine); }
-        if (stage == World.MineOpen && !args.Contains("--idle")) mine.Output!.Add(World.MineOre(mine), 20);
-        if (args.Contains("--idle")) { foreach (var w in world.S.Workers) world.Assign(w, null); mine.Output!.Add(World.MineOre(mine), 12); mine.Output.Add("stone", 12); }
-        world.S.Time = world.Data.DaySeconds * (args.Contains("--night") ? .55f : .2f);
+        if (stage == World.MineOpen && !launchArgs.Contains("--idle")) mine.Output!.Add(World.MineOre(mine), 20);
+        if (launchArgs.Contains("--idle")) { foreach (var w in world.S.Workers) world.Assign(w, null); mine.Output!.Add(World.MineOre(mine), 12); mine.Output.Add("stone", 12); }
+        world.S.Time = world.Data.DaySeconds * (launchArgs.Contains("--night") ? .55f : .2f);
         for (int i = 0; i < 80; i++) world.Tick(.25f);
-        if (args.Contains("--panel")) Select(mine); else ClosePanel();
+        if (launchArgs.Contains("--panel")) Select(mine); else ClosePanel();
         // Review from between the cart and portal, so either cliff-facing orientation fits in view.
         world.Player = mine.Pos - cliff.Face * .8f;
         view.Zoom = 1.25f;
     }
     private void Showcase() {
-        int environmentAt = Array.IndexOf(launchArgs, "--environment-review");
-        if (environmentAt >= 0) {
-            string location = environmentAt + 1 < launchArgs.Length ? launchArgs[environmentAt + 1] : "forest";
+        if (launchArgs.Contains("--environment-review")) {
+            string location = LaunchValue("--environment-review") ?? "forest";
             float coastAcross = Terrain.Across(Terrain.Spawn);
             var coastCenter = Terrain.Point(Terrain.Coast(coastAcross) - 2, coastAcross);
-            int oreAt = Array.IndexOf(launchArgs, "--mine-ore");
-            var reviewCliff = World.CliffOf(oreAt >= 0 && oreAt + 1 < launchArgs.Length ? launchArgs[oreAt + 1] : "coal");
+            var reviewCliff = World.CliffOf(LaunchValue("--mine-ore") ?? "coal");
             var mineCenter = World.MineSpot(reviewCliff) - reviewCliff.Face * 1.4f;
             world.Player = location switch {
                 "lake" => Terrain.WaterPoint(Terrain.Lake + Terrain.Seaward) + Terrain.Seaward,
@@ -1045,8 +1041,7 @@ public partial class Game : Node {
         world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
         if (launchArgs.Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         // --day-phase sets the time of day from 0 at dawn, for comparing the light across the day.
-        int phase = Array.IndexOf(launchArgs, "--day-phase");
-        if (phase >= 0) world.S.Time = world.Data.DaySeconds * float.Parse(launchArgs[phase + 1], System.Globalization.CultureInfo.InvariantCulture);
+        if (LaunchValue("--day-phase") is string phase) world.S.Time = world.Data.DaySeconds * float.Parse(phase, System.Globalization.CultureInfo.InvariantCulture);
         // A past walk toward the iron cliff leaves explored ground beyond the live sight circle.
         for (float d = 0; d <= 14; d += 2) { world.Player = Terrain.Spawn + new Vector2(d * .5f, -d); world.Tick(0); }
         world.Player = Terrain.Spawn; world.Tick(0); Select(bellows);

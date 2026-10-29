@@ -25,9 +25,8 @@ public partial class Game {
         int WorkersActive, int MachinesActive, int Site, bool Night, bool Settlement, long Pipelines);
 
     private void StartPerformanceRun() {
-        int at = Array.IndexOf(launchArgs, "--performance-run");
-        if (at < 0) return;
-        performanceFolder = at + 1 < launchArgs.Length ? launchArgs[at + 1] : "build/performance";
+        if (!launchArgs.Contains("--performance-run")) return;
+        performanceFolder = LaunchValue("--performance-run") ?? "build/performance";
         Directory.CreateDirectory(performanceFolder);
         HideScreen(); ClosePanel(); paused = false;
         Engine.MaxFps = 0; DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
