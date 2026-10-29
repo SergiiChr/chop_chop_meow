@@ -217,10 +217,8 @@ def build_project(env: dict[str, str]) -> None:
         # exit after editor initialization, with no reported engine errors.
         log = BUILD / "import.log"
         text = log.read_text(errors="replace") if log.is_file() else ""
-        native = ROOT / "addons" / "terrain_3d" / "terrain.gdextension"
         if (
             "import failed (exit -11)" not in str(error)
-            or not native.is_file()
             or "loading_editor_layout" not in text
             or ERRORS.search(text)
         ):
@@ -385,9 +383,8 @@ def package_linux() -> Path:
         BUILD / "data_ChopChopMeow_linuxbsd_x86_64",
         ROOT / "README.md",
         ROOT / "LICENSE",
+        BUILD / "libterrain.linux.release.x86_64.so",
     ]
-    if (ROOT / "addons" / "terrain_3d" / "terrain.gdextension").is_file():
-        paths.append(BUILD / "libterrain.linux.release.x86_64.so")
     archive = BUILD / "ChopChopMeow-linux-x86_64.tar.gz"
     with tarfile.open(archive, "w:gz") as bundle:
         for path in paths:
