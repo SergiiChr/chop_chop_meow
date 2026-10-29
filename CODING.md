@@ -8,6 +8,7 @@ Project rules on top of the global coding guide.
 - C# 14 on .NET 10 with nullable reference types; the build treats every warning as an error.
 - `dotnet format` keeps the style in `.editorconfig`: file-scoped namespaces, opening braces on the same line, four-space indents.
 - Short bodies stay on one line: a guard, a one-statement `if` or a field update chain reads better than a block.
+- A static field in one file of a `partial` class never depends on a static field in another file, since C# sets them up in no fixed order across files.
 - Godot API calls run on the main thread. Pure data work may run in parallel (`Parallel.For` in `Terrain3DView`) when the result is the same as running it in order.
 
 ## Python
@@ -33,6 +34,7 @@ Project rules on top of the global coding guide.
 ## Tests
 
 - Use representative end-to-end checks plus focused edge cases.
+- UI checks live in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` and `src/NetChecks.cs`; a change to a shared check helper covers all three.
 - Input tests go through `Input.ParseInputEvent`, not direct calls to input handlers.
 - Simulation setup may construct fixtures, but tests claiming resource-to-steel progression must gather raw materials and use the actual recipes and trade delays.
 - A fixture built by editing text, such as an old save, fails when the text it edits is missing.
