@@ -648,11 +648,17 @@ public sealed partial class World {
         if (!Near(hut)) return;
         if (SleepBlock() is string blocked) { Say(blocked); return; }
         if (Forwarded("sleep", hut.Id)) return;
-        // Time, wages, trades, hunger and production advance together; no frozen night exploit.
+        PassNight();
+    }
+    /// <summary>Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.</summary>
+    private void PassNight() {
         float seconds = SecondsToDawn;
         asleep = true;
-        while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
-        asleep = false;
+        try {
+            while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
+        } finally {
+            asleep = false;
+        }
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
     /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
