@@ -594,7 +594,7 @@ public partial class Game {
         Require(world.Carried("berries") == berries, "Key 8 must not eat the berries.");
         Require(hotbar.Buttons[7].GetThemeStylebox("normal") == Style.CupWanted, "Key 8 must outline the berries in hand.");
         Require(hotbar.Buttons[2].GetThemeStylebox("normal") != Style.CupWanted, "Key 8 must outline only the slot in hand.");
-        Require(view.BuildMode == null, "Selecting an item must clear any previously state.Selected building plan.");
+        Require(view.BuildMode == null, "Selecting an item must clear any previously selected building plan.");
         int played = sounds.Played;
         await ClickGround();
         Require(world.Carried("berries") == berries - 1, "A left click on open ground must eat the berries in hand.");
@@ -790,7 +790,7 @@ public partial class Game {
         await Until(() => view.PlayerAnimation != ActorAction.Pump, "the bellows action pulse finishing before pause checks", 3);
         return furnace;
     }
-    /// <summary>While state.Paused, Space and the pump button do nothing and animation clocks hold still; nothing plays late after resuming.</summary>
+    /// <summary>While paused, Space and the pump button do nothing and animation clocks hold still; nothing plays late after resuming.</summary>
     private async Task CheckPauseFreezesPumpingAttackAndAnimations(Thing furnace) {
         await CloseWithEsc();
         await KeyStroke(Key.Escape);
@@ -799,13 +799,13 @@ public partial class Game {
         var actionBeforePausedActions = view.PlayerAnimation;
         float pausedActionTime = view.PlayerAnimationTime;
         await KeyStroke(Key.Space);
-        Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "Space must not pump or attack while state.Paused.");
+        Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "Space must not pump or attack while paused.");
         // The pause menu holds world clicks, so a player cannot get here; this proves the button stays dead if a panel ever is open.
         panel.Select(furnace);
         var pumpButton = Named("pump");
-        Require(pumpButton != null, "The state.Selected furnace should still expose its pump control while state.Paused.");
+        Require(pumpButton != null, "The selected furnace should still expose its pump control while paused.");
         await Click(pumpButton!);
-        Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "The pump button must not change heat while state.Paused.");
+        Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "The pump button must not change heat while paused.");
         Require(view.PlayerAnimation == actionBeforePausedActions && Math.Abs(view.PlayerAnimationTime - pausedActionTime) < .001f, "Paused Space and pump-button input must not start an animation pulse.");
         await Click(Named("close")!);
         float animationTime = view.PlayerAnimationTime;
@@ -836,7 +836,7 @@ public partial class Game {
         Require(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
         await Until(() => view.PlayerAnimation != ActorAction.Attack, "the unarmed attack finishing", 3);
         var gatheringPosition = Terrain.Spawn - new Vector2(30, 30);
-        // Full-size tree crowns reach several tiles up the startMenu.Screen, so clear enough room for a clean click.
+        // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
         RemoveThings(world, t => t.Pos.DistanceTo(gatheringPosition) < 12);
         world.Player = gatheringPosition;
         // Far enough that the player has to keep walking after the button is released.

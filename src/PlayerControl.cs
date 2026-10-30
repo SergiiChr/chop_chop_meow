@@ -92,7 +92,7 @@ public sealed class PlayerControl(UiKit kit, WorldView view, SidePanel panel, Ho
                 if (t.Kind == ThingKind.Hut) state.Entering = t;
                 // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
                 if (t.IsStorage && hotbar.ActiveItem() is string item && hotbar.IsTransferable(item) && world.Holds(t, item) && !(t.Kind == ThingKind.Crate && World.IsCrate(item))) {
-                    if (world.Near(t)) { int moved = 0; kit.Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, ItemMoves.All ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) kit.Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else kit.Notify("Walk closer to the chest to store the state.Selected stack.");
+                    if (world.Near(t)) { int moved = 0; kit.Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, ItemMoves.All ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) kit.Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else kit.Notify("Walk closer to the chest to store the selected stack.");
                 }
                 panel.Select(t);
             } else if (hotbar.ActiveItem() is string held && hotbar.HasUse(held)) hotbar.UseHeld(view.ToWorld(mouse.Position));

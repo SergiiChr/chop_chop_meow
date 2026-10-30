@@ -60,7 +60,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // A clean three-bush comparison row, with one picked-clean bush to show its persistent model.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
-            // Bush variants are state.Selected from the id; start the row at variant zero and include all three.
+            // Bush variants are selected from the id; start the row at variant zero and include all three.
             world.S.NextId += (3 - world.S.NextId % 3) % 3;
             world.Add(ThingKind.Berries, at + new Vector2(-2.25f, 2.25f), 24);
             world.Add(ThingKind.Berries, at + new Vector2(-.75f, .75f), 24);
@@ -76,7 +76,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // A clean three-tree comparison row, placed beyond the settlement showcase.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
-            // Tree variants are state.Selected from the id: align the first id to oak, then add spruce and birch.
+            // Tree variants are selected from the id: align the first id to oak, then add spruce and birch.
             world.S.NextId += (3 - world.S.NextId % 3) % 3;
             world.Add(ThingKind.Tree, at + new Vector2(-3, 3), 42);
             world.Add(ThingKind.Tree, at, 42);

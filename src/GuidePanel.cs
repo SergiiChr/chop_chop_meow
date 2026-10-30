@@ -19,7 +19,7 @@ public partial class GuidePanel(SidePanel side) : PagePanel(side) {
             ("key:Hold RMB", "Walk over and gather. On a placed crate, pick it up with what is inside."),
             ("key:LMB", "Select. On open ground, use what is in hand: swing, eat, drink."),
             ("key:E", "Inspect what is nearest."),
-            ("key:Space", "Swing the tool in hand, or pump a state.Selected reinforced furnace."),
+            ("key:Space", "Swing the tool in hand, or pump a selected reinforced furnace."),
             ("key:1–9", "Put a hotbar slot in hand. Drag an item or plan onto a slot to assign it."),
             ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Your crew."), ("key:I", "This guide."),
             ("key:Click / Ctrl-click", "Click moves one item; Ctrl-click moves all of an item. Right-click picks up half."),

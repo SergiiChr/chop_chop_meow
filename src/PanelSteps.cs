@@ -41,7 +41,7 @@ public partial class Game {
     /// <summary>The side panel's title, or nothing while it is closed.</summary>
     private string ShownPage() => panel.Visible ? panel.HeadingTitle.Text : "";
 
-    /// <summary>Whether the side panel shows this thing and the world marks it as state.Selected.</summary>
+    /// <summary>Whether the side panel shows this thing and the world marks it as selected.</summary>
     private bool Shows(Thing thing) => ShownPage() == world.Data.Name(thing.Kind) && view.Selected == thing.Id;
 
     private IEnumerable<Button> Slots() => panel.FindChildren("slot_*", "Button", true, false).Concat(bag.FindChildren("slot_*", "Button", true, false)).OfType<Button>();
