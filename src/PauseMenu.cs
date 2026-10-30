@@ -1,44 +1,55 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
 
 /// <summary>The Esc menu: pauses the world and lists the starter goal chain with the current goal's hint, then the end goals.</summary>
-public partial class Game {
-    private PanelContainer menu = null!;
-    private VBoxContainer goals = null!;
-    private Button hostButton = null!, joinButton = null!, saveButton = null!, loadButton = null!, newGameButton = null!;
-    private Label netLine = null!;
+public partial class PauseMenu : PanelContainer {
+    private readonly UiKit kit;
+    private readonly World world;
+    private readonly Net net;
+    private readonly StartMenu startMenu;
+    private readonly VBoxContainer goals;
+    private readonly Button loadButton = null!, newGameButton = null!;
+    private readonly Label netLine;
+
+    public Button HostButton { get; }
+    public Button JoinButton { get; }
+    public Button SaveButton { get; } = null!;
+    /// <summary>What the menu says about the game being online.</summary>
+    public string NetStatusLine => netLine.Text;
 
     /// <summary>
     /// The pause board: the goal checklist in a well on the left, with the current goal's hint under it and the end goals below,
     /// and the game's buttons stacked on the right.
     /// </summary>
-    private void BuildMenu() {
-        menu = new PanelContainer { Visible = false, CustomMinimumSize = new Vector2(820, 0) };
-        menu.AddThemeStyleboxOverride("panel", Style.Board);
-        menu.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
-        menu.GrowHorizontal = Control.GrowDirection.Both; menu.GrowVertical = Control.GrowDirection.Both;
-        ui.AddChild(menu);
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 16); menu.AddChild(column);
+    /// <param name="leave">Ends a guest's game after the line closes and shows the start menu.</param>
+    public PauseMenu(UiKit kit, Net net, StartMenu startMenu, Action restart, Action quit, Action leave) {
+        this.kit = kit; world = kit.World; this.net = net; this.startMenu = startMenu;
+        Visible = false; CustomMinimumSize = new Vector2(820, 0);
+        AddThemeStyleboxOverride("panel", Style.Board);
+        SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
+        GrowHorizontal = GrowDirection.Both; GrowVertical = GrowDirection.Both;
+        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 16); AddChild(column);
         var title = Style.Heading("Paused", 28); column.AddChild(title);
         var body = new HBoxContainer(); body.AddThemeConstantOverride("separation", 20); column.AddChild(body);
-        var well = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; well.AddThemeStyleboxOverride("panel", Style.Well); body.AddChild(well);
+        var well = new PanelContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; well.AddThemeStyleboxOverride("panel", Style.Well); body.AddChild(well);
         goals = new VBoxContainer(); goals.AddThemeConstantOverride("separation", 6); well.AddChild(goals);
         var side = new VBoxContainer { CustomMinimumSize = new Vector2(220, 0) }; side.AddThemeConstantOverride("separation", 12); body.AddChild(side);
-        var resume = kit.BigButton("Resume · Esc", Style.Brick, CloseMenu); resume.Name = "resume"; side.AddChild(resume);
+        var resume = kit.BigButton("Resume · Esc", Style.Brick, Close); resume.Name = "resume"; side.AddChild(resume);
         foreach (var (text, action) in new (string, Action)[] {
             ("Save", () => startMenu.ShowSlots(true, BackToPause)), ("Load", () => startMenu.ShowSlots(false, BackToPause)), ("Options", () => startMenu.ShowOptions(BackToPause)),
-            ("New game", () => ConfirmLeave("NEW GAME", "Start a new game", () => { startMenu.Close(); Restart(); })), ("Quit", () => ConfirmLeave("QUIT", "Quit to desktop", () => Quit())),
+            ("New game", () => ConfirmLeave("NEW GAME", "Start a new game", () => { startMenu.Close(); restart(); })), ("Quit", () => ConfirmLeave("QUIT", "Quit to desktop", quit)),
         }) {
             var button = MenuButton(text, Style.Enamel, action); button.Name = text.ToLowerInvariant().Replace(' ', '_'); side.AddChild(button);
-            if (text == "Save") saveButton = button;
+            if (text == "Save") SaveButton = button;
             if (text == "Load") loadButton = button;
             if (text == "New game") newGameButton = button;
         }
-        side.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill });
-        hostButton = MenuButton("Host", Style.Sage, HostGame); hostButton.Name = "host"; side.AddChild(hostButton);
-        joinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); DropWorld(); startMenu.ShowStart(); } else startMenu.ShowJoin(BackToPause, true); }); joinButton.Name = "join_game"; side.AddChild(joinButton);
+        side.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
+        HostButton = MenuButton("Host", Style.Sage, HostGame); HostButton.Name = "host"; side.AddChild(HostButton);
+        JoinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
         netLine = Style.Text("", 13, Style.Beige); netLine.HorizontalAlignment = HorizontalAlignment.Center; netLine.AutowrapMode = TextServer.AutowrapMode.WordSmart; side.AddChild(netLine);
     }
 
@@ -58,11 +69,12 @@ public partial class Game {
 
     private static Label GoalMark(bool done, bool current) {
         var mark = Style.Pill(done ? "✓" : "", done ? Style.Round(Style.Sage, 12).Item1 : current ? Style.Round(Style.Mustard, 12).Item1 : Style.GoalTodo, Style.Rim, 13);
-        mark.CustomMinimumSize = new Vector2(24, 24); mark.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; mark.VerticalAlignment = VerticalAlignment.Center;
+        mark.CustomMinimumSize = new Vector2(24, 24); mark.SizeFlagsVertical = SizeFlags.ShrinkCenter; mark.VerticalAlignment = VerticalAlignment.Center;
         return mark;
     }
 
-    private void OpenMenu() {
+    /// <summary>Opens the board up to date with the goals and the game's online state, and holds the player.</summary>
+    public void Open() {
         foreach (var child in goals.GetChildren()) child.QueueFree();
         goals.AddChild(Style.WellLabel("Getting started"));
         // Goals already met shrink to a row of ticks, named on hover; the current goal sits in a framed box with its hint.
@@ -90,22 +102,34 @@ public partial class Game {
         streak.AddChild(new Control { CustomMinimumSize = new Vector2(70, 0) });
         int days = Math.Min(world.ProfitStreak, target.ProfitDays);
         for (int i = 0; i < target.ProfitDays; i++) {
-            var day = new Panel { CustomMinimumSize = new Vector2(26, 10), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter, TooltipText = i < days ? "A day at the target" : "A day still to go" };
+            var day = new Panel { CustomMinimumSize = new Vector2(26, 10), SizeFlagsVertical = SizeFlags.ShrinkCenter, TooltipText = i < days ? "A day at the target" : "A day still to go" };
             day.AddThemeStyleboxOverride("panel", i < days ? Style.BarGrow : Style.BarBack); streak.AddChild(day);
         }
         string yesterday = world.S.Profits.Count > 0 ? $"yesterday {world.S.Profits[^1]}" : "no day finished yet";
         var profit = Style.Text($"Profit is sale coins minus wages · {yesterday} · today's sales {world.S.DayRevenue}", 13, Style.Tan); profit.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         goals.AddChild(profit);
-        hostButton.Disabled = net.Online; hostButton.Text = net.Hosting ? "Hosting" : "Host";
+        HostButton.Disabled = net.Online; HostButton.Text = net.Hosting ? "Hosting" : "Host";
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.
-        joinButton.Text = world.Remote ? "Leave game" : "Join"; joinButton.Disabled = net.Hosting; saveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = world.Remote;
+        JoinButton.Text = world.Remote ? "Leave game" : "Join"; JoinButton.Disabled = net.Hosting; SaveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = world.Remote;
         netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
-        menu.Visible = true; state.Paused = true;
+        Visible = true; kit.State.Paused = true;
     }
 
-    private void BackToPause() { startMenu.Close(); OpenMenu(); }
+    private void BackToPause() { startMenu.Close(); Open(); }
 
-    private void CloseMenu() { menu.Visible = false; state.Paused = false; }
+    public void Close() { Visible = false; kit.State.Paused = false; }
+
+    private void HostGame() {
+        var error = net.Host();
+        if (error != Error.Ok) { kit.Notify($"Could not host on port {Net.DefaultPort}: {error}."); return; }
+        var addresses = IP.GetLocalAddresses().Where(a => a.Contains('.') && !a.StartsWith("127.") && !a.StartsWith("169.254.")).Take(2).ToArray();
+        kit.Notify($"Hosting on port {Net.DefaultPort}. Others join with {(addresses.Length > 0 ? string.Join(" or ", addresses) : "this computer's address")}.");
+        Close();
+    }
+
+    /// <summary>A line for the pause menu while the game is online.</summary>
+    private string NetStatus() => net.Hosting ? $"Hosting on port {Net.DefaultPort} · {net.Guests} {(net.Guests == 1 ? "guest" : "guests")}"
+        : world.Remote ? "Playing in the host's world. Your player saves on this computer." : "";
 
     /// <summary>Asks before leaving the settlement, since anything done after the last save would be lost.</summary>
     private void ConfirmLeave(string heading, string confirm, Action leave) {

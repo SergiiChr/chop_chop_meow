@@ -4,7 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Hosting the current game, and what happens around joining and leaving.</summary>
+/// <summary>What happens around joining and leaving.</summary>
 public partial class Game {
     private void ConnectNet() {
         net.Said += Notify;
@@ -16,18 +16,6 @@ public partial class Game {
         net.Left += reason => { startMenu.LeftReason = reason; DropWorld(); startMenu.ShowStart(); };
         net.Failed += reason => startMenu.ShowJoinFailure(reason);
     }
-
-    private void HostGame() {
-        var error = net.Host();
-        if (error != Error.Ok) { Notify($"Could not host on port {Net.DefaultPort}: {error}."); return; }
-        var addresses = IP.GetLocalAddresses().Where(a => a.Contains('.') && !a.StartsWith("127.") && !a.StartsWith("169.254.")).Take(2).ToArray();
-        Notify($"Hosting on port {Net.DefaultPort}. Others join with {(addresses.Length > 0 ? string.Join(" or ", addresses) : "this computer's address")}.");
-        CloseMenu();
-    }
-
-    /// <summary>A line for the pause menu while the game is online.</summary>
-    private string NetStatus() => net.Hosting ? $"Hosting on port {Net.DefaultPort} · {net.Guests} {(net.Guests == 1 ? "guest" : "guests")}"
-        : world.Remote ? "Playing in the host's world. Your player saves on this computer." : "";
 
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
     private void ShowReconnecting() { DropWorld(); startMenu.ShowReconnecting(); }

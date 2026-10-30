@@ -28,13 +28,13 @@ public partial class Game {
         world.Add(ThingKind.LooseCoal, NetOre, 2); world.Add(ThingKind.LooseCoal, NetCoal, 2);
         var chest = world.Add(ThingKind.Chest, NetChest); var hut = world.Add(ThingKind.Hut, NetHut);
         await KeyStroke(Key.Escape);
-        await Click(hostButton);
+        await Click(menu.HostButton);
         Require(net.Hosting && !menu.Visible, "Host in the pause menu must open the current game to guests and close the menu.");
         Require(await PlayerWalks(), "After hosting the player must be able to walk again.");
         await KeyStroke(Key.Escape);
         float before = world.Time;
         await Until(() => world.Time > before, "the world going on behind the host's pause menu", 5);
-        Require(menu.Visible && netLine.Text.StartsWith("Hosting on port 24565"), "While hosting, the pause menu must say so.");
+        Require(menu.Visible && menu.NetStatusLine.StartsWith("Hosting on port 24565"), "While hosting, the pause menu must say so.");
         await KeyStroke(Key.Escape);
 
         PlayerState Guest() => world.Players.Single(p => p != world.Me);
@@ -49,7 +49,7 @@ public partial class Game {
         // The guest's line drops with the host, and it returns once the same port opens again.
         await Signaled("joined");
         net.Leave();
-        await KeyStroke(Key.Escape); await Click(hostButton);
+        await KeyStroke(Key.Escape); await Click(menu.HostButton);
         await Until(() => world.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest reconnecting by itself with its coal", 90);
         await Until(() => world.Players.Count == 1, "the guest leaving again");
         await Until(() => world.Players.Count == 2, "the guest coming back with a broken save");
@@ -58,7 +58,7 @@ public partial class Game {
         await Signaled("joined");
         net.Leave();
         await Signaled("stopped");
-        await KeyStroke(Key.Escape); await Click(hostButton);
+        await KeyStroke(Key.Escape); await Click(menu.HostButton);
         await Until(() => world.Players.Count == 2, "the guest joining by hand after it stopped trying", 90);
         await Signaled("joined");
     }

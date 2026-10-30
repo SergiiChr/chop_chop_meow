@@ -67,8 +67,8 @@ public partial class Game {
 
     private async Task LeaveGame() {
         await CloseWithEsc(); await KeyStroke(Key.Escape);
-        Require(menu.Visible && joinButton.Text == "Leave game" && saveButton.Disabled, "A guest's pause menu must offer to leave and not to save the host's world.");
-        await Click(joinButton);
+        Require(menu.Visible && menu.JoinButton.Text == "Leave game" && menu.SaveButton.Disabled, "A guest's pause menu must offer to leave and not to save the host's world.");
+        await Click(menu.JoinButton);
         Require(!world.Remote && startMenu.Visible && Godot.FileAccess.FileExists(GuestSave), "Leaving must save the guest's player and return to the start menu.");
     }
 }

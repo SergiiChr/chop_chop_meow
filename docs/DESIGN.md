@@ -53,7 +53,7 @@ UI and input:
 | File | Owns |
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input, save/load, the main game loop and command-line review flags |
-| `src/Menu.cs` | The pause menu with the goal chain |
+| `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
 | `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, how a player action runs, the buttons), `UiState` and `LiveText` |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/Hud.cs` | The clock plate and the mode, full-bottle and death labels |
@@ -91,7 +91,7 @@ UI and input:
 | `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots, the settings file and the command line |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
-| `src/NetMenu.cs` | Hosting, and what happens around joining and leaving |
+| `src/NetMenu.cs` | What happens around joining and leaving |
 
 Rendering and sound:
 

@@ -38,6 +38,7 @@ public partial class Game : Node {
     private Net net = null!;
     private Saves saves = null!;
     private StartMenu startMenu = null!;
+    private PauseMenu menu = null!;
     /// <summary>Health as last shown, so a guest flashes the damage its updates bring.</summary>
     private float shownHealth;
     private float runTime;
@@ -119,8 +120,9 @@ public partial class Game : Node {
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         needsPlate = new NeedsPlate(kit, moves, damageEdges); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
-        ending = new EndingScreen(kit, panel.Close, Restart); ui.AddChild(ending); BuildMenu();
-        startMenu = new StartMenu(kit, saves, net, panel, ending, () => menu.Visible = false, Restart, () => Quit()); ui.AddChild(startMenu);
+        ending = new EndingScreen(kit, panel.Close, Restart); ui.AddChild(ending);
+        startMenu = new StartMenu(kit, saves, net, panel, ending, () => menu.Visible = false, Restart, () => Quit());
+        menu = new PauseMenu(kit, net, startMenu, Restart, () => Quit(), () => { DropWorld(); startMenu.ShowStart(); }); ui.AddChild(menu); ui.AddChild(startMenu);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
         RefreshLive();
     }
@@ -152,11 +154,11 @@ public partial class Game : Node {
         if (world == null || view == null || ending.Visible) return;
         if (blackHole.Showing) { if (blackHole.Asking && ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) blackHole.Cancel(); return; }
         if (startMenu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) startMenu.Back(); return; }
-        if (menu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) CloseMenu(); return; }
+        if (menu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) menu.Close(); return; }
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
                 case Key.Escape:
-                    if (view.BuildMode != null || state.AssigningWorker > 0) { view.BuildMode = null; state.AssigningWorker = 0; } else if (panel.Visible || bag.Visible) panel.Close(); else OpenMenu();
+                    if (view.BuildMode != null || state.AssigningWorker > 0) { view.BuildMode = null; state.AssigningWorker = 0; } else if (panel.Visible || bag.Visible) panel.Close(); else menu.Open();
                     RefreshLive(); break;
                 case Key.B: panel.Open("build"); break;
                 case Key.I: if (state.Page == "help") panel.Close(); else panel.Open("help"); break;
@@ -422,7 +424,7 @@ public partial class Game : Node {
         if (Launch.Has("--crew")) panel.Open("workers");
         if (Launch.Has("--worker")) panel.Select(world.S.Workers[0]);
         if (Launch.Has("--guide")) panel.Open("help");
-        if (Launch.Has("--menu")) { panel.Close(); OpenMenu(); }
+        if (Launch.Has("--menu")) { panel.Close(); menu.Open(); }
         if (Launch.Has("--furnace")) { world.Player = bellows.Pos + Vector2.One; panel.Select(bellows); }
         if (Launch.Has("--piles")) {
             var at = Terrain.Spawn + new Vector2(-3, 9);
