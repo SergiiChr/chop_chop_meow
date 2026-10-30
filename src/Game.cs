@@ -46,6 +46,7 @@ public partial class Game : Node {
     private string placingCrate = "";
     private UiKit kit = null!;
     private EndingScreen ending = null!;
+    private BlackHole blackHole = null!;
     private UiState state = null!;
     private float uiClock;
     private float autosave;
@@ -178,7 +179,9 @@ public partial class Game : Node {
         // Raised above the centred player so a downed body stays visible under the message.
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
-        BuildNeeds(); ending = new EndingScreen(kit, ClosePanel, Restart); ui.AddChild(ending); BuildMenu(); BuildScreens(); BuildAnomaly(); RefreshLive();
+        BuildNeeds(); ending = new EndingScreen(kit, ClosePanel, Restart); ui.AddChild(ending); BuildMenu(); BuildScreens();
+        blackHole = new BlackHole(kit, view, ui.Theme, ClosePanel, LatestSlot, LoadSlot, ShowStart); AddChild(blackHole);
+        RefreshLive();
     }
     private void Notify(string message) {
         if (message == Water.FullBottleWarning && waterWarning != null) { waterWarning.Text = message; waterWarningClock = 7; } else messages?.Post(message);
@@ -730,7 +733,7 @@ public partial class Game : Node {
     public override void _UnhandledInput(InputEvent ev) {
         if (view?.EnvironmentReview == true) return;
         if (world == null || view == null || ending.Visible) return;
-        if (anomaly.Visible) { if (anomalyWarning.Visible && ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) CancelAnomaly(); return; }
+        if (blackHole.Showing) { if (blackHole.Asking && ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) blackHole.Cancel(); return; }
         if (backdrop.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) screenBack?.Invoke(); return; }
         if (menu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) CloseMenu(); return; }
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
@@ -1084,8 +1087,8 @@ public partial class Game : Node {
         };
         if (launchArgs.Contains("--torch")) { world.Player = Terrain.Spawn + new Vector2(-5, 6); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!launchArgs.Contains("--kindle")) world.Tick(World.KindleSeconds); ClosePanel(); view.Zoom = 1.6f; }
         if (launchArgs.Contains("--crate")) { world.Player = crate.Pos + Vector2.One; Select(crate); }
-        if (launchArgs.Contains("--anomaly")) { world.Player = crate.Pos + Vector2.One; CrateIntoCrate(crate, crate.Inventory, "crate"); }
-        if (launchArgs.Contains("--collapse")) { world.Player = crate.Pos + Vector2.One; ClosePanel(); CrateIntoCrate(crate, crate.Inventory, "crate"); Collapse(crate); }
+        if (launchArgs.Contains("--anomaly")) { world.Player = crate.Pos + Vector2.One; blackHole.CrateIntoCrate(crate, crate.Inventory, "crate"); }
+        if (launchArgs.Contains("--collapse")) { world.Player = crate.Pos + Vector2.One; ClosePanel(); blackHole.CrateIntoCrate(crate, crate.Inventory, "crate"); blackHole.Collapse(crate); }
         if (launchArgs.Contains("--lunch")) {
             // Lunch review: the crew has walked over and sat down around the campfire, with the pay overview open.
             world.S.Time = (world.Data.LunchHour - 6) / 24 * world.Data.DaySeconds;

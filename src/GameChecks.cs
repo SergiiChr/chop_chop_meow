@@ -344,7 +344,7 @@ public partial class Game {
         string lastSlot = world.HotbarSlots[8]; int active = world.ActiveHotbar;
         Give(world, "crate", 1); SetHotbarSlot(world, 8, "crate"); await KeyStroke(Key.Key9); await CloseWithEsc();
         await Click(view.Screen(crate.Pos, .4f));
-        Require(!anomaly.Visible, "Clicking a crate with a crate in hand must not show the nesting alert.");
+        Require(!blackHole.Showing, "Clicking a crate with a crate in hand must not show the nesting alert.");
         Require(Shows(crate), "Clicking a crate with a crate in hand must select the clicked crate.");
         Require(crate.Inventory.Count == 0, "Clicking a crate with a crate in hand must not put the crate in hand into it.");
         Require(world.Carried("crate") == 1, "Clicking a crate with a crate in hand must keep the crate in hand.");
@@ -362,18 +362,18 @@ public partial class Game {
         RemoveThings(world, t => t.Kind == ThingKind.Crate && t != crate && t.Inventory.Count == 0);
         await ClickOn(crate);
         await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
-        Require(anomaly.Visible, "A crate dragged into a crate must show the nesting alert.");
-        Require(anomalyWarning.Visible, "A crate dragged into a crate must show the nesting warning.");
+        Require(blackHole.Showing, "A crate dragged into a crate must show the nesting alert.");
+        Require(blackHole.Asking, "A crate dragged into a crate must show the nesting warning.");
         Require(world.Carried(packed) == 1, "A crate dragged into a crate must stay in the backpack.");
         Require(crate.Inventory.Count == 0, "A crate dragged into a crate must leave the target crate empty.");
-        await Click((Control)anomaly.FindChild("anomaly_no", true, false));
-        Require(!anomaly.Visible && world.Carried(packed) == 1 && world.Find(crate.Id) != null, "No must cancel and keep both crates.");
+        await Click((Control)blackHole.FindChild("anomaly_no", true, false));
+        Require(!blackHole.Showing && world.Carried(packed) == 1 && world.Find(crate.Id) != null, "No must cancel and keep both crates.");
         await DragTo(await Showing(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
-        await Click((Control)anomaly.FindChild("anomaly_yes", true, false));
-        Require(collapse.Visible && !anomalyWarning.Visible, "Yes must open the black hole.");
-        await Until(() => singularity.Visible && singularity.Modulate.A > .99f, "the collapse ending on the game over screen", 10);
-        await Click((Control)singularity.FindChild("menu_after_collapse", true, false));
-        Require(!anomaly.Visible && backdrop.Visible && FindButton(screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
+        await Click((Control)blackHole.FindChild("anomaly_yes", true, false));
+        Require(blackHole.Collapsing && !blackHole.Asking, "Yes must open the black hole.");
+        await Until(() => blackHole.GameOverShown, "the collapse ending on the game over screen", 10);
+        await Click((Control)blackHole.FindChild("menu_after_collapse", true, false));
+        Require(!blackHole.Showing && backdrop.Visible && FindButton(screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
     }
 
     private async Task CheckMouseWheelOverPanelDoesNotZoom() {

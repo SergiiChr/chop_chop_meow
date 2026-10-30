@@ -136,6 +136,9 @@ public partial class Game {
         var window = GetWindow(); window.Mode = Window.ModeEnum.Windowed; window.Size = size; window.MoveToCenter();
     }
 
+    /// <summary>The save the player was using, else the most recent one, or -1 when there is none.</summary>
+    private int LatestSlot() => slot > 0 && SlotUsed(slot) ? slot : Enumerable.Range(0, SlotCount + 1).Where(SlotUsed).OrderByDescending(SavedAt).DefaultIfEmpty(-1).First();
+
     private void LoadSlot(int n) {
         if (!Load(n)) return;
         HideScreen(); ending.Visible = false;

@@ -68,7 +68,7 @@ public partial class Game {
     }
 
     /// <summary>Replaces the world with a new one and closes everything that showed the old one.</summary>
-    private void DropWorld() { world.NewGame(); ClosePanel(); ending.Visible = false; EndAnomaly(); }
+    private void DropWorld() { world.NewGame(); ClosePanel(); ending.Visible = false; blackHole.End(); }
 
     private void OnJoined(bool back) {
         StoreSetting("net", "address", net.Address);

@@ -111,7 +111,7 @@ public partial class Game {
     private void MoveStack(Inventory from, Inventory to, string item, Thing near) {
         if (!world.Near(near)) { Notify("Walk closer first."); return; }
         if (world.BoxBlock(near, to, item) is string refused) { Notify(refused); return; }
-        if (CrateIntoCrate(near, to, item)) return;
+        if (blackHole.CrateIntoCrate(near, to, item)) return;
         world.Transfer(from, to, item, MoveAll ? from[item] : 1);
     }
 
@@ -119,7 +119,7 @@ public partial class Game {
     private int MoveDrag(ItemDrag drag, Inventory to, Thing? container, int target = -1) {
         if ((drag.Container ?? container) is Thing near && !world.Near(near)) { Notify("Walk closer first."); return 0; }
         if (drag.From != to && container != null && world.BoxBlock(container, to, drag.Item) is string refused) { Notify(refused); return 0; }
-        if (CrateIntoCrate(container, to, drag.Item) || drag.From == null) return 0;
+        if (blackHole.CrateIntoCrate(container, to, drag.Item) || drag.From == null) return 0;
         if (target >= 0 && drag.SourceSlot >= 0) {
             if (drag.From == to && drag.SourceSlot == target) return 0;
             int moved = world.TransferSlot(drag.From, to, drag.SourceSlot, target, drag.Item, drag.Count);
