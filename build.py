@@ -212,6 +212,8 @@ def run_godot(
         raise SystemExit(
             f"{name} failed (exit {result.returncode}{detail}); see {log.relative_to(ROOT)}"
         )
+    if success_marker is not None:
+        print(f"{success_marker} ({log.relative_to(ROOT)})")
 
 
 def build_project(env: dict[str, str]) -> None:
