@@ -5,12 +5,31 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Pieces every panel is built from, so each screen looks and works alike.</summary>
-public partial class Game {
-    /// <summary>Which job's worker list is open under its button, so a rebuilt page keeps it open.</summary>
-    private string openJob = "";
-    /// <summary>Whether the filter window is open beside the panel, and whether its item list is shown.</summary>
-    private bool filterOpen, filterPicking;
+/// <summary>A page of the side panel, and the pieces every page is built from, so each screen looks and works alike.</summary>
+public partial class PagePanel : VBoxContainer {
+    private readonly SidePanel panel;
+    private readonly UiKit kit;
+    private readonly World world;
+    private readonly UiState state;
+    private readonly WorldView view;
+    private readonly Sounds sounds;
+    private readonly ItemMoves moves;
+    private readonly PageMemory memory;
+    private readonly BackpackDrawer bag;
+    private readonly List<Action> live;
+    private readonly string pageName;
+    /// <summary>Where the pieces go: this page, or for a moment another column being filled.</summary>
+    private Control content;
+    private HBoxContainer heading => panel.Heading;
+    private TextureRect headingIcon => panel.HeadingIcon;
+    private Label headingTitle => panel.HeadingTitle;
+
+    public PagePanel(SidePanel panel, string pageName) {
+        this.panel = panel; this.pageName = pageName;
+        kit = panel.Kit; world = kit.World; state = kit.State; sounds = kit.Sounds; view = panel.View; moves = panel.Moves; memory = panel.Memory; bag = panel.Bag; live = panel.Live;
+        content = this; SizeFlagsHorizontal = SizeFlags.ExpandFill;
+    }
+
     private static readonly Dictionary<string, string> JobNames = new() {
         ["gather"] = "Gather",
         ["bellows"] = "Bellows",
@@ -36,8 +55,8 @@ public partial class Game {
 
     /// <summary>The funnel that opens the filter window beside the panel, ringed while it is open.</summary>
     private void FilterButton(Thing t) {
-        var button = HeaderAction("filter", "Filters: what workers bring and take", () => { filterOpen = !filterOpen; filterPicking = false; OpenPage("inspect"); }, Style.FilterRound, "filters");
-        if (filterOpen) { Style.Skin(button, Style.Round(Style.Mustard, 18).Item1, Style.FilterRound.Hover); FilterWindow(t); }
+        var button = HeaderAction("filter", "Filters: what workers bring and take", () => { memory.FilterOpen = !memory.FilterOpen; memory.FilterPicking = false; panel.Open("inspect"); }, Style.FilterRound, "filters");
+        if (memory.FilterOpen) { Style.Skin(button, Style.Round(Style.Mustard, 18).Item1, Style.FilterRound.Hover); FilterWindow(t); }
     }
 
     /// <summary>A beige well inside the panel, holding a row or column of things.</summary>
@@ -107,7 +126,7 @@ public partial class Game {
         for (int i = 0; i < jobs.Length; i++) {
             string job = jobs[i];
             var look = Style.Pill(Style.JobColors[i % Style.JobColors.Length]);
-            var button = new Button { Name = $"job_{job}", CustomMinimumSize = new Vector2(0, 48), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand, ToggleMode = true, ButtonPressed = openJob == job };
+            var button = new Button { Name = $"job_{job}", CustomMinimumSize = new Vector2(0, 48), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand, ToggleMode = true, ButtonPressed = memory.OpenJob == job };
             Style.Skin(button, look.Item1, look.Item2, look.Item2);
             button.TooltipText = JobHint(t, job);
             var inner = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = Control.MouseFilterEnum.Ignore }; inner.AddThemeConstantOverride("separation", 8);
@@ -124,10 +143,10 @@ public partial class Game {
                 if (n == shown) return;
                 shown = n; count.Text = n.ToString();
             });
-            button.Pressed += () => { openJob = openJob == job ? "" : job; OpenPage("inspect"); };
+            button.Pressed += () => { memory.OpenJob = memory.OpenJob == job ? "" : job; panel.Open("inspect"); };
             row.AddChild(button);
         }
-        if (openJob != "" && jobs.Contains(openJob)) WorkerList(t, openJob);
+        if (memory.OpenJob != "" && jobs.Contains(memory.OpenJob)) WorkerList(t, memory.OpenJob);
     }
 
     private string JobHint(Thing t, string job) => job switch {
@@ -156,7 +175,7 @@ public partial class Game {
             tick.AddThemeColorOverride("font_color", Style.Ink); tick.AddThemeColorOverride("font_hover_color", Style.Ink); tick.AddThemeColorOverride("font_pressed_color", Style.Ink); tick.AddThemeColorOverride("font_hover_pressed_color", Style.Ink);
             tick.AddThemeFontOverride("font", Style.Bold);
             // A full mine refuses the worker, so the box shows what actually happened.
-            tick.Toggled += on => { world.SetDuty(worker, t, job, on); tick.SetPressedNoSignal(World.HasDuty(worker, t.Id, job)); RefreshLive(); };
+            tick.Toggled += on => { world.SetDuty(worker, t, job, on); tick.SetPressedNoSignal(World.HasDuty(worker, t.Id, job)); kit.Refresh(); };
             line.AddChild(tick);
             var elsewhere = w.Duties.Where(d => d.Thing != t.Id).ToList();
             if (elsewhere.Count == 0) continue;
@@ -167,26 +186,18 @@ public partial class Game {
         }
     }
 
-    /// <summary>The board beside the panel, for the price sign or the filter window; it hangs left of the panel.</summary>
-    private VBoxContainer SideBoard(StyleBox look, float width) {
-        side.AddThemeStyleboxOverride("panel", look);
-        side.Visible = true; sheet.Visible = true; sheet.CustomMinimumSize = new Vector2(width, 0);
-        panel.OffsetLeft = PanelLeft - width - 56;
-        return sheet;
-    }
-
     /// <summary>
     /// The one filter window for any storage that has filters: a row of what workers bring and one of what they take.
     /// Drop an item on a row to add it, click one to take it off; an empty row allows anything.
     /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
     /// </summary>
     private void FilterWindow(Thing t) {
-        var board = SideBoard(Style.Board, 340);
+        var board = panel.SideBoard(Style.Board, 340);
         var top = new HBoxContainer(); top.AddThemeConstantOverride("separation", 10); board.AddChild(top);
         top.AddChild(Style.Glyph("line_filter", 28, Style.Rim));
         var title = Style.Heading("Filters", 22); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);
         top.AddChild(Style.Icon(Icons.Of(t.Kind.Id()), 32));
-        top.AddChild(kit.HeaderButton("close", "Close the filters", () => { filterOpen = false; filterPicking = false; OpenPage("inspect"); }, Style.CloseRound, "filters_close"));
+        top.AddChild(kit.HeaderButton("close", "Close the filters", () => { memory.FilterOpen = false; memory.FilterPicking = false; panel.Open("inspect"); }, Style.CloseRound, "filters_close"));
         bool post = t.Kind == ThingKind.Signpost;
         foreach (bool output in post ? new[] { false } : new[] { false, true }) {
             var filter = output ? t.Inventory.OutputFilter : t.Inventory.InputFilter;
@@ -198,35 +209,34 @@ public partial class Game {
             foreach (string item in filter.OrderBy(FilterName)) {
                 var cell = FilterCell($"filter_{(output ? "out" : "in")}_{item}", item); cell.TooltipText = $"{FilterName(item)}\nClick to take it off";
                 string id = item;
-                cell.Pressed += () => { world.SetFilter(t, id, output, false); OpenPage("inspect"); };
+                cell.Pressed += () => { world.SetFilter(t, id, output, false); panel.Open("inspect"); };
                 row.AddChild(cell);
             }
             if (filter.Count == 0) { var any = Style.Text(post ? "no deliveries" : "anything", 14, Style.Tan); any.CustomMinimumSize = new Vector2(0, 44); row.AddChild(any); }
             var (add, _) = ItemSlot.Cup($"filter_add_{(output ? "out" : "in")}", 44);
             add.Text = "+"; add.AddThemeFontSizeOverride("font_size", 22); add.AddThemeColorOverride("font_color", Style.Tan);
             add.TooltipText = "Add an item · or drop one from your backpack";
-            add.Pressed += () => { filterPicking = !filterPicking; pickingOutput = output; OpenPage("inspect"); };
+            add.Pressed += () => { memory.FilterPicking = !memory.FilterPicking; memory.PickingOutput = output; panel.Open("inspect"); };
             add.CanTake = drag => drag.From != null && (!World.PackedKind(drag.Item).IsEmpty || !post && world.Data.Items.ContainsKey(drag.Item));
             // The item stays where it was: a filter only names it, or for a packed crate the kind of crate it is.
             add.Take = drag => {
                 var kind = World.PackedKind(drag.Item);
-                world.SetFilter(t, kind.IsEmpty ? drag.Item : new string(kind), output, true); Callable.From(() => OpenPage("inspect")).CallDeferred(); return 0;
+                world.SetFilter(t, kind.IsEmpty ? drag.Item : new string(kind), output, true); Callable.From(() => panel.Open("inspect")).CallDeferred(); return 0;
             };
             row.AddChild(add);
         }
-        if (filterPicking) {
+        if (memory.FilterPicking) {
             var picker = new GridContainer { Columns = 6 }; picker.AddThemeConstantOverride("h_separation", 6); picker.AddThemeConstantOverride("v_separation", 6);
             var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); well.AddChild(picker); board.AddChild(well);
             var crates = world.Data.Market.Sells.Keys.Select(World.CrateOf).Where(id => post || world.Holds(t, id));
             foreach (var id in (post ? crates : world.Data.Items.Keys.Where(id => world.Holds(t, id)).Concat(crates)).OrderBy(FilterName)) {
                 var cell = FilterCell($"pick_{id}", id); cell.TooltipText = FilterName(id);
-                cell.Pressed += () => { world.SetFilter(t, id, pickingOutput, true); filterPicking = false; OpenPage("inspect"); };
+                cell.Pressed += () => { world.SetFilter(t, id, memory.PickingOutput, true); memory.FilterPicking = false; panel.Open("inspect"); };
                 picker.AddChild(cell);
             }
         }
-        var clear = kit.Button(post ? "Clear" : "Clear both", () => { world.ClearFilters(t); OpenPage("inspect"); }); clear.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; board.AddChild(clear);
+        var clear = kit.Button(post ? "Clear" : "Clear both", () => { world.ClearFilters(t); panel.Open("inspect"); }); clear.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; board.AddChild(clear);
     }
-    private bool pickingOutput;
 
     /// <summary>What a filter entry names: an item, or a crate of a good.</summary>
     private string FilterName(string id) => world.CrateGood(id) is string good ? $"Crate of {world.Data.Name(good).ToLowerInvariant()}" : world.Data.Name(id);

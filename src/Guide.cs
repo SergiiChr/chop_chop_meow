@@ -6,10 +6,7 @@ namespace ChopChopMeow;
 /// The field guide: round tabs for its topics beside short tips, each led by the item or key it is about.
 /// Keys show as key caps; everything else as the item's icon in a cup.
 /// </summary>
-public partial class Game {
-    /// <summary>The guide topic shown, kept while the page is rebuilt.</summary>
-    private string guideTab = "controls";
-
+public partial class PagePanel {
     private static readonly (string Key, string Glyph, string Title)[] GuideTopics = {
         ("controls", "line_mouse", "Controls"), ("steel", "line_flame", "Iron and steel"), ("craft", "line_craft", "Crafting"),
         ("crew", "line_crew", "Crew and storage"), ("survive", "line_moon", "Staying alive"), ("trade", "line_cart", "Trade")
@@ -22,7 +19,7 @@ public partial class Game {
             ("key:Hold RMB", "Walk over and gather. On a placed crate, pick it up with what is inside."),
             ("key:LMB", "Select. On open ground, use what is in hand: swing, eat, drink."),
             ("key:E", "Inspect what is nearest."),
-            ("key:Space", "Swing the tool in hand, or pump a selected reinforced furnace."),
+            ("key:Space", "Swing the tool in hand, or pump a state.Selected reinforced furnace."),
             ("key:1–9", "Put a hotbar slot in hand. Drag an item or plan onto a slot to assign it."),
             ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Your crew."), ("key:I", "This guide."),
             ("key:Click / Ctrl-click", "Click moves one item; Ctrl-click moves all of an item. Right-click picks up half."),
@@ -75,16 +72,16 @@ public partial class Game {
             var tab = new Button { Name = $"guide_{key}", TooltipText = title, CustomMinimumSize = new Vector2(48, 48), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
             tab.Icon = GD.Load<Texture2D>($"res://assets/ui/{glyph}.svg"); tab.ExpandIcon = true; tab.IconAlignment = HorizontalAlignment.Center; tab.AddThemeConstantOverride("icon_max_width", 24);
             tab.AddThemeColorOverride("icon_normal_color", Style.Rim); tab.AddThemeColorOverride("icon_hover_color", Style.Rim);
-            var look = key == guideTab ? Style.TabActive : Style.TabRound; Style.Skin(tab, look.Normal, look.Hover);
+            var look = key == memory.GuideTab ? Style.TabActive : Style.TabRound; Style.Skin(tab, look.Normal, look.Hover);
             string topic = key;
-            tab.Pressed += () => { guideTab = topic; OpenPage("help"); };
+            tab.Pressed += () => { memory.GuideTab = topic; panel.Open("help"); };
             tabs.AddChild(tab);
         }
         var page = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; page.AddThemeConstantOverride("separation", 10); board.AddChild(page);
-        foreach (var (key, _, title) in GuideTopics) if (key == guideTab) page.AddChild(Style.Heading(title, 20));
+        foreach (var (key, _, title) in GuideTopics) if (key == memory.GuideTab) page.AddChild(Style.Heading(title, 20));
         var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); page.AddChild(well);
         var rows = new VBoxContainer(); rows.AddThemeConstantOverride("separation", 8); well.AddChild(rows);
-        var tips = GuideTips[guideTab];
+        var tips = GuideTips[memory.GuideTab];
         for (int i = 0; i < tips.Length; i++) {
             if (i > 0) rows.AddChild(new HSeparator());
             var (lead, tip) = tips[i];

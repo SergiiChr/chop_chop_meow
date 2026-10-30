@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>A mine's three building steps while it is built, then its miners and its two outputs once it is open.</summary>
-public partial class Game {
+public partial class PagePanel {
     private void MinePanel(Thing mine) {
         string name = World.MineName(mine); headingTitle.Text = char.ToUpper(name[0]) + name[1..];
         headingIcon.Texture = Icons.Of(World.MineOre(mine)); headingIcon.Visible = true;
@@ -36,7 +36,7 @@ public partial class Game {
                 foreach (var (item, amount) in data.Materials) {
                     var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); row.AddChild(column);
                     var (cell, count) = ItemSlot.Cup($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
-                    cell.Pressed += () => { kit.Act(() => world.SupplyMine(mine)); RefreshLive(); };
+                    cell.Pressed += () => { kit.Act(() => world.SupplyMine(mine)); kit.Refresh(); };
                     column.AddChild(PerBatch($"/ {amount}"));
                     int drawn = -1;
                     live.Add(() => {
@@ -62,7 +62,7 @@ public partial class Game {
                 var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 10); row.AddChild(pair);
                 var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); pair.AddChild(column);
                 var (cell, count) = ItemSlot.Cup($"output_{item}", 64); cell.Icon = Icons.Of(item); cell.AddThemeStyleboxOverride("normal", Style.CupWanted); column.AddChild(cell);
-                cell.Pressed += () => { kit.Act(() => moves.Stack(mine.Output!, world.S.Backpack, item, mine)); RefreshLive(); };
+                cell.Pressed += () => { kit.Act(() => moves.Stack(mine.Output!, world.S.Backpack, item, mine)); kit.Refresh(); };
                 cell.Drag = () => mine.Output![item] > 0 ? new ItemDrag(item, mine.Output[item], mine.Output, mine) : null;
                 var track = new Panel { CustomMinimumSize = new Vector2(64, 8) }; track.AddThemeStyleboxOverride("panel", Style.BarBack); column.AddChild(track);
                 var fill = new ColorRect { Color = Style.Mustard, Size = new Vector2(0, 8) }; track.AddChild(fill); bars[i] = fill;

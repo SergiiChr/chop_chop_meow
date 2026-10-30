@@ -150,6 +150,9 @@ public static class Style {
     }
 
     /// <summary>A small pill with a key or count on it.</summary>
+    /// <summary>A small heading at the top of a well.</summary>
+    public static Label WellLabel(string text) => Text(text, 13, Tan, Head);
+
     public static Label Pill(string text, StyleBox box, Color color, int size = 12) {
         var label = Text(text, size, color);
         label.AddThemeStyleboxOverride("normal", box); label.HorizontalAlignment = HorizontalAlignment.Center;

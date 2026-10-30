@@ -68,13 +68,13 @@ public partial class Game {
     }
 
     /// <summary>Replaces the world with a new one and closes everything that showed the old one.</summary>
-    private void DropWorld() { world.NewGame(); ClosePanel(); ending.Visible = false; blackHole.End(); }
+    private void DropWorld() { world.NewGame(); panel.Close(); ending.Visible = false; blackHole.End(); }
 
     private void OnJoined(bool back) {
         StoreSetting("net", "address", net.Address);
-        slot = 0; selected = 0; workerId = 0; gathering = null; entering = null; lifting = null; assigningWorker = 0; ending.Joined(back);
+        slot = 0; state.Selected = 0; state.WorkerId = 0; gathering = null; state.Entering = null; lifting = null; state.AssigningWorker = 0; ending.Joined(back);
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
-        HideScreen(); menu.Visible = false; ending.Visible = false; ClosePanel();
+        HideScreen(); menu.Visible = false; ending.Visible = false; panel.Close();
         Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
     }
 }

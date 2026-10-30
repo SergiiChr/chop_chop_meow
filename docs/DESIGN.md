@@ -52,7 +52,7 @@ UI and input:
 
 | File | Owns |
 | --- | --- |
-| `src/Game.cs` | UI, input, save/load, the main game loop and command-line review flags |
+| `src/Game.cs` | Creates and holds the interface's parts, routes input, save/load, the main game loop and command-line review flags |
 | `src/Menu.cs` | The pause menu with the goal chain, and the round menu badges |
 | `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, how a player action runs, the buttons), `UiState` and `LiveText` |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
@@ -60,7 +60,10 @@ UI and input:
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream cups, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
-| `src/Panels.cs` | Shared panel parts: header buttons, the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |
+| `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what pages keep while they are rebuilt |
+| `src/BackpackDrawer.cs` | The backpack drawer above the hotbar |
+| `src/Pages.cs` | What a page opens as, and the pages of plain buildings |
+| `src/Panels.cs` | `PagePanel`, a page and the pieces pages are built from: the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |
 | `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
@@ -118,7 +121,7 @@ Keep rendering and input separate from state transitions, so headless checks can
 Health, hunger and thirst are HUD icons.
 Coins are a backpack item that stacks to 1000.
 
-Every page that works with the backpack shows it in one place, a drawer above the hotbar (`Game.BagGrid`).
+Every page that works with the backpack shows it in one place, a drawer above the hotbar (`PagePanel.BagGrid`).
 The stacks that page takes are rimmed in brick and the rest are faded.
 A close button hides the drawer until another page or building opens.
 The side panel only shows the building and sizes itself to what it holds.
@@ -573,7 +576,7 @@ Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
 - The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe and anvil impacts, bellows pumps, storage lids and the cabin door.
-- `Game.Act` gives manual inventory moves and spending a sound by item kind when the action made none of its own.
+- `UiKit.Act` gives manual inventory moves and spending a sound by item kind when the action made none of its own.
 
 ### Music
 

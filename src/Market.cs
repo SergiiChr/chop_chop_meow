@@ -5,37 +5,32 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Trading post panel: outgoing crates, the cart's road and the mailbox, or hiring; and the village's prices on a sign beside the panel.</summary>
-public partial class Game {
+public partial class PagePanel {
     /// <summary>How far the price sign reaches left of the panel.</summary>
-    private const int SheetWidth = 420;
-    private string signpostTab = "market";
-    private bool sheetOpen = true;
-    /// <summary>The price rows' scroll area, sized like the panel's to the room there is.</summary>
-    private ScrollContainer? sheetScroll;
-    private VBoxContainer? sheetRows;
+    public const int SheetWidth = 420;
 
     private void Signpost(Thing sign) {
         headingTitle.Text = "Trading post";
-        Tab("cart", "coins", "Ship", () => signpostTab = "market", signpostTab == "market");
-        Tab("crew", "hardhat", "Hire", () => signpostTab = "workers", signpostTab == "workers");
-        Tab("guide", "prices", "Prices", () => sheetOpen = !sheetOpen, sheetOpen);
+        Tab("cart", "coins", "Ship", () => memory.SignpostTab = "market", memory.SignpostTab == "market");
+        Tab("crew", "hardhat", "Hire", () => memory.SignpostTab = "workers", memory.SignpostTab == "workers");
+        Tab("guide", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
         FilterButton(sign);
-        if (sheetOpen) PriceSheet(sign);
-        if (signpostTab == "workers") HireOffers(sign);
+        if (memory.SheetOpen) PriceSheet(sign);
+        if (memory.SignpostTab == "workers") HireOffers(sign);
         else Market(sign);
         JobButtons(sign);
     }
 
     /// <summary>A round tab in the header, lit while its page is shown.</summary>
     private void Tab(string glyph, string name, string tooltip, Action action, bool active) {
-        var tab = HeaderAction(glyph, tooltip, () => { action(); OpenPage("inspect"); }, active ? Style.TabActive : Style.TabRound, name);
+        var tab = HeaderAction(glyph, tooltip, () => { action(); panel.Open("inspect"); }, active ? Style.TabActive : Style.TabRound, name);
         tab.CustomMinimumSize = new Vector2(44, 44);
     }
 
     private void Market(Thing sign) {
         var output = sign.Output!;
         var outbound = Well(new VBoxContainer()); outbound.AddThemeConstantOverride("separation", 8);
-        outbound.AddChild(WellLabel("Outbound"));
+        outbound.AddChild(Style.WellLabel("Outbound"));
         var ship = new HBoxContainer(); ship.AddThemeConstantOverride("separation", 14); outbound.AddChild(ship);
         var host = content; content = new VBoxContainer();
         var crates = AddInventoryGrid(() => sign.Inventory, sign, id => moves.Stack(sign.Inventory, world.S.Backpack, id, sign), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item), columns: 3);
@@ -67,14 +62,14 @@ public partial class Game {
         });
         Road(sign);
         var inbound = Well(new VBoxContainer()); inbound.AddThemeConstantOverride("separation", 8);
-        inbound.AddChild(WellLabel("Inbound"));
+        inbound.AddChild(Style.WellLabel("Inbound"));
         var mail = new HBoxContainer(); mail.AddThemeConstantOverride("separation", 14); inbound.AddChild(mail);
         var glyph = Style.Glyph("line_mail", 30, Style.Ink); glyph.MouseFilter = Control.MouseFilterEnum.Pass; glyph.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(glyph);
         host = content; content = new VBoxContainer();
         var boxes = AddInventoryGrid(() => output, sign, id => moves.Stack(output, world.S.Backpack, id, sign), "Click or drag: take", _ => false, columns: 5);
         content.RemoveChild(boxes); content.QueueFree(); content = host;
         mail.AddChild(boxes);
-        BagGrid(id => { if (world.CanSell(id)) moves.Stack(world.S.Backpack, sign.Inventory, id, sign); else Notify("Pack goods the village buys in a crate to sell them."); }, "Click: put a packed crate on the cart · Drag onto a box", wanted: world.CanSell);
+        BagGrid(id => { if (world.CanSell(id)) moves.Stack(world.S.Backpack, sign.Inventory, id, sign); else kit.Notify("Pack goods the village buys in a crate to sell them."); }, "Click: put a packed crate on the cart · Drag onto a box", wanted: world.CanSell);
     }
 
     /// <summary>What the crates waiting at the post would fetch at the last known prices.</summary>
@@ -122,7 +117,7 @@ public partial class Game {
 
     private void HireOffers(Thing sign) {
         foreach (var offer in world.Data.HireOffers) {
-            var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => { if (world.Hire(sign, offer) is Worker w) Select(w); });
+            var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => { if (world.Hire(sign, offer) is Worker w) panel.Select(w); });
             hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = GD.Load<Texture2D>("res://assets/ui/hardhat.svg"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
             hire.CustomMinimumSize = new Vector2(0, 50); hire.Alignment = HorizontalAlignment.Left;
             hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}";
@@ -133,7 +128,7 @@ public partial class Game {
 
     /// <summary>Prices as last heard from the village, on an enamel shop sign beside the panel; buying is always at the current price.</summary>
     private void PriceSheet(Thing sign) {
-        var board = SideBoard(Style.Sign, SheetWidth - 56);
+        var board = panel.SideBoard(Style.Sign, SheetWidth - 56);
         var top = new HBoxContainer(); top.AddThemeConstantOverride("separation", 8); board.AddChild(top);
         var title = Style.Text("Bramblewick prices", 19, Style.Ink, Style.Head); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);
         var age = Style.Pill("", Style.Tag(Style.Mustard), Style.Line, 12); top.AddChild(age);
@@ -147,9 +142,9 @@ public partial class Game {
         });
         var fetch = new Button { Name = "fetch", Icon = GD.Load<Texture2D>("res://assets/ui/line_crew.svg"), Text = "→", ExpandIcon = true, CustomMinimumSize = new Vector2(64, 32), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
         fetch.AddThemeConstantOverride("icon_max_width", 18); var fetchLook = Style.Pill(Style.Enamel); Style.Skin(fetch, fetchLook.Item1, fetchLook.Item2);
-        fetch.Pressed += () => { kit.Act(() => world.FetchPrices(sign)); RefreshLive(); };
+        fetch.Pressed += () => { kit.Act(() => world.FetchPrices(sign)); kit.Refresh(); };
         top.AddChild(fetch);
-        top.AddChild(kit.HeaderButton("close", "Close the price sheet", () => { sheetOpen = false; OpenPage("inspect"); }, Style.CloseRound, "sheet_close"));
+        top.AddChild(kit.HeaderButton("close", "Close the price sheet", () => { memory.SheetOpen = false; panel.Open("inspect"); }, Style.CloseRound, "sheet_close"));
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(fetch)) return;
             string? blocked = world.FetchBlock(sign);
@@ -160,7 +155,7 @@ public partial class Game {
         header.AddChild(new Control { CustomMinimumSize = new Vector2(GoodsColumn, 0) });
         foreach (string column in new[] { "Sell price", "Buy price" }) { var cell = Style.Text(column, 13, Style.Tan); cell.CustomMinimumSize = new Vector2(PriceColumn, 0); cell.HorizontalAlignment = HorizontalAlignment.Center; header.AddChild(cell); }
         var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; rows.AddThemeConstantOverride("separation", 0);
-        sheetScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; sheetScroll.AddChild(rows); board.AddChild(sheetScroll); sheetRows = rows;
+        var sheetScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; sheetScroll.AddChild(rows); board.AddChild(sheetScroll); panel.ShowPriceRows(sheetScroll, rows);
         var coins = Icons.Of(Inventory.Coins);
         foreach (string id in world.Data.Market.Sells.Keys.Union(world.Data.Market.Buys.Keys)) {
             bool sells = world.Data.Market.Sells.ContainsKey(id), buys = world.Data.Market.Buys.ContainsKey(id);
@@ -194,7 +189,7 @@ public partial class Game {
             var buy = new Button { Name = $"buy_{id}", Text = $"{world.LotPrice(id)}", Icon = coins, ExpandIcon = true, IconAlignment = HorizontalAlignment.Right, CustomMinimumSize = new Vector2(80, 30), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
             buy.AddThemeConstantOverride("icon_max_width", 16); var buyLook = Style.Pill(Style.Brick); Style.Skin(buy, buyLook.Item1, buyLook.Item2);
             buy.AddThemeFontOverride("font", Style.Bold); buy.AddThemeFontSizeOverride("font_size", 14);
-            buy.Pressed += () => { kit.Act(() => world.Buy(sign, id, ItemMoves.All ? 5 : 1)); RefreshLive(); };
+            buy.Pressed += () => { kit.Act(() => world.Buy(sign, id, ItemMoves.All ? 5 : 1)); kit.Refresh(); };
             buy.TooltipText = world.Lot(id) > 1 ? $"Buy a crate of {world.Lot(id)} {world.Data.Name(id)} · Ctrl: 5 crates\nCrates arrive in the mailbox." : $"Buy a {world.Data.Name(id).ToLowerInvariant()} · Ctrl: 5\nGoods arrive in the mailbox.";
             buySlot.AddChild(buy);
         }
@@ -203,7 +198,4 @@ public partial class Game {
     private const float PriceColumn = 104;
     /// <summary>Room for a good's icon and the size of the crate it comes in.</summary>
     private const float GoodsColumn = 64;
-
-    /// <summary>A small heading at the top of a well.</summary>
-    private static Label WellLabel(string text) => Style.Text(text, 13, Style.Tan, Style.Head);
 }

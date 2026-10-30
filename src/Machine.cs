@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 /// Station view: its recipes as round tabs, the process row with one cup per input, the fuel and the outputs, and the jobs it offers.
 /// Each cup holds a single stack and shows a faint picture of what goes in it while empty.
 /// </summary>
-public partial class Game {
+public partial class PagePanel {
     private void Station(Thing t) {
         var recipes = world.Data.Recipes.Where(p => p.Value.Station == t.Kind).Select(p => p.Key).ToList();
         if (recipes.Count > 1) RecipePicker(t, recipes);
@@ -25,7 +25,7 @@ public partial class Game {
         var row = Row(); row.AddThemeConstantOverride("separation", 10);
         foreach (string id in recipes) {
             var r = world.Data.Recipes[id];
-            var pick = kit.Button("", () => { world.SetRecipe(t, id); OpenPage("inspect"); }); pick.Name = $"recipe_{id}";
+            var pick = kit.Button("", () => { world.SetRecipe(t, id); panel.Open("inspect"); }); pick.Name = $"recipe_{id}";
             pick.Icon = Icons.Of(r.Output); pick.ExpandIcon = true; pick.AddThemeConstantOverride("icon_max_width", 30); pick.CustomMinimumSize = new Vector2(48, 48);
             pick.TooltipText = r.Name;
             var look = id == t.Recipe ? Style.TabActive : Style.TabRound;
@@ -52,12 +52,12 @@ public partial class Game {
         var burner = t.Burner!;
         var (cell, count) = ItemSlot.Cup("fuel");
         cell.AddThemeStyleboxOverride("normal", Style.CupFuel);
-        cell.Pressed += () => { if (burner.First() is string held) { kit.Act(() => moves.Stack(burner, world.S.Backpack, held, t)); RefreshLive(); } };
+        cell.Pressed += () => { if (burner.First() is string held) { kit.Act(() => moves.Stack(burner, world.S.Backpack, held, t)); kit.Refresh(); } };
         cell.Drag = () => burner.First() is string held ? new ItemDrag(held, burner[held], burner, t) : null;
         cell.CanTake = drag => drag.From == world.S.Backpack && World.FuelFits(t, drag.Item);
         cell.Take = drag => {
             int left = world.Near(t) ? ItemMoves.Leftover(drag, burner.First() is string held && held != drag.Item ? 0 : burner.StackOf(drag.Item) - burner[drag.Item]) : 0;
-            kit.Act(() => world.LoadFuel(t, drag.Item, drag.Count)); RefreshLive(); return left;
+            kit.Act(() => world.LoadFuel(t, drag.Item, drag.Count)); kit.Refresh(); return left;
         };
         var lasts = Style.Text("", 14, Style.Ink);
         var lastsText = new LiveText(shown => lasts.Text = shown);
@@ -86,7 +86,7 @@ public partial class Game {
         var degrees = Style.Heading("", 30); column.AddChild(degrees);
         column.AddChild(Style.Text($"Steel requires {World.Celsius(World.SteelHeat)}+ °C", 14, Style.Beige));
         var pumpRow = new HBoxContainer(); pumpRow.AddThemeConstantOverride("separation", 8); column.AddChild(pumpRow);
-        var pump = kit.Button("Pump", () => { if (state.Paused) Notify("Resume before operating the bellows."); else world.Pump(t); });
+        var pump = kit.Button("Pump", () => { if (state.Paused) kit.Notify("Resume before operating the bellows."); else world.Pump(t); });
         pump.Name = "pump"; pump.TooltipText = "Pump the bellows · Space"; pump.CustomMinimumSize = new Vector2(84, 38);
         var look = Style.Pill(Style.Sage); Style.Skin(pump, look.Item1, look.Item2);
         pumpRow.AddChild(pump); pumpRow.AddChild(Style.Pill("Space", Style.KeyPill, Style.Line, 12));
@@ -108,13 +108,13 @@ public partial class Game {
         var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
         if (!input) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
         cell.Icon = Icons.Of(item);
-        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, t)); RefreshLive(); };
+        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, t)); kit.Refresh(); };
         cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, t) : null;
         if (input) {
             cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || item == "water" && Water.IsBottle(drag.Item));
             cell.Take = drag => {
                 int left = world.Near(t) ? ItemMoves.Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
-                kit.Act(() => world.LoadInput(t, drag.Item, drag.Count)); RefreshLive(); return drag.Item == item ? left : 0;
+                kit.Act(() => world.LoadInput(t, drag.Item, drag.Count)); kit.Refresh(); return drag.Item == item ? left : 0;
             };
         }
         string hint = input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";

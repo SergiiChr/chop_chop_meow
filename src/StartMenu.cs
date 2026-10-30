@@ -50,7 +50,7 @@ public partial class Game {
     private void BackToPause() { HideScreen(); OpenMenu(); }
 
     private void ShowStart() {
-        ClosePanel(); OpenScreen("CHOP CHOP MEOW", null);
+        panel.Close(); OpenScreen("CHOP CHOP MEOW", null);
         if (leftReason != "") { var note = Style.Wrapped(leftReason, 14, new Color("f2b38b")); note.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(note); leftReason = ""; }
         int latest = Enumerable.Range(0, SlotCount + 1).Where(SlotUsed).OrderByDescending(SavedAt).DefaultIfEmpty(-1).First();
         AddScreenButton("Continue", () => LoadSlot(latest), latest < 0);

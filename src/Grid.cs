@@ -5,10 +5,10 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Icon cells shared by inventory, storage, station and build pages.</summary>
-public partial class Game {
+public partial class PagePanel {
     private const int GridColumns = 6;
     /// <summary>The backpack drawer is two rows of twelve, or three of eight on a narrow screen.</summary>
-    private int BagColumns => ui.Size.X >= 1400 ? 12 : 8;
+    private int BagColumns => panel.ScreenWidth >= 1400 ? 12 : 8;
     /// <summary>Room between cups for the count pills that sit on their corners.</summary>
     private const int CupGap = 10;
 
@@ -41,11 +41,11 @@ public partial class Game {
                 if (stacks[slot] is not (string id, _)) return;
                 var held = inventory(); held.PreferredSlot = slot;
                 try { kit.Act(() => click(id)); } finally { held.PreferredSlot = -1; }
-                RefreshLive();
+                kit.Refresh();
             };
             cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container, slot) : null;
             cell.CanTake = accepts ?? (drag => drag.From != null);
-            cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, inventory(), container, slot)); RefreshLive(); return left; };
+            cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, inventory(), container, slot)); kit.Refresh(); return left; };
             grid.AddChild(cell);
         }
         // What each cell last drew: its stack and the inventory's total of that item. A cell is redrawn only when they change.

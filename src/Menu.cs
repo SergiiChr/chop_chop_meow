@@ -78,7 +78,7 @@ public partial class Game {
 
     private void OpenMenu() {
         foreach (var child in goals.GetChildren()) child.QueueFree();
-        goals.AddChild(WellLabel("Getting started"));
+        goals.AddChild(Style.WellLabel("Getting started"));
         // Goals already met shrink to a row of ticks, named on hover; the current goal sits in a framed box with its hint.
         var met = new HFlowContainer(); met.AddThemeConstantOverride("h_separation", 4); met.AddThemeConstantOverride("v_separation", 4); goals.AddChild(met);
         for (int i = 0; i < World.GoalCount; i++) {
@@ -96,7 +96,7 @@ public partial class Game {
         met.Visible = met.GetChildCount() > 0;
         if (world.GoalComplete) { var hint = Style.Text(world.Objective.Hint, 13, Style.Tan); hint.AutowrapMode = TextServer.AutowrapMode.WordSmart; goals.AddChild(hint); }
         goals.AddChild(new HSeparator());
-        goals.AddChild(WellLabel("End goals"));
+        goals.AddChild(Style.WellLabel("End goals"));
         foreach (var ore in World.MineOres) goals.AddChild(GoalRow($"A working {ore.Id()} mine", world.HasMine(ore), false, Icons.Of(World.ResourceItem(ore))));
         var target = world.Data.Goals;
         goals.AddChild(GoalRow($"{target.DailyProfit} coins profit a day for {target.ProfitDays} days in a row", world.ProfitGoalMet, false, Icons.Of(Inventory.Coins)));

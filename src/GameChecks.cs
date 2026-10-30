@@ -50,10 +50,10 @@ public partial class Game {
         // Held still so what each page shows stays the same. The pause menu would hold world clicks, so the hold and the page opening stay direct.
         bool wasPaused = state.Paused; state.Paused = true;
         var pages = new (string Name, Action Open)[] {
-            ("inventory", () => OpenPage("inventory")), ("craft", () => OpenPage("craft")), ("workers", () => OpenPage("workers")),
-            ("chest", () => Select(chest)), ("pile", () => Select(pile)), ("bellows furnace", () => Select(forge)), ("furnace", () => Select(furnace)),
-            ("campfire", () => Select(fire)), ("cabin", () => Select(hut)), ("signpost", () => Select(sign)), ("farm", () => Select(farm)), ("packing station", () => Select(packer)),
-            ("tree", () => Select(tree)), ("worker", () => Select(worker)),
+            ("inventory", () => panel.Open("inventory")), ("craft", () => panel.Open("craft")), ("workers", () => panel.Open("workers")),
+            ("chest", () => panel.Select(chest)), ("pile", () => panel.Select(pile)), ("bellows furnace", () => panel.Select(forge)), ("furnace", () => panel.Select(furnace)),
+            ("campfire", () => panel.Select(fire)), ("cabin", () => panel.Select(hut)), ("signpost", () => panel.Select(sign)), ("farm", () => panel.Select(farm)), ("packing station", () => panel.Select(packer)),
+            ("tree", () => panel.Select(tree)), ("worker", () => panel.Select(worker)),
         };
         foreach (var (name, open) in pages) {
             open(); await Frames();
@@ -217,8 +217,8 @@ public partial class Game {
             "The post's filter must offer crates of goods, not loose goods, and only a row of what workers bring.");
         await Click(Named("filters_close")!);
         var fetch = Named("fetch");
-        Require(sheet.Visible, "The price sheet must open.");
-        Require(panel.OffsetLeft == PanelLeft - SheetWidth, "The price sheet must open beside the panel.");
+        Require(panel.SheetShown, "The price sheet must open.");
+        Require(panel.OffsetLeft == SidePanel.Left - PagePanel.SheetWidth, "The price sheet must open beside the panel.");
         Require(fetch != null, "The price sheet must offer a fetch button.");
         Require(fetch.Disabled, "The fetch button must be disabled while no worker is assigned.");
         Require(fetch.TooltipText == "No worker assigned.", "The fetch button must explain that no worker is assigned.");
@@ -235,9 +235,9 @@ public partial class Game {
         await Click(Named("fetch")!);
         Require(hired!.Away > 0, "Fetching must send the assigned worker to the village.");
         await Click(Named("prices")!);
-        Require(!sheet.Visible && panel.OffsetLeft == PanelLeft, "The price sheet icon must close the sheet again.");
+        Require(!panel.SheetShown && panel.OffsetLeft == SidePanel.Left, "The price sheet icon must close the sheet again.");
         await Click(Named("prices")!); await Click(Named("sheet_close")!);
-        Require(!sheet.Visible && panel.Visible, "The price sheet's close button must close it and leave the panel open.");
+        Require(!panel.SheetShown && panel.Visible, "The price sheet's close button must close it and leave the panel open.");
         world.Fire(hired); world.Tick(world.Data.TradeSeconds); RemoveThings(world, t => t == sign || t.Kind == ThingKind.Grave); Drop(world, Inventory.Coins, 999);
         await CloseWithEsc();
     }
@@ -327,7 +327,7 @@ public partial class Game {
         Require(crates[0].Inventory["wood"] == cap && world.Carried("wood") == 64 - cap, "Dragging a full stack into a crate must fill it and leave the rest in the backpack.");
         Require(GetViewport().GuiIsDragging(), "What did not fit into the crate must stay held.");
         // A click in the world lets go of a held stack, so no player gets the rest this far: the next crate opens directly.
-        Select(crates[1]); await Frames();
+        panel.Select(crates[1]); await Frames();
         await Click(Cell(0, c => c.TooltipText == ""));
         Require(crates[1].Inventory["wood"] == cap && world.Carried("wood") == 64 - 2 * cap && GetViewport().GuiIsDragging(), "The held rest must drop into the next crate and keep what still does not fit.");
         await Click(Cell(1, c => c.TooltipText.Contains("Wood · ")));
@@ -594,7 +594,7 @@ public partial class Game {
         Require(world.Carried("berries") == berries, "Key 8 must not eat the berries.");
         Require(hotbarButtons[7].GetThemeStylebox("normal") == Style.CupWanted, "Key 8 must outline the berries in hand.");
         Require(hotbarButtons[2].GetThemeStylebox("normal") != Style.CupWanted, "Key 8 must outline only the slot in hand.");
-        Require(view.BuildMode == null, "Selecting an item must clear any previously selected building plan.");
+        Require(view.BuildMode == null, "Selecting an item must clear any previously state.Selected building plan.");
         int played = sounds.Played;
         await ClickGround();
         Require(world.Carried("berries") == berries - 1, "A left click on open ground must eat the berries in hand.");
@@ -653,7 +653,7 @@ public partial class Game {
         Require(chest.Inventory["wood"] == storedWood, "The split half must go back into the chest.");
         await Click(Named("filters")!);
         Require(Named("filters_close") != null, "Chest filters must open the filter window.");
-        Require(sheet.Visible, "Chest filters must show the sheet beside the panel.");
+        Require(panel.SheetShown, "Chest filters must show the sheet beside the panel.");
         Require(panel.FindChild("filter_in", true, false) != null, "The filter window must show an input filter.");
         Require(panel.FindChild("filter_out", true, false) != null, "The filter window must show an output filter.");
         await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), (Control)panel.FindChild("filter_add_in", true, false));
@@ -801,9 +801,9 @@ public partial class Game {
         await KeyStroke(Key.Space);
         Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "Space must not pump or attack while state.Paused.");
         // The pause menu holds world clicks, so a player cannot get here; this proves the button stays dead if a panel ever is open.
-        Select(furnace);
+        panel.Select(furnace);
         var pumpButton = Named("pump");
-        Require(pumpButton != null, "The selected furnace should still expose its pump control while state.Paused.");
+        Require(pumpButton != null, "The state.Selected furnace should still expose its pump control while state.Paused.");
         await Click(pumpButton!);
         Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "The pump button must not change heat while state.Paused.");
         Require(view.PlayerAnimation == actionBeforePausedActions && Math.Abs(view.PlayerAnimationTime - pausedActionTime) < .001f, "Paused Space and pump-button input must not start an animation pulse.");

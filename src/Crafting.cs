@@ -10,10 +10,7 @@ namespace ChopChopMeow;
 /// The personal crafting menu and the crafting bench panel: round tabs for the tools recipes need, beside a grid of recipe plates.
 /// Each plate shows the product big and its inputs small, each count in brick while the backpack is short.
 /// </summary>
-public partial class Game {
-    /// <summary>The tool group whose recipes are shown, kept while the page is rebuilt.</summary>
-    private string craftTab = "";
-
+public partial class PagePanel {
     private void CraftMenu() {
         headingIcon.Texture = GD.Load<Texture2D>("res://assets/ui/line_craft.svg"); headingIcon.SelfModulate = Style.Rim; headingIcon.Visible = true;
         headingIcon.TooltipText = "Crafting by hand. A crafting bench works twice as fast.";
@@ -35,7 +32,7 @@ public partial class Game {
         bool rebuilding = false;
         live.Add(() => {
             if (rebuilding || (queue.Count > 0 ? queue[0] : null) == head && queue.Count == queued) return;
-            rebuilding = true; Callable.From(() => { if (page == "craft") OpenPage("craft"); }).CallDeferred();
+            rebuilding = true; Callable.From(() => { if (state.Page == "craft") panel.Open("craft"); }).CallDeferred();
         });
         if (head == null) { Well(new VBoxContainer()).AddChild(Style.Text("Nothing in the works. Click a recipe to make it.", 14, Style.Ink)); return; }
         var making = world.Data.Recipes[head];
@@ -67,7 +64,7 @@ public partial class Game {
         cell.TooltipText = cancel == null ? world.Data.Name(item) : $"{world.Data.Name(item)}\nClick to cancel and get the materials back.";
         if (cancel != null) {
             cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
-            cell.Pressed += () => { kit.Act(cancel); RefreshLive(); };
+            cell.Pressed += () => { kit.Act(cancel); kit.Refresh(); };
         }
         column.AddChild(cell);
         if (perBatch != "") column.AddChild(PerBatch(perBatch));
@@ -80,7 +77,7 @@ public partial class Game {
         if (bench.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
         var groups = world.Data.Recipes.Where(p => p.Value.Station == bench.Kind).Select(p => p.Key).GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
         RecipeBoard(groups, group => group.Tool == "" ? null : world.BenchTool(bench, group.Tool, group.Tier), bench,
-            id => { world.SetRecipe(bench, id); OpenPage("inspect"); }, id => bench.Recipe == id, id => world.S.Backpack.Has(world.Data.Recipes[id].Inputs),
+            id => { world.SetRecipe(bench, id); panel.Open("inspect"); }, id => bench.Recipe == id, id => world.S.Backpack.Has(world.Data.Recipes[id].Inputs),
             // A double click also loads one batch of inputs from the backpack.
             id => kit.Act(() => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(bench, item, amount); }));
         if (bench.Recipe != "") Machine(bench);
@@ -99,10 +96,10 @@ public partial class Game {
         var (cell, _) = ItemSlot.Cup($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         string plainest = world.Data.Items.Where(p => p.Value.Tool == tool).OrderBy(p => p.Value.Speed).First().Key;
-        cell.Pressed += () => { if (world.BenchTool(bench, tool) is string held) { kit.Act(() => world.UnslotTool(bench, held)); RefreshLive(); } };
+        cell.Pressed += () => { if (world.BenchTool(bench, tool) is string held) { kit.Act(() => world.UnslotTool(bench, held)); kit.Refresh(); } };
         cell.Drag = () => world.BenchTool(bench, tool) is string held ? new ItemDrag(held, 1, bench.Tools, bench) : null;
         cell.CanTake = drag => drag.From == world.S.Backpack && world.Data.Items.GetValueOrDefault(drag.Item)?.Tool == tool;
-        cell.Take = drag => { kit.Act(() => world.SlotTool(bench, drag.Item)); RefreshLive(); return 0; };
+        cell.Take = drag => { kit.Act(() => world.SlotTool(bench, drag.Item)); kit.Refresh(); return 0; };
         // Redrawn only when the slotted tool changes.
         string? drawn = null; bool first = true;
         live.Add(() => {
@@ -139,8 +136,8 @@ public partial class Game {
     /// </summary>
     private void RecipeBoard(List<IGrouping<(string Tool, int Tier), string>> groups, Func<(string Tool, int Tier), string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready, Action<string>? twice = null) {
         // A board opens on the tab of the recipe its station makes, otherwise the first.
-        if (groups.All(g => GroupKey(g.Key) != craftTab))
-            craftTab = groups.FirstOrDefault(g => g.Any(chosen)) is { } making ? GroupKey(making.Key) : groups.Count > 0 ? GroupKey(groups[0].Key) : "";
+        if (groups.All(g => GroupKey(g.Key) != memory.CraftTab))
+            memory.CraftTab = groups.FirstOrDefault(g => g.Any(chosen)) is { } making ? GroupKey(making.Key) : groups.Count > 0 ? GroupKey(groups[0].Key) : "";
         var board = Row(); board.AddThemeConstantOverride("separation", 14);
         var tabs = new VBoxContainer { SizeFlagsVertical = Control.SizeFlags.ShrinkBegin }; tabs.AddThemeConstantOverride("separation", 10); board.AddChild(tabs);
         var plates = new GridContainer { Columns = 4, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkBegin };
@@ -148,8 +145,8 @@ public partial class Game {
         foreach (var group in groups) {
             var (tool, tier) = group.Key;
             string key = GroupKey(group.Key);
-            bool open = key == craftTab;
-            var tab = kit.Button("", () => { craftTab = key; OpenPage(page); }); tab.Name = $"section_{key}"; tab.CustomMinimumSize = new Vector2(48, 48);
+            bool open = key == memory.CraftTab;
+            var tab = kit.Button("", () => { memory.CraftTab = key; panel.Open(state.Page); }); tab.Name = $"section_{key}"; tab.CustomMinimumSize = new Vector2(48, 48);
             var look = open ? Style.TabActive : Style.TabRound; Style.Skin(tab, look.Normal, look.Hover);
             tabs.AddChild(tab);
             var badge = Style.Icon(null, 28); badge.Name = "badge"; badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); badge.GrowHorizontal = badge.GrowVertical = Control.GrowDirection.Both; badge.MouseFilter = Control.MouseFilterEnum.Pass;
@@ -194,8 +191,8 @@ public partial class Game {
             inputs.AddChild(need); needs.Add((item, amount, need));
         }
         count.Text = r.Amount > 1 ? $"×{r.Amount}" : ""; count.MoveToFront();
-        cell.Pressed += () => { click(id); RefreshLive(); };
-        if (twice != null) cell.DoubleClicked = () => { twice(id); RefreshLive(); };
+        cell.Pressed += () => { click(id); kit.Refresh(); };
+        if (twice != null) cell.DoubleClicked = () => { twice(id); kit.Refresh(); };
         float Time() => r.Seconds / ((station?.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * (held() is string inUse ? world.Data.Items[inUse].Speed : 1));
         void Describe(StringBuilder text) {
             text.Append(r.Name);

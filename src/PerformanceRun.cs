@@ -38,7 +38,7 @@ public partial class Game {
         if (!launchArgs.Contains("--performance-run")) return;
         performanceFolder = LaunchValue("--performance-run") ?? "build/performance";
         Directory.CreateDirectory(performanceFolder);
-        HideScreen(); ClosePanel(); state.Paused = false;
+        HideScreen(); panel.Close(); state.Paused = false;
         Engine.MaxFps = 0; DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
         DisplayServer.WindowSetSize(new Vector2I(2560, 1440));
         RenderingServer.ViewportSetMeasureRenderTime(GetViewport().GetViewportRid(), true);

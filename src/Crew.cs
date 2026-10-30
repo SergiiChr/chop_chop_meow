@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 /// The crew overview, one card per worker, and a worker's own panel.
 /// A card shows the worker's hat, name, wage, what they carry and the tool they hold, what they are doing, and their jobs as chips with each place's icon.
 /// </summary>
-public partial class Game {
+public partial class PagePanel {
     private static readonly Texture2D Hardhat = GD.Load<Texture2D>("res://assets/ui/hardhat.svg");
 
     private void Workers() {
@@ -52,13 +52,13 @@ public partial class Game {
         if (w.Duties.Count == 0) chips.AddChild(Style.Pill("No jobs", Style.Tag(Style.Tan), Style.Rim, 12));
         // A flat button over the whole card takes the click and rings it on hover.
         var open = new Button { Flat = false, FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand, Name = $"crew_{w.Id}" };
-        Style.Skin(open, Style.None, Style.CardHover); open.Pressed += () => Select(w); card.AddChild(open);
+        Style.Skin(open, Style.None, Style.CardHover); open.Pressed += () => panel.Select(w); card.AddChild(open);
         (string Status, int Duties) drawn = ("", -1);
         (int Carried, string? Item, string Tool) carrying = (-1, null, "");
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(status)) return;
             // A job given or taken elsewhere changes the chips, so the page is rebuilt.
-            if (drawn.Duties >= 0 && w.Duties.Count != drawn.Duties) { drawn.Duties = w.Duties.Count; Callable.From(() => { if (page == "workers") OpenPage("workers"); }).CallDeferred(); return; }
+            if (drawn.Duties >= 0 && w.Duties.Count != drawn.Duties) { drawn.Duties = w.Duties.Count; Callable.From(() => { if (state.Page == "workers") panel.Open("workers"); }).CallDeferred(); return; }
             drawn.Duties = w.Duties.Count;
             if (w.Status != drawn.Status) status.Text = drawn.Status = w.Status;
             ShowKit(w, ref carrying, carry, carried, tool);
@@ -114,7 +114,7 @@ public partial class Game {
             owedText.Show();
         });
         var jobs = Well(new VBoxContainer()); jobs.AddThemeConstantOverride("separation", 6);
-        jobs.AddChild(WellLabel("Jobs"));
+        jobs.AddChild(Style.WellLabel("Jobs"));
         bool first = true;
         foreach (var d in w.Duties.ToArray()) {
             if (world.DutyPlace(w, d.Thing) is not Thing at) continue;
@@ -126,7 +126,7 @@ public partial class Game {
             var place = Style.Text(world.Data.Name(at.Kind), 15, Style.Ink); place.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(place);
             int colour = System.Array.IndexOf(world.Jobs(at), d.Job);
             var tag = Style.Pill(JobName(d.Job), Style.Tag(Style.JobColors[System.Math.Max(0, colour) % Style.JobColors.Length]), Style.Rim, 13); tag.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; row.AddChild(tag);
-            var drop = kit.HeaderButton("close", "Take this job away", () => { world.SetDuty(w, at, duty.Job, false); OpenPage("inspect"); }, Style.CloseRound, $"drop_{d.Job}_{at.Id}");
+            var drop = kit.HeaderButton("close", "Take this job away", () => { world.SetDuty(w, at, duty.Job, false); panel.Open("inspect"); }, Style.CloseRound, $"drop_{d.Job}_{at.Id}");
             drop.CustomMinimumSize = new Vector2(30, 30); drop.AddThemeConstantOverride("icon_max_width", 14); row.AddChild(drop);
         }
         if (first) {
@@ -134,9 +134,9 @@ public partial class Game {
             none.AutowrapMode = TextServer.AutowrapMode.WordSmart; jobs.AddChild(none);
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { assigningWorker = w.Id; view.BuildMode = null; ClosePanel(); RefreshLive(); }));
-        buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); OpenPage("inspect"); }));
-        buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); OpenPage("workers"); }));
+        buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { state.AssigningWorker = w.Id; view.BuildMode = null; panel.Close(); kit.Refresh(); }));
+        buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); panel.Open("inspect"); }));
+        buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); panel.Open("workers"); }));
         if (w.WageDebt > 0) content.AddChild(kit.BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));
     }
 }

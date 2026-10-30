@@ -89,9 +89,9 @@ public partial class Game {
         world.S.ActiveHotbar = slot;
         string id = HotbarId(slot);
         view.BuildMode = null;
-        assigningWorker = 0;
+        state.AssigningWorker = 0;
         if (string.IsNullOrEmpty(id)) Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
-        else if (world.Data.TryBuilding(id, out var kind)) { view.BuildMode = kind; ClosePanel(); } else if (id == "crate") PlaceCrate(id);
+        else if (world.Data.TryBuilding(id, out var kind)) { view.BuildMode = kind; panel.Close(); } else if (id == "crate") panel.PlaceCrate(id);
         RefreshLive();
     }
 
