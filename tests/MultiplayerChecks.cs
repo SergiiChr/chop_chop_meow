@@ -41,9 +41,12 @@ public static class MultiplayerChecks {
         var returning = returningWorld.AddGuest(GuestId, world.ExportPlayer(guest));
         Require(returning.Backpack.Layout[9].Item == "wood" && returning.Backpack.Layout[0].Item == "stone",
             "a guest leaving and rejoining must retain their exact inventory positions");
-        var legacy = new PlayerState(); legacy.Backpack.Items["water"] = 64; legacy.Backpack.Items["wood"] = 1;
+        var legacy = new PlayerState { Backpack = { SavedItems = new Dictionary<string, int> { ["water"] = 64, ["wood"] = 1 } } };
+        // An old save holds item totals and no stacks.
+        var legacyJson = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(legacy, GameData.Json))!;
+        Require(legacyJson["Backpack"]!.AsObject().Remove("Layout"), "the legacy fixture must drop the saved stacks");
         var legacyWorld = new World(data, false);
-        var migrated = legacyWorld.AddGuest(GuestId, System.Text.Json.JsonSerializer.Serialize(legacy, GameData.Json));
+        var migrated = legacyWorld.AddGuest(GuestId, legacyJson.ToJsonString());
         Require(migrated.Backpack["wood"] == 1 && migrated.Backpack["water"] + legacyWorld.S.Things.Where(t => t.Kind == "grave").Sum(t => t.Inventory["water"]) == 64,
             "a legacy guest's stacked bottles must migrate without rejecting or losing the rest of their bag");
 
@@ -236,8 +239,8 @@ public static class MultiplayerChecks {
         good.Backpack.Add("wood", 3);
         string Json(PlayerState p) => System.Text.Json.JsonSerializer.Serialize(p, GameData.Json);
         Require(world.AddGuest(10, Json(good)).Backpack["wood"] == 3, "a sound saved player should come back as saved");
-        var unknown = new PlayerState(); unknown.Backpack.Items["diamond"] = 2;
-        var crowded = new PlayerState(); for (int i = 0; i < 30; i++) crowded.Backpack.Items[$"{World.PackedPrefix}{900 + i}"] = 1;
+        var unknown = new PlayerState(); unknown.Backpack.SavedItems = new Dictionary<string, int> { ["diamond"] = 2 };
+        var crowded = new PlayerState(); crowded.Backpack.SavedItems = Enumerable.Range(0, 30).ToDictionary(i => $"{World.PackedPrefix}{900 + i}", _ => 1);
         var underwater = new PlayerState { PlayerX = Terrain.Lake.X, PlayerY = Terrain.Lake.Y }; underwater.Backpack.Add("stone", 1);
         foreach (var (saved, why) in new[] { ("{ not json", "garbage"), ("null", "an empty save"), (Json(unknown), "an unknown item"), (Json(crowded), "crates without contents"), (Json(new PlayerState { Health = 0 }), "a dead player"), (Json(new PlayerState { Hunger = 900 }), "hunger out of range") }) {
             var p = world.AddGuest(20, saved);

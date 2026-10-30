@@ -367,6 +367,9 @@ Inventories are slot grids with stacks of 64.
 Tools, packed crates and bottles take a slot each everywhere.
 The layout is saved and synchronized: removing one stack never shifts unrelated cells.
 Sort is the only action that packs and regroups stacks.
+Item totals change only through `Inventory` methods, which keep them in line with the stacks.
+Stacks are rebuilt from totals once, where the two can disagree: when a save loads (old saves hold totals only) and when a guest joins.
+A guest's copy takes totals and stacks together from the host, so it does not rebuild.
 
 Input rule for every item cell, in storage and stations alike:
 

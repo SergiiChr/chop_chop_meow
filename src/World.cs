@@ -891,7 +891,7 @@ public sealed partial class World {
         S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count });
         Say($"Goods sold: {string.Join(", ", goods.Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;
     }
-    private string Goods(Dictionary<string, int> goods) => string.Join(", ", goods.Select(p => $"{p.Value} {Data.Name(p.Key)}"));
+    private string Goods(IReadOnlyDictionary<string, int> goods) => string.Join(", ", goods.Select(p => $"{p.Value} {Data.Name(p.Key)}"));
     /// <summary>Orders <paramref name="lots"/> purchases of a good the village sells: tools one by one, the rest in crates.</summary>
     public bool Buy(Thing sign, string item, int lots) {
         if (!Data.Market.Buys.ContainsKey(item) || lots <= 0) return false;
@@ -1955,7 +1955,7 @@ public sealed partial class World {
     /// <summary>No packed crates, for checking what a crate holds: a crate inside a crate is not a known item.</summary>
     private static readonly Dictionary<int, Inventory> NoCrates = new();
     /// <summary>Whether every entry is a positive count of a known item or of a packed crate in <paramref name="crates"/>.</summary>
-    private bool ValidCounts(Dictionary<string, int> items, Dictionary<int, Inventory> crates) {
+    private bool ValidCounts(IReadOnlyDictionary<string, int> items, Dictionary<int, Inventory> crates) {
         foreach (var (item, count) in items) if (count <= 0 || !KnownItem(item, crates)) return false;
         return true;
     }
@@ -1988,6 +1988,17 @@ public sealed partial class World {
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }
+    /// <summary>Brings every inventory of a freshly parsed save in line with its totals, since an old save holds totals without stacks.</summary>
+    private static void RebuildAllStacks(SaveState save) {
+        foreach (var player in save.Players) { player.Backpack?.RebuildStacks(); RebuildAll(player.Crates?.Values); }
+        RebuildAll(save.Crates?.Values);
+        foreach (var worker in save.Workers) worker?.Bag?.RebuildStacks();
+        foreach (var thing in save.Things ?? new()) RebuildThing(thing);
+        foreach (var thing in save.Remembered?.Values ?? Enumerable.Empty<Thing>()) RebuildThing(thing);
+        static void RebuildAll(IEnumerable<Inventory>? boxes) { if (boxes != null) foreach (var box in boxes) box.RebuildStacks(); }
+        static void RebuildThing(Thing thing) { foreach (var box in Boxes(thing)) box?.RebuildStacks(); }
+    }
+
     public void Deserialize(string json) {
         // Older saves hold steel tools as one item: they load as steel parts, and a missing axe or pickaxe is made from one so the save stays playable.
         bool legacyTools = json.Contains("\"steel_tools\"");
@@ -1995,6 +2006,7 @@ public sealed partial class World {
         // Iron tools and parts left the game: older saves get the steel ones instead.
         json = json.Replace("\"iron_axe\"", "\"steel_axe\"").Replace("\"iron_pick\"", "\"steel_pick\"").Replace("\"iron_hammer\"", "\"steel_hammer\"").Replace("\"iron_parts\"", "\"steel_parts\"");
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
+        RebuildAllStacks(loaded);
         if (loaded.Version < 4) throw new InvalidOperationException("This save is from an older, smaller map and cannot be loaded. Start a new game.");
         if (loaded.Version is not (4 or 5) || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
         // Edited or older saves may hold missing, extra or unknown hotbar entries.
