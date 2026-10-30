@@ -158,8 +158,8 @@ public sealed class WorldUpdates {
         int length;
         // A buffer too small and corrupt data both fail, so the buffer grows only up to the limit.
         while (!BrotliDecoder.TryDecompress(packed, output, out length)) {
-            if (output.Length >= MaxUpdate) throw new JsonException("A message did not decompress.");
-            output = new byte[output.Length * 2];
+            if (output.Length >= MaxUpdate) { output = new byte[1 << 16]; throw new JsonException("A message did not decompress."); }
+            output = new byte[Math.Max(output.Length * 2, 1 << 16)];
         }
         return output.AsSpan(0, length);
     }
@@ -199,7 +199,8 @@ public sealed class WorldUpdates {
             reader.Skip();
             var value = json[start..(int)reader.BytesConsumed];
             if (gone) snapshot.Remove(key);
-            else snapshot[key] = patched ? Patch(snapshot[key], value) : value.ToArray();
+            else if (!patched) snapshot[key] = value.ToArray();
+            else snapshot[key] = snapshot.TryGetValue(key, out var entry) ? Patch(entry, value) : throw new JsonException("A patch names an entry the update builds on does not have.");
         }
         return snapshot;
     }
@@ -261,7 +262,7 @@ public sealed class WorldUpdates {
     }
 
     public static T Unpack<T>(byte[] packed) {
-        var output = new byte[packed.Length * 4];
+        var output = new byte[Math.Max(packed.Length * 4, 1 << 16)];
         return JsonSerializer.Deserialize<T>(Decompress(packed, ref output), Compact) ?? throw new JsonException("Empty message");
     }
 }

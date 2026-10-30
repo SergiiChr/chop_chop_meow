@@ -69,7 +69,7 @@ Allocation budgets:
 - `CheckWalkingFrames` in the UI checks holds real frames to a measured budget: a change that adds a third more garbage fails it, and one that removes some lowers the budget.
 - `CheckPanelRefresh` holds every panel page to 0 bytes a refresh while what it shows stays the same. Live panel text goes through `LiveText`, which rebuilds it in a reused buffer and hands Godot a new string only when it changes.
 - Real frames are measured only while walking, so per-frame code for gathering, a mauling or a settlement in view has no allocation check yet; review those paths by hand.
-- The host's network updates, ten a second, serialize the world and may allocate; they are not a per-tick path.
+- The host's network updates, ten a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
 `./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a walking, day/night and staffed-settlement run.
