@@ -137,6 +137,8 @@ void fragment() {
     }
 
     /// <summary>The black hole opens at the crate, pulls the picture into itself until only black is left, then the game is over.</summary>
+    private Tween? collapseTween;
+
     private void Collapse(Thing crate) {
         StopPulse(); anomalyWarning.Visible = false; ClosePanel(); paused = true;
         var size = GetViewport().GetVisibleRect().Size;
@@ -145,7 +147,7 @@ void fragment() {
         material.SetShaderParameter("aspect", size.X / size.Y);
         material.SetShaderParameter("progress", 0f);
         collapse.Visible = true;
-        var tween = collapse.CreateTween();
+        var tween = collapseTween = collapse.CreateTween();
         tween.TweenMethod(Callable.From<float>(p => material.SetShaderParameter("progress", p)), 0f, 1f, 5f);
         tween.TweenCallback(Callable.From(() => {
             reloadAfterCollapse.Disabled = LatestSlot() < 0;
@@ -155,6 +157,7 @@ void fragment() {
     }
 
     private void EndAnomaly() {
+        collapseTween?.Kill();
         anomaly.Visible = false; collapse.Visible = false; singularity.Visible = false; anomalyCrate = null;
     }
 

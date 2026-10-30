@@ -17,7 +17,7 @@ public partial class Game {
         net.Acted += view.Acted;
         net.Joined += OnJoined;
         net.Disconnected += ShowReconnecting;
-        net.Reconnecting += left => { reconnectStatus.Text = $"{Net.LostLine} Trying again for {left} more {(left == 1 ? "second" : "seconds")}."; };
+        net.Reconnecting += left => { if (GodotObject.IsInstanceValid(reconnectStatus)) reconnectStatus.Text = $"{Net.LostLine} Trying again for {left} more {(left == 1 ? "second" : "seconds")}."; };
         net.Left += reason => { leftReason = reason; DropWorld(); ShowStart(); };
         net.Failed += reason => { if (GodotObject.IsInstanceValid(joinStatus)) joinStatus.Text = reason; };
     }
@@ -72,7 +72,7 @@ public partial class Game {
 
     private void OnJoined(bool back) {
         StoreSetting("net", "address", net.Address);
-        slot = 0; selected = 0; workerId = 0; gathering = null; entering = null; lifting = null; assigningWorker = 0; endingSeen = false;
+        slot = 0; selected = 0; workerId = 0; gathering = null; entering = null; lifting = null; assigningWorker = 0; endingSeen = endingSeen && back;
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
         HideScreen(); menu.Visible = false; ending.Visible = false; ClosePanel();
         Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
