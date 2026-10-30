@@ -52,7 +52,7 @@ UI and input:
 
 | File | Owns |
 | --- | --- |
-| `src/Game.cs` | Creates and holds the interface's parts, routes input, save/load, the main game loop and command-line review flags |
+| `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
 | `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, how a player action runs, the buttons), `UiState` and `LiveText` |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
@@ -116,6 +116,7 @@ Checks and review tools:
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
+| `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs` | The rendered performance run |
 | `src/AnimationCapture.cs` | Captures the animation review |
 
