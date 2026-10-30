@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Fixtures;
 
 /// <summary>
 /// Holds code that runs every tick to its allocation budget: every byte it allocates is garbage the runtime collects later,
@@ -118,12 +119,11 @@ public static class AllocationChecks {
         var fire = world.Add(ThingKind.Campfire, at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
         var furnace = world.Add(ThingKind.Furnace, at + new Vector2(3, 3));
         var forge = world.Add(ThingKind.Reinforced, at + new Vector2(-3, 3)); forge.Heat = 90;
-        Worker Hire(Vector2 p) { var w = new Worker { Id = world.S.NextId++, Name = $"Worker {world.S.Workers.Count + 1}", Pos = p }; world.S.Workers.Add(w); return w; }
         foreach (var tree in world.S.Things.Where(t => t.Kind == ThingKind.Tree).OrderBy(t => t.Pos.DistanceTo(at)).Take(2))
-            world.Assign(Hire(rack.Pos), tree);
-        world.Assign(Hire(forge.Pos + World.BellowsStand), forge);
-        world.Assign(Hire(chest.Pos), forge);
-        world.Assign(Hire(chest.Pos), furnace);
+            world.Assign(AddWorker(world, rack.Pos), tree);
+        world.Assign(AddWorker(world, forge.Pos + World.BellowsStand), forge);
+        world.Assign(AddWorker(world, chest.Pos), forge);
+        world.Assign(AddWorker(world, chest.Pos), furnace);
         return world;
     }
 }

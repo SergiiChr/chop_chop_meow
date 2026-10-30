@@ -9,8 +9,6 @@ using static Fixtures;
 
 /// <summary>Deterministic checks for the playable simulation, independent of the rendered scene.</summary>
 public static class SimulationChecks {
-    private const float Step = .25f;
-
     public static void Run(GameData data) {
         InventoryLayoutChecks.Run(data);
         ChopChopMeow.Tests.WaterChecks.Run(data);
@@ -87,20 +85,6 @@ public static class SimulationChecks {
         MultiplayerChecks.Run(data);
         AllocationChecks.Run(data);
         GD.Print("SELF-TEST PASS");
-    }
-
-    /// <summary>Rewrites a save into an older form, failing when a text it rewrites is missing so the fixture cannot silently stop testing anything.</summary>
-    private static string Patch(string json, params (string Old, string New)[] edits) {
-        foreach (var (old, replacement) in edits) {
-            Require(json.Contains(old), $"save fixture text {old} is missing");
-            json = json.Replace(old, replacement);
-        }
-        return json;
-    }
-
-    private static void SetCoins(World world, int coins) {
-        world.S.Backpack.Remove(Inventory.Coins, world.Coins);
-        world.S.Backpack.Add(Inventory.Coins, coins);
     }
 
     /// <summary>A worker with jobs at two places takes turns at them, and taking one job away keeps the other.</summary>
@@ -433,7 +417,6 @@ public static class SimulationChecks {
         worker!.Tool = "steel_axe";
         world.Assign(worker, workTarget);
         SetCoins(world, 0);
-        sign.Wages!.Remove(Inventory.Coins, sign.Wages[Inventory.Coins]);
         world.S.Time = data.DaySeconds * world.Day - .1f;
         SafeTick(world, .2f);
         Require(worker!.WageDebt == cheap.Wage && workTarget.Remaining == 6 && worker.Bag.Count == 0,
@@ -769,13 +752,6 @@ public static class SimulationChecks {
         }
     }
 
-    private static World NightWorld(GameData data) {
-        var world = EmptyWorld(data);
-        world.Player = new Vector2(20, 20);
-        world.S.Time = data.DaySeconds * (data.NightStarts + .02f);
-        return world;
-    }
-
     private static void CheckWolfHuntAndMeat(GameData data) {
         var chase = NightWorld(data);
         var runner = new Wolf { Pos = chase.Player + new Vector2(8, 0) };
@@ -893,12 +869,6 @@ public static class SimulationChecks {
                 "nighttime sleep should advance survival needs and clear wolves at dawn");
     }
 
-    private static List<Thing> Known(World world) {
-        var known = new List<Thing>();
-        world.CollectKnown(known);
-        return known;
-    }
-
     private static void CheckFogOfWar(GameData data) {
         var fresh = new World(data);
         var far = World.CliffOf(ThingKind.Coal).Center;
@@ -934,24 +904,6 @@ public static class SimulationChecks {
         SafeTick(world, Step);
         Require(Known(world).Single(t => t.Id == tree.Id).Remaining == 0,
                 "looking again should replace the memory with the current state");
-    }
-
-    private static void GatherUntil(World world, Thing resource, string item, int quantity) {
-        world.Player = resource.Pos;
-        int attempts = 0;
-        while (world.S.Backpack[item] < quantity && attempts++ < 200) {
-            int before = world.S.Backpack[item];
-            world.Gather(resource, world.Data.GatherSeconds);
-            Require(world.S.Backpack[item] > before, $"gathering {item} should produce raw material");
-            SafeTick(world, world.Data.GatherSeconds);
-        }
-        Require(world.S.Backpack[item] >= quantity, $"gathered enough {item} for the progression");
-    }
-
-    private static void PickUp(World world, Thing loose) {
-        world.Player = loose.Pos;
-        world.Gather(loose, 0);
-        Require(world.Find(loose.Id) == null, $"picking up {loose.Kind} should take the whole piece at once");
     }
 
     private static void CheckCliffsAndLoosePickup(GameData data) {
@@ -1002,32 +954,6 @@ public static class SimulationChecks {
         Require(world.Find(assigned.Id) == null && worker.Bag["coal"] == 2,
                 "a worker should pick up a loose piece at once, and it should not linger as an empty pile");
     }
-
-    private static Thing BuildAt(World world, ThingKind kind, Vector2 position) {
-        world.Player = position + new Vector2(-2, 0);
-        var built = world.Build(kind, position);
-        Require(built != null, $"build {kind} at a clear nearby location");
-        return built!;
-    }
-
-    private static void CompleteBatches(World world, Thing station, string output, int quantity, bool pump = false) {
-        int limit = 3000;
-        while (station.Inventory[output] < quantity && limit-- > 0) {
-            if (pump && station.Heat < 90) world.Pump(station);
-            SafeTick(world, .25f);
-        }
-        Require(limit > 0 && station.Inventory[output] >= quantity,
-                $"station should complete {quantity} {output} batch(es): kind={station.Kind}, recipe={station.Recipe}, output={station.Inventory[output]}, processing={station.Processing}, progress={station.Progress:0.0}, player={world.Player}, stationPos={station.Pos}, health={world.S.Health:0.0}, time={world.S.Time:0.0}");
-    }
-
-    private static void CraftByHand(World world, string recipe, int times) {
-        for (int i = 0; i < times; i++) Require(world.Craft(recipe), $"{recipe} should be craftable by hand: {world.CraftBlock(recipe)}");
-        for (int limit = 400; world.S.Crafting.Count > 0 && limit > 0; limit--) SafeTick(world, .25f);
-        Require(world.S.Crafting.Count == 0, $"hand crafting {recipe} should finish: rate={world.CraftRate}, progress={world.S.CraftTime}, slots={world.S.Backpack.UsedSlots}, items={string.Join(",", world.S.Backpack.Items.Select(p => p.Key + "=" + p.Value))}, room={world.S.Backpack.Room(world.Data.Recipes[recipe].Output)}");
-    }
-
-    /// <summary>A spot in the open middle of the valley, so the progression run has room to build.</summary>
-    private static Vector2 Site(float x, float y) => new(x + 60, y + 60);
 
     /// <summary>Plays from raw materials to a first hired worker: each stage hands the next what the player built with real recipes and trade delays.</summary>
     private static void CheckActualProgression(GameData data) {
@@ -1159,8 +1085,9 @@ public static class SimulationChecks {
                 "steel-tool payment should remain in transit until the trade delay elapses");
         SafeTick(world, .2f);
         sign.Wages!.TransferTo(world.S.Backpack, Inventory.Coins, sign.Wages[Inventory.Coins]);
-        Require(world.Coins >= data.HireOffers[1].Upfront && world.S.Milestones.Contains("sold_steel"),
-                $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, upfront={data.HireOffers[1].Upfront:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_pick"]}");
+        var offer = data.HireOffers[1];
+        Require(world.Coins >= offer.Upfront && world.S.Milestones.Contains("sold_steel"),
+                $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, upfront={offer.Upfront:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_pick"]}");
     }
 
     private static void CheckHiredWorkerSuppliesOpeningCamp(World world, Thing sign, Thing tree, Thing stone) {
@@ -1287,21 +1214,6 @@ public static class SimulationChecks {
         Require(world.S.Torch == 0 && !world.S.TorchLit && world.S.Backpack["torch"] == 1, "a torch should burn out for good");
         world.UseTorch(Vector2.Zero); world.Die();
         Require(world.S.Torch == 0 && !world.S.TorchLit && world.S.TorchKindling == 0, "a torch should go out when the player falls");
-    }
-
-    private static World TorchNight(GameData data) {
-        var world = NightWorld(data);
-        world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); world.Tick(World.KindleSeconds + .1f);
-        Require(world.S.TorchLit, "the torch fixture should be lit");
-        return world;
-    }
-
-    /// <summary>Ticks a night with only the given wolves, so new arrivals do not interfere.</summary>
-    private static void WolfTick(World world, float seconds, params Wolf[] keep) {
-        for (float t = 0; t < seconds; t += .1f) {
-            world.S.Hunger = world.S.Thirst = 100; world.Tick(.1f);
-            world.S.Wolves.RemoveAll(w => !keep.Contains(w));
-        }
     }
 
     private static void CheckTorchAndWolves(GameData data) {

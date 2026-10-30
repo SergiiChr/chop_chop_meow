@@ -8,8 +8,6 @@ using static Fixtures;
 
 /// <summary>Simulation checks for mines and the end goals.</summary>
 public static class MineChecks {
-    private const float Step = .25f;
-
     public static void Run(GameData data) {
         CheckAlignmentAndLegacySave(data);
         CheckMarking(data);
@@ -18,28 +16,6 @@ public static class MineChecks {
         CheckOnlyAvailableMinersUnload(data);
         CheckMiningIsSlowerThanDeposits(data);
         CheckDailyProfitAndEndGoals(data);
-    }
-
-    /// <summary>An empty map with coins enough to pay every wage, so no worker strikes.</summary>
-    private static World FundedWorld(GameData data) {
-        var world = new World(data, false);
-        world.S.Backpack.Add(Inventory.Coins, 1000);
-        return world;
-    }
-
-    /// <summary>Runs the world with the player fed and out of the wolves' way, through nights as well, until a condition holds.</summary>
-    private static void Work(World world, float seconds, Func<bool>? until = null) {
-        for (; seconds > 0 && until?.Invoke() != true; seconds -= Step) {
-            world.S.Hunger = world.S.Thirst = world.S.Health = 100;
-            world.Tick(Step, true);
-        }
-    }
-
-    /// <summary>A mine marked at the first cliff of an ore, with the player standing in front of it.</summary>
-    private static Thing MarkMine(World world, ThingKind ore = ThingKind.Iron) {
-        var cliff = World.CliffOf(ore);
-        world.Player = World.MineSpot(cliff) + cliff.Face * 3;
-        return world.Build(ThingKind.Mine, World.MineSpot(cliff) + cliff.Along + cliff.Face) ?? throw new InvalidOperationException($"Mine check failed: a mine should be marked at the {ore} cliff");
     }
 
     private static void CheckAlignmentAndLegacySave(GameData data) {
