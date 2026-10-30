@@ -70,7 +70,7 @@ UI and input:
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/Guide.cs` | The field guide topics |
 | `src/Needs.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
-| `src/Ending.cs` | The one-time ending screen |
+| `src/EndingScreen.cs` | The one-time ending screen |
 | `src/StartMenu.cs` | The start menu with its save slot, load and options screens |
 | `src/Hotbar.cs` | Nine saved item/plan references, assignment, icons and use |
 | `src/NetMenu.cs` | The host and join menus |

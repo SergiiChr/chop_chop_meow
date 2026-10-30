@@ -45,6 +45,7 @@ public partial class Game : Node {
     /// <summary>The backpack crate being placed while the build mode is "crate".</summary>
     private string placingCrate = "";
     private UiKit kit = null!;
+    private EndingScreen ending = null!;
     private UiState state = null!;
     private float uiClock;
     private float autosave;
@@ -177,7 +178,7 @@ public partial class Game : Node {
         // Raised above the centred player so a downed body stays visible under the message.
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
-        BuildNeeds(); BuildEnding(); BuildMenu(); BuildScreens(); BuildAnomaly(); RefreshLive();
+        BuildNeeds(); ending = new EndingScreen(kit, ClosePanel, Restart); ui.AddChild(ending); BuildMenu(); BuildScreens(); BuildAnomaly(); RefreshLive();
     }
     private void Notify(string message) {
         if (message == Water.FullBottleWarning && waterWarning != null) { waterWarning.Text = message; waterWarningClock = 7; } else messages?.Post(message);
@@ -702,6 +703,14 @@ public partial class Game : Node {
         int minutes = (int)(seconds / world.Data.DaySeconds * 1440);
         return text.Append(minutes / 60).Append(" h ").Append(minutes % 60).Append(" min");
     }
+    private void Restart() {
+        net.Leave();
+        world.NewGame();
+        selected = 0; workerId = 0; gathering = null; assigningWorker = 0; slot = 0; autosave = 0;
+        view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0;
+        ending.Visible = false; state.Paused = false; OpenPage("welcome");
+        Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
+    }
     private void Save(int n) {
         try {
             using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Write); if (file == null) throw new InvalidOperationException("Cannot open save file");
@@ -848,7 +857,7 @@ public partial class Game : Node {
         if (running) {
             float health = world.Remote ? shownHealth : world.S.Health;
             if (!world.Remote) world.Tick(dt);
-            ShowEndingOnce(); autosave += dt;
+            ending.ShowOnce(); autosave += dt;
             DamageFlash(health - world.S.Health); shownHealth = world.S.Health;
             // A guest saves its player whenever it changes instead; the world is the host's to save.
             if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) Save(0); autosave = 0; }
