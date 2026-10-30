@@ -116,7 +116,7 @@ public partial class Game {
         await ClickOn(table); await Frames(3);
         await Click(Cell(1, c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal)));
         Require(waterWarning.Text == Water.FullBottleWarning, "Trying a partial bottle must show the full-bottle warning text.");
-        Require(waterWarning.GetGlobalRect().Position.X < 50, "The full-bottle warning must sit at the left of the screen.");
+        Require(waterWarning.GetGlobalRect().Position.X < 50, "The full-bottle warning must sit at the left of the startMenu.Screen.");
         Require(waterWarning.Size.X > 300, "The full-bottle warning must be wide enough to read.");
         Require(waterWarning.Size.Y < 50, "The full-bottle warning must be a single short line.");
         Require(waterWarning.GetGlobalRect().End.Y < bag.GetGlobalRect().Position.Y, "The full-bottle warning must sit above the backpack.");

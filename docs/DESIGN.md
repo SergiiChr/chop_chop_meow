@@ -88,10 +88,10 @@ UI and input:
 | `src/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
-| `src/StartMenu.cs` | The start menu with its save slot, load and options screens |
+| `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots, the settings file and the command line |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
-| `src/NetMenu.cs` | The host and join menus |
+| `src/NetMenu.cs` | Hosting, and what happens around joining and leaving |
 
 Rendering and sound:
 

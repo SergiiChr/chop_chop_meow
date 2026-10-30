@@ -119,7 +119,7 @@ public partial class Game {
     private async Task ClickOn(Thing thing) {
         await Frames();
         var spots = Enumerable.Range(0, 24).Select(i => view.Screen(thing.Pos, i * .15f)).Where(p => view.Pick(p)?.Id == thing.Id && view.PickWorker(p) == null && Uncovered(p)).ToArray();
-        Require(spots.Length > 0, $"No spot on the {thing.Kind} can be clicked: it is off screen, hidden or under a panel.");
+        Require(spots.Length > 0, $"No spot on the {thing.Kind} can be clicked: it is off startMenu.Screen, hidden or under a panel.");
         await Click(spots[0]);
     }
 

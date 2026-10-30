@@ -28,8 +28,8 @@ public partial class Game {
         var side = new VBoxContainer { CustomMinimumSize = new Vector2(220, 0) }; side.AddThemeConstantOverride("separation", 12); body.AddChild(side);
         var resume = kit.BigButton("Resume · Esc", Style.Brick, CloseMenu); resume.Name = "resume"; side.AddChild(resume);
         foreach (var (text, action) in new (string, Action)[] {
-            ("Save", () => ShowSlots(true, BackToPause)), ("Load", () => ShowSlots(false, BackToPause)), ("Options", () => ShowOptions(BackToPause)),
-            ("New game", () => ConfirmLeave("NEW GAME", "Start a new game", () => { HideScreen(); Restart(); })), ("Quit", () => ConfirmLeave("QUIT", "Quit to desktop", () => Quit())),
+            ("Save", () => startMenu.ShowSlots(true, BackToPause)), ("Load", () => startMenu.ShowSlots(false, BackToPause)), ("Options", () => startMenu.ShowOptions(BackToPause)),
+            ("New game", () => ConfirmLeave("NEW GAME", "Start a new game", () => { startMenu.Close(); Restart(); })), ("Quit", () => ConfirmLeave("QUIT", "Quit to desktop", () => Quit())),
         }) {
             var button = MenuButton(text, Style.Enamel, action); button.Name = text.ToLowerInvariant().Replace(' ', '_'); side.AddChild(button);
             if (text == "Save") saveButton = button;
@@ -38,7 +38,7 @@ public partial class Game {
         }
         side.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill });
         hostButton = MenuButton("Host", Style.Sage, HostGame); hostButton.Name = "host"; side.AddChild(hostButton);
-        joinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); DropWorld(); ShowStart(); } else ShowJoin(BackToPause, true); }); joinButton.Name = "join_game"; side.AddChild(joinButton);
+        joinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); DropWorld(); startMenu.ShowStart(); } else startMenu.ShowJoin(BackToPause, true); }); joinButton.Name = "join_game"; side.AddChild(joinButton);
         netLine = Style.Text("", 13, Style.Beige); netLine.HorizontalAlignment = HorizontalAlignment.Center; netLine.AutowrapMode = TextServer.AutowrapMode.WordSmart; side.AddChild(netLine);
     }
 
@@ -103,14 +103,16 @@ public partial class Game {
         menu.Visible = true; state.Paused = true;
     }
 
+    private void BackToPause() { startMenu.Close(); OpenMenu(); }
+
     private void CloseMenu() { menu.Visible = false; state.Paused = false; }
 
     /// <summary>Asks before leaving the settlement, since anything done after the last save would be lost.</summary>
     private void ConfirmLeave(string heading, string confirm, Action leave) {
-        OpenScreen(heading, BackToPause);
+        startMenu.Open(heading, BackToPause);
         var note = Style.Wrapped(net.Hosting ? "Progress since the last save is lost, and your guests are disconnected." : "Progress since the last save is lost.", 14);
-        note.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(note);
-        AddScreenButton(confirm, leave);
-        AddScreenButton("Back · Esc", BackToPause);
+        note.HorizontalAlignment = HorizontalAlignment.Center; startMenu.Screen.AddChild(note);
+        startMenu.AddButton(confirm, leave);
+        startMenu.AddButton("Back · Esc", BackToPause);
     }
 }

@@ -43,32 +43,32 @@ public partial class Game {
     /// <summary>Join game on the start menu, the address typed into the popup and the port as it comes; tried again until the host is up.</summary>
     private async Task JoinFromStart() {
         for (ulong until = Time.GetTicksMsec() + 45000; !world.Remote;) {
-            if (Time.GetTicksMsec() > until) Require(false, $"joining the host never happened: {joinStatus.Text}");
-            await Click(FindButton(screen, "Join game")!);
-            var port = (LineEdit)screen.FindChild("port", true, false);
+            if (Time.GetTicksMsec() > until) Require(false, $"joining the host never happened: {startMenu.JoinStatus}");
+            await Click(FindButton(startMenu.Screen, "Join game")!);
+            var port = (LineEdit)startMenu.Screen.FindChild("port", true, false);
             Require(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
             await Click(port); await KeyStroke(Key.End);
             while (port.Text != "") await KeyStroke(Key.Backspace);
             await Type(CheckPort.ToString());
-            var address = (LineEdit)screen.FindChild("address", true, false);
+            var address = (LineEdit)startMenu.Screen.FindChild("address", true, false);
             // The popup offers the address of the last game joined.
             if (address.Text == "") {
                 await Click(address); await Type("127.0.0.1");
             } else Require(address.Text == "127.0.0.1", "The join popup must offer the last address joined.");
-            await Click(FindButton(screen, "Join")!);
-            for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && joinStatus.Text == "Connecting…";) await Frames(1);
+            await Click(FindButton(startMenu.Screen, "Join")!);
+            for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && startMenu.JoinStatus == "Connecting…";) await Frames(1);
             if (!world.Remote) {
-                await Click(FindButton(screen, "Back · Esc")!);
-                await Until(() => FindButton(screen, "Join game") != null, "the start menu after backing out of a failed join", 5);
+                await Click(FindButton(startMenu.Screen, "Back · Esc")!);
+                await Until(() => FindButton(startMenu.Screen, "Join game") != null, "the start menu after backing out of a failed join", 5);
             }
         }
-        await Until(() => !backdrop.Visible, "the join popup closing");
+        await Until(() => !startMenu.Visible, "the join popup closing");
     }
 
     private async Task LeaveGame() {
         await CloseWithEsc(); await KeyStroke(Key.Escape);
         Require(menu.Visible && joinButton.Text == "Leave game" && saveButton.Disabled, "A guest's pause menu must offer to leave and not to save the host's world.");
         await Click(joinButton);
-        Require(!world.Remote && backdrop.Visible && Godot.FileAccess.FileExists(GuestSave), "Leaving must save the guest's player and return to the start menu.");
+        Require(!world.Remote && startMenu.Visible && Godot.FileAccess.FileExists(GuestSave), "Leaving must save the guest's player and return to the start menu.");
     }
 }

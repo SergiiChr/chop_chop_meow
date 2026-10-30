@@ -4,22 +4,17 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Hosting the current game, the join popup, and what happens around joining and leaving.</summary>
+/// <summary>Hosting the current game, and what happens around joining and leaving.</summary>
 public partial class Game {
-    private Label joinStatus = null!;
-    private Label reconnectStatus = null!;
-    /// <summary>Why the last joined game ended, shown once on the start menu.</summary>
-    private string leftReason = "";
-
     private void ConnectNet() {
         net.Said += Notify;
         net.Heard += PlayWorldSound;
         net.Acted += view.Acted;
         net.Joined += OnJoined;
         net.Disconnected += ShowReconnecting;
-        net.Reconnecting += left => { if (GodotObject.IsInstanceValid(reconnectStatus)) reconnectStatus.Text = $"{Net.LostLine} Trying again for {left} more {(left == 1 ? "second" : "seconds")}."; };
-        net.Left += reason => { leftReason = reason; DropWorld(); ShowStart(); };
-        net.Failed += reason => { if (GodotObject.IsInstanceValid(joinStatus)) joinStatus.Text = reason; };
+        net.Reconnecting += left => startMenu.ShowRetry(left);
+        net.Left += reason => { startMenu.LeftReason = reason; DropWorld(); startMenu.ShowStart(); };
+        net.Failed += reason => startMenu.ShowJoinFailure(reason);
     }
 
     private void HostGame() {
@@ -34,38 +29,8 @@ public partial class Game {
     private string NetStatus() => net.Hosting ? $"Hosting on port {Net.DefaultPort} · {net.Guests} {(net.Guests == 1 ? "guest" : "guests")}"
         : world.Remote ? "Playing in the host's world. Your player saves on this computer." : "";
 
-    /// <summary>The join popup: the host's address and port, which starts out as the port a host opens.</summary>
-    /// <param name="inGame">Opened from the pause menu: the game in progress is autosaved before the host's world replaces it.</param>
-    private void ShowJoin(Action back, bool inGame) {
-        OpenScreen("JOIN A GAME", () => { if (net.Connecting) net.Leave(); back(); });
-        var address = new LineEdit { Name = "address", Text = Settings.Get("net", "address", ""), PlaceholderText = "Host address, such as 192.168.1.20", CustomMinimumSize = new Vector2(0, 38) };
-        var port = new LineEdit { Name = "port", Text = Net.DefaultPort.ToString(), CustomMinimumSize = new Vector2(0, 38) };
-        foreach (var (text, field) in new[] { ("Address", address), ("Port", port) }) {
-            var row = new HBoxContainer(); screen.AddChild(row);
-            var label = Style.Wrapped(text); label.CustomMinimumSize = new Vector2(80, 0); row.AddChild(label);
-            field.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(field);
-        }
-        joinStatus = Style.Wrapped("", 14, Style.Beige); screen.AddChild(joinStatus);
-        var join = kit.Button("Join", () => {
-            if (!int.TryParse(port.Text.Trim(), out int number) || number is < 1 or > 65535) { joinStatus.Text = "The port is a number from 1 to 65535."; return; }
-            if (address.Text.Trim() == "") { joinStatus.Text = "Enter the host's address."; return; }
-            if (inGame && !world.Remote) saves.Save(0);
-            var error = net.Join(address.Text.Trim(), number);
-            joinStatus.Text = error == Error.Ok ? "Connecting…" : $"Could not connect: {error}.";
-        });
-        join.Name = "join"; screen.AddChild(join);
-        address.TextSubmitted += _ => join.EmitSignal(BaseButton.SignalName.Pressed);
-        AddScreenButton("Back · Esc", () => screenBack?.Invoke());
-        address.CallDeferred(Control.MethodName.GrabFocus);
-    }
-
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
-    private void ShowReconnecting() {
-        DropWorld();
-        OpenScreen("RECONNECTING", () => { net.Leave(); ShowStart(); });
-        reconnectStatus = Style.Wrapped("", 14, Style.Beige); screen.AddChild(reconnectStatus);
-        AddScreenButton("Stop · Esc", () => screenBack?.Invoke());
-    }
+    private void ShowReconnecting() { DropWorld(); startMenu.ShowReconnecting(); }
 
     /// <summary>Replaces the world with a new one and closes everything that showed the old one.</summary>
     private void DropWorld() { world.NewGame(); panel.Close(); ending.Visible = false; blackHole.End(); }
@@ -74,7 +39,7 @@ public partial class Game {
         Settings.Store("net", "address", net.Address);
         saves.Slot = 0; state.Selected = 0; state.WorkerId = 0; gathering = null; state.Entering = null; lifting = null; state.AssigningWorker = 0; ending.Joined(back);
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
-        HideScreen(); menu.Visible = false; ending.Visible = false; panel.Close();
+        startMenu.Close(); menu.Visible = false; ending.Visible = false; panel.Close();
         Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
     }
 }

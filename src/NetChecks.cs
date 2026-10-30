@@ -23,7 +23,7 @@ public partial class Game {
 
     private async Task HostNetCheck() {
         RemoveCheckFiles(); await Frames(4);
-        await Click(FindButton(screen, "New game")!); await CloseWithEsc();
+        await Click(FindButton(startMenu.Screen, "New game")!); await CloseWithEsc();
         RemoveThings(world, t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
         world.Add(ThingKind.LooseCoal, NetOre, 2); world.Add(ThingKind.LooseCoal, NetCoal, 2);
         var chest = world.Add(ThingKind.Chest, NetChest); var hut = world.Add(ThingKind.Hut, NetHut);
@@ -66,7 +66,7 @@ public partial class Game {
     private async Task GuestNetCheck() {
         RemoveCheckFiles(); DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(GuestSave)); await Frames(4);
         await JoinFromStart();
-        Require(!backdrop.Visible && world.Players.Count == 2 && world.Things.Any(t => t.Kind == ThingKind.Chest && t.Pos == NetChest), "Joining must replace the start menu with the host's world.");
+        Require(!startMenu.Visible && world.Players.Count == 2 && world.Things.Any(t => t.Kind == ThingKind.Chest && t.Pos == NetChest), "Joining must replace the start menu with the host's world.");
         Require(world.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
         await Until(() => view.ShowsPlayer(1), "the host's figure appearing");
 
@@ -91,22 +91,22 @@ public partial class Game {
         await JoinFromStart();
         Require(world.Carried("coal") == 2, "A guest must come back with what it carried when it left.");
         Signal("joined");
-        await Until(() => backdrop.Visible && HasLabel(screen, "RECONNECTING"), "a dropped guest being told it is reconnecting", 60);
-        await Until(() => world.Remote && !backdrop.Visible, "a dropped guest getting back in by itself", 90);
+        await Until(() => startMenu.Visible && HasLabel(startMenu.Screen, "RECONNECTING"), "a dropped guest being told it is reconnecting", 60);
+        await Until(() => world.Remote && !startMenu.Visible, "a dropped guest getting back in by itself", 90);
         Require(world.Carried("coal") == 2, "A guest must reconnect with what it carried when the line dropped.");
         await LeaveGame();
         using (var file = Godot.FileAccess.Open(GuestSave, Godot.FileAccess.ModeFlags.Write)) file.StoreString("{ broken");
         await JoinFromStart();
         Require(world.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A broken save must bring the guest in with an empty backpack at the clearing.");
         Signal("joined");
-        await Until(() => backdrop.Visible && HasLabel(screen, "RECONNECTING"), "the guest being told it is reconnecting again", 60);
-        await Click(FindButton(screen, "Stop · Esc")!);
-        Require(!net.Retrying && FindButton(screen, "Join game") != null, "Stopping must end the tries and return to the start menu.");
+        await Until(() => startMenu.Visible && HasLabel(startMenu.Screen, "RECONNECTING"), "the guest being told it is reconnecting again", 60);
+        await Click(FindButton(startMenu.Screen, "Stop · Esc")!);
+        Require(!net.Retrying && FindButton(startMenu.Screen, "Join game") != null, "Stopping must end the tries and return to the start menu.");
         Signal("stopped");
         net.ReconnectLimit = 3;
         await JoinFromStart();
         Signal("joined");
-        await Until(() => backdrop.Visible && HasLabel(screen, "Lost the connection to the host") && FindButton(screen, "Join game") != null, "a guest giving up on a host that stays gone and saying why", 90);
+        await Until(() => startMenu.Visible && HasLabel(startMenu.Screen, "Lost the connection to the host") && FindButton(startMenu.Screen, "Join game") != null, "a guest giving up on a host that stays gone and saying why", 90);
         Require(!net.Retrying && !world.Remote, "A guest that gave up must stop trying.");
     }
 

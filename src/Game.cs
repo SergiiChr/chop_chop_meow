@@ -37,6 +37,7 @@ public partial class Game : Node {
     private const float AutosaveSeconds = 300;
     private Net net = null!;
     private Saves saves = null!;
+    private StartMenu startMenu = null!;
     /// <summary>Health as last shown, so a guest flashes the damage its updates bring.</summary>
     private float shownHealth;
     private float runTime;
@@ -64,7 +65,7 @@ public partial class Game : Node {
             SetTheme(); BuildHud();
             GetViewport().UseTaa = Settings.Taa;
             if (Launch.Has("--showcase")) Showcase();
-            else if (!Launch.Has("--animation-review")) ShowStart();
+            else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
             if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
             StartPerformanceRun();
             if (Launch.Has("--ui-test")) RunUIChecks();
@@ -104,7 +105,7 @@ public partial class Game : Node {
     }
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private void BuildHud() {
-        blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), saves.Latest, LoadSlot, ShowStart); AddChild(blackHole);
+        blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), saves.Latest, n => startMenu.LoadSlot(n), () => startMenu.ShowStart()); AddChild(blackHole);
         moves = new ItemMoves(kit, blackHole);
         panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;
         hotbar = new Hotbar(kit, view, panel);
@@ -118,7 +119,8 @@ public partial class Game : Node {
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         needsPlate = new NeedsPlate(kit, moves, damageEdges); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
-        ending = new EndingScreen(kit, panel.Close, Restart); ui.AddChild(ending); BuildMenu(); BuildScreens();
+        ending = new EndingScreen(kit, panel.Close, Restart); ui.AddChild(ending); BuildMenu();
+        startMenu = new StartMenu(kit, saves, net, panel, ending, () => menu.Visible = false, Restart, () => Quit()); ui.AddChild(startMenu);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
         RefreshLive();
     }
@@ -149,7 +151,7 @@ public partial class Game : Node {
         if (view?.EnvironmentReview == true) return;
         if (world == null || view == null || ending.Visible) return;
         if (blackHole.Showing) { if (blackHole.Asking && ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) blackHole.Cancel(); return; }
-        if (backdrop.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) screenBack?.Invoke(); return; }
+        if (startMenu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) startMenu.Back(); return; }
         if (menu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) CloseMenu(); return; }
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
@@ -162,8 +164,8 @@ public partial class Game : Node {
                 case Key.C: if (state.Page == "craft") panel.Close(); else panel.Open("craft"); break;
                 case Key.Tab: if (state.Page == "inventory") panel.Close(); else panel.Open("inventory"); break;
                 // Until a numbered slot is chosen, quick save and load ask which slot to use.
-                case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (saves.Slot > 0) saves.Save(saves.Slot); else ShowSlots(true, HideScreen); break;
-                case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (saves.Slot > 0) saves.Load(saves.Slot); else ShowSlots(false, HideScreen); break;
+                case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (saves.Slot > 0) saves.Save(saves.Slot); else startMenu.ShowSlots(true, startMenu.Close); break;
+                case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (saves.Slot > 0) saves.Load(saves.Slot); else startMenu.ShowSlots(false, startMenu.Close); break;
                 case >= Key.Key1 and <= Key.Key9: hotbar.Select((int)(key.PhysicalKeycode - Key.Key1)); break;
                 case Key.E:
                     var t = world.Find(state.Selected);

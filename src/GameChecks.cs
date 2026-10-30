@@ -90,7 +90,7 @@ public partial class Game {
         Require(old != null, "Every tree must have its model once the world has loaded.");
         CheckFadingCanopyKeepsItsCutoutShadows(old!);
         old!.Fade = .68f; old.Fall = 9;
-        await Click(FindButton(screen, "New game")!);
+        await Click(FindButton(startMenu.Screen, "New game")!);
         var fresh = view.PropOf(tree.Id) as TreeProp;
         Require(world.Find(tree.Id)?.Kind == ThingKind.Tree, "A new game must keep a tree where the last game's tree stood.");
         Require(fresh != null, "A new game must build a model for that tree.");
@@ -373,7 +373,7 @@ public partial class Game {
         Require(blackHole.Collapsing && !blackHole.Asking, "Yes must open the black hole.");
         await Until(() => blackHole.GameOverShown, "the collapse ending on the game over screen", 10);
         await Click((Control)blackHole.FindChild("menu_after_collapse", true, false));
-        Require(!blackHole.Showing && backdrop.Visible && FindButton(screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
+        Require(!blackHole.Showing && startMenu.Visible && FindButton(startMenu.Screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
     }
 
     private async Task CheckMouseWheelOverPanelDoesNotZoom() {
@@ -428,36 +428,36 @@ public partial class Game {
         // A failed earlier run may have left saves behind, which would enable Continue.
         // Going to the options and back rereads the saves the removal just cleared.
         RemoveCheckFiles(); await Frames(4);
-        await Click(FindButton(screen, "Options")!); await KeyStroke(Key.Escape);
-        Require(backdrop.Visible, "Launch must show the start menu.");
+        await Click(FindButton(startMenu.Screen, "Options")!); await KeyStroke(Key.Escape);
+        Require(startMenu.Visible, "Launch must show the start menu.");
         Require(view.Paused, "Launch must hold the world.");
-        Require(FindButton(screen, "New game") != null, "Launch must offer a new game.");
-        Require(FindButton(screen, "Continue")!.Disabled, "Launch must offer no save to continue.");
+        Require(FindButton(startMenu.Screen, "New game") != null, "Launch must offer a new game.");
+        Require(FindButton(startMenu.Screen, "Continue")!.Disabled, "Launch must offer no save to continue.");
         float launchTime = world.Time; await KeyStroke(Key.Escape);
-        Require(backdrop.Visible && world.Time == launchTime, "Esc must not leave the start menu, and the world must not advance behind it.");
-        await Click(FindButton(screen, "Options")!);
-        var picker = (OptionButton)screen.FindChild("resolution", true, false);
-        Require(picker.Selected == Array.IndexOf(Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
+        Require(startMenu.Visible && world.Time == launchTime, "Esc must not leave the start menu, and the world must not advance behind it.");
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        var picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
+        Require(picker.Selected == Array.IndexOf(StartMenu.Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
         await Choose(picker, 0);
-        var limits = (OptionButton)screen.FindChild("frame_limit", true, false);
+        var limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
         Require(limits.Selected == 0 && limits.GetItemText(0) == "Off" && Engine.MaxFps == 0, "The frame rate limit must start off.");
         await Choose(limits, 2);
         Require(Engine.MaxFps == 90, "Choosing a frame rate limit must cap the frame rate.");
-        var taa = (CheckButton)screen.FindChild("taa", true, false);
+        var taa = (CheckButton)startMenu.Screen.FindChild("taa", true, false);
         Require(taa.ButtonPressed && GetViewport().UseTaa, "Temporal anti-aliasing must start on.");
         await Click(taa);
         Require(!GetViewport().UseTaa, "Switching temporal anti-aliasing off must apply it at once.");
-        var musicSlider = (HSlider)screen.FindChild("music", true, false);
+        var musicSlider = (HSlider)startMenu.Screen.FindChild("music", true, false);
         Require(musicSlider.Value == 100, "Music must start at full volume.");
         await Click(musicSlider);
         Require(Mathf.IsEqualApprox(sounds.MusicVolume, .5f), "The music slider must set the music volume.");
         async Task ReopenOptions() {
             await KeyStroke(Key.Escape);
-            await Click(FindButton(screen, "Options")!);
-            picker = (OptionButton)screen.FindChild("resolution", true, false);
-            limits = (OptionButton)screen.FindChild("frame_limit", true, false);
-            taa = (CheckButton)screen.FindChild("taa", true, false);
-            musicSlider = (HSlider)screen.FindChild("music", true, false);
+            await Click(FindButton(startMenu.Screen, "Options")!);
+            picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
+            limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
+            taa = (CheckButton)startMenu.Screen.FindChild("taa", true, false);
+            musicSlider = (HSlider)startMenu.Screen.FindChild("music", true, false);
         }
         await ReopenOptions();
         Require(picker.Selected == 0, "Reopened options must show the chosen resolution.");
@@ -471,12 +471,12 @@ public partial class Game {
         await ReopenOptions();
         Require(limits.Selected == 0 && taa.ButtonPressed, "Reopened options must show the choices changed back.");
         await KeyStroke(Key.Escape);
-        Require(FindButton(screen, "New game") != null, "Esc in options must return to the start menu.");
-        await Click(FindButton(screen, "Load game")!);
-        Require(Enumerable.Range(0, Saves.SlotCount + 1).All(n => FindButton(screen, $"{Saves.SlotName(n)} · empty")!.Disabled), "Empty save slots must not be loadable.");
-        await Click(FindButton(screen, "Back · Esc")!);
-        await Click(FindButton(screen, "New game")!);
-        Require(!backdrop.Visible && !view.Paused && ShownPage() == "A new beginning", "New game must close the start menu and show the welcome page.");
+        Require(FindButton(startMenu.Screen, "New game") != null, "Esc in options must return to the start menu.");
+        await Click(FindButton(startMenu.Screen, "Load game")!);
+        Require(Enumerable.Range(0, Saves.SlotCount + 1).All(n => FindButton(startMenu.Screen, $"{Saves.SlotName(n)} · empty")!.Disabled), "Empty save slots must not be loadable.");
+        await Click(FindButton(startMenu.Screen, "Back · Esc")!);
+        await Click(FindButton(startMenu.Screen, "New game")!);
+        Require(!startMenu.Visible && !view.Paused && ShownPage() == "A new beginning", "New game must close the start menu and show the welcome page.");
     }
     /// <summary>Esc opens the pause menu with the current goal; New game and Quit ask first, and confirming a new game starts a fresh settlement.</summary>
     private async Task CheckPauseMenuAsksBeforeNewGameAndQuit() {
@@ -486,16 +486,16 @@ public partial class Game {
         // New game and Quit ask first, and Esc or Back returns to the pause menu.
         world.Player = Terrain.Spawn + new Vector2(6, 0);
         await Click(FindButton(menu, "New game")!);
-        Require(backdrop.Visible && FindButton(screen, "Start a new game") != null && world.Player != Terrain.Spawn, "New game must ask before leaving the settlement.");
+        Require(startMenu.Visible && FindButton(startMenu.Screen, "Start a new game") != null && world.Player != Terrain.Spawn, "New game must ask before leaving the settlement.");
         await KeyStroke(Key.Escape);
-        Require(!backdrop.Visible && menu.Visible && view.Paused, "Esc on the new game question must return to the pause menu.");
+        Require(!startMenu.Visible && menu.Visible && view.Paused, "Esc on the new game question must return to the pause menu.");
         await Click(FindButton(menu, "Quit")!);
-        Require(backdrop.Visible && FindButton(screen, "Quit to desktop") != null, "Quit must ask before closing the game.");
-        await Click(FindButton(screen, "Back · Esc")!);
+        Require(startMenu.Visible && FindButton(startMenu.Screen, "Quit to desktop") != null, "Quit must ask before closing the game.");
+        await Click(FindButton(startMenu.Screen, "Back · Esc")!);
         Require(menu.Visible && view.Paused, "Back on the quit question must return to the pause menu.");
         await Click(FindButton(menu, "New game")!);
-        await Click(FindButton(screen, "Start a new game")!);
-        Require(!backdrop.Visible, "Confirming a new game must close the start menu.");
+        await Click(FindButton(startMenu.Screen, "Start a new game")!);
+        Require(!startMenu.Visible, "Confirming a new game must close the start menu.");
         Require(!menu.Visible, "Confirming a new game must close the pause menu.");
         Require(!view.Paused, "Confirming a new game must resume the world.");
         Require(ShownPage() == "A new beginning", "Confirming a new game must show the welcome page.");
@@ -683,9 +683,9 @@ public partial class Game {
         var savedPosition = world.Player;
         var savedSlots = world.HotbarSlots.ToArray(); int savedActiveSlot = world.ActiveHotbar;
         await KeyStroke(Key.F5);
-        Require(backdrop.Visible && FindButton(screen, "Slot 1 · empty") != null && FindButton(screen, "Autosave · empty") == null, "F5 in a new game must ask for a save slot and leave out the autosave.");
-        await Click(FindButton(screen, "Slot 1 · empty")!);
-        Require(Saves.SlotUsed(1) && !backdrop.Visible && !view.Paused, "Choosing a slot must write the save and resume.");
+        Require(startMenu.Visible && FindButton(startMenu.Screen, "Slot 1 · empty") != null && FindButton(startMenu.Screen, "Autosave · empty") == null, "F5 in a new game must ask for a save slot and leave out the autosave.");
+        await Click(FindButton(startMenu.Screen, "Slot 1 · empty")!);
+        Require(Saves.SlotUsed(1) && !startMenu.Visible && !view.Paused, "Choosing a slot must write the save and resume.");
         int savedWood = chest.Inventory["wood"];
         Require(savedWood > 0 && chest.Inventory.Remove("wood", 1) == 1, "The chest must hold wood to take out after saving.");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
@@ -698,9 +698,9 @@ public partial class Game {
         world.Player += Vector2.One; await CloseWithEsc();
         await KeyStroke(Key.Escape);
         await Click(FindButton(menu, "Load")!);
-        Require(FindButton(screen, "Slot 2 · empty")!.Disabled, "The load screen must disable empty slots.");
-        await Click(screen.GetChildren().OfType<Button>().First(b => b.Text.StartsWith("Slot 1 · ")));
-        Require(!backdrop.Visible, "Loading from the pause menu must close the start menu.");
+        Require(FindButton(startMenu.Screen, "Slot 2 · empty")!.Disabled, "The load screen must disable empty slots.");
+        await Click(startMenu.Screen.GetChildren().OfType<Button>().First(b => b.Text.StartsWith("Slot 1 · ")));
+        Require(!startMenu.Visible, "Loading from the pause menu must close the start menu.");
         Require(!menu.Visible, "Loading from the pause menu must close the pause menu.");
         Require(!view.Paused, "Loading from the pause menu must resume the world.");
         Require(world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the saved position.");
@@ -836,7 +836,7 @@ public partial class Game {
         Require(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
         await Until(() => view.PlayerAnimation != ActorAction.Attack, "the unarmed attack finishing", 3);
         var gatheringPosition = Terrain.Spawn - new Vector2(30, 30);
-        // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
+        // Full-size tree crowns reach several tiles up the startMenu.Screen, so clear enough room for a clean click.
         RemoveThings(world, t => t.Pos.DistanceTo(gatheringPosition) < 12);
         world.Player = gatheringPosition;
         // Far enough that the player has to keep walking after the button is released.
