@@ -17,7 +17,7 @@ public static class WorkerStateChecks {
     }
 
     private static void CheckGatherAndReassign(GameData data) {
-        var world = new World(data, false);
+        var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
         world.Add(ThingKind.Chest, new Vector2(12, 10));
         var worker = AddWorker(world, tree.Pos);
@@ -37,7 +37,7 @@ public static class WorkerStateChecks {
     }
 
     private static void CheckNextKnownSpot(GameData data) {
-        var world = new World(data, false);
+        var world = EmptyWorld(data);
         var said = new System.Collections.Generic.List<string>();
         world.Notify += said.Add;
         var at = Terrain.Spawn;
@@ -97,7 +97,7 @@ public static class WorkerStateChecks {
     }
 
     private static void CheckStrikeResetsWorkState(GameData data) {
-        var world = new World(data, false);
+        var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
         world.Add(ThingKind.Chest, new Vector2(12, 10));
         var worker = AddWorker(world, tree.Pos);
@@ -112,7 +112,7 @@ public static class WorkerStateChecks {
     }
 
     private static void CheckBlockedPath(GameData data) {
-        var world = new World(data, false);
+        var world = EmptyWorld(data);
         // Off the map's edge: the tree is out of reach.
         var tree = world.Add(ThingKind.Tree, Vector2.One * (Terrain.Size - 1), 12);
         world.Add(ThingKind.Chest, Vector2.One * (Terrain.Size - 6));
@@ -126,7 +126,7 @@ public static class WorkerStateChecks {
     }
 
     private static void CheckFurnacePumping(GameData data) {
-        var world = new World(data, false);
+        var world = EmptyWorld(data);
         var furnace = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
         var bellowsWorker = AddWorker(world, furnace.Pos + World.BellowsStand);
         var secondWorker = AddWorker(world, furnace.Pos);
@@ -150,7 +150,7 @@ public static class WorkerStateChecks {
     }
 
     private static void CheckSaveRoundTrip(GameData data) {
-        var world = new World(data, false);
+        var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
         world.Add(ThingKind.Chest, new Vector2(12, 10));
         var worker = AddWorker(world, tree.Pos);
@@ -164,7 +164,7 @@ public static class WorkerStateChecks {
         Require(!save.Contains("WorkState", StringComparison.Ordinal),
                 "transient worker work state should be excluded from saved data");
 
-        var loaded = new World(data, false);
+        var loaded = EmptyWorld(data);
         loaded.Deserialize(save);
         var loadedWorker = loaded.S.Workers[0];
         Require(loadedWorker.WorkState == WorkerWorkState.Idle,

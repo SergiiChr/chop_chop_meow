@@ -542,21 +542,21 @@ public partial class Game {
             Require(musicSlider.Value == 100, "Music must start at full volume.");
             await Click(musicSlider);
             Require(Mathf.IsEqualApprox(sounds.MusicVolume, .5f), "The music slider must set the music volume.");
-            await KeyStroke(Key.Escape);
-            await Click(FindButton(screen, "Options")!);
-            picker = (OptionButton)screen.FindChild("resolution", true, false);
-            limits = (OptionButton)screen.FindChild("frame_limit", true, false);
-            taa = (CheckButton)screen.FindChild("taa", true, false);
-            musicSlider = (HSlider)screen.FindChild("music", true, false);
+            async Task ReopenOptions() {
+                await KeyStroke(Key.Escape);
+                await Click(FindButton(screen, "Options")!);
+                picker = (OptionButton)screen.FindChild("resolution", true, false);
+                limits = (OptionButton)screen.FindChild("frame_limit", true, false);
+                taa = (CheckButton)screen.FindChild("taa", true, false);
+                musicSlider = (HSlider)screen.FindChild("music", true, false);
+            }
+            await ReopenOptions();
             Require(picker.Selected == 0 && limits.Selected == 2 && !taa.ButtonPressed && musicSlider.Value == 50, "Reopened options must show the stored choices.");
             await Choose(limits, 0);
             Require(Engine.MaxFps == 0, "Turning the frame rate limit off must lift the cap.");
             await Click(taa);
             Require(GetViewport().UseTaa, "Switching temporal anti-aliasing back on must apply it.");
-            await KeyStroke(Key.Escape);
-            await Click(FindButton(screen, "Options")!);
-            limits = (OptionButton)screen.FindChild("frame_limit", true, false);
-            taa = (CheckButton)screen.FindChild("taa", true, false);
+            await ReopenOptions();
             Require(limits.Selected == 0 && taa.ButtonPressed, "Reopened options must show the choices changed back.");
             await KeyStroke(Key.Escape);
             Require(FindButton(screen, "New game") != null, "Esc in options must return to the start menu.");
@@ -713,7 +713,7 @@ public partial class Game {
             Require(filterOpen && sheet.Visible && panel.FindChild("filter_in", true, false) != null && panel.FindChild("filter_out", true, false) != null, "Chest filters must open in the filter window beside the panel.");
             await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), (Control)panel.FindChild("filter_add_in", true, false));
             Require(chest.Inventory.InputFilter.Contains("wood") && chest.Inventory["wood"] == storedWood, "Dropping an item on a filter row must add it to that filter without moving it.");
-            await Click((Button)panel.FindChild("filter_in_wood", true, false));
+            await Click(Named("filter_in_wood")!);
             Require(!chest.Inventory.InputFilter.Contains("wood"), "Clicking an item in a filter row must take it off.");
             await Click((Control)bag.FindChild("bag_close", true, false));
             await Click(Named("filters")!);

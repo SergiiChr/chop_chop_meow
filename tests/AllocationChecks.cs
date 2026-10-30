@@ -85,8 +85,8 @@ public static class AllocationChecks {
         mine = world.Add(ThingKind.Mine, World.MineSpot(cliff)); mine.MineStage = MineStage.Open;
         world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
         for (int i = 0; i < data.Mine.Workers; i++) {
-            var w = new Worker { Id = world.S.NextId++, Name = $"Miner {i + 1}", Pos = mine.Pos + cliff.Face * 2, Tool = "steel_pick" };
-            world.S.Workers.Add(w); world.Assign(w, mine);
+            var w = AddWorker(world, mine.Pos + cliff.Face * 2);
+            w.Tool = "steel_pick"; world.Assign(w, mine);
         }
         return world;
     }
@@ -101,8 +101,7 @@ public static class AllocationChecks {
         var packer = world.Add(ThingKind.Packer, at); world.SetPacking(packer, "berries");
         var sign = world.Add(ThingKind.Signpost, at + new Vector2(0, 3));
         world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);
-        var w = new Worker { Id = world.S.NextId++, Name = "Packer", Pos = at + new Vector2(1, 1) };
-        world.S.Workers.Add(w); world.Assign(w, packer);
+        world.Assign(AddWorker(world, at + new Vector2(1, 1)), packer);
         return world;
     }
 

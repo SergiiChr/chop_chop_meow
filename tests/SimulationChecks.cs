@@ -252,7 +252,7 @@ public static class SimulationChecks {
         SafeTick(world, .1f);
         Require(worker.Destination == general.Id && worker.Bag["wood"] == 5,
                 "worker should retarget in transit when the destination filter changes");
-        for (int i = 0; i < 32 && general.Inventory["wood"] == 0; i++) SafeTick(world, .25f);
+        for (int i = 0; i < 32 && general.Inventory["wood"] == 0; i++) SafeTick(world, Step);
         Require(general.Inventory["wood"] == 5 && filtered.Inventory["wood"] == 0 && worker.Bag["wood"] == 0,
                 "retargeted load should reach the newly accepting chest without leaking into the old one");
     }
@@ -270,7 +270,7 @@ public static class SimulationChecks {
 
         bool sawHauling = false;
         for (int i = 0; i < 600 && furnace.Inventory["steel_bar"] + chest.Inventory["steel_bar"] == 0; i++) {
-            SafeTick(world, .25f);
+            SafeTick(world, Step);
             sawHauling |= hauler.Destination == furnace.Id || hauler.Bag.Count > 0;
         }
 
@@ -293,7 +293,7 @@ public static class SimulationChecks {
 
         bool stayedOutOfPond = true;
         for (int i = 0; i < 700 && chest.Inventory["wood"] == 0; i++) {
-            SafeTick(world, .25f);
+            SafeTick(world, Step);
             stayedOutOfPond &= !Terrain.InLake(worker.Pos);
         }
 
@@ -319,16 +319,16 @@ public static class SimulationChecks {
         chest.Inventory.OutputFilter.Add("wood");
         bool sawFirewoodInTransit = false;
         for (int i = 0; i < 120 && chest.Inventory["wood"] == 6; i++) {
-            SafeTick(world, .25f);
+            SafeTick(world, Step);
             sawFirewoodInTransit |= worker.Bag["wood"] > 0 || worker.Destination == fire.Id;
         }
         for (int i = 0; i < 80 && (worker.Bag["wood"] > 0 || fire.Inventory["wood"] == 0); i++) {
-            SafeTick(world, .25f);
+            SafeTick(world, Step);
             sawFirewoodInTransit |= worker.Bag["wood"] > 0 || worker.Destination == fire.Id;
         }
         Require(sawFirewoodInTransit && chest.Inventory["wood"] == 3,
                 "campfire worker should carry three real wood from output-enabled storage");
-        SafeTick(world, .25f);
+        SafeTick(world, Step);
         Require(fire.Inventory["wood"] > 0 && fire.Burn > 0,
                 "carried firewood should be deposited into the fire and consumed to sustain its burn");
         int storedBeforeBurn = fire.Inventory["wood"];
@@ -571,7 +571,7 @@ public static class SimulationChecks {
         reinforced.Inventory.Add("coal", 2);
         world.Player = reinforced.Pos;
         reinforced.Heat = 100;
-        SafeTick(world, .25f);
+        SafeTick(world, Step);
         Require(!reinforced.Processing && reinforced.Inventory["iron_bar"] == 2,
                 "a steel batch must wait for fuel in the fuel slot, even with coal among its ingredients");
         reinforced.Heat = 0;
@@ -580,7 +580,7 @@ public static class SimulationChecks {
         Require(!reinforced.Processing && reinforced.Progress == 0 && reinforced.Inventory["iron_bar"] == 2 && reinforced.Inventory["coal"] == 2 && reinforced.Burner["coal"] == 1,
                 "the reinforced furnace must leave a complete steel batch untouched while below the steel heat");
         reinforced.Heat = 100;
-        SafeTick(world, .25f);
+        SafeTick(world, Step);
         Require(reinforced.Processing && reinforced.Inventory["iron_bar"] == 0 && reinforced.Inventory["coal"] == 0 && reinforced.Burner["coal"] == 0,
                 "once hot enough, the reinforced furnace should consume the batch's ingredients and one coal of fuel");
         reinforced.Burner.Add("coal", 3);
@@ -972,8 +972,8 @@ public static class SimulationChecks {
         var bench = CheckGatheredMaterialsMakeCrates(world, tree, stone, bush);
         var sign = CheckBerryCratesBuyFirstPickaxe(world, iron);
         CheckMinedOreBecomesSteelTools(world, iron, coal, bench);
-        CheckSoldSteelToolFundsHire(world, sign);
-        CheckHiredWorkerSuppliesOpeningCamp(world, sign, tree, stone);
+        var offer = CheckSoldSteelToolFundsHire(world, sign);
+        CheckHiredWorkerSuppliesOpeningCamp(world, sign, offer, tree, stone);
         world.Tick(.01f, true);
         Require(world.GoalComplete, "objective chain should reach the first automation milestone");
         GD.Print($"Progression simulation elapsed: {world.S.Time - startTime:0} seconds.");
@@ -1067,7 +1067,7 @@ public static class SimulationChecks {
                 "the bench should craft a steel pickaxe from steel parts and a crate from planks");
     }
 
-    private static void CheckSoldSteelToolFundsHire(World world, Thing sign) {
+    private static HireOffer CheckSoldSteelToolFundsHire(World world, Thing sign) {
         var data = world.Data;
         world.Player = sign.Pos;
         var crate = world.PlaceCrate("crate", sign.Pos + new Vector2(0, 2));
@@ -1088,11 +1088,12 @@ public static class SimulationChecks {
         var offer = data.HireOffers[1];
         Require(world.Coins >= offer.Upfront && world.S.Milestones.Contains("sold_steel"),
                 $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, upfront={offer.Upfront:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_pick"]}");
+        return offer;
     }
 
-    private static void CheckHiredWorkerSuppliesOpeningCamp(World world, Thing sign, Thing tree, Thing stone) {
+    private static void CheckHiredWorkerSuppliesOpeningCamp(World world, Thing sign, HireOffer offer, Thing tree, Thing stone) {
         var data = world.Data;
-        var worker = world.Hire(sign, data.HireOffers[1]);
+        var worker = world.Hire(sign, offer);
         Require(worker != null, "sale proceeds should fund a new worker");
         var chest = BuildAt(world, ThingKind.Chest, Site(37, 25));
         // A woodcutter takes an axe from a tool station, so the player racks theirs: a station is 8 planks and 4 stone.
@@ -1107,12 +1108,12 @@ public static class SimulationChecks {
         Require(worker!.Assignment == workerTree!.Id && worker.Duties.Count == 1 && World.HasDuty(worker, workerTree.Id, "gather") && world.S.Milestones.Contains("assigned"),
                 "player should assign the hired worker to gather from a resource");
         // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning.
-        for (int i = 0; i < 4000 && !world.OnDuty(worker); i++) { SafeTick(world, .25f); world.S.Health = 100; }
-        for (int i = 0; i < 480 && chest.Inventory["wood"] == 0; i++) SafeTick(world, .25f);
+        for (int i = 0; i < 4000 && !world.OnDuty(worker); i++) { SafeTick(world, Step); world.S.Health = 100; }
+        for (int i = 0; i < 480 && chest.Inventory["wood"] == 0; i++) SafeTick(world, Step);
         Require(chest.Inventory["wood"] > 0 && worker.Bag["wood"] == 0,
                 "hired worker should gather actual wood and deliver it to a built chest");
         // Reuse the worker's real gathered output after lending them the player's axe.
-        for (int i = 0; i < 8000 && chest.Inventory["wood"] < 26; i++) SafeTick(world, .25f);
+        for (int i = 0; i < 8000 && chest.Inventory["wood"] < 26; i++) SafeTick(world, Step);
         world.Player = chest.Pos;
         Require(chest.Inventory.TransferTo(world.S.Backpack, "wood", 26) == 26, "worker output should fund the shelter and fire");
         GatherUntil(world, stone, "stone", 12);
@@ -1291,7 +1292,7 @@ public static class SimulationChecks {
         Require(!bench.Processing && bench.Inventory["planks"] == 0, "a bench recipe should wait for its tool in the slot");
         Require(!world.SlotTool(bench, "wood_hammer") || world.BenchTool(bench, "chisel") == null, "a hammer must not fill the chisel slot");
         Require(world.SlotTool(bench, "stone_chisel") && world.S.Backpack["stone_chisel"] == 0 && !world.SlotTool(bench, "stone_chisel"), "the chisel should go into its one slot");
-        SafeTick(world, .25f);
+        SafeTick(world, Step);
         SafeTick(world, data.Recipes["planks"].Seconds / data.BenchSpeed);
         Require(bench.Inventory["planks"] == 4, "a bench should work twice as fast as crafting by hand");
         var worker = AddWorker(world, bench.Pos + Vector2.One);
@@ -1385,7 +1386,7 @@ public static class SimulationChecks {
         Require(worker.Tool == "steel_axe" && station.Inventory["steel_axe"] == 0 && tree.Remaining < 400,
                 "the worker should take the axe once one is there and start chopping");
         world.Assign(worker, rock);
-        for (int i = 0; i < 80 && worker.Tool != ""; i++) SafeTick(world, .25f);
+        for (int i = 0; i < 80 && worker.Tool != ""; i++) SafeTick(world, Step);
         Require(worker.Tool == "" && station.Inventory["steel_axe"] == 1, "a worker moved to stone, which needs no tool, should put the axe back");
         SafeTick(world, 10);
         Require(rock.Remaining < 400, "stone needs no tool");
@@ -1399,7 +1400,7 @@ public static class SimulationChecks {
         Require(miner.Tool == "steel_axe" && iron.Remaining == 400 && miner.Status == "No room to put back the steel axe",
                 "a worker who cannot put back the wrong tool should wait instead of mining with it");
         station.Inventory.Remove("steel_pick", 1);
-        for (int i = 0; i < 120 && miner.Tool != "steel_pick"; i++) SafeTick(world, .25f);
+        for (int i = 0; i < 120 && miner.Tool != "steel_pick"; i++) SafeTick(world, Step);
         Require(miner.Tool == "steel_pick" && station.Inventory["steel_axe"] == 2, "with room again the worker should swap the axe for a pickaxe");
         world.S.Workers.Remove(miner); station.Inventory.Remove("steel_pick", 99); station.Inventory.Remove("steel_axe", 1);
 
@@ -1407,7 +1408,7 @@ public static class SimulationChecks {
         SafeTick(world, 10);
         Require(worker.Tool == "steel_axe", "back on the tree the worker should fetch the axe again");
         world.S.Time = (world.Day - 1 + data.DuskStarts) * data.DaySeconds - .5f;
-        for (int i = 0; i < 400 && !worker.Home; i++) SafeTick(world, .25f);
+        for (int i = 0; i < 400 && !worker.Home; i++) SafeTick(world, Step);
         Require(worker.Home && worker.Tool == "" && station.Inventory["steel_axe"] == 1 && worker.Assignment == tree.Id,
                 "a worker going home should put the axe back and keep the assignment");
 

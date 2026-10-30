@@ -11,7 +11,6 @@ using static Fixtures;
 /// The player stays in a cabin far away, so nothing is worked, carried, packed or sold by hand.
 /// </summary>
 public static class ProductionChainChecks {
-    private const int Wage = 18;
     private static readonly string[] Products = { "canned_meat_stew", "bread", "steel_pick", "berries" };
 
     public static void Run(GameData data) {
@@ -47,7 +46,7 @@ public static class ProductionChainChecks {
         var crates = world.Add(ThingKind.Chest, packer.Pos + new Vector2(6, 0));
         crates.Inventory.InputFilter.Add(World.CrateOf("bread"));
         general.Inventory.Add("bread", 30); general.Inventory.Add("crate", 4);
-        var worker = AddWorker(world, packer.Pos + new Vector2(0, 1), Wage);
+        var worker = AddWorker(world, packer.Pos + new Vector2(0, 1));
         world.Assign(worker, packer);
         for (float waited = 0; waited < 40 && crates.Inventory[crate] == 0; waited += .1f) world.Tick(.1f);
         Require(crates.Inventory[crate] == 1 && general.Inventory[crate] == 0, "the hauler should carry the full crate past general storage to the chest asking for crates of bread");
@@ -108,7 +107,7 @@ public static class ProductionChainChecks {
         Thing Place(ThingKind kind, string recipe = "") { var t = world.Add(kind, Spot()); if (recipe != "") world.SetRecipe(t, recipe); return t; }
         void Store(string item) => Place(ThingKind.Chest).Inventory.InputFilter.Add(item);
         Worker Hire(Thing place, params string[] jobs) {
-            var w = AddWorker(world, place.Pos + new Vector2(0, 1.2f), Wage);
+            var w = AddWorker(world, place.Pos + new Vector2(0, 1.2f));
             foreach (string job in jobs) world.SetDuty(w, place, job, true);
             return w;
         }

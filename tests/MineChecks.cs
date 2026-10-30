@@ -204,10 +204,7 @@ public static class MineChecks {
         var worker = AddWorker(world, new Vector2(30, 30));
         worker.Wage = 26;
         var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
-        var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(0, 1));
-        crate.Inventory.Add("berries", 12);
-        Require(world.PickUpCrate(crate), "a crate of berries should be picked up");
-        world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.Single(World.IsCrate), 1);
+        world.S.Backpack.TransferTo(sign.Inventory, PackCrate(world, ("berries", 12)), 1);
         Require(world.Sell(sign), "a crate of berries should go to the village");
         Work(world, data.TradeSeconds + .5f);
         int revenue = sign.Wages![Inventory.Coins] + sign.Output![Inventory.Coins];

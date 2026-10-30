@@ -10,14 +10,7 @@ internal static class Fixtures {
     public const float Step = .25f;
 
     /// <summary>A world without its starting map, with a fed and healthy player on the first morning.</summary>
-    public static World EmptyWorld(GameData data) {
-        var world = new World(data, false);
-        world.S.Hunger = 100;
-        world.S.Thirst = 100;
-        world.S.Health = 100;
-        world.S.Time = 55;
-        return world;
-    }
+    public static World EmptyWorld(GameData data) => new(data, false);
 
     /// <summary>Runs the world for a time with the player kept fed and watered.</summary>
     public static void SafeTick(World world, float seconds) {
@@ -33,9 +26,8 @@ internal static class Fixtures {
     }
 
     /// <summary>Adds a worker directly, without a hiring offer or its payment.</summary>
-    public static Worker AddWorker(World world, Vector2 position, int? wage = null) {
+    public static Worker AddWorker(World world, Vector2 position) {
         var worker = new Worker { Id = world.S.NextId++, Name = $"Worker {world.S.Workers.Count + 1}", Pos = position };
-        if (wage != null) worker.Wage = wage.Value;
         world.S.Workers.Add(worker);
         return worker;
     }
@@ -51,7 +43,7 @@ internal static class Fixtures {
 
     /// <summary>An empty map with coins enough to pay every wage, so no worker strikes.</summary>
     public static World FundedWorld(GameData data) {
-        var world = new World(data, false);
+        var world = EmptyWorld(data);
         world.S.Backpack.Add(Inventory.Coins, 1000);
         return world;
     }
@@ -129,7 +121,7 @@ internal static class Fixtures {
         int limit = 3000;
         while (station.Inventory[output] < quantity && limit-- > 0) {
             if (pump && station.Heat < 90) world.Pump(station);
-            SafeTick(world, .25f);
+            SafeTick(world, Step);
         }
         Require(limit > 0 && station.Inventory[output] >= quantity,
                 $"station should complete {quantity} {output} batch(es): kind={station.Kind}, recipe={station.Recipe}, output={station.Inventory[output]}, processing={station.Processing}, progress={station.Progress:0.0}, player={world.Player}, stationPos={station.Pos}, health={world.S.Health:0.0}, time={world.S.Time:0.0}");
@@ -137,7 +129,7 @@ internal static class Fixtures {
 
     public static void CraftByHand(World world, string recipe, int times) {
         for (int i = 0; i < times; i++) Require(world.Craft(recipe), $"{recipe} should be craftable by hand: {world.CraftBlock(recipe)}");
-        for (int limit = 400; world.S.Crafting.Count > 0 && limit > 0; limit--) SafeTick(world, .25f);
+        for (int limit = 400; world.S.Crafting.Count > 0 && limit > 0; limit--) SafeTick(world, Step);
         Require(world.S.Crafting.Count == 0, $"hand crafting {recipe} should finish: rate={world.CraftRate}, progress={world.S.CraftTime}, slots={world.S.Backpack.UsedSlots}, items={string.Join(",", world.S.Backpack.Items.Select(p => p.Key + "=" + p.Value))}, room={world.S.Backpack.Room(world.Data.Recipes[recipe].Output)}");
     }
 
