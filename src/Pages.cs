@@ -110,7 +110,7 @@ public partial class PagePanel {
         if (t.Kind == ThingKind.Campfire) { Campfire(t); return; }
         if (t.Kind == ThingKind.Packer) { AddChild(new PackerPanel(panel, t)); return; }
         if (t.IsStorage) { Storage(t); return; }
-        Station(t);
+        AddChild(new StationPanel(panel, t));
     }
     /// <summary>How far away a building is, shown only while it is out of reach.</summary>
     protected void Reach(Thing t) {

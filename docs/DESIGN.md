@@ -67,7 +67,8 @@ UI and input:
 | `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
-| `src/Machine.cs` | Draws station input and output slots |
+| `src/StationPanel.cs` | A station's panel: recipes, process row, bellows and jobs |
+| `src/Machine.cs` | Draws a station's process row and its input and output slots |
 | `src/CraftPanel.cs` | The crafting menu and the crafting bench panel |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
