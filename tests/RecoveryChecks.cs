@@ -24,7 +24,7 @@ public static class RecoveryChecks {
         RemoveThings(world, t => t.Kind == ThingKind.Hut);
         var other = world.AddGuest(2, null);
         Require(!world.CanSkipMorning, "another living player should prevent skipping the shared night");
-        other.RespawnIn = 20;
+        SetRespawn(other, 20);
         Require(world.CanSkipMorning, "the skip should be available once every other player is downed");
     }
 

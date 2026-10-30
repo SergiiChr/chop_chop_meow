@@ -3,13 +3,18 @@ using System.Collections.Generic;
 using ChopChopMeow;
 
 /// <summary>
-/// Steps that write the raw save, each for a state real play cannot reach or cannot reach quickly enough, and why.
+/// Steps that write the raw save or a player's goods and needs.
+/// Each is for a state real play cannot reach or cannot reach quickly enough, and says why.
 /// Outside them, only <c>AddWorker</c> and old-save fixtures use the raw save.
-/// Checks also set fields directly on things and workers they placed.
+/// Checks also set fields directly on things and workers they placed and on players they build as save text.
+/// Placing the player with <c>world.Player</c> and holding a player's input are allowed too.
 /// </summary>
 internal static class SetupSteps {
     /// <summary>Puts goods in the backpack: gathering or buying each would take a day of ticks, and many goods are not sold.</summary>
-    public static int Give(World world, string item, int count = 1) => world.S.Backpack.Add(item, count);
+    public static int Give(World world, string item, int count = 1) => Give(world.S.Actor, item, count);
+
+    /// <summary>Puts goods in one player's backpack, for the same reason.</summary>
+    public static int Give(PlayerState player, string item, int count = 1) => player.Backpack.Add(item, count);
 
     /// <summary>Takes goods out of the backpack to clear the ground for the next check: the game can only move them somewhere else.</summary>
     public static int Drop(World world, string item, int count = int.MaxValue) => world.S.Backpack.Remove(item, count);
@@ -27,10 +32,13 @@ internal static class SetupSteps {
     }
 
     /// <summary>Sets needs: hunger and thirst only fall together with the clock and health falls only with them, so ticking cannot set one alone.</summary>
-    public static void SetNeeds(World world, float? hunger = null, float? thirst = null, float? health = null) {
-        if (hunger is float h) world.S.Hunger = h;
-        if (thirst is float t) world.S.Thirst = t;
-        if (health is float life) world.S.Health = life;
+    public static void SetNeeds(World world, float? hunger = null, float? thirst = null, float? health = null) => SetNeeds(world.S.Actor, hunger, thirst, health);
+
+    /// <summary>Sets one player's needs, for the same reason.</summary>
+    public static void SetNeeds(PlayerState player, float? hunger = null, float? thirst = null, float? health = null) {
+        if (hunger is float h) player.Hunger = h;
+        if (thirst is float t) player.Thirst = t;
+        if (health is float life) player.Health = life;
     }
 
     /// <summary>Tops up hunger and thirst for a run that is about something else, which would otherwise need a supply of food.</summary>
@@ -40,7 +48,7 @@ internal static class SetupSteps {
     public static void Fed(World world) => SetNeeds(world, 100, 100, 100);
 
     /// <summary>Tops up every player, each with their own needs that only eating restores.</summary>
-    public static void NourishEveryone(World world) { foreach (var p in world.Players) { p.Hunger = 100; p.Thirst = 100; } }
+    public static void NourishEveryone(World world) { foreach (var p in world.Players) SetNeeds(p, 100, 100); }
 
     /// <summary>Puts a wolf where the check needs it: real ones arrive at random out of sight.</summary>
     public static Wolf PlaceWolf(World world, Wolf wolf) { world.S.Wolves.Add(wolf); return wolf; }
@@ -67,7 +75,10 @@ internal static class SetupSteps {
     public static void OpenMine(Thing mine) => mine.MineStage = MineStage.Open;
 
     /// <summary>Starts a respawn timer of a set length: dying always sets the full length and drops the backpack.</summary>
-    public static void SetRespawn(World world, float seconds) => world.S.RespawnIn = seconds;
+    public static void SetRespawn(World world, float seconds) => SetRespawn(world.S.Actor, seconds);
+
+    /// <summary>Starts one player's respawn timer, for the same reason.</summary>
+    public static void SetRespawn(PlayerState player, float seconds) => player.RespawnIn = seconds;
 
     /// <summary>Marks goals as done: reaching them for real takes a whole playthrough.</summary>
     public static void Achieve(World world, params IEnumerable<string> milestones) => world.S.Milestones.UnionWith(milestones);
