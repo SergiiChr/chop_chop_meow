@@ -147,7 +147,7 @@ public static class WorkerStateChecks {
         world.Assign(thirdWorker, furnace);
         for (int i = 0; i < 40; i++) {
             world.Tick(.25f);
-            Require(world.S.Workers.Count(w => w.WorkState == WorkerWorkState.Pumping) <= 1,
+            Require(world.Workers.Count(w => w.WorkState == WorkerWorkState.Pumping) <= 1,
                     "at most one worker should pump the bellows at a time");
         }
         Require(bellowsWorker.WorkState == WorkerWorkState.Pumping,
@@ -171,7 +171,7 @@ public static class WorkerStateChecks {
 
         var loaded = EmptyWorld(data);
         loaded.Deserialize(save);
-        var loadedWorker = loaded.S.Workers[0];
+        var loadedWorker = loaded.Workers[0];
         Require(loadedWorker.WorkState == WorkerWorkState.Idle,
                 "a loaded worker should start with the default transient state");
         loaded.Tick(.25f);

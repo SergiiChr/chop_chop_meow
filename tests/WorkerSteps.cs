@@ -5,7 +5,7 @@ using Godot;
 internal static class WorkerSteps {
     /// <summary>Adds a worker directly, without a hiring offer or its payment.</summary>
     public static Worker AddWorker(World world, Vector2 position) {
-        var worker = new Worker { Id = world.S.NextId++, Name = $"Worker {world.S.Workers.Count + 1}", Pos = position };
+        var worker = new Worker { Id = world.S.NextId++, Name = $"Worker {world.Workers.Count + 1}", Pos = position };
         world.S.Workers.Add(worker);
         return worker;
     }

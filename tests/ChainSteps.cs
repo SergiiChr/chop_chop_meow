@@ -56,7 +56,7 @@ internal sealed class ChainSite(World world) {
                      "raw_meat", "meat_stew", "canned_meat_stew", "leaves", "wheat", "wheat_seeds", "grass", "fertilizer", "flour", "dough", "bread", "berries", "steel_pick" }) Store(item);
         var empties = Place(ThingKind.Pile); empties.Inventory.Add("empty_bottle", 8);
         Place(ThingKind.Pile); Place(ThingKind.Pile); Place(ThingKind.Pile);
-        return world.S.Things.Single(t => t.Kind == ThingKind.Chest && t.Inventory.InputFilter.Contains("raw_meat"));
+        return world.Things.Single(t => t.Kind == ThingKind.Chest && t.Inventory.InputFilter.Contains("raw_meat"));
     }
 
     /// <summary>Raw materials: deposits, a tree, berries, leaves and the lake, each gathered by a worker.</summary>

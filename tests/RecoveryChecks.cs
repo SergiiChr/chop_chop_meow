@@ -21,7 +21,7 @@ public static class RecoveryChecks {
         world.S.Things.RemoveAll(t => t.Kind == ThingKind.Hut);
         world.S.Players.Add(new PlayerState { Id = 2, RespawnIn = 0 });
         Require(!world.CanSkipMorning, "another living player should prevent skipping the shared night");
-        world.S.Players[1].RespawnIn = 20;
+        world.Players[1].RespawnIn = 20;
         Require(world.CanSkipMorning, "the skip should be available once every other player is downed");
     }
 
@@ -29,7 +29,7 @@ public static class RecoveryChecks {
         var world = new World(data, false);
         world.S.Time = data.DaySeconds * (data.NightStarts + .01f);
         world.S.WageDay = world.Day;
-        float timeToDawn = data.DaySeconds - world.S.Time % data.DaySeconds + 1;
+        float timeToDawn = data.DaySeconds - world.Time % data.DaySeconds + 1;
         world.S.RespawnIn = timeToDawn / 2;
         world.S.Hunger = 90; world.S.Thirst = 90;
         var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(4, 0));
@@ -45,16 +45,16 @@ public static class RecoveryChecks {
         furnace.Inventory.Add("iron_ore", 2); furnace.Burner!.Add("wood", 1);
         furnace.Processing = true; furnace.Progress = data.Recipes["iron_bar"].Seconds - .1f;
 
-        float priorTime = world.S.Time;
+        float priorTime = world.Time;
         world.SkipMorning();
 
-        Require(world.S.Time > priorTime && world.Hour >= 6,
+        Require(world.Time > priorTime && world.Hour >= 6,
                 "skipping should advance normal world time to dawn");
-        Require(!world.Dead && world.S.Health == 100 && world.S.RespawnIn == 0,
+        Require(!world.Dead && world.Health == 100 && world.RespawnIn == 0,
                 "the normal respawn should finish during the skipped time");
-        Require(world.S.Hunger < 65 && world.S.Thirst < 65,
+        Require(world.Hunger < 65 && world.Thirst < 65,
                 "survival needs should keep draining after the ordinary respawn during the skip");
-        Require(world.S.Orders.Count == 0 && sign.Wages![Inventory.Coins] == 15,
+        Require(world.Orders.Count == 0 && sign.Wages![Inventory.Coins] == 15,
                 "a returning trade should settle during the skip and fund dawn wages");
         Require(worker.WageDebt == 0 && sign.Wages![Inventory.Coins] == 15,
                 "dawn should charge wages through the regular wage slot");

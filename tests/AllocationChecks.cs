@@ -52,12 +52,12 @@ public static class AllocationChecks {
         var mine = WorkingMine(data, out var shaft);
         // Emptying the output each tick keeps the crew digging underground instead of hauling.
         Check("tick: miners underground", () => { mine.Tick(1 / 60f); Fed(mine); shaft.Output!.Clear(); }, warmup: 1200);
-        Require(mine.S.Workers.All(w => w.WorkState == WorkerWorkState.Underground), "the mine crew should be underground");
+        Require(mine.Workers.All(w => w.WorkState == WorkerWorkState.Underground), "the mine crew should be underground");
 
         var night = new World(data);
         night.S.Time = data.DaySeconds * (data.NightStarts + .05f);
         // Long enough for the pack to gather around the player; the player is kept on their feet so the hunt never ends.
-        Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); night.S.Mauled = false; foreach (var w in night.S.Wolves) { w.Leap = 0; w.Feeding = w.Pinning = false; } }, warmup: 3600);
+        Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }, warmup: 3600);
     }
 
     /// <summary>

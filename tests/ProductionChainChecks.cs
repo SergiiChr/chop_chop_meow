@@ -96,10 +96,10 @@ public static class ProductionChainChecks {
         world.SetAutoSell(sign, true);
         world.S.Backpack.TransferTo(sign.Inventory, crate, 1);
         SafeTick(world, 1);
-        Require(world.S.Orders.Count == 0, "the cart should wait while market slots are still free");
+        Require(world.Orders.Count == 0, "the cart should wait while market slots are still free");
         for (int i = 1; i < World.MarketSlots; i++) world.S.Backpack.TransferTo(sign.Inventory, PackCrate(world, ("berries", 12)), 1);
         SafeTick(world, 1);
-        Require(world.S.Orders.Count == 1 && world.S.Orders[0].Crates == World.MarketSlots && sign.Inventory.Count == 0, "a full post set to sell on its own should send the cart");
+        Require(world.Orders.Count == 1 && world.Orders[0].Crates == World.MarketSlots && sign.Inventory.Count == 0, "a full post set to sell on its own should send the cart");
     }
 
     /// <summary>
@@ -124,13 +124,13 @@ public static class ProductionChainChecks {
         for (; days < limit && !(Products.All(sold.Contains) && resown); days += 5) {
             meat.Inventory.Add("raw_meat", 64 - meat.Inventory["raw_meat"]);
             SafeTick(world, 5);
-            foreach (var order in world.S.Orders) if (!order.Buying && seen.Add(order)) sold.UnionWith(order.Goods.Keys);
+            foreach (var order in world.Orders) if (!order.Buying && seen.Add(order)) sold.UnionWith(order.Goods.Keys);
             resown |= farms.Any(f => f.FarmStage == FarmStage.Growing && f.Progress < world.GrowSeconds - 60);
         }
-        GD.Print($"Production chains: sold {string.Join(", ", sold)} in {days / data.DaySeconds:0.0} days with {world.S.Workers.Count} workers; farm sown again: {resown}");
-        string statuses = string.Join("\n", world.S.Workers.Select(w => $"  {w.Name} at {world.Find(w.Assignment)?.Kind}: {w.Status}"));
+        GD.Print($"Production chains: sold {string.Join(", ", sold)} in {days / data.DaySeconds:0.0} days with {world.Workers.Count} workers; farm sown again: {resown}");
+        string statuses = string.Join("\n", world.Workers.Select(w => $"  {w.Name} at {world.Find(w.Assignment)?.Kind}: {w.Status}"));
         Require(Products.All(sold.Contains), $"workers should sell every product by cart; sold {string.Join(", ", sold)}.\n{statuses}");
         Require(resown, $"the farm should be sown again from its own seeds and compost fertilizer.\n{statuses}");
-        Require(world.S.Workers.All(w => w.WageDebt <= 0), "the fixture pays every wage");
+        Require(world.Workers.All(w => w.WageDebt <= 0), "the fixture pays every wage");
     }
 }

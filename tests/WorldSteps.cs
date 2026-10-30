@@ -32,7 +32,7 @@ internal static class WorldSteps {
     public static World TorchNight(GameData data) {
         var world = NightWorld(data);
         world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); world.Tick(World.KindleSeconds + .1f);
-        Require(world.S.TorchLit, "the torch fixture should be lit");
+        Require(world.TorchLit, "the torch fixture should be lit");
         return world;
     }
 
@@ -64,7 +64,7 @@ internal static class WorldSteps {
         var fire = world.Add(ThingKind.Campfire, at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
         var furnace = world.Add(ThingKind.Furnace, at + new Vector2(3, 3));
         var forge = world.Add(ThingKind.Reinforced, at + new Vector2(-3, 3)); forge.Heat = 90;
-        foreach (var tree in world.S.Things.Where(t => t.Kind == ThingKind.Tree).OrderBy(t => t.Pos.DistanceTo(at)).Take(2))
+        foreach (var tree in world.Things.Where(t => t.Kind == ThingKind.Tree).OrderBy(t => t.Pos.DistanceTo(at)).Take(2))
             world.Assign(AddWorker(world, rack.Pos), tree);
         world.Assign(AddWorker(world, forge.Pos + World.BellowsStand), forge);
         world.Assign(AddWorker(world, chest.Pos), forge);
@@ -159,9 +159,15 @@ internal static class WorldSteps {
 
     public static void FedPlayersTick(World world, float seconds) {
         for (; seconds > 0; seconds -= Step) {
-            foreach (var p in world.S.Players) { p.Hunger = 100; p.Thirst = 100; }
+            foreach (var p in world.Players) { p.Hunger = 100; p.Thirst = 100; }
             world.Tick(Step);
         }
+    }
+
+    /// <summary>Calls the wolves off a pinned player, since a real mauling ends in death; runs in allocation checks, so it loops by index.</summary>
+    public static void FreePlayer(World world) {
+        world.S.Mauled = false;
+        for (int i = 0; i < world.Wolves.Count; i++) { var w = world.Wolves[i]; w.Leap = 0; w.Feeding = w.Pinning = false; }
     }
 
     public static void Fed(World world) { world.S.Hunger = 100; world.S.Thirst = 100; world.S.Health = 100; }

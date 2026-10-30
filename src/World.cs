@@ -275,6 +275,32 @@ public sealed partial class World {
     public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind == ThingKind.Water ? Terrain.WaterPoint(from) : t.Pos;
     public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(GatherAt(t, Player)) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
+    public int Carried(string item) => S.Backpack[item];
+    public Inventory Backpack => S.Backpack;
+    public float Time => S.Time;
+    public float Health => S.Health;
+    public float Hunger => S.Hunger;
+    public float Thirst => S.Thirst;
+    public float Torch => S.Torch;
+    public bool TorchLit => S.TorchLit;
+    public float TorchKindling => S.TorchKindling;
+    public float RespawnIn => S.RespawnIn;
+    public bool Mauled => S.Mauled;
+    public int Sheltered => S.Sheltered;
+    public int ActiveHotbar => S.ActiveHotbar;
+    public IReadOnlyList<string> HotbarSlots => S.HotbarSlots;
+    public IReadOnlyList<string> Crafting => S.Crafting;
+    public float CraftTime => S.CraftTime;
+    public IReadOnlyList<Thing> Things => S.Things;
+    public IReadOnlyList<Worker> Workers => S.Workers;
+    public IReadOnlyList<Wolf> Wolves => S.Wolves;
+    public IReadOnlyList<TradeOrder> Orders => S.Orders;
+    public IReadOnlyList<PlayerState> Players => S.Players;
+    public int Goal => S.Goal;
+    public bool Reached(string milestone) => S.Milestones.Contains(milestone);
+    public int DayRevenue => S.DayRevenue;
+    public IReadOnlyList<int> Profits => S.Profits;
+    public bool EndingShown => S.EndingShown;
     /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
     public bool Pay(int amount) => amount <= Coins && S.Backpack.Remove(Inventory.Coins, amount) == amount;
     // Where each id sits in the things list. The list is also changed directly, so every lookup checks the entry and a stale one rebuilds it.
@@ -805,7 +831,7 @@ public sealed partial class World {
     // Demand runs above 1 by the steady amount's worth, so those units sell at the full price; past it, each unit takes a share of a crate's drop.
     private float DemandStep(string item) => Data.Market.Sells[item].Drop / Data.CrateCapacity;
     private float FullDemand(string item) => Data.Market.Sells.TryGetValue(item, out var demand) ? 1 + demand.Steady * DemandStep(item) : 1;
-    private float Demand(string item) => S.Demand.TryGetValue(item, out float demand) ? demand : FullDemand(item);
+    public float Demand(string item) => S.Demand.TryGetValue(item, out float demand) ? demand : FullDemand(item);
     /// <summary>Units in one purchase of a good the village sells; more than one arrive packed in a crate.</summary>
     public int Lot(string item) => Data.Market.Buys.GetValueOrDefault(item, 1);
     /// <summary>The whole coins one purchase costs, crate included for boxed goods.</summary>

@@ -82,7 +82,7 @@ public static class EconomyChecks {
         world.Player = sign.Pos;
         var takings = new List<int>();
         for (int day = 1; day <= 4; day++) {
-            Work(world, (day - 1) * data.DaySeconds + 60 - world.S.Time);
+            Work(world, (day - 1) * data.DaySeconds + 60 - world.Time);
             takings.Add(Sell(world, sign, sells.ToDictionary(p => p.Key, p => p.Value.Daily)));
         }
         GD.Print($"Economy: a day's basket sells for {string.Join(", ", takings)} coins on four days running");
