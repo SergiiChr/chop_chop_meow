@@ -48,7 +48,8 @@ public partial class Game {
             var port = (LineEdit)startMenu.Screen.FindChild("port", true, false);
             Require(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
             await Click(port); await KeyStroke(Key.End);
-            while (port.Text != "") await KeyStroke(Key.Backspace);
+            for (ulong wait = Time.GetTicksMsec() + 5000; port.Text != "" && Time.GetTicksMsec() < wait;) await KeyStroke(Key.Backspace);
+            Require(port.Text == "", "Backspace must clear the port field.");
             await Type(CheckPort.ToString());
             var address = (LineEdit)startMenu.Screen.FindChild("address", true, false);
             // The popup offers the address of the last game joined.
