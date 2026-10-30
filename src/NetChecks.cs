@@ -66,7 +66,10 @@ public partial class Game {
     private async Task GuestNetCheck() {
         RemoveCheckFiles(); DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(GuestSave)); await Frames(4);
         await JoinFromStart();
-        Require(!startMenu.Visible && world.Players.Count == 2 && world.Things.Any(t => t.Kind == ThingKind.Chest && t.Pos == NetChest), "Joining must replace the start menu with the host's world.");
+        Require(!startMenu.Visible, "Joining must close the start menu.");
+        Require(world.Players.Count == 2, "Joining must add the guest to the host's world.");
+        Require(world.Things.Any(t => t.Kind == ThingKind.Chest && t.Pos == NetChest),
+            "Joining must bring the host's chest into the guest's world.");
         Require(world.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
         await Until(() => view.ShowsPlayer(1), "the host's figure appearing");
 
@@ -74,7 +77,9 @@ public partial class Game {
         await Until(() => world.Carried("coal") == 2 && world.Things.All(t => t.Pos != NetOre), "the host handing over the loose coal the guest walked to");
         await Click(view.Screen(NetChest, .3f));
         var opened = world.Find(view.Selected);
-        Require(opened is { Kind: ThingKind.Chest } && Shows(opened) && world.Near(opened), "Clicking the chest beside the coal must open it.");
+        Require(opened?.Kind == ThingKind.Chest, "Clicking the chest beside the coal must select that chest.");
+        Require(Shows(opened), "Clicking the chest beside the coal must open its page.");
+        Require(world.Near(opened), "Clicking the chest beside the coal must leave the player in reach of it.");
         await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
         await Until(() => opened!.Inventory["coal"] == 1 && world.Carried("coal") == 1, "a normal storage click moving exactly one coal");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = true });

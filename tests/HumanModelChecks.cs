@@ -42,7 +42,11 @@ public static class HumanModelChecks {
             Require(workerTexture.GetImage().GetPixel(1, 0).IsEqualApprox(new Color("e9dfc6")), "worker long sleeves should keep the shirt color through the forearm");
             var original = (StandardMaterial3D)playerArm.MaterialOverride!;
             ModelKit.SetFade(playerArm, original, .5f);
-            Require(playerArm.MaterialOverride is StandardMaterial3D faded && faded.AlbedoTexture!.GetInstanceId() == playerTexture.GetInstanceId() && Math.Abs(faded.AlbedoColor.A - .5f) < .001f, "fading should preserve the outfit palette texture");
+            var faded = playerArm.MaterialOverride as StandardMaterial3D;
+            Require(faded != null, "fading should give the arm a standard material");
+            Require(faded.AlbedoTexture!.GetInstanceId() == playerTexture.GetInstanceId(),
+                "fading should preserve the outfit palette texture");
+            Require(Math.Abs(faded.AlbedoColor.A - .5f) < .001f, "fading should make the material half transparent");
             ModelKit.SetFade(playerArm, original, 0);
 
             var right = (Skeleton3D)core[0].Single(m => m.Name == "HumanArmRight").GetParent();

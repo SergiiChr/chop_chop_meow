@@ -67,8 +67,10 @@ public static class WorkerStateChecks {
 
         for (int i = 0; i < 600 && worker.Status.IndexOf("waiting at the trading post", StringComparison.Ordinal) < 0; i++) world.Tick(.1f);
         for (int i = 0; i < 100; i++) world.Tick(.1f);
-        Require(seen.Remaining == 0 && worker.Assignment == seen.Id && worker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f,
-                "a worker who knows no other tree should wait at the trading post");
+        Require(seen.Remaining == 0, "the tree the worker knows should be gone");
+        Require(worker.Assignment == seen.Id, "the worker should keep the assignment");
+        Require(worker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f,
+            "a worker who knows no other tree should wait at the trading post");
         Require(said.Count(m => m.Contains("knows no other tree", StringComparison.Ordinal)) == 1, "a worker who knows no other tree should say so once");
 
         var picker = AddWorker(world, coal.Pos);

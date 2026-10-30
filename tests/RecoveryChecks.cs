@@ -52,8 +52,9 @@ public static class RecoveryChecks {
 
         Require(world.Time > priorTime && world.Hour >= 6,
                 "skipping should advance normal world time to dawn");
-        Require(!world.Dead && world.Health == 100 && world.RespawnIn == 0,
-                "the normal respawn should finish during the skipped time");
+        Require(!world.Dead, "a skipped night should end the respawn");
+        Require(world.Health == 100, "the player should wake at full health");
+        Require(world.RespawnIn == 0, "the respawn timer should be cleared after the skip");
         Require(world.Hunger < 65 && world.Thirst < 65,
                 "survival needs should keep draining after the ordinary respawn during the skip");
         Require(world.Orders.Count == 0 && sign.Wages![Inventory.Coins] == 15,

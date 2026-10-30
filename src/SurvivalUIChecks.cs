@@ -71,7 +71,9 @@ public partial class Game {
         var woodIndex = Array.IndexOf(bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().ToArray(), wood);
         ItemSlot target = bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().First(c => c.TooltipText == "");
         var targetIndex = Array.IndexOf(bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().ToArray(), target);
-        Require(woodIndex >= 0 && targetIndex >= 0 && targetIndex != woodIndex, "The inventory must expose source and empty destination slots.");
+        Require(woodIndex >= 0, "The inventory must expose a wood slot.");
+        Require(targetIndex >= 0, "The inventory must expose an empty destination slot.");
+        Require(targetIndex != woodIndex, "The source and destination slots must differ.");
         await DragTo(wood, target);
         Require(world.Backpack.Layout[targetIndex].Item == "wood", "Dragging a stack into an empty backpack slot must put the item in that slot.");
         Require(world.Backpack.Layout[targetIndex].Count == 7, "Dragging a stack into an empty backpack slot must keep its quantity.");
@@ -121,8 +123,9 @@ public partial class Game {
         Require(waterWarning.GetGlobalRect().End.Y < bag.GetGlobalRect().Position.Y, "The full-bottle warning must sit above the backpack.");
         var partial = Cell(1, c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal));
         await DragTo(partial, (Control)ui.FindChild("input_water", true, false));
-        Require(table.Inventory["water_2"] == 0 && world.Carried("water_2") == 1 && waterWarning.Text == Water.FullBottleWarning,
-            "Dragging a partial bottle onto a recipe water slot must warn without using it.");
+        Require(table.Inventory["water_2"] == 0, "A partial bottle dragged onto a water slot must not go in.");
+        Require(world.Carried("water_2") == 1, "A partial bottle dragged onto a water slot must stay in the backpack.");
+        Require(waterWarning.Text == Water.FullBottleWarning, "A partial bottle dragged onto a water slot must warn.");
         await SurvivalReviewShot("water-warning");
     }
     /// <summary>A downed player without a cabin may choose dawn; any cabin restores normal respawning.</summary>
@@ -136,8 +139,10 @@ public partial class Game {
         await SurvivalReviewShot("recovery-prompt");
         float previousDay = world.Day;
         await Click((Control)recovery.FindChild("skip_morning", true, false));
-        Require(world.RespawnIn == 0 && world.Day > previousDay && world.Time % world.Data.DaySeconds < world.Data.DaySeconds * .1f,
-            "Skipping morning must advance the simulated world to dawn and complete respawn.");
+        Require(world.RespawnIn == 0, "Skipping morning must complete respawn.");
+        Require(world.Day > previousDay, "Skipping morning must advance the world to the next day.");
+        Require(world.Time % world.Data.DaySeconds < world.Data.DaySeconds * .1f,
+            "Skipping morning must stop at dawn.");
         world.Die();
         await Until(() => recovery.Visible, "a player downed again still without a cabin being offered Skip to morning", 2);
         world.Add(ThingKind.Hut, world.Player + Vector2.Right);

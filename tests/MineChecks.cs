@@ -69,7 +69,9 @@ public static class MineChecks {
         Require(world.PlacementBlock(ThingKind.Mine, world.Player + cliff.Face * 15) != null, "a mine must be marked at a cliff, not out in the valley");
         int carried = world.Backpack.Count;
         var mine = MarkMine(world);
-        Require(mine.Pos == World.MineSpot(cliff) && mine.MineStage == MineStage.Marked && world.Backpack.Count == carried, "marking must be free and snap to the cliff's mine spot");
+        Require(mine.Pos == World.MineSpot(cliff), "marking must snap to the cliff's mine spot");
+        Require(mine.MineStage == MineStage.Marked, "marking must leave the mine in the marked stage");
+        Require(world.Backpack.Count == carried, "marking must be free");
         Require(world.Build(ThingKind.Mine, World.MineSpot(cliff) - cliff.Along * 2) == null && world.Things.Count(t => t.Kind == ThingKind.Mine) == 1, "a cliff must take only one mine");
         Require(World.Cliffs.All(c => world.CanStand(World.MineSpot(c)) && world.CanStand(World.MineDoor(new Thing { Kind = ThingKind.Mine, Pos = World.MineSpot(c) }))), "every cliff's mine spot and entrance must be open ground");
         Require(!world.CanStand(World.MineDoor(mine) - cliff.Face * 2), "the rock spur the tunnel runs into must block walking");
@@ -87,14 +89,21 @@ public static class MineChecks {
         var worker = AddWorker(world, chest.Pos);
         world.Assign(worker, mine);
         Work(world, 30);
-        Require(mine.MineStage == MineStage.Marked && mine.Progress == 0 && worker.Status.Contains("pickaxe"), "digging must wait until workers have a pickaxe");
+        Require(mine.MineStage == MineStage.Marked, "digging must not start without a pickaxe");
+        Require(mine.Progress == 0, "digging must show no progress without a pickaxe");
+        Require(worker.Status.Contains("pickaxe"), "a worker without a pickaxe must say so");
 
         // Workers take their tools from a tool station by the storage.
         var station = world.Add(ThingKind.Toolstation, chest.Pos + cliff.Along * 2);
         station.Inventory.Add("steel_pick", 1);
         float started = world.Time;
         Work(world, data.DaySeconds * 3, () => mine.MineStage > MineStage.Marked);
-        Require(mine.MineStage == MineStage.Dug && world.Time - started >= world.MineStageSeconds && world.Time - started < data.DaySeconds * 2, $"one worker must dig the entrance in about one working day: stage {mine.MineStage}, {world.Time - started:0}s, progress {mine.Progress:0}, {worker.Status}");
+        Require(mine.MineStage == MineStage.Dug,
+            $"one worker must dig the entrance: stage {mine.MineStage}, progress {mine.Progress:0}, {worker.Status}");
+        Require(world.Time - started >= world.MineStageSeconds,
+            $"digging the entrance must take at least one working day: {world.Time - started:0}s");
+        Require(world.Time - started < data.DaySeconds * 2,
+            $"digging the entrance must take less than two days: {world.Time - started:0}s");
 
         // The surplus wood stays in storage: the site takes only what it still needs.
         Work(world, data.DaySeconds, () => mine.MineStage > MineStage.Dug);
@@ -106,7 +115,9 @@ public static class MineChecks {
         Require(worker.Bag.Count == 0, $"a worker must deliver everything it carried: chest wood {chest.Inventory["wood"]}, bag {worker.Bag.Count}");
 
         Work(world, 30);
-        Require(mine.MineStage == MineStage.Supplied && mine.Progress == 0 && worker.Status.Contains("hammer"), "fitting the frame must wait for a hammer");
+        Require(mine.MineStage == MineStage.Supplied, "fitting the frame must not start without a hammer");
+        Require(mine.Progress == 0, "fitting the frame must show no progress without a hammer");
+        Require(worker.Status.Contains("hammer"), "a worker without a hammer must say so");
         Require(station.Inventory["steel_pick"] == 1, "a worker hauling materials needs no pickaxe and puts it back");
         station.Inventory.Add("wood_hammer", 1);
         started = world.Time;
@@ -119,7 +130,11 @@ public static class MineChecks {
         world.Player = other.Pos + Vector2.One;
         Give(world, "wood", 60); Give(world, "stone", 10);
         world.SupplyMine(other);
-        Require(other.Inventory["wood"] == data.Mine.Materials["wood"] && other.Inventory["stone"] == 10 && world.Carried("wood") == 10, "delivering from the backpack must hand over only what the mine still needs");
+        Require(other.Inventory["wood"] == data.Mine.Materials["wood"],
+            "delivering from the backpack must hand over only the wood the mine still needs");
+        Require(other.Inventory["stone"] == 10,
+            "delivering from the backpack must hand over only the stone the mine still needs");
+        Require(world.Carried("wood") == 10, "delivering from the backpack must leave the spare wood with the player");
     }
 
     private static void CheckMinersBringOreOutAndStopWhenOutputIsFull(GameData data) {
@@ -144,7 +159,9 @@ public static class MineChecks {
         Require(hauler.Bag["iron_ore"] == mine.Output.StackSize && mine.Output["iron_ore"] == 0, "the first miner must carry the whole full ore stack out");
         Require(mine.Output["stone"] <= stone + 3, "mining must stop once a slot is full");
         Work(world, 60, () => chest.Inventory["iron_ore"] >= mine.Output.StackSize);
-        Require(chest.Inventory["iron_ore"] == mine.Output.StackSize && hauler.Bag.Count == 0 && hauler.Bag.StackSize == Worker.BagStack, "the full stack must reach the nearest storage and the miner's hands go back to a normal load");
+        Require(chest.Inventory["iron_ore"] == mine.Output.StackSize, "the full stack must reach the nearest storage");
+        Require(hauler.Bag.Count == 0, "the miner must leave nothing in their hands");
+        Require(hauler.Bag.StackSize == Worker.BagStack, "the miner's hands must go back to a normal load");
         Work(world, 10);
         Require(mine.Output["iron_ore"] > 0, "mining must resume once the full stack is out");
 

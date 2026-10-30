@@ -127,8 +127,11 @@ public static class AnimationChecks {
             Require(poses.Count >= 6, $"{action} should move through at least six distinct poses per loop, found {poses.Count}");
             var start = ActorAnimation.PoseAt(action, 0, false);
             var end = ActorAnimation.PoseAt(action, ActorAnimation.Duration(action) - .001f, false);
-            Require(Math.Abs(start.RaiseR - end.RaiseR) < 2 && Math.Abs(start.Lean - end.Lean) < 2 && Math.Abs(start.SwingL - end.SwingL) < 2,
-                $"{action} should loop without a visible jump");
+            Require(Math.Abs(start.RaiseR - end.RaiseR) < 2,
+                $"{action} should end with its right arm where it started");
+            Require(Math.Abs(start.Lean - end.Lean) < 2, $"{action} should end with its lean where it started");
+            Require(Math.Abs(start.SwingL - end.SwingL) < 2,
+                $"{action} should end with its left swing where it started");
         }
         var windup = ActorAnimation.PoseAt(ActorAction.Chop, .38f, false);
         var strike = ActorAnimation.PoseAt(ActorAction.Chop, .52f, false);
@@ -141,7 +144,8 @@ public static class AnimationChecks {
             "a torch swing on the move should keep the swinging arm while the legs keep walking");
         Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Seat is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Seat == 0,
             "a cross-legged worker should sit on the ground, and one on a rock should not");
-        Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick" && ActorAnimation.Tool(ActorAction.Hammer) == "hammer" && ActorAnimation.Tool(ActorAction.Gather) == null,
-            "each action should show its own tool, and hand gathering none");
+        Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick", "steel mining should show the steel pick");
+        Require(ActorAnimation.Tool(ActorAction.Hammer) == "hammer", "hammering should show the hammer");
+        Require(ActorAnimation.Tool(ActorAction.Gather) == null, "hand gathering should show no tool");
     }
 }

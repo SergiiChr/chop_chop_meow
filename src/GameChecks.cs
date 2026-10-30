@@ -158,9 +158,12 @@ public partial class Game {
             Require(Opacity(faded) < Opacity(originals[i]), "Fading a tree canopy must make the visible mesh material more transparent.");
             Require(mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off, "Fading a tree canopy must leave the visible mesh without shadow casting, to its proxy.");
             var proxy = proxies[i];
-            Require(ReferenceEquals(proxy.MaterialOverride, originals[i]) &&
-                Mathf.IsEqualApprox(Opacity(proxyMaterials[i]), proxyAlphas[i]) && Blended(proxyMaterials[i]) == proxyBlended[i],
-                "A tree shadow proxy must retain the original material opacity while the visible mesh fades.");
+            Require(ReferenceEquals(proxy.MaterialOverride, originals[i]),
+                "A tree shadow proxy must keep its original material while the visible mesh fades.");
+            Require(Mathf.IsEqualApprox(Opacity(proxyMaterials[i]), proxyAlphas[i]),
+                "A tree shadow proxy must keep its original opacity while the visible mesh fades.");
+            Require(Blended(proxyMaterials[i]) == proxyBlended[i],
+                "A tree shadow proxy must keep its original blending while the visible mesh fades.");
         }
         ModelKit.SetFade(prop.SwayParts, 0);
         for (int i = 0; i < prop.SwayParts.Length; i++) {
@@ -186,7 +189,9 @@ public partial class Game {
         world.Notify("Third"); messages._Process(1); world.Notify("First"); world.Notify("Fourth"); world.Notify("Fifth"); world.Notify("Sixth");
         Require(messages.Shown.SequenceEqual(new[] { "First", "Fourth", "Fifth", "Sixth" }), "A full stack must drop the message closest to fading, even when a repeat kept an older line.");
         var lines = messages.GetChildren().OfType<Label>().ToArray();
-        Require(lines.Count(l => l.Visible) == 4 && lines[3].Text == "Sixth" && lines.All(l => l.Modulate.A == 1), "Every stacked message must show at full strength on its own line, newest last.");
+        Require(lines.Count(l => l.Visible) == 4, "All four stacked messages must show.");
+        Require(lines[3].Text == "Sixth", "The newest stacked message must be on the last line.");
+        Require(lines.All(l => l.Modulate.A == 1), "Every stacked message must show at full strength.");
         messages._Process(6.5);
         Require(lines[0].Modulate.A is > 0 and < 1, "A message must fade out over its last second.");
         messages._Process(1);
@@ -213,8 +218,11 @@ public partial class Game {
         await Click(Named("auto_sell")!);
         Require(sign.AutoSell, "Ticking Send when full must set the post to send the cart on its own.");
         await Click(Named("filters")!); await Click(Named("filter_add_in")!); await Click(Named($"pick_{World.CrateOf("berries")}")!);
-        Require(sign.Inventory.InputFilter.SetEquals(new[] { World.CrateOf("berries") }) && Named("filter_add_out") == null && Named("pick_berries") == null,
-            "The post's filter must offer crates of goods, not loose goods, and only a row of what workers bring.");
+        Require(sign.Inventory.InputFilter.SetEquals(new[] { World.CrateOf("berries") }),
+            "The post's filter must offer the crate of berries.");
+        Require(Named("filter_add_out") == null,
+            "The post's filter must not offer a row of goods that workers do not bring.");
+        Require(Named("pick_berries") == null, "The post's filter must not offer loose berries.");
         await Click(Named("filters_close")!);
         var fetch = Named("fetch");
         Require(panel.SheetShown, "The price sheet must open.");
@@ -222,7 +230,10 @@ public partial class Game {
         Require(fetch != null, "The price sheet must offer a fetch button.");
         Require(fetch.Disabled, "The fetch button must be disabled while no worker is assigned.");
         Require(fetch.TooltipText == "No worker assigned.", "The fetch button must explain that no worker is assigned.");
-        Require(Named("buy_wood") == null && Named("buy_berries") == null && Named("buy_water") != null, "The price sheet must only offer what the village sells.");
+        Require(Named("buy_wood") == null, "The price sheet must not offer wood, which the village does not sell.");
+        Require(Named("buy_berries") == null,
+            "The price sheet must not offer berries, which the village does not sell.");
+        Require(Named("buy_water") != null, "The price sheet must offer water, which the village sells.");
         await Click(Named("buy_water")!);
         Require(world.Orders.Count == 2 && world.Orders[1].Buying, "Buy on the price sheet must order goods.");
         await Click(Named("hardhat")!);
@@ -249,7 +260,9 @@ public partial class Game {
         await Click(view.Screen(packer.Pos, .8f));
         Require(Shows(packer) && Named("pack_berries") != null, "A packing station with nothing chosen must open its list of goods.");
         await Click(Named("pack_berries")!);
-        Require(packer.Packs == "berries" && Named("pack_berries") == null && Named("packed_crate") != null, "Picking berries must set what the station packs and show the crate being packed.");
+        Require(packer.Packs == "berries", "Picking berries must set what the station packs.");
+        Require(Named("pack_berries") == null, "Picked berries must leave the list of goods to pack.");
+        Require(Named("packed_crate") != null, "The station must show the crate being packed.");
         await Click(Slots().First(c => c.TooltipText.StartsWith("Berries ·")));
         Require(packer.Inventory["berries"] == 1, "Clicking berries in the backpack must load one into the packing station.");
         RemoveThings(world, t => t == packer); Drop(world, "berries"); await CloseWithEsc();
@@ -276,7 +289,10 @@ public partial class Game {
         }
         world.Player = home; await CloseWithEsc();
         await KeyStroke(Key.Escape);
-        Require(HasLabel(menu, "END GOALS") && HasLabel(menu, "A working iron mine") && HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"), "The pause menu must list the end goals.");
+        Require(HasLabel(menu, "END GOALS"), "The pause menu must have an end goals heading.");
+        Require(HasLabel(menu, "A working iron mine"), "The pause menu must list the iron mine goal.");
+        Require(HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"),
+            "The pause menu must list the daily profit goal.");
         await KeyStroke(Key.Escape);
     }
 
@@ -301,7 +317,10 @@ public partial class Game {
         await KeyStroke(Key.Key9);
         Require(world.Torch == 0, "Selecting a torch must not light it.");
         await ClickGround();
-        Require(world.TorchKindling > 0 && world.Carried("torch") == 0 && view.PlayerAnimation == ActorAction.Kindle, "The first click must strike flint and steel with the torch in hand.");
+        Require(world.TorchKindling > 0, "The first click must start striking flint and steel.");
+        Require(world.Carried("torch") == 0,
+            "The first click must take the torch out of the backpack and into the hand.");
+        Require(view.PlayerAnimation == ActorAction.Kindle, "The first click must play the kindling animation.");
         await Until(() => world.TorchLit, "the torch catching after the lighting animation", World.KindleSeconds + 2);
         await ClickGround();
         Require(world.TorchFlare > 0 && view.PlayerAnimation == ActorAction.TorchSwing, "Clicking with a lit torch must swing it.");
@@ -329,7 +348,9 @@ public partial class Game {
         // A click in the world lets go of a held stack, so no player gets the rest this far: the next crate opens directly.
         panel.Select(crates[1]); await Frames();
         await Click(Cell(0, c => c.TooltipText == ""));
-        Require(crates[1].Inventory["wood"] == cap && world.Carried("wood") == 64 - 2 * cap && GetViewport().GuiIsDragging(), "The held rest must drop into the next crate and keep what still does not fit.");
+        Require(crates[1].Inventory["wood"] == cap, "The held rest must fill the next crate.");
+        Require(world.Carried("wood") == 64 - 2 * cap, "The held rest must leave what fit out of the backpack.");
+        Require(GetViewport().GuiIsDragging(), "What still does not fit must stay held in the drag.");
         await Click(Cell(1, c => c.TooltipText.Contains("Wood · ")));
         Require(!GetViewport().GuiIsDragging() && world.Carried("wood") == 64 - 2 * cap, "Clicking the backpack must let go of the held rest.");
         foreach (var crate in crates) RemoveThings(world, t => t == crate);
@@ -357,7 +378,10 @@ public partial class Game {
             var spot = Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()))
                 .First(p => world.PlacementBlock(ThingKind.Crate, p, "crate") == null);
             await Click(view.Screen(spot));
-            Require(world.Carried("crate") == 2 - placed && !panel.Visible && view.BuildMode == (placed == 1 ? ThingKind.Crate : null), "Placing a crate must not open it and must stay in placement while crates remain.");
+            Require(world.Carried("crate") == 2 - placed, "Placing a crate must use one crate from the backpack.");
+            Require(!panel.Visible, "Placing a crate must not open it.");
+            Require(view.BuildMode == (placed == 1 ? ThingKind.Crate : null),
+                "Placing a crate must stay in placement while crates remain.");
         }
         RemoveThings(world, t => t.Kind == ThingKind.Crate && t != crate && t.Inventory.Count == 0);
         await ClickOn(crate);
@@ -367,13 +391,18 @@ public partial class Game {
         Require(world.Carried(packed) == 1, "A crate dragged into a crate must stay in the backpack.");
         Require(crate.Inventory.Count == 0, "A crate dragged into a crate must leave the target crate empty.");
         await Click((Control)blackHole.FindChild("anomaly_no", true, false));
-        Require(!blackHole.Showing && world.Carried(packed) == 1 && world.Find(crate.Id) != null, "No must cancel and keep both crates.");
+        Require(!blackHole.Showing, "No must close the black hole question.");
+        Require(world.Carried(packed) == 1, "No must keep the packed crate in the backpack.");
+        Require(world.Find(crate.Id) != null, "No must keep the placed crate on the ground.");
         await DragTo(await Showing(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
         await Click((Control)blackHole.FindChild("anomaly_yes", true, false));
         Require(blackHole.Collapsing && !blackHole.Asking, "Yes must open the black hole.");
         await Until(() => blackHole.GameOverShown, "the collapse ending on the game over screen", 10);
         await Click((Control)blackHole.FindChild("menu_after_collapse", true, false));
-        Require(!blackHole.Showing && startMenu.Visible && FindButton(startMenu.Screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
+        Require(!blackHole.Showing, "Main menu must leave the black hole.");
+        Require(startMenu.Visible, "Main menu must open the start menu.");
+        Require(FindButton(startMenu.Screen, "New game") != null,
+            "The start menu must offer New game after the black hole.");
     }
 
     private async Task CheckMouseWheelOverPanelDoesNotZoom() {
@@ -440,7 +469,9 @@ public partial class Game {
         Require(picker.Selected == Array.IndexOf(StartMenu.Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
         await Choose(picker, 0);
         var limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
-        Require(limits.Selected == 0 && limits.GetItemText(0) == "Off" && Engine.MaxFps == 0, "The frame rate limit must start off.");
+        Require(limits.Selected == 0, "The frame rate limit must start on its first choice.");
+        Require(limits.GetItemText(0) == "Off", "The frame rate limit's first choice must be Off.");
+        Require(Engine.MaxFps == 0, "The engine must start with no frame rate limit.");
         await Choose(limits, 2);
         Require(Engine.MaxFps == 90, "Choosing a frame rate limit must cap the frame rate.");
         var taa = (CheckButton)startMenu.Screen.FindChild("taa", true, false);
@@ -476,19 +507,29 @@ public partial class Game {
         Require(Enumerable.Range(0, Saves.SlotCount + 1).All(n => FindButton(startMenu.Screen, $"{Saves.SlotName(n)} · empty")!.Disabled), "Empty save slots must not be loadable.");
         await Click(FindButton(startMenu.Screen, "Back · Esc")!);
         await Click(FindButton(startMenu.Screen, "New game")!);
-        Require(!startMenu.Visible && !view.Paused && ShownPage() == "A new beginning", "New game must close the start menu and show the welcome page.");
+        Require(!startMenu.Visible, "New game must close the start menu.");
+        Require(!view.Paused, "New game must not leave the game paused.");
+        Require(ShownPage() == "A new beginning", "New game must show the welcome page.");
     }
     /// <summary>Esc opens the pause menu with the current goal; New game and Quit ask first, and confirming a new game starts a fresh settlement.</summary>
     private async Task CheckPauseMenuAsksBeforeNewGameAndQuit() {
         await CloseWithEsc();
         await KeyStroke(Key.Escape);
-        Require(menu.Visible && view.Paused && HasLabel(menu, World.ObjectiveFor(world.Goal).Title), "Esc must open the pause menu with the current goal.");
+        Require(menu.Visible, "Esc must open the pause menu.");
+        Require(view.Paused, "Esc must pause the game.");
+        Require(HasLabel(menu, World.ObjectiveFor(world.Goal).Title), "The pause menu must show the current goal.");
         // New game and Quit ask first, and Esc or Back returns to the pause menu.
         world.Player = Terrain.Spawn + new Vector2(6, 0);
         await Click(FindButton(menu, "New game")!);
-        Require(startMenu.Visible && FindButton(startMenu.Screen, "Start a new game") != null && world.Player != Terrain.Spawn, "New game must ask before leaving the settlement.");
+        Require(startMenu.Visible, "New game must open the start menu screen for its question.");
+        Require(FindButton(startMenu.Screen, "Start a new game") != null,
+            "New game must ask before leaving the settlement.");
+        Require(world.Player != Terrain.Spawn,
+            "The question must come up with the player still away from the clearing.");
         await KeyStroke(Key.Escape);
-        Require(!startMenu.Visible && menu.Visible && view.Paused, "Esc on the new game question must return to the pause menu.");
+        Require(!startMenu.Visible, "Esc on the new game question must close it.");
+        Require(menu.Visible, "Esc on the new game question must return to the pause menu.");
+        Require(view.Paused, "The game must stay paused after Esc on the new game question.");
         await Click(FindButton(menu, "Quit")!);
         Require(startMenu.Visible && FindButton(startMenu.Screen, "Quit to desktop") != null, "Quit must ask before closing the game.");
         await Click(FindButton(startMenu.Screen, "Back · Esc")!);
@@ -535,7 +576,9 @@ public partial class Game {
     }
     /// <summary>Sounds rotate through variants, music hands over and crossfades by time of day, and a faraway sound stays silent.</summary>
     private async Task CheckSoundsRotateCrossfadeAndStaySilentOffScreen() {
-        Require(Sounds.Names.All(name => sounds.VariantCount(name) > 0) && sounds.VariantCount("footsteps_default") == 3 && sounds.VariantCount("chop_tree") == 1, "Every sound must load, with numbered files grouped as variants.");
+        Require(Sounds.Names.All(name => sounds.VariantCount(name) > 0), "Every sound must load.");
+        Require(sounds.VariantCount("footsteps_default") == 3, "Numbered footstep files must group as three variants.");
+        Require(sounds.VariantCount("chop_tree") == 1, "A single chop file must count as one variant.");
         var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
         Require(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds);
@@ -549,12 +592,17 @@ public partial class Game {
         sounds.UpdateMusic(Sounds.MusicFadeSeconds); await Seconds(.5f);
         Require(!sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Day music must stop once faded out.");
         RunUntilMorning(world); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2); float stoppedAt = sounds.NightMusicPosition;
-        Require(!sounds.NightMusicPlaying && sounds.DayMusicPlaying && stoppedAt > .2f, "Dawn must stop the night music, keep its position and bring the day music back.");
+        Require(!sounds.NightMusicPlaying, "Dawn must stop the night music.");
+        Require(sounds.DayMusicPlaying, "Dawn must bring the day music back.");
+        Require(stoppedAt > .2f, "Dawn must keep the night music's position.");
         RunUntilNight(world); sounds.UpdateMusic(.1f);
         Require(sounds.NightMusicPlaying && sounds.NightMusicPosition >= stoppedAt, "The next night must resume the music where it stopped.");
         RunUntilMorning(world); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2);
         int heard = sounds.Played; sounds.Play("anvil_work", world.Player + Vector2.One * 40);
-        Require(view.OffScreen(world.Player) == 0 && view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach && sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
+        Require(view.OffScreen(world.Player) == 0, "A sound at the player must count as on screen.");
+        Require(view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach,
+            "A sound far from the player must count as beyond reach.");
+        Require(sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
     }
     /// <summary>Holding the right mouse button on a tree or a ripe farm plot walks over and works it.</summary>
     private async Task CheckRightClickGathersTreeAndHarvestsFarm() {
@@ -667,7 +715,10 @@ public partial class Game {
         await Click(Named("filters_close")!);
         Require(Named("filters_close") == null && panel.Visible, "The filter window's close button must close it and leave the panel open.");
         await KeyStroke(Key.Tab);
-        Require(!panel.Visible && bag.Visible && FindButton(panel, "Assign hotbar slots") == null, "Tab must open the backpack drawer, with no separate hotbar assignment.");
+        Require(!panel.Visible, "Tab must not open the side panel.");
+        Require(bag.Visible, "Tab must open the backpack drawer.");
+        Require(FindButton(panel, "Assign hotbar slots") == null,
+            "The side panel must have no separate hotbar assignment.");
         await Click((Control)bag.FindChild("bag_close", true, false));
         Require(!bag.Visible && !panel.Visible, "On the backpack page the drawer's close button must close the page.");
         await KeyStroke(Key.Tab);
@@ -683,9 +734,15 @@ public partial class Game {
         var savedPosition = world.Player;
         var savedSlots = world.HotbarSlots.ToArray(); int savedActiveSlot = world.ActiveHotbar;
         await KeyStroke(Key.F5);
-        Require(startMenu.Visible && FindButton(startMenu.Screen, "Slot 1 · empty") != null && FindButton(startMenu.Screen, "Autosave · empty") == null, "F5 in a new game must ask for a save slot and leave out the autosave.");
+        Require(startMenu.Visible, "F5 in a new game must open the save slots.");
+        Require(FindButton(startMenu.Screen, "Slot 1 · empty") != null,
+            "F5 in a new game must offer the empty first slot.");
+        Require(FindButton(startMenu.Screen, "Autosave · empty") == null,
+            "F5 in a new game must leave out the autosave.");
         await Click(FindButton(startMenu.Screen, "Slot 1 · empty")!);
-        Require(Saves.SlotUsed(1) && !startMenu.Visible && !view.Paused, "Choosing a slot must write the save and resume.");
+        Require(Saves.SlotUsed(1), "Choosing a slot must write the save.");
+        Require(!startMenu.Visible, "Choosing a slot must close the slot list.");
+        Require(!view.Paused, "Choosing a slot must resume the game.");
         int savedWood = chest.Inventory["wood"];
         Require(savedWood > 0 && chest.Inventory.Remove("wood", 1) == 1, "The chest must hold wood to take out after saving.");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
@@ -757,7 +814,9 @@ public partial class Game {
         await Seconds(.25);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
-        Require(world.Player == pinnedAt && view.PlayerAnimation == ActorAction.Mauled && deathLabel.Text == "", "A pinned player must not move, must show the mauled struggle and leaves the message to the pinned notice.");
+        Require(world.Player == pinnedAt, "A pinned player must not move.");
+        Require(view.PlayerAnimation == ActorAction.Mauled, "A pinned player must show the mauled struggle.");
+        Require(deathLabel.Text == "", "A pinned player must leave the message to the pinned notice.");
         SetMauled(world, false); RunUntilMorning(world); SetNeeds(world, health: 100);
         world.Die(); await Until(() => world.Dead && deathLabel.Text.Contains("Respawning in"), "death showing the respawn countdown", 2);
         world.Tick(world.RespawnIn); await Until(() => !world.Dead && deathLabel.Text == "", "the countdown clearing once the player respawns", 2);
@@ -773,7 +832,9 @@ public partial class Game {
         await Frames(3);
         Require(ending.Visible && view.Paused, "Reaching the end goals must show the ending and pause the world.");
         await Click((Button)ending.FindChild("keep_playing", true, false)); await Frames(3);
-        Require(!ending.Visible && !view.Paused && world.EndingShown, "Keep playing must close the ending and resume.");
+        Require(!ending.Visible, "Keep playing must close the ending.");
+        Require(!view.Paused, "Keep playing must resume the game.");
+        Require(world.EndingShown, "Keep playing must remember that the ending was shown.");
         await Frames(3);
         Require(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
     }
@@ -795,7 +856,9 @@ public partial class Game {
         var furnace = world.Add(ThingKind.Reinforced, world.Player + new Vector2(1, 0));
         Give(world, "iron_bar", 5); Give(world, "coal", 100);
         await ClickOn(furnace);
-        Require(Named("input_iron_bar") != null && Named("input_coal") != null && Named("output_steel_bar") != null, "The steel furnace must show one slot per input and output.");
+        Require(Named("input_iron_bar") != null, "The steel furnace must show a slot for iron bars.");
+        Require(Named("input_coal") != null, "The steel furnace must show a slot for coal.");
+        Require(Named("output_steel_bar") != null, "The steel furnace must show a slot for steel bars.");
         await DragTo(Cell(0, c => c.TooltipText.StartsWith("Iron bar")), Named("input_iron_bar")!);
         Require(furnace.Inventory["iron_bar"] == 5 && world.Carried("iron_bar") == 0, "Dragging bars onto the matching input slot must load them.");
         await DragTo(Cell(0, c => c.TooltipText.StartsWith("Mined coal")), Named("input_iron_bar")!);

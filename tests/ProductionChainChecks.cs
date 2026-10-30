@@ -68,7 +68,10 @@ public static class ProductionChainChecks {
         pile.Inventory.Add(crate, 1); crates.Inventory.Remove(crate, 1);
         world.Tick(.01f);
         string otherBread = PackCrate(world, ("bread", 2)), berryCrate = PackCrate(world, ("berries", 2));
-        Require(world.Holds(pile, otherBread) && pile.Inventory.Accepts(otherBread) && !world.Holds(pile, berryCrate), "a pile of bread crates should take another bread crate but not a crate of berries");
+        Require(world.Holds(pile, otherBread), "a pile of bread crates should hold another bread crate");
+        Require(pile.Inventory.Accepts(otherBread),
+            "a pile of bread crates should accept another bread crate into its inventory");
+        Require(!world.Holds(pile, berryCrate), "a pile of bread crates should not hold a crate of berries");
 
         // Changing the good leaves the old goods for the hauler to carry out.
         world.SetPacking(packer, "berries");
@@ -99,7 +102,9 @@ public static class ProductionChainChecks {
         Require(world.Orders.Count == 0, "the cart should wait while market slots are still free");
         for (int i = 1; i < World.MarketSlots; i++) world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("berries", 12)), 1);
         SafeTick(world, 1);
-        Require(world.Orders.Count == 1 && world.Orders[0].Crates == World.MarketSlots && sign.Inventory.Count == 0, "a full post set to sell on its own should send the cart");
+        Require(world.Orders.Count == 1, "a full post set to sell on its own should send one cart");
+        Require(world.Orders[0].Crates == World.MarketSlots, "the cart should carry every crate of the full post");
+        Require(sign.Inventory.Count == 0, "the post should be empty once the cart leaves");
     }
 
     /// <summary>

@@ -33,10 +33,12 @@ public static class NatureModelChecks {
                 for (int kind = 0; kind < 3; kind++)
                     Require(parts[kind * 2][part].MaterialOverride!.GetInstanceId() == parts[kind * 2 + 1][part].MaterialOverride!.GetInstanceId(),
                         $"repeated {kinds[kind]} deposits should reuse their {PartName(part)} palette material");
-                Require(parts[0][part].MaterialOverride!.GetInstanceId() != parts[2][part].MaterialOverride!.GetInstanceId()
-                    && parts[0][part].MaterialOverride!.GetInstanceId() != parts[4][part].MaterialOverride!.GetInstanceId()
-                    && parts[2][part].MaterialOverride!.GetInstanceId() != parts[4][part].MaterialOverride!.GetInstanceId(),
-                    $"{PartName(part)} palette materials should be distinct between coal, iron and tin");
+                Require(parts[0][part].MaterialOverride!.GetInstanceId() != parts[2][part].MaterialOverride!.GetInstanceId(),
+                    $"{PartName(part)} palette materials should be distinct between coal and iron");
+                Require(parts[0][part].MaterialOverride!.GetInstanceId() != parts[4][part].MaterialOverride!.GetInstanceId(),
+                    $"{PartName(part)} palette materials should be distinct between coal and tin");
+                Require(parts[2][part].MaterialOverride!.GetInstanceId() != parts[4][part].MaterialOverride!.GetInstanceId(),
+                    $"{PartName(part)} palette materials should be distinct between iron and tin");
             }
             Require(((StandardMaterial3D)parts[0][2].MaterialOverride!).AlbedoColor.IsEqualApprox(new Color("0c0e10")),
                 "mineable coal chips should use the near-black palette");
