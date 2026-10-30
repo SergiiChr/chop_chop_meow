@@ -62,8 +62,8 @@ UI and input:
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream cups, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
 | `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what pages keep while they are rebuilt |
 | `src/BackpackDrawer.cs` | The backpack drawer above the hotbar |
-| `src/Pages.cs` | What a page opens as, and the pages of plain buildings |
-| `src/Panels.cs` | `PagePanel`, a page and the pieces pages are built from: the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |
+| `src/InspectPage.cs` | Picks the panel for the selected thing or worker |
+| `src/PagePanel.cs` | `PagePanel`, the base of every page, and the pieces pages are built from: the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |
 | `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |

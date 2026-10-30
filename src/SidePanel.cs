@@ -90,7 +90,15 @@ public partial class SidePanel : PanelContainer {
         // Room for the pills that sit on the cups' corners.
         var inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);
         content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddChild(content);
-        content.AddChild(new PagePanel(this, name));
+        content.AddChild(name switch {
+            "welcome" => new WelcomePage(this),
+            "help" => new GuidePanel(this),
+            "build" => new PlansPanel(this),
+            "inventory" => new BackpackPage(this),
+            "workers" => new CrewPanel(this),
+            "craft" => new CraftPanel(this),
+            _ => new InspectPage(this)
+        });
         Kit.Refresh();
     }
 

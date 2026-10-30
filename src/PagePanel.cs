@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using Godot;
 
 namespace ChopChopMeow;
 
 /// <summary>A page of the side panel, and the pieces every page is built from, so each screen looks and works alike.</summary>
-public partial class PagePanel : VBoxContainer {
+public abstract partial class PagePanel : VBoxContainer {
     protected readonly SidePanel panel;
     protected readonly UiKit kit;
     protected readonly World world;
@@ -17,15 +18,14 @@ public partial class PagePanel : VBoxContainer {
     protected readonly PageMemory memory;
     protected readonly BackpackDrawer bag;
     protected readonly List<Action> live;
-    private readonly string pageName;
     /// <summary>Where the pieces go: this page, or for a moment another column being filled.</summary>
     protected Control content;
     protected HBoxContainer heading => panel.Heading;
     protected TextureRect headingIcon => panel.HeadingIcon;
     protected Label headingTitle => panel.HeadingTitle;
 
-    public PagePanel(SidePanel panel, string pageName = "") {
-        this.panel = panel; this.pageName = pageName;
+    protected PagePanel(SidePanel panel) {
+        this.panel = panel;
         kit = panel.Kit; world = kit.World; state = kit.State; sounds = kit.Sounds; view = panel.View; moves = panel.Moves; memory = panel.Memory; bag = panel.Bag; live = panel.Live;
         content = this; SizeFlagsHorizontal = SizeFlags.ExpandFill;
     }
@@ -253,5 +253,70 @@ public partial class PagePanel : VBoxContainer {
             cell.AddChild(badge);
         }
         return cell;
+    }
+
+    /// <summary>Shows the backpack drawer with a grid that works with the open page: <paramref name="wanted"/> lights up what it takes.</summary>
+    protected void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
+        var host = content; content = bag.Content;
+        AddInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns);
+        content = host; bag.Visible = !bag.Dismissed;
+    }
+    protected HBoxContainer Row() { var r = new HBoxContainer(); content.AddChild(r); return r; }
+    protected void AddLabel(string text, int size = 15, Color? color = null) => content.AddChild(Style.Wrapped(text, size, color));
+    protected void AddButton(string text, Action action, bool disabled = false) => content.AddChild(kit.Button(text, action, disabled));
+    /// <summary>A label whose text <paramref name="write"/> rebuilds on every refresh.</summary>
+    protected void Dynamic(Action<StringBuilder> write, int size = 15, Color? color = null) {
+        var l = Style.Wrapped("", size, color); content.AddChild(l);
+        var text = new LiveText(shown => l.Text = shown);
+        void Update() {
+            if (!GodotObject.IsInstanceValid(l)) return;
+            write(text.Clear()); text.Show();
+        }
+        Update(); live.Add(Update);
+    }
+    protected string Needs(Dictionary<string, int> cost) => LiveText.Of(text => AppendNeeds(text, cost));
+    protected string Cost(Dictionary<string, int> cost) => LiveText.Of(text => AppendCost(text, cost));
+    /// <summary>Each input with how many the backpack holds of how many are needed.</summary>
+    protected void AppendNeeds(StringBuilder text, Dictionary<string, int> cost) {
+        bool first = true;
+        foreach (var (item, amount) in cost) {
+            if (!first) text.Append("  ·  ");
+            first = false;
+            text.Append($"{world.Data.Name(item)} {world.S.Backpack[item]}/{amount}");
+        }
+    }
+    protected void AppendCost(StringBuilder text, Dictionary<string, int> cost) {
+        bool first = true;
+        foreach (var (item, amount) in cost) {
+            if (!first) text.Append("  ·  ");
+            first = false;
+            text.Append($"{amount} {world.Data.Name(item)}");
+        }
+    }
+    protected const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
+    protected void UseFromBag(string id) {
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
+    }
+    /// <summary>A storage's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
+    protected GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) {
+        var host = content; var column = new VBoxContainer(); content = column;
+        var grid = AddInventoryGrid(() => t.Inventory, t, id => moves.Stack(t.Inventory, world.S.Backpack, id, t), "Click: take one · Ctrl: take all · Drag to move", columns: columns, size: size);
+        content = host; column.RemoveChild(grid); column.QueueFree();
+        return grid;
+    }
+    /// <summary>Moves every material the storage takes from the backpack; tools stay, and so do crates, so one is never packed inside another.</summary>
+    protected void StoreAll(Thing t) {
+        if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
+        foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray())
+            if (world.Holds(t, id) && t.Inventory.Accepts(id)) world.Transfer(world.S.Backpack, t.Inventory, id, 999);
+    }
+    protected void TakeAll(Thing t) {
+        if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
+        foreach (var id in t.Inventory.Items.Keys.ToArray()) world.Transfer(t.Inventory, world.S.Backpack, id, 999);
+    }
+    /// <summary>Burn time as in-game hours and minutes.</summary>
+    protected StringBuilder AppendGameHours(StringBuilder text, float seconds) {
+        int minutes = (int)(seconds / world.Data.DaySeconds * 1440);
+        return text.Append(minutes / 60).Append(" h ").Append(minutes % 60).Append(" min");
     }
 }
