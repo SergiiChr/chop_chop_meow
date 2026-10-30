@@ -30,7 +30,10 @@ public static class ProductionChainChecks {
         var packer = world.Add(ThingKind.Packer, new Vector2(20, 20));
         world.Player = packer.Pos + new Vector2(1, 0);
         world.SetPacking(packer, "bread");
-        Require(packer.Packs == "bread" && world.Holds(packer, "bread") && world.Holds(packer, "crate") && !world.Holds(packer, "berries"), "a packing station should take only its good and empty crates");
+        Require(packer.Packs == "bread", "a packing station should be set to pack bread");
+        Require(world.Holds(packer, "bread"), "a packing station should take its own good");
+        Require(world.Holds(packer, "crate"), "a packing station should take empty crates");
+        Require(!world.Holds(packer, "berries"), "a packing station should refuse another good");
         packer.Inventory.Add("bread", 13); packer.Inventory.Add("crate", 2);
         world.Player = new Vector2(40, 40);
         SafeTick(world, 10);
@@ -38,8 +41,10 @@ public static class ProductionChainChecks {
         world.Player = packer.Pos + new Vector2(1, 0);
         SafeTick(world, data.PackSeconds * data.CrateCapacity + 1);
         string crate = packer.Output.First()!;
-        Require(crate.StartsWith(World.CrateOf("bread") + "_") && world.Packed(crate)!["bread"] == data.CrateCapacity && packer.Inventory["bread"] == 1 && packer.Inventory["crate"] == 1,
-                $"the player working it should pack a crate of twelve bread, named after its good: {crate}");
+        Require(crate.StartsWith(World.CrateOf("bread") + "_"), $"the player working it should name the crate after its good: {crate}");
+        Require(world.Packed(crate)!["bread"] == data.CrateCapacity, $"the player working it should pack a crate of twelve bread: {crate}");
+        Require(packer.Inventory["bread"] == 1, $"the packing station should use up one bread: {crate}");
+        Require(packer.Inventory["crate"] == 1, $"the packing station should use up one empty crate: {crate}");
         SafeTick(world, 10);
         Require(packer.Output.Count == 1 && packer.Inventory["bread"] == 1, "a full crate should wait in the output and stop packing until it is carried out");
 

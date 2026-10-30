@@ -49,8 +49,11 @@ public static class MineChecks {
         foreach (var mine in loaded.S.Things.Where(t => t.Kind == ThingKind.Mine)) {
             Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
                 "saved mines and their fog memories must use the aligned site");
-            Require(mine.MineStage == MineStage.Open && mine.Progress == 2 && mine.Inventory["wood"] == 7 && mine.Output![World.MineOre(mine)] == 12 && loaded.S.Workers.Any(w => w.Assignment == mine.Id && World.HasDuty(w, mine.Id, "mine")),
-                "aligning an older mine must preserve construction, stock, output and assigned workers");
+            Require(mine.MineStage == MineStage.Open, "aligning an older mine must preserve its construction stage");
+            Require(mine.Progress == 2, "aligning an older mine must preserve its construction progress");
+            Require(mine.Inventory["wood"] == 7, "aligning an older mine must preserve its stocked wood");
+            Require(mine.Output![World.MineOre(mine)] == 12, "aligning an older mine must preserve its output");
+            Require(loaded.S.Workers.Any(w => w.Assignment == mine.Id && World.HasDuty(w, mine.Id, "mine")), "aligning an older mine must preserve its assigned workers");
         }
         Require(loaded.S.Things.Where(t => t.Kind == ThingKind.Mine).Select(t => t.Pos).Distinct().Count() == World.Cliffs.Length, "migrating all cliffs must keep distinct mine sites");
         var restored = FundedWorld(data); restored.Deserialize(loaded.Serialize());
@@ -94,8 +97,12 @@ public static class MineChecks {
 
         // The surplus wood stays in storage: the site takes only what it still needs.
         Work(world, data.DaySeconds, () => mine.MineStage > MineStage.Dug);
-        Require(mine.MineStage == MineStage.Supplied && mine.Inventory.Count == 0 && chest.Inventory["wood"] == 20 && chest.Inventory["stone"] == 0 && chest.Inventory["iron_bar"] == 0 && worker.Bag.Count == 0,
-                $"a worker must haul exactly the mine's materials from storage: chest wood {chest.Inventory["wood"]}, bag {worker.Bag.Count}");
+        Require(mine.MineStage == MineStage.Supplied, $"a worker must finish hauling with the mine supplied: chest wood {chest.Inventory["wood"]}, bag {worker.Bag.Count}");
+        Require(mine.Inventory.Count == 0, $"a supplied mine must have used up the materials hauled to it: chest wood {chest.Inventory["wood"]}, bag {worker.Bag.Count}");
+        Require(chest.Inventory["wood"] == 20, $"a worker must leave the surplus wood in storage: chest wood {chest.Inventory["wood"]}, bag {worker.Bag.Count}");
+        Require(chest.Inventory["stone"] == 0, $"a worker must leave stone in storage: chest wood {chest.Inventory["wood"]}, bag {worker.Bag.Count}");
+        Require(chest.Inventory["iron_bar"] == 0, $"a worker must leave iron bars in storage: chest wood {chest.Inventory["wood"]}, bag {worker.Bag.Count}");
+        Require(worker.Bag.Count == 0, $"a worker must deliver everything it carried: chest wood {chest.Inventory["wood"]}, bag {worker.Bag.Count}");
 
         Work(world, 30);
         Require(mine.MineStage == MineStage.Supplied && mine.Progress == 0 && worker.Status.Contains("hammer"), "fitting the frame must wait for a hammer");

@@ -98,8 +98,14 @@ public static class WaterChecks {
 
     private static void CheckBottleRecipeMakesEmptyBottleFromTinAndWood(GameData data) {
         var recipe = data.Recipes["water_bottle"];
-        Require(recipe.Output == "empty_bottle" && recipe.Amount == 1 && recipe.Tool == "hammer" && recipe.Tier == 2, "the bottle recipe should create one empty bottle with the tin-can hammer tier");
-        Require(recipe.Inputs.TryGetValue("tin_bar", out int tin) && tin == 1 && recipe.Inputs.TryGetValue("wood_parts", out int parts) && parts == 1, "the bottle recipe should use one tin bar and one wood part");
+        Require(recipe.Output == "empty_bottle", "the bottle recipe should create an empty bottle");
+        Require(recipe.Amount == 1, "the bottle recipe should create one bottle");
+        Require(recipe.Tool == "hammer", "the bottle recipe should need the hammer");
+        Require(recipe.Tier == 2, "the bottle recipe should need the tin-can hammer tier");
+        Require(recipe.Inputs.TryGetValue("tin_bar", out int tin), "the bottle recipe should use tin bar");
+        Require(tin == 1, "the bottle recipe should use one tin bar");
+        Require(recipe.Inputs.TryGetValue("wood_parts", out int parts), "the bottle recipe should use wood parts");
+        Require(parts == 1, "the bottle recipe should use one wood part");
         Require(data.Market.Buys.ContainsKey("water"), "full bottles should remain purchasable");
     }
 

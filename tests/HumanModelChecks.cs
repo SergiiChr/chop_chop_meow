@@ -84,9 +84,10 @@ public static class HumanModelChecks {
                     float palmMaxY = Math.Max(palmCenter.Y, palmTop.Y);
                     Require(palmMaxY >= crateBounds.Min.Y - .04f && palmMaxY <= crateBounds.Min.Y + .01f,
                         $"{name} should support the crate from below while {(moving ? "walking" : "standing")}");
-                    Require(palmCenter.X >= crateBounds.Min.X && palmCenter.X <= crateBounds.Max.X
-                        && palmCenter.Z >= crateBounds.Min.Z && palmCenter.Z <= crateBounds.Max.Z,
-                        $"{name} palm should remain inside the crate footprint while {(moving ? "walking" : "standing")}");
+                    Require(palmCenter.X >= crateBounds.Min.X, $"{name} palm should not pass the crate footprint's near X edge while {(moving ? "walking" : "standing")}");
+                    Require(palmCenter.X <= crateBounds.Max.X, $"{name} palm should not pass the crate footprint's far X edge while {(moving ? "walking" : "standing")}");
+                    Require(palmCenter.Z >= crateBounds.Min.Z, $"{name} palm should not pass the crate footprint's near Z edge while {(moving ? "walking" : "standing")}");
+                    Require(palmCenter.Z <= crateBounds.Max.Z, $"{name} palm should not pass the crate footprint's far Z edge while {(moving ? "walking" : "standing")}");
                 }
             }
             rig.Show(new Pose(), null, false);

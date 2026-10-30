@@ -83,8 +83,10 @@ public partial class Game {
         var targetIndex = Array.IndexOf(bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().ToArray(), target);
         Require(woodIndex >= 0 && targetIndex >= 0 && targetIndex != woodIndex, "The inventory must expose source and empty destination slots.");
         await DragTo(wood, target);
-        Require(bagItems.Layout[targetIndex].Item == "wood" && bagItems.Layout[targetIndex].Count == 7 && bagItems["stone"] == 3 && bagItems["berries"] == 5,
-            "Dragging a stack into an exact empty backpack slot must preserve its quantity and the other stacks.");
+        Require(bagItems.Layout[targetIndex].Item == "wood", "Dragging a stack into an empty backpack slot must put the item in that slot.");
+        Require(bagItems.Layout[targetIndex].Count == 7, "Dragging a stack into an empty backpack slot must keep its quantity.");
+        Require(bagItems["stone"] == 3, "Dragging a stack into an empty backpack slot must leave the stone alone.");
+        Require(bagItems["berries"] == 5, "Dragging a stack into an empty backpack slot must leave the berries alone.");
         await Click((Control)bag.FindChild("sort_bag", true, false));
         var ordered = bagItems.Layout.Where(s => s.Item != "").Select(s => s.Item).ToArray();
         Require(ordered.SequenceEqual(ordered.OrderBy(id => id, StringComparer.Ordinal)), "The backpack Sort button must order stacks by item name.");
@@ -122,8 +124,11 @@ public partial class Game {
         world.SetRecipe(table, "dough");
         Select(table); await Frames(3);
         await Click(Cell(1, c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal)));
-        Require(waterWarning.Text == Water.FullBottleWarning && waterWarning.GetGlobalRect().Position.X < 50 && waterWarning.Size.X > 300 && waterWarning.Size.Y < 50 && waterWarning.GetGlobalRect().End.Y < bag.GetGlobalRect().Position.Y,
-            "Trying a partial bottle must show the full-bottle warning at the bottom left.");
+        Require(waterWarning.Text == Water.FullBottleWarning, "Trying a partial bottle must show the full-bottle warning text.");
+        Require(waterWarning.GetGlobalRect().Position.X < 50, "The full-bottle warning must sit at the left of the screen.");
+        Require(waterWarning.Size.X > 300, "The full-bottle warning must be wide enough to read.");
+        Require(waterWarning.Size.Y < 50, "The full-bottle warning must be a single short line.");
+        Require(waterWarning.GetGlobalRect().End.Y < bag.GetGlobalRect().Position.Y, "The full-bottle warning must sit above the backpack.");
         var partial = Cell(1, c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal));
         await DragTo(partial, (Control)ui.FindChild("input_water", true, false));
         Require(table.Inventory["water_2"] == 0 && world.S.Backpack["water_2"] == 1 && waterWarning.Text == Water.FullBottleWarning,

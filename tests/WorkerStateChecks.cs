@@ -58,8 +58,10 @@ public static class WorkerStateChecks {
         worker.Tool = "steel_axe";
         world.Assign(worker, spent);
         for (int i = 0; i < 600 && worker.Assignment != seen.Id; i++) world.Tick(.1f);
-        Require(worker.Assignment == seen.Id && worker.Duties.Count == 1 && worker.Duties[0].Thing == seen.Id && unseen.Remaining == 5,
-                "a worker whose tree is felled should move on to the nearest tree a player has seen, not a closer one under black fog");
+        Require(worker.Assignment == seen.Id, "a worker whose tree is felled should move to the nearest tree a player has seen");
+        Require(worker.Duties.Count == 1, "the worker should keep one duty");
+        Require(worker.Duties[0].Thing == seen.Id, "the worker's duty should be the seen tree");
+        Require(unseen.Remaining == 5, "the worker should not go to a closer tree under black fog");
         Require(world.S.Remembered.ContainsKey(seen.Id) && !world.Sees(seen.Pos), "the next tree should be one known from memory, now out of sight");
 
         for (int i = 0; i < 600 && worker.Status.IndexOf("waiting at the trading post", StringComparison.Ordinal) < 0; i++) world.Tick(.1f);
@@ -74,8 +76,10 @@ public static class WorkerStateChecks {
         Require(world.Find(coal.Id) == null && picker.Assignment == moreCoal.Id, "a worker who picks up the last of a loose coal should go to the next known one, not a closer one under black fog");
         for (int i = 0; i < 300 && world.Find(moreCoal.Id) != null; i++) world.Tick(.1f);
         for (int i = 0; i < 100; i++) world.Tick(.1f);
-        Require(world.Find(moreCoal.Id) == null && picker.Duties.Count == 1 && picker.Duties[0].Kind == ThingKind.LooseCoal && picker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f,
-                "a worker who picked up the last known loose coal should keep the job and wait at the trading post");
+        Require(world.Find(moreCoal.Id) == null, "a worker who picked up the last known loose coal should have it gone");
+        Require(picker.Duties.Count == 1, "the worker should keep one duty");
+        Require(picker.Duties[0].Kind == ThingKind.LooseCoal, "the worker should keep the loose coal duty");
+        Require(picker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f, "the worker should wait at the trading post");
 
         // The look comes at the end of a tick, so the worker acts on it the tick after.
         world.Player = at; world.Tick(.1f); world.Tick(.1f);

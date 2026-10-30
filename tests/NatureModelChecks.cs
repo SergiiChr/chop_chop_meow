@@ -48,12 +48,12 @@ public static class NatureModelChecks {
             Require(props[1].Root.Visible && repeatedCoalHost.Visible, "hiding one ore prop should not hide another prop sharing its mesh");
             props[0].Root.Visible = true;
             ModelKit.SetFade(coalHost, original, .5f);
-            Require(coalHost.MaterialOverride is StandardMaterial3D faded
-                    && faded.GetInstanceId() != original.GetInstanceId()
-                    && faded.VertexColorUseAsAlbedo
-                    && faded.AlbedoColor.IsEqualApprox(original.AlbedoColor with { A = .5f })
-                    && repeatedCoalHost.MaterialOverride!.GetInstanceId() == original.GetInstanceId(),
-                "fading one ore prop should not replace the shared palette material on another prop");
+            var faded = coalHost.MaterialOverride as StandardMaterial3D;
+            Require(faded != null, "fading one ore prop should give it a material");
+            Require(faded.GetInstanceId() != original.GetInstanceId(), "fading one ore prop should give it a copy of the shared palette material");
+            Require(faded.VertexColorUseAsAlbedo, "the faded copy should keep vertex colours as albedo");
+            Require(faded.AlbedoColor.IsEqualApprox(original.AlbedoColor with { A = .5f }), "the faded copy should be half transparent");
+            Require(repeatedCoalHost.MaterialOverride!.GetInstanceId() == original.GetInstanceId(), "fading one ore prop should leave another prop on the shared palette material");
             ModelKit.SetFade(coalHost, original, 0);
             Require(coalHost.MaterialOverride!.GetInstanceId() == original.GetInstanceId(),
                 "resetting an ore prop fade should restore its palette material");

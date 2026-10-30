@@ -86,8 +86,11 @@ public partial class Game {
         old!.Fade = .68f; old.Fall = 9;
         Restart(); await Frames(2);
         var fresh = view.PropOf(tree.Id) as TreeProp;
-        Require(world.Find(tree.Id)?.Kind == ThingKind.Tree && fresh != null && fresh != old && fresh.Fade == 0 && fresh.Fall < 0,
-            "A new game must build fresh models rather than keep the last game's, faded or fallen.");
+        Require(world.Find(tree.Id)?.Kind == ThingKind.Tree, "A new game must keep a tree where the last game's tree stood.");
+        Require(fresh != null, "A new game must build a model for that tree.");
+        Require(fresh != old, "A new game must build a fresh tree model rather than keep the last game's.");
+        Require(fresh.Fade == 0, "A new game's tree model must not stay faded.");
+        Require(fresh.Fall < 0, "A new game's tree model must not stay fallen.");
         ClosePanel();
     }
     /// <summary>Canopy fades use separate shadow-only meshes so the original cutout shadows survive alpha blending.</summary>
@@ -143,10 +146,11 @@ public partial class Game {
         ModelKit.SetFade(prop.SwayParts, .68f);
         for (int i = 0; i < prop.SwayParts.Length; i++) {
             var mesh = prop.SwayParts[i].Mesh;
-            Require(mesh.MaterialOverride is Material faded &&
-                Blended(faded) && Opacity(faded) < Opacity(originals[i]) &&
-                mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off,
-                "Fading a tree canopy must change only the visible mesh material and retain proxy shadow casting.");
+            var faded = mesh.MaterialOverride as Material;
+            Require(faded != null, "A faded tree canopy mesh must still have a material.");
+            Require(Blended(faded), "Fading a tree canopy must blend the visible mesh material.");
+            Require(Opacity(faded) < Opacity(originals[i]), "Fading a tree canopy must make the visible mesh material more transparent.");
+            Require(mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off, "Fading a tree canopy must leave the visible mesh without shadow casting, to its proxy.");
             var proxy = proxies[i];
             Require(ReferenceEquals(proxy.MaterialOverride, originals[i]) &&
                 Mathf.IsEqualApprox(Opacity(proxyMaterials[i]), proxyAlphas[i]) && Blended(proxyMaterials[i]) == proxyBlended[i],
@@ -189,7 +193,11 @@ public partial class Game {
         var berries = world.Add(ThingKind.Crate, world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); world.PickUpCrate(berries);
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         await Click(view.Screen(sign.Pos, .8f));
-        Require(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A trading post must open the market with its icon buttons.");
+        Require(selected == sign.Id, "Clicking a trading post must select it.");
+        Require(Named("sell") != null, "The market must offer a sell button.");
+        Require(Named("coins") != null, "The market must offer a coins button.");
+        Require(Named("hardhat") != null, "The market must offer a hire button.");
+        Require(Named("prices") != null, "The market must offer a prices button.");
         await Click(Cell(2, c => c.TooltipText.StartsWith("Wood ·")));
         Require(sign.Inventory.Count == 0 && world.S.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
         await Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));
@@ -203,7 +211,11 @@ public partial class Game {
             "The post's filter must offer crates of goods, not loose goods, and only a row of what workers bring.");
         await Click(Named("filters_close")!);
         var fetch = Named("fetch");
-        Require(sheet.Visible && panel.OffsetLeft == PanelLeft - SheetWidth && fetch != null && fetch.Disabled && fetch.TooltipText == "No worker assigned.", "The price sheet must open beside the panel and explain why no one can fetch prices.");
+        Require(sheet.Visible, "The price sheet must open.");
+        Require(panel.OffsetLeft == PanelLeft - SheetWidth, "The price sheet must open beside the panel.");
+        Require(fetch != null, "The price sheet must offer a fetch button.");
+        Require(fetch.Disabled, "The fetch button must be disabled while no worker is assigned.");
+        Require(fetch.TooltipText == "No worker assigned.", "The fetch button must explain that no worker is assigned.");
         Require(Named("buy_wood") == null && Named("buy_berries") == null && Named("buy_water") != null, "The price sheet must only offer what the village sells.");
         await Click(Named("buy_water")!);
         Require(world.S.Orders.Count == 2 && world.S.Orders[1].Buying, "Buy on the price sheet must order goods.");
@@ -249,7 +261,10 @@ public partial class Game {
             // Off the exact spot, so the click shows the plan snapping to the cliff.
             await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
             var mine = world.S.Things.LastOrDefault(t => t.Kind == ThingKind.Mine);
-            Require(mine != null && mine.Pos == spot && selected == mine.Id && view.BuildMode == null, $"A click near the {ore} cliff must mark a mine on its spot and select it.");
+            Require(mine != null, $"A click near the {ore} cliff must create a mine.");
+            Require(mine.Pos == spot, $"A click near the {ore} cliff must mark the mine on the cliff's spot.");
+            Require(selected == mine.Id, $"A click near the {ore} cliff must select the new mine.");
+            Require(view.BuildMode == null, $"A click near the {ore} cliff must end placement mode.");
             Require(new[] { "Stage 1 · Dig the entrance", "Stage 2 · Shore it up", "Stage 3 · Fit the frame and rails" }.Select((title, i) => panel.FindChild($"stage_{i + 1}", true, false) is Control node && node.TooltipText.StartsWith(title)).All(found => found),
                 "The mine panel must show its three stages.");
         }
@@ -322,7 +337,10 @@ public partial class Game {
         string lastSlot = world.S.HotbarSlots[8]; int active = world.S.ActiveHotbar;
         world.S.Backpack.Add("crate", 1); world.S.HotbarSlots[8] = "crate"; world.S.ActiveHotbar = 8; ClosePanel(); await Frames();
         await Click(view.Screen(crate.Pos, .4f));
-        Require(!anomaly.Visible && selected == crate.Id && crate.Inventory.Count == 0 && world.S.Backpack["crate"] == 1, "Clicking a crate with a crate in hand must open it without the nesting alert.");
+        Require(!anomaly.Visible, "Clicking a crate with a crate in hand must not show the nesting alert.");
+        Require(selected == crate.Id, "Clicking a crate with a crate in hand must select the clicked crate.");
+        Require(crate.Inventory.Count == 0, "Clicking a crate with a crate in hand must not put the crate in hand into it.");
+        Require(world.S.Backpack["crate"] == 1, "Clicking a crate with a crate in hand must keep the crate in hand.");
         world.S.HotbarSlots[8] = lastSlot; world.S.ActiveHotbar = active;
         // Two empty crates go down one after the other without opening, and placement ends with the last.
         world.S.Backpack.Add("crate", 1); PlaceCrate("crate");
@@ -335,7 +353,10 @@ public partial class Game {
         world.S.Things.RemoveAll(t => t.Kind == ThingKind.Crate && t != crate && t.Inventory.Count == 0);
         Select(crate); await Frames();
         await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
-        Require(anomaly.Visible && anomalyWarning.Visible && world.S.Backpack[packed] == 1 && crate.Inventory.Count == 0, "A crate dragged into a crate must stop at the warning.");
+        Require(anomaly.Visible, "A crate dragged into a crate must show the nesting alert.");
+        Require(anomalyWarning.Visible, "A crate dragged into a crate must show the nesting warning.");
+        Require(world.S.Backpack[packed] == 1, "A crate dragged into a crate must stay in the backpack.");
+        Require(crate.Inventory.Count == 0, "A crate dragged into a crate must leave the target crate empty.");
         await Click((Control)anomaly.FindChild("anomaly_no", true, false));
         Require(!anomaly.Visible && world.S.Backpack[packed] == 1 && world.Find(crate.Id) != null, "No must cancel and keep both crates.");
         RefreshLive();
@@ -399,7 +420,10 @@ public partial class Game {
     private async Task CheckStartMenuOptionsAndNewGame() {
         // A failed earlier run may have left saves behind, which would enable Continue.
         RemoveCheckFiles(); ShowStart(); await Frames(4);
-        Require(backdrop.Visible && paused && FindButton(screen, "New game") != null && FindButton(screen, "Continue")!.Disabled, "Launch must open the start menu, hold the world and offer no save to continue.");
+        Require(backdrop.Visible, "Launch must show the start menu.");
+        Require(paused, "Launch must hold the world.");
+        Require(FindButton(screen, "New game") != null, "Launch must offer a new game.");
+        Require(FindButton(screen, "Continue")!.Disabled, "Launch must offer no save to continue.");
         float launchTime = world.S.Time; await KeyStroke(Key.Escape);
         Require(backdrop.Visible && world.S.Time == launchTime, "Esc must not leave the start menu, and the world must not advance behind it.");
         await Click(FindButton(screen, "Options")!);
@@ -427,7 +451,10 @@ public partial class Game {
             musicSlider = (HSlider)screen.FindChild("music", true, false);
         }
         await ReopenOptions();
-        Require(picker.Selected == 0 && limits.Selected == 2 && !taa.ButtonPressed && musicSlider.Value == 50, "Reopened options must show the stored choices.");
+        Require(picker.Selected == 0, "Reopened options must show the chosen resolution.");
+        Require(limits.Selected == 2, "Reopened options must show the chosen frame rate limit.");
+        Require(!taa.ButtonPressed, "Reopened options must show temporal anti-aliasing off.");
+        Require(musicSlider.Value == 50, "Reopened options must show the chosen music volume.");
         await Choose(limits, 0);
         Require(Engine.MaxFps == 0, "Turning the frame rate limit off must lift the cap.");
         await Click(taa);
@@ -459,7 +486,11 @@ public partial class Game {
         Require(menu.Visible && paused, "Back on the quit question must return to the pause menu.");
         await Click(FindButton(menu, "New game")!);
         await Click(FindButton(screen, "Start a new game")!);
-        Require(!backdrop.Visible && !menu.Visible && !paused && page == "welcome" && world.Player == Terrain.Spawn, "Confirming a new game must start a fresh settlement.");
+        Require(!backdrop.Visible, "Confirming a new game must close the start menu.");
+        Require(!menu.Visible, "Confirming a new game must close the pause menu.");
+        Require(!paused, "Confirming a new game must resume the world.");
+        Require(page == "welcome", "Confirming a new game must show the welcome page.");
+        Require(world.Player == Terrain.Spawn, "Confirming a new game must put the player back at the spawn.");
         ClosePanel();
         await KeyStroke(Key.Escape);
         await KeyStroke(Key.Escape);
@@ -540,14 +571,20 @@ public partial class Game {
     }
     /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item in hand.</summary>
     private async Task CheckHudAndHotbarEatAndDrinkInHand() {
-        Require(!stats.Text.Contains("Health") && !stats.Text.Contains("Food") && !stats.Text.Contains("Water") && !stats.Text.Contains("coins") && !stats.Text.Contains("Pack"), "The persistent HUD must show only the day and clock beside the brand.");
+        Require(!stats.Text.Contains("Health"), "The persistent HUD must not show health.");
+        Require(!stats.Text.Contains("Food"), "The persistent HUD must not show food.");
+        Require(!stats.Text.Contains("Water"), "The persistent HUD must not show water.");
+        Require(!stats.Text.Contains("coins"), "The persistent HUD must not show coins.");
+        Require(!stats.Text.Contains("Pack"), "The persistent HUD must not show the pack.");
         Require(hotbarButtons.Count == 9 && world.S.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
         int berries = world.S.Backpack["berries"];
         await KeyStroke(Key.Key3);
         Require(view.BuildMode == ThingKind.Chest, "A building-plan hotkey must enter placement mode.");
         await KeyStroke(Key.Key8);
-        Require(world.S.ActiveHotbar == 7 && world.S.Backpack["berries"] == berries && hotbarButtons[7].GetThemeStylebox("normal") == Style.CupWanted && hotbarButtons[2].GetThemeStylebox("normal") != Style.CupWanted,
-            "Key 8 must put the berries in hand with an outline, without eating them.");
+        Require(world.S.ActiveHotbar == 7, "Key 8 must make the eighth hotbar slot active.");
+        Require(world.S.Backpack["berries"] == berries, "Key 8 must not eat the berries.");
+        Require(hotbarButtons[7].GetThemeStylebox("normal") == Style.CupWanted, "Key 8 must outline the berries in hand.");
+        Require(hotbarButtons[2].GetThemeStylebox("normal") != Style.CupWanted, "Key 8 must outline only the slot in hand.");
         Require(view.BuildMode == null, "Selecting an item must clear any previously selected building plan.");
         int played = sounds.Played;
         await ClickGround();
@@ -580,8 +617,10 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = windowPoint, Pressed = false });
         await Frames();
         var chest = world.S.Things.LastOrDefault(t => t.Kind == ThingKind.Chest);
-        Require(chest != null && view.BuildMode == (world.S.Backpack.Has(world.Data.Buildings[ThingKind.Chest].Cost) ? ThingKind.Chest : null) && selected != chest.Id && !panel.Visible,
-            "A ground click must construct the chest without opening it, staying in placement while another can be afforded.");
+        Require(chest != null, "A ground click must construct a chest.");
+        Require(view.BuildMode == (world.S.Backpack.Has(world.Data.Buildings[ThingKind.Chest].Cost) ? ThingKind.Chest : null), "A ground click must stay in placement while another chest can be afforded and leave it otherwise.");
+        Require(selected != chest.Id, "A ground click must not select the new chest.");
+        Require(!panel.Visible, "A ground click must not open a panel.");
         return chest!;
     }
     /// <summary>Chest stacks move by deposit, drag and split, filter rows take and release items, and the backpack drawer closes on its own.</summary>
@@ -606,7 +645,10 @@ public partial class Game {
         await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
         Require(chest.Inventory["wood"] == storedWood, "The split half must go back into the chest.");
         await Click(Named("filters")!);
-        Require(filterOpen && sheet.Visible && panel.FindChild("filter_in", true, false) != null && panel.FindChild("filter_out", true, false) != null, "Chest filters must open in the filter window beside the panel.");
+        Require(filterOpen, "Chest filters must open the filter window.");
+        Require(sheet.Visible, "Chest filters must show the sheet beside the panel.");
+        Require(panel.FindChild("filter_in", true, false) != null, "The filter window must show an input filter.");
+        Require(panel.FindChild("filter_out", true, false) != null, "The filter window must show an output filter.");
         await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), (Control)panel.FindChild("filter_add_in", true, false));
         Require(chest.Inventory.InputFilter.Contains("wood") && chest.Inventory["wood"] == storedWood, "Dropping an item on a filter row must add it to that filter without moving it.");
         await Click(Named("filter_in_wood")!);
@@ -651,7 +693,10 @@ public partial class Game {
         await Click(FindButton(menu, "Load")!);
         Require(FindButton(screen, "Slot 2 · empty")!.Disabled, "The load screen must disable empty slots.");
         await Click(screen.GetChildren().OfType<Button>().First(b => b.Text.StartsWith("Slot 1 · ")));
-        Require(!backdrop.Visible && !menu.Visible && !paused && world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the save and resume.");
+        Require(!backdrop.Visible, "Loading from the pause menu must close the start menu.");
+        Require(!menu.Visible, "Loading from the pause menu must close the pause menu.");
+        Require(!paused, "Loading from the pause menu must resume the world.");
+        Require(world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the saved position.");
     }
     /// <summary>Carried items show as backpack cells, and the HUD heart, stomach and droplet track health, hunger and thirst.</summary>
     private async Task CheckBackpackCellsAndHudIconsTrackStats() {
@@ -663,7 +708,10 @@ public partial class Game {
         world.S.Health = healthBefore;
         Require(!HasLabel(panel, "Hunger") && !HasLabel(panel, "Thirst"), "Hunger and thirst belong to the HUD icons, not the inventory.");
         world.S.Hunger = 40; world.S.Thirst = 70; RefreshLive();
-        Require(hunger.Visible && thirst.Visible && hunger.TooltipText == "Hunger 40%" && thirst.TooltipText == "Thirst 70%", "The HUD stomach and droplet must track hunger and thirst.");
+        Require(hunger.Visible, "The HUD stomach must show.");
+        Require(thirst.Visible, "The HUD droplet must show.");
+        Require(hunger.TooltipText == "Hunger 40%", "The HUD stomach must track hunger.");
+        Require(thirst.TooltipText == "Thirst 70%", "The HUD droplet must track thirst.");
         Require(Slots().Count() == world.S.Backpack.Slots, "The backpack must show one grid cell per slot.");
         world.S.Backpack.Add("berries", 2); RefreshLive();
         var berryCell = Slots().FirstOrDefault(c => c.TooltipText.StartsWith("Berries"));
@@ -809,8 +857,10 @@ public partial class Game {
         await Until(() => berryBush.Remaining == 0, "holding RMB on a berry bush picking it clean", world.Data.GatherSeconds + 3);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
         await Frames(2);
-        Require(berryBush.Remaining == 0 && world.S.Backpack["berries"] == 4 && !bushProp.Fruit.Visible && bushProp.Body.Visible,
-            "Harvesting must collect the berries and hide only the fruit, leaving the bush visible.");
+        Require(berryBush.Remaining == 0, "Harvesting must empty the berry bush.");
+        Require(world.S.Backpack["berries"] == 4, "Harvesting must put the berries in the backpack.");
+        Require(!bushProp.Fruit.Visible, "Harvesting must hide the fruit.");
+        Require(bushProp.Body.Visible, "Harvesting must leave the bush body visible.");
         berryBush.Remaining = 4; await Frames(2);
         Require(bushProp.Fruit.Visible, "A replenished bush must show its fruit again.");
     }

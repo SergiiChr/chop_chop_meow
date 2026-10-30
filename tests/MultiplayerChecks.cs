@@ -114,14 +114,19 @@ public static class MultiplayerChecks {
         copy.Build(ThingKind.Campfire, Terrain.Spawn + new Vector2(-2, 2));
         copy.Transfer(copy.S.Backpack, chest.Inventory, "wood", 5);
         copy.SetFilter(chest, "wood", false, true);
-        Require(copy.S.Backpack["berries"] == 3 && copy.S.Hunger == 50 && copy.S.Things.All(t => t.Kind != ThingKind.Campfire) && chest.Inventory.Count == 0 && chest.Inventory.InputFilter.Count == 0,
-            "a guest's copy should leave its world to the host's updates");
+        Require(copy.S.Backpack["berries"] == 3, "a guest's copy should keep its own backpack berries");
+        Require(copy.S.Hunger == 50, "a guest's copy should keep its own hunger");
+        Require(copy.S.Things.All(t => t.Kind != ThingKind.Campfire), "a guest's copy should not add a campfire to its world");
+        Require(chest.Inventory.Count == 0, "a guest's copy should not put anything in the host's chest");
+        Require(chest.Inventory.InputFilter.Count == 0, "a guest's copy should not set a filter on the host's chest");
         Require(sent.Select(c => c.Verb).SequenceEqual(new[] { Verb.Consume, Verb.Build, Verb.Transfer, Verb.SetFilter }), $"the copy should send each action once, in order: {string.Join(", ", sent.Select(c => c.Verb))}");
 
         foreach (var command in sent) host.Run(guest, command);
         var hostChest = host.Find(chest.Id)!;
-        Require(guest.Backpack["berries"] == 2 && guest.Hunger > 50 && host.S.Things.Any(t => t.Kind == ThingKind.Campfire) && guest.Backpack["wood"] == 9,
-            "the host should run the guest's actions as the guest");
+        Require(guest.Backpack["berries"] == 2, "the host should run the guest's eating on the guest's berries");
+        Require(guest.Hunger > 50, "the host should run the guest's eating on the guest's hunger");
+        Require(host.S.Things.Any(t => t.Kind == ThingKind.Campfire), "the host should run the guest's building in the host's world");
+        Require(guest.Backpack["wood"] == 9, "the host should take the guest's wood for the building and the transfer");
         Require(hostChest.Inventory["wood"] == 5 && hostChest.Inventory.InputFilter.Contains("wood"), "the guest's transfer and filter should land in the host's chest");
         Require(host.S.Backpack["berries"] == 0 && host.S.Hunger == 100, "the host's own player should be untouched by a guest's actions");
     }
