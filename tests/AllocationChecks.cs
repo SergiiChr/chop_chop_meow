@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
@@ -23,6 +24,24 @@ public static class AllocationChecks {
         // Twenty seconds first, so every worker has been through its trips once and the status and cost caches hold what they will show.
         // A store taking an item it has not held before grows its table once; that rare event is the one byte per tick allowed here (measured 0.2 to 0.5).
         Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 1, warmup: 1200);
+
+        // The host sends an update ten times a second, against one the guest confirmed a few updates back, as over a long connection, and the guest merges it.
+        // Only entries that changed are new arrays, on the host and again in the guest's merge: about seven worker and station entries an update in a working settlement (measured 12.2 KB an update).
+        var hosting = Settlement(data);
+        var host = new WorldUpdates(); var guest = new WorldUpdates();
+        var sent = new Queue<(Snapshot Host, Snapshot Guest)>();
+        Check("update: working settlement", () => {
+            for (int i = 0; i < 6; i++) hosting.Tick(1 / 60f);
+            Fed(hosting);
+            var now = host.Capture(hosting);
+            var known = sent.Count > 3 ? sent.Dequeue() : default;
+            var copy = guest.Merge(known.Guest, host.Delta(now, known.Host));
+            if (known.Host != null) { host.Release(known.Host); guest.Release(known.Guest); }
+            sent.Enqueue((now, copy));
+        }, maxBytesPerRun: 14000, warmup: 200, runs: 300);
+        foreach (var (hosted, copied) in sent)
+            if (hosted.Entries.Count != copied.Entries.Count || hosted.Entries.Any(pair => !copied.Entries.TryGetValue(pair.Key, out var entry) || !entry.AsSpan().SequenceEqual(pair.Value)))
+                throw new InvalidOperationException("Update check failed: the guest's merged entries should match the host's.");
 
         var packing = PackingLine(data, out var stock);
         // A crate fills about every twenty seconds and goes to the post, whose cart leaves once six are there; a hundred seconds see several crates and a cart.

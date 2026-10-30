@@ -44,7 +44,8 @@ Simulation and data:
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
 | `src/Players.cs` | Per-player state, the command dispatcher and guest adoption |
-| `src/Net.cs` | The ENet connection, world updates and guest saves |
+| `src/Net.cs` | The ENet connection, sending and merging world updates, and guest saves |
+| `src/WorldUpdates.cs` | World updates as entries, their differences and compression |
 
 UI and input:
 
@@ -137,6 +138,7 @@ Shared rules:
 
 An update holds only what changed since the last one the guest confirmed.
 The host keeps the world of each recent update as one JSON entry per thing, worker, wolf, trade cart and player, plus two shared entries, and sends changed fields of changed entries.
+`WorldUpdates` writes them into reused buffers and keeps the last update's array for every entry that did not change, so only changed entries allocate (`tests/AllocationChecks.cs`).
 The welcome is a guest's first update, with the fog uncovered so far.
 
 - Updates go unreliably on their own channel, so a lost one never delays the next.
