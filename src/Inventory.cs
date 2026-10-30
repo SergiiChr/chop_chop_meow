@@ -132,6 +132,8 @@ public sealed class Inventory {
                 break;
             }
         }
+        // Empty cells past the slots, such as those of a smaller inventory made from a default one, are dropped.
+        while (Layout.Count > Slots && Layout[^1].Item == "") Layout.RemoveAt(Layout.Count - 1);
     }
 
     private void PadLayout() { while (Layout.Count < Slots) Layout.Add(new Slot()); }
