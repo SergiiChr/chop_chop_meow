@@ -18,25 +18,22 @@ public partial class InspectPage(SidePanel side) : PagePanel(side) {
         Headline(t.Kind);
         if (t.Kind == ThingKind.Water) headingTitle.Text = "Collect water";
         Reach(t);
-        if (t.IsResource) { AddChild(new ResourcePanel(panel, t)); return; }
-        if (t.Kind == ThingKind.Hut) { AddChild(new CabinPanel(panel, t)); return; }
-        if (t.Tools != null) { AddChild(new BenchPanel(panel, t)); return; }
-        if (t.Kind == ThingKind.Signpost) { AddChild(new MarketPanel(panel, t)); return; }
-        if (t.Kind == ThingKind.Mine) { AddChild(new MinePanel(panel, t)); return; }
-        if (t.Kind == ThingKind.Farm) { AddChild(new FarmPanel(panel, t)); return; }
-        if (t.Kind == ThingKind.Campfire) { AddChild(new CampfirePanel(panel, t)); return; }
-        if (t.Kind == ThingKind.Packer) { AddChild(new PackerPanel(panel, t)); return; }
-        if (t.IsStorage) {
-            AddChild(t.Kind switch {
-                ThingKind.Crate => new CratePanel(panel, t),
-                ThingKind.Grave => new RecoveryBoxPanel(panel, t),
-                ThingKind.Toolstation => new ToolRackPanel(panel, t),
-                ThingKind.Pile => new PilePanel(panel, t),
-                _ => new StoragePanel(panel, t)
-            });
-            return;
-        }
-        AddChild(new StationPanel(panel, t));
+        AddChild(t switch {
+            { IsResource: true } => new ResourcePanel(panel, t),
+            { Kind: ThingKind.Hut } => new CabinPanel(panel, t),
+            { Tools: not null } => new BenchPanel(panel, t),
+            { Kind: ThingKind.Signpost } => new MarketPanel(panel, t),
+            { Kind: ThingKind.Mine } => new MinePanel(panel, t),
+            { Kind: ThingKind.Farm } => new FarmPanel(panel, t),
+            { Kind: ThingKind.Campfire } => new CampfirePanel(panel, t),
+            { Kind: ThingKind.Packer } => new PackerPanel(panel, t),
+            { Kind: ThingKind.Crate } => new CratePanel(panel, t),
+            { Kind: ThingKind.Grave } => new RecoveryBoxPanel(panel, t),
+            { Kind: ThingKind.Toolstation } => new ToolRackPanel(panel, t),
+            { Kind: ThingKind.Pile } => new PilePanel(panel, t),
+            { IsStorage: true } => new StoragePanel(panel, t),
+            _ => new StationPanel(panel, t)
+        });
     }
     /// <summary>How far away a building is, shown only while it is out of reach.</summary>
     private void Reach(Thing t) {
