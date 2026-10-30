@@ -10,7 +10,7 @@ public partial class Game {
         string name = World.MineName(mine); headingTitle.Text = char.ToUpper(name[0]) + name[1..];
         headingIcon.Texture = HotbarIcon(World.MineOre(mine)); headingIcon.Visible = true;
         var data = world.Data.Mine;
-        var tag = Style.Pill(mine.MineStage == MineStage.Open ? "open" : $"{mine.MineStage + 1} / 3", mine.MineStage == MineStage.Open ? Style.TagPill : Style.Tag(Style.Mustard), mine.MineStage == MineStage.Open ? Style.Rim : Style.Line, 13);
+        var tag = Style.Pill(mine.MineStage == MineStage.Open ? "open" : $"{(int)mine.MineStage + 1} / 3", mine.MineStage == MineStage.Open ? Style.TagPill : Style.Tag(Style.Mustard), mine.MineStage == MineStage.Open ? Style.Rim : Style.Line, 13);
         heading.AddChild(tag); heading.MoveChild(tag, heading.GetChildCount() - 2);
         if (mine.MineStage < MineStage.Open) {
             string workday = data.StageWorkdays == 1 ? "1 working day" : $"{data.StageWorkdays:0.#} working days";

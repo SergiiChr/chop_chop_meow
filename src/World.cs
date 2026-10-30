@@ -2005,10 +2005,10 @@ public sealed partial class World {
         foreach (var player in save.Players) { player.Backpack?.RebuildStacks(); RebuildAll(player.Crates?.Values); }
         RebuildAll(save.Crates?.Values);
         foreach (var worker in save.Workers) worker?.Bag?.RebuildStacks();
-        foreach (var thing in save.Things ?? new()) RebuildThing(thing);
+        foreach (var thing in save.Things) RebuildThing(thing);
         foreach (var thing in save.Remembered?.Values ?? Enumerable.Empty<Thing>()) RebuildThing(thing);
         static void RebuildAll(IEnumerable<Inventory>? boxes) { if (boxes != null) foreach (var box in boxes) box.RebuildStacks(); }
-        static void RebuildThing(Thing thing) { foreach (var box in Boxes(thing)) box?.RebuildStacks(); }
+        static void RebuildThing(Thing? thing) { if (thing != null) foreach (var box in Boxes(thing)) box?.RebuildStacks(); }
     }
 
     public void Deserialize(string json) {
@@ -2020,9 +2020,9 @@ public sealed partial class World {
         // Loose iron left the game too; its things go before loading, since no kind names them any more.
         if (json.Contains("\"loose_iron\"")) json = WithoutLooseIron(json);
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
-        RebuildAllStacks(loaded);
         if (loaded.Version < 4) throw new InvalidOperationException("This save is from an older, smaller map and cannot be loaded. Start a new game.");
         if (loaded.Version is not (4 or 5) || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
+        RebuildAllStacks(loaded);
         // Edited or older saves may hold missing, extra or unknown hotbar entries.
         var slots = loaded.HotbarSlots ?? new();
         loaded.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id)) ? id : "").ToList();
@@ -2042,7 +2042,7 @@ public sealed partial class World {
             if (t.Kind == ThingKind.Mine) t.MineStage = (MineStage)t.Stage; else if (t.Kind == ThingKind.Farm) t.FarmStage = (FarmStage)t.Stage;
             t.Stage = 0;
         }
-        if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
         if (loaded.Version == 4) AlignMines(loaded);
         loaded.Crates ??= new(); loaded.Crafting ??= new(); loaded.Profits ??= new();
         loaded.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);

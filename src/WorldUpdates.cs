@@ -63,6 +63,8 @@ public sealed class WorldUpdates {
     private readonly ArrayBufferWriter<byte> entry = new(4096), update = new(1 << 16), merged = new(4096);
     private readonly Utf8JsonWriter entryWriter, updateWriter, mergedWriter;
     private byte[] packed = new byte[1 << 16], unpacked = new byte[1 << 16];
+    /// <summary>Largest decompressed update a guest accepts.</summary>
+    private const int MaxUpdate = 1 << 28;
     private readonly List<Range> nowFields = new(), thenFields = new(), patchFields = new();
     // The snapshot taken last, whose arrays the next one keeps where nothing changed.
     private Snapshot? last;
@@ -173,7 +175,11 @@ public sealed class WorldUpdates {
     /// </summary>
     public Snapshot Merge(Snapshot? baseline, ReadOnlySpan<byte> update) {
         int length;
-        while (!BrotliDecoder.TryDecompress(update, unpacked, out length)) unpacked = new byte[unpacked.Length * 2];
+        // A buffer too small and corrupt data both fail, so the buffer grows only up to a limit no real update reaches.
+        while (!BrotliDecoder.TryDecompress(update, unpacked, out length)) {
+            if (unpacked.Length >= MaxUpdate) throw new JsonException("An update did not decompress.");
+            unpacked = new byte[unpacked.Length * 2];
+        }
         var snapshot = Empty();
         if (baseline != null) foreach (var (key, value) in baseline.Entries) snapshot.Entries[key] = value;
         var json = unpacked.AsSpan(0, length);

@@ -287,6 +287,8 @@ public sealed partial class World {
             Count = slot.Count
         }).ToList();
         backpack.Slots = 24;
+        // The guest's own layout may hold fewer cells than the backpack has.
+        backpack.RebuildStacks();
         p.Backpack = backpack; p.Crates = null;
         p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);

@@ -54,7 +54,7 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
     /// <summary>The village's carts, built while loading and reused for every trip.</summary>
-    private readonly WorldModels.CartModel[] cartPool = new WorldModels.CartModel[World.Carts];
+    private readonly List<WorldModels.CartModel> cartPool = new();
     private readonly Dictionary<int, float> pumping = new();
     /// <summary>Build-mode ghosts by building kind, made hidden while loading; mines have one per cliff ore instead.</summary>
     private readonly Dictionary<ThingKind, Prop> ghosts = new(), mineGhosts = new();
@@ -157,7 +157,7 @@ public partial class WorldView : Node3D {
         PileShape.Warm(World.Data);
         WorldModels.Warm();
         BuildGhosts();
-        for (int i = 0; i < cartPool.Length; i++) { cartPool[i] = new WorldModels.CartModel(); cartPool[i].Root.Visible = false; scene.AddChild(cartPool[i].Root); }
+        for (int i = 0; i < World.Carts; i++) NewCart();
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
         selectRing = Ring(new Color(.95f, .82f, .4f, .85f));
         hoverRing = Ring(new Color(1, .95f, .75f, .55f));
@@ -998,14 +998,20 @@ public partial class WorldView : Node3D {
         }
     }
 
-    /// <summary>A cart from the pool that no order holds.</summary>
+    /// <summary>A cart from the pool that no order holds, or a new one for an order beyond the village's carts, such as an edited save's.</summary>
     private WorldModels.CartModel IdleCart() {
         foreach (var cart in cartPool) {
             bool busy = false;
             foreach (var held in carts.Values) busy |= held == cart;
             if (!busy) return cart;
         }
-        throw new InvalidOperationException($"More than {World.Carts} carts are on the road.");
+        return NewCart();
+    }
+
+    private WorldModels.CartModel NewCart() {
+        var cart = new WorldModels.CartModel();
+        cart.Root.Visible = false; scene.AddChild(cart.Root); cartPool.Add(cart);
+        return cart;
     }
 
     private void UpdateMarkers() {

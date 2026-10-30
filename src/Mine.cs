@@ -113,7 +113,7 @@ public sealed partial class World {
 
     /// <summary>The tool a worker's jobs at a mine need at its stage: a pickaxe to dig and to mine, a hammer to fit; hauling needs none.</summary>
     public string? MineTool(Worker w, Thing mine) => mine.MineStage switch {
-        0 => HasDuty(w, mine.Id, "build") ? "pickaxe" : null,
+        MineStage.Marked => HasDuty(w, mine.Id, "build") ? "pickaxe" : null,
         MineStage.Dug => null,
         MineStage.Supplied => HasDuty(w, mine.Id, "build") ? "hammer" : null,
         _ => HasDuty(w, mine.Id, "mine") ? "pickaxe" : null
