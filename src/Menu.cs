@@ -12,7 +12,7 @@ public partial class Game {
 
     /// <summary>A round enamel badge with a line icon, and a key pill when a key opens the same page.</summary>
     private Button MenuIcon(string glyph, string tooltip, Action action, string key, Color color) {
-        var button = Button("", action);
+        var button = kit.Button("", action);
         button.Name = glyph; button.TooltipText = key == "" ? tooltip : $"{tooltip} · {key}";
         button.Icon = GD.Load<Texture2D>($"res://assets/ui/line_{glyph}.svg");
         button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center; button.VerticalIconAlignment = VerticalAlignment.Center;
@@ -40,7 +40,7 @@ public partial class Game {
         var well = new PanelContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; well.AddThemeStyleboxOverride("panel", Style.Well); body.AddChild(well);
         goals = new VBoxContainer(); goals.AddThemeConstantOverride("separation", 6); well.AddChild(goals);
         var side = new VBoxContainer { CustomMinimumSize = new Vector2(220, 0) }; side.AddThemeConstantOverride("separation", 12); body.AddChild(side);
-        var resume = BigButton("Resume · Esc", Style.Brick, CloseMenu); resume.Name = "resume"; side.AddChild(resume);
+        var resume = kit.BigButton("Resume · Esc", Style.Brick, CloseMenu); resume.Name = "resume"; side.AddChild(resume);
         foreach (var (text, action) in new (string, Action)[] {
             ("Save", () => ShowSlots(true, BackToPause)), ("Load", () => ShowSlots(false, BackToPause)), ("Options", () => ShowOptions(BackToPause)),
             ("New game", () => ConfirmLeave("NEW GAME", "Start a new game", () => { HideScreen(); Restart(); })), ("Quit", () => ConfirmLeave("QUIT", "Quit to desktop", () => Quit())),
@@ -57,7 +57,7 @@ public partial class Game {
     }
 
     private Button MenuButton(string text, Color color, Action action) {
-        var button = BigButton(text, color, action); button.CustomMinimumSize = new Vector2(0, 46); button.AddThemeFontSizeOverride("font_size", 16);
+        var button = kit.BigButton(text, color, action); button.CustomMinimumSize = new Vector2(0, 46); button.AddThemeFontSizeOverride("font_size", 16);
         return button;
     }
 
@@ -97,9 +97,9 @@ public partial class Game {
         if (world.GoalComplete) { var hint = Style.Text(world.Objective.Hint, 13, Style.Tan); hint.AutowrapMode = TextServer.AutowrapMode.WordSmart; goals.AddChild(hint); }
         goals.AddChild(new HSeparator());
         goals.AddChild(WellLabel("End goals"));
-        foreach (var ore in World.MineOres) goals.AddChild(GoalRow($"A working {ore.Id()} mine", world.HasMine(ore), false, HotbarIcon(World.ResourceItem(ore))));
+        foreach (var ore in World.MineOres) goals.AddChild(GoalRow($"A working {ore.Id()} mine", world.HasMine(ore), false, Icons.Of(World.ResourceItem(ore))));
         var target = world.Data.Goals;
-        goals.AddChild(GoalRow($"{target.DailyProfit} coins profit a day for {target.ProfitDays} days in a row", world.ProfitGoalMet, false, HotbarIcon(Inventory.Coins)));
+        goals.AddChild(GoalRow($"{target.DailyProfit} coins profit a day for {target.ProfitDays} days in a row", world.ProfitGoalMet, false, Icons.Of(Inventory.Coins)));
         var streak = new HBoxContainer(); streak.AddThemeConstantOverride("separation", 4); goals.AddChild(streak);
         streak.AddChild(new Control { CustomMinimumSize = new Vector2(70, 0) });
         int days = Math.Min(world.ProfitStreak, target.ProfitDays);
@@ -114,15 +114,15 @@ public partial class Game {
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.
         joinButton.Text = world.Remote ? "Leave game" : "Join"; joinButton.Disabled = net.Hosting; saveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = world.Remote;
         netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
-        menu.Visible = true; paused = true;
+        menu.Visible = true; state.Paused = true;
     }
 
-    private void CloseMenu() { menu.Visible = false; paused = false; }
+    private void CloseMenu() { menu.Visible = false; state.Paused = false; }
 
     /// <summary>Asks before leaving the settlement, since anything done after the last save would be lost.</summary>
     private void ConfirmLeave(string heading, string confirm, Action leave) {
         OpenScreen(heading, BackToPause);
-        var note = Label(net.Hosting ? "Progress since the last save is lost, and your guests are disconnected." : "Progress since the last save is lost.", 14);
+        var note = Style.Wrapped(net.Hosting ? "Progress since the last save is lost, and your guests are disconnected." : "Progress since the last save is lost.", 14);
         note.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(note);
         AddScreenButton(confirm, leave);
         AddScreenButton("Back · Esc", BackToPause);

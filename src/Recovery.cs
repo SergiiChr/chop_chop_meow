@@ -75,10 +75,10 @@ public partial class Game {
         body.AddChild(Style.Heading("Skip to morning?", 24));
         recoveryReason = Style.Text("", 15, Style.Rim); recoveryReason.AutowrapMode = TextServer.AutowrapMode.WordSmart; body.AddChild(recoveryReason);
         var actions = new HBoxContainer(); actions.AddThemeConstantOverride("separation", 10); body.AddChild(actions);
-        skipMorningButton = Button("Skip to morning", () => world.SkipMorning());
+        skipMorningButton = kit.Button("Skip to morning", () => world.SkipMorning());
         skipMorningButton.Name = "skip_morning";
         actions.AddChild(skipMorningButton);
-        actions.AddChild(Button("Wait for respawn", () => { recoveryDismissed = true; recoveryPrompt!.Visible = false; }));
+        actions.AddChild(kit.Button("Wait for respawn", () => { recoveryDismissed = true; recoveryPrompt!.Visible = false; }));
         ui.AddChild(recoveryPrompt);
     }
 }

@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 public partial class Game {
     private void MinePanel(Thing mine) {
         string name = World.MineName(mine); headingTitle.Text = char.ToUpper(name[0]) + name[1..];
-        headingIcon.Texture = HotbarIcon(World.MineOre(mine)); headingIcon.Visible = true;
+        headingIcon.Texture = Icons.Of(World.MineOre(mine)); headingIcon.Visible = true;
         var data = world.Data.Mine;
         int stage = (int)mine.MineStage; bool open = mine.MineStage == MineStage.Open;
         var tag = Style.Pill(open ? "open" : $"{stage + 1} / 3", open ? Style.TagPill : Style.Tag(Style.Mustard), open ? Style.Rim : Style.Line, 13);
@@ -26,7 +26,7 @@ public partial class Game {
                 if (i > 0) line.AddChild(new ColorRect { Color = i <= stage ? Style.Sage : Style.Line, CustomMinimumSize = new Vector2(0, 6), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
                 var node = new PanelContainer { Name = $"stage_{i + 1}", CustomMinimumSize = new Vector2(48, 48), MouseFilter = Control.MouseFilterEnum.Pass, TooltipText = $"Stage {i + 1} · {stages[i].Title}\n{stages[i].Needs}" };
                 node.AddThemeStyleboxOverride("panel", Style.Round(i < stage ? Style.Sage : i == stage ? Style.Mustard : Style.Line, 24).Item1);
-                var icon = Style.Icon(HotbarIcon(stages[i].Icon), 30); if (i > stage) icon.Modulate = Unready;
+                var icon = Style.Icon(Icons.Of(stages[i].Icon), 30); if (i > stage) icon.Modulate = Style.Unready;
                 node.AddChild(icon); line.AddChild(node);
             }
             AddLabel($"Stage {stage + 1} · {stages[stage].Title}", 16);
@@ -35,8 +35,8 @@ public partial class Game {
                 var row = Well(new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }); row.AddThemeConstantOverride("separation", 28);
                 foreach (var (item, amount) in data.Materials) {
                     var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); row.AddChild(column);
-                    var (cell, count) = IconCell($"supply_{item}"); cell.Icon = HotbarIcon(item); column.AddChild(cell);
-                    cell.Pressed += () => { Act(() => world.SupplyMine(mine)); RefreshLive(); };
+                    var (cell, count) = ItemSlot.Cup($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
+                    cell.Pressed += () => { kit.Act(() => world.SupplyMine(mine)); RefreshLive(); };
                     column.AddChild(PerBatch($"/ {amount}"));
                     int drawn = -1;
                     live.Add(() => {
@@ -47,7 +47,7 @@ public partial class Game {
                         cell.TooltipText = $"{world.Data.Name(item)} · {drawn} of {amount}\nClick to deliver from your backpack";
                     });
                 }
-            } else Dynamic(text => text.Append(stages[(int)mine.MineStage].Needs).Append(" · ").Append((int)(mine.Progress / world.MineStageSeconds * 100)).Append("% done"), 14, Muted);
+            } else Dynamic(text => text.Append(stages[(int)mine.MineStage].Needs).Append(" · ").Append((int)(mine.Progress / world.MineStageSeconds * 100)).Append("% done"), 14, Style.Beige);
             BagGrid(id => world.SupplyMine(mine), "Click: deliver what the mine needs", wanted: id => world.MineNeed(mine, id) > 0);
         } else {
             // Miners as hardhats, lit while underground, and the two outputs with how fast they fill.
@@ -61,8 +61,8 @@ public partial class Game {
                 string item = items[i];
                 var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 10); row.AddChild(pair);
                 var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); pair.AddChild(column);
-                var (cell, count) = IconCell($"output_{item}", 64); cell.Icon = HotbarIcon(item); cell.AddThemeStyleboxOverride("normal", Style.CupWanted); column.AddChild(cell);
-                cell.Pressed += () => { Act(() => MoveStack(mine.Output!, world.S.Backpack, item, mine)); RefreshLive(); };
+                var (cell, count) = ItemSlot.Cup($"output_{item}", 64); cell.Icon = Icons.Of(item); cell.AddThemeStyleboxOverride("normal", Style.CupWanted); column.AddChild(cell);
+                cell.Pressed += () => { kit.Act(() => MoveStack(mine.Output!, world.S.Backpack, item, mine)); RefreshLive(); };
                 cell.Drag = () => mine.Output![item] > 0 ? new ItemDrag(item, mine.Output[item], mine.Output, mine) : null;
                 var track = new Panel { CustomMinimumSize = new Vector2(64, 8) }; track.AddThemeStyleboxOverride("panel", Style.BarBack); column.AddChild(track);
                 var fill = new ColorRect { Color = Style.Mustard, Size = new Vector2(0, 8) }; track.AddChild(fill); bars[i] = fill;
@@ -84,7 +84,7 @@ public partial class Game {
                 int now = MinersUnderground(mine);
                 if (now == miners) return;
                 miners = now;
-                for (int i = 0; i < hats.Length; i++) hats[i].Modulate = i < now ? Colors.White : Unready;
+                for (int i = 0; i < hats.Length; i++) hats[i].Modulate = i < now ? Colors.White : Style.Unready;
                 rateText.Clear().Append(MathF.Round(now / data.Seconds * 100) / 100).Append(" /s"); rateText.Show();
             });
         }

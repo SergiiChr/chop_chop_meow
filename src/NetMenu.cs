@@ -42,11 +42,11 @@ public partial class Game {
         var port = new LineEdit { Name = "port", Text = Net.DefaultPort.ToString(), CustomMinimumSize = new Vector2(0, 38) };
         foreach (var (text, field) in new[] { ("Address", address), ("Port", port) }) {
             var row = new HBoxContainer(); screen.AddChild(row);
-            var label = Label(text); label.CustomMinimumSize = new Vector2(80, 0); row.AddChild(label);
+            var label = Style.Wrapped(text); label.CustomMinimumSize = new Vector2(80, 0); row.AddChild(label);
             field.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(field);
         }
-        joinStatus = Label("", 14, Muted); screen.AddChild(joinStatus);
-        var join = Button("Join", () => {
+        joinStatus = Style.Wrapped("", 14, Style.Beige); screen.AddChild(joinStatus);
+        var join = kit.Button("Join", () => {
             if (!int.TryParse(port.Text.Trim(), out int number) || number is < 1 or > 65535) { joinStatus.Text = "The port is a number from 1 to 65535."; return; }
             if (address.Text.Trim() == "") { joinStatus.Text = "Enter the host's address."; return; }
             if (inGame && !world.Remote) Save(0);
@@ -63,7 +63,7 @@ public partial class Game {
     private void ShowReconnecting() {
         DropWorld();
         OpenScreen("RECONNECTING", () => { net.Leave(); ShowStart(); });
-        reconnectStatus = Label("", 14, Muted); screen.AddChild(reconnectStatus);
+        reconnectStatus = Style.Wrapped("", 14, Style.Beige); screen.AddChild(reconnectStatus);
         AddScreenButton("Stop · Esc", () => screenBack?.Invoke());
     }
 

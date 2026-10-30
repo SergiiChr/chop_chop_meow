@@ -100,19 +100,19 @@ public partial class Game {
         var bank = new VBoxContainer(); bank.AddThemeConstantOverride("separation", 8); row.AddChild(bank);
         bank.AddChild(Style.Heading("Bank", 13));
         var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 12); bank.AddChild(line);
-        var (cup, count) = IconCell("bank", 56);
+        var (cup, count) = ItemSlot.Cup("bank", 56);
         bankCup = cup; bankCount = count;
         Style.Skin(cup, Style.CupBank, Style.Round(Style.CupFill, 28).Item2);
-        cup.Icon = HotbarIcon(Inventory.Coins);
+        cup.Icon = Icons.Of(Inventory.Coins);
         cup.TooltipText = "Coins kept at the trading posts for wages; sales land here first.\nDrop coins here at a trading post to bank them · click to take some out";
         cup.CanTake = drag => drag.Item == Inventory.Coins && drag.From == world.S.Backpack;
         cup.Take = drag => {
             if (NearPost() is not Thing post) { Notify("Bank coins at a trading post."); return drag.Count; }
-            int left = 0; Act(() => left = MoveDrag(drag, post.Wages!, post)); RefreshLive(); return left;
+            int left = 0; kit.Act(() => left = MoveDrag(drag, post.Wages!, post)); RefreshLive(); return left;
         };
         cup.Pressed += () => {
             if (NearPost() is not Thing post) { Notify("Take coins out at a trading post."); return; }
-            Act(() => MoveStack(post.Wages!, world.S.Backpack, Inventory.Coins, post)); RefreshLive();
+            kit.Act(() => MoveStack(post.Wages!, world.S.Backpack, Inventory.Coins, post)); RefreshLive();
         };
         line.AddChild(cup);
         bankDue = Style.Text("", 14, Style.Beige); line.AddChild(bankDue);
@@ -149,7 +149,7 @@ public partial class Game {
         if (bank != shownBank) {
             shownBank = bank;
             bankCount.Text = bank.WageCoins > 0 ? bank.WageCoins.ToString() : "";
-            bankCup.AddThemeColorOverride(IconNormal, bank.WageCoins > 0 ? Colors.White : Ghost);
+            bankCup.AddThemeColorOverride(ItemSlot.IconNormal, bank.WageCoins > 0 ? Colors.White : Style.Ghost);
             bankDue.Text = bank.Item2 > 0 ? $"−{bank.Item2} /day" : "";
             bankDue.AddThemeColorOverride("font_color", bank.Item2 > bank.WageCoins ? Style.Warn : Style.Beige);
             bankDue.TooltipText = bank.Item2 > bank.WageCoins ? "More than the bank holds; the rest comes from your backpack at dawn" : "Paid from the bank at dawn";

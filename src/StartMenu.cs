@@ -39,19 +39,19 @@ public partial class Game {
 
     private void OpenScreen(string heading, Action? back) {
         foreach (var child in screen.GetChildren()) { screen.RemoveChild(child); child.QueueFree(); }
-        var title = Label(heading, 22); title.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(title);
-        screenBack = back; backdrop.Visible = true; menu.Visible = false; paused = true;
+        var title = Style.Wrapped(heading, 22); title.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(title);
+        screenBack = back; backdrop.Visible = true; menu.Visible = false; state.Paused = true;
     }
 
-    private void AddScreenButton(string text, Action action, bool disabled = false) => screen.AddChild(Button(text, action, disabled));
+    private void AddScreenButton(string text, Action action, bool disabled = false) => screen.AddChild(kit.Button(text, action, disabled));
 
-    private void HideScreen() { backdrop.Visible = false; screenBack = null; paused = false; }
+    private void HideScreen() { backdrop.Visible = false; screenBack = null; state.Paused = false; }
 
     private void BackToPause() { HideScreen(); OpenMenu(); }
 
     private void ShowStart() {
         ClosePanel(); OpenScreen("CHOP CHOP MEOW", null);
-        if (leftReason != "") { var note = Label(leftReason, 14, new Color("f2b38b")); note.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(note); leftReason = ""; }
+        if (leftReason != "") { var note = Style.Wrapped(leftReason, 14, new Color("f2b38b")); note.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(note); leftReason = ""; }
         int latest = Enumerable.Range(0, SlotCount + 1).Where(SlotUsed).OrderByDescending(SavedAt).DefaultIfEmpty(-1).First();
         AddScreenButton("Continue", () => LoadSlot(latest), latest < 0);
         AddScreenButton("New game", () => { HideScreen(); Restart(); });
@@ -74,7 +74,7 @@ public partial class Game {
     private void ShowOptions(Action back) {
         OpenScreen("OPTIONS", back);
         var row = new HBoxContainer(); screen.AddChild(row);
-        var label = Label("Resolution"); label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(label);
+        var label = Style.Wrapped("Resolution"); label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(label);
         var picker = new OptionButton { Name = "resolution", CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
         foreach (var size in Resolutions) picker.AddItem($"{size.X} × {size.Y}");
         picker.Selected = Array.IndexOf(Resolutions, SavedResolution());
@@ -84,7 +84,7 @@ public partial class Game {
         };
         row.AddChild(picker);
         var limitRow = new HBoxContainer(); screen.AddChild(limitRow);
-        var limitLabel = Label("Frame rate limit"); limitLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; limitRow.AddChild(limitLabel);
+        var limitLabel = Style.Wrapped("Frame rate limit"); limitLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; limitRow.AddChild(limitLabel);
         var limits = new OptionButton { Name = "frame_limit", CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
         foreach (int fps in FrameLimits) limits.AddItem(fps == 0 ? "Off" : $"{fps} fps");
         limits.Selected = Math.Max(0, Array.IndexOf(FrameLimits, SavedFrameLimit()));
@@ -94,7 +94,7 @@ public partial class Game {
         };
         limitRow.AddChild(limits);
         var musicRow = new HBoxContainer(); screen.AddChild(musicRow);
-        var musicLabel = Label("Music volume"); musicLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; musicRow.AddChild(musicLabel);
+        var musicLabel = Style.Wrapped("Music volume"); musicLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; musicRow.AddChild(musicLabel);
         var slider = new HSlider { Name = "music", MaxValue = 100, Step = 5, Value = SavedMusicVolume() * 100, CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
         slider.ValueChanged += value => {
             var config = new ConfigFile(); config.Load(SettingsPath);
@@ -103,7 +103,7 @@ public partial class Game {
         };
         musicRow.AddChild(slider);
         var taaRow = new HBoxContainer(); screen.AddChild(taaRow);
-        var taaLabel = Label("Temporal anti-aliasing"); taaLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; taaRow.AddChild(taaLabel);
+        var taaLabel = Style.Wrapped("Temporal anti-aliasing"); taaLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; taaRow.AddChild(taaLabel);
         var taa = new CheckButton { Name = "taa", ButtonPressed = SavedTaa(), FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
         taa.Toggled += on => { StoreSetting("display", "taa", on); GetViewport().UseTaa = on; };
         taaRow.AddChild(taa);

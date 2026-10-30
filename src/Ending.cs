@@ -15,16 +15,16 @@ public partial class Game {
         ending.CustomMinimumSize = new Vector2(440, 0);
         ui.AddChild(ending);
         var column = new VBoxContainer(); ending.AddChild(column);
-        var title = Label("A settlement of your own", 26); title.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(title);
-        endingStats = Label("", 16, Muted); endingStats.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(endingStats);
-        var keep = Button("Keep playing", () => { ending.Visible = false; paused = false; }); keep.Name = "keep_playing"; column.AddChild(keep);
-        var restart = Button("Restart", Restart); restart.Name = "restart"; column.AddChild(restart);
+        var title = Style.Wrapped("A settlement of your own", 26); title.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(title);
+        endingStats = Style.Wrapped("", 16, Style.Beige); endingStats.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(endingStats);
+        var keep = kit.Button("Keep playing", () => { ending.Visible = false; state.Paused = false; }); keep.Name = "keep_playing"; column.AddChild(keep);
+        var restart = kit.Button("Restart", Restart); restart.Name = "restart"; column.AddChild(restart);
     }
 
     private void ShowEndingOnce() {
         // A guest's copy takes the host's flag with every update, so a guest remembers its own.
         if ((world.Remote ? endingSeen : world.S.EndingShown) || !world.EndGoalsComplete) return;
-        world.S.EndingShown = endingSeen = true; paused = true; ClosePanel();
+        world.S.EndingShown = endingSeen = true; state.Paused = true; ClosePanel();
         int seconds = (int)world.S.PlaySeconds;
         endingStats.Text = $"Every ore in the valley has its mine, and the settlement cleared {world.Data.Goals.DailyProfit} coins a day for {world.Data.Goals.ProfitDays} days.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";
         ending.Visible = true;
@@ -35,7 +35,7 @@ public partial class Game {
         world.NewGame();
         selected = 0; workerId = 0; gathering = null; assigningWorker = 0; slot = 0; autosave = 0;
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0;
-        ending.Visible = false; paused = false; OpenPage("welcome");
+        ending.Visible = false; state.Paused = false; OpenPage("welcome");
         Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
     }
 }

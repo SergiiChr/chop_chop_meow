@@ -12,27 +12,6 @@ public partial class Game {
     /// <summary>Room between cups for the count pills that sit on their corners.</summary>
     private const int CupGap = 10;
 
-    /// <summary>A cream cup for one stack, with its count on a pill at the corner.</summary>
-    private (ItemSlot Cell, Badge Count) IconCell(string name, float size = 52) {
-        var cell = new ItemSlot {
-            Name = name,
-            CustomMinimumSize = new Vector2(size, size),
-            ExpandIcon = true,
-            IconAlignment = HorizontalAlignment.Center,
-            VerticalIconAlignment = VerticalAlignment.Center,
-            FocusMode = Control.FocusModeEnum.None,
-            MouseDefaultCursorShape = Control.CursorShape.PointingHand
-        };
-        Style.Skin(cell, Style.CupNormal, Style.CupHover, Style.CupPressed);
-        cell.AddThemeConstantOverride("icon_max_width", (int)(size * .74f));
-        var count = CountBadge();
-        cell.AddChild(count);
-        // A packed crate shows what it holds on a round badge at the other corner.
-        var badge = Style.Corner(Style.Icon(null, 24), 0, 0); badge.Name = "badge"; badge.Visible = false;
-        cell.AddChild(badge);
-        return (cell, count);
-    }
-
     private GridContainer AddGrid(int columns = GridColumns) {
         var grid = new GridContainer { Columns = columns };
         grid.AddThemeConstantOverride("h_separation", CupGap);
@@ -52,7 +31,7 @@ public partial class Game {
         var grid = AddGrid(columns);
         if (size < 52) { grid.AddThemeConstantOverride("h_separation", 8); grid.AddThemeConstantOverride("v_separation", 8); }
         var stacks = new (string Item, int Count)?[inventory().Slots];
-        var cells = Enumerable.Range(0, stacks.Length).Select(i => IconCell($"slot_{i}", size)).ToArray();
+        var cells = Enumerable.Range(0, stacks.Length).Select(i => ItemSlot.Cup($"slot_{i}", size)).ToArray();
         var shown = new bool[cells.Length];
         bool first = true;
         for (int i = 0; i < cells.Length; i++) {
@@ -61,12 +40,12 @@ public partial class Game {
             cell.Pressed += () => {
                 if (stacks[slot] is not (string id, _)) return;
                 var held = inventory(); held.PreferredSlot = slot;
-                try { Act(() => click(id)); } finally { held.PreferredSlot = -1; }
+                try { kit.Act(() => click(id)); } finally { held.PreferredSlot = -1; }
                 RefreshLive();
             };
             cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container, slot) : null;
             cell.CanTake = accepts ?? (drag => drag.From != null);
-            cell.Take = drag => { int left = 0; Act(() => left = MoveDrag(drag, inventory(), container, slot)); RefreshLive(); return left; };
+            cell.Take = drag => { int left = 0; kit.Act(() => left = MoveDrag(drag, inventory(), container, slot)); RefreshLive(); return left; };
             grid.AddChild(cell);
         }
         // What each cell last drew: its stack and the inventory's total of that item. A cell is redrawn only when they change.
@@ -94,23 +73,20 @@ public partial class Game {
         });
         return grid;
         void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held) {
-            cell.Icon = stack is (string id, _) ? HotbarIcon(id) : null;
+            cell.Icon = stack is (string id, _) ? Icons.Of(id) : null;
             var contents = stack is (string crate, _) ? world.Packed(crate) : null;
             var badge = cell.GetNode<TextureRect>("badge");
             badge.Visible = contents != null;
-            if (contents != null) badge.Texture = HotbarIcon(contents.Items.OrderByDescending(p => p.Value).First().Key);
+            if (contents != null) badge.Texture = Icons.Of(contents.Items.OrderByDescending(p => p.Value).First().Key);
             count.Text = stack is (string bottle, _) && Water.IsBottle(bottle) ? $"{Water.BottleSips(bottle)}/3" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
             if (wanted != null) {
                 bool takes = stack is (string item, _) && wanted(item);
                 cell.AddThemeStyleboxOverride("normal", takes ? Style.CupWanted : Style.CupNormal);
-                cell.AddThemeColorOverride(IconNormal, stack == null || takes ? Colors.White : Faded);
+                cell.AddThemeColorOverride(ItemSlot.IconNormal, stack == null || takes ? Colors.White : Style.Faded);
             }
             cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}\n{hint}" : "";
         }
     }
-
-    private static readonly Color Faded = new(1, 1, 1, .4f);
-    private static readonly StringName IconNormal = "icon_normal_color";
 
     /// <summary>A slot that springs open with a slight overshoot, or shrinks and fades before it leaves the grid.</summary>
     private static void GrowCell(Control cell, bool open, float delay) {

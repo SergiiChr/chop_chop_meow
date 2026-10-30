@@ -24,6 +24,8 @@ public static class Style {
     /// <summary>Text on enamel that warns: a cost the bank cannot cover, a count the backpack is short of.</summary>
     public static readonly Color Warn = new("f2937c");
     public static readonly Color Rise = new("4f7a55");
+    /// <summary>Modulates: a faint picture of what an empty cup wants, something not ready yet, and what the open page does not take.</summary>
+    public static readonly Color Ghost = new(1, 1, 1, .28f), Unready = new(1, 1, 1, .5f), Faded = new(1, 1, 1, .4f);
 
     // Boxes by colour are made once and shared, since creating a resource allocates; declared first so the boxes below can use them.
     private static readonly System.Collections.Generic.Dictionary<Color, StyleBoxFlat> tags = new();
@@ -119,6 +121,18 @@ public static class Style {
         button.AddThemeStyleboxOverride("normal", normal); button.AddThemeStyleboxOverride("hover", hover);
         button.AddThemeStyleboxOverride("pressed", pressed ?? hover); button.AddThemeStyleboxOverride("hover_pressed", pressed ?? hover);
         button.AddThemeStyleboxOverride("disabled", normal); button.AddThemeStyleboxOverride("focus", None);
+    }
+
+    /// <summary>A label in the theme's body font that wraps at its width.</summary>
+    public static Label Wrapped(string text, int size = 15, Color? color = null) {
+        var l = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        l.AddThemeFontSizeOverride("font_size", size); if (color != null) l.AddThemeColorOverride("font_color", color.Value); return l;
+    }
+
+    /// <summary>Text over the world gets a dark outline so it reads on grass by day and night.</summary>
+    public static Label Outlined(Label label) {
+        label.AddThemeColorOverride("font_outline_color", Line); label.AddThemeConstantOverride("outline_size", 6);
+        return label;
     }
 
     public static Label Heading(string text, int size = 23) {

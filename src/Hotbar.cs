@@ -7,26 +7,6 @@ namespace ChopChopMeow;
 public partial class Game {
     private readonly System.Collections.Generic.List<ItemSlot> hotbarButtons = new();
     private readonly System.Collections.Generic.List<Label> hotbarCounts = new();
-    private readonly System.Collections.Generic.Dictionary<string, Texture2D> hotbarIcons = new();
-    private Texture2D? itemAtlas;
-
-    private void LoadHotbarAtlases() {
-        if (ResourceLoader.Exists("res://assets/item-atlas.png")) itemAtlas = GD.Load<Texture2D>("res://assets/item-atlas.png");
-    }
-
-    private Texture2D? HotbarIcon(string id) {
-        if (World.IsCrate(id)) id = "crate";
-        if (hotbarIcons.TryGetValue(id, out var cached)) return cached;
-        // Icons rendered from the game's own models come first; items without a model have drawn icons named by their id.
-        foreach (var path in new[] { $"res://assets/icons/{id}.png", $"res://assets/ui/{id}.svg" })
-            if (ResourceLoader.Exists(path)) return hotbarIcons[id] = GD.Load<Texture2D>(path);
-        int cell = id == "water" ? 10 : -1;
-        if (itemAtlas == null || cell < 0) return null;
-        const int Columns = 4, Rows = 3;
-        float width = itemAtlas.GetWidth() / (float)Columns, height = itemAtlas.GetHeight() / (float)Rows;
-        return hotbarIcons[id] = new AtlasTexture { Atlas = itemAtlas, Region = new Rect2(cell % Columns * width, cell / Columns * height, width, height) };
-    }
-
     /// <summary>A hotbar slot; dropping an item or building plan on it assigns that reference.</summary>
     private ItemSlot HotbarButton(int slot) {
         var button = new ItemSlot { FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
@@ -78,7 +58,7 @@ public partial class Game {
             int count = world.S.Backpack[id];
             bool building = world.Data.IsBuilding(id);
             hotbarCounts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : Water.IsBottle(id) ? $"{Water.BottleSips(id)}/3" : count.ToString();
-            button.Icon = string.IsNullOrEmpty(id) ? null : HotbarIcon(id);
+            button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · drag an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
             bool active = world.S.ActiveHotbar == slot;
@@ -122,8 +102,8 @@ public partial class Game {
     /// <summary>Uses the item in hand toward a point on the ground; items without a use do nothing.</summary>
     private void UseHeld(Vector2 at) {
         if (ActiveHotbarItem() is not string id || !HasUse(id)) return;
-        if (paused) { Notify("Resume before using items."); return; }
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) Act(() => world.Consume(id));
+        if (state.Paused) { Notify("Resume before using items."); return; }
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Act(() => world.Consume(id));
         else if (id == "torch") world.UseTorch(at - world.Player);
         else world.Attack();
     }

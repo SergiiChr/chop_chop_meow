@@ -95,7 +95,7 @@ public partial class Game {
                 row.AddChild(slot);
             } else {
                 var cup = new PanelContainer { CustomMinimumSize = new Vector2(44, 44), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; cup.AddThemeStyleboxOverride("panel", Style.CupNormal);
-                cup.AddChild(lead.StartsWith("line_") ? Style.Glyph(lead, 28, Style.Ink) : Style.Icon(HotbarIcon(lead), 32));
+                cup.AddChild(lead.StartsWith("line_") ? Style.Glyph(lead, 28, Style.Ink) : Style.Icon(Icons.Of(lead), 32));
                 row.AddChild(cup);
             }
             var text = Style.Text(tip, 14, Style.Ink); text.AutowrapMode = TextServer.AutowrapMode.WordSmart; text.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; text.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;

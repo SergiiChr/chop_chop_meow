@@ -58,7 +58,7 @@ void fragment() {
         anomalyWarning = ConsolePanel(Neon);
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 12); anomalyWarning.AddChild(column);
         column.AddChild(ConsoleLabel("⚠  SPACETIME INTEGRITY ALERT", 20, Alarm));
-        column.AddChild(ConsoleLabel("Placing a crate inside a crate will collapse space time and create a black hole. Are you sure you want to proceed?", 16, Cream));
+        column.AddChild(ConsoleLabel("Placing a crate inside a crate will collapse space time and create a black hole. Are you sure you want to proceed?", 16, Style.Rim));
         anomalyReadout = ConsoleLabel("", 12, Neon with { A = .7f }); column.AddChild(anomalyReadout);
         var answers = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; answers.AddThemeConstantOverride("separation", 24); column.AddChild(answers);
         var no = ConsoleButton("No", Neon, CancelAnomaly); no.Name = "anomaly_no"; answers.AddChild(no);
@@ -68,7 +68,7 @@ void fragment() {
         singularity = ConsolePanel(Neon);
         var over = new VBoxContainer(); over.AddThemeConstantOverride("separation", 12); singularity.AddChild(over);
         over.AddChild(ConsoleLabel("SINGULARITY EVENT", 26, Neon));
-        over.AddChild(ConsoleLabel("A crate folded into a crate. Space time collapsed around it and took Bramblewick, the woods and you with it.", 16, Cream));
+        over.AddChild(ConsoleLabel("A crate folded into a crate. Space time collapsed around it and took Bramblewick, the woods and you with it.", 16, Style.Rim));
         over.AddChild(ConsoleLabel("SIGNAL LOST · NO TIMELINE TO RESUME", 12, Alarm));
         reloadAfterCollapse = ConsoleButton("Reload save", Neon, () => { EndAnomaly(); LoadSlot(LatestSlot()); }); reloadAfterCollapse.Name = "reload_after_collapse"; over.AddChild(reloadAfterCollapse);
         var menuButton = ConsoleButton("Main menu", Neon, () => { EndAnomaly(); ShowStart(); }); menuButton.Name = "menu_after_collapse"; over.AddChild(menuButton);
@@ -97,13 +97,13 @@ void fragment() {
     private static readonly SystemFont ConsoleFont = new() { FontNames = new[] { "DejaVu Sans Mono", "Liberation Mono", "monospace" } };
 
     private Label ConsoleLabel(string text, int size, Color color) {
-        var label = Label(text, size, color); label.HorizontalAlignment = HorizontalAlignment.Center;
+        var label = Style.Wrapped(text, size, color); label.HorizontalAlignment = HorizontalAlignment.Center;
         label.AddThemeFontOverride("font", ConsoleFont);
         return label;
     }
 
     private Button ConsoleButton(string text, Color edge, System.Action action) {
-        var button = Button(text.ToUpperInvariant(), action);
+        var button = kit.Button(text.ToUpperInvariant(), action);
         button.CustomMinimumSize = new Vector2(150, 40); button.AddThemeFontOverride("font", ConsoleFont);
         button.AddThemeColorOverride("font_color", edge); button.AddThemeColorOverride("font_hover_color", Colors.White);
         button.AddThemeColorOverride("font_disabled_color", edge with { A = .35f });
@@ -118,7 +118,7 @@ void fragment() {
     /// <summary>Stops a crate from going into a placed crate and asks first; true when the move was intercepted.</summary>
     private bool CrateIntoCrate(Thing? target, Inventory to, string item) {
         if (target?.Kind != ThingKind.Crate || to != target.Inventory || !World.IsCrate(item)) return false;
-        anomalyCrate = target; pausedBeforeAnomaly = paused; paused = true;
+        anomalyCrate = target; pausedBeforeAnomaly = state.Paused; state.Paused = true;
         anomalyReadout.Text = $"CONTAINER {target.Id:0000} · NESTING DEPTH 2 · LOCAL METRIC STABILITY 0.03%";
         anomaly.Visible = true; anomalyWarning.Visible = true; singularity.Visible = false; collapse.Visible = false;
         // The alert border breathes while it waits for an answer.
@@ -128,7 +128,7 @@ void fragment() {
     }
 
     private void CancelAnomaly() {
-        StopPulse(); anomaly.Visible = false; anomalyCrate = null; paused = pausedBeforeAnomaly;
+        StopPulse(); anomaly.Visible = false; anomalyCrate = null; state.Paused = pausedBeforeAnomaly;
     }
 
     private void StopPulse() {
@@ -140,7 +140,7 @@ void fragment() {
     private Tween? collapseTween;
 
     private void Collapse(Thing crate) {
-        StopPulse(); anomalyWarning.Visible = false; ClosePanel(); paused = true;
+        StopPulse(); anomalyWarning.Visible = false; ClosePanel(); state.Paused = true;
         var size = GetViewport().GetVisibleRect().Size;
         var material = (ShaderMaterial)collapse.Material;
         material.SetShaderParameter("center", view.Screen(crate.Pos, .3f) / size);

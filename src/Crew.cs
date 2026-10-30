@@ -44,8 +44,8 @@ public partial class Game {
         var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Ignore }; text.AddThemeConstantOverride("separation", 0); top.AddChild(text);
         text.AddChild(Style.Text(w.Name, 18, Style.Ink, Style.Head));
         var status = Style.Text("", 13, Style.Tan); status.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis; status.ClipText = true; text.AddChild(status);
-        var (carry, carried) = IconCell($"carry_{w.Id}", 44); carry.MouseFilter = Control.MouseFilterEnum.Ignore; top.AddChild(carry);
-        var (tool, _) = IconCell($"tool_{w.Id}", 44); tool.MouseFilter = Control.MouseFilterEnum.Ignore; top.AddChild(tool);
+        var (carry, carried) = ItemSlot.Cup($"carry_{w.Id}", 44); carry.MouseFilter = Control.MouseFilterEnum.Ignore; top.AddChild(carry);
+        var (tool, _) = ItemSlot.Cup($"tool_{w.Id}", 44); tool.MouseFilter = Control.MouseFilterEnum.Ignore; top.AddChild(tool);
         var wage = Style.Pill($"{w.Wage} /day", Style.BeigePill, Style.Ink, 13); wage.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; top.AddChild(wage);
         var chips = new HFlowContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; chips.AddThemeConstantOverride("h_separation", 6); chips.AddThemeConstantOverride("v_separation", 6); column.AddChild(chips);
         foreach (var d in w.Duties) if (world.DutyPlace(w, d.Thing) is Thing at) chips.AddChild(DutyChip(at, d.Job));
@@ -54,14 +54,14 @@ public partial class Game {
         var open = new Button { Flat = false, FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand, Name = $"crew_{w.Id}" };
         Style.Skin(open, Style.None, Style.CardHover); open.Pressed += () => Select(w); card.AddChild(open);
         (string Status, int Duties) drawn = ("", -1);
-        (int Carried, string? Item, string Tool) kit = (-1, null, "");
+        (int Carried, string? Item, string Tool) carrying = (-1, null, "");
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(status)) return;
             // A job given or taken elsewhere changes the chips, so the page is rebuilt.
             if (drawn.Duties >= 0 && w.Duties.Count != drawn.Duties) { drawn.Duties = w.Duties.Count; Callable.From(() => { if (page == "workers") OpenPage("workers"); }).CallDeferred(); return; }
             drawn.Duties = w.Duties.Count;
             if (w.Status != drawn.Status) status.Text = drawn.Status = w.Status;
-            ShowKit(w, ref kit, carry, carried, tool);
+            ShowKit(w, ref carrying, carry, carried, tool);
         });
     }
 
@@ -71,9 +71,9 @@ public partial class Game {
         string? item = count > 0 ? w.Bag.First() : null;
         if (shown == (count, item, w.Tool)) return;
         shown = (count, item, w.Tool);
-        carry.Icon = item == null ? null : HotbarIcon(item); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
+        carry.Icon = item == null ? null : Icons.Of(item); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
         carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {count} {world.Data.Name(item)}";
-        tool.Icon = w.Tool == "" ? null : HotbarIcon(w.Tool); tool.Visible = w.Tool != "";
+        tool.Icon = w.Tool == "" ? null : Icons.Of(w.Tool); tool.Visible = w.Tool != "";
         tool.TooltipText = w.Tool == "" ? "No tool in hand" : world.Data.Name(w.Tool);
     }
 
@@ -86,7 +86,7 @@ public partial class Game {
         return chip;
     }
 
-    private Texture2D? PlaceIcon(Thing at) => HotbarIcon(at.IsResource ? World.ResourceItem(at) : at.Kind.Id());
+    private Texture2D? PlaceIcon(Thing at) => Icons.Of(at.IsResource ? World.ResourceItem(at) : at.Kind.Id());
 
     /// <summary>One worker: what they carry and hold, what they are doing, their jobs with a button to drop each, and what can be done with them.</summary>
     private void WorkerPanel(Worker? w) {
@@ -95,18 +95,18 @@ public partial class Game {
         var wage = Style.Pill($"{w.Wage} /day", Style.Tag(Style.Brick), Style.Rim, 13); wage.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; wage.MouseFilter = Control.MouseFilterEnum.Pass; wage.TooltipText = "Daily wage";
         heading.AddChild(wage); heading.MoveChild(wage, heading.GetChildCount() - 2);
         var well = Well(new HBoxContainer()); well.AddThemeConstantOverride("separation", 12);
-        var (carry, carried) = IconCell("carry", 56); well.AddChild(carry);
-        var (tool, _) = IconCell("tool", 56); well.AddChild(tool);
+        var (carry, carried) = ItemSlot.Cup("carry", 56); well.AddChild(carry);
+        var (tool, _) = ItemSlot.Cup("tool", 56); well.AddChild(tool);
         var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; text.AddThemeConstantOverride("separation", 2); well.AddChild(text);
         var status = Style.Text("", 15, Style.Ink); status.AutowrapMode = TextServer.AutowrapMode.WordSmart; text.AddChild(status);
         var owed = Style.Text("", 13, Style.Brick, Style.Bold); text.AddChild(owed);
         var owedText = new LiveText(shown => { owed.Text = shown; owed.Visible = shown != ""; });
         (string Status, int Owed) drawn = ("", -1);
-        (int Carried, string? Item, string Tool) kit = (-1, null, "");
+        (int Carried, string? Item, string Tool) carrying = (-1, null, "");
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(status)) return;
             if (w.Status != drawn.Status) status.Text = drawn.Status = w.Status;
-            ShowKit(w, ref kit, carry, carried, tool);
+            ShowKit(w, ref carrying, carry, carried, tool);
             int debt = (int)w.WageDebt;
             if (debt == drawn.Owed) return;
             drawn.Owed = debt;
@@ -126,7 +126,7 @@ public partial class Game {
             var place = Style.Text(world.Data.Name(at.Kind), 15, Style.Ink); place.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(place);
             int colour = System.Array.IndexOf(world.Jobs(at), d.Job);
             var tag = Style.Pill(JobName(d.Job), Style.Tag(Style.JobColors[System.Math.Max(0, colour) % Style.JobColors.Length]), Style.Rim, 13); tag.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; row.AddChild(tag);
-            var drop = HeaderButton("close", "Take this job away", () => { world.SetDuty(w, at, duty.Job, false); OpenPage("inspect"); }, Style.CloseRound, $"drop_{d.Job}_{at.Id}");
+            var drop = kit.HeaderButton("close", "Take this job away", () => { world.SetDuty(w, at, duty.Job, false); OpenPage("inspect"); }, Style.CloseRound, $"drop_{d.Job}_{at.Id}");
             drop.CustomMinimumSize = new Vector2(30, 30); drop.AddThemeConstantOverride("icon_max_width", 14); row.AddChild(drop);
         }
         if (first) {
@@ -134,9 +134,9 @@ public partial class Game {
             none.AutowrapMode = TextServer.AutowrapMode.WordSmart; jobs.AddChild(none);
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        buttons.AddChild(BigButton("Gather…", Style.Sage, () => { assigningWorker = w.Id; view.BuildMode = null; ClosePanel(); RefreshLive(); }));
-        buttons.AddChild(BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); OpenPage("inspect"); }));
-        buttons.AddChild(BigButton("Dismiss", Style.Brick, () => { world.Fire(w); OpenPage("workers"); }));
-        if (w.WageDebt > 0) content.AddChild(BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));
+        buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { assigningWorker = w.Id; view.BuildMode = null; ClosePanel(); RefreshLive(); }));
+        buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); OpenPage("inspect"); }));
+        buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); OpenPage("workers"); }));
+        if (w.WageDebt > 0) content.AddChild(kit.BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));
     }
 }

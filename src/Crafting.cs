@@ -18,7 +18,7 @@ public partial class Game {
         headingIcon.Texture = GD.Load<Texture2D>("res://assets/ui/line_craft.svg"); headingIcon.SelfModulate = Style.Rim; headingIcon.Visible = true;
         headingIcon.TooltipText = "Crafting by hand. A crafting bench works twice as fast.";
         var groups = world.HandRecipes.GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
-        RecipeBoard(groups, group => group.Tool == "" ? null : world.BestTool(group.Tool, null, group.Tier), null, id => Act(() => world.Craft(id)), _ => false, world.CanCraft);
+        RecipeBoard(groups, group => group.Tool == "" ? null : world.BestTool(group.Tool, null, group.Tier), null, id => kit.Act(() => world.Craft(id)), _ => false, world.CanCraft);
         CraftQueue();
         BagGrid(UseFromBag, UseHint, wanted: id => world.HandRecipes.Any(r => world.Data.Recipes[r].Inputs.ContainsKey(id)));
     }
@@ -47,7 +47,7 @@ public partial class Game {
             var r = world.Data.Recipes[queue[i]];
             waiting.Add(RecipeCup($"queue_{i}", r.Output, "", 44, () => world.CancelCraft(index)));
         }
-        Process(inputs, Text(text => AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))), () => making.Seconds > 0 ? world.S.CraftTime / making.Seconds : 0, null, product, waiting);
+        Process(inputs, LiveText.Of(text => AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))), () => making.Seconds > 0 ? world.S.CraftTime / making.Seconds : 0, null, product, waiting);
         if (making.Tool != "") {
             var status = Style.Text("", 14, Style.Warn); content.AddChild(status);
             bool shown = false;
@@ -63,11 +63,11 @@ public partial class Game {
     /// <summary>A cup in the craft queue's row with what one batch takes or makes under it; with a cancel action, clicking it cancels that entry.</summary>
     private VBoxContainer RecipeCup(string name, string item, string perBatch, float size, Action? cancel) {
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
-        var (cell, _) = IconCell(name, size); cell.Icon = HotbarIcon(item);
+        var (cell, _) = ItemSlot.Cup(name, size); cell.Icon = Icons.Of(item);
         cell.TooltipText = cancel == null ? world.Data.Name(item) : $"{world.Data.Name(item)}\nClick to cancel and get the materials back.";
         if (cancel != null) {
             cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
-            cell.Pressed += () => { Act(cancel); RefreshLive(); };
+            cell.Pressed += () => { kit.Act(cancel); RefreshLive(); };
         }
         column.AddChild(cell);
         if (perBatch != "") column.AddChild(PerBatch(perBatch));
@@ -82,9 +82,9 @@ public partial class Game {
         RecipeBoard(groups, group => group.Tool == "" ? null : world.BenchTool(bench, group.Tool, group.Tier), bench,
             id => { world.SetRecipe(bench, id); OpenPage("inspect"); }, id => bench.Recipe == id, id => world.S.Backpack.Has(world.Data.Recipes[id].Inputs),
             // A double click also loads one batch of inputs from the backpack.
-            id => Act(() => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(bench, item, amount); }));
+            id => kit.Act(() => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(bench, item, amount); }));
         if (bench.Recipe != "") Machine(bench);
-        else AddLabel("Choose what to make.", 14, Muted);
+        else AddLabel("Choose what to make.", 14, Style.Beige);
         var slotted = World.SlotKinds(bench.Kind);
         BagGrid(id => {
             if (slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(bench, world.Data.Items[id].Tool) == null) world.SlotTool(bench, id);
@@ -96,13 +96,13 @@ public partial class Game {
 
     /// <summary>A station's cup for one tool kind; while empty it shows a faint picture of the tool it wants.</summary>
     private ItemSlot ToolSlot(Thing bench, string tool) {
-        var (cell, _) = IconCell($"tool_{tool}");
+        var (cell, _) = ItemSlot.Cup($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         string plainest = world.Data.Items.Where(p => p.Value.Tool == tool).OrderBy(p => p.Value.Speed).First().Key;
-        cell.Pressed += () => { if (world.BenchTool(bench, tool) is string held) { Act(() => world.UnslotTool(bench, held)); RefreshLive(); } };
+        cell.Pressed += () => { if (world.BenchTool(bench, tool) is string held) { kit.Act(() => world.UnslotTool(bench, held)); RefreshLive(); } };
         cell.Drag = () => world.BenchTool(bench, tool) is string held ? new ItemDrag(held, 1, bench.Tools, bench) : null;
         cell.CanTake = drag => drag.From == world.S.Backpack && world.Data.Items.GetValueOrDefault(drag.Item)?.Tool == tool;
-        cell.Take = drag => { Act(() => world.SlotTool(bench, drag.Item)); RefreshLive(); return 0; };
+        cell.Take = drag => { kit.Act(() => world.SlotTool(bench, drag.Item)); RefreshLive(); return 0; };
         // Redrawn only when the slotted tool changes.
         string? drawn = null; bool first = true;
         live.Add(() => {
@@ -110,8 +110,8 @@ public partial class Game {
             string? held = world.BenchTool(bench, tool);
             if (!first && held == drawn) return;
             first = false; drawn = held;
-            cell.Icon = HotbarIcon(held ?? plainest);
-            cell.AddThemeColorOverride(IconNormal, held != null ? Colors.White : Ghost);
+            cell.Icon = Icons.Of(held ?? plainest);
+            cell.AddThemeColorOverride(ItemSlot.IconNormal, held != null ? Colors.White : Style.Ghost);
             cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\nClick: take it back" : $"Empty {tool} slot\nDrag a {tool} here from your backpack";
         });
         return cell;
@@ -124,7 +124,7 @@ public partial class Game {
         var inputs = new HBoxContainer(); inputs.AddThemeConstantOverride("separation", 10); column.AddChild(inputs);
         foreach (var (item, amount) in r.Inputs) {
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 2); inputs.AddChild(pair);
-            pair.AddChild(Style.Icon(HotbarIcon(item), 30));
+            pair.AddChild(Style.Icon(Icons.Of(item), 30));
             pair.AddChild(Style.Text(amount.ToString(), 14, world.S.Backpack[item] >= amount ? Style.Rim : Style.Warn));
         }
         column.AddChild(Style.Text($"{seconds:0.#} s", 14, Style.Beige));
@@ -149,15 +149,15 @@ public partial class Game {
             var (tool, tier) = group.Key;
             string key = GroupKey(group.Key);
             bool open = key == craftTab;
-            var tab = Button("", () => { craftTab = key; OpenPage(page); }); tab.Name = $"section_{key}"; tab.CustomMinimumSize = new Vector2(48, 48);
+            var tab = kit.Button("", () => { craftTab = key; OpenPage(page); }); tab.Name = $"section_{key}"; tab.CustomMinimumSize = new Vector2(48, 48);
             var look = open ? Style.TabActive : Style.TabRound; Style.Skin(tab, look.Normal, look.Hover);
             tabs.AddChild(tab);
             var badge = Style.Icon(null, 28); badge.Name = "badge"; badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); badge.GrowHorizontal = badge.GrowVertical = Control.GrowDirection.Both; badge.MouseFilter = Control.MouseFilterEnum.Pass;
             tab.AddChild(badge);
-            if (tool == "") { badge.Texture = HotbarIcon("stone"); badge.TooltipText = "No tool needed"; } else {
+            if (tool == "") { badge.Texture = Icons.Of("stone"); badge.TooltipText = "No tool needed"; } else {
                 string plainest = world.Data.Items.Where(p => p.Value.Tool == tool && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
                 string name = world.Data.ToolName(tool, tier);
-                badge.Texture = HotbarIcon(plainest);
+                badge.Texture = Icons.Of(plainest);
                 // Redrawn only when the tool in use changes.
                 string? drawn = null; bool first = true;
                 live.Add(() => {
@@ -165,7 +165,7 @@ public partial class Game {
                     string? inUse = held(group.Key);
                     if (!first && inUse == drawn) return;
                     first = false; drawn = inUse;
-                    if (inUse != null) badge.Texture = HotbarIcon(inUse);
+                    if (inUse != null) badge.Texture = Icons.Of(inUse);
                     badge.Modulate = inUse != null ? Colors.White : new Color(1, .35f, .3f);
                     badge.TooltipText = inUse != null
                         ? $"Needs a {name} · using {world.Data.Name(inUse)}"
@@ -180,16 +180,16 @@ public partial class Game {
     /// <summary>A recipe plate: the product big, with what it makes in a pill, and its inputs small underneath.</summary>
     private ItemSlot Plate(string id, Func<string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready, Action<string>? twice) {
         var r = world.Data.Recipes[id];
-        var (cell, count) = IconCell($"craft_{id}");
+        var (cell, count) = ItemSlot.Cup($"craft_{id}");
         cell.CustomMinimumSize = new Vector2(78, 84);
         Style.Skin(cell, chosen(id) ? Style.PlateChosen : Style.PlateNormal, Style.PlateHover);
         var face = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Alignment = BoxContainer.AlignmentMode.Center };
         face.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); face.AddThemeConstantOverride("separation", 4); cell.AddChild(face);
-        var product = Style.Icon(HotbarIcon(r.Output), 42); product.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter; face.AddChild(product);
+        var product = Style.Icon(Icons.Of(r.Output), 42); product.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter; face.AddChild(product);
         var inputs = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = Control.MouseFilterEnum.Ignore }; inputs.AddThemeConstantOverride("separation", 4); face.AddChild(inputs);
         var needs = new List<(string Item, int Amount, Label Count)>();
         foreach (var (item, amount) in r.Inputs) {
-            inputs.AddChild(Style.Icon(HotbarIcon(item), 18));
+            inputs.AddChild(Style.Icon(Icons.Of(item), 18));
             var need = Style.Text(amount.ToString(), 13, Style.Ink);
             inputs.AddChild(need); needs.Add((item, amount, need));
         }
@@ -210,7 +210,7 @@ public partial class Game {
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(cell)) return;
             Describe(tooltip.Clear()); tooltip.Show();
-            cell.Modulate = ready(id) ? Colors.White : Unready;
+            cell.Modulate = ready(id) ? Colors.White : Style.Unready;
             for (int i = 0; i < needs.Count; i++) {
                 bool lacking = world.S.Backpack[needs[i].Item] < needs[i].Amount;
                 if (shortOf[i] == lacking) continue;

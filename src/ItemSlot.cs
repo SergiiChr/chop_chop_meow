@@ -10,8 +10,46 @@ namespace ChopChopMeow;
 /// </summary>
 public sealed record ItemDrag(string Item, int Count, Inventory? From, Thing? Container, int SourceSlot = -1);
 
+/// <summary>The pill on a cup's corner: it shows only while it has something to count.</summary>
+public partial class Badge : Label {
+    public new string Text {
+        get => base.Text;
+        set { base.Text = value; Visible = value != ""; }
+    }
+}
+
 /// <summary>An icon button that can start an item drag and accept one.</summary>
 public partial class ItemSlot : Button {
+    public static readonly StringName IconNormal = "icon_normal_color";
+
+    /// <summary>A cream cup for one stack, with its count on a pill at the corner.</summary>
+    public static (ItemSlot Cell, Badge Count) Cup(string name, float size = 52) {
+        var cell = new ItemSlot {
+            Name = name,
+            CustomMinimumSize = new Vector2(size, size),
+            ExpandIcon = true,
+            IconAlignment = HorizontalAlignment.Center,
+            VerticalIconAlignment = VerticalAlignment.Center,
+            FocusMode = FocusModeEnum.None,
+            MouseDefaultCursorShape = CursorShape.PointingHand
+        };
+        Style.Skin(cell, Style.CupNormal, Style.CupHover, Style.CupPressed);
+        cell.AddThemeConstantOverride("icon_max_width", (int)(size * .74f));
+        var count = CountBadge();
+        cell.AddChild(count);
+        // A packed crate shows what it holds on a round badge at the other corner.
+        var badge = Style.Corner(Style.Icon(null, 24), 0, 0); badge.Name = "badge"; badge.Visible = false;
+        cell.AddChild(badge);
+        return (cell, count);
+    }
+
+    private static Badge CountBadge() {
+        var count = new Badge { MouseFilter = MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center, Visible = false };
+        count.AddThemeStyleboxOverride("normal", Style.CountPill);
+        count.AddThemeFontOverride("font", Style.Bold); count.AddThemeFontSizeOverride("font_size", 12); count.AddThemeColorOverride("font_color", Style.Rim);
+        return Style.Corner(count, 1, 1);
+    }
+
     // Godot drag data must be a Variant, so the C# payload rides alongside it for the drag's lifetime.
     private static ItemDrag? dragging;
     public Func<ItemDrag?>? Drag { get; set; }

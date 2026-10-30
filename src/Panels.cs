@@ -5,14 +5,6 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The pill on a cup's corner: it shows only while it has something to count.</summary>
-public partial class Badge : Label {
-    public new string Text {
-        get => base.Text;
-        set { base.Text = value; Visible = value != ""; }
-    }
-}
-
 /// <summary>Pieces every panel is built from, so each screen looks and works alike.</summary>
 public partial class Game {
     /// <summary>Which job's worker list is open under its button, so a rebuilt page keeps it open.</summary>
@@ -35,28 +27,9 @@ public partial class Game {
     };
     private static string JobName(string job) => JobNames.GetValueOrDefault(job, job);
 
-    private static Badge CountBadge() {
-        var count = new Badge { MouseFilter = Control.MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center, Visible = false };
-        count.AddThemeStyleboxOverride("normal", Style.CountPill);
-        count.AddThemeFontOverride("font", Style.Bold); count.AddThemeFontSizeOverride("font_size", 12); count.AddThemeColorOverride("font_color", Style.Rim);
-        return Style.Corner(count, 1, 1);
-    }
-
-    /// <summary>A round button in a panel's header, with a line icon.</summary>
-    private Button HeaderButton(string glyph, string tooltip, Action action, (StyleBoxFlat Normal, StyleBoxFlat Hover) look, string name = "") {
-        var button = Button("", action); button.TooltipText = tooltip; button.CustomMinimumSize = new Vector2(38, 38); button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        if (name != "") button.Name = name;
-        Style.Skin(button, look.Normal, look.Hover);
-        button.Icon = GD.Load<Texture2D>($"res://assets/ui/line_{glyph}.svg"); button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center;
-        button.AddThemeConstantOverride("icon_max_width", 18);
-        button.AddThemeColorOverride("icon_normal_color", look.Normal == Style.FilterRound.Normal ? Style.Ink : Style.Rim);
-        button.AddThemeColorOverride("icon_hover_color", look.Normal == Style.FilterRound.Normal ? Style.Ink : Style.Rim);
-        return button;
-    }
-
     /// <summary>Puts a round button in the header, before the close button.</summary>
     private Button HeaderAction(string glyph, string tooltip, Action action, (StyleBoxFlat Normal, StyleBoxFlat Hover) look, string name = "") {
-        var button = HeaderButton(glyph, tooltip, action, look, name);
+        var button = kit.HeaderButton(glyph, tooltip, action, look, name);
         heading.AddChild(button); heading.MoveChild(button, heading.GetChildCount() - 2);
         return button;
     }
@@ -212,8 +185,8 @@ public partial class Game {
         var top = new HBoxContainer(); top.AddThemeConstantOverride("separation", 10); board.AddChild(top);
         top.AddChild(Style.Glyph("line_filter", 28, Style.Rim));
         var title = Style.Heading("Filters", 22); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);
-        top.AddChild(Style.Icon(HotbarIcon(t.Kind.Id()), 32));
-        top.AddChild(HeaderButton("close", "Close the filters", () => { filterOpen = false; filterPicking = false; OpenPage("inspect"); }, Style.CloseRound, "filters_close"));
+        top.AddChild(Style.Icon(Icons.Of(t.Kind.Id()), 32));
+        top.AddChild(kit.HeaderButton("close", "Close the filters", () => { filterOpen = false; filterPicking = false; OpenPage("inspect"); }, Style.CloseRound, "filters_close"));
         bool post = t.Kind == ThingKind.Signpost;
         foreach (bool output in post ? new[] { false } : new[] { false, true }) {
             var filter = output ? t.Inventory.OutputFilter : t.Inventory.InputFilter;
@@ -229,7 +202,7 @@ public partial class Game {
                 row.AddChild(cell);
             }
             if (filter.Count == 0) { var any = Style.Text(post ? "no deliveries" : "anything", 14, Style.Tan); any.CustomMinimumSize = new Vector2(0, 44); row.AddChild(any); }
-            var (add, _) = IconCell($"filter_add_{(output ? "out" : "in")}", 44);
+            var (add, _) = ItemSlot.Cup($"filter_add_{(output ? "out" : "in")}", 44);
             add.Text = "+"; add.AddThemeFontSizeOverride("font_size", 22); add.AddThemeColorOverride("font_color", Style.Tan);
             add.TooltipText = "Add an item · or drop one from your backpack";
             add.Pressed += () => { filterPicking = !filterPicking; pickingOutput = output; OpenPage("inspect"); };
@@ -251,7 +224,7 @@ public partial class Game {
                 picker.AddChild(cell);
             }
         }
-        var clear = Button(post ? "Clear" : "Clear both", () => { world.ClearFilters(t); OpenPage("inspect"); }); clear.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; board.AddChild(clear);
+        var clear = kit.Button(post ? "Clear" : "Clear both", () => { world.ClearFilters(t); OpenPage("inspect"); }); clear.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; board.AddChild(clear);
     }
     private bool pickingOutput;
 
@@ -260,11 +233,11 @@ public partial class Game {
 
     /// <summary>A filter entry's cell: the item, or for a crate of a good, the good with a small crate in the corner.</summary>
     private ItemSlot FilterCell(string name, string id) {
-        var (cell, _) = IconCell(name, 44);
+        var (cell, _) = ItemSlot.Cup(name, 44);
         string? good = world.CrateGood(id);
-        cell.Icon = HotbarIcon(good ?? id);
+        cell.Icon = Icons.Of(good ?? id);
         if (good != null) {
-            var badge = Style.Icon(HotbarIcon("crate"), 22); badge.MouseFilter = Control.MouseFilterEnum.Ignore;
+            var badge = Style.Icon(Icons.Of("crate"), 22); badge.MouseFilter = Control.MouseFilterEnum.Ignore;
             badge.AnchorLeft = badge.AnchorTop = badge.AnchorRight = badge.AnchorBottom = 1;
             badge.OffsetLeft = badge.OffsetTop = -20; badge.OffsetRight = badge.OffsetBottom = 2;
             cell.AddChild(badge);

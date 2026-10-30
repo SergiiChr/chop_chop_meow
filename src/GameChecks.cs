@@ -48,7 +48,7 @@ public partial class Game {
         var worker = AddWorker(world, at + Vector2.One); worker.Name = "Panel Check"; worker.Wage = 5;
         world.Assign(worker, forge); worker.Bag.Add("coal", 2);
         // Held still so what each page shows stays the same. The pause menu would hold world clicks, so the hold and the page opening stay direct.
-        bool wasPaused = paused; paused = true;
+        bool wasPaused = state.Paused; state.Paused = true;
         var pages = new (string Name, Action Open)[] {
             ("inventory", () => OpenPage("inventory")), ("craft", () => OpenPage("craft")), ("workers", () => OpenPage("workers")),
             ("chest", () => Select(chest)), ("pile", () => Select(pile)), ("bellows furnace", () => Select(forge)), ("furnace", () => Select(furnace)),
@@ -73,7 +73,7 @@ public partial class Game {
             GD.Print(report);
             Require(bytes == 0, $"Allocation budget exceeded: {report}");
         }
-        await CloseWithEsc(); paused = wasPaused;
+        await CloseWithEsc(); state.Paused = wasPaused;
         world.Fire(worker);
         var placed = new[] { chest, pile, forge, furnace, fire, hut, sign, farm, packer };
         RemoveThings(world, t => placed.Contains(t) || t.Kind == ThingKind.Grave);
@@ -790,7 +790,7 @@ public partial class Game {
         await Until(() => view.PlayerAnimation != ActorAction.Pump, "the bellows action pulse finishing before pause checks", 3);
         return furnace;
     }
-    /// <summary>While paused, Space and the pump button do nothing and animation clocks hold still; nothing plays late after resuming.</summary>
+    /// <summary>While state.Paused, Space and the pump button do nothing and animation clocks hold still; nothing plays late after resuming.</summary>
     private async Task CheckPauseFreezesPumpingAttackAndAnimations(Thing furnace) {
         await CloseWithEsc();
         await KeyStroke(Key.Escape);
@@ -799,13 +799,13 @@ public partial class Game {
         var actionBeforePausedActions = view.PlayerAnimation;
         float pausedActionTime = view.PlayerAnimationTime;
         await KeyStroke(Key.Space);
-        Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "Space must not pump or attack while paused.");
+        Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "Space must not pump or attack while state.Paused.");
         // The pause menu holds world clicks, so a player cannot get here; this proves the button stays dead if a panel ever is open.
         Select(furnace);
         var pumpButton = Named("pump");
-        Require(pumpButton != null, "The selected furnace should still expose its pump control while paused.");
+        Require(pumpButton != null, "The selected furnace should still expose its pump control while state.Paused.");
         await Click(pumpButton!);
-        Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "The pump button must not change heat while paused.");
+        Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "The pump button must not change heat while state.Paused.");
         Require(view.PlayerAnimation == actionBeforePausedActions && Math.Abs(view.PlayerAnimationTime - pausedActionTime) < .001f, "Paused Space and pump-button input must not start an animation pulse.");
         await Click(Named("close")!);
         float animationTime = view.PlayerAnimationTime;

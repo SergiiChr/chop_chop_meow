@@ -44,7 +44,8 @@ public partial class Game : Node {
     private const float LiftSeconds = .6f;
     /// <summary>The backpack crate being placed while the build mode is "crate".</summary>
     private string placingCrate = "";
-    private bool paused;
+    private UiKit kit = null!;
+    private UiState state = null!;
     private float uiClock;
     private float autosave;
     private const float AutosaveSeconds = 300;
@@ -62,19 +63,17 @@ public partial class Game : Node {
     private const int PanelTop = 156;
     /// <summary>Bottom of the backpack drawer, measured up from the bottom of the screen, just above the hotbar.</summary>
     private const int BagBottom = 112;
-    private static readonly Color Cream = Style.Rim;
-    private static readonly Color Muted = Style.Beige;
     public override void _Ready() {
         try {
             var data = GameData.Load(); world = launchArgs.Contains("--performance-run") ? PerformanceFixture.Create(data) : new World(data);
             if (launchArgs.Contains("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             if (LaunchValue("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
             world.Notify = Notify;
-            LoadHotbarAtlases();
             sounds = new Sounds { World = world, MusicVolume = SavedMusicVolume() }; AddChild(sounds);
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
             view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = launchArgs.Contains("--environment-review") }; AddChild(view);
+            kit = new UiKit(world, sounds, Notify, RefreshLive); state = kit.State;
             net = new Net { Name = "Net", World = world, FilePrefix = FilePrefix }; AddChild(net);
             world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };
             world.PlayerActed += (action, at) => net.Echo(world.S.Actor.Id, action, at);
@@ -123,59 +122,19 @@ public partial class Game : Node {
         theme.SetFont("font", "TooltipLabel", Style.Bold);
         ui.Theme = theme;
     }
-    private Label Label(string text, int size = 15, Color? color = null) {
-        var l = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart };
-        l.AddThemeFontSizeOverride("font_size", size); if (color != null) l.AddThemeColorOverride("font_color", color.Value); return l;
-    }
-    /// <summary>Text over the world gets a dark outline so it reads on grass by day and night.</summary>
-    private static Label Outlined(Label label) {
-        label.AddThemeColorOverride("font_outline_color", Style.Line); label.AddThemeConstantOverride("outline_size", 6);
-        return label;
-    }
-    private Button Button(string text, Action action, bool disabled = false) {
-        var b = new Button { Text = text, Disabled = disabled, MouseDefaultCursorShape = Control.CursorShape.PointingHand, CustomMinimumSize = new Vector2(0, 34), FocusMode = Control.FocusModeEnum.None };
-        b.Pressed += () => { Act(action); RefreshLive(); }; return b;
-    }
-    /// <summary>Runs a player action and gives it a generic sound when it made none of its own: that of the item whose backpack count changed most.</summary>
-    private void Act(Action action) {
-        var state = world.S; int played = sounds.Played;
-        var before = new Dictionary<string, int>(state.Backpack.Items);
-        action();
-        // Starting or loading a game replaces the whole state; that is not an item moving.
-        if (world.S != state || sounds.Played != played) return;
-        var moved = state.Backpack.Items.Keys.Union(before.Keys).OrderByDescending(id => Math.Abs(state.Backpack[id] - before.GetValueOrDefault(id))).FirstOrDefault();
-        if (moved != null && state.Backpack[moved] != before.GetValueOrDefault(moved)) sounds.Play(Sounds.ForItem(moved));
-    }
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private HBoxContainer Row() { var r = new HBoxContainer(); content.AddChild(r); return r; }
-    private void AddLabel(string text, int size = 15, Color? color = null) => content.AddChild(Label(text, size, color));
-    private void AddButton(string text, Action action, bool disabled = false) => content.AddChild(Button(text, action, disabled));
-    /// <summary>
-    /// Text rebuilt on every refresh into a reused buffer and handed to Godot only when it differs from what is shown,
-    /// so an open panel allocates nothing while what it shows stays the same.
-    /// </summary>
-    private sealed class LiveText(Action<string> show) {
-        private readonly StringBuilder text = new();
-        private string? shown;
-        public StringBuilder Clear() => text.Clear();
-        public void Show() {
-            if (shown != null && text.Equals(shown.AsSpan())) return;
-            shown = text.ToString(); show(shown);
-        }
-    }
+    private void AddLabel(string text, int size = 15, Color? color = null) => content.AddChild(Style.Wrapped(text, size, color));
+    private void AddButton(string text, Action action, bool disabled = false) => content.AddChild(kit.Button(text, action, disabled));
     /// <summary>A label whose text <paramref name="write"/> rebuilds on every refresh.</summary>
     private void Dynamic(Action<StringBuilder> write, int size = 15, Color? color = null) {
-        var l = Label("", size, color); content.AddChild(l);
+        var l = Style.Wrapped("", size, color); content.AddChild(l);
         var text = new LiveText(shown => l.Text = shown);
         void Update() {
             if (!GodotObject.IsInstanceValid(l)) return;
             write(text.Clear()); text.Show();
         }
         Update(); live.Add(Update);
-    }
-    /// <summary>Text from a writer that panels also use live, for one-off labels and messages.</summary>
-    private static string Text(Action<StringBuilder> write) {
-        var text = new StringBuilder(); write(text); return text.ToString();
     }
     private void BuildHud() {
         // The day dial and clock share a plate in the top right corner; the side panel opens below it.
@@ -184,7 +143,7 @@ public partial class Game : Node {
         var dial = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddThemeConstantOverride("separation", 6); clock.AddChild(dial);
         dayDial = new DayDial { Arc = () => world.SkyArc, Night = () => world.MoonUp, CustomMinimumSize = new Vector2(0, 62), MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddChild(dayDial);
         stats = Style.Heading("", 16); stats.HorizontalAlignment = HorizontalAlignment.Center; dial.AddChild(stats);
-        modeLabel = Outlined(Label("", 17)); modeLabel.AnchorLeft = .5f; modeLabel.AnchorRight = .5f; modeLabel.OffsetTop = 18; modeLabel.GrowHorizontal = Control.GrowDirection.Both; modeLabel.HorizontalAlignment = HorizontalAlignment.Center; modeLabel.AutowrapMode = TextServer.AutowrapMode.Off; modeLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(modeLabel);
+        modeLabel = Style.Outlined(Style.Wrapped("", 17)); modeLabel.AnchorLeft = .5f; modeLabel.AnchorRight = .5f; modeLabel.OffsetTop = 18; modeLabel.GrowHorizontal = Control.GrowDirection.Both; modeLabel.HorizontalAlignment = HorizontalAlignment.Center; modeLabel.AutowrapMode = TextServer.AutowrapMode.Off; modeLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(modeLabel);
         // Menu badges and the hotbar sit on one plate centred along the bottom, like a tool belt.
         var bottom = new PanelContainer { AnchorLeft = .5f, AnchorRight = .5f, AnchorTop = 1, AnchorBottom = 1, OffsetTop = -14, OffsetBottom = -14, GrowHorizontal = Control.GrowDirection.Both, GrowVertical = Control.GrowDirection.Begin }; ui.AddChild(bottom);
         bottom.AddThemeStyleboxOverride("panel", Style.Plate);
@@ -194,7 +153,7 @@ public partial class Game : Node {
         var divider = new ColorRect { Color = new Color(Style.Beige, .6f), CustomMinimumSize = new Vector2(3, 46), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; slots.AddChild(divider);
         for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
-        messages = new MessageStack(() => Outlined(Label("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
+        messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
         // The side panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         panel = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = PanelLeft, OffsetRight = -20, OffsetTop = PanelTop, OffsetBottom = PanelTop };
         ui.AddChild(panel);
@@ -204,17 +163,17 @@ public partial class Game : Node {
         var label = new VBoxContainer { CustomMinimumSize = new Vector2(40, 0) }; label.AddThemeConstantOverride("separation", 4); drawer.AddChild(label);
         label.AddChild(Style.Glyph("line_bag", 30, Style.Rim));
         bagFill = Style.Text("", 13, Style.Beige); bagFill.HorizontalAlignment = HorizontalAlignment.Center; label.AddChild(bagFill);
-        var sort = Button("Sort", () => { world.SortBackpack(); RefreshLive(); }); sort.Name = "sort_bag"; sort.TooltipText = "Stack loose items and sort by type"; label.AddChild(sort);
+        var sort = kit.Button("Sort", () => { world.SortBackpack(); RefreshLive(); }); sort.Name = "sort_bag"; sort.TooltipText = "Stack loose items and sort by type"; label.AddChild(sort);
         bagContent = new VBoxContainer(); drawer.AddChild(bagContent);
         // Every closable window keeps its close button in its top right corner.
-        var hide = HeaderButton("close", "Hide the backpack", () => { if (page == "inventory") ClosePanel(); else { bagHidden = true; bag.Visible = false; } }, Style.CloseRound, "bag_close");
+        var hide = kit.HeaderButton("close", "Hide the backpack", () => { if (page == "inventory") ClosePanel(); else { bagHidden = true; bag.Visible = false; } }, Style.CloseRound, "bag_close");
         hide.SizeFlagsVertical = Control.SizeFlags.ShrinkBegin; drawer.AddChild(hide);
-        waterWarning = Outlined(Label("", 17)); waterWarning.Name = "water_warning";
+        waterWarning = Style.Outlined(Style.Wrapped("", 17)); waterWarning.Name = "water_warning";
         waterWarning.AnchorTop = 1; waterWarning.AnchorBottom = 1;
         waterWarning.OffsetLeft = 20; waterWarning.OffsetRight = 650; waterWarning.OffsetTop = -250; waterWarning.OffsetBottom = -220;
         waterWarning.AutowrapMode = TextServer.AutowrapMode.Off;
         waterWarning.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(waterWarning);
-        deathLabel = Outlined(Label("", 26)); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
+        deathLabel = Style.Outlined(Style.Wrapped("", 26)); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
         // Raised above the centred player so a downed body stays visible under the message.
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
@@ -295,7 +254,7 @@ public partial class Game : Node {
         headingIcon = Style.Icon(null, 44); headingIcon.Visible = false; headingIcon.MouseFilter = Control.MouseFilterEnum.Pass; heading.AddChild(headingIcon);
         headingTitle = Style.Heading(name switch { "welcome" => "A new beginning", "build" => "Building plans", "inventory" => "Backpack", "help" => "Field guide", "workers" => "Your crew", "craft" => "Crafting", _ => "Inspect" });
         headingTitle.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; heading.AddChild(headingTitle);
-        heading.AddChild(HeaderButton("close", "Close · Esc", ClosePanel, Style.CloseRound, "close"));
+        heading.AddChild(kit.HeaderButton("close", "Close · Esc", ClosePanel, Style.CloseRound, "close"));
         scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
         // Room for the pills that sit on the cups' corners.
         var inset = new MarginContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);
@@ -315,7 +274,7 @@ public partial class Game : Node {
     /// <summary>Names the page after the building it shows, with the building's own icon; its description becomes the icon's tooltip.</summary>
     private void Headline(ThingKind kind) {
         headingTitle.Text = world.Data.Name(kind);
-        headingIcon.Texture = HotbarIcon(kind.Id()); headingIcon.Visible = headingIcon.Texture != null;
+        headingIcon.Texture = Icons.Of(kind.Id()); headingIcon.Visible = headingIcon.Texture != null;
         headingIcon.TooltipText = world.Data.Buildings.TryGetValue(kind, out var def) ? def.Description : "";
     }
     /// <summary>Shows the backpack drawer with a grid that works with the open page: <paramref name="wanted"/> lights up what it takes.</summary>
@@ -331,14 +290,14 @@ public partial class Game : Node {
     private int pagesOpened;
     private void Welcome() {
         AddLabel("The woods are quiet. For now.", 21);
-        AddLabel("First, secure water, a cabin and a fire. Then use your steel axe and your hands to build a workshop, trade berries for a pickaxe, and work toward steel.", 16, Muted);
+        AddLabel("First, secure water, a cabin and a fire. Then use your steel axe and your hands to build a workshop, trade berries for a pickaxe, and work toward steel.", 16, Style.Beige);
         AddLabel("FIRST STEPS", 14);
         AddLabel("1  Collect water at the pond and keep a bottle filled. The sea is salt.\n2  Gather wood and stone; build a cabin and campfire before night.\n3  With your steel axe, fell trees. Gather stone and berries by hand. Knap a chisel, carve planks and a mallet, then build a bench.\n4  Make crates, build a trading post and sell berries. Buy your first pickaxe, then mine toward iron and steel.\n5  Press Esc any time to see your current goal.");
-        AddLabel("A bottle holds three sips and can be refilled at the lake. Without one, drink at the source. Each gathering action takes time, so plan ahead.", 15, Muted);
+        AddLabel("A bottle holds three sips and can be refilled at the lake. Without one, drink at the source. Each gathering action takes time, so plan ahead.", 15, Style.Beige);
         AddButton("Into the clearing", ClosePanel);
     }
-    private string Needs(Dictionary<string, int> cost) => Text(text => AppendNeeds(text, cost));
-    private string Cost(Dictionary<string, int> cost) => Text(text => AppendCost(text, cost));
+    private string Needs(Dictionary<string, int> cost) => LiveText.Of(text => AppendNeeds(text, cost));
+    private string Cost(Dictionary<string, int> cost) => LiveText.Of(text => AppendCost(text, cost));
     /// <summary>Each input with how many the backpack holds of how many are needed.</summary>
     private void AppendNeeds(StringBuilder text, Dictionary<string, int> cost) {
         bool first = true;
@@ -358,12 +317,12 @@ public partial class Game : Node {
     }
     private void BuildingPlans() {
         var grid = AddGrid();
-        var details = Label("Hover a plan to see what it needs. Click it, then click open ground nearby.", 14, Muted);
+        var details = Style.Wrapped("Hover a plan to see what it needs. Click it, then click open ground nearby.", 14, Style.Beige);
         foreach (var (id, def) in world.Data.Buildings) {
-            var (cell, _) = IconCell($"build_{id.Id()}"); cell.Icon = HotbarIcon(id.Id()); cell.TooltipText = $"{def.Name}\nClick to place · Drag onto the hotbar"; DragReference(cell, id.Id());
+            var (cell, _) = ItemSlot.Cup($"build_{id.Id()}"); cell.Icon = Icons.Of(id.Id()); cell.TooltipText = $"{def.Name}\nClick to place · Drag onto the hotbar"; DragReference(cell, id.Id());
             cell.Pressed += () => { view.BuildMode = id; assigningWorker = 0; ClosePanel(); RefreshLive(); };
             cell.MouseEntered += () => details.Text = $"{def.Name}\n{def.Description}\n\nNeeds: {Needs(def.Cost)}";
-            live.Add(() => { if (GodotObject.IsInstanceValid(cell)) cell.Modulate = world.S.Backpack.Has(def.Cost) ? Colors.White : Unready; });
+            live.Add(() => { if (GodotObject.IsInstanceValid(cell)) cell.Modulate = world.S.Backpack.Has(def.Cost) ? Colors.White : Style.Unready; });
             grid.AddChild(cell);
         }
         content.AddChild(details);
@@ -429,7 +388,7 @@ public partial class Game : Node {
     }
     private void Resource(Thing t) {
         var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
-        row.AddChild(Style.Icon(HotbarIcon(World.ResourceItem(t)), 44));
+        row.AddChild(Style.Icon(Icons.Of(World.ResourceItem(t)), 44));
         var left = Style.Text("", 16, Style.Ink); left.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; left.AutowrapMode = TextServer.AutowrapMode.WordSmart; row.AddChild(left);
         var text = new LiveText(shown => left.Text = shown);
         live.Add(() => {
@@ -439,7 +398,7 @@ public partial class Game : Node {
             line.Append(world.GatherBlock(t) ?? (t.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
             text.Show();
         });
-        if (t.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Muted);
+        if (t.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
         JobButtons(t);
     }
     private void Campfire(Thing fire) {
@@ -455,7 +414,7 @@ public partial class Game : Node {
             drawn = minutes;
             AppendGameHours(text.Clear(), fire.Burn).Append(" of light · wolves keep 5 tiles off"); text.Show();
         });
-        var (wood, count) = IconCell("fire_wood"); wood.Icon = HotbarIcon("wood"); row.AddChild(wood);
+        var (wood, count) = ItemSlot.Cup("fire_wood"); wood.Icon = Icons.Of("wood"); row.AddChild(wood);
         int held = -1;
         live.Add(() => { if (GodotObject.IsInstanceValid(wood) && fire.Inventory["wood"] != held) { held = fire.Inventory["wood"]; count.Text = held > 0 ? held.ToString() : ""; } });
         AddButton($"Feed · 1 wood · +{world.Data.CampfireHours:0} h", () => world.FuelFire(fire));
@@ -480,8 +439,8 @@ public partial class Game : Node {
             pair.AddChild(then[i] = new Vial { Fill = colors[i], Faded = true });
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        var door = BigButton("", Style.Sage, () => { if (world.S.Sheltered == hut.Id) world.Leave(); else entering = hut; });
-        var sleep = BigButton("Sleep", Style.Enamel, () => world.Sleep(hut)); sleep.Name = "sleep";
+        var door = kit.BigButton("", Style.Sage, () => { if (world.S.Sheltered == hut.Id) world.Leave(); else entering = hut; });
+        var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(hut)); sleep.Name = "sleep";
         buttons.AddChild(door); buttons.AddChild(sleep);
         var untilText = new LiveText(shown => until.Text = shown);
         (bool Inside, string? Block, int Minutes) shown = (false, "", -1);
@@ -496,7 +455,7 @@ public partial class Game : Node {
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);
             door.Text = inside ? "Step outside" : "Go inside";
             sleep.TooltipText = blocked ?? "Sleep until dawn. Production, hunger, trade and wages advance.";
-            sleep.Modulate = blocked == null ? Colors.White : Unready;
+            sleep.Modulate = blocked == null ? Colors.White : Style.Unready;
             block.Visible = blocked != null; block.Text = blocked == null ? "" : ShortBlock(blocked);
             AppendGameHours(untilText.Clear().Append("until dawn · +"), world.SecondsToDawn); untilText.Show();
             float seconds = world.SecondsToDawn;
@@ -511,13 +470,6 @@ public partial class Game : Node {
     }
     /// <summary>A sleep refusal cut to a tag: what stops it, in a word or two.</summary>
     private static string ShortBlock(string reason) => reason.Contains("thirsty") && reason.Contains("hungry") ? "too hungry and thirsty" : reason.Contains("thirsty") ? "too thirsty" : reason.Contains("hungry") ? "too hungry" : reason.Contains("night") ? "only at night" : "not yet";
-    /// <summary>A wide rounded button for a page's main actions.</summary>
-    private Button BigButton(string text, Color color, Action action) {
-        var button = Button(text, action); button.CustomMinimumSize = new Vector2(0, 56); button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        var look = Style.Pill(color); Style.Skin(button, look.Item1, look.Item2);
-        button.AddThemeFontSizeOverride("font_size", 17);
-        return button;
-    }
     private void Storage(Thing t) {
         switch (t.Kind) {
             case ThingKind.Crate: Crate(t); return;
@@ -575,7 +527,7 @@ public partial class Game : Node {
     private void Recovery(Thing t) {
         headingTitle.Text = "Recovery box";
         Well(new VBoxContainer()).AddChild(StorageGrid(t, 5));
-        var row = Row(); row.AddChild(BigButton("Take all", Style.Brick, () => TakeAll(t)));
+        var row = Row(); row.AddChild(kit.BigButton("Take all", Style.Brick, () => TakeAll(t)));
         BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Drag to move");
     }
     /// <summary>A tool rack: a row per kind of tool workers use, with what hangs there, how many are out, and who waits for one.</summary>
@@ -595,8 +547,8 @@ public partial class Game : Node {
             if (k > 0) rows.AddChild(new HSeparator { CustomMinimumSize = new Vector2(0, 14) });
             var row = new HBoxContainer { CustomMinimumSize = new Vector2(0, 60) }; row.AddThemeConstantOverride("separation", 12); rows.AddChild(row);
             string plainest = world.Data.Items.Where(p => p.Value.Tool == kind).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
-            var (cell, count) = IconCell($"rack_{kind}"); cell.Icon = HotbarIcon(plainest); row.AddChild(cell);
-            cell.Pressed += () => { if (world.BestTool(kind, t.Inventory) is string best) { Act(() => MoveStack(t.Inventory, world.S.Backpack, best, t)); RefreshLive(); } };
+            var (cell, count) = ItemSlot.Cup($"rack_{kind}"); cell.Icon = Icons.Of(plainest); row.AddChild(cell);
+            cell.Pressed += () => { if (world.BestTool(kind, t.Inventory) is string best) { kit.Act(() => MoveStack(t.Inventory, world.S.Backpack, best, t)); RefreshLive(); } };
             cell.Drag = () => world.BestTool(kind, t.Inventory) is string best ? new ItemDrag(best, t.Inventory[best], t.Inventory, t) : null;
             row.AddChild(new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
             var outPill = Style.Pill("", Style.Tag(Style.Enamel), Style.Rim, 12); outPill.MouseFilter = Control.MouseFilterEnum.Pass; row.AddChild(outPill);
@@ -610,8 +562,8 @@ public partial class Game : Node {
                 var now = (world.BestTool(kind, t.Inventory), held, out_, waiting);
                 if (now == shown) return;
                 shown = now;
-                cell.Icon = HotbarIcon(now.Item1 ?? plainest);
-                cell.AddThemeColorOverride(IconNormal, held > 0 ? Colors.White : Ghost);
+                cell.Icon = Icons.Of(now.Item1 ?? plainest);
+                cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
                 count.Text = held > 1 ? held.ToString() : "";
                 cell.TooltipText = held > 0 ? $"{world.Data.Name(now.Item1!)}\nClick to take" : $"No {kind} on the rack";
                 outPill.Visible = out_ > 0; outPill.Text = $"{out_} out";
@@ -630,7 +582,7 @@ public partial class Game : Node {
     /// </summary>
     private void Pile(Thing t) {
         headingTitle.Text = t.Compost ? "Compost" : t.Inventory.First() is string held ? $"Pile · {world.Data.Name(held).ToLowerInvariant()}" : "Pile";
-        if (t.Compost) { headingIcon.Texture = HotbarIcon("leaves"); headingIcon.Visible = true; }
+        if (t.Compost) { headingIcon.Texture = Icons.Of("leaves"); headingIcon.Visible = true; }
         var compost = new CheckButton { ButtonPressed = t.Compost, FocusMode = Control.FocusModeEnum.None, TooltipText = "Compost: turns leaves, grass and food into fertilizer", Name = "compost" };
         compost.Toggled += on => { if (!world.SetCompost(t, on)) compost.SetPressedNoSignal(t.Compost); else OpenPage("inspect"); };
         heading.AddChild(compost); heading.MoveChild(compost, heading.GetChildCount() - 2);
@@ -638,11 +590,11 @@ public partial class Game : Node {
         else HeaderAction("stash", "Store everything this pile takes", () => StoreAll(t), Style.ActionRound, "deposit");
         Well(new VBoxContainer()).AddChild(StorageGrid(t, 7, 44));
         if (!t.Compost) {
-            Dynamic(text => text.Append(t.Inventory.UsedSlots).Append(" of ").Append(t.Inventory.Slots).Append(" stacks"), 14, Muted);
+            Dynamic(text => text.Append(t.Inventory.UsedSlots).Append(" of ").Append(t.Inventory.Slots).Append(" stacks"), 14, Style.Beige);
         } else {
-            var item = Style.Icon(HotbarIcon("leaves"), 40); item.MouseFilter = Control.MouseFilterEnum.Pass;
+            var item = Style.Icon(Icons.Of("leaves"), 40); item.MouseFilter = Control.MouseFilterEnum.Pass;
             var lasts = Style.Text("", 13, Style.Tan);
-            var making = Style.Icon(HotbarIcon("fertilizer"), 52); making.TooltipText = "Makes fertilizer"; making.MouseFilter = Control.MouseFilterEnum.Pass;
+            var making = Style.Icon(Icons.Of("fertilizer"), 52); making.TooltipText = "Makes fertilizer"; making.MouseFilter = Control.MouseFilterEnum.Pass;
             var main = new VBoxContainer(); main.AddThemeConstantOverride("separation", 10); main.AddChild(making); main.AddChild(PerBatch("×1"));
             float hour = world.Data.DaySeconds / 24;
             Process(Array.Empty<Control>(), "1 h", () => t.Progress / hour, FuelRow("line_leaf", new Color("8fae7e"), item, lasts), main, Array.Empty<Control>());
@@ -655,7 +607,7 @@ public partial class Game : Node {
                 var now = (rotting, units / World.CompostBatch);
                 if (now == shown) return;
                 shown = now;
-                item.Texture = HotbarIcon(rotting ?? "leaves"); item.Modulate = rotting == null ? Unready : Colors.White;
+                item.Texture = Icons.Of(rotting ?? "leaves"); item.Modulate = rotting == null ? Style.Unready : Colors.White;
                 item.TooltipText = rotting == null ? "Nothing to compost" : $"Composting {world.Data.Name(rotting).ToLowerInvariant()}";
                 lastsText.Clear().Append('×').Append(World.CompostBatch).Append(" · ").Append(now.Item2).Append(" h"); lastsText.Show();
             });
@@ -677,7 +629,7 @@ public partial class Game : Node {
         for (int i = 0; i < 4; i++) {
             if (i > 0) { links[i - 1] = new ColorRect { CustomMinimumSize = new Vector2(0, 6), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; stages.AddChild(links[i - 1]); }
             var node = new PanelContainer { CustomMinimumSize = new Vector2(44, 44), TooltipText = names[i], MouseFilter = Control.MouseFilterEnum.Pass };
-            node.AddChild(looks[i] is string look ? Style.Icon(HotbarIcon(look), 30) : new ColorRect { Color = new Color("8a6a48"), CustomMinimumSize = new Vector2(24, 10), SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
+            node.AddChild(looks[i] is string look ? Style.Icon(Icons.Of(look), 30) : new ColorRect { Color = new Color("8a6a48"), CustomMinimumSize = new Vector2(24, 10), SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
             nodes[i] = node; stages.AddChild(node);
         }
         var ripe = Style.Text("", 14, Style.Rim); ripe.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; content.AddChild(ripe);
@@ -722,22 +674,22 @@ public partial class Game : Node {
     /// <summary>A cup bound to one item of a farm's sowing or harvest slots, with what one crop takes or gives under it.</summary>
     private VBoxContainer FarmCup(Thing farm, Inventory box, string item, bool input, string perBatch, float size = 52, StyleBoxFlat? look = null) {
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
-        var (cell, count) = IconCell($"{(input ? "input" : "output")}_{item}", size);
-        cell.Icon = HotbarIcon(item);
+        var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
+        cell.Icon = Icons.Of(item);
         if (look != null) cell.AddThemeStyleboxOverride("normal", look); else if (!input) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
-        cell.Pressed += () => { Act(() => MoveStack(box, world.S.Backpack, item, farm)); RefreshLive(); };
+        cell.Pressed += () => { kit.Act(() => MoveStack(box, world.S.Backpack, item, farm)); RefreshLive(); };
         cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, farm) : null;
         if (input) {
             // Seed comes back in from the plot's own harvest as well as from the backpack.
             cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == farm.Output) && drag.Item == item;
-            cell.Take = drag => { int left = 0; Act(() => left = MoveDrag(drag, box, farm)); RefreshLive(); return left; };
+            cell.Take = drag => { int left = 0; kit.Act(() => left = MoveDrag(drag, box, farm)); RefreshLive(); return left; };
         }
         int drawn = -1;
         live.Add(() => {
             int held = box[item];
             if (held == drawn) return;
             drawn = held;
-            cell.AddThemeColorOverride(IconNormal, held > 0 ? Colors.White : Ghost);
+            cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
             count.Text = held > 0 ? held.ToString() : "";
             cell.TooltipText = $"{world.Data.Name(item)} · {held}\n{(input ? "Click: take back · Drag seeds here from the harvest or backpack to sow" : "Click: take · Drag seeds to the sowing slot")}";
         });
@@ -791,7 +743,7 @@ public partial class Game : Node {
                     if (t == null || !world.Near(t)) t = world.S.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
                     if (t != null) Select(t); break;
                 case Key.Space:
-                    if (paused) { Notify("Resume before using tools."); break; }
+                    if (state.Paused) { Notify("Resume before using tools."); break; }
                     var station = world.Find(selected);
                     if (station != null && station.Kind == ThingKind.Reinforced && world.Near(station)) world.Pump(station); else world.Attack(); break;
             }
@@ -831,7 +783,7 @@ public partial class Game : Node {
                     if (t.Kind == ThingKind.Hut) entering = t;
                     // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
                     if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item) && !(t.Kind == ThingKind.Crate && World.IsCrate(item))) {
-                        if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
+                        if (world.Near(t)) { int moved = 0; kit.Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
                     }
                     Select(t);
                 } else if (ActiveHotbarItem() is string held && HasUse(held)) UseHeld(view.ToWorld(mouse.Position));
@@ -854,7 +806,7 @@ public partial class Game : Node {
     public override void _Process(double delta) {
         if (world == null || view == null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;
-        if (!paused) {
+        if (!state.Paused) {
             float x = (Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left) ? 1 : 0);
             float y = (Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up) ? 1 : 0);
             Vector2 direction = new Vector2(x + y * 2, y * 2 - x).Normalized();
@@ -892,7 +844,7 @@ public partial class Game : Node {
             world.Me.Held = ActiveHotbarItem() ?? "";
         } else world.Me.Sprinting = false;
         // Menus pause only a game nobody else is in.
-        bool running = !paused || net.Hosting || world.Remote;
+        bool running = !state.Paused || net.Hosting || world.Remote;
         if (running) {
             float health = world.Remote ? shownHealth : world.S.Health;
             if (!world.Remote) world.Tick(dt);
@@ -978,7 +930,7 @@ public partial class Game : Node {
             // The wide terrain camera must sit above the peaks rather than inside a near mountain face.
             if (location is "terrain" or "coast" or "mine") view.EnvironmentCameraDistance = 140;
             view.Zoom = location switch { "lake" => .44f, "terrain" => .24f, "coast" => .36f, "mine" => .85f, _ => .75f };
-            ClosePanel(); ui.Visible = false; paused = true;
+            ClosePanel(); ui.Visible = false; state.Paused = true;
             return;
         }
         if (launchArgs.Contains("--bushes")) {

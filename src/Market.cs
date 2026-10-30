@@ -42,7 +42,7 @@ public partial class Game {
         content.RemoveChild(crates); content.QueueFree(); content = host;
         ship.AddChild(crates);
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
-        var sell = Button("", () => { var load = sign.Inventory.Items.Keys.OrderByDescending(id => sign.Inventory[id]).FirstOrDefault(); if (world.Sell(sign) && load != null) sounds.Play(Sounds.ForItem(load)); });
+        var sell = kit.Button("", () => { var load = sign.Inventory.Items.Keys.OrderByDescending(id => sign.Inventory[id]).FirstOrDefault(); if (world.Sell(sign) && load != null) sounds.Play(Sounds.ForItem(load)); });
         sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = GD.Load<Texture2D>("res://assets/ui/line_cart.svg"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
         sell.AddThemeConstantOverride("icon_max_width", 32); sell.CustomMinimumSize = new Vector2(0, 56); sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; sell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         var look = Style.Pill(Style.Brick); Style.Skin(sell, look.Item1, look.Item2);
@@ -94,7 +94,7 @@ public partial class Game {
         var pad = new MarginContainer(); pad.AddThemeConstantOverride("margin_left", 12); pad.AddThemeConstantOverride("margin_right", 12); pad.AddThemeConstantOverride("margin_top", 6); pad.AddThemeConstantOverride("margin_bottom", 6);
         strip.AddChild(pad);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 10); pad.AddChild(row);
-        row.AddChild(Style.Icon(HotbarIcon("signpost"), 26));
+        row.AddChild(Style.Icon(Icons.Of("signpost"), 26));
         var road = new CartRoad { Name = "cart", Cart = GD.Load<Texture2D>("res://assets/ui/line_cart.svg"), CustomMinimumSize = new Vector2(0, 30), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Pass };
         row.AddChild(road);
         row.AddChild(Style.Glyph("line_village", 26, Style.Rim));
@@ -122,13 +122,13 @@ public partial class Game {
 
     private void HireOffers(Thing sign) {
         foreach (var offer in world.Data.HireOffers) {
-            var hire = Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => { if (world.Hire(sign, offer) is Worker w) Select(w); });
+            var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => { if (world.Hire(sign, offer) is Worker w) Select(w); });
             hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = GD.Load<Texture2D>("res://assets/ui/hardhat.svg"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
             hire.CustomMinimumSize = new Vector2(0, 50); hire.Alignment = HorizontalAlignment.Left;
             hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}";
             content.AddChild(hire);
         }
-        AddLabel("Wages come out of the bank at dawn, then your backpack. Unpaid workers strike.", 13, Muted);
+        AddLabel("Wages come out of the bank at dawn, then your backpack. Unpaid workers strike.", 13, Style.Beige);
     }
 
     /// <summary>Prices as last heard from the village, on an enamel shop sign beside the panel; buying is always at the current price.</summary>
@@ -147,9 +147,9 @@ public partial class Game {
         });
         var fetch = new Button { Name = "fetch", Icon = GD.Load<Texture2D>("res://assets/ui/line_crew.svg"), Text = "→", ExpandIcon = true, CustomMinimumSize = new Vector2(64, 32), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
         fetch.AddThemeConstantOverride("icon_max_width", 18); var fetchLook = Style.Pill(Style.Enamel); Style.Skin(fetch, fetchLook.Item1, fetchLook.Item2);
-        fetch.Pressed += () => { Act(() => world.FetchPrices(sign)); RefreshLive(); };
+        fetch.Pressed += () => { kit.Act(() => world.FetchPrices(sign)); RefreshLive(); };
         top.AddChild(fetch);
-        top.AddChild(HeaderButton("close", "Close the price sheet", () => { sheetOpen = false; OpenPage("inspect"); }, Style.CloseRound, "sheet_close"));
+        top.AddChild(kit.HeaderButton("close", "Close the price sheet", () => { sheetOpen = false; OpenPage("inspect"); }, Style.CloseRound, "sheet_close"));
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(fetch)) return;
             string? blocked = world.FetchBlock(sign);
@@ -161,14 +161,14 @@ public partial class Game {
         foreach (string column in new[] { "Sell price", "Buy price" }) { var cell = Style.Text(column, 13, Style.Tan); cell.CustomMinimumSize = new Vector2(PriceColumn, 0); cell.HorizontalAlignment = HorizontalAlignment.Center; header.AddChild(cell); }
         var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; rows.AddThemeConstantOverride("separation", 0);
         sheetScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; sheetScroll.AddChild(rows); board.AddChild(sheetScroll); sheetRows = rows;
-        var coins = HotbarIcon(Inventory.Coins);
+        var coins = Icons.Of(Inventory.Coins);
         foreach (string id in world.Data.Market.Sells.Keys.Union(world.Data.Market.Buys.Keys)) {
             bool sells = world.Data.Market.Sells.ContainsKey(id), buys = world.Data.Market.Buys.ContainsKey(id);
             var row = new HBoxContainer { CustomMinimumSize = new Vector2(0, 40), TooltipText = world.Lot(id) > 1 ? $"{world.Lot(id)} {world.Data.Name(id)}" : world.Data.Name(id), MouseFilter = Control.MouseFilterEnum.Pass };
             row.AddThemeConstantOverride("separation", 6); rows.AddChild(row);
             // Goods sold by the crate show its size beside the icon, so every row keeps the same height and columns.
             var goods = new HBoxContainer { CustomMinimumSize = new Vector2(GoodsColumn, 0) }; goods.AddThemeConstantOverride("separation", 2); row.AddChild(goods);
-            goods.AddChild(Style.Icon(HotbarIcon(id), 32));
+            goods.AddChild(Style.Icon(Icons.Of(id), 32));
             if (world.Lot(id) > 1) { var lot = Style.Text($"×{world.Lot(id)}", 13, Style.Tan, Style.Head); lot.VerticalAlignment = VerticalAlignment.Center; goods.AddChild(lot); }
             var sellColumn = new HBoxContainer { CustomMinimumSize = new Vector2(PriceColumn, 0), Alignment = BoxContainer.AlignmentMode.Center }; sellColumn.AddThemeConstantOverride("separation", 4); row.AddChild(sellColumn);
             var sellPrice = Style.Text("", 17, Style.Ink, Style.Head); sellPrice.CustomMinimumSize = new Vector2(40, 0); sellPrice.HorizontalAlignment = HorizontalAlignment.Right; sellColumn.AddChild(sellPrice);
@@ -194,7 +194,7 @@ public partial class Game {
             var buy = new Button { Name = $"buy_{id}", Text = $"{world.LotPrice(id)}", Icon = coins, ExpandIcon = true, IconAlignment = HorizontalAlignment.Right, CustomMinimumSize = new Vector2(80, 30), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
             buy.AddThemeConstantOverride("icon_max_width", 16); var buyLook = Style.Pill(Style.Brick); Style.Skin(buy, buyLook.Item1, buyLook.Item2);
             buy.AddThemeFontOverride("font", Style.Bold); buy.AddThemeFontSizeOverride("font_size", 14);
-            buy.Pressed += () => { Act(() => world.Buy(sign, id, MoveAll ? 5 : 1)); RefreshLive(); };
+            buy.Pressed += () => { kit.Act(() => world.Buy(sign, id, MoveAll ? 5 : 1)); RefreshLive(); };
             buy.TooltipText = world.Lot(id) > 1 ? $"Buy a crate of {world.Lot(id)} {world.Data.Name(id)} · Ctrl: 5 crates\nCrates arrive in the mailbox." : $"Buy a {world.Data.Name(id).ToLowerInvariant()} · Ctrl: 5\nGoods arrive in the mailbox.";
             buySlot.AddChild(buy);
         }

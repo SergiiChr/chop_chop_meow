@@ -53,13 +53,15 @@ UI and input:
 | --- | --- |
 | `src/Game.cs` | UI, input, save/load, the main game loop and command-line review flags |
 | `src/Menu.cs` | The pause menu with the goal chain, and the round menu badges |
+| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, how a player action runs, the buttons), `UiState` and `LiveText` |
+| `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/Recovery.cs` | The respawn countdown and "Skip to morning?" |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream cups, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
 | `src/Panels.cs` | Shared panel parts: header buttons, the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |
 | `src/Grid.cs` | Draws the icon-cell grids |
-| `src/ItemSlot.cs` | Drag and drop between grids |
+| `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
 | `src/Machine.cs` | Draws station input and output slots |
 | `src/Crafting.cs` | The crafting menu and the crafting bench panel |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
