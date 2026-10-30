@@ -104,7 +104,7 @@ public partial class PagePanel {
         if (t.IsResource) { Resource(t); return; }
         if (t.Kind == ThingKind.Hut) { Cabin(t); return; }
         if (t.Tools != null) { Bench(t); return; }
-        if (t.Kind == ThingKind.Signpost) { Signpost(t); return; }
+        if (t.Kind == ThingKind.Signpost) { AddChild(new MarketPanel(panel, t)); return; }
         if (t.Kind == ThingKind.Mine) { AddChild(new MinePanel(panel, t)); return; }
         if (t.Kind == ThingKind.Farm) { FarmPanel(t); return; }
         if (t.Kind == ThingKind.Campfire) { Campfire(t); return; }

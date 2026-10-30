@@ -5,19 +5,19 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>Trading post panel: outgoing crates, the cart's road and the mailbox, or hiring; and the village's prices on a sign beside the panel.</summary>
-public partial class PagePanel {
+public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
     /// <summary>How far the price sign reaches left of the panel.</summary>
     public const int SheetWidth = 420;
 
-    private void Signpost(Thing sign) {
+    public override void _Ready() {
         headingTitle.Text = "Trading post";
         Tab("cart", "coins", "Ship", () => memory.SignpostTab = "market", memory.SignpostTab == "market");
         Tab("crew", "hardhat", "Hire", () => memory.SignpostTab = "workers", memory.SignpostTab == "workers");
         Tab("guide", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
         FilterButton(sign);
-        if (memory.SheetOpen) PriceSheet(sign);
-        if (memory.SignpostTab == "workers") HireOffers(sign);
-        else Market(sign);
+        if (memory.SheetOpen) PriceSheet();
+        if (memory.SignpostTab == "workers") HireOffers();
+        else Shipping();
         JobButtons(sign);
     }
 
@@ -27,7 +27,7 @@ public partial class PagePanel {
         tab.CustomMinimumSize = new Vector2(44, 44);
     }
 
-    private void Market(Thing sign) {
+    private void Shipping() {
         var output = sign.Output!;
         var outbound = Well(new VBoxContainer()); outbound.AddThemeConstantOverride("separation", 8);
         outbound.AddChild(Style.WellLabel("Outbound"));
@@ -55,12 +55,12 @@ public partial class PagePanel {
             int count = sign.Inventory.Count;
             if (count == counted) return;
             counted = count;
-            int value = SaleWorth(sign);
+            int value = SaleWorth();
             if (value > 0) worth.Clear().Append("Approximate revenue: ").Append(value); else worth.Clear();
             revenue.Visible = value > 0;
             worth.Show();
         });
-        Road(sign);
+        Road();
         var inbound = Well(new VBoxContainer()); inbound.AddThemeConstantOverride("separation", 8);
         inbound.AddChild(Style.WellLabel("Inbound"));
         var mail = new HBoxContainer(); mail.AddThemeConstantOverride("separation", 14); inbound.AddChild(mail);
@@ -73,7 +73,7 @@ public partial class PagePanel {
     }
 
     /// <summary>What the crates waiting at the post would fetch at the last known prices.</summary>
-    private int SaleWorth(Thing sign) {
+    private int SaleWorth() {
         float value = 0;
         foreach (var pair in sign.Inventory.Items) {
             if (world.Packed(pair.Key) is not Inventory packed) continue;
@@ -84,7 +84,7 @@ public partial class PagePanel {
     }
 
     /// <summary>The road to the village with every cart from this post drawn where it is.</summary>
-    private void Road(Thing sign) {
+    private void Road() {
         var strip = new PanelContainer(); strip.AddThemeStyleboxOverride("panel", Style.Round(Style.Line, 22).Item1); content.AddChild(strip);
         var pad = new MarginContainer(); pad.AddThemeConstantOverride("margin_left", 12); pad.AddThemeConstantOverride("margin_right", 12); pad.AddThemeConstantOverride("margin_top", 6); pad.AddThemeConstantOverride("margin_bottom", 6);
         strip.AddChild(pad);
@@ -115,7 +115,7 @@ public partial class PagePanel {
         });
     }
 
-    private void HireOffers(Thing sign) {
+    private void HireOffers() {
         foreach (var offer in world.Data.HireOffers) {
             var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => { if (world.Hire(sign, offer) is Worker w) panel.Select(w); });
             hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = GD.Load<Texture2D>("res://assets/ui/hardhat.svg"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
@@ -127,7 +127,7 @@ public partial class PagePanel {
     }
 
     /// <summary>Prices as last heard from the village, on an enamel shop sign beside the panel; buying is always at the current price.</summary>
-    private void PriceSheet(Thing sign) {
+    private void PriceSheet() {
         var board = panel.SideBoard(Style.Sign, SheetWidth - 56);
         var top = new HBoxContainer(); top.AddThemeConstantOverride("separation", 8); board.AddChild(top);
         var title = Style.Text("Bramblewick prices", 19, Style.Ink, Style.Head); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);

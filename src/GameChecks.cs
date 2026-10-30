@@ -218,7 +218,7 @@ public partial class Game {
         await Click(Named("filters_close")!);
         var fetch = Named("fetch");
         Require(panel.SheetShown, "The price sheet must open.");
-        Require(panel.OffsetLeft == SidePanel.Left - PagePanel.SheetWidth, "The price sheet must open beside the panel.");
+        Require(panel.OffsetLeft == SidePanel.Left - MarketPanel.SheetWidth, "The price sheet must open beside the panel.");
         Require(fetch != null, "The price sheet must offer a fetch button.");
         Require(fetch.Disabled, "The fetch button must be disabled while no worker is assigned.");
         Require(fetch.TooltipText == "No worker assigned.", "The fetch button must explain that no worker is assigned.");

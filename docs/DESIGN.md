@@ -70,7 +70,7 @@ UI and input:
 | `src/Machine.cs` | Draws station input and output slots |
 | `src/Crafting.cs` | The crafting menu and the crafting bench panel |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
-| `src/Market.cs` | The trading post market, hiring offers and price sheet |
+| `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/GuidePanel.cs` | The field guide topics |
