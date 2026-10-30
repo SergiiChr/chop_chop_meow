@@ -5,11 +5,12 @@ using ChopChopMeow;
 using Godot;
 using static Checks;
 using static WorkerSteps;
-using static EconomySteps;
 
 /// <summary>World setup and passing time for the simulation checks.</summary>
 internal static class WorldSteps {
     public const float Step = .25f;
+    /// <summary>The id a guest has in the checks that host one.</summary>
+    public const int GuestId = 7;
 
     /// <summary>A world without its starting map, with a fed and healthy player on the first morning.</summary>
     public static World EmptyWorld(GameData data) => new(data, false);
@@ -36,10 +37,18 @@ internal static class WorldSteps {
     }
 
     public static World WorkDay(GameData data) {
-        var world = new World(data, false);
+        var world = FundedWorld(data);
         world.S.Time = 0;
-        world.S.Backpack.Add(Inventory.Coins, 1000);
         return world;
+    }
+
+    /// <summary>An empty world hosting one guest, and the messages that guest has heard.</summary>
+    public static (World World, PlayerState Guest, List<string> Heard) Hosted(GameData data) {
+        var world = EmptyWorld(data);
+        var heard = new List<string>();
+        world.Relay = (to, message) => { if (to == null || to.Id == GuestId) heard.Add(message); };
+        var guest = world.AddGuest(GuestId, null);
+        return (world, guest, heard);
     }
 
     /// <summary>A daytime camp in the generated valley: woodcutters, a bellows crew at a hot forge, a furnace, a campfire and storage.</summary>
@@ -135,7 +144,7 @@ internal static class WorldSteps {
     /// <summary>Runs the world with the player fed and out of the wolves' way, through nights as well, until a condition holds.</summary>
     public static void Work(World world, float seconds, Func<bool>? until = null) {
         for (; seconds > 0 && until?.Invoke() != true; seconds -= Step) {
-            world.S.Hunger = world.S.Thirst = world.S.Health = 100;
+            Fed(world);
             world.Tick(Step, true);
         }
     }
@@ -149,9 +158,9 @@ internal static class WorldSteps {
     }
 
     public static void FedPlayersTick(World world, float seconds) {
-        for (; seconds > 0; seconds -= .25f) {
+        for (; seconds > 0; seconds -= Step) {
             foreach (var p in world.S.Players) { p.Hunger = 100; p.Thirst = 100; }
-            world.Tick(.25f);
+            world.Tick(Step);
         }
     }
 

@@ -63,7 +63,8 @@ public static class HumanModelChecks {
 
     private static void CheckCarrySupport(ActorRig[] rigs) {
         foreach (var rig in rigs) {
-            var cargo = FindCargo(rig.Root) ?? throw new InvalidOperationException("Human model check failed: carried cargo mesh was not found");
+            var cargo = FindCargo(rig.Root);
+            Require(cargo != null, "the carried cargo mesh should be found");
             Require(cargo.Mesh!.GetInstanceId() == CrateShape.Cargo.GetInstanceId(), "carried cargo should reuse the cached shipping-crate mesh");
             var crateBounds = BoundsInTorso(cargo);
             foreach (bool moving in new[] { false, true }) {
@@ -92,21 +93,4 @@ public static class HumanModelChecks {
             Require(!((Node3D)cargo.GetParent()).Visible, "the shipping crate should hide when the actor is not carrying");
         }
     }
-
-    private static (Vector3 Min, Vector3 Max) BoundsInTorso(MeshInstance3D mesh) {
-        var bounds = mesh.Mesh!.GetAabb();
-        var toTorso = ((Node3D)mesh.GetParent()).Transform * mesh.Transform;
-        var first = toTorso * bounds.Position;
-        var min = first; var max = first;
-        for (int corner = 1; corner < 8; corner++) {
-            var point = toTorso * (bounds.Position + new Vector3(
-                (corner & 1) != 0 ? bounds.Size.X : 0,
-                (corner & 2) != 0 ? bounds.Size.Y : 0,
-                (corner & 4) != 0 ? bounds.Size.Z : 0));
-            min = new Vector3(Math.Min(min.X, point.X), Math.Min(min.Y, point.Y), Math.Min(min.Z, point.Z));
-            max = new Vector3(Math.Max(max.X, point.X), Math.Max(max.Y, point.Y), Math.Max(max.Z, point.Z));
-        }
-        return (min, max);
-    }
-
 }

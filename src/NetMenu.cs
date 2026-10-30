@@ -7,6 +7,7 @@ namespace ChopChopMeow;
 /// <summary>Hosting the current game, the join popup, and what happens around joining and leaving.</summary>
 public partial class Game {
     private Label joinStatus = null!;
+    private Label reconnectStatus = null!;
     /// <summary>Why the last joined game ended, shown once on the start menu.</summary>
     private string leftReason = "";
 
@@ -15,7 +16,9 @@ public partial class Game {
         net.Heard += PlayWorldSound;
         net.Acted += view.Acted;
         net.Joined += OnJoined;
-        net.Left += reason => { leftReason = reason; world.NewGame(); ShowStart(); };
+        net.Disconnected += ShowReconnecting;
+        net.Reconnecting += left => { if (GodotObject.IsInstanceValid(reconnectStatus)) reconnectStatus.Text = $"{Net.LostLine} Trying again for {left} more {(left == 1 ? "second" : "seconds")}."; };
+        net.Left += reason => { leftReason = reason; DropWorld(); ShowStart(); };
         net.Failed += reason => { if (GodotObject.IsInstanceValid(joinStatus)) joinStatus.Text = reason; };
     }
 
@@ -56,11 +59,22 @@ public partial class Game {
         address.CallDeferred(Control.MethodName.GrabFocus);
     }
 
-    private void OnJoined() {
+    /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
+    private void ShowReconnecting() {
+        DropWorld();
+        OpenScreen("RECONNECTING", () => { net.Leave(); ShowStart(); });
+        reconnectStatus = Label("", 14, Muted); screen.AddChild(reconnectStatus);
+        AddScreenButton("Stop · Esc", () => screenBack?.Invoke());
+    }
+
+    /// <summary>Replaces the world with a new one and closes everything that showed the old one.</summary>
+    private void DropWorld() { world.NewGame(); ClosePanel(); ending.Visible = false; EndAnomaly(); }
+
+    private void OnJoined(bool back) {
         StoreSetting("net", "address", net.Address);
-        slot = 0; selected = 0; workerId = 0; gathering = null; entering = null; lifting = null; assigningWorker = 0; endingSeen = false;
+        slot = 0; selected = 0; workerId = 0; gathering = null; entering = null; lifting = null; assigningWorker = 0; endingSeen = endingSeen && back;
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
         HideScreen(); menu.Visible = false; ending.Visible = false; ClosePanel();
-        Notify("Joined the host's settlement. Your belongings stay yours when you leave.");
+        Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
     }
 }

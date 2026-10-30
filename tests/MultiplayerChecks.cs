@@ -12,8 +12,6 @@ using static WorldSteps;
 /// The real two-process session is covered by the network check.
 /// </summary>
 public static class MultiplayerChecks {
-    private const int GuestId = 7;
-
     public static void Run(GameData data) {
         CheckGuestActsThroughCommands(data);
         CheckGuestCopyForwardsActions(data);
@@ -71,14 +69,6 @@ public static class MultiplayerChecks {
         world.Run(guest, new Command(Verb.SkipMorning, 0, 0, "", 0, default));
         Require(world.S.Time > time && guest.RespawnIn == 0 && world.S.RespawnIn == 0,
             "a downed guest should be able to skip when the host is down too, in that guest's action context");
-    }
-
-    private static (World World, PlayerState Guest, List<string> Heard) Hosted(GameData data) {
-        var world = new World(data, false);
-        var heard = new List<string>();
-        world.Relay = (to, message) => { if (to == null || to.Id == GuestId) heard.Add(message); };
-        var guest = world.AddGuest(GuestId, null);
-        return (world, guest, heard);
     }
 
     private static void CheckGuestActsThroughCommands(GameData data) {

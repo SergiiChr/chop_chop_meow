@@ -52,7 +52,7 @@ public partial class Game {
         }
         side.AddChild(new Control { SizeFlagsVertical = Control.SizeFlags.ExpandFill });
         hostButton = MenuButton("Host", Style.Sage, HostGame); hostButton.Name = "host"; side.AddChild(hostButton);
-        joinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); world.NewGame(); ShowStart(); } else ShowJoin(BackToPause, true); }); joinButton.Name = "join_game"; side.AddChild(joinButton);
+        joinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); DropWorld(); ShowStart(); } else ShowJoin(BackToPause, true); }); joinButton.Name = "join_game"; side.AddChild(joinButton);
         netLine = Style.Text("", 13, Style.Beige); netLine.HorizontalAlignment = HorizontalAlignment.Center; netLine.AutowrapMode = TextServer.AutowrapMode.WordSmart; side.AddChild(netLine);
     }
 

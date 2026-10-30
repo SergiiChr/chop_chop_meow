@@ -30,6 +30,9 @@ public partial class Net : Node {
     private const int TimeoutLimit = 64, TimeoutMinMsec = 15000, TimeoutMaxMsec = 45000;
     /// <summary>Joining gives up on a host that never answers after this long, instead of waiting out the full timeout.</summary>
     private const float ConnectTimeout = 10;
+    /// <summary>The pause between a dropped guest's tries to get back in.</summary>
+    private const float RetrySeconds = 2;
+    public const string LostLine = "Lost the connection to the host.";
     private const float SnapshotInterval = .1f, InputInterval = .05f;
     private const int HostId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
@@ -50,15 +53,24 @@ public partial class Net : Node {
     public World World = null!;
     /// <summary>Put in front of the guest save file names, so checks never touch a player's saves.</summary>
     public string FilePrefix = "";
+    /// <summary>Seconds a dropped guest keeps trying to get back in; the network check shortens it to see a guest give up.</summary>
+    public float ReconnectLimit = 120;
     public event Action<string>? Said;
     public event Action<string, Vector2>? Heard;
     public event Action<int, ActorAction, Vector2>? Acted;
-    public event Action? Joined;
+    public event Action<bool>? Joined;
+    /// <summary>A joined game's line dropped and the guest has started trying to get back in.</summary>
+    public event Action? Disconnected;
+    /// <summary>Whole seconds left of trying to get back in, raised as they change.</summary>
+    public event Action<int>? Reconnecting;
     /// <summary>A joined game ended; the reason says why.</summary>
     public event Action<string>? Left;
     public event Action<string>? Failed;
 
-    private string address = "";
+    private int port;
+    // Guest: time left to get back in after a drop, the pause before the next try and the seconds last shown.
+    private float reconnectLeft, retryIn;
+    private int shownLeft;
     private bool welcomed, leaving, unsaved;
     private float sendClock, saveClock;
     private string? farewell;
@@ -92,6 +104,7 @@ public partial class Net : Node {
     /// <summary>Kept apart from IsServer, which errors once a lost connection has closed the peer.</summary>
     public bool Hosting { get; private set; }
     public bool Connecting => Online && !Hosting && !welcomed;
+    public bool Retrying => reconnectLeft > 0;
     /// <summary>The host's address as typed, set once joined, for the popup to offer next time.</summary>
     public string Address { get; private set; } = "";
     public int Guests => Hosting ? World.S.Players.Count - 1 : 0;
@@ -102,7 +115,7 @@ public partial class Net : Node {
         Multiplayer.PeerDisconnected += id => { if (Hosting) Forget((int)id); };
         Multiplayer.ConnectedToServer += () => { connectTimer = null; RpcId(HostId, MethodName.Hello, Protocol, LoadGuest()); };
         Multiplayer.ConnectionFailed += () => Fail("Could not reach the host.");
-        Multiplayer.ServerDisconnected += () => End("Lost the connection to the host.");
+        Multiplayer.ServerDisconnected += Dropped;
         Multiplayer.PeerConnected += id => { if (Hosting && Multiplayer.MultiplayerPeer is ENetMultiplayerPeer enet) TolerateLag(enet.GetPeer((int)id)); };
     }
 
@@ -120,13 +133,13 @@ public partial class Net : Node {
     }
 
     public Error Join(string ip, int port = DefaultPort) {
-        Leave();
+        Disconnect();
         var peer = new ENetMultiplayerPeer();
         var error = peer.CreateClient(ip, port);
         if (error != Error.Ok) return error;
         if (peer.GetPeer(HostId) is { } host) TolerateLag(host);
         Multiplayer.MultiplayerPeer = peer;
-        address = $"{ip}:{port}"; Address = ip;
+        Address = ip; this.port = port;
         // The connect attempt itself would wait out the whole lag timeout; a host that never answers fails sooner.
         var timer = GetTree().CreateTimer(ConnectTimeout); connectTimer = timer;
         timer.Timeout += () => { if (timer == connectTimer && Connecting) Fail($"The host didn't answer within {ConnectTimeout:0} seconds."); };
@@ -135,6 +148,12 @@ public partial class Net : Node {
 
     /// <summary>Ends hosting or a joined game; a guest saves its player first, as the host has it when the line still works.</summary>
     public void Leave() {
+        reconnectLeft = 0;
+        Disconnect();
+    }
+
+    /// <summary>Closes the line and clears what belonged to it, keeping any tries to get back in going.</summary>
+    private void Disconnect() {
         if (leaving) return;
         leaving = true;
         if (welcomed && Multiplayer.MultiplayerPeer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Connected) {
@@ -160,13 +179,34 @@ public partial class Net : Node {
         walks.Remove(id); acked.Remove(id); heard.Remove(id); World.RemoveGuest(id);
     }
 
-    private void Fail(string reason) { Leave(); Failed?.Invoke(reason); }
+    private void Fail(string reason) { Disconnect(); Failed?.Invoke(reason); }
 
     private void End(string reason) { Leave(); Left?.Invoke(reason); }
 
+    /// <summary>The line to the host closed: a guest that was in the game tries to get back in on its own.</summary>
+    private void Dropped() {
+        // The farewell's wait polls the line, so a drop can arrive inside Disconnect, which finishes on its own.
+        if (leaving) return;
+        if (Retrying) Disconnect();
+        else if (!welcomed) End(LostLine);
+        else {
+            Disconnect();
+            reconnectLeft = ReconnectLimit; retryIn = RetrySeconds; shownLeft = 0;
+            Disconnected?.Invoke();
+        }
+    }
+
+    private void Retry(float dt) {
+        reconnectLeft -= dt;
+        if (reconnectLeft <= 0) { End(LostLine); return; }
+        int left = (int)MathF.Ceiling(reconnectLeft);
+        if (left != shownLeft) { shownLeft = left; Reconnecting?.Invoke(left); }
+        if (!Online && (retryIn -= dt) <= 0) { retryIn = RetrySeconds; Join(Address, port); }
+    }
+
     // ---------- Joining ----------
 
-    private string GuestPath => $"user://{FilePrefix}guest-{string.Concat(address.Select(c => char.IsLetterOrDigit(c) ? c : '-'))}.json";
+    private string GuestPath => $"user://{FilePrefix}guest-{string.Concat($"{Address}:{port}".Select(c => char.IsLetterOrDigit(c) ? c : '-'))}.json";
 
     /// <summary>The player this machine saved for the host it joins, or empty.</summary>
     private string LoadGuest() => Godot.FileAccess.FileExists(GuestPath) ? Godot.FileAccess.GetFileAsString(GuestPath) : "";
@@ -193,7 +233,9 @@ public partial class Net : Node {
     }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Refused(string reason) => Fail(reason);
+    private void Refused(string reason) {
+        if (Retrying) End(reason); else Fail(reason);
+    }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void Welcome(int id, int update, byte[] packed, byte[] fog) {
@@ -205,7 +247,9 @@ public partial class Net : Node {
         welcomed = true;
         Take(update, 0, packed);
         World.Host = Send;
-        Joined?.Invoke();
+        bool back = Retrying;
+        reconnectLeft = 0;
+        Joined?.Invoke(back);
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -221,6 +265,7 @@ public partial class Net : Node {
     // ---------- Running ----------
 
     public override void _Process(double delta) {
+        if (Retrying) Retry((float)delta);
         if (!Online) return;
         float dt = Math.Min((float)delta, .1f);
         foreach (var (owner, goal) in goals) Place(owner, Glide(Position(owner), goal, dt));

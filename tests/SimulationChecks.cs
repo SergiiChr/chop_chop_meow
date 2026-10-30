@@ -1456,7 +1456,8 @@ public static class SimulationChecks {
         Require(world.Add(ThingKind.Chest, origin + new Vector2(0, 8)).Inventory.Slots == 5, "a chest should hold a third of a pile, 5 stacks");
         Require(world.Snap(ThingKind.Pile, origin + new Vector2(3.4f, .4f)) == origin + new Vector2(3, 0) && world.Snap(ThingKind.Pile, origin + new Vector2(9, 0)) == origin + new Vector2(9, 0),
                 "a pile placed beside another should snap edge to edge, and one far away should not");
-        var east = world.Build(ThingKind.Pile, origin + new Vector2(3.3f, 0)) ?? throw new InvalidOperationException("a pile beside another should build");
+        var east = world.Build(ThingKind.Pile, origin + new Vector2(3.3f, 0));
+        Require(east != null, "a pile beside another should build");
         Require(world.PlacementBlock(ThingKind.Pile, origin + new Vector2(2, 0)) != null && east.Pos == origin + new Vector2(3, 0), "piles must not overlap but may touch");
         Require(world.CanStand(origin), "a pile should be walkable");
 
@@ -1552,9 +1553,11 @@ public static class SimulationChecks {
         var origin = new Vector2(20, 20);
         world.Player = origin + new Vector2(1.5f, 2.5f);
         world.S.Backpack.Add("wood", 16); world.S.Backpack.Add("wheat_seeds", 1); world.S.Backpack.Add("fertilizer", 1);
-        var compost = world.Build(ThingKind.Pile, origin) ?? throw new InvalidOperationException("a pile should build on open ground");
+        var compost = world.Build(ThingKind.Pile, origin);
+        Require(compost != null, "a pile should build on open ground");
         world.SetCompost(compost, true);
-        var farm = world.Build(ThingKind.Farm, origin + new Vector2(3.4f, .3f)) ?? throw new InvalidOperationException("a farm plot should build beside a pile");
+        var farm = world.Build(ThingKind.Farm, origin + new Vector2(3.4f, .3f));
+        Require(farm != null, "a farm plot should build beside a pile");
         Require(farm.Pos == origin + new Vector2(3, 0), "a farm plot should snap edge to edge with a pile");
         Require(world.CanStand(farm.Pos) && !world.Holds(farm, "stone") && world.GatherBlock(farm) != null, "a plot is walkable, takes only farm goods, and has nothing to harvest before sowing");
 

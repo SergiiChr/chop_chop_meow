@@ -44,10 +44,21 @@ public partial class Game {
         await Until(() => Guest().Sheltered == hut.Id, "the guest walking into the cabin with one click");
         await Until(() => world.S.Players.Count == 1, "the guest leaving");
         await Until(() => world.S.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest coming back with its coal");
+        // The guest's line drops with the host, and it returns once the same port opens again.
+        await Signaled("joined");
+        net.Leave();
+        await KeyStroke(Key.Escape); await Click(hostButton);
+        await Until(() => world.S.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest reconnecting by itself with its coal", 90);
         await Until(() => world.S.Players.Count == 1, "the guest leaving again");
         await Until(() => world.S.Players.Count == 2, "the guest coming back with a broken save");
         Require(Guest().Backpack.Count == 0 && Guest().Pos == Terrain.Spawn, "A broken guest save must bring the guest in with an empty backpack at the clearing.");
-        await Until(() => world.S.Players.Count == 1, "the guest leaving for good");
+        // The host drops out again while the guest stops trying, joins by hand, and drops for good when this check ends.
+        await Signaled("joined");
+        net.Leave();
+        await Signaled("stopped");
+        await KeyStroke(Key.Escape); await Click(hostButton);
+        await Until(() => world.S.Players.Count == 2, "the guest joining by hand after it stopped trying", 90);
+        await Signaled("joined");
     }
 
     private async Task GuestNetCheck() {
@@ -76,16 +87,24 @@ public partial class Game {
         await LeaveGame();
         await JoinFromStart();
         Require(world.S.Backpack["coal"] == 2, "A guest must come back with what it carried when it left.");
+        Signal("joined");
+        await Until(() => backdrop.Visible && HasLabel(screen, "RECONNECTING"), "a dropped guest being told it is reconnecting", 60);
+        await Until(() => world.Remote && !backdrop.Visible, "a dropped guest getting back in by itself", 90);
+        Require(world.S.Backpack["coal"] == 2, "A guest must reconnect with what it carried when the line dropped.");
         await LeaveGame();
         using (var file = Godot.FileAccess.Open(GuestSave, Godot.FileAccess.ModeFlags.Write)) file.StoreString("{ broken");
         await JoinFromStart();
         Require(world.S.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A broken save must bring the guest in with an empty backpack at the clearing.");
-        await LeaveGame();
+        Signal("joined");
+        await Until(() => backdrop.Visible && HasLabel(screen, "RECONNECTING"), "the guest being told it is reconnecting again", 60);
+        await Click(FindButton(screen, "Stop · Esc")!);
+        Require(!net.Retrying && FindButton(screen, "Join game") != null, "Stopping must end the tries and return to the start menu.");
+        Signal("stopped");
+        net.ReconnectLimit = 3;
+        await JoinFromStart();
+        Signal("joined");
+        await Until(() => backdrop.Visible && HasLabel(screen, "Lost the connection to the host") && FindButton(screen, "Join game") != null, "a guest giving up on a host that stays gone and saying why", 90);
+        Require(!net.Retrying && !world.Remote, "A guest that gave up must stop trying.");
     }
-
-    /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
-    private static int CheckPort => LaunchValue("--port") is string port ? int.Parse(port) : Net.DefaultPort;
-
-    private static string GuestSave => $"user://{FilePrefix}guest-127-0-0-1-{CheckPort}.json";
 
 }

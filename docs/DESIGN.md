@@ -148,6 +148,7 @@ The welcome is a guest's first update, with the fog uncovered so far.
 - Guests merge entries into their copy in place, so panels and the view keep their objects.
 - Each action carries where the guest stood, so the host checks reach from there rather than from a position still gliding in.
 - Leaving asks the host for the guest's player before the line closes.
+- A guest whose line drops saves its player from its copy, then `Net.Retry` joins the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, so the host may hold the old player until its side of the line times out.
 
 Factorio instead runs the same deterministic simulation on every machine and sends only inputs (lockstep).
 This simulation uses floats and frame-length steps, so it is not deterministic, and with hundreds of objects the deltas stay small.
