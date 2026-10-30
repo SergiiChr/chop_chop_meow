@@ -9,7 +9,22 @@ namespace ChopChopMeow;
 /// <summary>Starts and leaves games for the UI and network checks.</summary>
 public partial class Game {
     private static void RemoveCheckFiles() {
-        foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
+        var signals = new[] { "joined", "stopped" }.Select(SignalPath);
+        foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath).Concat(signals)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
+    }
+
+    private static string SignalPath(string name) => $"user://{FilePrefix}signal-{name}";
+
+    /// <summary>Tells the other network check process that this one reached a point, for the times the game itself cannot carry the news.</summary>
+    private static void Signal(string name) {
+        using var file = Godot.FileAccess.Open(SignalPath(name), Godot.FileAccess.ModeFlags.Write);
+        file.StoreString(name);
+    }
+
+    /// <summary>Waits for the other network check process to reach a point, and clears the signal so it can be sent again.</summary>
+    private async Task Signaled(string name) {
+        await Until(() => Godot.FileAccess.FileExists(SignalPath(name)), $"the other process signalling {name}", 90);
+        DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SignalPath(name)));
     }
 
     private async Task SurvivalReviewShot(string name) {
