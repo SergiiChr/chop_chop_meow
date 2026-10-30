@@ -144,11 +144,18 @@ public static class WorldModels {
     public const uint MarkLayer = 1 << 12;
 
     /// <summary>
-    /// Builds the shared meshes, outfit palettes and shaders of models that first appear mid-game while the world loads.
-    /// A trade cart with its courier, a wolf, a dropped backpack and fresh leaf patches then only add nodes over cached resources.
+    /// Builds one model of every kind in each of its looks, a mine at every ore and a wolf while the world loads, so their meshes, materials, shaders and faded copies are made.
+    /// A building, crate, carcass, dropped backpack or wolf that first appears mid-game then only adds nodes over cached resources.
     /// </summary>
     public static void Warm() {
-        foreach (var root in new[] { new CartModel().Root, new WolfModel().Root }) { ModelKit.BuildShaders(root); root.Free(); }
+        foreach (var kind in Kinds.All) {
+            if (kind == ThingKind.Mine) continue;
+            int looks = kind == ThingKind.Tree ? TreeVariants * NatureShape.Variants : NatureShape.Variants;
+            for (int id = 0; id < looks; id++) Discard(Build(new Thing { Id = id, Kind = kind }).Root);
+        }
+        foreach (var ore in World.MineOres) Discard(Build(new Thing { Kind = ThingKind.Mine, Pos = World.MineSpot(World.CliffOf(ore)) }).Root);
+        Discard(new WolfModel().Root);
+        static void Discard(Node3D root) { ModelKit.BuildShaders(root); root.Free(); }
         _ = BackpackShape.Details; _ = BackpackShape.Flap;
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
         scorchTexture ??= ScorchTexture();
@@ -1016,6 +1023,8 @@ public static class WorldModels {
         private readonly Node3D[] wheels = new Node3D[2];
         public float Distance, Yaw;
         public Vector2 Last;
+        /// <summary>The meshes and their own materials, whose faded copies are made with the cart, for fading it as it leaves view.</summary>
+        public readonly (MeshInstance3D Mesh, Material Material)[] Parts;
 
         public CartModel() {
             Root.AddChild(Courier.Root);
@@ -1039,6 +1048,8 @@ public static class WorldModels {
             }
             Cash = Pivot(cart, new Vector3(0, .4f, 0));
             Add(Cash, CartShape.Payment, CartShape.Steel, Vector3.Zero);
+            Parts = FadeParts(Root);
+            BuildShaders(Root);
         }
 
         /// <summary>Shows exactly <paramref name="crates"/> crates, or loose goods, or the cash box.</summary>
