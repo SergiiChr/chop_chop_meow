@@ -82,6 +82,7 @@ UI and input:
 | `src/CratePanel.cs` | A placed crate |
 | `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
+| `src/StoragePanel.cs` | A chest or other plain storage |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |

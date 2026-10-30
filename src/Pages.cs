@@ -83,7 +83,16 @@ public partial class PagePanel {
         if (t.Kind == ThingKind.Farm) { AddChild(new FarmPanel(panel, t)); return; }
         if (t.Kind == ThingKind.Campfire) { AddChild(new CampfirePanel(panel, t)); return; }
         if (t.Kind == ThingKind.Packer) { AddChild(new PackerPanel(panel, t)); return; }
-        if (t.IsStorage) { Storage(t); return; }
+        if (t.IsStorage) {
+            AddChild(t.Kind switch {
+                ThingKind.Crate => new CratePanel(panel, t),
+                ThingKind.Grave => new RecoveryBoxPanel(panel, t),
+                ThingKind.Toolstation => new ToolRackPanel(panel, t),
+                ThingKind.Pile => new PilePanel(panel, t),
+                _ => new StoragePanel(panel, t)
+            });
+            return;
+        }
         AddChild(new StationPanel(panel, t));
     }
     /// <summary>How far away a building is, shown only while it is out of reach.</summary>
@@ -100,18 +109,6 @@ public partial class PagePanel {
             label.Visible = tenths >= 0;
             if (tenths >= 0) { text.Clear().Append(tenths / 10).Append('.').Append(tenths % 10).Append(" tiles away · walk closer"); text.Show(); }
         });
-    }
-    protected void Storage(Thing t) {
-        switch (t.Kind) {
-            case ThingKind.Crate: AddChild(new CratePanel(panel, t)); return;
-            case ThingKind.Grave: AddChild(new RecoveryBoxPanel(panel, t)); return;
-            case ThingKind.Toolstation: AddChild(new ToolRackPanel(panel, t)); return;
-            case ThingKind.Pile: AddChild(new PilePanel(panel, t)); return;
-        }
-        HeaderAction("stash", "Store all materials · keeps tools", () => StoreAll(t), Style.ActionRound, "deposit");
-        if (t.Kind == ThingKind.Chest) FilterButton(t);
-        Well(new VBoxContainer()).AddChild(StorageGrid(t));
-        BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
     }
     /// <summary>A storage's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
     protected GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) {
