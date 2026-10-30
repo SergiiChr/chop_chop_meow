@@ -94,10 +94,10 @@ public static class ProductionChainChecks {
         Require(world.DepositFor(crate, chest.Pos) == chest && world.DepositFor(crate, sign.Pos) == sign, "between storage asking for the same crates, the nearer one should win");
 
         world.SetAutoSell(sign, true);
-        world.S.Backpack.TransferTo(sign.Inventory, crate, 1);
+        world.Transfer(world.Backpack, sign.Inventory, crate, 1);
         SafeTick(world, 1);
         Require(world.Orders.Count == 0, "the cart should wait while market slots are still free");
-        for (int i = 1; i < World.MarketSlots; i++) world.S.Backpack.TransferTo(sign.Inventory, PackCrate(world, ("berries", 12)), 1);
+        for (int i = 1; i < World.MarketSlots; i++) world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("berries", 12)), 1);
         SafeTick(world, 1);
         Require(world.Orders.Count == 1 && world.Orders[0].Crates == World.MarketSlots && sign.Inventory.Count == 0, "a full post set to sell on its own should send the cart");
     }

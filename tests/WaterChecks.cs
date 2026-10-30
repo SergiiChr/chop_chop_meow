@@ -3,6 +3,7 @@ using ChopChopMeow;
 using Godot;
 using System.Linq;
 using static Checks;
+using static SetupSteps;
 using static WorkerSteps;
 
 namespace ChopChopMeow.Tests;
@@ -25,7 +26,7 @@ public static class WaterChecks {
             var world = new World(data, false);
             var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
             world.SetRecipe(table, "dough");
-            world.S.Backpack.Add(item, 1); world.S.Backpack.Add("flour", 1);
+            Give(world, item, 1); Give(world, "flour", 1);
             string message = ""; world.Notify = text => message = text;
             Require(world.LoadInput(table, item, 1) == 0 && message == Water.FullBottleWarning,
                 "partial/empty bottle input clicks must give the full-bottle warning");
@@ -38,7 +39,7 @@ public static class WaterChecks {
             var chest = world.Add(ThingKind.Chest, world.Player + Vector2.Left);
             Require(world.Transfer(world.Backpack, chest.Inventory, item, 1) == 1,
                 "non-full bottles must remain transferable to ordinary storage");
-            world.S.Backpack.Add("water", 1);
+            Give(world, "water", 1);
             Require(world.LoadInput(table, "water", 1) == 1, "a full bottle must load normally");
         }
     }
@@ -56,8 +57,8 @@ public static class WaterChecks {
 
     private static void CheckBottleGivesThreeSips(GameData data) {
         var world = new World(data, false);
-        world.S.Thirst = 0;
-        Require(world.S.Backpack.Add("water", 1) == 1, "a filled bottle should fit");
+        SetNeeds(world, thirst: 0);
+        Require(Give(world, "water", 1) == 1, "a filled bottle should fit");
         Require(Water.SipBottle(world, "water"), "first sip should be consumed");
         Require(world.Carried("water_2") == 1 && world.Thirst > 33.32f && world.Thirst < 33.34f, "first sip should leave two sips and restore one third thirst");
         Require(Water.SipBottle(world, "water_2") && world.Carried("water_1") == 1, "second sip should leave one sip");
@@ -71,26 +72,26 @@ public static class WaterChecks {
         var world = new World(data, false);
         var lake = new Thing { Kind = ThingKind.Water };
         world.Backpack.Slots = 1;
-        world.S.Backpack.Add("empty_bottle", 1);
+        Give(world, "empty_bottle", 1);
         Require(Water.CollectWater(world, lake) == WaterCollectResult.RefilledBottle, "gathering with an empty bottle should refill it");
         Require(world.Carried("water") == 1 && world.Backpack.Count == 1 && world.Backpack.UsedSlots == 1, "refilling should reuse its slot without creating bottles");
         Require(Water.CollectWater(world, lake) == WaterCollectResult.NoChange, "a full bottle should not refill into an extra bottle");
 
         var priority = new World(data, false);
-        priority.S.Backpack.Add("water_1", 1);
-        priority.S.Backpack.Add("empty_bottle", 1);
+        Give(priority, "water_1", 1);
+        Give(priority, "empty_bottle", 1);
         Water.CollectWater(priority, lake);
         Require(priority.Carried("water") == 1 && priority.Carried("water_1") == 1 && priority.Carried("empty_bottle") == 0, "an empty bottle should refill before a partial bottle");
 
-        world.S.Backpack.Remove("water", 1);
-        world.S.Thirst = 25;
+        Drop(world, "water", 1);
+        SetNeeds(world, thirst: 25);
         Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceSip, "gathering without a bottle should drink directly from the source");
         Require(world.Thirst > 58.32f && world.Thirst < 58.34f && world.Backpack.Count == 0, "a direct source sip should restore exactly one third thirst without creating a bottle");
     }
 
     private static void CheckBottleKeepsPartialStateAcrossSave(GameData data) {
         var world = new World(data, false);
-        world.S.Backpack.Add("water_2", 1);
+        Give(world, "water_2", 1);
         var loaded = new World(data, false);
         loaded.Deserialize(world.Serialize());
         Require(loaded.Carried("water_2") == 1 && loaded.Carried("water") == 0, "save and load should preserve the bottle's partial state");
@@ -139,7 +140,7 @@ public static class WaterChecks {
         var old = new World(data, false);
         Inventory.Unstacked.Remove("water");
         string saved;
-        try { old.S.Backpack.Add("water", 64); old.S.Backpack.Add("wood", 1); saved = old.Serialize(); } finally { Inventory.Unstacked.Add("water"); }
+        try { Give(old, "water", 64); Give(old, "wood", 1); saved = old.Serialize(); } finally { Inventory.Unstacked.Add("water"); }
         var loaded = new World(data, false); loaded.Deserialize(saved);
         int preserved = loaded.Carried("water") + loaded.Things.Where(t => t.Kind == ThingKind.Grave).Sum(t => t.Inventory["water"]);
         Require(preserved == 64 && loaded.Backpack.UsedSlots <= 24 && loaded.Carried("wood") == 1,

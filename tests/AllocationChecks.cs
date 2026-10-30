@@ -4,6 +4,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static SetupSteps;
 using static WorldSteps;
 
 /// <summary>
@@ -55,7 +56,7 @@ public static class AllocationChecks {
         Require(mine.Workers.All(w => w.WorkState == WorkerWorkState.Underground), "the mine crew should be underground");
 
         var night = new World(data);
-        night.S.Time = data.DaySeconds * (data.NightStarts + .05f);
+        RunUntilPhase(night, data.NightStarts + .05f);
         // Long enough for the pack to gather around the player; the player is kept on their feet so the hunt never ends.
         Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }, warmup: 3600);
     }

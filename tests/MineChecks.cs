@@ -4,6 +4,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static SetupSteps;
 using static WorldSteps;
 using static PlayerSteps;
 using static WorkerSteps;
@@ -45,9 +46,9 @@ public static class MineChecks {
         }
         world.S.Version = 4;
         var loaded = FundedWorld(data); loaded.Deserialize(world.Serialize());
-        Require(loaded.S.Version == 5, "version 4 valley saves must upgrade to the current mine layout");
+        Require(loaded.SaveVersion == 5, "version 4 valley saves must upgrade to the current mine layout");
         foreach (var mine in loaded.Things.Where(t => t.Kind == ThingKind.Mine)) {
-            Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
+            Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.Remembered(mine.Id)!.Pos.IsEqualApprox(mine.Pos),
                 "saved mines and their fog memories must use the aligned site");
             Require(mine.MineStage == MineStage.Open, "aligning an older mine must preserve its construction stage");
             Require(mine.Progress == 2, "aligning an older mine must preserve its construction progress");
@@ -116,7 +117,7 @@ public static class MineChecks {
         var other = MarkMine(world, ThingKind.Coal);
         other.MineStage = MineStage.Dug;
         world.Player = other.Pos + Vector2.One;
-        world.S.Backpack.Add("wood", 60); world.S.Backpack.Add("stone", 10);
+        Give(world, "wood", 60); Give(world, "stone", 10);
         world.SupplyMine(other);
         Require(other.Inventory["wood"] == data.Mine.Materials["wood"] && other.Inventory["stone"] == 10 && world.Carried("wood") == 10, "delivering from the backpack must hand over only what the mine still needs");
     }
@@ -148,7 +149,7 @@ public static class MineChecks {
         Require(mine.Output["iron_ore"] > 0, "mining must resume once the full stack is out");
 
         // Without storage for it, the output stays put and the corner message shows once.
-        world.S.Things.Remove(chest);
+        RemoveThings(world, t => t == chest);
         var said = new List<string>();
         world.Notify = said.Add;
         mine.Output.Add("stone", mine.Output.StackSize - mine.Output["stone"]);
@@ -213,22 +214,22 @@ public static class MineChecks {
         var worker = AddWorker(world, new Vector2(30, 30));
         worker.Wage = 26;
         var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
-        world.S.Backpack.TransferTo(sign.Inventory, PackCrate(world, ("berries", 12)), 1);
+        world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("berries", 12)), 1);
         Require(world.Sell(sign), "a crate of berries should go to the village");
         Work(world, data.TradeSeconds + .5f);
         int revenue = sign.Wages![Inventory.Coins] + sign.Output![Inventory.Coins];
         Require(revenue > 0 && world.DayRevenue == revenue, "coins from a returned sale must count as the day's revenue");
 
-        void NextDawn() { world.S.Time = world.Day * data.DaySeconds - .1f; world.S.Hunger = world.S.Thirst = 100; world.Tick(.2f, true); }
+        void NextDawn() => RunUntilDawn(world);
         NextDawn();
         Require(world.Profits.SequenceEqual(new[] { revenue - 26 }) && world.DayRevenue == 0, "a day's profit must be its sales minus the wages charged at dawn");
 
         int goal = data.Goals.DailyProfit;
-        for (int day = 0; day < data.Goals.ProfitDays - 1; day++) { world.S.DayRevenue = goal + 26; NextDawn(); }
+        for (int day = 0; day < data.Goals.ProfitDays - 1; day++) { SetDayRevenue(world, goal + 26); NextDawn(); }
         Require(world.ProfitStreak == data.Goals.ProfitDays - 1 && !world.ProfitGoalMet, "a streak one day short must not meet the profit goal");
-        world.S.DayRevenue = goal + 25; NextDawn();
+        SetDayRevenue(world, goal + 25); NextDawn();
         Require(world.ProfitStreak == 0, "a day below the target must break the streak");
-        for (int day = 0; day < data.Goals.ProfitDays; day++) { world.S.DayRevenue = goal + 26; NextDawn(); }
+        for (int day = 0; day < data.Goals.ProfitDays; day++) { SetDayRevenue(world, goal + 26); NextDawn(); }
         Require(world.ProfitGoalMet, "enough days in a row at the target must meet the profit goal");
         NextDawn();
         Require(world.ProfitGoalMet && world.ProfitStreak == 0, "the profit goal must stay met after a later slow day");

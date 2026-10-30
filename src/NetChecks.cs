@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static SetupSteps;
 
 namespace ChopChopMeow;
 
@@ -23,7 +24,7 @@ public partial class Game {
     private async Task HostNetCheck() {
         RemoveCheckFiles(); await Frames(4);
         await Click(FindButton(screen, "New game")!); await CloseWithEsc();
-        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
+        RemoveThings(world, t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
         world.Add(ThingKind.LooseCoal, NetOre, 2); world.Add(ThingKind.LooseCoal, NetCoal, 2);
         var chest = world.Add(ThingKind.Chest, NetChest); var hut = world.Add(ThingKind.Hut, NetHut);
         await KeyStroke(Key.Escape);

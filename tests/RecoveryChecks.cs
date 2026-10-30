@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using Godot;
 using ChopChopMeow;
 using static Checks;
+using static SetupSteps;
+using static WorkerSteps;
+using static WorldSteps;
 
 /// <summary>Checks the no-cabin recovery path and its world-time effects.</summary>
 public static class RecoveryChecks {
@@ -13,29 +16,28 @@ public static class RecoveryChecks {
 
     private static void CheckSkipToMorningNeedsNoCabinAndNoOtherLivingPlayer(GameData data) {
         var world = new World(data, false);
-        world.S.RespawnIn = 20;
+        world.Die();
         Require(world.CanSkipMorning, "a downed player without a cabin should be able to skip to morning");
         world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(40, 0));
         Require(!world.CanSkipMorning, "a cabin anywhere in the world should block the no-shelter skip");
 
-        world.S.Things.RemoveAll(t => t.Kind == ThingKind.Hut);
-        world.S.Players.Add(new PlayerState { Id = 2, RespawnIn = 0 });
+        RemoveThings(world, t => t.Kind == ThingKind.Hut);
+        var other = world.AddGuest(2, null);
         Require(!world.CanSkipMorning, "another living player should prevent skipping the shared night");
-        world.Players[1].RespawnIn = 20;
+        other.RespawnIn = 20;
         Require(world.CanSkipMorning, "the skip should be available once every other player is downed");
     }
 
     private static void CheckSkipAdvancesWorld(GameData data) {
         var world = new World(data, false);
-        world.S.Time = data.DaySeconds * (data.NightStarts + .01f);
-        world.S.WageDay = world.Day;
+        RunUntilPhase(world, data.NightStarts + .01f);
         float timeToDawn = data.DaySeconds - world.Time % data.DaySeconds + 1;
-        world.S.RespawnIn = timeToDawn / 2;
-        world.S.Hunger = 90; world.S.Thirst = 90;
+        SetRespawn(world, timeToDawn / 2);
+        SetNeeds(world, 90, 90);
         var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(4, 0));
-        var worker = new Worker { Id = world.S.NextId++, Name = "Mara", Wage = 5, X = sign.Pos.X, Y = sign.Pos.Y };
-        world.S.Workers.Add(worker);
-        world.S.Orders.Add(new TradeOrder {
+        var worker = AddWorker(world, sign.Pos);
+        worker.Wage = 5;
+        PlaceOrder(world, new TradeOrder {
             Goods = new Dictionary<string, int> { ["berries"] = 1 },
             Value = 20,
             Signpost = sign.Id,

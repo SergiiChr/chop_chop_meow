@@ -32,7 +32,7 @@ internal static class EconomySteps {
         var crates = goods.SelectMany(p => Enumerable.Range(0, (p.Value + capacity - 1) / capacity).Select(i => (p.Key, Math.Min(capacity, p.Value - i * capacity)))).ToList();
         foreach (var load in crates.Chunk(World.MarketSlots)) {
             foreach (var (item, count) in load) {
-                world.S.Backpack.TransferTo(sign.Inventory, PackCrate(world, (item, count)), 1);
+                world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, (item, count)), 1);
             }
             Require(world.Sell(sign), "the village should take a day's basket");
             Work(world, world.Data.TradeSeconds + .5f);

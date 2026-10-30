@@ -6,11 +6,6 @@ using static WorldSteps;
 
 /// <summary>What the player does by hand in the simulation checks.</summary>
 internal static class PlayerSteps {
-    public static void SetCoins(World world, int coins) {
-        world.S.Backpack.Remove(Inventory.Coins, world.Coins);
-        world.S.Backpack.Add(Inventory.Coins, coins);
-    }
-
     /// <summary>Fills a crate at the player's feet and picks it up, returning the packed crate item now in the backpack.</summary>
     public static string PackCrate(World world, params (string Item, int Count)[] goods) {
         var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));

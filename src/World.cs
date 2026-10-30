@@ -301,6 +301,9 @@ public sealed partial class World {
     public int DayRevenue => S.DayRevenue;
     public IReadOnlyList<int> Profits => S.Profits;
     public bool EndingShown => S.EndingShown;
+    public int SaveVersion => S.Version;
+    public bool Priced(string item) => S.Prices.ContainsKey(item);
+    public Thing? Remembered(int id) => S.Remembered.GetValueOrDefault(id);
     /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
     public bool Pay(int amount) => amount <= Coins && S.Backpack.Remove(Inventory.Coins, amount) == amount;
     // Where each id sits in the things list. The list is also changed directly, so every lookup checks the entry and a stale one rebuilds it.

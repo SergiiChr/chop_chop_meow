@@ -3,6 +3,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static SetupSteps;
+using static WorldSteps;
 
 namespace ChopChopMeow;
 
@@ -12,8 +14,8 @@ public partial class Game {
         string savedWorld = world.Serialize();
         try {
             await CloseWithEsc();
-            world.S.Backpack.Clear();
-            world.S.HotbarSlots[8] = "water";
+            EmptyBackpack(world);
+            SetHotbarSlot(world, 8, "water");
             await CheckHoldingRightMouseOnShoreRefillsRetainedBottle();
             await CheckHotbarDrinkTakesOneSipAndKeepsEmptyBottle();
             await CheckDragPlacesStackInExactSlotAndSortOrdersByName();
@@ -30,12 +32,12 @@ public partial class Game {
     }
     /// <summary>A real source-ring pick and a held right mouse button refill the starter bottle.</summary>
     private async Task CheckHoldingRightMouseOnShoreRefillsRetainedBottle() {
-        world.S.Things.RemoveAll(t => t.Kind == ThingKind.Water);
+        RemoveThings(world, t => t.Kind == ThingKind.Water);
         world.Add(ThingKind.Water, world.Player + Vector2.Right * 20, 9999);
-        world.S.Backpack.Remove("water", 99);
-        world.S.Backpack.Remove("water_1", 99);
-        world.S.Backpack.Remove("water_2", 99);
-        world.S.Backpack.Add("empty_bottle", 1);
+        Drop(world, "water");
+        Drop(world, "water_1");
+        Drop(world, "water_2");
+        Give(world, "empty_bottle", 1);
         var shore = Terrain.WaterPoint(world.Player);
         world.Player = shore + (shore - Terrain.Lake).Normalized() * 1.8f;
         await Frames(4);
@@ -85,7 +87,7 @@ public partial class Game {
     /// <summary>A normal click moves one unit; Ctrl-click moves the entire remaining stack.</summary>
     private async Task CheckClickMovesOneUnitAndCtrlClickMovesRemainingStack() {
         await CloseWithEsc();
-        world.S.Backpack.Add("coal", 5);
+        Give(world, "coal", 5);
         var chest = world.Add(ThingKind.Chest, world.Player + Vector2.Right);
         chest.Inventory.Add("coal", 5);
         await ClickOn(chest); await Frames(3);
@@ -107,8 +109,8 @@ public partial class Game {
     /// <summary>A recipe water slot refuses a partial bottle, by click or by drag, and shows the full-bottle warning.</summary>
     private async Task CheckPartialBottleIsRefusedByRecipeWithWarning() {
         await CloseWithEsc();
-        world.S.Backpack.Clear();
-        world.S.Backpack.Add("water_2", 1);
+        EmptyBackpack(world);
+        Give(world, "water_2", 1);
         var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
         world.SetRecipe(table, "dough");
         await ClickOn(table); await Frames(3);
@@ -127,9 +129,9 @@ public partial class Game {
     /// <summary>A downed player without a cabin may choose dawn; any cabin restores normal respawning.</summary>
     private async Task CheckSkipToMorningOnlyForDownedPlayerWithoutCabin() {
         await CloseWithEsc();
-        world.S.Things.RemoveAll(t => t.Kind == ThingKind.Hut);
-        world.S.Time = world.Data.DaySeconds * .9f;
-        world.S.RespawnIn = 30;
+        RemoveThings(world, t => t.Kind == ThingKind.Hut);
+        RunUntilPhase(world, .9f);
+        world.Die();
         await Until(() => recoveryPrompt is { Visible: true }, "a downed player's Skip to morning prompt", 2);
         Require(recoveryPrompt is { Visible: true } && skipMorningButton is { Disabled: false }, "A downed player without a cabin must see an enabled Skip to morning prompt.");
         await SurvivalReviewShot("recovery-prompt");
@@ -138,7 +140,7 @@ public partial class Game {
         Require(world.RespawnIn == 0 && world.Day > previousDay && world.Time % world.Data.DaySeconds < world.Data.DaySeconds * .1f,
             "Skipping morning must advance the simulated world to dawn and complete respawn.");
         world.Add(ThingKind.Hut, world.Player + Vector2.Right);
-        world.S.RespawnIn = 30;
+        world.Die();
         await Frames(2);
         Require(recoveryPrompt is { Visible: false }, "A downed player with a cabin must not be offered Skip to morning.");
     }

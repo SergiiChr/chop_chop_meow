@@ -3,6 +3,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static SetupSteps;
 using static WorldSteps;
 using static WorkerSteps;
 
@@ -62,7 +63,7 @@ public static class WorkerStateChecks {
         Require(worker.Duties.Count == 1, "the worker should keep one duty");
         Require(worker.Duties[0].Thing == seen.Id, "the worker's duty should be the seen tree");
         Require(unseen.Remaining == 5, "the worker should not go to a closer tree under black fog");
-        Require(world.S.Remembered.ContainsKey(seen.Id) && !world.Sees(seen.Pos), "the next tree should be one known from memory, now out of sight");
+        Require(world.Remembered(seen.Id) != null && !world.Sees(seen.Pos), "the next tree should be one known from memory, now out of sight");
 
         for (int i = 0; i < 600 && worker.Status.IndexOf("waiting at the trading post", StringComparison.Ordinal) < 0; i++) world.Tick(.1f);
         for (int i = 0; i < 100; i++) world.Tick(.1f);
@@ -97,7 +98,7 @@ public static class WorkerStateChecks {
         var bench = world.Add(ThingKind.Bench, at + new Vector2(5, 5));
         world.Assign(crafter, bench);
         world.Tick(.1f); said.Clear();
-        world.S.Things.Remove(bench); world.Tick(.1f);
+        RemoveThings(world, t => t == bench); world.Tick(.1f);
         Require(crafter.Duties.Count == 0 && said.Contains($"{crafter.Name} without a job."), "a worker whose building is removed should be left without a job and say so");
     }
 

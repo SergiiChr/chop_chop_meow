@@ -2,6 +2,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static SetupSteps;
 using static WorkerSteps;
 
 /// <summary>
@@ -42,10 +43,10 @@ internal sealed class ChainSite(World world) {
     /// </summary>
     public Thing AddSettlement(string[] products) {
         var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(10, 10));
-        world.Player = hut.Pos; world.S.Sheltered = hut.Id;
+        world.Player = hut.Pos; world.Enter(hut);
         var sign = Place(ThingKind.Signpost);
         sign.Wages!.Add(Inventory.Coins, 1000);
-        world.S.Backpack.Add(Inventory.Coins, 5000);
+        Give(world, Inventory.Coins, 5000);
         foreach (string product in products) world.SetFilter(sign, World.CrateOf(product), false, true);
         world.SetAutoSell(sign, true);
         var rack = Place(ThingKind.Toolstation);
