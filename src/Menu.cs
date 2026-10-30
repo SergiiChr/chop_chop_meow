@@ -10,20 +10,6 @@ public partial class Game {
     private Button hostButton = null!, joinButton = null!, saveButton = null!, loadButton = null!, newGameButton = null!;
     private Label netLine = null!;
 
-    /// <summary>A round enamel badge with a line icon, and a key pill when a key opens the same page.</summary>
-    private Button MenuIcon(string glyph, string tooltip, Action action, string key, Color color) {
-        var button = kit.Button("", action);
-        button.Name = glyph; button.TooltipText = key == "" ? tooltip : $"{tooltip} · {key}";
-        button.Icon = GD.Load<Texture2D>($"res://assets/ui/line_{glyph}.svg");
-        button.ExpandIcon = true; button.IconAlignment = HorizontalAlignment.Center; button.VerticalIconAlignment = VerticalAlignment.Center;
-        button.CustomMinimumSize = new Vector2(56, 56); button.AddThemeConstantOverride("icon_max_width", 28);
-        button.AddThemeColorOverride("icon_normal_color", Style.Rim); button.AddThemeColorOverride("icon_hover_color", Style.Rim); button.AddThemeColorOverride("icon_pressed_color", Style.Rim);
-        button.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        var look = Style.Round(color, 28); Style.Skin(button, look.Item1, look.Item2);
-        if (key != "") button.AddChild(Style.Corner(Style.Pill(key, Style.KeyPill, Style.Line, 10), 1, 1, 8));
-        return button;
-    }
-
     /// <summary>
     /// The pause board: the goal checklist in a well on the left, with the current goal's hint under it and the end goals below,
     /// and the game's buttons stacked on the right.

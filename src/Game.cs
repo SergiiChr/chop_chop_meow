@@ -26,6 +26,7 @@ public partial class Game : Node {
     private UiKit kit = null!;
     private SidePanel panel = null!;
     private BackpackDrawer bag = null!;
+    private Hotbar hotbar = null!;
     private EndingScreen ending = null!;
     private BlackHole blackHole = null!;
     private ItemMoves moves = null!;
@@ -103,20 +104,14 @@ public partial class Game : Node {
     private void BuildHud() {
         blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), LatestSlot, LoadSlot, ShowStart); AddChild(blackHole);
         moves = new ItemMoves(kit, blackHole);
+        panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;
+        hotbar = new Hotbar(kit, view, panel);
         clock = new ClockPlate(world); ui.AddChild(clock);
         modeLabel = new ModeLabel(kit, view); ui.AddChild(modeLabel);
-        // Menu badges and the hotbar sit on one plate centred along the bottom, like a tool belt.
-        var bottom = new PanelContainer { AnchorLeft = .5f, AnchorRight = .5f, AnchorTop = 1, AnchorBottom = 1, OffsetTop = -14, OffsetBottom = -14, GrowHorizontal = Control.GrowDirection.Both, GrowVertical = Control.GrowDirection.Begin }; ui.AddChild(bottom);
-        bottom.AddThemeStyleboxOverride("panel", Style.Plate);
-        var slots = new HBoxContainer(); slots.AddThemeConstantOverride("separation", 10); bottom.AddChild(slots);
-        slots.AddChild(MenuIcon("build", "Build", () => panel.Open("build"), "B", Style.Brick)); slots.AddChild(MenuIcon("bag", "Backpack", () => panel.Open("inventory"), "Tab", Style.Sage));
-        slots.AddChild(MenuIcon("craft", "Crafting", () => panel.Open("craft"), "C", new Color("b08a45"))); slots.AddChild(MenuIcon("crew", "Crew", () => panel.Open("workers"), "H", new Color("5f8aa6"))); slots.AddChild(MenuIcon("guide", "Field guide", () => panel.Open("help"), "I", new Color("7d6488")));
-        var divider = new ColorRect { Color = new Color(Style.Beige, .6f), CustomMinimumSize = new Vector2(3, 46), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; slots.AddChild(divider);
-        for (int i = 0; i < 9; i++) slots.AddChild(HotbarButton(i));
+        ui.AddChild(hotbar);
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
-        panel = new SidePanel(kit, view, moves, ui); ui.AddChild(panel);
-        bag = panel.Bag; ui.AddChild(bag);
+        ui.AddChild(panel); ui.AddChild(bag);
         waterWarning = new WaterWarning(bag); ui.AddChild(waterWarning);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
@@ -133,7 +128,7 @@ public partial class Game : Node {
         if (needsPlate == null) return;
         clock.Refresh(); deathLabel.Refresh(); modeLabel.Refresh();
         panel.Refresh();
-        RefreshHotbar(); needsPlate.Refresh(); bag.Refresh();
+        hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
     }
     private bool CanPlaceAgain() => view.BuildMode == ThingKind.Crate ? world.S.Backpack[state.PlacingCrate] > 0 : view.BuildMode is ThingKind kind && world.S.Backpack.Has(world.Data.Buildings[kind].Cost);
     private void Restart() {
@@ -179,7 +174,7 @@ public partial class Game : Node {
                 // Until a numbered slot is chosen, quick save and load ask which slot to use.
                 case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (slot > 0) Save(slot); else ShowSlots(true, HideScreen); break;
                 case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (slot > 0) Load(slot); else ShowSlots(false, HideScreen); break;
-                case >= Key.Key1 and <= Key.Key9: SelectHotbar((int)(key.PhysicalKeycode - Key.Key1)); break;
+                case >= Key.Key1 and <= Key.Key9: hotbar.Select((int)(key.PhysicalKeycode - Key.Key1)); break;
                 case Key.E:
                     var t = world.Find(state.Selected);
                     if (t == null || !world.Near(t)) t = world.S.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
@@ -224,11 +219,11 @@ public partial class Game : Node {
                 else if (t != null) {
                     if (t.Kind == ThingKind.Hut) state.Entering = t;
                     // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
-                    if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item) && !(t.Kind == ThingKind.Crate && World.IsCrate(item))) {
+                    if (t.IsStorage && hotbar.ActiveItem() is string item && hotbar.IsTransferable(item) && world.Holds(t, item) && !(t.Kind == ThingKind.Crate && World.IsCrate(item))) {
                         if (world.Near(t)) { int moved = 0; kit.Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, ItemMoves.All ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the state.Selected stack.");
                     }
                     panel.Select(t);
-                } else if (ActiveHotbarItem() is string held && HasUse(held)) UseHeld(view.ToWorld(mouse.Position));
+                } else if (hotbar.ActiveItem() is string held && hotbar.HasUse(held)) hotbar.UseHeld(view.ToWorld(mouse.Position));
                 else panel.Close();
             }
         }
@@ -283,7 +278,7 @@ public partial class Game : Node {
             world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.S.Hunger >= GameData.LowNeed && world.S.Thirst >= GameData.LowNeed;
             world.MovePlayer(direction * dt * world.Data.WalkSpeed * (world.Me.Sprinting ? world.Data.SprintSpeed : 1)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
             view.GatheringTarget = view.Gathering ? gathering : null;
-            world.Me.Held = ActiveHotbarItem() ?? "";
+            world.Me.Held = hotbar.ActiveItem() ?? "";
         } else world.Me.Sprinting = false;
         // Menus pause only a game nobody else is in.
         bool running = !state.Paused || net.Hosting || world.Remote;
@@ -295,7 +290,7 @@ public partial class Game : Node {
             // A guest saves its player whenever it changes instead; the world is the host's to save.
             if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) Save(0); autosave = 0; }
         }
-        view.Paused = !running; view.SelectedTool = ActiveHotbarItem();
+        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem();
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }

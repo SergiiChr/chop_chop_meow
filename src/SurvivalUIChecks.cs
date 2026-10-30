@@ -54,10 +54,10 @@ public partial class Game {
     /// <summary>Drinking through hotbar slot nine consumes one sip at a time and keeps the empty bottle.</summary>
     private async Task CheckHotbarDrinkTakesOneSipAndKeepsEmptyBottle() {
         for (int expected = 3; expected >= 1; expected--) {
-            await Until(() => hotbarCounts[8].Text == $"{expected}/3", $"the bottle badge showing {expected}/3 before a sip", 2);
-            await Click(hotbarButtons[8]);
+            await Until(() => hotbar.Counts[8].Text == $"{expected}/3", $"the bottle badge showing {expected}/3 before a sip", 2);
+            await Click(hotbar.Buttons[8]);
             await ClickGround();
-            await Until(() => hotbarCounts[8].Text == $"{expected - 1}/3", "a hotbar drink removing exactly one sip", 2);
+            await Until(() => hotbar.Counts[8].Text == $"{expected - 1}/3", "a hotbar drink removing exactly one sip", 2);
         }
         Require(world.Carried("empty_bottle") == 1, "Three hotbar sips must leave the empty bottle in inventory.");
     }

@@ -585,23 +585,23 @@ public partial class Game {
         Require(!clock.Text.Contains("Water"), "The persistent HUD must not show water.");
         Require(!clock.Text.Contains("coins"), "The persistent HUD must not show coins.");
         Require(!clock.Text.Contains("Pack"), "The persistent HUD must not show the pack.");
-        Require(hotbarButtons.Count == 9 && world.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
+        Require(hotbar.Buttons.Count == 9 && world.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
         int berries = world.Carried("berries");
         await KeyStroke(Key.Key3);
         Require(view.BuildMode == ThingKind.Chest, "A building-plan hotkey must enter placement mode.");
         await KeyStroke(Key.Key8);
         Require(world.ActiveHotbar == 7, "Key 8 must make the eighth hotbar slot active.");
         Require(world.Carried("berries") == berries, "Key 8 must not eat the berries.");
-        Require(hotbarButtons[7].GetThemeStylebox("normal") == Style.CupWanted, "Key 8 must outline the berries in hand.");
-        Require(hotbarButtons[2].GetThemeStylebox("normal") != Style.CupWanted, "Key 8 must outline only the slot in hand.");
+        Require(hotbar.Buttons[7].GetThemeStylebox("normal") == Style.CupWanted, "Key 8 must outline the berries in hand.");
+        Require(hotbar.Buttons[2].GetThemeStylebox("normal") != Style.CupWanted, "Key 8 must outline only the slot in hand.");
         Require(view.BuildMode == null, "Selecting an item must clear any previously state.Selected building plan.");
         int played = sounds.Played;
         await ClickGround();
         Require(world.Carried("berries") == berries - 1, "A left click on open ground must eat the berries in hand.");
         Require(sounds.Played == played + 1 && sounds.Last == "eat_berry", "Eating must play only the eating sound, not an inventory sound as well.");
         Give(world, "water", 1); SetNeeds(world, thirst: 20);
-        await Until(() => !hotbarButtons[8].Disabled, "the hotbar showing the water", 2);
-        await Click(hotbarButtons[8]);
+        await Until(() => !hotbar.Buttons[8].Disabled, "the hotbar showing the water", 2);
+        await Click(hotbar.Buttons[8]);
         Require(world.ActiveHotbar == 8 && world.Carried("water") == 1, "Clicking a hotbar slot must only select it.");
         await ClickGround();
         Require(world.Carried("water") == 0 && world.Thirst > 20, "A left click on open ground must drink the water in hand.");
@@ -642,7 +642,7 @@ public partial class Game {
         int storedWood = chest.Inventory["wood"];
         await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), Cell(1, c => c.TooltipText == ""));
         Require(chest.Inventory["wood"] == 0 && world.Carried("wood") == storedWood, "Dragging a chest stack onto the backpack must move it.");
-        await DragTo(await Showing(1, c => c.TooltipText.StartsWith("Wood")), hotbarButtons[3]);
+        await DragTo(await Showing(1, c => c.TooltipText.StartsWith("Wood")), hotbar.Buttons[3]);
         Require(world.HotbarSlots[3] == "wood" && world.Carried("wood") == storedWood, "Dragging an item onto the hotbar must assign a reference without moving items.");
         await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
         Require(chest.Inventory["wood"] == storedWood, "Dragging a backpack stack onto the chest must store it.");
@@ -674,7 +674,7 @@ public partial class Game {
         Require(!panel.Visible && bag.Visible, "Tab must open the backpack again after it was closed.");
         await KeyStroke(Key.B);
         int carriedBeforeAssignment = world.Backpack.Count;
-        await DragTo(Named("build_hut")!, hotbarButtons[0]);
+        await DragTo(Named("build_hut")!, hotbar.Buttons[0]);
         Require(world.HotbarSlots[0] == "hut" && world.Backpack.Count == carriedBeforeAssignment, "Dragging a plan onto the hotbar must store a plan reference without creating items.");
     }
     /// <summary>F5 saves into a slot, F9 and the pause menu load it, restoring position, stored items and the hotbar.</summary>
