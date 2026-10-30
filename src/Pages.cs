@@ -15,7 +15,7 @@ public partial class PagePanel {
             case "help": AddChild(new GuidePanel(panel)); break;
             case "build": BuildingPlans(); break;
             case "inventory": Backpack(); break;
-            case "workers": Workers(); break;
+            case "workers": AddChild(new CrewPanel(panel)); break;
             case "craft": CraftMenu(); break;
             default: Inspect(); break;
         }
@@ -95,7 +95,7 @@ public partial class PagePanel {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
     }
     protected void Inspect() {
-        if (state.WorkerId > 0) { WorkerPanel(world.S.Workers.FirstOrDefault(w => w.Id == state.WorkerId)); return; }
+        if (state.WorkerId > 0) { AddChild(new WorkerPanel(panel, world.S.Workers.FirstOrDefault(w => w.Id == state.WorkerId))); return; }
         var t = world.Find(state.Selected);
         if (t == null) { AddLabel("Select a building or resource in the world."); return; }
         Headline(t.Kind);

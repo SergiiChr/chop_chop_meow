@@ -71,7 +71,7 @@ UI and input:
 | `src/Crafting.cs` | The crafting menu and the crafting bench panel |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/Market.cs` | The trading post market, hiring offers and price sheet |
-| `src/Crew.cs` | The crew cards and worker panel |
+| `src/CrewPanel.cs` | The crew cards and a worker's own panel |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |

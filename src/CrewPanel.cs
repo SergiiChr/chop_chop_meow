@@ -3,14 +3,31 @@ using Godot;
 
 namespace ChopChopMeow;
 
+/// <summary>What the crew overview and a worker's own panel share.</summary>
+public abstract partial class WorkerPage(SidePanel side) : PagePanel(side) {
+    protected static readonly Texture2D Hardhat = GD.Load<Texture2D>("res://assets/ui/hardhat.svg");
+
+    protected Texture2D? PlaceIcon(Thing at) => Icons.Of(at.IsResource ? World.ResourceItem(at) : at.Kind.Id());
+
+    /// <summary>Shows what a worker carries and the tool they hold in their two icon cells, redrawing them only when that differs from <paramref name="shown"/>.</summary>
+    protected void ShowKit(Worker w, ref (int Carried, string? Item, string Tool) shown, ItemSlot carry, Badge carried, ItemSlot tool) {
+        int count = w.Bag.Count;
+        string? item = count > 0 ? w.Bag.First() : null;
+        if (shown == (count, item, w.Tool)) return;
+        shown = (count, item, w.Tool);
+        carry.Icon = item == null ? null : Icons.Of(item); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
+        carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {count} {world.Data.Name(item)}";
+        tool.Icon = w.Tool == "" ? null : Icons.Of(w.Tool); tool.Visible = w.Tool != "";
+        tool.TooltipText = w.Tool == "" ? "No tool in hand" : world.Data.Name(w.Tool);
+    }
+}
+
 /// <summary>
-/// The crew overview, one card per worker, and a worker's own panel.
+/// The crew overview, one card per worker.
 /// A card shows the worker's hat, name, wage, what they carry and the tool they hold, what they are doing, and their jobs as chips with each place's icon.
 /// </summary>
-public partial class PagePanel {
-    private static readonly Texture2D Hardhat = GD.Load<Texture2D>("res://assets/ui/hardhat.svg");
-
-    private void Workers() {
+public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
+    public override void _Ready() {
         var count = Style.Pill("", Style.BlueTag, Style.Rim, 13); count.MouseFilter = Control.MouseFilterEnum.Pass; count.TooltipText = "Villagers hired, of the most who will come";
         var wages = Style.Pill("", Style.Tag(Style.Brick), Style.Rim, 13); wages.MouseFilter = Control.MouseFilterEnum.Pass; wages.TooltipText = "Wages paid each dawn";
         foreach (var pill in new[] { count, wages }) { pill.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; heading.AddChild(pill); heading.MoveChild(pill, heading.GetChildCount() - 2); }
@@ -65,18 +82,6 @@ public partial class PagePanel {
         });
     }
 
-    /// <summary>Shows what a worker carries and the tool they hold in their two icon cells, redrawing them only when that differs from <paramref name="shown"/>.</summary>
-    private void ShowKit(Worker w, ref (int Carried, string? Item, string Tool) shown, ItemSlot carry, Badge carried, ItemSlot tool) {
-        int count = w.Bag.Count;
-        string? item = count > 0 ? w.Bag.First() : null;
-        if (shown == (count, item, w.Tool)) return;
-        shown = (count, item, w.Tool);
-        carry.Icon = item == null ? null : Icons.Of(item); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
-        carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {count} {world.Data.Name(item)}";
-        tool.Icon = w.Tool == "" ? null : Icons.Of(w.Tool); tool.Visible = w.Tool != "";
-        tool.TooltipText = w.Tool == "" ? "No tool in hand" : world.Data.Name(w.Tool);
-    }
-
     /// <summary>A job as a small chip: the place's icon and the job's name.</summary>
     private Control DutyChip(Thing at, string job) {
         var chip = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; chip.AddThemeStyleboxOverride("panel", Style.Chip);
@@ -85,11 +90,11 @@ public partial class PagePanel {
         row.AddChild(Style.Text(JobName(job), 13, Style.Ink, Style.Bold));
         return chip;
     }
+}
 
-    private Texture2D? PlaceIcon(Thing at) => Icons.Of(at.IsResource ? World.ResourceItem(at) : at.Kind.Id());
-
-    /// <summary>One worker: what they carry and hold, what they are doing, their jobs with a button to drop each, and what can be done with them.</summary>
-    private void WorkerPanel(Worker? w) {
+/// <summary>One worker: what they carry and hold, what they are doing, their jobs with a button to drop each, and what can be done with them.</summary>
+public partial class WorkerPanel(SidePanel side, Worker? w) : WorkerPage(side) {
+    public override void _Ready() {
         if (w == null) { AddLabel("This worker has left."); return; }
         headingTitle.Text = w.Name; headingIcon.Texture = Hardhat; headingIcon.Visible = true;
         var wage = Style.Pill($"{w.Wage} /day", Style.Tag(Style.Brick), Style.Rim, 13); wage.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; wage.MouseFilter = Control.MouseFilterEnum.Pass; wage.TooltipText = "Daily wage";
