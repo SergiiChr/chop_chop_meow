@@ -4,7 +4,9 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
-using static Fixtures;
+using static WorldSteps;
+using static PlayerSteps;
+using static WorkerSteps;
 
 /// <summary>Simulation checks for mines and the end goals.</summary>
 public static class MineChecks {

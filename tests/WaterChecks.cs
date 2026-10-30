@@ -3,7 +3,7 @@ using ChopChopMeow;
 using Godot;
 using System.Linq;
 using static Checks;
-using static Fixtures;
+using static WorkerSteps;
 
 namespace ChopChopMeow.Tests;
 

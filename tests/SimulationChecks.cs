@@ -5,7 +5,9 @@ using System.Text.Json.Nodes;
 using ChopChopMeow;
 using Godot;
 using static Checks;
-using static Fixtures;
+using static WorldSteps;
+using static PlayerSteps;
+using static WorkerSteps;
 
 /// <summary>Deterministic checks for the playable simulation, independent of the rendered scene.</summary>
 public static class SimulationChecks {

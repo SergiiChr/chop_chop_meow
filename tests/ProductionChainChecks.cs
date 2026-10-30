@@ -3,7 +3,9 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
-using static Fixtures;
+using static WorldSteps;
+using static PlayerSteps;
+using static WorkerSteps;
 
 /// <summary>
 /// Checks that workers alone run every end product from raw resource to a sold cart: canned meat stew, bread, steel pickaxes and berries.

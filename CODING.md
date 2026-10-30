@@ -44,7 +44,7 @@ Project rules on top of the global coding and testing guides.
 - A fixture built by editing text, such as an old save, fails when the text it edits is missing.
 - UI checks wait for a condition with a time limit, not for a fixed time; a fixed wait is only for holding input or letting something play for a set time.
 - A check that a load restores something changes that thing between saving and loading.
-- World setup used by more than one simulation check lives in `tests/Fixtures.cs`.
+- Check files hold only checks and their runners. Steps live in feature files: `tests/WorldSteps.cs`, `PlayerSteps.cs`, `WorkerSteps.cs`, `EconomySteps.cs` and `ModelSteps.cs` for simulation checks, and `src/InputSteps.cs`, `PanelSteps.cs` and `SessionSteps.cs` for UI and network checks.
 - Checks fail through the shared `Checks.Require` in `tests/Checks.cs`.
 - Do not weaken assertions to make broken behavior pass.
 

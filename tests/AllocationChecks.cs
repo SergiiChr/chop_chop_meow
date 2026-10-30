@@ -4,7 +4,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
-using static Fixtures;
+using static WorldSteps;
 
 /// <summary>
 /// Holds code that runs every tick to its allocation budget: every byte it allocates is garbage the runtime collects later,
@@ -74,55 +74,4 @@ public static class AllocationChecks {
         Require(bytes <= maxBytesPerRun * runs, $"Allocation budget exceeded: {report}");
     }
 
-    private static void Fed(World world) { world.S.Hunger = 100; world.S.Thirst = 100; world.S.Health = 100; }
-
-    /// <summary>An open iron mine with a full crew of pickaxe-carrying miners and a chest beside it.</summary>
-    private static World WorkingMine(GameData data, out Thing mine) {
-        var world = new World(data, false);
-        world.S.Time = data.DaySeconds * .3f;
-        var cliff = World.CliffOf(ThingKind.Iron);
-        world.Player = World.MineSpot(cliff) + cliff.Face * 3;
-        mine = world.Add(ThingKind.Mine, World.MineSpot(cliff)); mine.MineStage = MineStage.Open;
-        world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
-        for (int i = 0; i < data.Mine.Workers; i++) {
-            var w = AddWorker(world, mine.Pos + cliff.Face * 2);
-            w.Tool = "steel_pick"; world.Assign(w, mine);
-        }
-        return world;
-    }
-
-    /// <summary>A packing station packing berries, its packer, a chest of berries and empty crates, and a post asking for crates of berries that sells on its own.</summary>
-    private static World PackingLine(GameData data, out Thing stock) {
-        var world = new World(data, false);
-        world.S.Time = data.DaySeconds * .3f;
-        var at = Terrain.Spawn;
-        world.Player = at + new Vector2(-20, 0);
-        stock = world.Add(ThingKind.Chest, at + new Vector2(2, 0));
-        var packer = world.Add(ThingKind.Packer, at); world.SetPacking(packer, "berries");
-        var sign = world.Add(ThingKind.Signpost, at + new Vector2(0, 3));
-        world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);
-        world.Assign(AddWorker(world, at + new Vector2(1, 1)), packer);
-        return world;
-    }
-
-    /// <summary>A daytime camp in the generated valley: woodcutters, a bellows crew at a hot forge, a furnace, a campfire and storage.</summary>
-    private static World Settlement(GameData data) {
-        var world = new World(data);
-        world.S.Time = data.DaySeconds * .3f;
-        var at = world.Player;
-        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 0));
-        world.Add(ThingKind.Chest, at + new Vector2(2, -2));
-        chest.Inventory.Add("iron_bar", 20); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_ore", 20); chest.Inventory.Add("wood", 30);
-        var rack = world.Add(ThingKind.Toolstation, at + new Vector2(-2, 0));
-        rack.Inventory.Add("steel_axe", 2);
-        var fire = world.Add(ThingKind.Campfire, at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
-        var furnace = world.Add(ThingKind.Furnace, at + new Vector2(3, 3));
-        var forge = world.Add(ThingKind.Reinforced, at + new Vector2(-3, 3)); forge.Heat = 90;
-        foreach (var tree in world.S.Things.Where(t => t.Kind == ThingKind.Tree).OrderBy(t => t.Pos.DistanceTo(at)).Take(2))
-            world.Assign(AddWorker(world, rack.Pos), tree);
-        world.Assign(AddWorker(world, forge.Pos + World.BellowsStand), forge);
-        world.Assign(AddWorker(world, chest.Pos), forge);
-        world.Assign(AddWorker(world, chest.Pos), furnace);
-        return world;
-    }
 }

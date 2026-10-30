@@ -4,6 +4,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static ModelSteps;
 
 /// <summary>Shared human geometry stays cached while outfit materials and rig state remain separate.</summary>
 public static class HumanModelChecks {
@@ -92,13 +93,6 @@ public static class HumanModelChecks {
         }
     }
 
-    private static MeshInstance3D? FindCargo(Node node) {
-        if (node is MeshInstance3D mesh && mesh.Mesh?.GetInstanceId() == CrateShape.Cargo.GetInstanceId()) return mesh;
-        for (int i = 0; i < node.GetChildCount(); i++)
-            if (FindCargo(node.GetChild(i)) is { } found) return found;
-        return null;
-    }
-
     private static (Vector3 Min, Vector3 Max) BoundsInTorso(MeshInstance3D mesh) {
         var bounds = mesh.Mesh!.GetAabb();
         var toTorso = ((Node3D)mesh.GetParent()).Transform * mesh.Transform;
@@ -115,13 +109,4 @@ public static class HumanModelChecks {
         return (min, max);
     }
 
-    private static List<MeshInstance3D> Core(ActorRig rig) {
-        var result = new List<MeshInstance3D>();
-        Visit(rig.Root, result);
-        return result;
-    }
-    private static void Visit(Node node, List<MeshInstance3D> result) {
-        if (node is MeshInstance3D mesh && mesh.Name.ToString().StartsWith("Human", StringComparison.Ordinal)) result.Add(mesh);
-        for (int i = 0; i < node.GetChildCount(); i++) Visit(node.GetChild(i), result);
-    }
 }

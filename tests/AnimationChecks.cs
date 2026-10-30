@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static EconomySteps;
 
 /// <summary>Focused checks for deterministic actor animation selection and timing.</summary>
 public static class AnimationChecks {

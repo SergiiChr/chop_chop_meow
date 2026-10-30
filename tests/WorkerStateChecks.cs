@@ -3,7 +3,8 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
-using static Fixtures;
+using static WorldSteps;
+using static WorkerSteps;
 
 /// <summary>Simulation checks for worker animation state transitions.</summary>
 public static class WorkerStateChecks {
