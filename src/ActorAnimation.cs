@@ -23,7 +23,8 @@ public enum ActorAction {
     Mauled,
     Devoured,
     Protest,
-    PickUp
+    PickUp,
+    Pack
 }
 
 /// <summary>
@@ -66,6 +67,7 @@ public static class ActorAnimation {
         ActorAction.Devoured => 1.4f,
         ActorAction.Protest => 1.6f,
         ActorAction.PickUp => .9f,
+        ActorAction.Pack => 2.4f,
         _ => 1
     };
 
@@ -151,6 +153,20 @@ public static class ActorAnimation {
                     (.35f, hold with { Lean = 8, RaiseR = 150, ElbowR = 96 }),
                     (.5f, hold with { Lean = 18, RaiseR = 58, ElbowR = 22 }),
                     (.7f, hold with { Lean = 18, RaiseR = 60, ElbowR = 24 }));
+            case ActorAction.Pack:
+                // Both hands rummage in the heap of goods, lift a piece across, and settle it into the crate on the other side.
+                var table = Stance with { Lean = 8, Head = 20, RaiseL = 50, OutL = -14, ElbowL = 46, RaiseR = 50, OutR = -14, ElbowR = 46 };
+                var heap = table with { Twist = -20, Sway = -3, RaiseL = 46, OutL = -22, ElbowL = 40, RaiseR = 56, OutR = -2, ElbowR = 50 };
+                var crate = table with { Twist = 20, Sway = 3, RaiseL = 56, OutL = -2, ElbowL = 50, RaiseR = 46, OutR = -22, ElbowR = 40 };
+                return Keys(p, (0, heap),
+                    (.12f, heap with { RaiseL = 40, ElbowL = 52, RaiseR = 62, ElbowR = 38 }),
+                    (.24f, heap with { RaiseL = 50, ElbowL = 34, RaiseR = 52, ElbowR = 58 }),
+                    (.36f, heap),
+                    (.5f, table with { Lean = 4, RaiseL = 70, ElbowL = 84, RaiseR = 70, ElbowR = 84 }),
+                    (.62f, crate with { Lean = 14, RaiseL = 50, ElbowL = 30, RaiseR = 46, ElbowR = 28 }),
+                    (.74f, crate with { Lean = 14, RaiseL = 56, ElbowL = 44, RaiseR = 42, ElbowR = 36 }),
+                    (.86f, crate),
+                    (.94f, table with { Lean = 6, RaiseL = 62, ElbowL = 70, RaiseR = 62, ElbowR = 70 }));
             case ActorAction.Attack:
                 var fists = Stance with { Twist = 10, RaiseL = 48, OutL = -14, ElbowL = 112, RaiseR = 44, OutR = -14, ElbowR = 115 };
                 return Keys(p, (0, fists),
@@ -254,6 +270,7 @@ public static class ActorAnimation {
 
         return worker.WorkState switch {
             WorkerWorkState.Pumping => ActorAction.Pump,
+            WorkerWorkState.Hammering when assignment?.Kind == "packer" => ActorAction.Pack,
             WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == "mine") => ActorAction.Hammer,
             WorkerWorkState.Digging => ActorAction.Mine,
             _ => ActorAction.Idle

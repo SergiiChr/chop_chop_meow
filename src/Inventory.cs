@@ -164,8 +164,16 @@ public sealed class Inventory {
         EnsureLayout();
     }
 
-    public bool Accepts(string item) => InputFilter.Count == 0 || InputFilter.Contains(item);
-    public bool AllowsWithdrawal(string item) => OutputFilter.Count == 0 || OutputFilter.Contains(item);
+    public bool Accepts(string item) => InputFilter.Count == 0 || Names(InputFilter, item);
+    public bool AllowsWithdrawal(string item) => OutputFilter.Count == 0 || Names(OutputFilter, item);
+    /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over unrestricted ones.</summary>
+    public bool Wants(string item) => InputFilter.Count > 0 && Names(InputFilter, item);
+    /// <summary>A filter names an item itself, or for a packed crate the kind of crate it is (<see cref="World.CrateOf"/>).</summary>
+    private static bool Names(HashSet<string> filter, string item) {
+        if (filter.Contains(item)) return true;
+        var kind = World.PackedKind(item);
+        return !kind.IsEmpty && filter.GetAlternateLookup<ReadOnlySpan<char>>().Contains(kind);
+    }
 
     public int Add(string item, int quantity) {
         EnsureLayout();

@@ -211,3 +211,43 @@ internal static class PileShape {
         s.SetColor(new Color(tint)); s.SetNormal(normal); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);
     }
 }
+
+/// <summary>
+/// Piled resources on a model, shown the way storage piles show them: fixed slots that each hold one item's cached pile stock.
+/// Every model that shows piled resources uses one, so a good looks the same in every pile.
+/// </summary>
+public sealed class StockPile {
+    private readonly MeshInstance3D[] slots;
+    private readonly string[] shown;
+
+    /// <summary>Adds a hidden slot under <paramref name="parent"/> at each position, its stock scaled by <paramref name="scale"/>.</summary>
+    public StockPile(Node3D parent, ReadOnlySpan<Vector3> positions, float scale = 1) {
+        slots = new MeshInstance3D[positions.Length]; shown = new string[positions.Length];
+        for (int i = 0; i < slots.Length; i++) {
+            slots[i] = new MeshInstance3D { Position = positions[i], Scale = Vector3.One * scale, Visible = false };
+            parent.AddChild(slots[i]); shown[i] = "";
+        }
+    }
+
+    public int Count => slots.Length;
+    /// <summary>The slot meshes, for checks that compare what piles show.</summary>
+    public IReadOnlyList<MeshInstance3D> Slots => slots;
+
+    /// <summary>Shows an item's stock in a slot, or hides the slot for "". Swaps only cached meshes and materials.</summary>
+    public void Show(int slot, string item, GameData data) {
+        if (shown[slot] == item) return;
+        shown[slot] = item;
+        var mesh = slots[slot];
+        mesh.Visible = item != "";
+        if (item == "") return;
+        PileShape.SetStock(mesh, item, data.Items.TryGetValue(item, out var def) ? def.Color : PileShape.Fallback);
+        // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
+        mesh.Rotation = new Vector3(0, item == "coal" ? slot * 2.399963f : 0, 0);
+    }
+
+    /// <summary>Shows one item in a slot for every <paramref name="perSlot"/> of <paramref name="count"/>, rounding up, and hides the rest.</summary>
+    public void Fill(string item, int count, int perSlot, GameData data) {
+        int filled = count <= 0 ? 0 : (count + perSlot - 1) / perSlot;
+        for (int i = 0; i < slots.Length; i++) Show(i, i < filled ? item : "", data);
+    }
+}

@@ -48,7 +48,7 @@ public partial class Game {
         var (tool, _) = IconCell($"tool_{w.Id}", 44); tool.MouseFilter = Control.MouseFilterEnum.Ignore; top.AddChild(tool);
         var wage = Style.Pill($"{w.Wage} /day", Style.BeigePill, Style.Ink, 13); wage.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; top.AddChild(wage);
         var chips = new HFlowContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; chips.AddThemeConstantOverride("h_separation", 6); chips.AddThemeConstantOverride("v_separation", 6); column.AddChild(chips);
-        foreach (var d in w.Duties) if (world.Find(d.Thing) is Thing at) chips.AddChild(DutyChip(at, d.Job));
+        foreach (var d in w.Duties) if (world.DutyPlace(w, d.Thing) is Thing at) chips.AddChild(DutyChip(at, d.Job));
         if (w.Duties.Count == 0) chips.AddChild(Style.Pill("No jobs", Style.Tag(Style.Tan), Style.Rim, 12));
         // A flat button over the whole card takes the click and rings it on hover.
         var open = new Button { Flat = false, FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand, Name = $"crew_{w.Id}" };
@@ -117,7 +117,7 @@ public partial class Game {
         jobs.AddChild(WellLabel("Jobs"));
         bool first = true;
         foreach (var d in w.Duties.ToArray()) {
-            if (world.Find(d.Thing) is not Thing at) continue;
+            if (world.DutyPlace(w, d.Thing) is not Thing at) continue;
             var duty = d;
             if (!first) jobs.AddChild(new HSeparator());
             first = false;

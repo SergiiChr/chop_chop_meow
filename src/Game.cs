@@ -408,6 +408,7 @@ public partial class Game : Node {
         if (t.Kind == "mine") { MinePanel(t); return; }
         if (t.Kind == "farm") { FarmPanel(t); return; }
         if (t.Kind == "campfire") { Campfire(t); return; }
+        if (t.Kind == "packer") { PackerPanel(t); return; }
         if (t.IsStorage) { Storage(t); return; }
         Station(t);
     }
@@ -1085,6 +1086,27 @@ public partial class Game : Node {
             cannery.Inventory.Add("meat_stew", 2); cannery.Inventory.Add("tin_can", 2); cannery.Burner!.Add("wood", 2);
             world.Player = at + new Vector2(1, 2.5f); world.Tick(.5f); view.Zoom = 1.7f;
             if (launchArgs.Contains("--panel")) Select(table); else ClosePanel();
+        }
+        if (launchArgs.Contains("--packing")) {
+            // A packing station part way through a crate of bread, with bread and empty crates waiting, beside the trading post asking for crates of bread and berries.
+            var at = Terrain.Spawn + new Vector2(3, 8);
+            world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
+            var packer = world.Add("packer", at); world.SetPacking(packer, "bread");
+            packer.Inventory.Add("bread", 20); packer.Inventory.Add("crate", 3);
+            world.Player = at + new Vector2(1, 1.5f); view.Zoom = 1.7f;
+            for (int i = 0; i < 7; i++) world.Tick(world.Data.PackSeconds);
+            // --crates N leaves that many empty crates at the station, and --unpacked takes its bread so packing stops.
+            if (LaunchValue("--crates") is string crates) { packer.Inventory.Remove("crate", 99); packer.Inventory.Add("crate", int.Parse(crates, System.Globalization.CultureInfo.InvariantCulture)); }
+            if (launchArgs.Contains("--unpacked")) { packer.Inventory.Remove("bread", 99); world.Tick(.1f); }
+            if (launchArgs.Contains("--crates") || launchArgs.Contains("--unpacked")) { world.Player = at + new Vector2(-1.4f, -1.4f); view.Zoom = 2.6f; }
+            // --packer puts a worker at the table packing, with the player stepped back.
+            if (launchArgs.Contains("--packer")) { world.S.Backpack.Add(Inventory.Coins, 500); world.Player = sign.Pos + Vector2.One; }
+            if (launchArgs.Contains("--packer") && world.Hire(sign, world.Data.HireOffers[1]) is Worker packing) {
+                world.SetDuty(packing, packer, "craft", true); packing.Pos = at + World.PackStand;
+                world.Player = at + new Vector2(.4f, -2.6f); view.Zoom = 3.4f; world.Tick(.1f);
+            }
+            world.SetFilter(sign, World.CrateOf("bread"), false, true); world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);
+            if (launchArgs.Contains("--post")) { world.Player = sign.Pos + Vector2.One; Select(sign); filterOpen = true; OpenPage("inspect"); } else if (launchArgs.Contains("--panel")) { packPicking = launchArgs.Contains("--pick"); Select(packer); } else ClosePanel();
         }
         if (launchArgs.Contains("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (launchArgs.Contains("--panel")) Select(rack); else ClosePanel(); }
         if (launchArgs.Contains("--tin")) { var cliff = World.CliffOf("tin"); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); ClosePanel(); }

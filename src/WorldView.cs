@@ -411,7 +411,7 @@ public partial class WorldView : Node3D {
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
-        if (action == ActorAction.Idle && StationToHammer() is Thing anvil) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
+        if (action == ActorAction.Idle && StationToHammer() is Thing anvil) { action = anvil.Kind == "packer" ? ActorAction.Pack : ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
         if (World.S.Mauled) {
             mauledFrom = PinningWolf()?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
             // Facing away from the wolf at the throat lays the head toward it once the rig tips onto its back.
@@ -447,11 +447,12 @@ public partial class WorldView : Node3D {
             bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking);
-            if (work == ActorAction.Hammer && assignment?.Processing != true && assignment?.Kind != "mine") work = ActorAction.Idle;
+            if (work is ActorAction.Hammer or ActorAction.Pack && assignment?.Processing != true && assignment?.Kind != "mine") work = ActorAction.Idle;
             // At a mine the worker faces the rock past the entrance, not the cart out front.
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
-                : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : assignment is { Kind: "mine" } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
+                : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : work == ActorAction.Pack ? worker.Pos + Vector2.Down
+                : assignment is { Kind: "mine" } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
             entry.Rig.Root.Visible = World.Sees(worker);
@@ -715,7 +716,7 @@ public partial class WorldView : Node3D {
                 prop.Body.Scale = new Vector3(1 + wobble * .04f, 1 - wobble * .03f, 1 + wobble * .04f);
                 break;
             case "furnace":
-                if (World.Sees(t.Pos)) WorldModels.SyncFuel(prop, t);
+                if (World.Sees(t.Pos)) WorldModels.SyncFuel(prop, t, World.Data);
                 prop.Glow!.Visible = t.Processing;
                 prop.Light!.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
                 Smoke(prop, t, t.Processing, dt, FurnaceSmoke);
@@ -764,6 +765,14 @@ public partial class WorldView : Node3D {
                 int look = World.CropLook(t, World.GrowSeconds);
                 prop.Crops[0].Visible = look > 0;
                 for (int i = 1; i < prop.Crops.Length; i++) prop.Crops[i].Visible = look == i + 1;
+                break;
+            case "packer":
+                // Remembered stations carry no inventory, so they keep the crates they had when last seen.
+                if (!World.Sees(t.Pos)) break;
+                for (int i = 0; i < prop.Crates.Length; i++) prop.Crates[i].Visible = i < t.Inventory["crate"];
+                prop.Packing!.Visible = t.Processing;
+                // The heap grows a pile for each third of a crate's worth.
+                prop.Stock!.Fill(t.Packs, t.Packs == "" ? 0 : t.Inventory[t.Packs], World.Data.CrateCapacity / 3, World.Data);
                 break;
             case "toolstation":
                 if (!World.Sees(t.Pos)) break;

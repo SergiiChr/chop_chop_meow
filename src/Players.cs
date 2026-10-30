@@ -128,7 +128,7 @@ public sealed partial class World {
             case "sort_bag": SortBackpack(); break;
             case "skip_morning": SkipMorning(); break;
             case "assign": if (w != null) Assign(w, t); break;
-            case "duty": if (w != null && t != null) SetDuty(w, t, c.Item, c.Count != 0); break;
+            case "duty": if (w != null && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, c.Item, c.Count != 0); break;
             case "fire": if (w != null) Fire(w); break;
             case "settle": if (w != null) SettleDebt(w); break;
         }
@@ -150,6 +150,8 @@ public sealed partial class World {
             case "enter": Enter(t); break;
             case "sleep": Sleep(t); break;
             case "sell": Sell(t); break;
+            case "auto_sell": SetAutoSell(t, c.Count != 0); break;
+            case "set_packing": SetPacking(t, c.Item); break;
             case "buy": Buy(t, c.Item, Math.Min(c.Count, 5)); break;
             case "pick_up_crate": PickUpCrate(t); break;
             case "slot_tool": SlotTool(t, c.Item); break;
@@ -214,7 +216,7 @@ public sealed partial class World {
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
-        if (!chest.IsStorage || !Data.Items.ContainsKey(item) || Forwarded("set_filter", chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
+        if (!(chest.IsStorage || chest.Kind == "signpost") || !(Data.Items.ContainsKey(item) || CrateGood(item) != null) || Forwarded("set_filter", chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         var filter = output ? chest.Inventory.OutputFilter : chest.Inventory.InputFilter;
         if (allowed) filter.Add(item); else filter.Remove(item);
     }
@@ -226,7 +228,7 @@ public sealed partial class World {
     }
 
     public void ClearFilters(Thing chest) {
-        if (!chest.IsStorage || Forwarded("clear_filters", chest.Id)) return;
+        if (!(chest.IsStorage || chest.Kind == "signpost") || Forwarded("clear_filters", chest.Id)) return;
         chest.Inventory.InputFilter.Clear(); chest.Inventory.OutputFilter.Clear();
     }
 

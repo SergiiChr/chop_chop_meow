@@ -62,6 +62,7 @@ public partial class Game {
         ["trade"] = new[] {
             ("crate", "A crate holds 12. Hold right mouse to pick it up with its contents. Never put a crate in a crate."),
             ("signpost", "Load packed crates at a trading post and send the cart: it is back in 30 seconds."),
+            ("packer", "A packing station packs one good into crates while someone works it. Ask for crates of it in the post's filter and tick Send when full to sell without you."),
             ("coins", "Sales fill the bank first; wages come out of it at dawn."),
             ("line_arrow", "Prices fall as you sell and recover over days. The sheet shows the last prices heard.")
         }

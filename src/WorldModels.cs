@@ -19,13 +19,13 @@ public sealed class Prop {
     /// <summary>A tool station's hanging tools by kind, each shown while the station holds one.</summary>
     public Dictionary<string, Node3D> Racked = new();
     /// <summary>A pile's stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
-    public MeshInstance3D[] Stacks = Array.Empty<MeshInstance3D>();
+    public StockPile? Stock;
     /// <summary>The item each pile stack shows, or "" for a hidden stack.</summary>
-    public string[] StackItems = Array.Empty<string>();
     /// <summary>A farm plot's looks by <see cref="World.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
     public Node3D[] Crops = Array.Empty<Node3D>();
+    public Node3D[] Crates = Array.Empty<Node3D>();
+    public Node3D? Packing;
     public Node3D[] Pleats = Array.Empty<Node3D>();
-    public Node3D? WoodPile, CoalPile;
     public MeshInstance3D? Glow, Window, Pool;
     public WorldModels.WolfModel? Wolf;
     public OmniLight3D? Light;
@@ -98,6 +98,7 @@ public static class WorldModels {
         "bench" => new[] { new Hit(.6f, 0, .95f) },
         "cooktable" => new[] { new Hit(.7f, 0, .9f) },
         "cannery" => new[] { new Hit(.6f, 0, 1f) },
+        "packer" => new[] { new Hit(1, 0, 1.1f) },
         "toolstation" => new[] { new Hit(.55f, 0, 1.5f) },
         "pile" => new[] { new Hit(1.5f, 0, .5f) },
         "farm" => new[] { new Hit(1.5f, 0, .5f) },
@@ -133,6 +134,7 @@ public static class WorldModels {
             case "bench": Workbench(prop); break;
             case "cooktable": CookingTable(prop); break;
             case "cannery": Cannery(prop); break;
+            case "packer": PackingStation(prop); break;
             case "toolstation": ToolRack(prop); break;
             case "pile": Pile(prop); break;
             case "farm": Farm(prop, t.Id); break;
@@ -142,7 +144,6 @@ public static class WorldModels {
             case "mine": Mine(prop, World.CliffAt(t.Pos).Ore); break;
         }
         if (t.Kind != "water") body.RotationDegrees = new Vector3(0, t.Kind == "tree" || t.IsResource ? Jitter(t.Id, 1) * 360 : 0, 0);
-        if (t.Kind == "furnace") SyncFuel(prop, t);
         if (t.Kind == "mine") body.Rotation = MineYaw(t.Pos);
         return prop;
     }
@@ -164,13 +165,12 @@ public static class WorldModels {
         switch (id) {
             case "steel_axe" or "steel_pick" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
-            case "wood": return Part("furnace", p => p.WoodPile!);
             case "rake": return Part("toolstation", p => p.Racked["rake"]);
             case "mortar": return Part("cooktable", p => p.Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
             case "water" or "water_2" or "water_1" or "empty_bottle": return BottleShape.Create(Water.BottleSips(id));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id);
-            case "planks" or "wood_parts": {
+            case "wood" or "planks" or "wood_parts": {
                     var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
                     return stock;
                 }
@@ -189,15 +189,15 @@ public static class WorldModels {
         var built = Build(new Thing { Kind = id });
         if (built.Glow != null) built.Glow.Visible = false;
         if (id == "farm") { built.Crops[0].Visible = built.Crops[^1].Visible = true; }
-        foreach (var stack in built.Stacks) { stack.Visible = true; PileShape.SetStock(stack, "wood", data.Items["wood"].Color); }
+        // A pile shows logs, a furnace its wood and a packing station a heap of bread.
+        built.Stock?.Fill(id == "packer" ? "bread" : "wood", int.MaxValue, 1, data);
         return built.Root;
     }
 
-    /// <summary>The outdoor pile represents stocked fuel, excluding fuel already burning in a batch.</summary>
-    public static void SyncFuel(Prop prop, Thing t) {
+    /// <summary>The outdoor pile shows stocked fuel, excluding fuel already burning in a batch: a pile of it for every two.</summary>
+    public static void SyncFuel(Prop prop, Thing t, GameData data) {
         string fuel = World.BurnedFuel(t);
-        prop.WoodPile!.Visible = fuel == "wood" && t.Burner?["wood"] > 0;
-        prop.CoalPile!.Visible = fuel == "coal" && t.Burner?["coal"] > 0;
+        prop.Stock!.Fill(fuel, t.Burner?[fuel] ?? 0, 2, data);
     }
 
     private static void Tree(Prop prop, int id) {
@@ -258,10 +258,8 @@ public static class WorldModels {
             new ActorShape.Ring(.95f, .09f, .09f, metal), new ActorShape.Ring(.9f, .11f, .11f, metal),
             new ActorShape.Ring(.85f, .12f, .12f, metal) }, material: FurnaceShape.Steel);
         prop.Vent = new Vector3(-.3f, 2.05f, -.25f);
-        prop.WoodPile = Pivot(body, Vector3.Zero);
-        for (int i = 0; i < 3; i++)
-            Cylinder(prop.WoodPile, .07f, .065f, .5f, new Vector3(.82f, .08f + (i == 2 ? .13f : 0), -.1f + (i == 2 ? .07f : i * .14f)), Mat(i == 1 ? "7a5235" : "8a5f3c"), new Vector3(90, 0, 0), 10);
-        prop.CoalPile = Add(body, FurnaceShape.CoalPile, FurnaceShape.Concrete, new Vector3(.82f, 0, -.03f));
+        // Stocked fuel piles beside the firebox: pile stock is centred and .16 tall at this scale.
+        prop.Stock = new StockPile(body, new[] { new Vector3(.82f, .08f, -.13f), new Vector3(.82f, .08f, .15f), new Vector3(.82f, .24f, .01f) }, .4f);
         prop.Light = Light(body, new Vector3(0, .35f, .7f), 2);
         Scorch(body, 1.9f);
     }
@@ -433,6 +431,25 @@ public static class WorldModels {
         prop.Hammer = Slot(new Vector3(.05f, .815f, -.1f), -20, ("wood_hammer", .052f), ("steel_hammer", .034f));
     }
 
+    /// <summary>
+    /// A long painted packing table with the crate being packed open on its top beside a heap of the good being packed,
+    /// and up to three empty crates stacked beside it, lids shut.
+    /// </summary>
+    private static void PackingStation(Prop prop) {
+        var body = prop.Body;
+        Add(body, BenchShape.Packing, BenchShape.Timber, new Vector3(-.25f, 0, 0));
+        prop.Packing = Pivot(body, new Vector3(-.6f, .835f, 0));
+        Add(prop.Packing, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
+        // Pile stock is centred and .12 tall at this scale, so two slots sit on the table top and the third on them.
+        prop.Stock = new StockPile(body, new[] { new Vector3(-.03f, .96f, -.04f), new Vector3(.21f, .96f, .04f), new Vector3(.09f, 1.08f, 0) }, .3f);
+        prop.Crates = new Node3D[3];
+        for (int i = 0; i < prop.Crates.Length; i++) {
+            var crate = prop.Crates[i] = Pivot(body, new Vector3(.85f, i * .44f, .05f));
+            Add(crate, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
+            Add(Pivot(crate, new Vector3(0, .42f, -.23f)), CrateShape.Lid, CrateShape.Timber, Vector3.Zero);
+        }
+    }
+
     /// <summary>A stone firebox under a steel grill with a stew pot, beside a plank counter where the slotted mortar and pestle sits.</summary>
     private static void CookingTable(Prop prop) {
         var body = prop.Body;
@@ -479,17 +496,14 @@ public static class WorldModels {
     private static void Pile(Prop prop) {
         var body = prop.Body;
         Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
-        var stacks = new List<MeshInstance3D>();
+        var slots = new List<Vector3>();
         foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
             for (int x = 0; x < count; x++)
                 for (int z = 0; z < count; z++) {
                     float step = .82f, offset = (count - 1) * step / 2;
-                    var block = Add(body, PileShape.Stack, Mat("b0a58a", .95f), new Vector3(x * step - offset, y, z * step - offset));
-                    block.Visible = false; stacks.Add(block);
+                    slots.Add(new Vector3(x * step - offset, y, z * step - offset));
                 }
-        prop.Stacks = stacks.ToArray();
-        prop.StackItems = new string[stacks.Count];
-        Array.Fill(prop.StackItems, "");
+        prop.Stock = new StockPile(body, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(slots));
     }
 
     private static readonly List<(string Item, int Count)> pileSlots = new();
@@ -497,19 +511,11 @@ public static class WorldModels {
     /// <summary>Refresh only visible inventory memory; the view guards this call with the existing sight check.</summary>
     public static void SyncPile(Prop prop, Thing t, GameData data) {
         t.Inventory.FillStacks(pileSlots);
-        var items = prop.StackItems;
         // Each drawn stack shows the next filled slot, or nothing once the slots run out.
-        for (int i = 0, next = 0; i < items.Length; i++) {
+        for (int i = 0, next = 0; i < prop.Stock!.Count; i++) {
             string item = "";
             while (item == "" && next < pileSlots.Count) item = pileSlots[next++].Item;
-            if (items[i] == item) continue;
-            items[i] = item;
-            var stack = prop.Stacks[i];
-            stack.Visible = item != "";
-            if (item == "") continue;
-            PileShape.SetStock(stack, item, data.Items.TryGetValue(item, out var def) ? def.Color : PileShape.Fallback);
-            // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
-            stack.Rotation = new Vector3(0, item == "coal" ? i * 2.399963f : 0, 0);
+            prop.Stock.Show(i, item, data);
         }
     }
 

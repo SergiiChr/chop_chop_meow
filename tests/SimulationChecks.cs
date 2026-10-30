@@ -72,6 +72,7 @@ public static class SimulationChecks {
         CheckTorchAndWolves(data);
         CheckStacking(data);
         MineChecks.Run(data);
+        ProductionChainChecks.Run(data);
         CheckActualProgression(data);
         MultiplayerChecks.Run(data);
         AllocationChecks.Run(data);

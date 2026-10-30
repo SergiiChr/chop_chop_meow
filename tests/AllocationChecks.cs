@@ -24,6 +24,11 @@ public static class AllocationChecks {
         // A store taking an item it has not held before grows its table once; that rare event is the one byte per tick allowed here (measured 0.2 to 0.5).
         Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 1, warmup: 1200);
 
+        var packing = PackingLine(data, out var stock);
+        // A crate fills about every twenty seconds and goes to the post, whose cart leaves once six are there; a hundred seconds see several crates and a cart.
+        // Opening a crate names it and gives it contents, and a cart leaving or coming back builds its order: those rare events are what this budget allows (measured 1.7 bytes a tick).
+        Check("tick: packing for the post", () => { packing.Tick(1 / 60f); Fed(packing); stock.Inventory.Add("berries", 64 - stock.Inventory["berries"]); stock.Inventory.Add("crate", 64 - stock.Inventory["crate"]); }, maxBytesPerRun: 2, warmup: 1200, runs: 6000);
+
         var mine = WorkingMine(data, out var shaft);
         // Emptying the output each tick keeps the crew digging underground instead of hauling.
         Check("tick: miners underground", () => { mine.Tick(1 / 60f); Fed(mine); shaft.Output!.Items.Clear(); }, warmup: 1200);
@@ -63,6 +68,21 @@ public static class AllocationChecks {
             var w = new Worker { Id = world.S.NextId++, Name = $"Miner {i + 1}", Pos = mine.Pos + cliff.Face * 2, Tool = "steel_pick" };
             world.S.Workers.Add(w); world.Assign(w, mine);
         }
+        return world;
+    }
+
+    /// <summary>A packing station packing berries, its packer, a chest of berries and empty crates, and a post asking for crates of berries that sells on its own.</summary>
+    private static World PackingLine(GameData data, out Thing stock) {
+        var world = new World(data, false);
+        world.S.Time = data.DaySeconds * .3f;
+        var at = Terrain.Spawn;
+        world.Player = at + new Vector2(-20, 0);
+        stock = world.Add("chest", at + new Vector2(2, 0));
+        var packer = world.Add("packer", at); world.SetPacking(packer, "berries");
+        var sign = world.Add("signpost", at + new Vector2(0, 3));
+        world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);
+        var w = new Worker { Id = world.S.NextId++, Name = "Packer", Pos = at + new Vector2(1, 1) };
+        world.S.Workers.Add(w); world.Assign(w, packer);
         return world;
     }
 

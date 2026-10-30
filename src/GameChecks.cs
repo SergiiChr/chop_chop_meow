@@ -56,6 +56,7 @@ public partial class Game {
         var hut = world.Add("hut", at + new Vector2(4, -3));
         var sign = world.Add("signpost", at + new Vector2(-4, -3));
         var farm = world.Add("farm", at + new Vector2(5, 3));
+        var packer = world.Add("packer", at + new Vector2(-5, 4)); world.SetPacking(packer, "berries"); packer.Inventory.Add("berries", 6); packer.Inventory.Add("crate", 2);
         var tree = world.S.Things.Where(t => t.Kind == "tree").MinBy(t => t.Pos.DistanceTo(at))!;
         var worker = new Worker { Id = world.S.NextId++, Name = "Panel Check", Pos = at + Vector2.One, Wage = 5 };
         world.S.Workers.Add(worker); world.Assign(worker, forge); worker.Bag.Add("coal", 2);
@@ -63,7 +64,7 @@ public partial class Game {
         var pages = new (string Name, Action Open)[] {
             ("inventory", () => OpenPage("inventory")), ("craft", () => OpenPage("craft")), ("workers", () => OpenPage("workers")),
             ("chest", () => Select(chest)), ("pile", () => Select(pile)), ("bellows furnace", () => Select(forge)), ("furnace", () => Select(furnace)),
-            ("campfire", () => Select(fire)), ("cabin", () => Select(hut)), ("signpost", () => Select(sign)), ("farm", () => Select(farm)),
+            ("campfire", () => Select(fire)), ("cabin", () => Select(hut)), ("signpost", () => Select(sign)), ("farm", () => Select(farm)), ("packing station", () => Select(packer)),
             ("tree", () => Select(tree)), ("worker", () => Select(worker)),
         };
         foreach (var (name, open) in pages) {
@@ -85,7 +86,7 @@ public partial class Game {
         }
         ClosePanel(); paused = wasPaused;
         world.S.Workers.Remove(worker);
-        foreach (var t in new[] { chest, pile, forge, furnace, fire, hut, sign, farm }) world.S.Things.Remove(t);
+        foreach (var t in new[] { chest, pile, forge, furnace, fire, hut, sign, farm, packer }) world.S.Things.Remove(t);
         await Frames();
     }
     /// <summary>
@@ -287,6 +288,12 @@ public partial class Game {
         Require(sign.Inventory[packed] == 1 && world.S.Backpack[packed] == 0, "Clicking a packed crate must load it into the market input.");
         await Click(Named("sell")!);
         Require(world.S.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
+        await Click(Named("auto_sell")!);
+        Require(sign.AutoSell, "Ticking Send when full must set the post to send the cart on its own.");
+        await Click(Named("filters")!); await Click(Named("filter_add_in")!); await Click(Named($"pick_{World.CrateOf("berries")}")!);
+        Require(sign.Inventory.InputFilter.SetEquals(new[] { World.CrateOf("berries") }) && Named("filter_add_out") == null && Named("pick_berries") == null,
+            "The post's filter must offer crates of goods, not loose goods, and only a row of what workers bring.");
+        await Click(Named("filters_close")!);
         var fetch = Named("fetch");
         Require(sheet.Visible && panel.OffsetLeft == PanelLeft - SheetWidth && fetch != null && fetch.Disabled && fetch.TooltipText == "No worker assigned.", "The price sheet must open beside the panel and explain why no one can fetch prices.");
         Require(Named("buy_wood") == null && Named("buy_berries") == null && Named("buy_water") != null, "The price sheet must only offer what the village sells.");
@@ -307,6 +314,19 @@ public partial class Game {
         Require(!sheet.Visible && panel.Visible, "The price sheet's close button must close it and leave the panel open.");
         world.S.Workers.Remove(hired); world.S.Orders.Clear(); world.S.Things.Remove(sign); world.S.Backpack.Remove(Inventory.Coins, 999);
         signpostTab = "market"; sheetOpen = true; ClosePanel(); await Frames();
+    }
+    /// <summary>A new packing station opens its list of goods; picking one sets what it packs, and a backpack click loads it.</summary>
+    private async Task CheckPackingStation() {
+        ClosePanel(); await Frames();
+        var packer = world.Add("packer", world.Player + new Vector2(2, 0));
+        world.S.Backpack.Add("berries", 5);
+        await Click(view.Screen(packer.Pos, .8f));
+        Require(selected == packer.Id && Named("pack_berries") != null, "A packing station with nothing chosen must open its list of goods.");
+        await Click(Named("pack_berries")!);
+        Require(packer.Packs == "berries" && Named("pack_berries") == null && Named("packed_crate") != null, "Picking berries must set what the station packs and show the crate being packed.");
+        await Click(Slots().First(c => c.TooltipText.StartsWith("Berries ·")));
+        Require(packer.Inventory["berries"] == 1, "Clicking berries in the backpack must load one into the packing station.");
+        world.S.Things.Remove(packer); world.S.Backpack.Remove("berries", 99); ClosePanel(); await Frames();
     }
     /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
     private async Task CheckMine() {
@@ -741,6 +761,7 @@ public partial class Game {
             await CheckWheelOverPanel();
             await CheckCabinAndCanopy();
             await CheckSignpost();
+            await CheckPackingStation();
 
             world.S.Milestones.UnionWith(new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" });
             await Frames(3);
