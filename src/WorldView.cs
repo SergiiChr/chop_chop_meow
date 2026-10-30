@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Godot;
 using static ChopChopMeow.ModelKit;
 
@@ -27,7 +26,7 @@ public partial class WorldView : Node3D {
     public string? SelectedTool;
     public bool Paused;
     public bool AnimationReview;
-    /// <summary>Fixed daylight landscape fixture for matching environment trial screenshots.</summary>
+    /// <summary>A fixed daylight landscape view with the lake and sea waves held at one moment, for <c>--environment-review</c>; set before the view enters the tree.</summary>
     public bool EnvironmentReview;
     public bool EnvironmentReviewFog;
     public Vector2? EnvironmentCenter;
@@ -50,11 +49,13 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<int, Avatar> others = new();
     // The host keeps the original teal; each guest keeps the first one free when it joined.
     private static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
-    private readonly Dictionary<int, (ActorRig Rig, ActorState State)> crew = new();
+    private readonly Dictionary<int, (ActorRig Rig, ActorState State, (MeshInstance3D Mesh, Material Material)[] Parts)> crew = new();
     private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
     private readonly Dictionary<int, float> pumping = new();
-    private readonly Dictionary<string, Prop> ghosts = new();
+    /// <summary>Build-mode ghosts by building kind, made hidden while loading; mines have one per cliff ore instead.</summary>
+    private readonly Dictionary<string, Prop> ghosts = new(), mineGhosts = new();
+    private Prop? ghost;
     private MeshInstance3D selectRing = null!, hoverRing = null!, workerRing = null!, playerRing = null!, placeTile = null!;
     private float pulseRemaining;
     private ActorAction pulseAction;
@@ -66,6 +67,19 @@ public partial class WorldView : Node3D {
     private static readonly StandardMaterial3D GhostValid = Flat(new Color(.55f, .95f, .45f, .45f));
     private static readonly StandardMaterial3D GhostBlocked = Flat(new Color(1, .35f, .3f, .5f));
     private static readonly StandardMaterial3D NightGlass = Mat("ffd58a", .3f, 0, 1.6f);
+    private static readonly StandardMaterial3D Sparks = Flat(new Color("ffd27a"));
+    private static readonly StandardMaterial3D GatherDust = Flat(new Color(.8f, .78f, .7f, .45f));
+    private static readonly StandardMaterial3D Splash = Flat(new Color(.7f, .88f, .95f, .8f));
+    private static readonly StandardMaterial3D Embers = Flat(new Color("ffb347"));
+    private static readonly StandardMaterial3D FallDust = Flat(new Color(.7f, .66f, .52f, .45f));
+    private static readonly StandardMaterial3D Cinders = Flat(new Color("ff9a3a"));
+    private static readonly StandardMaterial3D DayGlass = Mat("8fb4c4", .15f, .2f);
+    private static readonly Color TagText = new Color("f5ecd1");
+    private static readonly Color BarTrack = new Color("2b4135");
+    private static readonly Color BarFill = new Color("e5bf68");
+    private static readonly Color HeatReady = new Color("f0a03c");
+    private static readonly Color HeatLow = new Color("8a5a46");
+    private static readonly Color HeatTick = new Color("f2e8cf");
     private readonly ShaderMaterial fog = new() { Shader = new Shader { Code = FogShader }, RenderPriority = (int)Material.RenderPriorityMax };
     private Image explored = null!;
     private ImageTexture exploredTexture = null!;
@@ -122,10 +136,10 @@ public partial class WorldView : Node3D {
         sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, ShadowBias = .02f, ShadowNormalBias = .4f, LightAngularDistance = 2, LightEnergy = DaySun };
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
-        explored = Image.CreateFromData(World.MapSize, World.MapSize, false, Image.Format.L8, World.S.Explored);
+        explored = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.L8, World.S.Explored);
         exploredTexture = ImageTexture.CreateFromImage(explored);
         fog.SetShaderParameter("explored", exploredTexture);
-        fog.SetShaderParameter("map_size", World.MapSize);
+        fog.SetShaderParameter("map_size", Terrain.Size);
         // A screen-sized quad on the camera; its shader places it over the whole view, so it is never culled and casts no shadow.
         camera.AddChild(new MeshInstance3D {
             Mesh = new QuadMesh { Size = new Vector2(2, 2) },
@@ -139,6 +153,7 @@ public partial class WorldView : Node3D {
         BuildEffects(scene);
         PileShape.Warm(World.Data);
         WorldModels.Warm();
+        BuildGhosts();
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
         selectRing = Ring(new Color(.95f, .82f, .4f, .85f));
         hoverRing = Ring(new Color(1, .95f, .75f, .55f));
@@ -170,7 +185,7 @@ public partial class WorldView : Node3D {
         fog.SetShaderParameter(FogMemory, new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
         if (exploredRevision == World.ExploredRevision) return;
         exploredRevision = World.ExploredRevision;
-        explored.SetData(World.MapSize, World.MapSize, false, Image.Format.L8, World.S.Explored);
+        explored.SetData(Terrain.Size, Terrain.Size, false, Image.Format.L8, World.S.Explored);
         exploredTexture.Update(explored);
     }
 
@@ -392,13 +407,13 @@ public partial class WorldView : Node3D {
             playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
         }
         bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
-        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, SelectedTool, World.Me.Sprinting);
+        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting);
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
         if (action == ActorAction.Idle && StationToHammer() is Thing anvil) { action = ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
         if (World.S.Mauled) {
-            mauledFrom = World.S.Wolves.FirstOrDefault(w => w.Pinning)?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
+            mauledFrom = PinningWolf()?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
             // Facing away from the wolf at the throat lays the head toward it once the rig tips onto its back.
             action = World.Dead ? ActorAction.Devoured : ActorAction.Mauled; target = World.Player * 2 - mauledFrom; subject = null;
             downedFor += dt;
@@ -423,7 +438,9 @@ public partial class WorldView : Node3D {
         UpdateOthers(dt);
         foreach (var worker in World.S.Workers) {
             if (!crew.TryGetValue(worker.Id, out var entry)) {
-                entry = (new ActorRig(ActorSkin.Worker), new ActorState { Position = worker.Pos });
+                var rig = new ActorRig(ActorSkin.Worker);
+                // Gathered and warmed now, so the first walk home at dusk makes no faded materials.
+                entry = (rig, new ActorState { Position = worker.Pos }, FadeParts(rig.Root));
                 scene.AddChild(entry.Rig.Root); crew.Add(worker.Id, entry);
             }
             var state = entry.State;
@@ -439,7 +456,7 @@ public partial class WorldView : Node3D {
             Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
             entry.Rig.Root.Visible = World.Sees(worker);
             float trip = worker.Away > 0 ? World.TripLeg(1 - worker.Away / World.Data.TradeSeconds) : worker.Commute / (World.Data.TradeSeconds / 2);
-            Fade(entry.Rig.Root, TripFade(trip));
+            Fade(entry.Parts, entry.Rig.Root, TripFade(trip));
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest ? null : assignment);
         }
         // Removing while walking a dictionary is allowed, so no copy of its keys is needed.
@@ -473,7 +490,7 @@ public partial class WorldView : Node3D {
         }
         // Each strike of steel on flint throws a few sparks onto the torch head.
         if (state.Action == ActorAction.Kindle && (state.Struck(.1875f) || state.Struck(.4375f) || state.Struck(.6875f) || state.Struck(.9375f))) {
-            Burst(rig.Flame.GlobalPosition, Flat(new Color("ffd27a")), 7, 2.2f, .3f, 6, .022f);
+            Burst(rig.Flame.GlobalPosition, Sparks, 7, 2.2f, .3f, 6, .022f);
             Sounds?.Play("anvil_work", at);
         }
     }
@@ -492,7 +509,7 @@ public partial class WorldView : Node3D {
             bool moving = p.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var target = World.Find(p.GatherTarget);
             bool gathering = target != null && p.Pos.DistanceTo(World.GatherAt(target, p.Pos)) < 2.5f;
-            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Held, p.Sprinting);
+            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting);
             var facing = gathering ? World.GatherAt(target!, p.Pos) : p.Pos;
             if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; }
             if (p.Mauled) action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
@@ -583,15 +600,15 @@ public partial class WorldView : Node3D {
             case "stone" or "iron" or "coal" or "tin" or "mine":
                 var color = subject.Kind is "stone" or "mine" ? "9a9d99" : subject.Kind == "iron" ? "a35a2e" : subject.Kind == "tin" ? "b9bbb4" : "26282b";
                 Burst(side + Vector3.Up * .5f, Mat(color), 6, 2.4f, .5f, 9, .07f);
-                Burst(side + Vector3.Up * .4f, Flat(new Color(.8f, .78f, .7f, .45f)), 3, .5f, .9f, -.3f, .16f, 1.5f);
-                if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Flat(new Color("ffd27a")), 5, 3.2f, .3f, 4, .025f);
+                Burst(side + Vector3.Up * .4f, GatherDust, 3, .5f, .9f, -.3f, .16f, 1.5f);
+                if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Sparks, 5, 3.2f, .3f, 4, .025f);
                 break;
             case "wolf_corpse": Burst(side + Vector3.Up * .3f, Mat("7a1414", .6f), 5, 1.4f, .45f, 8, .04f); break;
             case "berries": Burst(To3(subject.Pos, .7f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f); break;
-            case "water": Burst(side + Vector3.Up * .05f, Flat(new Color(.7f, .88f, .95f, .8f)), 6, 1.6f, .45f, 7, .045f); break;
-            case "anvil": Burst(To3(subject.Pos) + prop.Vent, Flat(new Color("ffd27a")), 10, 3, .35f, 5, .025f); break;
+            case "water": Burst(side + Vector3.Up * .05f, Splash, 6, 1.6f, .45f, 7, .045f); break;
+            case "anvil": Burst(To3(subject.Pos) + prop.Vent, Sparks, 10, 3, .35f, 5, .025f); break;
             case "reinforced":
-                if (subject.Heat > 10) Burst(To3(subject.Pos, .9f) + new Vector3(0, 0, .5f), Flat(new Color("ffb347")), 6, 1.4f, .6f, -1, .03f);
+                if (subject.Heat > 10) Burst(To3(subject.Pos, .9f) + new Vector3(0, 0, .5f), Embers, 6, 1.4f, .6f, -1, .03f);
                 break;
         }
     }
@@ -675,7 +692,7 @@ public partial class WorldView : Node3D {
                 float before = prop.Fall; prop.Fall += dt;
                 float drop = Math.Min(1, prop.Fall / 1.1f);
                 sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
-                if (before < 1.1f && prop.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, Flat(new Color(.7f, .66f, .52f, .45f)), 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
+                if (before < 1.1f && prop.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
                 SetFade(prop.SwayParts, Math.Clamp((prop.Fall - 1.2f) / .5f, 0, 1));
                 sway.Visible = prop.Fall < 1.7f;
                 prop.Stump!.Visible = true;
@@ -727,7 +744,7 @@ public partial class WorldView : Node3D {
                 prop.Fire.Scale = new Vector3(1 + flicker * .08f, .85f + MathF.Abs(MathF.Sin(Elapsed * 9 + t.Id)) * .3f, 1 - flicker * .08f);
                 prop.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
                 prop.Light!.LightEnergy = burning ? (1.2f + flicker * .3f) * (.35f + night * 1.4f) : 0;
-                if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Flat(new Color("ff9a3a")), 1, .5f, 1.1f, -1.4f, .025f);
+                if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Cinders, 1, .5f, 1.1f, -1.4f, .025f);
                 Smoke(prop, t, burning, dt, CampfireSmoke);
                 break;
             case "bench":
@@ -777,8 +794,12 @@ public partial class WorldView : Node3D {
                 if (dt > 0 && near && prop.Open == 0) Sounds?.Play(World.S.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
                 prop.Open = Mathf.MoveToward(prop.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
                 prop.Door!.RotationDegrees = new Vector3(0, -100 * Ease(prop.Open), 0);
-                prop.Window!.MaterialOverride = night > .45f ? NightGlass : Mat("8fb4c4", .15f, .2f);
-                prop.Light!.LightEnergy = night > .45f ? .9f : 0;
+                bool lit = night > .45f;
+                if (lit != prop.Lit) {
+                    prop.Lit = lit;
+                    prop.Window!.MaterialOverride = lit ? NightGlass : DayGlass;
+                    prop.Light!.LightEnergy = lit ? .9f : 0;
+                }
                 break;
             case "mine":
                 // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty, and the lantern is out.
@@ -812,6 +833,10 @@ public partial class WorldView : Node3D {
     // Lookups that would otherwise capture the thing in a lambda, which allocates on every call for every thing drawn.
     private WorldModels.WolfModel? Dying(Vector2 at) {
         foreach (var (wolf, model) in wolves) if (!World.S.Wolves.Contains(wolf) && model.Last.DistanceTo(at) < 2) return model;
+        return null;
+    }
+    private Wolf? PinningWolf() {
+        foreach (var w in World.S.Wolves) if (w.Pinning) return w;
         return null;
     }
     private bool AnyPlayerNear(Vector2 at, float radius) {
@@ -899,7 +924,7 @@ public partial class WorldView : Node3D {
     /// <summary>Tufts of fur knocked loose by a hit, and embers off a burning torch.</summary>
     private void FurAndEmbers(Vector3 at) {
         Burst(at, Mat("6f746c"), 5, 1.8f, .5f, 6, .045f);
-        if (World.TorchFlare > 0) Burst(at, Flat(new Color("ffb347")), 9, 2.8f, .35f, 3, .03f);
+        if (World.TorchFlare > 0) Burst(at, Embers, 9, 2.8f, .35f, 3, .03f);
     }
 
     /// <summary>Fully drawn for the first part of a trip, then fading to nothing at the turn.</summary>
@@ -911,11 +936,21 @@ public partial class WorldView : Node3D {
     /// <summary>Fully drawn for most of the walk, fading out over its last quarter.</summary>
     private static float CartFade(float leg) => Math.Clamp((leg - .75f) / .25f, 0, 1);
     private readonly Dictionary<Node, float> fades = new();
+    /// <summary>Rounds a fade to tenths and records it for the node, returning false when the node already shows that step.</summary>
+    private bool FadeStep(Node node, float transparency, out float step) {
+        step = MathF.Round(transparency * 10) / 10;
+        if (fades.GetValueOrDefault(node) == step) return false;
+        fades[node] = step; return true;
+    }
+
     /// <summary>Applies a fade only when it changes, since it walks every mesh under the node.</summary>
     private void Fade(Node node, float transparency) {
-        float step = MathF.Round(transparency * 10) / 10;
-        if (fades.GetValueOrDefault(node) == step) return;
-        fades[node] = step; SetFade(node, step);
+        if (FadeStep(node, transparency, out float step)) SetFade(node, step);
+    }
+
+    /// <summary>Fades a model through its gathered parts, which walks no nodes.</summary>
+    private void Fade((MeshInstance3D Mesh, Material Material)[] parts, Node node, float transparency) {
+        if (FadeStep(node, transparency, out float step)) SetFade(parts, step);
     }
 
     private void SyncCarts(float dt) {
@@ -924,7 +959,7 @@ public partial class WorldView : Node3D {
             float phase = order.Elapsed / World.Data.TradeSeconds;
             // The cart sets off down the valley and fades out on its way to Bramblewick, then fades back in on return.
             float leg = CartLeg(order.Elapsed);
-            var pos = (sign?.Pos ?? World.Spawn) + Terrain.Seaward * CartDistance * leg;
+            var pos = (sign?.Pos ?? Terrain.Spawn) + Terrain.Seaward * CartDistance * leg;
             if (!carts.TryGetValue(order, out var cart)) {
                 cart = new WorldModels.CartModel { Last = pos };
                 scene.AddChild(cart.Root); carts[order] = cart;
@@ -962,21 +997,35 @@ public partial class WorldView : Node3D {
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
-        foreach (var (kind, ghost) in ghosts) ghost.Root.Visible = kind == BuildMode;
         placeTile.Visible = BuildMode != "";
-        if (BuildMode == "") return;
-        var at = World.Snap(BuildMode, ToWorld(Mouse).Round());
-        bool valid = World.PlacementBlock(BuildMode, at) == null;
-        if (!ghosts.TryGetValue(BuildMode, out var shown)) {
-            shown = WorldModels.Build(new Thing { Kind = BuildMode, Pos = at });
-            SetFade(shown.Root, .35f);
-            scene.AddChild(shown.Root); ghosts[BuildMode] = shown;
+        var at = BuildMode == "" ? Vector2.Zero : World.Snap(BuildMode, ToWorld(Mouse).Round());
+        var shown = BuildMode == "" ? null : BuildMode == "mine" ? mineGhosts[World.CliffAt(at).Ore] : ghosts[BuildMode];
+        if (shown != ghost) {
+            if (ghost != null) ghost.Root.Visible = false;
+            if (shown != null) shown.Root.Visible = true;
+            ghost = shown;
         }
-        if (shown.Tint != (valid ? 1 : 0)) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid ? 1 : 0; }
+        if (shown == null) return;
+        bool valid = World.PlacementBlock(BuildMode, at) == null;
+        if (shown.Tint != valid) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid; }
         shown.Root.Position = To3(at);
         if (BuildMode == "mine") shown.Body.Rotation = WorldModels.MineYaw(at);
         placeTile.Position = To3(at, .02f);
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
+    }
+
+    /// <summary>Builds a hidden, faded ghost of every building and of a crate, so picking one in build mode compiles nothing mid-game.</summary>
+    private void BuildGhosts() {
+        Prop Ghost(string kind, Vector2 at) {
+            var built = WorldModels.Build(new Thing { Kind = kind, Pos = at });
+            SetFade(built.Root, .35f);
+            built.Root.Visible = false;
+            scene.AddChild(built.Root);
+            return built;
+        }
+        foreach (var kind in World.Data.Buildings.Keys) if (kind != "mine") ghosts[kind] = Ghost(kind, Vector2.Zero);
+        ghosts["crate"] = Ghost("crate", Vector2.Zero);
+        foreach (var cliff in World.Cliffs) if (!mineGhosts.ContainsKey(cliff.Ore)) mineGhosts[cliff.Ore] = Ghost("mine", World.MineSpot(cliff));
     }
 
     private void Mark(MeshInstance3D ring, Thing? t, float lift) {
@@ -1031,7 +1080,7 @@ public partial class WorldView : Node3D {
     private void Tag(Vector2 at, string text) {
         var size = font.GetStringSize(text, HorizontalAlignment.Left, -1, 14);
         overlay.DrawStyleBox(tagBox, new Rect2(at - new Vector2(size.X / 2 + 6, 18), size + new Vector2(12, 6)));
-        overlay.DrawString(font, at - new Vector2(size.X / 2, 0), text, HorizontalAlignment.Left, -1, 14, new Color("f5ecd1"));
+        overlay.DrawString(font, at - new Vector2(size.X / 2, 0), text, HorizontalAlignment.Left, -1, 14, TagText);
     }
 
     private void PaintOverlay() {
@@ -1041,16 +1090,16 @@ public partial class WorldView : Node3D {
         foreach (var t in World.S.Things) {
             if (!t.Processing || !World.Sees(t.Pos) || !World.Data.Recipes.TryGetValue(t.Recipe, out var r)) continue;
             var p = Screen(t.Pos);
-            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), new Color("2b4135"));
-            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), new Color("e5bf68"));
+            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), BarTrack);
+            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), BarFill);
         }
         // Forge heat under each reinforced furnace, with a tick at the clear bar steel needs.
         foreach (var t in World.S.Things) {
             if (t.Kind != "reinforced" || !World.Sees(t.Pos)) continue;
             var p = Screen(t.Pos) + new Vector2(-28, 18);
-            overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), new Color("2b4135"));
-            overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? new Color("f0a03c") : new Color("8a5a46"));
-            overlay.DrawLine(p + new Vector2(56 * World.SteelHeat / 100, -2), p + new Vector2(56 * World.SteelHeat / 100, 7), new Color("f2e8cf"), 2);
+            overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), BarTrack);
+            overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? HeatReady : HeatLow);
+            overlay.DrawLine(p + new Vector2(56 * World.SteelHeat / 100, -2), p + new Vector2(56 * World.SteelHeat / 100, 7), HeatTick, 2);
         }
         // Only the hovered object is named; the side panel already names the selection.
         var hovered = World.Find(Hover);

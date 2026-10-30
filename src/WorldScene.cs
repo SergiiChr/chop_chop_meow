@@ -19,9 +19,9 @@ public partial class WorldView {
         BuildTerrain3D(parent, grass);
         // The arrival clearing: overlapping translucent discs soften into the grass.
         for (int ring = 0; ring < 4; ring++)
-            Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(World.Spawn.X, .003f + ring * .0005f, World.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
+            Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(Terrain.Spawn.X, .003f + ring * .0005f, Terrain.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
         // A narrow, worn trail from the clearing down the valley to the shore, the way the carts go.
-        float from = Terrain.Along(World.Spawn), across = Terrain.Across(World.Spawn);
+        float from = Terrain.Along(Terrain.Spawn), across = Terrain.Across(Terrain.Spawn);
         for (int layer = 3; layer > 0; layer--) {
             float width = .33f + layer * .12f;
             var strip = new SurfaceTool();
@@ -34,14 +34,12 @@ public partial class WorldView {
             }
             Add(parent, strip.Commit(), Flat(new Color(.67f, .6f, .43f, layer == 1 ? .3f : .16f), true), Vector3.Zero);
         }
-        BuildSea(parent);
+        // Sea and its feathered bank follow the coastline at the valley's mouth.
+        ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
         BuildLake(parent);
         foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
         BuildPlacedEnvironment(parent);
     }
-
-    /// <summary>Sea and its feathered bank follow the coastline at the valley's mouth.</summary>
-    private void BuildSea(Node3D parent) => ShorelineAppearance.BuildCoast(parent);
 
     /// <summary>A jagged wall of faceted columns with ore seams on the face and scree at its foot.</summary>
     private static void BuildCliff(Node3D parent, Cliff cliff) {
@@ -74,22 +72,21 @@ public partial class WorldView {
     private void BuildLake(Node3D parent) {
         var at = To3(Terrain.Lake);
         // The bank and water follow the same shore line that bounds walking.
-        float Shore(float angle) => Terrain.Shore(angle);
         ShorelineAppearance.BuildLakeBank(parent);
-        LakeAppearance.BuildLakeAppearance(parent);
+        LakeAppearance.BuildLakeAppearance(parent, EnvironmentReview);
         var rng = new Random(77);
         const int stones = 150;
         for (int i = 0; i < stones; i++) {
             float angle = i * Mathf.Tau / stones + (float)rng.NextDouble() * .03f;
             // Stones collect in irregular patches instead of forming an evenly spaced border.
             if (MathF.Sin(angle * 7 + 1.2f) + .55f * MathF.Sin(angle * 13) < -.05f) continue;
-            float r = Shore(angle) + .12f + (float)rng.NextDouble() * .95f;
+            float r = Terrain.Shore(angle) + .12f + (float)rng.NextDouble() * .95f;
             var stone = Sphere(parent, .1f + (float)rng.NextDouble() * .14f, at + new Vector3(MathF.Cos(angle) * r, .03f, MathF.Sin(angle) * r), Mat(i % 3 == 0 ? "a3a7a3" : "8d918e", .9f), new Vector3(1.2f, .5f, 1), 6);
             stone.RotationDegrees = new Vector3(0, i * 47, 0);
         }
         // Reed clumps with cattails along the banks, lily pads near the shore.
         for (float angle = .2f; angle < Mathf.Tau; angle += .45f + (float)rng.NextDouble() * .5f) {
-            var clump = at + new Vector3(MathF.Cos(angle) * (Shore(angle) - .1f), 0, MathF.Sin(angle) * (Shore(angle) - .1f));
+            var clump = at + new Vector3(MathF.Cos(angle) * (Terrain.Shore(angle) - .1f), 0, MathF.Sin(angle) * (Terrain.Shore(angle) - .1f));
             for (int i = 0; i < 7; i++) {
                 var offset = new Vector3((float)rng.NextDouble() - .5f, 0, (float)rng.NextDouble() - .5f) * .6f;
                 float height = .7f + (float)rng.NextDouble() * .6f;
@@ -98,7 +95,7 @@ public partial class WorldView {
             }
         }
         for (int i = 0; i < 24; i++) {
-            float angle = (float)rng.NextDouble() * Mathf.Tau, r = Shore(angle) - 1 - (float)rng.NextDouble() * 3;
+            float angle = (float)rng.NextDouble() * Mathf.Tau, r = Terrain.Shore(angle) - 1 - (float)rng.NextDouble() * 3;
             Cylinder(parent, .28f, .28f, .01f, at + new Vector3(MathF.Cos(angle) * r, .035f, MathF.Sin(angle) * r), Mat("5b8a3e", .7f), null, 9);
         }
     }

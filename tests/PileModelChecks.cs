@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using Godot;
+using static Checks;
 
 namespace ChopChopMeow;
 
@@ -36,9 +37,5 @@ public static class PileModelChecks {
             WorldModels.SyncPile(first, thing, data);
             Require(first.Stacks.All(s => !s.Visible), "emptying a pile must hide all contents");
         } finally { first.Root.Free(); second.Root.Free(); }
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException(message);
     }
 }

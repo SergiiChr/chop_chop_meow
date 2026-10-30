@@ -4,17 +4,19 @@
   ./build.py play    Set up the local tools, then run the game. Forward flags after --.
   ./build.py setup   Download tools if needed, compile C#, and import the project.
   ./build.py editor  Set up the project and open the Godot editor.
-  ./build.py test    Run the simulation, UI and two-process network checks headlessly.
-  ./build.py build   Test, export, and smoke-test build/ChopChopMeow.x86_64.
-  ./build.py lint    Compile the C# project and verify its formatting.
+  ./build.py check   Run every offline check: Python types and style, C# compile and
+                     format, then the simulation, UI and two-process network tests.
+  ./build.py test    Run only the simulation, UI and two-process network tests.
+  ./build.py build   Check, export, and smoke-test build/ChopChopMeow.x86_64.
   ./build.py icons   Render item and building icons from their models into assets/icons.
 
-Godot, .NET, and export templates are kept under .tools/. Set GODOT_BIN to use an
+Godot, .NET, the Python check tools and export templates are kept under .tools/. Set GODOT_BIN to use an
 existing Godot 4.7.2 .NET executable.
 """
 
 from __future__ import annotations
 
+import hashlib
 import heapq
 import itertools
 import os
@@ -54,6 +56,8 @@ BASE_URL = (
     f"https://github.com/godotengine/godot/releases/download/{GODOT_VERSION}-stable"
 )
 OUTPUT = BUILD / "ChopChopMeow.x86_64"
+PYTHON_TOOLS = TOOLS / "python"
+REQUIREMENTS = ROOT / "requirements-dev.txt"
 ERRORS = re.compile(r"SCRIPT ERROR|Parse Error|ERROR:|Unhandled exception")
 
 
@@ -79,6 +83,23 @@ def download(url: str, target: Path) -> None:
                 raise SystemExit(f"Could not download {url}: {error}") from error
             print(f"Download failed ({error}); retrying...")
             time.sleep(2 * (attempt + 1))
+
+
+def fetch_pinned(url: str, archive: Path, sha256: str) -> None:
+    """Downloads url into archive unless it is already there, and deletes it and stops when its SHA-256 is not sha256."""
+    if not archive.is_file():
+        print(f"Downloading {url}...")
+        download(url, archive)
+    digest = hashlib.sha256()
+    with archive.open("rb") as source:
+        while block := source.read(1 << 20):
+            digest.update(block)
+    actual = digest.hexdigest()
+    if actual != sha256:
+        archive.unlink()
+        raise SystemExit(
+            f"{archive.name} SHA-256 mismatch: expected {sha256}, got {actual}"
+        )
 
 
 def dotnet_env() -> dict[str, str]:
@@ -206,7 +227,7 @@ def build_project(env: dict[str, str]) -> None:
         ["dotnet", "build", "--nologo", "-v", "quiet", ROOT / "ChopChopMeow.csproj"],
         env=env,
     )
-    import_args = [GODOT, "--headless", "--path", ROOT, "--import"]
+    import_args: list[str | Path] = [GODOT, "--headless", "--path", ROOT, "--import"]
     try:
         run_godot("import", import_args, env)
     except SystemExit as error:
@@ -215,11 +236,16 @@ def build_project(env: dict[str, str]) -> None:
         # exit after editor initialization, with no reported engine errors.
         log = BUILD / "import.log"
         text = log.read_text(errors="replace") if log.is_file() else ""
-        native = ROOT / "addons" / "terrain_3d" / "terrain.gdextension"
-        if "import failed (exit -11)" not in str(error) or not native.is_file() or "loading_editor_layout" not in text or ERRORS.search(text):
+        if (
+            "import failed (exit -11)" not in str(error)
+            or "loading_editor_layout" not in text
+            or ERRORS.search(text)
+        ):
             raise
         shutil.copyfile(log, BUILD / "terrain3d-first-import.log")
-        print("Terrain3D first import crashed during editor shutdown; retrying once. See build/terrain3d-first-import.log.")
+        print(
+            "Terrain3D first import crashed during editor shutdown; retrying once. See build/terrain3d-first-import.log."
+        )
         run_godot("import", import_args, env)
 
 
@@ -289,6 +315,30 @@ def lag_proxy(stop: threading.Event, delay: float = 0.08, loss: float = 0.05) ->
         upstream.close()
 
 
+def python_checks() -> None:
+    """Install the pinned check tools into .tools/python when their list changes, then run them."""
+    bin_dir = PYTHON_TOOLS / "bin"
+    stamp = PYTHON_TOOLS / "requirements.txt"
+    if not stamp.is_file() or stamp.read_text() != REQUIREMENTS.read_text():
+        print("Installing pinned Python check tools into .tools/python...")
+        shutil.rmtree(PYTHON_TOOLS, ignore_errors=True)
+        command([sys.executable, "-m", "venv", PYTHON_TOOLS])
+        command(
+            [
+                bin_dir / "pip",
+                "install",
+                "-q",
+                "--disable-pip-version-check",
+                "-r",
+                REQUIREMENTS,
+            ]
+        )
+        shutil.copyfile(REQUIREMENTS, stamp)
+    command([bin_dir / "mypy"])
+    command([bin_dir / "ruff", "check"])
+    command([bin_dir / "ruff", "format", "--check"])
+
+
 def test(env: dict[str, str]) -> None:
     run_godot(
         "test",
@@ -352,9 +402,8 @@ def package_linux() -> Path:
         BUILD / "data_ChopChopMeow_linuxbsd_x86_64",
         ROOT / "README.md",
         ROOT / "LICENSE",
+        BUILD / "libterrain.linux.release.x86_64.so",
     ]
-    if (ROOT / "addons" / "terrain_3d" / "terrain.gdextension").is_file():
-        paths.append(BUILD / "libterrain.linux.release.x86_64.so")
     archive = BUILD / "ChopChopMeow-linux-x86_64.tar.gz"
     with tarfile.open(archive, "w:gz") as bundle:
         for path in paths:
@@ -367,7 +416,9 @@ def main() -> int:
     if action in {"-h", "--help", "help"}:
         print(__doc__)
         return 0
-    if action in {"play", "run", "editor", "setup", "test", "build", "lint", "icons"}:
+    if action in {"play", "run", "editor", "setup", "check", "test", "build", "icons"}:
+        if action in {"check", "build"}:
+            python_checks()
         env = setup()
         if action in {"play", "run"}:
             forwarded = sys.argv[2:]
@@ -377,10 +428,20 @@ def main() -> int:
             os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *game_args], env)
         if action == "editor":
             os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], env)
+        if action in {"check", "build"}:
+            command(
+                [
+                    "dotnet",
+                    "format",
+                    ROOT / "ChopChopMeow.csproj",
+                    "--verify-no-changes",
+                ],
+                env=env,
+            )
+            test(env)
         if action == "test":
             test(env)
-        elif action == "build":
-            test(env)
+        if action == "build":
             fetch_templates(env)
             run_godot(
                 "export",
@@ -405,16 +466,6 @@ def main() -> int:
             archive = package_linux()
             print(
                 f"Built {OUTPUT.relative_to(ROOT)}\nPortable bundle: {archive.relative_to(ROOT)}"
-            )
-        elif action == "lint":
-            command(
-                [
-                    "dotnet",
-                    "format",
-                    ROOT / "ChopChopMeow.csproj",
-                    "--verify-no-changes",
-                ],
-                env=env,
             )
         elif action == "icons":
             # Rendering needs a real window; the headless renderer draws nothing.

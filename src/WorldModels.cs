@@ -20,7 +20,8 @@ public sealed class Prop {
     public Dictionary<string, Node3D> Racked = new();
     /// <summary>A pile's stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
     public MeshInstance3D[] Stacks = Array.Empty<MeshInstance3D>();
-    public string StackKey = "";
+    /// <summary>The item each pile stack shows, or "" for a hidden stack.</summary>
+    public string[] StackItems = Array.Empty<string>();
     /// <summary>A farm plot's looks by <see cref="World.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
     public Node3D[] Crops = Array.Empty<Node3D>();
     public Node3D[] Pleats = Array.Empty<Node3D>();
@@ -34,8 +35,12 @@ public sealed class Prop {
     public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
     public string Kind = "";
     public float Fade, Fall = -1, Open, Shake, Puff;
-    public int LastCount, Tint = -1;
+    public int LastCount;
+    /// <summary>Whether a build-mode ghost is tinted as placeable, or null before its first tint.</summary>
+    public bool? Tint;
     public bool Seen;
+    /// <summary>Whether a hut shows its night window glow and lamp.</summary>
+    public bool Lit;
     /// <summary>Whether the model is drawn, kept here so it is set in Godot only when it changes.</summary>
     public bool Shown = true;
     public Prop() { Body = Pivot(Root, Vector3.Zero); }
@@ -48,20 +53,20 @@ public static class WorldModels {
     public const uint MarkLayer = 1 << 12;
 
     /// <summary>
-    /// Builds the shared meshes and outfit palettes of models that first appear mid-game while the world loads.
-    /// A trade cart with its courier, a dropped backpack and fresh leaf patches then only add nodes over cached resources.
+    /// Builds the shared meshes, outfit palettes and shaders of models that first appear mid-game while the world loads.
+    /// A trade cart with its courier, a wolf, a dropped backpack and fresh leaf patches then only add nodes over cached resources.
     /// </summary>
     public static void Warm() {
-        new CartModel().Root.Free();
+        foreach (var root in new[] { new CartModel().Root, new WolfModel().Root }) { ModelKit.BuildShaders(root); root.Free(); }
         _ = BackpackShape.Details; _ = BackpackShape.Flap;
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
         scorchTexture ??= ScorchTexture();
     }
-    /// <summary>Full deposit sizes from world generation; piles shrink toward half size as they are worked.</summary>
+    /// <summary>How full a resource is against its size from world generation; the view shrinks deposits toward 55% as they are worked.</summary>
     public static float Fullness(Thing t) => t.Kind switch {
-        "stone" => t.Remaining / 64f,
-        "iron" or "coal" or "tin" => t.Remaining / 400f,
-        "wolf_corpse" => t.Remaining / 4f,
+        "stone" => t.Remaining / (float)World.StonePile,
+        "iron" or "coal" or "tin" => t.Remaining / (float)World.DepositOre,
+        "wolf_corpse" => t.Remaining / (float)World.WolfMeat,
         "leaves" => t.Remaining / (float)World.LeafPatch,
         _ => 1
     };
@@ -483,21 +488,28 @@ public static class WorldModels {
                     block.Visible = false; stacks.Add(block);
                 }
         prop.Stacks = stacks.ToArray();
+        prop.StackItems = new string[stacks.Count];
+        Array.Fill(prop.StackItems, "");
     }
+
+    private static readonly List<(string Item, int Count)> pileSlots = new();
 
     /// <summary>Refresh only visible inventory memory; the view guards this call with the existing sight check.</summary>
     public static void SyncPile(Prop prop, Thing t, GameData data) {
-        var stacks = t.Inventory.Stacks().Select(s => s.Item).ToList();
-        string key = string.Join(",", stacks);
-        if (key == prop.StackKey) return;
-        prop.StackKey = key;
-        for (int i = 0; i < prop.Stacks.Length; i++) {
-            prop.Stacks[i].Visible = i < stacks.Count;
-            if (i < stacks.Count) {
-                PileShape.SetStock(prop.Stacks[i], stacks[i], data.Items.TryGetValue(stacks[i], out var def) ? def.Color : PileShape.Fallback);
-                // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
-                prop.Stacks[i].Rotation = new Vector3(0, stacks[i] == "coal" ? i * 2.399963f : 0, 0);
-            }
+        t.Inventory.FillStacks(pileSlots);
+        var items = prop.StackItems;
+        // Each drawn stack shows the next filled slot, or nothing once the slots run out.
+        for (int i = 0, next = 0; i < items.Length; i++) {
+            string item = "";
+            while (item == "" && next < pileSlots.Count) item = pileSlots[next++].Item;
+            if (items[i] == item) continue;
+            items[i] = item;
+            var stack = prop.Stacks[i];
+            stack.Visible = item != "";
+            if (item == "") continue;
+            PileShape.SetStock(stack, item, data.Items.TryGetValue(item, out var def) ? def.Color : PileShape.Fallback);
+            // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
+            stack.Rotation = new Vector3(0, item == "coal" ? i * 2.399963f : 0, 0);
         }
     }
 
@@ -580,7 +592,7 @@ public static class WorldModels {
 
     /// <summary>Turns a mine's local +Z along its rails, out of the cliff's end.</summary>
     public static Vector3 MineYaw(Vector2 p) {
-        var way = World.MineOut(World.CliffAt(p));
+        var way = World.CliffAt(p).Face;
         return new Vector3(0, MathF.Atan2(way.X, way.Y), 0);
     }
 

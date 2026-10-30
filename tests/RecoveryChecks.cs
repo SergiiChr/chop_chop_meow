@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Godot;
 using ChopChopMeow;
+using static Checks;
 
 /// <summary>Checks the no-cabin recovery path and its world-time effects.</summary>
 public static class RecoveryChecks {
@@ -14,7 +15,7 @@ public static class RecoveryChecks {
         var world = new World(data, false);
         world.S.RespawnIn = 20;
         Require(world.CanSkipMorning, "a downed player without a cabin should be able to skip to morning");
-        world.Add("hut", World.Spawn + new Vector2(40, 0));
+        world.Add("hut", Terrain.Spawn + new Vector2(40, 0));
         Require(!world.CanSkipMorning, "a cabin anywhere in the world should block the no-shelter skip");
 
         world.S.Things.RemoveAll(t => t.Kind == "hut");
@@ -31,7 +32,7 @@ public static class RecoveryChecks {
         float timeToDawn = data.DaySeconds - world.S.Time % data.DaySeconds + 1;
         world.S.RespawnIn = timeToDawn / 2;
         world.S.Hunger = 90; world.S.Thirst = 90;
-        var sign = world.Add("signpost", World.Spawn + new Vector2(4, 0));
+        var sign = world.Add("signpost", Terrain.Spawn + new Vector2(4, 0));
         var worker = new Worker { Id = world.S.NextId++, Name = "Mara", Wage = 5, X = sign.Pos.X, Y = sign.Pos.Y };
         world.S.Workers.Add(worker);
         world.S.Orders.Add(new TradeOrder {
@@ -40,7 +41,7 @@ public static class RecoveryChecks {
             Signpost = sign.Id,
             Elapsed = data.TradeSeconds - .1f
         });
-        var furnace = world.Add("furnace", World.Spawn + new Vector2(-4, 0));
+        var furnace = world.Add("furnace", Terrain.Spawn + new Vector2(-4, 0));
         furnace.Inventory.Add("iron_ore", 2); furnace.Burner!.Add("wood", 1);
         furnace.Processing = true; furnace.Progress = data.Recipes["iron_bar"].Seconds - .1f;
 
@@ -59,9 +60,5 @@ public static class RecoveryChecks {
                 "dawn should charge wages through the regular wage slot");
         Require(furnace.Inventory["iron_bar"] > 0,
                 "furnace production should continue while the night advances");
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Recovery check failed: {message}");
     }
 }

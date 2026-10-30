@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>
 /// Deterministic checks for players sharing one world: guests act through commands the host runs as them,
@@ -21,10 +22,6 @@ public static class MultiplayerChecks {
         CheckGuestSaveRoundTrip(data);
         CheckBrokenGuestSavesStartEmpty(data);
         CheckInventoryAndRecoveryCommands(data);
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Multiplayer check failed: {message}");
     }
 
     private static void CheckInventoryAndRecoveryCommands(GameData data) {
@@ -90,9 +87,9 @@ public static class MultiplayerChecks {
     private static void CheckGuestActsThroughCommands(GameData data) {
         var (world, guest, heard) = Hosted(data);
         Require(heard.Contains("A neighbor joined the settlement."), "everyone should hear that a guest joined");
-        Require(guest.Backpack.Count == 0 && guest.Pos == World.Spawn && guest.Warp == 1, "a guest without a saved player should start with an empty backpack at the clearing");
-        var lump = world.Add("loose_coal", World.Spawn + new Vector2(5, 0), 2);
-        var chest = world.Add("chest", World.Spawn + new Vector2(5, 2));
+        Require(guest.Backpack.Count == 0 && guest.Pos == Terrain.Spawn && guest.Warp == 1, "a guest without a saved player should start with an empty backpack at the clearing");
+        var lump = world.Add("loose_coal", Terrain.Spawn + new Vector2(5, 0), 2);
+        var chest = world.Add("chest", Terrain.Spawn + new Vector2(5, 2));
         int hostCoal = world.S.Backpack["coal"];
         string? hostHeard = null; world.Notify = message => hostHeard = message;
 
@@ -121,13 +118,13 @@ public static class MultiplayerChecks {
         var copy = new World(data, false);
         var sent = new List<Command>();
         copy.Host = sent.Add;
-        foreach (var world in new[] { host, copy }) world.Add("chest", World.Spawn + new Vector2(2, 2));
+        foreach (var world in new[] { host, copy }) world.Add("chest", Terrain.Spawn + new Vector2(2, 2));
         foreach (var p in new[] { copy.S.Players[0], guest }) { p.Backpack.Add("berries", 3); p.Backpack.Add("wood", 20); p.Backpack.Add("stone", 4); p.Hunger = 50; }
         var chest = copy.S.Things.Single(t => t.Kind == "chest");
 
         copy.Consume("berries");
-        Require(copy.Build("campfire", World.Spawn + new Vector2(30, 0)) == null && sent.Count == 1, "the copy should refuse a building out of reach itself");
-        copy.Build("campfire", World.Spawn + new Vector2(-2, 2));
+        Require(copy.Build("campfire", Terrain.Spawn + new Vector2(30, 0)) == null && sent.Count == 1, "the copy should refuse a building out of reach itself");
+        copy.Build("campfire", Terrain.Spawn + new Vector2(-2, 2));
         copy.Transfer(copy.S.Backpack, chest.Inventory, "wood", 5);
         copy.SetFilter(chest, "wood", false, true);
         Require(copy.S.Backpack["berries"] == 3 && copy.S.Hunger == 50 && copy.S.Things.All(t => t.Kind != "campfire") && chest.Inventory.Count == 0 && chest.Inventory.InputFilter.Count == 0,
@@ -144,7 +141,7 @@ public static class MultiplayerChecks {
 
     private static void CheckGuestGathersAndHammers(GameData data) {
         var (world, guest, _) = Hosted(data);
-        var tree = world.Add("tree", World.Spawn + new Vector2(4, 0), 40);
+        var tree = world.Add("tree", Terrain.Spawn + new Vector2(4, 0), 40);
         guest.Backpack.Add("steel_axe", 1);
         world.As(guest, () => world.MoveTo(tree.Pos + new Vector2(.8f, 0)));
         guest.GatherTarget = tree.Id;
@@ -152,10 +149,10 @@ public static class MultiplayerChecks {
         Require(guest.Backpack["wood"] >= 4 && world.S.Backpack["wood"] == 0 && tree.Remaining < 40, "a guest holding on to a tree should chop wood into their own backpack");
         guest.GatherTarget = 0;
 
-        var anvil = world.Add("anvil", World.Spawn + new Vector2(-6, 0));
+        var anvil = world.Add("anvil", Terrain.Spawn + new Vector2(-6, 0));
         world.SetRecipe(anvil, "steel_parts");
         anvil.Inventory.Add("steel_bar", 1);
-        world.Player = World.Spawn + new Vector2(20, 0);
+        world.Player = Terrain.Spawn + new Vector2(20, 0);
         Tick(world, 1);
         Require(!anvil.Processing, "an anvil nobody stands at should not start");
         world.As(guest, () => world.MoveTo(anvil.Pos + new Vector2(1, 0)));
@@ -165,8 +162,8 @@ public static class MultiplayerChecks {
 
     private static void CheckEachPlayerHasTheirOwnPack(GameData data) {
         var (world, guest, _) = Hosted(data);
-        world.Player = World.Spawn;
-        var far = Enumerable.Range(0, 63).Select(i => World.Spawn + Vector2.Right.Rotated(i * .1f) * 35).First(world.CanStand);
+        world.Player = Terrain.Spawn;
+        var far = Enumerable.Range(0, 63).Select(i => Terrain.Spawn + Vector2.Right.Rotated(i * .1f) * 35).First(world.CanStand);
         world.As(guest, () => world.MoveTo(far));
         world.S.Time = data.DaySeconds * (data.NightStarts + .02f);
         world.Tick(.25f);
@@ -185,13 +182,13 @@ public static class MultiplayerChecks {
         Require(world.S.Things.Any(t => t.Kind == "grave" && t.Inventory["stone"] == 2 && t.Pos.DistanceTo(far) < 2) && guest.Backpack.Count == 0, "a guest's belongings should stay where they fell");
         int warp = guest.Warp;
         for (float t = 0; t <= data.RespawnSeconds + .5f; t += .25f) { world.Tick(.25f); world.S.Health = 100; }
-        Require(guest.RespawnIn == 0 && guest.Pos == World.Spawn && guest.Warp == warp + 1, "a guest should respawn at the clearing, and the move should tell their machine");
+        Require(guest.RespawnIn == 0 && guest.Pos == Terrain.Spawn && guest.Warp == warp + 1, "a guest should respawn at the clearing, and the move should tell their machine");
     }
 
     private static void CheckSleepWaitsForEveryone(GameData data) {
         var (world, guest, _) = Hosted(data);
         world.S.Time = data.DaySeconds * (data.NightStarts + .02f);
-        var hut = world.Add("hut", World.Spawn + new Vector2(3, 0));
+        var hut = world.Add("hut", Terrain.Spawn + new Vector2(3, 0));
         world.Player = hut.Pos + new Vector2(1.5f, 0);
         Require(world.Enter(hut), "the host should step into the cabin");
         Require(world.SleepBlock() == "Everyone has to be inside a cabin to sleep.", $"sleeping should wait for a guest still outside: {world.SleepBlock()}");
@@ -200,7 +197,7 @@ public static class MultiplayerChecks {
         guest.Hunger = 1;
         Require(world.SleepBlock() == "Someone is too hungry or thirsty to sleep.", "sleeping should wait for a hungry guest");
         guest.Hunger = 100;
-        world.S.Workers.Add(new Worker { Id = world.S.NextId++, Name = "Paid", Wage = 10, Pos = World.Spawn });
+        world.S.Workers.Add(new Worker { Id = world.S.NextId++, Name = "Paid", Wage = 10, Pos = Terrain.Spawn });
         world.S.Backpack.Add(Inventory.Coins, 50); guest.Backpack.Add(Inventory.Coins, 50);
         int day = world.Day;
         world.Run(guest, new Command("sleep", hut.Id, 0, "", 0, default));
@@ -211,7 +208,7 @@ public static class MultiplayerChecks {
     private static void CheckGuestSaveRoundTrip(GameData data) {
         var (world, guest, _) = Hosted(data);
         guest.Backpack.Add("coal", 5);
-        world.As(guest, () => world.MoveTo(World.Spawn + new Vector2(6, 1)));
+        world.As(guest, () => world.MoveTo(Terrain.Spawn + new Vector2(6, 1)));
         var crate = world.Add("crate", guest.Pos + new Vector2(1, 0));
         crate.Inventory.Add("steel_axe", 2);
         Require(world.As(guest, () => world.PickUpCrate(crate)), "a guest should pick up a crate");
@@ -226,10 +223,10 @@ public static class MultiplayerChecks {
 
         world.RemoveGuest(GuestId);
         var other = new World(data, false);
-        other.Add("chest", World.Spawn + new Vector2(2, 2)); other.S.NextId += 50;
+        other.Add("chest", Terrain.Spawn + new Vector2(2, 2)); other.S.NextId += 50;
         var back = other.AddGuest(GuestId, saved);
         string renamed = back.Backpack.Items.Keys.Single(World.IsCrate);
-        Require(back.Backpack["coal"] == 5 && back.Pos == World.Spawn + new Vector2(6, 1), "a guest should come back with what they carried, where they were");
+        Require(back.Backpack["coal"] == 5 && back.Pos == Terrain.Spawn + new Vector2(6, 1), "a guest should come back with what they carried, where they were");
         Require(renamed != packed && other.Packed(renamed)?["steel_axe"] == 2 && back.HotbarSlots[3] == renamed, "a guest's packed crate should come back with its contents under a number free in this world");
     }
 
@@ -244,10 +241,10 @@ public static class MultiplayerChecks {
         var underwater = new PlayerState { PlayerX = Terrain.Lake.X, PlayerY = Terrain.Lake.Y }; underwater.Backpack.Add("stone", 1);
         foreach (var (saved, why) in new[] { ("{ not json", "garbage"), ("null", "an empty save"), (Json(unknown), "an unknown item"), (Json(crowded), "crates without contents"), (Json(new PlayerState { Health = 0 }), "a dead player"), (Json(new PlayerState { Hunger = 900 }), "hunger out of range") }) {
             var p = world.AddGuest(20, saved);
-            Require(p.Backpack.Count == 0 && p.Pos == World.Spawn && p.Health == 100, $"{why} should give an empty backpack at the clearing");
+            Require(p.Backpack.Count == 0 && p.Pos == Terrain.Spawn && p.Health == 100, $"{why} should give an empty backpack at the clearing");
             world.RemoveGuest(20);
         }
         var drowned = world.AddGuest(21, Json(underwater));
-        Require(drowned.Backpack["stone"] == 1 && drowned.Pos == World.Spawn, "a saved spot nobody can stand on should move the guest to the clearing");
+        Require(drowned.Backpack["stone"] == 1 && drowned.Pos == Terrain.Spawn, "a saved spot nobody can stand on should move the guest to the clearing");
     }
 }

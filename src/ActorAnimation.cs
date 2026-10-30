@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -226,16 +225,13 @@ public static class ActorAnimation {
         bool gathering,
         bool moving,
         Inventory backpack,
-        string? selectedTool,
         bool sprinting = false) {
         if (moving) return sprinting ? ActorAction.Run : ActorAction.Walk;
         if (!gathering || string.IsNullOrEmpty(resourceKind)) return ActorAction.Idle;
 
-        string[]? family = resourceKind == "tree" ? Axes : resourceKind is "stone" or "iron" or "coal" or "tin" ? Picks : null;
-        string? tool = family == null ? null : BestTool(backpack, selectedTool, family);
         return resourceKind switch {
-            "tree" => tool == null ? ActorAction.Gather : ActorAction.SteelChop,
-            "stone" or "iron" or "coal" or "tin" => tool == null ? ActorAction.Gather : ActorAction.SteelMine,
+            "tree" => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,
+            "stone" or "iron" or "coal" or "tin" => backpack["steel_pick"] > 0 ? ActorAction.SteelMine : ActorAction.Gather,
             "berries" or "water" or "wolf_corpse" or "leaves" => ActorAction.Gather,
             _ => ActorAction.Idle
         };
@@ -262,14 +258,5 @@ public static class ActorAnimation {
             WorkerWorkState.Digging => ActorAction.Mine,
             _ => ActorAction.Idle
         };
-    }
-
-    // Best first.
-    private static readonly string[] Axes = { "steel_axe" }, Picks = { "steel_pick" };
-
-    /// <summary>The carried tool of a family the player would use on a resource, preferring the selected hotbar tool, then the best one.</summary>
-    public static string? BestTool(Inventory backpack, string? selectedTool, string[] family) {
-        if (selectedTool != null && family.Contains(selectedTool) && backpack[selectedTool] > 0) return selectedTool;
-        return family.FirstOrDefault(tool => backpack[tool] > 0);
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -65,7 +66,6 @@ public sealed class Worker {
     /// <summary>The place the worker is at for one of their <see cref="Duties"/>; with jobs at several places they take turns.</summary>
     public int Assignment { get; set; }
     public List<Duty> Duties { get; set; } = new();
-    public string Job { get; set; } = "idle";
     public string Status { get; set; } = "Available";
     /// <summary>Units of one stack a worker carries; a miner bringing out a full mine output carries the whole stack.</summary>
     public const int BagStack = 5;
@@ -187,7 +187,7 @@ public sealed class SaveState {
     /// <summary>Profit of each finished day, oldest first.</summary>
     public List<int> Profits { get; set; } = new();
     /// <summary>One byte per map tile, 255 once the player has seen it; serialized as base64.</summary>
-    public byte[] Explored { get; set; } = new byte[World.MapSize * World.MapSize];
+    public byte[] Explored { get; set; } = new byte[Terrain.Size * Terrain.Size];
     /// <summary>Things as last seen, kept so the fog shows them unchanged until the player looks again.</summary>
     public Dictionary<int, Thing> Remembered { get; set; } = new();
 }
@@ -200,8 +200,6 @@ public sealed partial class World {
     public Action<ActorAction, Vector2>? PlayerActed;
     /// <summary>A named sound effect and where it happens; the simulation only names it.</summary>
     public Action<string, Vector2>? Sound;
-    public const int MapSize = Terrain.Size;
-    public static readonly Vector2 Spawn = Terrain.Spawn;
     /// <summary>How far down the valley an errand runner walks before fading from view on the way to Bramblewick.</summary>
     public const float TripDistance = 8;
     /// <summary>How far out a cart or runner is, from 0 at the start through 1 at the halfway turn and back to 0.</summary>
@@ -256,9 +254,7 @@ public sealed partial class World {
     public bool Sees(Vector2 p) => p.DistanceTo(Player) <= Data.SightRadius;
     /// <summary>Raised whenever newly seen tiles join the explored map.</summary>
     public int ExploredRevision { get; private set; }
-    /// <summary>Things as the player knows them: live within sight, as last seen elsewhere, and absent if never seen.</summary>
-    public IEnumerable<Thing> Known { get { var known = new List<Thing>(); CollectKnown(known); return known; } }
-    /// <summary>Fills <paramref name="known"/> with <see cref="Known"/>, without allocating, for code that runs every frame.</summary>
+    /// <summary>Fills <paramref name="known"/> with things as the player knows them: live within sight, as last seen elsewhere, and absent if never seen.</summary>
     public void CollectKnown(List<Thing> known) {
         known.Clear();
         foreach (var t in S.Things) if (Sees(t.Pos)) known.Add(t);
@@ -312,7 +308,7 @@ public sealed partial class World {
         var rng = new Random(4271);
         foreach (var cliff in Cliffs) {
             // Two deposits flank the mine's mouth in the middle of the cliff, holding what three did before.
-            foreach (float along in new[] { -3.5f, 3.5f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, 600);
+            foreach (float along in new[] { -3.5f, 3.5f }) Add(cliff.Ore, cliff.Center + cliff.Face * 2.6f + cliff.Along * along, DepositOre);
             if (cliff != CliffOf(cliff.Ore) || cliff.Ore != "coal") continue;
             // Loose coal rolls well out past the deposits of the nearer coal cliff, so collecting it takes a search.
             // Iron has no loose pieces: the first pickaxe is bought with berry money.
@@ -323,11 +319,11 @@ public sealed partial class World {
             }
         }
         // Rocks and berry bushes stand alone on the plains, far from the clearing and each other, so more of them means exploring.
-        Scatter(rng, "stone", 30, 64, 15, 9, _ => 1, 2000);
+        Scatter(rng, "stone", 30, StonePile, 15, 9, _ => 1, 2000);
         Scatter(rng, "berries", 24, 34, 14, 10, _ => 1, 2000);
-        var shore = Spawn - Terrain.Lake;
+        var shore = Terrain.Spawn - Terrain.Lake;
         Add("water", Terrain.Lake + shore.Normalized() * (Terrain.Shore(MathF.Atan2(shore.Y, shore.X)) + .2f), 9999);
-        Add("tree", Spawn + new Vector2(5, 0), 42);
+        Add("tree", Terrain.Spawn + new Vector2(5, 0), 42);
         // Trees are occasional on the plains and thicken into woods toward the mountains.
         // Full-size trees need room for their crowns, so even the woods stay walkable and readable.
         Scatter(rng, "tree", int.MaxValue, 42, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
@@ -336,6 +332,12 @@ public sealed partial class World {
     }
     /// <summary>Leaves a rake gathers in one go from a patch, which fills again every day.</summary>
     public const int LeafPatch = 12;
+    /// <summary>Ore in a full coal, iron or tin deposit at a cliff.</summary>
+    public const int DepositOre = 600;
+    /// <summary>Stone in a full boulder.</summary>
+    public const int StonePile = 64;
+    /// <summary>Meat on a fresh wolf carcass.</summary>
+    public const int WolfMeat = 4;
     public static readonly Vector2 LeafOffset = new(.9f, .9f);
     /// <summary>Leaf litter around every oak, the broadleaf one of the three tree variants picked by id; the patch sits off the trunk so both can be clicked.</summary>
     private void DropLeaves() {
@@ -357,8 +359,8 @@ public sealed partial class World {
             return false;
         }
         for (int placed = 0, tried = 0; placed < count && tried < tries; tried++) {
-            var p = new Vector2(rng.Next(3, MapSize - 3), rng.Next(3, MapSize - 3));
-            if (p.DistanceTo(Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InSpur(p, 2.5f)) continue;
+            var p = new Vector2(rng.Next(3, Terrain.Size - 3), rng.Next(3, Terrain.Size - 3));
+            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InSpur(p, 2.5f)) continue;
             if (rng.NextDouble() > chance(p) || Crowded(p)) continue;
             var t = Add(kind, p, remaining); placed++;
             if (!near.TryGetValue(Cell(p), out var cellList)) near[Cell(p)] = cellList = new();
@@ -389,8 +391,6 @@ public sealed partial class World {
         if (!IsZone(kind) || S.Things.Where(t => IsZone(t.Kind)).MinBy(t => t.Pos.DistanceSquaredTo(p)) is not Thing near || near.Pos.DistanceTo(p) > ZoneSize * 1.6f) return p;
         return near.Pos + ((p - near.Pos) / ZoneSize).Round() * ZoneSize;
     }
-    /// <summary>Tile centres a yard at <paramref name="p"/> covers.</summary>
-    private static IEnumerable<Vector2> ZoneTiles(Vector2 p) => Enumerable.Range(-1, 3).SelectMany(x => Enumerable.Range(-1, 3).Select(y => p + new Vector2(x, y)));
     /// <summary>Where a bellows operator stands: past the handle end of the bellows, behind the forge.</summary>
     public static readonly Vector2 BellowsStand = new(0, -2.1f);
     public static float Footprint(string kind) => kind switch { "pile" or "farm" => 1.5f, "cooktable" => .6f, "cannery" => .5f, "hut" => 1.55f, "reinforced" => .8f, "furnace" => .65f, "bench" => .6f, "chest" or "anvil" or "toolstation" => .45f, _ => .35f };
@@ -508,19 +508,28 @@ public sealed partial class World {
         if (kind == "mine") return MineBlock(p);
         if (IsZone(kind)) return ZoneBlock(kind, p);
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
-        if (Player.DistanceTo(p) < 1.2f || Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
+        if (Player.DistanceTo(p) < 1.2f || Terrain.Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
         if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
-        if (S.Things.Any(t => t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + .65f : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource))) return "Leave room around resources and buildings.";
+        foreach (var t in S.Things)
+            if (t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + .65f : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
         if (crate ? item != null && S.Backpack[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
         return null;
     }
     private string? ZoneBlock(string kind, Vector2 p) {
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
-        if (ZoneTiles(p).Any(q => !CanStand(q) || Terrain.InLake(q, .8f) || Spawn.DistanceTo(q) < 1)) return "Choose dry, open ground.";
+        // Every tile the yard covers.
+        for (int x = -1; x <= 1; x++)
+            for (int y = -1; y <= 1; y++) {
+                var q = p + new Vector2(x, y);
+                if (!CanStand(q) || Terrain.InLake(q, .8f) || Terrain.Spawn.DistanceTo(q) < 1) return "Choose dry, open ground.";
+            }
         float half = ZoneSize / 2;
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
-        bool Inside(Thing t, float margin) => Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin;
-        if (S.Things.Any(t => IsZone(t.Kind) ? Inside(t, half - .05f) : (t.Remaining > 0 || !t.IsResource) && Inside(t, t.IsResource ? .3f : Footprint(t.Kind) + .2f))) return "Leave room around resources and buildings.";
+        foreach (var t in S.Things) {
+            if (!IsZone(t.Kind) && t.IsResource && t.Remaining <= 0) continue;
+            float margin = IsZone(t.Kind) ? half - .05f : t.IsResource ? .3f : Footprint(t.Kind) + .2f;
+            if (Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin) return "Leave room around resources and buildings.";
+        }
         return S.Backpack.Has(Data.Buildings[kind].Cost) ? null : "Missing materials in your backpack.";
     }
     public Thing? Build(string kind, Vector2 p) {
@@ -650,11 +659,17 @@ public sealed partial class World {
         if (!Near(hut)) return;
         if (SleepBlock() is string blocked) { Say(blocked); return; }
         if (Forwarded("sleep", hut.Id)) return;
-        // Time, wages, trades, hunger and production advance together; no frozen night exploit.
+        PassNight();
+    }
+    /// <summary>Runs the world to dawn a second at a time, so time, wages, trades, hunger and production advance together, then clears the wolves.</summary>
+    private void PassNight() {
         float seconds = SecondsToDawn;
         asleep = true;
-        while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
-        asleep = false;
+        try {
+            while (seconds > 0) { float dt = Math.Min(1, seconds); Tick(dt, true); seconds -= dt; }
+        } finally {
+            asleep = false;
+        }
         S.Wolves.Clear(); SayToAll(S.Workers.Count > 0 ? "Dawn breaks. Your workers are walking back from Bramblewick." : "Dawn breaks.");
     }
     /// <summary>How far a burning campfire's safety reaches; its light is drawn to the same edge.</summary>
@@ -709,10 +724,7 @@ public sealed partial class World {
         var wolf = S.Wolves.Where(w => w.Leap <= 0 && !w.Feeding).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
             wolf.Health -= 1; wolf.Flee = FleeSeconds; KnockBack(wolf);
-            if (wolf.Health <= 0) {
-                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
-                Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
-            }
+            if (wolf.Health <= 0) KillWolf(wolf);
         }
         // A wave of fire toward a wolf on its own makes it keep its distance; a pack closing in no longer cares.
         if (!pack)
@@ -721,6 +733,11 @@ public sealed partial class World {
     public const float StaggerSeconds = .45f;
     /// <summary>Throws a struck wolf back from the player; the view slides it there over the stagger.</summary>
     private void KnockBack(Wolf wolf) { wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f; wolf.Stagger = StaggerSeconds; }
+    /// <summary>Leaves a carcass where a struck wolf fell, within the map.</summary>
+    private void KillWolf(Wolf wolf) {
+        S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (Terrain.Size - 3)), WolfMeat);
+        Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
+    }
     private void PutOutTorch() {
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
         foreach (var w in Hunters) w.Scared = false;
@@ -736,10 +753,7 @@ public sealed partial class World {
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
             wolf.Health -= axe == null ? .5f : 1.5f * Speed(axe);
             KnockBack(wolf);
-            if (wolf.Health <= 0) {
-                S.Wolves.Remove(wolf); Add("wolf_corpse", wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (MapSize - 3)), 4);
-                Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
-            }
+            if (wolf.Health <= 0) KillWolf(wolf);
         }
     }
     public void Die() {
@@ -760,7 +774,7 @@ public sealed partial class World {
         // The player wakes inside the cabin nearest to where they fell, or in the clearing without one.
         Thing? cabin = null;
         foreach (var t in S.Things) if (t.Kind == "hut" && (cabin == null || t.Pos.DistanceTo(Player) < cabin.Pos.DistanceTo(Player))) cabin = t;
-        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Spawn : Doorstep(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
+        S.Health = 100; S.Hunger = 65; S.Thirst = 65; Player = cabin == null ? Terrain.Spawn : Doorstep(cabin); S.Actor.Warp++; S.Mauled = false; S.Sheltered = cabin?.Id ?? 0; S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
         Say(cabin == null ? "You wake in the clearing. Recover your belongings from the box." : "You wake in the cabin. Recover your belongings from the box.");
     }
     /// <summary>Open ground just outside a cabin's walls, where its occupant stands when they step out.</summary>
@@ -1043,7 +1057,7 @@ public sealed partial class World {
     }
     private void Started(Worker w, Thing? target) {
         // Reassigning calls off a price errand, so the worker never freezes on the road.
-        w.Assignment = target?.Id ?? 0; w.Away = 0; w.Job = target == null ? "idle" : target.IsResource ? "gather" : "building"; w.WorkState = WorkerWorkState.Idle;
+        w.Assignment = target?.Id ?? 0; w.Away = 0; w.WorkState = WorkerWorkState.Idle;
         w.Destination = 0; w.Timer = 0; w.Status = target == null ? "Available" : "Starting work";
         if (target != null && target.Kind != "signpost") S.Milestones.Add("assigned");
     }
@@ -1154,11 +1168,11 @@ public sealed partial class World {
         foreach (var t in routeBlockers) if (Blocks(t, p)) return false;
         return true;
     }
-    private static int RouteIndex(Vector2I p) => p.Y * MapSize + p.X;
-    private static bool OnMap(Vector2I p) => p.X >= 0 && p.Y >= 0 && p.X < MapSize && p.Y < MapSize;
+    private static int RouteIndex(Vector2I p) => p.Y * Terrain.Size + p.X;
+    private static bool OnMap(Vector2I p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size;
     /// <summary>Appends the tiles from <paramref name="from"/> to within reach of <paramref name="destination"/> to <paramref name="route"/>, or nothing when there is no way.</summary>
     private void FindRoute(Vector2 from, Vector2 destination, List<Vector2> route) {
-        routeSeen ??= new int[MapSize * MapSize]; routeFrom ??= new int[MapSize * MapSize];
+        routeSeen ??= new int[Terrain.Size * Terrain.Size]; routeFrom ??= new int[Terrain.Size * Terrain.Size];
         int search = ++routeSearch;
         // Collected once, since a search on the large map can visit thousands of tiles.
         routeBlockers.Clear();
@@ -1180,7 +1194,7 @@ public sealed partial class World {
         }
         if (end < 0) return;
         int first = route.Count;
-        for (int node = end; node != RouteIndex(start); node = routeFrom[node]) route.Add(new Vector2(node % MapSize, node / MapSize));
+        for (int node = end; node != RouteIndex(start); node = routeFrom[node]) route.Add(new Vector2(node % Terrain.Size, node / Terrain.Size));
         route.Reverse(first, route.Count - first);
     }
     /// <summary>Moves a worker toward a destination and reports arrival within <paramref name="reach"/>.
@@ -1227,7 +1241,7 @@ public sealed partial class World {
             if (w.Commute == 0) {
                 if (w.Tool != "" && !ReturnTool(w, dt)) return;
                 var post = Nearest("signpost", w.Pos);
-                if (!Walk(w, post?.Pos + Vector2.One ?? Spawn, dt) && w.WorkState != WorkerWorkState.Blocked) return;
+                if (!Walk(w, post?.Pos + Vector2.One ?? Terrain.Spawn, dt) && w.WorkState != WorkerWorkState.Blocked) return;
                 w.WorkState = WorkerWorkState.Idle;
             }
             float step = Math.Min(dt, half - w.Commute);
@@ -1423,8 +1437,6 @@ public sealed partial class World {
     }
     /// <summary>Drops jobs at places that are gone, and points the worker at a place they still have a job at.</summary>
     private void TidyDuties(Worker w) {
-        // Older saves and fixtures set only the place; it carries every job there.
-        if (w.Duties.Count == 0 && w.Assignment > 0 && Find(w.Assignment) is Thing place) foreach (string job in Jobs(place)) w.Duties.Add(new Duty { Thing = place.Id, Job = job });
         for (int i = w.Duties.Count - 1; i >= 0; i--) if (Find(w.Duties[i].Thing) == null) w.Duties.RemoveAt(i);
         if (w.Duties.Count == 0) { w.Assignment = 0; return; }
         if (!HasDuty(w, w.Assignment)) w.Assignment = w.Duties[0].Thing;
@@ -1525,7 +1537,7 @@ public sealed partial class World {
             foreach (var (item, quantity) in goods) {
                 int overflow = quantity - output.Add(item, quantity);
                 if (overflow <= 0) continue;
-                var delivery = Add("grave", sign?.Pos + Vector2.One ?? Spawn);
+                var delivery = Add("grave", sign?.Pos + Vector2.One ?? Terrain.Spawn);
                 delivery.Inventory.Slots = overflow / delivery.Inventory.StackOf(item) + 1;
                 delivery.Inventory.Add(item, overflow);
             }
@@ -1670,11 +1682,11 @@ public sealed partial class World {
     private readonly List<int> forgotten = new();
     private void LookAround() {
         float radius = Data.SightRadius;
-        int fromX = Math.Max(0, (int)(Player.X - radius)), toX = Math.Min(MapSize - 1, (int)(Player.X + radius) + 1);
-        int fromY = Math.Max(0, (int)(Player.Y - radius)), toY = Math.Min(MapSize - 1, (int)(Player.Y + radius) + 1);
+        int fromX = Math.Max(0, (int)(Player.X - radius)), toX = Math.Min(Terrain.Size - 1, (int)(Player.X + radius) + 1);
+        int fromY = Math.Max(0, (int)(Player.Y - radius)), toY = Math.Min(Terrain.Size - 1, (int)(Player.Y + radius) + 1);
         for (int y = fromY; y <= toY; y++)
             for (int x = fromX; x <= toX; x++)
-                if (S.Explored[y * MapSize + x] == 0 && Sees(new Vector2(x, y))) { S.Explored[y * MapSize + x] = 255; ExploredRevision++; }
+                if (S.Explored[y * Terrain.Size + x] == 0 && Sees(new Vector2(x, y))) { S.Explored[y * Terrain.Size + x] = 255; ExploredRevision++; }
         forgotten.Clear();
         foreach (var pair in S.Remembered) if (Sees(pair.Value.Pos) && Find(pair.Key) == null) forgotten.Add(pair.Key);
         foreach (var id in forgotten) S.Remembered.Remove(id);
@@ -1685,7 +1697,7 @@ public sealed partial class World {
             memory.Kind = t.Kind; memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Recipe = t.Recipe; memory.Progress = t.Progress; memory.Stage = t.Stage;
         }
     }
-    public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < MapSize && p.Y < MapSize && S.Explored[(int)p.Y * MapSize + (int)p.X] != 0;
+    public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size && S.Explored[(int)p.Y * Terrain.Size + (int)p.X] != 0;
     /// <summary>Moves the pack hunting the acting player.</summary>
     private void TickWolves(float dt, List<Wolf> hunters) {
         if (!Dead) {
@@ -1817,21 +1829,69 @@ public sealed partial class World {
     };
     // ---------- End goals ----------
     /// <summary>Ores found in the valley's cliffs; the end goal wants a working mine on each.</summary>
-    public static IEnumerable<string> MineOres => Cliffs.Select(c => c.Ore).Distinct();
-    public bool HasMine(string ore) => S.Things.Any(t => t.Kind == "mine" && t.Stage == MineOpen && CliffAt(t.Pos).Ore == ore);
+    public static readonly string[] MineOres = Cliffs.Select(c => c.Ore).Distinct().ToArray();
+    public bool HasMine(string ore) {
+        foreach (var t in S.Things) if (t.Kind == "mine" && t.Stage == MineOpen && CliffAt(t.Pos).Ore == ore) return true;
+        return false;
+    }
     /// <summary>Finished days in a row, up to today, whose profit reached the goal.</summary>
     public int ProfitStreak => S.Profits.AsEnumerable().Reverse().TakeWhile(p => p >= Data.Goals.DailyProfit).Count();
     /// <summary>Once reached, the week of profit stays reached even if later days fall short.</summary>
     public bool ProfitGoalMet => S.Milestones.Contains("profit_week");
     // The milestone comes first: it is a set lookup, and the game checks this every frame.
-    public bool EndGoalsComplete => ProfitGoalMet && MineOres.All(HasMine);
+    public bool EndGoalsComplete {
+        get {
+            if (!ProfitGoalMet) return false;
+            foreach (string ore in MineOres) if (!HasMine(ore)) return false;
+            return true;
+        }
+    }
     private void CloseDay(int wages) {
         S.Profits.Add(S.DayRevenue - wages); S.DayRevenue = 0;
         if (ProfitStreak >= Data.Goals.ProfitDays) S.Milestones.Add("profit_week");
     }
     public string Serialize() => JsonSerializer.Serialize(S, GameData.Json);
+    // ---------- Validation of saves and guests ----------
+    /// <summary>Whether an id names a known item, or a packed crate whose contents are in <paramref name="crates"/>.</summary>
+    private bool KnownItem(string item, Dictionary<int, Inventory> crates) => item.StartsWith(PackedPrefix) ? crates.ContainsKey(PackedId(item)) : Data.Items.ContainsKey(item);
+    /// <summary>No packed crates, for checking what a crate holds: a crate inside a crate is not a known item.</summary>
+    private static readonly Dictionary<int, Inventory> NoCrates = new();
+    /// <summary>Whether every entry is a positive count of a known item or of a packed crate in <paramref name="crates"/>.</summary>
+    private bool ValidCounts(Dictionary<string, int> items, Dictionary<int, Inventory> crates) {
+        foreach (var (item, count) in items) if (count <= 0 || !KnownItem(item, crates)) return false;
+        return true;
+    }
+    /// <summary>Whether a box exists and holds only positive counts of known items or of packed crates in <paramref name="crates"/>.</summary>
+    private bool ValidInventory([NotNullWhen(true)] Inventory? box, Dictionary<int, Inventory> crates) => box?.Items != null && ValidCounts(box.Items, crates);
+    /// <summary>Whether each packed crate holds positive counts of known items, no other crates, and no more than a crate fits.</summary>
+    private bool ValidCrates(Dictionary<int, Inventory> crates) {
+        foreach (var box in crates.Values) if (!ValidInventory(box, NoCrates) || box.Count > Data.CrateCapacity) return false;
+        return true;
+    }
+    /// <summary>
+    /// Whether a player from a save or a joining guest carries only known items and has needs, torch and respawn timer within their limits.
+    /// The crafting queue must hold only recipes made by hand.
+    /// </summary>
+    private bool ValidPlayer(PlayerState p, Dictionary<int, Inventory> crates) {
+        if (p.HotbarSlots == null || p.Crafting == null || !ValidInventory(p.Backpack, crates)) return false;
+        foreach (string id in p.Crafting) if (!Data.Recipes.TryGetValue(id, out var r) || !r.Hand) return false;
+        // A player who left while dead comes back still waiting to respawn.
+        return (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
+            && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
+    }
+    /// <summary>Whether every building, worker and cart in a save holds only known items, and every worker's tool is a known item.</summary>
+    private bool ValidSettlement(SaveState save) {
+        foreach (var t in save.Things) {
+            if (t?.Inventory == null) return false;
+            foreach (var box in Boxes(t)) if (box != null && !ValidInventory(box, save.Crates)) return false;
+        }
+        foreach (var w in save.Workers)
+            if (w?.Duties == null || w.Tool == null || w.Tool != "" && !Data.Items.ContainsKey(w.Tool) || !ValidInventory(w.Bag, save.Crates)) return false;
+        foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
+        return true;
+    }
     public void Deserialize(string json) {
-        // Steel tools became steel parts; carried ones that were the only axe or pickaxe become those tools so the save stays playable.
+        // Older saves hold steel tools as one item: they load as steel parts, and a missing axe or pickaxe is made from one so the save stays playable.
         bool legacyTools = json.Contains("\"steel_tools\"");
         json = json.Replace("\"steel_tools\"", "\"steel_parts\"").Replace("\"cooked_meat\"", "\"burnt_steak\"");
         // Iron tools and parts left the game: older saves get the steel ones instead.
@@ -1851,7 +1911,7 @@ public sealed partial class World {
         foreach (var sign in loaded.Things.Where(t => t.Kind == "signpost" && t.Output == null)) { sign.Inventory.Slots = MarketSlots; sign.Output = new() { Slots = MarketSlots }; }
         foreach (var sign in loaded.Things.Where(t => t.Kind == "signpost" && t.Wages == null)) sign.Wages = NewWageSlot();
         // Saves from before the fog start unexplored.
-        if (loaded.Explored?.Length != MapSize * MapSize) loaded.Explored = new byte[MapSize * MapSize];
+        if (loaded.Explored?.Length != Terrain.Size * Terrain.Size) loaded.Explored = new byte[Terrain.Size * Terrain.Size];
         loaded.Remembered ??= new();
         if (loaded.Version == 4) AlignMines(loaded);
         // Loose iron left the game too.
@@ -1860,16 +1920,16 @@ public sealed partial class World {
         loaded.Crates ??= new(); loaded.Crafting ??= new(); loaded.Profits ??= new();
         loaded.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
         foreach (var t in loaded.Things) {
-            // Anvils of older saves may still be set to tools that are now made at the bench.
+            // A station set to a recipe it doesn't make, as on older saves' anvils, is cleared.
             if (t.Recipe != "" && (!Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Station != t.Kind)) { t.Recipe = ""; t.Processing = false; t.Progress = 0; }
             if (SlotKinds(t.Kind).Length > 0) t.Tools ??= NewToolSlots(t.Kind);
-            // Stations used to keep their fuel with the ingredients; fuel nothing smelts moves to the fuel slot.
-            // Plots used to keep their harvest with the seed; the harvest moves to its own slots.
+            // A plot from an older save keeps its harvest with the seed; the harvest moves to its own slots.
             if (t.Kind == "farm" && t.Output == null) {
                 t.Output = new() { Slots = Data.Farm.Yield.Count };
                 foreach (var item in t.Inventory.Items.Keys.Where(i => !Data.Farm.Sow.ContainsKey(i)).ToList()) t.Inventory.TransferTo(t.Output, item, t.Inventory[item]);
                 t.Inventory.Slots = Data.Farm.Sow.Count;
             }
+            // A station from an older save keeps its fuel with the ingredients; fuel nothing smelts moves to the fuel slot.
             if (Burns(t.Kind) && t.Burner == null) {
                 t.Burner = NewBurner();
                 string fuel = BurnedFuel(t);
@@ -1881,9 +1941,13 @@ public sealed partial class World {
                 if (BestTool(tool, loaded.Backpack) == null && loaded.Backpack.Remove("steel_parts", 1) == 1) loaded.Backpack.Add(made, 1);
             if (loaded.Milestones.Contains("steel_parts")) loaded.Milestones.Add("steel_tool");
         }
-        // The goal chain gained steps, so the current goal is worked out again from the milestones.
+        if (!ValidCrates(loaded.Crates) || !ValidPlayer(loaded.Actor, loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
+        // The current goal is worked out again from the milestones, so a save made with a shorter goal chain lands on the right step.
         loaded.Goal = 0;
         S = loaded;
+        // Older saves set only a worker's place; it carries every job there.
+        foreach (var w in S.Workers)
+            if (w.Duties.Count == 0 && w.Assignment > 0 && Find(w.Assignment) is Thing place) foreach (string job in Jobs(place)) w.Duties.Add(new Duty { Thing = place.Id, Job = job });
         NormalizeBottleStorage();
         // Saves from before raking have no leaf litter.
         if (!S.Things.Any(t => t.Kind == "leaves")) DropLeaves();

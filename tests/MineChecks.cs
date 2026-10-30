@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>Simulation checks for mines and the end goals.</summary>
 public static class MineChecks {
@@ -16,10 +17,6 @@ public static class MineChecks {
         CheckOnlyAvailableMinersUnload(data);
         CheckMiningIsSlowerThanDeposits(data);
         CheckDailyProfitAndEndGoals(data);
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Mine check failed: {message}");
     }
 
     /// <summary>An empty map with coins enough to pay every wage, so no worker strikes.</summary>
@@ -56,7 +53,7 @@ public static class MineChecks {
             Require(World.CliffAt(World.MineSpot(cliff)) == cliff, "each aligned site must belong to its own cliff");
             var marking = EmptyWorld(data); marking.Player = World.MineSpot(cliff) + cliff.Face * 3;
             Require(marking.Build("mine", World.MineSpot(cliff) + cliff.Along + cliff.Face)?.Pos == World.MineSpot(cliff), "every aligned site must remain markable and snap correctly");
-            var outward = World.MineOut(cliff);
+            var outward = cliff.Face;
             var basis = Basis.FromEuler(WorldModels.MineYaw(World.MineSpot(cliff)));
             var renderedOut = basis * Vector3.Back;
             var renderedHeader = basis * Vector3.Right;
@@ -79,7 +76,7 @@ public static class MineChecks {
         foreach (var mine in loaded.S.Things.Where(t => t.Kind == "mine")) {
             Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
                 "saved mines and their fog memories must use the aligned site");
-            Require(mine.Stage == World.MineOpen && mine.Progress == 2 && mine.Inventory["wood"] == 7 && mine.Output![World.MineOre(mine)] == 12 && loaded.S.Workers.Any(w => w.Assignment == mine.Id),
+            Require(mine.Stage == World.MineOpen && mine.Progress == 2 && mine.Inventory["wood"] == 7 && mine.Output![World.MineOre(mine)] == 12 && loaded.S.Workers.Any(w => w.Assignment == mine.Id && World.HasDuty(w, mine.Id, "mine")),
                 "aligning an older mine must preserve construction, stock, output and assigned workers");
         }
         Require(loaded.S.Things.Where(t => t.Kind == "mine").Select(t => t.Pos).Distinct().Count() == World.Cliffs.Length, "migrating all cliffs must keep distinct mine sites");
@@ -98,7 +95,7 @@ public static class MineChecks {
         Require(mine.Pos == World.MineSpot(cliff) && mine.Stage == 0 && world.S.Backpack.Count == carried, "marking must be free and snap to the cliff's mine spot");
         Require(world.Build("mine", World.MineSpot(cliff) - cliff.Along * 2) == null && world.S.Things.Count(t => t.Kind == "mine") == 1, "a cliff must take only one mine");
         Require(World.Cliffs.All(c => world.CanStand(World.MineSpot(c)) && world.CanStand(World.MineDoor(new Thing { Kind = "mine", Pos = World.MineSpot(c) }))), "every cliff's mine spot and entrance must be open ground");
-        Require(!world.CanStand(World.MineDoor(mine) - World.MineOut(cliff) * 2), "the rock spur the tunnel runs into must block walking");
+        Require(!world.CanStand(World.MineDoor(mine) - cliff.Face * 2), "the rock spur the tunnel runs into must block walking");
         var coal = MarkMine(world, "coal");
         Require(World.MineOre(coal) == "coal" && World.MineOre(mine) == "iron_ore", "each mine must yield the ore of its own cliff");
     }

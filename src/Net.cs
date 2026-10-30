@@ -231,7 +231,7 @@ public partial class Net : Node {
         float dt = Math.Min((float)delta, .1f);
         foreach (var (owner, goal) in goals) Place(owner, Glide(Position(owner), goal, dt));
         foreach (var p in World.S.Players)
-            if (walks.TryGetValue(p.Id, out var walk) && walk.Warp == p.Warp) World.As(p, () => World.MoveTo(Glide(p.Pos, walk.At, dt)));
+            if (walks.TryGetValue(p.Id, out var walk) && walk.Warp == p.Warp) using (World.ActAs(p)) World.MoveTo(Glide(p.Pos, walk.At, dt));
         if (World.Remote) World.Look();
         if (unsaved && (saveClock += dt) >= SaveInterval) SaveGuest();
         sendClock += dt;
@@ -269,7 +269,7 @@ public partial class Net : Node {
         if (!Hosting || Guest() is not PlayerState p) return;
         heard[p.Id] = Math.Max(order, heard.GetValueOrDefault(p.Id));
         // The action happened where the guest stood, so it goes there at once.
-        if (Stand(p, standing, warp)) World.As(p, () => World.MoveTo(standing));
+        if (Stand(p, standing, warp)) using (World.ActAs(p)) World.MoveTo(standing);
         World.Run(p, new Command(verb, target, other, item, count, at));
     }
 

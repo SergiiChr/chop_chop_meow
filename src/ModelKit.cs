@@ -101,7 +101,8 @@ public static class ModelKit {
             if (!mesh.HasMeta(BaseMaterial)) mesh.SetMeta(BaseMaterial, mesh.MaterialOverride);
             SetFade(mesh, (Material)mesh.GetMeta(BaseMaterial), transparency);
         }
-        foreach (var child in node.GetChildren()) SetFade(child, transparency);
+        int count = node.GetChildCount();
+        for (int i = 0; i < count; i++) SetFade(node.GetChild(i), transparency);
     }
 
     /// <summary>Fades one mesh whose own material is <paramref name="original"/>.</summary>
@@ -166,12 +167,25 @@ public static class ModelKit {
         copy.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
         copy.AlbedoColor = copy.AlbedoColor with { A = copy.AlbedoColor.A * (1 - step / 10f) };
         faded[key] = copy;
+        // Asking for the material's RID builds its shader now rather than on its first draw, which would stall that frame.
+        _ = copy.GetRid();
         return copy;
+    }
+
+    /// <summary>Builds the shaders of every material in a model now, while loading, rather than on its first draw.</summary>
+    public static void BuildShaders(Node node) {
+        if (node is MeshInstance3D mesh) {
+            _ = mesh.MaterialOverride?.GetRid();
+            if (mesh.Mesh is Mesh shape) for (int surface = 0; surface < shape.GetSurfaceCount(); surface++) _ = shape.SurfaceGetMaterial(surface)?.GetRid();
+        }
+        int count = node.GetChildCount();
+        for (int i = 0; i < count; i++) BuildShaders(node.GetChild(i));
     }
 
     public static void SetOverride(Node node, Material? material) {
         if (node is GeometryInstance3D geometry) geometry.MaterialOverlay = material;
         if (node is MeshInstance3D mesh && material != null) mesh.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
-        foreach (var child in node.GetChildren()) SetOverride(child, material);
+        int count = node.GetChildCount();
+        for (int i = 0; i < count; i++) SetOverride(node.GetChild(i), material);
     }
 }

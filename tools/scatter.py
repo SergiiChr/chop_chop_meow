@@ -8,18 +8,15 @@ the editor addon or recreate the scatter at runtime.
 
 from __future__ import annotations
 
-import hashlib
 import shutil
-import stat
 import sys
 import tempfile
 import zipfile
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
-
 
 COMMIT = "7198cc00078ebde61307578137c3f35223c6e438"
 ARCHIVE_URL = f"https://codeload.github.com/HungryProton/scatter/zip/{COMMIT}"
@@ -30,7 +27,7 @@ ADDON = CACHE / "addons" / "proton_scatter"
 BAKE_SCRIPT = ROOT / "tools" / "bake_scatter.gd"
 OUTPUT = ROOT / "assets" / "environment" / "proton_scatter" / "placements.json"
 
-PROJECT_SOURCE = '''; Isolated project for the ProtonScatter offline placement bake.
+PROJECT_SOURCE = """; Isolated project for the ProtonScatter offline placement bake.
 config_version=5
 
 [application]
@@ -42,62 +39,25 @@ renderer/rendering_method.mobile="gl_compatibility"
 
 [filesystem]
 import/blender/enabled=false
-'''
-
-
-def sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as source:
-        for block in iter(lambda: source.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
-
-
-def safe_member(name: str) -> PurePosixPath:
-    if "\\" in name or "\x00" in name:
-        raise SystemExit(f"Unsafe path in ProtonScatter archive: {name!r}")
-    path = PurePosixPath(name)
-    if path.is_absolute() or any(part in ("", ".", "..") for part in path.parts):
-        raise SystemExit(f"Unsafe path in ProtonScatter archive: {name!r}")
-    return path
+"""
 
 
 def install_addon() -> None:
-    CACHE.mkdir(parents=True, exist_ok=True)
-    if not ARCHIVE.is_file():
-        print(f"Downloading HungryProton/scatter commit {COMMIT}...")
-        build.download(ARCHIVE_URL, ARCHIVE)
-
-    actual = sha256(ARCHIVE)
-    if actual != ARCHIVE_SHA256:
-        ARCHIVE.unlink(missing_ok=True)
-        raise SystemExit(
-            "ProtonScatter archive SHA-256 mismatch: "
-            f"expected {ARCHIVE_SHA256}, got {actual}"
-        )
-
-    prefix = f"scatter-{COMMIT}/addons/proton_scatter/"
+    build.fetch_pinned(ARCHIVE_URL, ARCHIVE, ARCHIVE_SHA256)
+    top = f"scatter-{COMMIT}/"
     with zipfile.ZipFile(ARCHIVE) as archive:
-        files: list[tuple[str, zipfile.ZipInfo]] = []
-        for info in archive.infolist():
-            safe_member(info.filename.rstrip("/"))
-            if not info.filename.startswith(prefix) or info.is_dir():
-                continue
-            mode = info.external_attr >> 16
-            if stat.S_ISLNK(mode):
-                raise SystemExit(f"Symlink in ProtonScatter archive: {info.filename}")
-            relative = info.filename[len(prefix) :]
-            safe_member(relative)
-            files.append((relative, info))
-        if not any(relative == "plugin.cfg" for relative, _ in files):
-            raise SystemExit("Pinned ProtonScatter archive has no addons/proton_scatter/plugin.cfg")
-
+        members = [
+            info
+            for info in archive.infolist()
+            if info.filename.startswith(top + "addons/proton_scatter/")
+            and not info.is_dir()
+        ]
+        for info in members:
+            info.filename = info.filename.removeprefix(top)
         if ADDON.exists():
             shutil.rmtree(ADDON)
-        for relative, info in files:
-            destination = ADDON.joinpath(*safe_member(relative).parts)
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_bytes(archive.read(info))
+        archive.extractall(ADDON.parent.parent, members)
+
 
 def main() -> None:
     if not BAKE_SCRIPT.is_file():

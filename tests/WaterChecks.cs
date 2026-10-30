@@ -2,6 +2,7 @@ using System;
 using ChopChopMeow;
 using Godot;
 using System.Linq;
+using static Checks;
 
 namespace ChopChopMeow.Tests;
 
@@ -101,10 +102,6 @@ public static class WaterChecks {
         Require(data.Market.Buys.ContainsKey("water"), "full bottles should remain purchasable");
     }
 
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException("Water check failed: " + message);
-    }
-
     private static void CheckRecipeContainersAndWorker(GameData data) {
         var world = new World(data, false);
         var bench = world.Add("bench", world.Player + Vector2.Right * 2);
@@ -120,7 +117,7 @@ public static class WaterChecks {
             "cooking must use the water and return its reusable container");
 
         world = new World(data, false);
-        var shore = Terrain.WaterPoint(World.Spawn);
+        var shore = Terrain.WaterPoint(Terrain.Spawn);
         var outward = (shore - Terrain.Lake).Normalized();
         var pond = world.Add("water", shore, 9999);
         var chest = world.Add("chest", shore + outward * 5); chest.Inventory.Add("empty_bottle", 1);

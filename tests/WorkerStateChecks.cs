@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 
 /// <summary>Simulation checks for worker animation state transitions.</summary>
 public static class WorkerStateChecks {
@@ -11,10 +12,6 @@ public static class WorkerStateChecks {
         CheckBlockedPath(data);
         CheckFurnacePumping(data);
         CheckSaveRoundTrip(data);
-    }
-
-    private static void Require(bool condition, string message) {
-        if (!condition) throw new InvalidOperationException($"Worker state check failed: {message}");
     }
 
     private static World EmptyWorld(GameData data) => new(data, false);
@@ -63,9 +60,9 @@ public static class WorkerStateChecks {
     private static void CheckBlockedPath(GameData data) {
         var world = EmptyWorld(data);
         // Off the map's edge: the tree is out of reach.
-        var tree = world.Add("tree", Vector2.One * (World.MapSize - 1), 12);
-        world.Add("chest", Vector2.One * (World.MapSize - 6));
-        var worker = AddWorker(world, Vector2.One * (World.MapSize - 8));
+        var tree = world.Add("tree", Vector2.One * (Terrain.Size - 1), 12);
+        world.Add("chest", Vector2.One * (Terrain.Size - 6));
+        var worker = AddWorker(world, Vector2.One * (Terrain.Size - 8));
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
 
@@ -86,7 +83,7 @@ public static class WorkerStateChecks {
         Require(bellowsWorker.WorkState == WorkerWorkState.Pumping,
                 "the assigned furnace bellows operator should enter pumping state through World.Tick");
 
-        // Idle haulers with nothing to fetch used to pump too; extra crew must never join the operator.
+        // Only the bellows operator pumps: extra crew with nothing to fetch never joins.
         var thirdWorker = AddWorker(world, furnace.Pos);
         world.Assign(thirdWorker, furnace);
         for (int i = 0; i < 40; i++) {
