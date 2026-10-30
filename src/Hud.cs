@@ -59,22 +59,26 @@ public partial class ModeLabel : Label {
 public partial class WaterWarning : Label {
     private const float ShowSeconds = 7;
     private readonly BackpackDrawer bag;
+    private readonly Control screen;
     private float clock;
 
-    public WaterWarning(BackpackDrawer bag) {
-        this.bag = bag;
+    public WaterWarning(BackpackDrawer bag, Control screen) {
+        this.bag = bag; this.screen = screen;
         Name = "water_warning";
         AddThemeFontSizeOverride("font_size", 17); Style.Outlined(this);
         AnchorTop = 1; AnchorBottom = 1; OffsetLeft = 20; OffsetRight = 650; OffsetTop = -250; OffsetBottom = -220;
         AutowrapMode = TextServer.AutowrapMode.Off; MouseFilter = MouseFilterEnum.Ignore;
     }
 
-    public void Warn(string message) { Text = message; clock = ShowSeconds; }
+    // Here, not in the constructor: Godot turns processing on just before _Ready.
+    public override void _Ready() => SetProcess(false);
+
+    public void Warn(string message) { Text = message; clock = ShowSeconds; SetProcess(true); }
 
     public override void _Process(double delta) {
-        if (clock <= 0) return;
-        Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : GetParent<Control>().Size.Y - 148);
-        clock -= Math.Min((float)delta, .1f); if (clock <= 0) Text = "";
+        Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : screen.Size.Y - 148);
+        clock -= Math.Min((float)delta, .1f);
+        if (clock <= 0) { Text = ""; SetProcess(false); }
     }
 }
 
