@@ -11,10 +11,10 @@ public partial class PagePanel {
     /// <summary>Which page this is: a name from the side panel, or "inspect".</summary>
     public override void _Ready() {
         switch (pageName) {
-            case "welcome": Welcome(); break;
+            case "welcome": AddChild(new WelcomePage(panel)); break;
             case "help": AddChild(new GuidePanel(panel)); break;
-            case "build": BuildingPlans(); break;
-            case "inventory": Backpack(); break;
+            case "build": AddChild(new PlansPanel(panel)); break;
+            case "inventory": AddChild(new BackpackPage(panel)); break;
             case "workers": AddChild(new CrewPanel(panel)); break;
             case "craft": AddChild(new CraftPanel(panel)); break;
             default: Inspect(); break;
@@ -31,14 +31,6 @@ public partial class PagePanel {
         var host = content; content = bag.Content;
         AddInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns);
         content = host; bag.Visible = !bag.Dismissed;
-    }
-    protected void Welcome() {
-        AddLabel("The woods are quiet. For now.", 21);
-        AddLabel("First, secure water, a cabin and a fire. Then use your steel axe and your hands to build a workshop, trade berries for a pickaxe, and work toward steel.", 16, Style.Beige);
-        AddLabel("FIRST STEPS", 14);
-        AddLabel("1  Collect water at the pond and keep a bottle filled. The sea is salt.\n2  Gather wood and stone; build a cabin and campfire before night.\n3  With your steel axe, fell trees. Gather stone and berries by hand. Knap a chisel, carve planks and a mallet, then build a bench.\n4  Make crates, build a trading post and sell berries. Buy your first pickaxe, then mine toward iron and steel.\n5  Press Esc any time to see your current goal.");
-        AddLabel("A bottle holds three sips and can be refilled at the lake. Without one, drink at the source. Each gathering action takes time, so plan ahead.", 15, Style.Beige);
-        AddButton("Into the clearing", panel.Close);
     }
     protected HBoxContainer Row() { var r = new HBoxContainer(); content.AddChild(r); return r; }
     protected void AddLabel(string text, int size = 15, Color? color = null) => content.AddChild(Style.Wrapped(text, size, color));
@@ -71,24 +63,6 @@ public partial class PagePanel {
             first = false;
             text.Append($"{amount} {world.Data.Name(item)}");
         }
-    }
-    protected void BuildingPlans() {
-        var grid = AddGrid();
-        var details = Style.Wrapped("Hover a plan to see what it needs. Click it, then click open ground nearby.", 14, Style.Beige);
-        foreach (var (id, def) in world.Data.Buildings) {
-            var (cell, _) = ItemSlot.Cup($"build_{id.Id()}"); cell.Icon = Icons.Of(id.Id()); cell.TooltipText = $"{def.Name}\nClick to place · Drag onto the hotbar"; DragReference(cell, id.Id());
-            cell.Pressed += () => { view.BuildMode = id; state.AssigningWorker = 0; panel.Close(); kit.Refresh(); };
-            cell.MouseEntered += () => details.Text = $"{def.Name}\n{def.Description}\n\nNeeds: {Needs(def.Cost)}";
-            live.Add(() => { if (GodotObject.IsInstanceValid(cell)) cell.Modulate = world.S.Backpack.Has(def.Cost) ? Colors.White : Style.Unready; });
-            grid.AddChild(cell);
-        }
-        content.AddChild(details);
-    }
-    /// <summary>The backpack is only the drawer; the side panel stays hidden while it shows.</summary>
-    protected void Backpack() {
-        BagGrid(UseFromBag, UseHint);
-        // Only the drawer shows, so the camera keeps the player centred.
-        panel.Visible = false; view.PanelOpen = false;
     }
     protected const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
     protected void UseFromBag(string id) {
