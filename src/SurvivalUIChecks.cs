@@ -139,9 +139,10 @@ public partial class Game {
         await Click((Control)recovery.FindChild("skip_morning", true, false));
         Require(world.RespawnIn == 0 && world.Day > previousDay && world.Time % world.Data.DaySeconds < world.Data.DaySeconds * .1f,
             "Skipping morning must advance the simulated world to dawn and complete respawn.");
-        world.Add(ThingKind.Hut, world.Player + Vector2.Right);
         world.Die();
-        await Frames(2);
-        Require(!recovery.Visible, "A downed player with a cabin must not be offered Skip to morning.");
+        await Until(() => recovery.Visible, "a player downed again still without a cabin being offered Skip to morning", 2);
+        world.Add(ThingKind.Hut, world.Player + Vector2.Right);
+        await Until(() => !recovery.Visible, "a new cabin taking Skip to morning away from a downed player", 2);
+        Require(world.RespawnIn > 0, "Skip to morning must go because of the cabin, with the player still down.");
     }
 }
