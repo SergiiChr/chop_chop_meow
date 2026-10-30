@@ -123,6 +123,35 @@ public static class Style {
         button.AddThemeStyleboxOverride("disabled", normal); button.AddThemeStyleboxOverride("focus", None);
     }
 
+    /// <summary>The theme of the whole interface.</summary>
+    public static Theme Interface() {
+        var theme = new Theme { DefaultFont = Body };
+        theme.DefaultFontSize = 16;
+        theme.SetStylebox("panel", "PanelContainer", Board);
+        theme.SetStylebox("normal", "Button", ButtonNormal);
+        theme.SetStylebox("hover", "Button", ButtonHover);
+        theme.SetStylebox("pressed", "Button", ButtonPressed);
+        theme.SetStylebox("disabled", "Button", ButtonDisabled);
+        theme.SetStylebox("hover_pressed", "Button", ButtonPressed);
+        theme.SetStylebox("focus", "Button", None);
+        theme.SetFont("font", "Button", Head);
+        foreach (string state in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color" }) theme.SetColor(state, "Button", Rim);
+        theme.SetColor("font_disabled_color", "Button", new Color(Rim, .45f));
+        theme.SetColor("font_color", "Label", Rim);
+        theme.SetColor("font_color", "CheckBox", Rim);
+        theme.SetStylebox("normal", "CheckBox", None); theme.SetStylebox("hover", "CheckBox", None); theme.SetStylebox("pressed", "CheckBox", None); theme.SetStylebox("hover_pressed", "CheckBox", None);
+        theme.SetConstant("separation", "VBoxContainer", 16);
+        theme.SetConstant("separation", "HBoxContainer", 10);
+        theme.SetStylebox("normal", "OptionButton", ButtonNormal);
+        theme.SetStylebox("background", "ProgressBar", BarBack);
+        theme.SetStylebox("fill", "ProgressBar", BarFill);
+        // Tooltips read as solid popups with a bright edge rather than a translucent wash over the scene.
+        theme.SetStylebox("panel", "TooltipPanel", Tooltip);
+        theme.SetColor("font_color", "TooltipLabel", Rim);
+        theme.SetFont("font", "TooltipLabel", Bold);
+        return theme;
+    }
+
     /// <summary>A label in the theme's body font that wraps at its width.</summary>
     public static Label Wrapped(string text, int size = 15, Color? color = null) {
         var l = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart };

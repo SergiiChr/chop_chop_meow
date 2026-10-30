@@ -63,7 +63,7 @@ public partial class Game : Node {
             sounds.OffScreen = view.OffScreen;
             var layer = new CanvasLayer(); AddChild(layer);
             ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
-            SetTheme(); BuildHud();
+            ui.Theme = Style.Interface(); BuildHud();
             GetViewport().UseTaa = Settings.Taa;
             if (Launch.Has("--showcase")) Showcase();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
@@ -76,33 +76,6 @@ public partial class Game : Node {
                 if (Launch.Value("--animation-capture") is string captures) CaptureAnimations(captures);
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
-    }
-    private void SetTheme() {
-        var theme = new Theme { DefaultFont = Style.Body };
-        theme.DefaultFontSize = 16;
-        theme.SetStylebox("panel", "PanelContainer", Style.Board);
-        theme.SetStylebox("normal", "Button", Style.ButtonNormal);
-        theme.SetStylebox("hover", "Button", Style.ButtonHover);
-        theme.SetStylebox("pressed", "Button", Style.ButtonPressed);
-        theme.SetStylebox("disabled", "Button", Style.ButtonDisabled);
-        theme.SetStylebox("hover_pressed", "Button", Style.ButtonPressed);
-        theme.SetStylebox("focus", "Button", Style.None);
-        theme.SetFont("font", "Button", Style.Head);
-        foreach (string state in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color" }) theme.SetColor(state, "Button", Style.Rim);
-        theme.SetColor("font_disabled_color", "Button", new Color(Style.Rim, .45f));
-        theme.SetColor("font_color", "Label", Style.Rim);
-        theme.SetColor("font_color", "CheckBox", Style.Rim);
-        theme.SetStylebox("normal", "CheckBox", Style.None); theme.SetStylebox("hover", "CheckBox", Style.None); theme.SetStylebox("pressed", "CheckBox", Style.None); theme.SetStylebox("hover_pressed", "CheckBox", Style.None);
-        theme.SetConstant("separation", "VBoxContainer", 16);
-        theme.SetConstant("separation", "HBoxContainer", 10);
-        theme.SetStylebox("normal", "OptionButton", Style.ButtonNormal);
-        theme.SetStylebox("background", "ProgressBar", Style.BarBack);
-        theme.SetStylebox("fill", "ProgressBar", Style.BarFill);
-        // Tooltips read as solid popups with a bright edge rather than a translucent wash over the scene.
-        theme.SetStylebox("panel", "TooltipPanel", Style.Tooltip);
-        theme.SetColor("font_color", "TooltipLabel", Style.Rim);
-        theme.SetFont("font", "TooltipLabel", Style.Bold);
-        ui.Theme = theme;
     }
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private void BuildHud() {
