@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using ChopChopMeow;
 
 /// <summary>
@@ -12,7 +11,7 @@ internal static class SetupSteps {
     public static int Give(World world, string item, int count = 1) => world.S.Backpack.Add(item, count);
 
     /// <summary>Takes goods out of the backpack to clear the ground for the next check: the game can only move them somewhere else.</summary>
-    public static int Drop(World world, string item, int count = int.MaxValue) => world.S.Backpack.Remove(item, Math.Min(count, world.Carried(item)));
+    public static int Drop(World world, string item, int count = int.MaxValue) => world.S.Backpack.Remove(item, count);
 
     /// <summary>Empties the backpack: the game can only move goods somewhere else.</summary>
     public static void EmptyBackpack(World world) => world.S.Backpack.Clear();
