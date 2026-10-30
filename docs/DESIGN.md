@@ -56,6 +56,7 @@ UI and input:
 | `src/Menu.cs` | The pause menu with the goal chain, and the round menu badges |
 | `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, how a player action runs, the buttons), `UiState` and `LiveText` |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
+| `src/Hud.cs` | The clock plate and the mode, full-bottle and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |

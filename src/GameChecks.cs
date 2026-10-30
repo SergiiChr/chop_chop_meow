@@ -580,11 +580,11 @@ public partial class Game {
     }
     /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item in hand.</summary>
     private async Task CheckHudAndHotbarEatAndDrinkInHand() {
-        Require(!stats.Text.Contains("Health"), "The persistent HUD must not show health.");
-        Require(!stats.Text.Contains("Food"), "The persistent HUD must not show food.");
-        Require(!stats.Text.Contains("Water"), "The persistent HUD must not show water.");
-        Require(!stats.Text.Contains("coins"), "The persistent HUD must not show coins.");
-        Require(!stats.Text.Contains("Pack"), "The persistent HUD must not show the pack.");
+        Require(!clock.Text.Contains("Health"), "The persistent HUD must not show health.");
+        Require(!clock.Text.Contains("Food"), "The persistent HUD must not show food.");
+        Require(!clock.Text.Contains("Water"), "The persistent HUD must not show water.");
+        Require(!clock.Text.Contains("coins"), "The persistent HUD must not show coins.");
+        Require(!clock.Text.Contains("Pack"), "The persistent HUD must not show the pack.");
         Require(hotbarButtons.Count == 9 && world.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
         int berries = world.Carried("berries");
         await KeyStroke(Key.Key3);

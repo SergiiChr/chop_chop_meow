@@ -11,15 +11,13 @@ public partial class Game : Node {
     private WorldView view = null!;
     private Sounds sounds = null!;
     private Control ui = null!;
-    private Label stats = null!;
+    private ClockPlate clock = null!;
     private MessageStack messages = null!;
     private NeedsPlate needsPlate = null!;
     private DamageEdges damageEdges = null!;
-    private Label waterWarning = null!;
-    private float waterWarningClock;
-    private Label modeLabel = null!;
-    private DayDial dayDial = null!;
-    private Label deathLabel = null!;
+    private WaterWarning waterWarning = null!;
+    private ModeLabel modeLabel = null!;
+    private DeathLabel deathLabel = null!;
     private Thing? gathering;
     /// <summary>A crate held under the right mouse button; it is lifted once held for <see cref="LiftSeconds"/>.</summary>
     private Thing? lifting;
@@ -105,13 +103,8 @@ public partial class Game : Node {
     private void BuildHud() {
         blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), LatestSlot, LoadSlot, ShowStart); AddChild(blackHole);
         moves = new ItemMoves(kit, blackHole);
-        // The day dial and clock share a plate in the top right corner; the side panel opens below it.
-        var clock = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = -200, OffsetRight = -20, OffsetTop = 18, OffsetBottom = 18, MouseFilter = Control.MouseFilterEnum.Ignore };
-        clock.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(clock);
-        var dial = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddThemeConstantOverride("separation", 6); clock.AddChild(dial);
-        dayDial = new DayDial { Arc = () => world.SkyArc, Night = () => world.MoonUp, CustomMinimumSize = new Vector2(0, 62), MouseFilter = Control.MouseFilterEnum.Ignore }; dial.AddChild(dayDial);
-        stats = Style.Heading("", 16); stats.HorizontalAlignment = HorizontalAlignment.Center; dial.AddChild(stats);
-        modeLabel = Style.Outlined(Style.Wrapped("", 17)); modeLabel.AnchorLeft = .5f; modeLabel.AnchorRight = .5f; modeLabel.OffsetTop = 18; modeLabel.GrowHorizontal = Control.GrowDirection.Both; modeLabel.HorizontalAlignment = HorizontalAlignment.Center; modeLabel.AutowrapMode = TextServer.AutowrapMode.Off; modeLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(modeLabel);
+        clock = new ClockPlate(world); ui.AddChild(clock);
+        modeLabel = new ModeLabel(kit, view); ui.AddChild(modeLabel);
         // Menu badges and the hotbar sit on one plate centred along the bottom, like a tool belt.
         var bottom = new PanelContainer { AnchorLeft = .5f, AnchorRight = .5f, AnchorTop = 1, AnchorBottom = 1, OffsetTop = -14, OffsetBottom = -14, GrowHorizontal = Control.GrowDirection.Both, GrowVertical = Control.GrowDirection.Begin }; ui.AddChild(bottom);
         bottom.AddThemeStyleboxOverride("panel", Style.Plate);
@@ -124,15 +117,8 @@ public partial class Game : Node {
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
         panel = new SidePanel(kit, view, moves, ui); ui.AddChild(panel);
         bag = panel.Bag; ui.AddChild(bag);
-        waterWarning = Style.Outlined(Style.Wrapped("", 17)); waterWarning.Name = "water_warning";
-        waterWarning.AnchorTop = 1; waterWarning.AnchorBottom = 1;
-        waterWarning.OffsetLeft = 20; waterWarning.OffsetRight = 650; waterWarning.OffsetTop = -250; waterWarning.OffsetBottom = -220;
-        waterWarning.AutowrapMode = TextServer.AutowrapMode.Off;
-        waterWarning.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(waterWarning);
-        deathLabel = Style.Outlined(Style.Wrapped("", 26)); deathLabel.AutowrapMode = TextServer.AutowrapMode.Off; deathLabel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); deathLabel.GrowHorizontal = Control.GrowDirection.Both;
-        // Raised above the centred player so a downed body stays visible under the message.
-        deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
-        deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
+        waterWarning = new WaterWarning(bag); ui.AddChild(waterWarning);
+        deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         needsPlate = new NeedsPlate(kit, moves, damageEdges); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
         ending = new EndingScreen(kit, panel.Close, Restart); ui.AddChild(ending); BuildMenu(); BuildScreens();
@@ -140,34 +126,12 @@ public partial class Game : Node {
         RefreshLive();
     }
     private void Notify(string message) {
-        if (message == Water.FullBottleWarning && waterWarning != null) { waterWarning.Text = message; waterWarningClock = 7; } else messages?.Post(message);
+        if (message == Water.FullBottleWarning && waterWarning != null) waterWarning.Warn(message); else messages?.Post(message);
         GD.Print(message);
     }
-    // What the labels show, so their text is built only when it changes: building it allocates.
-    private (int Day, int Minute, bool Night) shownClock = (-1, -1, false);
-    private (bool Dead, bool Mauled, bool Pack, int Seconds) shownDeath;
-    private (bool Assigning, ThingKind? Mode) shownMode = (false, null);
     private void RefreshLive() {
-        if (world == null || stats == null) return;
-        var clock = (world.Day, (int)(world.DayPhase * 1440), world.Night);
-        if (clock != shownClock) {
-            shownClock = clock;
-            int hour = (int)world.Hour;
-            stats.Text = $"Day {world.Day} · {hour}:{(int)(world.DayPhase * 1440) % 60:00}";
-            dayDial.QueueRedraw();
-        }
-        int feeding = 0;
-        foreach (var w in world.S.Wolves) if (w.Feeding) feeding++;
-        var death = (world.Dead, world.S.Mauled, feeding > 1, (int)MathF.Ceiling(world.S.RespawnIn));
-        if (death != shownDeath) {
-            shownDeath = death;
-            deathLabel.Text = world.Dead ? $"{(world.S.Mauled ? feeding > 1 ? "The pack is feeding" : "A wolf is feeding" : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
-        }
-        var mode = (state.AssigningWorker > 0, view.BuildMode);
-        if (mode != shownMode) {
-            shownMode = mode;
-            modeLabel.Text = state.AssigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != null ? $"PLACE {world.Data.Name(view.BuildMode.Value).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
-        }
+        if (needsPlate == null) return;
+        clock.Refresh(); deathLabel.Refresh(); modeLabel.Refresh();
         panel.Refresh();
         RefreshHotbar(); needsPlate.Refresh(); bag.Refresh();
     }
@@ -337,8 +301,6 @@ public partial class Game : Node {
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }
         // Every frame, so a page that just opened takes its size once its wrapped text has a width.
         panel.Fit();
-        if (waterWarningClock > 0) waterWarning.Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : ui.Size.Y - 148);
-        waterWarningClock -= dt; if (waterWarningClock <= 0 && waterWarning != null) waterWarning.Text = "";
         // The needs plate grows with the bank count, and an open side panel would cover the messages' right end.
         float messagesLeft = needsPlate.GetRect().End.X + 24, messagesRight = panel.Visible ? SidePanel.Left - 16 : -messagesLeft;
         if (messages.OffsetLeft != messagesLeft || messages.OffsetRight != messagesRight) { messages.OffsetLeft = messagesLeft; messages.OffsetRight = messagesRight; }
