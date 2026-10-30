@@ -203,11 +203,9 @@ public sealed partial class World {
         if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
         if (Forwarded(Verb.TransferSlot, a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
         if (a > 0 && !Near(Find(a / BoxCodes)!) || b > 0 && !Near(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
-        // Bring stacks in line with totals changed directly, then reject a stale drag rather than moving a different item.
-        from.EnsureLayout();
+        // Reject a stale drag rather than moving a different item.
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
         if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
-        to.EnsureLayout();
         // A drop on another item's cell in another inventory still stores the stack wherever it fits.
         int moved;
         if (from != to && to.Layout[targetSlot].Item is var there && there != "" && there != item) {
@@ -283,7 +281,7 @@ public sealed partial class World {
             }
             backpack.Add(id, quantity);
         }
-        p.Backpack.EnsureLayout();
+        p.Backpack.RebuildStacks();
         backpack.Layout = p.Backpack.Layout.Select(slot => new Inventory.Slot {
             Item = renamed.GetValueOrDefault(slot.Item, slot.Item),
             Count = slot.Count

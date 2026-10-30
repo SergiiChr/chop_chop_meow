@@ -31,7 +31,7 @@ public static class AllocationChecks {
 
         var mine = WorkingMine(data, out var shaft);
         // Emptying the output each tick keeps the crew digging underground instead of hauling.
-        Check("tick: miners underground", () => { mine.Tick(1 / 60f); Fed(mine); shaft.Output!.Items.Clear(); }, warmup: 1200);
+        Check("tick: miners underground", () => { mine.Tick(1 / 60f); Fed(mine); shaft.Output!.Clear(); }, warmup: 1200);
         if (mine.S.Workers.Any(w => w.WorkState != WorkerWorkState.Underground)) throw new InvalidOperationException("Allocation check failed: the mine crew should be underground.");
 
         var night = new World(data);

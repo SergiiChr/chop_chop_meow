@@ -80,7 +80,6 @@ public sealed partial class World {
                 overflow.Inventory.Slots = System.Math.Max(overflow.Inventory.Slots, overflow.Inventory.Count + 1);
                 inventory.Remove(bottle, 1); overflow.Inventory.Add(bottle, 1);
             }
-            inventory.EnsureLayout();
         }
     }
 

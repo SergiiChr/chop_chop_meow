@@ -1200,7 +1200,7 @@ public static class SimulationChecks {
         Require(crate.UsedSlots == cap && crate.Count == cap && crate.Room("raw_meat") == 0, "a crate should also take as many different single items");
 
         // Packed crates keep their contents through the backpack, a save and placing them again.
-        crate.Items.Clear(); crate.Add("raw_meat", 5); crate.Add("steel_axe", 2);
+        crate.Clear(); crate.Add("raw_meat", 5); crate.Add("steel_axe", 2);
         string packed = world.S.Backpack.Items.Keys.Any(World.IsCrate) ? "" : PackCrate(world);
         Require(world.S.Things.Count(t => t.Kind == ThingKind.Crate) == 1, "picking up should remove only the picked crate");
         var placed = world.S.Things.Single(t => t.Kind == ThingKind.Crate);

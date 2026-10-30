@@ -25,7 +25,7 @@ public partial class Game {
             paused = false;
             ClosePanel();
             gathering = null;
-            world.S.Backpack.Items.Clear(); world.S.Backpack.Layout.Clear();
+            world.S.Backpack.Clear();
             world.S.HotbarSlots[8] = "water";
 
             // A real source-ring pick and a held right mouse button refill the starter bottle.
@@ -61,10 +61,8 @@ public partial class Game {
             // Seed distinct stacks so the slot drag can prove both the exact target and untouched cells.
             ClosePanel();
             var bagItems = world.S.Backpack;
-            bagItems.Layout = new System.Collections.Generic.List<Inventory.Slot>();
-            bagItems.Items.Clear();
+            bagItems.Clear();
             bagItems.Add("wood", 7); bagItems.Add("stone", 3); bagItems.Add("berries", 5);
-            bagItems.EnsureLayout();
             OpenPage("inventory"); await Frames(3);
             ItemSlot wood = Cell(0, c => c.TooltipText.StartsWith("Wood ·", StringComparison.Ordinal));
             var woodIndex = Array.IndexOf(bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().ToArray(), wood);
@@ -72,11 +70,9 @@ public partial class Game {
             var targetIndex = Array.IndexOf(bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().ToArray(), target);
             Require(woodIndex >= 0 && targetIndex >= 0 && targetIndex != woodIndex, "The inventory must expose source and empty destination slots.");
             await DragTo(wood, target);
-            bagItems.EnsureLayout();
             Require(bagItems.Layout[targetIndex].Item == "wood" && bagItems.Layout[targetIndex].Count == 7 && bagItems["stone"] == 3 && bagItems["berries"] == 5,
                 "Dragging a stack into an exact empty backpack slot must preserve its quantity and the other stacks.");
             await Click((Control)bag.FindChild("sort_bag", true, false));
-            bagItems.EnsureLayout();
             var ordered = bagItems.Layout.Where(s => s.Item != "").Select(s => s.Item).ToArray();
             Require(ordered.SequenceEqual(ordered.OrderBy(id => id, StringComparer.Ordinal)), "The backpack Sort button must order stacks by item name.");
 
@@ -104,7 +100,7 @@ public partial class Game {
                 "Ctrl-clicking a backpack stack must store all remaining units.");
 
             ClosePanel();
-            world.S.Backpack.Items.Clear(); world.S.Backpack.Layout.Clear();
+            world.S.Backpack.Clear();
             world.S.Backpack.Add("water_2", 1);
             var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
             world.SetRecipe(table, "dough");

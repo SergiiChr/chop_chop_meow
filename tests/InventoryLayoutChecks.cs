@@ -76,7 +76,7 @@ public static class InventoryLayoutChecks {
 
         var overflow = new Inventory { Slots = 3, StackSize = 2 };
         overflow.Add("wood", 3); overflow.Add("stone", 2);
-        overflow.Slots = 1; overflow.EnsureLayout();
+        overflow.Slots = 1;
         Require(overflow["wood"] == 3 && overflow["stone"] == 2 && overflow.UsedSlots == 3, "shrinking slot limits must preserve every aggregate stack for overflow handling");
         Require(overflow.AggregateSlotsNeeded == 3 && overflow.Room("wood") == 0, "overflow stack requirements should be exposed without accepting more items");
     }

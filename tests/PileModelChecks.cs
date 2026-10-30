@@ -19,21 +19,21 @@ public static class PileModelChecks {
             var logs = first.Stock!.Slots[0].Mesh!;
             Require(second.Stock!.Slots[0].Mesh!.GetInstanceId() == logs.GetInstanceId(), "piles must share cached stock geometry");
 
-            thing.Inventory.Items.Clear(); thing.Inventory.Add("stone", 64);
+            thing.Inventory.Clear(); thing.Inventory.Add("stone", 64);
             WorldModels.SyncPile(first, thing, data);
             Require(first.Stock!.Slots[0].Visible && first.Stock!.Slots.Skip(1).All(s => !s.Visible), "removing stock must hide its slots");
             Require(first.Stock!.Slots[0].Mesh!.GetInstanceId() != logs.GetInstanceId(), "replacing wood with stone must change the model");
             Require(second.Stock!.Slots.All(s => s.Visible) && second.Stock!.Slots[0].Mesh!.GetInstanceId() == logs.GetInstanceId(), "a refresh must leave another pile's remembered appearance alone");
 
-            thing.Inventory.Items.Clear(); thing.Inventory.Add("fertilizer", 64);
+            thing.Inventory.Clear(); thing.Inventory.Add("fertilizer", 64);
             WorldModels.SyncPile(first, thing, data);
             var fallback = first.Stock!.Slots[0].Mesh!;
-            thing.Inventory.Items.Clear(); thing.Inventory.Add("unmodelled_item", 64);
+            thing.Inventory.Clear(); thing.Inventory.Add("unmodelled_item", 64);
             WorldModels.SyncPile(first, thing, data);
             Require(first.Stock!.Slots[0].Mesh!.GetInstanceId() == fallback.GetInstanceId(), "unmodelled items must use the shared fallback");
             Require(first.Stock!.Slots[0].MaterialOverride is StandardMaterial3D material && material.AlbedoColor.IsEqualApprox(new Color("b0a58a")), "unknown items must have a visible fallback color");
 
-            thing.Inventory.Items.Clear();
+            thing.Inventory.Clear();
             WorldModels.SyncPile(first, thing, data);
             Require(first.Stock!.Slots.All(s => !s.Visible), "emptying a pile must hide all contents");
 
