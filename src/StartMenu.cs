@@ -136,7 +136,7 @@ public partial class StartMenu : ColorRect {
         });
         join.Name = "join"; Screen.AddChild(join);
         address.TextSubmitted += _ => join.EmitSignal(BaseButton.SignalName.Pressed);
-        AddButton("Back · Esc", () => screenBack?.Invoke());
+        AddButton("Back · Esc", Back);
         address.CallDeferred(Control.MethodName.GrabFocus);
     }
 
@@ -144,7 +144,7 @@ public partial class StartMenu : ColorRect {
     public void ShowReconnecting() {
         Open("RECONNECTING", () => { net.Leave(); ShowStart(); });
         reconnectStatus = Style.Wrapped("", 14, Style.Beige); Screen.AddChild(reconnectStatus);
-        AddButton("Stop · Esc", () => screenBack?.Invoke());
+        AddButton("Stop · Esc", Back);
     }
 
     public void ShowRetry(int left) { if (IsInstanceValid(reconnectStatus)) reconnectStatus.Text = $"{Net.LostLine} Trying again for {left} more {(left == 1 ? "second" : "seconds")}."; }

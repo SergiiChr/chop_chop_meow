@@ -33,9 +33,6 @@ public partial class SidePanel : PanelContainer {
     private readonly World world;
     private readonly UiState state;
     private readonly Control ui;
-    private HBoxContainer frameHeading = null!;
-    private TextureRect icon = null!;
-    private Label title = null!;
     private ScrollContainer scroll = null!;
     /// <summary>The board left of the panel that holds the price sign or the filter window.</summary>
     private PanelContainer board = null!;
@@ -55,9 +52,9 @@ public partial class SidePanel : PanelContainer {
     public BackpackDrawer Bag { get; }
     public PageMemory Memory { get; } = new();
     public List<Action> Live { get; } = new();
-    public HBoxContainer Heading => frameHeading;
-    public TextureRect HeadingIcon => icon;
-    public Label HeadingTitle => title;
+    public HBoxContainer Heading { get; private set; } = null!;
+    public TextureRect HeadingIcon { get; private set; } = null!;
+    public Label HeadingTitle { get; private set; } = null!;
     /// <summary>Whether the board beside the panel is showing.</summary>
     public bool SheetShown => sheet.Visible;
     public float ScreenWidth => ui.Size.X;
@@ -81,11 +78,11 @@ public partial class SidePanel : PanelContainer {
         board = new PanelContainer { Visible = false, SizeFlagsVertical = SizeFlags.ShrinkBegin }; frame.AddChild(board);
         sheet = new VBoxContainer { Visible = false }; sheet.AddThemeConstantOverride("separation", 12); board.AddChild(sheet);
         var outer = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; outer.AddThemeConstantOverride("separation", 16); frame.AddChild(outer);
-        frameHeading = new HBoxContainer(); frameHeading.AddThemeConstantOverride("separation", 12); outer.AddChild(frameHeading);
-        icon = Style.Icon(null, 44); icon.Visible = false; icon.MouseFilter = MouseFilterEnum.Pass; frameHeading.AddChild(icon);
-        title = Style.Heading(name switch { "welcome" => "A new beginning", "build" => "Building plans", "inventory" => "Backpack", "help" => "Field guide", "workers" => "Your crew", "craft" => "Crafting", _ => "Inspect" });
-        title.SizeFlagsHorizontal = SizeFlags.ExpandFill; frameHeading.AddChild(title);
-        frameHeading.AddChild(Kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "close"));
+        Heading = new HBoxContainer(); Heading.AddThemeConstantOverride("separation", 12); outer.AddChild(Heading);
+        HeadingIcon = Style.Icon(null, 44); HeadingIcon.Visible = false; HeadingIcon.MouseFilter = MouseFilterEnum.Pass; Heading.AddChild(HeadingIcon);
+        HeadingTitle = Style.Heading(name switch { "welcome" => "A new beginning", "build" => "Building plans", "inventory" => "Backpack", "help" => "Field guide", "workers" => "Your crew", "craft" => "Crafting", _ => "Inspect" });
+        HeadingTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill; Heading.AddChild(HeadingTitle);
+        Heading.AddChild(Kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "close"));
         scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
         // Room for the pills that sit on the cups' corners.
         var inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);

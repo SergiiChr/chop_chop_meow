@@ -72,7 +72,8 @@ public partial class WaterWarning : Label {
     public void Warn(string message) { Text = message; clock = ShowSeconds; }
 
     public override void _Process(double delta) {
-        if (clock > 0) Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : GetParent<Control>().Size.Y - 148);
+        if (clock <= 0) return;
+        Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : GetParent<Control>().Size.Y - 148);
         clock -= Math.Min((float)delta, .1f); if (clock <= 0) Text = "";
     }
 }

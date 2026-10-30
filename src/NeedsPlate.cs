@@ -160,7 +160,6 @@ public partial class NeedsPlate : PanelContainer {
     }
 }
 
-
 /// <summary>A red glow along the screen edges, at most 5% of the screen deep, that fades after a hit.</summary>
 public partial class DamageEdges : Control {
     public float Strength { get; set; }
