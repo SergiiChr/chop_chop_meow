@@ -711,6 +711,7 @@ public static class SimulationChecks {
     private static void CheckSunAndMoonFollowTheirArcs(GameData data) {
         var sky = EmptyWorld(data);
         float day = data.DaySeconds;
+        Require(!sky.MoonUp && sky.SkyArc < .15f && sky.Moonlight > .99f, "a new game should start just after sunrise under a full moon");
         RunUntil(sky, day * data.Sunset - .1f);
         Require(!sky.MoonUp && sky.SkyArc > .99f, "the sun should reach the far end of its arc just before sunset");
         RunUntil(sky, day * data.Sunset + .1f);
