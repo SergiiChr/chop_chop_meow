@@ -46,8 +46,9 @@ public partial class Game {
         await Click(hostButton);
         Require(net.Hosting && !menu.Visible && !paused, "Host in the pause menu must open the current game to guests and close the menu.");
         await KeyStroke(Key.Escape);
-        float before = world.S.Time; await Seconds(.4);
-        Require(menu.Visible && world.S.Time > before && netLine.Text.StartsWith("Hosting on port 24565"), "While hosting, the pause menu must say so and the world must keep going.");
+        float before = world.S.Time;
+        await Until(() => world.S.Time > before, "the world going on behind the host's pause menu", 5);
+        Require(menu.Visible && netLine.Text.StartsWith("Hosting on port 24565"), "While hosting, the pause menu must say so and the world must keep going.");
         await KeyStroke(Key.Escape);
 
         PlayerState Guest() => world.S.Players.Single(p => p != world.Me);

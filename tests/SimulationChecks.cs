@@ -5,6 +5,7 @@ using System.Text.Json.Nodes;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static Fixtures;
 
 /// <summary>Deterministic checks for the playable simulation, independent of the rendered scene.</summary>
 public static class SimulationChecks {
@@ -27,7 +28,9 @@ public static class SimulationChecks {
         CheckWorkerDetoursAroundLake(data);
         CheckCampfireWorkerFuel(data);
         CheckWorkerFurnaceCrew(data);
-        CheckTradeAndWages(data);
+        CheckCartDeliversAfterFullTrip(data);
+        CheckSaleLowersDemandAndNewsTravels(data);
+        CheckUnpaidWorkerStrikes(data);
         CheckMarketRoundTrip(data);
         RecoveryChecks.Run(data);
         CheckRecoveryBoxesStayPrivate(data);
@@ -63,7 +66,12 @@ public static class SimulationChecks {
         CheckRaking(data);
         CheckPilesAndCompost(data);
         CheckCookingAndCanning(data);
-        CheckWorkerDuties(data);
+        CheckWorkerWithTwoJobsTakesTurns(data);
+        CheckHaulerStocksBenchForCrafter(data);
+        CheckStockerFillsToolRack(data);
+        CheckTenderFeedsCompostWithoutFood(data);
+        CheckRunnerCarriesDeliveriesIntoStorage(data);
+        CheckWorkerLeavesToolTheFilterHolds(data);
         CheckFarmPlot(data);
         CheckNewFoodsAndRename(data);
         CheckMarketTakesOnlyCrates(data);
@@ -95,49 +103,9 @@ public static class SimulationChecks {
         world.S.Backpack.Add(Inventory.Coins, coins);
     }
 
-    private static World EmptyWorld(GameData data) {
-        var world = new World(data, false);
-        world.S.Hunger = 100;
-        world.S.Thirst = 100;
-        world.S.Health = 100;
-        world.S.Time = 55;
-        return world;
-    }
-
-    private static void SafeTick(World world, float seconds) {
-        world.S.Hunger = 100;
-        world.S.Thirst = 100;
-        while (seconds > 0) {
-            float dt = Math.Min(Step, seconds);
-            world.Tick(dt);
-            seconds -= dt;
-            world.S.Hunger = 100;
-            world.S.Thirst = 100;
-        }
-    }
-
-    /// <summary>Fills a crate at the player's feet and picks it up, returning the packed crate item now in the backpack.</summary>
-    private static string PackCrate(World world, params (string Item, int Count)[] goods) {
-        var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
-        foreach (var (item, count) in goods) Require(crate.Inventory.Add(item, count) == count, $"a crate should take {count} {item}");
-        var before = world.S.Backpack.Items.Keys.ToHashSet();
-        Require(world.PickUpCrate(crate), "a nearby crate should be picked up");
-        return world.S.Backpack.Items.Keys.Single(id => !before.Contains(id));
-    }
-
-    private static Worker AddWorker(World world, Vector2 position) {
-        var worker = new Worker { Id = world.S.NextId++, Name = $"Worker {world.S.Workers.Count + 1}", Pos = position };
-        world.S.Workers.Add(worker);
-        return worker;
-    }
-
-    /// <summary>
-    /// Workers take jobs one at a time: a worker with jobs at two places takes turns at them, haulers and crafters split a bench's work,
-    /// a stocker fills the tool rack from storage, a tender feeds compost without food when told to, and a runner carries deliveries in.
-    /// </summary>
-    private static void CheckWorkerDuties(GameData data) {
+    /// <summary>A worker with jobs at two places takes turns at them, and taking one job away keeps the other.</summary>
+    private static void CheckWorkerWithTwoJobsTakesTurns(GameData data) {
         var world = EmptyWorld(data);
-        float morning = world.S.Time;
         var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
         chest.Inventory.Add("wood", 20);
         var rock = world.Add(ThingKind.Stone, new Vector2(24, 20), 30);
@@ -151,10 +119,13 @@ public static class SimulationChecks {
                 "a worker with jobs at two places should take turns: gathering stone and feeding the fire");
         world.SetDuty(both, fire, "fuel", false);
         Require(both.Duties.Count == 1 && World.HasDuty(both, rock.Id, "gather"), "taking one job away should keep the other");
-        world.Assign(both, null);
+    }
 
-        world.S.Time = morning;
-        // A bench hauler only stocks it; the work itself waits for a crafter.
+    /// <summary>A bench hauler only stocks it; the work itself waits for a crafter.</summary>
+    private static void CheckHaulerStocksBenchForCrafter(GameData data) {
+        var world = EmptyWorld(data);
+        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        chest.Inventory.Add("wood", 20);
         var bench = world.Add(ThingKind.Bench, new Vector2(28, 24));
         bench.Tools!.Add("stone_chisel", 1);
         world.SetRecipe(bench, "planks");
@@ -167,20 +138,23 @@ public static class SimulationChecks {
         world.SetDuty(crafter, bench, "craft", true);
         SafeTick(world, 20);
         Require(bench.Inventory["planks"] + chest.Inventory["planks"] > 0, "a crafter should work the stocked bench");
-        world.Assign(hauler, null); world.Assign(crafter, null);
+    }
 
-        world.S.Time = morning;
-        // A stocker brings tools from storage to the rack.
+    private static void CheckStockerFillsToolRack(GameData data) {
+        var world = EmptyWorld(data);
+        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
         var rack = world.Add(ThingKind.Toolstation, new Vector2(16, 20));
         chest.Inventory.Add("steel_axe", 1);
         var stocker = AddWorker(world, new Vector2(18, 20));
         world.SetDuty(stocker, rack, "stock", true);
         SafeTick(world, 20);
         Require(rack.Inventory["steel_axe"] == 1 && chest.Inventory["steel_axe"] == 0, "a stocker should bring a stored tool to the rack");
-        world.Assign(stocker, null);
+    }
 
-        world.S.Time = morning;
-        // A tender feeds compost from storage, skipping food when told to, and carries its fertilizer back.
+    /// <summary>A tender feeds compost from storage, skipping food when told to, and carries its fertilizer back.</summary>
+    private static void CheckTenderFeedsCompostWithoutFood(GameData data) {
+        var world = EmptyWorld(data);
+        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
         var compost = world.Add(ThingKind.Pile, new Vector2(16, 24));
         Require(world.SetCompost(compost, true), "an empty pile should turn into compost");
         world.SetSkipFood(compost, true);
@@ -191,10 +165,11 @@ public static class SimulationChecks {
         SafeTick(world, 40);
         Require(chest.Inventory["fertilizer"] == 2 && compost.Inventory["leaves"] > 0 && chest.Inventory["berries"] == 6 && compost.Inventory["berries"] == 0,
                 "a tender should carry fertilizer to storage and bring leaves, but no food when food deliveries are skipped");
-        world.Assign(tender, null);
+    }
 
-        world.S.Time = morning;
-        // A trading post's runner carries what the cart delivered, other than coins, to storage.
+    /// <summary>A trading post's runner carries what the cart delivered, other than coins, to storage.</summary>
+    private static void CheckRunnerCarriesDeliveriesIntoStorage(GameData data) {
+        var world = EmptyWorld(data);
         var store = world.Add(ThingKind.Chest, new Vector2(26, 28));
         var sign = world.Add(ThingKind.Signpost, new Vector2(24, 26));
         sign.Output!.Add("tin_bar", 3); sign.Output.Add(Inventory.Coins, 20);
@@ -203,10 +178,12 @@ public static class SimulationChecks {
         SafeTick(world, 20);
         Require(store.Inventory["tin_bar"] == 3 && sign.Output["tin_bar"] == 0 && sign.Output[Inventory.Coins] == 20,
                 "a runner should carry deliveries into storage and leave the coins");
+    }
 
-        // A tool station's output filter keeps workers from taking a tool it does not let out.
-        world.S.Time = morning;
-        foreach (var other in world.S.Things.Where(t => t.Kind == ThingKind.Toolstation)) other.Inventory = new Inventory { Slots = other.Inventory.Slots, StackSize = other.Inventory.StackSize };
+    /// <summary>A tool station's output filter keeps workers from taking a tool it does not let out.</summary>
+    private static void CheckWorkerLeavesToolTheFilterHolds(GameData data) {
+        var world = EmptyWorld(data);
+        world.Add(ThingKind.Chest, new Vector2(20, 20));
         var heldRack = world.Add(ThingKind.Toolstation, new Vector2(30, 20));
         heldRack.Inventory.Add("steel_axe", 1);
         world.SetFilter(heldRack, "steel_pick", true, true);
@@ -376,7 +353,7 @@ public static class SimulationChecks {
                 "campfire should consume stored wood when its burn falls low");
     }
 
-    private static void CheckTradeAndWages(GameData data) {
+    private static void CheckCartDeliversAfterFullTrip(GameData data) {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
         var output = sign.Output!;
@@ -394,7 +371,15 @@ public static class SimulationChecks {
         var box = output.Items.Keys.SingleOrDefault(World.IsCrate);
         Require(world.S.Orders.Count == 0 && box == null && output["water"] == 1 && world.S.Backpack["water"] == 0,
                 "cart should deliver one refillable bottle directly to the market output");
+    }
 
+    /// <summary>A sale pays when the cart returns and lowers demand, and the price sheet only changes when someone brings news.</summary>
+    private static void CheckSaleLowersDemandAndNewsTravels(GameData data) {
+        var world = EmptyWorld(data);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
+        var output = sign.Output!;
+        world.Player = sign.Pos;
+        SetCoins(world, 100);
         world.S.Backpack.Add("wood", 3);
         world.S.Backpack.TransferTo(sign.Inventory, "wood", 3);
         Require(!world.Sell(sign) && world.S.Orders.Count == 0 && sign.Inventory["wood"] == 3, "loose goods must not be sold");
@@ -433,8 +418,14 @@ public static class SimulationChecks {
         SafeTick(world, data.TradeSeconds / 2 + .1f);
         Require(runner.Away == 0 && world.PriceAge == 0 && Math.Abs(world.KnownPrice("berries") - world.UnitPrice("berries", false)) < .01f && world.FetchBlock(sign) == null,
                 "the runner should return with current prices");
-        world.Fire(runner);
+    }
 
+    /// <summary>A worker the player cannot pay at dawn strikes for that one wage until the debt is paid in full.</summary>
+    private static void CheckUnpaidWorkerStrikes(GameData data) {
+        var world = EmptyWorld(data);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
+        world.Player = sign.Pos;
+        var cheap = data.HireOffers.OrderBy(o => o.Upfront).First();
         SetCoins(world, (int)cheap.Upfront);
         var worker = world.Hire(sign, cheap);
         Require(worker != null && worker.Wage == cheap.Wage, "player should be able to hire an individually tracked worker");
@@ -1038,6 +1029,7 @@ public static class SimulationChecks {
     /// <summary>A spot in the open middle of the valley, so the progression run has room to build.</summary>
     private static Vector2 Site(float x, float y) => new(x + 60, y + 60);
 
+    /// <summary>Plays from raw materials to a first hired worker: each stage hands the next what the player built with real recipes and trade delays.</summary>
     private static void CheckActualProgression(GameData data) {
         var world = EmptyWorld(data);
         float startTime = world.S.Time;
@@ -1051,11 +1043,22 @@ public static class SimulationChecks {
         var iron = world.Add(ThingKind.Iron, Site(12, 14), 120);
         var coal = world.Add(ThingKind.Coal, Site(16, 8), 120);
         Require(world.GatherBlock(iron)?.Contains("pickaxe") == true && world.GatherBlock(coal)?.Contains("pickaxe") == true, "deposits should wait for a pickaxe the player does not start with");
+        var bench = CheckGatheredMaterialsMakeCrates(world, tree, stone, bush);
+        var sign = CheckBerryCratesBuyFirstPickaxe(world, iron);
+        CheckMinedOreBecomesSteelTools(world, iron, coal, bench);
+        CheckSoldSteelToolFundsHire(world, sign);
+        CheckHiredWorkerSuppliesOpeningCamp(world, sign, tree, stone);
+        world.Tick(.01f, true);
+        Require(world.GoalComplete, "objective chain should reach the first automation milestone");
+        GD.Print($"Progression simulation elapsed: {world.S.Time - startTime:0} seconds.");
+    }
+
+    /// <summary>A stone chisel from bare stone opens wood crafting by hand, which leads to the bench, its mallet and crates.</summary>
+    private static Thing CheckGatheredMaterialsMakeCrates(World world, Thing tree, Thing stone, Thing bush) {
         GatherUntil(world, tree, "wood", 64);
         GatherUntil(world, stone, "stone", 58);
         GatherUntil(world, bush, "berries", 48);
 
-        // A stone chisel from bare stone opens wood crafting by hand, which leads to the bench, its mallet and crates.
         CraftByHand(world, "stone_chisel", 1);
         CraftByHand(world, "planks", 6);
         CraftByHand(world, "planks", 5);
@@ -1070,8 +1073,12 @@ public static class SimulationChecks {
         CompleteBatches(world, bench, "crate", 4);
         world.Collect(bench);
         Require(world.S.Backpack["crate"] == 4 && world.S.Milestones.Contains("crate"), "the bench should make crates from planks with the mallet slotted");
+        return bench;
+    }
 
-        // The first pickaxe is bought with berry money: four crates of berries pay for it.
+    /// <summary>The first pickaxe is bought with berry money: four crates of berries pay for it.</summary>
+    private static Thing CheckBerryCratesBuyFirstPickaxe(World world, Thing iron) {
+        var data = world.Data;
         var sign = BuildAt(world, ThingKind.Signpost, Site(34, 25));
         for (int i = 0; i < 4; i++) {
             world.Player = sign.Pos;
@@ -1088,7 +1095,10 @@ public static class SimulationChecks {
         SafeTick(world, data.TradeSeconds + .2f);
         Require(sign.Output.TransferTo(world.S.Backpack, "steel_pick", 1) == 1 && world.S.Milestones.Contains("pick") && world.GatherBlock(iron) == null,
                 "the bought pickaxe should arrive at the signpost and unlock mining deposits");
+        return sign;
+    }
 
+    private static void CheckMinedOreBecomesSteelTools(World world, Thing iron, Thing coal, Thing bench) {
         GatherUntil(world, iron, "iron_ore", 22);
         GatherUntil(world, coal, "coal", 6);
         var furnace = BuildAt(world, ThingKind.Furnace, Site(25, 25));
@@ -1129,7 +1139,10 @@ public static class SimulationChecks {
         world.Collect(bench);
         Require(world.S.Backpack["steel_pick"] == 2 && world.S.Backpack["crate"] == 1 && world.S.Milestones.Contains("steel_tool"),
                 "the bench should craft a steel pickaxe from steel parts and a crate from planks");
+    }
 
+    private static void CheckSoldSteelToolFundsHire(World world, Thing sign) {
+        var data = world.Data;
         world.Player = sign.Pos;
         var crate = world.PlaceCrate("crate", sign.Pos + new Vector2(0, 2));
         Require(crate != null && world.S.Backpack["crate"] == 0, "an empty crate should be placed from the backpack");
@@ -1146,11 +1159,13 @@ public static class SimulationChecks {
                 "steel-tool payment should remain in transit until the trade delay elapses");
         SafeTick(world, .2f);
         sign.Wages!.TransferTo(world.S.Backpack, Inventory.Coins, sign.Wages[Inventory.Coins]);
-        var offer = data.HireOffers[1];
-        Require(world.Coins >= offer.Upfront && world.S.Milestones.Contains("sold_steel"),
-                $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, upfront={offer.Upfront:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_pick"]}");
+        Require(world.Coins >= data.HireOffers[1].Upfront && world.S.Milestones.Contains("sold_steel"),
+                $"returned cart should fund hire and mark the sale: coins={world.Coins:0.0}, upfront={data.HireOffers[1].Upfront:0.0}, soldSteel={world.S.Milestones.Contains("sold_steel")}, health={world.S.Health:0.0}, time={world.S.Time:0.0}, backpackSteel={world.S.Backpack["steel_pick"]}");
+    }
 
-        var worker = world.Hire(sign, offer);
+    private static void CheckHiredWorkerSuppliesOpeningCamp(World world, Thing sign, Thing tree, Thing stone) {
+        var data = world.Data;
+        var worker = world.Hire(sign, data.HireOffers[1]);
         Require(worker != null, "sale proceeds should fund a new worker");
         var chest = BuildAt(world, ThingKind.Chest, Site(37, 25));
         // A woodcutter takes an axe from a tool station, so the player racks theirs: a station is 8 planks and 4 stone.
@@ -1180,10 +1195,6 @@ public static class SimulationChecks {
         world.Player = Site(3, 3);
         Require(world.Build(ThingKind.Hut, Site(5, 3)) != null, "gathered materials should build the opening shelter");
         Require(world.Build(ThingKind.Campfire, Site(3, 6)) != null, "gathered materials should build the opening fire");
-
-        world.Tick(.01f, true);
-        Require(world.GoalComplete, "objective chain should reach the first automation milestone");
-        GD.Print($"Progression simulation elapsed: {world.S.Time - startTime:0} seconds.");
     }
 
     private static void CheckCrateCapacityAndPacking(GameData data) {
@@ -1644,7 +1655,7 @@ public static class SimulationChecks {
         var lone = world.Add(ThingKind.Farm, origin + new Vector2(0, -6));
         lone.FarmStage = FarmStage.Ripe; world.Player = lone.Pos;
         world.Gather(lone, world.HarvestSeconds); world.Tick(1);
-        Require(lone.FarmStage == FarmStage.Fallow && lone.Output!["wheat_seeds"] == data.Farm.Yield["wheat_seeds"] && lone.Inventory["wheat_seeds"] == 0, "harvested seed should wait in the output until someone moves it into the plot");
+        Require(lone.FarmStage == FarmStage.Fallow && lone.Output!["wheat_seeds"] == 2 && lone.Inventory["wheat_seeds"] == 0, "harvested seed should wait in the output until someone moves it into the plot");
         world.S.Things.Remove(lone);
 
         world.Player = farm.Pos;
@@ -1658,11 +1669,11 @@ public static class SimulationChecks {
         var hut = world.Add(ThingKind.Hut, new Vector2(40, 40));
         world.Player = hut.Pos + new Vector2(0, 2); world.S.Sheltered = hut.Id;
         for (int i = 0; i < 4 * data.DaySeconds && farm.FarmStage == FarmStage.Ripe; i++) SafeTick(world, 1);
-        Require(farm.FarmStage == FarmStage.Fallow && farm.Output!["wheat_seeds"] + farm.Inventory["wheat_seeds"] == data.Farm.Yield["wheat_seeds"], "a worker should finish the shared harvest into the plot");
+        Require(farm.FarmStage == FarmStage.Fallow && farm.Output!["wheat_seeds"] + farm.Inventory["wheat_seeds"] == 2, "a worker should finish the shared harvest into the plot");
         SafeTick(world, 30);
-        Require(farm.Inventory["wheat_seeds"] == data.Farm.Sow["wheat_seeds"] && chest.Inventory["wheat_seeds"] == data.Farm.Yield["wheat_seeds"] - data.Farm.Sow["wheat_seeds"],
+        Require(farm.Inventory["wheat_seeds"] == 1 && chest.Inventory["wheat_seeds"] == 1,
                 "the hauler should move one sowing's seeds from the output into the plot and carry the rest to storage");
-        Require(chest.Inventory["wheat"] == data.Farm.Yield["wheat"] && compost.Inventory["wheat"] == 0 && compost.Inventory["grass"] == 1, "the wheat should go to storage rather than rot, and the grass to the compost");
+        Require(chest.Inventory["wheat"] == 4 && compost.Inventory["wheat"] == 0 && compost.Inventory["grass"] == 1, "the wheat should go to storage rather than rot, and the grass to the compost");
         chest.Inventory.Add("fertilizer", 1);
         SafeTick(world, 60);
         Require(farm.FarmStage == FarmStage.Growing && farm.Inventory["wheat_seeds"] == 0 && chest.Inventory["fertilizer"] == 0, "the worker should bring fertilizer and sow again from the seeds moved back in");
@@ -1894,7 +1905,7 @@ public static class SimulationChecks {
         world.S.Backpack.TransferTo(sign.Inventory, PackCrate(world, ("steel_axe", 1)), 1);
         Require(world.Sell(sign), "a loaded crate should sell");
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(world.Coins == 5 && sign.Wages![Inventory.Coins] == (int)(data.Items["steel_axe"].Price + data.Items["crate"].Price), "sale proceeds for the goods and their crate should arrive as whole coins in the wage slot");
+        Require(world.Coins == 5 && sign.Wages![Inventory.Coins] == 40, "sale proceeds for the goods and their crate should arrive as whole coins in the wage slot");
         world.S.Backpack.TransferTo(sign.Inventory, Inventory.Coins, 1);
         Require(!world.Sell(sign) && sign.Inventory[Inventory.Coins] == 1, "coins themselves cannot be sold");
         Require(!world.Buy(sign, Inventory.Coins, 1), "coins themselves cannot be bought");

@@ -136,7 +136,7 @@ public static class MultiplayerChecks {
 
         foreach (var command in sent) host.Run(guest, command);
         var hostChest = host.Find(chest.Id)!;
-        Require(guest.Backpack["berries"] == 2 && guest.Hunger > 50 && host.S.Things.Any(t => t.Kind == ThingKind.Campfire) && guest.Backpack["wood"] == 20 - data.Buildings[ThingKind.Campfire].Cost["wood"] - 5,
+        Require(guest.Backpack["berries"] == 2 && guest.Hunger > 50 && host.S.Things.Any(t => t.Kind == ThingKind.Campfire) && guest.Backpack["wood"] == 9,
             "the host should run the guest's actions as the guest");
         Require(hostChest.Inventory["wood"] == 5 && hostChest.Inventory.InputFilter.Contains("wood"), "the guest's transfer and filter should land in the host's chest");
         Require(host.S.Backpack["berries"] == 0 && host.S.Hunger == 100, "the host's own player should be untouched by a guest's actions");

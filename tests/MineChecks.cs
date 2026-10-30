@@ -4,6 +4,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static Fixtures;
 
 /// <summary>Simulation checks for mines and the end goals.</summary>
 public static class MineChecks {
@@ -20,16 +21,10 @@ public static class MineChecks {
     }
 
     /// <summary>An empty map with coins enough to pay every wage, so no worker strikes.</summary>
-    private static World EmptyWorld(GameData data) {
+    private static World FundedWorld(GameData data) {
         var world = new World(data, false);
         world.S.Backpack.Add(Inventory.Coins, 1000);
         return world;
-    }
-
-    private static Worker AddWorker(World world, Vector2 position) {
-        var worker = new Worker { Id = world.S.NextId++, Name = $"Miner {world.S.Workers.Count + 1}", Pos = position };
-        world.S.Workers.Add(worker);
-        return worker;
     }
 
     /// <summary>Runs the world with the player fed and out of the wolves' way, through nights as well, until a condition holds.</summary>
@@ -48,10 +43,10 @@ public static class MineChecks {
     }
 
     private static void CheckAlignmentAndLegacySave(GameData data) {
-        var world = EmptyWorld(data); var expected = new Dictionary<int, Vector2>();
+        var world = FundedWorld(data); var expected = new Dictionary<int, Vector2>();
         foreach (var cliff in World.Cliffs) {
             Require(World.CliffAt(World.MineSpot(cliff)) == cliff, "each aligned site must belong to its own cliff");
-            var marking = EmptyWorld(data); marking.Player = World.MineSpot(cliff) + cliff.Face * 3;
+            var marking = FundedWorld(data); marking.Player = World.MineSpot(cliff) + cliff.Face * 3;
             Require(marking.Build(ThingKind.Mine, World.MineSpot(cliff) + cliff.Along + cliff.Face)?.Pos == World.MineSpot(cliff), "every aligned site must remain markable and snap correctly");
             var outward = cliff.Face;
             var basis = Basis.FromEuler(WorldModels.MineYaw(World.MineSpot(cliff)));
@@ -71,7 +66,7 @@ public static class MineChecks {
             var worker = AddWorker(world, oldSpot + cliff.Face * 3); worker.Assignment = mine.Id;
         }
         world.S.Version = 4;
-        var loaded = EmptyWorld(data); loaded.Deserialize(world.Serialize());
+        var loaded = FundedWorld(data); loaded.Deserialize(world.Serialize());
         Require(loaded.S.Version == 5, "version 4 valley saves must upgrade to the current mine layout");
         foreach (var mine in loaded.S.Things.Where(t => t.Kind == ThingKind.Mine)) {
             Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.S.Remembered[mine.Id].Pos.IsEqualApprox(mine.Pos),
@@ -80,13 +75,13 @@ public static class MineChecks {
                 "aligning an older mine must preserve construction, stock, output and assigned workers");
         }
         Require(loaded.S.Things.Where(t => t.Kind == ThingKind.Mine).Select(t => t.Pos).Distinct().Count() == World.Cliffs.Length, "migrating all cliffs must keep distinct mine sites");
-        var restored = EmptyWorld(data); restored.Deserialize(loaded.Serialize());
+        var restored = FundedWorld(data); restored.Deserialize(loaded.Serialize());
         Require(restored.S.Things.Where(t => t.Kind == ThingKind.Mine).All(m => m.Pos.IsEqualApprox(loaded.Find(m.Id)!.Pos)),
             "loading an aligned save must not move its mines again");
     }
 
     private static void CheckMarking(GameData data) {
-        var world = EmptyWorld(data);
+        var world = FundedWorld(data);
         var cliff = World.CliffOf(ThingKind.Iron);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
         Require(world.PlacementBlock(ThingKind.Mine, world.Player + cliff.Face * 15) != null, "a mine must be marked at a cliff, not out in the valley");
@@ -101,7 +96,7 @@ public static class MineChecks {
     }
 
     private static void CheckConstruction(GameData data) {
-        var world = EmptyWorld(data);
+        var world = FundedWorld(data);
         var mine = MarkMine(world);
         var cliff = World.CliffAt(mine.Pos);
         var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 - cliff.Along * 2);
@@ -142,7 +137,7 @@ public static class MineChecks {
     }
 
     private static void CheckMiningAndFullOutput(GameData data) {
-        var world = EmptyWorld(data);
+        var world = FundedWorld(data);
         var mine = MarkMine(world);
         mine.MineStage = MineStage.Open;
         var cliff = World.CliffAt(mine.Pos);
@@ -189,7 +184,7 @@ public static class MineChecks {
     }
 
     private static void CheckOnlyAvailableMinersUnload(GameData data) {
-        var world = EmptyWorld(data);
+        var world = FundedWorld(data);
         var mine = MarkMine(world); mine.MineStage = MineStage.Open;
         var cliff = World.CliffAt(mine.Pos);
         var chest = world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
@@ -212,7 +207,7 @@ public static class MineChecks {
 
     private static void CheckMiningIsSlowerThanDeposits(GameData data) {
         int Gathered(bool mining) {
-            var world = EmptyWorld(data);
+            var world = FundedWorld(data);
             var cliff = World.CliffOf(ThingKind.Iron);
             Thing source;
             if (mining) { source = MarkMine(world); source.MineStage = MineStage.Open; } else source = world.Add(ThingKind.Iron, World.MineSpot(cliff), 400);
@@ -229,7 +224,7 @@ public static class MineChecks {
     }
 
     private static void CheckDailyProfitAndEndGoals(GameData data) {
-        var world = EmptyWorld(data);
+        var world = FundedWorld(data);
         var worker = AddWorker(world, new Vector2(30, 30));
         worker.Wage = 26;
         var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
