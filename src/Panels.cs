@@ -189,7 +189,7 @@ public partial class Game {
             if (elsewhere.Count == 0) continue;
             var circle = Style.Pill(elsewhere.Count.ToString(), Style.Round(Style.Enamel, 11).Item1, Style.Rim, 12);
             circle.CustomMinimumSize = new Vector2(22, 22); circle.MouseFilter = Control.MouseFilterEnum.Pass;
-            circle.TooltipText = string.Join("\n", elsewhere.Select(d => $"{(world.Find(d.Thing) is Thing at ? world.Data.Name(at.Kind) : "?")} · {JobName(d.Job).ToLowerInvariant()}"));
+            circle.TooltipText = string.Join("\n", elsewhere.Select(d => $"{(world.DutyPlace(w, d.Thing) is Thing at ? world.Data.Name(at.Kind) : "?")} · {JobName(d.Job).ToLowerInvariant()}"));
             line.AddChild(circle);
         }
     }
@@ -205,6 +205,7 @@ public partial class Game {
     /// <summary>
     /// The one filter window for any storage that has filters: a row of what workers bring and one of what they take.
     /// Drop an item on a row to add it, click one to take it off; an empty row allows anything.
+    /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
     /// </summary>
     private void FilterWindow(Thing t) {
         var board = SideBoard(Style.Board, 340);
@@ -213,40 +214,61 @@ public partial class Game {
         var title = Style.Heading("Filters", 22); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);
         top.AddChild(Style.Icon(HotbarIcon(t.Kind), 32));
         top.AddChild(HeaderButton("close", "Close the filters", () => { filterOpen = false; filterPicking = false; OpenPage("inspect"); }, Style.CloseRound, "filters_close"));
-        foreach (bool output in new[] { false, true }) {
+        bool post = t.Kind == "signpost";
+        foreach (bool output in post ? new[] { false } : new[] { false, true }) {
             var filter = output ? t.Inventory.OutputFilter : t.Inventory.InputFilter;
             var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); board.AddChild(well);
             var row = new HFlowContainer { Name = output ? "filter_out" : "filter_in" }; row.AddThemeConstantOverride("h_separation", 10); row.AddThemeConstantOverride("v_separation", 10); well.AddChild(row);
             var glyph = Style.Glyph(output ? "line_out" : "line_in", 30, Style.Ink); glyph.MouseFilter = Control.MouseFilterEnum.Pass;
-            glyph.TooltipText = output ? "Workers take only these from here" : "Workers bring only these here";
+            glyph.TooltipText = output ? "Workers take only these from here" : post ? "Workers bring these crates here to sell" : "Workers bring only these here";
             row.AddChild(glyph);
-            foreach (string item in filter.OrderBy(world.Data.Name)) {
-                var (cell, _) = IconCell($"filter_{(output ? "out" : "in")}_{item}", 44);
-                cell.Icon = HotbarIcon(item); cell.TooltipText = $"{world.Data.Name(item)}\nClick to take it off";
+            foreach (string item in filter.OrderBy(FilterName)) {
+                var cell = FilterCell($"filter_{(output ? "out" : "in")}_{item}", item); cell.TooltipText = $"{FilterName(item)}\nClick to take it off";
                 string id = item;
                 cell.Pressed += () => { world.SetFilter(t, id, output, false); OpenPage("inspect"); };
                 row.AddChild(cell);
             }
-            if (filter.Count == 0) { var any = Style.Text("anything", 14, Style.Tan); any.CustomMinimumSize = new Vector2(0, 44); row.AddChild(any); }
+            if (filter.Count == 0) { var any = Style.Text(post ? "no deliveries" : "anything", 14, Style.Tan); any.CustomMinimumSize = new Vector2(0, 44); row.AddChild(any); }
             var (add, _) = IconCell($"filter_add_{(output ? "out" : "in")}", 44);
             add.Text = "+"; add.AddThemeFontSizeOverride("font_size", 22); add.AddThemeColorOverride("font_color", Style.Tan);
             add.TooltipText = "Add an item · or drop one from your backpack";
             add.Pressed += () => { filterPicking = !filterPicking; pickingOutput = output; OpenPage("inspect"); };
-            add.CanTake = drag => drag.From != null && world.Data.Items.ContainsKey(drag.Item);
-            // The item stays where it was: a filter only names it.
-            add.Take = drag => { world.SetFilter(t, drag.Item, output, true); Callable.From(() => OpenPage("inspect")).CallDeferred(); return 0; };
+            add.CanTake = drag => drag.From != null && (!World.PackedKind(drag.Item).IsEmpty || !post && world.Data.Items.ContainsKey(drag.Item));
+            // The item stays where it was: a filter only names it, or for a packed crate the kind of crate it is.
+            add.Take = drag => {
+                var kind = World.PackedKind(drag.Item);
+                world.SetFilter(t, kind.IsEmpty ? drag.Item : new string(kind), output, true); Callable.From(() => OpenPage("inspect")).CallDeferred(); return 0;
+            };
             row.AddChild(add);
         }
         if (filterPicking) {
             var picker = new GridContainer { Columns = 6 }; picker.AddThemeConstantOverride("h_separation", 6); picker.AddThemeConstantOverride("v_separation", 6);
             var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); well.AddChild(picker); board.AddChild(well);
-            foreach (var (id, _) in world.Data.Items.Where(p => world.Holds(t, p.Key)).OrderBy(p => p.Value.Name)) {
-                var (cell, _) = IconCell($"pick_{id}", 44); cell.Icon = HotbarIcon(id); cell.TooltipText = world.Data.Name(id);
+            var crates = world.Data.Market.Sells.Keys.Select(World.CrateOf).Where(id => post || world.Holds(t, id));
+            foreach (var id in (post ? crates : world.Data.Items.Keys.Where(id => world.Holds(t, id)).Concat(crates)).OrderBy(FilterName)) {
+                var cell = FilterCell($"pick_{id}", id); cell.TooltipText = FilterName(id);
                 cell.Pressed += () => { world.SetFilter(t, id, pickingOutput, true); filterPicking = false; OpenPage("inspect"); };
                 picker.AddChild(cell);
             }
         }
-        var clear = Button("Clear both", () => { world.ClearFilters(t); OpenPage("inspect"); }); clear.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; board.AddChild(clear);
+        var clear = Button(post ? "Clear" : "Clear both", () => { world.ClearFilters(t); OpenPage("inspect"); }); clear.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; board.AddChild(clear);
     }
     private bool pickingOutput;
+
+    /// <summary>What a filter entry names: an item, or a crate of a good.</summary>
+    private string FilterName(string id) => world.CrateGood(id) is string good ? $"Crate of {world.Data.Name(good).ToLowerInvariant()}" : world.Data.Name(id);
+
+    /// <summary>A filter entry's cell: the item, or for a crate of a good, the good with a small crate in the corner.</summary>
+    private ItemSlot FilterCell(string name, string id) {
+        var (cell, _) = IconCell(name, 44);
+        string? good = world.CrateGood(id);
+        cell.Icon = HotbarIcon(good ?? id);
+        if (good != null) {
+            var badge = Style.Icon(HotbarIcon("crate"), 22); badge.MouseFilter = Control.MouseFilterEnum.Ignore;
+            badge.AnchorLeft = badge.AnchorTop = badge.AnchorRight = badge.AnchorBottom = 1;
+            badge.OffsetLeft = badge.OffsetTop = -20; badge.OffsetRight = badge.OffsetBottom = 2;
+            cell.AddChild(badge);
+        }
+        return cell;
+    }
 }

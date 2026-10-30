@@ -324,8 +324,22 @@ Both stations, like the stone furnace, take wood or coal in their fuel slot.
 A wood crate holds 12 items in total, as one stack or as single items, and its slots grow and shrink with its contents.
 Place one from the backpack or hotbar, click it to open it, and hold right mouse on it to pick it up with its contents packed inside.
 
-Workers never pack, open or place crates; a worker managing deliveries only carries packed crates from the mailbox to storage.
+Workers never open or place crates; they pack them at a packing station.
 Putting a crate inside a crate asks first; saying yes ends the game.
+
+### Packing station
+
+The packing station (8 planks, 4 wood) packs one good into crates.
+Click the cup at the top to choose the good from everything a crate holds.
+It keeps a stack of that good and a stack of empty crates, and packs one item every 1.5 seconds while you or an assigned worker work it.
+The crate being packed shows on the right with how full it is; a full crate waits there until someone takes it.
+
+- Craft: works the station.
+- Haul: carries out the full crate, and anything it no longer packs, to storage; then keeps a crate's worth of the good and two empty crates there.
+
+A crate of one good is a kind of item that filters can name: "Crate of bread" in a chest's filter, or in the trading post's.
+A full crate goes to the nearest storage whose filter asks for that crate, otherwise to the nearest open storage.
+A pile of crates takes more crates of the same good.
 
 ### Piles
 
@@ -405,6 +419,9 @@ A sale pays for the goods and the crate.
 Load crates, press Sell, and a cart takes them to Bramblewick and returns 30 seconds later with the coins.
 Bought goods also arrive in the output boxes.
 
+The filter button next to close names the crates workers bring here; with none named, workers bring nothing.
+Tick Send when full and the cart leaves on its own once all six boxes hold a crate.
+
 Trade carts keep their timing: a cart walks down the valley at a steady pace, fades out once it is well along, and waits out of view before walking back.
 
 ### Coins and wage slot
@@ -444,7 +461,11 @@ Buying costs a fixed 1.25× the base price, so a buy-and-resell loop never profi
 
 The Workers tab at the trading post offers several hiring deals: more coins up front means a lower daily wage.
 Workers are individual entities with assignments, wages, cargo and visible work status.
-There are at most eight workers.
+There are at most forty workers.
+
+A worker gathering a resource moves on to the next nearest spot of the same kind once theirs is spent, such as the next tree after felling one.
+They only go to spots a player has seen, even if fog hides them now.
+With no other spot known they say so and go on to their other jobs, or wait at the trading post.
 
 ### Daily routine
 
@@ -587,7 +608,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, hand gathering, axe and pick strokes, hammering, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, hand gathering, axe and pick strokes, hammering, packing crates, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 
 The world reacts too:

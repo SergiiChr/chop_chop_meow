@@ -19,6 +19,7 @@ public partial class Game {
         Tab("cart", "coins", "Ship", () => signpostTab = "market", signpostTab == "market");
         Tab("crew", "hardhat", "Hire", () => signpostTab = "workers", signpostTab == "workers");
         Tab("guide", "prices", "Prices", () => sheetOpen = !sheetOpen, sheetOpen);
+        FilterButton(sign);
         if (sheetOpen) PriceSheet(sign);
         if (signpostTab == "workers") HireOffers(sign);
         else Market(sign);
@@ -47,6 +48,10 @@ public partial class Game {
         var look = Style.Pill(Style.Brick); Style.Skin(sell, look.Item1, look.Item2);
         sell.AddThemeColorOverride("icon_normal_color", Style.Rim); sell.AddThemeColorOverride("icon_hover_color", Style.Rim);
         ship.AddChild(sell);
+        var auto = new CheckBox { Text = "Send when full", ButtonPressed = sign.AutoSell, FocusMode = Control.FocusModeEnum.None, Name = "auto_sell", TooltipText = "Send the cart by itself once every slot holds a crate" };
+        foreach (var color in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color" }) auto.AddThemeColorOverride(color, Style.Ink);
+        auto.Toggled += on => { world.SetAutoSell(sign, on); auto.SetPressedNoSignal(sign.AutoSell); };
+        outbound.AddChild(auto);
         var revenue = Style.Text("", 14, Style.Ink); outbound.AddChild(revenue);
         var worth = new LiveText(shown => revenue.Text = shown);
         int counted = -1;
@@ -69,7 +74,7 @@ public partial class Game {
         var boxes = AddInventoryGrid(() => output, sign, id => MoveStack(output, world.S.Backpack, id, sign), "Click or drag: take", _ => false, columns: 5);
         content.RemoveChild(boxes); content.QueueFree(); content = host;
         mail.AddChild(boxes);
-        BagGrid(id => { if (world.CanSell(id)) MoveStack(world.S.Backpack, sign.Inventory, id, sign); else Notify("Pack meat, berries or steel tools in a crate to sell them."); }, "Click: put a packed crate on the cart · Drag onto a box", wanted: world.CanSell);
+        BagGrid(id => { if (world.CanSell(id)) MoveStack(world.S.Backpack, sign.Inventory, id, sign); else Notify("Pack goods the village buys in a crate to sell them."); }, "Click: put a packed crate on the cart · Drag onto a box", wanted: world.CanSell);
     }
 
     /// <summary>What the crates waiting at the post would fetch at the last known prices.</summary>

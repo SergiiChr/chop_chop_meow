@@ -3,10 +3,11 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Shared fitted bench joinery, bevelled planks and a mounted bench vise.</summary>
+/// <summary>Shared fitted bench joinery, bevelled planks and a mounted bench vise, and the packing station's painted table.</summary>
 internal static class BenchShape {
-    private static ArrayMesh? wood, vise;
+    private static ArrayMesh? wood, vise, packing;
     public static Mesh Wood => wood ??= BuildWood();
+    public static Mesh Packing => packing ??= BuildPacking();
     public static Mesh Vise => vise ??= BuildVise();
     public static readonly StandardMaterial3D Timber = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .85f };
     public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .45f, Metallic = .6f };
@@ -27,6 +28,23 @@ internal static class BenchShape {
         Bevel(s, new Vector3(.96f, .035f, .46f), new Vector3(0, .20f, 0), .006f, "967045");
         for (int i = -1; i <= 1; i++)
             Bevel(s, new Vector3(1.12f, .07f, .202f), new Vector3(0, .78f, i * .206f), .012f, i == 0 ? "b98552" : "c28e59");
+        return s.Commit();
+    }
+
+    /// <summary>A long waist-high table with a sage-painted top on sled-footed legs, kraft paper and a twine spool on top and loose straw on the shelf below.</summary>
+    private static ArrayMesh BuildPacking() {
+        var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
+        foreach (float x in new[] { -.72f, .72f }) {
+            foreach (float z in new[] { -.23f, .23f }) Box(s, new Vector3(.08f, .84f, .08f), new Vector3(x, .42f, z), "3f4a3c");
+            Box(s, new Vector3(.11f, .05f, .6f), new Vector3(x, .025f, 0), "354033");
+        }
+        foreach (float z in new[] { -.26f, .26f }) Box(s, new Vector3(1.5f, .08f, .04f), new Vector3(0, .8f, z), "3f4a3c");
+        Bevel(s, new Vector3(1.6f, .06f, .6f), new Vector3(0, .87f, 0), .012f, "6f8f7a");
+        Box(s, new Vector3(1.4f, .03f, .46f), new Vector3(0, .2f, 0), "5f7c69");
+        Box(s, new Vector3(.6f, .16f, .36f), new Vector3(-.3f, .295f, 0), "d4b45a");
+        Box(s, new Vector3(.34f, .1f, .3f), new Vector3(.3f, .265f, .03f), "c9a64e");
+        Box(s, new Vector3(.46f, .006f, .38f), new Vector3(-.35f, .903f, .02f), "d8c7a3");
+        Box(s, new Vector3(.1f, .1f, .1f), new Vector3(.68f, .95f, -.2f), "c9a46a");
         return s.Commit();
     }
 

@@ -19,6 +19,7 @@
   "berryRegrowHours": 24,
   "sightRadius": 20,
   "crateCapacity": 12,
+  "packSeconds": 1.5,
   "benchSpeed": 2,
   "mine": {
     "materials": { "wood": 50, "iron_bar": 10, "stone": 50 },
@@ -427,6 +428,14 @@
         "planks": 8
       },
       "description": "Seals stew, jam or meat into tin cans over a wood or coal fire. Canned goods keep and sell for the most."
+    },
+    "packer": {
+      "name": "Packing station",
+      "cost": {
+        "planks": 8,
+        "wood": 4
+      },
+      "description": "Packs one chosen good into crates, one item at a time while someone works it. A full crate waits to be carried out."
     },
     "signpost": {
       "name": "Trading post",

@@ -39,6 +39,7 @@ Simulation and data:
 | `src/GameData.cs` | Loads tunable items, buildings, recipes, trade values and time values from `data/game.json` |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
+| `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
 | `src/Players.cs` | Per-player state, the command dispatcher and guest adoption |
@@ -62,6 +63,7 @@ UI and input:
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/Market.cs` | The trading post market, hiring offers and price sheet |
 | `src/Crew.cs` | The crew cards and worker panel |
+| `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/Guide.cs` | The field guide topics |
 | `src/Needs.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/Ending.cs` | The one-time ending screen |
@@ -101,6 +103,7 @@ Keep rendering and input separate from state transitions, so headless checks can
 - `tests/SimulationChecks.cs` covers filters, worker routing, furnace work, trade, wages, recovery after death, saves and a material-driven progression run.
 - `tests/EconomyChecks.cs` measures real workers through a day and checks the economy rules.
 - `tests/AllocationChecks.cs` holds ticks to their allocation budgets.
+- `tests/ProductionChainChecks.cs` covers the packing station, the trading post's filter and auto-sell, and workers alone running the berry, bread, canned stew and steel pickaxe chains to a sale.
 
 ### HUD and backpack
 
@@ -165,6 +168,9 @@ Actor animation is driven by gameplay state.
 The player's carried tool selects its matching action and the tool shown in hand.
 Workers animate according to movement and an explicit transient `WorkerWorkState`, not localized or presentation status text.
 The transient state is excluded from saves and recalculated on the next simulation tick.
+
+At a packing station the packer stands behind the table (`World.PackStand`) and the `Pack` action rummages in the heap of goods, lifts a piece across and settles it into the crate, then turns back.
+The player working a station they stand near packs the same way.
 
 Manual bellows pumping and the unarmed punch trigger one loop of their action.
 Each work action has an impact moment that shakes its target and spawns chips, leaves, splashes or sparks.
@@ -399,7 +405,19 @@ It keeps the player's filters rather than setting its own, and `Thing.SkipFood` 
 
 A wood crate holds `crateCapacity` (12) units.
 A picked-up crate becomes an item `crate_<n>` whose contents live in `SaveState.Crates`; an empty one is the stackable item `crate`.
-Crates are manual storage only.
+A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
+A pile of crates holds crates of one good.
+Placed crates are manual storage only.
+
+#### Packing station
+
+A packing station (`packer`, `src/Packing.cs`) packs the good in `Thing.Packs` into crates, anything a crate holds but crates and coins.
+Its inventory takes only that good and empty crates; `Thing.Output` holds the crate being packed.
+While worked like an anvil, it moves one item every `packSeconds` into that crate, opening an empty crate for the first.
+A full crate, or one of another good after the choice changes, waits in the output.
+
+- Haul carries that crate to `DepositFor` and the station's leftovers to storage, then keeps a crate's worth of the good and two empty crates there.
+- A worker with both jobs fetches only once the station runs dry, crates first.
 
 Putting a packed crate into a placed crate asks for confirmation.
 If confirmed, it ends the run in a black hole with a reload or main-menu choice.
@@ -423,6 +441,10 @@ Workers hold duties (`Worker.Duties`): a place and one of the jobs `World.Jobs` 
 - Stock brings tools from storage to a tool station.
 - Tend fetches what a compost pile's filters take from storage and carries its fertilizer out.
 - Deliveries runs price errands and carries the trading post's mail, other than coins, to storage.
+
+A gatherer whose spot is spent moves the duty to the nearest spot of the same kind in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
+With none known they say so once and go on to their other places, or wait at the nearest trading post until one is seen or the spot comes back.
+A worker with no duties waits at the nearest trading post.
 
 Only one worker ever pumps a reinforced furnace.
 Of those with the bellows job, the first pumps and the rest haul if they also hold haul.
@@ -471,6 +493,10 @@ Buying costs a fixed 1.25× the base price.
 
 A cart trip takes 30 seconds.
 Purchases settle on return into the trading post's market output (`Thing.Output`), with overflow in a box beside it.
+
+The trading post's input filter names the crates it asks for.
+`DepositFor` treats a post as storage only for an item its filter names, so workers deliver those crates there when it is the nearest storage asking for them.
+With `Thing.AutoSell` set, the cart leaves on its own once every market slot holds a crate and a cart is free.
 Sale coins fill the trading post's one-stack wage slot (`Thing.Wages`, coins only) first and the output after.
 Dawn wages and settled strikes draw on every wage slot before the payer's backpack.
 
