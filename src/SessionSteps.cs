@@ -9,7 +9,7 @@ namespace ChopChopMeow;
 /// <summary>Starts and leaves games for the UI and network checks.</summary>
 public partial class Game {
     private static void RemoveCheckFiles() {
-        var signals = new[] { "joined", "stopped" }.Select(SignalPath);
+        var signals = DirAccess.GetFilesAt("user://").Where(name => name.StartsWith($"{FilePrefix}signal-")).Select(name => $"user://{name}");
         foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath).Concat(signals)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
     }
 

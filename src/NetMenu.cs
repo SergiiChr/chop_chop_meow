@@ -17,8 +17,8 @@ public partial class Game {
         net.Acted += view.Acted;
         net.Joined += OnJoined;
         net.Disconnected += ShowReconnecting;
-        net.Reconnecting += left => { if (GodotObject.IsInstanceValid(reconnectStatus)) reconnectStatus.Text = $"Lost the connection to the host. Trying again for {left} more {(left == 1 ? "second" : "seconds")}."; };
-        net.Left += reason => { leftReason = reason; world.NewGame(); ShowStart(); };
+        net.Reconnecting += left => { reconnectStatus.Text = $"{Net.LostLine} Trying again for {left} more {(left == 1 ? "second" : "seconds")}."; };
+        net.Left += reason => { leftReason = reason; DropWorld(); ShowStart(); };
         net.Failed += reason => { if (GodotObject.IsInstanceValid(joinStatus)) joinStatus.Text = reason; };
     }
 
@@ -61,17 +61,20 @@ public partial class Game {
 
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
     private void ShowReconnecting() {
-        world.NewGame(); ClosePanel(); ending.Visible = false;
-        OpenScreen("RECONNECTING", () => { net.StopRetrying(); ShowStart(); });
-        reconnectStatus = Label("Lost the connection to the host. Trying again…", 14, Muted); screen.AddChild(reconnectStatus);
+        DropWorld();
+        OpenScreen("RECONNECTING", () => { net.Leave(); ShowStart(); });
+        reconnectStatus = Label("", 14, Muted); screen.AddChild(reconnectStatus);
         AddScreenButton("Stop · Esc", () => screenBack?.Invoke());
     }
 
-    private void OnJoined() {
+    /// <summary>Replaces the world with a new one and closes everything that showed the old one.</summary>
+    private void DropWorld() { world.NewGame(); ClosePanel(); ending.Visible = false; EndAnomaly(); }
+
+    private void OnJoined(bool back) {
         StoreSetting("net", "address", net.Address);
         slot = 0; selected = 0; workerId = 0; gathering = null; entering = null; lifting = null; assigningWorker = 0; endingSeen = false;
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
         HideScreen(); menu.Visible = false; ending.Visible = false; ClosePanel();
-        Notify(net.Retrying ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
+        Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
     }
 }

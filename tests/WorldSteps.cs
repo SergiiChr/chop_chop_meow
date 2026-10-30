@@ -44,7 +44,7 @@ internal static class WorldSteps {
 
     /// <summary>An empty world hosting one guest, and the messages that guest has heard.</summary>
     public static (World World, PlayerState Guest, List<string> Heard) Hosted(GameData data) {
-        var world = new World(data, false);
+        var world = EmptyWorld(data);
         var heard = new List<string>();
         world.Relay = (to, message) => { if (to == null || to.Id == GuestId) heard.Add(message); };
         var guest = world.AddGuest(GuestId, null);
