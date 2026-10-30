@@ -40,6 +40,7 @@ Project rules on top of the global coding and testing guides.
 - Use representative end-to-end checks plus focused edge cases.
 - UI checks live in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` and `src/NetChecks.cs`; a change to a shared check helper covers all three.
 - Input tests go through `Input.ParseInputEvent`, not direct calls to input handlers.
+- UI checks act like a player: they set up through `world`, then use real input and read what the screen shows. A direct call into private `Game` code says in a comment why no input reaches it.
 - Simulation setup may construct fixtures, but tests claiming resource-to-steel progression must gather raw materials and use the actual recipes and trade delays.
 - A fixture built by editing text, such as an old save, fails when the text it edits is missing.
 - UI checks wait for a condition with a time limit, not for a fixed time; a fixed wait is only for holding input, letting something play for a set time or pausing between retries.

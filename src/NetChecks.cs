@@ -22,13 +22,14 @@ public partial class Game {
 
     private async Task HostNetCheck() {
         RemoveCheckFiles(); await Frames(4);
-        await Click(FindButton(screen, "New game")!); ClosePanel();
+        await Click(FindButton(screen, "New game")!); await CloseWithEsc();
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
         world.Add(ThingKind.LooseCoal, NetOre, 2); world.Add(ThingKind.LooseCoal, NetCoal, 2);
         var chest = world.Add(ThingKind.Chest, NetChest); var hut = world.Add(ThingKind.Hut, NetHut);
         await KeyStroke(Key.Escape);
         await Click(hostButton);
-        Require(net.Hosting && !menu.Visible && !paused, "Host in the pause menu must open the current game to guests and close the menu.");
+        Require(net.Hosting && !menu.Visible, "Host in the pause menu must open the current game to guests and close the menu.");
+        Require(await PlayerWalks(), "After hosting the player must be able to walk again.");
         await KeyStroke(Key.Escape);
         float before = world.S.Time;
         await Until(() => world.S.Time > before, "the world going on behind the host's pause menu", 5);
@@ -71,17 +72,18 @@ public partial class Game {
         await RightClick(NetOre);
         await Until(() => world.S.Backpack["coal"] == 2 && world.S.Things.All(t => t.Pos != NetOre), "the host handing over the loose coal the guest walked to");
         await Click(view.Screen(NetChest, .3f));
-        Require(page == "inspect" && world.Find(selected)?.Kind == ThingKind.Chest && world.Near(world.Find(selected)!), "Clicking the chest beside the coal must open it.");
+        var opened = world.Find(view.Selected);
+        Require(opened is { Kind: ThingKind.Chest } && Shows(opened) && world.Near(opened), "Clicking the chest beside the coal must open it.");
         await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
-        await Until(() => world.Find(selected)!.Inventory["coal"] == 1 && world.S.Backpack["coal"] == 1, "a normal storage click moving exactly one coal");
+        await Until(() => opened!.Inventory["coal"] == 1 && world.S.Backpack["coal"] == 1, "a normal storage click moving exactly one coal");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = true });
         await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = false });
-        await Until(() => world.Find(selected)!.Inventory["coal"] == 2 && world.S.Backpack["coal"] == 0, "the stored coal showing up in the host's chest");
-        ClosePanel(); await RightClick(NetCoal);
+        await Until(() => opened!.Inventory["coal"] == 2 && world.S.Backpack["coal"] == 0, "the stored coal showing up in the host's chest");
+        await CloseWithEsc(); await RightClick(NetCoal);
         await Until(() => world.S.Backpack["coal"] == 2, "the host handing over the second loose coal");
         // The host checks reach from where the guest stood when it clicked, not from where its glide has got to.
-        ClosePanel(); await Click(view.Screen(NetHut, .8f));
+        await CloseWithEsc(); await Click(view.Screen(NetHut, .8f));
         await Until(() => world.S.Sheltered == world.S.Things.Single(t => t.Kind == ThingKind.Hut).Id, "the host letting the guest into the cabin it walked to");
 
         await LeaveGame();

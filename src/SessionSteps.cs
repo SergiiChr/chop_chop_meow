@@ -47,11 +47,14 @@ public partial class Game {
             await Click(FindButton(screen, "Join game")!);
             var port = (LineEdit)screen.FindChild("port", true, false);
             Require(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
-            port.Text = CheckPort.ToString();
+            await Click(port); await KeyStroke(Key.End);
+            while (port.Text != "") await KeyStroke(Key.Backspace);
+            await Type(CheckPort.ToString());
             var address = (LineEdit)screen.FindChild("address", true, false);
             // The popup offers the address of the last game joined.
-            if (address.Text == "") await Type("127.0.0.1");
-            else Require(address.Text == "127.0.0.1", "The join popup must offer the last address joined.");
+            if (address.Text == "") {
+                await Click(address); await Type("127.0.0.1");
+            } else Require(address.Text == "127.0.0.1", "The join popup must offer the last address joined.");
             await Click(FindButton(screen, "Join")!);
             for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && joinStatus.Text == "Connecting…";) await Frames(1);
             if (!world.Remote) {
@@ -63,7 +66,7 @@ public partial class Game {
     }
 
     private async Task LeaveGame() {
-        ClosePanel(); await KeyStroke(Key.Escape);
+        await CloseWithEsc(); await KeyStroke(Key.Escape);
         Require(menu.Visible && joinButton.Text == "Leave game" && saveButton.Disabled, "A guest's pause menu must offer to leave and not to save the host's world.");
         await Click(joinButton);
         Require(!world.Remote && backdrop.Visible && Godot.FileAccess.FileExists(GuestSave), "Leaving must save the guest's player and return to the start menu.");
