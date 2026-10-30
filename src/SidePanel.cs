@@ -120,6 +120,12 @@ public partial class SidePanel : PanelContainer {
     /// <summary>Selects a worker and shows them.</summary>
     public void Select(Worker w) { state.WorkerId = w.Id; state.Selected = 0; View.Selected = 0; View.SelectedWorker = w.Id; Open("inspect"); }
 
+    /// <summary>Forgets what was selected, any placement and any work order, when the world behind them goes away.</summary>
+    public void ClearSelection() {
+        state.Selected = 0; state.WorkerId = 0; state.AssigningWorker = 0;
+        View.BuildMode = null; View.Selected = 0; View.SelectedWorker = 0;
+    }
+
     /// <summary>Enters placement for a crate from the backpack.</summary>
     public void PlaceCrate(string item) {
         if (world.S.Backpack[item] == 0) { Kit.Notify("No empty crate in your backpack. Craft one at a bench."); return; }

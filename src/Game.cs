@@ -1,12 +1,17 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using Godot;
 
 namespace ChopChopMeow;
 
+/// <summary>
+/// The runner: creates the world and the interface's parts, holds them, routes input between them and runs the frame.
+/// Each part owns its feature; what several share is in <see cref="UiKit"/> and <see cref="UiState"/>.
+/// </summary>
 public partial class Game : Node {
+    private static readonly bool smokeTest = Launch.Has("--smoke-test");
+    private static readonly string? screenshotPath = Launch.Value("--screenshot");
+    private static readonly float shotDelay = float.TryParse(Launch.Value("--shot-delay"), System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
     private World world = null!;
     private WorldView view = null!;
     private Sounds sounds = null!;
@@ -106,17 +111,37 @@ public partial class Game : Node {
         panel.Refresh();
         hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
     }
+    private void ConnectNet() {
+        net.Said += Notify;
+        net.Heard += PlayWorldSound;
+        net.Acted += view.Acted;
+        net.Joined += OnJoined;
+        net.Disconnected += ShowReconnecting;
+        net.Reconnecting += left => startMenu.ShowRetry(left);
+        net.Left += reason => { startMenu.LeftReason = reason; DropWorld(); startMenu.ShowStart(); };
+        net.Failed += reason => startMenu.ShowJoinFailure(reason);
+    }
+    /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
+    private void ShowReconnecting() { DropWorld(); startMenu.ShowReconnecting(); }
+    /// <summary>Replaces the world with a new one and closes everything that showed the old one.</summary>
+    private void DropWorld() { world.NewGame(); panel.Close(); ending.Visible = false; blackHole.End(); }
+    private void OnJoined(bool back) {
+        Settings.Store("net", "address", net.Address);
+        saves.Slot = 0; panel.ClearSelection(); player.StopGathering(); state.Entering = null; player.StopLifting(); ending.Joined(back);
+        shownHealth = world.S.Health;
+        startMenu.Close(); menu.Visible = false; ending.Visible = false; panel.Close();
+        Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
+    }
     private void Restart() {
         net.Leave();
         world.NewGame();
-        state.Selected = 0; state.WorkerId = 0; player.StopGathering(); state.AssigningWorker = 0; saves.Slot = 0; autosave = 0;
-        view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0;
+        panel.ClearSelection(); player.StopGathering(); saves.Slot = 0; autosave = 0;
         ending.Visible = false; state.Paused = false; panel.Open("welcome");
         Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
     }
     /// <summary>Clears what belonged to the world before a load, and shows what was loaded.</summary>
     private void Loaded() {
-        state.Selected = 0; state.WorkerId = 0; player.StopGathering(); state.Entering = null; state.AssigningWorker = 0; view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; panel.Open("inventory");
+        panel.ClearSelection(); player.StopGathering(); state.Entering = null; panel.Open("inventory");
     }
     public override void _UnhandledInput(InputEvent ev) {
         if (view?.EnvironmentReview == true) return;
@@ -150,9 +175,6 @@ public partial class Game : Node {
         }
         if (ev is InputEventMouseButton mouse) player.Click(mouse, GetViewport().GuiGetHoveredControl() != null);
     }
-    private static readonly bool smokeTest = Launch.Has("--smoke-test");
-    private static readonly string? screenshotPath = Launch.Value("--screenshot");
-    private static readonly float shotDelay = float.TryParse(Launch.Value("--shot-delay"), System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
     public override void _Process(double delta) {
         if (world == null || view == null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;

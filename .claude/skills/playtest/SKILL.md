@@ -16,7 +16,7 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
    ```
 
    ```csharp
-   if (LaunchValue("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
+   if (Launch.Value("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
    ```
 
 2. Start the game in the background with a folder in your scratchpad: `./build.py play -- --drive <dir>`. Add `--showcase` and its flags for a late-game fixture instead of a fresh start.

@@ -28,6 +28,14 @@ These came from the user; change them only after asking.
 The project targets Godot 4.7.2 .NET with C#.
 `scenes/Main.tscn` is the project entry point and references `src/Game.cs`.
 
+### Interface parts
+
+`Game` is a thin runner: it creates the interface's nodes once while loading, holds them and routes input and the frame to them.
+Each feature is a node with a small public surface, given what it needs in its constructor.
+`UiKit` carries the world, sounds and how a player action runs; `UiState` holds what several parts share, such as `Paused` and the side panel's page.
+The side panel builds a new `PagePanel` node every time a page opens, so its build code runs once per open and its `Live` updates run on each refresh; `PageMemory` keeps what must outlast a rebuild.
+UI checks stay in `partial class Game` and reach the parts through their public members.
+
 ### Source files
 
 Simulation and data:
@@ -92,7 +100,6 @@ UI and input:
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots, the settings file and the command line |
 | `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings and clicking things |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
-| `src/NetMenu.cs` | What happens around joining and leaving |
 
 Rendering and sound:
 
