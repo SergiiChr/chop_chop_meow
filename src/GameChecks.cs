@@ -83,7 +83,7 @@ public partial class Game {
     /// A new game reuses the ids of the last one, so the models the view keeps for them must be built anew:
     /// an old one would carry the last game's state, such as a felled tree faded out.
     /// </summary>
-    private async Task CheckFreshModelsAfterRestart() {
+    private async Task CheckRestartBuildsFreshModelsForReusedIds() {
         var tree = world.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(world.Player))!;
         await Frames();
         var old = view.PropOf(tree.Id) as TreeProp;
@@ -995,7 +995,7 @@ public partial class Game {
             await CheckSurvivalActionsWorkThroughTheInventoryUI();
             await CheckCrateDraggedIntoCrateStopsAtWarning();
             RemoveCheckFiles();
-            await CheckFreshModelsAfterRestart();
+            await CheckRestartBuildsFreshModelsForReusedIds();
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
