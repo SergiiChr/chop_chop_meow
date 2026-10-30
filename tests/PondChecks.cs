@@ -9,7 +9,7 @@ public static class PondChecks {
             float angle = side * MathF.Tau / 24;
             var direction = new Vector2(MathF.Cos(angle), MathF.Sin(angle));
             var world = new World(data, false);
-            var pond = world.Add("water", Terrain.WaterPoint(Terrain.Spawn), 9999);
+            var pond = world.Add(ThingKind.Water, Terrain.WaterPoint(Terrain.Spawn), 9999);
             world.Player = Terrain.WaterPoint(Terrain.Lake + direction * 30) + direction;
             world.S.Backpack.Add("empty_bottle", 1);
             Require(world.Near(pond) && Terrain.WaterRing(world.Player), "Every part of the pond shore must collect water.");

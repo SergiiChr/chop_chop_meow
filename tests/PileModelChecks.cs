@@ -9,7 +9,7 @@ namespace ChopChopMeow;
 public static class PileModelChecks {
     public static void Run(GameData data) {
         PileShape.Warm(data);
-        var thing = new Thing { Kind = "pile", Inventory = new Inventory { Slots = 14 } };
+        var thing = new Thing { Kind = ThingKind.Pile, Inventory = new Inventory { Slots = 14 } };
         var first = WorldModels.Build(thing); var second = WorldModels.Build(thing);
         try {
             thing.Inventory.Add("wood", 14 * 64);
@@ -40,10 +40,10 @@ public static class PileModelChecks {
             // Stations showing piled goods use the same handler, so a good looks the same on them as in a storage pile.
             thing.Inventory.Add("wood", 64);
             WorldModels.SyncPile(first, thing, data);
-            var furnace = WorldModels.Build(new Thing { Kind = "furnace", Burner = new Inventory() });
-            var packer = WorldModels.Build(new Thing { Kind = "packer" });
+            var furnace = WorldModels.Build(new Thing { Kind = ThingKind.Furnace, Burner = new Inventory() });
+            var packer = WorldModels.Build(new Thing { Kind = ThingKind.Packer });
             try {
-                var fire = new Thing { Kind = "furnace", Burner = new Inventory() }; fire.Burner.Add("wood", 3);
+                var fire = new Thing { Kind = ThingKind.Furnace, Burner = new Inventory() }; fire.Burner.Add("wood", 3);
                 WorldModels.SyncFuel(furnace, fire, data);
                 Require(furnace.Stock!.Slots.Count(s => s.Visible) == 2 && furnace.Stock.Slots[0].Mesh == first.Stock!.Slots[0].Mesh,
                         "a furnace should show its stocked wood as storage pile logs, a pile for every two");

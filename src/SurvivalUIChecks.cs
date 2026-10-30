@@ -29,8 +29,8 @@ public partial class Game {
             world.S.HotbarSlots[8] = "water";
 
             // A real source-ring pick and a held right mouse button refill the starter bottle.
-            world.S.Things.RemoveAll(t => t.Kind == "water");
-            world.Add("water", world.Player + Vector2.Right * 20, 9999);
+            world.S.Things.RemoveAll(t => t.Kind == ThingKind.Water);
+            world.Add(ThingKind.Water, world.Player + Vector2.Right * 20, 9999);
             world.S.Backpack.Remove("water", 99);
             world.S.Backpack.Remove("water_1", 99);
             world.S.Backpack.Remove("water_2", 99);
@@ -39,7 +39,7 @@ public partial class Game {
             world.Player = shore + (shore - Terrain.Lake).Normalized() * 1.8f;
             await Frames(4);
             var shorePoint = view.Screen(shore, .8f);
-            Require(view.Pick(shorePoint)?.Kind == "water", "The visible shoreline ring must pick the water source.");
+            Require(view.Pick(shorePoint)?.Kind == ThingKind.Water, "The visible shoreline ring must pick the water source.");
             var windowPoint = GetViewport().GetFinalTransform() * shorePoint;
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
             await Until(() => world.S.Backpack["water"] == 1 && world.S.Backpack["empty_bottle"] == 0, "holding right mouse on the shoreline filling the retained bottle", world.Data.GatherSeconds + 3);
@@ -85,7 +85,7 @@ public partial class Game {
             // A normal click moves one unit; Ctrl-click moves the entire remaining stack.
             ClosePanel();
             world.S.Backpack.Add("coal", 5);
-            var chest = world.Add("chest", world.Player + Vector2.Right);
+            var chest = world.Add(ThingKind.Chest, world.Player + Vector2.Right);
             chest.Inventory.Add("coal", 5);
             Select(chest); await Frames(3);
             await Click(Cell(0, c => c.TooltipText.StartsWith("Mined coal ·", StringComparison.Ordinal)));
@@ -106,7 +106,7 @@ public partial class Game {
             ClosePanel();
             world.S.Backpack.Items.Clear(); world.S.Backpack.Layout.Clear();
             world.S.Backpack.Add("water_2", 1);
-            var table = world.Add("cooktable", world.Player + Vector2.Right);
+            var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
             world.SetRecipe(table, "dough");
             Select(table); await Frames(3);
             await Click(Cell(1, c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal)));
@@ -120,7 +120,7 @@ public partial class Game {
 
             // A downed player without a cabin may choose dawn; any cabin restores normal respawning.
             ClosePanel();
-            world.S.Things.RemoveAll(t => t.Kind == "hut");
+            world.S.Things.RemoveAll(t => t.Kind == ThingKind.Hut);
             world.S.Time = world.Data.DaySeconds * .9f;
             world.S.RespawnIn = 30;
             RefreshRecoveryPrompt(); RefreshLive(); await Frames(2);
@@ -130,7 +130,7 @@ public partial class Game {
             await Click(skipMorningButton!);
             Require(world.S.RespawnIn == 0 && world.Day > previousDay && world.S.Time % world.Data.DaySeconds < world.Data.DaySeconds * .1f,
                 "Skipping morning must advance the simulated world to dawn and complete respawn.");
-            world.Add("hut", world.Player + Vector2.Right);
+            world.Add(ThingKind.Hut, world.Player + Vector2.Right);
             world.S.RespawnIn = 30;
             RefreshRecoveryPrompt(); RefreshLive(); await Frames(2);
             Require(recoveryPrompt is { Visible: false }, "A downed player with a cabin must not be offered Skip to morning.");

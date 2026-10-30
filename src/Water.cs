@@ -35,7 +35,7 @@ public static class Water {
 
     /// <summary>Refills an empty bottle first, then a partial bottle. With no bottle, a source gathering gives one direct sip.</summary>
     public static WaterCollectResult CollectWater(World world, Thing source) {
-        if (source.Kind != "water") return WaterCollectResult.NoChange;
+        if (source.Kind != ThingKind.Water) return WaterCollectResult.NoChange;
         Inventory backpack = world.S.Backpack;
         string? bottle = FindBottle(backpack);
         if (bottle == "water") return WaterCollectResult.NoChange;
@@ -76,7 +76,7 @@ public sealed partial class World {
             while (inventory.AggregateSlotsNeeded > inventory.Slots) {
                 string? bottle = Water.FindBottle(inventory);
                 if (bottle == null) break;
-                overflow ??= Add("grave", position);
+                overflow ??= Add(ThingKind.Grave, position);
                 overflow.Inventory.Slots = System.Math.Max(overflow.Inventory.Slots, overflow.Inventory.Count + 1);
                 inventory.Remove(bottle, 1); overflow.Inventory.Add(bottle, 1);
             }

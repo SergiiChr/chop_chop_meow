@@ -35,6 +35,7 @@ Simulation and data:
 | File | Owns |
 | --- | --- |
 | `src/World.cs` | The `World` simulation and `SaveState` |
+| `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/Inventory.cs` | Inventories and their filter-aware transfers |
 | `src/GameData.cs` | Loads tunable items, buildings, recipes, trade values and time values from `data/game.json` |
 | `src/Farm.cs` | Farm plots |
@@ -122,7 +123,7 @@ Multiplayer is host-authoritative.
 The top-level player fields of `SaveState` pass through to `SaveState.Actor`, so saves keep the host's player where single player always had it.
 
 Player actions run in the acting player's context (`World.As`).
-In a guest's copy, `World.Forwarded` sends each action to the host as a `Command` instead of changing the copy.
+In a guest's copy, `World.Forwarded` sends each action to the host as a `Command`, named by its `Verb`, instead of changing the copy.
 Guests walk locally and send their position, gather target and held item.
 A host-made move such as a respawn bumps `PlayerState.Warp`, so it wins over the guest's own position.
 
@@ -513,13 +514,13 @@ Each portal follows its own cliff face, its tunnel runs into the rock, and its r
 A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`World.InSpur`), and holds the tunnel, which `WorldModels.Mine` darkens step by step to black.
 Loading a save made on an older valley moves only the mine cart anchor to this site and keeps stock, stages and worker assignments.
 
-`Thing.Stage` counts finished stages:
+`Thing.MineStage` counts finished stages from `MineStage.Marked`:
 
 | Stage | Done by | Check |
 | --- | --- | --- |
-| Dug | a worker with a pickaxe | `World.MineDug` |
-| Supplied | `mine.materials` delivered | `World.MineSupplied` |
-| Fitted | a worker with a hammer | `World.MineOpen` |
+| Dug | a worker with a pickaxe | `MineStage.Dug` |
+| Supplied | `mine.materials` delivered | `MineStage.Supplied` |
+| Fitted | a worker with a hammer | `MineStage.Open` |
 
 The two worker stages take `stageWorkdays` of `GameData.WorkdaySeconds`.
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
@@ -534,7 +535,7 @@ The first free miner then carries the whole stack to storage (`Worker.Bag` grows
 A farm plot (`farm`, `src/Farm.cs`) is a zone like a pile and snaps with piles.
 `farm` in `data/game.json` sets what sows it, how many days the wheat grows, how many working days the harvest takes and what it yields.
 
-`Thing.Stage` is `World.FarmFallow`, `FarmGrowing` or `FarmRipe`.
+`Thing.FarmStage` is `Fallow`, `Growing` or `Ripe`.
 `Thing.Progress` counts growth seconds, then harvest work.
 A fallow plot sows itself from its own inventory.
 `World.CropLook` gives the look: bare, soil, straws, green plants or wheat.

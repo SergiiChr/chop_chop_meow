@@ -37,7 +37,7 @@ public partial class IconRender : Node {
         DirAccess.MakeDirRecursiveAbsolute(Folder);
         var ids = new List<(string Id, bool Building)>();
         foreach (var id in Data.Items.Keys) ids.Add((id, false));
-        foreach (var id in Data.Buildings.Keys) ids.Add((id, true));
+        foreach (var kind in Data.Buildings.Keys) ids.Add((kind.Id(), true));
         int count = 0;
         foreach (var (id, building) in ids) {
             if (WorldModels.IconModel(id, building, Data) is not Node3D model) continue;

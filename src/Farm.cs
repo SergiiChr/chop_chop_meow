@@ -4,24 +4,25 @@ using System.Linq;
 
 namespace ChopChopMeow;
 
+/// <summary>Where a farm plot is: waiting for seeds and fertilizer, growing, or ripe for harvest.</summary>
+public enum FarmStage { Fallow, Growing, Ripe }
+
 /// <summary>Farm plots: sown with seeds and fertilizer, growing wheat for days, then harvested by hand with shared progress.</summary>
 public sealed partial class World {
-    /// <summary>Values of <see cref="Thing.Stage"/> for a farm plot: waiting for seeds and fertilizer, growing, and ripe for harvest.</summary>
-    public const int FarmFallow = 0, FarmGrowing = 1, FarmRipe = 2;
     public float GrowSeconds => Data.Farm.GrowDays * Data.DaySeconds;
     public float HarvestSeconds => Data.Farm.HarvestWorkdays * Data.WorkdaySeconds;
 
     /// <summary>What the plot shows: 0 bare, 1 sown soil, 2 small green straws, 3 tall green plants, 4 yellow wheat.</summary>
-    public static int CropLook(Thing farm, float growSeconds) => farm.Stage switch {
-        FarmRipe => 4,
-        FarmGrowing => 1 + Math.Min(2, (int)(farm.Progress / growSeconds * 3)),
+    public static int CropLook(Thing farm, float growSeconds) => farm.FarmStage switch {
+        FarmStage.Ripe => 4,
+        FarmStage.Growing => 1 + Math.Min(2, (int)(farm.Progress / growSeconds * 3)),
         _ => 0
     };
 
     /// <summary>A fallow plot sows once seeds and fertilizer are put in its sowing slots; growing wheat ripens after its days.</summary>
     private void FarmTick(Thing farm, float dt) {
-        if (farm.Stage == FarmFallow && farm.Inventory.Has(Data.Farm.Sow)) { farm.Inventory.Spend(Data.Farm.Sow); farm.Stage = FarmGrowing; farm.Progress = 0; }
-        if (farm.Stage == FarmGrowing && (farm.Progress += dt) >= GrowSeconds) { farm.Stage = FarmRipe; farm.Progress = 0; }
+        if (farm.FarmStage == FarmStage.Fallow && farm.Inventory.Has(Data.Farm.Sow)) { farm.Inventory.Spend(Data.Farm.Sow); farm.FarmStage = FarmStage.Growing; farm.Progress = 0; }
+        if (farm.FarmStage == FarmStage.Growing && (farm.Progress += dt) >= GrowSeconds) { farm.FarmStage = FarmStage.Ripe; farm.Progress = 0; }
     }
 
     /// <summary>
@@ -29,13 +30,13 @@ public sealed partial class World {
     /// A finished harvest waits at full progress until the plot has room for the yield, so nothing is lost.
     /// </summary>
     private void Harvest(Thing farm, float dt) {
-        if (farm.Stage != FarmRipe) return;
+        if (farm.FarmStage != FarmStage.Ripe) return;
         farm.Progress = Math.Min(HarvestSeconds, farm.Progress + dt);
         if (farm.Progress < HarvestSeconds) return;
         var yield = farm.Output ?? farm.Inventory;
         foreach (var pair in Data.Farm.Yield) if (yield.Room(pair.Key) < pair.Value) return;
         foreach (var (item, amount) in Data.Farm.Yield) yield.Add(item, amount);
-        farm.Stage = FarmFallow; farm.Progress = 0;
+        farm.FarmStage = FarmStage.Fallow; farm.Progress = 0;
     }
 
     /// <summary>
@@ -59,7 +60,7 @@ public sealed partial class World {
                 if (Walk(w, farm.Pos, dt)) { farm.Output.TransferTo(w.Bag, item, Math.Min(count, w.Bag.StackSize), true); w.Destination = dest.Id; }
                 return true;
             }
-            if (farm.Stage == FarmFallow)
+            if (farm.FarmStage == FarmStage.Fallow)
                 foreach (var (item, amount) in Data.Farm.Sow) {
                     if (farm.Inventory[item] >= amount) continue;
                     var source = SourceFor(item, w.Pos);
@@ -70,7 +71,7 @@ public sealed partial class World {
                 }
         }
         bool farms = HasDuty(w, farm.Id, "farm");
-        if (farm.Stage != FarmRipe) { w.Status = "Waiting for the wheat to grow"; if (farms) Walk(w, farm.Pos, dt); return false; }
+        if (farm.FarmStage != FarmStage.Ripe) { w.Status = "Waiting for the wheat to grow"; if (farms) Walk(w, farm.Pos, dt); return false; }
         if (!farms) { w.Status = "Waiting for the harvest"; return false; }
         w.Status = Phrase("Harvesting wheat · ", Number(farm.Progress / HarvestSeconds * 100), "%");
         if (!Walk(w, farm.Pos, dt)) return true;

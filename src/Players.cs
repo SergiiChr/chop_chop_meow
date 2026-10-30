@@ -57,8 +57,11 @@ public sealed class PlayerState {
     internal readonly List<float> TorchSwings = new();
 }
 
+/// <summary>The player actions a guest sends to the host.</summary>
+public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Duty, Enter, FetchPrices, Fire, FuelFire, Hire, Leave, LoadBatch, LoadFuel, LoadInput, PickUp, PickUpCrate, PlaceCrate, Pump, Sell, SetCompost, SetFilter, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, UnslotTool }
+
 /// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
-public readonly record struct Command(string Verb, int Target, int Other, string Item, int Count, Vector2 At);
+public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At);
 
 /// <summary>The players in the world and the guest side of actions.</summary>
 public sealed partial class World {
@@ -100,7 +103,7 @@ public sealed partial class World {
     }
 
     /// <summary>In a guest's copy, sends the action to the host and tells the caller to stop.</summary>
-    private bool Forwarded(string verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
+    private bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
         Host?.Invoke(new Command(verb, target, other, item, count, at));
         return Host != null;
     }
@@ -110,54 +113,54 @@ public sealed partial class World {
         var t = Find(c.Target);
         var w = S.Workers.Find(w => w.Id == c.Other);
         switch (c.Verb) {
-            case "build": Build(c.Item, c.At); break;
-            case "place_crate": PlaceCrate(c.Item, c.At); break;
-            case "consume": S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
-            case "torch": UseTorch(c.At); break;
-            case "attack": Attack(); break;
-            case "leave": Leave(); break;
-            case "craft": Craft(c.Item); break;
-            case "cancel_craft": CancelCraft(c.Count); break;
-            case "transfer":
+            case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Build(kind, c.At); break;
+            case Verb.PlaceCrate: PlaceCrate(c.Item, c.At); break;
+            case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
+            case Verb.Torch: UseTorch(c.At); break;
+            case Verb.Attack: Attack(); break;
+            case Verb.Leave: Leave(); break;
+            case Verb.Craft: Craft(c.Item); break;
+            case Verb.CancelCraft: CancelCraft(c.Count); break;
+            case Verb.Transfer:
                 if (Resolve(c.Target) is Inventory from && Resolve(c.Other) is Inventory to) {
                     from.PreferredSlot = c.At.Y == -1 ? (int)c.At.X : -1;
                     try { Transfer(from, to, c.Item, c.Count); } finally { from.PreferredSlot = -1; }
                 }
                 break;
-            case "transfer_slot": if (Resolve(c.Target) is Inventory slotFrom && Resolve(c.Other) is Inventory slotTo) TransferSlot(slotFrom, slotTo, (int)c.At.X, (int)c.At.Y, c.Item, c.Count); break;
-            case "sort_bag": SortBackpack(); break;
-            case "skip_morning": SkipMorning(); break;
-            case "assign": if (w != null) Assign(w, t); break;
-            case "duty": if (w != null && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, c.Item, c.Count != 0); break;
-            case "fire": if (w != null) Fire(w); break;
-            case "settle": if (w != null) SettleDebt(w); break;
+            case Verb.TransferSlot: if (Resolve(c.Target) is Inventory slotFrom && Resolve(c.Other) is Inventory slotTo) TransferSlot(slotFrom, slotTo, (int)c.At.X, (int)c.At.Y, c.Item, c.Count); break;
+            case Verb.SortBag: SortBackpack(); break;
+            case Verb.SkipMorning: SkipMorning(); break;
+            case Verb.Assign: if (w != null) Assign(w, t); break;
+            case Verb.Duty: if (w != null && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, c.Item, c.Count != 0); break;
+            case Verb.Fire: if (w != null) Fire(w); break;
+            case Verb.Settle: if (w != null) SettleDebt(w); break;
         }
         if (t == null) return;
         switch (c.Verb) {
-            case "pick_up": if (t.IsLoose) Gather(t, 0); break;
-            case "pump": Pump(t); break;
-            case "fuel_fire": FuelFire(t); break;
-            case "set_recipe": SetRecipe(t, c.Item); break;
-            case "set_filter": SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
-            case "clear_filters": ClearFilters(t); break;
-            case "set_compost": SetCompost(t, c.Count != 0); break;
-            case "skip_food": SetSkipFood(t, c.Count != 0); break;
-            case "supply_mine": SupplyMine(t); break;
-            case "load_batch": LoadBatch(t, Math.Clamp(c.Count, 1, 5)); break;
-            case "load_input": LoadInput(t, c.Item, c.Count); break;
-            case "load_fuel": LoadFuel(t, c.Item, c.Count); break;
-            case "collect": Collect(t); break;
-            case "enter": Enter(t); break;
-            case "sleep": Sleep(t); break;
-            case "sell": Sell(t); break;
-            case "auto_sell": SetAutoSell(t, c.Count != 0); break;
-            case "set_packing": SetPacking(t, c.Item); break;
-            case "buy": Buy(t, c.Item, Math.Min(c.Count, 5)); break;
-            case "pick_up_crate": PickUpCrate(t); break;
-            case "slot_tool": SlotTool(t, c.Item); break;
-            case "unslot_tool": UnslotTool(t, c.Item); break;
-            case "fetch_prices": FetchPrices(t); break;
-            case "hire": if (c.Count >= 0 && c.Count < Data.HireOffers.Count) Hire(t, Data.HireOffers[c.Count]); break;
+            case Verb.PickUp: if (t.IsLoose) Gather(t, 0); break;
+            case Verb.Pump: Pump(t); break;
+            case Verb.FuelFire: FuelFire(t); break;
+            case Verb.SetRecipe: SetRecipe(t, c.Item); break;
+            case Verb.SetFilter: SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
+            case Verb.ClearFilters: ClearFilters(t); break;
+            case Verb.SetCompost: SetCompost(t, c.Count != 0); break;
+            case Verb.SkipFood: SetSkipFood(t, c.Count != 0); break;
+            case Verb.SupplyMine: SupplyMine(t); break;
+            case Verb.LoadBatch: LoadBatch(t, Math.Clamp(c.Count, 1, 5)); break;
+            case Verb.LoadInput: LoadInput(t, c.Item, c.Count); break;
+            case Verb.LoadFuel: LoadFuel(t, c.Item, c.Count); break;
+            case Verb.Collect: Collect(t); break;
+            case Verb.Enter: Enter(t); break;
+            case Verb.Sleep: Sleep(t); break;
+            case Verb.Sell: Sell(t); break;
+            case Verb.AutoSell: SetAutoSell(t, c.Count != 0); break;
+            case Verb.SetPacking: SetPacking(t, c.Item); break;
+            case Verb.Buy: Buy(t, c.Item, Math.Min(c.Count, 5)); break;
+            case Verb.PickUpCrate: PickUpCrate(t); break;
+            case Verb.SlotTool: SlotTool(t, c.Item); break;
+            case Verb.UnslotTool: UnslotTool(t, c.Item); break;
+            case Verb.FetchPrices: FetchPrices(t); break;
+            case Verb.Hire: if (c.Count >= 0 && c.Count < Data.HireOffers.Count) Hire(t, Data.HireOffers[c.Count]); break;
         }
     });
 
@@ -180,7 +183,7 @@ public sealed partial class World {
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {
         int a = Locate(from), b = Locate(to);
-        if (a < 0 || b < 0 || Forwarded("transfer", a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
+        if (a < 0 || b < 0 || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
         if (new[] { a, b }.Where(at => at > 0).Any(at => !Near(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
         if (b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
         int moved = from.TransferTo(to, item, quantity);
@@ -190,7 +193,7 @@ public sealed partial class World {
     }
 
     public void SortBackpack() {
-        if (Downed || Forwarded("sort_bag")) return;
+        if (Downed || Forwarded(Verb.SortBag)) return;
         S.Backpack.Sort();
     }
 
@@ -198,7 +201,7 @@ public sealed partial class World {
         int a = Locate(from), b = Locate(to);
         if (a < 0 || b < 0 || Downed) return 0;
         if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
-        if (Forwarded("transfer_slot", a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
+        if (Forwarded(Verb.TransferSlot, a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
         if (a > 0 && !Near(Find(a / BoxCodes)!) || b > 0 && !Near(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
         // Bring stacks in line with totals changed directly, then reject a stale drag rather than moving a different item.
         from.EnsureLayout();
@@ -216,19 +219,19 @@ public sealed partial class World {
     }
 
     public void SetFilter(Thing chest, string item, bool output, bool allowed) {
-        if (!(chest.IsStorage || chest.Kind == "signpost") || !(Data.Items.ContainsKey(item) || CrateGood(item) != null) || Forwarded("set_filter", chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
+        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null) || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         var filter = output ? chest.Inventory.OutputFilter : chest.Inventory.InputFilter;
         if (allowed) filter.Add(item); else filter.Remove(item);
     }
 
     /// <summary>Stops or restarts workers bringing food to a compost.</summary>
     public void SetSkipFood(Thing pile, bool skip) {
-        if (!pile.Compost || Forwarded("skip_food", pile.Id, count: skip ? 1 : 0)) return;
+        if (!pile.Compost || Forwarded(Verb.SkipFood, pile.Id, count: skip ? 1 : 0)) return;
         pile.SkipFood = skip;
     }
 
     public void ClearFilters(Thing chest) {
-        if (!(chest.IsStorage || chest.Kind == "signpost") || Forwarded("clear_filters", chest.Id)) return;
+        if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || Forwarded(Verb.ClearFilters, chest.Id)) return;
         chest.Inventory.InputFilter.Clear(); chest.Inventory.OutputFilter.Clear();
     }
 
@@ -287,7 +290,7 @@ public sealed partial class World {
         }).ToList();
         backpack.Slots = 24;
         p.Backpack = backpack; p.Crates = null;
-        p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.Buildings.ContainsKey(id) || p.Backpack[id] > 0) ? id : "").ToList();
+        p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
         p.Sheltered = 0; p.Mauled = false; p.TorchKindling = 0; p.TorchLit = p.TorchLit && p.Torch > 0; p.GatherTarget = 0; p.Held = ""; p.TorchFlare = 0;
         if (!CanStand(p.Pos)) p.Pos = Terrain.Spawn;

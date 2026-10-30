@@ -227,7 +227,7 @@ public partial class Game : Node {
     // What the labels show, so their text is built only when it changes: building it allocates.
     private (int Day, int Minute, bool Night) shownClock = (-1, -1, false);
     private (bool Dead, bool Mauled, bool Pack, int Seconds) shownDeath;
-    private (bool Assigning, string Mode) shownMode = (false, "");
+    private (bool Assigning, ThingKind? Mode) shownMode = (false, null);
     private void RefreshLive() {
         if (world == null || stats == null) return;
         var clock = (world.Day, (int)(world.DayPhase * 1440), world.Night);
@@ -247,7 +247,7 @@ public partial class Game : Node {
         var mode = (assigningWorker > 0, view.BuildMode);
         if (mode != shownMode) {
             shownMode = mode;
-            modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != "" ? $"PLACE {world.Data.Name(view.BuildMode).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
+            modeLabel.Text = assigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != null ? $"PLACE {world.Data.Name(view.BuildMode.Value).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
         }
         // An update can open another page, which replaces the list; the old page's remaining updates are then dropped.
         int opened = pagesOpened;
@@ -313,9 +313,9 @@ public partial class Game : Node {
     }
     private (int, int) shownInspect;
     /// <summary>Names the page after the building it shows, with the building's own icon; its description becomes the icon's tooltip.</summary>
-    private void Headline(string kind) {
+    private void Headline(ThingKind kind) {
         headingTitle.Text = world.Data.Name(kind);
-        headingIcon.Texture = HotbarIcon(kind); headingIcon.Visible = headingIcon.Texture != null;
+        headingIcon.Texture = HotbarIcon(kind.Id()); headingIcon.Visible = headingIcon.Texture != null;
         headingIcon.TooltipText = world.Data.Buildings.TryGetValue(kind, out var def) ? def.Description : "";
     }
     /// <summary>Shows the backpack drawer with a grid that works with the open page: <paramref name="wanted"/> lights up what it takes.</summary>
@@ -360,7 +360,7 @@ public partial class Game : Node {
         var grid = AddGrid();
         var details = Label("Hover a plan to see what it needs. Click it, then click open ground nearby.", 14, Muted);
         foreach (var (id, def) in world.Data.Buildings) {
-            var (cell, _) = IconCell($"build_{id}"); cell.Icon = HotbarIcon(id); cell.TooltipText = $"{def.Name}\nClick to place · Drag onto the hotbar"; DragReference(cell, id);
+            var (cell, _) = IconCell($"build_{id.Id()}"); cell.Icon = HotbarIcon(id.Id()); cell.TooltipText = $"{def.Name}\nClick to place · Drag onto the hotbar"; DragReference(cell, id.Id());
             cell.Pressed += () => { view.BuildMode = id; assigningWorker = 0; ClosePanel(); RefreshLive(); };
             cell.MouseEntered += () => details.Text = $"{def.Name}\n{def.Description}\n\nNeeds: {Needs(def.Cost)}";
             live.Add(() => { if (GodotObject.IsInstanceValid(cell)) cell.Modulate = world.S.Backpack.Has(def.Cost) ? Colors.White : Unready; });
@@ -384,31 +384,31 @@ public partial class Game : Node {
         return wages;
     }
     private void Select(Thing t) {
-        if (t.Kind == "reinforced" && !(page == "inspect" && selected == t.Id)) sounds.Play("open_steel_smelter", t.Pos);
-        selected = t.Id; workerId = 0; view.Selected = t.Id; view.SelectedWorker = 0; view.BuildMode = ""; OpenPage("inspect");
+        if (t.Kind == ThingKind.Reinforced && !(page == "inspect" && selected == t.Id)) sounds.Play("open_steel_smelter", t.Pos);
+        selected = t.Id; workerId = 0; view.Selected = t.Id; view.SelectedWorker = 0; view.BuildMode = null; OpenPage("inspect");
     }
     /// <summary>Enters placement for a crate from the backpack.</summary>
     private void PlaceCrate(string item) {
         if (world.S.Backpack[item] == 0) { Notify("No empty crate in your backpack. Craft one at a bench."); return; }
-        placingCrate = item; view.BuildMode = "crate"; assigningWorker = 0; ClosePanel();
+        placingCrate = item; view.BuildMode = ThingKind.Crate; assigningWorker = 0; ClosePanel();
     }
-    private bool CanPlaceAgain() => view.BuildMode == "crate" ? world.S.Backpack[placingCrate] > 0 : world.S.Backpack.Has(world.Data.Buildings[view.BuildMode].Cost);
+    private bool CanPlaceAgain() => view.BuildMode == ThingKind.Crate ? world.S.Backpack[placingCrate] > 0 : view.BuildMode is ThingKind kind && world.S.Backpack.Has(world.Data.Buildings[kind].Cost);
     private void Select(Worker w) { workerId = w.Id; selected = 0; view.Selected = 0; view.SelectedWorker = w.Id; OpenPage("inspect"); }
     private void Inspect() {
         if (workerId > 0) { WorkerPanel(world.S.Workers.FirstOrDefault(w => w.Id == workerId)); return; }
         var t = world.Find(selected);
         if (t == null) { AddLabel("Select a building or resource in the world."); return; }
         Headline(t.Kind);
-        if (t.Kind == "water") headingTitle.Text = "Collect water";
+        if (t.Kind == ThingKind.Water) headingTitle.Text = "Collect water";
         Reach(t);
         if (t.IsResource) { Resource(t); return; }
-        if (t.Kind == "hut") { Cabin(t); return; }
+        if (t.Kind == ThingKind.Hut) { Cabin(t); return; }
         if (t.Tools != null) { Bench(t); return; }
-        if (t.Kind == "signpost") { Signpost(t); return; }
-        if (t.Kind == "mine") { MinePanel(t); return; }
-        if (t.Kind == "farm") { FarmPanel(t); return; }
-        if (t.Kind == "campfire") { Campfire(t); return; }
-        if (t.Kind == "packer") { PackerPanel(t); return; }
+        if (t.Kind == ThingKind.Signpost) { Signpost(t); return; }
+        if (t.Kind == ThingKind.Mine) { MinePanel(t); return; }
+        if (t.Kind == ThingKind.Farm) { FarmPanel(t); return; }
+        if (t.Kind == ThingKind.Campfire) { Campfire(t); return; }
+        if (t.Kind == ThingKind.Packer) { PackerPanel(t); return; }
         if (t.IsStorage) { Storage(t); return; }
         Station(t);
     }
@@ -435,11 +435,11 @@ public partial class Game : Node {
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(left)) return;
             var line = text.Clear();
-            if (t.Kind != "water") line.Append(t.Remaining).Append(" left · ");
+            if (t.Kind != ThingKind.Water) line.Append(t.Remaining).Append(" left · ");
             line.Append(world.GatherBlock(t) ?? (t.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
             text.Show();
         });
-        if (t.Kind == "water") AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Muted);
+        if (t.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Muted);
         JobButtons(t);
     }
     private void Campfire(Thing fire) {
@@ -520,13 +520,13 @@ public partial class Game : Node {
     }
     private void Storage(Thing t) {
         switch (t.Kind) {
-            case "crate": Crate(t); return;
-            case "grave": Recovery(t); return;
-            case "toolstation": ToolRack(t); return;
-            case "pile": Pile(t); return;
+            case ThingKind.Crate: Crate(t); return;
+            case ThingKind.Grave: Recovery(t); return;
+            case ThingKind.Toolstation: ToolRack(t); return;
+            case ThingKind.Pile: Pile(t); return;
         }
         HeaderAction("stash", "Store all materials · keeps tools", () => StoreAll(t), Style.ActionRound, "deposit");
-        if (t.Kind == "chest") FilterButton(t);
+        if (t.Kind == ThingKind.Chest) FilterButton(t);
         Well(new VBoxContainer()).AddChild(StorageGrid(t));
         BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
     }
@@ -685,15 +685,15 @@ public partial class Game : Node {
         (int Stage, int Hours) drawn = (-1, -1);
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(ripe)) return;
-            int at = farm.Stage == World.FarmRipe ? 3 : farm.Stage == World.FarmGrowing ? (farm.Progress < world.GrowSeconds / 3 ? 1 : 2) : 0;
-            int hours = farm.Stage == World.FarmGrowing ? (int)((world.GrowSeconds - farm.Progress) / world.Data.DaySeconds * 24) : -1;
+            int at = farm.FarmStage == FarmStage.Ripe ? 3 : farm.FarmStage == FarmStage.Growing ? (farm.Progress < world.GrowSeconds / 3 ? 1 : 2) : 0;
+            int hours = farm.FarmStage == FarmStage.Growing ? (int)((world.GrowSeconds - farm.Progress) / world.Data.DaySeconds * 24) : -1;
             if ((at, hours) == drawn) return;
             drawn = (at, hours);
             for (int i = 0; i < 4; i++) nodes[i].AddThemeStyleboxOverride("panel", Style.Round(i < at ? Style.Sage : i == at ? Style.Mustard : Style.Line, 22).Item1);
             for (int i = 0; i < 3; i++) links[i].Color = i < at ? Style.Sage : Style.Line;
             var line = ripeText.Clear();
             if (hours >= 0) line.Append("ripe in ").Append(hours / 24).Append(" d ").Append(hours % 24).Append(" h");
-            else line.Append(farm.Stage == World.FarmRipe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in");
+            else line.Append(farm.FarmStage == FarmStage.Ripe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in");
             ripeText.Show();
         });
         var output = farm.Output ?? farm.Inventory;
@@ -709,7 +709,7 @@ public partial class Game : Node {
             lastsText.Clear().Append("×").Append(world.Data.Farm.Sow.GetValueOrDefault("fertilizer")).Append(" · ").Append(stock / Math.Max(1, world.Data.Farm.Sow.GetValueOrDefault("fertilizer"))).Append(stock == 1 ? " crop" : " crops"); lastsText.Show();
         });
         var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => FarmCup(farm, farm.Inventory, k, true, $"×{world.Data.Farm.Sow[k]}"));
-        Process(inputs, $"{world.Data.Farm.GrowDays:0} d", () => farm.Stage == World.FarmGrowing ? farm.Progress / world.GrowSeconds : farm.Stage == World.FarmRipe ? 1 : 0,
+        Process(inputs, $"{world.Data.Farm.GrowDays:0} d", () => farm.FarmStage == FarmStage.Growing ? farm.Progress / world.GrowSeconds : farm.FarmStage == FarmStage.Ripe ? 1 : 0,
             FuelRow("line_leaf", new Color("8fae7e"), FuelCup(fertilizer), lasts), main, side);
         BagGrid(id => MoveStack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move", wanted: id => world.Holds(farm, id));
         JobButtons(farm);
@@ -762,7 +762,7 @@ public partial class Game : Node {
             using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Read); world.Deserialize(file.GetAsText());
             // Another world ends the game the guests are in.
             net.Leave();
-            slot = n; selected = 0; workerId = 0; gathering = null; entering = null; assigningWorker = 0; view.BuildMode = ""; view.Selected = 0; view.SelectedWorker = 0; OpenPage("inventory");
+            slot = n; selected = 0; workerId = 0; gathering = null; entering = null; assigningWorker = 0; view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; OpenPage("inventory");
             return true;
         } catch (Exception e) { Notify($"Load failed: {e.Message}"); return false; }
     }
@@ -775,7 +775,7 @@ public partial class Game : Node {
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
                 case Key.Escape:
-                    if (view.BuildMode != "" || assigningWorker > 0) { view.BuildMode = ""; assigningWorker = 0; } else if (panel.Visible || bag.Visible) ClosePanel(); else OpenMenu();
+                    if (view.BuildMode != null || assigningWorker > 0) { view.BuildMode = null; assigningWorker = 0; } else if (panel.Visible || bag.Visible) ClosePanel(); else OpenMenu();
                     RefreshLive(); break;
                 case Key.B: OpenPage("build"); break;
                 case Key.I: if (page == "help") ClosePanel(); else OpenPage("help"); break;
@@ -793,7 +793,7 @@ public partial class Game : Node {
                 case Key.Space:
                     if (paused) { Notify("Resume before using tools."); break; }
                     var station = world.Find(selected);
-                    if (station != null && station.Kind == "reinforced" && world.Near(station)) world.Pump(station); else world.Attack(); break;
+                    if (station != null && station.Kind == ThingKind.Reinforced && world.Near(station)) world.Pump(station); else world.Attack(); break;
             }
         }
         if (ev is InputEventMouseButton mouse) {
@@ -802,18 +802,18 @@ public partial class Game : Node {
             if (mouse.ButtonIndex == MouseButton.WheelUp && mouse.Pressed && !overPanel) view.Zoom = Math.Min(1.6f, view.Zoom + .1f);
             if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed && !overPanel) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
             if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed) {
-                var t = view.Pick(mouse.Position); if (t?.IsResource == true || t?.Kind == "farm") { gathering = t; selected = t.Id; view.Selected = t.Id; } else gathering = null;
-                lifting = t?.Kind == "crate" ? t : null; liftClock = 0;
+                var t = view.Pick(mouse.Position); if (t?.IsResource == true || t?.Kind == ThingKind.Farm) { gathering = t; selected = t.Id; view.Selected = t.Id; } else gathering = null;
+                lifting = t?.Kind == ThingKind.Crate ? t : null; liftClock = 0;
             }
             if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) {
-                if (view.BuildMode != "") {
+                if (view.BuildMode != null) {
                     var at = view.ToWorld(mouse.Position).Round();
-                    var built = view.BuildMode == "crate" ? world.PlaceCrate(placingCrate, at) : world.Build(view.BuildMode, at);
+                    var built = view.BuildMode == ThingKind.Crate ? world.PlaceCrate(placingCrate, at) : world.Build(view.BuildMode.Value, at);
                     // Placement stays on without opening what was placed, so several go down in a row until the materials or crates run out.
                     // A guest's building goes up on the host, so the guest stays in placement until Esc, except after a mine the host was sent.
                     // A mine opens its panel instead, since each cliff takes only one.
-                    if (built?.Kind == "mine") { view.BuildMode = ""; Select(built); } else if (built != null && !CanPlaceAgain()) view.BuildMode = "";
-                    else if (world.Remote && view.BuildMode == "mine" && world.PlacementBlock("mine", world.Snap("mine", at)) == null) view.BuildMode = "";
+                    if (built?.Kind == ThingKind.Mine) { view.BuildMode = null; Select(built); } else if (built != null && !CanPlaceAgain()) view.BuildMode = null;
+                    else if (world.Remote && view.BuildMode == ThingKind.Mine && world.PlacementBlock(ThingKind.Mine, world.Snap(ThingKind.Mine, at)) == null) view.BuildMode = null;
                     return;
                 }
                 var t = view.Pick(mouse.Position);
@@ -828,9 +828,9 @@ public partial class Game : Node {
                 var w = view.PickWorker(mouse.Position);
                 if (w != null) Select(w);
                 else if (t != null) {
-                    if (t.Kind == "hut") entering = t;
+                    if (t.Kind == ThingKind.Hut) entering = t;
                     // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
-                    if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item) && !(t.Kind == "crate" && World.IsCrate(item))) {
+                    if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item) && !(t.Kind == ThingKind.Crate && World.IsCrate(item))) {
                         if (world.Near(t)) { int moved = 0; Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
                     }
                     Select(t);
@@ -865,7 +865,7 @@ public partial class Game : Node {
             // A loose piece needs only one click: the player keeps walking to it after the button is released.
             if (gathering != null && (right || gathering.IsLoose) && direction == Vector2.Zero && entering == null) {
                 // Step in close enough for the tool to reach the model; the lake edge keeps its wider reach.
-                if (!world.Near(gathering, gathering.Kind == "water" ? 2.5f : 1.35f)) direction = (world.GatherAt(gathering, world.Player) - world.Player).Normalized();
+                if (!world.Near(gathering, gathering.Kind == ThingKind.Water ? 2.5f : 1.35f)) direction = (world.GatherAt(gathering, world.Player) - world.Player).Normalized();
                 else if (gathering.IsLoose) {
                     world.Gather(gathering, dt);
                     if (world.Find(gathering.Id) == null && selected == gathering.Id) { selected = 0; view.Selected = 0; }
@@ -933,16 +933,16 @@ public partial class Game : Node {
     }
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
-        int stage = int.TryParse(LaunchValue("--mine-stage"), out int n) ? n : World.MineOpen;
-        var cliff = World.CliffOf(LaunchValue("--mine-ore") ?? "iron");
+        var stage = int.TryParse(LaunchValue("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
+        var cliff = World.CliffOf(Kinds.Parse(LaunchValue("--mine-ore")) ?? ThingKind.Iron);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
-        var mine = world.Build("mine", World.MineSpot(cliff))!;
-        mine.Stage = stage; mine.Progress = stage is 0 or World.MineSupplied ? world.MineStageSeconds / 2 : 0;
-        if (stage == World.MineDug) mine.Inventory.Add("wood", 20);
-        world.Add("chest", mine.Pos + cliff.Face * 3 + cliff.Along * 2);
+        var mine = world.Build(ThingKind.Mine, World.MineSpot(cliff))!;
+        mine.MineStage = stage; mine.Progress = stage is MineStage.Marked or MineStage.Supplied ? world.MineStageSeconds / 2 : 0;
+        if (stage == MineStage.Dug) mine.Inventory.Add("wood", 20);
+        world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 + cliff.Along * 2);
         foreach (var w in world.S.Workers.ToArray()) world.Assign(w, null);
-        foreach (var w in world.S.Workers.Take(stage == World.MineOpen ? 3 : 1)) { w.Pos = world.Player; world.Assign(w, mine); }
-        if (stage == World.MineOpen && !launchArgs.Contains("--idle")) mine.Output!.Add(World.MineOre(mine), 20);
+        foreach (var w in world.S.Workers.Take(stage == MineStage.Open ? 3 : 1)) { w.Pos = world.Player; world.Assign(w, mine); }
+        if (stage == MineStage.Open && !launchArgs.Contains("--idle")) mine.Output!.Add(World.MineOre(mine), 20);
         if (launchArgs.Contains("--idle")) { foreach (var w in world.S.Workers) world.Assign(w, null); mine.Output!.Add(World.MineOre(mine), 12); mine.Output.Add("stone", 12); }
         world.S.Time = world.Data.DaySeconds * (launchArgs.Contains("--night") ? .55f : .2f);
         for (int i = 0; i < 80; i++) world.Tick(.25f);
@@ -956,7 +956,7 @@ public partial class Game : Node {
             string location = LaunchValue("--environment-review") ?? "forest";
             float coastAcross = Terrain.Across(Terrain.Spawn);
             var coastCenter = Terrain.Point(Terrain.Coast(coastAcross) - 2, coastAcross);
-            var reviewCliff = World.CliffOf(LaunchValue("--mine-ore") ?? "coal");
+            var reviewCliff = World.CliffOf(Kinds.Parse(LaunchValue("--mine-ore")) ?? ThingKind.Coal);
             var mineCenter = World.MineSpot(reviewCliff) - reviewCliff.Face * 1.4f;
             world.Player = location switch {
                 "lake" => Terrain.WaterPoint(Terrain.Lake + Terrain.Seaward) + Terrain.Seaward,
@@ -971,8 +971,8 @@ public partial class Game : Node {
             view.EnvironmentReviewFog = launchArgs.Contains("--review-fog");
             view.EnvironmentCenter = location switch { "lake" => Terrain.Lake + Terrain.Seaward * 3, "terrain" => Terrain.Point(125, -18), "coast" => coastCenter, "mine" => mineCenter, _ => null };
             if (location == "mine") {
-                var mine = world.Build("mine", World.MineSpot(reviewCliff))!;
-                mine.Stage = World.MineOpen;
+                var mine = world.Build(ThingKind.Mine, World.MineSpot(reviewCliff))!;
+                mine.MineStage = MineStage.Open;
                 mine.Output!.Add(World.MineOre(mine), 12);
             }
             // The wide terrain camera must sit above the peaks rather than inside a near mountain face.
@@ -987,10 +987,10 @@ public partial class Game : Node {
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Bush variants are selected from the id; start the row at variant zero and include all three.
             world.S.NextId += (3 - world.S.NextId % 3) % 3;
-            world.Add("berries", at + new Vector2(-2.25f, 2.25f), 24);
-            world.Add("berries", at + new Vector2(-.75f, .75f), 24);
-            world.Add("berries", at + new Vector2(.75f, -.75f), 24);
-            world.Add("berries", at + new Vector2(2.25f, -2.25f), 0);
+            world.Add(ThingKind.Berries, at + new Vector2(-2.25f, 2.25f), 24);
+            world.Add(ThingKind.Berries, at + new Vector2(-.75f, .75f), 24);
+            world.Add(ThingKind.Berries, at + new Vector2(.75f, -.75f), 24);
+            world.Add(ThingKind.Berries, at + new Vector2(2.25f, -2.25f), 0);
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
             world.Player = at + new Vector2(-1, -.5f);
@@ -1003,9 +1003,9 @@ public partial class Game : Node {
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Tree variants are selected from the id: align the first id to oak, then add spruce and birch.
             world.S.NextId += (3 - world.S.NextId % 3) % 3;
-            world.Add("tree", at + new Vector2(-3, 3), 42);
-            world.Add("tree", at, 42);
-            world.Add("tree", at + new Vector2(3, -3), 42);
+            world.Add(ThingKind.Tree, at + new Vector2(-3, 3), 42);
+            world.Add(ThingKind.Tree, at, 42);
+            world.Add(ThingKind.Tree, at + new Vector2(3, -3), 42);
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
             world.Player = at + new Vector2(1, -1);
@@ -1014,16 +1014,16 @@ public partial class Game : Node {
             ClosePanel(); return;
         }
         foreach (var t in world.S.Things.Where(t => t.Pos.DistanceTo(Terrain.Spawn) < 8).ToArray()) world.S.Things.Remove(t);
-        var hut = world.Add("hut", Terrain.Spawn + new Vector2(-2, -2)); var fire = world.Add("campfire", Terrain.Spawn + new Vector2(1, -3)); fire.Burn = 200;
-        var f = world.Add("furnace", Terrain.Spawn + new Vector2(4, -2)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);
-        var bellows = world.Add("reinforced", Terrain.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
-        var chest = world.Add("chest", Terrain.Spawn + new Vector2(2, 3)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
-        world.Add("anvil", Terrain.Spawn + new Vector2(4, 4)); var sign = world.Add("signpost", Terrain.Spawn + new Vector2(-1, 4));
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(-2, -2)); var fire = world.Add(ThingKind.Campfire, Terrain.Spawn + new Vector2(1, -3)); fire.Burn = 200;
+        var f = world.Add(ThingKind.Furnace, Terrain.Spawn + new Vector2(4, -2)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);
+        var bellows = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
+        var chest = world.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 3)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
+        world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(4, 4)); var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(-1, 4));
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("water", 4); world.S.Backpack.Add("steel_pick", 1);
-        var bench = world.Add("bench", Terrain.Spawn + new Vector2(-4, 1.5f)); bench.Recipe = "crate"; bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
-        var rack = world.Add("toolstation", Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1);
-        world.Add("leaves", Terrain.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
-        var crate = world.Add("crate", Terrain.Spawn + new Vector2(1.5f, 1.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
+        var bench = world.Add(ThingKind.Bench, Terrain.Spawn + new Vector2(-4, 1.5f)); bench.Recipe = "crate"; bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
+        var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1);
+        world.Add(ThingKind.Leaves, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
+        var crate = world.Add(ThingKind.Crate, Terrain.Spawn + new Vector2(1.5f, 1.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
         foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1), ("torch", 2) }) world.S.Backpack.Add(item, count);
         world.S.Milestones.UnionWith(new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool" });
         // The review fixture is deliberately separate from a fresh playable game.
@@ -1032,12 +1032,12 @@ public partial class Game : Node {
         if (w1 != null) world.Assign(w1, bellows); if (w2 != null) world.Assign(w2, bellows); if (w3 != null) world.Assign(w3, sign);
         // Three packed crates leave on the cart, so it should show three crates.
         foreach (var goods in new[] { "steel_axe", "berries", "raw_meat" }) {
-            var box = world.Add("crate", world.Player); box.Inventory.Add(goods, goods == "steel_axe" ? 2 : 12); world.PickUpCrate(box);
+            var box = world.Add(ThingKind.Crate, world.Player); box.Inventory.Add(goods, goods == "steel_axe" ? 2 : 12); world.PickUpCrate(box);
             world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1);
         }
         world.Sell(sign); world.S.Orders[0].Elapsed = 4;
         world.S.Crafting.AddRange(new[] { "planks", "wood_parts" }); world.S.CraftTime = 6;
-        var meat = world.Add("crate", world.Player); meat.Inventory.Add("burnt_steak", 12); world.PickUpCrate(meat);
+        var meat = world.Add(ThingKind.Crate, world.Player); meat.Inventory.Add("burnt_steak", 12); world.PickUpCrate(meat);
         world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
         if (launchArgs.Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         // --day-phase sets the time of day from 0 at dawn, for comparing the light across the day.
@@ -1058,31 +1058,31 @@ public partial class Game : Node {
         if (launchArgs.Contains("--piles")) {
             var at = Terrain.Spawn + new Vector2(-3, 9);
             foreach (var (item, stacks, dx) in new[] { ("stone", 14, 0), ("wood", 6, 3), ("leaves", 3, 6) }) {
-                var pile = world.Add("pile", at + new Vector2(dx, 0)); pile.Inventory.Add(item, stacks * pile.Inventory.StackSize);
+                var pile = world.Add(ThingKind.Pile, at + new Vector2(dx, 0)); pile.Inventory.Add(item, stacks * pile.Inventory.StackSize);
                 if (item == "leaves") { pile.Compost = true; pile.Inventory.Add("fertilizer", 20); }
             }
             world.Player = at + new Vector2(3, -2.5f); world.Tick(0); view.Zoom = 1.4f;
-            if (launchArgs.Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == "pile")); else ClosePanel();
+            if (launchArgs.Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == ThingKind.Pile)); else ClosePanel();
         }
         if (launchArgs.Contains("--farm")) {
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
             var at = Terrain.Spawn + new Vector2(-6, 9);
             for (int i = 0; i < 5; i++) {
-                var plot = world.Add("farm", at + new Vector2(i * World.ZoneSize, 0));
-                plot.Stage = i switch { 0 => World.FarmFallow, 4 => World.FarmRipe, _ => World.FarmGrowing };
+                var plot = world.Add(ThingKind.Farm, at + new Vector2(i * World.ZoneSize, 0));
+                plot.FarmStage = i switch { 0 => FarmStage.Fallow, 4 => FarmStage.Ripe, _ => FarmStage.Growing };
                 plot.Progress = i == 4 ? world.HarvestSeconds / 2 : (i - 1) * world.GrowSeconds / 3 + 1;
             }
-            var wheat = world.Add("pile", at + new Vector2(0, World.ZoneSize)); wheat.Inventory.Add("wheat", 300);
+            var wheat = world.Add(ThingKind.Pile, at + new Vector2(0, World.ZoneSize)); wheat.Inventory.Add("wheat", 300);
             world.Player = at + new Vector2(6, 2.5f); world.Tick(0); view.Zoom = 1.2f;
-            if (launchArgs.Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == "farm")); else ClosePanel();
+            if (launchArgs.Contains("--panel")) Select(world.S.Things.Last(t => t.Kind == ThingKind.Farm)); else ClosePanel();
         }
         if (launchArgs.Contains("--kitchen")) {
             // The cooking table mid-stew beside a canning station sealing cans, with the mortar slotted.
             var at = Terrain.Spawn + new Vector2(-3, 8);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
-            var table = world.Add("cooktable", at); table.Tools!.Add("mortar", 1); world.SetRecipe(table, "meat_stew");
+            var table = world.Add(ThingKind.Cooktable, at); table.Tools!.Add("mortar", 1); world.SetRecipe(table, "meat_stew");
             table.Inventory.Add("water", 2); table.Inventory.Add("raw_meat", 2); table.Burner!.Add("wood", 2);
-            var cannery = world.Add("cannery", at + new Vector2(2.2f, 0)); world.SetRecipe(cannery, "canned_meat_stew");
+            var cannery = world.Add(ThingKind.Cannery, at + new Vector2(2.2f, 0)); world.SetRecipe(cannery, "canned_meat_stew");
             cannery.Inventory.Add("meat_stew", 2); cannery.Inventory.Add("tin_can", 2); cannery.Burner!.Add("wood", 2);
             world.Player = at + new Vector2(1, 2.5f); world.Tick(.5f); view.Zoom = 1.7f;
             if (launchArgs.Contains("--panel")) Select(table); else ClosePanel();
@@ -1091,7 +1091,7 @@ public partial class Game : Node {
             // A packing station part way through a crate of bread, with bread and empty crates waiting, beside the trading post asking for crates of bread and berries.
             var at = Terrain.Spawn + new Vector2(3, 8);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
-            var packer = world.Add("packer", at); world.SetPacking(packer, "bread");
+            var packer = world.Add(ThingKind.Packer, at); world.SetPacking(packer, "bread");
             packer.Inventory.Add("bread", 20); packer.Inventory.Add("crate", 3);
             world.Player = at + new Vector2(1, 1.5f); view.Zoom = 1.7f;
             for (int i = 0; i < 7; i++) world.Tick(world.Data.PackSeconds);
@@ -1109,7 +1109,7 @@ public partial class Game : Node {
             if (launchArgs.Contains("--post")) { world.Player = sign.Pos + Vector2.One; Select(sign); filterOpen = true; OpenPage("inspect"); } else if (launchArgs.Contains("--panel")) { packPicking = launchArgs.Contains("--pick"); Select(packer); } else ClosePanel();
         }
         if (launchArgs.Contains("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (launchArgs.Contains("--panel")) Select(rack); else ClosePanel(); }
-        if (launchArgs.Contains("--tin")) { var cliff = World.CliffOf("tin"); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); ClosePanel(); }
+        if (launchArgs.Contains("--tin")) { var cliff = World.CliffOf(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); ClosePanel(); }
         if (launchArgs.Contains("--pantry")) {
             foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
             OpenPage("inventory");
@@ -1143,7 +1143,7 @@ public partial class Game : Node {
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(spot) < 6);
         world.S.Time = world.Data.DaySeconds * .78f; world.Player = spot; world.S.Health = 45;
         foreach (var offset in new[] { new Vector2(2.5f, -1), new Vector2(-6, 3), new Vector2(5, 5) }) world.S.Wolves.Add(new Wolf { Pos = spot + offset });
-        world.Add("wolf_corpse", spot + new Vector2(-2, -2), 4);
+        world.Add(ThingKind.WolfCorpse, spot + new Vector2(-2, -2), 4);
         ClosePanel(); view.Zoom = 1.6f;
     }
 }

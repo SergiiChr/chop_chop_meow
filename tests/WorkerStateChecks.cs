@@ -25,8 +25,8 @@ public static class WorkerStateChecks {
 
     private static void CheckGatherAndReassign(GameData data) {
         var world = EmptyWorld(data);
-        var tree = world.Add("tree", new Vector2(10, 10), 12);
-        world.Add("chest", new Vector2(12, 10));
+        var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
+        world.Add(ThingKind.Chest, new Vector2(12, 10));
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
@@ -48,17 +48,17 @@ public static class WorkerStateChecks {
         var said = new System.Collections.Generic.List<string>();
         world.Notify += said.Add;
         var at = Terrain.Spawn;
-        var post = world.Add("signpost", at + new Vector2(-3, 2));
-        world.Add("chest", at + new Vector2(2, 2));
-        var spent = world.Add("tree", at + new Vector2(1, 0), 1);
-        var seen = world.Add("tree", at + new Vector2(6, 0), 2);
-        var coal = world.Add("loose_coal", at + new Vector2(0, 3), 1);
-        var moreCoal = world.Add("loose_coal", at + new Vector2(4, 4), 1);
+        var post = world.Add(ThingKind.Signpost, at + new Vector2(-3, 2));
+        world.Add(ThingKind.Chest, at + new Vector2(2, 2));
+        var spent = world.Add(ThingKind.Tree, at + new Vector2(1, 0), 1);
+        var seen = world.Add(ThingKind.Tree, at + new Vector2(6, 0), 2);
+        var coal = world.Add(ThingKind.LooseCoal, at + new Vector2(0, 3), 1);
+        var moreCoal = world.Add(ThingKind.LooseCoal, at + new Vector2(4, 4), 1);
         world.Player = at; world.Look();
         // Out of every player's sight, so these stay under black fog.
         world.Player = at + new Vector2(0, 40); world.Look();
-        var unseen = world.Add("tree", at + new Vector2(3, 0), 5);
-        world.Add("loose_coal", at + new Vector2(1, 4), 1);
+        var unseen = world.Add(ThingKind.Tree, at + new Vector2(3, 0), 5);
+        world.Add(ThingKind.LooseCoal, at + new Vector2(1, 4), 1);
 
         var worker = AddWorker(world, spent.Pos);
         worker.Tool = "steel_axe";
@@ -80,7 +80,7 @@ public static class WorkerStateChecks {
         Require(world.Find(coal.Id) == null && picker.Assignment == moreCoal.Id, "a worker who picks up the last of a loose coal should go to the next known one, not a closer one under black fog");
         for (int i = 0; i < 300 && world.Find(moreCoal.Id) != null; i++) world.Tick(.1f);
         for (int i = 0; i < 100; i++) world.Tick(.1f);
-        Require(world.Find(moreCoal.Id) == null && picker.Duties.Count == 1 && picker.Duties[0].Kind == "loose_coal" && picker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f,
+        Require(world.Find(moreCoal.Id) == null && picker.Duties.Count == 1 && picker.Duties[0].Kind == ThingKind.LooseCoal && picker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f,
                 "a worker who picked up the last known loose coal should keep the job and wait at the trading post");
 
         // The look comes at the end of a tick, so the worker acts on it the tick after.
@@ -88,15 +88,15 @@ public static class WorkerStateChecks {
         Require(worker.Assignment == unseen.Id, "once a player sees another tree, the waiting worker should go to it");
 
         var raker = AddWorker(world, at);
-        var raked = world.Add("leaves", at + new Vector2(-2, -2), 0);
-        var bush = world.Add("berries", at + new Vector2(-4, -2), 6);
+        var raked = world.Add(ThingKind.Leaves, at + new Vector2(-2, -2), 0);
+        var bush = world.Add(ThingKind.Berries, at + new Vector2(-4, -2), 6);
         world.Tick(0);
         raker.Duties.Add(new Duty { Thing = raked.Id, Job = "gather" }); raker.Duties.Add(new Duty { Thing = bush.Id, Job = "gather" }); raker.Assignment = raked.Id;
         world.Tick(.1f); world.Tick(.1f);
         Require(raker.Assignment == bush.Id && raker.Duties.Count == 2, "a worker who knows no other raked patch should go on to their other job and keep the patch");
 
         var crafter = AddWorker(world, at);
-        var bench = world.Add("bench", at + new Vector2(5, 5));
+        var bench = world.Add(ThingKind.Bench, at + new Vector2(5, 5));
         world.Assign(crafter, bench);
         world.Tick(.1f); said.Clear();
         world.S.Things.Remove(bench); world.Tick(.1f);
@@ -105,8 +105,8 @@ public static class WorkerStateChecks {
 
     private static void CheckStrikeResetsWorkState(GameData data) {
         var world = EmptyWorld(data);
-        var tree = world.Add("tree", new Vector2(10, 10), 12);
-        world.Add("chest", new Vector2(12, 10));
+        var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
+        world.Add(ThingKind.Chest, new Vector2(12, 10));
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
@@ -121,8 +121,8 @@ public static class WorkerStateChecks {
     private static void CheckBlockedPath(GameData data) {
         var world = EmptyWorld(data);
         // Off the map's edge: the tree is out of reach.
-        var tree = world.Add("tree", Vector2.One * (Terrain.Size - 1), 12);
-        world.Add("chest", Vector2.One * (Terrain.Size - 6));
+        var tree = world.Add(ThingKind.Tree, Vector2.One * (Terrain.Size - 1), 12);
+        world.Add(ThingKind.Chest, Vector2.One * (Terrain.Size - 6));
         var worker = AddWorker(world, Vector2.One * (Terrain.Size - 8));
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);
@@ -134,7 +134,7 @@ public static class WorkerStateChecks {
 
     private static void CheckFurnacePumping(GameData data) {
         var world = EmptyWorld(data);
-        var furnace = world.Add("reinforced", new Vector2(20, 20));
+        var furnace = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
         var bellowsWorker = AddWorker(world, furnace.Pos + World.BellowsStand);
         var secondWorker = AddWorker(world, furnace.Pos);
         world.Assign(bellowsWorker, furnace);
@@ -158,8 +158,8 @@ public static class WorkerStateChecks {
 
     private static void CheckSaveRoundTrip(GameData data) {
         var world = EmptyWorld(data);
-        var tree = world.Add("tree", new Vector2(10, 10), 12);
-        world.Add("chest", new Vector2(12, 10));
+        var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
+        world.Add(ThingKind.Chest, new Vector2(12, 10));
         var worker = AddWorker(world, tree.Pos);
         worker.Tool = "steel_axe";
         world.Assign(worker, tree);

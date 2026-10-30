@@ -48,16 +48,16 @@ public partial class Game {
     /// </summary>
     private async Task CheckPanelRefresh() {
         var at = world.Player;
-        var chest = world.Add("chest", at + new Vector2(2, 0)); chest.Inventory.Add("wood", 40); chest.Inventory.Add("coal", 12);
-        var pile = world.Add("pile", at + new Vector2(-4, 2)); pile.Inventory.Add("stone", 9);
-        var forge = world.Add("reinforced", at + new Vector2(-2, 0)); forge.Inventory.Add("iron_bar", 4); forge.Inventory.Add("coal", 6); forge.Heat = 85; forge.Processing = true; forge.Progress = 2;
-        var furnace = world.Add("furnace", at + new Vector2(0, 2)); furnace.Inventory.Add("iron_ore", 4);
-        var fire = world.Add("campfire", at + new Vector2(0, -2)); fire.Burn = 120;
-        var hut = world.Add("hut", at + new Vector2(4, -3));
-        var sign = world.Add("signpost", at + new Vector2(-4, -3));
-        var farm = world.Add("farm", at + new Vector2(5, 3));
-        var packer = world.Add("packer", at + new Vector2(-5, 4)); world.SetPacking(packer, "berries"); packer.Inventory.Add("berries", 6); packer.Inventory.Add("crate", 2);
-        var tree = world.S.Things.Where(t => t.Kind == "tree").MinBy(t => t.Pos.DistanceTo(at))!;
+        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 0)); chest.Inventory.Add("wood", 40); chest.Inventory.Add("coal", 12);
+        var pile = world.Add(ThingKind.Pile, at + new Vector2(-4, 2)); pile.Inventory.Add("stone", 9);
+        var forge = world.Add(ThingKind.Reinforced, at + new Vector2(-2, 0)); forge.Inventory.Add("iron_bar", 4); forge.Inventory.Add("coal", 6); forge.Heat = 85; forge.Processing = true; forge.Progress = 2;
+        var furnace = world.Add(ThingKind.Furnace, at + new Vector2(0, 2)); furnace.Inventory.Add("iron_ore", 4);
+        var fire = world.Add(ThingKind.Campfire, at + new Vector2(0, -2)); fire.Burn = 120;
+        var hut = world.Add(ThingKind.Hut, at + new Vector2(4, -3));
+        var sign = world.Add(ThingKind.Signpost, at + new Vector2(-4, -3));
+        var farm = world.Add(ThingKind.Farm, at + new Vector2(5, 3));
+        var packer = world.Add(ThingKind.Packer, at + new Vector2(-5, 4)); world.SetPacking(packer, "berries"); packer.Inventory.Add("berries", 6); packer.Inventory.Add("crate", 2);
+        var tree = world.S.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(at))!;
         var worker = new Worker { Id = world.S.NextId++, Name = "Panel Check", Pos = at + Vector2.One, Wage = 5 };
         world.S.Workers.Add(worker); world.Assign(worker, forge); worker.Bag.Add("coal", 2);
         bool wasPaused = paused; paused = true;
@@ -94,7 +94,7 @@ public partial class Game {
     /// an old one would carry the last game's state, such as a felled tree faded out.
     /// </summary>
     private async Task CheckFreshModelsAfterRestart() {
-        var tree = world.S.Things.Where(t => t.Kind == "tree").MinBy(t => t.Pos.DistanceTo(world.Player))!;
+        var tree = world.S.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(world.Player))!;
         await Frames();
         var old = view.PropOf(tree.Id);
         Require(old != null, "Every tree must have its model once the world has loaded.");
@@ -102,7 +102,7 @@ public partial class Game {
         old!.Fade = .68f; old.Fall = 9;
         Restart(); await Frames(2);
         var fresh = view.PropOf(tree.Id);
-        Require(world.Find(tree.Id)?.Kind == "tree" && fresh != null && fresh != old && fresh.Fade == 0 && fresh.Fall < 0,
+        Require(world.Find(tree.Id)?.Kind == ThingKind.Tree && fresh != null && fresh != old && fresh.Fade == 0 && fresh.Fall < 0,
             "A new game must build fresh models rather than keep the last game's, faded or fallen.");
         ClosePanel();
     }
@@ -276,9 +276,9 @@ public partial class Game {
     }
     private async Task CheckSignpost() {
         ClosePanel(); await Frames();
-        var sign = world.Add("signpost", world.Player + new Vector2(2, 0));
+        var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
         world.S.Backpack.Add("wood", 5); world.S.Backpack.Add(Inventory.Coins, 100);
-        var berries = world.Add("crate", world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); world.PickUpCrate(berries);
+        var berries = world.Add(ThingKind.Crate, world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); world.PickUpCrate(berries);
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         await Click(view.Screen(sign.Pos, .8f));
         Require(selected == sign.Id && Named("sell") != null && Named("coins") != null && Named("hardhat") != null && Named("prices") != null, "A trading post must open the market with its icon buttons.");
@@ -318,7 +318,7 @@ public partial class Game {
     /// <summary>A new packing station opens its list of goods; picking one sets what it packs, and a backpack click loads it.</summary>
     private async Task CheckPackingStation() {
         ClosePanel(); await Frames();
-        var packer = world.Add("packer", world.Player + new Vector2(2, 0));
+        var packer = world.Add(ThingKind.Packer, world.Player + new Vector2(2, 0));
         world.S.Backpack.Add("berries", 5);
         await Click(view.Screen(packer.Pos, .8f));
         Require(selected == packer.Id && Named("pack_berries") != null, "A packing station with nothing chosen must open its list of goods.");
@@ -331,17 +331,17 @@ public partial class Game {
     /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
     private async Task CheckMine() {
         var home = world.Player;
-        foreach (string ore in World.MineOres) {
+        foreach (var ore in World.MineOres) {
             var cliff = World.CliffOf(ore);
             var spot = World.MineSpot(cliff);
             world.Player = spot + cliff.Face * 3; await Frames(4);
             await KeyStroke(Key.B);
             Named("build_mine")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
-            Require(view.BuildMode == "mine", "The mine plan must enter placement mode.");
+            Require(view.BuildMode == ThingKind.Mine, "The mine plan must enter placement mode.");
             // Off the exact spot, so the click shows the plan snapping to the cliff.
             await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
-            var mine = world.S.Things.LastOrDefault(t => t.Kind == "mine");
-            Require(mine != null && mine.Pos == spot && selected == mine.Id && view.BuildMode == "", $"A click near the {ore} cliff must mark a mine on its spot and select it.");
+            var mine = world.S.Things.LastOrDefault(t => t.Kind == ThingKind.Mine);
+            Require(mine != null && mine.Pos == spot && selected == mine.Id && view.BuildMode == null, $"A click near the {ore} cliff must mark a mine on its spot and select it.");
             Require(new[] { "Stage 1 · Dig the entrance", "Stage 2 · Shore it up", "Stage 3 · Fit the frame and rails" }.Select((title, i) => panel.FindChild($"stage_{i + 1}", true, false) is Control node && node.TooltipText.StartsWith(title)).All(found => found),
                 "The mine panel must show its three stages.");
         }
@@ -398,7 +398,7 @@ public partial class Game {
     private async Task CheckCrateOverflow() {
         world.S.Backpack.Remove("wood", world.S.Backpack["wood"]);
         Require(world.S.Backpack.Add("wood", 64) == 64, "The backpack must have room for a stack of wood.");
-        var crates = new[] { world.Add("crate", world.Player + new Vector2(-1, 0)), world.Add("crate", world.Player + new Vector2(0, -1)) };
+        var crates = new[] { world.Add(ThingKind.Crate, world.Player + new Vector2(-1, 0)), world.Add(ThingKind.Crate, world.Player + new Vector2(0, -1)) };
         int cap = world.Data.CrateCapacity;
         Select(crates[0]); await Frames();
         await DragTo(Cell(1, c => c.TooltipText.Contains("Wood · 64 total")), Cell(0, c => c.TooltipText == ""));
@@ -414,8 +414,8 @@ public partial class Game {
     }
 
     private async Task CheckCrateInCrate() {
-        var crate = world.Add("crate", world.Player + new Vector2(1, 0));
-        var box = world.Add("crate", world.Player); box.Inventory.Add("berries", 3); world.PickUpCrate(box);
+        var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
+        var box = world.Add(ThingKind.Crate, world.Player); box.Inventory.Add("berries", 3); world.PickUpCrate(box);
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         // A crate in hand on the hotbar only opens a clicked crate; the alert waits for a deliberate move.
         string lastSlot = world.S.HotbarSlots[8]; int active = world.S.ActiveHotbar;
@@ -427,11 +427,11 @@ public partial class Game {
         world.S.Backpack.Add("crate", 1); PlaceCrate("crate");
         for (int placed = 1; placed <= 2; placed++) {
             var spot = Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()))
-                .First(p => world.PlacementBlock("crate", p, "crate") == null);
+                .First(p => world.PlacementBlock(ThingKind.Crate, p, "crate") == null);
             await Click(view.Screen(spot));
-            Require(world.S.Backpack["crate"] == 2 - placed && !panel.Visible && view.BuildMode == (placed == 1 ? "crate" : ""), "Placing a crate must not open it and must stay in placement while crates remain.");
+            Require(world.S.Backpack["crate"] == 2 - placed && !panel.Visible && view.BuildMode == (placed == 1 ? ThingKind.Crate : null), "Placing a crate must not open it and must stay in placement while crates remain.");
         }
-        world.S.Things.RemoveAll(t => t.Kind == "crate" && t != crate && t.Inventory.Count == 0);
+        world.S.Things.RemoveAll(t => t.Kind == ThingKind.Crate && t != crate && t.Inventory.Count == 0);
         Select(crate); await Frames();
         await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
         Require(anomaly.Visible && anomalyWarning.Visible && world.S.Backpack[packed] == 1 && crate.Inventory.Count == 0, "A crate dragged into a crate must stop at the warning.");
@@ -472,7 +472,7 @@ public partial class Game {
 
     private async Task CheckCabinAndCanopy() {
         ClosePanel(); await Frames();
-        var hut = world.Add("hut", world.Player + new Vector2(0, 4));
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, 4));
         // The click lands while the player is still walking, as when running from a wolf.
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.1);
@@ -495,8 +495,8 @@ public partial class Game {
         world.S.Things.Remove(hut); ClosePanel(); await Frames();
 
         // A loose piece far enough behind a tree sits under its crown on screen; it must still be the one picked.
-        var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == Terrain.Spawn + new Vector2(5, 0));
-        var hidden = world.Add("loose_coal", tree.Pos - new Vector2(3.3f, 3.3f), 2);
+        var tree = world.S.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
+        var hidden = world.Add(ThingKind.LooseCoal, tree.Pos - new Vector2(3.3f, 3.3f), 2);
         var point = view.Screen(hidden.Pos, .15f);
         Require(view.Pick(point)?.Id == hidden.Id, "A tree crown must not steal the click from a loose piece behind it.");
         world.S.Things.Remove(hidden);
@@ -608,7 +608,7 @@ public partial class Game {
             world.S.Time = musicDay; sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2);
             int heard = sounds.Played; sounds.Play("anvil_work", world.Player + Vector2.One * 40);
             Require(view.OffScreen(world.Player) == 0 && view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach && sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
-            var tree = world.S.Things.First(t => t.Kind == "tree" && t.Pos == Terrain.Spawn + new Vector2(5, 0));
+            var tree = world.S.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
             int wood = world.S.Backpack["wood"];
             var point = view.Screen(tree.Pos) - new Vector2(0, 70);
             Require(view.Pick(point)?.Id == tree.Id, "Illustrated tree hit area must select the visible resource.");
@@ -618,24 +618,24 @@ public partial class Game {
                 "holding RMB approaching and gathering a tree with the starting axe's steel stroke and chop sound", 8);
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
             await Frames();
-            var farm = world.Add("farm", world.Player + new Vector2(-3, 3)); farm.Stage = World.FarmRipe;
+            var farm = world.Add(ThingKind.Farm, world.Player + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
             await Frames(2);
             var farmPoint = GetViewport().GetFinalTransform() * view.Screen(farm.Pos);
             Require(view.Pick(view.Screen(farm.Pos))?.Id == farm.Id, "A farm plot must be picked where it is drawn.");
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = farmPoint, GlobalPosition = farmPoint, Pressed = true });
             await Until(() => farm.Progress > 0, "holding RMB on a ripe farm plot walking over and harvesting by hand", 6);
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = farmPoint, Pressed = false });
-            await Frames(); Require(farm.Progress > 0 && farm.Stage == World.FarmRipe, "holding RMB on a ripe farm plot must walk over and harvest by hand.");
+            await Frames(); Require(farm.Progress > 0 && farm.FarmStage == FarmStage.Ripe, "holding RMB on a ripe farm plot must walk over and harvest by hand.");
             world.S.Things.Remove(farm);
             Require(!stats.Text.Contains("Health") && !stats.Text.Contains("Food") && !stats.Text.Contains("Water") && !stats.Text.Contains("coins") && !stats.Text.Contains("Pack"), "The persistent HUD must show only the day and clock beside the brand.");
             Require(hotbarButtons.Count == 9 && world.S.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
             int berries = world.S.Backpack["berries"];
             await KeyStroke(Key.Key3);
-            Require(view.BuildMode == "chest", "A building-plan hotkey must enter placement mode.");
+            Require(view.BuildMode == ThingKind.Chest, "A building-plan hotkey must enter placement mode.");
             await KeyStroke(Key.Key8);
             Require(world.S.ActiveHotbar == 7 && world.S.Backpack["berries"] == berries && hotbarButtons[7].GetThemeStylebox("normal") == Style.CupWanted && hotbarButtons[2].GetThemeStylebox("normal") != Style.CupWanted,
                 "Key 8 must put the berries in hand with an outline, without eating them.");
-            Require(view.BuildMode == "", "Selecting an item must clear any previously selected building plan.");
+            Require(view.BuildMode == null, "Selecting an item must clear any previously selected building plan.");
             int played = sounds.Played;
             await ClickGround();
             Require(world.S.Backpack["berries"] == berries - 1, "A left click on open ground must eat the berries in hand.");
@@ -650,11 +650,11 @@ public partial class Game {
             plan!.EmitSignal(Control.SignalName.MouseEntered); await Frames();
             Require(HasLabel(panel, "Needs: Wood") && HasLabel(panel, "5 slots"), "Hovering a plan must show its description and required resources.");
             plan.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
-            Require(view.BuildMode == "chest" && !panel.Visible, "Choosing a plan must enter placement mode.");
+            Require(view.BuildMode == ThingKind.Chest && !panel.Visible, "Choosing a plan must enter placement mode.");
             Vector2 place = Vector2.Zero;
             for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) {
                 var candidate = world.Player.Round() + new Vector2(x, y);
-                if (world.Player.DistanceTo(candidate) <= 3 && world.PlacementBlock("chest", candidate) == null) place = candidate;
+                if (world.Player.DistanceTo(candidate) <= 3 && world.PlacementBlock(ThingKind.Chest, candidate) == null) place = candidate;
             }
             Require(place != Vector2.Zero, "A fresh clearing must offer space for construction.");
             point = view.Screen(place);
@@ -663,10 +663,10 @@ public partial class Game {
             await Frames();
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = windowPoint, Pressed = false });
             await Frames();
-            var chest = world.S.Things.LastOrDefault(t => t.Kind == "chest");
-            Require(chest != null && view.BuildMode == (world.S.Backpack.Has(world.Data.Buildings["chest"].Cost) ? "chest" : "") && selected != chest.Id && !panel.Visible,
+            var chest = world.S.Things.LastOrDefault(t => t.Kind == ThingKind.Chest);
+            Require(chest != null && view.BuildMode == (world.S.Backpack.Has(world.Data.Buildings[ThingKind.Chest].Cost) ? ThingKind.Chest : null) && selected != chest.Id && !panel.Visible,
                 "A ground click must construct the chest without opening it, staying in placement while another can be afforded.");
-            view.BuildMode = ""; Select(chest!);
+            view.BuildMode = null; Select(chest!);
             var deposit = Named("deposit"); Require(deposit != null, "Chest context must expose deposit action.");
             deposit!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
             Require(chest!.Inventory["wood"] > 0 && world.S.Backpack["steel_axe"] == 1, "Manual deposit must move materials and retain equipped tools.");
@@ -767,7 +767,7 @@ public partial class Game {
             await Frames(3);
             Require(!ending.Visible && !paused, "The starter goal chain alone must not end the game.");
             await CheckMine();
-            foreach (var mine in world.S.Things.Where(t => t.Kind == "mine")) mine.Stage = World.MineOpen;
+            foreach (var mine in world.S.Things.Where(t => t.Kind == ThingKind.Mine)) mine.MineStage = MineStage.Open;
             world.S.Milestones.Add("profit_week");
             await Frames(3);
             Require(ending.Visible && paused, "Reaching the end goals must show the ending and pause the world.");
@@ -776,7 +776,7 @@ public partial class Game {
             await Frames(3);
             Require(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
             ClosePanel();
-            var workbench = world.Add("bench", world.Player + new Vector2(-1, 0)); world.SetRecipe(workbench, "crate");
+            var workbench = world.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); world.SetRecipe(workbench, "crate");
             Select(workbench); world.S.Backpack.Add("planks", 6); RefreshLive(); await Frames(2);
             await Click(bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(c => c.TooltipText.StartsWith("Wood planks")));
             Require(workbench.Inventory["planks"] == 1 && world.S.Backpack["planks"] == 5, "Clicking a backpack item at the bench must load just one.");
@@ -785,7 +785,7 @@ public partial class Game {
             await SplitTo(Named("input_planks")!, bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(c => c.TooltipText == ""));
             Require(workbench.Inventory["planks"] == 3 && world.S.Backpack["planks"] == 3, "Right-clicking a bench input must pick up half of it.");
             world.S.Things.Remove(workbench); world.S.Backpack.Remove("planks", 3); ClosePanel();
-            var furnace = world.Add("reinforced", world.Player + new Vector2(1, 0));
+            var furnace = world.Add(ThingKind.Reinforced, world.Player + new Vector2(1, 0));
             Select(furnace);
             Require(Named("input_iron_bar") != null && Named("input_coal") != null && Named("output_steel_bar") != null, "The steel furnace must show one slot per input and output.");
             world.S.Backpack.Add("iron_bar", 5); world.S.Backpack.Add("coal", 100); RefreshLive();
@@ -823,8 +823,8 @@ public partial class Game {
             Require(!paused, "Escape must resume after animation pause check.");
             await Frames();
             Require(view.PlayerAnimation != ActorAction.Pump, "Actions rejected during pause must not play delayed pulses after resume.");
-            var occluded = new Thing { Kind = "reinforced", Pos = world.Player };
-            var foregroundTree = new Thing { Kind = "tree", Pos = world.Player + Vector2.One };
+            var occluded = new Thing { Kind = ThingKind.Reinforced, Pos = world.Player };
+            var foregroundTree = new Thing { Kind = ThingKind.Tree, Pos = world.Player + Vector2.One };
             Require(view.TreeCanopyCoversThing(foregroundTree, occluded), "A foreground canopy overlapping a furnace must fade.");
             foregroundTree.Pos = world.Player - Vector2.One;
             Require(!view.TreeCanopyCoversThing(foregroundTree, occluded), "Trees behind buildings must retain their opacity.");
@@ -840,7 +840,7 @@ public partial class Game {
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(gatheringPosition) < 12);
             world.Player = gatheringPosition;
             // Far enough that the player has to keep walking after the button is released.
-            var looseOre = world.Add("loose_coal", gatheringPosition + new Vector2(2, 0), 2);
+            var looseOre = world.Add(ThingKind.LooseCoal, gatheringPosition + new Vector2(2, 0), 2);
             int oreBefore = world.S.Backpack["coal"];
             await Frames();
             point = view.Screen(looseOre.Pos) - new Vector2(0, 12) * view.Zoom;
@@ -854,7 +854,7 @@ public partial class Game {
             Require(world.Find(looseOre.Id) == null && world.S.Backpack["coal"] == oreBefore + 2, "One right-click must walk over and pick up the whole loose piece.");
             Require(!harvestAnimation, "Picking up loose ore must not play the gathering animation.");
             // Exercise the rendered bush's independent fruit handle through real gathering input.
-            var berryBush = world.Add("berries", world.Player + new Vector2(1, -1), 4);
+            var berryBush = world.Add(ThingKind.Berries, world.Player + new Vector2(1, -1), 4);
             world.S.Backpack.Remove("berries", 99);
             await Frames(2);
             var bushProp = view.PropOf(berryBush.Id)!;

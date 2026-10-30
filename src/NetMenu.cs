@@ -59,7 +59,7 @@ public partial class Game {
     private void OnJoined() {
         StoreSetting("net", "address", net.Address);
         slot = 0; selected = 0; workerId = 0; gathering = null; entering = null; lifting = null; assigningWorker = 0; endingSeen = false;
-        view.BuildMode = ""; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
+        view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
         HideScreen(); menu.Visible = false; ending.Visible = false; ClosePanel();
         Notify("Joined the host's settlement. Your belongings stay yours when you leave.");
     }

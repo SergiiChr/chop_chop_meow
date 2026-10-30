@@ -35,27 +35,27 @@ public static class AnimationChecks {
         bag.Add("steel_axe", 1);
         bag.Add("steel_pick", 1);
 
-        Require(ActorAnimation.PlayerAction("tree", true, true, bag) == ActorAction.Walk,
+        Require(ActorAnimation.PlayerAction(ThingKind.Tree, true, true, bag) == ActorAction.Walk,
             "movement toward a resource should animate as walking");
-        Require(ActorAnimation.PlayerAction("tree", true, false, bag) == ActorAction.SteelChop,
+        Require(ActorAnimation.PlayerAction(ThingKind.Tree, true, false, bag) == ActorAction.SteelChop,
             "a stationary player with a steel axe should chop a tree");
-        Require(ActorAnimation.PlayerAction("iron", true, false, bag) == ActorAction.SteelMine,
+        Require(ActorAnimation.PlayerAction(ThingKind.Iron, true, false, bag) == ActorAction.SteelMine,
             "a carried steel pick should mine iron deposits");
-        Require(ActorAnimation.PlayerAction("stone", true, false, bag) == ActorAction.SteelMine,
+        Require(ActorAnimation.PlayerAction(ThingKind.Stone, true, false, bag) == ActorAction.SteelMine,
             "a carried pick should mine stone");
 
         var empty = new Inventory();
-        Require(ActorAnimation.PlayerAction("tree", true, false, empty) == ActorAction.Gather,
+        Require(ActorAnimation.PlayerAction(ThingKind.Tree, true, false, empty) == ActorAction.Gather,
             "tools not carried should not animate as tool use");
         var axeOnly = new Inventory();
         axeOnly.Add("steel_axe", 1);
-        Require(ActorAnimation.PlayerAction("coal", true, false, axeOnly) == ActorAction.Gather,
+        Require(ActorAnimation.PlayerAction(ThingKind.Coal, true, false, axeOnly) == ActorAction.Gather,
             "a carried but unsuitable axe should not animate as mining");
-        Require(ActorAnimation.PlayerAction("berries", true, false, empty) == ActorAction.Gather,
+        Require(ActorAnimation.PlayerAction(ThingKind.Berries, true, false, empty) == ActorAction.Gather,
             "hand gathering berries should use the gather action");
-        Require(ActorAnimation.PlayerAction("wolf_corpse", true, false, empty) == ActorAction.Gather,
+        Require(ActorAnimation.PlayerAction(ThingKind.WolfCorpse, true, false, empty) == ActorAction.Gather,
             "butchering a carcass should use the crouched gather action");
-        Require(ActorAnimation.PlayerAction("tree", false, false, bag) == ActorAction.Idle,
+        Require(ActorAnimation.PlayerAction(ThingKind.Tree, false, false, bag) == ActorAction.Idle,
             "inactive gathering should leave the player idle");
     }
 
@@ -71,46 +71,46 @@ public static class AnimationChecks {
         worker.Bag.Remove("wood", 2);
         worker.Status = "Text can vary";
         worker.WorkState = WorkerWorkState.Pumping;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "reinforced" }, false) == ActorAction.Pump,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Reinforced }, false) == ActorAction.Pump,
             "bellows work state should select pumping animation");
         worker.Status = "Different text";
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "reinforced" }, false) == ActorAction.Pump,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Reinforced }, false) == ActorAction.Pump,
             "rewording status should not change the pumping animation");
 
         worker.Status = "Station status text";
         worker.WorkState = WorkerWorkState.Hammering;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, false) == ActorAction.Hammer,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Hammer,
             "anvil work should select hammering animation");
         worker.Status = "On strike · wages owed";
         worker.WorkState = WorkerWorkState.Idle;
         worker.WageDebt = worker.Wage;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, false) == ActorAction.Protest
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Protest
                 && ActorAnimation.Tool(ActorAction.Protest) == "protest_sign",
             "striking workers should stand holding the protest sign instead of working");
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, true) == ActorAction.Walk,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true) == ActorAction.Walk,
             "a striking worker heading home should walk, not protest");
         worker.WageDebt = 0;
         worker.Status = "Gathering wood";
         worker.WorkState = WorkerWorkState.Blocked;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "tree" }, false) == ActorAction.Idle,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Tree }, false) == ActorAction.Idle,
             "waiting workers should not swing tools just because they have an assignment");
 
         worker.Status = "Arbitrary status";
         worker.WorkState = WorkerWorkState.Gathering;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "tree" }, false) == ActorAction.Chop,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Tree }, false) == ActorAction.Chop,
             "workers gathering trees should chop");
         worker.Status = "Arbitrary status";
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "iron" }, false) == ActorAction.Mine,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Iron }, false) == ActorAction.Mine,
             "workers gathering iron should mine");
         worker.WorkState = WorkerWorkState.Resting;
         worker.Bag.Add("wood", 2);
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, false) == ActorAction.Perch,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Perch,
             "a worker at lunch should sit, even holding a load");
         worker.Id = 1;
         Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Sit,
             "every other worker should sit cross-legged on the ground rather than on a rock");
         worker.Id = 0;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = "anvil" }, true) == ActorAction.Carry,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true) == ActorAction.Carry,
             "a worker still walking to lunch should not sit");
         worker.Bag.Remove("wood", 2);
         worker.Status = "Available";

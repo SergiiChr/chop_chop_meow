@@ -31,7 +31,7 @@ public partial class Game {
     private ItemSlot HotbarButton(int slot) {
         var button = new ItemSlot { FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
         button.Pressed += () => SelectHotbar(slot);
-        button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.Buildings.ContainsKey(drag.Item);
+        button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.IsBuilding(drag.Item);
         button.Take = drag => { SetHotbar(slot, drag.Item); return 0; };
         button.CustomMinimumSize = new Vector2(56, 56);
         Style.Skin(button, Style.CupNormal, Style.CupHover, Style.CupPressed);
@@ -76,7 +76,7 @@ public partial class Game {
             if (button.GetParent() is HBoxContainer row) row.Alignment = BoxContainer.AlignmentMode.Center;
             var id = HotbarId(slot);
             int count = world.S.Backpack[id];
-            bool building = world.Data.Buildings.ContainsKey(id);
+            bool building = world.Data.IsBuilding(id);
             hotbarCounts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : Water.IsBottle(id) ? $"{Water.BottleSips(id)}/3" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : HotbarIcon(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
@@ -108,10 +108,10 @@ public partial class Game {
         slot = Math.Clamp(slot, 0, 8);
         world.S.ActiveHotbar = slot;
         string id = HotbarId(slot);
-        view.BuildMode = "";
+        view.BuildMode = null;
         assigningWorker = 0;
         if (string.IsNullOrEmpty(id)) Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
-        else if (world.Data.Buildings.ContainsKey(id)) { view.BuildMode = id; ClosePanel(); } else if (id == "crate") PlaceCrate(id);
+        else if (Kinds.Parse(id) is ThingKind kind && world.Data.Buildings.ContainsKey(kind)) { view.BuildMode = kind; ClosePanel(); } else if (id == "crate") PlaceCrate(id);
         RefreshLive();
     }
 

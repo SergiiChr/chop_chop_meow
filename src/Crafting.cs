@@ -77,7 +77,7 @@ public partial class Game {
     private void Bench(Thing bench) {
         // The station's own tool cups sit in the header: what is slotted sets which recipes can run and how fast.
         foreach (string tool in World.SlotKinds(bench.Kind)) { var slot = ToolSlot(bench, tool); heading.AddChild(slot); heading.MoveChild(slot, heading.GetChildCount() - 2); }
-        if (bench.Kind == "bench") headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
+        if (bench.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
         var groups = world.Data.Recipes.Where(p => p.Value.Station == bench.Kind).Select(p => p.Key).GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
         RecipeBoard(groups, group => group.Tool == "" ? null : world.BenchTool(bench, group.Tool, group.Tier), bench,
             id => { world.SetRecipe(bench, id); OpenPage("inspect"); }, id => bench.Recipe == id, id => world.S.Backpack.Has(world.Data.Recipes[id].Inputs),
@@ -196,7 +196,7 @@ public partial class Game {
         count.Text = r.Amount > 1 ? $"×{r.Amount}" : ""; count.MoveToFront();
         cell.Pressed += () => { click(id); RefreshLive(); };
         if (twice != null) cell.DoubleClicked = () => { twice(id); RefreshLive(); };
-        float Time() => r.Seconds / ((station?.Kind == "bench" ? world.Data.BenchSpeed : 1) * (held() is string inUse ? world.Data.Items[inUse].Speed : 1));
+        float Time() => r.Seconds / ((station?.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * (held() is string inUse ? world.Data.Items[inUse].Speed : 1));
         void Describe(StringBuilder text) {
             text.Append(r.Name);
             if (r.Amount > 1) text.Append($" ×{r.Amount}");

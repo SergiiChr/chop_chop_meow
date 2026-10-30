@@ -60,10 +60,10 @@ public static class AllocationChecks {
     private static World WorkingMine(GameData data, out Thing mine) {
         var world = new World(data, false);
         world.S.Time = data.DaySeconds * .3f;
-        var cliff = World.CliffOf("iron");
+        var cliff = World.CliffOf(ThingKind.Iron);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
-        mine = world.Add("mine", World.MineSpot(cliff)); mine.Stage = World.MineOpen;
-        world.Add("chest", mine.Pos + cliff.Face * 3);
+        mine = world.Add(ThingKind.Mine, World.MineSpot(cliff)); mine.MineStage = MineStage.Open;
+        world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3);
         for (int i = 0; i < data.Mine.Workers; i++) {
             var w = new Worker { Id = world.S.NextId++, Name = $"Miner {i + 1}", Pos = mine.Pos + cliff.Face * 2, Tool = "steel_pick" };
             world.S.Workers.Add(w); world.Assign(w, mine);
@@ -77,9 +77,9 @@ public static class AllocationChecks {
         world.S.Time = data.DaySeconds * .3f;
         var at = Terrain.Spawn;
         world.Player = at + new Vector2(-20, 0);
-        stock = world.Add("chest", at + new Vector2(2, 0));
-        var packer = world.Add("packer", at); world.SetPacking(packer, "berries");
-        var sign = world.Add("signpost", at + new Vector2(0, 3));
+        stock = world.Add(ThingKind.Chest, at + new Vector2(2, 0));
+        var packer = world.Add(ThingKind.Packer, at); world.SetPacking(packer, "berries");
+        var sign = world.Add(ThingKind.Signpost, at + new Vector2(0, 3));
         world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);
         var w = new Worker { Id = world.S.NextId++, Name = "Packer", Pos = at + new Vector2(1, 1) };
         world.S.Workers.Add(w); world.Assign(w, packer);
@@ -91,16 +91,16 @@ public static class AllocationChecks {
         var world = new World(data);
         world.S.Time = data.DaySeconds * .3f;
         var at = world.Player;
-        var chest = world.Add("chest", at + new Vector2(2, 0));
-        world.Add("chest", at + new Vector2(2, -2));
+        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 0));
+        world.Add(ThingKind.Chest, at + new Vector2(2, -2));
         chest.Inventory.Add("iron_bar", 20); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_ore", 20); chest.Inventory.Add("wood", 30);
-        var rack = world.Add("toolstation", at + new Vector2(-2, 0));
+        var rack = world.Add(ThingKind.Toolstation, at + new Vector2(-2, 0));
         rack.Inventory.Add("steel_axe", 2);
-        var fire = world.Add("campfire", at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
-        var furnace = world.Add("furnace", at + new Vector2(3, 3));
-        var forge = world.Add("reinforced", at + new Vector2(-3, 3)); forge.Heat = 90;
+        var fire = world.Add(ThingKind.Campfire, at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
+        var furnace = world.Add(ThingKind.Furnace, at + new Vector2(3, 3));
+        var forge = world.Add(ThingKind.Reinforced, at + new Vector2(-3, 3)); forge.Heat = 90;
         Worker Hire(Vector2 p) { var w = new Worker { Id = world.S.NextId++, Name = $"Worker {world.S.Workers.Count + 1}", Pos = p }; world.S.Workers.Add(w); return w; }
-        foreach (var tree in world.S.Things.Where(t => t.Kind == "tree").OrderBy(t => t.Pos.DistanceTo(at)).Take(2))
+        foreach (var tree in world.S.Things.Where(t => t.Kind == ThingKind.Tree).OrderBy(t => t.Pos.DistanceTo(at)).Take(2))
             world.Assign(Hire(rack.Pos), tree);
         world.Assign(Hire(forge.Pos + World.BellowsStand), forge);
         world.Assign(Hire(chest.Pos), forge);

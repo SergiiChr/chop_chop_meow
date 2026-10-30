@@ -44,7 +44,7 @@ public partial class Game {
         RenderingServer.ViewportSetMeasureRenderTime(GetViewport().GetViewportRid(), true);
         performanceSamples = new PerformanceSample[500_000];
         foreach (var thing in world.S.Things)
-            if (thing.Kind is "reinforced" or "furnace" or "bench") performanceMachines[thing.Id] = (thing.Progress, 0);
+            if (thing.Kind is ThingKind.Reinforced or ThingKind.Furnace or ThingKind.Bench) performanceMachines[thing.Id] = (thing.Progress, 0);
         performanceLastPosition = world.Player;
         performanceStart = performancePrevious = Time.GetTicksUsec();
         performanceRunning = true;
@@ -71,7 +71,7 @@ public partial class Game {
             var target = site switch {
                 1 => Terrain.WaterPoint(Terrain.Lake + Terrain.Seaward) + Terrain.Seaward * 3,
                 2 => Terrain.Point(Terrain.Coast(Terrain.Across(Terrain.Spawn)) - 6, Terrain.Across(Terrain.Spawn)),
-                3 or 4 or 5 => World.MineSpot(World.CliffOf(site == 3 ? "iron" : site == 4 ? "tin" : "coal")) + World.CliffOf(site == 3 ? "iron" : site == 4 ? "tin" : "coal").Face * 4,
+                3 or 4 or 5 => World.MineSpot(World.CliffOf(site == 3 ? ThingKind.Iron : site == 4 ? ThingKind.Tin : ThingKind.Coal)) + World.CliffOf(site == 3 ? ThingKind.Iron : site == 4 ? ThingKind.Tin : ThingKind.Coal).Face * 4,
                 6 => Terrain.Point(125, -18),
                 7 => Terrain.Spawn + new Vector2(14, 4),
                 _ => Terrain.Spawn,

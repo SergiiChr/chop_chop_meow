@@ -97,7 +97,7 @@ public partial class Game {
         if (world.GoalComplete) { var hint = Style.Text(world.Objective.Hint, 13, Style.Tan); hint.AutowrapMode = TextServer.AutowrapMode.WordSmart; goals.AddChild(hint); }
         goals.AddChild(new HSeparator());
         goals.AddChild(WellLabel("End goals"));
-        foreach (string ore in World.MineOres) goals.AddChild(GoalRow($"A working {ore} mine", world.HasMine(ore), false, HotbarIcon(ore == "coal" ? "coal" : $"{ore}_ore")));
+        foreach (var ore in World.MineOres) goals.AddChild(GoalRow($"A working {ore.Id()} mine", world.HasMine(ore), false, HotbarIcon(World.ResourceItem(ore))));
         var target = world.Data.Goals;
         goals.AddChild(GoalRow($"{target.DailyProfit} coins profit a day for {target.ProfitDays} days in a row", world.ProfitGoalMet, false, HotbarIcon(Inventory.Coins)));
         var streak = new HBoxContainer(); streak.AddThemeConstantOverride("separation", 4); goals.AddChild(streak);

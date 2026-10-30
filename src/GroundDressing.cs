@@ -95,10 +95,10 @@ public partial class WorldView {
     private void ShadeThing(Thing t) {
         if (t.IsDeposit) { ShadeObject(t.Pos, .9f, .7f); BareSoil(t.Pos, 1.6f); return; }
         switch (t.Kind) {
-            case "stone": ShadeObject(t.Pos, .7f, .7f); BareSoil(t.Pos, 1.3f); break;
-            case "tree": ShadeObject(t.Pos, .55f, .7f); break;
-            case "berries": ShadeObject(t.Pos, .6f, .6f); break;
-            case "water" or "leaves" or "wolf_corpse" or "campfire" or "grave" or "signpost" or "mine": break;
+            case ThingKind.Stone: ShadeObject(t.Pos, .7f, .7f); BareSoil(t.Pos, 1.3f); break;
+            case ThingKind.Tree: ShadeObject(t.Pos, .55f, .7f); break;
+            case ThingKind.Berries: ShadeObject(t.Pos, .6f, .6f); break;
+            case ThingKind.Water or ThingKind.Leaves or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine: break;
             default:
                 if (t.IsLoose) ShadeObject(t.Pos, .3f, .6f);
                 else if (!World.IsZone(t.Kind)) ShadeObject(t.Pos, World.Footprint(t.Kind) + .25f, .5f);
@@ -121,8 +121,8 @@ public partial class WorldView {
             for (float d = -3; d < 2; d += .75f) Stamp(disturbed, at + outwards * d, 2.6f, .95f);
         }
         foreach (var t in World.S.Things) {
-            if (t.IsResource || t.Kind is "crate" or "grave") continue;
-            float radius = t.Kind switch { "hut" or "pile" or "farm" => 3.4f, "mine" => 3, "campfire" => 2.3f, _ => 1.8f };
+            if (t.IsResource || t.Kind is ThingKind.Crate or ThingKind.Grave) continue;
+            float radius = t.Kind switch { ThingKind.Hut or ThingKind.Pile or ThingKind.Farm => 3.4f, ThingKind.Mine => 3, ThingKind.Campfire => 2.3f, _ => 1.8f };
             Stamp(disturbed, t.Pos, radius, 1);
         }
         disturbanceImage.SetData(Terrain.Size, Terrain.Size, false, Image.Format.R8, disturbed);

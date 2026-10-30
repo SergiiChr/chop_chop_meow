@@ -37,7 +37,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = .1f, InputInterval = .05f;
     private const int HostId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 3;
+    private const int Protocol = 4;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember; a guest that confirmed none of the last this many gets the whole world again.</summary>
@@ -249,7 +249,7 @@ public partial class Net : Node {
     private static Vector2 Glide(Vector2 from, Vector2 to, float dt) => from.DistanceTo(to) > MaxStep ? to : from.Lerp(to, 1 - MathF.Exp(-dt * 12));
 
     /// <summary>Sends an action with where this player stands, so the host checks its reach from there rather than from a position still gliding in.</summary>
-    private void Send(Command c) => RpcId(HostId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
+    private void Send(Command c) => RpcId(HostId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
 
     private PlayerState? Guest() => World.S.Players.Find(p => p.Id == Multiplayer.GetRemoteSenderId() && p != World.Me);
 
@@ -265,12 +265,12 @@ public partial class Net : Node {
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Do(int order, Vector2 standing, int warp, string verb, int target, int other, string item, int count, Vector2 at) {
+    private void Do(int order, Vector2 standing, int warp, int verb, int target, int other, string item, int count, Vector2 at) {
         if (!Hosting || Guest() is not PlayerState p) return;
         heard[p.Id] = Math.Max(order, heard.GetValueOrDefault(p.Id));
         // The action happened where the guest stood, so it goes there at once.
         if (Stand(p, standing, warp)) using (World.ActAs(p)) World.MoveTo(standing);
-        World.Run(p, new Command(verb, target, other, item, count, at));
+        World.Run(p, new Command((Verb)verb, target, other, item, count, at));
     }
 
     /// <summary>

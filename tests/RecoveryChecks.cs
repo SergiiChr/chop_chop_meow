@@ -15,10 +15,10 @@ public static class RecoveryChecks {
         var world = new World(data, false);
         world.S.RespawnIn = 20;
         Require(world.CanSkipMorning, "a downed player without a cabin should be able to skip to morning");
-        world.Add("hut", Terrain.Spawn + new Vector2(40, 0));
+        world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(40, 0));
         Require(!world.CanSkipMorning, "a cabin anywhere in the world should block the no-shelter skip");
 
-        world.S.Things.RemoveAll(t => t.Kind == "hut");
+        world.S.Things.RemoveAll(t => t.Kind == ThingKind.Hut);
         world.S.Players.Add(new PlayerState { Id = 2, RespawnIn = 0 });
         Require(!world.CanSkipMorning, "another living player should prevent skipping the shared night");
         world.S.Players[1].RespawnIn = 20;
@@ -32,7 +32,7 @@ public static class RecoveryChecks {
         float timeToDawn = data.DaySeconds - world.S.Time % data.DaySeconds + 1;
         world.S.RespawnIn = timeToDawn / 2;
         world.S.Hunger = 90; world.S.Thirst = 90;
-        var sign = world.Add("signpost", Terrain.Spawn + new Vector2(4, 0));
+        var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(4, 0));
         var worker = new Worker { Id = world.S.NextId++, Name = "Mara", Wage = 5, X = sign.Pos.X, Y = sign.Pos.Y };
         world.S.Workers.Add(worker);
         world.S.Orders.Add(new TradeOrder {
@@ -41,7 +41,7 @@ public static class RecoveryChecks {
             Signpost = sign.Id,
             Elapsed = data.TradeSeconds - .1f
         });
-        var furnace = world.Add("furnace", Terrain.Spawn + new Vector2(-4, 0));
+        var furnace = world.Add(ThingKind.Furnace, Terrain.Spawn + new Vector2(-4, 0));
         furnace.Inventory.Add("iron_ore", 2); furnace.Burner!.Add("wood", 1);
         furnace.Processing = true; furnace.Progress = data.Recipes["iron_bar"].Seconds - .1f;
 

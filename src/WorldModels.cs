@@ -33,7 +33,7 @@ public sealed class Prop {
     public Hit[] Hits = Array.Empty<Hit>();
     /// <summary>A tree crown's meshes and their own materials, for fading it without walking its nodes.</summary>
     public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
-    public string Kind = "";
+    public ThingKind Kind;
     public float Fade, Fall = -1, Open, Shake, Puff;
     public int LastCount;
     /// <summary>Whether a build-mode ghost is tinted as placeable, or null before its first tint.</summary>
@@ -64,10 +64,10 @@ public static class WorldModels {
     }
     /// <summary>How full a resource is against its size from world generation; the view shrinks deposits toward 55% as they are worked.</summary>
     public static float Fullness(Thing t) => t.Kind switch {
-        "stone" => t.Remaining / (float)World.StonePile,
-        "iron" or "coal" or "tin" => t.Remaining / (float)World.DepositOre,
-        "wolf_corpse" => t.Remaining / (float)World.WolfMeat,
-        "leaves" => t.Remaining / (float)World.LeafPatch,
+        ThingKind.Stone => t.Remaining / (float)World.StonePile,
+        ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => t.Remaining / (float)World.DepositOre,
+        ThingKind.WolfCorpse => t.Remaining / (float)World.WolfMeat,
+        ThingKind.Leaves => t.Remaining / (float)World.LeafPatch,
         _ => 1
     };
 
@@ -79,35 +79,35 @@ public static class WorldModels {
     }
 
     public static Hit[] Hits(Thing t) => t.Kind switch {
-        "tree" => (t.Id % TreeVariants) switch {
+        ThingKind.Tree => (t.Id % TreeVariants) switch {
             1 => new[] { new Hit(.3f, 0, 1.2f), new Hit(1.25f, 1.2f, 5.6f) },
             2 => new[] { new Hit(.25f, 0, 2.6f), new Hit(1.05f, 2.6f, 5.4f) },
             _ => new[] { new Hit(.35f, 0, 2.5f), new Hit(1.8f, 2.5f, 5.3f) },
         },
-        "stone" => new[] { new Hit(.75f, 0, .9f) },
-        "iron" or "coal" or "tin" => new[] { new Hit(.8f, 0, 1) },
-        "loose_coal" => new[] { new Hit(.45f, 0, .35f) },
-        "wolf_corpse" => new[] { new Hit(.65f, 0, .5f) },
-        "berries" => new[] { new Hit(.65f, 0, 1) },
-        "water" => new[] { new Hit(1.2f, 0, .5f) },
-        "furnace" => new[] { new Hit(.72f, 0, 1.15f) },
-        "reinforced" => new[] { new Hit(.95f, 0, 1.45f) },
-        "hut" => new[] { new Hit(1.6f, 0, 3.1f) },
-        "chest" => new[] { new Hit(.5f, 0, .65f) },
-        "crate" => new[] { new Hit(.4f, 0, .55f) },
-        "bench" => new[] { new Hit(.6f, 0, .95f) },
-        "cooktable" => new[] { new Hit(.7f, 0, .9f) },
-        "cannery" => new[] { new Hit(.6f, 0, 1f) },
-        "packer" => new[] { new Hit(1, 0, 1.1f) },
-        "toolstation" => new[] { new Hit(.55f, 0, 1.5f) },
-        "pile" => new[] { new Hit(1.5f, 0, .5f) },
-        "farm" => new[] { new Hit(1.5f, 0, .5f) },
-        "leaves" => new[] { new Hit(.6f, 0, .15f) },
-        "grave" => new[] { new Hit(.65f, 0, 1.5f) },
-        "anvil" => new[] { new Hit(.45f, 0, .85f) },
-        "signpost" => new[] { new Hit(1.02f, 0, 1.98f) },
-        "campfire" => new[] { new Hit(.55f, 0, .7f) },
-        "mine" => new[] { new Hit(.9f, 0, 1.8f) },
+        ThingKind.Stone => new[] { new Hit(.75f, 0, .9f) },
+        ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => new[] { new Hit(.8f, 0, 1) },
+        ThingKind.LooseCoal => new[] { new Hit(.45f, 0, .35f) },
+        ThingKind.WolfCorpse => new[] { new Hit(.65f, 0, .5f) },
+        ThingKind.Berries => new[] { new Hit(.65f, 0, 1) },
+        ThingKind.Water => new[] { new Hit(1.2f, 0, .5f) },
+        ThingKind.Furnace => new[] { new Hit(.72f, 0, 1.15f) },
+        ThingKind.Reinforced => new[] { new Hit(.95f, 0, 1.45f) },
+        ThingKind.Hut => new[] { new Hit(1.6f, 0, 3.1f) },
+        ThingKind.Chest => new[] { new Hit(.5f, 0, .65f) },
+        ThingKind.Crate => new[] { new Hit(.4f, 0, .55f) },
+        ThingKind.Bench => new[] { new Hit(.6f, 0, .95f) },
+        ThingKind.Cooktable => new[] { new Hit(.7f, 0, .9f) },
+        ThingKind.Cannery => new[] { new Hit(.6f, 0, 1f) },
+        ThingKind.Packer => new[] { new Hit(1, 0, 1.1f) },
+        ThingKind.Toolstation => new[] { new Hit(.55f, 0, 1.5f) },
+        ThingKind.Pile => new[] { new Hit(1.5f, 0, .5f) },
+        ThingKind.Farm => new[] { new Hit(1.5f, 0, .5f) },
+        ThingKind.Leaves => new[] { new Hit(.6f, 0, .15f) },
+        ThingKind.Grave => new[] { new Hit(.65f, 0, 1.5f) },
+        ThingKind.Anvil => new[] { new Hit(.45f, 0, .85f) },
+        ThingKind.Signpost => new[] { new Hit(1.02f, 0, 1.98f) },
+        ThingKind.Campfire => new[] { new Hit(.55f, 0, .7f) },
+        ThingKind.Mine => new[] { new Hit(.9f, 0, 1.8f) },
         _ => new[] { new Hit(.5f, 0, .8f) },
     };
 
@@ -115,36 +115,36 @@ public static class WorldModels {
         var prop = new Prop { Kind = t.Kind, Hits = Hits(t) };
         var body = prop.Body;
         switch (t.Kind) {
-            case "tree": Tree(prop, t.Id); break;
-            case "stone": Rocks(body, t.Kind, t.Id, "8d918e"); break;
-            case "iron": Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
-            case "coal": Rocks(body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
-            case "tin": Rocks(body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
-            case "loose_coal": LooseOre(body, t.Kind, t.Id, "2d2f33", "1d1e21"); break;
-            case "wolf_corpse": Carcass(prop); break;
-            case "berries": Bush(prop, t.Id); break;
-            case "water": break; // The lake is the drinking spot; this thing only provides the hit area.
-            case "furnace": BlockFurnace(prop); break;
-            case "reinforced": DrumForge(prop); break;
-            case "hut": Cabin(prop); break;
-            case "chest": Chest(prop); break;
-            case "grave": DroppedBackpack(prop); break;
-            case "anvil": Anvil(prop); break;
-            case "crate": Crate(prop); break;
-            case "bench": Workbench(prop); break;
-            case "cooktable": CookingTable(prop); break;
-            case "cannery": Cannery(prop); break;
-            case "packer": PackingStation(prop); break;
-            case "toolstation": ToolRack(prop); break;
-            case "pile": Pile(prop); break;
-            case "farm": Farm(prop, t.Id); break;
-            case "leaves": LeafLitter(body, t.Id); break;
-            case "signpost": Signpost(prop); break;
-            case "campfire": FirePit(prop); break;
-            case "mine": Mine(prop, World.CliffAt(t.Pos).Ore); break;
+            case ThingKind.Tree: Tree(prop, t.Id); break;
+            case ThingKind.Stone: Rocks(body, t.Kind, t.Id, "8d918e"); break;
+            case ThingKind.Iron: Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
+            case ThingKind.Coal: Rocks(body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
+            case ThingKind.Tin: Rocks(body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
+            case ThingKind.LooseCoal: LooseOre(body, t.Kind.Id(), t.Id, "2d2f33", "1d1e21"); break;
+            case ThingKind.WolfCorpse: Carcass(prop); break;
+            case ThingKind.Berries: Bush(prop, t.Id); break;
+            case ThingKind.Water: break; // The lake is the drinking spot; this thing only provides the hit area.
+            case ThingKind.Furnace: BlockFurnace(prop); break;
+            case ThingKind.Reinforced: DrumForge(prop); break;
+            case ThingKind.Hut: Cabin(prop); break;
+            case ThingKind.Chest: Chest(prop); break;
+            case ThingKind.Grave: DroppedBackpack(prop); break;
+            case ThingKind.Anvil: Anvil(prop); break;
+            case ThingKind.Crate: Crate(prop); break;
+            case ThingKind.Bench: Workbench(prop); break;
+            case ThingKind.Cooktable: CookingTable(prop); break;
+            case ThingKind.Cannery: Cannery(prop); break;
+            case ThingKind.Packer: PackingStation(prop); break;
+            case ThingKind.Toolstation: ToolRack(prop); break;
+            case ThingKind.Pile: Pile(prop); break;
+            case ThingKind.Farm: Farm(prop, t.Id); break;
+            case ThingKind.Leaves: LeafLitter(body, t.Id); break;
+            case ThingKind.Signpost: Signpost(prop); break;
+            case ThingKind.Campfire: FirePit(prop); break;
+            case ThingKind.Mine: Mine(prop, World.CliffAt(t.Pos).Ore); break;
         }
-        if (t.Kind != "water") body.RotationDegrees = new Vector3(0, t.Kind == "tree" || t.IsResource ? Jitter(t.Id, 1) * 360 : 0, 0);
-        if (t.Kind == "mine") body.Rotation = MineYaw(t.Pos);
+        if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Jitter(t.Id, 1) * 360 : 0, 0);
+        if (t.Kind == ThingKind.Mine) body.Rotation = MineYaw(t.Pos);
         return prop;
     }
 
@@ -154,7 +154,7 @@ public static class WorldModels {
     /// Berries show as a small heap of the bush's berries; planks, parts and bars as the stock a storage pile shows.
     /// </summary>
     public static Node3D? IconModel(string id, bool building, GameData data) {
-        Node3D Part(string kind, Func<Prop, Node3D> part) {
+        Node3D Part(ThingKind kind, Func<Prop, Node3D> part) {
             var prop = Build(new Thing { Kind = kind });
             var node = part(prop);
             node.GetParent().RemoveChild(node);
@@ -165,8 +165,8 @@ public static class WorldModels {
         switch (id) {
             case "steel_axe" or "steel_pick" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
-            case "rake": return Part("toolstation", p => p.Racked["rake"]);
-            case "mortar": return Part("cooktable", p => p.Mortar!);
+            case "rake": return Part(ThingKind.Toolstation, p => p.Racked["rake"]);
+            case "mortar": return Part(ThingKind.Cooktable, p => p.Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
             case "water" or "water_2" or "water_1" or "empty_bottle": return BottleShape.Create(Water.BottleSips(id));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id);
@@ -174,19 +174,21 @@ public static class WorldModels {
                     var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
                     return stock;
                 }
-            case "stone" or "leaves" or "crate": return Build(new Thing { Kind = id }).Root;
+            case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
+            case "leaves": return Build(new Thing { Kind = ThingKind.Leaves }).Root;
+            case "crate": return Build(new Thing { Kind = ThingKind.Crate }).Root;
             // Loose iron left the world, but its lump still makes the iron ore icon.
             case "iron_ore": { var lump = new Node3D(); LooseOre(lump, "loose_iron", 0, "a35a2e", "8b4f2b"); return lump; }
-            case "coal" or "tin_ore": return Build(new Thing { Kind = id == "coal" ? "loose_coal" : "tin" }).Root;
+            case "coal" or "tin_ore": return Build(new Thing { Kind = id == "coal" ? ThingKind.LooseCoal : ThingKind.Tin }).Root;
             case "mine": {
-                    var prop = new Prop { Kind = id };
-                    Mine(prop, "iron");
+                    var prop = new Prop { Kind = ThingKind.Mine };
+                    Mine(prop, ThingKind.Iron);
                     prop.Outline!.Visible = prop.Supplies!.Visible = prop.Glow!.Visible = prop.Fire!.Visible = false;
                     return prop.Root;
                 }
         }
-        if (!building) return null;
-        var built = Build(new Thing { Kind = id });
+        if (!building || Kinds.Parse(id) is not ThingKind kind) return null;
+        var built = Build(new Thing { Kind = kind });
         if (built.Glow != null) built.Glow.Visible = false;
         if (id == "farm") { built.Crops[0].Visible = built.Crops[^1].Visible = true; }
         // A pile shows logs, a furnace its wood and a packing station a heap of bread.
@@ -215,14 +217,14 @@ public static class WorldModels {
     }
 
     /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows veins across the rock faces and ore chunks set into it.</summary>
-    private static void Rocks(Node3D body, string kind, int id, string stone, string? vein = null, string? chunks = null) {
+    private static void Rocks(Node3D body, ThingKind kind, int id, string stone, string? vein = null, string? chunks = null) {
         int variant = id % NatureShape.Variants;
         if (vein == null || chunks == null) {
-            Add(body, NatureShape.Rocks(kind, new Color(stone), variant), NatureShape.Natural, Vector3.Zero);
+            Add(body, NatureShape.Rocks(kind.Id(), new Color(stone), variant), NatureShape.Natural, Vector3.Zero);
             return;
         }
         Add(body, NatureShape.Ore(variant, false), NatureShape.OreMaterial(stone, .92f, 0), Vector3.Zero);
-        float roughness = kind == "coal" ? .58f : .4f, metallic = kind == "coal" ? 0 : .3f;
+        float roughness = kind == ThingKind.Coal ? .58f : .4f, metallic = kind == ThingKind.Coal ? 0 : .3f;
         Add(body, NatureShape.Ore(variant, true), NatureShape.OreMaterial(vein, roughness, metallic), Vector3.Zero);
         Add(body, NatureShape.OreChips(variant), NatureShape.OreMaterial(chunks, roughness, metallic), Vector3.Zero);
     }
@@ -603,7 +605,7 @@ public static class WorldModels {
     }
 
     /// <summary>Ore color in a mine cart: rusty iron, black coal, and pale grey for anything else.</summary>
-    private static string OreColor(string ore) => ore switch { "iron" => "a35a2e", "coal" => "26282b", _ => "b9bbb4" };
+    private static string OreColor(ThingKind ore) => ore switch { ThingKind.Iron => "a35a2e", ThingKind.Coal => "26282b", _ => "b9bbb4" };
 
     /// <summary>The portal, this far behind a mine's spot along its rails; the cart stands at the spot (see <see cref="World.MineSpot"/>).</summary>
     public const float MineDoor = -2.2f;
@@ -622,7 +624,7 @@ public static class WorldModels {
     }
 
     /// <summary>A timbered adit into the cliff's spur, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>
-    private static void Mine(Prop prop, string ore) {
+    private static void Mine(Prop prop, ThingKind ore) {
         var body = prop.Body;
         const float Door = MineDoor;
         // The marking: a see-through green footprint and portal, shown until the mine is finished.
