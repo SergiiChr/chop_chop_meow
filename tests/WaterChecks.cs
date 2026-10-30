@@ -22,7 +22,7 @@ public static class WaterChecks {
     private static void CheckFullBottleRequirement(GameData data) {
         foreach (string item in new[] { "empty_bottle", "water_1", "water_2" }) {
             var world = new World(data, false);
-            var table = world.Add("cooktable", world.Player + Vector2.Right);
+            var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
             world.SetRecipe(table, "dough");
             world.S.Backpack.Add(item, 1); world.S.Backpack.Add("flour", 1);
             string message = ""; world.Notify = text => message = text;
@@ -34,7 +34,7 @@ public static class WaterChecks {
             message = ""; world.LoadBatch(table);
             Require(message == Water.FullBottleWarning && world.S.Backpack[item] == 1 && table.Inventory.Count == 0,
                 "batch loading must retain the non-full bottle and explain the requirement");
-            var chest = world.Add("chest", world.Player + Vector2.Left);
+            var chest = world.Add(ThingKind.Chest, world.Player + Vector2.Left);
             Require(world.Transfer(world.S.Backpack, chest.Inventory, item, 1) == 1,
                 "non-full bottles must remain transferable to ordinary storage");
             world.S.Backpack.Add("water", 1);
@@ -68,7 +68,7 @@ public static class WaterChecks {
 
     private static void CheckRefillAndDirectSip(GameData data) {
         var world = new World(data, false);
-        var lake = new Thing { Kind = "water" };
+        var lake = new Thing { Kind = ThingKind.Water };
         world.S.Backpack.Slots = 1;
         world.S.Backpack.Add("empty_bottle", 1);
         Require(Water.CollectWater(world, lake) == WaterCollectResult.RefilledBottle, "gathering with an empty bottle should refill it");
@@ -104,13 +104,13 @@ public static class WaterChecks {
 
     private static void CheckRecipeContainersAndWorker(GameData data) {
         var world = new World(data, false);
-        var bench = world.Add("bench", world.Player + Vector2.Right * 2);
+        var bench = world.Add(ThingKind.Bench, world.Player + Vector2.Right * 2);
         bench.Tools!.Add("steel_hammer", 1); world.SetRecipe(bench, "water_bottle");
         bench.Inventory.Add("tin_bar", 1); bench.Inventory.Add("wood_parts", 1);
         for (int i = 0; i < 100; i++) world.Tick(.25f, true);
         Require(bench.Inventory["empty_bottle"] == 1 && bench.Inventory["water"] == 0,
             "the actual bench recipe must make exactly one empty bottle without creating water");
-        var table = world.Add("cooktable", world.Player + Vector2.Left * 2);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Left * 2);
         world.SetRecipe(table, "dough"); table.Inventory.Add("water", 1); table.Inventory.Add("flour", 1);
         for (int i = 0; i < 100; i++) world.Tick(.25f, true);
         Require(table.Inventory["empty_bottle"] == 1 && table.Inventory["water"] == 0 && table.Inventory["dough"] > 0,
@@ -119,8 +119,8 @@ public static class WaterChecks {
         world = new World(data, false);
         var shore = Terrain.WaterPoint(Terrain.Spawn);
         var outward = (shore - Terrain.Lake).Normalized();
-        var pond = world.Add("water", shore, 9999);
-        var chest = world.Add("chest", shore + outward * 5); chest.Inventory.Add("empty_bottle", 1);
+        var pond = world.Add(ThingKind.Water, shore, 9999);
+        var chest = world.Add(ThingKind.Chest, shore + outward * 5); chest.Inventory.Add("empty_bottle", 1);
         var worker = new Worker { Id = world.S.NextId++, Pos = chest.Pos };
         world.S.Workers.Add(worker); world.Assign(worker, pond);
         for (int i = 0; i < 240; i++) world.Tick(.25f, true);
@@ -134,7 +134,7 @@ public static class WaterChecks {
         string saved;
         try { old.S.Backpack.Add("water", 64); old.S.Backpack.Add("wood", 1); saved = old.Serialize(); } finally { Inventory.Unstacked.Add("water"); }
         var loaded = new World(data, false); loaded.Deserialize(saved);
-        int preserved = loaded.S.Backpack["water"] + loaded.S.Things.Where(t => t.Kind == "grave").Sum(t => t.Inventory["water"]);
+        int preserved = loaded.S.Backpack["water"] + loaded.S.Things.Where(t => t.Kind == ThingKind.Grave).Sum(t => t.Inventory["water"]);
         Require(preserved == 64 && loaded.S.Backpack.UsedSlots <= 24 && loaded.S.Backpack["wood"] == 1,
             "legacy stacked bottles must overflow to a recovery box without loss or oversized player inventory");
     }

@@ -10,9 +10,10 @@ public partial class Game {
         string name = World.MineName(mine); headingTitle.Text = char.ToUpper(name[0]) + name[1..];
         headingIcon.Texture = HotbarIcon(World.MineOre(mine)); headingIcon.Visible = true;
         var data = world.Data.Mine;
-        var tag = Style.Pill(mine.Stage == World.MineOpen ? "open" : $"{mine.Stage + 1} / 3", mine.Stage == World.MineOpen ? Style.TagPill : Style.Tag(Style.Mustard), mine.Stage == World.MineOpen ? Style.Rim : Style.Line, 13);
+        int stage = (int)mine.MineStage; bool open = mine.MineStage == MineStage.Open;
+        var tag = Style.Pill(open ? "open" : $"{stage + 1} / 3", open ? Style.TagPill : Style.Tag(Style.Mustard), open ? Style.Rim : Style.Line, 13);
         heading.AddChild(tag); heading.MoveChild(tag, heading.GetChildCount() - 2);
-        if (mine.Stage < World.MineOpen) {
+        if (!open) {
             string workday = data.StageWorkdays == 1 ? "1 working day" : $"{data.StageWorkdays:0.#} working days";
             (string Title, string Needs, string Icon)[] stages = {
                 ("Dig the entrance", $"A worker with a pickaxe for {workday}", "steel_pick"),
@@ -22,14 +23,14 @@ public partial class Game {
             // The three steps on a line, done in sage, the current one in mustard.
             var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 0); content.AddChild(line);
             for (int i = 0; i < stages.Length; i++) {
-                if (i > 0) line.AddChild(new ColorRect { Color = i <= mine.Stage ? Style.Sage : Style.Line, CustomMinimumSize = new Vector2(0, 6), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
+                if (i > 0) line.AddChild(new ColorRect { Color = i <= stage ? Style.Sage : Style.Line, CustomMinimumSize = new Vector2(0, 6), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
                 var node = new PanelContainer { Name = $"stage_{i + 1}", CustomMinimumSize = new Vector2(48, 48), MouseFilter = Control.MouseFilterEnum.Pass, TooltipText = $"Stage {i + 1} · {stages[i].Title}\n{stages[i].Needs}" };
-                node.AddThemeStyleboxOverride("panel", Style.Round(i < mine.Stage ? Style.Sage : i == mine.Stage ? Style.Mustard : Style.Line, 24).Item1);
-                var icon = Style.Icon(HotbarIcon(stages[i].Icon), 30); if (i > mine.Stage) icon.Modulate = Unready;
+                node.AddThemeStyleboxOverride("panel", Style.Round(i < stage ? Style.Sage : i == stage ? Style.Mustard : Style.Line, 24).Item1);
+                var icon = Style.Icon(HotbarIcon(stages[i].Icon), 30); if (i > stage) icon.Modulate = Unready;
                 node.AddChild(icon); line.AddChild(node);
             }
-            AddLabel($"Stage {mine.Stage + 1} · {stages[mine.Stage].Title}", 16);
-            if (mine.Stage == World.MineDug) {
+            AddLabel($"Stage {stage + 1} · {stages[stage].Title}", 16);
+            if (mine.MineStage == MineStage.Dug) {
                 // Supplies: delivered on the pill, needed under the cup; click a lit backpack stack to deliver it.
                 var row = Well(new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }); row.AddThemeConstantOverride("separation", 28);
                 foreach (var (item, amount) in data.Materials) {
@@ -46,7 +47,7 @@ public partial class Game {
                         cell.TooltipText = $"{world.Data.Name(item)} · {drawn} of {amount}\nClick to deliver from your backpack";
                     });
                 }
-            } else Dynamic(text => text.Append(stages[mine.Stage].Needs).Append(" · ").Append((int)(mine.Progress / world.MineStageSeconds * 100)).Append("% done"), 14, Muted);
+            } else Dynamic(text => text.Append(stages[(int)mine.MineStage].Needs).Append(" · ").Append((int)(mine.Progress / world.MineStageSeconds * 100)).Append("% done"), 14, Muted);
             BagGrid(id => world.SupplyMine(mine), "Click: deliver what the mine needs", wanted: id => world.MineNeed(mine, id) > 0);
         } else {
             // Miners as hardhats, lit while underground, and the two outputs with how fast they fill.

@@ -1,21 +1,13 @@
 #!/usr/bin/env python3
 """Small Linux launcher and build helper for Chop Chop Meow.
 
-  ./build.py play    Set up the local tools, then run the game. Forward flags after --.
-  ./build.py setup   Download tools if needed, compile C#, and import the project.
-  ./build.py editor  Set up the project and open the Godot editor.
-  ./build.py check   Run every offline check: Python types and style, C# compile and
-                     format, then the simulation, UI and two-process network tests.
-  ./build.py test    Run only the simulation, UI and two-process network tests.
-  ./build.py build   Check, export, and smoke-test build/ChopChopMeow.x86_64.
-  ./build.py icons   Render item and building icons from their models into assets/icons.
-
 Godot, .NET, the Python check tools and export templates are kept under .tools/. Set GODOT_BIN to use an
 existing Godot 4.7.2 .NET executable.
 """
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import heapq
 import itertools
@@ -220,6 +212,8 @@ def run_godot(
         raise SystemExit(
             f"{name} failed (exit {result.returncode}{detail}); see {log.relative_to(ROOT)}"
         )
+    if success_marker is not None:
+        print(f"{success_marker} ({log.relative_to(ROOT)})")
 
 
 def build_project(env: dict[str, str]) -> None:
@@ -411,77 +405,107 @@ def package_linux() -> Path:
     return archive
 
 
+def run_check(env: dict[str, str]) -> None:
+    """Verify C# format, then run every test."""
+    command(
+        ["dotnet", "format", ROOT / "ChopChopMeow.csproj", "--verify-no-changes"],
+        env=env,
+    )
+    test(env)
+
+
+def run_build(env: dict[str, str]) -> None:
+    """Run every check, export the Linux build, smoke-test it and bundle it."""
+    run_check(env)
+    fetch_templates(env)
+    run_godot(
+        "export",
+        [GODOT, "--headless", "--path", ROOT, "--export-release", "Linux/X11", OUTPUT],
+        env,
+    )
+    run_godot(
+        "export-smoke",
+        [OUTPUT, "--headless", "--", "--smoke-test"],
+        env,
+        timeout=120,
+        success_marker="SMOKE-TEST PASS",
+    )
+    archive = package_linux()
+    print(
+        f"Built {OUTPUT.relative_to(ROOT)}\nPortable bundle: {archive.relative_to(ROOT)}"
+    )
+
+
+def run_icons(env: dict[str, str]) -> None:
+    """Render the icons from their models, then re-import the project."""
+    # Rendering needs a real window; the headless renderer draws nothing.
+    run_godot(
+        "icons",
+        [GODOT, "--path", ROOT, "--", "--render-icons", ROOT / "assets/icons"],
+        env,
+        timeout=300,
+        success_marker="ICONS RENDERED",
+    )
+    run_godot("import", [GODOT, "--headless", "--path", ROOT, "--import"], env)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Describe the subcommands and their help text."""
+    parser = argparse.ArgumentParser(
+        prog="build.py",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    commands = parser.add_subparsers(dest="action", metavar="command")
+    helps = {
+        "play": "Set up the local tools, then run the game. Forward flags after --.",
+        "editor": "Set up the project and open the Godot editor.",
+        "setup": "Download tools if needed, compile C#, and import the project.",
+        "check": "Run every offline check: Python types and style, C# compile and "
+        "format, then the simulation, UI and two-process network tests.",
+        "test": "Run only the simulation, UI and two-process network tests.",
+        "build": "Check, export, and smoke-test build/ChopChopMeow.x86_64.",
+        "icons": "Render item and building icons from their models into assets/icons.",
+    }
+    for name, text in helps.items():
+        subparser = commands.add_parser(name, help=text, description=text)
+        if name == "play":
+            subparser.usage = "build.py play [-h] [-- GAME_ARGS ...]"
+    return parser
+
+
 def main() -> int:
-    action = sys.argv[1] if len(sys.argv) > 1 else ""
-    if action in {"-h", "--help", "help"}:
-        print(__doc__)
-        return 0
-    if action in {"play", "run", "editor", "setup", "check", "test", "build", "icons"}:
-        if action in {"check", "build"}:
-            python_checks()
-        env = setup()
-        if action in {"play", "run"}:
-            forwarded = sys.argv[2:]
-            if forwarded[:1] == ["--"]:
-                forwarded = forwarded[1:]
-            game_args = ["--", *forwarded] if forwarded else []
-            os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *game_args], env)
-        if action == "editor":
+    argv = sys.argv[1:]
+    # Everything after the first `--` belongs to the game, not to this launcher.
+    split = argv.index("--") if "--" in argv else len(argv)
+    own_args, game_args = argv[:split], argv[split + 1 :]
+    parser = build_parser()
+    args = parser.parse_args(own_args)
+    if args.action is None:
+        parser.print_help()
+        return 2
+    if game_args and args.action != "play":
+        parser.error(f"{args.action} does not take arguments after --")
+    if args.action in {"check", "build"}:
+        python_checks()
+    env = setup()
+    match args.action:
+        case "play":
+            forwarded = ["--", *game_args] if game_args else []
+            os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *forwarded], env)
+        case "editor":
             os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], env)
-        if action in {"check", "build"}:
-            command(
-                [
-                    "dotnet",
-                    "format",
-                    ROOT / "ChopChopMeow.csproj",
-                    "--verify-no-changes",
-                ],
-                env=env,
-            )
-            test(env)
-        if action == "test":
-            test(env)
-        if action == "build":
-            fetch_templates(env)
-            run_godot(
-                "export",
-                [
-                    GODOT,
-                    "--headless",
-                    "--path",
-                    ROOT,
-                    "--export-release",
-                    "Linux/X11",
-                    OUTPUT,
-                ],
-                env,
-            )
-            run_godot(
-                "export-smoke",
-                [OUTPUT, "--headless", "--", "--smoke-test"],
-                env,
-                timeout=120,
-                success_marker="SMOKE-TEST PASS",
-            )
-            archive = package_linux()
-            print(
-                f"Built {OUTPUT.relative_to(ROOT)}\nPortable bundle: {archive.relative_to(ROOT)}"
-            )
-        elif action == "icons":
-            # Rendering needs a real window; the headless renderer draws nothing.
-            run_godot(
-                "icons",
-                [GODOT, "--path", ROOT, "--", "--render-icons", ROOT / "assets/icons"],
-                env,
-                timeout=300,
-                success_marker="ICONS RENDERED",
-            )
-            run_godot("import", [GODOT, "--headless", "--path", ROOT, "--import"], env)
-        elif action == "setup":
+        case "setup":
             print("Ready. Run ./build.py play to launch the game.")
-        return 0
-    print(__doc__)
-    return 2
+        case "check":
+            run_check(env)
+        case "test":
+            test(env)
+        case "build":
+            run_build(env)
+        case "icons":
+            run_icons(env)
+    return 0
 
 
 if __name__ == "__main__":

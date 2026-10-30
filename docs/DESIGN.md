@@ -35,6 +35,7 @@ Simulation and data:
 | File | Owns |
 | --- | --- |
 | `src/World.cs` | The `World` simulation and `SaveState` |
+| `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/Inventory.cs` | Inventories and their filter-aware transfers |
 | `src/GameData.cs` | Loads tunable items, buildings, recipes, trade values and time values from `data/game.json` |
 | `src/Farm.cs` | Farm plots |
@@ -43,7 +44,8 @@ Simulation and data:
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
 | `src/Players.cs` | Per-player state, the command dispatcher and guest adoption |
-| `src/Net.cs` | The ENet connection, world updates and guest saves |
+| `src/Net.cs` | The ENet connection, sending and merging world updates, and guest saves |
+| `src/WorldUpdates.cs` | World updates as entries, their differences and compression |
 
 UI and input:
 
@@ -122,7 +124,7 @@ Multiplayer is host-authoritative.
 The top-level player fields of `SaveState` pass through to `SaveState.Actor`, so saves keep the host's player where single player always had it.
 
 Player actions run in the acting player's context (`World.As`).
-In a guest's copy, `World.Forwarded` sends each action to the host as a `Command` instead of changing the copy.
+In a guest's copy, `World.Forwarded` sends each action to the host as a `Command`, named by its `Verb`, instead of changing the copy.
 Guests walk locally and send their position, gather target and held item.
 A host-made move such as a respawn bumps `PlayerState.Warp`, so it wins over the guest's own position.
 
@@ -136,6 +138,7 @@ Shared rules:
 
 An update holds only what changed since the last one the guest confirmed.
 The host keeps the world of each recent update as one JSON entry per thing, worker, wolf, trade cart and player, plus two shared entries, and sends changed fields of changed entries.
+`WorldUpdates` writes them into reused buffers and keeps the last update's array for every entry that did not change, so only changed entries allocate (`tests/AllocationChecks.cs`).
 The welcome is a guest's first update, with the fog uncovered so far.
 
 - Updates go unreliably on their own channel, so a lost one never delays the next.
@@ -151,6 +154,7 @@ This simulation uses floats and frame-length steps, so it is not deterministic, 
 
 Every world object is a low-poly model assembled from Godot primitive meshes in code.
 Meshes and materials are cached by parameters, so repeated objects share resources.
+`WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, so a building, crate or carcass that first appears mid-game builds no mesh, material or shader; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
 The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
 
@@ -367,6 +371,9 @@ Inventories are slot grids with stacks of 64.
 Tools, packed crates and bottles take a slot each everywhere.
 The layout is saved and synchronized: removing one stack never shifts unrelated cells.
 Sort is the only action that packs and regroups stacks.
+Item totals change only through `Inventory` methods, which keep them in line with the stacks.
+Stacks are rebuilt from totals once, where the two can disagree: when a save loads (old saves hold totals only) and when a guest joins.
+A guest's copy takes totals and stacks together from the host, so it does not rebuild.
 
 Input rule for every item cell, in storage and stations alike:
 
@@ -513,13 +520,13 @@ Each portal follows its own cliff face, its tunnel runs into the rock, and its r
 A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`World.InSpur`), and holds the tunnel, which `WorldModels.Mine` darkens step by step to black.
 Loading a save made on an older valley moves only the mine cart anchor to this site and keeps stock, stages and worker assignments.
 
-`Thing.Stage` counts finished stages:
+`Thing.MineStage` counts finished stages from `MineStage.Marked`:
 
 | Stage | Done by | Check |
 | --- | --- | --- |
-| Dug | a worker with a pickaxe | `World.MineDug` |
-| Supplied | `mine.materials` delivered | `World.MineSupplied` |
-| Fitted | a worker with a hammer | `World.MineOpen` |
+| Dug | a worker with a pickaxe | `MineStage.Dug` |
+| Supplied | `mine.materials` delivered | `MineStage.Supplied` |
+| Fitted | a worker with a hammer | `MineStage.Open` |
 
 The two worker stages take `stageWorkdays` of `GameData.WorkdaySeconds`.
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
@@ -534,7 +541,7 @@ The first free miner then carries the whole stack to storage (`Worker.Bag` grows
 A farm plot (`farm`, `src/Farm.cs`) is a zone like a pile and snaps with piles.
 `farm` in `data/game.json` sets what sows it, how many days the wheat grows, how many working days the harvest takes and what it yields.
 
-`Thing.Stage` is `World.FarmFallow`, `FarmGrowing` or `FarmRipe`.
+`Thing.FarmStage` is `Fallow`, `Growing` or `Ripe`.
 `Thing.Progress` counts growth seconds, then harvest work.
 A fallow plot sows itself from its own inventory.
 `World.CropLook` gives the look: bare, soil, straws, green plants or wheat.

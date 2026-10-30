@@ -48,7 +48,7 @@ public static class ProductionChainChecks {
     /// </summary>
     private static void CheckPackingStation(GameData data) {
         var world = EmptyWorld(data);
-        var packer = world.Add("packer", new Vector2(20, 20));
+        var packer = world.Add(ThingKind.Packer, new Vector2(20, 20));
         world.Player = packer.Pos + new Vector2(1, 0);
         world.SetPacking(packer, "bread");
         Require(packer.Packs == "bread" && world.Holds(packer, "bread") && world.Holds(packer, "crate") && !world.Holds(packer, "berries"), "a packing station should take only its good and empty crates");
@@ -65,8 +65,8 @@ public static class ProductionChainChecks {
         Require(packer.Output.Count == 1 && packer.Inventory["bread"] == 1, "a full crate should wait in the output and stop packing until it is carried out");
 
         world.Player = new Vector2(40, 40);
-        var general = world.Add("chest", packer.Pos + new Vector2(2, 0));
-        var crates = world.Add("chest", packer.Pos + new Vector2(6, 0));
+        var general = world.Add(ThingKind.Chest, packer.Pos + new Vector2(2, 0));
+        var crates = world.Add(ThingKind.Chest, packer.Pos + new Vector2(6, 0));
         crates.Inventory.InputFilter.Add(World.CrateOf("bread"));
         general.Inventory.Add("bread", 30); general.Inventory.Add("crate", 4);
         var worker = AddWorker(world, packer.Pos + new Vector2(0, 1));
@@ -79,7 +79,7 @@ public static class ProductionChainChecks {
                 "the worker should restock bread and crates and pack the next crate");
 
         // A pile of packed crates takes more crates of the same good, but no crate of another good.
-        var pile = world.Add("pile", new Vector2(30, 30));
+        var pile = world.Add(ThingKind.Pile, new Vector2(30, 30));
         pile.Inventory.Add(crate, 1); crates.Inventory.Remove(crate, 1);
         world.Tick(.01f);
         var berries = new Inventory(); berries.Add("berries", 2);
@@ -95,7 +95,7 @@ public static class ProductionChainChecks {
 
     /// <summary>Packs goods into a crate the way a picked-up crate is packed, and returns the crate item.</summary>
     private static string AddPacked(World world, Inventory contents) {
-        var box = world.Add("crate", world.Player + new Vector2(1, 0));
+        var box = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
         foreach (var pair in contents.Items) box.Inventory.Add(pair.Key, pair.Value);
         var before = world.S.Backpack.Items.Keys.ToHashSet();
         Require(world.PickUpCrate(box), "a nearby crate should be picked up");
@@ -108,8 +108,8 @@ public static class ProductionChainChecks {
     /// </summary>
     private static void CheckPostFilterAndAutoSell(GameData data) {
         var world = EmptyWorld(data);
-        var sign = world.Add("signpost", new Vector2(20, 20));
-        var chest = world.Add("chest", new Vector2(30, 20));
+        var sign = world.Add(ThingKind.Signpost, new Vector2(20, 20));
+        var chest = world.Add(ThingKind.Chest, new Vector2(30, 20));
         world.Player = sign.Pos;
         var contents = new Inventory(); contents.Add("berries", 12);
         string crate = AddPacked(world, contents);
@@ -139,70 +139,70 @@ public static class ProductionChainChecks {
         int next = 0;
         // Buildings on a grid three tiles apart, leaving lanes to walk between them.
         Vector2 Spot() { var p = origin + new Vector2(next % 9 * 3, next / 9 * 3); next++; Require(Terrain.Open(p), $"fixture spot {p} should be open ground"); return p; }
-        Thing Place(string kind, string recipe = "") { var t = world.Add(kind, Spot()); if (recipe != "") world.SetRecipe(t, recipe); return t; }
-        void Store(string item) => Place("chest").Inventory.InputFilter.Add(item);
+        Thing Place(ThingKind kind, string recipe = "") { var t = world.Add(kind, Spot()); if (recipe != "") world.SetRecipe(t, recipe); return t; }
+        void Store(string item) => Place(ThingKind.Chest).Inventory.InputFilter.Add(item);
         Worker Hire(Thing place, params string[] jobs) {
             var w = AddWorker(world, place.Pos + new Vector2(0, 1.2f));
             foreach (string job in jobs) world.SetDuty(w, place, job, true);
             return w;
         }
 
-        var hut = world.Add("hut", Terrain.Spawn + new Vector2(10, 10));
+        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(10, 10));
         world.Player = hut.Pos; world.S.Sheltered = hut.Id;
-        var sign = Place("signpost");
+        var sign = Place(ThingKind.Signpost);
         sign.Wages!.Add(Inventory.Coins, 1000);
         world.S.Backpack.Add(Inventory.Coins, 5000);
         foreach (string product in Products) world.SetFilter(sign, World.CrateOf(product), false, true);
         world.SetAutoSell(sign, true);
-        var rack = Place("toolstation");
+        var rack = Place(ThingKind.Toolstation);
         rack.Inventory.Add("steel_axe", 2); rack.Inventory.Add("steel_pick", 3); rack.Inventory.Add("rake", 1);
-        Place("campfire");
+        Place(ThingKind.Campfire);
 
         // Storage: a chest asking for each material, piles for bottles that take a slot each, and two open piles for anything else.
         foreach (string item in new[] { "wood", "planks", "crate", "iron_ore", "coal", "tin_ore", "iron_bar", "tin_bar", "steel_bar", "steel_parts", "wood_parts", "tin_can",
                      "raw_meat", "meat_stew", "canned_meat_stew", "leaves", "wheat", "wheat_seeds", "grass", "fertilizer", "flour", "dough", "bread", "berries", "steel_pick" }) Store(item);
-        var empties = Place("pile"); empties.Inventory.Add("empty_bottle", 8);
-        Place("pile"); Place("pile"); Place("pile");
-        var meat = world.S.Things.Single(t => t.Kind == "chest" && t.Inventory.InputFilter.Contains("raw_meat"));
+        var empties = Place(ThingKind.Pile); empties.Inventory.Add("empty_bottle", 8);
+        Place(ThingKind.Pile); Place(ThingKind.Pile); Place(ThingKind.Pile);
+        var meat = world.S.Things.Single(t => t.Kind == ThingKind.Chest && t.Inventory.InputFilter.Contains("raw_meat"));
 
         // Raw materials: deposits, a tree, berries, leaves and the lake.
-        Hire(world.Add("tree", Spot(), 9999), "gather");
-        Hire(world.Add("tree", Spot(), 9999), "gather");
-        Hire(world.Add("iron", Spot(), 9999), "gather");
-        Hire(world.Add("coal", Spot(), 9999), "gather");
-        Hire(world.Add("tin", Spot(), 9999), "gather");
-        Hire(world.Add("berries", Spot(), 9999), "gather");
-        Hire(world.Add("leaves", Spot(), 9999), "gather");
-        Hire(world.Add("water", Terrain.WaterPoint(origin), 9999), "gather");
+        Hire(world.Add(ThingKind.Tree, Spot(), 9999), "gather");
+        Hire(world.Add(ThingKind.Tree, Spot(), 9999), "gather");
+        Hire(world.Add(ThingKind.Iron, Spot(), 9999), "gather");
+        Hire(world.Add(ThingKind.Coal, Spot(), 9999), "gather");
+        Hire(world.Add(ThingKind.Tin, Spot(), 9999), "gather");
+        Hire(world.Add(ThingKind.Berries, Spot(), 9999), "gather");
+        Hire(world.Add(ThingKind.Leaves, Spot(), 9999), "gather");
+        Hire(world.Add(ThingKind.Water, Terrain.WaterPoint(origin), 9999), "gather");
 
         // Crates from wood.
-        var planks = Place("bench", "planks"); planks.Tools!.Add("steel_chisel", 1); Hire(planks, "craft", "haul");
-        var crates = Place("bench", "crate"); crates.Tools!.Add("steel_hammer", 1); Hire(crates, "craft", "haul");
+        var planks = Place(ThingKind.Bench, "planks"); planks.Tools!.Add("steel_chisel", 1); Hire(planks, "craft", "haul");
+        var crates = Place(ThingKind.Bench, "crate"); crates.Tools!.Add("steel_hammer", 1); Hire(crates, "craft", "haul");
 
         // Canned meat stew: stew from meat and water, cans from tin, sealed over a wood fire.
-        Hire(Place("cooktable", "meat_stew"), "haul");
-        Hire(Place("furnace", "tin_bar"), "haul");
-        var cans = Place("bench", "tin_can"); cans.Tools!.Add("steel_hammer", 1); Hire(cans, "craft", "haul");
-        Hire(Place("cannery", "canned_meat_stew"), "haul");
+        Hire(Place(ThingKind.Cooktable, "meat_stew"), "haul");
+        Hire(Place(ThingKind.Furnace, "tin_bar"), "haul");
+        var cans = Place(ThingKind.Bench, "tin_can"); cans.Tools!.Add("steel_hammer", 1); Hire(cans, "craft", "haul");
+        Hire(Place(ThingKind.Cannery, "canned_meat_stew"), "haul");
 
         // Bread: compost from raked leaves, wheat from the farm, flour, dough and the oven.
-        var compost = Place("pile"); world.SetCompost(compost, true); world.SetSkipFood(compost, true); Hire(compost, "tend");
-        var farms = new[] { Place("farm"), Place("farm") };
-        foreach (var farm in farms) { farm.Stage = World.FarmGrowing; farm.Progress = world.GrowSeconds - 30; Hire(farm, "farm", "haul"); }
-        var flour = Place("cooktable", "flour"); flour.Tools!.Add("mortar", 1); Hire(flour, "craft", "haul");
-        Hire(Place("cooktable", "dough"), "haul");
-        Hire(Place("furnace", "bread"), "haul");
+        var compost = Place(ThingKind.Pile); world.SetCompost(compost, true); world.SetSkipFood(compost, true); Hire(compost, "tend");
+        var farms = new[] { Place(ThingKind.Farm), Place(ThingKind.Farm) };
+        foreach (var farm in farms) { farm.FarmStage = FarmStage.Growing; farm.Progress = world.GrowSeconds - 30; Hire(farm, "farm", "haul"); }
+        var flour = Place(ThingKind.Cooktable, "flour"); flour.Tools!.Add("mortar", 1); Hire(flour, "craft", "haul");
+        Hire(Place(ThingKind.Cooktable, "dough"), "haul");
+        Hire(Place(ThingKind.Furnace, "bread"), "haul");
 
         // Steel pickaxes: iron bars, steel at the forge with one on the bellows and one hauling, parts at the anvil, handles and the pickaxe at benches.
-        Hire(Place("furnace", "iron_bar"), "haul");
-        var forge = Place("reinforced");
+        Hire(Place(ThingKind.Furnace, "iron_bar"), "haul");
+        var forge = Place(ThingKind.Reinforced);
         Hire(forge, "bellows"); Hire(forge, "haul");
-        Hire(Place("anvil", "steel_parts"), "craft", "haul");
-        var handles = Place("bench", "wood_parts"); handles.Tools!.Add("steel_chisel", 1); Hire(handles, "craft", "haul");
-        var picks = Place("bench", "steel_pick"); picks.Tools!.Add("steel_hammer", 1); Hire(picks, "craft", "haul");
+        Hire(Place(ThingKind.Anvil, "steel_parts"), "craft", "haul");
+        var handles = Place(ThingKind.Bench, "wood_parts"); handles.Tools!.Add("steel_chisel", 1); Hire(handles, "craft", "haul");
+        var picks = Place(ThingKind.Bench, "steel_pick"); picks.Tools!.Add("steel_hammer", 1); Hire(picks, "craft", "haul");
 
         // One packing station for each product.
-        foreach (string product in Products) { var packer = Place("packer"); world.SetPacking(packer, product); Hire(packer, "craft", "haul"); }
+        foreach (string product in Products) { var packer = Place(ThingKind.Packer); world.SetPacking(packer, product); Hire(packer, "craft", "haul"); }
 
         var sold = new HashSet<string>();
         bool resown = false;
@@ -212,7 +212,7 @@ public static class ProductionChainChecks {
             meat.Inventory.Add("raw_meat", 64 - meat.Inventory["raw_meat"]);
             Tick(world, 5);
             foreach (var order in world.S.Orders) if (!order.Buying && seen.Add(order)) sold.UnionWith(order.Goods.Keys);
-            resown |= farms.Any(f => f.Stage == World.FarmGrowing && f.Progress < world.GrowSeconds - 60);
+            resown |= farms.Any(f => f.FarmStage == FarmStage.Growing && f.Progress < world.GrowSeconds - 60);
         }
         GD.Print($"Production chains: sold {string.Join(", ", sold)} in {days / data.DaySeconds:0.0} days with {world.S.Workers.Count} workers; farm sown again: {resown}");
         string statuses = string.Join("\n", world.S.Workers.Select(w => $"  {w.Name} at {world.Find(w.Assignment)?.Kind}: {w.Status}"));

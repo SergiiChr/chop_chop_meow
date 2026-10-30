@@ -8,7 +8,7 @@ public sealed partial class World {
     public bool Packable(string item) => Data.Items.ContainsKey(item) && item is not ("crate" or Inventory.Coins);
 
     public void SetPacking(Thing t, string item) {
-        if (t.Kind != "packer" || !Packable(item) || item == t.Packs || Forwarded("set_packing", t.Id, item: item)) return;
+        if (t.Kind != ThingKind.Packer || !Packable(item) || item == t.Packs || Forwarded(Verb.SetPacking, t.Id, item: item)) return;
         t.Packs = item; t.Progress = 0;
     }
 

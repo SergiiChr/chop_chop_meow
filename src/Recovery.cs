@@ -14,7 +14,7 @@ public sealed partial class World {
     }
 
     internal bool HasCabin() {
-        foreach (var thing in S.Things) if (thing.Kind == "hut") return true;
+        foreach (var thing in S.Things) if (thing.Kind == ThingKind.Hut) return true;
         return false;
     }
 
@@ -25,7 +25,7 @@ public sealed partial class World {
 
     /// <summary>Advance normal world simulation to dawn while the local player is waiting to respawn.</summary>
     public void SkipMorning() {
-        if (Forwarded("skip_morning") || !CanSkipMorning) return;
+        if (Forwarded(Verb.SkipMorning) || !CanSkipMorning) return;
         PassNight();
     }
 }

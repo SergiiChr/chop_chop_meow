@@ -11,7 +11,7 @@ internal static class PerformanceFixture {
         world.S.Time = data.DaySeconds * .3f;
         var at = world.Player;
 
-        Thing Place(string kind, Vector2 offset) {
+        Thing Place(ThingKind kind, Vector2 offset) {
             // The preferred locations sit inside the open starting clearing; a small search keeps the fixture usable if terrain changes.
             for (int ring = 0; ring <= 4; ring++)
                 for (int side = -ring; side <= ring; side++)
@@ -25,36 +25,36 @@ internal static class PerformanceFixture {
         }
 
         var stores = new[] {
-            Place("chest", new Vector2(8, 0)),
-            Place("chest", new Vector2(8, 3)),
-            Place("chest", new Vector2(8, -3))
+            Place(ThingKind.Chest, new Vector2(8, 0)),
+            Place(ThingKind.Chest, new Vector2(8, 3)),
+            Place(ThingKind.Chest, new Vector2(8, -3))
         };
         var supply = stores[0].Inventory;
         supply.Add("iron_bar", 128); supply.Add("coal", 128); supply.Add("iron_ore", 128); supply.Add("wood", 128);
-        var wagePost = Place("signpost", new Vector2(-7, -4));
+        var wagePost = Place(ThingKind.Signpost, new Vector2(-7, -4));
         wagePost.Wages!.Add(Inventory.Coins, 1000);
         world.S.Backpack.Add(Inventory.Coins, 1000);
 
-        var tools = Place("toolstation", new Vector2(-7, 0));
+        var tools = Place(ThingKind.Toolstation, new Vector2(-7, 0));
         tools.Inventory.Add("steel_chisel", 1);
 
-        var forge = Place("reinforced", new Vector2(-4, 3));
+        var forge = Place(ThingKind.Reinforced, new Vector2(-4, 3));
         forge.Inventory.Add("iron_bar", 64); forge.Inventory.Add("coal", 64);
         forge.Burner!.Add("coal", 64); forge.Heat = 100;
 
-        var furnaceA = Place("furnace", new Vector2(2, 3));
-        var furnaceB = Place("furnace", new Vector2(5, 3));
+        var furnaceA = Place(ThingKind.Furnace, new Vector2(2, 3));
+        var furnaceB = Place(ThingKind.Furnace, new Vector2(5, 3));
         foreach (var furnace in new[] { furnaceA, furnaceB }) {
             furnace.Inventory.Add("iron_ore", 64);
             furnace.Burner!.Add("wood", 64);
         }
 
-        var bench = Place("bench", new Vector2(0, -4));
+        var bench = Place(ThingKind.Bench, new Vector2(0, -4));
         bench.Recipe = "planks";
         bench.Tools!.Add("steel_chisel", 1);
         bench.Inventory.Add("wood", 64);
 
-        var fire = Place("campfire", new Vector2(0, 7));
+        var fire = Place(ThingKind.Campfire, new Vector2(0, 7));
         fire.Inventory.Add("wood", 64);
         fire.Burn = data.CampfireSeconds * 5;
 

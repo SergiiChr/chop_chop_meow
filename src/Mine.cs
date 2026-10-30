@@ -5,10 +5,11 @@ using Godot;
 
 namespace ChopChopMeow;
 
+/// <summary>How far a mine is built: marked, the entrance dug, the materials in, and the frame and rails fitted.</summary>
+public enum MineStage { Marked, Dug, Supplied, Open }
+
 /// <summary>Mines: marked free at an ore cliff, built in three stages, then worked underground for ore and rocks that never run out.</summary>
 public sealed partial class World {
-    /// <summary>Values of <see cref="Thing.Stage"/>: the entrance is dug, the materials are in, and the frame and rails are fitted.</summary>
-    public const int MineDug = 1, MineSupplied = 2, MineOpen = 3;
     /// <summary>How far from a cliff a mine plan still snaps to it.</summary>
     private const float MineReach = 10;
     // Mines already reported full with nowhere to take the output, so the message shows once per stoppage.
@@ -46,7 +47,7 @@ public sealed partial class World {
 
     /// <summary>Old saves keep mine inventories, stages and worker assignments while the cart snaps to the aligned entrance.</summary>
     private static void AlignMines(SaveState state) {
-        foreach (var mine in state.Things.Concat(state.Remembered.Values).Where(t => t.Kind == "mine")) {
+        foreach (var mine in state.Things.Concat(state.Remembered.Values).Where(t => t.Kind == ThingKind.Mine)) {
             var cliff = Cliffs.MinBy(c => mine.Pos.DistanceSquaredTo(LegacyMineSpot(c)));
             mine.Pos = MineSpot(cliff);
         }
@@ -58,13 +59,13 @@ public sealed partial class World {
     private static bool NearMineSite(Cliff cliff, Vector2 p) => cliff.DistanceTo(p) <= MineReach || p.DistanceTo(MineSpot(cliff)) <= 2.5f;
     private static Vector2 SnapMine(Vector2 p) => CliffAt(p) is var c && NearMineSite(c, p) ? MineSpot(c) : p;
     public static string MineOre(Thing mine) => ResourceItem(CliffAt(mine.Pos).Ore);
-    public static string MineName(Thing mine) => CliffAt(mine.Pos).Ore switch { "iron" => "iron mine", "coal" => "coal mine", "tin" => "tin mine", var ore => $"{ore} mine" };
+    public static string MineName(Thing mine) => CliffAt(mine.Pos).Ore switch { ThingKind.Iron => "iron mine", ThingKind.Coal => "coal mine", ThingKind.Tin => "tin mine", var ore => $"{ore.Id()} mine" };
     public float MineStageSeconds => Data.Mine.StageWorkdays * Data.WorkdaySeconds;
     /// <summary>Materials the site still needs before its frame can go in.</summary>
-    public Dictionary<string, int> MineNeeds(Thing mine) => mine.Stage != MineDug ? new() :
+    public Dictionary<string, int> MineNeeds(Thing mine) => mine.MineStage != MineStage.Dug ? new() :
         Data.Mine.Materials.Where(p => mine.Inventory[p.Key] < p.Value).ToDictionary(p => p.Key, p => p.Value - mine.Inventory[p.Key]);
     /// <summary>How much more of one material the site needs, counted without building <see cref="MineNeeds"/>.</summary>
-    public int MineNeed(Thing mine, string item) => mine.Stage == MineDug && Data.Mine.Materials.TryGetValue(item, out int wanted) ? Math.Max(0, wanted - mine.Inventory[item]) : 0;
+    public int MineNeed(Thing mine, string item) => mine.MineStage == MineStage.Dug && Data.Mine.Materials.TryGetValue(item, out int wanted) ? Math.Max(0, wanted - mine.Inventory[item]) : 0;
     // The waiting status names what the site lacks; it is rebuilt only when that changes.
     private readonly Dictionary<int, (int Key, string Text)> mineWants = new();
     private string MineWants(Thing mine) {
@@ -80,7 +81,7 @@ public sealed partial class World {
         var cliff = CliffAt(p);
         if (!NearMineSite(cliff, p)) return "Mark a mine at the foot of an ore cliff.";
         var spot = MineSpot(cliff);
-        foreach (var t in S.Things) if (t.Kind == "mine" && t.Pos.DistanceTo(spot) < .1f) return "This cliff already has a mine.";
+        foreach (var t in S.Things) if (t.Kind == ThingKind.Mine && t.Pos.DistanceTo(spot) < .1f) return "This cliff already has a mine.";
         return Player.DistanceTo(spot) > 8 ? "Walk closer to the cliff." : null;
     }
 
@@ -88,15 +89,15 @@ public sealed partial class World {
     public void SupplyMine(Thing mine) {
         if (!Near(mine)) { Say("Walk closer to the mine."); return; }
         var needs = MineNeeds(mine);
-        if (needs.Count == 0 || Forwarded("supply_mine", mine.Id)) return;
+        if (needs.Count == 0 || Forwarded(Verb.SupplyMine, mine.Id)) return;
         if (needs.Sum(p => S.Backpack.TransferTo(mine.Inventory, p.Key, p.Value)) == 0) Say($"The mine still needs {Goods(needs)}.");
     }
 
     private void MineTick(Thing mine, float dt) {
-        if (mine.Stage == MineDug && mine.Inventory.Spend(Data.Mine.Materials)) {
-            mine.Stage = MineSupplied; mine.Progress = 0; Say($"The {MineName(mine)} has its timber, iron and stone. A worker with a hammer can fit the frame and rails.");
+        if (mine.MineStage == MineStage.Dug && mine.Inventory.Spend(Data.Mine.Materials)) {
+            mine.MineStage = MineStage.Supplied; mine.Progress = 0; Say($"The {MineName(mine)} has its timber, iron and stone. A worker with a hammer can fit the frame and rails.");
         }
-        if (mine.Stage != MineOpen || MineFull(mine)) return;
+        if (mine.MineStage != MineStage.Open || MineFull(mine)) return;
         int miners = 0;
         foreach (var w in S.Workers) if (w.Assignment == mine.Id && w.WorkState == WorkerWorkState.Underground) miners++;
         mine.Progress += dt * miners;
@@ -111,15 +112,15 @@ public sealed partial class World {
     }
 
     /// <summary>The tool a worker's jobs at a mine need at its stage: a pickaxe to dig and to mine, a hammer to fit; hauling needs none.</summary>
-    public string? MineTool(Worker w, Thing mine) => mine.Stage switch {
-        0 => HasDuty(w, mine.Id, "build") ? "pickaxe" : null,
-        MineDug => null,
-        MineSupplied => HasDuty(w, mine.Id, "build") ? "hammer" : null,
+    public string? MineTool(Worker w, Thing mine) => mine.MineStage switch {
+        MineStage.Marked => HasDuty(w, mine.Id, "build") ? "pickaxe" : null,
+        MineStage.Dug => null,
+        MineStage.Supplied => HasDuty(w, mine.Id, "build") ? "hammer" : null,
         _ => HasDuty(w, mine.Id, "mine") ? "pickaxe" : null
     };
     private bool MineWork(Worker w, Thing mine, List<Worker> crew, float dt) {
         if (MineTool(w, mine) is string tool && w.Tool == "") { FetchTool(w, tool, mine, dt); return w.Missing == ""; }
-        if (mine.Stage == MineDug) {
+        if (mine.MineStage == MineStage.Dug) {
             if (HasDuty(w, mine.Id, "haul"))
                 foreach (var pair in Data.Mine.Materials) {
                     string item = pair.Key; int need = MineNeed(mine, item);
@@ -132,15 +133,15 @@ public sealed partial class World {
                 }
             w.Status = MineWants(mine); return false;
         }
-        if (mine.Stage < MineOpen) {
-            bool digging = mine.Stage == 0;
+        if (mine.MineStage < MineStage.Open) {
+            bool digging = mine.MineStage == MineStage.Marked;
             if (!HasDuty(w, mine.Id, "build")) { w.Status = digging ? "Waiting for the entrance to be dug" : "Waiting for the frame to be fitted"; return false; }
             w.Status = digging ? "Digging the mine entrance" : "Fitting the mine frame and rails";
             if (!Walk(w, MineDoor(mine), dt, .5f)) return true;
             w.WorkState = digging ? WorkerWorkState.Digging : WorkerWorkState.Hammering;
             mine.Progress += dt;
             if (mine.Progress < MineStageSeconds) return true;
-            mine.Stage++; mine.Progress = 0;
+            mine.MineStage++; mine.Progress = 0;
             Say(digging ? $"The {MineName(mine)} entrance is dug. Deliver {Goods(Data.Mine.Materials)}." : $"The {MineName(mine)} is open. Up to {Data.Mine.Workers} workers with pickaxes can mine it.");
             return true;
         }

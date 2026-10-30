@@ -9,46 +9,56 @@ namespace ChopChopMeow;
 public sealed class Inventory {
     /// <summary>A persisted stack in a particular inventory cell.</summary>
     public sealed class Slot { public string Item { get; set; } = ""; public int Count { get; set; } }
-    public Dictionary<string, int> Items { get; set; } = new();
+    private readonly Dictionary<string, int> items = new();
+    private int slots = 18, stackSize = 64;
+    /// <summary>Read-only view of each item's total across all stacks; the inventory's methods are the only way to change it.</summary>
+    [JsonIgnore] public ItemTotals Items { get; }
+    /// <summary>
+    /// The totals as saved under the name "Items", for loading and network copies.
+    /// Assigning copies the totals in; the stacks then need <see cref="RebuildStacks"/> unless <see cref="Layout"/> is set from the same source.
+    /// </summary>
+    [JsonPropertyName("Items")] public IReadOnlyDictionary<string, int> SavedItems { get => items; set { if (!ReferenceEquals(value, items)) { items.Clear(); foreach (var pair in value) items[pair.Key] = pair.Value; } } }
     /// <summary>Physical stack positions; <see cref="Items"/> holds each item's total across them.</summary>
     public List<Slot> Layout { get; set; } = new();
     public HashSet<string> InputFilter { get; set; } = new();
     public HashSet<string> OutputFilter { get; set; } = new();
-    public int Slots { get; set; } = 18;
-    public int StackSize { get; set; } = 64;
+    /// <summary>Number of cells. Changing it adds empty cells or moves stacks out of removed ones.</summary>
+    public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
+    /// <summary>Most units of one item per cell. Changing it splits or merges stacks to fit.</summary>
+    public int StackSize { get => stackSize; set { if (value == stackSize) return; stackSize = value; RebuildStacks(); } }
     /// <summary>Most units the inventory holds across all its stacks, or 0 for no limit beyond its slots.</summary>
     public int Capacity { get; set; }
     /// <summary>Physical cell a UI action targets when an item id appears in several cells.</summary>
     [JsonIgnore] public int PreferredSlot { get; set; } = -1;
     private readonly Dictionary<string, int> layoutRemainder = new();
     public const string Coins = "coins";
+    public Inventory() { Items = new ItemTotals(items); PadLayout(); }
     public int Count {
         get {
             int count = 0;
-            foreach (var pair in Items) count += pair.Value;
+            foreach (var pair in items) count += pair.Value;
             return count;
         }
     }
     public int UsedSlots {
         get {
-            EnsureLayout();
-            int slots = 0;
-            foreach (var slot in Layout) if (slot.Item != "") slots++;
-            return slots;
+            int used = 0;
+            foreach (var slot in Layout) if (slot.Item != "") used++;
+            return used;
         }
     }
     /// <summary>Minimum number of physical stacks required to represent the aggregate item counts.</summary>
     public int AggregateSlotsNeeded {
         get {
             int needed = 0;
-            foreach (var pair in Items) {
+            foreach (var pair in items) {
                 int size = StackOf(pair.Key);
                 needed += (pair.Value + size - 1) / size;
             }
             return needed;
         }
     }
-    public int this[string item] => Items.GetValueOrDefault(item);
+    public int this[string item] => items.GetValueOrDefault(item);
 
     /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Unstacked = new();
@@ -56,7 +66,6 @@ public sealed class Inventory {
     public int StackOf(string item) => item == Coins ? 1000 : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) ? 1 : StackSize;
     /// <summary>Units of an item that still fit: empty slots plus the unfilled part of its last stack.</summary>
     public int Room(string item) {
-        EnsureLayout();
         int stack = StackOf(item), room = 0, used = 0;
         for (int i = 0; i < Math.Min(Slots, Layout.Count); i++) {
             var slot = Layout[i];
@@ -72,7 +81,7 @@ public sealed class Inventory {
     public int ShownSlots {
         get {
             if (Capacity <= 0) return Slots;
-            EnsureLayout(); int last = 0;
+            int last = 0;
             for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item != "") last = i + 1;
             return Math.Min(Slots, Math.Max(last, UsedSlots + Math.Max(0, Capacity - Count)));
         }
@@ -89,18 +98,17 @@ public sealed class Inventory {
     /// <summary>Fills <paramref name="stacks"/> with <see cref="Stacks"/>, without allocating, for panels that refresh while open.</summary>
     public void FillStacks(List<(string Item, int Count)> stacks) {
         stacks.Clear();
-        EnsureLayout();
         foreach (var slot in Layout) stacks.Add((slot.Item, slot.Count));
     }
 
     /// <summary>
-    /// Brings the stacks in line with the item totals after the totals were changed directly.
+    /// Brings the stacks in line with the item totals, for totals that arrived without matching stacks such as an old save's.
     /// Surviving stacks keep their cells, new units fill empty cells, and stacks beyond the slot count move into free cells.
     /// </summary>
-    public void EnsureLayout() {
+    public void RebuildStacks() {
         Layout ??= new();
-        while (Layout.Count < Slots) Layout.Add(new Slot());
-        var remaining = layoutRemainder; remaining.Clear(); foreach (var pair in Items) remaining[pair.Key] = pair.Value;
+        PadLayout();
+        var remaining = layoutRemainder; remaining.Clear(); foreach (var pair in items) remaining[pair.Key] = pair.Value;
         for (int i = 0; i < Layout.Count; i++) {
             var s = Layout[i];
             if (s.Item == "") { s.Count = 0; continue; }
@@ -124,11 +132,21 @@ public sealed class Inventory {
                 break;
             }
         }
+        // Empty cells past the slots, such as those of a smaller inventory made from a default one, are dropped.
+        while (Layout.Count > Slots && Layout[^1].Item == "") Layout.RemoveAt(Layout.Count - 1);
+    }
+
+    private void PadLayout() { while (Layout.Count < Slots) Layout.Add(new Slot()); }
+
+    /// <summary>Removes every item.</summary>
+    public void Clear() {
+        items.Clear();
+        foreach (var slot in Layout) { slot.Item = ""; slot.Count = 0; }
+        PadLayout();
     }
 
     /// <summary>Moves an exact source cell to a destination cell; matching stacks merge up to their stack limit, otherwise cells swap.</summary>
     public int MoveSlotTo(int source, Inventory destination, int target, int quantity = int.MaxValue) {
-        EnsureLayout(); if (!ReferenceEquals(this, destination)) destination.EnsureLayout();
         if ((uint)source >= (uint)Layout.Count || (uint)target >= (uint)destination.Layout.Count) return 0;
         Slot a = Layout[source], b = destination.Layout[target]; if (a.Item == "" || quantity <= 0) return 0;
         bool same = ReferenceEquals(this, destination);
@@ -150,18 +168,18 @@ public sealed class Inventory {
     }
 
     private void SyncAggregate() {
-        Items.Clear(); foreach (var s in Layout) if (s.Item != "") Items[s.Item] = Items.GetValueOrDefault(s.Item) + s.Count;
+        items.Clear(); foreach (var s in Layout) if (s.Item != "") items[s.Item] = items.GetValueOrDefault(s.Item) + s.Count;
     }
 
     /// <summary>Stacks loose items and orders player inventory by item name for predictable access.</summary>
     public void Sort() {
-        EnsureLayout(); Layout.RemoveAll(s => s.Item == "");
+        Layout.RemoveAll(s => s.Item == "");
         Layout.Sort((a, b) => string.CompareOrdinal(a.Item, b.Item));
         for (int i = 0; i < Layout.Count - 1;) {
             var a = Layout[i]; var b = Layout[i + 1];
             if (a.Item == b.Item && a.Count < StackOf(a.Item)) { int n = Math.Min(StackOf(a.Item) - a.Count, b.Count); a.Count += n; b.Count -= n; if (b.Count == 0) Layout.RemoveAt(i + 1); else i++; } else i++;
         }
-        EnsureLayout();
+        PadLayout();
     }
 
     public bool Accepts(string item) => InputFilter.Count == 0 || Names(InputFilter, item);
@@ -176,10 +194,9 @@ public sealed class Inventory {
     }
 
     public int Add(string item, int quantity) {
-        EnsureLayout();
         int amount = Math.Min(Math.Max(0, quantity), Room(item));
         if (amount > 0) {
-            Items[item] = this[item] + amount; var left = amount;
+            items[item] = this[item] + amount; var left = amount;
             int limit = Math.Min(Slots, Layout.Count);
             for (int i = 0; i < limit; i++) { var s = Layout[i]; if (s.Item == item && s.Count < StackOf(item)) { int n = Math.Min(left, StackOf(item) - s.Count); s.Count += n; left -= n; if (left == 0) break; } }
             for (int i = 0; i < limit && left > 0; i++) if (Layout[i].Item == "") { int n = Math.Min(left, StackOf(item)); Layout[i].Item = item; Layout[i].Count = n; left -= n; }
@@ -188,10 +205,9 @@ public sealed class Inventory {
     }
 
     public int Remove(string item, int quantity) {
-        EnsureLayout();
         int amount = Math.Min(Math.Max(0, quantity), this[item]);
-        if (amount == this[item]) Items.Remove(item);
-        else Items[item] -= amount;
+        if (amount == this[item]) items.Remove(item);
+        else items[item] -= amount;
         int left = amount;
         if ((uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == item) left -= RemoveFromSlot(Layout[PreferredSlot], left);
         for (int i = Layout.Count - 1; i >= 0 && left > 0; i--) if (i != PreferredSlot && Layout[i].Item == item) left -= RemoveFromSlot(Layout[i], left);
@@ -207,20 +223,19 @@ public sealed class Inventory {
     /// <summary>Changes the first matching stack to another item while keeping that exact cell and its quantity.</summary>
     public bool Replace(string oldItem, string newItem) {
         if (oldItem == newItem) return this[oldItem] > 0;
-        EnsureLayout();
         int slotIndex = (uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == oldItem ? PreferredSlot : -1;
         if (slotIndex < 0) for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item == oldItem) { slotIndex = i; break; }
         if (slotIndex < 0) return false;
         Slot slot = Layout[slotIndex]; int quantity = slot.Count;
         if (quantity > StackOf(newItem)) return false;
         slot.Item = newItem;
-        Items[oldItem] -= quantity; if (Items[oldItem] <= 0) Items.Remove(oldItem);
-        Items[newItem] = Items.GetValueOrDefault(newItem) + quantity;
+        items[oldItem] -= quantity; if (items[oldItem] <= 0) items.Remove(oldItem);
+        items[newItem] = items.GetValueOrDefault(newItem) + quantity;
         return true;
     }
 
     public bool Fits(IReadOnlyDictionary<string, int> added) {
-        EnsureLayout(); int total = 0, empty = 0, limit = Math.Min(Slots, Layout.Count);
+        int total = 0, empty = 0, limit = Math.Min(Slots, Layout.Count);
         for (int i = 0; i < limit; i++) if (Layout[i].Item == "") empty++;
         int free = empty;
         foreach (var pair in added) {
@@ -242,7 +257,7 @@ public sealed class Inventory {
 
     /// <summary>Any one item held, or null when empty.</summary>
     public string? First() {
-        foreach (var pair in Items) return pair.Key;
+        foreach (var pair in items) return pair.Key;
         return null;
     }
 
@@ -258,4 +273,20 @@ public sealed class Inventory {
         Remove(item, amount);
         return destination.Add(item, amount);
     }
+}
+
+/// <summary>Read-only view of an inventory's item totals whose enumerator is a struct, so a loop over it allocates nothing.</summary>
+public sealed class ItemTotals : IReadOnlyDictionary<string, int> {
+    private readonly Dictionary<string, int> totals;
+    internal ItemTotals(Dictionary<string, int> totals) { this.totals = totals; }
+    public int Count => totals.Count;
+    public int this[string item] => totals[item];
+    public Dictionary<string, int>.KeyCollection Keys => totals.Keys;
+    public bool ContainsKey(string item) => totals.ContainsKey(item);
+    public bool TryGetValue(string item, out int count) => totals.TryGetValue(item, out count);
+    public Dictionary<string, int>.Enumerator GetEnumerator() => totals.GetEnumerator();
+    IEnumerable<string> IReadOnlyDictionary<string, int>.Keys => totals.Keys;
+    IEnumerable<int> IReadOnlyDictionary<string, int>.Values => totals.Values;
+    IEnumerator<KeyValuePair<string, int>> IEnumerable<KeyValuePair<string, int>>.GetEnumerator() => totals.GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => totals.GetEnumerator();
 }

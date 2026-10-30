@@ -237,18 +237,18 @@ public static class ActorAnimation {
     }
 
     public static ActorAction PlayerAction(
-        string? resourceKind,
+        ThingKind? resourceKind,
         bool gathering,
         bool moving,
         Inventory backpack,
         bool sprinting = false) {
         if (moving) return sprinting ? ActorAction.Run : ActorAction.Walk;
-        if (!gathering || string.IsNullOrEmpty(resourceKind)) return ActorAction.Idle;
+        if (!gathering || resourceKind == null) return ActorAction.Idle;
 
         return resourceKind switch {
-            "tree" => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,
-            "stone" or "iron" or "coal" or "tin" => backpack["steel_pick"] > 0 ? ActorAction.SteelMine : ActorAction.Gather,
-            "berries" or "water" or "wolf_corpse" or "leaves" => ActorAction.Gather,
+            ThingKind.Tree => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,
+            ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => backpack["steel_pick"] > 0 ? ActorAction.SteelMine : ActorAction.Gather,
+            ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.Leaves => ActorAction.Gather,
             _ => ActorAction.Idle
         };
     }
@@ -260,18 +260,18 @@ public static class ActorAnimation {
         if (worker.WorkState == WorkerWorkState.Resting && !moving) return worker.Id % 2 == 0 ? ActorAction.Perch : ActorAction.Sit;
         if (worker.Bag.Count > 0) return ActorAction.Carry;
         if (moving) return ActorAction.Walk;
-        if (worker.WorkState == WorkerWorkState.Gathering && (assignment?.IsResource == true || assignment?.Kind == "farm")) {
+        if (worker.WorkState == WorkerWorkState.Gathering && (assignment?.IsResource == true || assignment?.Kind == ThingKind.Farm)) {
             return assignment.Kind switch {
-                "tree" => ActorAction.Chop,
-                "stone" or "iron" or "coal" or "tin" => ActorAction.Mine,
+                ThingKind.Tree => ActorAction.Chop,
+                ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => ActorAction.Mine,
                 _ => ActorAction.Gather
             };
         }
 
         return worker.WorkState switch {
             WorkerWorkState.Pumping => ActorAction.Pump,
-            WorkerWorkState.Hammering when assignment?.Kind == "packer" => ActorAction.Pack,
-            WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == "mine") => ActorAction.Hammer,
+            WorkerWorkState.Hammering when assignment?.Kind == ThingKind.Packer => ActorAction.Pack,
+            WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == ThingKind.Mine) => ActorAction.Hammer,
             WorkerWorkState.Digging => ActorAction.Mine,
             _ => ActorAction.Idle
         };

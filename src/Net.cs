@@ -1,13 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
-using System.Text.Json.Serialization.Metadata;
 using Godot;
 
 namespace ChopChopMeow;
@@ -37,7 +33,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = .1f, InputInterval = .05f;
     private const int HostId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 3;
+    private const int Protocol = 4;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember; a guest that confirmed none of the last this many gets the whole world again.</summary>
@@ -77,25 +73,20 @@ public partial class Net : Node {
     private readonly Dictionary<int, int> heard = new();
     // Host: the world by entry as each recent update had it, and the last update each guest confirmed.
     private int sequence;
-    private readonly Dictionary<int, Dictionary<string, string>> sent = new();
+    private readonly Dictionary<int, Snapshot> sent = new();
     private readonly Dictionary<int, int> acked = new();
     // Guest: the world by entry as recent updates had it, and the update its copy shows now.
-    private readonly Dictionary<int, Dictionary<string, string>> received = new();
-    private Dictionary<string, string> applied = new();
+    private readonly Dictionary<int, Snapshot> received = new();
+    private Snapshot applied;
     private int appliedSequence;
     private Dictionary<int, WorkerWorkState> work = new();
+    private readonly WorldUpdates updates = new();
+    // Reused while a guest merges an update into its copy.
+    private readonly Dictionary<int, object> have = new();
+    private readonly List<object> gone = new();
+    private readonly List<int> forgotten = new();
 
-    private static readonly JsonSerializerOptions Compact = new(GameData.Json) { WriteIndented = false };
-    // Lists merged by identity, the fog each machine keeps itself, and the player properties, which the players list carries.
-    // The world's crate contents share a name with a player's, which only a guest's own save uses, and stay in.
-    private static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered) }
-        .Concat(typeof(PlayerState).GetProperties().Select(p => p.Name).Where(n => n != nameof(SaveState.Crates))).ToHashSet();
-    // The world's own fields, without the lists and players that have entries of their own, or the fog, which each machine works out from where everyone stands.
-    private static readonly JsonSerializerOptions Rest = new(Compact) {
-        TypeInfoResolver = new DefaultJsonTypeInfoResolver {
-            Modifiers = { info => { if (info.Type == typeof(SaveState)) foreach (var p in info.Properties.Where(p => Shared.Contains(p.Name)).ToList()) info.Properties.Remove(p); } }
-        }
-    };
+    public Net() { applied = updates.Empty(); }
 
     public bool Online => Multiplayer.MultiplayerPeer is not OfflineMultiplayerPeer;
     /// <summary>Kept apart from IsServer, which errors once a lost connection has closed the peer.</summary>
@@ -157,7 +148,10 @@ public partial class Net : Node {
         Multiplayer.MultiplayerPeer = new OfflineMultiplayerPeer(); Hosting = false;
         World.Host = null; World.Relay = null; World.LocalId = 1;
         welcomed = unsaved = false; connectTimer = null; farewell = null; stamp = 0; goals.Clear(); walks.Clear(); heard.Clear();
-        sequence = 0; sent.Clear(); acked.Clear(); received.Clear(); applied = new(); appliedSequence = 0; work = new();
+        sequence = 0; acked.Clear(); appliedSequence = 0; work = new();
+        foreach (var snapshot in sent.Values) updates.Release(snapshot);
+        foreach (var snapshot in received.Values) updates.Release(snapshot);
+        sent.Clear(); received.Clear(); applied = updates.Empty();
         leaving = false;
     }
 
@@ -193,9 +187,9 @@ public partial class Net : Node {
         if (protocol != Protocol) { RpcId(id, MethodName.Refused, "The host runs a different version of the game."); return; }
         World.AddGuest(id, saved == "" ? null : saved);
         // The welcome is the guest's first update, which later ones build on.
-        var entries = Entries();
-        sent[++sequence] = entries; acked[id] = sequence;
-        RpcId(id, MethodName.Welcome, id, sequence, Delta(entries, null), Pack(new Fog { Explored = World.S.Explored, Remembered = World.S.Remembered }));
+        var entries = Remember(updates.Capture(World));
+        acked[id] = sequence;
+        RpcId(id, MethodName.Welcome, id, sequence, updates.Delta(entries, null).ToArray(), WorldUpdates.Pack(new Fog { Explored = World.S.Explored, Remembered = World.S.Remembered }));
     }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -203,7 +197,7 @@ public partial class Net : Node {
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void Welcome(int id, int update, byte[] packed, byte[] fog) {
-        var uncovered = Unpack<Fog>(fog);
+        var uncovered = WorldUpdates.Unpack<Fog>(fog);
         // An empty world with a stand-in for this player, which the first update fills in.
         var state = new SaveState { Explored = uncovered.Explored, Remembered = uncovered.Remembered };
         state.Players[0].Id = id;
@@ -249,7 +243,7 @@ public partial class Net : Node {
     private static Vector2 Glide(Vector2 from, Vector2 to, float dt) => from.DistanceTo(to) > MaxStep ? to : from.Lerp(to, 1 - MathF.Exp(-dt * 12));
 
     /// <summary>Sends an action with where this player stands, so the host checks its reach from there rather than from a position still gliding in.</summary>
-    private void Send(Command c) => RpcId(HostId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
+    private void Send(Command c) => RpcId(HostId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
 
     private PlayerState? Guest() => World.S.Players.Find(p => p.Id == Multiplayer.GetRemoteSenderId() && p != World.Me);
 
@@ -265,12 +259,12 @@ public partial class Net : Node {
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Do(int order, Vector2 standing, int warp, string verb, int target, int other, string item, int count, Vector2 at) {
+    private void Do(int order, Vector2 standing, int warp, int verb, int target, int other, string item, int count, Vector2 at) {
         if (!Hosting || Guest() is not PlayerState p) return;
         heard[p.Id] = Math.Max(order, heard.GetValueOrDefault(p.Id));
         // The action happened where the guest stood, so it goes there at once.
         if (Stand(p, standing, warp)) using (World.ActAs(p)) World.MoveTo(standing);
-        World.Run(p, new Command(verb, target, other, item, count, at));
+        World.Run(p, new Command((Verb)verb, target, other, item, count, at));
     }
 
     /// <summary>
@@ -309,83 +303,32 @@ public partial class Net : Node {
 
     // ---------- Updates ----------
 
-    private static byte[] Pack<T>(T value) {
-        using var output = new MemoryStream();
-        using (var brotli = new BrotliStream(output, CompressionLevel.Fastest)) JsonSerializer.Serialize(brotli, value, Compact);
-        return output.ToArray();
-    }
-
-    private static T Unpack<T>(byte[] packed) {
-        using var brotli = new BrotliStream(new MemoryStream(packed), CompressionMode.Decompress);
-        return JsonSerializer.Deserialize<T>(brotli, Compact) ?? throw new InvalidDataException("Empty message");
-    }
-
     private void Work() {
         foreach (var w in World.S.Workers) w.WorkState = work.GetValueOrDefault(w.Id);
     }
 
-    /// <summary>The world as entries a guest can compare one by one: each thing, worker, wolf, trade order and player under its id, and the rest in two shared entries.</summary>
-    private Dictionary<string, string> Entries() {
-        var s = World.S;
-        World.NumberWolvesAndOrders();
-        var entries = new Dictionary<string, string> {
-            ["state"] = JsonSerializer.Serialize(s, Rest),
-            ["work"] = JsonSerializer.Serialize(s.Workers.ToDictionary(w => w.Id, w => w.WorkState), Compact)
-        };
-        foreach (var t in s.Things) entries[$"t:{t.Id}"] = JsonSerializer.Serialize(t, Compact);
-        foreach (var w in s.Workers) entries[$"w:{w.Id}"] = JsonSerializer.Serialize(w, Compact);
-        foreach (var w in s.Wolves) entries[$"f:{w.Id}"] = JsonSerializer.Serialize(w, Compact);
-        foreach (var o in s.Orders) entries[$"o:{o.Id}"] = JsonSerializer.Serialize(o, Compact);
-        foreach (var p in s.Players) entries[$"p:{p.Id}"] = JsonSerializer.Serialize(p, Compact);
+    /// <summary>Host: keeps a snapshot as the next update, forgetting the one no guest can still build on.</summary>
+    private Snapshot Remember(Snapshot entries) {
+        sent[++sequence] = entries;
+        if (sent.Remove(sequence - History, out var old)) updates.Release(old);
         return entries;
     }
 
     private void SendUpdates() {
-        var entries = Entries();
-        sent[++sequence] = entries;
-        sent.Remove(sequence - History);
-        foreach (var p in World.S.Players.Where(p => p != World.Me)) {
+        var entries = Remember(updates.Capture(World));
+        // Guests that confirmed the same update get the same changes.
+        int builtOn = -1; byte[] delta = [];
+        foreach (var p in World.S.Players) {
+            if (p == World.Me) continue;
             int baseline = acked.GetValueOrDefault(p.Id);
             var known = sent.GetValueOrDefault(baseline);
-            var delta = Delta(entries, known);
+            if (baseline != builtOn) { delta = updates.Delta(entries, known).ToArray(); builtOn = baseline; }
             if (known != null && delta.Length <= PacketSize) { RpcId(p.Id, MethodName.Refresh, sequence, baseline, delta); continue; }
             // Big updates go on their own reliable channel, so messages and actions never queue behind them.
             RpcId(p.Id, MethodName.RefreshReliably, sequence, known == null ? 0 : baseline, delta);
             // The whole world is sure to arrive, so later updates build on it rather than sending it again until the guest confirms it.
             if (known == null) acked[p.Id] = sequence;
         }
-    }
-
-    /// <summary>
-    /// The entries that differ from <paramref name="known"/>, all of them without it, with null for each entry that is gone.
-    /// A changed entry only carries its changed fields, under its key with <see cref="Patched"/> in front.
-    /// </summary>
-    private static byte[] Delta(Dictionary<string, string> entries, Dictionary<string, string>? known) {
-        using var output = new MemoryStream();
-        using (var brotli = new BrotliStream(output, CompressionLevel.Fastest))
-        using (var json = new Utf8JsonWriter(brotli)) {
-            json.WriteStartObject();
-            foreach (var (key, value) in entries) {
-                var before = known?.GetValueOrDefault(key);
-                if (before == value) continue;
-                if (before != null && Fields(value) is { } now && Fields(before) is { } then && then.Keys.All(now.ContainsKey)) {
-                    json.WriteStartObject(Patched + key);
-                    foreach (var (field, raw) in now.Where(f => then[f.Key] != f.Value)) { json.WritePropertyName(field); json.WriteRawValue(raw, skipInputValidation: true); }
-                    json.WriteEndObject();
-                } else { json.WritePropertyName(key); json.WriteRawValue(value, skipInputValidation: true); }
-            }
-            foreach (var key in known?.Keys.Where(k => !entries.ContainsKey(k)) ?? []) json.WriteNull(key);
-            json.WriteEndObject();
-        }
-        return output.ToArray();
-    }
-
-    private const char Patched = '~';
-
-    /// <summary>An object entry's fields as raw JSON, or null for a list.</summary>
-    private static Dictionary<string, string>? Fields(string entry) {
-        using var document = JsonDocument.Parse(entry);
-        return document.RootElement.ValueKind == JsonValueKind.Object ? document.RootElement.EnumerateObject().ToDictionary(f => f.Name, f => f.Value.GetRawText()) : null;
     }
 
     /// <param name="baseline">The update the changes are against, which this guest confirmed; zero when they are the whole world.</param>
@@ -400,67 +343,65 @@ public partial class Net : Node {
         if (!welcomed || update <= appliedSequence) return;
         // An update against one this machine has forgotten waits for the host to catch up with the confirmations.
         if (baseline != 0 && !received.ContainsKey(baseline)) return;
-        var entries = baseline == 0 ? new Dictionary<string, string>() : new Dictionary<string, string>(received[baseline]);
-        using (var brotli = new BrotliStream(new MemoryStream(packed), CompressionMode.Decompress))
-        using (var changes = JsonDocument.Parse(brotli))
-            foreach (var entry in changes.RootElement.EnumerateObject())
-                if (entry.Value.ValueKind == JsonValueKind.Null) entries.Remove(entry.Name);
-                else if (entry.Name[0] == Patched) entries[entry.Name[1..]] = Patch(entries[entry.Name[1..]], entry.Value);
-                else entries[entry.Name] = entry.Value.GetRawText();
+        var entries = updates.Merge(baseline == 0 ? null : received[baseline], packed);
         received[update] = entries;
-        foreach (var old in received.Keys.Where(k => k <= update - History).ToList()) received.Remove(old);
+        forgotten.Clear();
+        foreach (int old in received.Keys) if (old <= update - History) forgotten.Add(old);
+        foreach (int old in forgotten) if (received.Remove(old, out var snapshot) && snapshot != applied) updates.Release(snapshot);
         Apply(entries);
+        var was = applied;
         applied = entries; appliedSequence = update;
+        if (!received.ContainsValue(was)) updates.Release(was);
     }
 
     /// <summary>Brings the guest's copy from the entries it shows now to <paramref name="entries"/>, touching only what differs.</summary>
-    private void Apply(Dictionary<string, string> entries) {
+    private void Apply(Snapshot entries) {
         var s = World.S;
-        string? Changed(string key) => entries.TryGetValue(key, out var value) && applied.GetValueOrDefault(key) != value ? value : null;
-        if (Changed("state") is string state) CopyExcept(s, Read<SaveState>(state), Shared);
-        void Glides(object o, Vector2 from) { goals[o] = Position(o); Place(o, from); }
-        Sync(s.Things, "t:", t => t.Id, entries, null);
-        Sync(s.Workers, "w:", w => w.Id, entries, Glides);
-        Sync(s.Wolves, "f:", w => w.Id, entries, Glides);
-        Sync(s.Orders, "o:", o => o.Id, entries, null);
-        if (Changed("work") is string working) work = Read<Dictionary<int, WorkerWorkState>>(working);
+        if (Changed(entries, new EntryKey(EntryKey.State, 0)) is byte[] state) CopyExcept(s, WorldUpdates.Read<SaveState>(state), WorldUpdates.Shared);
+        Sync(s.Things, EntryKey.Thing, static t => t.Id, entries, false, null);
+        Sync(s.Workers, EntryKey.Worker, static w => w.Id, entries, true, null);
+        Sync(s.Wolves, EntryKey.Wolf, static w => w.Id, entries, true, null);
+        Sync(s.Orders, EntryKey.Order, static o => o.Id, entries, false, null);
+        if (Changed(entries, new EntryKey(EntryKey.Work, 0)) is byte[] working) work = WorldUpdates.Read<Dictionary<int, WorkerWorkState>>(working);
         var me = World.Me;
         // This machine walks its own player and keeps its hotbar; only a move the simulation made, such as a respawn, comes back.
         // The welcome's first update brings all of it, over the stand-in this copy started with.
         bool joining = applied.Count == 0;
         var own = (me.Pos, me.Warp, me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held, me.Sprinting);
-        unsaved |= Changed($"p:{me.Id}") != null;
-        Sync(s.Players, "p:", p => p.Id, entries, (p, from) => { if (p != me) Glides(p, from); });
+        unsaved |= Changed(entries, new EntryKey(EntryKey.Player, me.Id)) != null;
+        Sync(s.Players, EntryKey.Player, static p => p.Id, entries, true, me);
         if (!joining && me.Warp == own.Warp) me.Pos = own.Pos;
         if (!joining) (me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held, me.Sprinting) = (own.HotbarSlots, own.ActiveHotbar, own.GatherTarget, own.Held, own.Sprinting);
-        foreach (var gone in goals.Keys.Where(o => o is Worker w ? !s.Workers.Contains(w) : o is Wolf wolf ? !s.Wolves.Contains(wolf) : o is PlayerState p && !s.Players.Contains(p)).ToList()) goals.Remove(gone);
+        gone.Clear();
+        foreach (var o in goals.Keys) if (o is Worker w ? !s.Workers.Contains(w) : o is Wolf wolf ? !s.Wolves.Contains(wolf) : o is PlayerState p && !s.Players.Contains(p)) gone.Add(o);
+        foreach (var o in gone) goals.Remove(o);
         s.Actor = me;
         Work();
         World.UpdateLunchFire();
     }
 
-    private static string Patch(string entry, JsonElement changes) {
-        var fields = JsonNode.Parse(entry)!.AsObject();
-        foreach (var field in changes.EnumerateObject()) fields[field.Name] = JsonNode.Parse(field.Value.GetRawText());
-        return fields.ToJsonString();
-    }
+    /// <summary>The entry when it differs from what the copy shows now, or null.</summary>
+    private byte[]? Changed(Snapshot entries, EntryKey key) => entries.TryGetValue(key, out var value) && !Shown(key, value) ? value : null;
 
-    private static T Read<T>(string json) => JsonSerializer.Deserialize<T>(json, Compact) ?? throw new InvalidDataException("Empty entry");
+    private bool Shown(EntryKey key, byte[] value) => applied.TryGetValue(key, out var before) && Snapshot.Same(before, value);
 
     /// <summary>
     /// Updates the members of <paramref name="list"/> whose entries changed, in place, adds new ones and drops those without an entry.
-    /// <paramref name="moved"/> sees each updated member with its position before the update.
+    /// Updated members that <paramref name="glide"/> other than <paramref name="except"/> glide from where they were.
     /// </summary>
-    private void Sync<T>(List<T> list, string prefix, Func<T, int> id, Dictionary<string, string> entries, Action<object, Vector2>? moved) where T : class {
-        var have = list.ToDictionary(t => prefix + id(t));
-        list.RemoveAll(t => !entries.ContainsKey(prefix + id(t)));
+    private void Sync<T>(List<T> list, byte prefix, Func<T, int> id, Snapshot entries, bool glide, T? except) where T : class {
+        have.Clear();
+        for (int i = list.Count - 1; i >= 0; i--) {
+            var key = new EntryKey(prefix, id(list[i]));
+            if (entries.ContainsKey(key)) have[key.Id] = list[i]; else list.RemoveAt(i);
+        }
         foreach (var (key, json) in entries) {
-            if (!key.StartsWith(prefix) || applied.GetValueOrDefault(key) == json && have.ContainsKey(key)) continue;
-            var item = Read<T>(json);
-            if (!have.TryGetValue(key, out var old)) { list.Add(item); continue; }
+            if (key.Prefix != prefix || have.ContainsKey(key.Id) && Shown(key, json)) continue;
+            var item = WorldUpdates.Read<T>(json);
+            if (!have.TryGetValue(key.Id, out var old)) { list.Add(item); continue; }
             var from = Position(old);
             CopyExcept(old, item, null);
-            moved?.Invoke(old, from);
+            if (glide && old != except) { goals[old] = Position(old); Place(old, from); }
         }
     }
 

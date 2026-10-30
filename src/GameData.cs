@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Godot;
 
 namespace ChopChopMeow;
@@ -30,7 +31,8 @@ public sealed class BuildingDef {
 }
 public sealed class RecipeDef {
     public string Name { get; set; } = "";
-    public string Station { get; set; } = "";
+    /// <summary>The station that makes it, or null for a recipe made only by hand.</summary>
+    [JsonConverter(typeof(OptionalKind))] public ThingKind? Station { get; set; }
     public Dictionary<string, int> Inputs { get; set; } = new();
     public string Output { get; set; } = "";
     public int Amount { get; set; } = 1;
@@ -140,7 +142,7 @@ public sealed class GameData {
     /// <summary>A worker's time on duty in a day: dawn to dusk, less lunch and the walk in.</summary>
     public float WorkdaySeconds => DuskStarts * DaySeconds - DaySeconds / 24 - TradeSeconds / 2;
     public Dictionary<string, ItemDef> Items { get; set; } = new();
-    public Dictionary<string, BuildingDef> Buildings { get; set; } = new();
+    public Dictionary<ThingKind, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
     public static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true, WriteIndented = true };
     public static GameData Load() {
@@ -160,7 +162,7 @@ public sealed class GameData {
                 if (!Items.ContainsKey(cost.Key) || cost.Value <= 0) throw new InvalidOperationException($"Invalid cost for {building.Key}: {cost.Key}.");
         foreach (var recipe in Recipes) {
             bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool && i.Tier >= recipe.Value.Tier);
-            if (!(recipe.Value.Station == "" ? recipe.Value.Hand : Buildings.ContainsKey(recipe.Value.Station)) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
+            if (!(recipe.Value.Station is ThingKind station ? Buildings.ContainsKey(station) : recipe.Value.Hand) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
             foreach (var input in recipe.Value.Inputs)
                 if (!Items.ContainsKey(input.Key) || input.Value <= 0) throw new InvalidOperationException($"Invalid input for {recipe.Key}: {input.Key}.");
@@ -183,13 +185,17 @@ public sealed class GameData {
     }
     // Named once per tool and tier, since workers ask every tick while a station waits for its tool.
     private readonly Dictionary<(string, int), string> toolNames = new();
-    public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Buildings.TryGetValue(id, out var b) ? b.Name : id switch {
-        "tree" => "Tree",
-        "iron" => "Iron deposit",
-        "tin" => "Tin deposit",
-        "loose_coal" => "Coal",
-        "grave" => "Recovery box",
-        "wolf_corpse" => "Wolf carcass",
-        _ => id.Replace('_', ' ')
+    /// <summary>Whether an id, such as a hotbar slot's, names a building plan, and which.</summary>
+    public bool TryBuilding(string id, out ThingKind kind) => Kinds.TryParse(id, out kind) && Buildings.ContainsKey(kind);
+    public bool IsBuilding(string id) => TryBuilding(id, out _);
+    public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' ');
+    public string Name(ThingKind kind) => Items.TryGetValue(kind.Id(), out var i) ? i.Name : Buildings.TryGetValue(kind, out var b) ? b.Name : kind switch {
+        ThingKind.Tree => "Tree",
+        ThingKind.Iron => "Iron deposit",
+        ThingKind.Tin => "Tin deposit",
+        ThingKind.LooseCoal => "Coal",
+        ThingKind.Grave => "Recovery box",
+        ThingKind.WolfCorpse => "Wolf carcass",
+        _ => kind.Id().Replace('_', ' ')
     };
 }

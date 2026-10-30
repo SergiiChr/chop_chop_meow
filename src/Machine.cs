@@ -14,7 +14,7 @@ public partial class Game {
         if (recipes.Count > 1) RecipePicker(t, recipes);
         if (t.Recipe != "") Machine(t);
         else AddLabel("Choose what to make.", 14, Muted);
-        if (t.Kind == "reinforced") Bellows(t);
+        if (t.Kind == ThingKind.Reinforced) Bellows(t);
         BagGrid(id => world.LoadInput(t, id, MoveAll ? world.S.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot",
             wanted: id => t.Recipe != "" && (world.BatchCost(t).ContainsKey(id) || t.Burner != null && World.FuelFits(t, id)));
         JobButtons(t);
@@ -37,7 +37,7 @@ public partial class Game {
     /// <summary>A station's work: what one batch takes, how long it runs, what it burns and what it makes.</summary>
     private void Machine(Thing t) {
         var recipe = world.Data.Recipes[t.Recipe];
-        float rate = (t.Kind == "bench" ? world.Data.BenchSpeed : 1) * world.Speed(t.Tools != null && recipe.Tool != "" ? world.BenchTool(t, recipe.Tool, recipe.Tier) : null);
+        float rate = (t.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * world.Speed(t.Tools != null && recipe.Tool != "" ? world.BenchTool(t, recipe.Tool, recipe.Tier) : null);
         float seconds = recipe.Seconds / Math.Max(.01f, rate);
         var inputs = world.BatchCost(t).Select(p => (Control)MachineSlot(t, t.Inventory, p.Key, true, $"×{p.Value}"));
         // Leftovers from an earlier recipe or fuel stay reachable as side outputs.

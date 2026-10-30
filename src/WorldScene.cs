@@ -45,8 +45,8 @@ public partial class WorldView {
     private static void BuildCliff(Node3D parent, Cliff cliff) {
         // Host rock follows the mountain; distinctive ore colors remain in the seams.
         (string[] rock, var seam, int seed) = cliff.Ore switch {
-            "iron" => (new[] { "686650", "716b56", "5b5e4c" }, Mat("b4622a", .5f), 11),
-            "tin" => (new[] { "656d5d", "717665", "586252" }, Mat("e9ebe4", .35f), 37),
+            ThingKind.Iron => (new[] { "686650", "716b56", "5b5e4c" }, Mat("b4622a", .5f), 11),
+            ThingKind.Tin => (new[] { "656d5d", "717665", "586252" }, Mat("e9ebe4", .35f), 37),
             _ => (new[] { "535d4b", "606753", "495440" }, Mat("15161a", .5f, .3f), 23),
         };
         // Local +Z is the face, so everything toward the camera and the deposits is built on the positive side.

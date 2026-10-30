@@ -40,8 +40,8 @@ public partial class Game {
         RemoveCheckFiles(); await Frames(4);
         await Click(FindButton(screen, "New game")!); ClosePanel();
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
-        world.Add("loose_coal", NetOre, 2); world.Add("loose_coal", NetCoal, 2);
-        var chest = world.Add("chest", NetChest); var hut = world.Add("hut", NetHut);
+        world.Add(ThingKind.LooseCoal, NetOre, 2); world.Add(ThingKind.LooseCoal, NetCoal, 2);
+        var chest = world.Add(ThingKind.Chest, NetChest); var hut = world.Add(ThingKind.Hut, NetHut);
         await KeyStroke(Key.Escape);
         await Click(hostButton);
         Require(net.Hosting && !menu.Visible && !paused, "Host in the pause menu must open the current game to guests and close the menu.");
@@ -68,14 +68,14 @@ public partial class Game {
     private async Task GuestNetCheck() {
         RemoveCheckFiles(); DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(GuestSave)); await Frames(4);
         await JoinFromStart();
-        Require(!backdrop.Visible && world.S.Players.Count == 2 && world.S.Things.Any(t => t.Kind == "chest" && t.Pos == NetChest), "Joining must replace the start menu with the host's world.");
+        Require(!backdrop.Visible && world.S.Players.Count == 2 && world.S.Things.Any(t => t.Kind == ThingKind.Chest && t.Pos == NetChest), "Joining must replace the start menu with the host's world.");
         Require(world.S.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
         await Until(() => view.ShowsPlayer(1), "the host's figure appearing");
 
         await RightClick(NetOre);
         await Until(() => world.S.Backpack["coal"] == 2 && world.S.Things.All(t => t.Pos != NetOre), "the host handing over the loose coal the guest walked to");
         await Click(view.Screen(NetChest, .3f));
-        Require(page == "inspect" && world.Find(selected)?.Kind == "chest" && world.Near(world.Find(selected)!), "Clicking the chest beside the coal must open it.");
+        Require(page == "inspect" && world.Find(selected)?.Kind == ThingKind.Chest && world.Near(world.Find(selected)!), "Clicking the chest beside the coal must open it.");
         await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
         await Until(() => world.Find(selected)!.Inventory["coal"] == 1 && world.S.Backpack["coal"] == 1, "a normal storage click moving exactly one coal");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = true });
@@ -86,7 +86,7 @@ public partial class Game {
         await Until(() => world.S.Backpack["coal"] == 2, "the host handing over the second loose coal");
         // The host checks reach from where the guest stood when it clicked, not from where its glide has got to.
         ClosePanel(); await Click(view.Screen(NetHut, .8f));
-        await Until(() => world.S.Sheltered == world.S.Things.Single(t => t.Kind == "hut").Id, "the host letting the guest into the cabin it walked to");
+        await Until(() => world.S.Sheltered == world.S.Things.Single(t => t.Kind == ThingKind.Hut).Id, "the host letting the guest into the cabin it walked to");
 
         await LeaveGame();
         await JoinFromStart();

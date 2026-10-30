@@ -60,6 +60,7 @@ Allocation is fine while loading, setting up and on rare events.
 - Keep a temporary collection a feature needs every frame as a field and refill it (`Clear()`, then fill): a `List<T>` keeps its capacity. Hand out its contents as `CollectionsMarshal.AsSpan(list)` where a loop needs an array's speed.
 - Let a caller pass a list or `Span<T>` to fill rather than returning a new one, and take `ReadOnlySpan<T>` rather than `IEnumerable<T>`.
 - LINQ, lambdas that capture, `ToArray()`, `ToList()`, `Clone()`, string interpolation and `foreach` over an interface allocate: keep them out of those paths. Status text built from parts goes through a cache.
+- A read-only view of a collection that per-tick code loops over is a class or a concrete type whose public `GetEnumerator()` returns the struct enumerator, as `ItemTotals` does, not an interface such as `IReadOnlyDictionary`: a `foreach` over an interface boxes its enumerator.
 - On the Godot side, passing a plain string where a `StringName` is expected, `GetChildren()`, a C# handler on a Godot signal and creating a resource such as a `StyleBoxFlat` allocate too. Keep `StringName`s and resources in static or instance fields, walk children by index, and override virtual methods such as `_Draw` instead of connecting handlers.
 - Godot's own memory (meshes, images, packed arrays) isn't the .NET heap: these rules don't cover it.
 
@@ -69,7 +70,7 @@ Allocation budgets:
 - `CheckWalkingFrames` in the UI checks holds real frames to a measured budget: a change that adds a third more garbage fails it, and one that removes some lowers the budget.
 - `CheckPanelRefresh` holds every panel page to 0 bytes a refresh while what it shows stays the same. Live panel text goes through `LiveText`, which rebuilds it in a reused buffer and hands Godot a new string only when it changes.
 - Real frames are measured only while walking, so per-frame code for gathering, a mauling or a settlement in view has no allocation check yet; review those paths by hand.
-- The host's network updates, ten a second, serialize the world and may allocate; they are not a per-tick path.
+- The host's network updates, ten a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
 `./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a walking, day/night and staffed-settlement run.

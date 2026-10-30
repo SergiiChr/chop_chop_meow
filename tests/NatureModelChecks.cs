@@ -13,12 +13,12 @@ public static class NatureModelChecks {
     private static void CheckVariant(int variant) {
         string[] kinds = { "coal", "iron", "tin" };
         var props = new[] {
-            WorldModels.Build(new Thing { Kind = "coal", Id = variant }),
-            WorldModels.Build(new Thing { Kind = "coal", Id = variant + NatureShape.Variants }),
-            WorldModels.Build(new Thing { Kind = "iron", Id = variant }),
-            WorldModels.Build(new Thing { Kind = "iron", Id = variant + NatureShape.Variants }),
-            WorldModels.Build(new Thing { Kind = "tin", Id = variant }),
-            WorldModels.Build(new Thing { Kind = "tin", Id = variant + NatureShape.Variants })
+            WorldModels.Build(new Thing { Kind = ThingKind.Coal, Id = variant }),
+            WorldModels.Build(new Thing { Kind = ThingKind.Coal, Id = variant + NatureShape.Variants }),
+            WorldModels.Build(new Thing { Kind = ThingKind.Iron, Id = variant }),
+            WorldModels.Build(new Thing { Kind = ThingKind.Iron, Id = variant + NatureShape.Variants }),
+            WorldModels.Build(new Thing { Kind = ThingKind.Tin, Id = variant }),
+            WorldModels.Build(new Thing { Kind = ThingKind.Tin, Id = variant + NatureShape.Variants })
         };
         try {
             var parts = props.Select(Parts).ToArray();

@@ -117,7 +117,7 @@ void fragment() {
 
     /// <summary>Stops a crate from going into a placed crate and asks first; true when the move was intercepted.</summary>
     private bool CrateIntoCrate(Thing? target, Inventory to, string item) {
-        if (target?.Kind != "crate" || to != target.Inventory || !World.IsCrate(item)) return false;
+        if (target?.Kind != ThingKind.Crate || to != target.Inventory || !World.IsCrate(item)) return false;
         anomalyCrate = target; pausedBeforeAnomaly = paused; paused = true;
         anomalyReadout.Text = $"CONTAINER {target.Id:0000} · NESTING DEPTH 2 · LOCAL METRIC STABILITY 0.03%";
         anomaly.Visible = true; anomalyWarning.Visible = true; singularity.Visible = false; collapse.Visible = false;

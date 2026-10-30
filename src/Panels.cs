@@ -159,7 +159,7 @@ public partial class Game {
 
     private string JobHint(Thing t, string job) => job switch {
         "bellows" => "Keeps the fire hot. Only one worker pumps at a time.",
-        "haul" => t.Kind switch { "farm" => "Brings seeds and fertilizer and carries the harvest to storage.", "mine" => "Brings the timber, iron and stone the mine needs.", _ => "Brings ingredients and fuel and carries what is made to storage." },
+        "haul" => t.Kind switch { ThingKind.Farm => "Brings seeds and fertilizer and carries the harvest to storage.", ThingKind.Mine => "Brings the timber, iron and stone the mine needs.", _ => "Brings ingredients and fuel and carries what is made to storage." },
         "craft" => "Works the station; it only makes progress while someone works it.",
         "deliveries" => "Fetches fresh prices on request and carries deliveries to storage.",
         "fuel" => "Keeps the fire fed with wood from storage.",
@@ -212,9 +212,9 @@ public partial class Game {
         var top = new HBoxContainer(); top.AddThemeConstantOverride("separation", 10); board.AddChild(top);
         top.AddChild(Style.Glyph("line_filter", 28, Style.Rim));
         var title = Style.Heading("Filters", 22); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);
-        top.AddChild(Style.Icon(HotbarIcon(t.Kind), 32));
+        top.AddChild(Style.Icon(HotbarIcon(t.Kind.Id()), 32));
         top.AddChild(HeaderButton("close", "Close the filters", () => { filterOpen = false; filterPicking = false; OpenPage("inspect"); }, Style.CloseRound, "filters_close"));
-        bool post = t.Kind == "signpost";
+        bool post = t.Kind == ThingKind.Signpost;
         foreach (bool output in post ? new[] { false } : new[] { false, true }) {
             var filter = output ? t.Inventory.OutputFilter : t.Inventory.InputFilter;
             var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); board.AddChild(well);

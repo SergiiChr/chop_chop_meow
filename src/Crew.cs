@@ -86,7 +86,7 @@ public partial class Game {
         return chip;
     }
 
-    private Texture2D? PlaceIcon(Thing at) => HotbarIcon(at.IsResource ? World.ResourceItem(at) : at.Kind);
+    private Texture2D? PlaceIcon(Thing at) => HotbarIcon(at.IsResource ? World.ResourceItem(at) : at.Kind.Id());
 
     /// <summary>One worker: what they carry and hold, what they are doing, their jobs with a button to drop each, and what can be done with them.</summary>
     private void WorkerPanel(Worker? w) {
@@ -134,7 +134,7 @@ public partial class Game {
             none.AutowrapMode = TextServer.AutowrapMode.WordSmart; jobs.AddChild(none);
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        buttons.AddChild(BigButton("Gather…", Style.Sage, () => { assigningWorker = w.Id; view.BuildMode = ""; ClosePanel(); RefreshLive(); }));
+        buttons.AddChild(BigButton("Gather…", Style.Sage, () => { assigningWorker = w.Id; view.BuildMode = null; ClosePanel(); RefreshLive(); }));
         buttons.AddChild(BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); OpenPage("inspect"); }));
         buttons.AddChild(BigButton("Dismiss", Style.Brick, () => { world.Fire(w); OpenPage("workers"); }));
         if (w.WageDebt > 0) content.AddChild(BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));

@@ -121,7 +121,7 @@ public partial class Game {
 
     /// <summary>The trading post within reach that has coins or room for them, or null.</summary>
     private Thing? NearPost() {
-        foreach (var t in world.S.Things) if (t.Kind == "signpost" && t.Wages != null && world.Near(t)) return t;
+        foreach (var t in world.S.Things) if (t.Kind == ThingKind.Signpost && t.Wages != null && world.Near(t)) return t;
         return null;
     }
 
