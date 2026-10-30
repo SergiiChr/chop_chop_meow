@@ -16,7 +16,7 @@ public partial class PagePanel {
             case "build": BuildingPlans(); break;
             case "inventory": Backpack(); break;
             case "workers": AddChild(new CrewPanel(panel)); break;
-            case "craft": CraftMenu(); break;
+            case "craft": AddChild(new CraftPanel(panel)); break;
             default: Inspect(); break;
         }
     }
@@ -103,7 +103,7 @@ public partial class PagePanel {
         Reach(t);
         if (t.IsResource) { Resource(t); return; }
         if (t.Kind == ThingKind.Hut) { Cabin(t); return; }
-        if (t.Tools != null) { Bench(t); return; }
+        if (t.Tools != null) { AddChild(new BenchPanel(panel, t)); return; }
         if (t.Kind == ThingKind.Signpost) { AddChild(new MarketPanel(panel, t)); return; }
         if (t.Kind == ThingKind.Mine) { AddChild(new MinePanel(panel, t)); return; }
         if (t.Kind == ThingKind.Farm) { FarmPanel(t); return; }

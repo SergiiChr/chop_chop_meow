@@ -6,12 +6,9 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>
-/// The personal crafting menu and the crafting bench panel: round tabs for the tools recipes need, beside a grid of recipe plates.
-/// Each plate shows the product big and its inputs small, each count in brick while the backpack is short.
-/// </summary>
-public partial class PagePanel {
-    private void CraftMenu() {
+/// <summary>The personal crafting menu: the recipe board, then what is being made by hand.</summary>
+public partial class CraftPanel(SidePanel side) : RecipePage(side) {
+    public override void _Ready() {
         headingIcon.Texture = GD.Load<Texture2D>("res://assets/ui/line_craft.svg"); headingIcon.SelfModulate = Style.Rim; headingIcon.Visible = true;
         headingIcon.TooltipText = "Crafting by hand. A crafting bench works twice as fast.";
         var groups = world.HandRecipes.GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
@@ -70,10 +67,13 @@ public partial class PagePanel {
         if (perBatch != "") column.AddChild(PerBatch(perBatch));
         return column;
     }
+}
 
-    private void Bench(Thing bench) {
+/// <summary>A crafting bench or cooking table: its tool cups in the header, the recipe board, and the work of the chosen recipe.</summary>
+public partial class BenchPanel(SidePanel side, Thing bench) : RecipePage(side) {
+    public override void _Ready() {
         // The station's own tool cups sit in the header: what is slotted sets which recipes can run and how fast.
-        foreach (string tool in World.SlotKinds(bench.Kind)) { var slot = ToolSlot(bench, tool); heading.AddChild(slot); heading.MoveChild(slot, heading.GetChildCount() - 2); }
+        foreach (string tool in World.SlotKinds(bench.Kind)) { var slot = ToolSlot(tool); heading.AddChild(slot); heading.MoveChild(slot, heading.GetChildCount() - 2); }
         if (bench.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
         var groups = world.Data.Recipes.Where(p => p.Value.Station == bench.Kind).Select(p => p.Key).GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
         RecipeBoard(groups, group => group.Tool == "" ? null : world.BenchTool(bench, group.Tool, group.Tier), bench,
@@ -92,7 +92,7 @@ public partial class PagePanel {
     }
 
     /// <summary>A station's cup for one tool kind; while empty it shows a faint picture of the tool it wants.</summary>
-    private ItemSlot ToolSlot(Thing bench, string tool) {
+    private ItemSlot ToolSlot(string tool) {
         var (cell, _) = ItemSlot.Cup($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         string plainest = world.Data.Items.Where(p => p.Value.Tool == tool).OrderBy(p => p.Value.Speed).First().Key;
@@ -113,7 +113,13 @@ public partial class PagePanel {
         });
         return cell;
     }
+}
 
+/// <summary>
+/// Round tabs for the tools recipes need, beside a grid of recipe plates.
+/// Each plate shows the product big and its inputs small, each count in brick while the backpack is short.
+/// </summary>
+public abstract partial class RecipePage(SidePanel side) : PagePanel(side) {
     /// <summary>A recipe's hover popup: its name, each input as an icon with the amount (brick while the backpack is short), and the time where it is crafted.</summary>
     private Control RecipePopup(RecipeDef r, float seconds) {
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 6);
@@ -134,7 +140,7 @@ public partial class PagePanel {
     /// The recipe board: a column of round tabs, one per tool the recipes need (red while that tool is missing), beside the chosen tab's plates.
     /// <paramref name="held"/> names the tool in use for a group, or null when it is missing or none is needed; <paramref name="station"/> is null when crafting by hand.
     /// </summary>
-    private void RecipeBoard(List<IGrouping<(string Tool, int Tier), string>> groups, Func<(string Tool, int Tier), string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready, Action<string>? twice = null) {
+    protected void RecipeBoard(List<IGrouping<(string Tool, int Tier), string>> groups, Func<(string Tool, int Tier), string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready, Action<string>? twice = null) {
         // A board opens on the tab of the recipe its station makes, otherwise the first.
         if (groups.All(g => GroupKey(g.Key) != memory.CraftTab))
             memory.CraftTab = groups.FirstOrDefault(g => g.Any(chosen)) is { } making ? GroupKey(making.Key) : groups.Count > 0 ? GroupKey(groups[0].Key) : "";
