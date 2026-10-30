@@ -80,6 +80,7 @@ UI and input:
 | `src/PilePanel.cs` | A pile or compost heap |
 | `src/ToolRackPanel.cs` | A tool station |
 | `src/CratePanel.cs` | A placed crate |
+| `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |

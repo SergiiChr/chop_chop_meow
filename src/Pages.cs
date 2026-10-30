@@ -130,7 +130,7 @@ public partial class PagePanel {
     protected void Storage(Thing t) {
         switch (t.Kind) {
             case ThingKind.Crate: AddChild(new CratePanel(panel, t)); return;
-            case ThingKind.Grave: Recovery(t); return;
+            case ThingKind.Grave: AddChild(new RecoveryBoxPanel(panel, t)); return;
             case ThingKind.Toolstation: AddChild(new ToolRackPanel(panel, t)); return;
             case ThingKind.Pile: AddChild(new PilePanel(panel, t)); return;
         }
@@ -155,12 +155,6 @@ public partial class PagePanel {
     protected void TakeAll(Thing t) {
         if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
         foreach (var id in t.Inventory.Items.Keys.ToArray()) world.Transfer(t.Inventory, world.S.Backpack, id, 999);
-    }
-    protected void Recovery(Thing t) {
-        headingTitle.Text = "Recovery box";
-        Well(new VBoxContainer()).AddChild(StorageGrid(t, 5));
-        var row = Row(); row.AddChild(kit.BigButton("Take all", Style.Brick, () => TakeAll(t)));
-        BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Drag to move");
     }
     /// <summary>Burn time as in-game hours and minutes.</summary>
     protected StringBuilder AppendGameHours(StringBuilder text, float seconds) {
