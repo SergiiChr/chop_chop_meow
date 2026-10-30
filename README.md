@@ -555,7 +555,9 @@ In between, it is saved a couple of seconds after it changes, and on F5.
 A guest cannot save or load the host's world.
 
 A guest that joins for the first time, or whose save is missing, broken or does not fit the host's world, starts with an empty backpack at the clearing.
-Leaving, or losing the connection, returns a guest to the start menu.
+Leaving returns a guest to the start menu.
+A guest that loses the connection tries to get back in on its own for up to 120 seconds, with a countdown on screen, and returns with its player as saved on its computer.
+**Stop · Esc** ends the tries, and when the time runs out the guest returns to the start menu.
 
 ### Shared world
 

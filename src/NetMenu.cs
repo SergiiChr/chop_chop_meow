@@ -7,6 +7,7 @@ namespace ChopChopMeow;
 /// <summary>Hosting the current game, the join popup, and what happens around joining and leaving.</summary>
 public partial class Game {
     private Label joinStatus = null!;
+    private Label reconnectStatus = null!;
     /// <summary>Why the last joined game ended, shown once on the start menu.</summary>
     private string leftReason = "";
 
@@ -15,6 +16,8 @@ public partial class Game {
         net.Heard += PlayWorldSound;
         net.Acted += view.Acted;
         net.Joined += OnJoined;
+        net.Disconnected += ShowReconnecting;
+        net.Reconnecting += left => { if (GodotObject.IsInstanceValid(reconnectStatus)) reconnectStatus.Text = $"Lost the connection to the host. Trying again for {left} more seconds."; };
         net.Left += reason => { leftReason = reason; world.NewGame(); ShowStart(); };
         net.Failed += reason => { if (GodotObject.IsInstanceValid(joinStatus)) joinStatus.Text = reason; };
     }
@@ -56,11 +59,19 @@ public partial class Game {
         address.CallDeferred(Control.MethodName.GrabFocus);
     }
 
+    /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
+    private void ShowReconnecting() {
+        world.NewGame(); ClosePanel();
+        OpenScreen("RECONNECTING", () => { net.StopRetrying(); ShowStart(); });
+        reconnectStatus = Label("Lost the connection to the host. Trying again…", 14, Muted); screen.AddChild(reconnectStatus);
+        AddScreenButton("Stop · Esc", () => screenBack?.Invoke());
+    }
+
     private void OnJoined() {
         StoreSetting("net", "address", net.Address);
         slot = 0; selected = 0; workerId = 0; gathering = null; entering = null; lifting = null; assigningWorker = 0; endingSeen = false;
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
         HideScreen(); menu.Visible = false; ending.Visible = false; ClosePanel();
-        Notify("Joined the host's settlement. Your belongings stay yours when you leave.");
+        Notify(net.Retrying ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
     }
 }
