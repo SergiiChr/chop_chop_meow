@@ -66,7 +66,7 @@ public partial class Game : Node {
             ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
             ui.Theme = Style.Interface(); BuildHud();
             GetViewport().UseTaa = Settings.Taa;
-            if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit.State).Run();
+            if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, state).Run();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
             if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
             StartPerformanceRun();
@@ -124,10 +124,12 @@ public partial class Game : Node {
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
     private void ShowReconnecting() { DropWorld(); startMenu.ShowReconnecting(); }
     /// <summary>Replaces the world with a new one and closes everything that showed the old one.</summary>
-    private void DropWorld() { world.NewGame(); panel.Close(); ending.Visible = false; blackHole.End(); }
+    private void DropWorld() { world.NewGame(); ForgetWorld(); panel.Close(); ending.Visible = false; blackHole.End(); }
+    /// <summary>Forgets what the player had selected and was doing in the world that went away.</summary>
+    private void ForgetWorld() { panel.ClearSelection(); player.Stop(); }
     private void OnJoined(bool back) {
         Settings.Store("net", "address", net.Address);
-        saves.Slot = 0; panel.ClearSelection(); player.StopGathering(); state.Entering = null; player.StopLifting(); ending.Joined(back);
+        saves.Slot = 0; ForgetWorld(); ending.Joined(back);
         shownHealth = world.S.Health;
         startMenu.Close(); menu.Visible = false; ending.Visible = false; panel.Close();
         Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
@@ -135,14 +137,12 @@ public partial class Game : Node {
     private void Restart() {
         net.Leave();
         world.NewGame();
-        panel.ClearSelection(); player.StopGathering(); saves.Slot = 0; autosave = 0;
+        ForgetWorld(); saves.Slot = 0; autosave = 0;
         ending.Visible = false; state.Paused = false; panel.Open("welcome");
         Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
     }
     /// <summary>Clears what belonged to the world before a load, and shows what was loaded.</summary>
-    private void Loaded() {
-        panel.ClearSelection(); player.StopGathering(); state.Entering = null; panel.Open("inventory");
-    }
+    private void Loaded() { ForgetWorld(); panel.Open("inventory"); }
     public override void _UnhandledInput(InputEvent ev) {
         if (view?.EnvironmentReview == true) return;
         if (world == null || view == null || ending.Visible) return;

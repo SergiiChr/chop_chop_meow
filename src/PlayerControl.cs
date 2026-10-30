@@ -14,8 +14,8 @@ public sealed class PlayerControl(UiKit kit, WorldView view, SidePanel panel, Ho
     private Thing? lifting;
     private float liftClock;
 
-    public void StopGathering() => gathering = null;
-    public void StopLifting() => lifting = null;
+    /// <summary>Drops a gather, a crate lift and a walk into a cabin, whose targets belong to a world that went away.</summary>
+    public void Stop() { gathering = null; lifting = null; state.Entering = null; }
 
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started.</summary>
     public void Update(float dt) {

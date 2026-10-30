@@ -705,6 +705,25 @@ public partial class Game {
         Require(!view.Paused, "Loading from the pause menu must resume the world.");
         Require(world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the saved position.");
     }
+    /// <summary>A load ends a crate lift under way, since finishing it on the crate from before the load would copy the crate into the backpack.</summary>
+    private async Task CheckLoadEndsCrateLiftUnderWay() {
+        await CloseWithEsc();
+        var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
+        int carried = world.Carried("crate");
+        await KeyStroke(Key.F5);
+        await Frames();
+        var point = view.Screen(crate.Pos, .3f);
+        Require(view.Pick(point)?.Id == crate.Id, "The crate fixture must be selectable.");
+        var windowPoint = GetViewport().GetFinalTransform() * point;
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
+        await Frames();
+        await KeyStroke(Key.F9);
+        await Seconds(1);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
+        await Frames();
+        Require(world.Carried("crate") == carried && world.Find(crate.Id) != null, "Loading while a crate is held under the right button must leave it on the ground, and not in the backpack too.");
+        RemoveThings(world, t => t.Id == crate.Id);
+    }
     /// <summary>Carried items show as backpack cells, and the HUD heart, stomach and droplet track health, hunger and thirst.</summary>
     private async Task CheckBackpackCellsAndHudIconsTrackStats() {
         Give(world, Inventory.Coins, 1200);
@@ -894,6 +913,7 @@ public partial class Game {
             var chest = await CheckBuildPlanPlacesChest();
             await CheckChestMovesSplitsAndFiltersStacks(chest);
             await CheckQuickSaveAndLoadRestorePlayerAndChest(chest);
+            await CheckLoadEndsCrateLiftUnderWay();
             await CheckBackpackCellsAndHudIconsTrackStats();
             await CheckPinnedPlayerStaysDownAndDeathCountsDown();
             await CheckMouseWheelOverPanelDoesNotZoom();
