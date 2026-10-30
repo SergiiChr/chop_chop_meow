@@ -106,8 +106,8 @@ public partial class Game : Node {
         GD.Print(message);
     }
     private void RefreshLive() {
-        if (needsPlate == null) return;
-        clock.Refresh(); deathLabel.Refresh(); modeLabel.Refresh();
+        if (recovery == null) return;
+        clock.Refresh(); deathLabel.Refresh(); modeLabel.Refresh(); recovery.Refresh();
         panel.Refresh();
         hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
     }
@@ -126,7 +126,7 @@ public partial class Game : Node {
     /// <summary>Replaces the world with a new one and closes everything that showed the old one.</summary>
     private void DropWorld() { world.NewGame(); ForgetWorld(); panel.Close(); ending.Visible = false; blackHole.End(); }
     /// <summary>Forgets what the player had selected and was doing in the world that went away.</summary>
-    private void ForgetWorld() { panel.ClearSelection(); player.Stop(); }
+    private void ForgetWorld() { panel.ClearSelection(); player.Stop(); recovery.Refresh(); }
     private void OnJoined(bool back) {
         Settings.Store("net", "address", net.Address);
         saves.Slot = 0; ForgetWorld(); ending.Joined(back);
