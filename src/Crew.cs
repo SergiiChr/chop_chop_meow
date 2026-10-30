@@ -19,7 +19,7 @@ public partial class Game {
         (int Hired, int Daily) shown = (-1, -1);
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(count)) return;
-            var now = (world.S.Workers.Count, DailyWages());
+            var now = (world.S.Workers.Count, world.DailyWages);
             if (now == shown) return;
             shown = now;
             countText.Clear().Append(now.Item1).Append(" / ").Append(World.MaxWorkers); countText.Show();

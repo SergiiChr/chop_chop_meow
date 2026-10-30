@@ -69,33 +69,37 @@ public partial class Vial : Control {
     }
 }
 
-public partial class Game {
-    private Vial health = null!;
-    private Vial hunger = null!;
-    private Vial thirst = null!;
-    private DamageEdges damageEdges = null!;
-    private Label bankDue = null!;
-    private Badge bankCount = null!;
-    private ItemSlot bankCup = null!;
+/// <summary>
+/// The top left plate: health, hunger and thirst as capsules that drain, each over its icon, and the bank:
+/// coins kept for wages at the trading posts, with the day's wages, in red while they come to more than the bank holds.
+/// </summary>
+public partial class NeedsPlate : PanelContainer {
+    private readonly UiKit kit;
+    private readonly World world;
+    private readonly DamageEdges edges;
+    private readonly Label bankDue;
+    private readonly Badge bankCount;
+    private readonly ItemSlot bankCup;
+    // The capsules, whose tooltips name each need's level.
+    public Vial Health { get; }
+    public Vial Hunger { get; }
+    public Vial Thirst { get; }
 
-    /// <summary>
-    /// The top left plate: health, hunger and thirst as capsules that drain, each over its icon, and the bank:
-    /// coins kept for wages at the trading posts, with the day's wages, in red while they come to more than the bank holds.
-    /// </summary>
-    private void BuildNeeds() {
-        var box = needsPlate = new PanelContainer { OffsetLeft = 20, OffsetTop = 18 };
-        box.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(box);
-        var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); box.AddChild(row);
+    public NeedsPlate(UiKit kit, ItemMoves moves, DamageEdges edges) {
+        this.kit = kit; world = kit.World; this.edges = edges;
+        OffsetLeft = 20; OffsetTop = 18;
+        AddThemeStyleboxOverride("panel", Style.Plate);
+        var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); AddChild(row);
         Vial Need(string name, Vector2[] shape, Color color) {
             var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 6); row.AddChild(column);
-            var vial = new Vial { Name = name, Fill = color }; vial.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter; column.AddChild(vial);
-            var icon = new NeedGauge { Shape = shape, Fill = color, CustomMinimumSize = new Vector2(22, 20), MouseFilter = Control.MouseFilterEnum.Ignore };
+            var vial = new Vial { Name = name, Fill = color }; vial.SizeFlagsHorizontal = SizeFlags.ShrinkCenter; column.AddChild(vial);
+            var icon = new NeedGauge { Shape = shape, Fill = color, CustomMinimumSize = new Vector2(22, 20), MouseFilter = MouseFilterEnum.Ignore };
             column.AddChild(icon);
             return vial;
         }
-        health = Need("health", NeedGauge.Heart, Style.Brick);
-        hunger = Need("hunger", NeedGauge.Stomach, Style.Mustard);
-        thirst = Need("thirst", NeedGauge.Droplet, Style.Sky);
+        Health = Need("health", NeedGauge.Heart, Style.Brick);
+        Hunger = Need("hunger", NeedGauge.Stomach, Style.Mustard);
+        Thirst = Need("thirst", NeedGauge.Droplet, Style.Sky);
         row.AddChild(new ColorRect { Color = new Color(Style.Beige, .7f), CustomMinimumSize = new Vector2(3, 0) });
         var bank = new VBoxContainer(); bank.AddThemeConstantOverride("separation", 8); row.AddChild(bank);
         bank.AddChild(Style.Heading("Bank", 13));
@@ -107,16 +111,15 @@ public partial class Game {
         cup.TooltipText = "Coins kept at the trading posts for wages; sales land here first.\nDrop coins here at a trading post to bank them · click to take some out";
         cup.CanTake = drag => drag.Item == Inventory.Coins && drag.From == world.S.Backpack;
         cup.Take = drag => {
-            if (NearPost() is not Thing post) { Notify("Bank coins at a trading post."); return drag.Count; }
-            int left = 0; kit.Act(() => left = moves.Drag(drag, post.Wages!, post)); RefreshLive(); return left;
+            if (NearPost() is not Thing post) { kit.Notify("Bank coins at a trading post."); return drag.Count; }
+            int left = 0; kit.Act(() => left = moves.Drag(drag, post.Wages!, post)); kit.Refresh(); return left;
         };
         cup.Pressed += () => {
-            if (NearPost() is not Thing post) { Notify("Take coins out at a trading post."); return; }
-            kit.Act(() => moves.Stack(post.Wages!, world.S.Backpack, Inventory.Coins, post)); RefreshLive();
+            if (NearPost() is not Thing post) { kit.Notify("Take coins out at a trading post."); return; }
+            kit.Act(() => moves.Stack(post.Wages!, world.S.Backpack, Inventory.Coins, post)); kit.Refresh();
         };
         line.AddChild(cup);
         bankDue = Style.Text("", 14, Style.Beige); line.AddChild(bankDue);
-        damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); ui.AddChild(damageEdges);
     }
 
     /// <summary>The trading post within reach that has coins or room for them, or null.</summary>
@@ -126,26 +129,26 @@ public partial class Game {
     }
 
     /// <summary>Flashes the screen edges on a hit; a pinned player keeps a steady glow while the wolves feed, and a hungry or thirsty one a faint pulse.</summary>
-    private void DamageFlash(float lost) {
-        if (lost >= 3) damageEdges.Strength = 1;
-        if (world.S.Mauled && !world.Dead) damageEdges.Strength = Math.Max(damageEdges.Strength, .55f);
+    public void DamageFlash(float lost, float runTime) {
+        if (lost >= 3) edges.Strength = 1;
+        if (world.S.Mauled && !world.Dead) edges.Strength = Math.Max(edges.Strength, .55f);
         // Food or drink under 15% keeps the edges pulsing faintly until the player eats or drinks.
-        else if (!world.Dead && (world.S.Hunger < GameData.LowNeed || world.S.Thirst < GameData.LowNeed)) damageEdges.Strength = Math.Max(damageEdges.Strength, .5f + .15f * MathF.Sin(runTime * 4));
+        else if (!world.Dead && (world.S.Hunger < GameData.LowNeed || world.S.Thirst < GameData.LowNeed)) edges.Strength = Math.Max(edges.Strength, .5f + .15f * MathF.Sin(runTime * 4));
     }
 
     // The rounded values the tooltips show, so their text is built only when one changes.
     private (int Health, int Hunger, int Thirst) shownNeeds = (-1, -1, -1);
     private (int Bank, int Due) shownBank = (-1, -1);
-    private void RefreshNeeds() {
+    public void Refresh() {
         var needs = ((int)MathF.Round(world.S.Health, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Hunger, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Thirst, MidpointRounding.AwayFromZero));
         if (needs != shownNeeds) {
             shownNeeds = needs;
-            health.TooltipText = $"Health {world.S.Health:0}%"; hunger.TooltipText = $"Hunger {world.S.Hunger:0}%"; thirst.TooltipText = $"Thirst {world.S.Thirst:0}%";
-            health.Level = world.S.Health; hunger.Level = world.S.Hunger; thirst.Level = world.S.Thirst;
-            health.Warn = world.S.Health <= 25; hunger.Warn = world.S.Hunger <= 25; thirst.Warn = world.S.Thirst <= 25;
-            health.QueueRedraw(); hunger.QueueRedraw(); thirst.QueueRedraw();
+            Health.TooltipText = $"Health {world.S.Health:0}%"; Hunger.TooltipText = $"Hunger {world.S.Hunger:0}%"; Thirst.TooltipText = $"Thirst {world.S.Thirst:0}%";
+            Health.Level = world.S.Health; Hunger.Level = world.S.Hunger; Thirst.Level = world.S.Thirst;
+            Health.Warn = world.S.Health <= 25; Hunger.Warn = world.S.Hunger <= 25; Thirst.Warn = world.S.Thirst <= 25;
+            Health.QueueRedraw(); Hunger.QueueRedraw(); Thirst.QueueRedraw();
         }
-        var bank = (world.WageCoins, DailyWages());
+        var bank = (world.WageCoins, world.DailyWages);
         if (bank != shownBank) {
             shownBank = bank;
             bankCount.Text = bank.WageCoins > 0 ? bank.WageCoins.ToString() : "";
@@ -156,6 +159,7 @@ public partial class Game {
         }
     }
 }
+
 
 /// <summary>A red glow along the screen edges, at most 5% of the screen deep, that fades after a hit.</summary>
 public partial class DamageEdges : Control {

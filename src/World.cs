@@ -275,6 +275,14 @@ public sealed partial class World {
     public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind == ThingKind.Water ? Terrain.WaterPoint(from) : t.Pos;
     public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(GatherAt(t, Player)) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
+    /// <summary>What every worker's wage comes to each dawn.</summary>
+    public int DailyWages {
+        get {
+            int wages = 0;
+            foreach (var w in S.Workers) wages += w.Wage;
+            return wages;
+        }
+    }
     public int Carried(string item) => S.Backpack[item];
     public Inventory Backpack => S.Backpack;
     public float Time => S.Time;

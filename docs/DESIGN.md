@@ -71,7 +71,7 @@ UI and input:
 | `src/Crew.cs` | The crew cards and worker panel |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/Guide.cs` | The field guide topics |
-| `src/Needs.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
+| `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/StartMenu.cs` | The start menu with its save slot, load and options screens |
 | `src/Hotbar.cs` | Nine saved item/plan references, assignment, icons and use |

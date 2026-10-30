@@ -15,7 +15,8 @@ public partial class Game : Node {
     private VBoxContainer content = null!;
     private Label stats = null!;
     private MessageStack messages = null!;
-    private PanelContainer needsPlate = null!;
+    private NeedsPlate needsPlate = null!;
+    private DamageEdges damageEdges = null!;
     private Label waterWarning = null!;
     private float waterWarningClock;
     private Label modeLabel = null!;
@@ -183,7 +184,9 @@ public partial class Game : Node {
         // Raised above the centred player so a downed body stays visible under the message.
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
-        BuildNeeds(); ending = new EndingScreen(kit, ClosePanel, Restart); ui.AddChild(ending); BuildMenu(); BuildScreens();
+        damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
+        needsPlate = new NeedsPlate(kit, moves, damageEdges); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
+        ending = new EndingScreen(kit, ClosePanel, Restart); ui.AddChild(ending); BuildMenu(); BuildScreens();
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
         RefreshLive();
     }
@@ -219,7 +222,7 @@ public partial class Game : Node {
         // An update can open another page, which replaces the list; the old page's remaining updates are then dropped.
         int opened = pagesOpened;
         for (int i = 0; i < live.Count && opened == pagesOpened; i++) live[i]();
-        RefreshHotbar(); RefreshNeeds(); RefreshBag();
+        RefreshHotbar(); needsPlate.Refresh(); RefreshBag();
     }
     private (int Used, int Slots) shownFill = (-1, -1);
     private void RefreshBag() {
@@ -344,11 +347,6 @@ public partial class Game : Node {
     private const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
     private void UseFromBag(string id) {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
-    }
-    private int DailyWages() {
-        int wages = 0;
-        foreach (var w in world.S.Workers) wages += w.Wage;
-        return wages;
     }
     private void Select(Thing t) {
         if (t.Kind == ThingKind.Reinforced && !(page == "inspect" && selected == t.Id)) sounds.Play("open_steel_smelter", t.Pos);
@@ -865,7 +863,7 @@ public partial class Game : Node {
             float health = world.Remote ? shownHealth : world.S.Health;
             if (!world.Remote) world.Tick(dt);
             ending.ShowOnce(); autosave += dt;
-            DamageFlash(health - world.S.Health); shownHealth = world.S.Health;
+            needsPlate.DamageFlash(health - world.S.Health, runTime); shownHealth = world.S.Health;
             // A guest saves its player whenever it changes instead; the world is the host's to save.
             if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) Save(0); autosave = 0; }
         }
