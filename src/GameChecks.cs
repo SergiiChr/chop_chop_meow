@@ -9,22 +9,6 @@ using static Checks;
 namespace ChopChopMeow;
 
 public partial class Game {
-    private async Task Frames(int count = 2) {
-        for (int i = 0; i < count; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-    }
-    private async Task Seconds(double seconds) => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);
-    /// <summary>Waits frame by frame until <paramref name="done"/> holds, and fails naming <paramref name="what"/> if it still does not after <paramref name="seconds"/> real seconds.</summary>
-    private async Task Until(Func<bool> done, string what, double seconds = 60, [CallerFilePath] string file = "") {
-        ulong end = Time.GetTicksMsec() + (ulong)(seconds * 1000);
-        while (!done() && Time.GetTicksMsec() < end) await Frames(1);
-        Require(done(), $"{what} never happened.", file);
-    }
-    private async Task KeyStroke(Key key) {
-        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = key, Keycode = key, Pressed = false });
-        await Frames();
-    }
     /// <summary>
     /// Walking for a few hundred real frames, through Godot input, allocates no more than its budget on the main thread:
     /// every byte is garbage the runtime collects later, in a pause that stalls a frame.
@@ -175,82 +159,6 @@ public partial class Game {
                 "Restoring a tree canopy must restore the original visible material while proxies keep casting shadows.");
         }
     }
-    private Button? FindButton(Node parent, string text) {
-        foreach (var child in parent.GetChildren()) {
-            if (child is Button b && b.Text == text) return b;
-            var found = FindButton(child, text); if (found != null) return found;
-        }
-        return null;
-    }
-    private Button? Named(string name) => panel.FindChild(name, true, false) as Button;
-    private bool HasLabel(Node parent, string text) {
-        foreach (var child in parent.GetChildren()) {
-            if (child is Label label && label.Text.Contains(text, StringComparison.OrdinalIgnoreCase)) return true;
-            if (HasLabel(child, text)) return true;
-        }
-        return false;
-    }
-    /// <summary>Window position of a control's centre, scrolled into view first.</summary>
-    private async Task<Vector2> At(Control control) {
-        for (Node? n = control.GetParent(); n != null; n = n.GetParent()) if (n is ScrollContainer scroll) scroll.EnsureControlVisible(control);
-        await Frames();
-        return GetViewport().GetFinalTransform() * control.GetGlobalRect().GetCenter();
-    }
-    private async Task Click(Control control) {
-        var at = await At(control);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
-        await Frames();
-    }
-    /// <summary>Two presses, the second flagged as a double click the way Godot reports one.</summary>
-    private async Task DoubleClick(Control control) {
-        var at = await At(control);
-        foreach (bool second in new[] { false, true }) {
-            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true, DoubleClick = second });
-            await Frames();
-            Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
-            await Frames();
-        }
-    }
-    /// <summary>A real mouse drag: press, move in steps past the drag threshold, release over the target.</summary>
-    private async Task DragTo(Control from, Control to) {
-        var start = await At(from); var end = await At(to);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = start, GlobalPosition = start, Pressed = true });
-        await Frames();
-        for (int i = 1; i <= 8; i++) {
-            var at = start.Lerp(end, i / 8f);
-            Input.ParseInputEvent(new InputEventMouseMotion { ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Relative = (end - start) / 8 });
-            await Frames(1);
-        }
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
-        await Frames();
-    }
-    /// <summary>A right click on a stack, a move to the target and a left click there.</summary>
-    private async Task SplitTo(Control from, Control to) {
-        var start = await At(from); var end = await At(to);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = start, GlobalPosition = start, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = start, GlobalPosition = start, Pressed = false });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseMotion { Position = end, GlobalPosition = end, Relative = end - start });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = end, GlobalPosition = end, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
-        await Frames();
-    }
-    /// <summary>The panel's grids in order, then the backpack drawer's.</summary>
-    private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => panel.FindChildren("*", "GridContainer", true, false).Concat(bag.FindChildren("*", "GridContainer", true, false))
-        .ElementAt(grid).GetChildren().OfType<ItemSlot>().First(match);
-    private System.Collections.Generic.IEnumerable<Button> Slots() => panel.FindChildren("slot_*", "Button", true, false).Concat(bag.FindChildren("slot_*", "Button", true, false)).OfType<Button>();
-    private async Task Click(Vector2 point) {
-        var at = GetViewport().GetFinalTransform() * point;
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
-        await Frames();
-    }
     /// <summary>Messages keep clear of the HUD, stack, restart on a repeat, make room by dropping the stalest and fade out.</summary>
     private async Task CheckMessages() {
         ClosePanel(); await Frames();
@@ -336,7 +244,7 @@ public partial class Game {
             var spot = World.MineSpot(cliff);
             world.Player = spot + cliff.Face * 3; await Frames(4);
             await KeyStroke(Key.B);
-            Named("build_mine")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            await Click(Named("build_mine")!);
             Require(view.BuildMode == ThingKind.Mine, "The mine plan must enter placement mode.");
             // Off the exact spot, so the click shows the plan snapping to the cliff.
             await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
@@ -349,13 +257,6 @@ public partial class Game {
         await KeyStroke(Key.Escape);
         Require(HasLabel(menu, "END GOALS") && HasLabel(menu, "A working iron mine") && HasLabel(menu, $"{world.Data.Goals.DailyProfit} coins profit a day"), "The pause menu must list the end goals.");
         await KeyStroke(Key.Escape);
-    }
-    /// <summary>Clicks open ground beside the player, so the click uses the item in hand instead of selecting something.</summary>
-    private async Task ClickGround() {
-        await Frames();
-        var open = Enumerable.Range(1, 6).SelectMany(r => Enumerable.Range(0, 8).Select(a => world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r))
-            .Select(p => view.Screen(p)).First(p => view.Pick(p) == null && view.PickWorker(p) == null && GetViewport().GetVisibleRect().HasPoint(p) && p.Y < GetViewport().GetVisibleRect().Size.Y - 120);
-        await Click(open);
     }
 
     private async Task CheckCraftingAndTorch() {
@@ -446,15 +347,6 @@ public partial class Game {
         Require(!anomaly.Visible && backdrop.Visible && FindButton(screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
     }
 
-    private async Task Wheel(Vector2 point) {
-        var at = GetViewport().GetFinalTransform() * point;
-        Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Position = at, GlobalPosition = at, Pressed = true, Factor = 1 });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Position = at, GlobalPosition = at, Pressed = false, Factor = 1 });
-        await Frames();
-    }
-
     private async Task CheckWheelOverPanel() {
         float zoom = view.Zoom;
         foreach (var page in new[] { "inventory", "build", "craft", "help" }) {
@@ -503,9 +395,6 @@ public partial class Game {
         Require(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
         Require(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
     }
-    private static void RemoveCheckFiles() {
-        foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
-    }
     private async void RunUIChecks() {
         try {
             // A failed earlier run may have left saves behind, which would enable Continue.
@@ -516,24 +405,35 @@ public partial class Game {
             await Click(FindButton(screen, "Options")!);
             var picker = (OptionButton)screen.FindChild("resolution", true, false);
             Require(picker.Selected == Array.IndexOf(Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
-            picker.Select(0); picker.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
-            Require(SavedResolution() == Resolutions[0], "Choosing a resolution must store it in the settings file.");
+            await Choose(picker, 0);
             var limits = (OptionButton)screen.FindChild("frame_limit", true, false);
             Require(limits.Selected == 0 && limits.GetItemText(0) == "Off" && Engine.MaxFps == 0, "The frame rate limit must start off.");
-            limits.Select(2); limits.EmitSignal(OptionButton.SignalName.ItemSelected, 2L); await Frames();
-            Require(SavedFrameLimit() == 90 && Engine.MaxFps == 90, "Choosing a frame rate limit must store it and cap the frame rate.");
-            limits.Select(0); limits.EmitSignal(OptionButton.SignalName.ItemSelected, 0L); await Frames();
-            Require(SavedFrameLimit() == 0 && Engine.MaxFps == 0, "Turning the frame rate limit off must store it and lift the cap.");
+            await Choose(limits, 2);
+            Require(Engine.MaxFps == 90, "Choosing a frame rate limit must cap the frame rate.");
             var taa = (CheckButton)screen.FindChild("taa", true, false);
             Require(taa.ButtonPressed && GetViewport().UseTaa, "Temporal anti-aliasing must start on.");
             await Click(taa);
-            Require(!SavedTaa() && !GetViewport().UseTaa, "Switching temporal anti-aliasing off must store it and apply it at once.");
-            await Click(taa);
-            Require(SavedTaa() && GetViewport().UseTaa, "Switching temporal anti-aliasing back on must store it and apply it.");
+            Require(!GetViewport().UseTaa, "Switching temporal anti-aliasing off must apply it at once.");
             var musicSlider = (HSlider)screen.FindChild("music", true, false);
             Require(musicSlider.Value == 100, "Music must start at full volume.");
-            musicSlider.Value = 40; await Frames();
-            Require(Mathf.IsEqualApprox(SavedMusicVolume(), .4f) && Mathf.IsEqualApprox(sounds.MusicVolume, .4f), "The music slider must set and store the music volume.");
+            await Click(musicSlider);
+            Require(Mathf.IsEqualApprox(sounds.MusicVolume, .5f), "The music slider must set the music volume.");
+            async Task ReopenOptions() {
+                await KeyStroke(Key.Escape);
+                await Click(FindButton(screen, "Options")!);
+                picker = (OptionButton)screen.FindChild("resolution", true, false);
+                limits = (OptionButton)screen.FindChild("frame_limit", true, false);
+                taa = (CheckButton)screen.FindChild("taa", true, false);
+                musicSlider = (HSlider)screen.FindChild("music", true, false);
+            }
+            await ReopenOptions();
+            Require(picker.Selected == 0 && limits.Selected == 2 && !taa.ButtonPressed && musicSlider.Value == 50, "Reopened options must show the stored choices.");
+            await Choose(limits, 0);
+            Require(Engine.MaxFps == 0, "Turning the frame rate limit off must lift the cap.");
+            await Click(taa);
+            Require(GetViewport().UseTaa, "Switching temporal anti-aliasing back on must apply it.");
+            await ReopenOptions();
+            Require(limits.Selected == 0 && taa.ButtonPressed, "Reopened options must show the choices changed back.");
             await KeyStroke(Key.Escape);
             Require(FindButton(screen, "New game") != null, "Esc in options must return to the start menu.");
             await Click(FindButton(screen, "Load game")!);
@@ -647,9 +547,9 @@ public partial class Game {
             Require(world.S.Backpack["water"] == 0 && world.S.Thirst > 20, "A left click on open ground must drink the water in hand.");
             await KeyStroke(Key.B); Require(page == "build" && panel.Visible, "B must open the building plans.");
             var plan = Named("build_chest"); Require(plan != null, "Building plans must expose storage construction.");
-            plan!.EmitSignal(Control.SignalName.MouseEntered); await Frames();
+            await Hover(plan!);
             Require(HasLabel(panel, "Needs: Wood") && HasLabel(panel, "5 slots"), "Hovering a plan must show its description and required resources.");
-            plan.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            await Click(plan!);
             Require(view.BuildMode == ThingKind.Chest && !panel.Visible, "Choosing a plan must enter placement mode.");
             Vector2 place = Vector2.Zero;
             for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) {
@@ -668,7 +568,7 @@ public partial class Game {
                 "A ground click must construct the chest without opening it, staying in placement while another can be afforded.");
             view.BuildMode = null; Select(chest!);
             var deposit = Named("deposit"); Require(deposit != null, "Chest context must expose deposit action.");
-            deposit!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            await Click(deposit!);
             Require(chest!.Inventory["wood"] > 0 && world.S.Backpack["steel_axe"] == 1, "Manual deposit must move materials and retain equipped tools.");
             int storedWood = chest.Inventory["wood"]; RefreshLive();
             await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), Cell(1, c => c.TooltipText == ""));
@@ -685,16 +585,16 @@ public partial class Game {
             RefreshLive();
             await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
             Require(chest.Inventory["wood"] == storedWood, "The split half must go back into the chest.");
-            Named("filters")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            await Click(Named("filters")!);
             Require(filterOpen && sheet.Visible && panel.FindChild("filter_in", true, false) != null && panel.FindChild("filter_out", true, false) != null, "Chest filters must open in the filter window beside the panel.");
             await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), (Control)panel.FindChild("filter_add_in", true, false));
             Require(chest.Inventory.InputFilter.Contains("wood") && chest.Inventory["wood"] == storedWood, "Dropping an item on a filter row must add it to that filter without moving it.");
-            ((Button)panel.FindChild("filter_in_wood", true, false)).EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            await Click(Named("filter_in_wood")!);
             Require(!chest.Inventory.InputFilter.Contains("wood"), "Clicking an item in a filter row must take it off.");
             await Click((Control)bag.FindChild("bag_close", true, false));
-            Named("filters")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            await Click(Named("filters")!);
             Require(!bag.Visible && panel.Visible, "The backpack drawer's close button must hide it while the building's page stays open and refreshes.");
-            Named("filters")!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            await Click(Named("filters")!);
             await Click(Named("filters_close")!);
             Require(!filterOpen && panel.Visible, "The filter window's close button must close it and leave the panel open.");
             await KeyStroke(Key.Tab);
@@ -743,7 +643,7 @@ public partial class Game {
             var berryCell = Slots().FirstOrDefault(c => c.TooltipText.StartsWith("Berries"));
             int berriesBeforeClick = world.S.Backpack["berries"];
             Require(berryCell != null, "Carried berries must appear as a grid cell.");
-            berryCell!.EmitSignal(BaseButton.SignalName.Pressed); await Frames();
+            await Click(berryCell!);
             Require(world.S.Backpack["berries"] == berriesBeforeClick - 1, "Clicking a berry cell must eat one berry.");
 
             float dayTime = world.S.Time;
@@ -771,7 +671,7 @@ public partial class Game {
             world.S.Milestones.Add("profit_week");
             await Frames(3);
             Require(ending.Visible && paused, "Reaching the end goals must show the ending and pause the world.");
-            ((Button)ending.FindChild("keep_playing", true, false)).EmitSignal(BaseButton.SignalName.Pressed); await Frames(3);
+            await Click((Button)ending.FindChild("keep_playing", true, false)); await Frames(3);
             Require(!ending.Visible && !paused && world.S.EndingShown, "Keep playing must close the ending and resume.");
             await Frames(3);
             Require(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
@@ -811,8 +711,7 @@ public partial class Game {
             Select(furnace);
             var pumpButton = Named("pump");
             Require(pumpButton != null, "The selected furnace should still expose its pump control while paused.");
-            pumpButton!.EmitSignal(BaseButton.SignalName.Pressed);
-            await Frames();
+            await Click(pumpButton!);
             Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "The pump button must not change heat while paused.");
             Require(view.PlayerAnimation == actionBeforePausedActions && Math.Abs(view.PlayerAnimationTime - pausedActionTime) < .001f, "Paused Space and pump-button input must not start an animation pulse.");
             ClosePanel();

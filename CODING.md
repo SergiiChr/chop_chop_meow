@@ -1,6 +1,6 @@
 # Coding rules
 
-Project rules on top of the global coding guide.
+Project rules on top of the global coding and testing guides.
 `./build.py check` enforces the parts a tool can check.
 
 ## C#
@@ -33,6 +33,10 @@ Project rules on top of the global coding guide.
 
 ## Tests
 
+- Test at these seams:
+  - `World`'s public methods catch simulation rule breaks and miss anything on screen.
+  - `Input.ParseInputEvent` and what the player sees catch broken controls and panels, and miss how the game looks.
+  - `Net`'s messages between a host and a guest process catch sync breaks and miss a real network.
 - Use representative end-to-end checks plus focused edge cases.
 - UI checks live in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` and `src/NetChecks.cs`; a change to a shared check helper covers all three.
 - Input tests go through `Input.ParseInputEvent`, not direct calls to input handlers.
@@ -40,6 +44,7 @@ Project rules on top of the global coding guide.
 - A fixture built by editing text, such as an old save, fails when the text it edits is missing.
 - UI checks wait for a condition with a time limit, not for a fixed time; a fixed wait is only for holding input or letting something play for a set time.
 - A check that a load restores something changes that thing between saving and loading.
+- Check files hold only checks and their runners. Steps live in feature files: `tests/WorldSteps.cs`, `PlayerSteps.cs`, `WorkerSteps.cs`, `EconomySteps.cs` and `ModelSteps.cs` for simulation checks, and `src/InputSteps.cs`, `PanelSteps.cs` and `SessionSteps.cs` for UI and network checks.
 - Checks fail through the shared `Checks.Require` in `tests/Checks.cs`.
 - Do not weaken assertions to make broken behavior pass.
 

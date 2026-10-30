@@ -7,14 +7,6 @@ using static Checks;
 namespace ChopChopMeow;
 
 public partial class Game {
-    private async Task SurvivalReviewShot(string name) {
-        if (LaunchValue("--review-captures") is not string folder) return;
-        System.IO.Directory.CreateDirectory(folder);
-        await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
-        Require(GetViewport().GetTexture().GetImage().SavePng(System.IO.Path.Combine(folder, name + ".png")) == Error.Ok,
-            "The rendered survival review capture must save successfully.");
-    }
-
     /// <summary>Exercises survival interactions through the same UI and input path a player uses.</summary>
     private async Task CheckSurvivalInventoryUI() {
         string savedWorld = world.Serialize();

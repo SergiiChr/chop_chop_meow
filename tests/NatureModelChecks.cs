@@ -3,6 +3,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static ModelSteps;
 
 /// <summary>Ore deposits share cached geometry while each prop keeps independent visibility and fade state.</summary>
 public static class NatureModelChecks {
@@ -61,10 +62,4 @@ public static class NatureModelChecks {
         }
     }
 
-    private static MeshInstance3D[] Parts(Prop prop) => Enumerable.Range(0, 3)
-        .Select(index => prop.Body.GetChild(index) as MeshInstance3D
-            ?? throw new InvalidOperationException("Nature model check failed: ore mesh instance was not found"))
-        .ToArray();
-
-    private static string PartName(int index) => index switch { 0 => "host", 1 => "seam", _ => "chip" };
 }

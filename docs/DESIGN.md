@@ -91,9 +91,11 @@ Checks and review tools:
 
 | File | Owns |
 | --- | --- |
-| `tests/*.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`) |
+| `tests/*Checks.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`) |
+| `tests/*Steps.cs` | Steps shared by the simulation checks |
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
+| `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs` | The rendered performance run |
 | `src/AnimationCapture.cs` | Captures the animation review |
 

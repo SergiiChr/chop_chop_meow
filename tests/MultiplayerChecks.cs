@@ -4,6 +4,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static WorldSteps;
 
 /// <summary>
 /// Deterministic checks for players sharing one world: guests act through commands the host runs as them,
@@ -80,13 +81,6 @@ public static class MultiplayerChecks {
         return (world, guest, heard);
     }
 
-    private static void Tick(World world, float seconds) {
-        for (; seconds > 0; seconds -= .25f) {
-            foreach (var p in world.S.Players) { p.Hunger = 100; p.Thirst = 100; }
-            world.Tick(.25f);
-        }
-    }
-
     private static void CheckGuestActsThroughCommands(GameData data) {
         var (world, guest, heard) = Hosted(data);
         Require(heard.Contains("A neighbor joined the settlement."), "everyone should hear that a guest joined");
@@ -136,7 +130,7 @@ public static class MultiplayerChecks {
 
         foreach (var command in sent) host.Run(guest, command);
         var hostChest = host.Find(chest.Id)!;
-        Require(guest.Backpack["berries"] == 2 && guest.Hunger > 50 && host.S.Things.Any(t => t.Kind == ThingKind.Campfire) && guest.Backpack["wood"] == 20 - data.Buildings[ThingKind.Campfire].Cost["wood"] - 5,
+        Require(guest.Backpack["berries"] == 2 && guest.Hunger > 50 && host.S.Things.Any(t => t.Kind == ThingKind.Campfire) && guest.Backpack["wood"] == 9,
             "the host should run the guest's actions as the guest");
         Require(hostChest.Inventory["wood"] == 5 && hostChest.Inventory.InputFilter.Contains("wood"), "the guest's transfer and filter should land in the host's chest");
         Require(host.S.Backpack["berries"] == 0 && host.S.Hunger == 100, "the host's own player should be untouched by a guest's actions");
@@ -148,7 +142,7 @@ public static class MultiplayerChecks {
         guest.Backpack.Add("steel_axe", 1);
         world.As(guest, () => world.MoveTo(tree.Pos + new Vector2(.8f, 0)));
         guest.GatherTarget = tree.Id;
-        Tick(world, data.GatherSeconds * 2 + .5f);
+        FedPlayersTick(world, data.GatherSeconds * 2 + .5f);
         Require(guest.Backpack["wood"] >= 4 && world.S.Backpack["wood"] == 0 && tree.Remaining < 40, "a guest holding on to a tree should chop wood into their own backpack");
         guest.GatherTarget = 0;
 
@@ -156,10 +150,10 @@ public static class MultiplayerChecks {
         world.SetRecipe(anvil, "steel_parts");
         anvil.Inventory.Add("steel_bar", 1);
         world.Player = Terrain.Spawn + new Vector2(20, 0);
-        Tick(world, 1);
+        FedPlayersTick(world, 1);
         Require(!anvil.Processing, "an anvil nobody stands at should not start");
         world.As(guest, () => world.MoveTo(anvil.Pos + new Vector2(1, 0)));
-        Tick(world, data.Recipes["steel_parts"].Seconds + 1);
+        FedPlayersTick(world, data.Recipes["steel_parts"].Seconds + 1);
         Require(anvil.Inventory["steel_parts"] == 1, "a guest standing at an anvil should hammer it");
     }
 

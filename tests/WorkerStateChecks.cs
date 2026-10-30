@@ -3,6 +3,8 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static WorldSteps;
+using static WorkerSteps;
 
 /// <summary>Simulation checks for worker animation state transitions.</summary>
 public static class WorkerStateChecks {
@@ -13,14 +15,6 @@ public static class WorkerStateChecks {
         CheckBlockedPath(data);
         CheckFurnacePumping(data);
         CheckSaveRoundTrip(data);
-    }
-
-    private static World EmptyWorld(GameData data) => new(data, false);
-
-    private static Worker AddWorker(World world, Vector2 position) {
-        var worker = new Worker { Id = world.S.NextId++, Name = "State check worker", Pos = position };
-        world.S.Workers.Add(worker);
-        return worker;
     }
 
     private static void CheckGatherAndReassign(GameData data) {

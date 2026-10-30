@@ -13,22 +13,6 @@ namespace ChopChopMeow;
 public partial class Game {
     private static readonly Vector2 NetOre = Terrain.Spawn + new Vector2(2.5f, 2), NetCoal = Terrain.Spawn + new Vector2(-1.5f, 3.5f), NetChest = Terrain.Spawn + new Vector2(.5f, 3), NetHut = Terrain.Spawn + new Vector2(-3.5f, -3);
 
-    private async Task Type(string text) {
-        foreach (char c in text) {
-            Input.ParseInputEvent(new InputEventKey { Keycode = (Key)c, Unicode = c, Pressed = true });
-            Input.ParseInputEvent(new InputEventKey { Keycode = (Key)c, Unicode = c, Pressed = false });
-            await Frames(1);
-        }
-    }
-
-    private async Task RightClick(Vector2 at) {
-        var point = GetViewport().GetFinalTransform() * view.Screen(at, .2f);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = point, GlobalPosition = point, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = point, GlobalPosition = point, Pressed = false });
-        await Frames();
-    }
-
     private async void RunNetCheck(bool hosting) {
         try {
             if (hosting) await HostNetCheck(); else await GuestNetCheck();
@@ -46,8 +30,9 @@ public partial class Game {
         await Click(hostButton);
         Require(net.Hosting && !menu.Visible && !paused, "Host in the pause menu must open the current game to guests and close the menu.");
         await KeyStroke(Key.Escape);
-        float before = world.S.Time; await Seconds(.4);
-        Require(menu.Visible && world.S.Time > before && netLine.Text.StartsWith("Hosting on port 24565"), "While hosting, the pause menu must say so and the world must keep going.");
+        float before = world.S.Time;
+        await Until(() => world.S.Time > before, "the world going on behind the host's pause menu", 5);
+        Require(menu.Visible && netLine.Text.StartsWith("Hosting on port 24565"), "While hosting, the pause menu must say so.");
         await KeyStroke(Key.Escape);
 
         PlayerState Guest() => world.S.Players.Single(p => p != world.Me);
@@ -103,29 +88,4 @@ public partial class Game {
 
     private static string GuestSave => $"user://{FilePrefix}guest-127-0-0-1-{CheckPort}.json";
 
-    /// <summary>Join game on the start menu, the address typed into the popup and the port as it comes; tried again until the host is up.</summary>
-    private async Task JoinFromStart() {
-        for (ulong until = Time.GetTicksMsec() + 45000; !world.Remote;) {
-            if (Time.GetTicksMsec() > until) Require(false, $"joining the host never happened: {joinStatus.Text}");
-            await Click(FindButton(screen, "Join game")!);
-            var port = (LineEdit)screen.FindChild("port", true, false);
-            Require(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
-            port.Text = CheckPort.ToString();
-            var address = (LineEdit)screen.FindChild("address", true, false);
-            // The popup offers the address of the last game joined.
-            if (address.Text == "") await Type("127.0.0.1");
-            else Require(address.Text == "127.0.0.1", "The join popup must offer the last address joined.");
-            await Click(FindButton(screen, "Join")!);
-            for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && joinStatus.Text == "Connecting…";) await Frames(1);
-            if (!world.Remote) { await Click(FindButton(screen, "Back · Esc")!); await Seconds(1); }
-        }
-        await Until(() => !backdrop.Visible, "the join popup closing");
-    }
-
-    private async Task LeaveGame() {
-        ClosePanel(); await KeyStroke(Key.Escape);
-        Require(menu.Visible && joinButton.Text == "Leave game" && saveButton.Disabled, "A guest's pause menu must offer to leave and not to save the host's world.");
-        await Click(joinButton);
-        Require(!world.Remote && backdrop.Visible && Godot.FileAccess.FileExists(GuestSave), "Leaving must save the guest's player and return to the start menu.");
-    }
 }

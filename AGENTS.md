@@ -32,7 +32,6 @@ Icons and models are committed; playing does not call an image-generation servic
 ## Working rules
 
 - Plan ahead and split work into well-defined tasks.
-- Hand lower-complexity tasks to a cheaper, faster model or subagent; inspect and verify its result.
 - Continue until the requested goal is achieved. Ask about material design ambiguities rather than quietly changing the game.
 - Several agent sessions share the main checkout: do branch work in a worktree ([docs/RELEASE.md](docs/RELEASE.md)).
 - Keep tool downloads and build output ignored, and never depend on another local checkout.
