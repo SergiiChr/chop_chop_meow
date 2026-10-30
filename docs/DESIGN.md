@@ -73,7 +73,7 @@ UI and input:
 | `src/Market.cs` | The trading post market, hiring offers and price sheet |
 | `src/Crew.cs` | The crew cards and worker panel |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
-| `src/Guide.cs` | The field guide topics |
+| `src/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/StartMenu.cs` | The start menu with its save slot, load and options screens |

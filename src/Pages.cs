@@ -12,7 +12,7 @@ public partial class PagePanel {
     public override void _Ready() {
         switch (pageName) {
             case "welcome": Welcome(); break;
-            case "help": Help(); break;
+            case "help": AddChild(new GuidePanel(panel)); break;
             case "build": BuildingPlans(); break;
             case "inventory": Backpack(); break;
             case "workers": Workers(); break;

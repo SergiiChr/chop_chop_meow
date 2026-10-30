@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 /// The field guide: round tabs for its topics beside short tips, each led by the item or key it is about.
 /// Keys show as key caps; everything else as the item's icon in a cup.
 /// </summary>
-public partial class PagePanel {
+public partial class GuidePanel(SidePanel side) : PagePanel(side) {
     private static readonly (string Key, string Glyph, string Title)[] GuideTopics = {
         ("controls", "line_mouse", "Controls"), ("steel", "line_flame", "Iron and steel"), ("craft", "line_craft", "Crafting"),
         ("crew", "line_crew", "Crew and storage"), ("survive", "line_moon", "Staying alive"), ("trade", "line_cart", "Trade")
@@ -65,7 +65,7 @@ public partial class PagePanel {
         }
     };
 
-    private void Help() {
+    public override void _Ready() {
         var board = new HBoxContainer(); board.AddThemeConstantOverride("separation", 14); content.AddChild(board);
         var tabs = new VBoxContainer(); tabs.AddThemeConstantOverride("separation", 10); board.AddChild(tabs);
         foreach (var (key, glyph, title) in GuideTopics) {
