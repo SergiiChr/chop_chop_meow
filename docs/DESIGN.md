@@ -75,6 +75,7 @@ UI and input:
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
 | `src/CabinPanel.cs` | A cabin: its door and sleep |
+| `src/CampfirePanel.cs` | A campfire |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
