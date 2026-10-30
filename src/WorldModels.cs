@@ -9,41 +9,132 @@ namespace ChopChopMeow;
 /// <summary>A vertical hit cylinder in model space; picking and canopy fading use the same volumes.</summary>
 public readonly record struct Hit(float Radius, float Bottom, float Top);
 
-/// <summary>A built world object plus the moving parts that <see cref="WorldView"/> animates from simulation state.</summary>
-public sealed class Prop {
+/// <summary>A built world object; subtypes hold the moving parts of each kind that <see cref="WorldView"/> animates from simulation state.</summary>
+public class Prop {
     public readonly Node3D Root = new();
     public readonly Node3D Body;
-    public Node3D? Sway, Stump, Fruit, Lid, Door, Lever, Needle, Flag, Fire, Chisel, Hammer, Mortar, Marker;
-    /// <summary>A mine's parts, shown stage by stage: the marked outline, the dug hole, the delivered materials, the timber frame, the rails and the cart with its load.</summary>
-    public Node3D? Outline, Hole, Supplies, Frame, Rails, Cart, Load;
-    /// <summary>A tool station's hanging tools by kind, each shown while the station holds one.</summary>
-    public Dictionary<string, Node3D> Racked = new();
-    /// <summary>A pile's stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
-    public StockPile? Stock;
-    /// <summary>The item each pile stack shows, or "" for a hidden stack.</summary>
-    /// <summary>A farm plot's looks by <see cref="World.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
-    public Node3D[] Crops = Array.Empty<Node3D>();
-    public Node3D[] Crates = Array.Empty<Node3D>();
-    public Node3D? Packing;
-    public Node3D[] Pleats = Array.Empty<Node3D>();
-    public MeshInstance3D? Glow, Window, Pool;
-    public WorldModels.WolfModel? Wolf;
-    public OmniLight3D? Light;
-    public Vector3 Vent;
     public Hit[] Hits = Array.Empty<Hit>();
-    /// <summary>A tree crown's meshes and their own materials, for fading it without walking its nodes.</summary>
-    public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
     public ThingKind Kind;
-    public float Fade, Fall = -1, Open, Shake, Puff;
-    public int LastCount;
+    public float Shake;
     /// <summary>Whether a build-mode ghost is tinted as placeable, or null before its first tint.</summary>
     public bool? Tint;
     public bool Seen;
-    /// <summary>Whether a hut shows its night window glow and lamp.</summary>
-    public bool Lit;
     /// <summary>Whether the model is drawn, kept here so it is set in Godot only when it changes.</summary>
     public bool Shown = true;
     public Prop() { Body = Pivot(Root, Vector3.Zero); }
+}
+
+public sealed class TreeProp : Prop {
+    /// <summary>The trunk and crown, which shake and fall about the base.</summary>
+    public Node3D Sway = null!, Stump = null!;
+    /// <summary>The crown's meshes and their own materials, for fading it without walking its nodes.</summary>
+    public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
+    /// <summary>Seconds since the tree was felled, or below zero while it stands.</summary>
+    public float Fall = -1;
+    /// <summary>How see-through the crown is while it hides something behind it.</summary>
+    public float Fade;
+}
+
+public sealed class BushProp : Prop {
+    public Node3D Fruit = null!;
+}
+
+public sealed class CarcassProp : Prop {
+    public WorldModels.WolfModel Wolf = null!;
+    public MeshInstance3D Pool = null!;
+}
+
+/// <summary>A chest, crate or dropped backpack, whose lid opens while it is used.</summary>
+public sealed class BoxProp : Prop {
+    public Node3D Lid = null!;
+    /// <summary>The bobbing marker over a dropped backpack.</summary>
+    public Node3D? Marker;
+    public float Open;
+    /// <summary>Seconds the lid stays open after the contents changed.</summary>
+    public float Puff;
+    public int LastCount;
+}
+
+/// <summary>A station with a fire, whose smoke rises from <see cref="Vent"/>.</summary>
+public abstract class HearthProp : Prop {
+    public OmniLight3D Light = null!;
+    public Vector3 Vent;
+    /// <summary>Seconds until the next puff of smoke.</summary>
+    public float Smoke;
+}
+
+public sealed class CampfireProp : HearthProp {
+    public Node3D Fire = null!;
+}
+
+public sealed class FurnaceProp : HearthProp {
+    public MeshInstance3D Glow = null!;
+    /// <summary>The stocked fuel beside the furnace.</summary>
+    public StockPile Stock = null!;
+}
+
+/// <summary>A cooking table or canning station.</summary>
+public sealed class StoveProp : HearthProp {
+    public MeshInstance3D Glow = null!;
+    /// <summary>The cooking table's mortar, shown while one is slotted.</summary>
+    public Node3D? Mortar;
+}
+
+public sealed class ForgeProp : HearthProp {
+    public MeshInstance3D Glow = null!;
+    public Node3D Needle = null!, Lever = null!;
+    public Node3D[] Pleats = Array.Empty<Node3D>();
+}
+
+public sealed class AnvilProp : Prop {
+    /// <summary>Where sparks fly from a hammer blow.</summary>
+    public Vector3 Vent;
+}
+
+public sealed class HutProp : Prop {
+    public Node3D Door = null!;
+    public MeshInstance3D Window = null!;
+    public OmniLight3D Light = null!;
+    public float Open;
+    /// <summary>Whether the hut shows its night window glow and lamp.</summary>
+    public bool Lit;
+}
+
+public sealed class BenchProp : Prop {
+    public Node3D Chisel = null!, Hammer = null!;
+}
+
+public sealed class PileProp : Prop {
+    /// <summary>The stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
+    public StockPile Stock = null!;
+}
+
+public sealed class FarmProp : Prop {
+    /// <summary>The plot's looks by <see cref="World.CropLook"/> from 1: sown soil, small straws, tall green plants and ripe wheat; one shows at a time over the soil.</summary>
+    public Node3D[] Crops = Array.Empty<Node3D>();
+}
+
+public sealed class PackerProp : Prop {
+    public Node3D[] Crates = Array.Empty<Node3D>();
+    public Node3D Packing = null!;
+    public StockPile Stock = null!;
+}
+
+public sealed class RackProp : Prop {
+    /// <summary>The hanging tools by kind, each shown while the station holds one.</summary>
+    public readonly Dictionary<string, Node3D> Racked = new();
+}
+
+public sealed class SignpostProp : Prop {
+    public Node3D Flag = null!;
+    public float Open;
+}
+
+/// <summary>A mine's parts, shown stage by stage: the marked outline, the dug hole, the delivered materials, the timber frame, the rails and the cart with its load.</summary>
+public sealed class MineProp : Prop {
+    public Node3D Outline = null!, Hole = null!, Supplies = null!, Frame = null!, Rails = null!, Cart = null!, Load = null!, Fire = null!;
+    public MeshInstance3D Glow = null!;
+    public OmniLight3D Light = null!;
 }
 
 /// <summary>Code-built low-poly models for every world object: natural, modern and DIY rather than fantasy.</summary>
@@ -112,37 +203,40 @@ public static class WorldModels {
     };
 
     public static Prop Build(Thing t) {
-        var prop = new Prop { Kind = t.Kind, Hits = Hits(t) };
-        var body = prop.Body;
+        Prop prop;
         switch (t.Kind) {
-            case ThingKind.Tree: Tree(prop, t.Id); break;
-            case ThingKind.Stone: Rocks(body, t.Kind, t.Id, "8d918e"); break;
-            case ThingKind.Iron: Rocks(body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
-            case ThingKind.Coal: Rocks(body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
-            case ThingKind.Tin: Rocks(body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
-            case ThingKind.LooseCoal: LooseOre(body, t.Kind.Id(), t.Id, "2d2f33", "1d1e21"); break;
-            case ThingKind.WolfCorpse: Carcass(prop); break;
-            case ThingKind.Berries: Bush(prop, t.Id); break;
-            case ThingKind.Water: break; // The lake is the drinking spot; this thing only provides the hit area.
-            case ThingKind.Furnace: BlockFurnace(prop); break;
-            case ThingKind.Reinforced: DrumForge(prop); break;
-            case ThingKind.Hut: Cabin(prop); break;
-            case ThingKind.Chest: Chest(prop); break;
-            case ThingKind.Grave: DroppedBackpack(prop); break;
-            case ThingKind.Anvil: Anvil(prop); break;
-            case ThingKind.Crate: Crate(prop); break;
-            case ThingKind.Bench: Workbench(prop); break;
-            case ThingKind.Cooktable: CookingTable(prop); break;
-            case ThingKind.Cannery: Cannery(prop); break;
-            case ThingKind.Packer: PackingStation(prop); break;
-            case ThingKind.Toolstation: ToolRack(prop); break;
-            case ThingKind.Pile: Pile(prop); break;
-            case ThingKind.Farm: Farm(prop, t.Id); break;
-            case ThingKind.Leaves: LeafLitter(body, t.Id); break;
-            case ThingKind.Signpost: Signpost(prop); break;
-            case ThingKind.Campfire: FirePit(prop); break;
-            case ThingKind.Mine: Mine(prop, World.CliffAt(t.Pos).Ore); break;
+            case ThingKind.Tree: prop = Tree(t.Id); break;
+            case ThingKind.Stone: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "8d918e"); break;
+            case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
+            case ThingKind.Coal: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
+            case ThingKind.Tin: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
+            case ThingKind.LooseCoal: prop = new Prop(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "2d2f33", "1d1e21"); break;
+            case ThingKind.Leaves: prop = new Prop(); LeafLitter(prop.Body, t.Id); break;
+            case ThingKind.WolfCorpse: prop = Carcass(); break;
+            case ThingKind.Berries: prop = Bush(t.Id); break;
+            // The lake is the drinking spot; this thing only provides the hit area.
+            case ThingKind.Water: prop = new Prop(); break;
+            case ThingKind.Furnace: prop = BlockFurnace(); break;
+            case ThingKind.Reinforced: prop = DrumForge(); break;
+            case ThingKind.Hut: prop = Cabin(); break;
+            case ThingKind.Chest: prop = Chest(); break;
+            case ThingKind.Grave: prop = DroppedBackpack(); break;
+            case ThingKind.Anvil: prop = Anvil(); break;
+            case ThingKind.Crate: prop = Crate(); break;
+            case ThingKind.Bench: prop = Workbench(); break;
+            case ThingKind.Cooktable: prop = CookingTable(); break;
+            case ThingKind.Cannery: prop = Cannery(); break;
+            case ThingKind.Packer: prop = PackingStation(); break;
+            case ThingKind.Toolstation: prop = ToolRack(); break;
+            case ThingKind.Pile: prop = Pile(); break;
+            case ThingKind.Farm: prop = Farm(t.Id); break;
+            case ThingKind.Signpost: prop = Signpost(); break;
+            case ThingKind.Campfire: prop = FirePit(); break;
+            case ThingKind.Mine: prop = Mine(World.CliffAt(t.Pos).Ore); break;
+            default: throw new ArgumentOutOfRangeException(nameof(t), t.Kind, "No model for this kind.");
         }
+        prop.Kind = t.Kind; prop.Hits = Hits(t);
+        var body = prop.Body;
         if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Jitter(t.Id, 1) * 360 : 0, 0);
         if (t.Kind == ThingKind.Mine) body.Rotation = MineYaw(t.Pos);
         return prop;
@@ -165,8 +259,8 @@ public static class WorldModels {
         switch (id) {
             case "steel_axe" or "steel_pick" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
-            case "rake": return Part(ThingKind.Toolstation, p => p.Racked["rake"]);
-            case "mortar": return Part(ThingKind.Cooktable, p => p.Mortar!);
+            case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Racked["rake"]);
+            case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
             case "water" or "water_2" or "water_1" or "empty_bottle": return BottleShape.Create(Water.BottleSips(id));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id);
@@ -181,28 +275,33 @@ public static class WorldModels {
             case "iron_ore": { var lump = new Node3D(); LooseOre(lump, "loose_iron", 0, "a35a2e", "8b4f2b"); return lump; }
             case "coal" or "tin_ore": return Build(new Thing { Kind = id == "coal" ? ThingKind.LooseCoal : ThingKind.Tin }).Root;
             case "mine": {
-                    var prop = new Prop { Kind = ThingKind.Mine };
-                    Mine(prop, ThingKind.Iron);
-                    prop.Outline!.Visible = prop.Supplies!.Visible = prop.Glow!.Visible = prop.Fire!.Visible = false;
+                    var prop = Mine(ThingKind.Iron);
+                    prop.Outline.Visible = prop.Supplies.Visible = prop.Glow.Visible = prop.Fire.Visible = false;
                     return prop.Root;
                 }
         }
         if (!building || Kinds.Parse(id) is not ThingKind kind) return null;
         var built = Build(new Thing { Kind = kind });
-        if (built.Glow != null) built.Glow.Visible = false;
-        if (id == "farm") { built.Crops[0].Visible = built.Crops[^1].Visible = true; }
-        // A pile shows logs, a furnace its wood and a packing station a heap of bread.
-        built.Stock?.Fill(id == "packer" ? "bread" : "wood", int.MaxValue, 1, data);
+        // A pile and a furnace show logs, a packing station a heap of bread, and a farm ripe wheat over sown soil.
+        switch (built) {
+            case FurnaceProp furnace: furnace.Glow.Visible = false; furnace.Stock.Fill("wood", int.MaxValue, 1, data); break;
+            case StoveProp stove: stove.Glow.Visible = false; break;
+            case ForgeProp forge: forge.Glow.Visible = false; break;
+            case FarmProp farm: farm.Crops[0].Visible = farm.Crops[^1].Visible = true; break;
+            case PileProp pile: pile.Stock.Fill("wood", int.MaxValue, 1, data); break;
+            case PackerProp packer: packer.Stock.Fill("bread", int.MaxValue, 1, data); break;
+        }
         return built.Root;
     }
 
     /// <summary>The outdoor pile shows stocked fuel, excluding fuel already burning in a batch: a pile of it for every two.</summary>
-    public static void SyncFuel(Prop prop, Thing t, GameData data) {
+    public static void SyncFuel(FurnaceProp prop, Thing t, GameData data) {
         string fuel = World.BurnedFuel(t);
-        prop.Stock!.Fill(fuel, t.Burner?[fuel] ?? 0, 2, data);
+        prop.Stock.Fill(fuel, t.Burner?[fuel] ?? 0, 2, data);
     }
 
-    private static void Tree(Prop prop, int id) {
+    private static TreeProp Tree(int id) {
+        var prop = new TreeProp();
         var sway = Pivot(prop.Body, Vector3.Zero);
         prop.Sway = sway; // the whole tree shakes and falls about its base
         float scale = .9f + Jitter(id, 2) * .22f;
@@ -214,6 +313,8 @@ public static class WorldModels {
         var stump = Add(prop.Root, NatureShape.Stump, NatureShape.Natural, Vector3.Zero);
         stump.Visible = false;
         prop.Stump = stump;
+        prop.SwayParts = FadeParts(sway);
+        return prop;
     }
 
     /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows veins across the rock faces and ore chunks set into it.</summary>
@@ -232,22 +333,27 @@ public static class WorldModels {
     private static void LooseOre(Node3D body, string kind, int id, string light, string dark) =>
         Add(body, NatureShape.Loose(kind, new Color(light), new Color(dark), id % NatureShape.Variants), NatureShape.Natural, Vector3.Zero);
 
-    private static void Carcass(Prop prop) {
+    private static CarcassProp Carcass() {
+        var prop = new CarcassProp();
         prop.Pool = Cylinder(prop.Body, .55f, .55f, .004f, new Vector3(.1f, .006f, 0), Flat(new Color(.36f, .05f, .05f, .75f), true), null, 14);
         prop.Wolf = new WolfModel();
         prop.Body.AddChild(prop.Wolf.Root);
+        return prop;
     }
 
-    private static void Bush(Prop prop, int id) {
+    private static BushProp Bush(int id) {
+        var prop = new BushProp();
         int variant = id % NatureShape.Variants;
         var leaves = Tree3DShape.Add(prop.Body, 3, variant);
         var fruit = Pivot(prop.Body, Vector3.Zero);
         Add(fruit, NatureShape.CardBerries(leaves, variant), NatureShape.Glossy, Vector3.Zero);
         prop.Fruit = fruit;
+        return prop;
     }
 
     /// <summary>Cinder-block furnace with a steel top plate, stovepipe and stocked fuel pile.</summary>
-    private static void BlockFurnace(Prop prop) {
+    private static FurnaceProp BlockFurnace() {
+        var prop = new FurnaceProp();
         var body = prop.Body;
         Add(body, FurnaceShape.Masonry, FurnaceShape.Concrete, Vector3.Zero);
         prop.Glow = Add(body, FurnaceShape.Fire, FurnaceShape.Flame, Vector3.Zero);
@@ -264,10 +370,12 @@ public static class WorldModels {
         prop.Stock = new StockPile(body, new[] { new Vector3(.82f, .08f, -.13f), new Vector3(.82f, .08f, .15f), new Vector3(.82f, .24f, .01f) }, .4f);
         prop.Light = Light(body, new Vector3(0, .35f, .7f), 2);
         Scorch(body, 1.9f);
+        return prop;
     }
 
     /// <summary>A propane-tank forge on an angle-iron stand, fed by a hinged leather bellows with a heat gauge on top.</summary>
-    private static void DrumForge(Prop prop) {
+    private static ForgeProp DrumForge() {
+        var prop = new ForgeProp();
         var body = prop.Body;
         var steel = Mat("3b3f42", .5f, .7f);
         foreach (var (x, z) in new[] { (-.35f, -.3f), (.35f, -.3f), (-.35f, .3f), (.35f, .3f) }) Box(body, new Vector3(.05f, .5f, .05f), new Vector3(x, .25f, z), steel);
@@ -317,10 +425,12 @@ public static class WorldModels {
         }
         prop.Light = Light(body, new Vector3(0, .9f, .9f), 2.2f);
         Scorch(body, 1.6f);
+        return prop;
     }
 
     /// <summary>Small OSB cabin on block piers with a corrugated shed roof, solar panel and rain barrel.</summary>
-    private static void Cabin(Prop prop) {
+    private static HutProp Cabin() {
+        var prop = new HutProp();
         var body = prop.Body;
         foreach (var (x, z) in new[] { (-1.1f, -1f), (1.1f, -1f), (-1.1f, 1f), (1.1f, 1f) }) Box(body, new Vector3(.3f, .3f, .3f), new Vector3(x, .15f, z), Mat("9a9b97"));
         Box(body, new Vector3(2.6f, .12f, 2.4f), new Vector3(0, .36f, 0), Mat("7d5f43"));
@@ -346,7 +456,6 @@ public static class WorldModels {
         Box(roof, new Vector3(1.14f, .03f, .84f), new Vector3(.55f, .065f, -.4f), Mat("c9ced2", .4f, .7f));
         Post(body, .08f, .08f, 1.1f, new Vector3(-.75f, 2.4f, -.6f), Mat("8e9396", .45f, .7f));
         Post(body, .14f, 0, .12f, new Vector3(-.75f, 3.48f, -.6f), Mat("8e9396", .45f, .7f), 8);
-        prop.Vent = new Vector3(-.75f, 3.6f, -.6f);
         // Door hinged on its left edge, painted teal.
         // The hinge axis sits just ahead of the jamb so the open leaf clears the frame.
         var door = Pivot(body, new Vector3(-.75f, .42f, 1.075f));
@@ -370,9 +479,11 @@ public static class WorldModels {
             new ActorShape.Ring(.73f, .28f, .28f, blue), new ActorShape.Ring(.16f, .28f, .28f, blue),
             new ActorShape.Ring(.03f, .255f, .255f, blue), new ActorShape.Ring(0, .23f, .23f, blue) });
         prop.Light = Light(body, new Vector3(.55f, 1.65f, 1.4f), 2.5f);
+        return prop;
     }
 
-    private static void Chest(Prop prop) {
+    private static BoxProp Chest() {
+        var prop = new BoxProp();
         var body = prop.Body;
         Add(body, ChestShape.Body, ChestShape.Wood, Vector3.Zero);
         Add(body, ChestShape.Frame, ChestShape.Metal, Vector3.Zero);
@@ -380,13 +491,15 @@ public static class WorldModels {
         Add(hinge, ChestShape.Lid, ChestShape.Wood, Vector3.Zero);
         Add(hinge, ChestShape.LidFrame, ChestShape.Metal, Vector3.Zero);
         prop.Lid = hinge;
+        return prop;
     }
 
     /// <summary>
     /// The player's shared canvas pack laid on its straps, with an animated access flap.
     /// It is drawn larger than the worn pack, and a glowing gem bobs above it, so it stands out from grass and shows at night.
     /// </summary>
-    private static void DroppedBackpack(Prop prop) {
+    private static BoxProp DroppedBackpack() {
+        var prop = new BoxProp();
         var dropped = Pivot(prop.Body, Vector3.Zero, new Vector3(0, -18, 0));
         dropped.Scale = Vector3.One * 1.4f;
         var pack = Pivot(dropped, new Vector3(0, .145f, 0), new Vector3(90, 0, 0));
@@ -401,18 +514,22 @@ public static class WorldModels {
         Cylinder(marker, .13f, 0, .09f, new Vector3(0, .045f, 0), gold, sides: 4);
         Cylinder(marker, 0, .13f, .24f, new Vector3(0, -.12f, 0), gold, sides: 4);
         prop.Marker = marker;
+        return prop;
     }
 
     /// <summary>A hollow slatted crate with a separately hinged lid and shared wood geometry.</summary>
-    private static void Crate(Prop prop) {
+    private static BoxProp Crate() {
+        var prop = new BoxProp();
         Add(prop.Body, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
         var lid = Pivot(prop.Body, new Vector3(0, .42f, -.23f));
         Add(lid, CrateShape.Lid, CrateShape.Timber, Vector3.Zero);
         prop.Lid = lid;
+        return prop;
     }
 
     /// <summary>A plank-topped workbench with a lower shelf and a vise; slotted tools lie on the top.</summary>
-    private static void Workbench(Prop prop) {
+    private static BenchProp Workbench() {
+        var prop = new BenchProp();
         var body = prop.Body;
         var steel = Mat("4a4d50", .4f, .6f);
         Add(body, BenchShape.Wood, BenchShape.Timber, Vector3.Zero);
@@ -431,13 +548,15 @@ public static class WorldModels {
         }
         prop.Chisel = Slot(new Vector3(-.3f, .815f, .05f), 30, ("stone_chisel", .02f), ("steel_chisel", .02f));
         prop.Hammer = Slot(new Vector3(.05f, .815f, -.1f), -20, ("wood_hammer", .052f), ("steel_hammer", .034f));
+        return prop;
     }
 
     /// <summary>
     /// A long painted packing table with the crate being packed open on its top beside a heap of the good being packed,
     /// and up to three empty crates stacked beside it, lids shut.
     /// </summary>
-    private static void PackingStation(Prop prop) {
+    private static PackerProp PackingStation() {
+        var prop = new PackerProp();
         var body = prop.Body;
         Add(body, BenchShape.Packing, BenchShape.Timber, new Vector3(-.25f, 0, 0));
         prop.Packing = Pivot(body, new Vector3(-.6f, .835f, 0));
@@ -450,10 +569,12 @@ public static class WorldModels {
             Add(crate, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
             Add(Pivot(crate, new Vector3(0, .42f, -.23f)), CrateShape.Lid, CrateShape.Timber, Vector3.Zero);
         }
+        return prop;
     }
 
     /// <summary>A stone firebox under a steel grill with a stew pot, beside a plank counter where the slotted mortar and pestle sits.</summary>
-    private static void CookingTable(Prop prop) {
+    private static StoveProp CookingTable() {
+        var prop = new StoveProp();
         var body = prop.Body;
         Add(body, CookShape.Masonry, CookShape.Stone, Vector3.Zero);
         Add(body, CookShape.Timber, CookShape.Wood, Vector3.Zero);
@@ -465,10 +586,12 @@ public static class WorldModels {
         prop.Mortar = mortar;
         prop.Light = Light(body, new Vector3(-.33f, .3f, .6f), 2.2f);
         Scorch(body, 1.3f);
+        return prop;
     }
 
     /// <summary>A steel stove with a lidded canning pot, beside a plank table with tin cans and a lever press.</summary>
-    private static void Cannery(Prop prop) {
+    private static StoveProp Cannery() {
+        var prop = new StoveProp();
         var body = prop.Body;
         Add(body, CanneryShape.Stove, CanneryShape.Iron, Vector3.Zero);
         Add(body, CanneryShape.Timber, CanneryShape.Wood, Vector3.Zero);
@@ -478,10 +601,12 @@ public static class WorldModels {
         prop.Vent = new Vector3(-.44f, 1.1f, -.18f);
         prop.Light = Light(body, new Vector3(-.27f, .25f, .55f), 2f);
         Scorch(body, 1.3f);
+        return prop;
     }
 
     /// <summary>A plank pegboard on two posts set in a cinder-block footing, with an axe, a pickaxe and a rake hanging on it.</summary>
-    private static void ToolRack(Prop prop) {
+    private static RackProp ToolRack() {
+        var prop = new RackProp();
         // Turned to face down the valley, toward the camera, so the hanging tools show.
         var body = Pivot(prop.Body, Vector3.Zero, new Vector3(0, 45, 0));
         Add(body, RackShape.Feet, RackShape.Concrete, Vector3.Zero);
@@ -491,11 +616,13 @@ public static class WorldModels {
             Add(hook, mesh, RackShape.Tool, Vector3.Zero);
             return hook;
         }
-        prop.Racked = new() { ["axe"] = Hang(-.3f, RackShape.Axe), ["pickaxe"] = Hang(0, RackShape.Pick), ["rake"] = Hang(.3f, RackShape.Rake) };
+        prop.Racked["axe"] = Hang(-.3f, RackShape.Axe); prop.Racked["pickaxe"] = Hang(0, RackShape.Pick); prop.Racked["rake"] = Hang(.3f, RackShape.Rake);
+        return prop;
     }
 
     /// <summary>A 3×3 yard of packed earth edged with logs, with fourteen stack blocks in a 9-4-1 pyramid that the view shows as the pile fills.</summary>
-    private static void Pile(Prop prop) {
+    private static PileProp Pile() {
+        var prop = new PileProp();
         var body = prop.Body;
         Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
         var slots = new List<Vector3>();
@@ -506,15 +633,16 @@ public static class WorldModels {
                     slots.Add(new Vector3(x * step - offset, y, z * step - offset));
                 }
         prop.Stock = new StockPile(body, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(slots));
+        return prop;
     }
 
     private static readonly List<(string Item, int Count)> pileSlots = new();
 
     /// <summary>Refresh only visible inventory memory; the view guards this call with the existing sight check.</summary>
-    public static void SyncPile(Prop prop, Thing t, GameData data) {
+    public static void SyncPile(PileProp prop, Thing t, GameData data) {
         t.Inventory.FillStacks(pileSlots);
         // Each drawn stack shows the next filled slot, or nothing once the slots run out.
-        for (int i = 0, next = 0; i < prop.Stock!.Count; i++) {
+        for (int i = 0, next = 0; i < prop.Stock.Count; i++) {
             string item = "";
             while (item == "" && next < pileSlots.Count) item = pileSlots[next++].Item;
             prop.Stock.Show(i, item, data);
@@ -522,7 +650,8 @@ public static class WorldModels {
     }
 
     /// <summary>A farm plot: an empty pile's yard that, once sown, shows dark tilled rows and then the wheat growing on them.</summary>
-    private static void Farm(Prop prop, int id) {
+    private static FarmProp Farm(int id) {
+        var prop = new FarmProp();
         var body = prop.Body;
         Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
         int variant = id % 3;
@@ -535,6 +664,7 @@ public static class WorldModels {
         }
         prop.Crops = new[] { soil, Field(0), Field(1), Field(2) };
         foreach (var crop in prop.Crops) crop.Visible = false;
+        return prop;
     }
 
     /// <summary>A loose scatter of fallen oak leaves in autumn colours, flat on the ground.</summary>
@@ -543,7 +673,8 @@ public static class WorldModels {
     }
 
     /// <summary>Anvil bolted to a welded square-tube stand.</summary>
-    private static void Anvil(Prop prop) {
+    private static AnvilProp Anvil() {
+        var prop = new AnvilProp();
         var body = prop.Body;
         var tube = Mat("5d6a4f", .6f, .4f);
         foreach (var (x, z) in new[] { (-.2f, -.15f), (.2f, -.15f), (-.2f, .15f), (.2f, .15f) }) Box(body, new Vector3(.06f, .46f, .06f), new Vector3(x * 1.1f, .23f, z * 1.1f), tube);
@@ -551,10 +682,12 @@ public static class WorldModels {
         Box(body, new Vector3(.5f, .04f, .05f), new Vector3(0, .12f, .17f), tube);
         Add(body, AnvilShape.Casting, AnvilShape.Iron, Vector3.Zero);
         prop.Vent = new Vector3(0, .86f, 0);
+        return prop;
     }
 
     /// <summary>A village market post with a mailbox, framed chalkboard and shipping storage.</summary>
-    private static void Signpost(Prop prop) {
+    private static SignpostProp Signpost() {
+        var prop = new SignpostProp();
         var body = prop.Body;
         Add(body, SignpostShape.Timber, SignpostShape.Wood, Vector3.Zero);
         Add(body, SignpostShape.Mailbox, SignpostShape.Steel, Vector3.Zero);
@@ -577,10 +710,12 @@ public static class WorldModels {
             NoDepthTest = false,
             Shaded = true
         });
+        return prop;
     }
 
     /// <summary>Campfire enclosed by hand-packed fieldstones, with split firewood and flickering flames.</summary>
-    private static void FirePit(Prop prop) {
+    private static CampfireProp FirePit() {
+        var prop = new CampfireProp();
         var body = prop.Body;
         Add(body, FirePitShape.Stones, FirePitShape.Stone, Vector3.Zero);
         Add(body, FirePitShape.Fuel, FirePitShape.Wood, Vector3.Zero);
@@ -593,6 +728,7 @@ public static class WorldModels {
         prop.Light.OmniAttenuation = .5f;
         prop.Light.ShadowEnabled = true;
         Scorch(body, 2.6f);
+        return prop;
     }
 
     /// <summary>Needle roll in degrees for a heat fraction: cold points left, full heat points right.</summary>
@@ -624,7 +760,8 @@ public static class WorldModels {
     }
 
     /// <summary>A timbered adit into the cliff's spur, local +Z out of the rock, with rails running in and a cart standing on them at the origin.</summary>
-    private static void Mine(Prop prop, ThingKind ore) {
+    private static MineProp Mine(ThingKind ore) {
+        var prop = new MineProp();
         var body = prop.Body;
         const float Door = MineDoor;
         // The marking: a see-through green footprint and portal, shown until the mine is finished.
@@ -676,6 +813,7 @@ public static class WorldModels {
         prop.Cart = cart;
         // Lamplight deep inside while someone works underground: a faint warm haze at the dark end.
         prop.Glow = Box(body, new Vector3(1.4f, 1.7f, .02f), new Vector3(0, .86f, Door - 2.5f), Flat(new Color(1, .55f, .2f, .25f)));
+        return prop;
     }
 
     private static OmniLight3D Light(Node3D parent, Vector3 at, float range) {

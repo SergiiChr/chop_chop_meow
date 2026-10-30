@@ -96,25 +96,25 @@ public partial class Game {
     private async Task CheckFreshModelsAfterRestart() {
         var tree = world.S.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(world.Player))!;
         await Frames();
-        var old = view.PropOf(tree.Id);
+        var old = view.PropOf(tree.Id) as TreeProp;
         Require(old != null, "Every tree must have its model once the world has loaded.");
         CheckTreeCanopyShadows(old!);
         old!.Fade = .68f; old.Fall = 9;
         Restart(); await Frames(2);
-        var fresh = view.PropOf(tree.Id);
+        var fresh = view.PropOf(tree.Id) as TreeProp;
         Require(world.Find(tree.Id)?.Kind == ThingKind.Tree && fresh != null && fresh != old && fresh.Fade == 0 && fresh.Fall < 0,
             "A new game must build fresh models rather than keep the last game's, faded or fallen.");
         ClosePanel();
     }
     /// <summary>Canopy fades use separate shadow-only meshes so the original cutout shadows survive alpha blending.</summary>
-    private void CheckTreeCanopyShadows(Prop prop) {
+    private void CheckTreeCanopyShadows(TreeProp prop) {
         Require(prop.SwayParts.Length > 0, "A tree canopy must expose its visible meshes for fading.");
         var allMeshes = new List<MeshInstance3D>();
         void Gather(Node at) {
             if (at is MeshInstance3D mesh) allMeshes.Add(mesh);
             foreach (var child in at.GetChildren()) Gather(child);
         }
-        Gather(prop.Sway!);
+        Gather(prop.Sway);
         // The solid core that fills a canopy's shadow is separate from the per-mesh proxies.
         static bool Core(MeshInstance3D mesh) => mesh.MaterialOverride is ShaderMaterial { Shader: var shader } && shader == Tree3DShape.SolidFoliage;
         Require(allMeshes.Count(mesh => Core(mesh) && mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.ShadowsOnly) == 1,
@@ -857,7 +857,7 @@ public partial class Game {
             var berryBush = world.Add(ThingKind.Berries, world.Player + new Vector2(1, -1), 4);
             world.S.Backpack.Remove("berries", 99);
             await Frames(2);
-            var bushProp = view.PropOf(berryBush.Id)!;
+            var bushProp = (BushProp)view.PropOf(berryBush.Id)!;
             Require(bushProp.Fruit is { Visible: true }, "A ripe berry bush must display its fruit.");
             point = view.Screen(berryBush.Pos, .35f);
             Require(view.Pick(point)?.Id == berryBush.Id, "The bush foliage must select its berry resource.");
@@ -866,10 +866,10 @@ public partial class Game {
             await Until(() => berryBush.Remaining == 0, "holding RMB on a berry bush picking it clean", world.Data.GatherSeconds + 3);
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
             await Frames(2);
-            Require(berryBush.Remaining == 0 && world.S.Backpack["berries"] == 4 && !bushProp.Fruit!.Visible && bushProp.Body.Visible,
+            Require(berryBush.Remaining == 0 && world.S.Backpack["berries"] == 4 && !bushProp.Fruit.Visible && bushProp.Body.Visible,
                 "Harvesting must collect the berries and hide only the fruit, leaving the bush visible.");
             berryBush.Remaining = 4; await Frames(2);
-            Require(bushProp.Fruit!.Visible, "A replenished bush must show its fruit again.");
+            Require(bushProp.Fruit.Visible, "A replenished bush must show its fruit again.");
             await CheckCraftingAndTorch();
             await CheckCrateOverflow();
             await CheckSurvivalInventoryUI();

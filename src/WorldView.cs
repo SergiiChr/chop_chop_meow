@@ -608,7 +608,7 @@ public partial class WorldView : Node3D {
             case ThingKind.WolfCorpse: Burst(side + Vector3.Up * .3f, Mat("7a1414", .6f), 5, 1.4f, .45f, 8, .04f); break;
             case ThingKind.Berries: Burst(To3(subject.Pos, .7f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f); break;
             case ThingKind.Water: Burst(side + Vector3.Up * .05f, Splash, 6, 1.6f, .45f, 7, .045f); break;
-            case ThingKind.Anvil: Burst(To3(subject.Pos) + prop.Vent, Sparks, 10, 3, .35f, 5, .025f); break;
+            case ThingKind.Anvil when prop is AnvilProp anvil: Burst(To3(subject.Pos) + anvil.Vent, Sparks, 10, 3, .35f, 5, .025f); break;
             case ThingKind.Reinforced:
                 if (subject.Heat > 10) Burst(To3(subject.Pos, .9f) + new Vector3(0, 0, .5f), Embers, 6, 1.4f, .6f, -1, .03f);
                 break;
@@ -669,7 +669,6 @@ public partial class WorldView : Node3D {
         scene.AddChild(prop.Root);
         props[t.Id] = prop;
         prop.Root.Position = To3(t.Pos);
-        if (prop.Sway != null) prop.SwayParts = FadeParts(prop.Sway);
         // A fresh carcass keeps the heading of the wolf model it replaces.
         if (t.Kind == ThingKind.WolfCorpse && Dying(t.Pos) is { } dying) prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
         return prop;
@@ -681,159 +680,159 @@ public partial class WorldView : Node3D {
         prop.Shake = Math.Max(0, prop.Shake - dt * 2.5f);
         float wobble = prop.Shake * MathF.Sin(Elapsed * 34);
         float flicker = MathF.Sin(Elapsed * 13 + t.Id) * .5f + MathF.Sin(Elapsed * 7.3f + t.Id * 3) * .5f;
-        switch (t.Kind) {
-            case ThingKind.Tree:
-                var sway = prop.Sway!;
+        switch (prop) {
+            case TreeProp tree:
+                var sway = tree.Sway;
                 if (t.Remaining > 0) {
-                    prop.Fall = -1; sway.Visible = true; prop.Stump!.Visible = false;
+                    tree.Fall = -1; sway.Visible = true; tree.Stump.Visible = false;
                     sway.RotationDegrees = new Vector3(wobble * 3, 0, prop.Shake * 2 * MathF.Cos(Elapsed * 29));
                     break;
                 }
                 // A felled tree topples, fades away and leaves its stump.
-                if (prop.Fall < 0) prop.Fall = first ? 9 : 0;
-                float before = prop.Fall; prop.Fall += dt;
-                float drop = Math.Min(1, prop.Fall / 1.1f);
+                if (tree.Fall < 0) tree.Fall = first ? 9 : 0;
+                float before = tree.Fall; tree.Fall += dt;
+                float drop = Math.Min(1, tree.Fall / 1.1f);
                 sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
-                if (before < 1.1f && prop.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
-                SetFade(prop.SwayParts, Math.Clamp((prop.Fall - 1.2f) / .5f, 0, 1));
-                sway.Visible = prop.Fall < 1.7f;
-                prop.Stump!.Visible = true;
+                if (before < 1.1f && tree.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
+                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - 1.2f) / .5f, 0, 1));
+                sway.Visible = tree.Fall < 1.7f;
+                tree.Stump.Visible = true;
                 break;
-            case ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.LooseCoal or ThingKind.Leaves:
+            case Prop when t.Kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.LooseCoal or ThingKind.Leaves:
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
                 break;
-            case ThingKind.WolfCorpse:
+            case CarcassProp carcass:
                 float dying = Math.Clamp(t.Progress / .9f, 0, 1);
-                prop.Wolf!.Fall(dying);
+                carcass.Wolf.Fall(dying);
                 // Butchering flattens the carcass while the blood pool spreads out from under it.
-                prop.Wolf.Root.Scale = new Vector3(1, .6f + .4f * WorldModels.Fullness(t), 1);
-                prop.Wolf.Root.Position = new Vector3(wobble * .03f, 0, 0);
-                prop.Pool!.Scale = Vector3.One * (.2f + .8f * Ease(dying)) * (1.25f - .25f * WorldModels.Fullness(t));
+                carcass.Wolf.Root.Scale = new Vector3(1, .6f + .4f * WorldModels.Fullness(t), 1);
+                carcass.Wolf.Root.Position = new Vector3(wobble * .03f, 0, 0);
+                carcass.Pool.Scale = Vector3.One * (.2f + .8f * Ease(dying)) * (1.25f - .25f * WorldModels.Fullness(t));
                 break;
-            case ThingKind.Berries:
-                prop.Fruit!.Visible = t.Remaining > 0;
+            case BushProp bush:
+                bush.Fruit.Visible = t.Remaining > 0;
                 prop.Body.Scale = new Vector3(1 + wobble * .04f, 1 - wobble * .03f, 1 + wobble * .04f);
                 break;
-            case ThingKind.Furnace:
-                if (World.Sees(t.Pos)) WorldModels.SyncFuel(prop, t, World.Data);
-                prop.Glow!.Visible = t.Processing;
-                prop.Light!.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
-                Smoke(prop, t, t.Processing, dt, FurnaceSmoke);
+            case FurnaceProp furnace:
+                if (World.Sees(t.Pos)) WorldModels.SyncFuel(furnace, t, World.Data);
+                furnace.Glow.Visible = t.Processing;
+                furnace.Light.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
+                Smoke(furnace, t, t.Processing, dt, FurnaceSmoke);
                 break;
-            case ThingKind.Cooktable or ThingKind.Cannery:
+            case StoveProp stove:
                 // The fire only burns for recipes that take fuel; the mortar's work and kneading dough are cold.
                 bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Fuel;
-                prop.Glow!.Visible = cooking;
-                prop.Light!.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
-                if (prop.Mortar != null && World.Sees(t.Pos)) prop.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null;
-                Smoke(prop, t, cooking, dt, FurnaceSmoke);
+                stove.Glow.Visible = cooking;
+                stove.Light.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
+                if (stove.Mortar != null && World.Sees(t.Pos)) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null;
+                Smoke(stove, t, cooking, dt, FurnaceSmoke);
                 break;
-            case ThingKind.Reinforced:
+            case ForgeProp forge:
                 float heat = t.Heat / 100;
-                prop.Glow!.Visible = heat > .05f || t.Processing;
-                prop.Light!.LightEnergy = (heat * 1.5f + (t.Processing ? .4f : 0)) * (1 + flicker * .15f) * (.5f + night);
-                prop.Needle!.RotationDegrees = new Vector3(0, 0, Mathf.Lerp(prop.Needle.RotationDegrees.Z, WorldModels.Gauge(heat), Math.Min(1, dt * 6)));
+                forge.Glow.Visible = heat > .05f || t.Processing;
+                forge.Light.LightEnergy = (heat * 1.5f + (t.Processing ? .4f : 0)) * (1 + flicker * .15f) * (.5f + night);
+                forge.Needle.RotationDegrees = new Vector3(0, 0, Mathf.Lerp(forge.Needle.RotationDegrees.Z, WorldModels.Gauge(heat), Math.Min(1, dt * 6)));
                 float lift = 18 * (1 - pumping.GetValueOrDefault(t.Id));
-                prop.Lever!.RotationDegrees = new Vector3(0, 0, lift);
-                for (int i = 0; i < prop.Pleats.Length; i++) prop.Pleats[i].RotationDegrees = new Vector3(0, 0, lift * (i + 1) / (prop.Pleats.Length + 1));
-                Smoke(prop, t, t.Processing || heat > .3f, dt, ForgeSmoke);
+                forge.Lever.RotationDegrees = new Vector3(0, 0, lift);
+                for (int i = 0; i < forge.Pleats.Length; i++) forge.Pleats[i].RotationDegrees = new Vector3(0, 0, lift * (i + 1) / (forge.Pleats.Length + 1));
+                Smoke(forge, t, t.Processing || heat > .3f, dt, ForgeSmoke);
                 break;
-            case ThingKind.Campfire:
+            case CampfireProp campfire:
                 bool burning = t.Burn > 0;
-                prop.Fire!.Visible = burning;
-                prop.Fire.Scale = new Vector3(1 + flicker * .08f, .85f + MathF.Abs(MathF.Sin(Elapsed * 9 + t.Id)) * .3f, 1 - flicker * .08f);
-                prop.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
-                prop.Light!.LightEnergy = burning ? (1.2f + flicker * .3f) * (.35f + night * 1.4f) : 0;
+                campfire.Fire.Visible = burning;
+                campfire.Fire.Scale = new Vector3(1 + flicker * .08f, .85f + MathF.Abs(MathF.Sin(Elapsed * 9 + t.Id)) * .3f, 1 - flicker * .08f);
+                campfire.Fire.RotationDegrees = new Vector3(0, Elapsed * 40, 0);
+                campfire.Light.LightEnergy = burning ? (1.2f + flicker * .3f) * (.35f + night * 1.4f) : 0;
                 if (burning && dt > 0 && Jitter() < dt * 3) Burst(To3(t.Pos, .55f), Cinders, 1, .5f, 1.1f, -1.4f, .025f);
-                Smoke(prop, t, burning, dt, CampfireSmoke);
+                Smoke(campfire, t, burning, dt, CampfireSmoke);
                 break;
-            case ThingKind.Bench:
+            case BenchProp bench:
                 // Slotted tools lie on the bench top.
                 if (!World.Sees(t.Pos)) break;
-                ShowSlotted(prop.Chisel!, World.BenchTool(t, "chisel"));
-                ShowSlotted(prop.Hammer!, World.BenchTool(t, "hammer"));
+                ShowSlotted(bench.Chisel, World.BenchTool(t, "chisel"));
+                ShowSlotted(bench.Hammer, World.BenchTool(t, "hammer"));
                 prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
                 break;
-            case ThingKind.Pile:
+            case PileProp pile:
                 // Remembered piles carry no inventory, so they keep the stacks they had when last seen.
                 if (!World.Sees(t.Pos)) break;
-                WorldModels.SyncPile(prop, t, World.Data);
+                WorldModels.SyncPile(pile, t, World.Data);
                 break;
-            case ThingKind.Farm:
+            case FarmProp farm:
                 if (!World.Sees(t.Pos)) break;
                 int look = World.CropLook(t, World.GrowSeconds);
-                prop.Crops[0].Visible = look > 0;
-                for (int i = 1; i < prop.Crops.Length; i++) prop.Crops[i].Visible = look == i + 1;
+                farm.Crops[0].Visible = look > 0;
+                for (int i = 1; i < farm.Crops.Length; i++) farm.Crops[i].Visible = look == i + 1;
                 break;
-            case ThingKind.Packer:
+            case PackerProp packer:
                 // Remembered stations carry no inventory, so they keep the crates they had when last seen.
                 if (!World.Sees(t.Pos)) break;
-                for (int i = 0; i < prop.Crates.Length; i++) prop.Crates[i].Visible = i < t.Inventory["crate"];
-                prop.Packing!.Visible = t.Processing;
+                for (int i = 0; i < packer.Crates.Length; i++) packer.Crates[i].Visible = i < t.Inventory["crate"];
+                packer.Packing.Visible = t.Processing;
                 // The heap grows a pile for each third of a crate's worth.
-                prop.Stock!.Fill(t.Packs, t.Packs == "" ? 0 : t.Inventory[t.Packs], World.Data.CrateCapacity / 3, World.Data);
+                packer.Stock.Fill(t.Packs, t.Packs == "" ? 0 : t.Inventory[t.Packs], World.Data.CrateCapacity / 3, World.Data);
                 break;
-            case ThingKind.Toolstation:
+            case RackProp rack:
                 if (!World.Sees(t.Pos)) break;
-                foreach (var (kind, tool) in prop.Racked) tool.Visible = World.BestTool(kind, t.Inventory) != null;
+                foreach (var (kind, tool) in rack.Racked) tool.Visible = World.BestTool(kind, t.Inventory) != null;
                 break;
-            case ThingKind.Chest or ThingKind.Grave or ThingKind.Crate:
+            case BoxProp box:
                 // Remembered boxes carry no inventory, so the lid stays as it was last seen.
                 if (!World.Sees(t.Pos)) break;
                 int count = t.Inventory.Count;
-                if (!first && count != prop.LastCount) prop.Puff = .9f;
-                prop.LastCount = count;
-                prop.Puff = Math.Max(0, prop.Puff - dt);
-                bool open = prop.Puff > 0 || t.Id == Selected && PanelOpen && World.Near(t);
-                if (dt > 0 && (open ? prop.Open == 0 : prop.Open == 1)) Sounds?.Play(open ? "open_chest" : "close_chest", t.Pos);
-                prop.Open = Mathf.MoveToward(prop.Open, open ? 1 : 0, dt * 4);
-                prop.Lid!.RotationDegrees = new Vector3(-80 * Ease(prop.Open), 0, 0);
-                if (prop.Marker != null) {
-                    prop.Marker.Position = new Vector3(0, 1.2f + .08f * MathF.Sin(Elapsed * 2.5f), 0);
-                    prop.Marker.Rotation = new Vector3(0, Elapsed * 1.5f, 0);
+                if (!first && count != box.LastCount) box.Puff = .9f;
+                box.LastCount = count;
+                box.Puff = Math.Max(0, box.Puff - dt);
+                bool open = box.Puff > 0 || t.Id == Selected && PanelOpen && World.Near(t);
+                if (dt > 0 && (open ? box.Open == 0 : box.Open == 1)) Sounds?.Play(open ? "open_chest" : "close_chest", t.Pos);
+                box.Open = Mathf.MoveToward(box.Open, open ? 1 : 0, dt * 4);
+                box.Lid.RotationDegrees = new Vector3(-80 * Ease(box.Open), 0, 0);
+                if (box.Marker != null) {
+                    box.Marker.Position = new Vector3(0, 1.2f + .08f * MathF.Sin(Elapsed * 2.5f), 0);
+                    box.Marker.Rotation = new Vector3(0, Elapsed * 1.5f, 0);
                 }
                 // A crate being lifted rises and rocks before it goes into the backpack.
                 float lifted = t.Id == Lifting ? Ease(LiftProgress) : 0;
                 if (t.Kind == ThingKind.Crate) { prop.Body.Position = new Vector3(0, lifted * .35f, 0); prop.Body.RotationDegrees = new Vector3(lifted * 9 * MathF.Sin(Elapsed * 18), 0, lifted * 6 * MathF.Cos(Elapsed * 15)); }
                 break;
-            case ThingKind.Hut:
+            case HutProp hut:
                 bool near = AnyPlayerNear(t.Pos, 2.6f);
                 // Running inside from a hunting pack slams the door instead of swinging it open.
-                if (dt > 0 && near && prop.Open == 0) Sounds?.Play(World.S.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
-                prop.Open = Mathf.MoveToward(prop.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
-                prop.Door!.RotationDegrees = new Vector3(0, -100 * Ease(prop.Open), 0);
+                if (dt > 0 && near && hut.Open == 0) Sounds?.Play(World.S.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
+                hut.Open = Mathf.MoveToward(hut.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
+                hut.Door.RotationDegrees = new Vector3(0, -100 * Ease(hut.Open), 0);
                 bool lit = night > .45f;
-                if (lit != prop.Lit) {
-                    prop.Lit = lit;
-                    prop.Window!.MaterialOverride = lit ? NightGlass : DayGlass;
-                    prop.Light!.LightEnergy = lit ? .9f : 0;
+                if (lit != hut.Lit) {
+                    hut.Lit = lit;
+                    hut.Window.MaterialOverride = lit ? NightGlass : DayGlass;
+                    hut.Light.LightEnergy = lit ? .9f : 0;
                 }
                 break;
-            case ThingKind.Mine:
+            case MineProp mine:
                 // Remembered mines carry only their stage and progress, so out of sight the cart rests outside, empty, and the lantern is out.
                 float stageShare = Math.Clamp(t.Progress / World.MineStageSeconds, 0, 1);
                 bool finished = t.MineStage == MineStage.Open;
-                prop.Outline!.Visible = !finished;
-                prop.Hole!.Visible = t.MineStage > MineStage.Marked || stageShare > 0;
-                prop.Hole.Scale = new Vector3(1, 1, t.MineStage > MineStage.Marked ? 1 : Math.Max(.05f, stageShare));
-                prop.Supplies!.Visible = t.MineStage == MineStage.Supplied;
-                prop.Frame!.Visible = finished || t.MineStage == MineStage.Supplied && stageShare > 0;
-                prop.Frame.Scale = new Vector3(1, finished ? 1 : Math.Max(.05f, stageShare), 1);
+                mine.Outline.Visible = !finished;
+                mine.Hole.Visible = t.MineStage > MineStage.Marked || stageShare > 0;
+                mine.Hole.Scale = new Vector3(1, 1, t.MineStage > MineStage.Marked ? 1 : Math.Max(.05f, stageShare));
+                mine.Supplies.Visible = t.MineStage == MineStage.Supplied;
+                mine.Frame.Visible = finished || t.MineStage == MineStage.Supplied && stageShare > 0;
+                mine.Frame.Scale = new Vector3(1, finished ? 1 : Math.Max(.05f, stageShare), 1);
                 bool mining = finished && World.Sees(t.Pos) && Underground(t.Id);
-                prop.Rails!.Visible = finished;
-                prop.Cart!.Visible = finished && !mining;
-                prop.Load!.Visible = (t.Output?.Count ?? 0) > 0;
-                prop.Glow!.Visible = prop.Fire!.Visible = mining;
+                mine.Rails.Visible = finished;
+                mine.Cart.Visible = finished && !mining;
+                mine.Load.Visible = (t.Output?.Count ?? 0) > 0;
+                mine.Glow.Visible = mine.Fire.Visible = mining;
                 // The lantern lights its surroundings like a held torch.
-                if (mining) prop.Fire.Scale = new Vector3(1, .9f + flicker * .1f, 1);
-                prop.Light!.LightEnergy = mining ? (1 + flicker * .25f) * (.3f + night * 1.3f) : 0;
+                if (mining) mine.Fire.Scale = new Vector3(1, .9f + flicker * .1f, 1);
+                mine.Light.LightEnergy = mining ? (1 + flicker * .25f) * (.3f + night * 1.3f) : 0;
                 break;
-            case ThingKind.Signpost:
+            case SignpostProp sign:
                 bool waiting = OrderAt(t.Id);
-                prop.Open = Mathf.MoveToward(prop.Open, waiting ? 1 : 0, Math.Max(dt, .016f) * 3);
-                prop.Flag!.RotationDegrees = new Vector3(-90 * (1 - Ease(prop.Open)), 0, 0);
+                sign.Open = Mathf.MoveToward(sign.Open, waiting ? 1 : 0, Math.Max(dt, .016f) * 3);
+                sign.Flag.RotationDegrees = new Vector3(-90 * (1 - Ease(sign.Open)), 0, 0);
                 break;
         }
     }
@@ -868,11 +867,11 @@ public partial class WorldView : Node3D {
     private static readonly SmokeStyle FurnaceSmoke = new(.3f, new Color(.58f, .58f, .56f, .42f), .14f, 2.4f);
     private static readonly SmokeStyle ForgeSmoke = new(.16f, new Color(.36f, .36f, .36f, .55f), .2f, 2.8f);
 
-    private void Smoke(Prop prop, Thing t, bool active, float dt, SmokeStyle smoke) {
+    private void Smoke(HearthProp prop, Thing t, bool active, float dt, SmokeStyle smoke) {
         if (!active || dt <= 0) return;
-        prop.Puff -= dt;
-        if (prop.Puff > 0) return;
-        prop.Puff = smoke.Every;
+        prop.Smoke -= dt;
+        if (prop.Smoke > 0) return;
+        prop.Smoke = smoke.Every;
         Burst(To3(t.Pos) + prop.Vent, Flat(smoke.Color), 1, .25f, 2.4f, -.45f, smoke.Size, smoke.Grow);
     }
 
@@ -885,11 +884,11 @@ public partial class WorldView : Node3D {
         foreach (var o in World.S.Things)
             if (!o.IsResource && seen.Contains(o.Id) && bounds.HasPoint(camera.UnprojectPosition(To3(o.Pos)))) structures.Add(o);
         foreach (var t in World.S.Things) {
-            if (t.Kind != ThingKind.Tree || t.Remaining <= 0 || !seen.Contains(t.Id) || !props.TryGetValue(t.Id, out var prop)) continue;
+            if (t.Kind != ThingKind.Tree || t.Remaining <= 0 || !seen.Contains(t.Id) || props.GetValueOrDefault(t.Id) is not TreeProp tree) continue;
             if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
-            float fade = Mathf.MoveToward(prop.Fade, CoversSomething(t, ppu) ? .68f : 0, Math.Max(dt, .016f) * 3);
-            if (Math.Abs(fade - prop.Fade) < .001f) continue;
-            prop.Fade = fade; SetFade(prop.SwayParts, fade);
+            float fade = Mathf.MoveToward(tree.Fade, CoversSomething(t, ppu) ? .68f : 0, Math.Max(dt, .016f) * 3);
+            if (Math.Abs(fade - tree.Fade) < .001f) continue;
+            tree.Fade = fade; SetFade(tree.SwayParts, fade);
         }
     }
 
