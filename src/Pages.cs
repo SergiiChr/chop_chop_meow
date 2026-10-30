@@ -101,7 +101,7 @@ public partial class PagePanel {
         Headline(t.Kind);
         if (t.Kind == ThingKind.Water) headingTitle.Text = "Collect water";
         Reach(t);
-        if (t.IsResource) { Resource(t); return; }
+        if (t.IsResource) { AddChild(new ResourcePanel(panel, t)); return; }
         if (t.Kind == ThingKind.Hut) { AddChild(new CabinPanel(panel, t)); return; }
         if (t.Tools != null) { AddChild(new BenchPanel(panel, t)); return; }
         if (t.Kind == ThingKind.Signpost) { AddChild(new MarketPanel(panel, t)); return; }
@@ -126,21 +126,6 @@ public partial class PagePanel {
             label.Visible = tenths >= 0;
             if (tenths >= 0) { text.Clear().Append(tenths / 10).Append('.').Append(tenths % 10).Append(" tiles away · walk closer"); text.Show(); }
         });
-    }
-    protected void Resource(Thing t) {
-        var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
-        row.AddChild(Style.Icon(Icons.Of(World.ResourceItem(t)), 44));
-        var left = Style.Text("", 16, Style.Ink); left.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; left.AutowrapMode = TextServer.AutowrapMode.WordSmart; row.AddChild(left);
-        var text = new LiveText(shown => left.Text = shown);
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(left)) return;
-            var line = text.Clear();
-            if (t.Kind != ThingKind.Water) line.Append(t.Remaining).Append(" left · ");
-            line.Append(world.GatherBlock(t) ?? (t.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
-            text.Show();
-        });
-        if (t.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
-        JobButtons(t);
     }
     protected void Storage(Thing t) {
         switch (t.Kind) {
