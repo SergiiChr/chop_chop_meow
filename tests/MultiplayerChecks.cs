@@ -67,7 +67,7 @@ public static class MultiplayerChecks {
         float time = world.Time;
         world.Run(guest, new Command(Verb.SkipMorning, 0, 0, "", 0, default));
         Require(world.Time == time, "a guest must not skip the night while the host lives");
-        SetRespawn(world, 20);
+        world.Die();
         world.Run(guest, new Command(Verb.SkipMorning, 0, 0, "", 0, default));
         Require(world.Time > time && guest.RespawnIn == 0 && world.RespawnIn == 0,
             "a downed guest should be able to skip when the host is down too, in that guest's action context");

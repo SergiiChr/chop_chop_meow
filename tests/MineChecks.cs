@@ -220,18 +220,17 @@ public static class MineChecks {
         int revenue = sign.Wages![Inventory.Coins] + sign.Output![Inventory.Coins];
         Require(revenue > 0 && world.DayRevenue == revenue, "coins from a returned sale must count as the day's revenue");
 
-        void NextDawn() => RunUntilDawn(world);
-        NextDawn();
+        RunUntilDawn(world);
         Require(world.Profits.SequenceEqual(new[] { revenue - 26 }) && world.DayRevenue == 0, "a day's profit must be its sales minus the wages charged at dawn");
 
         int goal = data.Goals.DailyProfit;
-        for (int day = 0; day < data.Goals.ProfitDays - 1; day++) { SetDayRevenue(world, goal + 26); NextDawn(); }
+        for (int day = 0; day < data.Goals.ProfitDays - 1; day++) { SetDayRevenue(world, goal + 26); RunUntilDawn(world); }
         Require(world.ProfitStreak == data.Goals.ProfitDays - 1 && !world.ProfitGoalMet, "a streak one day short must not meet the profit goal");
-        SetDayRevenue(world, goal + 25); NextDawn();
+        SetDayRevenue(world, goal + 25); RunUntilDawn(world);
         Require(world.ProfitStreak == 0, "a day below the target must break the streak");
-        for (int day = 0; day < data.Goals.ProfitDays; day++) { SetDayRevenue(world, goal + 26); NextDawn(); }
+        for (int day = 0; day < data.Goals.ProfitDays; day++) { SetDayRevenue(world, goal + 26); RunUntilDawn(world); }
         Require(world.ProfitGoalMet, "enough days in a row at the target must meet the profit goal");
-        NextDawn();
+        RunUntilDawn(world);
         Require(world.ProfitGoalMet && world.ProfitStreak == 0, "the profit goal must stay met after a later slow day");
 
         Require(!world.EndGoalsComplete, "the end goals must also need a working mine on every ore");

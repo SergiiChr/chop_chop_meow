@@ -720,7 +720,8 @@ public static class SimulationChecks {
         RunUntil(sky, day * data.MoonCycleDays / 2);
         Require(sky.Moonlight < .01f, "halfway through its cycle the moon should be new and give no light");
         RunUntil(sky, day * data.MoonCycleDays);
-        Require(!sky.MoonUp && sky.SkyArc == 0 && sky.Moonlight > .99f, "a whole cycle after the first sunrise, the sun should rise under a full moon again");
+        Require(!sky.MoonUp && sky.SkyArc == 0, "a whole cycle after the first sunrise, the sun should be rising");
+        Require(sky.Moonlight > .99f, "the moon should be full again after a whole cycle");
     }
 
     private static void CheckWolvesHurtUnprotectedPlayerAtNightAndAvoidFire(GameData data) {

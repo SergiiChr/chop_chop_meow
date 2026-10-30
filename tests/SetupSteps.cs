@@ -75,6 +75,6 @@ internal static class SetupSteps {
     /// <summary>Moves the clock without ticks: two real days would refill the market a check is watching, so only the age of the news changes.</summary>
     public static void SkipClock(World world, float seconds) => world.S.Time += seconds;
 
-    /// <summary>Puts an item on a hotbar slot, a drag that only the UI can do and that simulation has no method for.</summary>
+    /// <summary>Puts an item on a hotbar slot: the real way is a drag from the open backpack, which these checks are not about.</summary>
     public static void SetHotbarSlot(World world, int slot, string item) => world.S.HotbarSlots[slot] = item;
 }
