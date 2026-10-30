@@ -17,6 +17,9 @@ internal static class SetupSteps {
     /// <summary>Empties the backpack: the game can only move goods somewhere else.</summary>
     public static void EmptyBackpack(World world) => world.S.Backpack.Clear();
 
+    /// <summary>Sets the backpack's size so a check can fill it with a few goods: in the game it is always 24 slots.</summary>
+    public static void SetBackpackSlots(World world, int slots) => world.S.Backpack.Slots = slots;
+
     /// <summary>Sets coins exactly: wages and sales only change them by amounts the check does not control.</summary>
     public static void SetCoins(World world, int coins) {
         Drop(world, Inventory.Coins);

@@ -64,9 +64,8 @@ public partial class Game {
     /// <summary>Distinct stacks show the slot drag lands on the exact target and leaves other cells alone.</summary>
     private async Task CheckDragPlacesStackInExactSlotAndSortOrdersByName() {
         await CloseWithEsc();
-        var bagItems = world.Backpack;
-        bagItems.Clear();
-        bagItems.Add("wood", 7); bagItems.Add("stone", 3); bagItems.Add("berries", 5);
+        EmptyBackpack(world);
+        Give(world, "wood", 7); Give(world, "stone", 3); Give(world, "berries", 5);
         await KeyStroke(Key.Tab); await Frames(3);
         ItemSlot wood = Cell(0, c => c.TooltipText.StartsWith("Wood ·", StringComparison.Ordinal));
         var woodIndex = Array.IndexOf(bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().ToArray(), wood);
@@ -74,12 +73,12 @@ public partial class Game {
         var targetIndex = Array.IndexOf(bag.FindChildren("*", "Button", true, false).OfType<ItemSlot>().ToArray(), target);
         Require(woodIndex >= 0 && targetIndex >= 0 && targetIndex != woodIndex, "The inventory must expose source and empty destination slots.");
         await DragTo(wood, target);
-        Require(bagItems.Layout[targetIndex].Item == "wood", "Dragging a stack into an empty backpack slot must put the item in that slot.");
-        Require(bagItems.Layout[targetIndex].Count == 7, "Dragging a stack into an empty backpack slot must keep its quantity.");
-        Require(bagItems["stone"] == 3, "Dragging a stack into an empty backpack slot must leave the stone alone.");
-        Require(bagItems["berries"] == 5, "Dragging a stack into an empty backpack slot must leave the berries alone.");
+        Require(world.Backpack.Layout[targetIndex].Item == "wood", "Dragging a stack into an empty backpack slot must put the item in that slot.");
+        Require(world.Backpack.Layout[targetIndex].Count == 7, "Dragging a stack into an empty backpack slot must keep its quantity.");
+        Require(world.Backpack["stone"] == 3, "Dragging a stack into an empty backpack slot must leave the stone alone.");
+        Require(world.Backpack["berries"] == 5, "Dragging a stack into an empty backpack slot must leave the berries alone.");
         await Click((Control)bag.FindChild("sort_bag", true, false));
-        var ordered = bagItems.Layout.Where(s => s.Item != "").Select(s => s.Item).ToArray();
+        var ordered = world.Backpack.Layout.Where(s => s.Item != "").Select(s => s.Item).ToArray();
         Require(ordered.SequenceEqual(ordered.OrderBy(id => id, StringComparer.Ordinal)), "The backpack Sort button must order stacks by item name.");
 
         await SurvivalReviewShot("sorted-inventory");

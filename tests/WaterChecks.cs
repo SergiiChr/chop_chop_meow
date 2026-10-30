@@ -71,7 +71,7 @@ public static class WaterChecks {
     private static void CheckBottlesRefillFromWaterAndCanBeSippedDirectly(GameData data) {
         var world = new World(data, false);
         var lake = new Thing { Kind = ThingKind.Water };
-        world.Backpack.Slots = 1;
+        SetBackpackSlots(world, 1);
         Give(world, "empty_bottle", 1);
         Require(Water.CollectWater(world, lake) == WaterCollectResult.RefilledBottle, "gathering with an empty bottle should refill it");
         Require(world.Carried("water") == 1 && world.Backpack.Count == 1 && world.Backpack.UsedSlots == 1, "refilling should reuse its slot without creating bottles");
