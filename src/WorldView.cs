@@ -53,8 +53,8 @@ public partial class WorldView : Node3D {
     private readonly Dictionary<int, (ActorRig Rig, ActorState State, (MeshInstance3D Mesh, Material Material)[] Parts)> crew = new();
     private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
-    /// <summary>The village's carts, built while loading and reused for every trip.</summary>
-    private readonly List<WorldModels.CartModel> cartPool = new();
+    /// <summary>The village's carts no order holds, built while loading and reused for every trip.</summary>
+    private readonly Stack<WorldModels.CartModel> idleCarts = new();
     private readonly Dictionary<int, float> pumping = new();
     /// <summary>Build-mode ghosts by building kind, made hidden while loading; mines have one per cliff ore instead.</summary>
     private readonly Dictionary<ThingKind, Prop> ghosts = new(), mineGhosts = new();
@@ -157,7 +157,7 @@ public partial class WorldView : Node3D {
         PileShape.Warm(World.Data);
         WorldModels.Warm();
         BuildGhosts();
-        for (int i = 0; i < World.Carts; i++) NewCart();
+        for (int i = 0; i < World.Carts; i++) idleCarts.Push(NewCart());
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
         selectRing = Ring(new Color(.95f, .82f, .4f, .85f));
         hoverRing = Ring(new Color(1, .95f, .75f, .55f));
@@ -955,11 +955,6 @@ public partial class WorldView : Node3D {
         fades[node] = step; return true;
     }
 
-    /// <summary>Applies a fade only when it changes, since it walks every mesh under the node.</summary>
-    private void Fade(Node node, float transparency) {
-        if (FadeStep(node, transparency, out float step)) SetFade(node, step);
-    }
-
     /// <summary>Fades a model through its gathered parts, which walks no nodes.</summary>
     private void Fade((MeshInstance3D Mesh, Material Material)[] parts, Node node, float transparency) {
         if (FadeStep(node, transparency, out float step)) SetFade(parts, step);
@@ -968,7 +963,7 @@ public partial class WorldView : Node3D {
     private void SyncCarts(float dt) {
         // Carts whose trip ended go back to the pool first, so an order starting the same frame finds one.
         foreach (var (order, cart) in carts)
-            if (!World.S.Orders.Contains(order)) { fades.Remove(cart.Root); SetFade(cart.Parts, 0); cart.Root.Visible = false; carts.Remove(order); }
+            if (!World.S.Orders.Contains(order)) { fades.Remove(cart.Root); SetFade(cart.Parts, 0); cart.Root.Visible = false; carts.Remove(order); idleCarts.Push(cart); }
         foreach (var order in World.S.Orders) {
             var sign = World.Find(order.Signpost);
             float phase = order.Elapsed / World.Data.TradeSeconds;
@@ -976,7 +971,8 @@ public partial class WorldView : Node3D {
             float leg = CartLeg(order.Elapsed);
             var pos = (sign?.Pos ?? Terrain.Spawn) + Terrain.Seaward * CartDistance * leg;
             if (!carts.TryGetValue(order, out var cart)) {
-                cart = IdleCart();
+                // An order beyond the village's carts, such as an edited save's, gets a new one.
+                cart = idleCarts.Count > 0 ? idleCarts.Pop() : NewCart();
                 cart.Last = pos; cart.Distance = 0; cart.Yaw = 0;
                 carts[order] = cart;
             }
@@ -998,19 +994,9 @@ public partial class WorldView : Node3D {
         }
     }
 
-    /// <summary>A cart from the pool that no order holds, or a new one for an order beyond the village's carts, such as an edited save's.</summary>
-    private WorldModels.CartModel IdleCart() {
-        foreach (var cart in cartPool) {
-            bool busy = false;
-            foreach (var held in carts.Values) busy |= held == cart;
-            if (!busy) return cart;
-        }
-        return NewCart();
-    }
-
     private WorldModels.CartModel NewCart() {
         var cart = new WorldModels.CartModel();
-        cart.Root.Visible = false; scene.AddChild(cart.Root); cartPool.Add(cart);
+        cart.Root.Visible = false; scene.AddChild(cart.Root);
         return cart;
     }
 
@@ -1028,18 +1014,19 @@ public partial class WorldView : Node3D {
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
         placeTile.Visible = BuildMode != null;
-        var at = BuildMode is ThingKind placing ? World.Snap(placing, ToWorld(Mouse).Round()) : Vector2.Zero;
-        var shown = BuildMode is not ThingKind kind ? null : kind == ThingKind.Mine ? mineGhosts[World.CliffAt(at).Ore] : ghosts[kind];
+        var kind = BuildMode.GetValueOrDefault();
+        var at = BuildMode == null ? Vector2.Zero : World.Snap(kind, ToWorld(Mouse).Round());
+        var shown = BuildMode == null ? null : kind == ThingKind.Mine ? mineGhosts[World.CliffAt(at).Ore] : ghosts[kind];
         if (shown != ghost) {
             if (ghost != null) ghost.Root.Visible = false;
             if (shown != null) shown.Root.Visible = true;
             ghost = shown;
         }
         if (shown == null) return;
-        bool valid = World.PlacementBlock(BuildMode!.Value, at) == null;
+        bool valid = World.PlacementBlock(kind, at) == null;
         if (shown.Tint != valid) { SetOverride(shown.Root, valid ? GhostValid : GhostBlocked); shown.Tint = valid; }
         shown.Root.Position = To3(at);
-        if (BuildMode == ThingKind.Mine) shown.Body.Rotation = WorldModels.MineYaw(at);
+        if (kind == ThingKind.Mine) shown.Body.Rotation = WorldModels.MineYaw(at);
         placeTile.Position = To3(at, .02f);
         placeTile.MaterialOverride = valid ? GhostValid : GhostBlocked;
     }
@@ -1055,7 +1042,7 @@ public partial class WorldView : Node3D {
         }
         foreach (var kind in World.Data.Buildings.Keys) if (kind != ThingKind.Mine) ghosts[kind] = Ghost(kind, Vector2.Zero);
         ghosts[ThingKind.Crate] = Ghost(ThingKind.Crate, Vector2.Zero);
-        foreach (var cliff in World.Cliffs) if (!mineGhosts.ContainsKey(cliff.Ore)) mineGhosts[cliff.Ore] = Ghost(ThingKind.Mine, World.MineSpot(cliff));
+        foreach (var ore in World.MineOres) mineGhosts[ore] = Ghost(ThingKind.Mine, World.MineSpot(World.CliffOf(ore)));
     }
 
     private void Mark(MeshInstance3D ring, Thing? t, float lift) {

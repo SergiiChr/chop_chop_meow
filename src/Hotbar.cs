@@ -111,7 +111,7 @@ public partial class Game {
         view.BuildMode = null;
         assigningWorker = 0;
         if (string.IsNullOrEmpty(id)) Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
-        else if (Kinds.Parse(id) is ThingKind kind && world.Data.Buildings.ContainsKey(kind)) { view.BuildMode = kind; ClosePanel(); } else if (id == "crate") PlaceCrate(id);
+        else if (world.Data.TryBuilding(id, out var kind)) { view.BuildMode = kind; ClosePanel(); } else if (id == "crate") PlaceCrate(id);
         RefreshLive();
     }
 

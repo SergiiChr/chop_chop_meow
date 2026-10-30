@@ -10,9 +10,10 @@ public partial class Game {
         string name = World.MineName(mine); headingTitle.Text = char.ToUpper(name[0]) + name[1..];
         headingIcon.Texture = HotbarIcon(World.MineOre(mine)); headingIcon.Visible = true;
         var data = world.Data.Mine;
-        var tag = Style.Pill(mine.MineStage == MineStage.Open ? "open" : $"{(int)mine.MineStage + 1} / 3", mine.MineStage == MineStage.Open ? Style.TagPill : Style.Tag(Style.Mustard), mine.MineStage == MineStage.Open ? Style.Rim : Style.Line, 13);
+        int stage = (int)mine.MineStage; bool open = mine.MineStage == MineStage.Open;
+        var tag = Style.Pill(open ? "open" : $"{stage + 1} / 3", open ? Style.TagPill : Style.Tag(Style.Mustard), open ? Style.Rim : Style.Line, 13);
         heading.AddChild(tag); heading.MoveChild(tag, heading.GetChildCount() - 2);
-        if (mine.MineStage < MineStage.Open) {
+        if (!open) {
             string workday = data.StageWorkdays == 1 ? "1 working day" : $"{data.StageWorkdays:0.#} working days";
             (string Title, string Needs, string Icon)[] stages = {
                 ("Dig the entrance", $"A worker with a pickaxe for {workday}", "steel_pick"),
@@ -22,13 +23,13 @@ public partial class Game {
             // The three steps on a line, done in sage, the current one in mustard.
             var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 0); content.AddChild(line);
             for (int i = 0; i < stages.Length; i++) {
-                if (i > 0) line.AddChild(new ColorRect { Color = i <= (int)mine.MineStage ? Style.Sage : Style.Line, CustomMinimumSize = new Vector2(0, 6), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
+                if (i > 0) line.AddChild(new ColorRect { Color = i <= stage ? Style.Sage : Style.Line, CustomMinimumSize = new Vector2(0, 6), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
                 var node = new PanelContainer { Name = $"stage_{i + 1}", CustomMinimumSize = new Vector2(48, 48), MouseFilter = Control.MouseFilterEnum.Pass, TooltipText = $"Stage {i + 1} · {stages[i].Title}\n{stages[i].Needs}" };
-                node.AddThemeStyleboxOverride("panel", Style.Round(i < (int)mine.MineStage ? Style.Sage : i == (int)mine.MineStage ? Style.Mustard : Style.Line, 24).Item1);
-                var icon = Style.Icon(HotbarIcon(stages[i].Icon), 30); if (i > (int)mine.MineStage) icon.Modulate = Unready;
+                node.AddThemeStyleboxOverride("panel", Style.Round(i < stage ? Style.Sage : i == stage ? Style.Mustard : Style.Line, 24).Item1);
+                var icon = Style.Icon(HotbarIcon(stages[i].Icon), 30); if (i > stage) icon.Modulate = Unready;
                 node.AddChild(icon); line.AddChild(node);
             }
-            AddLabel($"Stage {(int)mine.MineStage + 1} · {stages[(int)mine.MineStage].Title}", 16);
+            AddLabel($"Stage {stage + 1} · {stages[stage].Title}", 16);
             if (mine.MineStage == MineStage.Dug) {
                 // Supplies: delivered on the pill, needed under the cup; click a lit backpack stack to deliver it.
                 var row = Well(new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }); row.AddThemeConstantOverride("separation", 28);

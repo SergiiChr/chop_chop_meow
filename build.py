@@ -403,17 +403,6 @@ def package_linux() -> Path:
     return archive
 
 
-def run_play(env: dict[str, str], game_args: list[str]) -> None:
-    """Replace this process with the game, passing game_args after `--`."""
-    forwarded = ["--", *game_args] if game_args else []
-    os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *forwarded], env)
-
-
-def run_editor(env: dict[str, str]) -> None:
-    """Replace this process with the Godot editor."""
-    os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], env)
-
-
 def run_check(env: dict[str, str]) -> None:
     """Verify C# format, then run every test."""
     command(
@@ -500,9 +489,10 @@ def main() -> int:
     env = setup()
     match args.action:
         case "play":
-            run_play(env, game_args)
+            forwarded = ["--", *game_args] if game_args else []
+            os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *forwarded], env)
         case "editor":
-            run_editor(env)
+            os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], env)
         case "setup":
             print("Ready. Run ./build.py play to launch the game.")
         case "check":

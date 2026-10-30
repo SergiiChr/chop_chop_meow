@@ -150,7 +150,8 @@ public static class WorldModels {
     public static void Warm() {
         foreach (var kind in Kinds.All) {
             if (kind == ThingKind.Mine) continue;
-            int looks = kind == ThingKind.Tree ? TreeVariants * NatureShape.Variants : NatureShape.Variants;
+            // Natural things and farm plots look different by id; buildings, crates and backpacks look the same.
+            int looks = kind == ThingKind.Tree ? TreeVariants * NatureShape.Variants : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
             for (int id = 0; id < looks; id++) Discard(Build(new Thing { Id = id, Kind = kind }).Root);
         }
         foreach (var ore in World.MineOres) Discard(Build(new Thing { Kind = ThingKind.Mine, Pos = World.MineSpot(World.CliffOf(ore)) }).Root);

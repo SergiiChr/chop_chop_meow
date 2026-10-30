@@ -316,14 +316,16 @@ public partial class Net : Node {
 
     private void SendUpdates() {
         var entries = Remember(updates.Capture(World));
+        // Guests that confirmed the same update get the same changes.
+        int builtOn = -1; byte[] delta = [];
         foreach (var p in World.S.Players) {
             if (p == World.Me) continue;
             int baseline = acked.GetValueOrDefault(p.Id);
             var known = sent.GetValueOrDefault(baseline);
-            var delta = updates.Delta(entries, known);
-            if (known != null && delta.Length <= PacketSize) { RpcId(p.Id, MethodName.Refresh, sequence, baseline, delta.ToArray()); continue; }
+            if (baseline != builtOn) { delta = updates.Delta(entries, known).ToArray(); builtOn = baseline; }
+            if (known != null && delta.Length <= PacketSize) { RpcId(p.Id, MethodName.Refresh, sequence, baseline, delta); continue; }
             // Big updates go on their own reliable channel, so messages and actions never queue behind them.
-            RpcId(p.Id, MethodName.RefreshReliably, sequence, known == null ? 0 : baseline, delta.ToArray());
+            RpcId(p.Id, MethodName.RefreshReliably, sequence, known == null ? 0 : baseline, delta);
             // The whole world is sure to arrive, so later updates build on it rather than sending it again until the guest confirms it.
             if (known == null) acked[p.Id] = sequence;
         }
@@ -364,7 +366,7 @@ public partial class Net : Node {
         var me = World.Me;
         // This machine walks its own player and keeps its hotbar; only a move the simulation made, such as a respawn, comes back.
         // The welcome's first update brings all of it, over the stand-in this copy started with.
-        bool joining = applied.Entries.Count == 0;
+        bool joining = applied.Count == 0;
         var own = (me.Pos, me.Warp, me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Held, me.Sprinting);
         unsaved |= Changed(entries, new EntryKey(EntryKey.Player, me.Id)) != null;
         Sync(s.Players, EntryKey.Player, static p => p.Id, entries, true, me);
@@ -379,9 +381,9 @@ public partial class Net : Node {
     }
 
     /// <summary>The entry when it differs from what the copy shows now, or null.</summary>
-    private byte[]? Changed(Snapshot entries, EntryKey key) => entries.Entries.TryGetValue(key, out var value) && !Shown(key, value) ? value : null;
+    private byte[]? Changed(Snapshot entries, EntryKey key) => entries.TryGetValue(key, out var value) && !Shown(key, value) ? value : null;
 
-    private bool Shown(EntryKey key, byte[] value) => applied.Entries.TryGetValue(key, out var before) && (ReferenceEquals(before, value) || before.AsSpan().SequenceEqual(value));
+    private bool Shown(EntryKey key, byte[] value) => applied.TryGetValue(key, out var before) && Snapshot.Same(before, value);
 
     /// <summary>
     /// Updates the members of <paramref name="list"/> whose entries changed, in place, adds new ones and drops those without an entry.
@@ -391,9 +393,9 @@ public partial class Net : Node {
         have.Clear();
         for (int i = list.Count - 1; i >= 0; i--) {
             var key = new EntryKey(prefix, id(list[i]));
-            if (entries.Entries.ContainsKey(key)) have[key.Id] = list[i]; else list.RemoveAt(i);
+            if (entries.ContainsKey(key)) have[key.Id] = list[i]; else list.RemoveAt(i);
         }
-        foreach (var (key, json) in entries.Entries) {
+        foreach (var (key, json) in entries) {
             if (key.Prefix != prefix || have.ContainsKey(key.Id) && Shown(key, json)) continue;
             var item = WorldUpdates.Read<T>(json);
             if (!have.TryGetValue(key.Id, out var old)) { list.Add(item); continue; }

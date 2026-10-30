@@ -37,8 +37,9 @@ public readonly record struct EntryKey(byte Prefix, int Id) {
 }
 
 /// <summary>The world as entries of compact JSON that can be compared one by one. Arrays are never changed once made, so snapshots share the unchanged ones.</summary>
-public sealed class Snapshot {
-    public readonly Dictionary<EntryKey, byte[]> Entries = new();
+public sealed class Snapshot : Dictionary<EntryKey, byte[]> {
+    /// <summary>Whether two entries hold the same bytes, shared arrays first.</summary>
+    public static bool Same(byte[] a, ReadOnlySpan<byte> b) => a.AsSpan() == b || a.AsSpan().SequenceEqual(b);
 }
 
 /// <summary>
@@ -63,7 +64,7 @@ public sealed class WorldUpdates {
     private readonly ArrayBufferWriter<byte> entry = new(4096), update = new(1 << 16), merged = new(4096);
     private readonly Utf8JsonWriter entryWriter, updateWriter, mergedWriter;
     private byte[] packed = new byte[1 << 16], unpacked = new byte[1 << 16];
-    /// <summary>Largest decompressed update a guest accepts.</summary>
+    /// <summary>Largest decompressed message a guest accepts.</summary>
     private const int MaxUpdate = 1 << 28;
     private readonly List<Range> nowFields = new(), thenFields = new(), patchFields = new();
     // The snapshot taken last, whose arrays the next one keeps where nothing changed.
@@ -77,15 +78,11 @@ public sealed class WorldUpdates {
     /// <summary>A snapshot no update needs any more goes back to be reused.</summary>
     public void Release(Snapshot snapshot) {
         if (snapshot == last) last = null;
-        snapshot.Entries.Clear();
+        snapshot.Clear();
         spare.Push(snapshot);
     }
 
-    public Snapshot Empty() {
-        var snapshot = spare.Count > 0 ? spare.Pop() : new Snapshot();
-        snapshot.Entries.Clear();
-        return snapshot;
-    }
+    public Snapshot Empty() => spare.Count > 0 ? spare.Pop() : new Snapshot();
 
     /// <summary>The world as entries: each thing, worker, wolf, trade order and player under its id, the rest of the world, and what each worker is doing.</summary>
     public Snapshot Capture(World world) {
@@ -121,7 +118,7 @@ public sealed class WorldUpdates {
     private void Keep(Snapshot snapshot, EntryKey key) {
         entryWriter.Flush();
         var written = entry.WrittenSpan;
-        snapshot.Entries[key] = last != null && last.Entries.TryGetValue(key, out var before) && before.AsSpan().SequenceEqual(written) ? before : written.ToArray();
+        snapshot[key] = last != null && last.TryGetValue(key, out var before) && Snapshot.Same(before, written) ? before : written.ToArray();
     }
 
     /// <summary>
@@ -133,23 +130,38 @@ public sealed class WorldUpdates {
         update.ResetWrittenCount(); updateWriter.Reset(update);
         updateWriter.WriteStartObject();
         Span<byte> name = stackalloc byte[EntryKey.MaxName];
-        foreach (var (key, value) in now.Entries) {
+        foreach (var (key, value) in now) {
             byte[]? before = null;
-            if (known != null && known.Entries.TryGetValue(key, out before) && (ReferenceEquals(before, value) || before.AsSpan().SequenceEqual(value))) continue;
+            if (known != null && known.TryGetValue(key, out before) && Snapshot.Same(before, value)) continue;
             if (before != null && WritePatch(key, value, before)) continue;
             updateWriter.WritePropertyName(name[..key.Format(name, false)]);
             updateWriter.WriteRawValue(value, skipInputValidation: true);
         }
         if (known != null)
-            foreach (var key in known.Entries.Keys)
-                if (!now.Entries.ContainsKey(key)) updateWriter.WriteNull(name[..key.Format(name, false)]);
+            foreach (var key in known.Keys)
+                if (!now.ContainsKey(key)) updateWriter.WriteNull(name[..key.Format(name, false)]);
         updateWriter.WriteEndObject();
         updateWriter.Flush();
-        var json = update.WrittenSpan;
+        return Compress(update.WrittenSpan, ref packed);
+    }
+
+    /// <summary>Compresses into <paramref name="output"/>, growing it when needed, and returns the compressed part.</summary>
+    private static ReadOnlySpan<byte> Compress(ReadOnlySpan<byte> json, ref byte[] output) {
         int room = BrotliEncoder.GetMaxCompressedLength(json.Length);
-        if (packed.Length < room) packed = new byte[room];
-        if (!BrotliEncoder.TryCompress(json, packed, out int written, quality: 1, window: 22)) throw new InvalidOperationException("An update did not compress.");
-        return packed.AsSpan(0, written);
+        if (output.Length < room) output = new byte[room];
+        if (!BrotliEncoder.TryCompress(json, output, out int written, quality: 1, window: 22)) throw new InvalidOperationException("A message did not compress.");
+        return output.AsSpan(0, written);
+    }
+
+    /// <summary>Decompresses into <paramref name="output"/>, growing it up to a limit no real message reaches, and returns the decompressed part.</summary>
+    private static ReadOnlySpan<byte> Decompress(ReadOnlySpan<byte> packed, ref byte[] output) {
+        int length;
+        // A buffer too small and corrupt data both fail, so the buffer grows only up to the limit.
+        while (!BrotliDecoder.TryDecompress(packed, output, out length)) {
+            if (output.Length >= MaxUpdate) throw new JsonException("A message did not decompress.");
+            output = new byte[output.Length * 2];
+        }
+        return output.AsSpan(0, length);
     }
 
     /// <summary>Writes only the changed fields of an object entry, unless a field it had is gone or it is not an object.</summary>
@@ -174,15 +186,9 @@ public sealed class WorldUpdates {
     /// Untouched entries keep the baseline's arrays.
     /// </summary>
     public Snapshot Merge(Snapshot? baseline, ReadOnlySpan<byte> update) {
-        int length;
-        // A buffer too small and corrupt data both fail, so the buffer grows only up to a limit no real update reaches.
-        while (!BrotliDecoder.TryDecompress(update, unpacked, out length)) {
-            if (unpacked.Length >= MaxUpdate) throw new JsonException("An update did not decompress.");
-            unpacked = new byte[unpacked.Length * 2];
-        }
+        var json = Decompress(update, ref unpacked);
         var snapshot = Empty();
-        if (baseline != null) foreach (var (key, value) in baseline.Entries) snapshot.Entries[key] = value;
-        var json = unpacked.AsSpan(0, length);
+        if (baseline != null) foreach (var (key, value) in baseline) snapshot[key] = value;
         var reader = new Utf8JsonReader(json);
         reader.Read();
         while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName) {
@@ -192,8 +198,8 @@ public sealed class WorldUpdates {
             bool gone = reader.TokenType == JsonTokenType.Null;
             reader.Skip();
             var value = json[start..(int)reader.BytesConsumed];
-            if (gone) snapshot.Entries.Remove(key);
-            else snapshot.Entries[key] = patched ? Patch(snapshot.Entries[key], value) : value.ToArray();
+            if (gone) snapshot.Remove(key);
+            else snapshot[key] = patched ? Patch(snapshot[key], value) : value.ToArray();
         }
         return snapshot;
     }
@@ -250,14 +256,12 @@ public sealed class WorldUpdates {
 
     /// <summary>Packs a value whole, for the welcome's fog.</summary>
     public static byte[] Pack<T>(T value) {
-        var json = JsonSerializer.SerializeToUtf8Bytes(value, Compact);
-        var output = new byte[BrotliEncoder.GetMaxCompressedLength(json.Length)];
-        BrotliEncoder.TryCompress(json, output, out int written, quality: 1, window: 22);
-        return output[..written];
+        var output = Array.Empty<byte>();
+        return Compress(JsonSerializer.SerializeToUtf8Bytes(value, Compact), ref output).ToArray();
     }
 
     public static T Unpack<T>(byte[] packed) {
-        using var brotli = new BrotliStream(new System.IO.MemoryStream(packed), CompressionMode.Decompress);
-        return JsonSerializer.Deserialize<T>(brotli, Compact) ?? throw new JsonException("Empty message");
+        var output = new byte[packed.Length * 4];
+        return JsonSerializer.Deserialize<T>(Decompress(packed, ref output), Compact) ?? throw new JsonException("Empty message");
     }
 }

@@ -35,8 +35,6 @@ public sealed class Thing {
     public MineStage MineStage { get; set; }
     /// <summary>Where a farm plot is in its growing cycle.</summary>
     public FarmStage FarmStage { get; set; }
-    /// <summary>The one stage field of older saves, which held both; moved into <see cref="MineStage"/> or <see cref="FarmStage"/> on load.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Stage { get; set; }
     /// <summary>A pile turned into compost: it takes leaves, grass and food and slowly turns them into fertilizer.</summary>
     public bool Compost { get; set; }
     /// <summary>A compost that workers bring no food to; food put in by hand still rots into fertilizer.</summary>
@@ -1993,11 +1991,26 @@ public sealed partial class World {
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }
-    private static string WithoutLooseIron(string json) {
+    /// <summary>
+    /// Brings older saves' things up to date before they are read: loose iron left the game and no kind names it any more,
+    /// and a mine's or farm plot's stage was one number for both.
+    /// </summary>
+    private static string UpgradeThings(string json) {
         static bool Loose(JsonNode? thing) => thing?["Kind"]?.GetValue<string>() == "loose_iron";
+        static void Stage(JsonNode? thing) {
+            if (thing is not JsonObject fields || !fields.Remove("Stage", out var stage)) return;
+            string? kind = fields["Kind"]?.GetValue<string>();
+            if (kind == ThingKind.Mine.Id()) fields["MineStage"] = stage; else if (kind == ThingKind.Farm.Id()) fields["FarmStage"] = stage;
+        }
         var save = JsonNode.Parse(json)!.AsObject();
-        if (save["Things"] is JsonArray things) foreach (var thing in things.Where(Loose).ToList()) things.Remove(thing);
-        if (save["Remembered"] is JsonObject remembered) foreach (var (id, _) in remembered.Where(pair => Loose(pair.Value)).ToList()) remembered.Remove(id);
+        if (save["Things"] is JsonArray things) {
+            foreach (var thing in things.Where(Loose).ToList()) things.Remove(thing);
+            foreach (var thing in things) Stage(thing);
+        }
+        if (save["Remembered"] is JsonObject remembered) {
+            foreach (var (id, _) in remembered.Where(pair => Loose(pair.Value)).ToList()) remembered.Remove(id);
+            foreach (var (_, thing) in remembered) Stage(thing);
+        }
         return save.ToJsonString();
     }
     /// <summary>Brings every inventory of a freshly parsed save in line with its totals, since an old save holds totals without stacks.</summary>
@@ -2017,8 +2030,7 @@ public sealed partial class World {
         json = json.Replace("\"steel_tools\"", "\"steel_parts\"").Replace("\"cooked_meat\"", "\"burnt_steak\"");
         // Iron tools and parts left the game: older saves get the steel ones instead.
         json = json.Replace("\"iron_axe\"", "\"steel_axe\"").Replace("\"iron_pick\"", "\"steel_pick\"").Replace("\"iron_hammer\"", "\"steel_hammer\"").Replace("\"iron_parts\"", "\"steel_parts\"");
-        // Loose iron left the game too; its things go before loading, since no kind names them any more.
-        if (json.Contains("\"loose_iron\"")) json = WithoutLooseIron(json);
+        if (json.Contains("\"loose_iron\"") || json.Contains("\"Stage\"")) json = UpgradeThings(json);
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version < 4) throw new InvalidOperationException("This save is from an older, smaller map and cannot be loaded. Start a new game.");
         if (loaded.Version is not (4 or 5) || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
@@ -2037,11 +2049,6 @@ public sealed partial class World {
         // Saves from before the fog start unexplored.
         if (loaded.Explored?.Length != Terrain.Size * Terrain.Size) loaded.Explored = new byte[Terrain.Size * Terrain.Size];
         loaded.Remembered ??= new();
-        // Older saves kept a mine's and a farm plot's stage in one number.
-        foreach (var t in loaded.Things.Concat(loaded.Remembered.Values).Where(t => t.Stage != 0)) {
-            if (t.Kind == ThingKind.Mine) t.MineStage = (MineStage)t.Stage; else if (t.Kind == ThingKind.Farm) t.FarmStage = (FarmStage)t.Stage;
-            t.Stage = 0;
-        }
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
         if (loaded.Version == 4) AlignMines(loaded);
         loaded.Crates ??= new(); loaded.Crafting ??= new(); loaded.Profits ??= new();

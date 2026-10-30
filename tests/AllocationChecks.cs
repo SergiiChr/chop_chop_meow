@@ -40,7 +40,7 @@ public static class AllocationChecks {
             sent.Enqueue((now, copy));
         }, maxBytesPerRun: 14000, warmup: 200, runs: 300);
         foreach (var (hosted, copied) in sent)
-            if (hosted.Entries.Count != copied.Entries.Count || hosted.Entries.Any(pair => !copied.Entries.TryGetValue(pair.Key, out var entry) || !entry.AsSpan().SequenceEqual(pair.Value)))
+            if (hosted.Count != copied.Count || hosted.Any(pair => !copied.TryGetValue(pair.Key, out var entry) || !entry.AsSpan().SequenceEqual(pair.Value)))
                 throw new InvalidOperationException("Update check failed: the guest's merged entries should match the host's.");
 
         var packing = PackingLine(data, out var stock);

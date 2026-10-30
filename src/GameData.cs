@@ -185,8 +185,9 @@ public sealed class GameData {
     }
     // Named once per tool and tier, since workers ask every tick while a station waits for its tool.
     private readonly Dictionary<(string, int), string> toolNames = new();
-    /// <summary>Whether an id, such as a hotbar slot's, names a building plan.</summary>
-    public bool IsBuilding(string id) => Kinds.TryParse(id, out var kind) && Buildings.ContainsKey(kind);
+    /// <summary>Whether an id, such as a hotbar slot's, names a building plan, and which.</summary>
+    public bool TryBuilding(string id, out ThingKind kind) => Kinds.TryParse(id, out kind) && Buildings.ContainsKey(kind);
+    public bool IsBuilding(string id) => TryBuilding(id, out _);
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' ');
     public string Name(ThingKind kind) => Items.TryGetValue(kind.Id(), out var i) ? i.Name : Buildings.TryGetValue(kind, out var b) ? b.Name : kind switch {
         ThingKind.Tree => "Tree",
