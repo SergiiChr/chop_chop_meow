@@ -5,8 +5,8 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>A mine's three building steps while it is built, then its miners and its two outputs once it is open.</summary>
-public partial class PagePanel {
-    private void MinePanel(Thing mine) {
+public partial class MinePanel(SidePanel side, Thing mine) : PagePanel(side) {
+    public override void _Ready() {
         string name = World.MineName(mine); headingTitle.Text = char.ToUpper(name[0]) + name[1..];
         headingIcon.Texture = Icons.Of(World.MineOre(mine)); headingIcon.Visible = true;
         var data = world.Data.Mine;
@@ -81,7 +81,7 @@ public partial class PagePanel {
             int miners = -1;
             live.Add(() => {
                 if (!GodotObject.IsInstanceValid(rates[0])) return;
-                int now = MinersUnderground(mine);
+                int now = MinersUnderground();
                 if (now == miners) return;
                 miners = now;
                 for (int i = 0; i < hats.Length; i++) hats[i].Modulate = i < now ? Colors.White : Style.Unready;
@@ -91,7 +91,7 @@ public partial class PagePanel {
         JobButtons(mine);
     }
 
-    private int MinersUnderground(Thing mine) {
+    private int MinersUnderground() {
         int miners = 0;
         foreach (var w in world.S.Workers) if (w.Assignment == mine.Id && w.WorkState == WorkerWorkState.Underground) miners++;
         return miners;
