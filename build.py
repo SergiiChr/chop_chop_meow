@@ -1,15 +1,6 @@
 #!/usr/bin/env python3
 """Small Linux launcher and build helper for Chop Chop Meow.
 
-  ./build.py play    Set up the local tools, then run the game. Forward flags after --.
-  ./build.py setup   Download tools if needed, compile C#, and import the project.
-  ./build.py editor  Set up the project and open the Godot editor.
-  ./build.py check   Run every offline check: Python types and style, C# compile and
-                     format, then the simulation, UI and two-process network tests.
-  ./build.py test    Run only the simulation, UI and two-process network tests.
-  ./build.py build   Check, export, and smoke-test build/ChopChopMeow.x86_64.
-  ./build.py icons   Render item and building icons from their models into assets/icons.
-
 Godot, .NET, the Python check tools and export templates are kept under .tools/. Set GODOT_BIN to use an
 existing Godot 4.7.2 .NET executable.
 """
@@ -471,7 +462,8 @@ def build_parser() -> argparse.ArgumentParser:
     """Describe the subcommands and their help text."""
     parser = argparse.ArgumentParser(
         prog="build.py",
-        description="Linux launcher and build helper for Chop Chop Meow.",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     commands = parser.add_subparsers(dest="action", metavar="command")
     helps = {
