@@ -42,6 +42,7 @@ Simulation and data:
 | `src/Mine.cs` | Mines |
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
+| `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
 | `src/Players.cs` | Per-player state, the command dispatcher and guest adoption |
 | `src/Net.cs` | The ENet connection, sending and merging world updates, and guest saves |
@@ -56,7 +57,7 @@ UI and input:
 | `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, how a player action runs, the buttons), `UiState` and `LiveText` |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
-| `src/Recovery.cs` | The respawn countdown and "Skip to morning?" |
+| `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream cups, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
 | `src/Panels.cs` | Shared panel parts: header buttons, the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |

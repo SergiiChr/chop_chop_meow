@@ -132,16 +132,16 @@ public partial class Game {
         RemoveThings(world, t => t.Kind == ThingKind.Hut);
         RunUntilPhase(world, .9f);
         world.Die();
-        await Until(() => recoveryPrompt is { Visible: true }, "a downed player's Skip to morning prompt", 2);
-        Require(recoveryPrompt is { Visible: true } && skipMorningButton is { Disabled: false }, "A downed player without a cabin must see an enabled Skip to morning prompt.");
+        await Until(() => recovery.Visible, "a downed player's Skip to morning prompt", 2);
+        Require(recovery.Visible && recovery.CanSkip, "A downed player without a cabin must see an enabled Skip to morning prompt.");
         await SurvivalReviewShot("recovery-prompt");
         float previousDay = world.Day;
-        await Click(skipMorningButton!);
+        await Click((Control)recovery.FindChild("skip_morning", true, false));
         Require(world.RespawnIn == 0 && world.Day > previousDay && world.Time % world.Data.DaySeconds < world.Data.DaySeconds * .1f,
             "Skipping morning must advance the simulated world to dawn and complete respawn.");
         world.Add(ThingKind.Hut, world.Player + Vector2.Right);
         world.Die();
         await Frames(2);
-        Require(recoveryPrompt is { Visible: false }, "A downed player with a cabin must not be offered Skip to morning.");
+        Require(!recovery.Visible, "A downed player with a cabin must not be offered Skip to morning.");
     }
 }

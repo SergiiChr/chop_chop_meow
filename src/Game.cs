@@ -47,6 +47,7 @@ public partial class Game : Node {
     private UiKit kit = null!;
     private EndingScreen ending = null!;
     private BlackHole blackHole = null!;
+    private RecoveryPrompt recovery = null!;
     private UiState state = null!;
     private float uiClock;
     private float autosave;
@@ -181,6 +182,7 @@ public partial class Game : Node {
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
         BuildNeeds(); ending = new EndingScreen(kit, ClosePanel, Restart); ui.AddChild(ending); BuildMenu(); BuildScreens();
         blackHole = new BlackHole(kit, view, ui.Theme, ClosePanel, LatestSlot, LoadSlot, ShowStart); AddChild(blackHole);
+        recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
         RefreshLive();
     }
     private void Notify(string message) {
@@ -869,7 +871,6 @@ public partial class Game : Node {
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }
-        RefreshRecoveryPrompt();
         // Every frame, so a page that just opened takes its size once its wrapped text has a width.
         FitPanel();
         if (waterWarningClock > 0) waterWarning.Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : ui.Size.Y - 148);
