@@ -25,7 +25,7 @@ public partial class Game {
 
     private void OnJoined(bool back) {
         Settings.Store("net", "address", net.Address);
-        saves.Slot = 0; state.Selected = 0; state.WorkerId = 0; gathering = null; state.Entering = null; lifting = null; state.AssigningWorker = 0; ending.Joined(back);
+        saves.Slot = 0; state.Selected = 0; state.WorkerId = 0; player.StopGathering(); state.Entering = null; player.StopLifting(); state.AssigningWorker = 0; ending.Joined(back);
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
         startMenu.Close(); menu.Visible = false; ending.Visible = false; panel.Close();
         Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
