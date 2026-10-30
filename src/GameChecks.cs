@@ -768,7 +768,7 @@ public partial class Game {
         await Frames(3);
         Require(!ending.Visible && !view.Paused, "The starter goal chain alone must not end the game.");
         await CheckMineIsMarkedByClickAndEndGoalsShowInPauseMenu();
-        foreach (var mine in world.Things.Where(t => t.Kind == ThingKind.Mine)) mine.MineStage = MineStage.Open;
+        foreach (var mine in world.Things.Where(t => t.Kind == ThingKind.Mine)) OpenMine(mine);
         Achieve(world, "profit_week");
         await Frames(3);
         Require(ending.Visible && view.Paused, "Reaching the end goals must show the ending and pause the world.");

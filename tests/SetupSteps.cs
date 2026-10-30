@@ -3,8 +3,9 @@ using System.Collections.Generic;
 using ChopChopMeow;
 
 /// <summary>
-/// The only steps that write the raw save, each for a state real play cannot reach or cannot reach quickly enough, and why.
-/// Everything else in the checks goes through <see cref="World"/>'s public methods.
+/// Steps that write the raw save, each for a state real play cannot reach or cannot reach quickly enough, and why.
+/// Outside them, only <c>AddWorker</c> and old-save fixtures use the raw save.
+/// Checks also set fields directly on things and workers they placed.
 /// </summary>
 internal static class SetupSteps {
     /// <summary>Puts goods in the backpack: gathering or buying each would take a day of ticks, and many goods are not sold.</summary>
@@ -58,6 +59,9 @@ internal static class SetupSteps {
         SetMauled(world, false);
         for (int i = 0; i < world.Wolves.Count; i++) { var w = world.Wolves[i]; w.Leap = 0; w.Feeding = w.Pinning = false; }
     }
+
+    /// <summary>Opens a mine at once: the real way is days of a crew digging, hauling and framing at the cliff, for each ore.</summary>
+    public static void OpenMine(Thing mine) => mine.MineStage = MineStage.Open;
 
     /// <summary>Starts a respawn timer of a set length: dying always sets the full length and drops the backpack.</summary>
     public static void SetRespawn(World world, float seconds) => world.S.RespawnIn = seconds;

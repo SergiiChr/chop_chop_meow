@@ -234,9 +234,9 @@ public static class MineChecks {
         Require(world.ProfitGoalMet && world.ProfitStreak == 0, "the profit goal must stay met after a later slow day");
 
         Require(!world.EndGoalsComplete, "the end goals must also need a working mine on every ore");
-        foreach (var ore in World.MineOres) { var mine = MarkMine(world, ore); if (ore != World.MineOres.Last()) mine.MineStage = MineStage.Open; }
+        foreach (var ore in World.MineOres) { var mine = MarkMine(world, ore); if (ore != World.MineOres.Last()) OpenMine(mine); }
         Require(!world.EndGoalsComplete, "an unfinished mine must not count");
-        world.Things.Last(t => t.Kind == ThingKind.Mine).MineStage = MineStage.Open;
+        OpenMine(world.Things.Last(t => t.Kind == ThingKind.Mine));
         Require(world.EndGoalsComplete, "a working mine on every ore and a week of profit must complete the end goals");
     }
 }

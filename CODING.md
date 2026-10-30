@@ -46,6 +46,7 @@ Project rules on top of the global coding and testing guides.
   - They set up through real play: `Build`, `Buy`, `Consume`, `Tick` and the like, with `Add` for placing things. A time of day comes from a named step that ticks there, such as `RunUntilDawn`.
   - A state real play cannot reach, or cannot reach within the stage's time limit, goes behind a named step in `tests/SetupSteps.cs` whose comment says why. `AddWorker` is the same kind of step, in `WorkerSteps`.
   - Only fixtures that build old-save text, and reads of their old fields, may use `world.S` elsewhere.
+  - A check may set fields directly on things and workers it placed, such as a farm's stage or a worker's tool.
 - Simulation setup may construct fixtures, but tests claiming resource-to-steel progression must gather raw materials and use the actual recipes and trade delays.
 - A fixture built by editing text, such as an old save, fails when the text it edits is missing.
 - UI checks wait for a condition with a time limit, not for a fixed time; a fixed wait is only for holding input, letting something play for a set time or pausing between retries.
