@@ -77,6 +77,7 @@ UI and input:
 | `src/CabinPanel.cs` | A cabin: its door and sleep |
 | `src/CampfirePanel.cs` | A campfire |
 | `src/ResourcePanel.cs` | A resource in the world |
+| `src/PilePanel.cs` | A pile or compost heap |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
