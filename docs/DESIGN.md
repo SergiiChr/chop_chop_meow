@@ -73,6 +73,7 @@ UI and input:
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel |
+| `src/FarmPanel.cs` | A farm plot's stages and process row |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
 | `src/GuidePanel.cs` | The field guide topics |
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
