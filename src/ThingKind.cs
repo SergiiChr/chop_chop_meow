@@ -5,36 +5,36 @@ using System.Text.Json.Serialization;
 
 namespace ChopChopMeow;
 
-/// <summary>What a world object is. Saves, network updates and data/game.json name each kind by its id, such as "wolf_corpse".</summary>
-[JsonConverter(typeof(JsonStringEnumConverter<ThingKind>))]
+/// <summary>What a world object is. Saves, network updates and data/game.json name each kind by its id, the member name in snake case, such as "wolf_corpse".</summary>
+[JsonConverter(typeof(KindConverter))]
 public enum ThingKind {
-    [JsonStringEnumMemberName("tree")] Tree,
-    [JsonStringEnumMemberName("stone")] Stone,
-    [JsonStringEnumMemberName("berries")] Berries,
-    [JsonStringEnumMemberName("water")] Water,
-    [JsonStringEnumMemberName("leaves")] Leaves,
-    [JsonStringEnumMemberName("wolf_corpse")] WolfCorpse,
-    [JsonStringEnumMemberName("iron")] Iron,
-    [JsonStringEnumMemberName("coal")] Coal,
-    [JsonStringEnumMemberName("tin")] Tin,
-    [JsonStringEnumMemberName("loose_coal")] LooseCoal,
-    [JsonStringEnumMemberName("chest")] Chest,
-    [JsonStringEnumMemberName("campfire")] Campfire,
-    [JsonStringEnumMemberName("hut")] Hut,
-    [JsonStringEnumMemberName("furnace")] Furnace,
-    [JsonStringEnumMemberName("anvil")] Anvil,
-    [JsonStringEnumMemberName("bench")] Bench,
-    [JsonStringEnumMemberName("reinforced")] Reinforced,
-    [JsonStringEnumMemberName("mine")] Mine,
-    [JsonStringEnumMemberName("pile")] Pile,
-    [JsonStringEnumMemberName("farm")] Farm,
-    [JsonStringEnumMemberName("toolstation")] Toolstation,
-    [JsonStringEnumMemberName("cooktable")] Cooktable,
-    [JsonStringEnumMemberName("cannery")] Cannery,
-    [JsonStringEnumMemberName("packer")] Packer,
-    [JsonStringEnumMemberName("signpost")] Signpost,
-    [JsonStringEnumMemberName("grave")] Grave,
-    [JsonStringEnumMemberName("crate")] Crate,
+    Tree,
+    Stone,
+    Berries,
+    Water,
+    Leaves,
+    WolfCorpse,
+    Iron,
+    Coal,
+    Tin,
+    LooseCoal,
+    Chest,
+    Campfire,
+    Hut,
+    Furnace,
+    Anvil,
+    Bench,
+    Reinforced,
+    Mine,
+    Pile,
+    Farm,
+    Toolstation,
+    Cooktable,
+    Cannery,
+    Packer,
+    Signpost,
+    Grave,
+    Crate,
 }
 
 /// <summary>Converts kinds to and from the ids that hotbar slots, icons and sounds use.</summary>
@@ -46,8 +46,7 @@ public static class Kinds {
     static Kinds() {
         ids = new string[All.Length];
         foreach (var kind in All) {
-            var name = typeof(ThingKind).GetField(kind.ToString())!.GetCustomAttributes(typeof(JsonStringEnumMemberNameAttribute), false);
-            ids[(int)kind] = ((JsonStringEnumMemberNameAttribute)name[0]).Name;
+            ids[(int)kind] = JsonNamingPolicy.SnakeCaseLower.ConvertName(kind.ToString());
             byId[ids[(int)kind]] = kind;
         }
     }
@@ -64,6 +63,9 @@ public static class Kinds {
     /// <summary>The kind an id names, or null for an item id or an empty slot.</summary>
     public static ThingKind? Parse(string? id) => TryParse(id, out var kind) ? kind : null;
 }
+
+/// <summary>Reads and writes a kind as its id.</summary>
+public sealed class KindConverter() : JsonStringEnumConverter<ThingKind>(JsonNamingPolicy.SnakeCaseLower);
 
 /// <summary>Reads an optional kind, where an empty id means none, and writes none as an empty id.</summary>
 public sealed class OptionalKind : JsonConverter<ThingKind?> {
