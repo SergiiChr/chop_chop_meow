@@ -99,6 +99,9 @@ public partial class SidePanel : PanelContainer {
         Kit.Refresh();
     }
 
+    /// <summary>Opens a page, or closes it if it is the one showing.</summary>
+    public void Toggle(string name) { if (state.Page == name) Close(); else Open(name); }
+
     public void Close() { Visible = false; Bag.Visible = false; View.PanelOpen = false; state.Page = ""; Live.Clear(); pagesOpened++; }
 
     /// <summary>Runs the open page's updates.</summary>

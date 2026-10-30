@@ -155,10 +155,10 @@ public partial class Game : Node {
                     if (view.BuildMode != null || state.AssigningWorker > 0) { view.BuildMode = null; state.AssigningWorker = 0; } else if (panel.Visible || bag.Visible) panel.Close(); else menu.Open();
                     RefreshLive(); break;
                 case Key.B: panel.Open("build"); break;
-                case Key.I: if (state.Page == "help") panel.Close(); else panel.Open("help"); break;
-                case Key.H: if (state.Page == "workers") panel.Close(); else panel.Open("workers"); break;
-                case Key.C: if (state.Page == "craft") panel.Close(); else panel.Open("craft"); break;
-                case Key.Tab: if (state.Page == "inventory") panel.Close(); else panel.Open("inventory"); break;
+                case Key.I: panel.Toggle("help"); break;
+                case Key.H: panel.Toggle("workers"); break;
+                case Key.C: panel.Toggle("craft"); break;
+                case Key.Tab: panel.Toggle("inventory"); break;
                 // Until a numbered slot is chosen, quick save and load ask which slot to use.
                 case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (saves.Slot > 0) saves.Save(saves.Slot); else startMenu.ShowSlots(true, startMenu.Close); break;
                 case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (saves.Slot > 0) saves.Load(saves.Slot); else startMenu.ShowSlots(false, startMenu.Close); break;
