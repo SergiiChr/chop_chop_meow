@@ -154,9 +154,9 @@ void fragment() {
         anomalyWarning.SelfModulate = Colors.White;
     }
 
-    /// <summary>The black hole opens at the crate, pulls the picture into itself until only black is left, then the game is over.</summary>
     private Tween? collapseTween;
 
+    /// <summary>The black hole opens at the crate, pulls the picture into itself until only black is left, then the game is over.</summary>
     public void Collapse(Thing crate) {
         StopPulse(); anomalyWarning.Visible = false; closePanel(); kit.State.Paused = true;
         var size = GetViewport().GetVisibleRect().Size;
@@ -176,7 +176,7 @@ void fragment() {
 
     /// <summary>Closes everything, stopping a collapse that is still running.</summary>
     public void End() {
-        collapseTween?.Kill();
+        StopPulse(); collapseTween?.Kill();
         anomaly.Visible = false; collapse.Visible = false; singularity.Visible = false; anomalyCrate = null;
     }
 }
