@@ -11,12 +11,12 @@ public partial class PauseMenu : PanelContainer {
     private readonly Net net;
     private readonly StartMenu startMenu;
     private readonly VBoxContainer goals;
-    private readonly Button loadButton = null!, newGameButton = null!;
+    private readonly Button loadButton, newGameButton;
     private readonly Label netLine;
 
     public Button HostButton { get; }
     public Button JoinButton { get; }
-    public Button SaveButton { get; } = null!;
+    public Button SaveButton { get; }
     /// <summary>What the menu says about the game being online.</summary>
     public string NetStatusLine => netLine.Text;
 
@@ -38,15 +38,11 @@ public partial class PauseMenu : PanelContainer {
         goals = new VBoxContainer(); goals.AddThemeConstantOverride("separation", 6); well.AddChild(goals);
         var side = new VBoxContainer { CustomMinimumSize = new Vector2(220, 0) }; side.AddThemeConstantOverride("separation", 12); body.AddChild(side);
         var resume = kit.BigButton("Resume · Esc", Style.Brick, Close); resume.Name = "resume"; side.AddChild(resume);
-        foreach (var (text, action) in new (string, Action)[] {
-            ("Save", () => startMenu.ShowSlots(true, BackToPause)), ("Load", () => startMenu.ShowSlots(false, BackToPause)), ("Options", () => startMenu.ShowOptions(BackToPause)),
-            ("New game", () => ConfirmLeave("NEW GAME", "Start a new game", () => { startMenu.Close(); restart(); })), ("Quit", () => ConfirmLeave("QUIT", "Quit to desktop", quit)),
-        }) {
-            var button = MenuButton(text, Style.Enamel, action); button.Name = text.ToLowerInvariant().Replace(' ', '_'); side.AddChild(button);
-            if (text == "Save") SaveButton = button;
-            if (text == "Load") loadButton = button;
-            if (text == "New game") newGameButton = button;
-        }
+        SaveButton = MenuButton("Save", Style.Enamel, () => startMenu.ShowSlots(true, BackToPause)); SaveButton.Name = "save"; side.AddChild(SaveButton);
+        loadButton = MenuButton("Load", Style.Enamel, () => startMenu.ShowSlots(false, BackToPause)); loadButton.Name = "load"; side.AddChild(loadButton);
+        var options = MenuButton("Options", Style.Enamel, () => startMenu.ShowOptions(BackToPause)); options.Name = "options"; side.AddChild(options);
+        newGameButton = MenuButton("New game", Style.Enamel, () => ConfirmLeave("NEW GAME", "Start a new game", () => { startMenu.Close(); restart(); })); newGameButton.Name = "new_game"; side.AddChild(newGameButton);
+        var quitButton = MenuButton("Quit", Style.Enamel, () => ConfirmLeave("QUIT", "Quit to desktop", quit)); quitButton.Name = "quit"; side.AddChild(quitButton);
         side.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         HostButton = MenuButton("Host", Style.Sage, HostGame); HostButton.Name = "host"; side.AddChild(HostButton);
         JoinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
