@@ -54,7 +54,10 @@ public partial class Game {
             else Require(address.Text == "127.0.0.1", "The join popup must offer the last address joined.");
             await Click(FindButton(screen, "Join")!);
             for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && joinStatus.Text == "Connecting…";) await Frames(1);
-            if (!world.Remote) { await Click(FindButton(screen, "Back · Esc")!); await Seconds(1); }
+            if (!world.Remote) {
+                await Click(FindButton(screen, "Back · Esc")!);
+                await Until(() => FindButton(screen, "Join game") != null, "the start menu after backing out of a failed join", 5);
+            }
         }
         await Until(() => !backdrop.Visible, "the join popup closing");
     }
