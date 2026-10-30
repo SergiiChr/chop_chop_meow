@@ -1,6 +1,5 @@
 using ChopChopMeow;
 using Godot;
-using static WorldSteps;
 
 /// <summary>Adding workers to a world for the simulation checks.</summary>
 internal static class WorkerSteps {

@@ -107,9 +107,4 @@ public partial class Game {
         Require(!net.Retrying && !world.Remote, "A guest that gave up must stop trying.");
     }
 
-    /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
-    private static int CheckPort => LaunchValue("--port") is string port ? int.Parse(port) : Net.DefaultPort;
-
-    private static string GuestSave => $"user://{FilePrefix}guest-127-0-0-1-{CheckPort}.json";
-
 }

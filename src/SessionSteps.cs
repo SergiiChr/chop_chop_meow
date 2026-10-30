@@ -13,6 +13,11 @@ public partial class Game {
         foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath).Concat(signals)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
     }
 
+    /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
+    private static int CheckPort => LaunchValue("--port") is string port ? int.Parse(port) : Net.DefaultPort;
+
+    private static string GuestSave => $"user://{FilePrefix}guest-127-0-0-1-{CheckPort}.json";
+
     private static string SignalPath(string name) => $"user://{FilePrefix}signal-{name}";
 
     /// <summary>Tells the other network check process that this one reached a point, for the times the game itself cannot carry the news.</summary>

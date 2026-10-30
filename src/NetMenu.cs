@@ -17,7 +17,7 @@ public partial class Game {
         net.Acted += view.Acted;
         net.Joined += OnJoined;
         net.Disconnected += ShowReconnecting;
-        net.Reconnecting += left => { if (GodotObject.IsInstanceValid(reconnectStatus)) reconnectStatus.Text = $"Lost the connection to the host. Trying again for {left} more seconds."; };
+        net.Reconnecting += left => { if (GodotObject.IsInstanceValid(reconnectStatus)) reconnectStatus.Text = $"Lost the connection to the host. Trying again for {left} more {(left == 1 ? "second" : "seconds")}."; };
         net.Left += reason => { leftReason = reason; world.NewGame(); ShowStart(); };
         net.Failed += reason => { if (GodotObject.IsInstanceValid(joinStatus)) joinStatus.Text = reason; };
     }
@@ -61,7 +61,7 @@ public partial class Game {
 
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
     private void ShowReconnecting() {
-        world.NewGame(); ClosePanel();
+        world.NewGame(); ClosePanel(); ending.Visible = false;
         OpenScreen("RECONNECTING", () => { net.StopRetrying(); ShowStart(); });
         reconnectStatus = Label("Lost the connection to the host. Trying again…", 14, Muted); screen.AddChild(reconnectStatus);
         AddScreenButton("Stop · Esc", () => screenBack?.Invoke());

@@ -30,8 +30,8 @@ public partial class Net : Node {
     private const int TimeoutLimit = 64, TimeoutMinMsec = 15000, TimeoutMaxMsec = 45000;
     /// <summary>Joining gives up on a host that never answers after this long, instead of waiting out the full timeout.</summary>
     private const float ConnectTimeout = 10;
-    /// <summary>How long a dropped guest keeps trying to get back in, and the pause between its tries.</summary>
-    private const float ReconnectSeconds = 120, RetrySeconds = 2;
+    /// <summary>The pause between a dropped guest's tries to get back in.</summary>
+    private const float RetrySeconds = 2;
     private const string LostLine = "Lost the connection to the host.";
     private const float SnapshotInterval = .1f, InputInterval = .05f;
     private const int HostId = 1;
@@ -53,8 +53,8 @@ public partial class Net : Node {
     public World World = null!;
     /// <summary>Put in front of the guest save file names, so checks never touch a player's saves.</summary>
     public string FilePrefix = "";
-    /// <summary>Seconds a dropped guest keeps trying; the network check shortens it to see a guest give up.</summary>
-    public float ReconnectLimit = ReconnectSeconds;
+    /// <summary>Seconds a dropped guest keeps trying to get back in; the network check shortens it to see a guest give up.</summary>
+    public float ReconnectLimit = 120;
     public event Action<string>? Said;
     public event Action<string, Vector2>? Heard;
     public event Action<int, ActorAction, Vector2>? Acted;
@@ -134,11 +134,6 @@ public partial class Net : Node {
     }
 
     public Error Join(string ip, int port = DefaultPort) {
-        reconnectLeft = 0;
-        return Connect(ip, port);
-    }
-
-    private Error Connect(string ip, int port) {
         Leave();
         var peer = new ENetMultiplayerPeer();
         var error = peer.CreateClient(ip, port);
@@ -192,6 +187,8 @@ public partial class Net : Node {
 
     /// <summary>The line to the host closed: a guest that was in the game tries to get back in on its own.</summary>
     private void Dropped() {
+        // Leaving is already under way and finishes on its own.
+        if (leaving) return;
         if (Retrying) Fail(LostLine);
         else if (!welcomed) End(LostLine);
         else {
@@ -206,7 +203,7 @@ public partial class Net : Node {
         if (reconnectLeft <= 0) { reconnectLeft = 0; End(LostLine); return; }
         int left = (int)MathF.Ceiling(reconnectLeft);
         if (left != shownLeft) { shownLeft = left; Reconnecting?.Invoke(left); }
-        if (!Online && (retryIn -= dt) <= 0) { retryIn = RetrySeconds; Connect(Address, port); }
+        if (!Online && (retryIn -= dt) <= 0) { retryIn = RetrySeconds; Join(Address, port); }
     }
 
     // ---------- Joining ----------
