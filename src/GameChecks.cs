@@ -13,7 +13,7 @@ public partial class Game {
     /// Walking for a few hundred real frames, through Godot input, allocates no more than its budget on the main thread:
     /// every byte is garbage the runtime collects later, in a pause that stalls a frame.
     /// </summary>
-    private async Task CheckWalkingFrames(long maxBytesPerFrame) {
+    private async Task CheckWalkingStaysWithinAllocationBudget(long maxBytesPerFrame) {
         var key = new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true };
         Input.ParseInputEvent(key);
         await Frames(120);
@@ -30,7 +30,7 @@ public partial class Game {
     /// Every panel page, refreshed again and again while what it shows stays the same, allocates nothing:
     /// the panel refreshes several times a second while it is open.
     /// </summary>
-    private async Task CheckPanelRefresh() {
+    private async Task CheckPanelPagesRefreshWithoutAllocating() {
         var at = world.Player;
         var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 0)); chest.Inventory.Add("wood", 40); chest.Inventory.Add("coal", 12);
         var pile = world.Add(ThingKind.Pile, at + new Vector2(-4, 2)); pile.Inventory.Add("stone", 9);
@@ -82,7 +82,7 @@ public partial class Game {
         await Frames();
         var old = view.PropOf(tree.Id) as TreeProp;
         Require(old != null, "Every tree must have its model once the world has loaded.");
-        CheckTreeCanopyShadows(old!);
+        CheckFadingCanopyKeepsItsCutoutShadows(old!);
         old!.Fade = .68f; old.Fall = 9;
         Restart(); await Frames(2);
         var fresh = view.PropOf(tree.Id) as TreeProp;
@@ -91,7 +91,7 @@ public partial class Game {
         ClosePanel();
     }
     /// <summary>Canopy fades use separate shadow-only meshes so the original cutout shadows survive alpha blending.</summary>
-    private void CheckTreeCanopyShadows(TreeProp prop) {
+    private void CheckFadingCanopyKeepsItsCutoutShadows(TreeProp prop) {
         Require(prop.SwayParts.Length > 0, "A tree canopy must expose its visible meshes for fading.");
         var allMeshes = new List<MeshInstance3D>();
         void Gather(Node at) {
@@ -160,7 +160,7 @@ public partial class Game {
         }
     }
     /// <summary>Messages keep clear of the HUD, stack, restart on a repeat, make room by dropping the stalest and fade out.</summary>
-    private async Task CheckMessages() {
+    private async Task CheckMessagesStackFadeAndKeepClearOfHud() {
         ClosePanel(); await Frames();
         Require(messages.GetGlobalRect().Position.X > needsPlate.GetGlobalRect().End.X && messages.GetGlobalRect().End.X < ui.Size.X - needsPlate.GetGlobalRect().End.X + 1,
             "Messages must keep clear of the needs plate and stay centred.");
@@ -182,7 +182,7 @@ public partial class Game {
         messages._Process(1);
         Require(messages.Shown.Length == 0 && lines.All(l => !l.Visible), "Every message must disappear once its time is up.");
     }
-    private async Task CheckSignpost() {
+    private async Task CheckTradingPostSellsBuysAndHires() {
         ClosePanel(); await Frames();
         var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
         world.S.Backpack.Add("wood", 5); world.S.Backpack.Add(Inventory.Coins, 100);
@@ -224,7 +224,7 @@ public partial class Game {
         signpostTab = "market"; sheetOpen = true; ClosePanel(); await Frames();
     }
     /// <summary>A new packing station opens its list of goods; picking one sets what it packs, and a backpack click loads it.</summary>
-    private async Task CheckPackingStation() {
+    private async Task CheckPackingStationListsGoodsAndTakesBackpackClicks() {
         ClosePanel(); await Frames();
         var packer = world.Add(ThingKind.Packer, world.Player + new Vector2(2, 0));
         world.S.Backpack.Add("berries", 5);
@@ -237,7 +237,7 @@ public partial class Game {
         world.S.Things.Remove(packer); world.S.Backpack.Remove("berries", 99); ClosePanel(); await Frames();
     }
     /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
-    private async Task CheckMine() {
+    private async Task CheckMineIsMarkedByClickAndEndGoalsShowInPauseMenu() {
         var home = world.Player;
         foreach (var ore in World.MineOres) {
             var cliff = World.CliffOf(ore);
@@ -259,7 +259,7 @@ public partial class Game {
         await KeyStroke(Key.Escape);
     }
 
-    private async Task CheckCraftingAndTorch() {
+    private async Task CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings() {
         ClosePanel(); world.S.Backpack.Remove("stone_chisel", 99); world.S.Backpack.Add("stone", 2); world.S.Backpack.Add("wood", 3);
         await KeyStroke(Key.C);
         Require(page == "craft", "C must open the crafting menu.");
@@ -296,7 +296,7 @@ public partial class Game {
     }
 
     /// <summary>A stack bigger than a crate's room fills it and the rest stays on the cursor until it is dropped elsewhere.</summary>
-    private async Task CheckCrateOverflow() {
+    private async Task CheckStackLargerThanCrateFillsItAndRestStaysHeld() {
         world.S.Backpack.Remove("wood", world.S.Backpack["wood"]);
         Require(world.S.Backpack.Add("wood", 64) == 64, "The backpack must have room for a stack of wood.");
         var crates = new[] { world.Add(ThingKind.Crate, world.Player + new Vector2(-1, 0)), world.Add(ThingKind.Crate, world.Player + new Vector2(0, -1)) };
@@ -314,7 +314,7 @@ public partial class Game {
         ClosePanel(); await Frames();
     }
 
-    private async Task CheckCrateInCrate() {
+    private async Task CheckCrateDraggedIntoCrateStopsAtWarning() {
         var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
         var box = world.Add(ThingKind.Crate, world.Player); box.Inventory.Add("berries", 3); world.PickUpCrate(box);
         string packed = world.S.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
@@ -347,7 +347,7 @@ public partial class Game {
         Require(!anomaly.Visible && backdrop.Visible && FindButton(screen, "New game") != null, "Main menu must leave the black hole for the start menu.");
     }
 
-    private async Task CheckWheelOverPanel() {
+    private async Task CheckMouseWheelOverPanelDoesNotZoom() {
         float zoom = view.Zoom;
         foreach (var page in new[] { "inventory", "build", "craft", "help" }) {
             OpenPage(page); await Frames(3);
@@ -362,7 +362,7 @@ public partial class Game {
         view.Zoom = zoom;
     }
 
-    private async Task CheckCabinAndCanopy() {
+    private async Task CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable() {
         ClosePanel(); await Frames();
         var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, 4));
         // The click lands while the player is still walking, as when running from a wolf.
@@ -480,11 +480,11 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
             world.S.Thirst = drink;
             Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = false });
-            await CheckMessages();
+            await CheckMessagesStackFadeAndKeepClearOfHud();
             // Measured about 115 B a frame: this check's own await of each frame and the memory of things seen for the first time on a straight walk.
             // The budget leaves a third more, so a change that adds garbage to every frame fails it.
-            await CheckWalkingFrames(150);
-            await CheckPanelRefresh();
+            await CheckWalkingStaysWithinAllocationBudget(150);
+            await CheckPanelPagesRefreshWithoutAllocating();
             float fed = world.S.Hunger; world.S.Hunger = 10; await Frames();
             Require(damageEdges.Strength >= .15f, "Food under 15% must keep the screen edges glowing.");
             world.S.Hunger = fed;
@@ -658,15 +658,15 @@ public partial class Game {
             world.S.Health = -1; await Until(() => world.Dead && deathLabel.Text.Contains("Respawning in"), "death showing the respawn countdown", 2);
             world.S.RespawnIn = .01f; await Until(() => !world.Dead && deathLabel.Text == "", "the countdown clearing once the player respawns", 2);
 
-            await CheckWheelOverPanel();
-            await CheckCabinAndCanopy();
-            await CheckSignpost();
-            await CheckPackingStation();
+            await CheckMouseWheelOverPanelDoesNotZoom();
+            await CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable();
+            await CheckTradingPostSellsBuysAndHires();
+            await CheckPackingStationListsGoodsAndTakesBackpackClicks();
 
             world.S.Milestones.UnionWith(new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" });
             await Frames(3);
             Require(!ending.Visible && !paused, "The starter goal chain alone must not end the game.");
-            await CheckMine();
+            await CheckMineIsMarkedByClickAndEndGoalsShowInPauseMenu();
             foreach (var mine in world.S.Things.Where(t => t.Kind == ThingKind.Mine)) mine.MineStage = MineStage.Open;
             world.S.Milestones.Add("profit_week");
             await Frames(3);
@@ -769,10 +769,10 @@ public partial class Game {
                 "Harvesting must collect the berries and hide only the fruit, leaving the bush visible.");
             berryBush.Remaining = 4; await Frames(2);
             Require(bushProp.Fruit.Visible, "A replenished bush must show its fruit again.");
-            await CheckCraftingAndTorch();
-            await CheckCrateOverflow();
+            await CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings();
+            await CheckStackLargerThanCrateFillsItAndRestStaysHeld();
             await CheckSurvivalInventoryUI();
-            await CheckCrateInCrate();
+            await CheckCrateDraggedIntoCrateStopsAtWarning();
             RemoveCheckFiles();
             await CheckFreshModelsAfterRestart();
             GD.Print("UI-TEST PASS"); Quit();

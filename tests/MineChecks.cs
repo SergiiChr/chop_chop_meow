@@ -11,16 +11,16 @@ using static WorkerSteps;
 /// <summary>Simulation checks for mines and the end goals.</summary>
 public static class MineChecks {
     public static void Run(GameData data) {
-        CheckAlignmentAndLegacySave(data);
-        CheckMarking(data);
-        CheckConstruction(data);
-        CheckMiningAndFullOutput(data);
+        CheckMineSitesAlignWithCliffsAndOldSavesUpgrade(data);
+        CheckMinesAreMarkedAtCliffsOnceEach(data);
+        CheckWorkersDigAndFrameMineWithTheirTools(data);
+        CheckMinersBringOreOutAndStopWhenOutputIsFull(data);
         CheckOnlyAvailableMinersUnload(data);
         CheckMiningIsSlowerThanDeposits(data);
-        CheckDailyProfitAndEndGoals(data);
+        CheckDailyProfitIsSalesMinusWagesAndMeetsEndGoals(data);
     }
 
-    private static void CheckAlignmentAndLegacySave(GameData data) {
+    private static void CheckMineSitesAlignWithCliffsAndOldSavesUpgrade(GameData data) {
         var world = FundedWorld(data); var expected = new Dictionary<int, Vector2>();
         foreach (var cliff in World.Cliffs) {
             Require(World.CliffAt(World.MineSpot(cliff)) == cliff, "each aligned site must belong to its own cliff");
@@ -58,7 +58,7 @@ public static class MineChecks {
             "loading an aligned save must not move its mines again");
     }
 
-    private static void CheckMarking(GameData data) {
+    private static void CheckMinesAreMarkedAtCliffsOnceEach(GameData data) {
         var world = FundedWorld(data);
         var cliff = World.CliffOf(ThingKind.Iron);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
@@ -73,7 +73,7 @@ public static class MineChecks {
         Require(World.MineOre(coal) == "coal" && World.MineOre(mine) == "iron_ore", "each mine must yield the ore of its own cliff");
     }
 
-    private static void CheckConstruction(GameData data) {
+    private static void CheckWorkersDigAndFrameMineWithTheirTools(GameData data) {
         var world = FundedWorld(data);
         var mine = MarkMine(world);
         var cliff = World.CliffAt(mine.Pos);
@@ -114,7 +114,7 @@ public static class MineChecks {
         Require(other.Inventory["wood"] == data.Mine.Materials["wood"] && other.Inventory["stone"] == 10 && world.S.Backpack["wood"] == 10, "delivering from the backpack must hand over only what the mine still needs");
     }
 
-    private static void CheckMiningAndFullOutput(GameData data) {
+    private static void CheckMinersBringOreOutAndStopWhenOutputIsFull(GameData data) {
         var world = FundedWorld(data);
         var mine = MarkMine(world);
         mine.MineStage = MineStage.Open;
@@ -201,7 +201,7 @@ public static class MineChecks {
         Require(mined > 0 && mined < dug, "a mine must be slower than working a deposit, at the gain of never running out");
     }
 
-    private static void CheckDailyProfitAndEndGoals(GameData data) {
+    private static void CheckDailyProfitIsSalesMinusWagesAndMeetsEndGoals(GameData data) {
         var world = FundedWorld(data);
         var worker = AddWorker(world, new Vector2(30, 30));
         worker.Wage = 26;

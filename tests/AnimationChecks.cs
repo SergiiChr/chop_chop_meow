@@ -7,14 +7,14 @@ using static Checks;
 /// <summary>Focused checks for deterministic actor animation selection and timing.</summary>
 public static class AnimationChecks {
     public static void Run() {
-        CheckTiming();
-        CheckFacing();
-        CheckPlayerActions();
-        CheckWorkerActions();
-        CheckPoses();
+        CheckActionsLoopAndWrapByTheirDuration();
+        CheckActorsTurnToFaceTheirMovement();
+        CheckPlayerActionFollowsToolAndTarget();
+        CheckWorkerActionFollowsItsWork();
+        CheckEveryActionMovesThroughDistinctPoses();
     }
 
-    private static void CheckTiming() {
+    private static void CheckActionsLoopAndWrapByTheirDuration() {
         Require(ActorAnimation.Phase(ActorAction.Chop, .25f) == .25f, "a one-second chop should be a quarter through after .25s");
         Require(ActorAnimation.Phase(ActorAction.Chop, 1) == 0, "action loops should wrap after their duration");
         Require(Math.Abs(ActorAnimation.Phase(ActorAction.Chop, -.125f) - .875f) < 1e-5f, "negative elapsed time should wrap safely");
@@ -23,14 +23,14 @@ public static class AnimationChecks {
         Require(ActorAnimation.Phase(ActorAction.Idle, float.NaN) == 0, "invalid time should fall back to the first pose");
     }
 
-    private static void CheckFacing() {
+    private static void CheckActorsTurnToFaceTheirMovement() {
         Require(Math.Abs(ActorAnimation.Yaw(new Vector2(0, 1), 1) - 0) < 1e-5f, "world +Y movement should face the rig's +Z forward");
         Require(Math.Abs(ActorAnimation.Yaw(new Vector2(1, 0), 0) - Mathf.Pi / 2) < 1e-5f, "eastward movement should turn a quarter turn");
         Require(Math.Abs(Math.Abs(ActorAnimation.Yaw(new Vector2(0, -1), 0)) - Mathf.Pi) < 1e-5f, "northward movement should face backward");
         Require(ActorAnimation.Yaw(Vector2.Zero, 2) == 2, "zero movement should retain the previous facing");
     }
 
-    private static void CheckPlayerActions() {
+    private static void CheckPlayerActionFollowsToolAndTarget() {
         var bag = new Inventory();
         bag.Add("steel_axe", 1);
         bag.Add("steel_pick", 1);
@@ -59,7 +59,7 @@ public static class AnimationChecks {
             "inactive gathering should leave the player idle");
     }
 
-    private static void CheckWorkerActions() {
+    private static void CheckWorkerActionFollowsItsWork() {
         var worker = new Worker();
         worker.Bag.Add("wood", 2);
         worker.Status = "Carrying wood → chest";
@@ -119,7 +119,7 @@ public static class AnimationChecks {
             "available workers should remain idle");
     }
 
-    private static void CheckPoses() {
+    private static void CheckEveryActionMovesThroughDistinctPoses() {
         foreach (var action in Enum.GetValues<ActorAction>()) {
             var poses = new HashSet<Pose>();
             for (int step = 0; step < 8; step++)

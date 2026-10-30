@@ -18,12 +18,12 @@ public static class MultiplayerChecks {
         CheckGuestGathersAndHammers(data);
         CheckEachPlayerHasTheirOwnPack(data);
         CheckSleepWaitsForEveryone(data);
-        CheckGuestSaveRoundTrip(data);
+        CheckGuestComesBackFromSaveWithTheirPackAndSpot(data);
         CheckBrokenGuestSavesStartEmpty(data);
-        CheckInventoryAndRecoveryCommands(data);
+        CheckGuestInventoryAndRecoveryCommandsLeaveOthersAlone(data);
     }
 
-    private static void CheckInventoryAndRecoveryCommands(GameData data) {
+    private static void CheckGuestInventoryAndRecoveryCommandsLeaveOthersAlone(GameData data) {
         var (world, guest, _) = Hosted(data);
         guest.Backpack.Add("wood", 10); guest.Backpack.Add("stone", 2);
         world.Run(guest, new Command(Verb.TransferSlot, 0, 0, "wood", 4, new Vector2(0, 7)));
@@ -192,7 +192,7 @@ public static class MultiplayerChecks {
         Require(world.S.Backpack[Inventory.Coins] == 40 && guest.Backpack[Inventory.Coins] == 50, "the host's backpack should pay the wages even when a guest sleeps");
     }
 
-    private static void CheckGuestSaveRoundTrip(GameData data) {
+    private static void CheckGuestComesBackFromSaveWithTheirPackAndSpot(GameData data) {
         var (world, guest, _) = Hosted(data);
         guest.Backpack.Add("coal", 5);
         world.As(guest, () => world.MoveTo(Terrain.Spawn + new Vector2(6, 1)));

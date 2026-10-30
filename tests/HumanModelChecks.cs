@@ -55,13 +55,13 @@ public static class HumanModelChecks {
             rigs[1].Show(new Pose(ElbowR: 110), null, false);
             Require(right.GetBonePoseRotation(1).IsEqualApprox(playerPose), "posing one rig must not mutate another rig's skeleton");
 
-            CheckCarrySupport(rigs);
+            CheckCarriedCrateFollowsCarryingVisibility(rigs);
         } finally {
             foreach (var rig in rigs) rig.Root.Free();
         }
     }
 
-    private static void CheckCarrySupport(ActorRig[] rigs) {
+    private static void CheckCarriedCrateFollowsCarryingVisibility(ActorRig[] rigs) {
         foreach (var rig in rigs) {
             var cargo = FindCargo(rig.Root);
             Require(cargo != null, "the carried cargo mesh should be found");

@@ -9,15 +9,15 @@ using static WorkerSteps;
 /// <summary>Simulation checks for worker animation state transitions.</summary>
 public static class WorkerStateChecks {
     public static void Run(GameData data) {
-        CheckGatherAndReassign(data);
-        CheckNextKnownSpot(data);
+        CheckWorkerStateFollowsGatheringAndReassignment(data);
+        CheckWorkerGoesToNextKnownSpotNotSeenOne(data);
         CheckStrikeResetsWorkState(data);
-        CheckBlockedPath(data);
-        CheckFurnacePumping(data);
-        CheckSaveRoundTrip(data);
+        CheckWorkerWithoutRouteIsBlocked(data);
+        CheckOnlyFirstFurnaceWorkerPumpsBellows(data);
+        CheckSavedWorkerRestartsWithDefaultWorkState(data);
     }
 
-    private static void CheckGatherAndReassign(GameData data) {
+    private static void CheckWorkerStateFollowsGatheringAndReassignment(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
         world.Add(ThingKind.Chest, new Vector2(12, 10));
@@ -37,7 +37,7 @@ public static class WorkerStateChecks {
                 "an available worker should remain idle after its next simulation tick");
     }
 
-    private static void CheckNextKnownSpot(GameData data) {
+    private static void CheckWorkerGoesToNextKnownSpotNotSeenOne(GameData data) {
         var world = EmptyWorld(data);
         var said = new System.Collections.Generic.List<string>();
         world.Notify += said.Add;
@@ -112,7 +112,7 @@ public static class WorkerStateChecks {
                 "a worker on strike should have no active work animation state");
     }
 
-    private static void CheckBlockedPath(GameData data) {
+    private static void CheckWorkerWithoutRouteIsBlocked(GameData data) {
         var world = EmptyWorld(data);
         // Off the map's edge: the tree is out of reach.
         var tree = world.Add(ThingKind.Tree, Vector2.One * (Terrain.Size - 1), 12);
@@ -126,7 +126,7 @@ public static class WorkerStateChecks {
                 "a worker with no valid route to its destination should enter blocked state through Walk");
     }
 
-    private static void CheckFurnacePumping(GameData data) {
+    private static void CheckOnlyFirstFurnaceWorkerPumpsBellows(GameData data) {
         var world = EmptyWorld(data);
         var furnace = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
         var bellowsWorker = AddWorker(world, furnace.Pos + World.BellowsStand);
@@ -150,7 +150,7 @@ public static class WorkerStateChecks {
                 "the first assigned worker should keep operating the bellows with extra crew assigned");
     }
 
-    private static void CheckSaveRoundTrip(GameData data) {
+    private static void CheckSavedWorkerRestartsWithDefaultWorkState(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 12);
         world.Add(ThingKind.Chest, new Vector2(12, 10));

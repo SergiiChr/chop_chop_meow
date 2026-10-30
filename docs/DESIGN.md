@@ -321,7 +321,7 @@ So a steel chisel does everything a stone chisel does, faster, while tin cans ne
 `World.ToolKind` names the tool a resource needs: an axe for trees, a pickaxe for deposits, a rake for leaves.
 Stone, berries and loose coal need none.
 
-Every tool and its parts stay reachable, which `CheckNoToolDeadlocks` verifies:
+Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFreshStart` verifies:
 
 - a chisel is always 2 stone away;
 - a mallet is a wood part;

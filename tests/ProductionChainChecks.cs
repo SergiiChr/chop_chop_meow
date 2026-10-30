@@ -16,8 +16,8 @@ public static class ProductionChainChecks {
     private static readonly string[] Products = { "canned_meat_stew", "bread", "steel_pick", "berries" };
 
     public static void Run(GameData data) {
-        CheckPackingStation(data);
-        CheckPostFilterAndAutoSell(data);
+        CheckPackingStationTakesOnlyItsGoodAndPacksCrates(data);
+        CheckPostsTakeOnlyAskedForCratesAndSendTheCartWhenFull(data);
         CheckWorkersRunEveryChain(data);
     }
 
@@ -25,7 +25,7 @@ public static class ProductionChainChecks {
     /// A packing station packs only while worked, one item at a time, names the crate after its good, and holds a full crate until it is carried out.
     /// Its hauler stocks goods and crates from storage and carries the full crate to the nearest storage asking for crates of that good.
     /// </summary>
-    private static void CheckPackingStation(GameData data) {
+    private static void CheckPackingStationTakesOnlyItsGoodAndPacksCrates(GameData data) {
         var world = EmptyWorld(data);
         var packer = world.Add(ThingKind.Packer, new Vector2(20, 20));
         world.Player = packer.Pos + new Vector2(1, 0);
@@ -75,7 +75,7 @@ public static class ProductionChainChecks {
     /// A trading post is a delivery target only for the crates its filter asks for, and only when it is closer than other storage asking for them.
     /// Set to sell on its own, it sends the cart once every market slot holds a crate.
     /// </summary>
-    private static void CheckPostFilterAndAutoSell(GameData data) {
+    private static void CheckPostsTakeOnlyAskedForCratesAndSendTheCartWhenFull(GameData data) {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(20, 20));
         var chest = world.Add(ThingKind.Chest, new Vector2(30, 20));

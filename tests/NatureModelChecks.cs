@@ -8,10 +8,10 @@ using static ModelSteps;
 /// <summary>Ore deposits share cached geometry while each prop keeps independent visibility and fade state.</summary>
 public static class NatureModelChecks {
     public static void Run() {
-        for (int variant = 0; variant < NatureShape.Variants; variant++) CheckVariant(variant);
+        for (int variant = 0; variant < NatureShape.Variants; variant++) CheckHidingOneOreVariantLeavesPropsSharingItsMesh(variant);
     }
 
-    private static void CheckVariant(int variant) {
+    private static void CheckHidingOneOreVariantLeavesPropsSharingItsMesh(int variant) {
         string[] kinds = { "coal", "iron", "tin" };
         var props = new[] {
             WorldModels.Build(new Thing { Kind = ThingKind.Coal, Id = variant }),

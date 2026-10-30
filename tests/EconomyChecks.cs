@@ -16,13 +16,13 @@ public static class EconomyChecks {
     private const float HireDays = 10;
 
     public static void Run(GameData data) {
-        CheckValueLadder(data);
-        CheckHiringPays(data);
+        CheckEveryRecipeAddsValueAlongTheLadder(data);
+        CheckHiredWorkersEarnMoreThanTheirPay(data);
         CheckBasketIsSustainable(data);
     }
 
     /// <summary>Every recipe adds value at reference prices, and the markup shrinks the deeper the recipe sits in its chain.</summary>
-    private static void CheckValueLadder(GameData data) {
+    private static void CheckEveryRecipeAddsValueAlongTheLadder(GameData data) {
         var world = new World(data, false);
         var markups = data.Recipes.Select(p => {
             // Water recipes return their reusable bottles; only the water is a consumed material.
@@ -41,7 +41,7 @@ public static class EconomyChecks {
     /// A berry picker barely covers their pay, steel tool crews earn several times theirs and cooks a good part more, and longer chains earn more per worker-day.
     /// Food chains are compared among themselves, apart from the tools.
     /// </summary>
-    private static void CheckHiringPays(GameData data) {
+    private static void CheckHiredWorkersEarnMoreThanTheirPay(GameData data) {
         var gathered = new[] { ("iron_ore", ThingKind.Iron), ("coal", ThingKind.Coal), ("tin_ore", ThingKind.Tin), ("wood", ThingKind.Tree), ("berries", ThingKind.Berries) }.ToDictionary(p => p.Item1, p => Gather(data, p.Item2, p.Item2 == ThingKind.Berries ? 2 : 1));
         var made = new Dictionary<string, float>();
         float Made(string recipe) => made.TryGetValue(recipe, out float perDay) ? perDay : made[recipe] = Station(data, recipe);

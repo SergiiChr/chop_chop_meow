@@ -7,11 +7,11 @@ using static Checks;
 /// <summary>Checks the no-cabin recovery path and its world-time effects.</summary>
 public static class RecoveryChecks {
     public static void Run(GameData data) {
-        CheckEligibility(data);
+        CheckSkipToMorningNeedsNoCabinAndNoOtherLivingPlayer(data);
         CheckSkipAdvancesWorld(data);
     }
 
-    private static void CheckEligibility(GameData data) {
+    private static void CheckSkipToMorningNeedsNoCabinAndNoOtherLivingPlayer(GameData data) {
         var world = new World(data, false);
         world.S.RespawnIn = 20;
         Require(world.CanSkipMorning, "a downed player without a cabin should be able to skip to morning");

@@ -10,17 +10,17 @@ namespace ChopChopMeow.Tests;
 /// <summary>Focused bottle-state checks; called from the deterministic simulation checks.</summary>
 public static class WaterChecks {
     public static void Run(GameData data) {
-        CheckFullBottleRequirement(data);
-        CheckData(data);
-        CheckThreeSips(data);
-        CheckRefillAndDirectSip(data);
-        CheckBottleSave(data);
-        CheckCrafting(data);
-        CheckRecipeContainersAndWorker(data);
-        CheckLegacyOverflow(data);
+        CheckRecipesTakeOnlyFullBottles(data);
+        CheckBottleStatesAreDefinedInData(data);
+        CheckBottleGivesThreeSips(data);
+        CheckBottlesRefillFromWaterAndCanBeSippedDirectly(data);
+        CheckBottleKeepsPartialStateAcrossSave(data);
+        CheckBottleRecipeMakesEmptyBottleFromTinAndWood(data);
+        CheckRecipesReturnReusableBottles(data);
+        CheckLegacyStackedBottlesOverflowToRecoveryBox(data);
     }
 
-    private static void CheckFullBottleRequirement(GameData data) {
+    private static void CheckRecipesTakeOnlyFullBottles(GameData data) {
         foreach (string item in new[] { "empty_bottle", "water_1", "water_2" }) {
             var world = new World(data, false);
             var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
@@ -43,7 +43,7 @@ public static class WaterChecks {
         }
     }
 
-    private static void CheckData(GameData data) {
+    private static void CheckBottleStatesAreDefinedInData(GameData data) {
         Require(data.ThirstHours == 24, "a full thirst gauge should last one game day");
         foreach (string item in Water.BottleItems) {
             Require(data.Items.ContainsKey(item), $"data should define bottle state {item}");
@@ -54,7 +54,7 @@ public static class WaterChecks {
         Require(!data.IsConsumable("empty_bottle"), "an empty bottle should not be consumable");
     }
 
-    private static void CheckThreeSips(GameData data) {
+    private static void CheckBottleGivesThreeSips(GameData data) {
         var world = new World(data, false);
         world.S.Thirst = 0;
         Require(world.S.Backpack.Add("water", 1) == 1, "a filled bottle should fit");
@@ -67,7 +67,7 @@ public static class WaterChecks {
         Require(world.S.Backpack.UsedSlots == 1, "each sip should preserve one physical bottle slot");
     }
 
-    private static void CheckRefillAndDirectSip(GameData data) {
+    private static void CheckBottlesRefillFromWaterAndCanBeSippedDirectly(GameData data) {
         var world = new World(data, false);
         var lake = new Thing { Kind = ThingKind.Water };
         world.S.Backpack.Slots = 1;
@@ -88,7 +88,7 @@ public static class WaterChecks {
         Require(world.S.Thirst > 58.32f && world.S.Thirst < 58.34f && world.S.Backpack.Count == 0, "a direct source sip should restore exactly one third thirst without creating a bottle");
     }
 
-    private static void CheckBottleSave(GameData data) {
+    private static void CheckBottleKeepsPartialStateAcrossSave(GameData data) {
         var world = new World(data, false);
         world.S.Backpack.Add("water_2", 1);
         var loaded = new World(data, false);
@@ -96,14 +96,14 @@ public static class WaterChecks {
         Require(loaded.S.Backpack["water_2"] == 1 && loaded.S.Backpack["water"] == 0, "save and load should preserve the bottle's partial state");
     }
 
-    private static void CheckCrafting(GameData data) {
+    private static void CheckBottleRecipeMakesEmptyBottleFromTinAndWood(GameData data) {
         var recipe = data.Recipes["water_bottle"];
         Require(recipe.Output == "empty_bottle" && recipe.Amount == 1 && recipe.Tool == "hammer" && recipe.Tier == 2, "the bottle recipe should create one empty bottle with the tin-can hammer tier");
         Require(recipe.Inputs.TryGetValue("tin_bar", out int tin) && tin == 1 && recipe.Inputs.TryGetValue("wood_parts", out int parts) && parts == 1, "the bottle recipe should use one tin bar and one wood part");
         Require(data.Market.Buys.ContainsKey("water"), "full bottles should remain purchasable");
     }
 
-    private static void CheckRecipeContainersAndWorker(GameData data) {
+    private static void CheckRecipesReturnReusableBottles(GameData data) {
         var world = new World(data, false);
         var bench = world.Add(ThingKind.Bench, world.Player + Vector2.Right * 2);
         bench.Tools!.Add("steel_hammer", 1); world.SetRecipe(bench, "water_bottle");
@@ -129,7 +129,7 @@ public static class WaterChecks {
             "an assigned collector must refill and deliver an existing bottle without generating more containers");
     }
 
-    private static void CheckLegacyOverflow(GameData data) {
+    private static void CheckLegacyStackedBottlesOverflowToRecoveryBox(GameData data) {
         var old = new World(data, false);
         Inventory.Unstacked.Remove("water");
         string saved;
