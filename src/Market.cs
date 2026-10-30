@@ -38,7 +38,7 @@ public partial class Game {
         outbound.AddChild(WellLabel("Outbound"));
         var ship = new HBoxContainer(); ship.AddThemeConstantOverride("separation", 14); outbound.AddChild(ship);
         var host = content; content = new VBoxContainer();
-        var crates = AddInventoryGrid(() => sign.Inventory, sign, id => MoveStack(sign.Inventory, world.S.Backpack, id, sign), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item), columns: 3);
+        var crates = AddInventoryGrid(() => sign.Inventory, sign, id => moves.Stack(sign.Inventory, world.S.Backpack, id, sign), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item), columns: 3);
         content.RemoveChild(crates); content.QueueFree(); content = host;
         ship.AddChild(crates);
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
@@ -71,10 +71,10 @@ public partial class Game {
         var mail = new HBoxContainer(); mail.AddThemeConstantOverride("separation", 14); inbound.AddChild(mail);
         var glyph = Style.Glyph("line_mail", 30, Style.Ink); glyph.MouseFilter = Control.MouseFilterEnum.Pass; glyph.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(glyph);
         host = content; content = new VBoxContainer();
-        var boxes = AddInventoryGrid(() => output, sign, id => MoveStack(output, world.S.Backpack, id, sign), "Click or drag: take", _ => false, columns: 5);
+        var boxes = AddInventoryGrid(() => output, sign, id => moves.Stack(output, world.S.Backpack, id, sign), "Click or drag: take", _ => false, columns: 5);
         content.RemoveChild(boxes); content.QueueFree(); content = host;
         mail.AddChild(boxes);
-        BagGrid(id => { if (world.CanSell(id)) MoveStack(world.S.Backpack, sign.Inventory, id, sign); else Notify("Pack goods the village buys in a crate to sell them."); }, "Click: put a packed crate on the cart · Drag onto a box", wanted: world.CanSell);
+        BagGrid(id => { if (world.CanSell(id)) moves.Stack(world.S.Backpack, sign.Inventory, id, sign); else Notify("Pack goods the village buys in a crate to sell them."); }, "Click: put a packed crate on the cart · Drag onto a box", wanted: world.CanSell);
     }
 
     /// <summary>What the crates waiting at the post would fetch at the last known prices.</summary>
@@ -194,7 +194,7 @@ public partial class Game {
             var buy = new Button { Name = $"buy_{id}", Text = $"{world.LotPrice(id)}", Icon = coins, ExpandIcon = true, IconAlignment = HorizontalAlignment.Right, CustomMinimumSize = new Vector2(80, 30), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
             buy.AddThemeConstantOverride("icon_max_width", 16); var buyLook = Style.Pill(Style.Brick); Style.Skin(buy, buyLook.Item1, buyLook.Item2);
             buy.AddThemeFontOverride("font", Style.Bold); buy.AddThemeFontSizeOverride("font_size", 14);
-            buy.Pressed += () => { kit.Act(() => world.Buy(sign, id, MoveAll ? 5 : 1)); RefreshLive(); };
+            buy.Pressed += () => { kit.Act(() => world.Buy(sign, id, ItemMoves.All ? 5 : 1)); RefreshLive(); };
             buy.TooltipText = world.Lot(id) > 1 ? $"Buy a crate of {world.Lot(id)} {world.Data.Name(id)} · Ctrl: 5 crates\nCrates arrive in the mailbox." : $"Buy a {world.Data.Name(id).ToLowerInvariant()} · Ctrl: 5\nGoods arrive in the mailbox.";
             buySlot.AddChild(buy);
         }

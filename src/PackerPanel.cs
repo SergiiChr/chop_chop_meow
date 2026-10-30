@@ -24,7 +24,7 @@ public partial class Game {
             var inputs = new Control[] { MachineSlot(t, t.Inventory, t.Packs, true, "×1"), MachineSlot(t, t.Inventory, "crate", true, "") };
             Process(inputs, LiveText.Of(text => AppendDuration(text, world.Data.PackSeconds)), () => t.Processing ? t.Progress / world.Data.PackSeconds : 0, null, PackedCrate(t), Array.Empty<Control>());
         }
-        BagGrid(id => world.LoadInput(t, id, MoveAll ? world.S.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot", wanted: id => world.Holds(t, id));
+        BagGrid(id => world.LoadInput(t, id, ItemMoves.All ? world.S.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot", wanted: id => world.Holds(t, id));
         JobButtons(t);
     }
 
@@ -47,7 +47,7 @@ public partial class Game {
         var (cell, _) = ItemSlot.Cup("packed_crate", 64);
         cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
         cell.Icon = Icons.Of("crate");
-        cell.Pressed += () => { if (output.First() is string crate) { kit.Act(() => MoveStack(output, world.S.Backpack, crate, t)); RefreshLive(); } };
+        cell.Pressed += () => { if (output.First() is string crate) { kit.Act(() => moves.Stack(output, world.S.Backpack, crate, t)); RefreshLive(); } };
         cell.Drag = () => output.First() is string crate ? new ItemDrag(crate, 1, output, t) : null;
         column.AddChild(cell);
         var fill = PerBatch(""); column.AddChild(fill);

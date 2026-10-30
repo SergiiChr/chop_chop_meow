@@ -108,11 +108,11 @@ public partial class Game {
         cup.CanTake = drag => drag.Item == Inventory.Coins && drag.From == world.S.Backpack;
         cup.Take = drag => {
             if (NearPost() is not Thing post) { Notify("Bank coins at a trading post."); return drag.Count; }
-            int left = 0; kit.Act(() => left = MoveDrag(drag, post.Wages!, post)); RefreshLive(); return left;
+            int left = 0; kit.Act(() => left = moves.Drag(drag, post.Wages!, post)); RefreshLive(); return left;
         };
         cup.Pressed += () => {
             if (NearPost() is not Thing post) { Notify("Take coins out at a trading post."); return; }
-            kit.Act(() => MoveStack(post.Wages!, world.S.Backpack, Inventory.Coins, post)); RefreshLive();
+            kit.Act(() => moves.Stack(post.Wages!, world.S.Backpack, Inventory.Coins, post)); RefreshLive();
         };
         line.AddChild(cup);
         bankDue = Style.Text("", 14, Style.Beige); line.AddChild(bankDue);

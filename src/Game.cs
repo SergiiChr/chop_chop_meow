@@ -47,6 +47,7 @@ public partial class Game : Node {
     private UiKit kit = null!;
     private EndingScreen ending = null!;
     private BlackHole blackHole = null!;
+    private ItemMoves moves = null!;
     private RecoveryPrompt recovery = null!;
     private UiState state = null!;
     private float uiClock;
@@ -140,6 +141,8 @@ public partial class Game : Node {
         Update(); live.Add(Update);
     }
     private void BuildHud() {
+        blackHole = new BlackHole(kit, view, ui.Theme, ClosePanel, LatestSlot, LoadSlot, ShowStart); AddChild(blackHole);
+        moves = new ItemMoves(kit, blackHole);
         // The day dial and clock share a plate in the top right corner; the side panel opens below it.
         var clock = new PanelContainer { AnchorLeft = 1, AnchorRight = 1, OffsetLeft = -200, OffsetRight = -20, OffsetTop = 18, OffsetBottom = 18, MouseFilter = Control.MouseFilterEnum.Ignore };
         clock.AddThemeStyleboxOverride("panel", Style.Plate); ui.AddChild(clock);
@@ -181,7 +184,6 @@ public partial class Game : Node {
         deathLabel.OffsetTop -= 190; deathLabel.OffsetBottom -= 190;
         deathLabel.HorizontalAlignment = HorizontalAlignment.Center; deathLabel.MouseFilter = Control.MouseFilterEnum.Ignore; ui.AddChild(deathLabel);
         BuildNeeds(); ending = new EndingScreen(kit, ClosePanel, Restart); ui.AddChild(ending); BuildMenu(); BuildScreens();
-        blackHole = new BlackHole(kit, view, ui.Theme, ClosePanel, LatestSlot, LoadSlot, ShowStart); AddChild(blackHole);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
         RefreshLive();
     }
@@ -486,12 +488,12 @@ public partial class Game : Node {
         HeaderAction("stash", "Store all materials · keeps tools", () => StoreAll(t), Style.ActionRound, "deposit");
         if (t.Kind == ThingKind.Chest) FilterButton(t);
         Well(new VBoxContainer()).AddChild(StorageGrid(t));
-        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
+        BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
     }
     /// <summary>A storage's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
     private GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) {
         var host = content; var column = new VBoxContainer(); content = column;
-        var grid = AddInventoryGrid(() => t.Inventory, t, id => MoveStack(t.Inventory, world.S.Backpack, id, t), "Click: take one · Ctrl: take all · Drag to move", columns: columns, size: size);
+        var grid = AddInventoryGrid(() => t.Inventory, t, id => moves.Stack(t.Inventory, world.S.Backpack, id, t), "Click: take one · Ctrl: take all · Drag to move", columns: columns, size: size);
         content = host; column.RemoveChild(grid); column.QueueFree();
         return grid;
     }
@@ -528,13 +530,13 @@ public partial class Game : Node {
         Well(new VBoxContainer()).AddChild(StorageGrid(t));
         var hint = Row(); hint.AddThemeConstantOverride("separation", 8);
         hint.AddChild(Style.Text("Hold", 14, Style.Beige)); hint.AddChild(Style.Glyph("line_mouse", 24, Style.Rim)); hint.AddChild(Style.Text("to pick up", 14, Style.Beige));
-        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
+        BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
     }
     private void Recovery(Thing t) {
         headingTitle.Text = "Recovery box";
         Well(new VBoxContainer()).AddChild(StorageGrid(t, 5));
         var row = Row(); row.AddChild(kit.BigButton("Take all", Style.Brick, () => TakeAll(t)));
-        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Drag to move");
+        BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Drag to move");
     }
     /// <summary>A tool rack: a row per kind of tool workers use, with what hangs there, how many are out, and who waits for one.</summary>
     private void ToolRack(Thing t) {
@@ -554,7 +556,7 @@ public partial class Game : Node {
             var row = new HBoxContainer { CustomMinimumSize = new Vector2(0, 60) }; row.AddThemeConstantOverride("separation", 12); rows.AddChild(row);
             string plainest = world.Data.Items.Where(p => p.Value.Tool == kind).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
             var (cell, count) = ItemSlot.Cup($"rack_{kind}"); cell.Icon = Icons.Of(plainest); row.AddChild(cell);
-            cell.Pressed += () => { if (world.BestTool(kind, t.Inventory) is string best) { kit.Act(() => MoveStack(t.Inventory, world.S.Backpack, best, t)); RefreshLive(); } };
+            cell.Pressed += () => { if (world.BestTool(kind, t.Inventory) is string best) { kit.Act(() => moves.Stack(t.Inventory, world.S.Backpack, best, t)); RefreshLive(); } };
             cell.Drag = () => world.BestTool(kind, t.Inventory) is string best ? new ItemDrag(best, t.Inventory[best], t.Inventory, t) : null;
             row.AddChild(new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
             var outPill = Style.Pill("", Style.Tag(Style.Enamel), Style.Rim, 12); outPill.MouseFilter = Control.MouseFilterEnum.Pass; row.AddChild(outPill);
@@ -578,7 +580,7 @@ public partial class Game : Node {
                 waitPill.TooltipText = string.Join("\n", world.S.Workers.Where(w => w.Missing == kind).Select(w => $"{w.Name} needs {A(kind)}"));
             });
         }
-        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: hang a tool · Ctrl: all of them · Drag to move", wanted: id => world.Holds(t, id) && t.Inventory.Accepts(id));
+        BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: hang a tool · Ctrl: all of them · Drag to move", wanted: id => world.Holds(t, id) && t.Inventory.Accepts(id));
         JobButtons(t);
     }
     private static string A(string word) => "aeiou".Contains(word[0]) ? $"an {word}" : $"a {word}";
@@ -622,7 +624,7 @@ public partial class Game : Node {
             content.AddChild(skip);
             JobButtons(t);
         }
-        BagGrid(id => MoveStack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move", wanted: id => world.Holds(t, id));
+        BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move", wanted: id => world.Holds(t, id));
     }
     /// <summary>
     /// A farm plot: its growth from bare soil to ripe wheat, then the process row: seeds in, fertilizer as its fuel, wheat out with seeds and grass beside.
@@ -669,7 +671,7 @@ public partial class Game : Node {
         var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => FarmCup(farm, farm.Inventory, k, true, $"×{world.Data.Farm.Sow[k]}"));
         Process(inputs, $"{world.Data.Farm.GrowDays:0} d", () => farm.FarmStage == FarmStage.Growing ? farm.Progress / world.GrowSeconds : farm.FarmStage == FarmStage.Ripe ? 1 : 0,
             FuelRow("line_leaf", new Color("8fae7e"), FuelCup(fertilizer), lasts), main, side);
-        BagGrid(id => MoveStack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move", wanted: id => world.Holds(farm, id));
+        BagGrid(id => moves.Stack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move", wanted: id => world.Holds(farm, id));
         JobButtons(farm);
     }
     /// <summary>Takes a cup out of the column it was built in, for the fuel row, and frees the column.</summary>
@@ -683,12 +685,12 @@ public partial class Game : Node {
         var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
         cell.Icon = Icons.Of(item);
         if (look != null) cell.AddThemeStyleboxOverride("normal", look); else if (!input) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
-        cell.Pressed += () => { kit.Act(() => MoveStack(box, world.S.Backpack, item, farm)); RefreshLive(); };
+        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, farm)); RefreshLive(); };
         cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, farm) : null;
         if (input) {
             // Seed comes back in from the plot's own harvest as well as from the backpack.
             cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == farm.Output) && drag.Item == item;
-            cell.Take = drag => { int left = 0; kit.Act(() => left = MoveDrag(drag, box, farm)); RefreshLive(); return left; };
+            cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, box, farm)); RefreshLive(); return left; };
         }
         int drawn = -1;
         live.Add(() => {
@@ -797,7 +799,7 @@ public partial class Game : Node {
                     if (t.Kind == ThingKind.Hut) entering = t;
                     // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
                     if (t.IsStorage && ActiveHotbarItem() is string item && IsTransferableHotbarItem(item) && world.Holds(t, item) && !(t.Kind == ThingKind.Crate && World.IsCrate(item))) {
-                        if (world.Near(t)) { int moved = 0; kit.Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, MoveAll ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
+                        if (world.Near(t)) { int moved = 0; kit.Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, ItemMoves.All ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else Notify("Walk closer to the chest to store the selected stack.");
                     }
                     Select(t);
                 } else if (ActiveHotbarItem() is string held && HasUse(held)) UseHeld(view.ToWorld(mouse.Position));

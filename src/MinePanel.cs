@@ -62,7 +62,7 @@ public partial class Game {
                 var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 10); row.AddChild(pair);
                 var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); pair.AddChild(column);
                 var (cell, count) = ItemSlot.Cup($"output_{item}", 64); cell.Icon = Icons.Of(item); cell.AddThemeStyleboxOverride("normal", Style.CupWanted); column.AddChild(cell);
-                cell.Pressed += () => { kit.Act(() => MoveStack(mine.Output!, world.S.Backpack, item, mine)); RefreshLive(); };
+                cell.Pressed += () => { kit.Act(() => moves.Stack(mine.Output!, world.S.Backpack, item, mine)); RefreshLive(); };
                 cell.Drag = () => mine.Output![item] > 0 ? new ItemDrag(item, mine.Output[item], mine.Output, mine) : null;
                 var track = new Panel { CustomMinimumSize = new Vector2(64, 8) }; track.AddThemeStyleboxOverride("panel", Style.BarBack); column.AddChild(track);
                 var fill = new ColorRect { Color = Style.Mustard, Size = new Vector2(0, 8) }; track.AddChild(fill); bars[i] = fill;

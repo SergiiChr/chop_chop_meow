@@ -15,7 +15,7 @@ public partial class Game {
         if (t.Recipe != "") Machine(t);
         else AddLabel("Choose what to make.", 14, Style.Beige);
         if (t.Kind == ThingKind.Reinforced) Bellows(t);
-        BagGrid(id => world.LoadInput(t, id, MoveAll ? world.S.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot",
+        BagGrid(id => world.LoadInput(t, id, ItemMoves.All ? world.S.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot",
             wanted: id => t.Recipe != "" && (world.BatchCost(t).ContainsKey(id) || t.Burner != null && World.FuelFits(t, id)));
         JobButtons(t);
     }
@@ -52,11 +52,11 @@ public partial class Game {
         var burner = t.Burner!;
         var (cell, count) = ItemSlot.Cup("fuel");
         cell.AddThemeStyleboxOverride("normal", Style.CupFuel);
-        cell.Pressed += () => { if (burner.First() is string held) { kit.Act(() => MoveStack(burner, world.S.Backpack, held, t)); RefreshLive(); } };
+        cell.Pressed += () => { if (burner.First() is string held) { kit.Act(() => moves.Stack(burner, world.S.Backpack, held, t)); RefreshLive(); } };
         cell.Drag = () => burner.First() is string held ? new ItemDrag(held, burner[held], burner, t) : null;
         cell.CanTake = drag => drag.From == world.S.Backpack && World.FuelFits(t, drag.Item);
         cell.Take = drag => {
-            int left = world.Near(t) ? Leftover(drag, burner.First() is string held && held != drag.Item ? 0 : burner.StackOf(drag.Item) - burner[drag.Item]) : 0;
+            int left = world.Near(t) ? ItemMoves.Leftover(drag, burner.First() is string held && held != drag.Item ? 0 : burner.StackOf(drag.Item) - burner[drag.Item]) : 0;
             kit.Act(() => world.LoadFuel(t, drag.Item, drag.Count)); RefreshLive(); return left;
         };
         var lasts = Style.Text("", 14, Style.Ink);
@@ -108,12 +108,12 @@ public partial class Game {
         var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
         if (!input) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
         cell.Icon = Icons.Of(item);
-        cell.Pressed += () => { kit.Act(() => MoveStack(box, world.S.Backpack, item, t)); RefreshLive(); };
+        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, t)); RefreshLive(); };
         cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, t) : null;
         if (input) {
             cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || item == "water" && Water.IsBottle(drag.Item));
             cell.Take = drag => {
-                int left = world.Near(t) ? Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
+                int left = world.Near(t) ? ItemMoves.Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
                 kit.Act(() => world.LoadInput(t, drag.Item, drag.Count)); RefreshLive(); return drag.Item == item ? left : 0;
             };
         }

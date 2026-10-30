@@ -61,6 +61,7 @@ UI and input:
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream cups, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
 | `src/Panels.cs` | Shared panel parts: header buttons, the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |
+| `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
 | `src/Machine.cs` | Draws station input and output slots |

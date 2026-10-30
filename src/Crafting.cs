@@ -88,7 +88,7 @@ public partial class Game {
         var slotted = World.SlotKinds(bench.Kind);
         BagGrid(id => {
             if (slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(bench, world.Data.Items[id].Tool) == null) world.SlotTool(bench, id);
-            else world.LoadInput(bench, id, MoveAll ? world.S.Backpack[id] : 1);
+            else world.LoadInput(bench, id, ItemMoves.All ? world.S.Backpack[id] : 1);
         }, "Click: slot a tool, or add one · Ctrl: all of it · Drag onto a slot",
             wanted: id => bench.Recipe != "" && world.BatchCost(bench).ContainsKey(id) || slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(bench, world.Data.Items[id].Tool) == null);
         JobButtons(bench);
