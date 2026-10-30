@@ -38,7 +38,7 @@ public partial class Game {
     /// <param name="inGame">Opened from the pause menu: the game in progress is autosaved before the host's world replaces it.</param>
     private void ShowJoin(Action back, bool inGame) {
         OpenScreen("JOIN A GAME", () => { if (net.Connecting) net.Leave(); back(); });
-        var address = new LineEdit { Name = "address", Text = Setting("net", "address", ""), PlaceholderText = "Host address, such as 192.168.1.20", CustomMinimumSize = new Vector2(0, 38) };
+        var address = new LineEdit { Name = "address", Text = Settings.Get("net", "address", ""), PlaceholderText = "Host address, such as 192.168.1.20", CustomMinimumSize = new Vector2(0, 38) };
         var port = new LineEdit { Name = "port", Text = Net.DefaultPort.ToString(), CustomMinimumSize = new Vector2(0, 38) };
         foreach (var (text, field) in new[] { ("Address", address), ("Port", port) }) {
             var row = new HBoxContainer(); screen.AddChild(row);
@@ -49,7 +49,7 @@ public partial class Game {
         var join = kit.Button("Join", () => {
             if (!int.TryParse(port.Text.Trim(), out int number) || number is < 1 or > 65535) { joinStatus.Text = "The port is a number from 1 to 65535."; return; }
             if (address.Text.Trim() == "") { joinStatus.Text = "Enter the host's address."; return; }
-            if (inGame && !world.Remote) Save(0);
+            if (inGame && !world.Remote) saves.Save(0);
             var error = net.Join(address.Text.Trim(), number);
             joinStatus.Text = error == Error.Ok ? "Connecting…" : $"Could not connect: {error}.";
         });
@@ -71,8 +71,8 @@ public partial class Game {
     private void DropWorld() { world.NewGame(); panel.Close(); ending.Visible = false; blackHole.End(); }
 
     private void OnJoined(bool back) {
-        StoreSetting("net", "address", net.Address);
-        slot = 0; state.Selected = 0; state.WorkerId = 0; gathering = null; state.Entering = null; lifting = null; state.AssigningWorker = 0; ending.Joined(back);
+        Settings.Store("net", "address", net.Address);
+        saves.Slot = 0; state.Selected = 0; state.WorkerId = 0; gathering = null; state.Entering = null; lifting = null; state.AssigningWorker = 0; ending.Joined(back);
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; shownHealth = world.S.Health;
         HideScreen(); menu.Visible = false; ending.Visible = false; panel.Close();
         Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");

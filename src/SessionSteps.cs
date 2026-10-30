@@ -9,16 +9,16 @@ namespace ChopChopMeow;
 /// <summary>Starts and leaves games for the UI and network checks.</summary>
 public partial class Game {
     private static void RemoveCheckFiles() {
-        var signals = DirAccess.GetFilesAt("user://").Where(name => name.StartsWith($"{FilePrefix}signal-")).Select(name => $"user://{name}");
-        foreach (var path in Enumerable.Range(0, SlotCount + 1).Select(SlotPath).Append(SettingsPath).Concat(signals)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
+        var signals = DirAccess.GetFilesAt("user://").Where(name => name.StartsWith($"{Launch.FilePrefix}signal-")).Select(name => $"user://{name}");
+        foreach (var path in Enumerable.Range(0, Saves.SlotCount + 1).Select(Saves.SlotPath).Append(Settings.Path).Concat(signals)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
     }
 
     /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
-    private static int CheckPort => LaunchValue("--port") is string port ? int.Parse(port) : Net.DefaultPort;
+    private static int CheckPort => Launch.Value("--port") is string port ? int.Parse(port) : Net.DefaultPort;
 
-    private static string GuestSave => $"user://{FilePrefix}guest-127-0-0-1-{CheckPort}.json";
+    private static string GuestSave => $"user://{Launch.FilePrefix}guest-127-0-0-1-{CheckPort}.json";
 
-    private static string SignalPath(string name) => $"user://{FilePrefix}signal-{name}";
+    private static string SignalPath(string name) => $"user://{Launch.FilePrefix}signal-{name}";
 
     /// <summary>Tells the other network check process that this one reached a point, for the times the game itself cannot carry the news.</summary>
     private static void Signal(string name) {
@@ -33,7 +33,7 @@ public partial class Game {
     }
 
     private async Task SurvivalReviewShot(string name) {
-        if (LaunchValue("--review-captures") is not string folder) return;
+        if (Launch.Value("--review-captures") is not string folder) return;
         System.IO.Directory.CreateDirectory(folder);
         await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
         Require(GetViewport().GetTexture().GetImage().SavePng(System.IO.Path.Combine(folder, name + ".png")) == Error.Ok,

@@ -36,6 +36,7 @@ public partial class Game : Node {
     private float autosave;
     private const float AutosaveSeconds = 300;
     private Net net = null!;
+    private Saves saves = null!;
     /// <summary>Health as last shown, so a guest flashes the damage its updates bring.</summary>
     private float shownHealth;
     private float runTime;
@@ -43,16 +44,17 @@ public partial class Game : Node {
     private bool quitting;
     public override void _Ready() {
         try {
-            var data = GameData.Load(); world = launchArgs.Contains("--performance-run") ? PerformanceFixture.Create(data) : new World(data);
-            if (launchArgs.Contains("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
-            if (LaunchValue("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
+            var data = GameData.Load(); world = Launch.Has("--performance-run") ? PerformanceFixture.Create(data) : new World(data);
+            if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
+            if (Launch.Value("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
             world.Notify = Notify;
-            sounds = new Sounds { World = world, MusicVolume = SavedMusicVolume() }; AddChild(sounds);
+            sounds = new Sounds { World = world, MusicVolume = Settings.MusicVolume }; AddChild(sounds);
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
-            view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = launchArgs.Contains("--environment-review") }; AddChild(view);
+            view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = Launch.Has("--environment-review") }; AddChild(view);
             kit = new UiKit(world, sounds, Notify, RefreshLive); state = kit.State;
-            net = new Net { Name = "Net", World = world, FilePrefix = FilePrefix }; AddChild(net);
+            net = new Net { Name = "Net", World = world, FilePrefix = Launch.FilePrefix }; AddChild(net);
+            saves = new Saves(kit, net, Loaded);
             world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };
             world.PlayerActed += (action, at) => net.Echo(world.S.Actor.Id, action, at);
             ConnectNet();
@@ -60,16 +62,16 @@ public partial class Game : Node {
             var layer = new CanvasLayer(); AddChild(layer);
             ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
             SetTheme(); BuildHud();
-            GetViewport().UseTaa = SavedTaa();
-            if (launchArgs.Contains("--showcase")) Showcase();
-            else if (!launchArgs.Contains("--animation-review")) ShowStart();
-            if (!launchArgs.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { ApplyResolution(SavedResolution()); Engine.MaxFps = SavedFrameLimit(); }
+            GetViewport().UseTaa = Settings.Taa;
+            if (Launch.Has("--showcase")) Showcase();
+            else if (!Launch.Has("--animation-review")) ShowStart();
+            if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
             StartPerformanceRun();
-            if (launchArgs.Contains("--ui-test")) RunUIChecks();
-            if (launchArgs.Contains("--net-check")) RunNetCheck(LaunchValue("--net-check") == "host");
-            if (launchArgs.Contains("--animation-review")) {
+            if (Launch.Has("--ui-test")) RunUIChecks();
+            if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
+            if (Launch.Has("--animation-review")) {
                 panel.Close(); ui.Visible = false; view.AnimationReview = true;
-                if (LaunchValue("--animation-capture") is string captures) CaptureAnimations(captures);
+                if (Launch.Value("--animation-capture") is string captures) CaptureAnimations(captures);
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
@@ -102,7 +104,7 @@ public partial class Game : Node {
     }
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private void BuildHud() {
-        blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), LatestSlot, LoadSlot, ShowStart); AddChild(blackHole);
+        blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), saves.Latest, LoadSlot, ShowStart); AddChild(blackHole);
         moves = new ItemMoves(kit, blackHole);
         panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;
         hotbar = new Hotbar(kit, view, panel);
@@ -134,26 +136,14 @@ public partial class Game : Node {
     private void Restart() {
         net.Leave();
         world.NewGame();
-        state.Selected = 0; state.WorkerId = 0; gathering = null; state.AssigningWorker = 0; slot = 0; autosave = 0;
+        state.Selected = 0; state.WorkerId = 0; gathering = null; state.AssigningWorker = 0; saves.Slot = 0; autosave = 0;
         view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0;
         ending.Visible = false; state.Paused = false; panel.Open("welcome");
         Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
     }
-    private void Save(int n) {
-        try {
-            using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Write); if (file == null) throw new InvalidOperationException("Cannot open save file");
-            file.StoreString(world.Serialize()); if (n > 0) slot = n; Notify($"Settlement saved · {SlotName(n)}.");
-        } catch (Exception e) { Notify($"Save failed: {e.Message}"); }
-    }
-    private bool Load(int n) {
-        try {
-            if (!SlotUsed(n)) { Notify($"{SlotName(n)} is empty."); return false; }
-            using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Read); world.Deserialize(file.GetAsText());
-            // Another world ends the game the guests are in.
-            net.Leave();
-            slot = n; state.Selected = 0; state.WorkerId = 0; gathering = null; state.Entering = null; state.AssigningWorker = 0; view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; panel.Open("inventory");
-            return true;
-        } catch (Exception e) { Notify($"Load failed: {e.Message}"); return false; }
+    /// <summary>Clears what belonged to the world before a load, and shows what was loaded.</summary>
+    private void Loaded() {
+        state.Selected = 0; state.WorkerId = 0; gathering = null; state.Entering = null; state.AssigningWorker = 0; view.BuildMode = null; view.Selected = 0; view.SelectedWorker = 0; panel.Open("inventory");
     }
     public override void _UnhandledInput(InputEvent ev) {
         if (view?.EnvironmentReview == true) return;
@@ -172,8 +162,8 @@ public partial class Game : Node {
                 case Key.C: if (state.Page == "craft") panel.Close(); else panel.Open("craft"); break;
                 case Key.Tab: if (state.Page == "inventory") panel.Close(); else panel.Open("inventory"); break;
                 // Until a numbered slot is chosen, quick save and load ask which slot to use.
-                case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (slot > 0) Save(slot); else ShowSlots(true, HideScreen); break;
-                case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (slot > 0) Load(slot); else ShowSlots(false, HideScreen); break;
+                case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (saves.Slot > 0) saves.Save(saves.Slot); else ShowSlots(true, HideScreen); break;
+                case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (saves.Slot > 0) saves.Load(saves.Slot); else ShowSlots(false, HideScreen); break;
                 case >= Key.Key1 and <= Key.Key9: hotbar.Select((int)(key.PhysicalKeycode - Key.Key1)); break;
                 case Key.E:
                     var t = world.Find(state.Selected);
@@ -228,18 +218,9 @@ public partial class Game : Node {
             }
         }
     }
-    // Read once: fetching them from the engine allocates a fresh array each time.
-    private static readonly string[] launchArgs = OS.GetCmdlineUserArgs();
-    private static readonly bool smokeTest = launchArgs.Contains("--smoke-test");
-    private static readonly string? screenshotPath = LaunchValue("--screenshot");
-    private static readonly float shotDelay = float.TryParse(LaunchValue("--shot-delay"), System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
-    // Review fixtures and UI checks keep their own files so they never touch the player's saves or settings.
-    private static readonly string FilePrefix = launchArgs.Contains("--performance-run") ? "performance-" : launchArgs.Contains("--showcase") ? "review-" : launchArgs.Contains("--ui-test") ? "ui-check-" : launchArgs.Contains("--net-check") ? "net-check-" : "";
-    /// <summary>The launch argument after <paramref name="option"/>, or null when it is missing.</summary>
-    private static string? LaunchValue(string option) {
-        int at = Array.IndexOf(launchArgs, option);
-        return at >= 0 && at + 1 < launchArgs.Length ? launchArgs[at + 1] : null;
-    }
+    private static readonly bool smokeTest = Launch.Has("--smoke-test");
+    private static readonly string? screenshotPath = Launch.Value("--screenshot");
+    private static readonly float shotDelay = float.TryParse(Launch.Value("--shot-delay"), System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
     public override void _Process(double delta) {
         if (world == null || view == null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;
@@ -288,7 +269,7 @@ public partial class Game : Node {
             ending.ShowOnce(); autosave += dt;
             needsPlate.DamageFlash(health - world.S.Health, runTime); shownHealth = world.S.Health;
             // A guest saves its player whenever it changes instead; the world is the host's to save.
-            if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) Save(0); autosave = 0; }
+            if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) saves.Save(0); autosave = 0; }
         }
         view.Paused = !running; view.SelectedTool = hotbar.ActiveItem();
         view.Mouse = GetViewport().GetMousePosition();
@@ -319,8 +300,8 @@ public partial class Game : Node {
     }
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
-        var stage = int.TryParse(LaunchValue("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
-        var cliff = World.CliffOf(Kinds.Parse(LaunchValue("--mine-ore")) ?? ThingKind.Iron);
+        var stage = int.TryParse(Launch.Value("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
+        var cliff = World.CliffOf(Kinds.Parse(Launch.Value("--mine-ore")) ?? ThingKind.Iron);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
         var mine = world.Build(ThingKind.Mine, World.MineSpot(cliff))!;
         mine.MineStage = stage; mine.Progress = stage is MineStage.Marked or MineStage.Supplied ? world.MineStageSeconds / 2 : 0;
@@ -328,21 +309,21 @@ public partial class Game : Node {
         world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 + cliff.Along * 2);
         foreach (var w in world.S.Workers.ToArray()) world.Assign(w, null);
         foreach (var w in world.S.Workers.Take(stage == MineStage.Open ? 3 : 1)) { w.Pos = world.Player; world.Assign(w, mine); }
-        if (stage == MineStage.Open && !launchArgs.Contains("--idle")) mine.Output!.Add(World.MineOre(mine), 20);
-        if (launchArgs.Contains("--idle")) { foreach (var w in world.S.Workers) world.Assign(w, null); mine.Output!.Add(World.MineOre(mine), 12); mine.Output.Add("stone", 12); }
-        world.S.Time = world.Data.DaySeconds * (launchArgs.Contains("--night") ? .55f : .2f);
+        if (stage == MineStage.Open && !Launch.Has("--idle")) mine.Output!.Add(World.MineOre(mine), 20);
+        if (Launch.Has("--idle")) { foreach (var w in world.S.Workers) world.Assign(w, null); mine.Output!.Add(World.MineOre(mine), 12); mine.Output.Add("stone", 12); }
+        world.S.Time = world.Data.DaySeconds * (Launch.Has("--night") ? .55f : .2f);
         for (int i = 0; i < 80; i++) world.Tick(.25f);
-        if (launchArgs.Contains("--panel")) panel.Select(mine); else panel.Close();
+        if (Launch.Has("--panel")) panel.Select(mine); else panel.Close();
         // Review from between the cart and portal, so either cliff-facing orientation fits in view.
         world.Player = mine.Pos - cliff.Face * .8f;
         view.Zoom = 1.25f;
     }
     private void Showcase() {
-        if (launchArgs.Contains("--environment-review")) {
-            string location = LaunchValue("--environment-review") ?? "forest";
+        if (Launch.Has("--environment-review")) {
+            string location = Launch.Value("--environment-review") ?? "forest";
             float coastAcross = Terrain.Across(Terrain.Spawn);
             var coastCenter = Terrain.Point(Terrain.Coast(coastAcross) - 2, coastAcross);
-            var reviewCliff = World.CliffOf(Kinds.Parse(LaunchValue("--mine-ore")) ?? ThingKind.Coal);
+            var reviewCliff = World.CliffOf(Kinds.Parse(Launch.Value("--mine-ore")) ?? ThingKind.Coal);
             var mineCenter = World.MineSpot(reviewCliff) - reviewCliff.Face * 1.4f;
             world.Player = location switch {
                 "lake" => Terrain.WaterPoint(Terrain.Lake + Terrain.Seaward) + Terrain.Seaward,
@@ -354,7 +335,7 @@ public partial class Game : Node {
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear();
             world.Tick(0);
-            view.EnvironmentReviewFog = launchArgs.Contains("--review-fog");
+            view.EnvironmentReviewFog = Launch.Has("--review-fog");
             view.EnvironmentCenter = location switch { "lake" => Terrain.Lake + Terrain.Seaward * 3, "terrain" => Terrain.Point(125, -18), "coast" => coastCenter, "mine" => mineCenter, _ => null };
             if (location == "mine") {
                 var mine = world.Build(ThingKind.Mine, World.MineSpot(reviewCliff))!;
@@ -367,7 +348,7 @@ public partial class Game : Node {
             panel.Close(); ui.Visible = false; state.Paused = true;
             return;
         }
-        if (launchArgs.Contains("--bushes")) {
+        if (Launch.Has("--bushes")) {
             // A clean three-bush comparison row, with one picked-clean bush to show its persistent model.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
@@ -383,7 +364,7 @@ public partial class Game : Node {
             world.Tick(0); view.Zoom = 1.8f;
             panel.Close(); return;
         }
-        if (launchArgs.Contains("--trees")) {
+        if (Launch.Has("--trees")) {
             // A clean three-tree comparison row, placed beyond the settlement showcase.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
@@ -395,7 +376,7 @@ public partial class Game : Node {
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
             world.Player = at + new Vector2(1, -1);
-            if (launchArgs.Contains("--tree-shadow")) world.Player = at - Vector2.One * 2;
+            if (Launch.Has("--tree-shadow")) world.Player = at - Vector2.One * 2;
             world.Tick(0); view.Zoom = 1;
             panel.Close(); return;
         }
@@ -425,32 +406,32 @@ public partial class Game : Node {
         world.S.Crafting.AddRange(new[] { "planks", "wood_parts" }); world.S.CraftTime = 6;
         var meat = world.Add(ThingKind.Crate, world.Player); meat.Inventory.Add("burnt_steak", 12); world.PickUpCrate(meat);
         world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
-        if (launchArgs.Contains("--night")) world.S.Time = world.Data.DaySeconds * .78f;
+        if (Launch.Has("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         // --day-phase sets the time of day from 0 at dawn, for comparing the light across the day.
-        if (LaunchValue("--day-phase") is string phase) world.S.Time = world.Data.DaySeconds * float.Parse(phase, System.Globalization.CultureInfo.InvariantCulture);
+        if (Launch.Value("--day-phase") is string phase) world.S.Time = world.Data.DaySeconds * float.Parse(phase, System.Globalization.CultureInfo.InvariantCulture);
         // A past walk toward the iron cliff leaves explored ground beyond the live sight circle.
         for (float d = 0; d <= 14; d += 2) { world.Player = Terrain.Spawn + new Vector2(d * .5f, -d); world.Tick(0); }
         world.Player = Terrain.Spawn; world.Tick(0); panel.Select(bellows);
         // --hide-ui leaves only the world in review screenshots.
-        if (launchArgs.Contains("--hide-ui")) ui.Visible = false;
-        if (launchArgs.Contains("--market")) { world.Player = sign.Pos + Vector2.One; panel.Memory.SheetOpen = true; panel.Select(sign); }
-        if (launchArgs.Contains("--bench")) { world.Player = bench.Pos + Vector2.One; panel.Select(bench); }
-        if (launchArgs.Contains("--craft")) panel.Open("craft");
-        if (launchArgs.Contains("--crew")) panel.Open("workers");
-        if (launchArgs.Contains("--worker")) panel.Select(world.S.Workers[0]);
-        if (launchArgs.Contains("--guide")) panel.Open("help");
-        if (launchArgs.Contains("--menu")) { panel.Close(); OpenMenu(); }
-        if (launchArgs.Contains("--furnace")) { world.Player = bellows.Pos + Vector2.One; panel.Select(bellows); }
-        if (launchArgs.Contains("--piles")) {
+        if (Launch.Has("--hide-ui")) ui.Visible = false;
+        if (Launch.Has("--market")) { world.Player = sign.Pos + Vector2.One; panel.Memory.SheetOpen = true; panel.Select(sign); }
+        if (Launch.Has("--bench")) { world.Player = bench.Pos + Vector2.One; panel.Select(bench); }
+        if (Launch.Has("--craft")) panel.Open("craft");
+        if (Launch.Has("--crew")) panel.Open("workers");
+        if (Launch.Has("--worker")) panel.Select(world.S.Workers[0]);
+        if (Launch.Has("--guide")) panel.Open("help");
+        if (Launch.Has("--menu")) { panel.Close(); OpenMenu(); }
+        if (Launch.Has("--furnace")) { world.Player = bellows.Pos + Vector2.One; panel.Select(bellows); }
+        if (Launch.Has("--piles")) {
             var at = Terrain.Spawn + new Vector2(-3, 9);
             foreach (var (item, stacks, dx) in new[] { ("stone", 14, 0), ("wood", 6, 3), ("leaves", 3, 6) }) {
                 var pile = world.Add(ThingKind.Pile, at + new Vector2(dx, 0)); pile.Inventory.Add(item, stacks * pile.Inventory.StackSize);
                 if (item == "leaves") { pile.Compost = true; pile.Inventory.Add("fertilizer", 20); }
             }
             world.Player = at + new Vector2(3, -2.5f); world.Tick(0); view.Zoom = 1.4f;
-            if (launchArgs.Contains("--panel")) panel.Select(world.S.Things.Last(t => t.Kind == ThingKind.Pile)); else panel.Close();
+            if (Launch.Has("--panel")) panel.Select(world.S.Things.Last(t => t.Kind == ThingKind.Pile)); else panel.Close();
         }
-        if (launchArgs.Contains("--farm")) {
+        if (Launch.Has("--farm")) {
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
             var at = Terrain.Spawn + new Vector2(-6, 9);
             for (int i = 0; i < 5; i++) {
@@ -460,9 +441,9 @@ public partial class Game : Node {
             }
             var wheat = world.Add(ThingKind.Pile, at + new Vector2(0, World.ZoneSize)); wheat.Inventory.Add("wheat", 300);
             world.Player = at + new Vector2(6, 2.5f); world.Tick(0); view.Zoom = 1.2f;
-            if (launchArgs.Contains("--panel")) panel.Select(world.S.Things.Last(t => t.Kind == ThingKind.Farm)); else panel.Close();
+            if (Launch.Has("--panel")) panel.Select(world.S.Things.Last(t => t.Kind == ThingKind.Farm)); else panel.Close();
         }
-        if (launchArgs.Contains("--kitchen")) {
+        if (Launch.Has("--kitchen")) {
             // The cooking table mid-stew beside a canning station sealing cans, with the mortar slotted.
             var at = Terrain.Spawn + new Vector2(-3, 8);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
@@ -471,9 +452,9 @@ public partial class Game : Node {
             var cannery = world.Add(ThingKind.Cannery, at + new Vector2(2.2f, 0)); world.SetRecipe(cannery, "canned_meat_stew");
             cannery.Inventory.Add("meat_stew", 2); cannery.Inventory.Add("tin_can", 2); cannery.Burner!.Add("wood", 2);
             world.Player = at + new Vector2(1, 2.5f); world.Tick(.5f); view.Zoom = 1.7f;
-            if (launchArgs.Contains("--panel")) panel.Select(table); else panel.Close();
+            if (Launch.Has("--panel")) panel.Select(table); else panel.Close();
         }
-        if (launchArgs.Contains("--packing")) {
+        if (Launch.Has("--packing")) {
             // A packing station part way through a crate of bread, with bread and empty crates waiting, beside the trading post asking for crates of bread and berries.
             var at = Terrain.Spawn + new Vector2(3, 8);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
@@ -482,48 +463,48 @@ public partial class Game : Node {
             world.Player = at + new Vector2(1, 1.5f); view.Zoom = 1.7f;
             for (int i = 0; i < 7; i++) world.Tick(world.Data.PackSeconds);
             // --crates N leaves that many empty crates at the station, and --unpacked takes its bread so packing stops.
-            if (LaunchValue("--crates") is string crates) { packer.Inventory.Remove("crate", 99); packer.Inventory.Add("crate", int.Parse(crates, System.Globalization.CultureInfo.InvariantCulture)); }
-            if (launchArgs.Contains("--unpacked")) { packer.Inventory.Remove("bread", 99); world.Tick(.1f); }
-            if (launchArgs.Contains("--crates") || launchArgs.Contains("--unpacked")) { world.Player = at + new Vector2(-1.4f, -1.4f); view.Zoom = 2.6f; }
+            if (Launch.Value("--crates") is string crates) { packer.Inventory.Remove("crate", 99); packer.Inventory.Add("crate", int.Parse(crates, System.Globalization.CultureInfo.InvariantCulture)); }
+            if (Launch.Has("--unpacked")) { packer.Inventory.Remove("bread", 99); world.Tick(.1f); }
+            if (Launch.Has("--crates") || Launch.Has("--unpacked")) { world.Player = at + new Vector2(-1.4f, -1.4f); view.Zoom = 2.6f; }
             // --packer puts a worker at the table packing, with the player stepped back.
-            if (launchArgs.Contains("--packer")) { world.S.Backpack.Add(Inventory.Coins, 500); world.Player = sign.Pos + Vector2.One; }
-            if (launchArgs.Contains("--packer") && world.Hire(sign, world.Data.HireOffers[1]) is Worker packing) {
+            if (Launch.Has("--packer")) { world.S.Backpack.Add(Inventory.Coins, 500); world.Player = sign.Pos + Vector2.One; }
+            if (Launch.Has("--packer") && world.Hire(sign, world.Data.HireOffers[1]) is Worker packing) {
                 world.SetDuty(packing, packer, "craft", true); packing.Pos = at + World.PackStand;
                 world.Player = at + new Vector2(.4f, -2.6f); view.Zoom = 3.4f; world.Tick(.1f);
             }
             world.SetFilter(sign, World.CrateOf("bread"), false, true); world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);
-            if (launchArgs.Contains("--post")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); panel.Memory.FilterOpen = true; panel.Open("inspect"); } else if (launchArgs.Contains("--panel")) { panel.Memory.PackPicking = launchArgs.Contains("--pick"); panel.Select(packer); } else panel.Close();
+            if (Launch.Has("--post")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); panel.Memory.FilterOpen = true; panel.Open("inspect"); } else if (Launch.Has("--panel")) { panel.Memory.PackPicking = Launch.Has("--pick"); panel.Select(packer); } else panel.Close();
         }
-        if (launchArgs.Contains("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (launchArgs.Contains("--panel")) panel.Select(rack); else panel.Close(); }
-        if (launchArgs.Contains("--tin")) { var cliff = World.CliffOf(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }
-        if (launchArgs.Contains("--pantry")) {
+        if (Launch.Has("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (Launch.Has("--panel")) panel.Select(rack); else panel.Close(); }
+        if (Launch.Has("--tin")) { var cliff = World.CliffOf(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }
+        if (Launch.Has("--pantry")) {
             foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
             panel.Open("inventory");
         }
         // Hovering a recipe shows its description below the grids and as a tooltip at the pointer.
-        if (launchArgs.Contains("--hover")) GetTree().CreateTimer(.5).Timeout += () => {
+        if (Launch.Has("--hover")) GetTree().CreateTimer(.5).Timeout += () => {
             if (Named("craft_torch") is not Button cell) return;
             cell.EmitSignal(Control.SignalName.MouseEntered);
             var at = GetViewport().GetFinalTransform() * cell.GetGlobalRect().GetCenter();
             Input.WarpMouse(at); Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
         };
-        if (launchArgs.Contains("--torch")) { world.Player = Terrain.Spawn + new Vector2(-5, 6); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!launchArgs.Contains("--kindle")) world.Tick(World.KindleSeconds); panel.Close(); view.Zoom = 1.6f; }
-        if (launchArgs.Contains("--crate")) { world.Player = crate.Pos + Vector2.One; panel.Select(crate); }
-        if (launchArgs.Contains("--anomaly")) { world.Player = crate.Pos + Vector2.One; blackHole.CrateIntoCrate(crate, crate.Inventory, "crate"); }
-        if (launchArgs.Contains("--collapse")) { world.Player = crate.Pos + Vector2.One; panel.Close(); blackHole.CrateIntoCrate(crate, crate.Inventory, "crate"); blackHole.Collapse(crate); }
-        if (launchArgs.Contains("--lunch")) {
+        if (Launch.Has("--torch")) { world.Player = Terrain.Spawn + new Vector2(-5, 6); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!Launch.Has("--kindle")) world.Tick(World.KindleSeconds); panel.Close(); view.Zoom = 1.6f; }
+        if (Launch.Has("--crate")) { world.Player = crate.Pos + Vector2.One; panel.Select(crate); }
+        if (Launch.Has("--anomaly")) { world.Player = crate.Pos + Vector2.One; blackHole.CrateIntoCrate(crate, crate.Inventory, "crate"); }
+        if (Launch.Has("--collapse")) { world.Player = crate.Pos + Vector2.One; panel.Close(); blackHole.CrateIntoCrate(crate, crate.Inventory, "crate"); blackHole.Collapse(crate); }
+        if (Launch.Has("--lunch")) {
             // Lunch review: the crew has walked over and sat down around the campfire, with the pay overview open.
             world.S.Time = (world.Data.LunchHour - 6) / 24 * world.Data.DaySeconds;
             for (int i = 0; i < 60; i++) world.Tick(.25f);
             panel.Open("workers");
         }
-        if (launchArgs.Contains("--strike")) {
+        if (Launch.Has("--strike")) {
             // Strike review: the whole crew owes wages and stands holding protest signs.
             foreach (var w in world.S.Workers) w.WageDebt = w.Wage;
             world.Player = sign.Pos + new Vector2(2.5f, 1.5f); world.Tick(.25f); panel.Close(); view.Zoom = 2.2f;
         }
-        if (launchArgs.Contains("--mine")) MineReview(sign);
-        if (!launchArgs.Contains("--wolves")) return;
+        if (Launch.Has("--mine")) MineReview(sign);
+        if (!Launch.Has("--wolves")) return;
         // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
         var spot = Terrain.Spawn + new Vector2(11, 8);
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(spot) < 6);

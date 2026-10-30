@@ -473,7 +473,7 @@ public partial class Game {
         await KeyStroke(Key.Escape);
         Require(FindButton(screen, "New game") != null, "Esc in options must return to the start menu.");
         await Click(FindButton(screen, "Load game")!);
-        Require(Enumerable.Range(0, SlotCount + 1).All(n => FindButton(screen, $"{SlotName(n)} · empty")!.Disabled), "Empty save slots must not be loadable.");
+        Require(Enumerable.Range(0, Saves.SlotCount + 1).All(n => FindButton(screen, $"{Saves.SlotName(n)} · empty")!.Disabled), "Empty save slots must not be loadable.");
         await Click(FindButton(screen, "Back · Esc")!);
         await Click(FindButton(screen, "New game")!);
         Require(!backdrop.Visible && !view.Paused && ShownPage() == "A new beginning", "New game must close the start menu and show the welcome page.");
@@ -685,7 +685,7 @@ public partial class Game {
         await KeyStroke(Key.F5);
         Require(backdrop.Visible && FindButton(screen, "Slot 1 · empty") != null && FindButton(screen, "Autosave · empty") == null, "F5 in a new game must ask for a save slot and leave out the autosave.");
         await Click(FindButton(screen, "Slot 1 · empty")!);
-        Require(SlotUsed(1) && !backdrop.Visible && !view.Paused, "Choosing a slot must write the save and resume.");
+        Require(Saves.SlotUsed(1) && !backdrop.Visible && !view.Paused, "Choosing a slot must write the save and resume.");
         int savedWood = chest.Inventory["wood"];
         Require(savedWood > 0 && chest.Inventory.Remove("wood", 1) == 1, "The chest must hold wood to take out after saving.");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });

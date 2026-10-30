@@ -6,28 +6,12 @@ namespace ChopChopMeow;
 
 /// <summary>The start menu and the save, load and options screens it shares with the pause menu.</summary>
 public partial class Game {
-    private const int SlotCount = 3;
     private static readonly Vector2I[] Resolutions = { new(1280, 720), new(1440, 900), new(1600, 900), new(1920, 1080), new(2560, 1440) };
     /// <summary>Frame rate caps offered in the options; 0 leaves the rate to vsync alone.</summary>
     private static readonly int[] FrameLimits = { 0, 60, 90 };
     private ColorRect backdrop = null!;
     private VBoxContainer screen = null!;
     private Action? screenBack;
-    /// <summary>Numbered slot that F5 and F9 use; 0 until the player saves to or loads one.</summary>
-    private int slot;
-
-    private static string SettingsPath => $"user://{FilePrefix}settings.cfg";
-    // Slot 0 is the autosave; slot 1 keeps the original single-save file name, so older saves load as slot 1.
-    private static string SlotPath(int n) => $"user://{FilePrefix}{(n == 0 ? "autosave" : n == 1 ? "settlement" : $"settlement-{n}")}.json";
-    private static string SlotName(int n) => n == 0 ? "Autosave" : $"Slot {n}";
-    private static bool SlotUsed(int n) => Godot.FileAccess.FileExists(SlotPath(n));
-    private static long SavedAt(int n) => (long)Godot.FileAccess.GetModifiedTime(SlotPath(n));
-
-    private static string SlotLabel(int n) {
-        if (!SlotUsed(n)) return $"{SlotName(n)} · empty";
-        long local = SavedAt(n) + Time.GetTimeZoneFromSystem()["bias"].AsInt64() * 60;
-        return $"{SlotName(n)} · {Time.GetDatetimeStringFromUnixTime(local, true)[..16]}";
-    }
 
     private void BuildScreens() {
         backdrop = new ColorRect { Color = new Color(.07f, .12f, .09f, .86f), Visible = false };
@@ -52,7 +36,7 @@ public partial class Game {
     private void ShowStart() {
         panel.Close(); OpenScreen("CHOP CHOP MEOW", null);
         if (leftReason != "") { var note = Style.Wrapped(leftReason, 14, new Color("f2b38b")); note.HorizontalAlignment = HorizontalAlignment.Center; screen.AddChild(note); leftReason = ""; }
-        int latest = Enumerable.Range(0, SlotCount + 1).Where(SlotUsed).OrderByDescending(SavedAt).DefaultIfEmpty(-1).First();
+        int latest = Saves.Newest();
         AddScreenButton("Continue", () => LoadSlot(latest), latest < 0);
         AddScreenButton("New game", () => { HideScreen(); Restart(); });
         AddScreenButton("Load game", () => ShowSlots(false, ShowStart));
@@ -64,9 +48,9 @@ public partial class Game {
     private void ShowSlots(bool saving, Action back) {
         OpenScreen(saving ? "SAVE GAME" : "LOAD GAME", back);
         // The autosave is written by the game alone, so it is only offered for loading.
-        for (int n = saving ? 1 : 0; n <= SlotCount; n++) {
+        for (int n = saving ? 1 : 0; n <= Saves.SlotCount; n++) {
             int target = n;
-            AddScreenButton(SlotLabel(n), () => { if (saving) { Save(target); back(); } else LoadSlot(target); }, !saving && !SlotUsed(n));
+            AddScreenButton(Saves.SlotLabel(n), () => { if (saving) { saves.Save(target); back(); } else LoadSlot(target); }, !saving && !Saves.SlotUsed(n));
         }
         AddScreenButton("Back · Esc", back);
     }
@@ -77,70 +61,40 @@ public partial class Game {
         var label = Style.Wrapped("Resolution"); label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(label);
         var picker = new OptionButton { Name = "resolution", CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
         foreach (var size in Resolutions) picker.AddItem($"{size.X} × {size.Y}");
-        picker.Selected = Array.IndexOf(Resolutions, SavedResolution());
+        picker.Selected = Array.IndexOf(Resolutions, Settings.Resolution);
         picker.ItemSelected += index => {
-            StoreSetting("display", "resolution", Resolutions[index]);
-            ApplyResolution(Resolutions[index]);
+            Settings.Store("display", "resolution", Resolutions[index]);
+            Settings.ApplyResolution(GetWindow(), Resolutions[index]);
         };
         row.AddChild(picker);
         var limitRow = new HBoxContainer(); screen.AddChild(limitRow);
         var limitLabel = Style.Wrapped("Frame rate limit"); limitLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; limitRow.AddChild(limitLabel);
         var limits = new OptionButton { Name = "frame_limit", CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
         foreach (int fps in FrameLimits) limits.AddItem(fps == 0 ? "Off" : $"{fps} fps");
-        limits.Selected = Math.Max(0, Array.IndexOf(FrameLimits, SavedFrameLimit()));
+        limits.Selected = Math.Max(0, Array.IndexOf(FrameLimits, Settings.FrameLimit));
         limits.ItemSelected += index => {
-            StoreSetting("display", "frame_limit", FrameLimits[index]);
+            Settings.Store("display", "frame_limit", FrameLimits[index]);
             Engine.MaxFps = FrameLimits[index];
         };
         limitRow.AddChild(limits);
         var musicRow = new HBoxContainer(); screen.AddChild(musicRow);
         var musicLabel = Style.Wrapped("Music volume"); musicLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; musicRow.AddChild(musicLabel);
-        var slider = new HSlider { Name = "music", MaxValue = 100, Step = 5, Value = SavedMusicVolume() * 100, CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
+        var slider = new HSlider { Name = "music", MaxValue = 100, Step = 5, Value = Settings.MusicVolume * 100, CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
         slider.ValueChanged += value => {
-            var config = new ConfigFile(); config.Load(SettingsPath);
-            config.SetValue("audio", "music", value / 100); config.Save(SettingsPath);
+            Settings.Store("audio", "music", value / 100);
             sounds.MusicVolume = (float)value / 100;
         };
         musicRow.AddChild(slider);
         var taaRow = new HBoxContainer(); screen.AddChild(taaRow);
         var taaLabel = Style.Wrapped("Temporal anti-aliasing"); taaLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; taaRow.AddChild(taaLabel);
-        var taa = new CheckButton { Name = "taa", ButtonPressed = SavedTaa(), FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
-        taa.Toggled += on => { StoreSetting("display", "taa", on); GetViewport().UseTaa = on; };
+        var taa = new CheckButton { Name = "taa", ButtonPressed = Settings.Taa, FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
+        taa.Toggled += on => { Settings.Store("display", "taa", on); GetViewport().UseTaa = on; };
         taaRow.AddChild(taa);
         AddScreenButton("Back · Esc", back);
     }
 
-    /// <summary>The stored window size, or the project's default size before the player picks one.</summary>
-    private static Vector2I SavedResolution() => Setting("display", "resolution",
-        new Vector2I(ProjectSettings.GetSetting("display/window/size/viewport_width").AsInt32(), ProjectSettings.GetSetting("display/window/size/viewport_height").AsInt32()));
-
-    private static int SavedFrameLimit() => Setting("display", "frame_limit", 0);
-    private static bool SavedTaa() => Setting("display", "taa", true);
-
-    private static T Setting<[MustBeVariant] T>(string section, string key, T fallback) {
-        var config = new ConfigFile(); config.Load(SettingsPath);
-        return config.GetValue(section, key, Variant.From(fallback)).As<T>();
-    }
-
-    private static void StoreSetting<[MustBeVariant] T>(string section, string key, T value) {
-        var config = new ConfigFile(); config.Load(SettingsPath);
-        config.SetValue(section, key, Variant.From(value)); config.Save(SettingsPath);
-    }
-
-    private static float SavedMusicVolume() {
-        var config = new ConfigFile(); config.Load(SettingsPath);
-        return config.GetValue("audio", "music", 1f).AsSingle();
-    }
-
-    private void ApplyResolution(Vector2I size) {
-        var window = GetWindow(); window.Mode = Window.ModeEnum.Windowed; window.Size = size; window.MoveToCenter();
-    }
-
-    /// <summary>The save the player was using, else the most recent one, or -1 when there is none.</summary>
-    private int LatestSlot() => slot > 0 && SlotUsed(slot) ? slot : Enumerable.Range(0, SlotCount + 1).Where(SlotUsed).OrderByDescending(SavedAt).DefaultIfEmpty(-1).First();
-
     private void LoadSlot(int n) {
-        if (!Load(n)) return;
+        if (!saves.Load(n)) return;
         HideScreen(); ending.Visible = false;
     }
 }
