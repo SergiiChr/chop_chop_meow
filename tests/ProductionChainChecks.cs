@@ -103,75 +103,14 @@ public static class ProductionChainChecks {
     /// </summary>
     private static void CheckWorkersRunEveryChain(GameData data) {
         var world = EmptyWorld(data);
-        var origin = Terrain.Lake + Terrain.Seaward * 24 + Terrain.Sideways * -6;
-        int next = 0;
-        // Buildings on a grid three tiles apart, leaving lanes to walk between them.
-        Vector2 Spot() { var p = origin + new Vector2(next % 9 * 3, next / 9 * 3); next++; Require(Terrain.Open(p), $"fixture spot {p} should be open ground"); return p; }
-        Thing Place(ThingKind kind, string recipe = "") { var t = world.Add(kind, Spot()); if (recipe != "") world.SetRecipe(t, recipe); return t; }
-        void Store(string item) => Place(ThingKind.Chest).Inventory.InputFilter.Add(item);
-        Worker Hire(Thing place, params string[] jobs) {
-            var w = AddWorker(world, place.Pos + new Vector2(0, 1.2f));
-            w.Wage = 18;
-            foreach (string job in jobs) world.SetDuty(w, place, job, true);
-            return w;
-        }
-
-        var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(10, 10));
-        world.Player = hut.Pos; world.S.Sheltered = hut.Id;
-        var sign = Place(ThingKind.Signpost);
-        sign.Wages!.Add(Inventory.Coins, 1000);
-        world.S.Backpack.Add(Inventory.Coins, 5000);
-        foreach (string product in Products) world.SetFilter(sign, World.CrateOf(product), false, true);
-        world.SetAutoSell(sign, true);
-        var rack = Place(ThingKind.Toolstation);
-        rack.Inventory.Add("steel_axe", 2); rack.Inventory.Add("steel_pick", 3); rack.Inventory.Add("rake", 1);
-        Place(ThingKind.Campfire);
-
-        // Storage: a chest asking for each material, piles for bottles that take a slot each, and two open piles for anything else.
-        foreach (string item in new[] { "wood", "planks", "crate", "iron_ore", "coal", "tin_ore", "iron_bar", "tin_bar", "steel_bar", "steel_parts", "wood_parts", "tin_can",
-                     "raw_meat", "meat_stew", "canned_meat_stew", "leaves", "wheat", "wheat_seeds", "grass", "fertilizer", "flour", "dough", "bread", "berries", "steel_pick" }) Store(item);
-        var empties = Place(ThingKind.Pile); empties.Inventory.Add("empty_bottle", 8);
-        Place(ThingKind.Pile); Place(ThingKind.Pile); Place(ThingKind.Pile);
-        var meat = world.S.Things.Single(t => t.Kind == ThingKind.Chest && t.Inventory.InputFilter.Contains("raw_meat"));
-
-        // Raw materials: deposits, a tree, berries, leaves and the lake.
-        Hire(world.Add(ThingKind.Tree, Spot(), 9999), "gather");
-        Hire(world.Add(ThingKind.Tree, Spot(), 9999), "gather");
-        Hire(world.Add(ThingKind.Iron, Spot(), 9999), "gather");
-        Hire(world.Add(ThingKind.Coal, Spot(), 9999), "gather");
-        Hire(world.Add(ThingKind.Tin, Spot(), 9999), "gather");
-        Hire(world.Add(ThingKind.Berries, Spot(), 9999), "gather");
-        Hire(world.Add(ThingKind.Leaves, Spot(), 9999), "gather");
-        Hire(world.Add(ThingKind.Water, Terrain.WaterPoint(origin), 9999), "gather");
-
-        // Crates from wood.
-        var planks = Place(ThingKind.Bench, "planks"); planks.Tools!.Add("steel_chisel", 1); Hire(planks, "craft", "haul");
-        var crates = Place(ThingKind.Bench, "crate"); crates.Tools!.Add("steel_hammer", 1); Hire(crates, "craft", "haul");
-
-        // Canned meat stew: stew from meat and water, cans from tin, sealed over a wood fire.
-        Hire(Place(ThingKind.Cooktable, "meat_stew"), "haul");
-        Hire(Place(ThingKind.Furnace, "tin_bar"), "haul");
-        var cans = Place(ThingKind.Bench, "tin_can"); cans.Tools!.Add("steel_hammer", 1); Hire(cans, "craft", "haul");
-        Hire(Place(ThingKind.Cannery, "canned_meat_stew"), "haul");
-
-        // Bread: compost from raked leaves, wheat from the farm, flour, dough and the oven.
-        var compost = Place(ThingKind.Pile); world.SetCompost(compost, true); world.SetSkipFood(compost, true); Hire(compost, "tend");
-        var farms = new[] { Place(ThingKind.Farm), Place(ThingKind.Farm) };
-        foreach (var farm in farms) { farm.FarmStage = FarmStage.Growing; farm.Progress = world.GrowSeconds - 30; Hire(farm, "farm", "haul"); }
-        var flour = Place(ThingKind.Cooktable, "flour"); flour.Tools!.Add("mortar", 1); Hire(flour, "craft", "haul");
-        Hire(Place(ThingKind.Cooktable, "dough"), "haul");
-        Hire(Place(ThingKind.Furnace, "bread"), "haul");
-
-        // Steel pickaxes: iron bars, steel at the forge with one on the bellows and one hauling, parts at the anvil, handles and the pickaxe at benches.
-        Hire(Place(ThingKind.Furnace, "iron_bar"), "haul");
-        var forge = Place(ThingKind.Reinforced);
-        Hire(forge, "bellows"); Hire(forge, "haul");
-        Hire(Place(ThingKind.Anvil, "steel_parts"), "craft", "haul");
-        var handles = Place(ThingKind.Bench, "wood_parts"); handles.Tools!.Add("steel_chisel", 1); Hire(handles, "craft", "haul");
-        var picks = Place(ThingKind.Bench, "steel_pick"); picks.Tools!.Add("steel_hammer", 1); Hire(picks, "craft", "haul");
-
-        // One packing station for each product.
-        foreach (string product in Products) { var packer = Place(ThingKind.Packer); world.SetPacking(packer, product); Hire(packer, "craft", "haul"); }
+        var site = new ChainSite(world);
+        var meat = site.AddSettlement(Products);
+        site.AddGatherers();
+        site.AddCrateBenches();
+        site.AddCannedStewChain();
+        var farms = site.AddBreadChain();
+        site.AddSteelPickChain();
+        site.AddPackers(Products);
 
         var sold = new HashSet<string>();
         bool resown = false;
