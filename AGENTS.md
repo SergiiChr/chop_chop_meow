@@ -20,7 +20,8 @@ Icons and models are committed; playing does not call an image-generation servic
 
 - `src/World.cs`: authoritative simulation, independent of menus and rendering.
 - `src/WorldView.cs`: reads world state and draws it.
-- `src/Game.cs`: UI, input and saves.
+- `src/Game.cs`: creates and holds the interface's parts, routes input, saves.
+- `src/SidePanel.cs` and `src/*Panel.cs`: the side panel and its pages, one node per feature.
 - `src/GameData.cs`: loads and validates `data/game.json`.
 - `src/Inventory.cs`: inventory rules, used by every worker job.
 - `src/Net.cs`: multiplayer host and guest.

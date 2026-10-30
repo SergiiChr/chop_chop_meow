@@ -21,18 +21,18 @@ public partial class PagePanel {
         }
     }
     /// <summary>Names the page after the building it shows, with the building's own icon; its description becomes the icon's tooltip.</summary>
-    private void Headline(ThingKind kind) {
+    protected void Headline(ThingKind kind) {
         headingTitle.Text = world.Data.Name(kind);
         headingIcon.Texture = Icons.Of(kind.Id()); headingIcon.Visible = headingIcon.Texture != null;
         headingIcon.TooltipText = world.Data.Buildings.TryGetValue(kind, out var def) ? def.Description : "";
     }
     /// <summary>Shows the backpack drawer with a grid that works with the open page: <paramref name="wanted"/> lights up what it takes.</summary>
-    private void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
+    protected void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
         var host = content; content = bag.Content;
         AddInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns);
         content = host; bag.Visible = !bag.Dismissed;
     }
-    private void Welcome() {
+    protected void Welcome() {
         AddLabel("The woods are quiet. For now.", 21);
         AddLabel("First, secure water, a cabin and a fire. Then use your steel axe and your hands to build a workshop, trade berries for a pickaxe, and work toward steel.", 16, Style.Beige);
         AddLabel("FIRST STEPS", 14);
@@ -40,11 +40,11 @@ public partial class PagePanel {
         AddLabel("A bottle holds three sips and can be refilled at the lake. Without one, drink at the source. Each gathering action takes time, so plan ahead.", 15, Style.Beige);
         AddButton("Into the clearing", panel.Close);
     }
-    private HBoxContainer Row() { var r = new HBoxContainer(); content.AddChild(r); return r; }
-    private void AddLabel(string text, int size = 15, Color? color = null) => content.AddChild(Style.Wrapped(text, size, color));
-    private void AddButton(string text, Action action, bool disabled = false) => content.AddChild(kit.Button(text, action, disabled));
+    protected HBoxContainer Row() { var r = new HBoxContainer(); content.AddChild(r); return r; }
+    protected void AddLabel(string text, int size = 15, Color? color = null) => content.AddChild(Style.Wrapped(text, size, color));
+    protected void AddButton(string text, Action action, bool disabled = false) => content.AddChild(kit.Button(text, action, disabled));
     /// <summary>A label whose text <paramref name="write"/> rebuilds on every refresh.</summary>
-    private void Dynamic(Action<StringBuilder> write, int size = 15, Color? color = null) {
+    protected void Dynamic(Action<StringBuilder> write, int size = 15, Color? color = null) {
         var l = Style.Wrapped("", size, color); content.AddChild(l);
         var text = new LiveText(shown => l.Text = shown);
         void Update() {
@@ -53,10 +53,10 @@ public partial class PagePanel {
         }
         Update(); live.Add(Update);
     }
-    private string Needs(Dictionary<string, int> cost) => LiveText.Of(text => AppendNeeds(text, cost));
-    private string Cost(Dictionary<string, int> cost) => LiveText.Of(text => AppendCost(text, cost));
+    protected string Needs(Dictionary<string, int> cost) => LiveText.Of(text => AppendNeeds(text, cost));
+    protected string Cost(Dictionary<string, int> cost) => LiveText.Of(text => AppendCost(text, cost));
     /// <summary>Each input with how many the backpack holds of how many are needed.</summary>
-    private void AppendNeeds(StringBuilder text, Dictionary<string, int> cost) {
+    protected void AppendNeeds(StringBuilder text, Dictionary<string, int> cost) {
         bool first = true;
         foreach (var (item, amount) in cost) {
             if (!first) text.Append("  ·  ");
@@ -64,7 +64,7 @@ public partial class PagePanel {
             text.Append($"{world.Data.Name(item)} {world.S.Backpack[item]}/{amount}");
         }
     }
-    private void AppendCost(StringBuilder text, Dictionary<string, int> cost) {
+    protected void AppendCost(StringBuilder text, Dictionary<string, int> cost) {
         bool first = true;
         foreach (var (item, amount) in cost) {
             if (!first) text.Append("  ·  ");
@@ -72,7 +72,7 @@ public partial class PagePanel {
             text.Append($"{amount} {world.Data.Name(item)}");
         }
     }
-    private void BuildingPlans() {
+    protected void BuildingPlans() {
         var grid = AddGrid();
         var details = Style.Wrapped("Hover a plan to see what it needs. Click it, then click open ground nearby.", 14, Style.Beige);
         foreach (var (id, def) in world.Data.Buildings) {
@@ -85,16 +85,16 @@ public partial class PagePanel {
         content.AddChild(details);
     }
     /// <summary>The backpack is only the drawer; the side panel stays hidden while it shows.</summary>
-    private void Backpack() {
+    protected void Backpack() {
         BagGrid(UseFromBag, UseHint);
         // Only the drawer shows, so the camera keeps the player centred.
         panel.Visible = false; view.PanelOpen = false;
     }
-    private const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
-    private void UseFromBag(string id) {
+    protected const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
+    protected void UseFromBag(string id) {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
     }
-    private void Inspect() {
+    protected void Inspect() {
         if (state.WorkerId > 0) { WorkerPanel(world.S.Workers.FirstOrDefault(w => w.Id == state.WorkerId)); return; }
         var t = world.Find(state.Selected);
         if (t == null) { AddLabel("Select a building or resource in the world."); return; }
@@ -108,12 +108,12 @@ public partial class PagePanel {
         if (t.Kind == ThingKind.Mine) { MinePanel(t); return; }
         if (t.Kind == ThingKind.Farm) { FarmPanel(t); return; }
         if (t.Kind == ThingKind.Campfire) { Campfire(t); return; }
-        if (t.Kind == ThingKind.Packer) { PackerPanel(t); return; }
+        if (t.Kind == ThingKind.Packer) { AddChild(new PackerPanel(panel, t)); return; }
         if (t.IsStorage) { Storage(t); return; }
         Station(t);
     }
     /// <summary>How far away a building is, shown only while it is out of reach.</summary>
-    private void Reach(Thing t) {
+    protected void Reach(Thing t) {
         var label = Style.Text("", 14, Style.Warn); label.Visible = false; content.AddChild(label);
         var text = new LiveText(shown => label.Text = shown);
         // Rewritten only when the distance moves a tenth of a tile or the building comes into reach.
@@ -127,7 +127,7 @@ public partial class PagePanel {
             if (tenths >= 0) { text.Clear().Append(tenths / 10).Append('.').Append(tenths % 10).Append(" tiles away · walk closer"); text.Show(); }
         });
     }
-    private void Resource(Thing t) {
+    protected void Resource(Thing t) {
         var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
         row.AddChild(Style.Icon(Icons.Of(World.ResourceItem(t)), 44));
         var left = Style.Text("", 16, Style.Ink); left.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; left.AutowrapMode = TextServer.AutowrapMode.WordSmart; row.AddChild(left);
@@ -142,7 +142,7 @@ public partial class PagePanel {
         if (t.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
         JobButtons(t);
     }
-    private void Campfire(Thing fire) {
+    protected void Campfire(Thing fire) {
         var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
         row.AddChild(Style.Glyph("line_flame", 30, Style.Ember));
         var light = Style.Text("", 16, Style.Ink); light.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(light);
@@ -161,7 +161,7 @@ public partial class PagePanel {
         AddButton($"Feed · 1 wood · +{world.Data.CampfireHours:0} h", () => world.FuelFire(fire));
         JobButtons(fire);
     }
-    private void Cabin(Thing hut) {
+    protected void Cabin(Thing hut) {
         var tag = Style.Pill("", Style.TagPill, Style.Rim, 13); tag.MouseFilter = Control.MouseFilterEnum.Pass; tag.TooltipText = "Wolves back off while you are inside";
         heading.AddChild(tag); heading.MoveChild(tag, heading.GetChildCount() - 2);
         // What a night's sleep would leave: each need now, and at dawn.
@@ -210,8 +210,8 @@ public partial class PagePanel {
         }
     }
     /// <summary>A sleep refusal cut to a tag: what stops it, in a word or two.</summary>
-    private static string ShortBlock(string reason) => reason.Contains("thirsty") && reason.Contains("hungry") ? "too hungry and thirsty" : reason.Contains("thirsty") ? "too thirsty" : reason.Contains("hungry") ? "too hungry" : reason.Contains("night") ? "only at night" : "not yet";
-    private void Storage(Thing t) {
+    protected static string ShortBlock(string reason) => reason.Contains("thirsty") && reason.Contains("hungry") ? "too hungry and thirsty" : reason.Contains("thirsty") ? "too thirsty" : reason.Contains("hungry") ? "too hungry" : reason.Contains("night") ? "only at night" : "not yet";
+    protected void Storage(Thing t) {
         switch (t.Kind) {
             case ThingKind.Crate: Crate(t); return;
             case ThingKind.Grave: Recovery(t); return;
@@ -224,24 +224,24 @@ public partial class PagePanel {
         BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
     }
     /// <summary>A storage's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
-    private GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) {
+    protected GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) {
         var host = content; var column = new VBoxContainer(); content = column;
         var grid = AddInventoryGrid(() => t.Inventory, t, id => moves.Stack(t.Inventory, world.S.Backpack, id, t), "Click: take one · Ctrl: take all · Drag to move", columns: columns, size: size);
         content = host; column.RemoveChild(grid); column.QueueFree();
         return grid;
     }
     /// <summary>Moves every material the storage takes from the backpack; tools stay, and so do crates, so one is never packed inside another.</summary>
-    private void StoreAll(Thing t) {
+    protected void StoreAll(Thing t) {
         if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
         foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray())
             if (world.Holds(t, id) && t.Inventory.Accepts(id)) world.Transfer(world.S.Backpack, t.Inventory, id, 999);
     }
-    private void TakeAll(Thing t) {
+    protected void TakeAll(Thing t) {
         if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
         foreach (var id in t.Inventory.Items.Keys.ToArray()) world.Transfer(t.Inventory, world.S.Backpack, id, 999);
     }
     /// <summary>A crate: its fill out of twelve, whether the village would buy it packed, and how to pick it up.</summary>
-    private void Crate(Thing t) {
+    protected void Crate(Thing t) {
         var sells = Style.Pill("✓", Style.TagPill, Style.Rim, 13); sells.MouseFilter = Control.MouseFilterEnum.Pass; sells.TooltipText = "The village buys this crate packed";
         heading.AddChild(sells); heading.MoveChild(sells, heading.GetChildCount() - 2);
         var meter = Row(); meter.AddThemeConstantOverride("separation", 10);
@@ -265,14 +265,14 @@ public partial class PagePanel {
         hint.AddChild(Style.Text("Hold", 14, Style.Beige)); hint.AddChild(Style.Glyph("line_mouse", 24, Style.Rim)); hint.AddChild(Style.Text("to pick up", 14, Style.Beige));
         BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move");
     }
-    private void Recovery(Thing t) {
+    protected void Recovery(Thing t) {
         headingTitle.Text = "Recovery box";
         Well(new VBoxContainer()).AddChild(StorageGrid(t, 5));
         var row = Row(); row.AddChild(kit.BigButton("Take all", Style.Brick, () => TakeAll(t)));
         BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Drag to move");
     }
     /// <summary>A tool rack: a row per kind of tool workers use, with what hangs there, how many are out, and who waits for one.</summary>
-    private void ToolRack(Thing t) {
+    protected void ToolRack(Thing t) {
         HeaderAction("stash", "Hang spare tools · keeps your best of each", () => {
             if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
             foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Holds(t, i) && t.Inventory.Accepts(i)).ToArray())
@@ -316,12 +316,12 @@ public partial class PagePanel {
         BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: hang a tool · Ctrl: all of them · Drag to move", wanted: id => world.Holds(t, id) && t.Inventory.Accepts(id));
         JobButtons(t);
     }
-    private static string A(string word) => "aeiou".Contains(word[0]) ? $"an {word}" : $"a {word}";
+    protected static string A(string word) => "aeiou".Contains(word[0]) ? $"an {word}" : $"a {word}";
     /// <summary>
     /// A pile: fourteen stacks of the one resource it holds, filled left to right and top to bottom, and a switch that turns it into compost.
     /// Compost shows the same grid; under its bar is what it is composting and how long that lasts, and the fertilizer it makes.
     /// </summary>
-    private void Pile(Thing t) {
+    protected void Pile(Thing t) {
         headingTitle.Text = t.Compost ? "Compost" : t.Inventory.First() is string held ? $"Pile · {world.Data.Name(held).ToLowerInvariant()}" : "Pile";
         if (t.Compost) { headingIcon.Texture = Icons.Of("leaves"); headingIcon.Visible = true; }
         var compost = new CheckButton { ButtonPressed = t.Compost, FocusMode = Control.FocusModeEnum.None, TooltipText = "Compost: turns leaves, grass and food into fertilizer", Name = "compost" };
@@ -362,7 +362,7 @@ public partial class PagePanel {
     /// <summary>
     /// A farm plot: its growth from bare soil to ripe wheat, then the process row: seeds in, fertilizer as its fuel, wheat out with seeds and grass beside.
     /// </summary>
-    private void FarmPanel(Thing farm) {
+    protected void FarmPanel(Thing farm) {
         var stages = new HBoxContainer(); stages.AddThemeConstantOverride("separation", 0); content.AddChild(stages);
         string?[] looks = { null, "wheat_seeds", "grass", "wheat" };
         string[] names = { "Fallow", "Sown", "Growing", "Ripe" };
@@ -408,12 +408,12 @@ public partial class PagePanel {
         JobButtons(farm);
     }
     /// <summary>Takes a cup out of the column it was built in, for the fuel row, and frees the column.</summary>
-    private static Control FuelCup(Control column) {
+    protected static Control FuelCup(Control column) {
         var cup = column.GetChild<Control>(0); column.RemoveChild(cup); column.QueueFree();
         return cup;
     }
     /// <summary>A cup bound to one item of a farm's sowing or harvest slots, with what one crop takes or gives under it.</summary>
-    private VBoxContainer FarmCup(Thing farm, Inventory box, string item, bool input, string perBatch, float size = 52, StyleBoxFlat? look = null) {
+    protected VBoxContainer FarmCup(Thing farm, Inventory box, string item, bool input, string perBatch, float size = 52, StyleBoxFlat? look = null) {
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
         var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
         cell.Icon = Icons.Of(item);
@@ -439,7 +439,7 @@ public partial class PagePanel {
         return column;
     }
     /// <summary>Burn time as in-game hours and minutes.</summary>
-    private StringBuilder AppendGameHours(StringBuilder text, float seconds) {
+    protected StringBuilder AppendGameHours(StringBuilder text, float seconds) {
         int minutes = (int)(seconds / world.Data.DaySeconds * 1440);
         return text.Append(minutes / 60).Append(" h ").Append(minutes % 60).Append(" min");
     }

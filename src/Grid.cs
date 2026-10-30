@@ -6,13 +6,13 @@ namespace ChopChopMeow;
 
 /// <summary>Icon cells shared by inventory, storage, station and build pages.</summary>
 public partial class PagePanel {
-    private const int GridColumns = 6;
+    protected const int GridColumns = 6;
     /// <summary>The backpack drawer is two rows of twelve, or three of eight on a narrow screen.</summary>
-    private int BagColumns => panel.ScreenWidth >= 1400 ? 12 : 8;
+    protected int BagColumns => panel.ScreenWidth >= 1400 ? 12 : 8;
     /// <summary>Room between cups for the count pills that sit on their corners.</summary>
-    private const int CupGap = 10;
+    protected const int CupGap = 10;
 
-    private GridContainer AddGrid(int columns = GridColumns) {
+    protected GridContainer AddGrid(int columns = GridColumns) {
         var grid = new GridContainer { Columns = columns };
         grid.AddThemeConstantOverride("h_separation", CupGap);
         grid.AddThemeConstantOverride("v_separation", CupGap);
@@ -27,7 +27,7 @@ public partial class PagePanel {
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// With <paramref name="wanted"/>, stacks it names are rimmed in orange and the rest fade, so what the open page takes stands out.
     /// </summary>
-    private GridContainer AddInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52) {
+    protected GridContainer AddInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52) {
         var grid = AddGrid(columns);
         if (size < 52) { grid.AddThemeConstantOverride("h_separation", 8); grid.AddThemeConstantOverride("v_separation", 8); }
         var stacks = new (string Item, int Count)?[inventory().Slots];
@@ -89,7 +89,7 @@ public partial class PagePanel {
     }
 
     /// <summary>A slot that springs open with a slight overshoot, or shrinks and fades before it leaves the grid.</summary>
-    private static void GrowCell(Control cell, bool open, float delay) {
+    protected static void GrowCell(Control cell, bool open, float delay) {
         if (cell.HasMeta("tween") && cell.GetMeta("tween").As<Tween>() is Tween running && running.IsValid()) running.Kill();
         cell.PivotOffset = cell.CustomMinimumSize / 2;
         var tween = cell.CreateTween(); cell.SetMeta("tween", tween);
@@ -106,5 +106,5 @@ public partial class PagePanel {
     }
 
     /// <summary>Building plans and palette entries drag as hotbar references.</summary>
-    private static void DragReference(ItemSlot cell, string id) => cell.Drag = () => new ItemDrag(id, 0, null, null);
+    protected static void DragReference(ItemSlot cell, string id) => cell.Drag = () => new ItemDrag(id, 0, null, null);
 }

@@ -9,7 +9,7 @@ namespace ChopChopMeow;
 /// Each cup holds a single stack and shows a faint picture of what goes in it while empty.
 /// </summary>
 public partial class PagePanel {
-    private void Station(Thing t) {
+    protected void Station(Thing t) {
         var recipes = world.Data.Recipes.Where(p => p.Value.Station == t.Kind).Select(p => p.Key).ToList();
         if (recipes.Count > 1) RecipePicker(t, recipes);
         if (t.Recipe != "") Machine(t);
@@ -21,7 +21,7 @@ public partial class PagePanel {
     }
 
     /// <summary>A station's recipes as round tabs showing their products; the one it makes is lit.</summary>
-    private void RecipePicker(Thing t, System.Collections.Generic.List<string> recipes) {
+    protected void RecipePicker(Thing t, System.Collections.Generic.List<string> recipes) {
         var row = Row(); row.AddThemeConstantOverride("separation", 10);
         foreach (string id in recipes) {
             var r = world.Data.Recipes[id];
@@ -35,7 +35,7 @@ public partial class PagePanel {
     }
 
     /// <summary>A station's work: what one batch takes, how long it runs, what it burns and what it makes.</summary>
-    private void Machine(Thing t) {
+    protected void Machine(Thing t) {
         var recipe = world.Data.Recipes[t.Recipe];
         float rate = (t.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * world.Speed(t.Tools != null && recipe.Tool != "" ? world.BenchTool(t, recipe.Tool, recipe.Tier) : null);
         float seconds = recipe.Seconds / Math.Max(.01f, rate);
@@ -48,7 +48,7 @@ public partial class PagePanel {
     }
 
     /// <summary>The fuel slot under the bar: a flame, its cup, and how long the fuel in it lasts at one per batch.</summary>
-    private HBoxContainer FuelSlot(Thing t, float batchSeconds) {
+    protected HBoxContainer FuelSlot(Thing t, float batchSeconds) {
         var burner = t.Burner!;
         var (cell, count) = ItemSlot.Cup("fuel");
         cell.AddThemeStyleboxOverride("normal", Style.CupFuel);
@@ -78,7 +78,7 @@ public partial class PagePanel {
     }
 
     /// <summary>The reinforced furnace's heat dial in degrees Celsius, with the bellows' pump and its key.</summary>
-    private void Bellows(Thing t) {
+    protected void Bellows(Thing t) {
         var row = Row(); row.AddThemeConstantOverride("separation", 18);
         var dial = new HeatDial { Level = () => t.Heat, CustomMinimumSize = new Vector2(132, 132), Name = "heat", TooltipText = $"Steel requires {World.Celsius(World.SteelHeat)}+ °C" };
         row.AddChild(dial);
@@ -103,7 +103,7 @@ public partial class PagePanel {
     }
 
     /// <summary>A cup for one input or output; empty, it shows a faint picture of its item, and under it what one batch takes or makes.</summary>
-    private VBoxContainer MachineSlot(Thing t, Inventory box, string item, bool input, string perBatch, float size = 52) {
+    protected VBoxContainer MachineSlot(Thing t, Inventory box, string item, bool input, string perBatch, float size = 52) {
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
         var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
         if (!input) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);

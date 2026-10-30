@@ -7,30 +7,30 @@ namespace ChopChopMeow;
 
 /// <summary>A page of the side panel, and the pieces every page is built from, so each screen looks and works alike.</summary>
 public partial class PagePanel : VBoxContainer {
-    private readonly SidePanel panel;
-    private readonly UiKit kit;
-    private readonly World world;
-    private readonly UiState state;
-    private readonly WorldView view;
-    private readonly Sounds sounds;
-    private readonly ItemMoves moves;
-    private readonly PageMemory memory;
-    private readonly BackpackDrawer bag;
-    private readonly List<Action> live;
+    protected readonly SidePanel panel;
+    protected readonly UiKit kit;
+    protected readonly World world;
+    protected readonly UiState state;
+    protected readonly WorldView view;
+    protected readonly Sounds sounds;
+    protected readonly ItemMoves moves;
+    protected readonly PageMemory memory;
+    protected readonly BackpackDrawer bag;
+    protected readonly List<Action> live;
     private readonly string pageName;
     /// <summary>Where the pieces go: this page, or for a moment another column being filled.</summary>
-    private Control content;
-    private HBoxContainer heading => panel.Heading;
-    private TextureRect headingIcon => panel.HeadingIcon;
-    private Label headingTitle => panel.HeadingTitle;
+    protected Control content;
+    protected HBoxContainer heading => panel.Heading;
+    protected TextureRect headingIcon => panel.HeadingIcon;
+    protected Label headingTitle => panel.HeadingTitle;
 
-    public PagePanel(SidePanel panel, string pageName) {
+    public PagePanel(SidePanel panel, string pageName = "") {
         this.panel = panel; this.pageName = pageName;
         kit = panel.Kit; world = kit.World; state = kit.State; sounds = kit.Sounds; view = panel.View; moves = panel.Moves; memory = panel.Memory; bag = panel.Bag; live = panel.Live;
         content = this; SizeFlagsHorizontal = SizeFlags.ExpandFill;
     }
 
-    private static readonly Dictionary<string, string> JobNames = new() {
+    protected static readonly Dictionary<string, string> JobNames = new() {
         ["gather"] = "Gather",
         ["bellows"] = "Bellows",
         ["haul"] = "Haul",
@@ -44,36 +44,36 @@ public partial class PagePanel : VBoxContainer {
         ["tend"] = "Tend",
         ["work"] = "Work"
     };
-    private static string JobName(string job) => JobNames.GetValueOrDefault(job, job);
+    protected static string JobName(string job) => JobNames.GetValueOrDefault(job, job);
 
     /// <summary>Puts a round button in the header, before the close button.</summary>
-    private Button HeaderAction(string glyph, string tooltip, Action action, (StyleBoxFlat Normal, StyleBoxFlat Hover) look, string name = "") {
+    protected Button HeaderAction(string glyph, string tooltip, Action action, (StyleBoxFlat Normal, StyleBoxFlat Hover) look, string name = "") {
         var button = kit.HeaderButton(glyph, tooltip, action, look, name);
         heading.AddChild(button); heading.MoveChild(button, heading.GetChildCount() - 2);
         return button;
     }
 
     /// <summary>The funnel that opens the filter window beside the panel, ringed while it is open.</summary>
-    private void FilterButton(Thing t) {
+    protected void FilterButton(Thing t) {
         var button = HeaderAction("filter", "Filters: what workers bring and take", () => { memory.FilterOpen = !memory.FilterOpen; memory.FilterPicking = false; panel.Open("inspect"); }, Style.FilterRound, "filters");
         if (memory.FilterOpen) { Style.Skin(button, Style.Round(Style.Mustard, 18).Item1, Style.FilterRound.Hover); FilterWindow(t); }
     }
 
     /// <summary>A beige well inside the panel, holding a row or column of things.</summary>
-    private T Well<T>(T inner) where T : Control {
+    protected T Well<T>(T inner) where T : Control {
         var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); content.AddChild(well);
         well.AddChild(inner);
         return inner;
     }
 
     /// <summary>A label under a cup: what one batch takes or makes.</summary>
-    private static Label PerBatch(string text) {
+    protected static Label PerBatch(string text) {
         var label = Style.Text(text, 13, Style.Tan); label.HorizontalAlignment = HorizontalAlignment.Center;
         return label;
     }
 
     /// <summary>Seconds as a short duration: seconds up to a minute and a half, then minutes, then hours.</summary>
-    private static System.Text.StringBuilder AppendDuration(System.Text.StringBuilder text, float seconds) {
+    protected static System.Text.StringBuilder AppendDuration(System.Text.StringBuilder text, float seconds) {
         if (seconds < 90) return text.Append((int)MathF.Ceiling(seconds)).Append(" s");
         if (seconds < 5400) return text.Append((int)MathF.Round(seconds / 60)).Append(" min");
         return text.Append((int)MathF.Round(seconds / 3600)).Append(" h");
@@ -83,7 +83,7 @@ public partial class PagePanel : VBoxContainer {
     /// The process row every station shares: inputs with what one batch takes under each, the batch time over the progress bar,
     /// the fuel under it with how long it lasts, and the main output with its side outputs in a second row.
     /// </summary>
-    private void Process(IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) {
+    protected void Process(IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) {
         var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 14);
         var left = new HBoxContainer { SizeFlagsVertical = Control.SizeFlags.ShrinkBegin }; left.AddThemeConstantOverride("separation", 12); row.AddChild(left);
         foreach (var input in inputs) left.AddChild(input);
@@ -109,7 +109,7 @@ public partial class PagePanel : VBoxContainer {
     }
 
     /// <summary>The fuel position under a process bar: an icon for what it is, its cup or picture, and how long it lasts.</summary>
-    private static HBoxContainer FuelRow(string glyph, Color tint, Control cup, Label lasts) {
+    protected static HBoxContainer FuelRow(string glyph, Color tint, Control cup, Label lasts) {
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 8);
         row.AddChild(Style.Glyph(glyph, 24, tint)); row.AddChild(cup); row.AddChild(lasts);
         return row;
@@ -119,7 +119,7 @@ public partial class PagePanel : VBoxContainer {
     /// A place's job buttons, side by side along the bottom: each shows how many workers do it, and opens a list of workers to tick.
     /// Each worker shows how many jobs they have elsewhere, listed on hover.
     /// </summary>
-    private void JobButtons(Thing t) {
+    protected void JobButtons(Thing t) {
         var jobs = world.Jobs(t);
         if (jobs.Length == 0) return;
         var row = Row(); row.AddThemeConstantOverride("separation", 12);
@@ -149,7 +149,7 @@ public partial class PagePanel : VBoxContainer {
         if (memory.OpenJob != "" && jobs.Contains(memory.OpenJob)) WorkerList(t, memory.OpenJob);
     }
 
-    private string JobHint(Thing t, string job) => job switch {
+    protected string JobHint(Thing t, string job) => job switch {
         "bellows" => "Keeps the fire hot. Only one worker pumps at a time.",
         "haul" => t.Kind switch { ThingKind.Farm => "Brings seeds and fertilizer and carries the harvest to storage.", ThingKind.Mine => "Brings the timber, iron and stone the mine needs.", _ => "Brings ingredients and fuel and carries what is made to storage." },
         "craft" => "Works the station; it only makes progress while someone works it.",
@@ -164,7 +164,7 @@ public partial class PagePanel : VBoxContainer {
     };
 
     /// <summary>Every worker, ticked when they do this job here; the circle counts their jobs elsewhere.</summary>
-    private void WorkerList(Thing t, string job) {
+    protected void WorkerList(Thing t, string job) {
         var list = new VBoxContainer(); list.AddThemeConstantOverride("separation", 2);
         var box = new PanelContainer(); box.AddThemeStyleboxOverride("panel", Style.Dropdown); box.AddChild(list); content.AddChild(box);
         if (world.S.Workers.Count == 0) { list.AddChild(Style.Text("Hire villagers at a trading post.", 14, Style.Ink)); return; }
@@ -191,7 +191,7 @@ public partial class PagePanel : VBoxContainer {
     /// Drop an item on a row to add it, click one to take it off; an empty row allows anything.
     /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
     /// </summary>
-    private void FilterWindow(Thing t) {
+    protected void FilterWindow(Thing t) {
         var board = panel.SideBoard(Style.Board, 340);
         var top = new HBoxContainer(); top.AddThemeConstantOverride("separation", 10); board.AddChild(top);
         top.AddChild(Style.Glyph("line_filter", 28, Style.Rim));
@@ -239,10 +239,10 @@ public partial class PagePanel : VBoxContainer {
     }
 
     /// <summary>What a filter entry names: an item, or a crate of a good.</summary>
-    private string FilterName(string id) => world.CrateGood(id) is string good ? $"Crate of {world.Data.Name(good).ToLowerInvariant()}" : world.Data.Name(id);
+    protected string FilterName(string id) => world.CrateGood(id) is string good ? $"Crate of {world.Data.Name(good).ToLowerInvariant()}" : world.Data.Name(id);
 
     /// <summary>A filter entry's cell: the item, or for a crate of a good, the good with a small crate in the corner.</summary>
-    private ItemSlot FilterCell(string name, string id) {
+    protected ItemSlot FilterCell(string name, string id) {
         var (cell, _) = ItemSlot.Cup(name, 44);
         string? good = world.CrateGood(id);
         cell.Icon = Icons.Of(good ?? id);
