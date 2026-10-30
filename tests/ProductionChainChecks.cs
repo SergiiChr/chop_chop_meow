@@ -47,6 +47,7 @@ public static class ProductionChainChecks {
         crates.Inventory.InputFilter.Add(World.CrateOf("bread"));
         general.Inventory.Add("bread", 30); general.Inventory.Add("crate", 4);
         var worker = AddWorker(world, packer.Pos + new Vector2(0, 1));
+        worker.Wage = 18;
         world.Assign(worker, packer);
         for (float waited = 0; waited < 40 && crates.Inventory[crate] == 0; waited += .1f) world.Tick(.1f);
         Require(crates.Inventory[crate] == 1 && general.Inventory[crate] == 0, "the hauler should carry the full crate past general storage to the chest asking for crates of bread");
@@ -108,6 +109,7 @@ public static class ProductionChainChecks {
         void Store(string item) => Place(ThingKind.Chest).Inventory.InputFilter.Add(item);
         Worker Hire(Thing place, params string[] jobs) {
             var w = AddWorker(world, place.Pos + new Vector2(0, 1.2f));
+            w.Wage = 18;
             foreach (string job in jobs) world.SetDuty(w, place, job, true);
             return w;
         }

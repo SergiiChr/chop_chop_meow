@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static Checks;
 using static Fixtures;
 
 /// <summary>
@@ -41,8 +42,7 @@ public static class AllocationChecks {
             sent.Enqueue((now, copy));
         }, maxBytesPerRun: 14000, warmup: 200, runs: 300);
         foreach (var (hosted, copied) in sent)
-            if (hosted.Count != copied.Count || hosted.Any(pair => !copied.TryGetValue(pair.Key, out var entry) || !entry.AsSpan().SequenceEqual(pair.Value)))
-                throw new InvalidOperationException("Update check failed: the guest's merged entries should match the host's.");
+            Require(hosted.Count == copied.Count && hosted.All(pair => copied.TryGetValue(pair.Key, out var entry) && entry.AsSpan().SequenceEqual(pair.Value)), "the guest's merged entries should match the host's");
 
         var packing = PackingLine(data, out var stock);
         // A crate fills about every twenty seconds and goes to the post, whose cart leaves once six are there; a hundred seconds see several crates and a cart.
@@ -52,7 +52,7 @@ public static class AllocationChecks {
         var mine = WorkingMine(data, out var shaft);
         // Emptying the output each tick keeps the crew digging underground instead of hauling.
         Check("tick: miners underground", () => { mine.Tick(1 / 60f); Fed(mine); shaft.Output!.Clear(); }, warmup: 1200);
-        if (mine.S.Workers.Any(w => w.WorkState != WorkerWorkState.Underground)) throw new InvalidOperationException("Allocation check failed: the mine crew should be underground.");
+        Require(mine.S.Workers.All(w => w.WorkState == WorkerWorkState.Underground), "the mine crew should be underground");
 
         var night = new World(data);
         night.S.Time = data.DaySeconds * (data.NightStarts + .05f);
@@ -71,7 +71,7 @@ public static class AllocationChecks {
         long bytes = GC.GetAllocatedBytesForCurrentThread() - before;
         string report = $"{label}: {bytes} B over {runs} runs, {(double)bytes / runs:0.#} B per run (budget {maxBytesPerRun} B)";
         GD.Print(report);
-        if (bytes > maxBytesPerRun * runs) throw new InvalidOperationException($"Allocation budget exceeded: {report}");
+        Require(bytes <= maxBytesPerRun * runs, $"Allocation budget exceeded: {report}");
     }
 
     private static void Fed(World world) { world.S.Hunger = 100; world.S.Thirst = 100; world.S.Health = 100; }

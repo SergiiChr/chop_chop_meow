@@ -33,7 +33,10 @@ Project rules on top of the global coding and testing guides.
 
 ## Tests
 
-- Test at these seams: `World`'s public methods for simulation rules, `Input.ParseInputEvent` and what the player sees for UI, and `Net`'s messages between a host and a guest process.
+- Test at these seams:
+  - `World`'s public methods catch simulation rule breaks and miss anything on screen.
+  - `Input.ParseInputEvent` and what the player sees catch broken controls and panels, and miss how the game looks.
+  - `Net`'s messages between a host and a guest process catch sync breaks and miss a real network.
 - Use representative end-to-end checks plus focused edge cases.
 - UI checks live in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` and `src/NetChecks.cs`; a change to a shared check helper covers all three.
 - Input tests go through `Input.ParseInputEvent`, not direct calls to input handlers.

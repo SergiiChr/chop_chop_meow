@@ -346,7 +346,7 @@ public static class SimulationChecks {
         float coinsBeforeBuy = world.Coins;
         Require(!world.Buy(sign, "wood", 1) && world.S.Orders.Count == 0, "the village should not sell goods missing from its list");
         Require(world.Buy(sign, "water", 1), "market should accept an affordable buy order");
-        Require(world.Coins == coinsBeforeBuy - world.LotPrice("water") && world.S.Orders.Count == 1 && output.Count == 0,
+        Require(world.Coins == coinsBeforeBuy - 15 && world.S.Orders.Count == 1 && output.Count == 0,
                 "buy order should reserve coins immediately while goods remain in transit");
         SafeTick(world, 29.9f);
         Require(world.S.Orders.Count == 1 && output.Count == 0,
@@ -1632,7 +1632,7 @@ public static class SimulationChecks {
                 "a cart should take every acceptable crate, count them for the cart, and leave the rest");
         Require(world.S.Orders.Single().Goods["raw_meat"] == 6 && world.S.Orders.Single().Goods["steel_pick"] == 1, "the sale should pay for what the crates hold");
         SetCoins(world, 1000);
-        Require(world.Buy(sign, "canned_food", 2) && world.S.Orders.Last().Crates == 2 && world.Coins == 1000 - 2 * world.LotPrice("canned_food"), "boxed goods are bought by the crate");
+        Require(world.Buy(sign, "canned_food", 2) && world.S.Orders.Last().Crates == 2 && world.Coins == 830, "boxed goods are bought by the crate");
         Require(world.LotPrice("canned_food") > data.Market.Buys["canned_food"] * world.UnitPrice("canned_food", false), "a bought crate costs more than its contents would sell for");
         SafeTick(world, data.TradeSeconds + .1f);
         var bought = sign.Output!.Items.Keys.Where(World.IsCrate).ToList();

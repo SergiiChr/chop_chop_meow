@@ -3,6 +3,7 @@ using ChopChopMeow;
 using Godot;
 using System.Linq;
 using static Checks;
+using static Fixtures;
 
 namespace ChopChopMeow.Tests;
 
@@ -121,8 +122,8 @@ public static class WaterChecks {
         var outward = (shore - Terrain.Lake).Normalized();
         var pond = world.Add(ThingKind.Water, shore, 9999);
         var chest = world.Add(ThingKind.Chest, shore + outward * 5); chest.Inventory.Add("empty_bottle", 1);
-        var worker = new Worker { Id = world.S.NextId++, Pos = chest.Pos };
-        world.S.Workers.Add(worker); world.Assign(worker, pond);
+        var worker = AddWorker(world, chest.Pos);
+        world.Assign(worker, pond);
         for (int i = 0; i < 240; i++) world.Tick(.25f, true);
         Require(chest.Inventory["water"] == 1 && chest.Inventory["empty_bottle"] == 0 && worker.Bag.Count == 0,
             "an assigned collector must refill and deliver an existing bottle without generating more containers");
