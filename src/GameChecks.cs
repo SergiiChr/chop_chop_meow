@@ -264,14 +264,14 @@ public partial class Game {
             world.Player = spot + cliff.Face * 3; await Frames(4);
             await KeyStroke(Key.B);
             await Click(Named("build_mine")!);
-            Require(view.BuildMode == ThingKind.Mine, "The mine plan must enter placement mode.");
+            Require(player.Mode.Placing == ThingKind.Mine, "The mine plan must enter placement mode.");
             // Off the exact spot, so the click shows the plan snapping to the cliff.
             await Click(view.Screen(spot + cliff.Face * .8f + cliff.Along * .8f));
             var mine = world.Things.LastOrDefault(t => t.Kind == ThingKind.Mine);
             Require(mine != null, $"A click near the {ore} cliff must create a mine.");
             Require(mine.Pos == spot, $"A click near the {ore} cliff must mark the mine on the cliff's spot.");
             Require(panel.Visible && view.Selection.Thing == mine.Id, $"A click near the {ore} cliff must select the new mine.");
-            Require(view.BuildMode == null, $"A click near the {ore} cliff must end placement mode.");
+            Require(player.Mode.Placing == null, $"A click near the {ore} cliff must end placement mode.");
             Require(new[] { "Stage 1 · Dig the entrance", "Stage 2 · Shore it up", "Stage 3 · Fit the frame and rails" }.Select((title, i) => panel.FindChild($"stage_{i + 1}", true, false) is Control node && node.TooltipText.StartsWith(title)).All(found => found),
                 "The mine panel must show its three stages.");
         }
@@ -373,7 +373,7 @@ public partial class Game {
             await Click(view.Screen(spot));
             Require(world.Carried("crate") == 2 - placed, "Placing a crate must use one crate from the backpack.");
             Require(!panel.Visible, "Placing a crate must not open it.");
-            Require(view.BuildMode == (placed == 1 ? ThingKind.Crate : null),
+            Require(player.Mode.Placing == (placed == 1 ? ThingKind.Crate : null),
                 "Placing a crate must stay in placement while crates remain.");
         }
         RemoveThings(world, t => t.Kind == ThingKind.Crate && t != crate && t.Inventory.Count == 0);
@@ -637,13 +637,13 @@ public partial class Game {
         Require(hotbar.Buttons.Count == 9 && world.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
         int berries = world.Carried("berries");
         await KeyStroke(Key.Key3);
-        Require(view.BuildMode == ThingKind.Chest, "A building-plan hotkey must enter placement mode.");
+        Require(player.Mode.Placing == ThingKind.Chest, "A building-plan hotkey must enter placement mode.");
         await KeyStroke(Key.Key8);
         Require(world.ActiveHotbar == 7, "Key 8 must make the eighth hotbar slot active.");
         Require(world.Carried("berries") == berries, "Key 8 must not eat the berries.");
         Require(hotbar.Buttons[7].GetThemeStylebox("normal") == Style.CupWanted, "Key 8 must outline the berries in hand.");
         Require(hotbar.Buttons[2].GetThemeStylebox("normal") != Style.CupWanted, "Key 8 must outline only the slot in hand.");
-        Require(view.BuildMode == null, "Selecting an item must clear any previously selected building plan.");
+        Require(player.Mode.Placing == null, "Selecting an item must clear any previously selected building plan.");
         int played = sounds.Played;
         await ClickGround();
         Require(world.Carried("berries") == berries - 1, "A left click on open ground must eat the berries in hand.");
@@ -662,7 +662,7 @@ public partial class Game {
         await Hover(plan!);
         Require(HasLabel(panel, "Needs: Wood") && HasLabel(panel, "5 slots"), "Hovering a plan must show its description and required resources.");
         await Click(plan!);
-        Require(view.BuildMode == ThingKind.Chest && !panel.Visible, "Choosing a plan must enter placement mode.");
+        Require(player.Mode.Placing == ThingKind.Chest && !panel.Visible, "Choosing a plan must enter placement mode.");
         Vector2 place = Vector2.Zero;
         for (int x = -3; x <= 3; x++) for (int y = -3; y <= 3; y++) {
             var candidate = world.Player.Round() + new Vector2(x, y);
@@ -677,7 +677,7 @@ public partial class Game {
         await Frames();
         var chest = world.Things.LastOrDefault(t => t.Kind == ThingKind.Chest);
         Require(chest != null, "A ground click must construct a chest.");
-        Require(view.BuildMode == (world.Backpack.Has(world.Data.Buildings[ThingKind.Chest].Cost) ? ThingKind.Chest : null), "A ground click must stay in placement while another chest can be afforded and leave it otherwise.");
+        Require(player.Mode.Placing == (world.Backpack.Has(world.Data.Buildings[ThingKind.Chest].Cost) ? ThingKind.Chest : null), "A ground click must stay in placement while another chest can be afforded and leave it otherwise.");
         Require(view.Selection.Thing != chest.Id, "A ground click must not select the new chest.");
         Require(!panel.Visible, "A ground click must not open a panel.");
         return chest!;

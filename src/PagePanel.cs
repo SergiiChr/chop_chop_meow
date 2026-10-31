@@ -295,7 +295,7 @@ public abstract partial class PagePanel : VBoxContainer {
     }
     protected const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
     protected void UseFromBag(string id) {
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
     }
     /// <summary>A storage's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
     protected GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) {

@@ -15,7 +15,7 @@ public partial class WorldView : Node3D {
     public int Hover;
     public int HoverWorker;
     /// <summary>The building being placed, or a packed crate, or null when not placing.</summary>
-    public ThingKind? BuildMode;
+    public ThingKind? Placing;
     /// <summary>The crate the player is lifting with a held right click, and how far along the lift is from 0 to 1.</summary>
     public int Lifting;
     public float LiftProgress;
@@ -1012,10 +1012,10 @@ public partial class WorldView : Node3D {
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
         playerRing.Position = To3(World.Player, .015f); playerRing.Scale = new Vector3(.42f, 1, .42f);
-        placeTile.Visible = BuildMode != null;
-        var kind = BuildMode.GetValueOrDefault();
-        var at = BuildMode == null ? Vector2.Zero : World.Snap(kind, ToWorld(Mouse).Round());
-        var shown = BuildMode == null ? null : kind == ThingKind.Mine ? mineGhosts[World.CliffAt(at).Ore] : ghosts[kind];
+        placeTile.Visible = Placing != null;
+        var kind = Placing.GetValueOrDefault();
+        var at = Placing == null ? Vector2.Zero : World.Snap(kind, ToWorld(Mouse).Round());
+        var shown = Placing == null ? null : kind == ThingKind.Mine ? mineGhosts[World.CliffAt(at).Ore] : ghosts[kind];
         if (shown != ghost) {
             if (ghost != null) ghost.Root.Visible = false;
             if (shown != null) shown.Root.Visible = true;

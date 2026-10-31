@@ -83,10 +83,10 @@ public partial class Game : Node {
         blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), saves.Latest, n => saves.Load(n), () => startMenu.ShowStart()); AddChild(blackHole);
         moves = new ItemMoves(kit, blackHole);
         panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;
-        hotbar = new Hotbar(kit, view, panel);
-        player = new PlayerControl(kit, view, panel, hotbar);
+        hotbar = new Hotbar(kit, panel);
+        player = new PlayerControl(kit, view, panel, hotbar); panel.Player = player;
         clock = new ClockPlate(world); ui.AddChild(clock);
-        modeLabel = new ModeLabel(kit, view); ui.AddChild(modeLabel);
+        modeLabel = new ModeLabel(kit, player); ui.AddChild(modeLabel);
         ui.AddChild(hotbar);
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
@@ -145,7 +145,7 @@ public partial class Game : Node {
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
                 case Key.Escape:
-                    if (view.BuildMode != null || state.AssigningWorker > 0) { view.BuildMode = null; state.AssigningWorker = 0; } else if (panel.Visible || bag.Visible) panel.Close(); else menu.Open();
+                    if (player.Mode is not ClickMode.Normal) player.Mode = new ClickMode.Normal(); else if (panel.Visible || bag.Visible) panel.Close(); else menu.Open();
                     RefreshLive(); break;
                 case Key.B: panel.Open("build"); break;
                 case Key.I: panel.Toggle("help"); break;
@@ -181,7 +181,7 @@ public partial class Game : Node {
             // A guest saves its player whenever it changes instead; the world is the host's to save.
             if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) saves.Save(0); autosave = 0; }
         }
-        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection;
+        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection; view.Placing = player.Mode.Placing;
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }

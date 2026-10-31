@@ -36,22 +36,20 @@ public partial class ClockPlate : PanelContainer {
 /// <summary>Says what the next click in the world does while a placement or a work order is under way.</summary>
 public partial class ModeLabel : Label {
     private readonly World world;
-    private readonly UiState state;
-    private readonly WorldView view;
-    private (bool Assigning, ThingKind? Mode) shown = (false, null);
+    private readonly PlayerControl player;
+    private ClickMode shown = new ClickMode.Normal();
 
-    public ModeLabel(UiKit kit, WorldView view) {
-        world = kit.World; state = kit.State; this.view = view;
+    public ModeLabel(UiKit kit, PlayerControl player) {
+        world = kit.World; this.player = player;
         AddThemeFontSizeOverride("font_size", 17); Style.Outlined(this);
         AnchorLeft = .5f; AnchorRight = .5f; OffsetTop = 18; GrowHorizontal = GrowDirection.Both; HorizontalAlignment = HorizontalAlignment.Center;
         AutowrapMode = TextServer.AutowrapMode.Off; MouseFilter = MouseFilterEnum.Ignore;
     }
 
     public void Refresh() {
-        var now = (state.AssigningWorker > 0, view.BuildMode);
-        if (now == shown) return;
-        shown = now;
-        Text = state.AssigningWorker > 0 ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : view.BuildMode != null ? $"PLACE {world.Data.Name(view.BuildMode.Value).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
+        if (player.Mode == shown) return;
+        shown = player.Mode;
+        Text = shown is ClickMode.Assign ? "WORK ORDER · Click a resource to assign this villager. Esc cancels." : shown.Placing is ThingKind kind ? $"PLACE {world.Data.Name(kind).ToUpperInvariant()} · Left click ground. Esc cancels." : "";
     }
 }
 

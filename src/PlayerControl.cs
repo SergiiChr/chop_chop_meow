@@ -4,6 +4,21 @@ using Godot;
 
 namespace ChopChopMeow;
 
+/// <summary>What the next left click in the world does.</summary>
+public abstract record ClickMode {
+    /// <summary>A click selects or uses what is under it.</summary>
+    public sealed record Normal : ClickMode;
+    /// <summary>A click places a building of this kind.</summary>
+    public sealed record Build(ThingKind Kind) : ClickMode;
+    /// <summary>A click places this crate from the backpack.</summary>
+    public sealed record Crate(string Item) : ClickMode;
+    /// <summary>A click on a resource makes it this worker's gathering spot.</summary>
+    public sealed record Assign(int Worker) : ClickMode;
+
+    /// <summary>The kind being placed, or null when a click places nothing.</summary>
+    public ThingKind? Placing => this switch { Build build => build.Kind, Crate => ThingKind.Crate, _ => null };
+}
+
 /// <summary>The player in the world: walking, gathering, lifting crates, placing buildings and clicking things.</summary>
 public sealed class PlayerControl {
     private const float LiftSeconds = .6f;
@@ -18,13 +33,22 @@ public sealed class PlayerControl {
     private Thing? lifting;
     private float liftClock;
 
+    /// <summary>What the next left click in the world does.</summary>
+    public ClickMode Mode { get; set; } = new ClickMode.Normal();
+
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar) {
         this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; world = kit.World; state = kit.State;
-        world.Replaced += Stop;
+        world.Replaced += () => { Stop(); Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops a gather, a crate lift and a walk into a cabin, whose targets belong to a world that went away.</summary>
     private void Stop() { gathering = null; lifting = null; state.Entering = null; }
+
+    /// <summary>Enters placement for a crate from the backpack.</summary>
+    public void PlaceCrate(string item) {
+        if (world.S.Backpack[item] == 0) { kit.Notify("No empty crate in your backpack. Craft one at a bench."); return; }
+        Mode = new ClickMode.Crate(item); panel.Close();
+    }
 
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started.</summary>
     public void Update(float dt) {
@@ -76,22 +100,13 @@ public sealed class PlayerControl {
             lifting = t?.Kind == ThingKind.Crate ? t : null; liftClock = 0;
         }
         if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) {
-            if (view.BuildMode != null) {
-                var at = view.ToWorld(mouse.Position).Round();
-                var built = view.BuildMode == ThingKind.Crate ? world.PlaceCrate(state.PlacingCrate, at) : world.Build(view.BuildMode.Value, at);
-                // Placement stays on without opening what was placed, so several go down in a row until the materials or crates run out.
-                // A guest's building goes up on the host, so the guest stays in placement until Esc, except after a mine the host was sent.
-                // A mine opens its panel instead, since each cliff takes only one.
-                if (built?.Kind == ThingKind.Mine) { view.BuildMode = null; panel.Select(built); } else if (built != null && !CanPlaceAgain()) view.BuildMode = null;
-                else if (world.Remote && view.BuildMode == ThingKind.Mine && world.PlacementBlock(ThingKind.Mine, world.Snap(ThingKind.Mine, at)) == null) view.BuildMode = null;
-                return;
-            }
+            if (Mode.Placing != null) { Place(view.ToWorld(mouse.Position).Round()); return; }
             var t = view.Pick(mouse.Position);
-            if (state.AssigningWorker > 0) {
-                var worker = world.S.Workers.FirstOrDefault(w => w.Id == state.AssigningWorker);
+            if (Mode is ClickMode.Assign assign) {
+                var worker = world.S.Workers.FirstOrDefault(w => w.Id == assign.Worker);
                 if (worker != null && t?.IsResource == true) {
                     string? blocked = world.GatherBlock(t, true);
-                    if (blocked != null) kit.Notify(blocked); else { world.SetDuty(worker, t, "gather", true); state.AssigningWorker = 0; panel.Select(worker); }
+                    if (blocked != null) kit.Notify(blocked); else { world.SetDuty(worker, t, "gather", true); Mode = new ClickMode.Normal(); panel.Select(worker); }
                 } else kit.Notify("Choose a tree, leaves, stone, ore, coal, berry bush or water source.");
                 return;
             }
@@ -109,5 +124,20 @@ public sealed class PlayerControl {
         }
     }
 
-    private bool CanPlaceAgain() => view.BuildMode == ThingKind.Crate ? world.S.Backpack[state.PlacingCrate] > 0 : view.BuildMode is ThingKind kind && world.S.Backpack.Has(world.Data.Buildings[kind].Cost);
+    /// <summary>
+    /// Placement stays on without opening what was placed, so several go down in a row until the materials or crates run out.
+    /// A guest's building goes up on the host, so the guest stays in placement until Esc, except after a mine the host was sent.
+    /// A mine opens its panel instead, since each cliff takes only one.
+    /// </summary>
+    private void Place(Vector2 at) {
+        var built = Mode is ClickMode.Crate crate ? world.PlaceCrate(crate.Item, at) : world.Build(Mode.Placing!.Value, at);
+        if (built?.Kind == ThingKind.Mine) { Mode = new ClickMode.Normal(); panel.Select(built); } else if (built != null && !CanPlaceAgain()) Mode = new ClickMode.Normal();
+        else if (world.Remote && Mode.Placing == ThingKind.Mine && world.PlacementBlock(ThingKind.Mine, world.Snap(ThingKind.Mine, at)) == null) Mode = new ClickMode.Normal();
+    }
+
+    private bool CanPlaceAgain() => Mode switch {
+        ClickMode.Crate crate => world.S.Backpack[crate.Item] > 0,
+        ClickMode.Build build => world.S.Backpack.Has(world.Data.Buildings[build.Kind].Cost),
+        _ => false
+    };
 }

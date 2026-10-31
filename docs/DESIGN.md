@@ -99,7 +99,7 @@ UI and input:
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
 | `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots, the settings file and the command line |
-| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings and clicking things |
+| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, clicking things and `ClickMode`, what the next click does |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:

@@ -139,7 +139,7 @@ public partial class WorkerPanel(SidePanel side, Worker? w) : WorkerPage(side) {
             none.AutowrapMode = TextServer.AutowrapMode.WordSmart; jobs.AddChild(none);
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { state.AssigningWorker = w.Id; view.BuildMode = null; panel.Close(); kit.Refresh(); }));
+        buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { panel.Player.Mode = new ClickMode.Assign(w.Id); panel.Close(); kit.Refresh(); }));
         buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); panel.Open("inspect"); }));
         buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); panel.Open("workers"); }));
         if (w.WageDebt > 0) content.AddChild(kit.BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));

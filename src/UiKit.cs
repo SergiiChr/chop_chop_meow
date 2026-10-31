@@ -10,10 +10,6 @@ namespace ChopChopMeow;
 public sealed class UiState {
     /// <summary>A menu or overlay holds the player; only a game nobody else is in stops the world too.</summary>
     public bool Paused;
-    /// <summary>The worker whose gathering spot the next click on a resource sets.</summary>
-    public int AssigningWorker;
-    /// <summary>The backpack crate being placed while the build mode is "crate".</summary>
-    public string PlacingCrate = "";
     /// <summary>A cabin the player is walking to after clicking it; they step inside on arrival.</summary>
     public Thing? Entering;
 }

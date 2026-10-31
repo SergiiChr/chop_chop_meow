@@ -128,7 +128,7 @@ public partial class Game {
 
     /// <summary>Esc until no placement, side panel or backpack drawer is left; with nothing open it does nothing, so it never opens the pause menu.</summary>
     private async Task CloseWithEsc() {
-        for (int i = 0; i < 3 && (view.BuildMode != null || panel.Visible || bag.Visible); i++) await KeyStroke(Key.Escape);
+        for (int i = 0; i < 3 && (player.Mode.Placing != null || panel.Visible || bag.Visible); i++) await KeyStroke(Key.Escape);
     }
 
     /// <summary>Holds D until the player moves, so it shows the world is not held.</summary>

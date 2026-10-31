@@ -11,15 +11,13 @@ namespace ChopChopMeow;
 public partial class Hotbar : PanelContainer {
     private readonly UiKit kit;
     private readonly World world;
-    private readonly UiState state;
-    private readonly WorldView view;
     private readonly SidePanel panel;
 
     public System.Collections.Generic.List<ItemSlot> Buttons { get; } = new();
     public System.Collections.Generic.List<Label> Counts { get; } = new();
 
-    public Hotbar(UiKit kit, WorldView view, SidePanel panel) {
-        this.kit = kit; world = kit.World; state = kit.State; this.view = view; this.panel = panel;
+    public Hotbar(UiKit kit, SidePanel panel) {
+        this.kit = kit; world = kit.World; this.panel = panel;
         AnchorLeft = .5f; AnchorRight = .5f; AnchorTop = 1; AnchorBottom = 1; OffsetTop = -14; OffsetBottom = -14; GrowHorizontal = GrowDirection.Both; GrowVertical = GrowDirection.Begin;
         AddThemeStyleboxOverride("panel", Style.Plate);
         var slots = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; slots.AddThemeConstantOverride("separation", 10); AddChild(slots);
@@ -121,10 +119,9 @@ public partial class Hotbar : PanelContainer {
         slot = Math.Clamp(slot, 0, 8);
         world.S.ActiveHotbar = slot;
         string id = HotbarId(slot);
-        view.BuildMode = null;
-        state.AssigningWorker = 0;
+        panel.Player.Mode = new ClickMode.Normal();
         if (string.IsNullOrEmpty(id)) kit.Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
-        else if (world.Data.TryBuilding(id, out var kind)) { view.BuildMode = kind; panel.Close(); } else if (id == "crate") panel.PlaceCrate(id);
+        else if (world.Data.TryBuilding(id, out var kind)) { panel.Player.Mode = new ClickMode.Build(kind); panel.Close(); } else if (id == "crate") panel.Player.PlaceCrate(id);
         kit.Refresh();
     }
 

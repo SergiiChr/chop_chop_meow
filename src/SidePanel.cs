@@ -59,6 +59,8 @@ public partial class SidePanel : PanelContainer {
     public ItemMoves Moves { get; }
     public BackpackDrawer Bag { get; }
     public PageMemory Memory { get; } = new();
+    /// <summary>The player's control of the world, which also needs this panel, so the game sets it once both exist.</summary>
+    public PlayerControl Player { get; set; } = null!;
     public List<Action> Live { get; } = new();
     /// <summary>The open page, or nothing while the panel is closed.</summary>
     public string Page { get; private set; } = "welcome";
@@ -75,7 +77,7 @@ public partial class SidePanel : PanelContainer {
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top;
         Bag = new BackpackDrawer(kit, this);
-        world.Replaced += () => { ClearSelection(); Close(); };
+        world.Replaced += () => { Selection = default; Close(); };
     }
 
     public void Open(string name) {
@@ -126,7 +128,10 @@ public partial class SidePanel : PanelContainer {
     /// <summary>Selects a building or resource and shows it.</summary>
     public void Select(Thing t) {
         if (t.Kind == ThingKind.Reinforced && !(Page == "inspect" && Selection.Thing == t.Id)) Kit.Sounds.Play("open_steel_smelter", t.Pos);
-        Selection = Selection.Of(t); View.BuildMode = null; Open("inspect");
+        Selection = Selection.Of(t);
+        // A work order carries on: it waits for a click on a resource, whatever the panel shows meanwhile.
+        if (Player.Mode.Placing != null) Player.Mode = new ClickMode.Normal();
+        Open("inspect");
     }
 
     /// <summary>Selects a worker and shows them.</summary>
@@ -139,18 +144,6 @@ public partial class SidePanel : PanelContainer {
     public bool Deselect(int id) {
         if (Selection.Thing != id) return false;
         Selection = default; return true;
-    }
-
-    /// <summary>Forgets what was selected, any placement and any work order, when the world behind them goes away.</summary>
-    private void ClearSelection() {
-        Selection = default; state.AssigningWorker = 0;
-        View.BuildMode = null;
-    }
-
-    /// <summary>Enters placement for a crate from the backpack.</summary>
-    public void PlaceCrate(string item) {
-        if (world.S.Backpack[item] == 0) { Kit.Notify("No empty crate in your backpack. Craft one at a bench."); return; }
-        state.PlacingCrate = item; View.BuildMode = ThingKind.Crate; state.AssigningWorker = 0; Close();
     }
 
     /// <summary>The board beside the panel, for the price sign or the filter window; it hangs left of the panel.</summary>
