@@ -28,6 +28,8 @@ public sealed class BuildingDef {
     public string Name { get; set; } = "";
     public Dictionary<string, int> Cost { get; set; } = new();
     public string Description { get; set; } = "";
+    /// <summary>The recipe a station starts on, or empty for one that waits for the player's choice.</summary>
+    public string Recipe { get; set; } = "";
 }
 public sealed class RecipeDef {
     public string Name { get; set; } = "";
@@ -161,9 +163,14 @@ public sealed class GameData {
     public void Validate() {
         if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
             throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
-        foreach (var building in Buildings)
+        foreach (var building in Buildings) {
             foreach (var cost in building.Value.Cost)
                 if (!Items.ContainsKey(cost.Key) || cost.Value <= 0) throw new InvalidOperationException($"Invalid cost for {building.Key}: {cost.Key}.");
+            if (building.Value.Recipe != "" && (!Recipes.TryGetValue(building.Value.Recipe, out var starting) || starting.Station != building.Key))
+                throw new InvalidOperationException($"Invalid starting recipe for {building.Key}: {building.Value.Recipe}.");
+            if (building.Value.Recipe == "" && Recipes.Values.Count(r => r.Station == building.Key) == 1)
+                throw new InvalidOperationException($"{building.Key} has one recipe, so it must start on it.");
+        }
         foreach (var recipe in Recipes) {
             bool tool = recipe.Value.Tool == "" || Items.Values.Any(i => i.Tool == recipe.Value.Tool && i.Tier >= recipe.Value.Tier);
             if (!(recipe.Value.Station is ThingKind station ? Buildings.ContainsKey(station) : recipe.Value.Hand) || !tool || !Items.ContainsKey(recipe.Value.Output) || recipe.Value.Amount <= 0 || recipe.Value.Seconds <= 0)

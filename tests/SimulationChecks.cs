@@ -670,7 +670,6 @@ public static class SimulationChecks {
     private static void CheckAnvilNeedsHammering(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        world.SetRecipe(anvil, "steel_parts");
         anvil.Inventory.Add("steel_bar", 3);
         world.Player = anvil.Pos + new Vector2(1.5f, 0);
         for (int i = 0; i < 8; i++) { world.MovePlayer(new Vector2(i % 2 == 0 ? .1f : -.1f, 0)); world.Tick(.25f); }
@@ -1168,7 +1167,6 @@ public static class SimulationChecks {
 
         var anvil = BuildAt(world, ThingKind.Anvil, Site(28, 25));
         world.Player = anvil.Pos + Vector2.One;
-        world.SetRecipe(anvil, "steel_parts");
         world.LoadBatch(anvil, 2);
         CompleteBatches(world, anvil, "steel_parts", 2);
         world.Collect(anvil);

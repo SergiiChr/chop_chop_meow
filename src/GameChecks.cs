@@ -880,7 +880,7 @@ public partial class Game {
         Require(workbench.Inventory["planks"] == 3 && world.Backpack["planks"] == 3, "Right-clicking a bench input must pick up half of it.");
         RemoveThings(world, t => t == workbench); Drop(world, "planks", 3); await CloseWithEsc();
     }
-    /// <summary>A new anvil's page shows steel bars going in and steel parts coming out, and a backpack click loads a bar.</summary>
+    /// <summary>A new anvil's page shows steel bars in, steel parts out, and a backpack click loads a bar.</summary>
     private async Task CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack() {
         var anvil = world.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
         Give(world, "steel_bar", 2);

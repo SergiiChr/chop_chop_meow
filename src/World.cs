@@ -338,11 +338,10 @@ public sealed partial class World {
     }
     // Sleep fast-forwards hours in one frame, so its events stay silent instead of playing all at once.
     private void Play(string sound, Vector2 at) { if (!asleep) Sound?.Invoke(sound, at); }
-    /// <summary>The recipe a station is set to when placed; the anvil and reinforced furnace have no other, so their pages offer no choice.</summary>
-    private static string StartingRecipe(ThingKind kind) => kind switch { ThingKind.Furnace => "iron_bar", ThingKind.Reinforced => "steel_bar", ThingKind.Anvil => "steel_parts", _ => "" };
+    /// <summary>The recipe game data names for a station placed or loaded without one, or empty.</summary>
+    private string StartingRecipe(ThingKind kind) => Data.Buildings.TryGetValue(kind, out var building) ? building.Recipe : "";
     public Thing Add(ThingKind kind, Vector2 pos, int remaining = 0) {
-        var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining };
-        t.Recipe = StartingRecipe(kind);
+        var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining, Recipe = StartingRecipe(kind) };
         if (kind == ThingKind.Reinforced) t.Fuel = "coal";
         if (kind == ThingKind.Signpost) { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; t.Wages = NewWageSlot(); }
         if (SlotKinds(kind).Length > 0) t.Tools = NewToolSlots(kind);
@@ -2098,7 +2097,8 @@ public sealed partial class World {
         loaded.Crates ??= new(); loaded.Crafting ??= new(); loaded.Profits ??= new();
         loaded.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
         foreach (var t in loaded.Things) {
-            // A station set to a recipe it doesn't make, as on older saves' anvils, is cleared, and one left with none goes back to its starting recipe.
+            // A station set to a recipe it doesn't make, as on older saves' anvils, is cleared.
+            // One left with no recipe goes back to its starting recipe.
             if (t.Recipe != "" && (!Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Station != t.Kind)) { t.Recipe = ""; t.Processing = false; t.Progress = 0; }
             if (t.Recipe == "") t.Recipe = StartingRecipe(t.Kind);
             if (SlotKinds(t.Kind).Length > 0) t.Tools ??= NewToolSlots(t.Kind);

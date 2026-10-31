@@ -376,6 +376,9 @@ They run at base speed times the tool's speed while the player carries it, and g
 
 The bench runs at `benchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
 
+A building's `recipe` in `data/game.json` names the recipe a station starts on.
+The anvil and reinforced furnace have no other recipe, so their pages offer no choice.
+
 #### Tool slots
 
 `World.SlotKinds` names the tool slots a station has (`Thing.Tools`): a chisel and a hammer at the bench, a mortar at the cooking table (`cooktable`).

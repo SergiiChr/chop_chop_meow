@@ -172,7 +172,6 @@ public static class MultiplayerChecks {
         guest.GatherTarget = 0;
 
         var anvil = world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(-6, 0));
-        world.SetRecipe(anvil, "steel_parts");
         anvil.Inventory.Add("steel_bar", 1);
         world.Player = Terrain.Spawn + new Vector2(20, 0);
         FedPlayersTick(world, 1);
