@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 /// The field guide: round tabs for its topics beside short tips, each led by the item or key it is about.
 /// Keys show as key caps; everything else as the item's icon in a cup.
 /// </summary>
-public partial class GuidePanel(SidePanel side) : PagePanel(side) {
+public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
     private static readonly (string Key, string Glyph, string Title)[] GuideTopics = {
         ("controls", "line_mouse", "Controls"), ("steel", "line_flame", "Iron and steel"), ("craft", "line_craft", "Crafting"),
         ("crew", "line_crew", "Crew and storage"), ("survive", "line_moon", "Staying alive"), ("trade", "line_cart", "Trade")
@@ -65,7 +65,7 @@ public partial class GuidePanel(SidePanel side) : PagePanel(side) {
         }
     };
 
-    public override void _Ready() {
+    protected override void Build() {
         var board = new HBoxContainer(); board.AddThemeConstantOverride("separation", 14); AddChild(board);
         var tabs = new VBoxContainer(); tabs.AddThemeConstantOverride("separation", 10); board.AddChild(tabs);
         foreach (var (key, glyph, title) in GuideTopics) {
@@ -74,7 +74,7 @@ public partial class GuidePanel(SidePanel side) : PagePanel(side) {
             tab.AddThemeColorOverride("icon_normal_color", Style.Rim); tab.AddThemeColorOverride("icon_hover_color", Style.Rim);
             var look = key == memory.GuideTab ? Style.TabActive : Style.TabRound; Style.Skin(tab, look.Normal, look.Hover);
             string topic = key;
-            tab.Pressed += () => { memory.GuideTab = topic; panel.Open("help"); };
+            tab.Pressed += () => { memory.GuideTab = topic; Redraw(); };
             tabs.AddChild(tab);
         }
         var page = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; page.AddThemeConstantOverride("separation", 10); board.AddChild(page);

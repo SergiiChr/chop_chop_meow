@@ -3,16 +3,16 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>A tree, rock, bush or the lake: what is left, how to gather it, and the gatherers.</summary>
-public partial class ResourcePanel(SidePanel side, Thing t) : PagePanel(side) {
-    public override void _Ready() {
+public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
+    protected override void Body() {
         var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
-        row.AddChild(Style.Icon(Icons.Of(World.ResourceItem(t)), 44));
+        row.AddChild(Style.Icon(Icons.Of(World.ResourceItem(thing)), 44));
         var left = Style.Text("", 16, Style.Ink); left.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; left.AutowrapMode = TextServer.AutowrapMode.WordSmart; row.AddChild(left);
         live.Bind(left, line => {
-            if (t.Kind != ThingKind.Water) line.Append(t.Remaining).Append(" left · ");
-            line.Append(world.GatherBlock(t) ?? (t.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
+            if (thing.Kind != ThingKind.Water) line.Append(thing.Remaining).Append(" left · ");
+            line.Append(world.GatherBlock(thing) ?? (thing.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));
         });
-        if (t.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
-        JobButtons(t);
+        if (thing.Kind == ThingKind.Water) AddLabel("Collect water · hold right mouse on the pond shore to fill a bottle, or drink if you have none.", 14, Style.Beige);
+        JobButtons();
     }
 }

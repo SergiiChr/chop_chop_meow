@@ -4,8 +4,8 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>A cabin: inside or outside, and what a night's sleep would leave of each need.</summary>
-public partial class CabinPanel(SidePanel side, Thing hut) : PagePanel(side) {
-    public override void _Ready() {
+public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
+    protected override void Body() {
         var tag = Style.Pill("", Style.TagPill, Style.Rim, 13); tag.MouseFilter = Control.MouseFilterEnum.Pass; tag.TooltipText = "Wolves back off while you are inside";
         heading.AddChild(tag); heading.MoveChild(tag, heading.GetChildCount() - 2);
         // What a night's sleep would leave: each need now, and at dawn.
@@ -24,10 +24,10 @@ public partial class CabinPanel(SidePanel side, Thing hut) : PagePanel(side) {
             pair.AddChild(then[i] = new Vial { Fill = colors[i], Faded = true });
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == hut.Id) world.Leave(); else panel.Player.WalkInto(hut); });
-        var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(hut)); sleep.Name = "sleep";
+        var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == thing.Id) world.Leave(); else panel.Player.WalkInto(thing); });
+        var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(thing)); sleep.Name = "sleep";
         buttons.AddChild(door); buttons.AddChild(sleep);
-        live.Watch(() => (world.Sheltered == hut.Id, world.SleepBlock(), (int)(world.SecondsToDawn / world.Data.DaySeconds * 1440)), now => {
+        live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), (int)(world.SecondsToDawn / world.Data.DaySeconds * 1440)), now => {
             var (inside, blocked, _) = now;
             tag.Text = inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);
@@ -35,7 +35,7 @@ public partial class CabinPanel(SidePanel side, Thing hut) : PagePanel(side) {
             sleep.TooltipText = blocked ?? "Sleep until dawn. Production, hunger, trade and wages advance.";
             sleep.Modulate = blocked == null ? Colors.White : Style.Unready;
             block.Visible = blocked != null; block.Text = blocked == null ? "" : ShortBlock(blocked);
-            until.Text = LiveText.Of(text => AppendGameHours(text.Append("until dawn · +"), world.SecondsToDawn));
+            until.Text = LiveText.Of(text => PageText.AppendGameHours(world, text.Append("until dawn · +"), world.SecondsToDawn));
             float seconds = world.SecondsToDawn;
             Show(0, world.Health, world.Health);
             Show(1, world.Hunger, world.Hunger - seconds * world.Data.HungerPerSecond);

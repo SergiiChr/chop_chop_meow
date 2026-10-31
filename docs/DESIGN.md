@@ -36,7 +36,9 @@ Each feature is a node with a small public surface, given what it needs in its c
 The interface reads the world through `World`'s read members and keeps `world.S` for writes, and for what needs the real `Inventory`, such as a move between grids.
 `UiKit.Paused` follows which overlays are open: each one registers with `HoldWhile`, so none saves or restores another's pause.
 `World.Replaced` fires whenever the whole state is replaced (a new game, a load, a guest taking the host's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
-The side panel builds a new `PagePanel` node every time a page opens, so its build code runs once per open and its `Live` updates run on each refresh; `PageMemory` keeps what must outlast a rebuild.
+The side panel builds a new `PagePanel` node when a page opens; the page holds its own `LiveUpdates`, which run on each refresh, and its own state.
+A tab or other choice on a page calls `Redraw`, which builds its body again and keeps that state; `PageMemory` keeps only what outlasts the page.
+A `ThingPage` is a page about one thing in the world, with its job buttons and filters.
 UI checks stay in `partial class Game` and reach the parts through their public members.
 
 ### Source files
@@ -65,16 +67,16 @@ UI and input:
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
-| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons) and `LiveText` |
+| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates` and `LiveText` |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/Hud.cs` | The clock plate and the mode, full-bottle and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream cups, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
-| `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what pages keep while they are rebuilt |
+| `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what outlasts a page |
 | `src/BackpackDrawer.cs` | The backpack drawer above the hotbar |
-| `src/InspectPage.cs` | Picks the panel for the selected thing or worker |
+| `src/InspectPage.cs` | Picks the page for the selected thing or worker, and `ThingPage`, the base of a page about one thing |
 | `src/PagePanel.cs` | `PagePanel`, the base of every page |
 | `src/ProcessRow.cs` | The process row every station shares and the fuel row under its bar |
 | `src/JobRow.cs` | A place's job buttons, their worker lists and what each job is called |
@@ -85,6 +87,8 @@ UI and input:
 | `src/StationPanel.cs` | A station's panel: recipes, process row, bellows and jobs |
 | `src/Machine.cs` | Draws a station's process row and its input and output slots |
 | `src/CraftPanel.cs` | The crafting menu and the crafting bench panel |
+| `src/RecipeBoard.cs` | The recipe board both of them show |
+| `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel |

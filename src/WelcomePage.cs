@@ -3,8 +3,8 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The page a new game opens on.</summary>
-public partial class WelcomePage(SidePanel side) : PagePanel(side) {
-    public override void _Ready() {
+public partial class WelcomePage(PageTools tools) : PagePanel(tools) {
+    protected override void Build() {
         AddLabel("The woods are quiet. For now.", 21);
         AddLabel("First, secure water, a cabin and a fire. Then use your steel axe and your hands to build a workshop, trade berries for a pickaxe, and work toward steel.", 16, Style.Beige);
         AddLabel("FIRST STEPS", 14);

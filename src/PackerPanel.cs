@@ -5,25 +5,25 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>A packing station: the good it packs, its goods and empty crates, the crate being packed with how full it is, and its jobs.</summary>
-public partial class PackerPanel(SidePanel side, Thing t) : PagePanel(side) {
-    public override void _Ready() {
+public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
+    protected override void Body() {
         var pick = Row(); pick.AddThemeConstantOverride("separation", 12);
         var (chosen, _) = ItemSlot.Cup("pack_good", 48); chosen.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        chosen.Icon = t.Packs == "" ? null : Icons.Of(t.Packs);
-        chosen.Text = t.Packs == "" ? "?" : "";
+        chosen.Icon = thing.Packs == "" ? null : Icons.Of(thing.Packs);
+        chosen.Text = thing.Packs == "" ? "?" : "";
         chosen.TooltipText = "Choose what to pack";
-        chosen.Pressed += () => { memory.PackPicking = !memory.PackPicking; panel.Open("inspect"); };
+        chosen.Pressed += () => { memory.PackPicking = !memory.PackPicking; Redraw(); };
         pick.AddChild(chosen);
-        var packs = Style.Wrapped(t.Packs == "" ? "Choose what to pack" : $"Packs {world.Data.Name(t.Packs).ToLowerInvariant()}", 16);
+        var packs = Style.Wrapped(thing.Packs == "" ? "Choose what to pack" : $"Packs {world.Data.Name(thing.Packs).ToLowerInvariant()}", 16);
         packs.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; packs.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         pick.AddChild(packs);
-        if (memory.PackPicking || t.Packs == "") GoodPicker();
-        if (t.Packs != "") {
-            var inputs = new Control[] { MachineSlot(t, t.Inventory, t.Packs, true, "×1"), MachineSlot(t, t.Inventory, "crate", true, "") };
-            AddChild(new ProcessRow(live, inputs, LiveText.Of(text => AppendDuration(text, world.Data.PackSeconds)), () => t.Processing ? t.Progress / world.Data.PackSeconds : 0, null, PackedCrate(), Array.Empty<Control>()));
+        if (memory.PackPicking || thing.Packs == "") GoodPicker();
+        if (thing.Packs != "") {
+            var inputs = new Control[] { MachineSlot(thing, thing.Inventory, thing.Packs, true, "×1"), MachineSlot(thing, thing.Inventory, "crate", true, "") };
+            AddChild(new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, world.Data.PackSeconds)), () => thing.Processing ? thing.Progress / world.Data.PackSeconds : 0, null, PackedCrate(), Array.Empty<Control>()));
         }
-        BagGrid(id => world.LoadInput(t, id, ItemMoves.All ? world.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot", wanted: id => world.Holds(t, id));
-        JobButtons(t);
+        BagGrid(id => world.LoadInput(thing, id, ItemMoves.All ? world.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot", wanted: id => world.Holds(thing, id));
+        JobButtons();
     }
 
     /// <summary>Every good a crate holds as a grid of icons; the one packed now is lit.</summary>
@@ -32,21 +32,21 @@ public partial class PackerPanel(SidePanel side, Thing t) : PagePanel(side) {
         Well(new VBoxContainer()).AddChild(picker);
         foreach (var (id, def) in world.Data.Items.Where(p => world.Packable(p.Key)).OrderBy(p => p.Value.Name)) {
             var (cell, _) = ItemSlot.Cup($"pack_{id}", 44); cell.Icon = Icons.Of(id); cell.TooltipText = def.Name;
-            if (id == t.Packs) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
-            cell.Pressed += () => { world.SetPacking(t, id); memory.PackPicking = false; panel.Open("inspect"); };
+            if (id == thing.Packs) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
+            cell.Pressed += () => { world.SetPacking(thing, id); memory.PackPicking = false; Redraw(); };
             picker.AddChild(cell);
         }
     }
 
     /// <summary>The crate being packed, with how many of its twelve places are filled; click takes it.</summary>
     private VBoxContainer PackedCrate() {
-        var output = t.Output!;
+        var output = thing.Output!;
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
         var (cell, _) = ItemSlot.Cup("packed_crate", 64);
         cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
         cell.Icon = Icons.Of("crate");
-        cell.Pressed += () => { if (output.First() is string crate) { kit.Act(() => moves.Stack(output, world.S.Backpack, crate, t)); kit.Refresh(); } };
-        cell.Drag = () => output.First() is string crate ? new ItemDrag(crate, 1, output, t) : null;
+        cell.Pressed += () => { if (output.First() is string crate) { kit.Act(() => moves.Stack(output, world.S.Backpack, crate, thing)); kit.Refresh(); } };
+        cell.Drag = () => output.First() is string crate ? new ItemDrag(crate, 1, output, thing) : null;
         column.AddChild(cell);
         var fill = PerBatch(""); column.AddChild(fill);
         live.Watch(() => output.First() is string crate && world.Packed(crate) is Inventory contents ? contents.Count : -1, packed => {

@@ -5,12 +5,17 @@ using Godot;
 
 namespace ChopChopMeow;
 
+/// <summary>Which job's worker list is open under its button.</summary>
+public sealed class JobChoice {
+    public string Job = "";
+}
+
 /// <summary>
 /// A place's job buttons, side by side along the bottom: each shows how many workers do it, and opens a list of workers to tick.
 /// Each worker shows how many jobs they have elsewhere, listed on hover.
 /// </summary>
 /// <param name="redraw">Draws the page again after a job's list opens or closes.</param>
-public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, PageMemory memory, Action redraw) : VBoxContainer {
+public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, JobChoice choice, Action redraw) : VBoxContainer {
     private static readonly Dictionary<string, string> Names = new() {
         ["gather"] = "Gather",
         ["bellows"] = "Bellows",
@@ -36,7 +41,7 @@ public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, PageMemory mem
         for (int i = 0; i < jobs.Length; i++) {
             string job = jobs[i];
             var look = Style.Pill(Style.JobColors[i % Style.JobColors.Length]);
-            var button = new Button { Name = $"job_{job}", CustomMinimumSize = new Vector2(0, 48), SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, ToggleMode = true, ButtonPressed = memory.OpenJob == job };
+            var button = new Button { Name = $"job_{job}", CustomMinimumSize = new Vector2(0, 48), SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, ToggleMode = true, ButtonPressed = choice.Job == job };
             Style.Skin(button, look.Item1, look.Item2, look.Item2);
             button.TooltipText = Hint(job);
             var inner = new HBoxContainer { Alignment = AlignmentMode.Center, MouseFilter = MouseFilterEnum.Ignore }; inner.AddThemeConstantOverride("separation", 8);
@@ -46,7 +51,7 @@ public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, PageMemory mem
             // The label sits on the button rather than in it, so the button is widened to fit it.
             button.CustomMinimumSize = new Vector2(inner.GetCombinedMinimumSize().X + 32, 48);
             counts[i] = count;
-            button.Pressed += () => { memory.OpenJob = memory.OpenJob == job ? "" : job; redraw(); };
+            button.Pressed += () => { choice.Job = choice.Job == job ? "" : job; redraw(); };
             row.AddChild(button);
         }
         var shown = new int[jobs.Length];
@@ -61,7 +66,7 @@ public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, PageMemory mem
                 shown[i] = now[i]; counts[i].Text = now[i].ToString();
             }
         });
-        if (memory.OpenJob != "" && jobs.Contains(memory.OpenJob)) WorkerList(memory.OpenJob);
+        if (choice.Job != "" && jobs.Contains(choice.Job)) WorkerList(choice.Job);
     }
 
     private string Hint(string job) => job switch {

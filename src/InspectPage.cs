@@ -3,45 +3,82 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The selected worker or thing: its name and icon, how far it is, and the panel for what it is.</summary>
-public partial class InspectPage(SidePanel side) : PagePanel(side) {
+/// <summary>Picks the page for what the side panel inspects.</summary>
+public static class InspectPage {
+    public static PagePanel For(PageTools tools, Selection selection) {
+        var world = tools.Kit.World;
+        if (selection.Worker > 0) return new WorkerPanel(tools, world.Workers.FirstOrDefault(w => w.Id == selection.Worker));
+        return world.Find(selection.Thing) switch {
+            null => new NothingSelectedPage(tools),
+            { IsResource: true } t => new ResourcePanel(tools, t),
+            { Kind: ThingKind.Hut } t => new CabinPanel(tools, t),
+            { Tools: not null } t => new BenchPanel(tools, t),
+            { Kind: ThingKind.Signpost } t => new MarketPanel(tools, t),
+            { Kind: ThingKind.Mine } t => new MinePanel(tools, t),
+            { Kind: ThingKind.Farm } t => new FarmPanel(tools, t),
+            { Kind: ThingKind.Campfire } t => new CampfirePanel(tools, t),
+            { Kind: ThingKind.Packer } t => new PackerPanel(tools, t),
+            { Kind: ThingKind.Crate } t => new CratePanel(tools, t),
+            { Kind: ThingKind.Grave } t => new RecoveryBoxPanel(tools, t),
+            { Kind: ThingKind.Toolstation } t => new ToolRackPanel(tools, t),
+            { Kind: ThingKind.Pile } t => new PilePanel(tools, t),
+            { IsStorage: true } t => new StoragePanel(tools, t),
+            var t => new StationPanel(tools, t)
+        };
+    }
+}
+
+/// <summary>The inspect page with nothing to inspect.</summary>
+public partial class NothingSelectedPage(PageTools tools) : PagePanel(tools) {
+    protected override void Build() => AddLabel("Select a building or resource in the world.");
+}
+
+/// <summary>
+/// A page about one thing in the world: its name and icon, how far it is, and what the page for that kind adds.
+/// The page keeps which job list and filters are open while it shows.
+/// </summary>
+public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePanel(tools) {
+    /// <summary>What the page is about.</summary>
+    protected readonly Thing thing = subject;
+    private readonly JobChoice job = new();
+    private readonly FilterState filters = new();
+
+    public override bool Current => world.Find(thing.Id) == thing;
+
+    protected override void Build() {
+        Headline();
+        Reach();
+        Body();
+    }
+
+    /// <summary>What this kind of thing shows under its name.</summary>
+    protected abstract void Body();
+
     /// <summary>Names the page after the building it shows, with the building's own icon; its description becomes the icon's tooltip.</summary>
-    private void Headline(ThingKind kind) {
-        headingTitle.Text = world.Data.Name(kind);
-        headingIcon.Texture = Icons.Of(kind.Id()); headingIcon.Visible = headingIcon.Texture != null;
-        headingIcon.TooltipText = world.Data.Buildings.TryGetValue(kind, out var def) ? def.Description : "";
+    private void Headline() {
+        headingTitle.Text = thing.Kind == ThingKind.Water ? "Collect water" : world.Data.Name(thing.Kind);
+        headingIcon.Texture = Icons.Of(thing.Kind.Id()); headingIcon.Visible = headingIcon.Texture != null;
+        headingIcon.TooltipText = world.Data.Buildings.TryGetValue(thing.Kind, out var def) ? def.Description : "";
     }
-    public override void _Ready() {
-        if (panel.Selection.Worker > 0) { AddChild(new WorkerPanel(panel, world.Workers.FirstOrDefault(w => w.Id == panel.Selection.Worker))); return; }
-        var t = world.Find(panel.Selection.Thing);
-        if (t == null) { AddLabel("Select a building or resource in the world."); return; }
-        Headline(t.Kind);
-        if (t.Kind == ThingKind.Water) headingTitle.Text = "Collect water";
-        Reach(t);
-        AddChild(t switch {
-            { IsResource: true } => new ResourcePanel(panel, t),
-            { Kind: ThingKind.Hut } => new CabinPanel(panel, t),
-            { Tools: not null } => new BenchPanel(panel, t),
-            { Kind: ThingKind.Signpost } => new MarketPanel(panel, t),
-            { Kind: ThingKind.Mine } => new MinePanel(panel, t),
-            { Kind: ThingKind.Farm } => new FarmPanel(panel, t),
-            { Kind: ThingKind.Campfire } => new CampfirePanel(panel, t),
-            { Kind: ThingKind.Packer } => new PackerPanel(panel, t),
-            { Kind: ThingKind.Crate } => new CratePanel(panel, t),
-            { Kind: ThingKind.Grave } => new RecoveryBoxPanel(panel, t),
-            { Kind: ThingKind.Toolstation } => new ToolRackPanel(panel, t),
-            { Kind: ThingKind.Pile } => new PilePanel(panel, t),
-            { IsStorage: true } => new StoragePanel(panel, t),
-            _ => new StationPanel(panel, t)
-        });
-    }
+
     /// <summary>How far away a building is, shown only while it is out of reach.</summary>
-    private void Reach(Thing t) {
+    private void Reach() {
         var label = Style.Text("", 14, Style.Warn); label.Visible = false; AddChild(label);
         // Rewritten only when the distance moves a tenth of a tile or the building comes into reach.
-        live.Watch(() => world.Near(t) ? -1 : (int)(world.Player.DistanceTo(world.GatherAt(t, world.Player)) * 10), tenths => {
+        live.Watch(() => world.Near(thing) ? -1 : (int)(world.Player.DistanceTo(world.GatherAt(thing, world.Player)) * 10), tenths => {
             label.Visible = tenths >= 0;
             if (tenths >= 0) label.Text = $"{tenths / 10}.{tenths % 10} tiles away · walk closer";
         });
     }
+
+    /// <summary>The funnel that opens the filter window beside the panel, ringed while it is open.</summary>
+    protected void FilterButton() {
+        var button = HeaderAction("filter", "Filters: what workers bring and take", () => { filters.Open = !filters.Open; filters.Picking = false; Redraw(); }, Style.FilterRound, "filters");
+        if (!filters.Open) return;
+        Style.Skin(button, Style.Round(Style.Mustard, 18).Item1, Style.FilterRound.Hover);
+        panel.SideBoard(Style.Board, 340).AddChild(new FilterWindow(kit, thing, filters, Redraw));
+    }
+
+    /// <summary>The row of job buttons, for a place that offers jobs.</summary>
+    protected void JobButtons() { if (world.Jobs(thing).Length > 0) AddChild(new JobRow(kit, live, thing, job, Redraw)); }
 }

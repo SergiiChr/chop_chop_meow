@@ -8,8 +8,8 @@ namespace ChopChopMeow;
 /// <summary>
 /// A farm plot: its growth from bare soil to ripe wheat, then the process row: seeds in, fertilizer as its fuel, wheat out with seeds and grass beside.
 /// </summary>
-public partial class FarmPanel(SidePanel side, Thing farm) : PagePanel(side) {
-    public override void _Ready() {
+public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
+    protected override void Body() {
         var stages = new HBoxContainer(); stages.AddThemeConstantOverride("separation", 0); AddChild(stages);
         string?[] looks = { null, "wheat_seeds", "grass", "wheat" };
         string[] names = { "Fallow", "Sown", "Growing", "Ripe" };
@@ -22,27 +22,27 @@ public partial class FarmPanel(SidePanel side, Thing farm) : PagePanel(side) {
         }
         var ripe = Style.Text("", 14, Style.Rim); ripe.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; AddChild(ripe);
         live.Watch(() => {
-            int at = farm.FarmStage == FarmStage.Ripe ? 3 : farm.FarmStage == FarmStage.Growing ? (farm.Progress < world.GrowSeconds / 3 ? 1 : 2) : 0;
-            int hours = farm.FarmStage == FarmStage.Growing ? (int)((world.GrowSeconds - farm.Progress) / world.Data.DaySeconds * 24) : -1;
+            int at = thing.FarmStage == FarmStage.Ripe ? 3 : thing.FarmStage == FarmStage.Growing ? (thing.Progress < world.GrowSeconds / 3 ? 1 : 2) : 0;
+            int hours = thing.FarmStage == FarmStage.Growing ? (int)((world.GrowSeconds - thing.Progress) / world.Data.DaySeconds * 24) : -1;
             return (at, hours);
         }, now => {
             var (at, hours) = now;
             for (int i = 0; i < 4; i++) nodes[i].AddThemeStyleboxOverride("panel", Style.Round(i < at ? Style.Sage : i == at ? Style.Mustard : Style.Line, 22).Item1);
             for (int i = 0; i < 3; i++) links[i].Color = i < at ? Style.Sage : Style.Line;
-            ripe.Text = hours >= 0 ? $"ripe in {hours / 24} d {hours % 24} h" : farm.FarmStage == FarmStage.Ripe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in";
+            ripe.Text = hours >= 0 ? $"ripe in {hours / 24} d {hours % 24} h" : thing.FarmStage == FarmStage.Ripe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in";
         });
-        var output = farm.Output ?? farm.Inventory;
+        var output = thing.Output ?? thing.Inventory;
         var main = FarmCup(output, "wheat", false, $"×{world.Data.Farm.Yield.GetValueOrDefault("wheat")}");
         var side = world.Data.Farm.Yield.Keys.Where(k => k != "wheat").Select(k => FarmCup(output, k, false, $"×{world.Data.Farm.Yield[k]}", 44)).ToArray();
-        var fertilizer = FarmCup(farm.Inventory, "fertilizer", true, "", 52, Style.CupFuel);
+        var fertilizer = FarmCup(thing.Inventory, "fertilizer", true, "", 52, Style.CupFuel);
         var lasts = Style.Text("", 13, Style.Tan);
         int perCrop = world.Data.Farm.Sow.GetValueOrDefault("fertilizer");
-        live.Watch(() => farm.Inventory["fertilizer"], stock => lasts.Text = $"×{perCrop} · {stock / Math.Max(1, perCrop)}{(stock == 1 ? " crop" : " crops")}");
-        var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => FarmCup(farm.Inventory, k, true, $"×{world.Data.Farm.Sow[k]}"));
-        AddChild(new ProcessRow(live, inputs, $"{world.Data.Farm.GrowDays:0} d", () => farm.FarmStage == FarmStage.Growing ? farm.Progress / world.GrowSeconds : farm.FarmStage == FarmStage.Ripe ? 1 : 0,
+        live.Watch(() => thing.Inventory["fertilizer"], stock => lasts.Text = $"×{perCrop} · {stock / Math.Max(1, perCrop)}{(stock == 1 ? " crop" : " crops")}");
+        var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => FarmCup(thing.Inventory, k, true, $"×{world.Data.Farm.Sow[k]}"));
+        AddChild(new ProcessRow(live, inputs, $"{world.Data.Farm.GrowDays:0} d", () => thing.FarmStage == FarmStage.Growing ? thing.Progress / world.GrowSeconds : thing.FarmStage == FarmStage.Ripe ? 1 : 0,
             new FuelRow("line_leaf", new Color("8fae7e"), FuelCup(fertilizer), lasts), main, side));
-        BagGrid(id => moves.Stack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move", wanted: id => world.Holds(farm, id));
-        JobButtons(farm);
+        BagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), "Click: sow seeds or fertilizer · Drag to move", wanted: id => world.Holds(thing, id));
+        JobButtons();
     }
     /// <summary>Takes a cup out of the column it was built in, for the fuel row, and frees the column.</summary>
     private static Control FuelCup(Control column) {
@@ -55,12 +55,12 @@ public partial class FarmPanel(SidePanel side, Thing farm) : PagePanel(side) {
         var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
         cell.Icon = Icons.Of(item);
         if (look != null) cell.AddThemeStyleboxOverride("normal", look); else if (!input) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
-        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, farm)); kit.Refresh(); };
-        cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, farm) : null;
+        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, thing)); kit.Refresh(); };
+        cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, thing) : null;
         if (input) {
             // Seed comes back in from the plot's own harvest as well as from the backpack.
-            cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == farm.Output) && drag.Item == item;
-            cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, box, farm)); kit.Refresh(); return left; };
+            cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == thing.Output) && drag.Item == item;
+            cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, box, thing)); kit.Refresh(); return left; };
         }
         live.Watch(() => box[item], held => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);

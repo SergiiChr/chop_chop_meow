@@ -26,6 +26,8 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.Player = mine.Pos - cliff.Face * .8f;
         view.Zoom = 1.25f;
     }
+    private void Press(string button) => panel.FindChild(button, true, false).EmitSignal(BaseButton.SignalName.Pressed);
+
     public void Run() {
         if (Launch.Has("--environment-review")) {
             string location = Launch.Value("--environment-review") ?? "forest";
@@ -122,7 +124,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.Player = Terrain.Spawn; world.Tick(0); panel.Select(bellows);
         // --hide-ui leaves only the world in review screenshots.
         if (Launch.Has("--hide-ui")) ui.Visible = false;
-        if (Launch.Has("--market")) { world.Player = sign.Pos + Vector2.One; panel.Memory.SheetOpen = true; panel.Select(sign); }
+        if (Launch.Has("--market")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); }
         if (Launch.Has("--bench")) { world.Player = bench.Pos + Vector2.One; panel.Select(bench); }
         if (Launch.Has("--craft")) panel.Open("craft");
         if (Launch.Has("--crew")) panel.Open("workers");
@@ -181,7 +183,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
                 world.Player = at + new Vector2(.4f, -2.6f); view.Zoom = 3.4f; world.Tick(.1f);
             }
             world.SetFilter(sign, World.CrateOf("bread"), false, true); world.SetFilter(sign, World.CrateOf("berries"), false, true); world.SetAutoSell(sign, true);
-            if (Launch.Has("--post")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); panel.Memory.FilterOpen = true; panel.Open("inspect"); } else if (Launch.Has("--panel")) { panel.Memory.PackPicking = Launch.Has("--pick"); panel.Select(packer); } else panel.Close();
+            if (Launch.Has("--post")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); Press("filters"); } else if (Launch.Has("--panel")) { panel.Select(packer); if (Launch.Has("--pick")) Press("pack_good"); } else panel.Close();
         }
         if (Launch.Has("--tools")) { world.Player = rack.Pos + new Vector2(2.5f, 2.5f); view.Zoom = 1.6f; if (Launch.Has("--panel")) panel.Select(rack); else panel.Close(); }
         if (Launch.Has("--tin")) { var cliff = World.CliffOf(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }

@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What the crew overview and a worker's own panel share.</summary>
-public abstract partial class WorkerPage(SidePanel side) : PagePanel(side) {
+public abstract partial class WorkerPage(PageTools tools) : PagePanel(tools) {
     protected static readonly Texture2D Hardhat = GD.Load<Texture2D>("res://assets/ui/hardhat.svg");
 
     protected Texture2D? PlaceIcon(Thing at) => Icons.Of(at.IsResource ? World.ResourceItem(at) : at.Kind.Id());
@@ -25,8 +25,8 @@ public abstract partial class WorkerPage(SidePanel side) : PagePanel(side) {
 /// The crew overview, one card per worker.
 /// A card shows the worker's hat, name, wage, what they carry and the tool they hold, what they are doing, and their jobs as chips with each place's icon.
 /// </summary>
-public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
-    public override void _Ready() {
+public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
+    protected override void Build() {
         var count = Style.Pill("", Style.BlueTag, Style.Rim, 13); count.MouseFilter = Control.MouseFilterEnum.Pass; count.TooltipText = "Villagers hired, of the most who will come";
         var wages = Style.Pill("", Style.Tag(Style.Brick), Style.Rim, 13); wages.MouseFilter = Control.MouseFilterEnum.Pass; wages.TooltipText = "Wages paid each dawn";
         foreach (var pill in new[] { count, wages }) { pill.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; heading.AddChild(pill); heading.MoveChild(pill, heading.GetChildCount() - 2); }
@@ -66,7 +66,7 @@ public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
         int duties = w.Duties.Count;
         live.Add(() => {
             if (w.Duties.Count == duties) return;
-            duties = w.Duties.Count; Callable.From(() => { if (panel.Page == "workers") panel.Open("workers"); }).CallDeferred();
+            duties = w.Duties.Count; RedrawLater();
         });
         live.Watch(() => w.Status, shown => status.Text = shown);
         WatchKit(w, carry, carried, tool);
@@ -83,8 +83,10 @@ public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
 }
 
 /// <summary>One worker: what they carry and hold, what they are doing, their jobs with a button to drop each, and what can be done with them.</summary>
-public partial class WorkerPanel(SidePanel side, Worker? w) : WorkerPage(side) {
-    public override void _Ready() {
+public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools) {
+    public override bool Current => w == null || world.Workers.Contains(w);
+
+    protected override void Build() {
         if (w == null) { AddLabel("This worker has left."); return; }
         headingTitle.Text = w.Name; headingIcon.Texture = Hardhat; headingIcon.Visible = true;
         var wage = Style.Pill($"{w.Wage} /day", Style.Tag(Style.Brick), Style.Rim, 13); wage.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; wage.MouseFilter = Control.MouseFilterEnum.Pass; wage.TooltipText = "Daily wage";
@@ -111,7 +113,7 @@ public partial class WorkerPanel(SidePanel side, Worker? w) : WorkerPage(side) {
             var place = Style.Text(world.Data.Name(at.Kind), 15, Style.Ink); place.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(place);
             int colour = System.Array.IndexOf(world.Jobs(at), d.Job);
             var tag = Style.Pill(JobRow.Title(d.Job), Style.Tag(Style.JobColors[System.Math.Max(0, colour) % Style.JobColors.Length]), Style.Rim, 13); tag.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; row.AddChild(tag);
-            var drop = kit.HeaderButton("close", "Take this job away", () => { world.SetDuty(w, at, duty.Job, false); panel.Open("inspect"); }, Style.CloseRound, $"drop_{d.Job}_{at.Id}");
+            var drop = kit.HeaderButton("close", "Take this job away", () => { world.SetDuty(w, at, duty.Job, false); Redraw(); }, Style.CloseRound, $"drop_{d.Job}_{at.Id}");
             drop.CustomMinimumSize = new Vector2(30, 30); drop.AddThemeConstantOverride("icon_max_width", 14); row.AddChild(drop);
         }
         if (first) {
@@ -120,7 +122,7 @@ public partial class WorkerPanel(SidePanel side, Worker? w) : WorkerPage(side) {
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
         buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { panel.Player.Mode = new ClickMode.Assign(w.Id); panel.Close(); kit.Refresh(); }));
-        buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); panel.Open("inspect"); }));
+        buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); Redraw(); }));
         buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); panel.Open("workers"); }));
         if (w.WageDebt > 0) AddChild(kit.BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));
     }
