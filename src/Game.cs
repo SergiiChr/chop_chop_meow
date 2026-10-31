@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The runner: creates the world and the interface's parts, holds them, routes input between them and runs the frame.
-/// Each part owns its feature; what several share is in <see cref="UiKit"/> and <see cref="UiState"/>.
+/// Each part owns its feature; what several share is in <see cref="UiKit"/>.
 /// </summary>
 public partial class Game : Node {
     private static readonly bool smokeTest = Launch.Has("--smoke-test");
@@ -31,7 +31,6 @@ public partial class Game : Node {
     private BlackHole blackHole = null!;
     private ItemMoves moves = null!;
     private RecoveryPrompt recovery = null!;
-    private UiState state = null!;
     private PlayerControl player = null!;
     private float uiClock;
     private float autosave;
@@ -55,7 +54,7 @@ public partial class Game : Node {
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
             view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = Launch.Has("--environment-review") }; AddChild(view);
-            kit = new UiKit(world, sounds, Notify, RefreshLive); state = kit.State;
+            kit = new UiKit(world, sounds, Notify, RefreshLive);
             net = new Net { Name = "Net", World = world, FilePrefix = Launch.FilePrefix }; AddChild(net);
             saves = new Saves(kit, net, () => panel.Open("inventory"));
             world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };

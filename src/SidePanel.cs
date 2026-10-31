@@ -39,7 +39,6 @@ public partial class SidePanel : PanelContainer {
     /// <summary>Top of the panel, below the clock.</summary>
     private const int Top = 156;
     private readonly World world;
-    private readonly UiState state;
     private readonly Control ui;
     private ScrollContainer scroll = null!;
     /// <summary>The board left of the panel that holds the price sign or the filter window.</summary>
@@ -73,7 +72,7 @@ public partial class SidePanel : PanelContainer {
     public float ScreenWidth => ui.Size.X;
 
     public SidePanel(UiKit kit, WorldView view, ItemMoves moves, Control ui) {
-        Kit = kit; View = view; Moves = moves; this.ui = ui; world = kit.World; state = kit.State;
+        Kit = kit; View = view; Moves = moves; this.ui = ui; world = kit.World;
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top;
         Bag = new BackpackDrawer(kit, this);

@@ -27,8 +27,9 @@ public sealed class PlayerControl {
     private readonly SidePanel panel;
     private readonly Hotbar hotbar;
     private readonly World world;
-    private readonly UiState state;
     private Thing? gathering;
+    /// <summary>A cabin the player is walking to after clicking it; they step inside on arrival.</summary>
+    private Thing? entering;
     /// <summary>A crate held under the right mouse button; it is lifted once held for <see cref="LiftSeconds"/>.</summary>
     private Thing? lifting;
     private float liftClock;
@@ -37,12 +38,15 @@ public sealed class PlayerControl {
     public ClickMode Mode { get; set; } = new ClickMode.Normal();
 
     public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar) {
-        this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; world = kit.World; state = kit.State;
+        this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; world = kit.World;
         world.Replaced += () => { Stop(); Mode = new ClickMode.Normal(); };
     }
 
     /// <summary>Drops a gather, a crate lift and a walk into a cabin, whose targets belong to a world that went away.</summary>
-    private void Stop() { gathering = null; lifting = null; state.Entering = null; }
+    private void Stop() { gathering = null; lifting = null; entering = null; }
+
+    /// <summary>Walks the player to a cabin's door and inside.</summary>
+    public void WalkInto(Thing cabin) => entering = cabin;
 
     /// <summary>Enters placement for a crate from the backpack.</summary>
     public void PlaceCrate(string item) {
@@ -58,10 +62,10 @@ public sealed class PlayerControl {
             Vector2 direction = new Vector2(x + y * 2, y * 2 - x).Normalized();
             bool right = Input.IsMouseButtonPressed(MouseButton.Right);
             // A clicked cabin draws the player to its door, even with a movement key still held from walking there.
-            if (world.Downed || state.Entering != null && world.Find(state.Entering.Id) == null) state.Entering = null;
-            if (state.Entering != null) { if (world.Enter(state.Entering)) state.Entering = null; else direction = (state.Entering.Pos - world.Player).Normalized(); }
+            if (world.Downed || entering != null && world.Find(entering.Id) == null) entering = null;
+            if (entering != null) { if (world.Enter(entering)) entering = null; else direction = (entering.Pos - world.Player).Normalized(); }
             // A loose piece needs only one click: the player keeps walking to it after the button is released.
-            if (gathering != null && (right || gathering.IsLoose) && direction == Vector2.Zero && state.Entering == null) {
+            if (gathering != null && (right || gathering.IsLoose) && direction == Vector2.Zero && entering == null) {
                 // Step in close enough for the tool to reach the model; the lake edge keeps its wider reach.
                 if (!world.Near(gathering, gathering.Kind == ThingKind.Water ? 2.5f : 1.35f)) direction = (world.GatherAt(gathering, world.Player) - world.Player).Normalized();
                 else if (gathering.IsLoose) {
@@ -75,7 +79,7 @@ public sealed class PlayerControl {
                 }
             } else { world.ResetGather(); if (!right || gathering?.IsLoose == true) gathering = null; }
             // A held right click walks to a crate and lifts it once the button has been held long enough.
-            if (lifting != null && right && direction == Vector2.Zero && state.Entering == null && world.Find(lifting.Id) != null) {
+            if (lifting != null && right && direction == Vector2.Zero && entering == null && world.Find(lifting.Id) != null) {
                 if (!world.Near(lifting, 1.5f)) direction = (lifting.Pos - world.Player).Normalized();
                 else if ((liftClock += dt) >= LiftSeconds) {
                     var crate = lifting; lifting = null;
@@ -113,7 +117,7 @@ public sealed class PlayerControl {
             var w = view.PickWorker(mouse.Position);
             if (w != null) panel.Select(w);
             else if (t != null) {
-                if (t.Kind == ThingKind.Hut) state.Entering = t;
+                if (t.Kind == ThingKind.Hut) entering = t;
                 // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
                 if (t.IsStorage && hotbar.ActiveItem() is string item && hotbar.IsTransferable(item) && world.Holds(t, item) && !(t.Kind == ThingKind.Crate && World.IsCrate(item))) {
                     if (world.Near(t)) { int moved = 0; kit.Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, ItemMoves.All ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) kit.Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else kit.Notify("Walk closer to the chest to store the selected stack.");

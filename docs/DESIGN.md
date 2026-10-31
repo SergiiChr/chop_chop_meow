@@ -32,7 +32,7 @@ The project targets Godot 4.7.2 .NET with C#.
 
 `Game` is a thin runner: it creates the interface's nodes once while loading, holds them and routes input and the frame to them.
 Each feature is a node with a small public surface, given what it needs in its constructor.
-`UiKit` carries the world, sounds and how a player action runs; `UiState` holds what several parts share.
+`UiKit` carries the world, sounds and how a player action runs.
 `UiKit.Paused` follows which overlays are open: each one registers with `HoldWhile`, so none saves or restores another's pause.
 `World.Replaced` fires whenever the whole state is replaced (a new game, a load, a guest taking the host's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
 The side panel builds a new `PagePanel` node every time a page opens, so its build code runs once per open and its `Live` updates run on each refresh; `PageMemory` keeps what must outlast a rebuild.
@@ -64,7 +64,7 @@ UI and input:
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
-| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, how a player action runs, the buttons), `UiState` and `LiveText` |
+| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons) and `LiveText` |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/Hud.cs` | The clock plate and the mode, full-bottle and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |

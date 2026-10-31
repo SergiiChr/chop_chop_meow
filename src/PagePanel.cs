@@ -11,7 +11,6 @@ public abstract partial class PagePanel : VBoxContainer {
     protected readonly SidePanel panel;
     protected readonly UiKit kit;
     protected readonly World world;
-    protected readonly UiState state;
     protected readonly WorldView view;
     protected readonly Sounds sounds;
     protected readonly ItemMoves moves;
@@ -26,7 +25,7 @@ public abstract partial class PagePanel : VBoxContainer {
 
     protected PagePanel(SidePanel panel) {
         this.panel = panel;
-        kit = panel.Kit; world = kit.World; state = kit.State; sounds = kit.Sounds; view = panel.View; moves = panel.Moves; memory = panel.Memory; bag = panel.Bag; live = panel.Live;
+        kit = panel.Kit; world = kit.World; sounds = kit.Sounds; view = panel.View; moves = panel.Moves; memory = panel.Memory; bag = panel.Bag; live = panel.Live;
         content = this; SizeFlagsHorizontal = SizeFlags.ExpandFill;
     }
 

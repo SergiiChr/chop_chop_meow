@@ -6,12 +6,6 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>What several parts of the interface read or change; each field has this one home.</summary>
-public sealed class UiState {
-    /// <summary>A cabin the player is walking to after clicking it; they step inside on arrival.</summary>
-    public Thing? Entering;
-}
-
 /// <summary>
 /// What the interface's parts work with: the world, how a player action runs, and the buttons that run one.
 /// Every button runs its action through <see cref="Act"/> and then refreshes the screen.
@@ -19,7 +13,6 @@ public sealed class UiState {
 public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Action refresh) {
     public World World { get; } = world;
     public Sounds Sounds { get; } = sounds;
-    public UiState State { get; } = new();
     private readonly List<Func<bool>> holds = new();
 
     /// <summary>A menu or overlay holds the player; only a game nobody else is in stops the world too.</summary>

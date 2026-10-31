@@ -24,7 +24,7 @@ public partial class CabinPanel(SidePanel side, Thing hut) : PagePanel(side) {
             pair.AddChild(then[i] = new Vial { Fill = colors[i], Faded = true });
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        var door = kit.BigButton("", Style.Sage, () => { if (world.S.Sheltered == hut.Id) world.Leave(); else state.Entering = hut; });
+        var door = kit.BigButton("", Style.Sage, () => { if (world.S.Sheltered == hut.Id) world.Leave(); else panel.Player.WalkInto(hut); });
         var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(hut)); sleep.Name = "sleep";
         buttons.AddChild(door); buttons.AddChild(sleep);
         var untilText = new LiveText(shown => until.Text = shown);
