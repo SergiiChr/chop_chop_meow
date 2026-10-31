@@ -168,7 +168,6 @@ public partial class Game : Node {
                     if (t == null || !world.Near(t)) t = world.S.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
                     if (t != null) panel.Select(t); break;
                 case Key.Space:
-                    if (state.Paused) { Notify("Resume before using tools."); break; }
                     var station = world.Find(state.Selected);
                     if (station != null && station.Kind == ThingKind.Reinforced && world.Near(station)) world.Pump(station); else world.Attack(); break;
             }
