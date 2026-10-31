@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
     private readonly World world = kit.World;
 
-    /// <summary>Whether a click moves every unit of an item rather than one item: Ctrl, or Shift as before.</summary>
+    /// <summary>Whether a click moves every unit of an item rather than one item: while Ctrl or Shift is held.</summary>
     public static bool All => Input.IsKeyPressed(Key.Ctrl) || Input.IsKeyPressed(Key.Shift);
 
     /// <summary>Whether the player can reach a thing; if not, says so.</summary>

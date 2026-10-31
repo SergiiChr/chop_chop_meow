@@ -21,7 +21,7 @@ public partial class PagePanel {
     }
 
     /// <summary>
-    /// A grid with one cell per slot, refreshed live and not yet placed anywhere. from the inventory's stacks.
+    /// A grid with one cell per slot, refreshed live from the inventory's stacks and not yet placed anywhere.
     /// An inventory with a capacity shows only <see cref="Inventory.ShownSlots"/>; cells grow in and shrink away as that changes.
     /// Cells drag their stack out, or half of it on a right click, and accept stacks dragged in from another inventory, unless <paramref name="accepts"/> narrows that.
     /// The inventory is re-read on each refresh because death replaces the backpack object.
