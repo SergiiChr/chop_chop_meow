@@ -1,4 +1,3 @@
-using System;
 using Godot;
 
 namespace ChopChopMeow;
@@ -16,7 +15,7 @@ public partial class BackpackDrawer : PanelContainer {
     /// <summary>Set by the close button; the drawer stays hidden until another page or building opens.</summary>
     public bool Dismissed { get; set; }
 
-    public BackpackDrawer(UiKit kit, Action closePage) {
+    public BackpackDrawer(UiKit kit, SidePanel panel) {
         world = kit.World;
         Name = "bag"; Visible = false;
         AnchorTop = 1; AnchorBottom = 1; OffsetLeft = 20; OffsetTop = -Bottom; OffsetBottom = -Bottom; GrowVertical = GrowDirection.Begin;
@@ -27,7 +26,7 @@ public partial class BackpackDrawer : PanelContainer {
         var sort = kit.Button("Sort", () => { world.SortBackpack(); kit.Refresh(); }); sort.Name = "sort_bag"; sort.TooltipText = "Stack loose items and sort by type"; label.AddChild(sort);
         Content = new VBoxContainer(); drawer.AddChild(Content);
         // Every closable window keeps its close button in its top right corner.
-        var hide = kit.HeaderButton("close", "Hide the backpack", () => { if (kit.State.Page == "inventory") closePage(); else { Dismissed = true; Visible = false; } }, Style.CloseRound, "bag_close");
+        var hide = kit.HeaderButton("close", "Hide the backpack", () => { if (panel.Page == "inventory") panel.Close(); else { Dismissed = true; Visible = false; } }, Style.CloseRound, "bag_close");
         hide.SizeFlagsVertical = SizeFlags.ShrinkBegin; drawer.AddChild(hide);
     }
 

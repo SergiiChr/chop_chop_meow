@@ -270,7 +270,7 @@ public partial class Game {
             var mine = world.Things.LastOrDefault(t => t.Kind == ThingKind.Mine);
             Require(mine != null, $"A click near the {ore} cliff must create a mine.");
             Require(mine.Pos == spot, $"A click near the {ore} cliff must mark the mine on the cliff's spot.");
-            Require(panel.Visible && view.Selected == mine.Id, $"A click near the {ore} cliff must select the new mine.");
+            Require(panel.Visible && view.Selection.Thing == mine.Id, $"A click near the {ore} cliff must select the new mine.");
             Require(view.BuildMode == null, $"A click near the {ore} cliff must end placement mode.");
             Require(new[] { "Stage 1 · Dig the entrance", "Stage 2 · Shore it up", "Stage 3 · Fit the frame and rails" }.Select((title, i) => panel.FindChild($"stage_{i + 1}", true, false) is Control node && node.TooltipText.StartsWith(title)).All(found => found),
                 "The mine panel must show its three stages.");
@@ -338,7 +338,7 @@ public partial class Game {
         await Until(() => !world.Near(crates[0]) && world.Near(crates[1]), "walking out of reach of the first crate and up to the second", 10);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await KeyStroke(Key.E);
-        Require(view.Selected == crates[1].Id, "E must open the second crate once the first is out of reach.");
+        Require(view.Selection.Thing == crates[1].Id, "E must open the second crate once the first is out of reach.");
         Require(GetViewport().GuiIsDragging(), "Walking and opening the next crate must keep the rest held.");
         await Click(Cell(0, c => c.TooltipText == ""));
         Require(crates[1].Inventory["wood"] == cap, "The held rest must fill the next crate.");
@@ -678,7 +678,7 @@ public partial class Game {
         var chest = world.Things.LastOrDefault(t => t.Kind == ThingKind.Chest);
         Require(chest != null, "A ground click must construct a chest.");
         Require(view.BuildMode == (world.Backpack.Has(world.Data.Buildings[ThingKind.Chest].Cost) ? ThingKind.Chest : null), "A ground click must stay in placement while another chest can be afforded and leave it otherwise.");
-        Require(view.Selected != chest.Id, "A ground click must not select the new chest.");
+        Require(view.Selection.Thing != chest.Id, "A ground click must not select the new chest.");
         Require(!panel.Visible, "A ground click must not open a panel.");
         return chest!;
     }

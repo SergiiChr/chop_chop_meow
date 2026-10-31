@@ -42,7 +42,7 @@ public sealed class PlayerControl {
                 if (!world.Near(gathering, gathering.Kind == ThingKind.Water ? 2.5f : 1.35f)) direction = (world.GatherAt(gathering, world.Player) - world.Player).Normalized();
                 else if (gathering.IsLoose) {
                     world.Gather(gathering, dt);
-                    if (world.Find(gathering.Id) == null && state.Selected == gathering.Id) { state.Selected = 0; view.Selected = 0; }
+                    if (world.Find(gathering.Id) == null) panel.Deselect(gathering.Id);
                     gathering = null;
                 } else {
                     // Emptying it shows on the stump or bare bush; a target that was already empty or out of reach still says why.
@@ -55,7 +55,7 @@ public sealed class PlayerControl {
                 if (!world.Near(lifting, 1.5f)) direction = (lifting.Pos - world.Player).Normalized();
                 else if ((liftClock += dt) >= LiftSeconds) {
                     var crate = lifting; lifting = null;
-                    if (world.PickUpCrate(crate) && state.Selected == crate.Id) { state.Selected = 0; view.Selected = 0; if (state.Page == "inspect") panel.Close(); }
+                    if (world.PickUpCrate(crate) && panel.Deselect(crate.Id) && panel.Page == "inspect") panel.Close();
                 }
             } else { lifting = null; liftClock = 0; }
             view.Lifting = lifting?.Id ?? 0; view.LiftProgress = liftClock / LiftSeconds;
@@ -72,7 +72,7 @@ public sealed class PlayerControl {
         if (mouse.ButtonIndex == MouseButton.WheelUp && mouse.Pressed && !overPanel) view.Zoom = Math.Min(1.6f, view.Zoom + .1f);
         if (mouse.ButtonIndex == MouseButton.WheelDown && mouse.Pressed && !overPanel) view.Zoom = Math.Max(.55f, view.Zoom - .1f);
         if (mouse.ButtonIndex == MouseButton.Right && mouse.Pressed) {
-            var t = view.Pick(mouse.Position); if (t?.IsResource == true || t?.Kind == ThingKind.Farm) { gathering = t; state.Selected = t.Id; view.Selected = t.Id; } else gathering = null;
+            var t = view.Pick(mouse.Position); if (t?.IsResource == true || t?.Kind == ThingKind.Farm) { gathering = t; panel.Mark(t); } else gathering = null;
             lifting = t?.Kind == ThingKind.Crate ? t : null; liftClock = 0;
         }
         if (mouse.ButtonIndex == MouseButton.Left && mouse.Pressed) {

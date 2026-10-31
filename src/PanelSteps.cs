@@ -42,7 +42,7 @@ public partial class Game {
     private string ShownPage() => panel.Visible ? panel.HeadingTitle.Text : "";
 
     /// <summary>Whether the side panel shows this thing and the world marks it as selected.</summary>
-    private bool Shows(Thing thing) => ShownPage() == world.Data.Name(thing.Kind) && view.Selected == thing.Id;
+    private bool Shows(Thing thing) => ShownPage() == world.Data.Name(thing.Kind) && view.Selection.Thing == thing.Id;
 
     private IEnumerable<Button> Slots() => panel.FindChildren("slot_*", "Button", true, false).Concat(bag.FindChildren("slot_*", "Button", true, false)).OfType<Button>();
 }

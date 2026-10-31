@@ -157,11 +157,11 @@ public partial class Game : Node {
                 case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (saves.Slot > 0) saves.Load(saves.Slot); else startMenu.ShowSlots(false, startMenu.Close); break;
                 case >= Key.Key1 and <= Key.Key9: hotbar.Select((int)(key.PhysicalKeycode - Key.Key1)); break;
                 case Key.E:
-                    var t = world.Find(state.Selected);
+                    var t = world.Find(panel.Selection.Thing);
                     if (t == null || !world.Near(t)) t = world.S.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
                     if (t != null) panel.Select(t); break;
                 case Key.Space:
-                    var station = world.Find(state.Selected);
+                    var station = world.Find(panel.Selection.Thing);
                     if (station != null && station.Kind == ThingKind.Reinforced && world.Near(station)) world.Pump(station); else world.Attack(); break;
             }
         }
@@ -181,7 +181,7 @@ public partial class Game : Node {
             // A guest saves its player whenever it changes instead; the world is the host's to save.
             if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) saves.Save(0); autosave = 0; }
         }
-        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem();
+        view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection;
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
         uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }

@@ -29,7 +29,7 @@ public partial class CraftPanel(SidePanel side) : RecipePage(side) {
         bool rebuilding = false;
         live.Add(() => {
             if (rebuilding || (queue.Count > 0 ? queue[0] : null) == head && queue.Count == queued) return;
-            rebuilding = true; Callable.From(() => { if (state.Page == "craft") panel.Open("craft"); }).CallDeferred();
+            rebuilding = true; Callable.From(() => { if (panel.Page == "craft") panel.Open("craft"); }).CallDeferred();
         });
         if (head == null) { Well(new VBoxContainer()).AddChild(Style.Text("Nothing in the works. Click a recipe to make it.", 14, Style.Ink)); return; }
         var making = world.Data.Recipes[head];
@@ -152,7 +152,7 @@ public abstract partial class RecipePage(SidePanel side) : PagePanel(side) {
             var (tool, tier) = group.Key;
             string key = GroupKey(group.Key);
             bool open = key == memory.CraftTab;
-            var tab = kit.Button("", () => { memory.CraftTab = key; panel.Open(state.Page); }); tab.Name = $"section_{key}"; tab.CustomMinimumSize = new Vector2(48, 48);
+            var tab = kit.Button("", () => { memory.CraftTab = key; panel.Open(panel.Page); }); tab.Name = $"section_{key}"; tab.CustomMinimumSize = new Vector2(48, 48);
             var look = open ? Style.TabActive : Style.TabRound; Style.Skin(tab, look.Normal, look.Hover);
             tabs.AddChild(tab);
             var badge = Style.Icon(null, 28); badge.Name = "badge"; badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); badge.GrowHorizontal = badge.GrowVertical = Control.GrowDirection.Both; badge.MouseFilter = Control.MouseFilterEnum.Pass;

@@ -21,6 +21,14 @@ public sealed class PageMemory {
     public bool SheetOpen = true;
 }
 
+/// <summary>What the side panel inspects: a thing, a worker or nothing, never both.</summary>
+public readonly record struct Selection {
+    public int Thing { get; private init; }
+    public int Worker { get; private init; }
+    public static Selection Of(Thing t) => new() { Thing = t.Id };
+    public static Selection Of(Worker w) => new() { Worker = w.Id };
+}
+
 /// <summary>
 /// The panel on the right: one page at a time under a shared header, with the board beside it for the price sheet or the filter window.
 /// A page is built afresh whenever it opens, and <see cref="Live"/> holds what brings it up to date on each refresh.
@@ -42,7 +50,7 @@ public partial class SidePanel : PanelContainer {
     /// <summary>The price rows' scroll area, sized like the panel's to the room there is.</summary>
     private ScrollContainer? sheetScroll;
     private VBoxContainer? sheetRows;
-    private (int, int) shownInspect;
+    private Selection shownInspect;
     // Counts pages opened and closed, so a refresh notices when an update replaced the page under it.
     private int pagesOpened;
 
@@ -52,6 +60,9 @@ public partial class SidePanel : PanelContainer {
     public BackpackDrawer Bag { get; }
     public PageMemory Memory { get; } = new();
     public List<Action> Live { get; } = new();
+    /// <summary>The open page, or nothing while the panel is closed.</summary>
+    public string Page { get; private set; } = "welcome";
+    public Selection Selection { get; private set; }
     public HBoxContainer Heading { get; private set; } = null!;
     public TextureRect HeadingIcon { get; private set; } = null!;
     public Label HeadingTitle { get; private set; } = null!;
@@ -63,15 +74,15 @@ public partial class SidePanel : PanelContainer {
         Kit = kit; View = view; Moves = moves; this.ui = ui; world = kit.World; state = kit.State;
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top;
-        Bag = new BackpackDrawer(kit, Close);
+        Bag = new BackpackDrawer(kit, this);
         world.Replaced += () => { ClearSelection(); Close(); };
     }
 
     public void Open(string name) {
         // A different page or building closes the job list and the filter window that belonged to the last one.
-        if (name != state.Page || name == "inspect" && (state.Selected, state.WorkerId) != shownInspect) { Memory.OpenJob = ""; Memory.FilterOpen = false; Memory.FilterPicking = false; Bag.Dismissed = false; }
-        shownInspect = (state.Selected, state.WorkerId);
-        state.Page = name; Live.Clear(); pagesOpened++; Visible = true; View.PanelOpen = true;
+        if (name != Page || name == "inspect" && Selection != shownInspect) { Memory.OpenJob = ""; Memory.FilterOpen = false; Memory.FilterPicking = false; Bag.Dismissed = false; }
+        shownInspect = Selection;
+        Page = name; Live.Clear(); pagesOpened++; Visible = true; View.PanelOpen = true;
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
         Bag.Clear(); sheetScroll = null;
         OffsetLeft = Left;
@@ -101,9 +112,9 @@ public partial class SidePanel : PanelContainer {
     }
 
     /// <summary>Opens a page, or closes it if it is the one showing.</summary>
-    public void Toggle(string name) { if (state.Page == name) Close(); else Open(name); }
+    public void Toggle(string name) { if (Page == name) Close(); else Open(name); }
 
-    public void Close() { Visible = false; Bag.Visible = false; View.PanelOpen = false; state.Page = ""; Live.Clear(); pagesOpened++; }
+    public void Close() { Visible = false; Bag.Visible = false; View.PanelOpen = false; Page = ""; Live.Clear(); pagesOpened++; }
 
     /// <summary>Runs the open page's updates.</summary>
     public void Refresh() {
@@ -114,17 +125,26 @@ public partial class SidePanel : PanelContainer {
 
     /// <summary>Selects a building or resource and shows it.</summary>
     public void Select(Thing t) {
-        if (t.Kind == ThingKind.Reinforced && !(state.Page == "inspect" && state.Selected == t.Id)) Kit.Sounds.Play("open_steel_smelter", t.Pos);
-        state.Selected = t.Id; state.WorkerId = 0; View.Selected = t.Id; View.SelectedWorker = 0; View.BuildMode = null; Open("inspect");
+        if (t.Kind == ThingKind.Reinforced && !(Page == "inspect" && Selection.Thing == t.Id)) Kit.Sounds.Play("open_steel_smelter", t.Pos);
+        Selection = Selection.Of(t); View.BuildMode = null; Open("inspect");
     }
 
     /// <summary>Selects a worker and shows them.</summary>
-    public void Select(Worker w) { state.WorkerId = w.Id; state.Selected = 0; View.Selected = 0; View.SelectedWorker = w.Id; Open("inspect"); }
+    public void Select(Worker w) { Selection = Selection.Of(w); Open("inspect"); }
+
+    /// <summary>Marks a thing as selected without opening its page, as a right click on it does.</summary>
+    public void Mark(Thing t) => Selection = Selection.Of(t);
+
+    /// <summary>Clears the selection if it is this thing, which has gone; true when it was.</summary>
+    public bool Deselect(int id) {
+        if (Selection.Thing != id) return false;
+        Selection = default; return true;
+    }
 
     /// <summary>Forgets what was selected, any placement and any work order, when the world behind them goes away.</summary>
     private void ClearSelection() {
-        state.Selected = 0; state.WorkerId = 0; state.AssigningWorker = 0;
-        View.BuildMode = null; View.Selected = 0; View.SelectedWorker = 0;
+        Selection = default; state.AssigningWorker = 0;
+        View.BuildMode = null;
     }
 
     /// <summary>Enters placement for a crate from the backpack.</summary>

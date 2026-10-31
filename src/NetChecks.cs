@@ -81,7 +81,7 @@ public partial class Game {
         await RightClick(NetOre);
         await Until(() => world.Carried("coal") == 2 && world.Things.All(t => t.Pos != NetOre), "the host handing over the loose coal the guest walked to");
         await Click(view.Screen(NetChest, .3f));
-        var opened = world.Find(view.Selected);
+        var opened = world.Find(view.Selection.Thing);
         Require(opened?.Kind == ThingKind.Chest, "Clicking the chest beside the coal must select that chest.");
         Require(Shows(opened), "Clicking the chest beside the coal must open its page.");
         Require(world.Near(opened), "Clicking the chest beside the coal must leave the player in reach of it.");

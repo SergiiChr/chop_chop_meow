@@ -75,7 +75,7 @@ public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(status)) return;
             // A job given or taken elsewhere changes the chips, so the page is rebuilt.
-            if (drawn.Duties >= 0 && w.Duties.Count != drawn.Duties) { drawn.Duties = w.Duties.Count; Callable.From(() => { if (state.Page == "workers") panel.Open("workers"); }).CallDeferred(); return; }
+            if (drawn.Duties >= 0 && w.Duties.Count != drawn.Duties) { drawn.Duties = w.Duties.Count; Callable.From(() => { if (panel.Page == "workers") panel.Open("workers"); }).CallDeferred(); return; }
             drawn.Duties = w.Duties.Count;
             if (w.Status != drawn.Status) status.Text = drawn.Status = w.Status;
             ShowKit(w, ref carrying, carry, carried, tool);

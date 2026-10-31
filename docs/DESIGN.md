@@ -32,7 +32,7 @@ The project targets Godot 4.7.2 .NET with C#.
 
 `Game` is a thin runner: it creates the interface's nodes once while loading, holds them and routes input and the frame to them.
 Each feature is a node with a small public surface, given what it needs in its constructor.
-`UiKit` carries the world, sounds and how a player action runs; `UiState` holds what several parts share, such as `Paused` and the side panel's page.
+`UiKit` carries the world, sounds and how a player action runs; `UiState` holds what several parts share, such as `Paused`.
 `World.Replaced` fires whenever the whole state is replaced (a new game, a load, a guest taking the host's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
 The side panel builds a new `PagePanel` node every time a page opens, so its build code runs once per open and its `Live` updates run on each refresh; `PageMemory` keeps what must outlast a rebuild.
 UI checks stay in `partial class Game` and reach the parts through their public members.

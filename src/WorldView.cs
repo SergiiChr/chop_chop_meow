@@ -11,9 +11,8 @@ namespace ChopChopMeow;
 /// </summary>
 public partial class WorldView : Node3D {
     public World World = null!;
-    public int Selected;
+    public Selection Selection;
     public int Hover;
-    public int SelectedWorker;
     public int HoverWorker;
     /// <summary>The building being placed, or a packed crate, or null when not placing.</summary>
     public ThingKind? BuildMode;
@@ -788,7 +787,7 @@ public partial class WorldView : Node3D {
                 if (!first && count != box.LastCount) box.Puff = .9f;
                 box.LastCount = count;
                 box.Puff = Math.Max(0, box.Puff - dt);
-                bool open = box.Puff > 0 || t.Id == Selected && PanelOpen && World.Near(t);
+                bool open = box.Puff > 0 || t.Id == Selection.Thing && PanelOpen && World.Near(t);
                 if (dt > 0 && (open ? box.Open == 0 : box.Open == 1)) Sounds?.Play(open ? "open_chest" : "close_chest", t.Pos);
                 box.Open = Mathf.MoveToward(box.Open, open ? 1 : 0, dt * 4);
                 box.Lid.RotationDegrees = new Vector3(-80 * Ease(box.Open), 0, 0);
@@ -1005,10 +1004,10 @@ public partial class WorldView : Node3D {
             selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = placeTile.Visible = false;
             return;
         }
-        Mark(selectRing, World.Find(Selected), 0);
-        Mark(hoverRing, Hover != Selected ? World.Find(Hover) : null, .004f);
+        Mark(selectRing, World.Find(Selection.Thing), 0);
+        Mark(hoverRing, Hover != Selection.Thing ? World.Find(Hover) : null, .004f);
         Worker? worker = null;
-        foreach (var w in World.S.Workers) if (w.Id == SelectedWorker) worker = w;
+        foreach (var w in World.S.Workers) if (w.Id == Selection.Worker) worker = w;
         workerRing.Visible = worker != null && World.Sees(worker);
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
@@ -1126,7 +1125,7 @@ public partial class WorldView : Node3D {
             Tag(Screen(hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(GetViewport().GetMousePosition())) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
         }
         foreach (var w in World.S.Workers)
-            if (World.Sees(w) && (w.Id == HoverWorker || w.Id == SelectedWorker)) Tag(Screen(w.Pos, 2.05f), w.Name);
+            if (World.Sees(w) && (w.Id == HoverWorker || w.Id == Selection.Worker)) Tag(Screen(w.Pos, 2.05f), w.Name);
     }
 }
 
