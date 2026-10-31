@@ -20,15 +20,13 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                 ("Shore it up", PageText.Cost(world, data.Materials), "wood"),
                 ("Fit the frame and rails", $"A worker with a hammer for {workday}", "steel_hammer"),
             };
-            // The three steps on a line, done in sage, the current one in mustard.
-            var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 0); AddChild(line);
+            var nodes = new PanelContainer[stages.Length];
             for (int i = 0; i < stages.Length; i++) {
-                if (i > 0) line.AddChild(new ColorRect { Color = i <= stage ? Style.Sage : Style.Line, CustomMinimumSize = new Vector2(0, 6), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
-                var node = new PanelContainer { Name = $"stage_{i + 1}", CustomMinimumSize = new Vector2(48, 48), MouseFilter = Control.MouseFilterEnum.Pass, TooltipText = $"Stage {i + 1} · {stages[i].Title}\n{stages[i].Needs}" };
-                node.AddThemeStyleboxOverride("panel", Style.Round(i < stage ? Style.Sage : i == stage ? Style.Mustard : Style.Line, 24).Item1);
+                nodes[i] = new PanelContainer { Name = $"stage_{i + 1}", CustomMinimumSize = new Vector2(48, 48), MouseFilter = Control.MouseFilterEnum.Pass, TooltipText = $"Stage {i + 1} · {stages[i].Title}\n{stages[i].Needs}" };
                 var icon = Style.Icon(Icons.Of(stages[i].Icon), 30); if (i > stage) icon.Modulate = Style.Unready;
-                node.AddChild(icon); line.AddChild(node);
+                nodes[i].AddChild(icon);
             }
+            var line = new StageTrack(nodes); AddChild(line); line.At(stage);
             AddLabel($"Stage {stage + 1} · {stages[stage].Title}", 16);
             if (thing.MineStage == MineStage.Dug) {
                 // Supplies: delivered on the pill, needed under the cup; click a lit backpack stack to deliver it.

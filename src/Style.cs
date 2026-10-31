@@ -96,6 +96,9 @@ public static class Style {
     public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) CloseRound = Round(Brick, 18), ActionRound = Round(Sage, 18), FilterRound = Round(Beige, 18);
     public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) TabRound = Round(Line, 24), TabActive = Round(Brick, 24);
 
+    /// <summary>A stage on a track: done, the current one, and still to come.</summary>
+    public static readonly StyleBoxFlat StageDone = Round(Sage, 24).Item1, StageNow = Round(Mustard, 24).Item1, StageTodo = Round(Line, 24).Item1;
+
     private static StyleBoxFlat Flat(Color bg, int radius, int margin, Color? edge = null, int border = 0, int horizontal = -1) {
         var box = new StyleBoxFlat { BgColor = bg, BorderColor = edge ?? Colors.Transparent, AntiAliasing = true };
         box.SetCornerRadiusAll(radius);

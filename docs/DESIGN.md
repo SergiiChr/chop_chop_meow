@@ -92,6 +92,7 @@ UI and input:
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel |
+| `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
 | `src/CabinPanel.cs` | A cabin: its door and sleep |
 | `src/CampfirePanel.cs` | A campfire |

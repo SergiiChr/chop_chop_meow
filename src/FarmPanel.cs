@@ -10,26 +10,19 @@ namespace ChopChopMeow;
 /// </summary>
 public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        var stages = new HBoxContainer(); stages.AddThemeConstantOverride("separation", 0); AddChild(stages);
         string?[] looks = { null, "wheat_seeds", "grass", "wheat" };
         string[] names = { "Fallow", "Sown", "Growing", "Ripe" };
-        var nodes = new PanelContainer[4]; var links = new ColorRect[3];
+        var nodes = new PanelContainer[4];
         for (int i = 0; i < 4; i++) {
-            if (i > 0) { links[i - 1] = new ColorRect { CustomMinimumSize = new Vector2(0, 6), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; stages.AddChild(links[i - 1]); }
-            var node = new PanelContainer { CustomMinimumSize = new Vector2(44, 44), TooltipText = names[i], MouseFilter = Control.MouseFilterEnum.Pass };
-            node.AddChild(looks[i] is string look ? Style.Icon(Icons.Of(look), 30) : new ColorRect { Color = new Color("8a6a48"), CustomMinimumSize = new Vector2(24, 10), SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
-            nodes[i] = node; stages.AddChild(node);
+            nodes[i] = new PanelContainer { CustomMinimumSize = new Vector2(44, 44), TooltipText = names[i], MouseFilter = Control.MouseFilterEnum.Pass };
+            nodes[i].AddChild(looks[i] is string look ? Style.Icon(Icons.Of(look), 30) : new ColorRect { Color = new Color("8a6a48"), CustomMinimumSize = new Vector2(24, 10), SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
         }
+        var track = new StageTrack(nodes); AddChild(track);
         var ripe = Style.Text("", 14, Style.Rim); ripe.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; AddChild(ripe);
-        live.Watch(() => {
-            int at = thing.FarmStage == FarmStage.Ripe ? 3 : thing.FarmStage == FarmStage.Growing ? (thing.Progress < world.GrowSeconds / 3 ? 1 : 2) : 0;
-            int hours = thing.FarmStage == FarmStage.Growing ? (int)((world.GrowSeconds - thing.Progress) / world.Data.DaySeconds * 24) : -1;
-            return (at, hours);
-        }, now => {
-            var (at, hours) = now;
-            for (int i = 0; i < 4; i++) nodes[i].AddThemeStyleboxOverride("panel", Style.Round(i < at ? Style.Sage : i == at ? Style.Mustard : Style.Line, 22).Item1);
-            for (int i = 0; i < 3; i++) links[i].Color = i < at ? Style.Sage : Style.Line;
-            ripe.Text = hours >= 0 ? $"ripe in {hours / 24} d {hours % 24} h" : thing.FarmStage == FarmStage.Ripe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in";
+        live.Watch(() => thing.FarmStage == FarmStage.Ripe ? 3 : thing.FarmStage == FarmStage.Growing ? (thing.Progress < world.GrowSeconds / 3 ? 1 : 2) : 0, track.At);
+        live.Watch(() => (thing.FarmStage, thing.FarmStage == FarmStage.Growing ? (int)((world.GrowSeconds - thing.Progress) / world.Data.DaySeconds * 24) : -1), now => {
+            var (stage, hours) = now;
+            ripe.Text = hours >= 0 ? $"ripe in {hours / 24} d {hours % 24} h" : stage == FarmStage.Ripe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in";
         });
         var fertilizer = SowingCup("fertilizer", Style.CupFuel);
         var lasts = Style.Text("", 13, Style.Tan);
