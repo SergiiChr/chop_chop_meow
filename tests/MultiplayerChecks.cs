@@ -163,7 +163,6 @@ public static class MultiplayerChecks {
     private static void CheckGuestGathersAndHammers(GameData data) {
         var (world, guest, _) = Hosted(data);
         var tree = world.Add(ThingKind.Tree, Terrain.Spawn + new Vector2(4, 0), 40);
-        Give(guest, "steel_axe", 1);
         world.As(guest, () => world.MoveTo(tree.Pos + new Vector2(.8f, 0)));
         guest.GatherTarget = tree.Id;
         FedPlayersTick(world, data.GatherSeconds * 2 + .5f);

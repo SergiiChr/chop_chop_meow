@@ -520,7 +520,7 @@ public partial class WorldView : Node3D {
             var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting);
             var subject = gathering ? target : null;
             var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
-            if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; }
+            if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; subject = ThingAt(other.PulseTarget); }
             if (action == ActorAction.Idle && StationToHammer(p) is Thing station) { action = ActorAnimation.StationAction(station.Kind); facing = station.Pos; subject = station; }
             if (p.Mauled) action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
             state.Update(p.Pos, action, facing, dt);
