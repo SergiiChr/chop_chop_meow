@@ -41,7 +41,7 @@ public partial class CraftPanel(SidePanel side) : RecipePage(side) {
             var r = world.Data.Recipes[queue[i]];
             waiting.Add(RecipeCup($"queue_{i}", r.Output, "", 44, () => world.CancelCraft(index)));
         }
-        Process(inputs, LiveText.Of(text => AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))), () => making.Seconds > 0 ? world.CraftTime / making.Seconds : 0, null, product, waiting);
+        AddChild(new ProcessRow(live, inputs, LiveText.Of(text => AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))), () => making.Seconds > 0 ? world.CraftTime / making.Seconds : 0, null, product, waiting));
         if (making.Tool != "") {
             var status = Style.Text("", 14, Style.Warn); AddChild(status);
             bool shown = false;

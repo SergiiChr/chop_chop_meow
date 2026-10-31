@@ -158,6 +158,12 @@ public static class Style {
         l.AddThemeFontSizeOverride("font_size", size); if (color != null) l.AddThemeColorOverride("font_color", color.Value); return l;
     }
 
+    /// <summary>A beige well around a control.</summary>
+    public static PanelContainer InWell(Control inner) {
+        var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Well); well.AddChild(inner);
+        return well;
+    }
+
     /// <summary>Text over the world gets a dark outline so it reads on grass by day and night.</summary>
     public static Label Outlined(Label label) {
         label.AddThemeColorOverride("font_outline_color", Line); label.AddThemeConstantOverride("outline_size", 6);

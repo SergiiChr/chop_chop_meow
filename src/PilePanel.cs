@@ -25,7 +25,7 @@ public partial class PilePanel(SidePanel side, Thing t) : PagePanel(side) {
             var making = Style.Icon(Icons.Of("fertilizer"), 52); making.TooltipText = "Makes fertilizer"; making.MouseFilter = Control.MouseFilterEnum.Pass;
             var main = new VBoxContainer(); main.AddThemeConstantOverride("separation", 10); main.AddChild(making); main.AddChild(PerBatch("×1"));
             float hour = world.Data.DaySeconds / 24;
-            Process(Array.Empty<Control>(), "1 h", () => t.Progress / hour, FuelRow("line_leaf", new Color("8fae7e"), item, lasts), main, Array.Empty<Control>());
+            AddChild(new ProcessRow(live, Array.Empty<Control>(), "1 h", () => t.Progress / hour, new FuelRow("line_leaf", new Color("8fae7e"), item, lasts), main, Array.Empty<Control>()));
             var lastsText = new LiveText(shown => lasts.Text = shown);
             (string? Item, int Hours) shown = ("", -1);
             live.Add(() => {

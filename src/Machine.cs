@@ -14,13 +14,13 @@ public partial class PagePanel {
         var inputs = world.BatchCost(t).Select(p => (Control)MachineSlot(t, t.Inventory, p.Key, true, $"×{p.Value}"));
         // Leftovers from an earlier recipe or fuel stay reachable as side outputs.
         var side = world.Leftovers(t).Where(item => item != recipe.Output).Select(item => (Control)MachineSlot(t, t.Inventory, item, false, "", 44));
-        Process(inputs, LiveText.Of(text => AppendDuration(text, seconds)), () => t.Processing ? t.Progress / recipe.Seconds : 0,
+        AddChild(new ProcessRow(live, inputs, LiveText.Of(text => AppendDuration(text, seconds)), () => t.Processing ? t.Progress / recipe.Seconds : 0,
             recipe.Fuel && t.Burner != null ? FuelSlot(t, seconds) : null,
-            MachineSlot(t, t.Inventory, recipe.Output, false, recipe.Amount > 1 ? $"×{recipe.Amount}" : "×1", 64), side.ToArray());
+            MachineSlot(t, t.Inventory, recipe.Output, false, recipe.Amount > 1 ? $"×{recipe.Amount}" : "×1", 64), side.ToArray()));
     }
 
     /// <summary>The fuel slot under the bar: a flame, its cup, and how long the fuel in it lasts at one per batch.</summary>
-    protected HBoxContainer FuelSlot(Thing t, float batchSeconds) {
+    protected FuelRow FuelSlot(Thing t, float batchSeconds) {
         var burner = t.Burner!;
         var (cell, count) = ItemSlot.Cup("fuel");
         cell.AddThemeStyleboxOverride("normal", Style.CupFuel);
@@ -46,7 +46,7 @@ public partial class PagePanel {
             cell.TooltipText = $"Fuel · {world.Data.Name(fuel)} · {now.Item2}/{burner.StackOf(fuel)}\nOne burns per batch · drag wood or coal here";
             AppendDuration(lastsText.Clear(), now.Item2 * batchSeconds); lastsText.Show();
         });
-        return FuelRow("line_flame", Style.Ember, cell, lasts);
+        return new FuelRow("line_flame", Style.Ember, cell, lasts);
     }
 
     /// <summary>A cup for one input or output; empty, it shows a faint picture of its item, and under it what one batch takes or makes.</summary>

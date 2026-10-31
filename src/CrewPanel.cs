@@ -87,7 +87,7 @@ public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
         var chip = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; chip.AddThemeStyleboxOverride("panel", Style.Chip);
         var row = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; row.AddThemeConstantOverride("separation", 6); chip.AddChild(row);
         row.AddChild(Style.Icon(PlaceIcon(at), 20));
-        row.AddChild(Style.Text(JobName(job), 13, Style.Ink, Style.Bold));
+        row.AddChild(Style.Text(JobRow.Title(job), 13, Style.Ink, Style.Bold));
         return chip;
     }
 }
@@ -130,7 +130,7 @@ public partial class WorkerPanel(SidePanel side, Worker? w) : WorkerPage(side) {
             row.AddChild(Style.Icon(PlaceIcon(at), 32));
             var place = Style.Text(world.Data.Name(at.Kind), 15, Style.Ink); place.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(place);
             int colour = System.Array.IndexOf(world.Jobs(at), d.Job);
-            var tag = Style.Pill(JobName(d.Job), Style.Tag(Style.JobColors[System.Math.Max(0, colour) % Style.JobColors.Length]), Style.Rim, 13); tag.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; row.AddChild(tag);
+            var tag = Style.Pill(JobRow.Title(d.Job), Style.Tag(Style.JobColors[System.Math.Max(0, colour) % Style.JobColors.Length]), Style.Rim, 13); tag.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; row.AddChild(tag);
             var drop = kit.HeaderButton("close", "Take this job away", () => { world.SetDuty(w, at, duty.Job, false); panel.Open("inspect"); }, Style.CloseRound, $"drop_{d.Job}_{at.Id}");
             drop.CustomMinimumSize = new Vector2(30, 30); drop.AddThemeConstantOverride("icon_max_width", 14); row.AddChild(drop);
         }

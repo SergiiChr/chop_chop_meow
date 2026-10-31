@@ -75,7 +75,10 @@ UI and input:
 | `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what pages keep while they are rebuilt |
 | `src/BackpackDrawer.cs` | The backpack drawer above the hotbar |
 | `src/InspectPage.cs` | Picks the panel for the selected thing or worker |
-| `src/PagePanel.cs` | `PagePanel`, the base of every page, and the pieces pages are built from: the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |
+| `src/PagePanel.cs` | `PagePanel`, the base of every page |
+| `src/ProcessRow.cs` | The process row every station shares and the fuel row under its bar |
+| `src/JobRow.cs` | A place's job buttons, their worker lists and what each job is called |
+| `src/FilterWindow.cs` | The filter window beside the panel |
 | `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |

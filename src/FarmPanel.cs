@@ -49,8 +49,8 @@ public partial class FarmPanel(SidePanel side, Thing farm) : PagePanel(side) {
             lastsText.Clear().Append("×").Append(world.Data.Farm.Sow.GetValueOrDefault("fertilizer")).Append(" · ").Append(stock / Math.Max(1, world.Data.Farm.Sow.GetValueOrDefault("fertilizer"))).Append(stock == 1 ? " crop" : " crops"); lastsText.Show();
         });
         var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => FarmCup(farm.Inventory, k, true, $"×{world.Data.Farm.Sow[k]}"));
-        Process(inputs, $"{world.Data.Farm.GrowDays:0} d", () => farm.FarmStage == FarmStage.Growing ? farm.Progress / world.GrowSeconds : farm.FarmStage == FarmStage.Ripe ? 1 : 0,
-            FuelRow("line_leaf", new Color("8fae7e"), FuelCup(fertilizer), lasts), main, side);
+        AddChild(new ProcessRow(live, inputs, $"{world.Data.Farm.GrowDays:0} d", () => farm.FarmStage == FarmStage.Growing ? farm.Progress / world.GrowSeconds : farm.FarmStage == FarmStage.Ripe ? 1 : 0,
+            new FuelRow("line_leaf", new Color("8fae7e"), FuelCup(fertilizer), lasts), main, side));
         BagGrid(id => moves.Stack(world.S.Backpack, farm.Inventory, id, farm), "Click: sow seeds or fertilizer · Drag to move", wanted: id => world.Holds(farm, id));
         JobButtons(farm);
     }
