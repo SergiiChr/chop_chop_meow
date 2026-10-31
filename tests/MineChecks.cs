@@ -41,10 +41,10 @@ public static class MineChecks {
             Require(World.MineSpot(cliff).IsEqualApprox(cliff.Center + cliff.Face * 4.2f), "each new entrance must project directly from its cliff center");
             var mine = world.Add(ThingKind.Mine, oldSpot); expected[mine.Id] = World.MineSpot(cliff); mine.MineStage = MineStage.Open; mine.Progress = 2;
             mine.Inventory.Add("wood", 7); mine.Output!.Add(World.MineOre(mine), 12);
-            world.S.Remembered[mine.Id] = new Thing { Id = mine.Id, Kind = ThingKind.Mine, Pos = oldSpot, MineStage = MineStage.Open };
+            Remember(world, new Thing { Id = mine.Id, Kind = ThingKind.Mine, Pos = oldSpot, MineStage = MineStage.Open });
             var worker = AddWorker(world, oldSpot + cliff.Face * 3); worker.Assignment = mine.Id;
         }
-        world.S.Version = 4;
+        SetSaveVersion(world, 4);
         var loaded = FundedWorld(data); loaded.Deserialize(world.Serialize());
         Require(loaded.SaveVersion == 5, "version 4 valley saves must upgrade to the current mine layout");
         foreach (var mine in loaded.Things.Where(t => t.Kind == ThingKind.Mine)) {

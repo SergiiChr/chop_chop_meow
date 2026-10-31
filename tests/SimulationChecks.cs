@@ -1832,8 +1832,8 @@ public static class SimulationChecks {
         anvil.Recipe = "steel_pick"; anvil.Inventory.Add("iron_bar", 3);
         Give(old, "steel_pick", 1); Give(old, "steel_hammer", 1); Give(old, "iron_bar", 2);
         old.Add(ThingKind.Stone, new Vector2(20, 20), 2);
-        old.S.Milestones.UnionWith(new[] { "gather", "furnace", "iron_bar", "anvil", "pick" });
-        old.S.Goal = 5;
+        Achieve(old, "gather", "furnace", "iron_bar", "anvil", "pick");
+        SetGoal(old, 5);
         // Older saves had steel tools as one item, and iron tools and loose iron that have since left the game.
         var json = Patch(old.Serialize(), ("\"iron_bar\": 2", "\"steel_tools\": 3"), ("\"steel_pick\"", "\"iron_pick\""), ("\"steel_hammer\"", "\"iron_hammer\""), ("\"stone\"", "\"loose_iron\""));
         var loaded = EmptyWorld(data);
@@ -2049,7 +2049,8 @@ public static class SimulationChecks {
         order["Goods"] = new System.Text.Json.Nodes.JsonObject(); order["Item"] = "wood"; order["Quantity"] = 4;
         var loaded = EmptyWorld(data);
         loaded.Deserialize(json.ToJsonString());
-        Require(loaded.Coins == 30 && loaded.S.Coins == null, "coins from an older save should move into the backpack");
+        Require(loaded.Coins == 30, "coins from an older save should move into the backpack");
+        Require(OldCoins(loaded) == null, "an older save's loose coins should not stay behind after moving");
         Require(loaded.Find(sign.Id) is { Output.Slots: World.MarketSlots, Inventory.Slots: World.MarketSlots, Wages.Slots: 1 }, "an older signpost should get its market boxes");
         Require(loaded.Orders.Single().Goods.GetValueOrDefault("wood") == 4 && loaded.Orders.Single().Item == null, "an older single-item order should keep its goods");
         var migrated = System.Text.Json.Nodes.JsonNode.Parse(loaded.Serialize())!;

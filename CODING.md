@@ -9,6 +9,8 @@ Project rules on top of the global coding and testing guides.
 - `dotnet format` keeps the style in `.editorconfig`: file-scoped namespaces, opening braces on the same line, four-space indents.
 - Short bodies stay on one line: a guard, a one-statement `if` or a field update chain reads better than a block.
 - A static field in one file of a `partial` class never depends on a static field in another file, since C# sets them up in no fixed order across files.
+- A Godot node with constructor arguments builds its children in `_Ready`, or in the constructor when it lives as long as the game. A primary constructor parameter never shares a name with a base class field.
+- `SetProcess(false)` goes in `_Ready`: Godot turns processing on just before calling it, so a call in the constructor does nothing.
 - Godot API calls run on the main thread. Pure data work may run in parallel (`Parallel.For` in `Terrain3DView`) when the result is the same as running it in order.
 
 ## Python
@@ -44,8 +46,8 @@ Project rules on top of the global coding and testing guides.
 - Checks never touch `world.S`, the raw save, and never change a player's backpack, needs or respawn timer directly:
   - They read results through `World`'s public members; a missing read becomes a small read-only member like `Coins`.
   - They set up through real play: `Build`, `Buy`, `Consume`, `Tick` and the like, with `Add` for placing things. A time of day comes from a named step that ticks there, such as `RunUntilDawn`.
-  - A state real play cannot reach, or cannot reach within the stage's time limit, goes behind a named step in `tests/SetupSteps.cs` whose comment says why. `AddWorker` is the same kind of step, in `WorkerSteps`.
-  - Only fixtures that build old-save text, and reads of their old fields, may use `world.S` elsewhere.
+  - A state real play cannot reach, or cannot reach within the stage's time limit, goes behind a named step in `tests/SetupSteps.cs` whose comment says why. Old-save fixtures use steps there too.
+  - `./build.py check` fails on the raw save anywhere else in `tests/`, `src/*Checks.cs` or `src/*Steps.cs`.
   - A check may set fields directly on things and workers it placed, such as a farm's stage or a worker's tool, and on a `PlayerState` it builds as save text.
   - A check may place the player, with `world.Player = position`, and hold a player's input, with `Sprinting` or `GatherTarget`.
 - Simulation setup may construct fixtures, but tests claiming resource-to-steel progression must gather raw materials and use the actual recipes and trade delays.
@@ -54,6 +56,7 @@ Project rules on top of the global coding and testing guides.
 - A check that a load restores something changes that thing between saving and loading.
 - Check files hold only checks and their runners. Steps live in feature files: `tests/WorldSteps.cs`, `PlayerSteps.cs`, `WorkerSteps.cs`, `EconomySteps.cs`, `ModelSteps.cs`, `ChainSteps.cs` and `SetupSteps.cs` for simulation checks, and `src/InputSteps.cs`, `PanelSteps.cs` and `SessionSteps.cs` for UI and network checks.
 - Checks fail through the shared `Checks.Require` in `tests/Checks.cs`.
+- A check over 50 lines is long: split it into one check per behaviour, or move its setup into steps. A longer one stays only when it is a single scenario that loses its point when split, and says so in its summary.
 - Do not weaken assertions to make broken behavior pass.
 
 ## Fast code

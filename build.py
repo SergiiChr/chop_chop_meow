@@ -405,8 +405,30 @@ def package_linux() -> Path:
     return archive
 
 
+def check_raw_save() -> None:
+    """Fail when a check or step outside tests/SetupSteps.cs uses a world's raw save."""
+    raw = re.compile(r"\b(?!Key\b)\w+\.S\b")
+    files = [
+        *ROOT.glob("tests/*.cs"),
+        *ROOT.glob("src/*Checks.cs"),
+        *ROOT.glob("src/*Steps.cs"),
+    ]
+    found = [
+        f"{path.relative_to(ROOT)}:{number}: {line.strip()}"
+        for path in sorted(files)
+        if path.name != "SetupSteps.cs"
+        for number, line in enumerate(path.read_text().splitlines(), 1)
+        if raw.search(line)
+    ]
+    if found:
+        raise SystemExit(
+            "Raw save used outside tests/SetupSteps.cs:\n" + "\n".join(found)
+        )
+
+
 def run_check(env: dict[str, str]) -> None:
-    """Verify C# format, then run every test."""
+    """Verify C# format and raw save use, then run every test."""
+    check_raw_save()
     command(
         ["dotnet", "format", ROOT / "ChopChopMeow.csproj", "--verify-no-changes"],
         env=env,

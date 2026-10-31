@@ -1,11 +1,12 @@
 using System;
 using System.Collections.Generic;
 using ChopChopMeow;
+using Godot;
 
 /// <summary>
 /// Steps that write the raw save or a player's goods and needs.
 /// Each is for a state real play cannot reach or cannot reach quickly enough, and says why.
-/// Outside them, only <c>AddWorker</c> and old-save fixtures use the raw save.
+/// <c>./build.py check</c> fails on the raw save anywhere else in the checks.
 /// Checks also set fields directly on things and workers they placed and on players they build as save text.
 /// Placing the player with <c>world.Player</c> and holding a player's input are allowed too.
 /// </summary>
@@ -94,4 +95,23 @@ internal static class SetupSteps {
 
     /// <summary>Puts an item on a hotbar slot: the real way is a drag from the open backpack, which these checks are not about.</summary>
     public static void SetHotbarSlot(World world, int slot, string item) => world.S.HotbarSlots[slot] = item;
+
+    /// <summary>Adds a worker directly at a spot: hiring needs a signpost and coins, starts them at the post and counts as the hiring goal.</summary>
+    public static Worker AddWorker(World world, Vector2 position) {
+        var worker = new Worker { Id = world.S.NextId++, Name = $"Worker {world.Workers.Count + 1}", Pos = position };
+        world.S.Workers.Add(worker);
+        return worker;
+    }
+
+    /// <summary>Puts a thing in the player's memory as an older save held it: old-save fixtures only.</summary>
+    public static void Remember(World world, Thing thing) => world.S.Remembered[thing.Id] = thing;
+
+    /// <summary>Marks the save as an older version: old-save fixtures only.</summary>
+    public static void SetSaveVersion(World world, int version) => world.S.Version = version;
+
+    /// <summary>Sets a goal number from an older save: old-save fixtures only.</summary>
+    public static void SetGoal(World world, int goal) => world.S.Goal = goal;
+
+    /// <summary>The loose coins field an older save held, which has no read in the game.</summary>
+    public static float? OldCoins(World world) => world.S.Coins;
 }

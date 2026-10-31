@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using ChopChopMeow;
 using Godot;
+using static SetupSteps;
 using static Checks;
 using static WorldSteps;
 using static PlayerSteps;
