@@ -49,7 +49,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             tabs.AddChild(tab);
             var badge = Style.Icon(null, 28); badge.Name = "badge"; badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); badge.GrowHorizontal = badge.GrowVertical = Control.GrowDirection.Both; badge.MouseFilter = Control.MouseFilterEnum.Pass;
             tab.AddChild(badge);
-            if (kind == "") { badge.Texture = Icons.Of("stone"); badge.TooltipText = "No kind needed"; } else {
+            if (kind == "") { badge.Texture = Icons.Of("stone"); badge.TooltipText = "No tool needed"; } else {
                 string plainest = world.Data.PlainestTool(kind, tier);
                 string name = world.Data.ToolName(kind, tier);
                 badge.Texture = Icons.Of(plainest);
