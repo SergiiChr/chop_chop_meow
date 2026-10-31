@@ -7,7 +7,7 @@ public partial class StoragePanel(PageTools tools, Thing subject) : ThingPage(to
     protected override void Body() {
         HeaderAction("stash", "Store all materials · keeps tools", () => StoreAll(thing), Style.ActionRound, "deposit");
         if (thing.Kind == ThingKind.Chest) FilterButton();
-        Well(new VBoxContainer()).AddChild(StorageGrid(thing));
-        BagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), "Click: store one · Ctrl: store all · Drag to move");
+        Well(new VBoxContainer()).AddChild(StorageGrid());
+        StoreBagGrid("Click: store one · Ctrl: store all · Drag to move");
     }
 }

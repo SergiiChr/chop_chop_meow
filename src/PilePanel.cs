@@ -16,7 +16,7 @@ public partial class PilePanel(PageTools tools, Thing subject) : ThingPage(tools
         panel.AddToHeader(compost);
         if (thing.Compost) FilterButton();
         else HeaderAction("stash", "Store everything this pile takes", () => StoreAll(thing), Style.ActionRound, "deposit");
-        Well(new VBoxContainer()).AddChild(StorageGrid(thing, 7, 44));
+        Well(new VBoxContainer()).AddChild(StorageGrid(7, 44));
         if (!thing.Compost) {
             Dynamic(text => text.Append(thing.Inventory.UsedSlots).Append(" of ").Append(thing.Inventory.Slots).Append(" stacks"), 14, Style.Beige);
         } else {
@@ -41,6 +41,6 @@ public partial class PilePanel(PageTools tools, Thing subject) : ThingPage(tools
             AddChild(skip);
             JobButtons();
         }
-        BagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), "Click: store one · Ctrl: store all · Drag to move", wanted: id => world.Holds(thing, id));
+        StoreBagGrid("Click: store one · Ctrl: store all · Drag to move", id => world.Holds(thing, id));
     }
 }

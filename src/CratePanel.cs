@@ -20,9 +20,9 @@ public partial class CratePanel(PageTools tools, Thing subject) : ThingPage(tool
             foreach (var pair in thing.Inventory.Items) sellable &= world.Data.Market.Sells.ContainsKey(pair.Key);
             sells.Visible = sellable;
         });
-        Well(new VBoxContainer()).AddChild(StorageGrid(thing));
+        Well(new VBoxContainer()).AddChild(StorageGrid());
         var hint = Row(); hint.AddThemeConstantOverride("separation", 8);
         hint.AddChild(Style.Text("Hold", 14, Style.Beige)); hint.AddChild(Style.Glyph("line_mouse", 24, Style.Rim)); hint.AddChild(Style.Text("to pick up", 14, Style.Beige));
-        BagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), "Click: store one · Ctrl: store all · Drag to move");
+        StoreBagGrid("Click: store one · Ctrl: store all · Drag to move");
     }
 }

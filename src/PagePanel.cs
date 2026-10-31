@@ -76,9 +76,6 @@ public abstract partial class PagePanel : VBoxContainer {
     protected void UseFromBag(string id) {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
     }
-    /// <summary>A storage's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
-    protected GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) =>
-        NewInventoryGrid(() => t.Inventory, t, id => moves.Stack(t.Inventory, world.S.Backpack, id, t), "Click: take one · Ctrl: take all · Drag to move", columns: columns, size: size);
     /// <summary>Moves every material the storage takes from the backpack; tools stay, and so do crates, so one is never packed inside another.</summary>
     protected void StoreAll(Thing t) {
         if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }

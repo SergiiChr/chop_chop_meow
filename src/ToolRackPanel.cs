@@ -44,7 +44,7 @@ public partial class ToolRackPanel(PageTools tools, Thing subject) : ThingPage(t
                 waitPill.TooltipText = string.Join("\n", world.Workers.Where(w => w.Missing == kind).Select(w => $"{w.Name} needs {A(kind)}"));
             });
         }
-        BagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), "Click: hang a tool · Ctrl: all of them · Drag to move", wanted: id => world.Holds(thing, id) && thing.Inventory.Accepts(id));
+        StoreBagGrid("Click: hang a tool · Ctrl: all of them · Drag to move", id => world.Holds(thing, id) && thing.Inventory.Accepts(id));
         JobButtons();
     }
     private static string A(string word) => "aeiou".Contains(word[0]) ? $"an {word}" : $"a {word}";

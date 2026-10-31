@@ -22,7 +22,7 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
             var inputs = new Control[] { cups.StationCup(thing.Packs, true, "×1"), cups.StationCup("crate", true, "") };
             AddChild(new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, world.Data.PackSeconds)), () => thing.Processing ? thing.Progress / world.Data.PackSeconds : 0, null, PackedCrate(), Array.Empty<Control>()));
         }
-        BagGrid(id => world.LoadInput(thing, id, ItemMoves.All ? world.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot", wanted: id => world.Holds(thing, id));
+        LoadBagGrid(id => world.Holds(thing, id));
         JobButtons();
     }
 

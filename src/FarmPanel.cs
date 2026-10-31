@@ -40,7 +40,7 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
         var side = world.Data.Farm.Yield.Keys.Where(k => k != "wheat").Select(k => (Control)Cups.Labelled(HarvestCup(k, 44), $"×{world.Data.Farm.Yield[k]}")).ToArray();
         AddChild(new ProcessRow(live, inputs, $"{world.Data.Farm.GrowDays:0} d", () => thing.FarmStage == FarmStage.Growing ? thing.Progress / world.GrowSeconds : thing.FarmStage == FarmStage.Ripe ? 1 : 0,
             new FuelRow("line_leaf", new Color("8fae7e"), fertilizer, lasts), main, side));
-        BagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), "Click: sow seeds or fertilizer · Drag to move", wanted: id => world.Holds(thing, id));
+        StoreBagGrid("Click: sow seeds or fertilizer · Drag to move", id => world.Holds(thing, id));
         JobButtons();
     }
 
