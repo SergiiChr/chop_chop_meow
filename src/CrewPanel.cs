@@ -123,7 +123,7 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
         buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { panel.Player.Mode = new ClickMode.Assign(w.Id); panel.Close(); kit.Refresh(); }));
         buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); Redraw(); }));
-        buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); panel.Open("workers"); }));
+        buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); panel.Open(Page.Crew); }));
         if (w.WageDebt > 0) AddChild(kit.BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));
     }
 }

@@ -11,13 +11,15 @@ public sealed class PageMemory {
     public string GuideTab = "controls";
     /// <summary>The tool group whose recipes are shown.</summary>
     public string CraftTab = "";
-    /// <summary>The trading post's page, and whether its price sheet is open.</summary>
-    public string SignpostTab = "market";
-    public bool SheetOpen = true;
+    /// <summary>Whether the trading post shows hiring rather than shipping, and whether its price sheet is open.</summary>
+    public bool Hiring, SheetOpen = true;
 }
 
 /// <summary>What every page is built with.</summary>
 public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory);
+
+/// <summary>The pages of the side panel.</summary>
+public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect }
 
 /// <summary>What the side panel inspects: a thing, a worker or nothing, never both.</summary>
 public readonly record struct Selection {
@@ -36,6 +38,17 @@ public partial class SidePanel : PanelContainer {
     public const int Left = -476;
     /// <summary>Top of the panel, below the clock.</summary>
     private const int Top = 156;
+    /// <summary>Each page's title and how it is made, in the order of <see cref="ChopChopMeow.Page"/>.</summary>
+    private static readonly (string Title, Func<PageTools, Selection, PagePanel> Make)[] Pages = {
+        ("Inspect", InspectPage.For),
+        ("A new beginning", (tools, _) => new WelcomePage(tools)),
+        ("Building plans", (tools, _) => new PlansPanel(tools)),
+        ("Backpack", (tools, _) => new BackpackPage(tools)),
+        ("Field guide", (tools, _) => new GuidePanel(tools)),
+        ("Your crew", (tools, _) => new CrewPanel(tools)),
+        ("Crafting", (tools, _) => new CraftPanel(tools)),
+        ("Inspect", InspectPage.For),
+    };
     private readonly World world;
     private readonly UiKit kit;
     private readonly WorldView view;
@@ -61,7 +74,7 @@ public partial class SidePanel : PanelContainer {
     /// <summary>The player's control of the world, which also needs this panel, so the game sets it once both exist.</summary>
     public PlayerControl Player { get; set; } = null!;
     /// <summary>The open page, or nothing while the panel is closed.</summary>
-    public string Page { get; private set; } = "welcome";
+    public Page Page { get; private set; } = Page.Welcome;
     public Selection Selection { get; private set; }
     public TextureRect HeadingIcon { get; }
     public Label HeadingTitle { get; }
@@ -90,8 +103,8 @@ public partial class SidePanel : PanelContainer {
     }
 
     /// <summary>Shows a page: the one already showing draws again and keeps its state, any other starts afresh.</summary>
-    public void Open(string name) {
-        bool same = name == Page && (name != "inspect" || Selection == shownInspect);
+    public void Open(Page name) {
+        bool same = name == Page && (name != Page.Inspect || Selection == shownInspect);
         shownInspect = Selection;
         Visible = true; view.PanelOpen = true;
         if (same && page is { Current: true }) { page.Redraw(); return; }
@@ -100,15 +113,7 @@ public partial class SidePanel : PanelContainer {
         Page = name;
         foreach (var child in content.GetChildren()) { content.RemoveChild(child); child.QueueFree(); }
         ClearFrame();
-        page = name switch {
-            "welcome" => new WelcomePage(tools),
-            "help" => new GuidePanel(tools),
-            "build" => new PlansPanel(tools),
-            "inventory" => new BackpackPage(tools),
-            "workers" => new CrewPanel(tools),
-            "craft" => new CraftPanel(tools),
-            _ => InspectPage.For(tools, Selection)
-        };
+        page = Pages[(int)name].Make(tools, Selection);
         content.AddChild(page);
         page.Refresh(); Bag.Refresh();
     }
@@ -117,7 +122,7 @@ public partial class SidePanel : PanelContainer {
     public void ClearFrame() {
         while (heading.GetChildCount() > 3) { var extra = heading.GetChild(2); heading.RemoveChild(extra); extra.QueueFree(); }
         HeadingIcon.Texture = null; HeadingIcon.Visible = false; HeadingIcon.TooltipText = ""; HeadingIcon.SelfModulate = Colors.White;
-        HeadingTitle.Text = Page switch { "welcome" => "A new beginning", "build" => "Building plans", "inventory" => "Backpack", "help" => "Field guide", "workers" => "Your crew", "craft" => "Crafting", _ => "Inspect" };
+        HeadingTitle.Text = Pages[(int)Page].Title;
         foreach (var child in sheet.GetChildren()) { sheet.RemoveChild(child); child.QueueFree(); }
         board.Visible = false; sheet.Visible = false; sheetScroll = null;
         OffsetLeft = Left; scroll.ScrollVertical = 0;
@@ -134,24 +139,24 @@ public partial class SidePanel : PanelContainer {
     public void DrawerOnly() { Visible = false; view.PanelOpen = false; }
 
     /// <summary>Opens a page, or closes it if it is the one showing.</summary>
-    public void Toggle(string name) { if (Page == name) Close(); else Open(name); }
+    public void Toggle(Page name) { if (Page == name) Close(); else Open(name); }
 
-    public void Close() { Visible = false; Bag.Visible = false; view.PanelOpen = false; Page = ""; page = null; }
+    public void Close() { Visible = false; Bag.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
 
     /// <summary>Runs the open page's updates.</summary>
     public void Refresh() => page?.Refresh();
 
     /// <summary>Selects a building or resource and shows it.</summary>
     public void Select(Thing t) {
-        if (t.Kind == ThingKind.Reinforced && !(Page == "inspect" && Selection.Thing == t.Id)) kit.Sounds.Play("open_steel_smelter", t.Pos);
+        if (t.Kind == ThingKind.Reinforced && !(Page == Page.Inspect && Selection.Thing == t.Id)) kit.Sounds.Play("open_steel_smelter", t.Pos);
         Selection = Selection.Of(t);
         // A work order carries on: it waits for a click on a resource, whatever the panel shows meanwhile.
         if (Player.Mode.Placing != null) Player.Mode = new ClickMode.Normal();
-        Open("inspect");
+        Open(Page.Inspect);
     }
 
     /// <summary>Selects a worker and shows them.</summary>
-    public void Select(Worker w) { Selection = Selection.Of(w); Open("inspect"); }
+    public void Select(Worker w) { Selection = Selection.Of(w); Open(Page.Inspect); }
 
     /// <summary>Marks a thing as selected without opening its page, as a right click on it does.</summary>
     public void Mark(Thing t) => Selection = Selection.Of(t);

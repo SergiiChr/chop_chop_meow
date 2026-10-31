@@ -56,7 +56,7 @@ public partial class Game : Node {
             view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = Launch.Has("--environment-review") }; AddChild(view);
             kit = new UiKit(world, sounds, Notify, RefreshLive);
             net = new Net { Name = "Net", World = world, FilePrefix = Launch.FilePrefix }; AddChild(net);
-            saves = new Saves(kit, net, () => panel.Open("inventory"));
+            saves = new Saves(kit, net, () => panel.Open(Page.Backpack));
             world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };
             world.PlayerActed += (action, at) => net.Echo(world.S.Actor.Id, action, at);
             ConnectNet();
@@ -132,7 +132,7 @@ public partial class Game : Node {
         net.Leave();
         world.NewGame();
         saves.Slot = 0; autosave = 0;
-        panel.Open("welcome");
+        panel.Open(Page.Welcome);
         Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
     }
     public override void _UnhandledInput(InputEvent ev) {
@@ -146,11 +146,11 @@ public partial class Game : Node {
                 case Key.Escape:
                     if (player.Mode is not ClickMode.Normal) player.Mode = new ClickMode.Normal(); else if (panel.Visible || bag.Visible) panel.Close(); else menu.Open();
                     RefreshLive(); break;
-                case Key.B: panel.Open("build"); break;
-                case Key.I: panel.Toggle("help"); break;
-                case Key.H: panel.Toggle("workers"); break;
-                case Key.C: panel.Toggle("craft"); break;
-                case Key.Tab: panel.Toggle("inventory"); break;
+                case Key.B: panel.Open(Page.Build); break;
+                case Key.I: panel.Toggle(Page.Guide); break;
+                case Key.H: panel.Toggle(Page.Crew); break;
+                case Key.C: panel.Toggle(Page.Craft); break;
+                case Key.Tab: panel.Toggle(Page.Backpack); break;
                 // Until a numbered slot is chosen, quick save and load ask which slot to use.
                 case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (saves.Slot > 0) saves.Save(saves.Slot); else startMenu.ShowSlots(true, startMenu.Close); break;
                 case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (saves.Slot > 0) saves.Load(saves.Slot); else startMenu.ShowSlots(false, startMenu.Close); break;

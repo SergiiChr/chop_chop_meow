@@ -11,12 +11,12 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
 
     protected override void Body() {
         headingTitle.Text = "Trading post";
-        Tab("cart", "coins", "Ship", () => memory.SignpostTab = "market", memory.SignpostTab == "market");
-        Tab("crew", "hardhat", "Hire", () => memory.SignpostTab = "workers", memory.SignpostTab == "workers");
+        Tab("cart", "coins", "Ship", () => memory.Hiring = false, !memory.Hiring);
+        Tab("crew", "hardhat", "Hire", () => memory.Hiring = true, memory.Hiring);
         Tab("guide", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
         FilterButton();
         if (memory.SheetOpen) PriceSheet();
-        if (memory.SignpostTab == "workers") HireOffers();
+        if (memory.Hiring) HireOffers();
         else Shipping();
         JobButtons();
     }

@@ -26,7 +26,7 @@ public partial class BackpackDrawer : PanelContainer {
         var sort = kit.Button("Sort", world.SortBackpack); sort.Name = "sort_bag"; sort.TooltipText = "Stack loose items and sort by type"; label.AddChild(sort);
         Content = new VBoxContainer(); drawer.AddChild(Content);
         // Every closable window keeps its close button in its top right corner.
-        var hide = kit.HeaderButton("close", "Hide the backpack", () => { if (panel.Page == "inventory") panel.Close(); else { Dismissed = true; Visible = false; } }, Style.CloseRound, "bag_close");
+        var hide = kit.HeaderButton("close", "Hide the backpack", () => { if (panel.Page == Page.Backpack) panel.Close(); else { Dismissed = true; Visible = false; } }, Style.CloseRound, "bag_close");
         hide.SizeFlagsVertical = SizeFlags.ShrinkBegin; drawer.AddChild(hide);
     }
 

@@ -83,7 +83,7 @@ public sealed class PlayerControl {
                 if (!world.Near(lifting, 1.5f)) direction = (lifting.Pos - world.Player).Normalized();
                 else if ((liftClock += dt) >= LiftSeconds) {
                     var crate = lifting; lifting = null;
-                    if (world.PickUpCrate(crate) && panel.Deselect(crate.Id) && panel.Page == "inspect") panel.Close();
+                    if (world.PickUpCrate(crate) && panel.Deselect(crate.Id) && panel.Page == Page.Inspect) panel.Close();
                 }
             } else { lifting = null; liftClock = 0; }
             view.Lifting = lifting?.Id ?? 0; view.LiftProgress = liftClock / LiftSeconds;

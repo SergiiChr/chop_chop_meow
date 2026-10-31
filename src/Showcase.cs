@@ -126,10 +126,10 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--hide-ui")) ui.Visible = false;
         if (Launch.Has("--market")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); }
         if (Launch.Has("--bench")) { world.Player = bench.Pos + Vector2.One; panel.Select(bench); }
-        if (Launch.Has("--craft")) panel.Open("craft");
-        if (Launch.Has("--crew")) panel.Open("workers");
+        if (Launch.Has("--craft")) panel.Open(Page.Craft);
+        if (Launch.Has("--crew")) panel.Open(Page.Crew);
         if (Launch.Has("--worker")) panel.Select(world.Workers[0]);
-        if (Launch.Has("--guide")) panel.Open("help");
+        if (Launch.Has("--guide")) panel.Open(Page.Guide);
         if (Launch.Has("--menu")) { panel.Close(); menu.Open(); }
         if (Launch.Has("--furnace")) { world.Player = bellows.Pos + Vector2.One; panel.Select(bellows); }
         if (Launch.Has("--piles")) {
@@ -189,7 +189,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--tin")) { var cliff = World.CliffOf(ThingKind.Tin); world.Player = cliff.Center + cliff.Face * 5.5f; world.Tick(0); panel.Close(); }
         if (Launch.Has("--pantry")) {
             foreach (var id in new[] { "tin_ore", "tin_bar", "tin_can", "steel_chisel", "rake", "mortar", "leaves", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "bread", "crushed_berries", "berry_jam", "meat_stew", "burnt_steak", "canned_jam", "canned_meat_stew" }) world.S.Backpack.Add(id, 3);
-            panel.Open("inventory");
+            panel.Open(Page.Backpack);
         }
         // Hovering a recipe shows its description below the grids and as a tooltip at the pointer.
         if (Launch.Has("--hover")) panel.GetTree().CreateTimer(.5).Timeout += () => {
@@ -206,7 +206,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // Lunch review: the crew has walked over and sat down around the campfire, with the pay overview open.
             world.S.Time = (world.Data.LunchHour - 6) / 24 * world.Data.DaySeconds;
             for (int i = 0; i < 60; i++) world.Tick(.25f);
-            panel.Open("workers");
+            panel.Open(Page.Crew);
         }
         if (Launch.Has("--strike")) {
             // Strike review: the whole crew owes wages and stands holding protest signs.

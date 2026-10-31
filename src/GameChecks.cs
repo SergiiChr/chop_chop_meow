@@ -51,7 +51,7 @@ public partial class Game {
         // Held still so what each page shows stays the same. The pause menu would hold world clicks, so the hold and the page opening stay direct.
         bool held = true; kit.HoldWhile(() => held);
         var pages = new (string Name, Action Open)[] {
-            ("inventory", () => panel.Open("inventory")), ("craft", () => panel.Open("craft")), ("workers", () => panel.Open("workers")),
+            ("inventory", () => panel.Open(Page.Backpack)), ("craft", () => panel.Open(Page.Craft)), ("workers", () => panel.Open(Page.Crew)),
             ("chest", () => panel.Select(chest)), ("pile", () => panel.Select(pile)), ("bellows furnace", () => panel.Select(forge)), ("furnace", () => panel.Select(furnace)),
             ("campfire", () => panel.Select(fire)), ("cabin", () => panel.Select(hut)), ("signpost", () => panel.Select(sign)), ("farm", () => panel.Select(farm)), ("packing station", () => panel.Select(packer)),
             ("tree", () => panel.Select(tree)), ("worker", () => panel.Select(worker)),
@@ -401,10 +401,10 @@ public partial class Game {
     private async Task CheckMouseWheelOverPanelDoesNotZoom() {
         float zoom = view.Zoom;
         await CloseWithEsc();
-        foreach (var (page, key) in new[] { ("inventory", Key.Tab), ("build", Key.B), ("craft", Key.C), ("help", Key.I) }) {
+        foreach (var (page, key) in new[] { (Page.Backpack, Key.Tab), (Page.Build, Key.B), (Page.Craft, Key.C), (Page.Guide, Key.I) }) {
             await KeyStroke(key);
             // The backpack shows only its drawer, so the wheel goes over that.
-            var box = page == "inventory" ? bag.GetGlobalRect() : panel.GetGlobalRect();
+            var box = page == Page.Backpack ? bag.GetGlobalRect() : panel.GetGlobalRect();
             foreach (var spot in new[] { box.GetCenter(), box.Position + new Vector2(30, 30), box.End - new Vector2(30, 30) }) await Wheel(spot);
             Require(view.Zoom == zoom, $"The mouse wheel over the {page} panel must not zoom the world.");
         }
