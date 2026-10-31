@@ -41,6 +41,7 @@ public partial class SidePanel : PanelContainer {
     private readonly WorldView view;
     private readonly Control ui;
     private readonly PageTools tools;
+    private readonly HBoxContainer heading;
     private readonly ScrollContainer scroll;
     /// <summary>The board left of the panel that holds the price sign or the filter window.</summary>
     private readonly PanelContainer board;
@@ -60,7 +61,6 @@ public partial class SidePanel : PanelContainer {
     /// <summary>The open page, or nothing while the panel is closed.</summary>
     public string Page { get; private set; } = "welcome";
     public Selection Selection { get; private set; }
-    public HBoxContainer Heading { get; }
     public TextureRect HeadingIcon { get; }
     public Label HeadingTitle { get; }
     public float ScreenWidth => ui.Size.X;
@@ -75,11 +75,11 @@ public partial class SidePanel : PanelContainer {
         board = new PanelContainer { Visible = false, SizeFlagsVertical = SizeFlags.ShrinkBegin }; frame.AddChild(board);
         sheet = new VBoxContainer { Name = "side_board", Visible = false }; sheet.AddThemeConstantOverride("separation", 12); board.AddChild(sheet);
         var outer = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; outer.AddThemeConstantOverride("separation", 16); frame.AddChild(outer);
-        Heading = new HBoxContainer(); Heading.AddThemeConstantOverride("separation", 12); outer.AddChild(Heading);
-        HeadingIcon = Style.Icon(null, 44); HeadingIcon.Visible = false; HeadingIcon.MouseFilter = MouseFilterEnum.Pass; Heading.AddChild(HeadingIcon);
+        heading = new HBoxContainer(); heading.AddThemeConstantOverride("separation", 12); outer.AddChild(heading);
+        HeadingIcon = Style.Icon(null, 44); HeadingIcon.Visible = false; HeadingIcon.MouseFilter = MouseFilterEnum.Pass; heading.AddChild(HeadingIcon);
         HeadingTitle = Style.Heading("");
-        HeadingTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill; Heading.AddChild(HeadingTitle);
-        Heading.AddChild(kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "close"));
+        HeadingTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill; heading.AddChild(HeadingTitle);
+        heading.AddChild(kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "close"));
         scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
         // Room for the pills that sit on the cups' corners.
         var inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);
@@ -113,7 +113,7 @@ public partial class SidePanel : PanelContainer {
 
     /// <summary>Empties what a page fills around its body: the header, the side board and the backpack drawer.</summary>
     public void ClearFrame() {
-        while (Heading.GetChildCount() > 3) { var extra = Heading.GetChild(2); Heading.RemoveChild(extra); extra.QueueFree(); }
+        while (heading.GetChildCount() > 3) { var extra = heading.GetChild(2); heading.RemoveChild(extra); extra.QueueFree(); }
         HeadingIcon.Texture = null; HeadingIcon.Visible = false; HeadingIcon.TooltipText = ""; HeadingIcon.SelfModulate = Colors.White;
         HeadingTitle.Text = Page switch { "welcome" => "A new beginning", "build" => "Building plans", "inventory" => "Backpack", "help" => "Field guide", "workers" => "Your crew", "craft" => "Crafting", _ => "Inspect" };
         foreach (var child in sheet.GetChildren()) { sheet.RemoveChild(child); child.QueueFree(); }
@@ -121,6 +121,9 @@ public partial class SidePanel : PanelContainer {
         OffsetLeft = Left; scroll.ScrollVertical = 0;
         Bag.Clear();
     }
+
+    /// <summary>Puts a control in the header, before the close button.</summary>
+    public void AddToHeader(Control control) { heading.AddChild(control); heading.MoveChild(control, heading.GetChildCount() - 2); }
 
     /// <summary>Whether this page is the one showing.</summary>
     public bool Shows(PagePanel shown) => page == shown;

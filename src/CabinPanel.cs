@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
         var tag = Style.Pill("", Style.TagPill, Style.Rim, 13); tag.MouseFilter = Control.MouseFilterEnum.Pass; tag.TooltipText = "Wolves back off while you are inside";
-        heading.AddChild(tag); heading.MoveChild(tag, heading.GetChildCount() - 2);
+        panel.AddToHeader(tag);
         // What a night's sleep would leave: each need now, and at dawn.
         var well = Well(new VBoxContainer()); well.AddThemeConstantOverride("separation", 12);
         var top = new HBoxContainer(); top.AddThemeConstantOverride("separation", 8); well.AddChild(top);

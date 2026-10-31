@@ -13,7 +13,7 @@ public partial class PilePanel(PageTools tools, Thing subject) : ThingPage(tools
         if (thing.Compost) { headingIcon.Texture = Icons.Of("leaves"); headingIcon.Visible = true; }
         var compost = new CheckButton { ButtonPressed = thing.Compost, FocusMode = Control.FocusModeEnum.None, TooltipText = "Compost: turns leaves, grass and food into fertilizer", Name = "compost" };
         compost.Toggled += on => { if (!world.SetCompost(thing, on)) compost.SetPressedNoSignal(thing.Compost); else Redraw(); };
-        heading.AddChild(compost); heading.MoveChild(compost, heading.GetChildCount() - 2);
+        panel.AddToHeader(compost);
         if (thing.Compost) FilterButton();
         else HeaderAction("stash", "Store everything this pile takes", () => StoreAll(thing), Style.ActionRound, "deposit");
         Well(new VBoxContainer()).AddChild(StorageGrid(thing, 7, 44));

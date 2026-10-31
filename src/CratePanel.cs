@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 public partial class CratePanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
         var sells = Style.Pill("✓", Style.TagPill, Style.Rim, 13); sells.MouseFilter = Control.MouseFilterEnum.Pass; sells.TooltipText = "The village buys this crate packed";
-        heading.AddChild(sells); heading.MoveChild(sells, heading.GetChildCount() - 2);
+        panel.AddToHeader(sells);
         var meter = Row(); meter.AddThemeConstantOverride("separation", 10);
         var cells = new HBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; cells.AddThemeConstantOverride("separation", 4); meter.AddChild(cells);
         var segments = Enumerable.Range(0, thing.Inventory.Capacity).Select(_ => new ColorRect { CustomMinimumSize = new Vector2(0, 12), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }).ToArray();

@@ -14,7 +14,6 @@ public abstract partial class PagePanel : VBoxContainer {
     protected readonly ItemMoves moves;
     protected readonly PageMemory memory;
     protected readonly LiveUpdates live = new();
-    protected HBoxContainer heading => panel.Heading;
     protected TextureRect headingIcon => panel.HeadingIcon;
     protected Label headingTitle => panel.HeadingTitle;
 
@@ -50,7 +49,7 @@ public abstract partial class PagePanel : VBoxContainer {
     /// <summary>Puts a round button in the header, before the close button.</summary>
     protected Button HeaderAction(string glyph, string tooltip, Action action, (StyleBoxFlat Normal, StyleBoxFlat Hover) look, string name = "") {
         var button = kit.HeaderButton(glyph, tooltip, action, look, name);
-        heading.AddChild(button); heading.MoveChild(button, heading.GetChildCount() - 2);
+        panel.AddToHeader(button);
         return button;
     }
 

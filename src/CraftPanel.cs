@@ -67,7 +67,7 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
 public partial class BenchPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
         // The station's own tool cups sit in the header: what is slotted sets which recipes can run and how fast.
-        foreach (string tool in World.SlotKinds(thing.Kind)) { var slot = ToolSlot(tool); heading.AddChild(slot); heading.MoveChild(slot, heading.GetChildCount() - 2); }
+        foreach (string tool in World.SlotKinds(thing.Kind)) { var slot = ToolSlot(tool); panel.AddToHeader(slot); }
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
         var groups = world.Data.Recipes.Where(p => p.Value.Station == thing.Kind).Select(p => p.Key).GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
         AddChild(new RecipeBoard(kit, live, memory, Redraw, groups, group => group.Tool == "" ? null : world.BenchTool(thing, group.Tool, group.Tier), thing,

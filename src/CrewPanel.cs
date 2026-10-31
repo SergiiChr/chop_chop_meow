@@ -29,7 +29,7 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
     protected override void Build() {
         var count = Style.Pill("", Style.BlueTag, Style.Rim, 13); count.MouseFilter = Control.MouseFilterEnum.Pass; count.TooltipText = "Villagers hired, of the most who will come";
         var wages = Style.Pill("", Style.Tag(Style.Brick), Style.Rim, 13); wages.MouseFilter = Control.MouseFilterEnum.Pass; wages.TooltipText = "Wages paid each dawn";
-        foreach (var pill in new[] { count, wages }) { pill.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; heading.AddChild(pill); heading.MoveChild(pill, heading.GetChildCount() - 2); }
+        foreach (var pill in new[] { count, wages }) { pill.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; panel.AddToHeader(pill); }
         live.Watch(() => (world.Workers.Count, world.DailyWages), now => {
             count.Text = $"{now.Item1} / {World.MaxWorkers}";
             wages.Text = $"−{now.Item2} /day";
@@ -90,7 +90,7 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
         if (w == null) { AddLabel("This worker has left."); return; }
         headingTitle.Text = w.Name; headingIcon.Texture = Hardhat; headingIcon.Visible = true;
         var wage = Style.Pill($"{w.Wage} /day", Style.Tag(Style.Brick), Style.Rim, 13); wage.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; wage.MouseFilter = Control.MouseFilterEnum.Pass; wage.TooltipText = "Daily wage";
-        heading.AddChild(wage); heading.MoveChild(wage, heading.GetChildCount() - 2);
+        panel.AddToHeader(wage);
         var well = Well(new HBoxContainer()); well.AddThemeConstantOverride("separation", 12);
         var (carry, carried) = ItemSlot.Cup("carry", 56); well.AddChild(carry);
         var (tool, _) = ItemSlot.Cup("tool", 56); well.AddChild(tool);
