@@ -627,6 +627,22 @@ public partial class Game {
         await Frames(); Require(farm.Progress > 0 && farm.FarmStage == FarmStage.Ripe, "holding RMB on a ripe farm plot must walk over and harvest by hand.");
         RemoveThings(world, t => t == farm);
     }
+    private async Task CheckRightClickGathersAndLeavesASelectedWorkerMarked() {
+        var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
+        var worker = AddWorker(world, world.Player + new Vector2(-2, 2));
+        await Frames(); await Click(view.Screen(worker.Pos, 1));
+        Require(view.Selection.Worker == worker.Id, "A left click on a worker must select them.");
+        var point = view.Screen(tree.Pos) - new Vector2(0, 70);
+        Require(Uncovered(point), "The tree must be clear of the worker's page.");
+        var windowPoint = GetViewport().GetFinalTransform() * point;
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
+        await Until(() => view.Gathering, "a right click on a tree starting to gather", 4);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
+        await Frames();
+        Require(view.Selection.Worker == worker.Id, "A right click on a tree must leave a selected worker marked.");
+        Require(panel.HeadingTitle.Text == worker.Name, "A right click on a tree must leave the worker's page open.");
+        world.Fire(worker); await CloseWithEsc();
+    }
     /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item in hand.</summary>
     private async Task CheckHudAndHotbarEatAndDrinkInHand() {
         Require(!HasLabel(clock, "Health"), "The persistent HUD must not show health.");
@@ -700,6 +716,7 @@ public partial class Game {
         Require(world.Backpack["wood"] == half && chest.Inventory["wood"] == storedWood - half, $"A right click must pick up half a stack and a left click must drop it ({world.Backpack["wood"]} of {half}, chest {chest.Inventory["wood"]} of {storedWood}).");
         await DragTo(await Showing(1, c => c.TooltipText.StartsWith("Wood")), Cell(0, c => c.TooltipText == ""));
         Require(chest.Inventory["wood"] == storedWood, "The split half must go back into the chest.");
+        float plainHeight = panel.Size.Y;
         await Click(Named("filters")!);
         Require(Named("filters_close") != null, "Chest filters must open the filter window.");
         Require(ShowsChild(panel, "side_board"), "Chest filters must show the sheet beside the panel.");
@@ -715,6 +732,7 @@ public partial class Game {
         await Click(Named("filters")!);
         await Click(Named("filters_close")!);
         Require(Named("filters_close") == null && panel.Visible, "The filter window's close button must close it and leave the panel open.");
+        await Until(() => panel.Size.Y == plainHeight, "the panel shrinking back once the taller filter window closed", 2);
         await KeyStroke(Key.Tab);
         Require(!panel.Visible, "Tab must not open the side panel.");
         Require(bag.Visible, "Tab must open the backpack drawer.");
@@ -762,6 +780,16 @@ public partial class Game {
         Require(!menu.Visible, "Loading from the pause menu must close the pause menu.");
         Require(!view.Paused, "Loading from the pause menu must resume the world.");
         Require(world.Player.DistanceTo(savedPosition) < .01f, "Loading from the pause menu must restore the saved position.");
+    }
+    private async Task CheckLoadEndsClickModeAndSelection() {
+        var chest = world.Things.First(t => t.Kind == ThingKind.Chest);
+        await CloseWithEsc(); await ClickOn(chest);
+        Require(Shows(chest), "A click must select the chest.");
+        await KeyStroke(Key.Key3);
+        Require(player.Mode.Placing == ThingKind.Chest && view.Selection.Thing == chest.Id, "A plan's hotkey must enter placement and keep the selection.");
+        await KeyStroke(Key.F9); await Frames();
+        Require(player.Mode is ClickMode.Normal, "A load must end placement.");
+        Require(view.Selection == default, "A load must clear the selection.");
     }
     /// <summary>A load ends a crate lift under way, since finishing it on the crate from before the load would copy the crate into the backpack.</summary>
     private async Task CheckLoadEndsCrateLiftUnderWay() {
@@ -975,10 +1003,12 @@ public partial class Game {
             await CheckLowFoodGlowsScreenEdges();
             await CheckSoundsRotateCrossfadeAndStaySilentOffScreen();
             await CheckRightClickGathersTreeAndHarvestsFarm();
+            await CheckRightClickGathersAndLeavesASelectedWorkerMarked();
             await CheckHudAndHotbarEatAndDrinkInHand();
             var chest = await CheckBuildPlanPlacesChest();
             await CheckChestMovesSplitsAndFiltersStacks(chest);
             await CheckQuickSaveAndLoadRestorePlayerAndChest(chest);
+            await CheckLoadEndsClickModeAndSelection();
             await CheckLoadEndsCrateLiftUnderWay();
             await CheckBackpackCellsAndHudIconsTrackStats();
             await CheckPinnedPlayerStaysDownAndDeathCountsDown();

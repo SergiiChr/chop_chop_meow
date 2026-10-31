@@ -74,7 +74,7 @@ public partial class SidePanel : PanelContainer {
     /// <summary>The player's control of the world, which also needs this panel, so the game sets it once both exist.</summary>
     public PlayerControl Player { get; set; } = null!;
     /// <summary>The open page, or nothing while the panel is closed.</summary>
-    public Page Page { get; private set; } = Page.Welcome;
+    public Page Page { get; private set; }
     public Selection Selection { get; private set; }
     public TextureRect HeadingIcon { get; }
     public Label HeadingTitle { get; }
@@ -158,8 +158,8 @@ public partial class SidePanel : PanelContainer {
     /// <summary>Selects a worker and shows them.</summary>
     public void Select(Worker w) { Selection = Selection.Of(w); Open(Page.Inspect); }
 
-    /// <summary>Marks a thing as selected without opening its page, as a right click on it does.</summary>
-    public void Mark(Thing t) => Selection = Selection.Of(t);
+    /// <summary>Marks a thing as selected without opening its page, as a right click on it does; a selected worker stays selected.</summary>
+    public void Mark(Thing t) { if (Selection.Worker == 0) Selection = Selection.Of(t); }
 
     /// <summary>Clears the selection if it is this thing, which has gone; true when it was.</summary>
     public bool Deselect(int id) {
@@ -189,9 +189,7 @@ public partial class SidePanel : PanelContainer {
             float rows = Math.Min(sheetRows!.GetCombinedMinimumSize().Y, Math.Min(room, clear) - 110);
             if (Math.Abs(sheetScroll.CustomMinimumSize.Y - rows) > .5f) sheetScroll.CustomMinimumSize = new Vector2(0, rows);
         }
-        if (Math.Abs(scroll.CustomMinimumSize.Y - want) < .5f) return;
-        // A control grows to its minimum size but never shrinks back on its own, so the panel is reset to it.
-        scroll.CustomMinimumSize = new Vector2(0, want);
-        OffsetBottom = Top;
+        // The panel's bottom offset stays at its top, so it hugs this minimum size as it grows and shrinks.
+        if (Math.Abs(scroll.CustomMinimumSize.Y - want) >= .5f) scroll.CustomMinimumSize = new Vector2(0, want);
     }
 }

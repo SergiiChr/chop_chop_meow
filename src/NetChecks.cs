@@ -100,10 +100,22 @@ public partial class Game {
 
     private async Task CheckGuestComesBackFromLeavingDroppingAndABrokenSave() {
         await LeaveGame();
-        await JoinFromStart();
+        // The start menu covers the world and Esc ends a click mode before Join can be reached, so no input leaves either in place for a join.
+        panel.Mark(world.Things.First()); player.Mode = new ClickMode.Build(ThingKind.Chest); await Frames();
+        Require(view.Selection != default, "The guest must have something selected before it joins.");
+        await JoinFromStart(); await Frames();
+        Require(player.Mode is ClickMode.Normal, "Joining must end placement.");
+        Require(view.Selection == default, "Joining must clear the selection.");
         Require(world.Backpack["coal"] == 2, "A guest must come back with what it carried when it left.");
+        await CloseWithEsc(); await Click(view.Screen(NetChest, .3f));
+        Require(view.Selection != default, "The guest must select the chest before the line drops.");
+        await KeyStroke(Key.Key3);
+        Require(player.Mode.Placing == ThingKind.Chest, "A plan's hotkey must enter placement before the line drops.");
         Signal("joined");
         await Until(() => startMenu.Visible && HasLabel(startMenu.Screen, "RECONNECTING"), "a dropped guest being told it is reconnecting", 60);
+        await Frames();
+        Require(player.Mode is ClickMode.Normal, "A lost connection must end placement.");
+        Require(view.Selection == default, "A lost connection must clear the selection.");
         await Until(() => world.Remote && !startMenu.Visible, "a dropped guest getting back in by itself", 90);
         Require(world.Backpack["coal"] == 2, "A guest must reconnect with what it carried when the line dropped.");
         await LeaveGame();

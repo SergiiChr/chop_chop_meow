@@ -2181,7 +2181,9 @@ public static class SimulationChecks {
         var crew = StartDayCrew(data);
         var (world, tree, _, _, forge, cutter, pumper, _) = crew;
         var sign = SignOutCrew(crew);
-        Require(world.Workers.All(w => w.Home && !world.Sees(w) && w.Commute == data.TradeSeconds / 2), "at dusk every worker should walk off like a cart and sign out");
+        Require(world.Workers.All(w => w.Home), "at dusk every worker should sign out");
+        Require(world.Workers.All(w => !world.Sees(w)), "a signed-out worker should be out of sight");
+        Require(world.Workers.All(w => w.Commute == data.TradeSeconds / 2), "a signed-out worker should walk off for as long as a cart's trip");
         // Walking arrives within reach of the signpost, so the walk-off starts up to that far from it.
         Require(cutter.Pos.DistanceTo(sign.Pos + Vector2.One + Terrain.Seaward * World.TripDistance) < 1.25f,
                 "a worker should sign out a cart's trip down the valley from the signpost");
