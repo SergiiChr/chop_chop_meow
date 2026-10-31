@@ -20,9 +20,10 @@ public partial class EndingScreen : PanelContainer {
         var column = new VBoxContainer(); AddChild(column);
         var title = Style.Wrapped("A settlement of your own", 26); title.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(title);
         stats = Style.Wrapped("", 16, Style.Beige); stats.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(stats);
-        var keep = kit.Button("Keep playing", () => { Visible = false; kit.State.Paused = false; }); keep.Name = "keep_playing"; column.AddChild(keep);
+        var keep = kit.Button("Keep playing", () => Visible = false); keep.Name = "keep_playing"; column.AddChild(keep);
         var again = kit.Button("Restart", restart); again.Name = "restart"; column.AddChild(again);
         kit.World.Replaced += () => Visible = false;
+        kit.HoldWhile(() => Visible);
     }
 
     /// <summary>Called on every running frame; opens the screen the first time the end goals are complete.</summary>
@@ -30,7 +31,7 @@ public partial class EndingScreen : PanelContainer {
         var world = kit.World;
         // A guest's copy takes the host's flag with every update, so a guest remembers its own.
         if ((world.Remote ? seen : world.S.EndingShown) || !world.EndGoalsComplete) return;
-        world.S.EndingShown = seen = true; kit.State.Paused = true; closePanel();
+        world.S.EndingShown = seen = true; closePanel();
         int seconds = (int)world.S.PlaySeconds;
         stats.Text = $"Every ore in the valley has its mine, and the settlement cleared {world.Data.Goals.DailyProfit} coins a day for {world.Data.Goals.ProfitDays} days.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";
         Visible = true;

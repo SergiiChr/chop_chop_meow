@@ -8,8 +8,6 @@ namespace ChopChopMeow;
 
 /// <summary>What several parts of the interface read or change; each field has this one home.</summary>
 public sealed class UiState {
-    /// <summary>A menu or overlay holds the player; only a game nobody else is in stops the world too.</summary>
-    public bool Paused;
     /// <summary>A cabin the player is walking to after clicking it; they step inside on arrival.</summary>
     public Thing? Entering;
 }
@@ -22,6 +20,18 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
     public World World { get; } = world;
     public Sounds Sounds { get; } = sounds;
     public UiState State { get; } = new();
+    private readonly List<Func<bool>> holds = new();
+
+    /// <summary>A menu or overlay holds the player; only a game nobody else is in stops the world too.</summary>
+    public bool Paused {
+        get {
+            foreach (var open in holds) if (open()) return true;
+            return false;
+        }
+    }
+
+    /// <summary>Adds what pauses the game while it is open, so no part writes or restores another's pause.</summary>
+    public void HoldWhile(Func<bool> open) => holds.Add(open);
 
     /// <summary>Tells the player something through the game's message stack.</summary>
     public void Notify(string message) => notify(message);

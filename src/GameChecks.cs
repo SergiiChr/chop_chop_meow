@@ -49,7 +49,7 @@ public partial class Game {
         var worker = AddWorker(world, at + Vector2.One); worker.Name = "Panel Check"; worker.Wage = 5;
         world.Assign(worker, forge); worker.Bag.Add("coal", 2);
         // Held still so what each page shows stays the same. The pause menu would hold world clicks, so the hold and the page opening stay direct.
-        bool wasPaused = state.Paused; state.Paused = true;
+        bool held = true; kit.HoldWhile(() => held);
         var pages = new (string Name, Action Open)[] {
             ("inventory", () => panel.Open("inventory")), ("craft", () => panel.Open("craft")), ("workers", () => panel.Open("workers")),
             ("chest", () => panel.Select(chest)), ("pile", () => panel.Select(pile)), ("bellows furnace", () => panel.Select(forge)), ("furnace", () => panel.Select(furnace)),
@@ -74,7 +74,7 @@ public partial class Game {
             GD.Print(report);
             Require(bytes == 0, $"Allocation budget exceeded: {report}");
         }
-        await CloseWithEsc(); state.Paused = wasPaused;
+        await CloseWithEsc(); held = false;
         world.Fire(worker);
         var placed = new[] { chest, pile, forge, furnace, fire, hut, sign, farm, packer };
         RemoveThings(world, t => placed.Contains(t) || t.Kind == ThingKind.Grave);

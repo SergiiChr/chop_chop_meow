@@ -34,18 +34,19 @@ public partial class StartMenu : ColorRect {
         var box = new PanelContainer { CustomMinimumSize = new Vector2(460, 0) }; center.AddChild(box);
         Screen = new VBoxContainer(); box.AddChild(Screen);
         world.Replaced += Close;
+        kit.HoldWhile(() => Visible);
     }
 
     /// <summary>Clears the column for a new screen under a title; <paramref name="back"/> is what Esc does there.</summary>
     public void Open(string heading, Action? back) {
         foreach (var child in Screen.GetChildren()) { Screen.RemoveChild(child); child.QueueFree(); }
         var title = Style.Wrapped(heading, 22); title.HorizontalAlignment = HorizontalAlignment.Center; Screen.AddChild(title);
-        screenBack = back; Visible = true; hideMenu(); kit.State.Paused = true;
+        screenBack = back; Visible = true; hideMenu();
     }
 
     public void AddButton(string text, Action action, bool disabled = false) => Screen.AddChild(kit.Button(text, action, disabled));
 
-    public void Close() { Visible = false; screenBack = null; kit.State.Paused = false; }
+    public void Close() { Visible = false; screenBack = null; }
 
     /// <summary>What Esc does on the open screen.</summary>
     public void Back() => screenBack?.Invoke();

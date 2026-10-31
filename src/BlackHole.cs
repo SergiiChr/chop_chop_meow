@@ -21,7 +21,6 @@ public partial class BlackHole : CanvasLayer {
     private readonly Label anomalyReadout;
     private readonly Button reloadAfterCollapse;
     private Thing? anomalyCrate;
-    private bool pausedBeforeAnomaly;
 
     private const string CollapseShader = @"
 shader_type canvas_item;
@@ -82,6 +81,7 @@ void fragment() {
         var menuButton = ConsoleButton("Main menu", Neon, () => { End(); mainMenu(); }); menuButton.Name = "menu_after_collapse"; over.AddChild(menuButton);
         anomaly.AddChild(singularity);
         kit.World.Replaced += End;
+        kit.HoldWhile(() => Showing);
     }
 
     /// <summary>The warning or the black hole is on screen, and takes all input.</summary>
@@ -136,7 +136,7 @@ void fragment() {
     /// <summary>Stops a crate from going into a placed crate and asks first; true when the move was intercepted.</summary>
     public bool CrateIntoCrate(Thing? target, Inventory to, string item) {
         if (target?.Kind != ThingKind.Crate || to != target.Inventory || !World.IsCrate(item)) return false;
-        anomalyCrate = target; pausedBeforeAnomaly = kit.State.Paused; kit.State.Paused = true;
+        anomalyCrate = target;
         anomalyReadout.Text = $"CONTAINER {target.Id:0000} · NESTING DEPTH 2 · LOCAL METRIC STABILITY 0.03%";
         anomaly.Visible = true; anomalyWarning.Visible = true; singularity.Visible = false; collapse.Visible = false;
         // The alert border breathes while it waits for an answer.
@@ -147,7 +147,7 @@ void fragment() {
 
     /// <summary>Answers no: the warning closes and the game goes on as it was.</summary>
     public void Cancel() {
-        StopPulse(); anomaly.Visible = false; anomalyCrate = null; kit.State.Paused = pausedBeforeAnomaly;
+        StopPulse(); anomaly.Visible = false; anomalyCrate = null;
     }
 
     private void StopPulse() {
@@ -159,7 +159,7 @@ void fragment() {
 
     /// <summary>The black hole opens at the crate, pulls the picture into itself until only black is left, then the game is over.</summary>
     public void Collapse(Thing crate) {
-        StopPulse(); anomalyWarning.Visible = false; closePanel(); kit.State.Paused = true;
+        StopPulse(); anomalyWarning.Visible = false; closePanel();
         var size = GetViewport().GetVisibleRect().Size;
         var material = (ShaderMaterial)collapse.Material;
         material.SetShaderParameter("center", view.Screen(crate.Pos, .3f) / size);

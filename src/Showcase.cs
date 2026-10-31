@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The review fixtures behind <c>--showcase</c> and its flags: settled scenes for screenshots, separate from a playable game.</summary>
-public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiState state) {
+public sealed class Showcase(World world, WorldView view, SidePanel panel, Control ui, BlackHole blackHole, PauseMenu menu, UiKit kit) {
     /// <summary>Mine review at the near cliff of <c>--mine-ore</c>, iron by default: <c>--mine-stage N</c> sets the finished stages, and a finished mine gets a crew underground and some output.</summary>
     private void MineReview(Thing sign) {
         var stage = int.TryParse(Launch.Value("--mine-stage"), out int n) ? (MineStage)n : MineStage.Open;
@@ -53,7 +53,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             // The wide terrain camera must sit above the peaks rather than inside a near mountain face.
             if (location is "terrain" or "coast" or "mine") view.EnvironmentCameraDistance = 140;
             view.Zoom = location switch { "lake" => .44f, "terrain" => .24f, "coast" => .36f, "mine" => .85f, _ => .75f };
-            panel.Close(); ui.Visible = false; state.Paused = true;
+            panel.Close(); ui.Visible = false; kit.HoldWhile(() => true);
             return;
         }
         if (Launch.Has("--bushes")) {

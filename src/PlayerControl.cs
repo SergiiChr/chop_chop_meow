@@ -52,7 +52,7 @@ public sealed class PlayerControl {
 
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started.</summary>
     public void Update(float dt) {
-        if (!state.Paused) {
+        if (!kit.Paused) {
             float x = (Input.IsPhysicalKeyPressed(Key.D) || Input.IsPhysicalKeyPressed(Key.Right) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.A) || Input.IsPhysicalKeyPressed(Key.Left) ? 1 : 0);
             float y = (Input.IsPhysicalKeyPressed(Key.S) || Input.IsPhysicalKeyPressed(Key.Down) ? 1 : 0) - (Input.IsPhysicalKeyPressed(Key.W) || Input.IsPhysicalKeyPressed(Key.Up) ? 1 : 0);
             Vector2 direction = new Vector2(x + y * 2, y * 2 - x).Normalized();

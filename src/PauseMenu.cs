@@ -48,6 +48,7 @@ public partial class PauseMenu : PanelContainer {
         JoinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
         netLine = Style.Text("", 13, Style.Beige); netLine.HorizontalAlignment = HorizontalAlignment.Center; netLine.AutowrapMode = TextServer.AutowrapMode.WordSmart; side.AddChild(netLine);
         world.Replaced += () => Visible = false;
+        kit.HoldWhile(() => Visible);
     }
 
     private Button MenuButton(string text, Color color, Action action) {
@@ -109,12 +110,12 @@ public partial class PauseMenu : PanelContainer {
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.
         JoinButton.Text = world.Remote ? "Leave game" : "Join"; JoinButton.Disabled = net.Hosting; SaveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = world.Remote;
         netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
-        Visible = true; kit.State.Paused = true;
+        Visible = true;
     }
 
     private void BackToPause() { startMenu.Close(); Open(); }
 
-    public void Close() { Visible = false; kit.State.Paused = false; }
+    public void Close() => Visible = false;
 
     private void HostGame() {
         var error = net.Host();

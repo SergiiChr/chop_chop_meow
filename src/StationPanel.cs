@@ -39,7 +39,7 @@ public partial class StationPanel(SidePanel side, Thing t) : PagePanel(side) {
         var degrees = Style.Heading("", 30); column.AddChild(degrees);
         column.AddChild(Style.Text($"Steel requires {World.Celsius(World.SteelHeat)}+ °C", 14, Style.Beige));
         var pumpRow = new HBoxContainer(); pumpRow.AddThemeConstantOverride("separation", 8); column.AddChild(pumpRow);
-        var pump = kit.Button("Pump", () => { if (state.Paused) kit.Notify("Resume before operating the bellows."); else world.Pump(t); });
+        var pump = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before operating the bellows."); else world.Pump(t); });
         pump.Name = "pump"; pump.TooltipText = "Pump the bellows · Space"; pump.CustomMinimumSize = new Vector2(84, 38);
         var look = Style.Pill(Style.Sage); Style.Skin(pump, look.Item1, look.Item2);
         pumpRow.AddChild(pump); pumpRow.AddChild(Style.Pill("Space", Style.KeyPill, Style.Line, 12));

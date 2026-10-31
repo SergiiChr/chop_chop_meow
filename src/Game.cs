@@ -66,7 +66,7 @@ public partial class Game : Node {
             ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
             ui.Theme = Style.Interface(); BuildHud();
             GetViewport().UseTaa = Settings.Taa;
-            if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, state).Run();
+            if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
             if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
             StartPerformanceRun();
@@ -133,7 +133,7 @@ public partial class Game : Node {
         net.Leave();
         world.NewGame();
         saves.Slot = 0; autosave = 0;
-        state.Paused = false; panel.Open("welcome");
+        panel.Open("welcome");
         Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
     }
     public override void _UnhandledInput(InputEvent ev) {
@@ -172,7 +172,7 @@ public partial class Game : Node {
         float dt = Math.Min((float)delta, .1f); runTime += dt;
         player.Update(dt);
         // Menus pause only a game nobody else is in.
-        bool running = !state.Paused || net.Hosting || world.Remote;
+        bool running = !kit.Paused || net.Hosting || world.Remote;
         if (running) {
             float health = world.Remote ? shownHealth : world.S.Health;
             if (!world.Remote) world.Tick(dt);
