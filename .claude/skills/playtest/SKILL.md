@@ -16,11 +16,12 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
    ```
 
    ```csharp
-   if (LaunchValue("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
+   if (Launch.Value("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
    ```
 
-2. Start the game in the background with a folder in your scratchpad: `./build.py play -- --drive <dir>`. Add `--showcase` and its flags for a late-game fixture instead of a fresh start.
-3. When done, remove both: `git checkout src/Game.cs && rm -f src/ReviewDrive.cs src/ReviewDrive.cs.uid`. Never commit the driver.
+2. Back up the saves: every worktree's game uses the same `app_userdata` folder, so playing can overwrite the player's real saves. Press New game, not Continue, unless the test needs a save, and restore the backup when done.
+3. Start the game in the background with a folder in your scratchpad: `env -u WAYLAND_DISPLAY ./build.py play -- --drive <dir>`. On native Wayland the window runs at about one frame a second. Add `--showcase` and its flags for a late-game fixture instead of a fresh start.
+4. When done, remove both: `git checkout src/Game.cs && rm -f src/ReviewDrive.cs src/ReviewDrive.cs.uid`. Never commit the driver.
 
 ## Drive
 
@@ -33,7 +34,7 @@ Wait for `ready` before writing the next `cmd.txt`.
 | `key W [down\|up]` | Taps, presses or releases a key by Godot `Key` name (`W`, `Escape`, `Tab`, `Space`, `Shift`, `Ctrl`); digits `1`–`9` work as is |
 | `hold W 1.5` | Holds a key for real seconds |
 | `move X Y` | Moves the cursor (hover, placement ghost) |
-| `click X Y [right] [ctrl] [shift] [double]` | Clicks at screen pixels |
+| `click X Y [right] [ctrl] [shift] [double]` | Clicks at screen pixels. Code that reads `Input.IsKeyPressed`, such as Ctrl item moves, needs `key Ctrl down` first instead of `ctrl` |
 | `down X Y [right]` / `up X Y [right]` | Presses or releases a button, e.g. hold right mouse to gather |
 | `wheel X Y up\|down [steps]` | Zooms |
 | `wait 2` | Waits real seconds, whatever the time scale |
@@ -41,12 +42,11 @@ Wait for `ready` before writing the next `cmd.txt`.
 | `shot name` | Saves `<dir>/name.png` from the viewport |
 | `quit` | Closes the game |
 
-Coordinates are window pixels at the game's resolution; screenshots use the same pixels, so read positions off the last shot.
+Coordinates are window pixels at the game's resolution; screenshots use the same pixels, so read positions off the last shot. A showcase runs at 1440x900 and a normal game at the saved resolution, so they differ.
 Look at every screenshot before deciding the next step.
 
 ## Pitfalls
 
-- Stop the game by PID from `pgrep -a Godot`; `pkill -f` with a pattern in the same shell command kills that shell.
-- Saves written by the game in this sandbox may not persist across restarts; don't rely on reloading them.
+- Stop the game by PID from `pgrep -a Godot`. `pkill -f` and `pgrep -f` match the calling shell's own command line: `pkill -f` kills that shell, and a wait loop on `pgrep -f` never ends.
 - A run driven by `scale` or a showcase fixture is not a fair timing or full-playthrough result; say what was skipped.
 - Treat Godot errors in the game output as failures.

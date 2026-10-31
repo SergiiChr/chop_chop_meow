@@ -209,6 +209,8 @@ public sealed partial class World {
     public SaveState S { get; private set; } = new();
     public Action<string>? Notify;
     public Action<ActorAction, Vector2>? PlayerActed;
+    /// <summary>Raised once the whole state has been replaced by a new game, a load or a guest's copy of the host's world; what belonged to the old world resets itself on it.</summary>
+    public Action? Replaced;
     /// <summary>A named sound effect and where it happens; the simulation only names it.</summary>
     public Action<string, Vector2>? Sound;
     /// <summary>How far down the valley an errand runner walks before fading from view on the way to Bramblewick.</summary>
@@ -275,6 +277,45 @@ public sealed partial class World {
     public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind == ThingKind.Water ? Terrain.WaterPoint(from) : t.Pos;
     public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(GatherAt(t, Player)) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
+    /// <summary>What every worker's wage comes to each dawn.</summary>
+    public int DailyWages {
+        get {
+            int wages = 0;
+            foreach (var w in S.Workers) wages += w.Wage;
+            return wages;
+        }
+    }
+    public InventoryView Backpack => new(S.Backpack);
+    public float Time => S.Time;
+    public float Health => S.Health;
+    public float Hunger => S.Hunger;
+    public float Thirst => S.Thirst;
+    public float Torch => S.Torch;
+    public bool TorchLit => S.TorchLit;
+    public float TorchKindling => S.TorchKindling;
+    public float RespawnIn => S.RespawnIn;
+    public bool Mauled => S.Mauled;
+    public int Sheltered => S.Sheltered;
+    public int ActiveHotbar => S.ActiveHotbar;
+    public ListView<string> HotbarSlots => new(S.HotbarSlots);
+    public ListView<string> Crafting => new(S.Crafting);
+    public float CraftTime => S.CraftTime;
+    public ListView<Thing> Things => new(S.Things);
+    public ListView<Worker> Workers => new(S.Workers);
+    public ListView<Wolf> Wolves => new(S.Wolves);
+    public ListView<TradeOrder> Orders => new(S.Orders);
+    public ListView<PlayerState> Players => new(S.Players);
+    public int Goal => S.Goal;
+    public bool Reached(string milestone) => S.Milestones.Contains(milestone);
+    public int DayRevenue => S.DayRevenue;
+    public ListView<int> Profits => new(S.Profits);
+    public bool EndingShown => S.EndingShown;
+    public float PlaySeconds => S.PlaySeconds;
+    /// <summary>The player whose action or turn is running.</summary>
+    public int ActorId => S.Actor.Id;
+    public int SaveVersion => S.Version;
+    public bool Priced(string item) => S.Prices.ContainsKey(item);
+    public Thing? Remembered(int id) => S.Remembered.GetValueOrDefault(id);
     /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
     public bool Pay(int amount) => amount <= Coins && S.Backpack.Remove(Inventory.Coins, amount) == amount;
     // Where each id sits in the things list. The list is also changed directly, so every lookup checks the entry and a stale one rebuilds it.
@@ -341,6 +382,7 @@ public sealed partial class World {
         Scatter(rng, ThingKind.Tree, int.MaxValue, 42, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
         DropLeaves();
         Look();
+        Replaced?.Invoke();
     }
     /// <summary>Leaves a rake gathers in one go from a patch, which fills again every day.</summary>
     public const int LeafPatch = 12;
@@ -805,7 +847,7 @@ public sealed partial class World {
     // Demand runs above 1 by the steady amount's worth, so those units sell at the full price; past it, each unit takes a share of a crate's drop.
     private float DemandStep(string item) => Data.Market.Sells[item].Drop / Data.CrateCapacity;
     private float FullDemand(string item) => Data.Market.Sells.TryGetValue(item, out var demand) ? 1 + demand.Steady * DemandStep(item) : 1;
-    private float Demand(string item) => S.Demand.TryGetValue(item, out float demand) ? demand : FullDemand(item);
+    public float Demand(string item) => S.Demand.TryGetValue(item, out float demand) ? demand : FullDemand(item);
     /// <summary>Units in one purchase of a good the village sells; more than one arrive packed in a crate.</summary>
     public int Lot(string item) => Data.Market.Buys.GetValueOrDefault(item, 1);
     /// <summary>The whole coins one purchase costs, crate included for boxed goods.</summary>
@@ -1189,7 +1231,7 @@ public sealed partial class World {
         foreach (var pair in pile.Inventory.Items) if (Compostable(pair.Key)) rotting += pair.Value;
         if (rotting < CompostBatch || pile.Inventory.Room("fertilizer") == 0) { pile.Progress = 0; return; }
         pile.Progress += dt;
-        if (pile.Progress < Data.DaySeconds / 24) return;
+        if (pile.Progress < Data.HourSeconds) return;
         pile.Progress = 0;
         for (int left = CompostBatch; left > 0;) left -= pile.Inventory.Remove(pile.Inventory.Items.Keys.First(Compostable), left);
         pile.Inventory.Add("fertilizer", 1);
@@ -2089,5 +2131,6 @@ public sealed partial class World {
         // Saves from before raking have no leaf litter.
         if (!S.Things.Any(t => t.Kind == ThingKind.Leaves)) DropLeaves();
         UpdateGoal(); gatherClock = 0; ExploredRevision++; Look(); Say("Settlement loaded.");
+        Replaced?.Invoke();
     }
 }

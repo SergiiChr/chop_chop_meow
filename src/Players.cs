@@ -192,10 +192,22 @@ public sealed partial class World {
         return moved;
     }
 
+    /// <summary>Moves items out of the backpack a view shows.</summary>
+    public int Transfer(InventoryView from, Inventory to, string item, int quantity) => Transfer(from.Inventory, to, item, quantity);
+
+    /// <summary>Moves items into the backpack a view shows.</summary>
+    public int Transfer(Inventory from, InventoryView to, string item, int quantity) => Transfer(from, to.Inventory, item, quantity);
+
     public void SortBackpack() {
         if (Downed || Forwarded(Verb.SortBag)) return;
         S.Backpack.Sort();
     }
+
+    /// <summary>Moves a stack from a cell of the backpack a view shows.</summary>
+    public int TransferSlot(InventoryView from, Inventory to, int sourceSlot, int targetSlot, string item, int quantity) => TransferSlot(from.Inventory, to, sourceSlot, targetSlot, item, quantity);
+
+    /// <summary>Moves a stack between two cells of the backpack a view shows.</summary>
+    public int TransferSlot(InventoryView from, InventoryView to, int sourceSlot, int targetSlot, string item, int quantity) => TransferSlot(from.Inventory, to.Inventory, sourceSlot, targetSlot, item, quantity);
 
     public int TransferSlot(Inventory from, Inventory to, int sourceSlot, int targetSlot, string item, int quantity) {
         int a = Locate(from), b = Locate(to);
@@ -315,5 +327,6 @@ public sealed partial class World {
     public void Mirror(SaveState state, List<PlayerState> players, int localId) {
         state.Players = players; LocalId = localId; S = state; S.Actor = Me;
         UpdateLunchFire(); ExploredRevision++; Look();
+        Replaced?.Invoke();
     }
 }

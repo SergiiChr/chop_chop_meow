@@ -4,6 +4,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static SetupSteps;
 using static WorldSteps;
 
 /// <summary>
@@ -46,18 +47,19 @@ public static class AllocationChecks {
 
         var packing = PackingLine(data, out var stock);
         // A crate fills about every twenty seconds and goes to the post, whose cart leaves once six are there; a hundred seconds see several crates and a cart.
-        // Opening a crate names it and gives it contents, and a cart leaving or coming back builds its order: those rare events are what this budget allows (measured 1.7 bytes a tick).
-        Check("tick: packing for the post", () => { packing.Tick(1 / 60f); Fed(packing); stock.Inventory.Add("berries", 64 - stock.Inventory["berries"]); stock.Inventory.Add("crate", 64 - stock.Inventory["crate"]); }, maxBytesPerRun: 2, warmup: 1200, runs: 6000);
+        // The warm-up lasts until a cart has been out and back: the first crate carried out costs a one-off 98 KB in about one process in a hundred, which must not land in the measured runs.
+        // Opening a crate names it and gives it contents, and a cart leaving or coming back builds its order: those rare events are what this budget allows (measured 0.6 bytes a tick).
+        Check("tick: packing for the post", () => { packing.Tick(1 / 60f); Fed(packing); stock.Inventory.Add("berries", 64 - stock.Inventory["berries"]); stock.Inventory.Add("crate", 64 - stock.Inventory["crate"]); }, maxBytesPerRun: 1, warmup: 12000, runs: 6000);
 
         var mine = WorkingMine(data, out var shaft);
         // Emptying the output each tick keeps the crew digging underground instead of hauling.
         Check("tick: miners underground", () => { mine.Tick(1 / 60f); Fed(mine); shaft.Output!.Clear(); }, warmup: 1200);
-        Require(mine.S.Workers.All(w => w.WorkState == WorkerWorkState.Underground), "the mine crew should be underground");
+        Require(mine.Workers.All(w => w.WorkState == WorkerWorkState.Underground), "the mine crew should be underground");
 
         var night = new World(data);
-        night.S.Time = data.DaySeconds * (data.NightStarts + .05f);
+        RunUntilPhase(night, data.NightStarts + .05f);
         // Long enough for the pack to gather around the player; the player is kept on their feet so the hunt never ends.
-        Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); night.S.Mauled = false; foreach (var w in night.S.Wolves) { w.Leap = 0; w.Feeding = w.Pinning = false; } }, warmup: 3600);
+        Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }, warmup: 3600);
     }
 
     /// <summary>

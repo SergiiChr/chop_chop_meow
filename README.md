@@ -60,7 +60,7 @@ Play accepts Godot arguments after `--`:
 | `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection |
 | `--performance-run /absolute/directory` | Record a walking, day/night and staffed-settlement benchmark; summarise it with `python3 tools/performance_report.py /absolute/directory` |
 
-Other showcase flags are parsed in `src/Game.cs`.
+Other showcase flags are parsed in `src/Showcase.cs`.
 These options are developer review tools; they do not represent a normal fresh-start playthrough.
 
 ```sh

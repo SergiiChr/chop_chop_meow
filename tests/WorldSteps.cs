@@ -4,6 +4,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static SetupSteps;
 using static WorkerSteps;
 
 /// <summary>World setup and passing time for the simulation checks.</summary>
@@ -18,27 +19,27 @@ internal static class WorldSteps {
     /// <summary>An empty map with coins enough to pay every wage, so no worker strikes.</summary>
     public static World FundedWorld(GameData data) {
         var world = EmptyWorld(data);
-        world.S.Backpack.Add(Inventory.Coins, 1000);
+        Give(world, Inventory.Coins, 1000);
         return world;
     }
 
     public static World NightWorld(GameData data) {
         var world = EmptyWorld(data);
         world.Player = new Vector2(20, 20);
-        world.S.Time = data.DaySeconds * (data.NightStarts + .02f);
+        RunUntilNight(world);
         return world;
     }
 
     public static World TorchNight(GameData data) {
         var world = NightWorld(data);
-        world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); world.Tick(World.KindleSeconds + .1f);
-        Require(world.S.TorchLit, "the torch fixture should be lit");
+        Give(world, "torch", 1); world.UseTorch(Vector2.Zero); world.Tick(World.KindleSeconds + .1f);
+        Require(world.TorchLit, "the torch fixture should be lit");
         return world;
     }
 
     public static World WorkDay(GameData data) {
         var world = FundedWorld(data);
-        world.S.Time = 0;
+        RunUntilDawn(world);
         return world;
     }
 
@@ -54,7 +55,7 @@ internal static class WorldSteps {
     /// <summary>A daytime camp in the generated valley: woodcutters, a bellows crew at a hot forge, a furnace, a campfire and storage.</summary>
     public static World Settlement(GameData data) {
         var world = new World(data);
-        world.S.Time = data.DaySeconds * .3f;
+        RunUntilPhase(world, .3f);
         var at = world.Player;
         var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 0));
         world.Add(ThingKind.Chest, at + new Vector2(2, -2));
@@ -64,7 +65,7 @@ internal static class WorldSteps {
         var fire = world.Add(ThingKind.Campfire, at + new Vector2(0, 3)); fire.Inventory.Add("wood", 20);
         var furnace = world.Add(ThingKind.Furnace, at + new Vector2(3, 3));
         var forge = world.Add(ThingKind.Reinforced, at + new Vector2(-3, 3)); forge.Heat = 90;
-        foreach (var tree in world.S.Things.Where(t => t.Kind == ThingKind.Tree).OrderBy(t => t.Pos.DistanceTo(at)).Take(2))
+        foreach (var tree in world.Things.Where(t => t.Kind == ThingKind.Tree).OrderBy(t => t.Pos.DistanceTo(at)).Take(2))
             world.Assign(AddWorker(world, rack.Pos), tree);
         world.Assign(AddWorker(world, forge.Pos + World.BellowsStand), forge);
         world.Assign(AddWorker(world, chest.Pos), forge);
@@ -75,7 +76,7 @@ internal static class WorldSteps {
     /// <summary>An open iron mine with a full crew of pickaxe-carrying miners and a chest beside it.</summary>
     public static World WorkingMine(GameData data, out Thing mine) {
         var world = new World(data, false);
-        world.S.Time = data.DaySeconds * .3f;
+        RunUntilPhase(world, .3f);
         var cliff = World.CliffOf(ThingKind.Iron);
         world.Player = World.MineSpot(cliff) + cliff.Face * 3;
         mine = world.Add(ThingKind.Mine, World.MineSpot(cliff)); mine.MineStage = MineStage.Open;
@@ -90,7 +91,7 @@ internal static class WorldSteps {
     /// <summary>A packing station packing berries, its packer, a chest of berries and empty crates, and a post asking for crates of berries that sells on its own.</summary>
     public static World PackingLine(GameData data, out Thing stock) {
         var world = new World(data, false);
-        world.S.Time = data.DaySeconds * .3f;
+        RunUntilPhase(world, .3f);
         var at = Terrain.Spawn;
         world.Player = at + new Vector2(-20, 0);
         stock = world.Add(ThingKind.Chest, at + new Vector2(2, 0));
@@ -128,16 +129,38 @@ internal static class WorldSteps {
         return known;
     }
 
+    /// <summary>Ticks to a moment on the clock with the player fed; sleeping ticks bring no wolves, so a check meets only the ones it places.</summary>
+    public static void RunUntil(World world, float time) {
+        while (world.Time < time) {
+            Nourished(world);
+            world.Tick(Math.Min(1, time - world.Time), true);
+        }
+        Nourished(world);
+    }
+
+    /// <summary>Ticks to the next time this fraction of a day comes round.</summary>
+    public static void RunUntilPhase(World world, float phase) {
+        float time = (world.Day - 1 + phase) * world.Data.DaySeconds;
+        RunUntil(world, time > world.Time ? time : time + world.Data.DaySeconds);
+    }
+
+    /// <summary>Ticks to the next daytime, with no wolves about.</summary>
+    public static void RunUntilMorning(World world) => RunUntilPhase(world, .3f);
+
+    /// <summary>Ticks to just after nightfall, late enough for wolves to hunt.</summary>
+    public static void RunUntilNight(World world) => RunUntilPhase(world, world.Data.NightStarts + .02f);
+
+    /// <summary>Ticks to the moment the next day begins, when wages fall due.</summary>
+    public static void RunUntilDawn(World world) => RunUntil(world, world.Day * world.Data.DaySeconds);
+
     /// <summary>Runs the world for a time with the player kept fed and watered.</summary>
     public static void SafeTick(World world, float seconds) {
-        world.S.Hunger = 100;
-        world.S.Thirst = 100;
+        Nourished(world);
         while (seconds > 0) {
             float dt = Math.Min(Step, seconds);
             world.Tick(dt);
             seconds -= dt;
-            world.S.Hunger = 100;
-            world.S.Thirst = 100;
+            Nourished(world);
         }
     }
 
@@ -152,17 +175,16 @@ internal static class WorldSteps {
     /// <summary>Ticks a night with only the given wolves, so new arrivals do not interfere.</summary>
     public static void WolfTick(World world, float seconds, params Wolf[] keep) {
         for (float t = 0; t < seconds; t += .1f) {
-            world.S.Hunger = world.S.Thirst = 100; world.Tick(.1f);
-            world.S.Wolves.RemoveAll(w => !keep.Contains(w));
+            Nourished(world); world.Tick(.1f);
+            RemoveWolves(world, w => !keep.Contains(w));
         }
     }
 
     public static void FedPlayersTick(World world, float seconds) {
         for (; seconds > 0; seconds -= Step) {
-            foreach (var p in world.S.Players) { p.Hunger = 100; p.Thirst = 100; }
+            NourishEveryone(world);
             world.Tick(Step);
         }
     }
 
-    public static void Fed(World world) { world.S.Hunger = 100; world.S.Thirst = 100; world.S.Health = 100; }
 }

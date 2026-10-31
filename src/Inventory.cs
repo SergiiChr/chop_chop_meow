@@ -290,3 +290,31 @@ public sealed class ItemTotals : IReadOnlyDictionary<string, int> {
     IEnumerator<KeyValuePair<string, int>> IEnumerable<KeyValuePair<string, int>>.GetEnumerator() => totals.GetEnumerator();
     System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => totals.GetEnumerator();
 }
+
+/// <summary>
+/// A list to read but not change. A <c>foreach</c> over it allocates nothing, unlike one over an interface such as <c>IReadOnlyList</c>.
+/// LINQ works on it too, for code outside the frame and the tick.
+/// </summary>
+public readonly struct ListView<T>(List<T> list) : IReadOnlyList<T> {
+    public int Count => list.Count;
+    public T this[int index] => list[index];
+    public bool Contains(T item) => list.Contains(item);
+    public T? Find(Predicate<T> match) => list.Find(match);
+    public List<T>.Enumerator GetEnumerator() => list.GetEnumerator();
+    IEnumerator<T> IEnumerable<T>.GetEnumerator() => list.GetEnumerator();
+    System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() => list.GetEnumerator();
+}
+
+/// <summary>An inventory to read but not change; <see cref="World.Transfer(InventoryView, Inventory, string, int)"/> takes one as an end of a move.</summary>
+public readonly struct InventoryView(Inventory inventory) {
+    internal Inventory Inventory => inventory;
+    public int this[string item] => inventory[item];
+    public int Count => inventory.Count;
+    public int UsedSlots => inventory.UsedSlots;
+    public int Slots => inventory.Slots;
+    public ItemTotals Items => inventory.Items;
+    public ListView<Inventory.Slot> Layout => new(inventory.Layout);
+    public int StackOf(string item) => inventory.StackOf(item);
+    public int Room(string item) => inventory.Room(item);
+    public bool Has(Dictionary<string, int> cost) => inventory.Has(cost);
+}

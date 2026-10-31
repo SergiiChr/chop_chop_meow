@@ -1,4 +1,4 @@
-using System.Linq;
+using System;
 using Godot;
 
 namespace ChopChopMeow;
@@ -7,17 +7,20 @@ namespace ChopChopMeow;
 /// Putting a crate inside a crate: a warning, then a black hole that swallows the screen from the crate outward, then game over.
 /// The whole flow is styled like a starship console rather than the woodland interface.
 /// </summary>
-public partial class Game {
+public partial class BlackHole : CanvasLayer {
     private static readonly Color Neon = new("4fe3ff");
     private static readonly Color Alarm = new("ff4f7a");
-    private Control anomaly = null!;
-    private PanelContainer anomalyWarning = null!;
-    private PanelContainer singularity = null!;
-    private ColorRect collapse = null!;
-    private Label anomalyReadout = null!;
-    private Button reloadAfterCollapse = null!;
+    private readonly UiKit kit;
+    private readonly WorldView view;
+    private readonly Saves saves;
+    private readonly Action closePanel;
+    private readonly Control anomaly;
+    private readonly PanelContainer anomalyWarning;
+    private readonly PanelContainer singularity;
+    private readonly ColorRect collapse;
+    private readonly Label anomalyReadout;
+    private readonly Button reloadAfterCollapse;
     private Thing? anomalyCrate;
-    private bool pausedBeforeAnomaly;
 
     private const string CollapseShader = @"
 shader_type canvas_item;
@@ -48,34 +51,42 @@ void fragment() {
     COLOR = vec4(col, 1.0);
 }";
 
-    private void BuildAnomaly() {
-        var layer = new CanvasLayer { Layer = 20 }; AddChild(layer);
-        anomaly = new Control { Visible = false, Name = "anomaly" }; anomaly.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(anomaly);
-        anomaly.Theme = ui.Theme;
-        collapse = new ColorRect { Visible = false, Material = new ShaderMaterial { Shader = new Shader { Code = CollapseShader } }, MouseFilter = Control.MouseFilterEnum.Stop };
+    public BlackHole(UiKit kit, WorldView view, Theme theme, IGameFlow flow, Saves saves, Action closePanel) {
+        this.kit = kit; this.view = view; this.saves = saves; this.closePanel = closePanel;
+        Layer = 20;
+        anomaly = new Control { Visible = false, Name = "anomaly" }; anomaly.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); AddChild(anomaly);
+        anomaly.Theme = theme;
+        collapse = new ColorRect { Name = "collapse", Visible = false, Material = new ShaderMaterial { Shader = new Shader { Code = CollapseShader } }, MouseFilter = Control.MouseFilterEnum.Stop };
         collapse.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); anomaly.AddChild(collapse);
 
         anomalyWarning = ConsolePanel(Neon);
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 12); anomalyWarning.AddChild(column);
         column.AddChild(ConsoleLabel("⚠  SPACETIME INTEGRITY ALERT", 20, Alarm));
-        column.AddChild(ConsoleLabel("Placing a crate inside a crate will collapse space time and create a black hole. Are you sure you want to proceed?", 16, Cream));
+        column.AddChild(ConsoleLabel("Placing a crate inside a crate will collapse space time and create a black hole. Are you sure you want to proceed?", 16, Style.Rim));
         anomalyReadout = ConsoleLabel("", 12, Neon with { A = .7f }); column.AddChild(anomalyReadout);
         var answers = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; answers.AddThemeConstantOverride("separation", 24); column.AddChild(answers);
-        var no = ConsoleButton("No", Neon, CancelAnomaly); no.Name = "anomaly_no"; answers.AddChild(no);
+        var no = ConsoleButton("No", Neon, Cancel); no.Name = "anomaly_no"; answers.AddChild(no);
         var yes = ConsoleButton("Yes", Alarm, () => { if (anomalyCrate != null) Collapse(anomalyCrate); }); yes.Name = "anomaly_yes"; answers.AddChild(yes);
         anomaly.AddChild(anomalyWarning);
 
-        singularity = ConsolePanel(Neon);
+        singularity = ConsolePanel(Neon); singularity.Name = "game_over";
         var over = new VBoxContainer(); over.AddThemeConstantOverride("separation", 12); singularity.AddChild(over);
         over.AddChild(ConsoleLabel("SINGULARITY EVENT", 26, Neon));
-        over.AddChild(ConsoleLabel("A crate folded into a crate. Space time collapsed around it and took Bramblewick, the woods and you with it.", 16, Cream));
+        over.AddChild(ConsoleLabel("A crate folded into a crate. Space time collapsed around it and took Bramblewick, the woods and you with it.", 16, Style.Rim));
         over.AddChild(ConsoleLabel("SIGNAL LOST · NO TIMELINE TO RESUME", 12, Alarm));
-        reloadAfterCollapse = ConsoleButton("Reload save", Neon, () => { EndAnomaly(); LoadSlot(LatestSlot()); }); reloadAfterCollapse.Name = "reload_after_collapse"; over.AddChild(reloadAfterCollapse);
-        var menuButton = ConsoleButton("Main menu", Neon, () => { EndAnomaly(); ShowStart(); }); menuButton.Name = "menu_after_collapse"; over.AddChild(menuButton);
+        reloadAfterCollapse = ConsoleButton("Reload save", Neon, () => { End(); flow.LoadSlot(saves.Latest()); }); reloadAfterCollapse.Name = "reload_after_collapse"; over.AddChild(reloadAfterCollapse);
+        var menuButton = ConsoleButton("Main menu", Neon, () => { End(); flow.ShowStart(); }); menuButton.Name = "menu_after_collapse"; over.AddChild(menuButton);
         anomaly.AddChild(singularity);
+        kit.World.Replaced += End;
+        kit.HoldWhile(() => Showing);
     }
 
-    private PanelContainer ConsolePanel(Color edge) {
+    /// <summary>The warning or the black hole is on screen, and takes all input.</summary>
+    public bool Showing => anomaly.Visible;
+    /// <summary>The warning waits for an answer.</summary>
+    public bool Asking => anomalyWarning.Visible;
+
+    private static PanelContainer ConsolePanel(Color edge) {
         var panel = new PanelContainer { CustomMinimumSize = new Vector2(520, 0) };
         panel.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center);
         panel.GrowHorizontal = Control.GrowDirection.Both; panel.GrowVertical = Control.GrowDirection.Both;
@@ -96,14 +107,14 @@ void fragment() {
 
     private static readonly SystemFont ConsoleFont = new() { FontNames = new[] { "DejaVu Sans Mono", "Liberation Mono", "monospace" } };
 
-    private Label ConsoleLabel(string text, int size, Color color) {
-        var label = Label(text, size, color); label.HorizontalAlignment = HorizontalAlignment.Center;
+    private static Label ConsoleLabel(string text, int size, Color color) {
+        var label = Style.Wrapped(text, size, color); label.HorizontalAlignment = HorizontalAlignment.Center;
         label.AddThemeFontOverride("font", ConsoleFont);
         return label;
     }
 
-    private Button ConsoleButton(string text, Color edge, System.Action action) {
-        var button = Button(text.ToUpperInvariant(), action);
+    private Button ConsoleButton(string text, Color edge, Action action) {
+        var button = kit.Button(text.ToUpperInvariant(), action);
         button.CustomMinimumSize = new Vector2(150, 40); button.AddThemeFontOverride("font", ConsoleFont);
         button.AddThemeColorOverride("font_color", edge); button.AddThemeColorOverride("font_hover_color", Colors.White);
         button.AddThemeColorOverride("font_disabled_color", edge with { A = .35f });
@@ -116,9 +127,9 @@ void fragment() {
     }
 
     /// <summary>Stops a crate from going into a placed crate and asks first; true when the move was intercepted.</summary>
-    private bool CrateIntoCrate(Thing? target, Inventory to, string item) {
+    public bool CrateIntoCrate(Thing? target, Inventory to, string item) {
         if (target?.Kind != ThingKind.Crate || to != target.Inventory || !World.IsCrate(item)) return false;
-        anomalyCrate = target; pausedBeforeAnomaly = paused; paused = true;
+        anomalyCrate = target;
         anomalyReadout.Text = $"CONTAINER {target.Id:0000} · NESTING DEPTH 2 · LOCAL METRIC STABILITY 0.03%";
         anomaly.Visible = true; anomalyWarning.Visible = true; singularity.Visible = false; collapse.Visible = false;
         // The alert border breathes while it waits for an answer.
@@ -127,8 +138,9 @@ void fragment() {
         return true;
     }
 
-    private void CancelAnomaly() {
-        StopPulse(); anomaly.Visible = false; anomalyCrate = null; paused = pausedBeforeAnomaly;
+    /// <summary>Answers no: the warning closes and the game goes on as it was.</summary>
+    public void Cancel() {
+        StopPulse(); anomaly.Visible = false; anomalyCrate = null;
     }
 
     private void StopPulse() {
@@ -136,11 +148,11 @@ void fragment() {
         anomalyWarning.SelfModulate = Colors.White;
     }
 
-    /// <summary>The black hole opens at the crate, pulls the picture into itself until only black is left, then the game is over.</summary>
     private Tween? collapseTween;
 
-    private void Collapse(Thing crate) {
-        StopPulse(); anomalyWarning.Visible = false; ClosePanel(); paused = true;
+    /// <summary>The black hole opens at the crate, pulls the picture into itself until only black is left, then the game is over.</summary>
+    public void Collapse(Thing crate) {
+        StopPulse(); anomalyWarning.Visible = false; closePanel();
         var size = GetViewport().GetVisibleRect().Size;
         var material = (ShaderMaterial)collapse.Material;
         material.SetShaderParameter("center", view.Screen(crate.Pos, .3f) / size);
@@ -150,17 +162,15 @@ void fragment() {
         var tween = collapseTween = collapse.CreateTween();
         tween.TweenMethod(Callable.From<float>(p => material.SetShaderParameter("progress", p)), 0f, 1f, 5f);
         tween.TweenCallback(Callable.From(() => {
-            reloadAfterCollapse.Disabled = LatestSlot() < 0;
+            reloadAfterCollapse.Disabled = saves.Latest() < 0;
             singularity.Modulate = new Color(1, 1, 1, 0); singularity.Visible = true;
         }));
         tween.TweenProperty(singularity, "modulate:a", 1f, 1.2f);
     }
 
-    private void EndAnomaly() {
-        collapseTween?.Kill();
+    /// <summary>Closes everything, stopping a collapse that is still running.</summary>
+    public void End() {
+        StopPulse(); collapseTween?.Kill();
         anomaly.Visible = false; collapse.Visible = false; singularity.Visible = false; anomalyCrate = null;
     }
-
-    /// <summary>The save the player was using, else the most recent one, or -1 when there is none.</summary>
-    private int LatestSlot() => slot > 0 && SlotUsed(slot) ? slot : Enumerable.Range(0, SlotCount + 1).Where(SlotUsed).OrderByDescending(SavedAt).DefaultIfEmpty(-1).First();
 }

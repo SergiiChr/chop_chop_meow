@@ -43,7 +43,7 @@ public static class Water {
             Replace(backpack, bottle, "water");
             return WaterCollectResult.RefilledBottle;
         }
-        world.S.Thirst = System.Math.Min(100, world.S.Thirst + SipThirst);
+        world.S.Thirst = System.Math.Min(100, world.Thirst + SipThirst);
         return WaterCollectResult.SourceSip;
     }
 
@@ -52,7 +52,7 @@ public static class Water {
         if (BottleSips(item) <= 0) return false;
         Inventory backpack = world.S.Backpack;
         if (!backpack.Replace(item, WaterItem(BottleSips(item) - 1))) return false;
-        world.S.Thirst = System.Math.Min(100, world.S.Thirst + SipThirst);
+        world.S.Thirst = System.Math.Min(100, world.Thirst + SipThirst);
         return true;
     }
 

@@ -24,6 +24,8 @@ public static class Style {
     /// <summary>Text on enamel that warns: a cost the bank cannot cover, a count the backpack is short of.</summary>
     public static readonly Color Warn = new("f2937c");
     public static readonly Color Rise = new("4f7a55");
+    /// <summary>Modulates: a faint picture of what an empty cup wants, something not ready yet, and what the open page does not take.</summary>
+    public static readonly Color Ghost = new(1, 1, 1, .28f), Unready = new(1, 1, 1, .5f), Faded = new(1, 1, 1, .4f);
 
     // Boxes by colour are made once and shared, since creating a resource allocates; declared first so the boxes below can use them.
     private static readonly System.Collections.Generic.Dictionary<Color, StyleBoxFlat> tags = new();
@@ -94,6 +96,9 @@ public static class Style {
     public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) CloseRound = Round(Brick, 18), ActionRound = Round(Sage, 18), FilterRound = Round(Beige, 18);
     public static readonly (StyleBoxFlat Normal, StyleBoxFlat Hover) TabRound = Round(Line, 24), TabActive = Round(Brick, 24);
 
+    /// <summary>A stage on a track: done, the current one, and still to come.</summary>
+    public static readonly StyleBoxFlat StageDone = Round(Sage, 24).Item1, StageNow = Round(Mustard, 24).Item1, StageTodo = Round(Line, 24).Item1;
+
     private static StyleBoxFlat Flat(Color bg, int radius, int margin, Color? edge = null, int border = 0, int horizontal = -1) {
         var box = new StyleBoxFlat { BgColor = bg, BorderColor = edge ?? Colors.Transparent, AntiAliasing = true };
         box.SetCornerRadiusAll(radius);
@@ -121,6 +126,62 @@ public static class Style {
         button.AddThemeStyleboxOverride("disabled", normal); button.AddThemeStyleboxOverride("focus", None);
     }
 
+    /// <summary>Gives a button the rounded look of a job or action button in this colour.</summary>
+    public static void SkinPill(Button button, Color color) { var look = Pill(color); Skin(button, look.Item1, look.Item2); }
+
+    /// <summary>Dark text on a check box that sits on a beige well.</summary>
+    public static void InkCheck(CheckBox box) {
+        foreach (var state in CheckStates) box.AddThemeColorOverride(state, Ink);
+    }
+    private static readonly string[] CheckStates = { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color" };
+
+    /// <summary>The theme of the whole interface.</summary>
+    public static Theme Interface() {
+        var theme = new Theme { DefaultFont = Body };
+        theme.DefaultFontSize = 16;
+        theme.SetStylebox("panel", "PanelContainer", Board);
+        theme.SetStylebox("normal", "Button", ButtonNormal);
+        theme.SetStylebox("hover", "Button", ButtonHover);
+        theme.SetStylebox("pressed", "Button", ButtonPressed);
+        theme.SetStylebox("disabled", "Button", ButtonDisabled);
+        theme.SetStylebox("hover_pressed", "Button", ButtonPressed);
+        theme.SetStylebox("focus", "Button", None);
+        theme.SetFont("font", "Button", Head);
+        foreach (string state in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color", "font_focus_color" }) theme.SetColor(state, "Button", Rim);
+        theme.SetColor("font_disabled_color", "Button", new Color(Rim, .45f));
+        theme.SetColor("font_color", "Label", Rim);
+        theme.SetColor("font_color", "CheckBox", Rim);
+        theme.SetStylebox("normal", "CheckBox", None); theme.SetStylebox("hover", "CheckBox", None); theme.SetStylebox("pressed", "CheckBox", None); theme.SetStylebox("hover_pressed", "CheckBox", None);
+        theme.SetConstant("separation", "VBoxContainer", 16);
+        theme.SetConstant("separation", "HBoxContainer", 10);
+        theme.SetStylebox("normal", "OptionButton", ButtonNormal);
+        theme.SetStylebox("background", "ProgressBar", BarBack);
+        theme.SetStylebox("fill", "ProgressBar", BarFill);
+        // Tooltips read as solid popups with a bright edge rather than a translucent wash over the scene.
+        theme.SetStylebox("panel", "TooltipPanel", Tooltip);
+        theme.SetColor("font_color", "TooltipLabel", Rim);
+        theme.SetFont("font", "TooltipLabel", Bold);
+        return theme;
+    }
+
+    /// <summary>A label in the theme's body font that wraps at its width.</summary>
+    public static Label Wrapped(string text, int size = 15, Color? color = null) {
+        var l = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.WordSmart };
+        l.AddThemeFontSizeOverride("font_size", size); if (color != null) l.AddThemeColorOverride("font_color", color.Value); return l;
+    }
+
+    /// <summary>A beige well around a control.</summary>
+    public static PanelContainer InWell(Control inner) {
+        var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Well); well.AddChild(inner);
+        return well;
+    }
+
+    /// <summary>Text over the world gets a dark outline so it reads on grass by day and night.</summary>
+    public static Label Outlined(Label label) {
+        label.AddThemeColorOverride("font_outline_color", Line); label.AddThemeConstantOverride("outline_size", 6);
+        return label;
+    }
+
     public static Label Heading(string text, int size = 23) {
         var label = new Label { Text = text, VerticalAlignment = VerticalAlignment.Center };
         label.AddThemeFontOverride("font", Head); label.AddThemeFontSizeOverride("font_size", size);
@@ -128,10 +189,19 @@ public static class Style {
         return label;
     }
 
-    /// <summary>Plain text in the given colour, the body face by default.</summary>
-    public static Label Text(string text, int size, Color color, Font? font = null) {
-        var label = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.Off, VerticalAlignment = VerticalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
+    /// <summary>Plain text in the given colour, the body face by default; with <paramref name="wrap"/> it wraps at its width.</summary>
+    public static Label Text(string text, int size, Color color, Font? font = null, bool wrap = false) {
+        var label = new Label { Text = text, AutowrapMode = wrap ? TextServer.AutowrapMode.WordSmart : TextServer.AutowrapMode.Off, VerticalAlignment = VerticalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
         label.AddThemeFontOverride("font", font ?? Bold); label.AddThemeFontSizeOverride("font_size", size); label.AddThemeColorOverride("font_color", color);
+        return label;
+    }
+
+    /// <summary>A small heading at the top of a well.</summary>
+    public static Label WellLabel(string text) => Text(text, 13, Tan, Head);
+
+    /// <summary>A label under a cup: what one batch takes or makes.</summary>
+    public static Label PerBatch(string text) {
+        var label = Text(text, 13, Tan); label.HorizontalAlignment = HorizontalAlignment.Center;
         return label;
     }
 

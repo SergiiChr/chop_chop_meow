@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static SetupSteps;
 
 namespace ChopChopMeow;
 
@@ -22,88 +23,114 @@ public partial class Game {
 
     private async Task HostNetCheck() {
         RemoveCheckFiles(); await Frames(4);
-        await Click(FindButton(screen, "New game")!); ClosePanel();
-        world.S.Things.RemoveAll(t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
+        await Click(FindButton(startMenu.Screen, "New game")!); await CloseWithEsc();
+        RemoveThings(world, t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
         world.Add(ThingKind.LooseCoal, NetOre, 2); world.Add(ThingKind.LooseCoal, NetCoal, 2);
         var chest = world.Add(ThingKind.Chest, NetChest); var hut = world.Add(ThingKind.Hut, NetHut);
         await KeyStroke(Key.Escape);
-        await Click(hostButton);
-        Require(net.Hosting && !menu.Visible && !paused, "Host in the pause menu must open the current game to guests and close the menu.");
+        await Click(menu.HostButton);
+        Require(net.Hosting && !menu.Visible, "Host in the pause menu must open the current game to guests and close the menu.");
+        Require(await PlayerWalks(), "After hosting the player must be able to walk again.");
         await KeyStroke(Key.Escape);
-        float before = world.S.Time;
-        await Until(() => world.S.Time > before, "the world going on behind the host's pause menu", 5);
-        Require(menu.Visible && netLine.Text.StartsWith("Hosting on port 24565"), "While hosting, the pause menu must say so.");
+        float before = world.Time;
+        await Until(() => world.Time > before, "the world going on behind the host's pause menu", 5);
+        Require(menu.Visible && ((Label)menu.FindChild("net_status", true, false)).Text.StartsWith("Hosting on port 24565"), "While hosting, the pause menu must say so.");
         await KeyStroke(Key.Escape);
 
-        PlayerState Guest() => world.S.Players.Single(p => p != world.Me);
-        await Until(() => world.S.Players.Count == 2, "a guest joining", 45);
+        PlayerState Guest() => world.Players.Single(p => p != world.Me);
+        await Until(() => world.Players.Count == 2, "a guest joining", 45);
         Require(Guest().Backpack.Count == 0 && Guest().Pos == Terrain.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
         await Until(() => view.ShowsPlayer(Guest().Id), "the guest's figure appearing");
         await Until(() => chest.Inventory["coal"] == 2 && Guest().Backpack["coal"] == 2, "the guest storing the first loose coal and gathering the second", 90);
-        Require(world.S.Backpack["coal"] == 0, "What the guest gathers must not reach the host's backpack.");
+        Require(world.Backpack["coal"] == 0, "What the guest gathers must not reach the host's backpack.");
         await Until(() => Guest().Sheltered == hut.Id, "the guest walking into the cabin with one click");
-        await Until(() => world.S.Players.Count == 1, "the guest leaving");
-        await Until(() => world.S.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest coming back with its coal");
+        await Until(() => world.Players.Count == 1, "the guest leaving");
+        await Until(() => world.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest coming back with its coal");
         // The guest's line drops with the host, and it returns once the same port opens again.
         await Signaled("joined");
         net.Leave();
-        await KeyStroke(Key.Escape); await Click(hostButton);
-        await Until(() => world.S.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest reconnecting by itself with its coal", 90);
-        await Until(() => world.S.Players.Count == 1, "the guest leaving again");
-        await Until(() => world.S.Players.Count == 2, "the guest coming back with a broken save");
+        await KeyStroke(Key.Escape); await Click(menu.HostButton);
+        await Until(() => world.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest reconnecting by itself with its coal", 90);
+        await Until(() => world.Players.Count == 1, "the guest leaving again");
+        await Until(() => world.Players.Count == 2, "the guest coming back with a broken save");
         Require(Guest().Backpack.Count == 0 && Guest().Pos == Terrain.Spawn, "A broken guest save must bring the guest in with an empty backpack at the clearing.");
         // The host drops out again while the guest stops trying, joins by hand, and drops for good when this check ends.
         await Signaled("joined");
         net.Leave();
         await Signaled("stopped");
-        await KeyStroke(Key.Escape); await Click(hostButton);
-        await Until(() => world.S.Players.Count == 2, "the guest joining by hand after it stopped trying", 90);
+        await KeyStroke(Key.Escape); await Click(menu.HostButton);
+        await Until(() => world.Players.Count == 2, "the guest joining by hand after it stopped trying", 90);
         await Signaled("joined");
     }
 
     private async Task GuestNetCheck() {
+        await CheckFirstTimeGuestActsThroughTheHost();
+        await CheckGuestComesBackFromLeavingDroppingAndABrokenSave();
+    }
+
+    private async Task CheckFirstTimeGuestActsThroughTheHost() {
         RemoveCheckFiles(); DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(GuestSave)); await Frames(4);
         await JoinFromStart();
-        Require(!backdrop.Visible && world.S.Players.Count == 2 && world.S.Things.Any(t => t.Kind == ThingKind.Chest && t.Pos == NetChest), "Joining must replace the start menu with the host's world.");
-        Require(world.S.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
+        Require(!startMenu.Visible, "Joining must close the start menu.");
+        Require(world.Players.Count == 2, "Joining must add the guest to the host's world.");
+        Require(world.Things.Any(t => t.Kind == ThingKind.Chest && t.Pos == NetChest),
+            "Joining must bring the host's chest into the guest's world.");
+        Require(world.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A first-time guest must start with an empty backpack at the clearing.");
         await Until(() => view.ShowsPlayer(1), "the host's figure appearing");
 
         await RightClick(NetOre);
-        await Until(() => world.S.Backpack["coal"] == 2 && world.S.Things.All(t => t.Pos != NetOre), "the host handing over the loose coal the guest walked to");
+        await Until(() => world.Backpack["coal"] == 2 && world.Things.All(t => t.Pos != NetOre), "the host handing over the loose coal the guest walked to");
         await Click(view.Screen(NetChest, .3f));
-        Require(page == "inspect" && world.Find(selected)?.Kind == ThingKind.Chest && world.Near(world.Find(selected)!), "Clicking the chest beside the coal must open it.");
+        var opened = world.Find(view.Selection.Thing);
+        Require(opened?.Kind == ThingKind.Chest, "Clicking the chest beside the coal must select that chest.");
+        Require(Shows(opened), "Clicking the chest beside the coal must open its page.");
+        Require(world.Near(opened), "Clicking the chest beside the coal must leave the player in reach of it.");
         await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
-        await Until(() => world.Find(selected)!.Inventory["coal"] == 1 && world.S.Backpack["coal"] == 1, "a normal storage click moving exactly one coal");
+        await Until(() => opened!.Inventory["coal"] == 1 && world.Backpack["coal"] == 1, "a normal storage click moving exactly one coal");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = true });
         await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = false });
-        await Until(() => world.Find(selected)!.Inventory["coal"] == 2 && world.S.Backpack["coal"] == 0, "the stored coal showing up in the host's chest");
-        ClosePanel(); await RightClick(NetCoal);
-        await Until(() => world.S.Backpack["coal"] == 2, "the host handing over the second loose coal");
+        await Until(() => opened!.Inventory["coal"] == 2 && world.Backpack["coal"] == 0, "the stored coal showing up in the host's chest");
+        await CloseWithEsc(); await RightClick(NetCoal);
+        await Until(() => world.Backpack["coal"] == 2, "the host handing over the second loose coal");
         // The host checks reach from where the guest stood when it clicked, not from where its glide has got to.
-        ClosePanel(); await Click(view.Screen(NetHut, .8f));
-        await Until(() => world.S.Sheltered == world.S.Things.Single(t => t.Kind == ThingKind.Hut).Id, "the host letting the guest into the cabin it walked to");
+        await CloseWithEsc(); await Click(view.Screen(NetHut, .8f));
+        await Until(() => world.Sheltered == world.Things.Single(t => t.Kind == ThingKind.Hut).Id, "the host letting the guest into the cabin it walked to");
+    }
 
+    private async Task CheckGuestComesBackFromLeavingDroppingAndABrokenSave() {
         await LeaveGame();
-        await JoinFromStart();
-        Require(world.S.Backpack["coal"] == 2, "A guest must come back with what it carried when it left.");
+        // The start menu covers the world and Esc ends a click mode before Join can be reached, so no input leaves either in place for a join.
+        panel.Mark(world.Things.First()); player.Mode = new ClickMode.Build(ThingKind.Chest); await Frames();
+        Require(view.Selection != default, "The guest must have something selected before it joins.");
+        await JoinFromStart(); await Frames();
+        Require(player.Mode is ClickMode.Normal, "Joining must end placement.");
+        Require(view.Selection == default, "Joining must clear the selection.");
+        Require(world.Backpack["coal"] == 2, "A guest must come back with what it carried when it left.");
+        await CloseWithEsc(); await Click(view.Screen(NetChest, .3f));
+        Require(view.Selection != default, "The guest must select the chest before the line drops.");
+        await KeyStroke(Key.Key3);
+        Require(player.Mode.Placing == ThingKind.Chest, "A plan's hotkey must enter placement before the line drops.");
         Signal("joined");
-        await Until(() => backdrop.Visible && HasLabel(screen, "RECONNECTING"), "a dropped guest being told it is reconnecting", 60);
-        await Until(() => world.Remote && !backdrop.Visible, "a dropped guest getting back in by itself", 90);
-        Require(world.S.Backpack["coal"] == 2, "A guest must reconnect with what it carried when the line dropped.");
+        await Until(() => startMenu.Visible && HasLabel(startMenu.Screen, "RECONNECTING"), "a dropped guest being told it is reconnecting", 60);
+        await Frames();
+        Require(player.Mode is ClickMode.Normal, "A lost connection must end placement.");
+        Require(view.Selection == default, "A lost connection must clear the selection.");
+        await Until(() => world.Remote && !startMenu.Visible, "a dropped guest getting back in by itself", 90);
+        Require(world.Backpack["coal"] == 2, "A guest must reconnect with what it carried when the line dropped.");
         await LeaveGame();
         using (var file = Godot.FileAccess.Open(GuestSave, Godot.FileAccess.ModeFlags.Write)) file.StoreString("{ broken");
         await JoinFromStart();
-        Require(world.S.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A broken save must bring the guest in with an empty backpack at the clearing.");
+        Require(world.Backpack.Count == 0 && world.Player == Terrain.Spawn, "A broken save must bring the guest in with an empty backpack at the clearing.");
         Signal("joined");
-        await Until(() => backdrop.Visible && HasLabel(screen, "RECONNECTING"), "the guest being told it is reconnecting again", 60);
-        await Click(FindButton(screen, "Stop · Esc")!);
-        Require(!net.Retrying && FindButton(screen, "Join game") != null, "Stopping must end the tries and return to the start menu.");
+        await Until(() => startMenu.Visible && HasLabel(startMenu.Screen, "RECONNECTING"), "the guest being told it is reconnecting again", 60);
+        await Click(FindButton(startMenu.Screen, "Stop · Esc")!);
+        Require(!net.Retrying && FindButton(startMenu.Screen, "Join game") != null, "Stopping must end the tries and return to the start menu.");
         Signal("stopped");
         net.ReconnectLimit = 3;
         await JoinFromStart();
         Signal("joined");
-        await Until(() => backdrop.Visible && HasLabel(screen, "Lost the connection to the host") && FindButton(screen, "Join game") != null, "a guest giving up on a host that stays gone and saying why", 90);
+        await Until(() => startMenu.Visible && HasLabel(startMenu.Screen, "Lost the connection to the host") && FindButton(startMenu.Screen, "Join game") != null, "a guest giving up on a host that stays gone and saying why", 90);
         Require(!net.Retrying && !world.Remote, "A guest that gave up must stop trying.");
     }
 

@@ -45,7 +45,7 @@ public partial class WorldView {
         if (trafficClock < .5f) return;
         trafficClock = 0;
         Tread(World.Player);
-        foreach (var worker in World.S.Workers) Tread(worker.Pos);
+        foreach (var worker in World.Workers) Tread(worker.Pos);
         // Grass takes back even a fully bare path within two game days.
         if (regrowClock > World.Data.DaySeconds * 2 / 255) {
             regrowClock = 0;

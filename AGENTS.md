@@ -20,7 +20,8 @@ Icons and models are committed; playing does not call an image-generation servic
 
 - `src/World.cs`: authoritative simulation, independent of menus and rendering.
 - `src/WorldView.cs`: reads world state and draws it.
-- `src/Game.cs`: UI, input and saves.
+- `src/Game.cs`: creates and holds the interface's parts, routes input.
+- `src/SidePanel.cs` and `src/*Panel.cs`: the side panel and its pages, one node per feature.
 - `src/GameData.cs`: loads and validates `data/game.json`.
 - `src/Inventory.cs`: inventory rules, used by every worker job.
 - `src/Net.cs`: multiplayer host and guest.
@@ -39,11 +40,13 @@ Icons and models are committed; playing does not call an image-generation servic
 - Docs describe the game as it is now. Update them in the same change as the code; git keeps the history.
 - For a visual change, look at a rendered screenshot (`./build.py play -- --showcase --screenshot /absolute/path.png`); headless checks cannot verify presentation.
 - To play the real window with keyboard and mouse, use the `playtest` skill (`.claude/skills/playtest`).
+- After a scripted rename, run `python3 tools/compare_strings.py <base>`: checks do not read most text, and a rename can reach into it.
 - Report limitations candidly; do not claim a full playthrough from a fixture that injects finished goods.
 
 ## Checks
 
-`./build.py check` runs every offline check: C# compile with warnings as errors, C# format, Python `mypy --strict` and `ruff`, then the simulation, UI and network tests.
+`./build.py check` runs every offline check: C# compile with warnings as errors, C# format, Python `mypy --strict` and `ruff`, then the simulation, UI and network tests, printing each stage's time against its limit.
+`./build.py test sim`, `ui` or `net` runs one stage.
 CI runs the same command.
 Treat Godot error output as a failure even when the process exits zero; `build.py` does.
 

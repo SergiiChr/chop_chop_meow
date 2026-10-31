@@ -115,12 +115,38 @@ public partial class Game {
         await Click(open);
     }
 
-    private async Task Wheel(Vector2 point) {
+    /// <summary>Clicks a thing in the world where its model shows, clear of workers and of the panels over the world.</summary>
+    private async Task ClickOn(Thing thing) {
+        await Frames();
+        var spots = Enumerable.Range(0, 24).Select(i => view.Screen(thing.Pos, i * .15f)).Where(p => view.Pick(p)?.Id == thing.Id && view.PickWorker(p) == null && Uncovered(p)).ToArray();
+        Require(spots.Length > 0, $"No spot on the {thing.Kind} can be clicked: it is off screen, hidden or under a panel.");
+        await Click(spots[0]);
+    }
+
+    /// <summary>Whether a click at this point reaches the world rather than a panel over it.</summary>
+    private bool Uncovered(Vector2 point) => ui.GetChildren().OfType<Control>().All(c => !c.Visible || c.MouseFilter == Control.MouseFilterEnum.Ignore || !c.GetGlobalRect().HasPoint(point));
+
+    /// <summary>Esc until no placement, side panel or backpack drawer is left; with nothing open it does nothing, so it never opens the pause menu.</summary>
+    private async Task CloseWithEsc() {
+        for (int i = 0; i < 3 && (player.Mode.Placing != null || panel.Visible || bag.Visible); i++) await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>Holds D until the player moves, so it shows the world is not held.</summary>
+    private async Task<bool> PlayerWalks() {
+        var from = world.Player;
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
+        for (ulong end = Time.GetTicksMsec() + 1000; world.Player == from && Time.GetTicksMsec() < end;) await Frames(1);
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
+        await Frames();
+        return world.Player != from;
+    }
+
+    private async Task Wheel(Vector2 point, MouseButton wheel = MouseButton.WheelDown) {
         var at = GetViewport().GetFinalTransform() * point;
         Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Position = at, GlobalPosition = at, Pressed = true, Factor = 1 });
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = wheel, Position = at, GlobalPosition = at, Pressed = true, Factor = 1 });
         await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.WheelDown, Position = at, GlobalPosition = at, Pressed = false, Factor = 1 });
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = wheel, Position = at, GlobalPosition = at, Pressed = false, Factor = 1 });
         await Frames();
     }
 

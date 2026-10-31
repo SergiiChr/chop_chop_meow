@@ -28,6 +28,20 @@ These came from the user; change them only after asking.
 The project targets Godot 4.7.2 .NET with C#.
 `scenes/Main.tscn` is the project entry point and references `src/Game.cs`.
 
+### Interface parts
+
+`Game` is a thin runner: it creates the interface's nodes once while loading, holds them and routes input and the frame to them.
+Each feature is a node with a small public surface, given what it needs in its constructor.
+`UiKit` carries the world, sounds and how a player action runs.
+`Game` implements `IGameFlow`, what the menus call to start, load, leave or quit a game.
+The interface reads the world through `World`'s read members and keeps `world.S` for writes, and for what needs the real `Inventory`, such as a move between grids.
+`UiKit.Paused` follows which overlays are open: each one registers with `HoldWhile`, so none saves or restores another's pause.
+`World.Replaced` fires whenever the whole state is replaced (a new game, a load, a guest taking the host's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
+The side panel builds a new `PagePanel` node when a page opens; the page holds its own `LiveUpdates`, which run on each refresh, and its own state.
+A tab or other choice on a page calls `Redraw`, which builds its body again and keeps that state; `PageMemory` keeps only what outlasts the page.
+A `ThingPage` is a page about one thing in the world, with its job buttons and filters.
+UI checks stay in `partial class Game` and reach the parts through their public members.
+
 ### Source files
 
 Simulation and data:
@@ -36,12 +50,13 @@ Simulation and data:
 | --- | --- |
 | `src/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView` |
 | `src/GameData.cs` | Loads tunable items, buildings, recipes, trade values and time values from `data/game.json` |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
+| `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
 | `src/Players.cs` | Per-player state, the command dispatcher and guest adoption |
 | `src/Net.cs` | The ENet connection, sending and merging world updates, and guest saves |
@@ -51,27 +66,52 @@ UI and input:
 
 | File | Owns |
 | --- | --- |
-| `src/Game.cs` | UI, input, save/load, the main game loop and command-line review flags |
-| `src/Menu.cs` | The pause menu with the goal chain, and the round menu badges |
+| `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
+| `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
+| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates` and `LiveText` |
+| `src/Icons.cs` | Item and building icons, cached as they are first asked for |
+| `src/Hud.cs` | The clock plate and the mode, full-bottle and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
-| `src/Recovery.cs` | The respawn countdown and "Skip to morning?" |
+| `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
 | `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream cups, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
-| `src/Panels.cs` | Shared panel parts: header buttons, the filter window, the process row with its fuel slot and side outputs, job buttons and their worker lists |
+| `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what outlasts a page |
+| `src/BackpackDrawer.cs` | The backpack drawer above the hotbar |
+| `src/InspectPage.cs` | Picks the page for the selected thing or worker, and `ThingPage`, the base of a page about one thing |
+| `src/PagePanel.cs` | `PagePanel`, the base of every page |
+| `src/ProcessRow.cs` | The process row every station shares and the fuel row under its bar |
+| `src/JobRow.cs` | A place's job buttons, their worker lists and what each job is called |
+| `src/FilterWindow.cs` | The filter window beside the panel |
+| `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
-| `src/ItemSlot.cs` | Drag and drop between grids |
-| `src/Machine.cs` | Draws station input and output slots |
-| `src/Crafting.cs` | The crafting menu and the crafting bench panel |
+| `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
+| `src/StationPanel.cs` | A station's panel: recipes, process row, bellows and jobs |
+| `src/Cups.cs` | `Cups`: a building's item cups and a station's process row |
+| `src/CraftPanel.cs` | The crafting menu and the crafting bench panel |
+| `src/RecipeBoard.cs` | The recipe board both of them show |
+| `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
-| `src/Market.cs` | The trading post market, hiring offers and price sheet |
-| `src/Crew.cs` | The crew cards and worker panel |
+| `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
+| `src/CrewPanel.cs` | The crew cards and a worker's own panel |
+| `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
+| `src/FarmPanel.cs` | A farm plot's stages and process row |
+| `src/CabinPanel.cs` | A cabin: its door and sleep |
+| `src/CampfirePanel.cs` | A campfire |
+| `src/ResourcePanel.cs` | A resource in the world |
+| `src/PilePanel.cs` | A pile or compost heap |
+| `src/ToolRackPanel.cs` | A tool station |
+| `src/CratePanel.cs` | A placed crate |
+| `src/RecoveryBoxPanel.cs` | A recovery box |
+| `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
+| `src/StoragePanel.cs` | A chest or other plain storage |
 | `src/PackerPanel.cs` | The packing station panel and its good picker |
-| `src/Guide.cs` | The field guide topics |
-| `src/Needs.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
-| `src/Ending.cs` | The one-time ending screen |
-| `src/StartMenu.cs` | The start menu with its save slot, load and options screens |
-| `src/Hotbar.cs` | Nine saved item/plan references, assignment, icons and use |
-| `src/NetMenu.cs` | The host and join menus |
+| `src/GuidePanel.cs` | The field guide topics |
+| `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
+| `src/EndingScreen.cs` | The one-time ending screen |
+| `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
+| `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
+| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, clicking things, E and Space, and `ClickMode`, what the next click does |
+| `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:
 
@@ -96,6 +136,7 @@ Checks and review tools:
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
+| `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs` | The rendered performance run |
 | `src/AnimationCapture.cs` | Captures the animation review |
 
@@ -114,7 +155,7 @@ Keep rendering and input separate from state transitions, so headless checks can
 Health, hunger and thirst are HUD icons.
 Coins are a backpack item that stacks to 1000.
 
-Every page that works with the backpack shows it in one place, a drawer above the hotbar (`Game.BagGrid`).
+Every page that works with the backpack shows it in one place, a drawer above the hotbar (`PagePanel.BagGrid`).
 The stacks that page takes are rimmed in brick and the rest are faded.
 A close button hides the drawer until another page or building opens.
 The side panel only shows the building and sizes itself to what it holds.
@@ -321,7 +362,7 @@ So a steel chisel does everything a stone chisel does, faster, while tin cans ne
 `World.ToolKind` names the tool a resource needs: an axe for trees, a pickaxe for deposits, a rake for leaves.
 Stone, berries and loose coal need none.
 
-Every tool and its parts stay reachable, which `CheckNoToolDeadlocks` verifies:
+Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFreshStart` verifies:
 
 - a chisel is always 2 stone away;
 - a mallet is a wood part;
@@ -569,7 +610,7 @@ Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
 - The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe and anvil impacts, bellows pumps, storage lids and the cabin door.
-- `Game.Act` gives manual inventory moves and spending a sound by item kind when the action made none of its own.
+- `UiKit.Act` gives manual inventory moves and spending a sound by item kind when the action made none of its own.
 
 ### Music
 

@@ -7,14 +7,18 @@ using static Checks;
 /// <summary>Focused checks for deterministic actor animation selection and timing.</summary>
 public static class AnimationChecks {
     public static void Run() {
-        CheckTiming();
-        CheckFacing();
-        CheckPlayerActions();
-        CheckWorkerActions();
-        CheckPoses();
+        CheckActionsLoopAndWrapByTheirDuration();
+        CheckActorsTurnToFaceTheirMovement();
+        CheckPlayerActionFollowsToolAndTarget();
+        CheckWorkerHoldingALoadCarriesIt();
+        CheckStationWorkFollowsWorkStateNotItsWording();
+        CheckStrikingWorkerProtestsUntilWalking();
+        CheckGatheringWorkerSwingsTheToolOfItsTarget();
+        CheckWorkerAtLunchSitsOnceThere();
+        CheckEveryActionMovesThroughDistinctPoses();
     }
 
-    private static void CheckTiming() {
+    private static void CheckActionsLoopAndWrapByTheirDuration() {
         Require(ActorAnimation.Phase(ActorAction.Chop, .25f) == .25f, "a one-second chop should be a quarter through after .25s");
         Require(ActorAnimation.Phase(ActorAction.Chop, 1) == 0, "action loops should wrap after their duration");
         Require(Math.Abs(ActorAnimation.Phase(ActorAction.Chop, -.125f) - .875f) < 1e-5f, "negative elapsed time should wrap safely");
@@ -23,14 +27,14 @@ public static class AnimationChecks {
         Require(ActorAnimation.Phase(ActorAction.Idle, float.NaN) == 0, "invalid time should fall back to the first pose");
     }
 
-    private static void CheckFacing() {
+    private static void CheckActorsTurnToFaceTheirMovement() {
         Require(Math.Abs(ActorAnimation.Yaw(new Vector2(0, 1), 1) - 0) < 1e-5f, "world +Y movement should face the rig's +Z forward");
         Require(Math.Abs(ActorAnimation.Yaw(new Vector2(1, 0), 0) - Mathf.Pi / 2) < 1e-5f, "eastward movement should turn a quarter turn");
         Require(Math.Abs(Math.Abs(ActorAnimation.Yaw(new Vector2(0, -1), 0)) - Mathf.Pi) < 1e-5f, "northward movement should face backward");
         Require(ActorAnimation.Yaw(Vector2.Zero, 2) == 2, "zero movement should retain the previous facing");
     }
 
-    private static void CheckPlayerActions() {
+    private static void CheckPlayerActionFollowsToolAndTarget() {
         var bag = new Inventory();
         bag.Add("steel_axe", 1);
         bag.Add("steel_pick", 1);
@@ -59,7 +63,7 @@ public static class AnimationChecks {
             "inactive gathering should leave the player idle");
     }
 
-    private static void CheckWorkerActions() {
+    private static void CheckWorkerHoldingALoadCarriesIt() {
         var worker = new Worker();
         worker.Bag.Add("wood", 2);
         worker.Status = "Carrying wood → chest";
@@ -67,8 +71,10 @@ public static class AnimationChecks {
             "a worker hauling a load while moving should retain the carry action");
         Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Carry,
             "a worker holding a load while stationary should use carry pose");
+    }
 
-        worker.Bag.Remove("wood", 2);
+    private static void CheckStationWorkFollowsWorkStateNotItsWording() {
+        var worker = new Worker();
         worker.Status = "Text can vary";
         worker.WorkState = WorkerWorkState.Pumping;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Reinforced }, false) == ActorAction.Pump,
@@ -81,6 +87,10 @@ public static class AnimationChecks {
         worker.WorkState = WorkerWorkState.Hammering;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Hammer,
             "anvil work should select hammering animation");
+    }
+
+    private static void CheckStrikingWorkerProtestsUntilWalking() {
+        var worker = new Worker();
         worker.Status = "On strike · wages owed";
         worker.WorkState = WorkerWorkState.Idle;
         worker.WageDebt = worker.Wage;
@@ -89,7 +99,10 @@ public static class AnimationChecks {
             "striking workers should stand holding the protest sign instead of working");
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true) == ActorAction.Walk,
             "a striking worker heading home should walk, not protest");
-        worker.WageDebt = 0;
+    }
+
+    private static void CheckGatheringWorkerSwingsTheToolOfItsTarget() {
+        var worker = new Worker();
         worker.Status = "Gathering wood";
         worker.WorkState = WorkerWorkState.Blocked;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Tree }, false) == ActorAction.Idle,
@@ -102,6 +115,14 @@ public static class AnimationChecks {
         worker.Status = "Arbitrary status";
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Iron }, false) == ActorAction.Mine,
             "workers gathering iron should mine");
+        worker.Status = "Available";
+        worker.WorkState = WorkerWorkState.Idle;
+        Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Idle,
+            "available workers should remain idle");
+    }
+
+    private static void CheckWorkerAtLunchSitsOnceThere() {
+        var worker = new Worker();
         worker.WorkState = WorkerWorkState.Resting;
         worker.Bag.Add("wood", 2);
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Perch,
@@ -112,14 +133,9 @@ public static class AnimationChecks {
         worker.Id = 0;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true) == ActorAction.Carry,
             "a worker still walking to lunch should not sit");
-        worker.Bag.Remove("wood", 2);
-        worker.Status = "Available";
-        worker.WorkState = WorkerWorkState.Idle;
-        Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Idle,
-            "available workers should remain idle");
     }
 
-    private static void CheckPoses() {
+    private static void CheckEveryActionMovesThroughDistinctPoses() {
         foreach (var action in Enum.GetValues<ActorAction>()) {
             var poses = new HashSet<Pose>();
             for (int step = 0; step < 8; step++)
@@ -127,8 +143,11 @@ public static class AnimationChecks {
             Require(poses.Count >= 6, $"{action} should move through at least six distinct poses per loop, found {poses.Count}");
             var start = ActorAnimation.PoseAt(action, 0, false);
             var end = ActorAnimation.PoseAt(action, ActorAnimation.Duration(action) - .001f, false);
-            Require(Math.Abs(start.RaiseR - end.RaiseR) < 2 && Math.Abs(start.Lean - end.Lean) < 2 && Math.Abs(start.SwingL - end.SwingL) < 2,
-                $"{action} should loop without a visible jump");
+            Require(Math.Abs(start.RaiseR - end.RaiseR) < 2,
+                $"{action} should end with its right arm where it started");
+            Require(Math.Abs(start.Lean - end.Lean) < 2, $"{action} should end with its lean where it started");
+            Require(Math.Abs(start.SwingL - end.SwingL) < 2,
+                $"{action} should end with its left swing where it started");
         }
         var windup = ActorAnimation.PoseAt(ActorAction.Chop, .38f, false);
         var strike = ActorAnimation.PoseAt(ActorAction.Chop, .52f, false);
@@ -141,7 +160,8 @@ public static class AnimationChecks {
             "a torch swing on the move should keep the swinging arm while the legs keep walking");
         Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Seat is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Seat == 0,
             "a cross-legged worker should sit on the ground, and one on a rock should not");
-        Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick" && ActorAnimation.Tool(ActorAction.Hammer) == "hammer" && ActorAnimation.Tool(ActorAction.Gather) == null,
-            "each action should show its own tool, and hand gathering none");
+        Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick", "steel mining should show the steel pick");
+        Require(ActorAnimation.Tool(ActorAction.Hammer) == "hammer", "hammering should show the hammer");
+        Require(ActorAnimation.Tool(ActorAction.Gather) == null, "hand gathering should show no tool");
     }
 }

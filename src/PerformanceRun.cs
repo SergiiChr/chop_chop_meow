@@ -35,15 +35,15 @@ public partial class Game {
         int WorkersActive, int MachinesActive, int Site, bool Night, bool Settlement, long Pipelines);
 
     private void StartPerformanceRun() {
-        if (!launchArgs.Contains("--performance-run")) return;
-        performanceFolder = LaunchValue("--performance-run") ?? "build/performance";
+        if (!Launch.Has("--performance-run")) return;
+        performanceFolder = Launch.Value("--performance-run") ?? "build/performance";
         Directory.CreateDirectory(performanceFolder);
-        HideScreen(); ClosePanel(); paused = false;
+        startMenu.Close(); panel.Close();
         Engine.MaxFps = 0; DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
         DisplayServer.WindowSetSize(new Vector2I(2560, 1440));
         RenderingServer.ViewportSetMeasureRenderTime(GetViewport().GetViewportRid(), true);
         performanceSamples = new PerformanceSample[500_000];
-        foreach (var thing in world.S.Things)
+        foreach (var thing in world.Things)
             if (thing.Kind is ThingKind.Reinforced or ThingKind.Furnace or ThingKind.Bench) performanceMachines[thing.Id] = (thing.Progress, 0);
         performanceLastPosition = world.Player;
         performanceStart = performancePrevious = Time.GetTicksUsec();
@@ -92,9 +92,9 @@ public partial class Game {
             performanceKey = key;
         }
         int activeWorkers = 0, activeMachines = 0;
-        foreach (var worker in world.S.Workers)
+        foreach (var worker in world.Workers)
             if (worker.WorkState is WorkerWorkState.Gathering or WorkerWorkState.Pumping or WorkerWorkState.Hammering or WorkerWorkState.Digging or WorkerWorkState.Underground) activeWorkers++;
-        foreach (var thing in world.S.Things) {
+        foreach (var thing in world.Things) {
             if (thing.Processing) activeMachines++;
             if (performanceMachines.TryGetValue(thing.Id, out var previous)) {
                 int batches = previous.Batches + (previous.Progress > .01f && thing.Progress < previous.Progress ? 1 : 0);
@@ -128,7 +128,7 @@ public partial class Game {
         if (performanceFirsts == PerformanceFirstTimes.Length || seconds < PerformanceFirstTimes[performanceFirsts].Seconds) return;
         var (_, name) = PerformanceFirstTimes[performanceFirsts++];
         var at = world.Player;
-        var post = world.S.Things.First(t => t.Kind == ThingKind.Signpost);
+        var post = world.Things.First(t => t.Kind == ThingKind.Signpost);
         switch (name) {
             case "cart" or "second cart": world.S.Orders.Add(new TradeOrder { Signpost = post.Id, Crates = 3, Goods = { ["berries"] = 30 } }); break;
             case "buildings": foreach (var (kind, x) in new[] { (ThingKind.Cannery, -3f), (ThingKind.Cooktable, -1f), (ThingKind.Packer, 1f), (ThingKind.Hut, 4f) }) world.Add(kind, at + new Vector2(x, 3)); break;
@@ -147,7 +147,7 @@ public partial class Game {
                 csv.WriteLine(FormattableString.Invariant($"{s.Seconds:F6},{s.FrameMs:F4},{s.ProcessMs:F4},{s.RenderCpuMs:F4},{s.GpuMs:F4},{s.Allocated},{s.Gen0},{s.Gen1},{s.Gen2},{s.StaticBytes},{s.VideoBytes},{s.DrawCalls},{s.Primitives},{s.WorkersActive},{s.MachinesActive},{PerformanceSites[s.Site]},{s.Night},{s.Settlement},{s.Pipelines}"));
             }
         }
-        var stations = world.S.Things.Where(t => performanceMachines.ContainsKey(t.Id)).Select(t => new {
+        var stations = world.Things.Where(t => performanceMachines.ContainsKey(t.Id)).Select(t => new {
             t.Id,
             t.Kind,
             t.Recipe,
@@ -168,7 +168,7 @@ public partial class Game {
             walkedUnits = performanceWalked,
             events = performanceEvents,
             stations,
-            workers = world.S.Workers.Select(w => new { w.Name, workState = w.WorkState.ToString(), w.Status, w.WageDebt }).ToArray(),
+            workers = world.Workers.Select(w => new { w.Name, workState = w.WorkState.ToString(), w.Status, w.WageDebt }).ToArray(),
         };
         File.WriteAllText(Path.Combine(performanceFolder, "run.json"), JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
         GD.Print($"PERFORMANCE COMPLETE: {performanceCount} frames, {performanceWalked:0.0} units walked. Results: {performanceFolder}");
