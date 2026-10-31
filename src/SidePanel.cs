@@ -48,6 +48,8 @@ public partial class SidePanel : PanelContainer {
     /// <summary>The board's column.</summary>
     private readonly VBoxContainer sheet;
     private readonly VBoxContainer content;
+    /// <summary>What the scroll area holds, whose size the panel takes.</summary>
+    private readonly MarginContainer inset;
     /// <summary>The price rows' scroll area, sized like the panel's to the room there is.</summary>
     private ScrollContainer? sheetScroll;
     private VBoxContainer? sheetRows;
@@ -82,7 +84,7 @@ public partial class SidePanel : PanelContainer {
         heading.AddChild(kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "close"));
         scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
         // Room for the pills that sit on the cups' corners.
-        var inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);
+        inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);
         content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddChild(content);
         world.Replaced += () => { Selection = default; Close(); };
     }
@@ -175,12 +177,12 @@ public partial class SidePanel : PanelContainer {
     public void Fit() {
         if (!Visible) return;
         float room = Math.Max(160, ui.Size.Y - Top - 120);
-        float want = Math.Min(content.GetParent<Control>().GetCombinedMinimumSize().Y, room);
-        if (sheet.Visible && IsInstanceValid(sheetScroll)) {
+        float want = Math.Min(inset.GetCombinedMinimumSize().Y, room);
+        if (sheet.Visible && sheetScroll != null) {
             // The board reaches further left than the panel, over the backpack drawer, so it stops above the drawer.
             float clear = Bag.Visible ? ui.Size.Y - Top - BackpackDrawer.Bottom - Bag.Size.Y - 40 : room;
             float rows = Math.Min(sheetRows!.GetCombinedMinimumSize().Y, Math.Min(room, clear) - 110);
-            if (Math.Abs(sheetScroll!.CustomMinimumSize.Y - rows) > .5f) sheetScroll.CustomMinimumSize = new Vector2(0, rows);
+            if (Math.Abs(sheetScroll.CustomMinimumSize.Y - rows) > .5f) sheetScroll.CustomMinimumSize = new Vector2(0, rows);
         }
         if (Math.Abs(scroll.CustomMinimumSize.Y - want) < .5f) return;
         // A control grows to its minimum size but never shrinks back on its own, so the panel is reset to it.

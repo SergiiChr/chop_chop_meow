@@ -93,7 +93,7 @@ public partial class DeathLabel : Label {
 
     public void Refresh() {
         int feeding = 0;
-        foreach (var w in world.Wolves) if (w.Feeding) feeding++;
+        if (world.Dead) foreach (var w in world.Wolves) if (w.Feeding) feeding++;
         var now = (world.Dead, world.Mauled, feeding > 1, (int)MathF.Ceiling(world.RespawnIn));
         if (now == shown) return;
         shown = now;

@@ -79,21 +79,21 @@ public partial class Hotbar : PanelContainer {
     }
 
     // What each slot shows, so a slot is redrawn only when its item, count or selection changes: redrawing builds text and styles.
-    private readonly System.Collections.Generic.Dictionary<int, (ItemSlot Button, string Id, int Count, bool Active)> shownSlots = new();
+    private readonly (string Id, int Count, bool Active)?[] shownSlots = new (string, int, bool)?[9];
     public void Refresh() {
         for (int slot = 0; slot < Buttons.Count; slot++) {
             var button = Buttons[slot];
-            var shown = (button, HotbarId(slot), world.Backpack[HotbarId(slot)], world.ActiveHotbar == slot);
-            if (shownSlots.TryGetValue(slot, out var before) && before == shown) continue;
-            shownSlots[slot] = shown;
-            var id = HotbarId(slot);
+            string id = HotbarId(slot);
             int count = world.Backpack[id];
+            bool active = world.ActiveHotbar == slot;
+            var shown = (id, count, active);
+            if (shownSlots[slot] == shown) continue;
+            shownSlots[slot] = shown;
             bool building = world.Data.IsBuilding(id);
             Counts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : Water.IsBottle(id) ? $"{Water.BottleSips(id)}/3" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · drag an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
-            bool active = world.ActiveHotbar == slot;
             // The item in hand gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.CupWanted : Style.CupNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.CupWanted : Style.CupNormal);
@@ -110,7 +110,10 @@ public partial class Hotbar : PanelContainer {
     }
     private static readonly string[] DrinkingBottles = { "water_1", "water_2", "water", "empty_bottle" };
 
-    public string? ActiveItem() => world.Data.Items.ContainsKey(HotbarId(world.ActiveHotbar)) ? HotbarId(world.ActiveHotbar) : null;
+    public string? ActiveItem() {
+        string id = HotbarId(world.ActiveHotbar);
+        return world.Data.Items.ContainsKey(id) ? id : null;
+    }
 
     public bool IsTransferable(string id) => world.Data.Items[id].Tool == "" && !world.Data.IsConsumable(id);
 
