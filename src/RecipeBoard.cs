@@ -12,8 +12,9 @@ namespace ChopChopMeow;
 /// </summary>
 /// <param name="held">Names the tool in use for a group, or null when it is missing or none is needed.</param>
 /// <param name="station">Null when crafting by hand.</param>
-public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, Action redraw, List<IGrouping<(string Tool, int Tier), string>> groups, Func<(string Tool, int Tier), string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready, Action<string>? twice = null) : HBoxContainer {
+public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, Action redraw, IEnumerable<string> recipes, Func<(string Tool, int Tier), string?> held, Thing? station, Action<string> click, Func<string, bool> chosen, Func<string, bool> ready, Action<string>? twice = null) : HBoxContainer {
     private readonly World world = kit.World;
+    private readonly List<IGrouping<(string Tool, int Tier), string>> groups = recipes.GroupBy(id => (kit.World.Data.Recipes[id].Tool, kit.World.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
 
     /// <summary>A recipe's hover popup: its name, each input as an icon with the amount (brick while the backpack is short), and the time where it is crafted.</summary>
     private Control RecipePopup(RecipeDef r, float seconds) {

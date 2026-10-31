@@ -11,8 +11,7 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
     protected override void Build() {
         headingIcon.Texture = GD.Load<Texture2D>("res://assets/ui/line_craft.svg"); headingIcon.SelfModulate = Style.Rim; headingIcon.Visible = true;
         headingIcon.TooltipText = "Crafting by hand. A crafting bench works twice as fast.";
-        var groups = world.HandRecipes.GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
-        AddChild(new RecipeBoard(kit, live, memory, Redraw, groups, group => group.Tool == "" ? null : world.BestTool(group.Tool, null, group.Tier), null, id => world.Craft(id), _ => false, world.CanCraft));
+        AddChild(new RecipeBoard(kit, live, memory, Redraw, world.HandRecipes, group => group.Tool == "" ? null : world.BestTool(group.Tool, null, group.Tier), null, id => world.Craft(id), _ => false, world.CanCraft));
         CraftQueue();
         BagGrid(UseFromBag, UseHint, wanted: id => world.HandRecipes.Any(r => world.Data.Recipes[r].Inputs.ContainsKey(id)));
     }
@@ -50,16 +49,13 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
 
     /// <summary>A cup in the craft queue's row with what one batch takes or makes under it; with a cancel action, clicking it cancels that entry.</summary>
     private VBoxContainer RecipeCup(string name, string item, string perBatch, float size, Action? cancel) {
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
         var (cell, _) = ItemSlot.Cup(name, size); cell.Icon = Icons.Of(item);
         cell.TooltipText = cancel == null ? world.Data.Name(item) : $"{world.Data.Name(item)}\nClick to cancel and get the materials back.";
         if (cancel != null) {
             cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
             cell.Pressed += () => kit.Run(cancel);
         }
-        column.AddChild(cell);
-        if (perBatch != "") column.AddChild(Style.PerBatch(perBatch));
-        return column;
+        return Cups.Labelled(cell, perBatch);
     }
 }
 
@@ -69,8 +65,8 @@ public partial class BenchPanel(PageTools tools, Thing subject) : ThingPage(tool
         // The station's own tool cups sit in the header: what is slotted sets which recipes can run and how fast.
         foreach (string tool in World.SlotKinds(thing.Kind)) { var slot = ToolSlot(tool); panel.AddToHeader(slot); }
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
-        var groups = world.Data.Recipes.Where(p => p.Value.Station == thing.Kind).Select(p => p.Key).GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
-        AddChild(new RecipeBoard(kit, live, memory, Redraw, groups, group => group.Tool == "" ? null : world.BenchTool(thing, group.Tool, group.Tier), thing,
+        var recipes = world.Data.Recipes.Where(p => p.Value.Station == thing.Kind).Select(p => p.Key);
+        AddChild(new RecipeBoard(kit, live, memory, Redraw, recipes, group => group.Tool == "" ? null : world.BenchTool(thing, group.Tool, group.Tier), thing,
             id => { world.SetRecipe(thing, id); Redraw(); }, id => thing.Recipe == id, id => world.Backpack.Has(world.Data.Recipes[id].Inputs),
             // A double click also loads one batch of inputs from the backpack.
             id => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(thing, item, amount); }));
