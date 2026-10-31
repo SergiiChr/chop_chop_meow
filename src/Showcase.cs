@@ -126,6 +126,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--hide-ui")) ui.Visible = false;
         if (Launch.Has("--market")) { world.Player = sign.Pos + Vector2.One; panel.Select(sign); }
         if (Launch.Has("--bench")) { world.Player = bench.Pos + Vector2.One; panel.Select(bench); }
+        if (Launch.Has("--neighbor")) { world.As(world.AddGuest(2, null), () => world.Player = bench.Pos + Vector2.One); world.Player = bench.Pos + new Vector2(-2, 4); panel.Close(); view.Zoom = 1.6f; }
         if (Launch.Has("--craft")) panel.Open(Page.Craft);
         if (Launch.Has("--crew")) panel.Open(Page.Crew);
         if (Launch.Has("--worker")) panel.Select(world.Workers[0]);

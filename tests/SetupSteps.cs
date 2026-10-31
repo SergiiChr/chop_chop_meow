@@ -11,6 +11,11 @@ using Godot;
 /// Placing the player with <c>world.Player</c> and holding a player's input are allowed too.
 /// </summary>
 internal static class SetupSteps {
+    /// <summary>Whether a backpack holds what a new guest starts with and nothing else.</summary>
+    public static bool HoldsNewcomerKit(InventoryView bag) => bag.Count == 2 && bag["steel_axe"] == 1 && bag["empty_bottle"] == 1;
+
+    public static bool HoldsNewcomerKit(Inventory bag) => HoldsNewcomerKit(new InventoryView(bag));
+
     /// <summary>Puts goods in the backpack: gathering or buying each would take a day of ticks, and many goods are not sold.</summary>
     public static int Give(World world, string item, int count = 1) => Give(world.S.Actor, item, count);
 
@@ -18,7 +23,10 @@ internal static class SetupSteps {
     public static int Give(PlayerState player, string item, int count = 1) => player.Backpack.Add(item, count);
 
     /// <summary>Takes goods out of the backpack to clear the ground for the next check: the game can only move them somewhere else.</summary>
-    public static int Drop(World world, string item, int count = int.MaxValue) => world.S.Backpack.Remove(item, count);
+    public static int Drop(World world, string item, int count = int.MaxValue) => Drop(world.S.Actor, item, count);
+
+    /// <summary>Takes goods out of one player's backpack, for the same reason.</summary>
+    public static int Drop(PlayerState player, string item, int count = int.MaxValue) => player.Backpack.Remove(item, count);
 
     /// <summary>Empties the backpack: the game can only move goods somewhere else.</summary>
     public static void EmptyBackpack(World world) => world.S.Backpack.Clear();

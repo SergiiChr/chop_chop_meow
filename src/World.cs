@@ -553,6 +553,10 @@ public sealed partial class World {
     /// <summary>An anvil or bench only works while the player or a paid worker is hammering at it, not merely standing near.</summary>
     public bool Hammered(Thing anvil) {
         foreach (var p in S.Players) using (ActAs(p)) if (PlayerHammers(anvil)) return true;
+        return CrewHammers(anvil);
+    }
+    /// <summary>Whether a paid worker is hammering at a station right now.</summary>
+    public bool CrewHammers(Thing anvil) {
         foreach (var w in S.Workers) if (w.Assignment == anvil.Id && w.WageDebt <= 0 && w.WorkState == WorkerWorkState.Hammering && HasDuty(w, anvil.Id, "craft")) return true;
         return false;
     }

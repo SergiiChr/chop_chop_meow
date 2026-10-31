@@ -399,7 +399,7 @@ The canning station (`cannery`) seals a filling and a `tin_can` into a canned go
 
 #### Anvil
 
-An anvil only progresses while someone hammers it: the player standing within reach without walking or gathering, or a paid assigned worker hammering at the station.
+An anvil only progresses while someone hammers it: a player standing within reach without walking or gathering, or a paid assigned worker hammering at the station.
 A smith stays with a running batch and fetches the next load once it is done.
 
 #### Furnaces and steel
