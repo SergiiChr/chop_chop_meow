@@ -40,7 +40,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         var pumpRow = new HBoxContainer(); pumpRow.AddThemeConstantOverride("separation", 8); column.AddChild(pumpRow);
         var pump = kit.Button("Pump", () => { if (kit.Paused) kit.Notify("Resume before operating the bellows."); else world.Pump(thing); });
         pump.Name = "pump"; pump.TooltipText = "Pump the bellows · Space"; pump.CustomMinimumSize = new Vector2(84, 38);
-        var look = Style.Pill(Style.Sage); Style.Skin(pump, look.Item1, look.Item2);
+        Style.SkinPill(pump, Style.Sage);
         pumpRow.AddChild(pump); pumpRow.AddChild(Style.Pill("Space", Style.KeyPill, Style.Line, 12));
         // Redrawn only when the shown degrees change.
         live.Watch(() => World.Celsius(thing.Heat), celsius => { dial.QueueRedraw(); degrees.Text = $"{celsius} °C"; });

@@ -7,7 +7,7 @@ public partial class ResourcePanel(PageTools tools, Thing subject) : ThingPage(t
     protected override void Body() {
         var row = Well(new HBoxContainer()); row.AddThemeConstantOverride("separation", 12);
         row.AddChild(Style.Icon(Icons.Of(World.ResourceItem(thing)), 44));
-        var left = Style.Text("", 16, Style.Ink); left.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; left.AutowrapMode = TextServer.AutowrapMode.WordSmart; row.AddChild(left);
+        var left = Style.Text("", 16, Style.Ink, wrap: true); left.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(left);
         live.Bind(left, line => {
             if (thing.Kind != ThingKind.Water) line.Append(thing.Remaining).Append(" left · ");
             line.Append(world.GatherBlock(thing) ?? (thing.IsLoose ? "right-click to pick it up" : "hold right mouse to gather"));

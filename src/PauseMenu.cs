@@ -44,7 +44,7 @@ public partial class PauseMenu : PanelContainer {
         side.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         HostButton = MenuButton("Host", Style.Sage, HostGame); HostButton.Name = "host"; side.AddChild(HostButton);
         JoinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
-        netLine = Style.Text("", 13, Style.Beige); netLine.Name = "net_status"; netLine.HorizontalAlignment = HorizontalAlignment.Center; netLine.AutowrapMode = TextServer.AutowrapMode.WordSmart; side.AddChild(netLine);
+        netLine = Style.Text("", 13, Style.Beige, wrap: true); netLine.Name = "net_status"; netLine.HorizontalAlignment = HorizontalAlignment.Center; side.AddChild(netLine);
         world.Replaced += () => Visible = false;
         kit.HoldWhile(() => Visible);
     }
@@ -82,13 +82,13 @@ public partial class PauseMenu : PanelContainer {
                 var current = new PanelContainer(); current.AddThemeStyleboxOverride("panel", Style.Dropdown); goals.AddChild(current);
                 var inner = new VBoxContainer(); inner.AddThemeConstantOverride("separation", 4); current.AddChild(inner);
                 inner.AddChild(GoalRow(title, false, true));
-                var hint = Style.Text(world.Objective.Hint, 13, Style.Tan); hint.AutowrapMode = TextServer.AutowrapMode.WordSmart; inner.AddChild(hint);
+                var hint = Style.Text(world.Objective.Hint, 13, Style.Tan, wrap: true); inner.AddChild(hint);
                 continue;
             }
             goals.AddChild(GoalRow(title, false, false));
         }
         met.Visible = met.GetChildCount() > 0;
-        if (world.GoalComplete) { var hint = Style.Text(world.Objective.Hint, 13, Style.Tan); hint.AutowrapMode = TextServer.AutowrapMode.WordSmart; goals.AddChild(hint); }
+        if (world.GoalComplete) { var hint = Style.Text(world.Objective.Hint, 13, Style.Tan, wrap: true); goals.AddChild(hint); }
         goals.AddChild(new HSeparator());
         goals.AddChild(Style.WellLabel("End goals"));
         foreach (var ore in World.MineOres) goals.AddChild(GoalRow($"A working {ore.Id()} mine", world.HasMine(ore), false, Icons.Of(World.ResourceItem(ore))));
@@ -102,7 +102,7 @@ public partial class PauseMenu : PanelContainer {
             day.AddThemeStyleboxOverride("panel", i < days ? Style.BarGrow : Style.BarBack); streak.AddChild(day);
         }
         string yesterday = world.Profits.Count > 0 ? $"yesterday {world.Profits[^1]}" : "no day finished yet";
-        var profit = Style.Text($"Profit is sale coins minus wages · {yesterday} · today's sales {world.DayRevenue}", 13, Style.Tan); profit.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        var profit = Style.Text($"Profit is sale coins minus wages · {yesterday} · today's sales {world.DayRevenue}", 13, Style.Tan, wrap: true);
         goals.AddChild(profit);
         HostButton.Disabled = net.Online; HostButton.Text = net.Hosting ? "Hosting" : "Host";
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.

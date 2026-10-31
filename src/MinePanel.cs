@@ -48,7 +48,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
             // Miners as hardhats, lit while underground, and the two outputs with how fast they fill.
             var crew = Row(); crew.AddThemeConstantOverride("separation", 8);
             var tunnel = Style.Glyph("line_tunnel", 28, Style.Rim); tunnel.MouseFilter = Control.MouseFilterEnum.Pass; tunnel.TooltipText = "Miners underground"; crew.AddChild(tunnel);
-            var hats = Enumerable.Range(0, data.Workers).Select(_ => Style.Icon(GD.Load<Texture2D>("res://assets/ui/hardhat.svg"), 30)).ToArray();
+            var hats = Enumerable.Range(0, data.Workers).Select(_ => Style.Icon(Icons.Of("hardhat"), 30)).ToArray();
             foreach (var hat in hats) crew.AddChild(hat);
             var row = Well(new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }); row.AddThemeConstantOverride("separation", 36);
             var rates = new Label[2]; var bars = new ColorRect[2]; var items = new[] { World.MineOre(thing), "stone" };

@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>What the crew overview and a worker's own panel share.</summary>
 public abstract partial class WorkerPage(PageTools tools) : PagePanel(tools) {
-    protected static readonly Texture2D Hardhat = GD.Load<Texture2D>("res://assets/ui/hardhat.svg");
+    protected static readonly Texture2D? Hardhat = Icons.Of("hardhat");
 
     protected Texture2D? PlaceIcon(Thing at) => Icons.Of(at.IsResource ? World.ResourceItem(at) : at.Kind.Id());
 
@@ -37,8 +37,8 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
         if (world.Workers.Count == 0) {
             var empty = Well(new HBoxContainer()); empty.AddThemeConstantOverride("separation", 14);
             empty.AddChild(Style.Icon(Hardhat, 40));
-            var hint = Style.Text("No crew yet. Hire villagers at a trading post: more coins up front means a lower daily wage.", 15, Style.Ink);
-            hint.AutowrapMode = TextServer.AutowrapMode.WordSmart; hint.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; empty.AddChild(hint);
+            var hint = Style.Text("No crew yet. Hire villagers at a trading post: more coins up front means a lower daily wage.", 15, Style.Ink, wrap: true);
+            hint.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; empty.AddChild(hint);
             return;
         }
         foreach (var w in world.Workers) WorkerCard(w);
@@ -95,7 +95,7 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
         var (carry, carried) = ItemSlot.Cup("carry", 56); well.AddChild(carry);
         var (tool, _) = ItemSlot.Cup("tool", 56); well.AddChild(tool);
         var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; text.AddThemeConstantOverride("separation", 2); well.AddChild(text);
-        var status = Style.Text("", 15, Style.Ink); status.AutowrapMode = TextServer.AutowrapMode.WordSmart; text.AddChild(status);
+        var status = Style.Text("", 15, Style.Ink, wrap: true); text.AddChild(status);
         var owed = Style.Text("", 13, Style.Brick, Style.Bold); text.AddChild(owed);
         live.Watch(() => w.Status, shown => status.Text = shown);
         WatchKit(w, carry, carried, tool);
@@ -117,8 +117,8 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
             drop.CustomMinimumSize = new Vector2(30, 30); drop.AddThemeConstantOverride("icon_max_width", 14); row.AddChild(drop);
         }
         if (first) {
-            var none = Style.Text("No jobs. Give one with the job buttons at a building, or send them to gather.", 14, Style.Tan);
-            none.AutowrapMode = TextServer.AutowrapMode.WordSmart; jobs.AddChild(none);
+            var none = Style.Text("No jobs. Give one with the job buttons at a building, or send them to gather.", 14, Style.Tan, wrap: true);
+            jobs.AddChild(none);
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
         buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { panel.Player.Mode = new ClickMode.Assign(w.Id); panel.Close(); kit.Refresh(); }));

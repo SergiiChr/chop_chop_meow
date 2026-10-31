@@ -95,7 +95,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
                 cup.AddChild(lead.StartsWith("line_") ? Style.Glyph(lead, 28, Style.Ink) : Style.Icon(Icons.Of(lead), 32));
                 row.AddChild(cup);
             }
-            var text = Style.Text(tip, 14, Style.Ink); text.AutowrapMode = TextServer.AutowrapMode.WordSmart; text.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; text.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+            var text = Style.Text(tip, 14, Style.Ink, wrap: true); text.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; text.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
             row.AddChild(text);
         }
     }

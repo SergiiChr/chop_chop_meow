@@ -35,13 +35,13 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         ship.AddChild(NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item), columns: 3));
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
         var sell = kit.Button("", () => { var load = thing.Inventory.Items.Keys.OrderByDescending(id => thing.Inventory[id]).FirstOrDefault(); if (world.Sell(thing) && load != null) kit.Sounds.Play(Sounds.ForItem(load)); });
-        sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = GD.Load<Texture2D>("res://assets/ui/line_cart.svg"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
+        sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = Icons.Of("line_cart"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
         sell.AddThemeConstantOverride("icon_max_width", 32); sell.CustomMinimumSize = new Vector2(0, 56); sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; sell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        var look = Style.Pill(Style.Brick); Style.Skin(sell, look.Item1, look.Item2);
+        Style.SkinPill(sell, Style.Brick);
         sell.AddThemeColorOverride("icon_normal_color", Style.Rim); sell.AddThemeColorOverride("icon_hover_color", Style.Rim);
         ship.AddChild(sell);
         var auto = new CheckBox { Text = "Send when full", ButtonPressed = thing.AutoSell, FocusMode = Control.FocusModeEnum.None, Name = "auto_sell", TooltipText = "Send the cart by itself once every slot holds a crate" };
-        foreach (var color in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color" }) auto.AddThemeColorOverride(color, Style.Ink);
+        Style.InkCheck(auto);
         auto.Toggled += on => { world.SetAutoSell(thing, on); auto.SetPressedNoSignal(thing.AutoSell); };
         outbound.AddChild(auto);
         var revenue = Style.Text("", 14, Style.Ink); outbound.AddChild(revenue);
@@ -77,7 +77,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         strip.AddChild(pad);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 10); pad.AddChild(row);
         row.AddChild(Style.Icon(Icons.Of("signpost"), 26));
-        var road = new CartRoad { Name = "cart", Cart = GD.Load<Texture2D>("res://assets/ui/line_cart.svg"), CustomMinimumSize = new Vector2(0, 30), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Pass };
+        var road = new CartRoad { Name = "cart", Cart = Icons.Of("line_cart"), CustomMinimumSize = new Vector2(0, 30), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Pass };
         row.AddChild(road);
         row.AddChild(Style.Glyph("line_village", 26, Style.Rim));
         var left = Style.Heading("", 15); left.CustomMinimumSize = new Vector2(40, 0); left.HorizontalAlignment = HorizontalAlignment.Right; row.AddChild(left);
@@ -100,7 +100,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
     private void HireOffers() {
         foreach (var offer in world.Data.HireOffers) {
             var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => { if (world.Hire(thing, offer) is Worker w) panel.Select(w); });
-            hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = GD.Load<Texture2D>("res://assets/ui/hardhat.svg"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
+            hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = Icons.Of("hardhat"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
             hire.CustomMinimumSize = new Vector2(0, 50); hire.Alignment = HorizontalAlignment.Left;
             hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}";
             AddChild(hire);
@@ -115,9 +115,8 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         var title = Style.Text("Bramblewick prices", 19, Style.Ink, Style.Head); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);
         var age = Style.Pill("", Style.Tag(Style.Mustard), Style.Line, 12); top.AddChild(age);
         live.Watch(() => world.PriceAge, days => age.Text = days == 0 ? "today" : days == 1 ? "yesterday" : $"{days} days old");
-        var fetch = new Button { Name = "fetch", Icon = GD.Load<Texture2D>("res://assets/ui/line_crew.svg"), Text = "→", ExpandIcon = true, CustomMinimumSize = new Vector2(64, 32), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
-        fetch.AddThemeConstantOverride("icon_max_width", 18); var fetchLook = Style.Pill(Style.Enamel); Style.Skin(fetch, fetchLook.Item1, fetchLook.Item2);
-        fetch.Pressed += () => kit.Run(() => world.FetchPrices(thing));
+        var fetch = kit.Button("→", () => world.FetchPrices(thing)); fetch.Name = "fetch"; fetch.Icon = Icons.Of("line_crew"); fetch.ExpandIcon = true; fetch.CustomMinimumSize = new Vector2(64, 32);
+        fetch.AddThemeConstantOverride("icon_max_width", 18); Style.SkinPill(fetch, Style.Enamel);
         top.AddChild(fetch);
         top.AddChild(kit.HeaderButton("close", "Close the price sheet", () => { memory.SheetOpen = false; Redraw(); }, Style.CloseRound, "sheet_close"));
         live.Watch(() => world.FetchBlock(thing), blocked => {
@@ -153,10 +152,9 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
             var buySlot = new CenterContainer { CustomMinimumSize = new Vector2(PriceColumn, 36) }; row.AddChild(buySlot);
             // Goods the village does not take show no sell price, and goods it does not sell no buy button.
             if (!buys) continue;
-            var buy = new Button { Name = $"buy_{id}", Text = $"{world.LotPrice(id)}", Icon = coins, ExpandIcon = true, IconAlignment = HorizontalAlignment.Right, CustomMinimumSize = new Vector2(80, 30), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
-            buy.AddThemeConstantOverride("icon_max_width", 16); var buyLook = Style.Pill(Style.Brick); Style.Skin(buy, buyLook.Item1, buyLook.Item2);
+            var buy = kit.Button($"{world.LotPrice(id)}", () => world.Buy(thing, id, ItemMoves.All ? 5 : 1)); buy.Name = $"buy_{id}"; buy.Icon = coins; buy.ExpandIcon = true; buy.IconAlignment = HorizontalAlignment.Right; buy.CustomMinimumSize = new Vector2(80, 30);
+            buy.AddThemeConstantOverride("icon_max_width", 16); Style.SkinPill(buy, Style.Brick);
             buy.AddThemeFontOverride("font", Style.Bold); buy.AddThemeFontSizeOverride("font_size", 14);
-            buy.Pressed += () => kit.Run(() => world.Buy(thing, id, ItemMoves.All ? 5 : 1));
             buy.TooltipText = world.Lot(id) > 1 ? $"Buy a crate of {world.Lot(id)} {world.Data.Name(id)} · Ctrl: 5 crates\nCrates arrive in the mailbox." : $"Buy a {world.Data.Name(id).ToLowerInvariant()} · Ctrl: 5\nGoods arrive in the mailbox.";
             buySlot.AddChild(buy);
         }

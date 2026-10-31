@@ -19,7 +19,7 @@ public partial class RecoveryPrompt : PanelContainer {
         AddThemeStyleboxOverride("panel", Style.Board);
         var body = new VBoxContainer(); body.AddThemeConstantOverride("separation", 14); AddChild(body);
         body.AddChild(Style.Heading("Skip to morning?", 24));
-        reason = Style.Text("", 15, Style.Rim); reason.AutowrapMode = TextServer.AutowrapMode.WordSmart; body.AddChild(reason);
+        reason = Style.Text("", 15, Style.Rim, wrap: true); body.AddChild(reason);
         var actions = new HBoxContainer(); actions.AddThemeConstantOverride("separation", 10); body.AddChild(actions);
         skip = kit.Button("Skip to morning", () => world.SkipMorning()); skip.Name = "skip_morning";
         actions.AddChild(skip);

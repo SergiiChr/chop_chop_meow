@@ -126,6 +126,15 @@ public static class Style {
         button.AddThemeStyleboxOverride("disabled", normal); button.AddThemeStyleboxOverride("focus", None);
     }
 
+    /// <summary>Gives a button the rounded look of a job or action button in this colour.</summary>
+    public static void SkinPill(Button button, Color color) { var look = Pill(color); Skin(button, look.Item1, look.Item2); }
+
+    /// <summary>Dark text on a check box that sits on a beige well.</summary>
+    public static void InkCheck(CheckBox box) {
+        foreach (var state in CheckStates) box.AddThemeColorOverride(state, Ink);
+    }
+    private static readonly string[] CheckStates = { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color" };
+
     /// <summary>The theme of the whole interface.</summary>
     public static Theme Interface() {
         var theme = new Theme { DefaultFont = Body };
@@ -180,9 +189,9 @@ public static class Style {
         return label;
     }
 
-    /// <summary>Plain text in the given colour, the body face by default.</summary>
-    public static Label Text(string text, int size, Color color, Font? font = null) {
-        var label = new Label { Text = text, AutowrapMode = TextServer.AutowrapMode.Off, VerticalAlignment = VerticalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
+    /// <summary>Plain text in the given colour, the body face by default; with <paramref name="wrap"/> it wraps at its width.</summary>
+    public static Label Text(string text, int size, Color color, Font? font = null, bool wrap = false) {
+        var label = new Label { Text = text, AutowrapMode = wrap ? TextServer.AutowrapMode.WordSmart : TextServer.AutowrapMode.Off, VerticalAlignment = VerticalAlignment.Center, MouseFilter = Control.MouseFilterEnum.Ignore };
         label.AddThemeFontOverride("font", font ?? Bold); label.AddThemeFontSizeOverride("font_size", size); label.AddThemeColorOverride("font_color", color);
         return label;
     }

@@ -61,7 +61,7 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
     /// <summary>A wide rounded button for a page's main actions.</summary>
     public Button BigButton(string text, Color color, Action action) {
         var button = Button(text, action); button.CustomMinimumSize = new Vector2(0, 56); button.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill;
-        var look = Style.Pill(color); Style.Skin(button, look.Item1, look.Item2);
+        Style.SkinPill(button, color);
         button.AddThemeFontSizeOverride("font_size", 17);
         return button;
     }

@@ -40,9 +40,8 @@ public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, JobChoice choi
         var counts = new Label[jobs.Length];
         for (int i = 0; i < jobs.Length; i++) {
             string job = jobs[i];
-            var look = Style.Pill(Style.JobColors[i % Style.JobColors.Length]);
             var button = new Button { Name = $"job_{job}", CustomMinimumSize = new Vector2(0, 48), SizeFlagsHorizontal = SizeFlags.ExpandFill, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, ToggleMode = true, ButtonPressed = choice.Job == job };
-            Style.Skin(button, look.Item1, look.Item2, look.Item2);
+            Style.SkinPill(button, Style.JobColors[i % Style.JobColors.Length]);
             button.TooltipText = Hint(job);
             var inner = new HBoxContainer { Alignment = AlignmentMode.Center, MouseFilter = MouseFilterEnum.Ignore }; inner.AddThemeConstantOverride("separation", 8);
             inner.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); button.AddChild(inner);
@@ -92,7 +91,7 @@ public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, JobChoice choi
             var worker = w;
             var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 8); list.AddChild(line);
             var tick = new CheckBox { Text = w.Name, ButtonPressed = World.HasDuty(w, t.Id, job), FocusMode = FocusModeEnum.None, SizeFlagsHorizontal = SizeFlags.ExpandFill, Name = $"duty_{w.Id}" };
-            tick.AddThemeColorOverride("font_color", Style.Ink); tick.AddThemeColorOverride("font_hover_color", Style.Ink); tick.AddThemeColorOverride("font_pressed_color", Style.Ink); tick.AddThemeColorOverride("font_hover_pressed_color", Style.Ink);
+            Style.InkCheck(tick);
             tick.AddThemeFontOverride("font", Style.Bold);
             // A full mine refuses the worker, so the box shows what actually happened.
             tick.Toggled += on => { world.SetDuty(worker, t, job, on); tick.SetPressedNoSignal(World.HasDuty(worker, t.Id, job)); kit.Refresh(); };
