@@ -94,6 +94,7 @@ public static class SimulationChecks {
         CheckFoodsFeedWaterAndHealByTheirData(data);
         CheckMarketTakesOnlyCrates(data);
         CheckOlderSavesResetMadeToolAnvilsAndStartWaterGoal(data);
+        CheckAnvilSavedWithNoRecipeLoadsSetToSteelParts(data);
         CheckLoadedSaveDropsOldStageNumber(data);
         CheckEverythingIsReachableFromFreshStart(data);
         CheckTorchLightsAndBurnsOut(data);
@@ -669,7 +670,6 @@ public static class SimulationChecks {
     private static void CheckAnvilNeedsHammering(GameData data) {
         var world = EmptyWorld(data);
         var anvil = world.Add(ThingKind.Anvil, new Vector2(10, 10));
-        world.SetRecipe(anvil, "steel_parts");
         anvil.Inventory.Add("steel_bar", 3);
         world.Player = anvil.Pos + new Vector2(1.5f, 0);
         for (int i = 0; i < 8; i++) { world.MovePlayer(new Vector2(i % 2 == 0 ? .1f : -.1f, 0)); world.Tick(.25f); }
@@ -1167,7 +1167,6 @@ public static class SimulationChecks {
 
         var anvil = BuildAt(world, ThingKind.Anvil, Site(28, 25));
         world.Player = anvil.Pos + Vector2.One;
-        world.SetRecipe(anvil, "steel_parts");
         world.LoadBatch(anvil, 2);
         CompleteBatches(world, anvil, "steel_parts", 2);
         world.Collect(anvil);
@@ -1912,8 +1911,17 @@ public static class SimulationChecks {
         Require(loaded.Backpack["steel_pick"] == 1, "old iron pickaxes should become steel ones");
         Require(loaded.Backpack["steel_hammer"] == 1, "old iron hammers should become steel ones");
         Require(loaded.Things.Count == old.Things.Count(t => t.Kind != ThingKind.Stone), "loose iron should be gone");
-        Require(loaded.Find(anvil.Id)!.Recipe == "" && loaded.Find(anvil.Id)!.Inventory["iron_bar"] == 3, "an anvil set to a tool now made at the bench is reset and keeps its inputs");
+        Require(loaded.Find(anvil.Id)!.Recipe == "steel_parts" && loaded.Find(anvil.Id)!.Inventory["iron_bar"] == 3, "an anvil set to a tool now made at the bench goes back to steel parts and keeps its inputs");
         Require(loaded.Goal == 0, "an older save should begin with the new collect-water survival goal");
+    }
+
+    private static void CheckAnvilSavedWithNoRecipeLoadsSetToSteelParts(GameData data) {
+        var old = EmptyWorld(data);
+        var anvil = old.Add(ThingKind.Anvil, new Vector2(10, 10));
+        anvil.Recipe = "";
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(old.Serialize());
+        Require(loaded.Find(anvil.Id)!.Recipe == "steel_parts", "an anvil saved with no recipe should load set to steel parts");
     }
 
     /// <summary>

@@ -359,7 +359,8 @@
         "stone": 16,
         "wood": 6
       },
-      "description": "Smelts iron and tin ore, sears meat and bakes bread. Uses wood or mined coal as fuel."
+      "description": "Smelts iron and tin ore, sears meat and bakes bread. Uses wood or mined coal as fuel.",
+      "recipe": "iron_bar"
     },
     "anvil": {
       "name": "Anvil",
@@ -367,7 +368,8 @@
         "iron_bar": 4,
         "stone": 6
       },
-      "description": "Hammer iron and steel bars into parts for tools. Someone has to stand at it and hammer."
+      "description": "Hammer steel bars into parts for tools. Someone has to stand at it and hammer.",
+      "recipe": "steel_parts"
     },
     "bench": {
       "name": "Crafting bench",
@@ -383,7 +385,8 @@
         "iron_bar": 5,
         "wood": 8
       },
-      "description": "Steel from iron + mined coal. Coal fuel only. Pump bellows to reach 80\u00b0."
+      "description": "Steel from iron + mined coal. Coal fuel only. Pump bellows to reach 80\u00b0.",
+      "recipe": "steel_bar"
     },
     "mine": {
       "name": "Mine",

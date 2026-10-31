@@ -102,7 +102,7 @@ internal sealed class ChainSite(World world) {
         Employ(Place(ThingKind.Furnace, "iron_bar"), "haul");
         var forge = Place(ThingKind.Reinforced);
         Employ(forge, "bellows"); Employ(forge, "haul");
-        Employ(Place(ThingKind.Anvil, "steel_parts"), "craft", "haul");
+        Employ(Place(ThingKind.Anvil), "craft", "haul");
         var handles = Place(ThingKind.Bench, "wood_parts"); handles.Tools!.Add("steel_chisel", 1); Employ(handles, "craft", "haul");
         var picks = Place(ThingKind.Bench, "steel_pick"); picks.Tools!.Add("steel_hammer", 1); Employ(picks, "craft", "haul");
     }

@@ -338,10 +338,11 @@ public sealed partial class World {
     }
     // Sleep fast-forwards hours in one frame, so its events stay silent instead of playing all at once.
     private void Play(string sound, Vector2 at) { if (!asleep) Sound?.Invoke(sound, at); }
+    /// <summary>The recipe game data names for a station placed or loaded without one, or empty.</summary>
+    private string StartingRecipe(ThingKind kind) => Data.Buildings.TryGetValue(kind, out var building) ? building.Recipe : "";
     public Thing Add(ThingKind kind, Vector2 pos, int remaining = 0) {
-        var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining };
-        if (kind == ThingKind.Furnace) t.Recipe = "iron_bar";
-        if (kind == ThingKind.Reinforced) { t.Recipe = "steel_bar"; t.Fuel = "coal"; }
+        var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining, Recipe = StartingRecipe(kind) };
+        if (kind == ThingKind.Reinforced) t.Fuel = "coal";
         if (kind == ThingKind.Signpost) { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; t.Wages = NewWageSlot(); }
         if (SlotKinds(kind).Length > 0) t.Tools = NewToolSlots(kind);
         if (Burns(kind)) t.Burner = NewBurner();
@@ -2097,7 +2098,9 @@ public sealed partial class World {
         loaded.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
         foreach (var t in loaded.Things) {
             // A station set to a recipe it doesn't make, as on older saves' anvils, is cleared.
+            // One left with no recipe goes back to its starting recipe.
             if (t.Recipe != "" && (!Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Station != t.Kind)) { t.Recipe = ""; t.Processing = false; t.Progress = 0; }
+            if (t.Recipe == "") t.Recipe = StartingRecipe(t.Kind);
             if (SlotKinds(t.Kind).Length > 0) t.Tools ??= NewToolSlots(t.Kind);
             // A plot from an older save keeps its harvest with the seed; the harvest moves to its own slots.
             if (t.Kind == ThingKind.Farm && t.Output == null) {
