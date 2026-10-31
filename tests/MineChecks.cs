@@ -137,7 +137,7 @@ public static class MineChecks {
             "delivering from the backpack must hand over only the wood the mine still needs");
         Require(other.Inventory["stone"] == 10,
             "delivering from the backpack must hand over only the stone the mine still needs");
-        Require(world.Carried("wood") == 10, "delivering from the backpack must leave the spare wood with the player");
+        Require(world.Backpack["wood"] == 10, "delivering from the backpack must leave the spare wood with the player");
     }
 
     private static void CheckMinersBringOreOutAndStopWhenOutputIsFull(GameData data) {

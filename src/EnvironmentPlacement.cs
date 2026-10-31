@@ -18,7 +18,7 @@ public partial class WorldView {
         var patch = new FastNoiseLite { Seed = 671, Frequency = .18f, FractalOctaves = 2 };
         var blocked = new bool[Terrain.Size, Terrain.Size];
         // Decorative plants have no collision or inventory. Keep actual resources and initial buildings readable.
-        foreach (var thing in World.S.Things) {
+        foreach (var thing in World.Things) {
             float radius = thing.Kind == ThingKind.Tree ? .45f : thing.IsResource ? .8f : 2.2f;
             for (int y = Math.Max(0, (int)(thing.Pos.Y - radius)); y <= Math.Min(Terrain.Size - 1, (int)(thing.Pos.Y + radius)); y++)
                 for (int x = Math.Max(0, (int)(thing.Pos.X - radius)); x <= Math.Min(Terrain.Size - 1, (int)(thing.Pos.X + radius)); x++)

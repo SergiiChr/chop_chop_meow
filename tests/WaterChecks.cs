@@ -35,7 +35,7 @@ public static class WaterChecks {
                 "direct recipe transfers must reject non-full bottles with the warning");
             message = ""; world.LoadBatch(table);
             Require(message == Water.FullBottleWarning, "batch loading must explain the requirement");
-            Require(world.Carried(item) == 1, "batch loading must retain the non-full bottle");
+            Require(world.Backpack[item] == 1, "batch loading must retain the non-full bottle");
             Require(table.Inventory.Count == 0, "batch loading must not put the bottle on the table");
             var chest = world.Add(ThingKind.Chest, world.Player + Vector2.Left);
             Require(world.Transfer(world.Backpack, chest.Inventory, item, 1) == 1,
@@ -63,13 +63,13 @@ public static class WaterChecks {
         SetNeeds(world, thirst: 0);
         Require(Give(world, "water", 1) == 1, "a filled bottle should fit");
         Require(Water.SipBottle(world, "water"), "first sip should be consumed");
-        Require(world.Carried("water_2") == 1, "first sip should leave two sips");
+        Require(world.Backpack["water_2"] == 1, "first sip should leave two sips");
         Require(world.Thirst > 33.32f, "first sip should restore at least one third thirst");
         Require(world.Thirst < 33.34f, "first sip should restore no more than one third thirst");
-        Require(Water.SipBottle(world, "water_2") && world.Carried("water_1") == 1, "second sip should leave one sip");
-        Require(Water.SipBottle(world, "water_1") && world.Carried("empty_bottle") == 1, "third sip should leave the same bottle empty");
+        Require(Water.SipBottle(world, "water_2") && world.Backpack["water_1"] == 1, "second sip should leave one sip");
+        Require(Water.SipBottle(world, "water_1") && world.Backpack["empty_bottle"] == 1, "third sip should leave the same bottle empty");
         Require(world.Thirst > 99.99f && world.Thirst <= 100, "three sips should restore a full thirst gauge");
-        Require(!Water.SipBottle(world, "empty_bottle") && world.Carried("empty_bottle") == 1, "an empty bottle should not produce a free sip");
+        Require(!Water.SipBottle(world, "empty_bottle") && world.Backpack["empty_bottle"] == 1, "an empty bottle should not produce a free sip");
         Require(world.Backpack.UsedSlots == 1, "each sip should preserve one physical bottle slot");
     }
 
@@ -79,7 +79,7 @@ public static class WaterChecks {
         SetBackpackSlots(world, 1);
         Give(world, "empty_bottle", 1);
         Require(Water.CollectWater(world, lake) == WaterCollectResult.RefilledBottle, "gathering with an empty bottle should refill it");
-        Require(world.Carried("water") == 1, "refilling should give one full bottle");
+        Require(world.Backpack["water"] == 1, "refilling should give one full bottle");
         Require(world.Backpack.Count == 1, "refilling should not create bottles");
         Require(world.Backpack.UsedSlots == 1, "refilling should reuse its slot");
         Require(Water.CollectWater(world, lake) == WaterCollectResult.NoChange, "a full bottle should not refill into an extra bottle");
@@ -88,9 +88,9 @@ public static class WaterChecks {
         Give(priority, "water_1", 1);
         Give(priority, "empty_bottle", 1);
         Water.CollectWater(priority, lake);
-        Require(priority.Carried("water") == 1, "an empty bottle should refill first");
-        Require(priority.Carried("water_1") == 1, "the partial bottle should stay partial");
-        Require(priority.Carried("empty_bottle") == 0, "no empty bottle should remain after the refill");
+        Require(priority.Backpack["water"] == 1, "an empty bottle should refill first");
+        Require(priority.Backpack["water_1"] == 1, "the partial bottle should stay partial");
+        Require(priority.Backpack["empty_bottle"] == 0, "no empty bottle should remain after the refill");
 
         Drop(world, "water", 1);
         SetNeeds(world, thirst: 25);
@@ -105,7 +105,7 @@ public static class WaterChecks {
         Give(world, "water_2", 1);
         var loaded = new World(data, false);
         loaded.Deserialize(world.Serialize());
-        Require(loaded.Carried("water_2") == 1 && loaded.Carried("water") == 0, "save and load should preserve the bottle's partial state");
+        Require(loaded.Backpack["water_2"] == 1 && loaded.Backpack["water"] == 0, "save and load should preserve the bottle's partial state");
     }
 
     private static void CheckBottleRecipeMakesEmptyBottleFromTinAndWood(GameData data) {
@@ -155,9 +155,9 @@ public static class WaterChecks {
         string saved;
         try { Give(old, "water", 64); Give(old, "wood", 1); saved = old.Serialize(); } finally { Inventory.Unstacked.Add("water"); }
         var loaded = new World(data, false); loaded.Deserialize(saved);
-        int preserved = loaded.Carried("water") + loaded.Things.Where(t => t.Kind == ThingKind.Grave).Sum(t => t.Inventory["water"]);
+        int preserved = loaded.Backpack["water"] + loaded.Things.Where(t => t.Kind == ThingKind.Grave).Sum(t => t.Inventory["water"]);
         Require(preserved == 64, "legacy stacked bottles must overflow without loss");
         Require(loaded.Backpack.UsedSlots <= 24, "legacy stacked bottles must not oversize the player's inventory");
-        Require(loaded.Carried("wood") == 1, "legacy stacked bottles must leave other goods alone");
+        Require(loaded.Backpack["wood"] == 1, "legacy stacked bottles must leave other goods alone");
     }
 }

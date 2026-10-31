@@ -93,7 +93,7 @@ public partial class MinePanel(SidePanel side, Thing mine) : PagePanel(side) {
 
     private int MinersUnderground() {
         int miners = 0;
-        foreach (var w in world.S.Workers) if (w.Assignment == mine.Id && w.WorkState == WorkerWorkState.Underground) miners++;
+        foreach (var w in world.Workers) if (w.Assignment == mine.Id && w.WorkState == WorkerWorkState.Underground) miners++;
         return miners;
     }
 }

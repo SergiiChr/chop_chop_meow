@@ -120,7 +120,7 @@ public partial class WorldView {
             var at = World.MineSpot(cliff); var outwards = cliff.Face;
             for (float d = -3; d < 2; d += .75f) Stamp(disturbed, at + outwards * d, 2.6f, .95f);
         }
-        foreach (var t in World.S.Things) {
+        foreach (var t in World.Things) {
             if (t.IsResource || t.Kind is ThingKind.Crate or ThingKind.Grave) continue;
             float radius = t.Kind switch { ThingKind.Hut or ThingKind.Pile or ThingKind.Farm => 3.4f, ThingKind.Mine => 3, ThingKind.Campfire => 2.3f, _ => 1.8f };
             Stamp(disturbed, t.Pos, radius, 1);
@@ -134,7 +134,7 @@ public partial class WorldView {
             sceneryShadeTexture.Update(sceneryShadeImage);
         }
         Array.Clear(objectShade);
-        foreach (var t in World.S.Things) ShadeThing(t);
+        foreach (var t in World.Things) ShadeThing(t);
         objectShadeImage.SetData(ContactSize, ContactSize, false, Image.Format.Rg8, objectShade);
         objectShadeTexture.Update(objectShadeImage);
     }

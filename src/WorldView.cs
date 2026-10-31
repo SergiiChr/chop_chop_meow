@@ -325,7 +325,7 @@ public partial class WorldView : Node3D {
         if (best != null) return best;
         var point = ToWorld(screen);
         if (Terrain.WaterRing(point) && World.Sees(point))
-            foreach (var thing in World.S.Things) if (thing.Kind == ThingKind.Water) return thing;
+            foreach (var thing in World.Things) if (thing.Kind == ThingKind.Water) return thing;
         return null;
     }
 
@@ -333,7 +333,7 @@ public partial class WorldView : Node3D {
     public Worker? PickWorker(Vector2 screen) {
         SyncCamera();
         Worker? best = null; float nearest = float.MaxValue;
-        foreach (var w in World.S.Workers)
+        foreach (var w in World.Workers)
             if (World.Sees(w) && RayHits(screen, w.Pos, PersonHit, out float d) && d < nearest) { nearest = d; best = w; }
         return best;
     }
@@ -415,7 +415,7 @@ public partial class WorldView : Node3D {
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
         if (action == ActorAction.Idle && StationToHammer() is Thing anvil) { action = anvil.Kind == ThingKind.Packer ? ActorAction.Pack : ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
-        if (World.S.Mauled) {
+        if (World.Mauled) {
             mauledFrom = PinningWolf()?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
             // Facing away from the wolf at the throat lays the head toward it once the rig tips onto its back.
             action = World.Dead ? ActorAction.Devoured : ActorAction.Mauled; target = World.Player * 2 - mauledFrom; subject = null;
@@ -426,20 +426,20 @@ public partial class WorldView : Node3D {
         if (action is ActorAction.Walk or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
         string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(SelectedTool, World.S.Backpack) : null);
-        bool torch = World.S.Torch > 0 && !World.Dead;
+        bool torch = World.Torch > 0 && !World.Dead;
         Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch);
-        Torch(playerRig, player, World.S.TorchLit, World.TorchFlare, null);
-        if (World.S.Mauled) {
+        Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
+        if (World.Mauled) {
             // Tip backwards about the feet, then slide forward so the body lies centred on the player's tile.
             float tip = Ease(Math.Min(1, downedFor / .3f));
             var forward = new Vector3(MathF.Sin(player.Yaw), 0, MathF.Cos(player.Yaw));
             playerRig.Root.Position = To3(player.Position) + forward * .8f * tip + Vector3.Up * .17f * tip;
             playerRig.Root.Rotation = new Vector3(-Mathf.Pi / 2 * tip, player.Yaw, 0);
         }
-        playerRig.Root.Visible = (!World.Dead || World.S.Mauled) && World.S.Sheltered == 0;
+        playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject);
         UpdateOthers(dt);
-        foreach (var worker in World.S.Workers) {
+        foreach (var worker in World.Workers) {
             if (!crew.TryGetValue(worker.Id, out var entry)) {
                 var rig = new ActorRig(ActorSkin.Worker);
                 // Gathered and warmed now, so the first walk home at dusk makes no faded materials.
@@ -472,10 +472,10 @@ public partial class WorldView : Node3D {
 
     /// <summary>A worked station nearby that is processing with nobody of the crew at it, which the idle player hammers at.</summary>
     private Thing? StationToHammer() {
-        foreach (var t in World.S.Things) {
+        foreach (var t in World.Things) {
             if (!World.Worked(t) || !t.Processing || !World.Near(t)) continue;
             bool crewed = false;
-            foreach (var w in World.S.Workers) if (w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2) crewed = true;
+            foreach (var w in World.Workers) if (w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2) crewed = true;
             if (!crewed) return t;
         }
         return null;
@@ -502,7 +502,7 @@ public partial class WorldView : Node3D {
     /// <summary>The other players, posed from what their machines report: walking, the resource they work on, the tool in hand and their swings.</summary>
     private void UpdateOthers(float dt) {
         var me = World.Me;
-        foreach (var p in World.S.Players) {
+        foreach (var p in World.Players) {
             if (p == me) continue;
             if (!others.TryGetValue(p.Id, out var other) || other.Shirt != ShirtOf(p)) {
                 other?.Rig.Root.QueueFree();
@@ -530,24 +530,24 @@ public partial class WorldView : Node3D {
     }
 
     private bool HasWorker(int id) {
-        foreach (var w in World.S.Workers) if (w.Id == id) return true;
+        foreach (var w in World.Workers) if (w.Id == id) return true;
         return false;
     }
 
     private bool HasPlayer(int id) {
-        foreach (var p in World.S.Players) if (p.Id == id) return true;
+        foreach (var p in World.Players) if (p.Id == id) return true;
         return false;
     }
 
     private Thing? ThingAt(Vector2 at) {
-        foreach (var t in World.S.Things) if (t.Pos == at) return t;
+        foreach (var t in World.Things) if (t.Pos == at) return t;
         return null;
     }
 
     private string FootstepSound(Vector2 p) {
         if (Terrain.InLake(p, 1)) return "footsteps_water";
         foreach (var c in World.Cliffs) if (c.DistanceTo(p) < Cliff.Depth + 3) return "footsteps_rocks";
-        foreach (var t in World.S.Things) if ((t.Kind == ThingKind.Stone || t.IsDeposit) && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f) return "footsteps_rocks";
+        foreach (var t in World.Things) if ((t.Kind == ThingKind.Stone || t.IsDeposit) && t.Remaining > 0 && t.Pos.DistanceTo(p) < 1.3f) return "footsteps_rocks";
         return "footsteps_default";
     }
 
@@ -632,11 +632,11 @@ public partial class WorldView : Node3D {
             foreach (var (_, old) in props) old.Root.QueueFree();
             props.Clear();
             loadingProps = true;
-            foreach (var t in World.S.Things) Show(PropFor(t), false);
+            foreach (var t in World.Things) Show(PropFor(t), false);
             loadingProps = false;
         }
         seen.Clear();
-        if (EnvironmentReview && EnvironmentCenter.HasValue) { known.Clear(); known.AddRange(World.S.Things); } else World.CollectKnown(known);
+        if (EnvironmentReview && EnvironmentCenter.HasValue) { known.Clear(); known.AddRange(World.Things); } else World.CollectKnown(known);
         foreach (var t in known) {
             seen.Add(t.Id);
             var prop = PropFor(t);
@@ -646,8 +646,8 @@ public partial class WorldView : Node3D {
         }
         foreach (var (id, prop) in props) if (!seen.Contains(id)) Show(prop, false);
         // Things leave the world rarely, so their models are looked for only when the count changes.
-        if (thingsCounted != World.S.Things.Count) {
-            thingsCounted = World.S.Things.Count;
+        if (thingsCounted != World.Things.Count) {
+            thingsCounted = World.Things.Count;
             RefreshDressing();
             gone.Clear();
             foreach (var (id, _) in props) if (!seen.Contains(id) && World.Find(id) == null) gone.Add(id);
@@ -802,7 +802,7 @@ public partial class WorldView : Node3D {
             case HutProp hut:
                 bool near = AnyPlayerNear(t.Pos, 2.6f);
                 // Running inside from a hunting pack slams the door instead of swinging it open.
-                if (dt > 0 && near && hut.Open == 0) Sounds?.Play(World.S.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
+                if (dt > 0 && near && hut.Open == 0) Sounds?.Play(World.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
                 hut.Open = Mathf.MoveToward(hut.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
                 hut.Door.RotationDegrees = new Vector3(0, -100 * Ease(hut.Open), 0);
                 bool lit = night > .45f;
@@ -843,23 +843,23 @@ public partial class WorldView : Node3D {
 
     // Lookups that would otherwise capture the thing in a lambda, which allocates on every call for every thing drawn.
     private WorldModels.WolfModel? Dying(Vector2 at) {
-        foreach (var (wolf, model) in wolves) if (!World.S.Wolves.Contains(wolf) && model.Last.DistanceTo(at) < 2) return model;
+        foreach (var (wolf, model) in wolves) if (!World.Wolves.Contains(wolf) && model.Last.DistanceTo(at) < 2) return model;
         return null;
     }
     private Wolf? PinningWolf() {
-        foreach (var w in World.S.Wolves) if (w.Pinning) return w;
+        foreach (var w in World.Wolves) if (w.Pinning) return w;
         return null;
     }
     private bool AnyPlayerNear(Vector2 at, float radius) {
-        foreach (var p in World.S.Players) if (p.RespawnIn <= 0 && p.Pos.DistanceTo(at) < radius) return true;
+        foreach (var p in World.Players) if (p.RespawnIn <= 0 && p.Pos.DistanceTo(at) < radius) return true;
         return false;
     }
     private bool Underground(int mine) {
-        foreach (var w in World.S.Workers) if (w.Assignment == mine && w.WorkState == WorkerWorkState.Underground) return true;
+        foreach (var w in World.Workers) if (w.Assignment == mine && w.WorkState == WorkerWorkState.Underground) return true;
         return false;
     }
     private bool OrderAt(int signpost) {
-        foreach (var o in World.S.Orders) if (o.Signpost == signpost) return true;
+        foreach (var o in World.Orders) if (o.Signpost == signpost) return true;
         return false;
     }
 
@@ -883,9 +883,9 @@ public partial class WorldView : Node3D {
         var bounds = GetViewport().GetVisibleRect().Grow(300);
         float ppu = PixelsPerUnit;
         structures.Clear();
-        foreach (var o in World.S.Things)
+        foreach (var o in World.Things)
             if (!o.IsResource && seen.Contains(o.Id) && bounds.HasPoint(camera.UnprojectPosition(To3(o.Pos)))) structures.Add(o);
-        foreach (var t in World.S.Things) {
+        foreach (var t in World.Things) {
             if (t.Kind != ThingKind.Tree || t.Remaining <= 0 || !seen.Contains(t.Id) || props.GetValueOrDefault(t.Id) is not TreeProp tree) continue;
             if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
             float fade = Mathf.MoveToward(tree.Fade, CoversSomething(t, ppu) ? .68f : 0, Math.Max(dt, .016f) * 3);
@@ -896,14 +896,14 @@ public partial class WorldView : Node3D {
 
     private bool CoversSomething(Thing tree, float ppu) {
         if (!World.Dead && TreeCoversPerson(tree, World.Player, ppu)) return true;
-        foreach (var w in World.S.Workers) if (World.Sees(w) && TreeCoversPerson(tree, w.Pos, ppu)) return true;
-        foreach (var p in World.S.Players) if (p != World.Me && p.RespawnIn <= 0 && World.Sees(p.Pos) && TreeCoversPerson(tree, p.Pos, ppu)) return true;
+        foreach (var w in World.Workers) if (World.Sees(w) && TreeCoversPerson(tree, w.Pos, ppu)) return true;
+        foreach (var p in World.Players) if (p != World.Me && p.RespawnIn <= 0 && World.Sees(p.Pos) && TreeCoversPerson(tree, p.Pos, ppu)) return true;
         foreach (var o in structures) if (Covers(tree, o, ppu)) return true;
         return false;
     }
 
     private void SyncWolves(float dt) {
-        foreach (var wolf in World.S.Wolves) {
+        foreach (var wolf in World.Wolves) {
             if (!wolves.TryGetValue(wolf, out var model)) {
                 model = new WorldModels.WolfModel { Last = wolf.Pos, Yaw = ActorAnimation.Yaw(World.Player - wolf.Pos, 0) };
                 scene.AddChild(model.Root); wolves[wolf] = model;
@@ -929,7 +929,7 @@ public partial class WorldView : Node3D {
             else model.Idle(Elapsed + wolf.GetHashCode() % 7);
         }
         foreach (var (wolf, model) in wolves)
-            if (!World.S.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
+            if (!World.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
     }
 
     /// <summary>Tufts of fur knocked loose by a hit, and embers off a burning torch.</summary>
@@ -962,8 +962,8 @@ public partial class WorldView : Node3D {
     private void SyncCarts(float dt) {
         // Carts whose trip ended go back to the pool first, so an order starting the same frame finds one.
         foreach (var (order, cart) in carts)
-            if (!World.S.Orders.Contains(order)) { fades.Remove(cart.Root); SetFade(cart.Parts, 0); cart.Root.Visible = false; carts.Remove(order); idleCarts.Push(cart); }
-        foreach (var order in World.S.Orders) {
+            if (!World.Orders.Contains(order)) { fades.Remove(cart.Root); SetFade(cart.Parts, 0); cart.Root.Visible = false; carts.Remove(order); idleCarts.Push(cart); }
+        foreach (var order in World.Orders) {
             var sign = World.Find(order.Signpost);
             float phase = order.Elapsed / World.Data.TradeSeconds;
             // The cart sets off down the valley and fades out on its way to Bramblewick, then fades back in on return.
@@ -1007,7 +1007,7 @@ public partial class WorldView : Node3D {
         Mark(selectRing, World.Find(Selection.Thing), 0);
         Mark(hoverRing, Hover != Selection.Thing ? World.Find(Hover) : null, .004f);
         Worker? worker = null;
-        foreach (var w in World.S.Workers) if (w.Id == Selection.Worker) worker = w;
+        foreach (var w in World.Workers) if (w.Id == Selection.Worker) worker = w;
         workerRing.Visible = worker != null && World.Sees(worker);
         if (worker != null) { workerRing.Position = To3(worker.Pos, .02f); workerRing.Scale = new Vector3(.5f, 1, .5f); }
         playerRing.Visible = !World.Dead;
@@ -1103,14 +1103,14 @@ public partial class WorldView : Node3D {
         if (EnvironmentReview) return;
         if (World == null) return;
         if (AnimationReview) { PaintReview(); return; }
-        foreach (var t in World.S.Things) {
+        foreach (var t in World.Things) {
             if (!t.Processing || !World.Sees(t.Pos) || !World.Data.Recipes.TryGetValue(t.Recipe, out var r)) continue;
             var p = Screen(t.Pos);
             overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), BarTrack);
             overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), BarFill);
         }
         // Forge heat under each reinforced furnace, with a tick at the clear bar steel needs.
-        foreach (var t in World.S.Things) {
+        foreach (var t in World.Things) {
             if (t.Kind != ThingKind.Reinforced || !World.Sees(t.Pos)) continue;
             var p = Screen(t.Pos) + new Vector2(-28, 18);
             overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), BarTrack);
@@ -1124,7 +1124,7 @@ public partial class WorldView : Node3D {
             foreach (var hit in HitsOf(hovered)) top = Math.Max(top, hit.Top);
             Tag(Screen(hovered.Kind == ThingKind.Water ? Terrain.WaterPoint(ToWorld(GetViewport().GetMousePosition())) : hovered.Pos, top + .2f) - new Vector2(0, 8), hovered.Kind == ThingKind.Water ? "Collect water" : World.Data.Name(hovered.Kind));
         }
-        foreach (var w in World.S.Workers)
+        foreach (var w in World.Workers)
             if (World.Sees(w) && (w.Id == HoverWorker || w.Id == Selection.Worker)) Tag(Screen(w.Pos, 2.05f), w.Name);
     }
 }

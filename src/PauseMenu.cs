@@ -79,8 +79,8 @@ public partial class PauseMenu : PanelContainer {
         var met = new HFlowContainer(); met.AddThemeConstantOverride("h_separation", 4); met.AddThemeConstantOverride("v_separation", 4); goals.AddChild(met);
         for (int i = 0; i < World.GoalCount; i++) {
             var (title, _) = World.ObjectiveFor(i);
-            if (i < world.S.Goal) { var tick = GoalMark(true, false); tick.TooltipText = title; tick.MouseFilter = Control.MouseFilterEnum.Pass; met.AddChild(tick); continue; }
-            if (i == world.S.Goal) {
+            if (i < world.Goal) { var tick = GoalMark(true, false); tick.TooltipText = title; tick.MouseFilter = Control.MouseFilterEnum.Pass; met.AddChild(tick); continue; }
+            if (i == world.Goal) {
                 var current = new PanelContainer(); current.AddThemeStyleboxOverride("panel", Style.Dropdown); goals.AddChild(current);
                 var inner = new VBoxContainer(); inner.AddThemeConstantOverride("separation", 4); current.AddChild(inner);
                 inner.AddChild(GoalRow(title, false, true));
@@ -103,8 +103,8 @@ public partial class PauseMenu : PanelContainer {
             var day = new Panel { CustomMinimumSize = new Vector2(26, 10), SizeFlagsVertical = SizeFlags.ShrinkCenter, TooltipText = i < days ? "A day at the target" : "A day still to go" };
             day.AddThemeStyleboxOverride("panel", i < days ? Style.BarGrow : Style.BarBack); streak.AddChild(day);
         }
-        string yesterday = world.S.Profits.Count > 0 ? $"yesterday {world.S.Profits[^1]}" : "no day finished yet";
-        var profit = Style.Text($"Profit is sale coins minus wages · {yesterday} · today's sales {world.S.DayRevenue}", 13, Style.Tan); profit.AutowrapMode = TextServer.AutowrapMode.WordSmart;
+        string yesterday = world.Profits.Count > 0 ? $"yesterday {world.Profits[^1]}" : "no day finished yet";
+        var profit = Style.Text($"Profit is sale coins minus wages · {yesterday} · today's sales {world.DayRevenue}", 13, Style.Tan); profit.AutowrapMode = TextServer.AutowrapMode.WordSmart;
         goals.AddChild(profit);
         HostButton.Disabled = net.Online; HostButton.Text = net.Hosting ? "Hosting" : "Host";
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.

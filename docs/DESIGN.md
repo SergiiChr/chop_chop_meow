@@ -33,6 +33,7 @@ The project targets Godot 4.7.2 .NET with C#.
 `Game` is a thin runner: it creates the interface's nodes once while loading, holds them and routes input and the frame to them.
 Each feature is a node with a small public surface, given what it needs in its constructor.
 `UiKit` carries the world, sounds and how a player action runs.
+The interface reads the world through `World`'s read members and keeps `world.S` for writes, and for what needs the real `Inventory`, such as a move between grids.
 `UiKit.Paused` follows which overlays are open: each one registers with `HoldWhile`, so none saves or restores another's pause.
 `World.Replaced` fires whenever the whole state is replaced (a new game, a load, a guest taking the host's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
 The side panel builds a new `PagePanel` node every time a page opens, so its build code runs once per open and its `Live` updates run on each refresh; `PageMemory` keeps what must outlast a rebuild.
@@ -46,7 +47,7 @@ Simulation and data:
 | --- | --- |
 | `src/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
-| `src/Inventory.cs` | Inventories and their filter-aware transfers |
+| `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView` |
 | `src/GameData.cs` | Loads tunable items, buildings, recipes, trade values and time values from `data/game.json` |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |

@@ -50,7 +50,7 @@ public sealed class PlayerControl {
 
     /// <summary>Enters placement for a crate from the backpack.</summary>
     public void PlaceCrate(string item) {
-        if (world.S.Backpack[item] == 0) { kit.Notify("No empty crate in your backpack. Craft one at a bench."); return; }
+        if (world.Backpack[item] == 0) { kit.Notify("No empty crate in your backpack. Craft one at a bench."); return; }
         Mode = new ClickMode.Crate(item); panel.Close();
     }
 
@@ -88,7 +88,7 @@ public sealed class PlayerControl {
             } else { lifting = null; liftClock = 0; }
             view.Lifting = lifting?.Id ?? 0; view.LiftProgress = liftClock / LiftSeconds;
             // Under 15% food or drink the player is too weak to sprint.
-            world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.S.Hunger >= GameData.LowNeed && world.S.Thirst >= GameData.LowNeed;
+            world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
             world.MovePlayer(direction * dt * world.Data.WalkSpeed * (world.Me.Sprinting ? world.Data.SprintSpeed : 1)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
             view.GatheringTarget = view.Gathering ? gathering : null;
             world.Me.Held = hotbar.ActiveItem() ?? "";
@@ -107,7 +107,7 @@ public sealed class PlayerControl {
             if (Mode.Placing != null) { Place(view.ToWorld(mouse.Position).Round()); return; }
             var t = view.Pick(mouse.Position);
             if (Mode is ClickMode.Assign assign) {
-                var worker = world.S.Workers.FirstOrDefault(w => w.Id == assign.Worker);
+                var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);
                 if (worker != null && t?.IsResource == true) {
                     string? blocked = world.GatherBlock(t, true);
                     if (blocked != null) kit.Notify(blocked); else { world.SetDuty(worker, t, "gather", true); Mode = new ClickMode.Normal(); panel.Select(worker); }
@@ -120,7 +120,7 @@ public sealed class PlayerControl {
                 if (t.Kind == ThingKind.Hut) entering = t;
                 // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
                 if (t.IsStorage && hotbar.ActiveItem() is string item && hotbar.IsTransferable(item) && world.Holds(t, item) && !(t.Kind == ThingKind.Crate && World.IsCrate(item))) {
-                    if (world.Near(t)) { int moved = 0; kit.Act(() => moved = world.Transfer(world.S.Backpack, t.Inventory, item, ItemMoves.All ? world.S.Backpack[item] : 1)); if (!world.Remote && moved == 0) kit.Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else kit.Notify("Walk closer to the chest to store the selected stack.");
+                    if (world.Near(t)) { int moved = 0; kit.Act(() => moved = world.Transfer(world.Backpack, t.Inventory, item, ItemMoves.All ? world.Backpack[item] : 1)); if (!world.Remote && moved == 0) kit.Notify($"No {world.Data.Name(item)} to store, or chest is full."); } else kit.Notify("Walk closer to the chest to store the selected stack.");
                 }
                 panel.Select(t);
             } else if (hotbar.ActiveItem() is string held && hotbar.HasUse(held)) hotbar.UseHeld(view.ToWorld(mouse.Position));
@@ -140,8 +140,8 @@ public sealed class PlayerControl {
     }
 
     private bool CanPlaceAgain() => Mode switch {
-        ClickMode.Crate crate => world.S.Backpack[crate.Item] > 0,
-        ClickMode.Build build => world.S.Backpack.Has(world.Data.Buildings[build.Kind].Cost),
+        ClickMode.Crate crate => world.Backpack[crate.Item] > 0,
+        ClickMode.Build build => world.Backpack.Has(world.Data.Buildings[build.Kind].Cost),
         _ => false
     };
 }

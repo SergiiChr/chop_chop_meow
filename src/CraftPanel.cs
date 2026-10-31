@@ -22,7 +22,7 @@ public partial class CraftPanel(SidePanel side) : RecipePage(side) {
     /// The rest of the queue waits in a row under it; clicking the product or a waiting recipe cancels it and returns its materials.
     /// </summary>
     private void CraftQueue() {
-        var queue = world.S.Crafting;
+        var queue = world.Crafting;
         string? head = queue.Count > 0 ? queue[0] : null;
         int queued = queue.Count;
         // The row shows one recipe, so the page is rebuilt once when the queue moves on or grows.
@@ -41,7 +41,7 @@ public partial class CraftPanel(SidePanel side) : RecipePage(side) {
             var r = world.Data.Recipes[queue[i]];
             waiting.Add(RecipeCup($"queue_{i}", r.Output, "", 44, () => world.CancelCraft(index)));
         }
-        Process(inputs, LiveText.Of(text => AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))), () => making.Seconds > 0 ? world.S.CraftTime / making.Seconds : 0, null, product, waiting);
+        Process(inputs, LiveText.Of(text => AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))), () => making.Seconds > 0 ? world.CraftTime / making.Seconds : 0, null, product, waiting);
         if (making.Tool != "") {
             var status = Style.Text("", 14, Style.Warn); content.AddChild(status);
             bool shown = false;
@@ -77,7 +77,7 @@ public partial class BenchPanel(SidePanel side, Thing bench) : RecipePage(side) 
         if (bench.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
         var groups = world.Data.Recipes.Where(p => p.Value.Station == bench.Kind).Select(p => p.Key).GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
         RecipeBoard(groups, group => group.Tool == "" ? null : world.BenchTool(bench, group.Tool, group.Tier), bench,
-            id => { world.SetRecipe(bench, id); panel.Open("inspect"); }, id => bench.Recipe == id, id => world.S.Backpack.Has(world.Data.Recipes[id].Inputs),
+            id => { world.SetRecipe(bench, id); panel.Open("inspect"); }, id => bench.Recipe == id, id => world.Backpack.Has(world.Data.Recipes[id].Inputs),
             // A double click also loads one batch of inputs from the backpack.
             id => kit.Act(() => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(bench, item, amount); }));
         if (bench.Recipe != "") Machine(bench);
@@ -85,7 +85,7 @@ public partial class BenchPanel(SidePanel side, Thing bench) : RecipePage(side) 
         var slotted = World.SlotKinds(bench.Kind);
         BagGrid(id => {
             if (slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(bench, world.Data.Items[id].Tool) == null) world.SlotTool(bench, id);
-            else world.LoadInput(bench, id, ItemMoves.All ? world.S.Backpack[id] : 1);
+            else world.LoadInput(bench, id, ItemMoves.All ? world.Backpack[id] : 1);
         }, "Click: slot a tool, or add one · Ctrl: all of it · Drag onto a slot",
             wanted: id => bench.Recipe != "" && world.BatchCost(bench).ContainsKey(id) || slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(bench, world.Data.Items[id].Tool) == null);
         JobButtons(bench);
@@ -128,7 +128,7 @@ public abstract partial class RecipePage(SidePanel side) : PagePanel(side) {
         foreach (var (item, amount) in r.Inputs) {
             var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 2); inputs.AddChild(pair);
             pair.AddChild(Style.Icon(Icons.Of(item), 30));
-            pair.AddChild(Style.Text(amount.ToString(), 14, world.S.Backpack[item] >= amount ? Style.Rim : Style.Warn));
+            pair.AddChild(Style.Text(amount.ToString(), 14, world.Backpack[item] >= amount ? Style.Rim : Style.Warn));
         }
         column.AddChild(Style.Text($"{seconds:0.#} s", 14, Style.Beige));
         return column;
@@ -215,7 +215,7 @@ public abstract partial class RecipePage(SidePanel side) : PagePanel(side) {
             Describe(tooltip.Clear()); tooltip.Show();
             cell.Modulate = ready(id) ? Colors.White : Style.Unready;
             for (int i = 0; i < needs.Count; i++) {
-                bool lacking = world.S.Backpack[needs[i].Item] < needs[i].Amount;
+                bool lacking = world.Backpack[needs[i].Item] < needs[i].Amount;
                 if (shortOf[i] == lacking) continue;
                 shortOf[i] = lacking;
                 needs[i].Count.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink);

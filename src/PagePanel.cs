@@ -138,7 +138,7 @@ public abstract partial class PagePanel : VBoxContainer {
             live.Add(() => {
                 if (!GodotObject.IsInstanceValid(count)) return;
                 int n = 0;
-                foreach (var w in world.S.Workers) if (World.HasDuty(w, t.Id, job)) n++;
+                foreach (var w in world.Workers) if (World.HasDuty(w, t.Id, job)) n++;
                 if (n == shown) return;
                 shown = n; count.Text = n.ToString();
             });
@@ -166,8 +166,8 @@ public abstract partial class PagePanel : VBoxContainer {
     protected void WorkerList(Thing t, string job) {
         var list = new VBoxContainer(); list.AddThemeConstantOverride("separation", 2);
         var box = new PanelContainer(); box.AddThemeStyleboxOverride("panel", Style.Dropdown); box.AddChild(list); content.AddChild(box);
-        if (world.S.Workers.Count == 0) { list.AddChild(Style.Text("Hire villagers at a trading post.", 14, Style.Ink)); return; }
-        foreach (var w in world.S.Workers) {
+        if (world.Workers.Count == 0) { list.AddChild(Style.Text("Hire villagers at a trading post.", 14, Style.Ink)); return; }
+        foreach (var w in world.Workers) {
             var worker = w;
             var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 8); list.AddChild(line);
             var tick = new CheckBox { Text = w.Name, ButtonPressed = World.HasDuty(w, t.Id, job), FocusMode = Control.FocusModeEnum.None, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, Name = $"duty_{w.Id}" };
@@ -281,7 +281,7 @@ public abstract partial class PagePanel : VBoxContainer {
         foreach (var (item, amount) in cost) {
             if (!first) text.Append("  ·  ");
             first = false;
-            text.Append($"{world.Data.Name(item)} {world.S.Backpack[item]}/{amount}");
+            text.Append($"{world.Data.Name(item)} {world.Backpack[item]}/{amount}");
         }
     }
     protected void AppendCost(StringBuilder text, Dictionary<string, int> cost) {
@@ -294,7 +294,7 @@ public abstract partial class PagePanel : VBoxContainer {
     }
     protected const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
     protected void UseFromBag(string id) {
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.S.TorchLit) world.UseTorch(Vector2.Zero);
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
     }
     /// <summary>A storage's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
     protected GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) {
@@ -306,12 +306,12 @@ public abstract partial class PagePanel : VBoxContainer {
     /// <summary>Moves every material the storage takes from the backpack; tools stay, and so do crates, so one is never packed inside another.</summary>
     protected void StoreAll(Thing t) {
         if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
-        foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray())
-            if (world.Holds(t, id) && t.Inventory.Accepts(id)) world.Transfer(world.S.Backpack, t.Inventory, id, 999);
+        foreach (var id in world.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray())
+            if (world.Holds(t, id) && t.Inventory.Accepts(id)) world.Transfer(world.Backpack, t.Inventory, id, 999);
     }
     protected void TakeAll(Thing t) {
         if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
-        foreach (var id in t.Inventory.Items.Keys.ToArray()) world.Transfer(t.Inventory, world.S.Backpack, id, 999);
+        foreach (var id in t.Inventory.Items.Keys.ToArray()) world.Transfer(t.Inventory, world.Backpack, id, 999);
     }
     /// <summary>Burn time as in-game hours and minutes.</summary>
     protected StringBuilder AppendGameHours(StringBuilder text, float seconds) {

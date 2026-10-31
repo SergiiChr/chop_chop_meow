@@ -285,8 +285,7 @@ public sealed partial class World {
             return wages;
         }
     }
-    public int Carried(string item) => S.Backpack[item];
-    public Inventory Backpack => S.Backpack;
+    public InventoryView Backpack => new(S.Backpack);
     public float Time => S.Time;
     public float Health => S.Health;
     public float Hunger => S.Hunger;
@@ -298,18 +297,18 @@ public sealed partial class World {
     public bool Mauled => S.Mauled;
     public int Sheltered => S.Sheltered;
     public int ActiveHotbar => S.ActiveHotbar;
-    public IReadOnlyList<string> HotbarSlots => S.HotbarSlots;
-    public IReadOnlyList<string> Crafting => S.Crafting;
+    public ListView<string> HotbarSlots => new(S.HotbarSlots);
+    public ListView<string> Crafting => new(S.Crafting);
     public float CraftTime => S.CraftTime;
-    public IReadOnlyList<Thing> Things => S.Things;
-    public IReadOnlyList<Worker> Workers => S.Workers;
-    public IReadOnlyList<Wolf> Wolves => S.Wolves;
-    public IReadOnlyList<TradeOrder> Orders => S.Orders;
-    public IReadOnlyList<PlayerState> Players => S.Players;
+    public ListView<Thing> Things => new(S.Things);
+    public ListView<Worker> Workers => new(S.Workers);
+    public ListView<Wolf> Wolves => new(S.Wolves);
+    public ListView<TradeOrder> Orders => new(S.Orders);
+    public ListView<PlayerState> Players => new(S.Players);
     public int Goal => S.Goal;
     public bool Reached(string milestone) => S.Milestones.Contains(milestone);
     public int DayRevenue => S.DayRevenue;
-    public IReadOnlyList<int> Profits => S.Profits;
+    public ListView<int> Profits => new(S.Profits);
     public bool EndingShown => S.EndingShown;
     public int SaveVersion => S.Version;
     public bool Priced(string item) => S.Prices.ContainsKey(item);

@@ -101,7 +101,7 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
             if (!GodotObject.IsInstanceValid(road)) return;
             road.Trips.Clear();
             TradeOrder? next = null; int moved = 0;
-            foreach (var o in world.S.Orders) {
+            foreach (var o in world.Orders) {
                 if (o.Signpost != sign.Id) continue;
                 float trip = o.Elapsed / world.Data.TradeSeconds; road.Trips.Add(trip); moved += (int)(trip * 400);
                 if (next == null || o.Elapsed > next.Elapsed) next = o;

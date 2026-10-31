@@ -96,10 +96,10 @@ public partial class DeathLabel : Label {
 
     public void Refresh() {
         int feeding = 0;
-        foreach (var w in world.S.Wolves) if (w.Feeding) feeding++;
-        var now = (world.Dead, world.S.Mauled, feeding > 1, (int)MathF.Ceiling(world.S.RespawnIn));
+        foreach (var w in world.Wolves) if (w.Feeding) feeding++;
+        var now = (world.Dead, world.Mauled, feeding > 1, (int)MathF.Ceiling(world.RespawnIn));
         if (now == shown) return;
         shown = now;
-        Text = world.Dead ? $"{(world.S.Mauled ? feeding > 1 ? "The pack is feeding" : "A wolf is feeding" : "You collapsed")}\nRespawning in {MathF.Ceiling(world.S.RespawnIn):0}s" : "";
+        Text = world.Dead ? $"{(world.Mauled ? feeding > 1 ? "The pack is feeding" : "A wolf is feeding" : "You collapsed")}\nRespawning in {MathF.Ceiling(world.RespawnIn):0}s" : "";
     }
 }

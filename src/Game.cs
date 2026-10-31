@@ -125,7 +125,7 @@ public partial class Game : Node {
     private void OnJoined(bool back) {
         Settings.Store("net", "address", net.Address);
         saves.Slot = 0; ending.Joined(back);
-        shownHealth = world.S.Health;
+        shownHealth = world.Health;
         Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
     }
     private void Restart() {
@@ -157,7 +157,7 @@ public partial class Game : Node {
                 case >= Key.Key1 and <= Key.Key9: hotbar.Select((int)(key.PhysicalKeycode - Key.Key1)); break;
                 case Key.E:
                     var t = world.Find(panel.Selection.Thing);
-                    if (t == null || !world.Near(t)) t = world.S.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
+                    if (t == null || !world.Near(t)) t = world.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
                     if (t != null) panel.Select(t); break;
                 case Key.Space:
                     var station = world.Find(panel.Selection.Thing);
@@ -173,10 +173,10 @@ public partial class Game : Node {
         // Menus pause only a game nobody else is in.
         bool running = !kit.Paused || net.Hosting || world.Remote;
         if (running) {
-            float health = world.Remote ? shownHealth : world.S.Health;
+            float health = world.Remote ? shownHealth : world.Health;
             if (!world.Remote) world.Tick(dt);
             ending.ShowOnce(); autosave += dt;
-            needsPlate.DamageFlash(health - world.S.Health, runTime); shownHealth = world.S.Health;
+            needsPlate.DamageFlash(health - world.Health, runTime); shownHealth = world.Health;
             // A guest saves its player whenever it changes instead; the world is the host's to save.
             if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) saves.Save(0); autosave = 0; }
         }

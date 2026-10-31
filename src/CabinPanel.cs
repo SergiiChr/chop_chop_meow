@@ -24,14 +24,14 @@ public partial class CabinPanel(SidePanel side, Thing hut) : PagePanel(side) {
             pair.AddChild(then[i] = new Vial { Fill = colors[i], Faded = true });
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
-        var door = kit.BigButton("", Style.Sage, () => { if (world.S.Sheltered == hut.Id) world.Leave(); else panel.Player.WalkInto(hut); });
+        var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == hut.Id) world.Leave(); else panel.Player.WalkInto(hut); });
         var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(hut)); sleep.Name = "sleep";
         buttons.AddChild(door); buttons.AddChild(sleep);
         var untilText = new LiveText(shown => until.Text = shown);
         (bool Inside, string? Block, int Minutes) shown = (false, "", -1);
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(sleep)) return;
-            bool inside = world.S.Sheltered == hut.Id;
+            bool inside = world.Sheltered == hut.Id;
             string? blocked = world.SleepBlock();
             int minutes = (int)(world.SecondsToDawn / world.Data.DaySeconds * 1440);
             if ((inside, blocked, minutes) == shown) return;
@@ -44,9 +44,9 @@ public partial class CabinPanel(SidePanel side, Thing hut) : PagePanel(side) {
             block.Visible = blocked != null; block.Text = blocked == null ? "" : ShortBlock(blocked);
             AppendGameHours(untilText.Clear().Append("until dawn · +"), world.SecondsToDawn); untilText.Show();
             float seconds = world.SecondsToDawn;
-            Show(0, world.S.Health, world.S.Health);
-            Show(1, world.S.Hunger, world.S.Hunger - seconds * world.Data.HungerPerSecond);
-            Show(2, world.S.Thirst, world.S.Thirst - seconds * world.Data.ThirstPerSecond);
+            Show(0, world.Health, world.Health);
+            Show(1, world.Hunger, world.Hunger - seconds * world.Data.HungerPerSecond);
+            Show(2, world.Thirst, world.Thirst - seconds * world.Data.ThirstPerSecond);
         });
         void Show(int i, float level, float after) {
             now[i].Level = level; then[i].Level = Math.Max(0, after); then[i].Warn = after <= 0;

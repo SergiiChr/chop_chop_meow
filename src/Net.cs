@@ -107,7 +107,7 @@ public partial class Net : Node {
     public bool Retrying => reconnectLeft > 0;
     /// <summary>The host's address as typed, set once joined, for the popup to offer next time.</summary>
     public string Address { get; private set; } = "";
-    public int Guests => Hosting ? World.S.Players.Count - 1 : 0;
+    public int Guests => Hosting ? World.Players.Count - 1 : 0;
 
     public override void _Ready() {
         // Guests only hear about each other from the host's messages and updates.
@@ -162,7 +162,7 @@ public partial class Net : Node {
             for (ulong until = Time.GetTicksMsec() + FarewellMsec; farewell == null && Time.GetTicksMsec() < until; OS.DelayMsec(5)) Multiplayer.Poll();
         }
         SaveGuest(farewell);
-        if (Hosting) foreach (var guest in World.S.Players.Where(p => p != World.Me).ToList()) World.RemoveGuest(guest.Id);
+        if (Hosting) foreach (var guest in World.Players.Where(p => p != World.Me).ToList()) World.RemoveGuest(guest.Id);
         if (Online) Multiplayer.MultiplayerPeer.Close();
         Multiplayer.MultiplayerPeer = new OfflineMultiplayerPeer(); Hosting = false;
         World.Host = null; World.Relay = null; World.LocalId = 1;
@@ -223,7 +223,7 @@ public partial class Net : Node {
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void Hello(int protocol, string saved) {
         int id = Multiplayer.GetRemoteSenderId();
-        if (!Hosting || World.S.Players.Any(p => p.Id == id)) return;
+        if (!Hosting || World.Players.Any(p => p.Id == id)) return;
         if (protocol != Protocol) { RpcId(id, MethodName.Refused, "The host runs a different version of the game."); return; }
         World.AddGuest(id, saved == "" ? null : saved);
         // The welcome is the guest's first update, which later ones build on.
@@ -269,14 +269,14 @@ public partial class Net : Node {
         if (!Online) return;
         float dt = Math.Min((float)delta, .1f);
         foreach (var (owner, goal) in goals) Place(owner, Glide(Position(owner), goal, dt));
-        foreach (var p in World.S.Players)
+        foreach (var p in World.Players)
             if (walks.TryGetValue(p.Id, out var walk) && walk.Warp == p.Warp) using (World.ActAs(p)) World.MoveTo(Glide(p.Pos, walk.At, dt));
         if (World.Remote) World.Look();
         if (unsaved && (saveClock += dt) >= SaveInterval) SaveGuest();
         sendClock += dt;
         if (Hosting && sendClock >= SnapshotInterval) {
             sendClock = 0;
-            if (World.S.Players.Count > 1) SendUpdates();
+            if (World.Players.Count > 1) SendUpdates();
         } else if (welcomed && sendClock >= InputInterval) {
             sendClock = 0;
             var me = World.Me;
@@ -290,7 +290,7 @@ public partial class Net : Node {
     /// <summary>Sends an action with where this player stands, so the host checks its reach from there rather than from a position still gliding in.</summary>
     private void Send(Command c) => RpcId(HostId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
 
-    private PlayerState? Guest() => World.S.Players.Find(p => p.Id == Multiplayer.GetRemoteSenderId() && p != World.Me);
+    private PlayerState? Guest() => World.Players.Find(p => p.Id == Multiplayer.GetRemoteSenderId() && p != World.Me);
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = StreamChannel)]
     private void Walked(int order, Vector2 at, int warp, int gathering, string held, bool sprinting, int seen) {
@@ -324,7 +324,7 @@ public partial class Net : Node {
 
     /// <summary>Host: passes a message on to one guest, or all of them.</summary>
     private void Tell(PlayerState? to, string message) {
-        foreach (var p in World.S.Players.Where(p => p != World.Me && (to == null || p == to))) RpcId(p.Id, MethodName.Told, message);
+        foreach (var p in World.Players.Where(p => p != World.Me && (to == null || p == to))) RpcId(p.Id, MethodName.Told, message);
     }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -349,7 +349,7 @@ public partial class Net : Node {
     // ---------- Updates ----------
 
     private void Work() {
-        foreach (var w in World.S.Workers) w.WorkState = work.GetValueOrDefault(w.Id);
+        foreach (var w in World.Workers) w.WorkState = work.GetValueOrDefault(w.Id);
     }
 
     /// <summary>Host: keeps a snapshot as the next update, forgetting the one no guest can still build on.</summary>
@@ -363,7 +363,7 @@ public partial class Net : Node {
         var entries = Remember(updates.Capture(World));
         // Guests that confirmed the same update get the same changes.
         int builtOn = -1; byte[] delta = [];
-        foreach (var p in World.S.Players) {
+        foreach (var p in World.Players) {
             if (p == World.Me) continue;
             int baseline = acked.GetValueOrDefault(p.Id);
             var known = sent.GetValueOrDefault(baseline);

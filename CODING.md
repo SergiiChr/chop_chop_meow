@@ -45,6 +45,7 @@ Project rules on top of the global coding and testing guides.
 - UI checks act like a player: they set up through `world`, then use real input and read what the screen shows. A direct call into private `Game` code says in a comment why no input reaches it.
 - Checks never touch `world.S`, the raw save, and never change a player's backpack, needs or respawn timer directly:
   - They read results through `World`'s public members; a missing read becomes a small read-only member like `Coins`.
+  - `World.Backpack` is a read-only `InventoryView`, which `World.Transfer` takes as an end of a move, so a check moves items the way a player does.
   - They set up through real play: `Build`, `Buy`, `Consume`, `Tick` and the like, with `Add` for placing things. A time of day comes from a named step that ticks there, such as `RunUntilDawn`.
   - A state real play cannot reach, or cannot reach within the stage's time limit, goes behind a named step in `tests/SetupSteps.cs` whose comment says why. Old-save fixtures use steps there too.
   - `./build.py check` fails on the raw save anywhere else in `tests/`, `src/*Checks.cs` or `src/*Steps.cs`.
@@ -76,7 +77,7 @@ Allocation is fine while loading, setting up and on rare events.
 - Keep a temporary collection a feature needs every frame as a field and refill it (`Clear()`, then fill): a `List<T>` keeps its capacity. Hand out its contents as `CollectionsMarshal.AsSpan(list)` where a loop needs an array's speed.
 - Let a caller pass a list or `Span<T>` to fill rather than returning a new one, and take `ReadOnlySpan<T>` rather than `IEnumerable<T>`.
 - LINQ, lambdas that capture, `ToArray()`, `ToList()`, `Clone()`, string interpolation and `foreach` over an interface allocate: keep them out of those paths. Status text built from parts goes through a cache.
-- A read-only view of a collection that per-tick code loops over is a class or a concrete type whose public `GetEnumerator()` returns the struct enumerator, as `ItemTotals` does, not an interface such as `IReadOnlyDictionary`: a `foreach` over an interface boxes its enumerator.
+- A read-only view of a collection that per-tick code loops over is a class or a concrete type whose public `GetEnumerator()` returns the struct enumerator, as `ItemTotals` and `ListView` do, not an interface such as `IReadOnlyDictionary`: a `foreach` over an interface boxes its enumerator.
 - On the Godot side, passing a plain string where a `StringName` is expected, `GetChildren()`, a C# handler on a Godot signal and creating a resource such as a `StyleBoxFlat` allocate too. Keep `StringName`s and resources in static or instance fields, walk children by index, and override virtual methods such as `_Draw` instead of connecting handlers.
 - Godot's own memory (meshes, images, packed arrays) isn't the .NET heap: these rules don't cover it.
 

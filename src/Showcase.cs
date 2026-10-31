@@ -15,10 +15,10 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         mine.MineStage = stage; mine.Progress = stage is MineStage.Marked or MineStage.Supplied ? world.MineStageSeconds / 2 : 0;
         if (stage == MineStage.Dug) mine.Inventory.Add("wood", 20);
         world.Add(ThingKind.Chest, mine.Pos + cliff.Face * 3 + cliff.Along * 2);
-        foreach (var w in world.S.Workers.ToArray()) world.Assign(w, null);
-        foreach (var w in world.S.Workers.Take(stage == MineStage.Open ? 3 : 1)) { w.Pos = world.Player; world.Assign(w, mine); }
+        foreach (var w in world.Workers.ToArray()) world.Assign(w, null);
+        foreach (var w in world.Workers.Take(stage == MineStage.Open ? 3 : 1)) { w.Pos = world.Player; world.Assign(w, mine); }
         if (stage == MineStage.Open && !Launch.Has("--idle")) mine.Output!.Add(World.MineOre(mine), 20);
-        if (Launch.Has("--idle")) { foreach (var w in world.S.Workers) world.Assign(w, null); mine.Output!.Add(World.MineOre(mine), 12); mine.Output.Add("stone", 12); }
+        if (Launch.Has("--idle")) { foreach (var w in world.Workers) world.Assign(w, null); mine.Output!.Add(World.MineOre(mine), 12); mine.Output.Add("stone", 12); }
         world.S.Time = world.Data.DaySeconds * (Launch.Has("--night") ? .55f : .2f);
         for (int i = 0; i < 80; i++) world.Tick(.25f);
         if (Launch.Has("--panel")) panel.Select(mine); else panel.Close();
@@ -88,7 +88,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Tick(0); view.Zoom = 1;
             panel.Close(); return;
         }
-        foreach (var t in world.S.Things.Where(t => t.Pos.DistanceTo(Terrain.Spawn) < 8).ToArray()) world.S.Things.Remove(t);
+        foreach (var t in world.Things.Where(t => t.Pos.DistanceTo(Terrain.Spawn) < 8).ToArray()) world.S.Things.Remove(t);
         var hut = world.Add(ThingKind.Hut, Terrain.Spawn + new Vector2(-2, -2)); var fire = world.Add(ThingKind.Campfire, Terrain.Spawn + new Vector2(1, -3)); fire.Burn = 200;
         var f = world.Add(ThingKind.Furnace, Terrain.Spawn + new Vector2(4, -2)); f.Inventory.Add("iron_ore", 12); f.Inventory.Add("wood", 6);
         var bellows = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
@@ -108,12 +108,12 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         // Three packed crates leave on the cart, so it should show three crates.
         foreach (var goods in new[] { "steel_axe", "berries", "raw_meat" }) {
             var box = world.Add(ThingKind.Crate, world.Player); box.Inventory.Add(goods, goods == "steel_axe" ? 2 : 12); world.PickUpCrate(box);
-            world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1);
+            world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1);
         }
-        world.Sell(sign); world.S.Orders[0].Elapsed = 4;
+        world.Sell(sign); world.Orders[0].Elapsed = 4;
         world.S.Crafting.AddRange(new[] { "planks", "wood_parts" }); world.S.CraftTime = 6;
         var meat = world.Add(ThingKind.Crate, world.Player); meat.Inventory.Add("burnt_steak", 12); world.PickUpCrate(meat);
-        world.S.Backpack.TransferTo(sign.Inventory, world.S.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
+        world.S.Backpack.TransferTo(sign.Inventory, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1); sign.Output!.Add(Inventory.Coins, 36);
         if (Launch.Has("--night")) world.S.Time = world.Data.DaySeconds * .78f;
         // --day-phase sets the time of day from 0 at dawn, for comparing the light across the day.
         if (Launch.Value("--day-phase") is string phase) world.S.Time = world.Data.DaySeconds * float.Parse(phase, System.Globalization.CultureInfo.InvariantCulture);
@@ -126,7 +126,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--bench")) { world.Player = bench.Pos + Vector2.One; panel.Select(bench); }
         if (Launch.Has("--craft")) panel.Open("craft");
         if (Launch.Has("--crew")) panel.Open("workers");
-        if (Launch.Has("--worker")) panel.Select(world.S.Workers[0]);
+        if (Launch.Has("--worker")) panel.Select(world.Workers[0]);
         if (Launch.Has("--guide")) panel.Open("help");
         if (Launch.Has("--menu")) { panel.Close(); menu.Open(); }
         if (Launch.Has("--furnace")) { world.Player = bellows.Pos + Vector2.One; panel.Select(bellows); }
@@ -137,7 +137,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
                 if (item == "leaves") { pile.Compost = true; pile.Inventory.Add("fertilizer", 20); }
             }
             world.Player = at + new Vector2(3, -2.5f); world.Tick(0); view.Zoom = 1.4f;
-            if (Launch.Has("--panel")) panel.Select(world.S.Things.Last(t => t.Kind == ThingKind.Pile)); else panel.Close();
+            if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Pile)); else panel.Close();
         }
         if (Launch.Has("--farm")) {
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
@@ -149,7 +149,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             }
             var wheat = world.Add(ThingKind.Pile, at + new Vector2(0, World.ZoneSize)); wheat.Inventory.Add("wheat", 300);
             world.Player = at + new Vector2(6, 2.5f); world.Tick(0); view.Zoom = 1.2f;
-            if (Launch.Has("--panel")) panel.Select(world.S.Things.Last(t => t.Kind == ThingKind.Farm)); else panel.Close();
+            if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Farm)); else panel.Close();
         }
         if (Launch.Has("--kitchen")) {
             // The cooking table mid-stew beside a canning station sealing cans, with the mortar slotted.
@@ -208,7 +208,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         }
         if (Launch.Has("--strike")) {
             // Strike review: the whole crew owes wages and stands holding protest signs.
-            foreach (var w in world.S.Workers) w.WageDebt = w.Wage;
+            foreach (var w in world.Workers) w.WageDebt = w.Wage;
             world.Player = sign.Pos + new Vector2(2.5f, 1.5f); world.Tick(.25f); panel.Close(); view.Zoom = 2.2f;
         }
         if (Launch.Has("--mine")) MineReview(sign);

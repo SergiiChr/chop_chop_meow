@@ -73,7 +73,7 @@ public static class MultiplayerChecks {
     private static void CheckDropOnAnotherItemsChestCellStoresTheStack(GameData data) {
         var dropper = new World(data, false); var shelf = dropper.Add(ThingKind.Chest, dropper.Player + new Vector2(1, 0));
         shelf.Inventory.Add("stone", 1); Give(dropper, "wood", 3);
-        int woodSlot = dropper.Backpack.Layout.FindIndex(slot => slot.Item == "wood");
+        int woodSlot = dropper.Backpack.Layout.ToList().FindIndex(slot => slot.Item == "wood");
         Require(dropper.TransferSlot(dropper.Backpack, shelf.Inventory, woodSlot, 0, "wood", 3) == 3,
             "a drop on another item's cell in a chest should store the whole stack");
         Require(shelf.Inventory["wood"] == 3,
@@ -103,7 +103,7 @@ public static class MultiplayerChecks {
         Require(guest.Warp == 1, "a guest without a saved player should be told of the move there");
         var lump = world.Add(ThingKind.LooseCoal, Terrain.Spawn + new Vector2(5, 0), 2);
         var chest = world.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(5, 2));
-        int hostCoal = world.Carried("coal");
+        int hostCoal = world.Backpack["coal"];
         string? hostHeard = null; world.Notify = message => hostHeard = message;
 
         world.Run(guest, new Command(Verb.PickUp, lump.Id, 0, "", 0, default));
@@ -111,7 +111,7 @@ public static class MultiplayerChecks {
         world.As(guest, () => world.MoveTo(lump.Pos + new Vector2(.5f, 0)));
         world.Run(guest, new Command(Verb.PickUp, lump.Id, 0, "", 0, default));
         Require(guest.Backpack["coal"] == 2, "a guest's pick-up should go into the guest's backpack");
-        Require(world.Carried("coal") == hostCoal, "a guest's pick-up should leave the host's backpack alone");
+        Require(world.Backpack["coal"] == hostCoal, "a guest's pick-up should leave the host's backpack alone");
         Require(world.Find(lump.Id) == null, "a guest's pick-up should take the lump off the ground");
         world.Run(guest, new Command(Verb.Consume, 0, 0, "raw_meat", 0, default));
         Require(heard.Contains($"{data.Name("raw_meat")} needs cooking first.") && hostHeard == null, "what a guest's action says should reach the guest, not the host");
@@ -119,7 +119,7 @@ public static class MultiplayerChecks {
         world.Run(guest, new Command(Verb.Transfer, 0, chest.Id * World.BoxCodes + 1, "coal", 99, default));
         Require(chest.Inventory["coal"] == 2 && guest.Backpack["coal"] == 0, "a guest should store into a chest within reach");
         world.Player = chest.Pos + new Vector2(1, 0);
-        Require(world.Transfer(chest.Inventory, world.Backpack, "coal", 99) == 2 && world.Carried("coal") == hostCoal + 2, "the host should take what a guest stored");
+        Require(world.Transfer(chest.Inventory, world.Backpack, "coal", 99) == 2 && world.Backpack["coal"] == hostCoal + 2, "the host should take what a guest stored");
         world.Run(guest, new Command(Verb.Transfer, chest.Id * World.BoxCodes + 2, 0, "coal", 99, default));
         world.Run(guest, new Command(Verb.Hire, chest.Id, 0, "", 99, default));
         Require(guest.Backpack.Count == 0 && world.Workers.Count == 0, "commands naming boxes or offers that do not exist should do nothing");
@@ -142,7 +142,7 @@ public static class MultiplayerChecks {
         copy.Build(ThingKind.Campfire, Terrain.Spawn + new Vector2(-2, 2));
         copy.Transfer(copy.Backpack, chest.Inventory, "wood", 5);
         copy.SetFilter(chest, "wood", false, true);
-        Require(copy.Carried("berries") == 3, "a guest's copy should keep its own backpack berries");
+        Require(copy.Backpack["berries"] == 3, "a guest's copy should keep its own backpack berries");
         Require(copy.Hunger == 50, "a guest's copy should keep its own hunger");
         Require(copy.Things.All(t => t.Kind != ThingKind.Campfire), "a guest's copy should not add a campfire to its world");
         Require(chest.Inventory.Count == 0, "a guest's copy should not put anything in the host's chest");
@@ -156,7 +156,7 @@ public static class MultiplayerChecks {
         Require(host.Things.Any(t => t.Kind == ThingKind.Campfire), "the host should run the guest's building in the host's world");
         Require(guest.Backpack["wood"] == 9, "the host should take the guest's wood for the building and the transfer");
         Require(hostChest.Inventory["wood"] == 5 && hostChest.Inventory.InputFilter.Contains("wood"), "the guest's transfer and filter should land in the host's chest");
-        Require(host.Carried("berries") == 0 && host.Hunger == 100, "the host's own player should be untouched by a guest's actions");
+        Require(host.Backpack["berries"] == 0 && host.Hunger == 100, "the host's own player should be untouched by a guest's actions");
     }
 
     private static void CheckGuestGathersAndHammers(GameData data) {
@@ -167,7 +167,7 @@ public static class MultiplayerChecks {
         guest.GatherTarget = tree.Id;
         FedPlayersTick(world, data.GatherSeconds * 2 + .5f);
         Require(guest.Backpack["wood"] >= 4, "a guest holding on to a tree should chop wood into their own backpack");
-        Require(world.Carried("wood") == 0, "a guest holding on to a tree should put nothing in the host's backpack");
+        Require(world.Backpack["wood"] == 0, "a guest holding on to a tree should put nothing in the host's backpack");
         Require(tree.Remaining < 40, "a guest holding on to a tree should cut the tree down");
         guest.GatherTarget = 0;
 
@@ -228,7 +228,7 @@ public static class MultiplayerChecks {
         Require(world.Day == day + 1, "with everyone inside, a guest's sleep should move to the next day");
         Require(!world.Night, "with everyone inside, a guest's sleep should end the night");
         Require(guest.Hunger < 100, "with everyone inside, a guest's sleep should use up the guest's hunger");
-        Require(world.Carried(Inventory.Coins) == 40 && guest.Backpack[Inventory.Coins] == 50, "the host's backpack should pay the wages even when a guest sleeps");
+        Require(world.Backpack[Inventory.Coins] == 40 && guest.Backpack[Inventory.Coins] == 50, "the host's backpack should pay the wages even when a guest sleeps");
     }
 
     private static void CheckGuestComesBackFromSaveWithTheirPackAndSpot(GameData data) {

@@ -33,13 +33,13 @@ internal static class PlayerSteps {
     public static void GatherUntil(World world, Thing resource, string item, int quantity) {
         world.Player = resource.Pos;
         int attempts = 0;
-        while (world.Carried(item) < quantity && attempts++ < 200) {
-            int before = world.Carried(item);
+        while (world.Backpack[item] < quantity && attempts++ < 200) {
+            int before = world.Backpack[item];
             world.Gather(resource, world.Data.GatherSeconds);
-            Require(world.Carried(item) > before, $"gathering {item} should produce raw material");
+            Require(world.Backpack[item] > before, $"gathering {item} should produce raw material");
             SafeTick(world, world.Data.GatherSeconds);
         }
-        Require(world.Carried(item) >= quantity, $"gathered enough {item} for the progression");
+        Require(world.Backpack[item] >= quantity, $"gathered enough {item} for the progression");
     }
 
     public static void PickUp(World world, Thing loose) {

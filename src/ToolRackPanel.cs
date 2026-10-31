@@ -9,8 +9,8 @@ public partial class ToolRackPanel(SidePanel side, Thing t) : PagePanel(side) {
     public override void _Ready() {
         HeaderAction("stash", "Hang spare tools · keeps your best of each", () => {
             if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
-            foreach (var id in world.S.Backpack.Items.Keys.Where(i => world.Holds(t, i) && t.Inventory.Accepts(i)).ToArray())
-                world.Transfer(world.S.Backpack, t.Inventory, id, world.BestTool(world.Data.Items[id].Tool) == id ? world.S.Backpack[id] - 1 : world.S.Backpack[id]);
+            foreach (var id in world.Backpack.Items.Keys.Where(i => world.Holds(t, i) && t.Inventory.Accepts(i)).ToArray())
+                world.Transfer(world.Backpack, t.Inventory, id, world.BestTool(world.Data.Items[id].Tool) == id ? world.Backpack[id] - 1 : world.Backpack[id]);
         }, Style.ActionRound, "deposit");
         FilterButton(t);
         var rows = Well(new VBoxContainer()); rows.AddThemeConstantOverride("separation", 0);
@@ -33,7 +33,7 @@ public partial class ToolRackPanel(SidePanel side, Thing t) : PagePanel(side) {
                 if (!GodotObject.IsInstanceValid(cell)) return;
                 int held = 0, out_ = 0, waiting = 0;
                 foreach (var pair in t.Inventory.Items) if (world.Data.Items.TryGetValue(pair.Key, out var def) && def.Tool == kind) held += pair.Value;
-                foreach (var w in world.S.Workers) { if (w.Tool != "" && world.Data.Items[w.Tool].Tool == kind) out_++; if (w.Missing == kind) waiting++; }
+                foreach (var w in world.Workers) { if (w.Tool != "" && world.Data.Items[w.Tool].Tool == kind) out_++; if (w.Missing == kind) waiting++; }
                 var now = (world.BestTool(kind, t.Inventory), held, out_, waiting);
                 if (now == shown) return;
                 shown = now;
@@ -42,9 +42,9 @@ public partial class ToolRackPanel(SidePanel side, Thing t) : PagePanel(side) {
                 count.Text = held > 1 ? held.ToString() : "";
                 cell.TooltipText = held > 0 ? $"{world.Data.Name(now.Item1!)}\nClick to take" : $"No {kind} on the rack";
                 outPill.Visible = out_ > 0; outPill.Text = $"{out_} out";
-                outPill.TooltipText = string.Join("\n", world.S.Workers.Where(w => w.Tool != "" && world.Data.Items[w.Tool].Tool == kind).Select(w => w.Name));
+                outPill.TooltipText = string.Join("\n", world.Workers.Where(w => w.Tool != "" && world.Data.Items[w.Tool].Tool == kind).Select(w => w.Name));
                 waitPill.Visible = waiting > 0; waitPill.Text = $"{waiting} waiting";
-                waitPill.TooltipText = string.Join("\n", world.S.Workers.Where(w => w.Missing == kind).Select(w => $"{w.Name} needs {A(kind)}"));
+                waitPill.TooltipText = string.Join("\n", world.Workers.Where(w => w.Missing == kind).Select(w => $"{w.Name} needs {A(kind)}"));
             });
         }
         BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: hang a tool · Ctrl: all of them · Drag to move", wanted: id => world.Holds(t, id) && t.Inventory.Accepts(id));

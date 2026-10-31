@@ -30,10 +30,10 @@ public partial class EndingScreen : PanelContainer {
     public void ShowOnce() {
         var world = kit.World;
         // A guest's copy takes the host's flag with every update, so a guest remembers its own.
-        if ((world.Remote ? seen : world.S.EndingShown) || !world.EndGoalsComplete) return;
+        if ((world.Remote ? seen : world.EndingShown) || !world.EndGoalsComplete) return;
         world.S.EndingShown = seen = true; closePanel();
         int seconds = (int)world.S.PlaySeconds;
-        stats.Text = $"Every ore in the valley has its mine, and the settlement cleared {world.Data.Goals.DailyProfit} coins a day for {world.Data.Goals.ProfitDays} days.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.S.Workers.Count} villagers";
+        stats.Text = $"Every ore in the valley has its mine, and the settlement cleared {world.Data.Goals.DailyProfit} coins a day for {world.Data.Goals.ProfitDays} days.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.Workers.Count} villagers";
         Visible = true;
     }
 

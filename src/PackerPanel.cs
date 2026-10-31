@@ -22,7 +22,7 @@ public partial class PackerPanel(SidePanel side, Thing t) : PagePanel(side) {
             var inputs = new Control[] { MachineSlot(t, t.Inventory, t.Packs, true, "×1"), MachineSlot(t, t.Inventory, "crate", true, "") };
             Process(inputs, LiveText.Of(text => AppendDuration(text, world.Data.PackSeconds)), () => t.Processing ? t.Progress / world.Data.PackSeconds : 0, null, PackedCrate(), Array.Empty<Control>());
         }
-        BagGrid(id => world.LoadInput(t, id, ItemMoves.All ? world.S.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot", wanted: id => world.Holds(t, id));
+        BagGrid(id => world.LoadInput(t, id, ItemMoves.All ? world.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot", wanted: id => world.Holds(t, id));
         JobButtons(t);
     }
 

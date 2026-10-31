@@ -39,7 +39,7 @@ public partial class BackpackDrawer : PanelContainer {
     /// <summary>Shows how full the backpack is.</summary>
     public void Refresh() {
         if (!Visible) return;
-        var now = (world.S.Backpack.UsedSlots, world.S.Backpack.Slots);
+        var now = (world.Backpack.UsedSlots, world.Backpack.Slots);
         if (now == shownFill) return;
         shownFill = now;
         fill.Text = $"{now.UsedSlots}/{now.Slots}";

@@ -12,7 +12,7 @@ public partial class InspectPage(SidePanel side) : PagePanel(side) {
         headingIcon.TooltipText = world.Data.Buildings.TryGetValue(kind, out var def) ? def.Description : "";
     }
     public override void _Ready() {
-        if (panel.Selection.Worker > 0) { AddChild(new WorkerPanel(panel, world.S.Workers.FirstOrDefault(w => w.Id == panel.Selection.Worker))); return; }
+        if (panel.Selection.Worker > 0) { AddChild(new WorkerPanel(panel, world.Workers.FirstOrDefault(w => w.Id == panel.Selection.Worker))); return; }
         var t = world.Find(panel.Selection.Thing);
         if (t == null) { AddLabel("Select a building or resource in the world."); return; }
         Headline(t.Kind);

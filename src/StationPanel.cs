@@ -11,7 +11,7 @@ public partial class StationPanel(SidePanel side, Thing t) : PagePanel(side) {
         if (t.Recipe != "") Machine(t);
         else AddLabel("Choose what to make.", 14, Style.Beige);
         if (t.Kind == ThingKind.Reinforced) Bellows();
-        BagGrid(id => world.LoadInput(t, id, ItemMoves.All ? world.S.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot",
+        BagGrid(id => world.LoadInput(t, id, ItemMoves.All ? world.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot",
             wanted: id => t.Recipe != "" && (world.BatchCost(t).ContainsKey(id) || t.Burner != null && World.FuelFits(t, id)));
         JobButtons(t);
     }

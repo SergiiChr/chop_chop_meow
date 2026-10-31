@@ -36,20 +36,20 @@ public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
         (int Hired, int Daily) shown = (-1, -1);
         live.Add(() => {
             if (!GodotObject.IsInstanceValid(count)) return;
-            var now = (world.S.Workers.Count, world.DailyWages);
+            var now = (world.Workers.Count, world.DailyWages);
             if (now == shown) return;
             shown = now;
             countText.Clear().Append(now.Item1).Append(" / ").Append(World.MaxWorkers); countText.Show();
             wagesText.Clear().Append('−').Append(now.Item2).Append(" /day"); wagesText.Show();
         });
-        if (world.S.Workers.Count == 0) {
+        if (world.Workers.Count == 0) {
             var empty = Well(new HBoxContainer()); empty.AddThemeConstantOverride("separation", 14);
             empty.AddChild(Style.Icon(Hardhat, 40));
             var hint = Style.Text("No crew yet. Hire villagers at a trading post: more coins up front means a lower daily wage.", 15, Style.Ink);
             hint.AutowrapMode = TextServer.AutowrapMode.WordSmart; hint.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; empty.AddChild(hint);
             return;
         }
-        foreach (var w in world.S.Workers) WorkerCard(w);
+        foreach (var w in world.Workers) WorkerCard(w);
     }
 
     /// <summary>A worker's card in the crew overview; clicking it opens the worker.</summary>

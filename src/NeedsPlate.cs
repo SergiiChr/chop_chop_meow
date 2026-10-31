@@ -124,28 +124,28 @@ public partial class NeedsPlate : PanelContainer {
 
     /// <summary>The trading post within reach that has coins or room for them, or null.</summary>
     private Thing? NearPost() {
-        foreach (var t in world.S.Things) if (t.Kind == ThingKind.Signpost && t.Wages != null && world.Near(t)) return t;
+        foreach (var t in world.Things) if (t.Kind == ThingKind.Signpost && t.Wages != null && world.Near(t)) return t;
         return null;
     }
 
     /// <summary>Flashes the screen edges on a hit; a pinned player keeps a steady glow while the wolves feed, and a hungry or thirsty one a faint pulse.</summary>
     public void DamageFlash(float lost, float runTime) {
         if (lost >= 3) edges.Strength = 1;
-        if (world.S.Mauled && !world.Dead) edges.Strength = Math.Max(edges.Strength, .55f);
+        if (world.Mauled && !world.Dead) edges.Strength = Math.Max(edges.Strength, .55f);
         // Food or drink under 15% keeps the edges pulsing faintly until the player eats or drinks.
-        else if (!world.Dead && (world.S.Hunger < GameData.LowNeed || world.S.Thirst < GameData.LowNeed)) edges.Strength = Math.Max(edges.Strength, .5f + .15f * MathF.Sin(runTime * 4));
+        else if (!world.Dead && (world.Hunger < GameData.LowNeed || world.Thirst < GameData.LowNeed)) edges.Strength = Math.Max(edges.Strength, .5f + .15f * MathF.Sin(runTime * 4));
     }
 
     // The rounded values the tooltips show, so their text is built only when one changes.
     private (int Health, int Hunger, int Thirst) shownNeeds = (-1, -1, -1);
     private (int Bank, int Due) shownBank = (-1, -1);
     public void Refresh() {
-        var needs = ((int)MathF.Round(world.S.Health, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Hunger, MidpointRounding.AwayFromZero), (int)MathF.Round(world.S.Thirst, MidpointRounding.AwayFromZero));
+        var needs = ((int)MathF.Round(world.Health, MidpointRounding.AwayFromZero), (int)MathF.Round(world.Hunger, MidpointRounding.AwayFromZero), (int)MathF.Round(world.Thirst, MidpointRounding.AwayFromZero));
         if (needs != shownNeeds) {
             shownNeeds = needs;
-            Health.TooltipText = $"Health {world.S.Health:0}%"; Hunger.TooltipText = $"Hunger {world.S.Hunger:0}%"; Thirst.TooltipText = $"Thirst {world.S.Thirst:0}%";
-            Health.Level = world.S.Health; Hunger.Level = world.S.Hunger; Thirst.Level = world.S.Thirst;
-            Health.Warn = world.S.Health <= 25; Hunger.Warn = world.S.Hunger <= 25; Thirst.Warn = world.S.Thirst <= 25;
+            Health.TooltipText = $"Health {world.Health:0}%"; Hunger.TooltipText = $"Hunger {world.Hunger:0}%"; Thirst.TooltipText = $"Thirst {world.Thirst:0}%";
+            Health.Level = world.Health; Hunger.Level = world.Hunger; Thirst.Level = world.Thirst;
+            Health.Warn = world.Health <= 25; Hunger.Warn = world.Hunger <= 25; Thirst.Warn = world.Thirst <= 25;
             Health.QueueRedraw(); Hunger.QueueRedraw(); Thirst.QueueRedraw();
         }
         var bank = (world.WageCoins, world.DailyWages);

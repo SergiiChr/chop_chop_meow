@@ -83,17 +83,17 @@ public partial class Hotbar : PanelContainer {
     public void Refresh() {
         for (int slot = 0; slot < Buttons.Count; slot++) {
             var button = Buttons[slot];
-            var shown = (button, HotbarId(slot), world.S.Backpack[HotbarId(slot)], world.S.ActiveHotbar == slot);
+            var shown = (button, HotbarId(slot), world.Backpack[HotbarId(slot)], world.ActiveHotbar == slot);
             if (shownSlots.TryGetValue(slot, out var before) && before == shown) continue;
             shownSlots[slot] = shown;
             var id = HotbarId(slot);
-            int count = world.S.Backpack[id];
+            int count = world.Backpack[id];
             bool building = world.Data.IsBuilding(id);
             Counts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : Water.IsBottle(id) ? $"{Water.BottleSips(id)}/3" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · drag an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
-            bool active = world.S.ActiveHotbar == slot;
+            bool active = world.ActiveHotbar == slot;
             // The item in hand gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.CupWanted : Style.CupNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.CupWanted : Style.CupNormal);
@@ -103,14 +103,14 @@ public partial class Hotbar : PanelContainer {
 
     // World.Deserialize keeps nine known entries, so reads need no repair here.
     private string HotbarId(int slot) {
-        string id = world.S.HotbarSlots[slot];
+        string id = world.HotbarSlots[slot];
         if (!Water.IsBottle(id)) return id;
-        foreach (var bottle in DrinkingBottles) if (world.S.Backpack[bottle] > 0) return bottle;
+        foreach (var bottle in DrinkingBottles) if (world.Backpack[bottle] > 0) return bottle;
         return "empty_bottle";
     }
     private static readonly string[] DrinkingBottles = { "water_1", "water_2", "water", "empty_bottle" };
 
-    public string? ActiveItem() => world.Data.Items.ContainsKey(HotbarId(world.S.ActiveHotbar)) ? HotbarId(world.S.ActiveHotbar) : null;
+    public string? ActiveItem() => world.Data.Items.ContainsKey(HotbarId(world.ActiveHotbar)) ? HotbarId(world.ActiveHotbar) : null;
 
     public bool IsTransferable(string id) => world.Data.Items[id].Tool == "" && !world.Data.IsConsumable(id);
 
