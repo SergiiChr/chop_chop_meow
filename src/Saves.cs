@@ -29,6 +29,16 @@ public sealed class Saves(UiKit kit, Net net, Action loaded) {
     /// <summary>The save the player was using, else the most recent one, or -1 when there is none.</summary>
     public int Latest() => Slot > 0 && SlotUsed(Slot) ? Slot : Newest();
 
+    /// <summary>F5: until a numbered slot is chosen, asks which slot to use; a guest saves only its own player.</summary>
+    public void QuickSave(StartMenu menu) {
+        if (kit.World.Remote) { net.SaveGuest(); kit.Notify("Your player is saved on this computer. The host saves the world."); } else if (Slot > 0) Save(Slot); else menu.ShowSlots(true, menu.Close);
+    }
+
+    /// <summary>F9: until a numbered slot is chosen, asks which slot to use; a guest has nothing of its own to load.</summary>
+    public void QuickLoad(StartMenu menu) {
+        if (kit.World.Remote) kit.Notify("Leave the host's game to load your own."); else if (Slot > 0) Load(Slot); else menu.ShowSlots(false, menu.Close);
+    }
+
     public void Save(int n) {
         try {
             using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Write); if (file == null) throw new InvalidOperationException("Cannot open save file");

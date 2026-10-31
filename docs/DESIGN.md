@@ -33,6 +33,7 @@ The project targets Godot 4.7.2 .NET with C#.
 `Game` is a thin runner: it creates the interface's nodes once while loading, holds them and routes input and the frame to them.
 Each feature is a node with a small public surface, given what it needs in its constructor.
 `UiKit` carries the world, sounds and how a player action runs.
+`Game` implements `IGameFlow`, what the menus call to start, load, leave or quit a game.
 The interface reads the world through `World`'s read members and keeps `world.S` for writes, and for what needs the real `Inventory`, such as a move between grids.
 `UiKit.Paused` follows which overlays are open: each one registers with `HoldWhile`, so none saves or restores another's pause.
 `World.Replaced` fires whenever the whole state is replaced (a new game, a load, a guest taking the host's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
@@ -108,8 +109,8 @@ UI and input:
 | `src/NeedsPlate.cs` | The HUD health, hunger and thirst vials, the bank and the red damage edges |
 | `src/EndingScreen.cs` | The one-time ending screen |
 | `src/StartMenu.cs` | The start menu with its save slot, load, options and join screens |
-| `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots, the settings file and the command line |
-| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, clicking things and `ClickMode`, what the next click does |
+| `src/Saves.cs`, `src/Settings.cs`, `src/Launch.cs` | The save slots with quick save and load, the settings file and the command line |
+| `src/PlayerControl.cs` | The player in the world: walking, gathering, lifting crates, placing buildings, clicking things, E and Space, and `ClickMode`, what the next click does |
 | `src/Hotbar.cs` | The tool belt: the round menu badges and nine saved item/plan references, assignment and use |
 
 Rendering and sound:

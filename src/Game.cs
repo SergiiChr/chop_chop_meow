@@ -155,17 +155,11 @@ public partial class Game : Node, IGameFlow {
                 case Key.H: panel.Toggle(Page.Crew); break;
                 case Key.C: panel.Toggle(Page.Craft); break;
                 case Key.Tab: panel.Toggle(Page.Backpack); break;
-                // Until a numbered slot is chosen, quick save and load ask which slot to use.
-                case Key.F5: if (world.Remote) { net.SaveGuest(); Notify("Your player is saved on this computer. The host saves the world."); } else if (saves.Slot > 0) saves.Save(saves.Slot); else startMenu.ShowSlots(true, startMenu.Close); break;
-                case Key.F9: if (world.Remote) Notify("Leave the host's game to load your own."); else if (saves.Slot > 0) saves.Load(saves.Slot); else startMenu.ShowSlots(false, startMenu.Close); break;
+                case Key.F5: saves.QuickSave(startMenu); break;
+                case Key.F9: saves.QuickLoad(startMenu); break;
                 case >= Key.Key1 and <= Key.Key9: hotbar.Select((int)(key.PhysicalKeycode - Key.Key1)); break;
-                case Key.E:
-                    var t = world.Find(panel.Selection.Thing);
-                    if (t == null || !world.Near(t)) t = world.Things.Where(t => world.Near(t)).OrderBy(t => t.Pos.DistanceTo(world.Player)).FirstOrDefault();
-                    if (t != null) panel.Select(t); break;
-                case Key.Space:
-                    var station = world.Find(panel.Selection.Thing);
-                    if (station != null && station.Kind == ThingKind.Reinforced && world.Near(station)) world.Pump(station); else world.Attack(); break;
+                case Key.E: player.InspectNearest(); break;
+                case Key.Space: player.Swing(); break;
             }
         }
         if (ev is InputEventMouseButton mouse) player.Click(mouse, GetViewport().GuiGetHoveredControl() != null);
