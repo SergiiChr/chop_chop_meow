@@ -41,12 +41,13 @@ public partial class PauseMenu : PanelContainer {
         SaveButton = MenuButton("Save", Style.Enamel, () => startMenu.ShowSlots(true, BackToPause)); SaveButton.Name = "save"; side.AddChild(SaveButton);
         loadButton = MenuButton("Load", Style.Enamel, () => startMenu.ShowSlots(false, BackToPause)); loadButton.Name = "load"; side.AddChild(loadButton);
         var options = MenuButton("Options", Style.Enamel, () => startMenu.ShowOptions(BackToPause)); options.Name = "options"; side.AddChild(options);
-        newGameButton = MenuButton("New game", Style.Enamel, () => ConfirmLeave("NEW GAME", "Start a new game", () => { startMenu.Close(); restart(); })); newGameButton.Name = "new_game"; side.AddChild(newGameButton);
+        newGameButton = MenuButton("New game", Style.Enamel, () => ConfirmLeave("NEW GAME", "Start a new game", restart)); newGameButton.Name = "new_game"; side.AddChild(newGameButton);
         var quitButton = MenuButton("Quit", Style.Enamel, () => ConfirmLeave("QUIT", "Quit to desktop", quit)); quitButton.Name = "quit"; side.AddChild(quitButton);
         side.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         HostButton = MenuButton("Host", Style.Sage, HostGame); HostButton.Name = "host"; side.AddChild(HostButton);
         JoinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
         netLine = Style.Text("", 13, Style.Beige); netLine.HorizontalAlignment = HorizontalAlignment.Center; netLine.AutowrapMode = TextServer.AutowrapMode.WordSmart; side.AddChild(netLine);
+        world.Replaced += () => Visible = false;
     }
 
     private Button MenuButton(string text, Color color, Action action) {

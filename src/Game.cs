@@ -57,7 +57,7 @@ public partial class Game : Node {
             view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = Launch.Has("--environment-review") }; AddChild(view);
             kit = new UiKit(world, sounds, Notify, RefreshLive); state = kit.State;
             net = new Net { Name = "Net", World = world, FilePrefix = Launch.FilePrefix }; AddChild(net);
-            saves = new Saves(kit, net, Loaded);
+            saves = new Saves(kit, net, () => panel.Open("inventory"));
             world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };
             world.PlayerActed += (action, at) => net.Echo(world.S.Actor.Id, action, at);
             ConnectNet();
@@ -80,7 +80,7 @@ public partial class Game : Node {
     }
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private void BuildHud() {
-        blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), saves.Latest, n => startMenu.LoadSlot(n), () => startMenu.ShowStart()); AddChild(blackHole);
+        blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), saves.Latest, n => saves.Load(n), () => startMenu.ShowStart()); AddChild(blackHole);
         moves = new ItemMoves(kit, blackHole);
         panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;
         hotbar = new Hotbar(kit, view, panel);
@@ -96,8 +96,8 @@ public partial class Game : Node {
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         needsPlate = new NeedsPlate(kit, moves, damageEdges); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
         ending = new EndingScreen(kit, panel.Close, Restart); ui.AddChild(ending);
-        startMenu = new StartMenu(kit, saves, net, panel, ending, () => menu.Visible = false, Restart, () => Quit());
-        menu = new PauseMenu(kit, net, startMenu, Restart, () => Quit(), () => { DropWorld(); startMenu.ShowStart(); }); ui.AddChild(menu); ui.AddChild(startMenu);
+        startMenu = new StartMenu(kit, saves, net, panel, () => menu.Visible = false, Restart, () => Quit());
+        menu = new PauseMenu(kit, net, startMenu, Restart, () => Quit(), () => { world.NewGame(); startMenu.ShowStart(); }); ui.AddChild(menu); ui.AddChild(startMenu);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
         RefreshLive();
     }
@@ -118,31 +118,24 @@ public partial class Game : Node {
         net.Joined += OnJoined;
         net.Disconnected += ShowReconnecting;
         net.Reconnecting += left => startMenu.ShowRetry(left);
-        net.Left += reason => { startMenu.LeftReason = reason; DropWorld(); startMenu.ShowStart(); };
+        net.Left += reason => { startMenu.LeftReason = reason; world.NewGame(); startMenu.ShowStart(); };
         net.Failed += reason => startMenu.ShowJoinFailure(reason);
     }
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
-    private void ShowReconnecting() { DropWorld(); startMenu.ShowReconnecting(); }
-    /// <summary>Replaces the world with a new one and closes everything that showed the old one.</summary>
-    private void DropWorld() { world.NewGame(); ForgetWorld(); panel.Close(); ending.Visible = false; blackHole.End(); }
-    /// <summary>Forgets what the player had selected and was doing in the world that went away.</summary>
-    private void ForgetWorld() { panel.ClearSelection(); player.Stop(); recovery.Refresh(); }
+    private void ShowReconnecting() { world.NewGame(); startMenu.ShowReconnecting(); }
     private void OnJoined(bool back) {
         Settings.Store("net", "address", net.Address);
-        saves.Slot = 0; ForgetWorld(); ending.Joined(back);
+        saves.Slot = 0; ending.Joined(back);
         shownHealth = world.S.Health;
-        startMenu.Close(); menu.Visible = false; ending.Visible = false; panel.Close();
         Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
     }
     private void Restart() {
         net.Leave();
         world.NewGame();
-        ForgetWorld(); saves.Slot = 0; autosave = 0;
-        ending.Visible = false; state.Paused = false; panel.Open("welcome");
+        saves.Slot = 0; autosave = 0;
+        state.Paused = false; panel.Open("welcome");
         Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
     }
-    /// <summary>Clears what belonged to the world before a load, and shows what was loaded.</summary>
-    private void Loaded() { ForgetWorld(); panel.Open("inventory"); }
     public override void _UnhandledInput(InputEvent ev) {
         if (view?.EnvironmentReview == true) return;
         if (world == null || view == null || ending.Visible) return;

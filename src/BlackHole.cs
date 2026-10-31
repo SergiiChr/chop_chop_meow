@@ -81,6 +81,7 @@ void fragment() {
         reloadAfterCollapse = ConsoleButton("Reload save", Neon, () => { End(); reload(latestSlot()); }); reloadAfterCollapse.Name = "reload_after_collapse"; over.AddChild(reloadAfterCollapse);
         var menuButton = ConsoleButton("Main menu", Neon, () => { End(); mainMenu(); }); menuButton.Name = "menu_after_collapse"; over.AddChild(menuButton);
         anomaly.AddChild(singularity);
+        kit.World.Replaced += End;
     }
 
     /// <summary>The warning or the black hole is on screen, and takes all input.</summary>

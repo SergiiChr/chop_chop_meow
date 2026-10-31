@@ -209,6 +209,8 @@ public sealed partial class World {
     public SaveState S { get; private set; } = new();
     public Action<string>? Notify;
     public Action<ActorAction, Vector2>? PlayerActed;
+    /// <summary>Raised once the whole state has been replaced by a new game, a load or a guest's copy of the host's world; what belonged to the old world resets itself on it.</summary>
+    public Action? Replaced;
     /// <summary>A named sound effect and where it happens; the simulation only names it.</summary>
     public Action<string, Vector2>? Sound;
     /// <summary>How far down the valley an errand runner walks before fading from view on the way to Bramblewick.</summary>
@@ -378,6 +380,7 @@ public sealed partial class World {
         Scatter(rng, ThingKind.Tree, int.MaxValue, 42, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
         DropLeaves();
         Look();
+        Replaced?.Invoke();
     }
     /// <summary>Leaves a rake gathers in one go from a patch, which fills again every day.</summary>
     public const int LeafPatch = 12;
@@ -2126,5 +2129,6 @@ public sealed partial class World {
         // Saves from before raking have no leaf litter.
         if (!S.Things.Any(t => t.Kind == ThingKind.Leaves)) DropLeaves();
         UpdateGoal(); gatherClock = 0; ExploredRevision++; Look(); Say("Settlement loaded.");
+        Replaced?.Invoke();
     }
 }

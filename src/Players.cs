@@ -315,5 +315,6 @@ public sealed partial class World {
     public void Mirror(SaveState state, List<PlayerState> players, int localId) {
         state.Players = players; LocalId = localId; S = state; S.Actor = Me;
         UpdateLunchFire(); ExploredRevision++; Look();
+        Replaced?.Invoke();
     }
 }

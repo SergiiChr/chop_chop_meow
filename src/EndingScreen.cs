@@ -22,6 +22,7 @@ public partial class EndingScreen : PanelContainer {
         stats = Style.Wrapped("", 16, Style.Beige); stats.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(stats);
         var keep = kit.Button("Keep playing", () => { Visible = false; kit.State.Paused = false; }); keep.Name = "keep_playing"; column.AddChild(keep);
         var again = kit.Button("Restart", restart); again.Name = "restart"; column.AddChild(again);
+        kit.World.Replaced += () => Visible = false;
     }
 
     /// <summary>Called on every running frame; opens the screen the first time the end goals are complete.</summary>

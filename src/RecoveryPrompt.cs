@@ -24,6 +24,7 @@ public partial class RecoveryPrompt : PanelContainer {
         skip = kit.Button("Skip to morning", () => world.SkipMorning()); skip.Name = "skip_morning";
         actions.AddChild(skip);
         actions.AddChild(kit.Button("Wait for respawn", () => { dismissed = true; Visible = false; }));
+        world.Replaced += Refresh;
     }
 
     public bool CanSkip => !skip.Disabled;

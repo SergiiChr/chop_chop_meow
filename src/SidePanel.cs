@@ -64,6 +64,7 @@ public partial class SidePanel : PanelContainer {
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top;
         Bag = new BackpackDrawer(kit, Close);
+        world.Replaced += () => { ClearSelection(); Close(); };
     }
 
     public void Open(string name) {
@@ -121,7 +122,7 @@ public partial class SidePanel : PanelContainer {
     public void Select(Worker w) { state.WorkerId = w.Id; state.Selected = 0; View.Selected = 0; View.SelectedWorker = w.Id; Open("inspect"); }
 
     /// <summary>Forgets what was selected, any placement and any work order, when the world behind them goes away.</summary>
-    public void ClearSelection() {
+    private void ClearSelection() {
         state.Selected = 0; state.WorkerId = 0; state.AssigningWorker = 0;
         View.BuildMode = null; View.Selected = 0; View.SelectedWorker = 0;
     }

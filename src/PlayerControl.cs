@@ -5,17 +5,26 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The player in the world: walking, gathering, lifting crates, placing buildings and clicking things.</summary>
-public sealed class PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar) {
+public sealed class PlayerControl {
     private const float LiftSeconds = .6f;
-    private readonly World world = kit.World;
-    private readonly UiState state = kit.State;
+    private readonly UiKit kit;
+    private readonly WorldView view;
+    private readonly SidePanel panel;
+    private readonly Hotbar hotbar;
+    private readonly World world;
+    private readonly UiState state;
     private Thing? gathering;
     /// <summary>A crate held under the right mouse button; it is lifted once held for <see cref="LiftSeconds"/>.</summary>
     private Thing? lifting;
     private float liftClock;
 
+    public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar) {
+        this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; world = kit.World; state = kit.State;
+        world.Replaced += Stop;
+    }
+
     /// <summary>Drops a gather, a crate lift and a walk into a cabin, whose targets belong to a world that went away.</summary>
-    public void Stop() { gathering = null; lifting = null; state.Entering = null; }
+    private void Stop() { gathering = null; lifting = null; state.Entering = null; }
 
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started.</summary>
     public void Update(float dt) {
