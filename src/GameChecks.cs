@@ -880,6 +880,17 @@ public partial class Game {
         Require(workbench.Inventory["planks"] == 3 && world.Backpack["planks"] == 3, "Right-clicking a bench input must pick up half of it.");
         RemoveThings(world, t => t == workbench); Drop(world, "planks", 3); await CloseWithEsc();
     }
+    /// <summary>A new anvil's page shows steel bars going in and steel parts coming out, and a backpack click loads a bar.</summary>
+    private async Task CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack() {
+        var anvil = world.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
+        Give(world, "steel_bar", 2);
+        await ClickOn(anvil);
+        Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
+        Require(Named("output_steel_parts") != null, "A new anvil must show a slot for steel parts.");
+        await Click(Cell(0, c => c.TooltipText.StartsWith("Steel bar")));
+        Require(world.Backpack["steel_bar"] == 1, "Clicking a steel bar in the backpack must load it into the anvil.");
+        RemoveThings(world, t => t == anvil); Drop(world, "steel_bar"); await CloseWithEsc();
+    }
     /// <summary>The steel furnace shows one slot per input and output, loads by drag and click, and Space pumps its bellows. Returns the furnace.</summary>
     private async Task<Thing> CheckSteelFurnaceSlotsLoadByDragAndClickThenPump() {
         var furnace = world.Add(ThingKind.Reinforced, world.Player + new Vector2(1, 0));
@@ -1019,6 +1030,7 @@ public partial class Game {
             await CheckPackingStationListsGoodsAndTakesBackpackClicks();
             await CheckEndGoalsShowEndingOnceAndKeepPlaying();
             await CheckBenchLoadsInputsByClickDoubleClickAndSplit();
+            await CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack();
             var furnace = await CheckSteelFurnaceSlotsLoadByDragAndClickThenPump();
             await CheckPauseFreezesPumpingAttackAndAnimations(furnace);
             CheckForegroundCanopyFadesOnlyOverBuildings();
