@@ -7,11 +7,7 @@ namespace ChopChopMeow;
 /// <summary>A tool rack: a row per kind of tool workers use, with what hangs there, how many are out, and who waits for one.</summary>
 public partial class ToolRackPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
-        HeaderAction("stash", "Hang spare tools · keeps your best of each", () => {
-            if (!world.Near(thing)) { kit.Notify("Walk closer first."); return; }
-            foreach (var id in world.Backpack.Items.Keys.Where(i => world.Holds(thing, i) && thing.Inventory.Accepts(i)).ToArray())
-                world.Transfer(world.Backpack, thing.Inventory, id, world.BestTool(world.Data.Items[id].Tool) == id ? world.Backpack[id] - 1 : world.Backpack[id]);
-        }, Style.ActionRound, "deposit");
+        HeaderAction("stash", "Hang spare tools · keeps your best of each", () => moves.StoreAll(thing, id => world.BestTool(world.Data.Items[id].Tool) == id ? world.Backpack[id] - 1 : world.Backpack[id]), Style.ActionRound, "deposit");
         FilterButton();
         var rows = Well(new VBoxContainer()); rows.AddThemeConstantOverride("separation", 0);
         // The four kinds workers fetch always have a row; any other tool hung here, such as a chisel, gets one too.
@@ -21,7 +17,7 @@ public partial class ToolRackPanel(PageTools tools, Thing subject) : ThingPage(t
             string kind = kinds[k];
             if (k > 0) rows.AddChild(new HSeparator { CustomMinimumSize = new Vector2(0, 14) });
             var row = new HBoxContainer { CustomMinimumSize = new Vector2(0, 60) }; row.AddThemeConstantOverride("separation", 12); rows.AddChild(row);
-            string plainest = world.Data.Items.Where(p => p.Value.Tool == kind).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
+            string plainest = world.Data.PlainestTool(kind);
             var (cell, count) = ItemSlot.Cup($"rack_{kind}"); cell.Icon = Icons.Of(plainest); row.AddChild(cell);
             moves.TakeCell(cell, thing.Inventory, () => world.BestTool(kind, thing.Inventory), thing);
             row.AddChild(new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });

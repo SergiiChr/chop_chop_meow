@@ -27,7 +27,7 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == thing.Id) world.Leave(); else panel.Player.WalkInto(thing); });
         var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(thing)); sleep.Name = "sleep";
         buttons.AddChild(door); buttons.AddChild(sleep);
-        live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), (int)(world.SecondsToDawn / world.Data.DaySeconds * 1440)), now => {
+        live.Watch(() => (world.Sheltered == thing.Id, world.SleepBlock(), world.Data.GameMinutes(world.SecondsToDawn)), now => {
             var (inside, blocked, _) = now;
             tag.Text = inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);

@@ -15,7 +15,7 @@ public static class PageText {
 
     /// <summary>Burn time as in-game hours and minutes.</summary>
     public static StringBuilder AppendGameHours(World world, StringBuilder text, float seconds) {
-        int minutes = (int)(seconds / world.Data.DaySeconds * 1440);
+        int minutes = world.Data.GameMinutes(seconds);
         return text.Append(minutes / 60).Append(" h ").Append(minutes % 60).Append(" min");
     }
 

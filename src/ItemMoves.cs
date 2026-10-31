@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -10,9 +11,15 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
     /// <summary>Whether a click moves every unit of an item rather than one item: Ctrl, or Shift as before.</summary>
     public static bool All => Input.IsKeyPressed(Key.Ctrl) || Input.IsKeyPressed(Key.Shift);
 
+    /// <summary>Whether the player can reach a thing; if not, says so.</summary>
+    private bool InReach(Thing t) {
+        if (world.Near(t)) return true;
+        kit.Notify("Walk closer first."); return false;
+    }
+
     /// <summary>Moves one item, or every unit of the item while Ctrl or Shift is held.</summary>
     public void Stack(Inventory from, Inventory to, string item, Thing near) {
-        if (!world.Near(near)) { kit.Notify("Walk closer first."); return; }
+        if (!InReach(near)) return;
         if (world.BoxBlock(near, to, item) is string refused) { kit.Notify(refused); return; }
         if (blackHole.CrateIntoCrate(near, to, item)) return;
         world.Transfer(from, to, item, All ? from[item] : 1);
@@ -20,7 +27,7 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
 
     /// <summary>Drops a dragged stack into an inventory and returns what did not fit; the building on either end must be within reach.</summary>
     public int Drag(ItemDrag drag, Inventory to, Thing? container, int target = -1) {
-        if ((drag.Container ?? container) is Thing near && !world.Near(near)) { kit.Notify("Walk closer first."); return 0; }
+        if ((drag.Container ?? container) is Thing near && !InReach(near)) return 0;
         if (drag.From != to && container != null && world.BoxBlock(container, to, drag.Item) is string refused) { kit.Notify(refused); return 0; }
         if (blackHole.CrateIntoCrate(container, to, drag.Item) || drag.From == null) return 0;
         if (target >= 0 && drag.SourceSlot >= 0) {
@@ -31,6 +38,21 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
         int left = Leftover(drag, to.Room(drag.Item));
         world.Transfer(drag.From, to, drag.Item, drag.Count);
         return left;
+    }
+
+    /// <summary>Stores what a thing takes from the backpack, <paramref name="amount"/> saying how much of each item.</summary>
+    public void StoreAll(Thing t, Func<string, int> amount) {
+        if (!InReach(t)) return;
+        foreach (var id in world.Backpack.Items.Keys.Where(id => world.Holds(t, id) && t.Inventory.Accepts(id)).ToArray())
+            if (amount(id) is > 0 and int count) world.Transfer(world.Backpack, t.Inventory, id, count);
+    }
+
+    /// <summary>All of a material; tools stay, and so do crates, so one is never packed inside another.</summary>
+    public int Materials(string id) => world.Data.Items.TryGetValue(id, out var def) && def.Tool == "" && id != "crate" ? 999 : 0;
+
+    public void TakeAll(Thing t) {
+        if (!InReach(t)) return;
+        foreach (var id in t.Inventory.Items.Keys.ToArray()) world.Transfer(t.Inventory, world.Backpack, id, 999);
     }
 
     /// <summary>Makes a cup hand one item of an inventory to the backpack: a click moves it as <see cref="Stack"/> does, a drag carries the stack.</summary>

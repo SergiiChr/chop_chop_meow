@@ -76,14 +76,4 @@ public abstract partial class PagePanel : VBoxContainer {
     protected void UseFromBag(string id) {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
     }
-    /// <summary>Moves every material the storage takes from the backpack; tools stay, and so do crates, so one is never packed inside another.</summary>
-    protected void StoreAll(Thing t) {
-        if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
-        foreach (var id in world.Backpack.Items.Keys.Where(i => world.Data.Items.TryGetValue(i, out var def) && def.Tool == "" && i != "crate").ToArray())
-            if (world.Holds(t, id) && t.Inventory.Accepts(id)) world.Transfer(world.Backpack, t.Inventory, id, 999);
-    }
-    protected void TakeAll(Thing t) {
-        if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }
-        foreach (var id in t.Inventory.Items.Keys.ToArray()) world.Transfer(t.Inventory, world.Backpack, id, 999);
-    }
 }

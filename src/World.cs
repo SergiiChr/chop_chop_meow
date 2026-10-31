@@ -1228,7 +1228,7 @@ public sealed partial class World {
         foreach (var pair in pile.Inventory.Items) if (Compostable(pair.Key)) rotting += pair.Value;
         if (rotting < CompostBatch || pile.Inventory.Room("fertilizer") == 0) { pile.Progress = 0; return; }
         pile.Progress += dt;
-        if (pile.Progress < Data.DaySeconds / 24) return;
+        if (pile.Progress < Data.HourSeconds) return;
         pile.Progress = 0;
         for (int left = CompostBatch; left > 0;) left -= pile.Inventory.Remove(pile.Inventory.Items.Keys.First(Compostable), left);
         pile.Inventory.Add("fertilizer", 1);

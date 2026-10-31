@@ -89,7 +89,7 @@ public partial class BenchPanel(PageTools tools, Thing subject) : ThingPage(tool
     private ItemSlot ToolSlot(string tool) {
         var (cell, _) = ItemSlot.Cup($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
-        string plainest = world.Data.Items.Where(p => p.Value.Tool == tool).OrderBy(p => p.Value.Speed).First().Key;
+        string plainest = world.Data.PlainestTool(tool);
         cell.Pressed += () => { if (world.BenchTool(thing, tool) is string held) kit.Run(() => world.UnslotTool(thing, held)); };
         cell.Drag = () => world.BenchTool(thing, tool) is string held ? new ItemDrag(held, 1, thing.Tools, thing) : null;
         cell.CanTake = drag => drag.From == world.S.Backpack && world.Data.Items.GetValueOrDefault(drag.Item)?.Tool == tool;

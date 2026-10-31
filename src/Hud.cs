@@ -21,11 +21,11 @@ public partial class ClockPlate : PanelContainer {
     }
 
     public void Refresh() {
-        var now = (world.Day, (int)(world.DayPhase * 1440), world.Night);
+        var now = (world.Day, (int)(world.DayPhase * GameData.MinutesPerDay), world.Night);
         if (now == shown) return;
         shown = now;
         int hour = (int)world.Hour;
-        time.Text = $"Day {world.Day} · {hour}:{(int)(world.DayPhase * 1440) % 60:00}";
+        time.Text = $"Day {world.Day} · {hour}:{(int)(world.DayPhase * GameData.MinutesPerDay) % 60:00}";
         dial.QueueRedraw();
     }
 }

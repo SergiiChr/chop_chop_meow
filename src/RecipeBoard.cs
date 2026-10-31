@@ -50,7 +50,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             var badge = Style.Icon(null, 28); badge.Name = "badge"; badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); badge.GrowHorizontal = badge.GrowVertical = Control.GrowDirection.Both; badge.MouseFilter = Control.MouseFilterEnum.Pass;
             tab.AddChild(badge);
             if (kind == "") { badge.Texture = Icons.Of("stone"); badge.TooltipText = "No kind needed"; } else {
-                string plainest = world.Data.Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
+                string plainest = world.Data.PlainestTool(kind, tier);
                 string name = world.Data.ToolName(kind, tier);
                 badge.Texture = Icons.Of(plainest);
                 live.Watch(() => held(group.Key), inUse => {

@@ -92,6 +92,7 @@ public sealed class GoalsDef {
     public int ProfitDays { get; set; }
 }
 public sealed class GameData {
+    public const int MinutesPerDay = 1440;
     public float DaySeconds { get; set; } = 420;
     public float NightStarts { get; set; } = .7f;
     /// <summary>Day phase where the light starts to fade, a tenth of a day before night; workers sign out then.</summary>
@@ -118,6 +119,9 @@ public sealed class GameData {
     public float RespawnSeconds { get; set; } = 30;
     /// <summary>In-game hours a picked-clean berry bush takes to fruit again.</summary>
     public float BerryRegrowHours { get; set; } = 24;
+    public float HourSeconds => DaySeconds / 24;
+    /// <summary>Seconds of play as whole in-game minutes.</summary>
+    public int GameMinutes(float seconds) => (int)(seconds / DaySeconds * MinutesPerDay);
     public float BerryRegrowSeconds => BerryRegrowHours / 24 * DaySeconds;
     /// <summary>In-game hours a full hunger or thirst bar lasts, so the drain follows the day length.</summary>
     public float HungerHours { get; set; } = 24;
@@ -140,7 +144,7 @@ public sealed class GameData {
     public FarmDef Farm { get; set; } = new();
     public GoalsDef Goals { get; set; } = new();
     /// <summary>A worker's time on duty in a day: dawn to dusk, less lunch and the walk in.</summary>
-    public float WorkdaySeconds => DuskStarts * DaySeconds - DaySeconds / 24 - TradeSeconds / 2;
+    public float WorkdaySeconds => DuskStarts * DaySeconds - HourSeconds - TradeSeconds / 2;
     public Dictionary<string, ItemDef> Items { get; set; } = new();
     public Dictionary<ThingKind, BuildingDef> Buildings { get; set; } = new();
     public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
@@ -178,6 +182,9 @@ public sealed class GameData {
     public bool IsConsumable(string item) => Water.BottleSips(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>The plainest tool of a kind that meets a tier, for naming what a recipe needs.</summary>
+    /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
+    public string PlainestTool(string kind, int tier = 0) => Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
+
     public string ToolName(string tool, int tier) {
         if (!toolNames.TryGetValue((tool, tier), out var name))
             toolNames[(tool, tier)] = name = Items.Values.Where(i => i.Tool == tool && i.Tier >= tier).MinBy(i => i.Tier) is ItemDef def && tier > 0 ? def.Name.ToLowerInvariant() : tool;
