@@ -310,6 +310,9 @@ public sealed partial class World {
     public int DayRevenue => S.DayRevenue;
     public ListView<int> Profits => new(S.Profits);
     public bool EndingShown => S.EndingShown;
+    public float PlaySeconds => S.PlaySeconds;
+    /// <summary>The player whose action or turn is running.</summary>
+    public int ActorId => S.Actor.Id;
     public int SaveVersion => S.Version;
     public bool Priced(string item) => S.Prices.ContainsKey(item);
     public Thing? Remembered(int id) => S.Remembered.GetValueOrDefault(id);

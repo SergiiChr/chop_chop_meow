@@ -58,7 +58,7 @@ public partial class Game : Node, IGameFlow {
             net = new Net { Name = "Net", World = world, FilePrefix = Launch.FilePrefix }; AddChild(net);
             saves = new Saves(kit, net, () => panel.Open(Page.Backpack));
             world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };
-            world.PlayerActed += (action, at) => net.Echo(world.S.Actor.Id, action, at);
+            world.PlayerActed += (action, at) => net.Echo(world.ActorId, action, at);
             ConnectNet();
             sounds.OffScreen = view.OffScreen;
             var layer = new CanvasLayer(); AddChild(layer);
