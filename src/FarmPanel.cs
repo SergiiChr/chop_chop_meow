@@ -48,7 +48,7 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
     private ItemSlot SowingCup(string item, StyleBoxFlat? look = null) {
         var cell = cups.Cup(thing.Inventory, item, true, held => $"{world.Data.Name(item)} · {held}\nClick: take back · Drag seeds here from the harvest or backpack to sow", look: look);
         cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == thing.Output) && drag.Item == item;
-        cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, thing.Inventory, thing)); kit.Refresh(); return left; };
+        cell.Take = drag => kit.Run(() => moves.Drag(drag, thing.Inventory, thing));
         return cell;
     }
 

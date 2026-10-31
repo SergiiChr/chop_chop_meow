@@ -45,8 +45,7 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         var (cell, _) = ItemSlot.Cup("packed_crate", 64);
         cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
         cell.Icon = Icons.Of("crate");
-        cell.Pressed += () => { if (output.First() is string crate) { kit.Act(() => moves.Stack(output, world.S.Backpack, crate, thing)); kit.Refresh(); } };
-        cell.Drag = () => output.First() is string crate ? new ItemDrag(crate, 1, output, thing) : null;
+        moves.TakeCell(cell, output, output.First, thing);
         column.AddChild(cell);
         var fill = Style.PerBatch(""); column.AddChild(fill);
         live.Watch(() => output.First() is string crate && world.Packed(crate) is Inventory contents ? contents.Count : -1, packed => {

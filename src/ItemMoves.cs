@@ -33,6 +33,15 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
         return left;
     }
 
+    /// <summary>Makes a cup hand one item of an inventory to the backpack: a click moves it as <see cref="Stack"/> does, a drag carries the stack.</summary>
+    public void TakeCell(ItemSlot cell, Inventory box, string item, Thing near) => TakeCell(cell, box, () => item, near);
+
+    /// <summary>The same for a cup whose item changes; <paramref name="item"/> is null while it has nothing to give.</summary>
+    public void TakeCell(ItemSlot cell, Inventory box, Func<string?> item, Thing near) {
+        cell.Pressed += () => { if (item() is string id) kit.Run(() => Stack(box, world.S.Backpack, id, near)); };
+        cell.Drag = () => item() is string id && box[id] > 0 ? new ItemDrag(id, box[id], box, near) : null;
+    }
+
     /// <summary>
     /// Units of a drag that will not fit into the given room.
     /// Worked out before the move because a guest's move happens later, on the host.

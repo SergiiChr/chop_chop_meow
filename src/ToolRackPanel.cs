@@ -23,8 +23,7 @@ public partial class ToolRackPanel(PageTools tools, Thing subject) : ThingPage(t
             var row = new HBoxContainer { CustomMinimumSize = new Vector2(0, 60) }; row.AddThemeConstantOverride("separation", 12); rows.AddChild(row);
             string plainest = world.Data.Items.Where(p => p.Value.Tool == kind).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
             var (cell, count) = ItemSlot.Cup($"rack_{kind}"); cell.Icon = Icons.Of(plainest); row.AddChild(cell);
-            cell.Pressed += () => { if (world.BestTool(kind, thing.Inventory) is string best) { kit.Act(() => moves.Stack(thing.Inventory, world.S.Backpack, best, thing)); kit.Refresh(); } };
-            cell.Drag = () => world.BestTool(kind, thing.Inventory) is string best ? new ItemDrag(best, thing.Inventory[best], thing.Inventory, thing) : null;
+            moves.TakeCell(cell, thing.Inventory, () => world.BestTool(kind, thing.Inventory), thing);
             row.AddChild(new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
             var outPill = Style.Pill("", Style.Tag(Style.Enamel), Style.Rim, 12); outPill.MouseFilter = Control.MouseFilterEnum.Pass; row.AddChild(outPill);
             var waitPill = Style.Pill("", Style.Tag(Style.Brick), Style.Rim, 12); waitPill.MouseFilter = Control.MouseFilterEnum.Pass; row.AddChild(waitPill);

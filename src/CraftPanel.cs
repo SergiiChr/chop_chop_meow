@@ -12,7 +12,7 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
         headingIcon.Texture = GD.Load<Texture2D>("res://assets/ui/line_craft.svg"); headingIcon.SelfModulate = Style.Rim; headingIcon.Visible = true;
         headingIcon.TooltipText = "Crafting by hand. A crafting bench works twice as fast.";
         var groups = world.HandRecipes.GroupBy(id => (world.Data.Recipes[id].Tool, world.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
-        AddChild(new RecipeBoard(kit, live, memory, Redraw, groups, group => group.Tool == "" ? null : world.BestTool(group.Tool, null, group.Tier), null, id => kit.Act(() => world.Craft(id)), _ => false, world.CanCraft));
+        AddChild(new RecipeBoard(kit, live, memory, Redraw, groups, group => group.Tool == "" ? null : world.BestTool(group.Tool, null, group.Tier), null, id => world.Craft(id), _ => false, world.CanCraft));
         CraftQueue();
         BagGrid(UseFromBag, UseHint, wanted: id => world.HandRecipes.Any(r => world.Data.Recipes[r].Inputs.ContainsKey(id)));
     }
@@ -55,7 +55,7 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
         cell.TooltipText = cancel == null ? world.Data.Name(item) : $"{world.Data.Name(item)}\nClick to cancel and get the materials back.";
         if (cancel != null) {
             cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
-            cell.Pressed += () => { kit.Act(cancel); kit.Refresh(); };
+            cell.Pressed += () => kit.Run(cancel);
         }
         column.AddChild(cell);
         if (perBatch != "") column.AddChild(Style.PerBatch(perBatch));
@@ -73,7 +73,7 @@ public partial class BenchPanel(PageTools tools, Thing subject) : ThingPage(tool
         AddChild(new RecipeBoard(kit, live, memory, Redraw, groups, group => group.Tool == "" ? null : world.BenchTool(thing, group.Tool, group.Tier), thing,
             id => { world.SetRecipe(thing, id); Redraw(); }, id => thing.Recipe == id, id => world.Backpack.Has(world.Data.Recipes[id].Inputs),
             // A double click also loads one batch of inputs from the backpack.
-            id => kit.Act(() => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(thing, item, amount); })));
+            id => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(thing, item, amount); }));
         if (thing.Recipe != "") AddChild(cups.Machine());
         else AddLabel("Choose what to make.", 14, Style.Beige);
         var slotted = World.SlotKinds(thing.Kind);
@@ -90,10 +90,10 @@ public partial class BenchPanel(PageTools tools, Thing subject) : ThingPage(tool
         var (cell, _) = ItemSlot.Cup($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         string plainest = world.Data.Items.Where(p => p.Value.Tool == tool).OrderBy(p => p.Value.Speed).First().Key;
-        cell.Pressed += () => { if (world.BenchTool(thing, tool) is string held) { kit.Act(() => world.UnslotTool(thing, held)); kit.Refresh(); } };
+        cell.Pressed += () => { if (world.BenchTool(thing, tool) is string held) kit.Run(() => world.UnslotTool(thing, held)); };
         cell.Drag = () => world.BenchTool(thing, tool) is string held ? new ItemDrag(held, 1, thing.Tools, thing) : null;
         cell.CanTake = drag => drag.From == world.S.Backpack && world.Data.Items.GetValueOrDefault(drag.Item)?.Tool == tool;
-        cell.Take = drag => { kit.Act(() => world.SlotTool(thing, drag.Item)); kit.Refresh(); return 0; };
+        cell.Take = drag => { kit.Run(() => world.SlotTool(thing, drag.Item)); return 0; };
         live.Watch(() => world.BenchTool(thing, tool), held => {
             cell.Icon = Icons.Of(held ?? plainest);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held != null ? Colors.White : Style.Ghost);

@@ -117,7 +117,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         live.Watch(() => world.PriceAge, days => age.Text = days == 0 ? "today" : days == 1 ? "yesterday" : $"{days} days old");
         var fetch = new Button { Name = "fetch", Icon = GD.Load<Texture2D>("res://assets/ui/line_crew.svg"), Text = "→", ExpandIcon = true, CustomMinimumSize = new Vector2(64, 32), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
         fetch.AddThemeConstantOverride("icon_max_width", 18); var fetchLook = Style.Pill(Style.Enamel); Style.Skin(fetch, fetchLook.Item1, fetchLook.Item2);
-        fetch.Pressed += () => { kit.Act(() => world.FetchPrices(thing)); kit.Refresh(); };
+        fetch.Pressed += () => kit.Run(() => world.FetchPrices(thing));
         top.AddChild(fetch);
         top.AddChild(kit.HeaderButton("close", "Close the price sheet", () => { memory.SheetOpen = false; Redraw(); }, Style.CloseRound, "sheet_close"));
         live.Watch(() => world.FetchBlock(thing), blocked => {
@@ -156,7 +156,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
             var buy = new Button { Name = $"buy_{id}", Text = $"{world.LotPrice(id)}", Icon = coins, ExpandIcon = true, IconAlignment = HorizontalAlignment.Right, CustomMinimumSize = new Vector2(80, 30), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
             buy.AddThemeConstantOverride("icon_max_width", 16); var buyLook = Style.Pill(Style.Brick); Style.Skin(buy, buyLook.Item1, buyLook.Item2);
             buy.AddThemeFontOverride("font", Style.Bold); buy.AddThemeFontSizeOverride("font_size", 14);
-            buy.Pressed += () => { kit.Act(() => world.Buy(thing, id, ItemMoves.All ? 5 : 1)); kit.Refresh(); };
+            buy.Pressed += () => kit.Run(() => world.Buy(thing, id, ItemMoves.All ? 5 : 1));
             buy.TooltipText = world.Lot(id) > 1 ? $"Buy a crate of {world.Lot(id)} {world.Data.Name(id)} · Ctrl: 5 crates\nCrates arrive in the mailbox." : $"Buy a {world.Data.Name(id).ToLowerInvariant()} · Ctrl: 5\nGoods arrive in the mailbox.";
             buySlot.AddChild(buy);
         }

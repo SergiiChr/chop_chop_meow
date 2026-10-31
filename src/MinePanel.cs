@@ -36,7 +36,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                 foreach (var (item, amount) in data.Materials) {
                     var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); row.AddChild(column);
                     var (cell, count) = ItemSlot.Cup($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
-                    cell.Pressed += () => { kit.Act(() => world.SupplyMine(thing)); kit.Refresh(); };
+                    cell.Pressed += () => kit.Run(() => world.SupplyMine(thing));
                     column.AddChild(Style.PerBatch($"/ {amount}"));
                     live.Watch(() => thing.Inventory[item], drawn => {
                         count.Text = drawn.ToString();
@@ -59,8 +59,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                 var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 10); row.AddChild(pair);
                 var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); pair.AddChild(column);
                 var (cell, count) = ItemSlot.Cup($"output_{item}", 64); cell.Icon = Icons.Of(item); cell.AddThemeStyleboxOverride("normal", Style.CupWanted); column.AddChild(cell);
-                cell.Pressed += () => { kit.Act(() => moves.Stack(thing.Output!, world.S.Backpack, item, thing)); kit.Refresh(); };
-                cell.Drag = () => thing.Output![item] > 0 ? new ItemDrag(item, thing.Output[item], thing.Output, thing) : null;
+                moves.TakeCell(cell, thing.Output!, item, thing);
                 var track = new Panel { CustomMinimumSize = new Vector2(64, 8) }; track.AddThemeStyleboxOverride("panel", Style.BarBack); column.AddChild(track);
                 var fill = new ColorRect { Color = Style.Mustard, Size = new Vector2(0, 8) }; track.AddChild(fill); bars[i] = fill;
                 rates[i] = Style.Text("", 13, Style.Tan); pair.AddChild(rates[i]);

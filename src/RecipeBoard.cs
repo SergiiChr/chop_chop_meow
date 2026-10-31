@@ -84,8 +84,8 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             live.Watch(() => world.Backpack[item] < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
         count.Text = r.Amount > 1 ? $"×{r.Amount}" : ""; count.MoveToFront();
-        cell.Pressed += () => { click(id); kit.Refresh(); };
-        if (twice != null) cell.DoubleClicked = () => { twice(id); kit.Refresh(); };
+        cell.Pressed += () => kit.Run(() => click(id));
+        if (twice != null) cell.DoubleClicked = () => kit.Run(() => twice(id));
         float Time() => r.Seconds / ((station?.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * (tool() is string inUse ? world.Data.Items[inUse].Speed : 1));
         void Describe(StringBuilder text) {
             text.Append(r.Name);

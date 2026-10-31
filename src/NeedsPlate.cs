@@ -112,11 +112,11 @@ public partial class NeedsPlate : PanelContainer {
         cup.CanTake = drag => drag.Item == Inventory.Coins && drag.From == world.S.Backpack;
         cup.Take = drag => {
             if (NearPost() is not Thing post) { kit.Notify("Bank coins at a trading post."); return drag.Count; }
-            int left = 0; kit.Act(() => left = moves.Drag(drag, post.Wages!, post)); kit.Refresh(); return left;
+            return kit.Run(() => moves.Drag(drag, post.Wages!, post));
         };
         cup.Pressed += () => {
             if (NearPost() is not Thing post) { kit.Notify("Take coins out at a trading post."); return; }
-            kit.Act(() => moves.Stack(post.Wages!, world.S.Backpack, Inventory.Coins, post)); kit.Refresh();
+            kit.Run(() => moves.Stack(post.Wages!, world.S.Backpack, Inventory.Coins, post));
         };
         line.AddChild(cup);
         bankDue = Style.Text("", 14, Style.Beige); line.AddChild(bankDue);

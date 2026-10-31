@@ -14,8 +14,7 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
         var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
         cell.Icon = Icons.Of(item);
         if ((look ?? (input ? null : Style.CupWanted)) is StyleBoxFlat rim) cell.AddThemeStyleboxOverride("normal", rim);
-        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, t)); kit.Refresh(); };
-        cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, t) : null;
+        moves.TakeCell(cell, box, item, t);
         // Redrawn only when the amount held changes.
         live.Watch(() => box[item], held => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
@@ -51,12 +50,11 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
         var burner = t.Burner!;
         var (cell, count) = ItemSlot.Cup("fuel");
         cell.AddThemeStyleboxOverride("normal", Style.CupFuel);
-        cell.Pressed += () => { if (burner.First() is string held) { kit.Act(() => moves.Stack(burner, world.S.Backpack, held, t)); kit.Refresh(); } };
-        cell.Drag = () => burner.First() is string held ? new ItemDrag(held, burner[held], burner, t) : null;
+        moves.TakeCell(cell, burner, burner.First, t);
         cell.CanTake = drag => drag.From == world.S.Backpack && World.FuelFits(t, drag.Item);
         cell.Take = drag => {
             int left = world.Near(t) ? ItemMoves.Leftover(drag, burner.First() is string held && held != drag.Item ? 0 : burner.StackOf(drag.Item) - burner[drag.Item]) : 0;
-            kit.Act(() => world.LoadFuel(t, drag.Item, drag.Count)); kit.Refresh(); return left;
+            kit.Run(() => world.LoadFuel(t, drag.Item, drag.Count)); return left;
         };
         var lasts = Style.Text("", 14, Style.Ink);
         live.Watch(() => { string fuel = world.FuelOf(t) ?? World.BurnedFuel(t); return (fuel, burner[fuel]); }, now => {
@@ -79,7 +77,7 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
             cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || item == "water" && Water.IsBottle(drag.Item));
             cell.Take = drag => {
                 int left = world.Near(t) ? ItemMoves.Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
-                kit.Act(() => world.LoadInput(t, drag.Item, drag.Count)); kit.Refresh(); return drag.Item == item ? left : 0;
+                kit.Run(() => world.LoadInput(t, drag.Item, drag.Count)); return drag.Item == item ? left : 0;
             };
         }
         return Labelled(cell, perBatch);

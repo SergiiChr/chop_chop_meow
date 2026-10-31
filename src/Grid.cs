@@ -40,12 +40,11 @@ public partial class PagePanel {
             cell.Pressed += () => {
                 if (stacks[slot] is not (string id, _)) return;
                 var held = inventory(); held.PreferredSlot = slot;
-                try { kit.Act(() => click(id)); } finally { held.PreferredSlot = -1; }
-                kit.Refresh();
+                try { kit.Run(() => click(id)); } finally { held.PreferredSlot = -1; }
             };
             cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container, slot) : null;
             cell.CanTake = accepts ?? (drag => drag.From != null);
-            cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, inventory(), container, slot)); kit.Refresh(); return left; };
+            cell.Take = drag => kit.Run(() => moves.Drag(drag, inventory(), container, slot));
             grid.AddChild(cell);
         }
         // What each cell last drew: its stack and the inventory's total of that item. A cell is redrawn only when they change.

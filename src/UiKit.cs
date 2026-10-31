@@ -43,9 +43,19 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
         if (moved != null && state.Backpack[moved] != before.GetValueOrDefault(moved)) Sounds.Play(Sounds.ForItem(moved));
     }
 
+    /// <summary>Runs a player action, then brings the screen up to date.</summary>
+    public void Run(Action action) { Act(action); Refresh(); }
+
+    /// <summary>Runs a player action that gives a value back, such as what a drag left over, then brings the screen up to date.</summary>
+    public T Run<T>(Func<T> action) {
+        T result = default!;
+        Run(() => { result = action(); });
+        return result;
+    }
+
     public Button Button(string text, Action action, bool disabled = false) {
         var b = new Button { Text = text, Disabled = disabled, MouseDefaultCursorShape = Control.CursorShape.PointingHand, CustomMinimumSize = new Vector2(0, 34), FocusMode = Control.FocusModeEnum.None };
-        b.Pressed += () => { Act(action); Refresh(); }; return b;
+        b.Pressed += () => Run(action); return b;
     }
 
     /// <summary>A wide rounded button for a page's main actions.</summary>
