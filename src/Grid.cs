@@ -57,7 +57,6 @@ public partial class PagePanel {
             int visible = held.ShownSlots, changed = 0;
             for (int i = 0; i < cells.Length; i++) {
                 var (cell, count) = cells[i];
-                if (!GodotObject.IsInstanceValid(cell)) return;
                 stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
                 var looks = stacks[i] is (string item, int n) ? (item, n, held[item]) : ((string?)null, 0, 0);
                 if (first || looks != drawn[i]) {

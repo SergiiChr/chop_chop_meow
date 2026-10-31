@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 /// Each worker shows how many jobs they have elsewhere, listed on hover.
 /// </summary>
 /// <param name="redraw">Draws the page again after a job's list opens or closes.</param>
-public partial class JobRow(UiKit kit, List<Action> live, Thing t, PageMemory memory, Action redraw) : VBoxContainer {
+public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, PageMemory memory, Action redraw) : VBoxContainer {
     private static readonly Dictionary<string, string> Names = new() {
         ["gather"] = "Gather",
         ["bellows"] = "Bellows",
@@ -53,7 +53,6 @@ public partial class JobRow(UiKit kit, List<Action> live, Thing t, PageMemory me
         var now = new int[jobs.Length];
         Array.Fill(shown, -1);
         live.Add(() => {
-            if (!IsInstanceValid(this)) return;
             Array.Clear(now);
             foreach (var w in world.Workers)
                 for (int i = 0; i < jobs.Length; i++) if (World.HasDuty(w, t.Id, jobs[i])) now[i]++;

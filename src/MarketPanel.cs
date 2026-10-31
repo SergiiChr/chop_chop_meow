@@ -45,17 +45,10 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
         auto.Toggled += on => { world.SetAutoSell(sign, on); auto.SetPressedNoSignal(sign.AutoSell); };
         outbound.AddChild(auto);
         var revenue = Style.Text("", 14, Style.Ink); outbound.AddChild(revenue);
-        var worth = new LiveText(shown => revenue.Text = shown);
-        int counted = -1;
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(sell)) return;
-            int count = sign.Inventory.Count;
-            if (count == counted) return;
-            counted = count;
+        live.Watch(() => sign.Inventory.Count, _ => {
             int value = SaleWorth();
-            if (value > 0) worth.Clear().Append("Approximate revenue: ").Append(value); else worth.Clear();
+            revenue.Text = value > 0 ? $"Approximate revenue: {value}" : "";
             revenue.Visible = value > 0;
-            worth.Show();
         });
         Road();
         var inbound = Well(new VBoxContainer()); inbound.AddThemeConstantOverride("separation", 8);
@@ -88,11 +81,9 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
         row.AddChild(road);
         row.AddChild(Style.Glyph("line_village", 26, Style.Rim));
         var left = Style.Heading("", 15); left.CustomMinimumSize = new Vector2(40, 0); left.HorizontalAlignment = HorizontalAlignment.Right; row.AddChild(left);
-        var leftText = new LiveText(shown => { left.Text = shown; road.TooltipText = shown == "" ? "No carts on the road." : $"Cart back in {shown}"; });
-        // Redrawn only when a cart moves a whole pixel's worth or the seconds left change.
-        int drawn = int.MinValue;
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(road)) return;
+        // Redrawn only when a cart moves a whole pixel's worth, and the time when the seconds left change.
+        int seconds = -1;
+        live.Watch(() => {
             road.Trips.Clear();
             TradeOrder? next = null; int moved = 0;
             foreach (var o in world.Orders) {
@@ -100,13 +91,10 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
                 float trip = o.Elapsed / world.Data.TradeSeconds; road.Trips.Add(trip); moved += (int)(trip * 400);
                 if (next == null || o.Elapsed > next.Elapsed) next = o;
             }
-            int seconds = next == null ? -1 : (int)MathF.Ceiling(Math.Max(0, world.Data.TradeSeconds - next.Elapsed));
-            if (moved * 1000 + seconds == drawn) return;
-            drawn = moved * 1000 + seconds;
-            road.QueueRedraw();
-            if (seconds < 0) leftText.Clear(); else leftText.Clear().Append(seconds).Append(" s");
-            leftText.Show();
-        });
+            seconds = next == null ? -1 : (int)MathF.Ceiling(Math.Max(0, world.Data.TradeSeconds - next.Elapsed));
+            return moved;
+        }, _ => road.QueueRedraw());
+        live.Watch(() => seconds, away => { left.Text = away < 0 ? "" : $"{away} s"; road.TooltipText = away < 0 ? "No carts on the road." : $"Cart back in {away} s"; });
     }
 
     private void HireOffers() {
@@ -126,22 +114,13 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
         var top = new HBoxContainer(); top.AddThemeConstantOverride("separation", 8); board.AddChild(top);
         var title = Style.Text("Bramblewick prices", 19, Style.Ink, Style.Head); title.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(title);
         var age = Style.Pill("", Style.Tag(Style.Mustard), Style.Line, 12); top.AddChild(age);
-        var news = new LiveText(shown => age.Text = shown);
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(age)) return;
-            if (world.PriceAge == 0) news.Clear().Append("today");
-            else if (world.PriceAge == 1) news.Clear().Append("yesterday");
-            else news.Clear().Append(world.PriceAge).Append(" days old");
-            news.Show();
-        });
+        live.Watch(() => world.PriceAge, days => age.Text = days == 0 ? "today" : days == 1 ? "yesterday" : $"{days} days old");
         var fetch = new Button { Name = "fetch", Icon = GD.Load<Texture2D>("res://assets/ui/line_crew.svg"), Text = "→", ExpandIcon = true, CustomMinimumSize = new Vector2(64, 32), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };
         fetch.AddThemeConstantOverride("icon_max_width", 18); var fetchLook = Style.Pill(Style.Enamel); Style.Skin(fetch, fetchLook.Item1, fetchLook.Item2);
         fetch.Pressed += () => { kit.Act(() => world.FetchPrices(sign)); kit.Refresh(); };
         top.AddChild(fetch);
         top.AddChild(kit.HeaderButton("close", "Close the price sheet", () => { memory.SheetOpen = false; panel.Open("inspect"); }, Style.CloseRound, "sheet_close"));
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(fetch)) return;
-            string? blocked = world.FetchBlock(sign);
+        live.Watch(() => world.FetchBlock(sign), blocked => {
             fetch.Disabled = blocked != null; fetch.TooltipText = blocked ?? "The worker managing deliveries walks to Bramblewick and back with fresh prices.";
         });
         board.AddChild(new ColorRect { Color = Style.Enamel, CustomMinimumSize = new Vector2(0, 3) });
@@ -163,15 +142,9 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
             var sellPrice = Style.Text("", 17, Style.Ink, Style.Head); sellPrice.CustomMinimumSize = new Vector2(40, 0); sellPrice.HorizontalAlignment = HorizontalAlignment.Right; sellColumn.AddChild(sellPrice);
             var trend = Style.Text("", 18, Style.Brick, Style.Head); trend.CustomMinimumSize = new Vector2(20, 0); trend.HorizontalAlignment = HorizontalAlignment.Center; sellColumn.AddChild(trend);
             if (sells) {
-                var price = new LiveText(shown => sellPrice.Text = shown);
-                int shownTenths = -1;
-                live.Add(() => {
-                    if (!GodotObject.IsInstanceValid(sellPrice)) return;
+                live.Watch(() => (int)MathF.Round(world.KnownPrice(id) * 10), tenths => {
                     float known = world.KnownPrice(id), full = world.Data.Items[id].Price;
-                    int tenths = (int)MathF.Round(known * 10);
-                    if (tenths == shownTenths) return;
-                    shownTenths = tenths;
-                    price.Clear().Append(tenths / 10).Append('.').Append(tenths % 10); price.Show();
+                    sellPrice.Text = $"{tenths / 10}.{tenths % 10}";
                     // Below its full price the village has had its fill; the arrow shows which way the price stands.
                     trend.Text = known < full * .99f ? "↘" : known > full * 1.01f ? "↗" : "";
                     trend.AddThemeColorOverride("font_color", known < full ? Style.Brick : Style.Rise);

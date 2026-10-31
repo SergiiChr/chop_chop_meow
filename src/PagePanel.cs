@@ -16,7 +16,7 @@ public abstract partial class PagePanel : VBoxContainer {
     protected readonly ItemMoves moves;
     protected readonly PageMemory memory;
     protected readonly BackpackDrawer bag;
-    protected readonly List<Action> live;
+    protected readonly LiveUpdates live;
     protected HBoxContainer heading => panel.Heading;
     protected TextureRect headingIcon => panel.HeadingIcon;
     protected Label headingTitle => panel.HeadingTitle;
@@ -76,12 +76,7 @@ public abstract partial class PagePanel : VBoxContainer {
     /// <summary>A label whose text <paramref name="write"/> rebuilds on every refresh.</summary>
     protected void Dynamic(Action<StringBuilder> write, int size = 15, Color? color = null) {
         var l = Style.Wrapped("", size, color); AddChild(l);
-        var text = new LiveText(shown => l.Text = shown);
-        void Update() {
-            if (!GodotObject.IsInstanceValid(l)) return;
-            write(text.Clear()); text.Show();
-        }
-        Update(); live.Add(Update);
+        live.Bind(l, write);
     }
     protected string Needs(Dictionary<string, int> cost) => LiveText.Of(text => AppendNeeds(text, cost));
     protected string Cost(Dictionary<string, int> cost) => LiveText.Of(text => AppendCost(text, cost));

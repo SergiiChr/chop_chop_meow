@@ -38,10 +38,7 @@ public partial class MinePanel(SidePanel side, Thing mine) : PagePanel(side) {
                     var (cell, count) = ItemSlot.Cup($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
                     cell.Pressed += () => { kit.Act(() => world.SupplyMine(mine)); kit.Refresh(); };
                     column.AddChild(PerBatch($"/ {amount}"));
-                    int drawn = -1;
-                    live.Add(() => {
-                        if (!GodotObject.IsInstanceValid(cell) || mine.Inventory[item] == drawn) return;
-                        drawn = mine.Inventory[item];
+                    live.Watch(() => mine.Inventory[item], drawn => {
                         count.Text = drawn.ToString();
                         cell.AddThemeStyleboxOverride("normal", drawn >= amount ? Style.Round(Style.CupFill, 14).Item1 : Style.CupNormal);
                         cell.TooltipText = $"{world.Data.Name(item)} · {drawn} of {amount}\nClick to deliver from your backpack";
@@ -67,25 +64,16 @@ public partial class MinePanel(SidePanel side, Thing mine) : PagePanel(side) {
                 var track = new Panel { CustomMinimumSize = new Vector2(64, 8) }; track.AddThemeStyleboxOverride("panel", Style.BarBack); column.AddChild(track);
                 var fill = new ColorRect { Color = Style.Mustard, Size = new Vector2(0, 8) }; track.AddChild(fill); bars[i] = fill;
                 rates[i] = Style.Text("", 13, Style.Tan); pair.AddChild(rates[i]);
-                int drawn = -1;
-                live.Add(() => {
-                    if (!GodotObject.IsInstanceValid(cell) || mine.Output![item] == drawn) return;
-                    drawn = mine.Output[item];
+                live.Watch(() => mine.Output![item], drawn => {
                     count.Text = drawn > 0 ? drawn.ToString() : "";
-                    float full = (float)drawn / mine.Output.StackSize;
+                    float full = (float)drawn / mine.Output!.StackSize;
                     fill.Size = new Vector2(64 * full, 8); fill.Color = full > .85f ? Style.Brick : Style.Mustard;
-                    cell.TooltipText = $"{world.Data.Name(item)} · {drawn}/{mine.Output.StackSize}\nClick to take · mining stops when either is full";
+                    cell.TooltipText = $"{world.Data.Name(item)} · {drawn}/{mine.Output!.StackSize}\nClick to take · mining stops when either is full";
                 });
             }
-            var rateText = new LiveText(shown => { rates[0].Text = shown; rates[1].Text = shown; });
-            int miners = -1;
-            live.Add(() => {
-                if (!GodotObject.IsInstanceValid(rates[0])) return;
-                int now = MinersUnderground();
-                if (now == miners) return;
-                miners = now;
+            live.Watch(MinersUnderground, now => {
                 for (int i = 0; i < hats.Length; i++) hats[i].Modulate = i < now ? Colors.White : Style.Unready;
-                rateText.Clear().Append(MathF.Round(now / data.Seconds * 100) / 100).Append(" /s"); rateText.Show();
+                rates[0].Text = rates[1].Text = $"{MathF.Round(now / data.Seconds * 100) / 100} /s";
             });
         }
         JobButtons(mine);

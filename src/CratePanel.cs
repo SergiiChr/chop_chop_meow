@@ -13,13 +13,9 @@ public partial class CratePanel(SidePanel side, Thing t) : PagePanel(side) {
         var segments = Enumerable.Range(0, t.Inventory.Capacity).Select(_ => new ColorRect { CustomMinimumSize = new Vector2(0, 12), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }).ToArray();
         foreach (var segment in segments) cells.AddChild(segment);
         var fill = Style.Text("", 14, Style.Rim); meter.AddChild(fill);
-        var fillText = new LiveText(shown => fill.Text = shown);
-        int drawn = -1;
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(fill) || t.Inventory.Count == drawn) return;
-            drawn = t.Inventory.Count;
+        live.Watch(() => t.Inventory.Count, drawn => {
             for (int i = 0; i < segments.Length; i++) segments[i].Color = i < drawn ? Style.Mustard : new Color(Style.Rim, .25f);
-            fillText.Clear().Append(drawn).Append(" / ").Append(t.Inventory.Capacity); fillText.Show();
+            fill.Text = $"{drawn} / {t.Inventory.Capacity}";
             bool sellable = drawn > 0;
             foreach (var pair in t.Inventory.Items) sellable &= world.Data.Market.Sells.ContainsKey(pair.Key);
             sells.Visible = sellable;

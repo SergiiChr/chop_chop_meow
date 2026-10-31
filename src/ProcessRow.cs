@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 /// The process row every station shares: inputs with what one batch takes under each, the batch time over the progress bar,
 /// the fuel under it with how long it lasts, and the main output with its side outputs in a second row.
 /// </summary>
-public partial class ProcessRow(List<Action> live, IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) : PanelContainer {
+public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) : PanelContainer {
     public override void _Ready() {
         AddThemeStyleboxOverride("panel", Style.Well);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); AddChild(row);
@@ -20,13 +20,7 @@ public partial class ProcessRow(List<Action> live, IEnumerable<Control> inputs, 
         var bar = new ProgressBar { MaxValue = 1, ShowPercentage = false, CustomMinimumSize = new Vector2(60, 14), Name = "progress" };
         middle.AddChild(bar);
         // Redrawn only when the bar moves a pixel's worth.
-        int drawn = -1;
-        live.Add(() => {
-            if (!IsInstanceValid(bar)) return;
-            int at = (int)(progress() * 200);
-            if (at == drawn) return;
-            drawn = at; bar.Value = at / 200f;
-        });
+        live.Watch(() => (int)(progress() * 200), at => bar.Value = at / 200f);
         if (fuel != null) { fuel.SizeFlagsHorizontal = SizeFlags.ShrinkCenter; middle.AddChild(fuel); }
         var right = new VBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkBegin }; right.AddThemeConstantOverride("separation", 10); row.AddChild(right);
         if (main != null) right.AddChild(main);

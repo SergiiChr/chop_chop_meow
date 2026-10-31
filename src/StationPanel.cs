@@ -43,15 +43,7 @@ public partial class StationPanel(SidePanel side, Thing t) : PagePanel(side) {
         pump.Name = "pump"; pump.TooltipText = "Pump the bellows · Space"; pump.CustomMinimumSize = new Vector2(84, 38);
         var look = Style.Pill(Style.Sage); Style.Skin(pump, look.Item1, look.Item2);
         pumpRow.AddChild(pump); pumpRow.AddChild(Style.Pill("Space", Style.KeyPill, Style.Line, 12));
-        var degreesText = new LiveText(shown => degrees.Text = shown);
         // Redrawn only when the shown degrees change.
-        int drawn = int.MinValue;
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(dial)) return;
-            int celsius = World.Celsius(t.Heat);
-            if (celsius == drawn) return;
-            drawn = celsius; dial.QueueRedraw();
-            degreesText.Clear().Append(celsius).Append(" °C"); degreesText.Show();
-        });
+        live.Watch(() => World.Celsius(t.Heat), celsius => { dial.QueueRedraw(); degrees.Text = $"{celsius} °C"; });
     }
 }

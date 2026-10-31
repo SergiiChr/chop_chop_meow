@@ -26,18 +26,15 @@ public partial class PilePanel(SidePanel side, Thing t) : PagePanel(side) {
             var main = new VBoxContainer(); main.AddThemeConstantOverride("separation", 10); main.AddChild(making); main.AddChild(PerBatch("×1"));
             float hour = world.Data.DaySeconds / 24;
             AddChild(new ProcessRow(live, Array.Empty<Control>(), "1 h", () => t.Progress / hour, new FuelRow("line_leaf", new Color("8fae7e"), item, lasts), main, Array.Empty<Control>()));
-            var lastsText = new LiveText(shown => lasts.Text = shown);
-            (string? Item, int Hours) shown = ("", -1);
-            live.Add(() => {
-                if (!GodotObject.IsInstanceValid(lasts)) return;
+            live.Watch(() => {
                 string? rotting = null; int units = 0;
                 foreach (var pair in t.Inventory.Items) if (world.Compostable(pair.Key)) { rotting ??= pair.Key; units += pair.Value; }
-                var now = (rotting, units / World.CompostBatch);
-                if (now == shown) return;
-                shown = now;
+                return (rotting, units / World.CompostBatch);
+            }, now => {
+                var (rotting, hours) = now;
                 item.Texture = Icons.Of(rotting ?? "leaves"); item.Modulate = rotting == null ? Style.Unready : Colors.White;
                 item.TooltipText = rotting == null ? "Nothing to compost" : $"Composting {world.Data.Name(rotting).ToLowerInvariant()}";
-                lastsText.Clear().Append('×').Append(World.CompostBatch).Append(" · ").Append(now.Item2).Append(" h"); lastsText.Show();
+                lasts.Text = $"×{World.CompostBatch} · {hours} h";
             });
             var skip = new CheckBox { Text = "Skip food delivery", ButtonPressed = t.SkipFood, FocusMode = Control.FocusModeEnum.None, Name = "skip_food", TooltipText = "Workers bring no food here; food you put in yourself still composts" };
             skip.Toggled += on => { world.SetSkipFood(t, on); skip.SetPressedNoSignal(t.SkipFood); };

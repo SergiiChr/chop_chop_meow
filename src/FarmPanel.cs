@@ -21,33 +21,23 @@ public partial class FarmPanel(SidePanel side, Thing farm) : PagePanel(side) {
             nodes[i] = node; stages.AddChild(node);
         }
         var ripe = Style.Text("", 14, Style.Rim); ripe.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; AddChild(ripe);
-        var ripeText = new LiveText(shown => ripe.Text = shown);
-        (int Stage, int Hours) drawn = (-1, -1);
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(ripe)) return;
+        live.Watch(() => {
             int at = farm.FarmStage == FarmStage.Ripe ? 3 : farm.FarmStage == FarmStage.Growing ? (farm.Progress < world.GrowSeconds / 3 ? 1 : 2) : 0;
             int hours = farm.FarmStage == FarmStage.Growing ? (int)((world.GrowSeconds - farm.Progress) / world.Data.DaySeconds * 24) : -1;
-            if ((at, hours) == drawn) return;
-            drawn = (at, hours);
+            return (at, hours);
+        }, now => {
+            var (at, hours) = now;
             for (int i = 0; i < 4; i++) nodes[i].AddThemeStyleboxOverride("panel", Style.Round(i < at ? Style.Sage : i == at ? Style.Mustard : Style.Line, 22).Item1);
             for (int i = 0; i < 3; i++) links[i].Color = i < at ? Style.Sage : Style.Line;
-            var line = ripeText.Clear();
-            if (hours >= 0) line.Append("ripe in ").Append(hours / 24).Append(" d ").Append(hours % 24).Append(" h");
-            else line.Append(farm.FarmStage == FarmStage.Ripe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in");
-            ripeText.Show();
+            ripe.Text = hours >= 0 ? $"ripe in {hours / 24} d {hours % 24} h" : farm.FarmStage == FarmStage.Ripe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in";
         });
         var output = farm.Output ?? farm.Inventory;
         var main = FarmCup(output, "wheat", false, $"×{world.Data.Farm.Yield.GetValueOrDefault("wheat")}");
         var side = world.Data.Farm.Yield.Keys.Where(k => k != "wheat").Select(k => FarmCup(output, k, false, $"×{world.Data.Farm.Yield[k]}", 44)).ToArray();
         var fertilizer = FarmCup(farm.Inventory, "fertilizer", true, "", 52, Style.CupFuel);
         var lasts = Style.Text("", 13, Style.Tan);
-        var lastsText = new LiveText(shown => lasts.Text = shown);
-        int stock = -1;
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(lasts) || farm.Inventory["fertilizer"] == stock) return;
-            stock = farm.Inventory["fertilizer"];
-            lastsText.Clear().Append("×").Append(world.Data.Farm.Sow.GetValueOrDefault("fertilizer")).Append(" · ").Append(stock / Math.Max(1, world.Data.Farm.Sow.GetValueOrDefault("fertilizer"))).Append(stock == 1 ? " crop" : " crops"); lastsText.Show();
-        });
+        int perCrop = world.Data.Farm.Sow.GetValueOrDefault("fertilizer");
+        live.Watch(() => farm.Inventory["fertilizer"], stock => lasts.Text = $"×{perCrop} · {stock / Math.Max(1, perCrop)}{(stock == 1 ? " crop" : " crops")}");
         var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => FarmCup(farm.Inventory, k, true, $"×{world.Data.Farm.Sow[k]}"));
         AddChild(new ProcessRow(live, inputs, $"{world.Data.Farm.GrowDays:0} d", () => farm.FarmStage == FarmStage.Growing ? farm.Progress / world.GrowSeconds : farm.FarmStage == FarmStage.Ripe ? 1 : 0,
             new FuelRow("line_leaf", new Color("8fae7e"), FuelCup(fertilizer), lasts), main, side));
@@ -72,11 +62,7 @@ public partial class FarmPanel(SidePanel side, Thing farm) : PagePanel(side) {
             cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == farm.Output) && drag.Item == item;
             cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, box, farm)); kit.Refresh(); return left; };
         }
-        int drawn = -1;
-        live.Add(() => {
-            int held = box[item];
-            if (held == drawn) return;
-            drawn = held;
+        live.Watch(() => box[item], held => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
             count.Text = held > 0 ? held.ToString() : "";
             cell.TooltipText = $"{world.Data.Name(item)} · {held}\n{(input ? "Click: take back · Drag seeds here from the harvest or backpack to sow" : "Click: take · Drag seeds to the sowing slot")}";

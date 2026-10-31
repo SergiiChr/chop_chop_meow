@@ -32,19 +32,13 @@ public partial class PagePanel {
             kit.Act(() => world.LoadFuel(t, drag.Item, drag.Count)); kit.Refresh(); return left;
         };
         var lasts = Style.Text("", 14, Style.Ink);
-        var lastsText = new LiveText(shown => lasts.Text = shown);
-        (string? Fuel, int Held) drawn = ("", -1);
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(cell)) return;
-            string fuel = world.FuelOf(t) ?? World.BurnedFuel(t);
-            var now = (fuel, burner[fuel]);
-            if (now == drawn) return;
-            drawn = now;
+        live.Watch(() => { string fuel = world.FuelOf(t) ?? World.BurnedFuel(t); return (fuel, burner[fuel]); }, now => {
+            string fuel = now.Item1;
             cell.Icon = Icons.Of(fuel);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, now.Item2 > 0 ? Colors.White : Style.Ghost);
             count.Text = now.Item2 > 0 ? now.Item2.ToString() : "";
             cell.TooltipText = $"Fuel · {world.Data.Name(fuel)} · {now.Item2}/{burner.StackOf(fuel)}\nOne burns per batch · drag wood or coal here";
-            AppendDuration(lastsText.Clear(), now.Item2 * batchSeconds); lastsText.Show();
+            lasts.Text = LiveText.Of(text => AppendDuration(text, now.Item2 * batchSeconds));
         });
         return new FuelRow("line_flame", Style.Ember, cell, lasts);
     }
@@ -65,12 +59,7 @@ public partial class PagePanel {
             };
         }
         string hint = input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";
-        // Redrawn only when the amount held changes.
-        int drawn = -1;
-        live.Add(() => {
-            int held = box[item];
-            if (held == drawn) return;
-            drawn = held;
+        live.Watch(() => box[item], held => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
             count.Text = held > 0 ? held.ToString() : "";
             cell.TooltipText = $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}";

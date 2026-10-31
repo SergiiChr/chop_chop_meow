@@ -70,6 +70,45 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
 }
 
 /// <summary>
+/// What keeps an open page up to date: every update runs on each refresh, and a watched value is drawn only when it changes,
+/// so an open panel allocates nothing while what it shows stays the same.
+/// </summary>
+public sealed class LiveUpdates {
+    private readonly List<Action> updates = new();
+    // Counts clears, so a run notices when an update replaced the page under it.
+    private int clears;
+
+    public void Add(Action update) => updates.Add(update);
+    public void Clear() { updates.Clear(); clears++; }
+
+    /// <summary>Runs the updates; once one opens another page, the old page's remaining updates are dropped.</summary>
+    public void Run() {
+        int run = clears;
+        for (int i = 0; i < updates.Count && run == clears; i++) updates[i]();
+    }
+
+    /// <summary>Calls <paramref name="draw"/> on the first refresh and whenever <paramref name="read"/> gives something new.</summary>
+    public void Watch<T>(Func<T> read, Action<T> draw) {
+        bool first = true;
+        T shown = default!;
+        updates.Add(() => {
+            T now = read();
+            if (!first && EqualityComparer<T>.Default.Equals(now, shown)) return;
+            first = false; shown = now; draw(now);
+        });
+    }
+
+    /// <summary>Keeps a label's text to what <paramref name="write"/> writes on each refresh.</summary>
+    public void Bind(Label label, Action<StringBuilder> write) => Bind(shown => label.Text = shown, write);
+
+    /// <summary>Rebuilds text on each refresh and hands it to <paramref name="show"/> when it changes.</summary>
+    public void Bind(Action<string> show, Action<StringBuilder> write) {
+        var text = new LiveText(show);
+        updates.Add(() => { write(text.Clear()); text.Show(); });
+    }
+}
+
+/// <summary>
 /// Text rebuilt on every refresh into a reused buffer and handed to Godot only when it differs from what is shown,
 /// so an open panel allocates nothing while what it shows stays the same.
 /// </summary>

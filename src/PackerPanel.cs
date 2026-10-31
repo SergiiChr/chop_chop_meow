@@ -49,16 +49,10 @@ public partial class PackerPanel(SidePanel side, Thing t) : PagePanel(side) {
         cell.Drag = () => output.First() is string crate ? new ItemDrag(crate, 1, output, t) : null;
         column.AddChild(cell);
         var fill = PerBatch(""); column.AddChild(fill);
-        var fillText = new LiveText(shown => fill.Text = shown);
-        int drawn = -1;
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(cell)) return;
-            int packed = output.First() is string crate && world.Packed(crate) is Inventory contents ? contents.Count : -1;
-            if (packed == drawn) return;
-            drawn = packed;
+        live.Watch(() => output.First() is string crate && world.Packed(crate) is Inventory contents ? contents.Count : -1, packed => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, packed >= 0 ? Colors.White : Style.Ghost);
             cell.TooltipText = packed < 0 ? "The crate being packed shows here" : packed == world.Data.CrateCapacity ? "Full crate · click or drag to take" : "Crate being packed · click or drag to take";
-            fillText.Clear().Append(Math.Max(0, packed)).Append(" / ").Append(world.Data.CrateCapacity); fillText.Show();
+            fill.Text = $"{Math.Max(0, packed)} / {world.Data.CrateCapacity}";
         });
         return column;
     }

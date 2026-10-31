@@ -28,19 +28,17 @@ public partial class ToolRackPanel(SidePanel side, Thing t) : PagePanel(side) {
             row.AddChild(new Control { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill });
             var outPill = Style.Pill("", Style.Tag(Style.Enamel), Style.Rim, 12); outPill.MouseFilter = Control.MouseFilterEnum.Pass; row.AddChild(outPill);
             var waitPill = Style.Pill("", Style.Tag(Style.Brick), Style.Rim, 12); waitPill.MouseFilter = Control.MouseFilterEnum.Pass; row.AddChild(waitPill);
-            (string? Best, int Held, int Out, int Waiting) shown = (null, -1, -1, -1);
-            live.Add(() => {
-                if (!GodotObject.IsInstanceValid(cell)) return;
+            live.Watch(() => {
                 int held = 0, out_ = 0, waiting = 0;
                 foreach (var pair in t.Inventory.Items) if (world.Data.Items.TryGetValue(pair.Key, out var def) && def.Tool == kind) held += pair.Value;
                 foreach (var w in world.Workers) { if (w.Tool != "" && world.Data.Items[w.Tool].Tool == kind) out_++; if (w.Missing == kind) waiting++; }
-                var now = (world.BestTool(kind, t.Inventory), held, out_, waiting);
-                if (now == shown) return;
-                shown = now;
-                cell.Icon = Icons.Of(now.Item1 ?? plainest);
+                return (world.BestTool(kind, t.Inventory), held, out_, waiting);
+            }, now => {
+                var (best, held, out_, waiting) = now;
+                cell.Icon = Icons.Of(best ?? plainest);
                 cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
                 count.Text = held > 1 ? held.ToString() : "";
-                cell.TooltipText = held > 0 ? $"{world.Data.Name(now.Item1!)}\nClick to take" : $"No {kind} on the rack";
+                cell.TooltipText = held > 0 ? $"{world.Data.Name(best!)}\nClick to take" : $"No {kind} on the rack";
                 outPill.Visible = out_ > 0; outPill.Text = $"{out_} out";
                 outPill.TooltipText = string.Join("\n", world.Workers.Where(w => w.Tool != "" && world.Data.Items[w.Tool].Tool == kind).Select(w => w.Name));
                 waitPill.Visible = waiting > 0; waitPill.Text = $"{waiting} waiting";

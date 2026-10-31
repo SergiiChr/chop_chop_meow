@@ -9,16 +9,15 @@ public abstract partial class WorkerPage(SidePanel side) : PagePanel(side) {
 
     protected Texture2D? PlaceIcon(Thing at) => Icons.Of(at.IsResource ? World.ResourceItem(at) : at.Kind.Id());
 
-    /// <summary>Shows what a worker carries and the tool they hold in their two icon cells, redrawing them only when that differs from <paramref name="shown"/>.</summary>
-    protected void ShowKit(Worker w, ref (int Carried, string? Item, string Tool) shown, ItemSlot carry, Badge carried, ItemSlot tool) {
-        int count = w.Bag.Count;
-        string? item = count > 0 ? w.Bag.First() : null;
-        if (shown == (count, item, w.Tool)) return;
-        shown = (count, item, w.Tool);
-        carry.Icon = item == null ? null : Icons.Of(item); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
-        carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {count} {world.Data.Name(item)}";
-        tool.Icon = w.Tool == "" ? null : Icons.Of(w.Tool); tool.Visible = w.Tool != "";
-        tool.TooltipText = w.Tool == "" ? "No tool in hand" : world.Data.Name(w.Tool);
+    /// <summary>Keeps a worker's two icon cells on what they carry and the tool they hold.</summary>
+    protected void WatchKit(Worker w, ItemSlot carry, Badge carried, ItemSlot tool) {
+        live.Watch(() => { int count = w.Bag.Count; return (count, count > 0 ? w.Bag.First() : null, w.Tool); }, now => {
+            var (count, item, held) = now;
+            carry.Icon = item == null ? null : Icons.Of(item); carried.Text = count > 1 ? count.ToString() : ""; carry.Visible = item != null;
+            carry.TooltipText = item == null ? "Carrying nothing" : $"Carrying {count} {world.Data.Name(item)}";
+            tool.Icon = held == "" ? null : Icons.Of(held); tool.Visible = held != "";
+            tool.TooltipText = held == "" ? "No tool in hand" : world.Data.Name(held);
+        });
     }
 }
 
@@ -31,16 +30,9 @@ public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
         var count = Style.Pill("", Style.BlueTag, Style.Rim, 13); count.MouseFilter = Control.MouseFilterEnum.Pass; count.TooltipText = "Villagers hired, of the most who will come";
         var wages = Style.Pill("", Style.Tag(Style.Brick), Style.Rim, 13); wages.MouseFilter = Control.MouseFilterEnum.Pass; wages.TooltipText = "Wages paid each dawn";
         foreach (var pill in new[] { count, wages }) { pill.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; heading.AddChild(pill); heading.MoveChild(pill, heading.GetChildCount() - 2); }
-        var countText = new LiveText(shown => count.Text = shown);
-        var wagesText = new LiveText(shown => wages.Text = shown);
-        (int Hired, int Daily) shown = (-1, -1);
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(count)) return;
-            var now = (world.Workers.Count, world.DailyWages);
-            if (now == shown) return;
-            shown = now;
-            countText.Clear().Append(now.Item1).Append(" / ").Append(World.MaxWorkers); countText.Show();
-            wagesText.Clear().Append('−').Append(now.Item2).Append(" /day"); wagesText.Show();
+        live.Watch(() => (world.Workers.Count, world.DailyWages), now => {
+            count.Text = $"{now.Item1} / {World.MaxWorkers}";
+            wages.Text = $"−{now.Item2} /day";
         });
         if (world.Workers.Count == 0) {
             var empty = Well(new HBoxContainer()); empty.AddThemeConstantOverride("separation", 14);
@@ -70,16 +62,14 @@ public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
         // A flat button over the whole card takes the click and rings it on hover.
         var open = new Button { Flat = false, FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand, Name = $"crew_{w.Id}" };
         Style.Skin(open, Style.None, Style.CardHover); open.Pressed += () => panel.Select(w); card.AddChild(open);
-        (string Status, int Duties) drawn = ("", -1);
-        (int Carried, string? Item, string Tool) carrying = (-1, null, "");
+        // A job given or taken elsewhere changes the chips, so the page is rebuilt.
+        int duties = w.Duties.Count;
         live.Add(() => {
-            if (!GodotObject.IsInstanceValid(status)) return;
-            // A job given or taken elsewhere changes the chips, so the page is rebuilt.
-            if (drawn.Duties >= 0 && w.Duties.Count != drawn.Duties) { drawn.Duties = w.Duties.Count; Callable.From(() => { if (panel.Page == "workers") panel.Open("workers"); }).CallDeferred(); return; }
-            drawn.Duties = w.Duties.Count;
-            if (w.Status != drawn.Status) status.Text = drawn.Status = w.Status;
-            ShowKit(w, ref carrying, carry, carried, tool);
+            if (w.Duties.Count == duties) return;
+            duties = w.Duties.Count; Callable.From(() => { if (panel.Page == "workers") panel.Open("workers"); }).CallDeferred();
         });
+        live.Watch(() => w.Status, shown => status.Text = shown);
+        WatchKit(w, carry, carried, tool);
     }
 
     /// <summary>A job as a small chip: the place's icon and the job's name.</summary>
@@ -105,19 +95,9 @@ public partial class WorkerPanel(SidePanel side, Worker? w) : WorkerPage(side) {
         var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; text.AddThemeConstantOverride("separation", 2); well.AddChild(text);
         var status = Style.Text("", 15, Style.Ink); status.AutowrapMode = TextServer.AutowrapMode.WordSmart; text.AddChild(status);
         var owed = Style.Text("", 13, Style.Brick, Style.Bold); text.AddChild(owed);
-        var owedText = new LiveText(shown => { owed.Text = shown; owed.Visible = shown != ""; });
-        (string Status, int Owed) drawn = ("", -1);
-        (int Carried, string? Item, string Tool) carrying = (-1, null, "");
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(status)) return;
-            if (w.Status != drawn.Status) status.Text = drawn.Status = w.Status;
-            ShowKit(w, ref carrying, carry, carried, tool);
-            int debt = (int)w.WageDebt;
-            if (debt == drawn.Owed) return;
-            drawn.Owed = debt;
-            if (debt > 0) owedText.Clear().Append("Owed ").Append(debt).Append(" coins · on strike"); else owedText.Clear();
-            owedText.Show();
-        });
+        live.Watch(() => w.Status, shown => status.Text = shown);
+        WatchKit(w, carry, carried, tool);
+        live.Watch(() => (int)w.WageDebt, debt => { owed.Text = debt > 0 ? $"Owed {debt} coins · on strike" : ""; owed.Visible = debt > 0; });
         var jobs = Well(new VBoxContainer()); jobs.AddThemeConstantOverride("separation", 6);
         jobs.AddChild(Style.WellLabel("Jobs"));
         bool first = true;

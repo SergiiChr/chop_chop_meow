@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using Godot;
 
 namespace ChopChopMeow;
@@ -50,8 +49,6 @@ public partial class SidePanel : PanelContainer {
     private ScrollContainer? sheetScroll;
     private VBoxContainer? sheetRows;
     private Selection shownInspect;
-    // Counts pages opened and closed, so a refresh notices when an update replaced the page under it.
-    private int pagesOpened;
 
     public UiKit Kit { get; }
     public WorldView View { get; }
@@ -60,7 +57,7 @@ public partial class SidePanel : PanelContainer {
     public PageMemory Memory { get; } = new();
     /// <summary>The player's control of the world, which also needs this panel, so the game sets it once both exist.</summary>
     public PlayerControl Player { get; set; } = null!;
-    public List<Action> Live { get; } = new();
+    public LiveUpdates Live { get; } = new();
     /// <summary>The open page, or nothing while the panel is closed.</summary>
     public string Page { get; private set; } = "welcome";
     public Selection Selection { get; private set; }
@@ -81,7 +78,7 @@ public partial class SidePanel : PanelContainer {
         // A different page or building closes the job list and the filter window that belonged to the last one.
         if (name != Page || name == "inspect" && Selection != shownInspect) { Memory.OpenJob = ""; Memory.FilterOpen = false; Memory.FilterPicking = false; Bag.Dismissed = false; }
         shownInspect = Selection;
-        Page = name; Live.Clear(); pagesOpened++; Visible = true; View.PanelOpen = true;
+        Page = name; Live.Clear(); Visible = true; View.PanelOpen = true;
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
         Bag.Clear(); sheetScroll = null;
         OffsetLeft = Left;
@@ -113,14 +110,10 @@ public partial class SidePanel : PanelContainer {
     /// <summary>Opens a page, or closes it if it is the one showing.</summary>
     public void Toggle(string name) { if (Page == name) Close(); else Open(name); }
 
-    public void Close() { Visible = false; Bag.Visible = false; View.PanelOpen = false; Page = ""; Live.Clear(); pagesOpened++; }
+    public void Close() { Visible = false; Bag.Visible = false; View.PanelOpen = false; Page = ""; Live.Clear(); }
 
     /// <summary>Runs the open page's updates.</summary>
-    public void Refresh() {
-        // An update can open another page, which replaces the list; the old page's remaining updates are then dropped.
-        int opened = pagesOpened;
-        for (int i = 0; i < Live.Count && opened == pagesOpened; i++) Live[i]();
-    }
+    public void Refresh() => Live.Run();
 
     /// <summary>Selects a building or resource and shows it.</summary>
     public void Select(Thing t) {

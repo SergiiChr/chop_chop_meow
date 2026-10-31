@@ -44,13 +44,7 @@ public partial class CraftPanel(SidePanel side) : RecipePage(side) {
         AddChild(new ProcessRow(live, inputs, LiveText.Of(text => AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))), () => making.Seconds > 0 ? world.CraftTime / making.Seconds : 0, null, product, waiting));
         if (making.Tool != "") {
             var status = Style.Text("", 14, Style.Warn); AddChild(status);
-            bool shown = false;
-            live.Add(() => {
-                if (!GodotObject.IsInstanceValid(status)) return;
-                bool stalled = world.CraftRate <= 0;
-                if (stalled == shown) return;
-                shown = stalled; status.Text = stalled ? $"Waiting for a {making.Tool} in your backpack" : "";
-            });
+            live.Watch(() => world.CraftRate <= 0, stalled => status.Text = stalled ? $"Waiting for a {making.Tool} in your backpack" : "");
         }
     }
 
@@ -100,13 +94,7 @@ public partial class BenchPanel(SidePanel side, Thing bench) : RecipePage(side) 
         cell.Drag = () => world.BenchTool(bench, tool) is string held ? new ItemDrag(held, 1, bench.Tools, bench) : null;
         cell.CanTake = drag => drag.From == world.S.Backpack && world.Data.Items.GetValueOrDefault(drag.Item)?.Tool == tool;
         cell.Take = drag => { kit.Act(() => world.SlotTool(bench, drag.Item)); kit.Refresh(); return 0; };
-        // Redrawn only when the slotted tool changes.
-        string? drawn = null; bool first = true;
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(cell)) return;
-            string? held = world.BenchTool(bench, tool);
-            if (!first && held == drawn) return;
-            first = false; drawn = held;
+        live.Watch(() => world.BenchTool(bench, tool), held => {
             cell.Icon = Icons.Of(held ?? plainest);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held != null ? Colors.White : Style.Ghost);
             cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\nClick: take it back" : $"Empty {tool} slot\nDrag a {tool} here from your backpack";
@@ -161,13 +149,7 @@ public abstract partial class RecipePage(SidePanel side) : PagePanel(side) {
                 string plainest = world.Data.Items.Where(p => p.Value.Tool == tool && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;
                 string name = world.Data.ToolName(tool, tier);
                 badge.Texture = Icons.Of(plainest);
-                // Redrawn only when the tool in use changes.
-                string? drawn = null; bool first = true;
-                live.Add(() => {
-                    if (!GodotObject.IsInstanceValid(badge)) return;
-                    string? inUse = held(group.Key);
-                    if (!first && inUse == drawn) return;
-                    first = false; drawn = inUse;
+                live.Watch(() => held(group.Key), inUse => {
                     if (inUse != null) badge.Texture = Icons.Of(inUse);
                     badge.Modulate = inUse != null ? Colors.White : new Color(1, .35f, .3f);
                     badge.TooltipText = inUse != null
@@ -190,11 +172,12 @@ public abstract partial class RecipePage(SidePanel side) : PagePanel(side) {
         face.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); face.AddThemeConstantOverride("separation", 4); cell.AddChild(face);
         var product = Style.Icon(Icons.Of(r.Output), 42); product.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter; face.AddChild(product);
         var inputs = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = Control.MouseFilterEnum.Ignore }; inputs.AddThemeConstantOverride("separation", 4); face.AddChild(inputs);
-        var needs = new List<(string Item, int Amount, Label Count)>();
         foreach (var (item, amount) in r.Inputs) {
             inputs.AddChild(Style.Icon(Icons.Of(item), 18));
             var need = Style.Text(amount.ToString(), 13, Style.Ink);
-            inputs.AddChild(need); needs.Add((item, amount, need));
+            inputs.AddChild(need);
+            // Counts turn brick while the backpack is short.
+            live.Watch(() => world.Backpack[item] < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
         count.Text = r.Amount > 1 ? $"×{r.Amount}" : ""; count.MoveToFront();
         cell.Pressed += () => { click(id); kit.Refresh(); };
@@ -207,20 +190,8 @@ public abstract partial class RecipePage(SidePanel side) : PagePanel(side) {
             text.Append($"\n{Time():0.#} s");
         }
         cell.Popup = () => RecipePopup(r, Time());
-        var tooltip = new LiveText(shown => cell.TooltipText = shown);
-        // Counts turn brick while the backpack is short; each is recoloured only when that changes.
-        var shortOf = new bool?[needs.Count];
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(cell)) return;
-            Describe(tooltip.Clear()); tooltip.Show();
-            cell.Modulate = ready(id) ? Colors.White : Style.Unready;
-            for (int i = 0; i < needs.Count; i++) {
-                bool lacking = world.Backpack[needs[i].Item] < needs[i].Amount;
-                if (shortOf[i] == lacking) continue;
-                shortOf[i] = lacking;
-                needs[i].Count.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink);
-            }
-        });
+        live.Bind(shown => cell.TooltipText = shown, Describe);
+        live.Watch(() => ready(id), yes => cell.Modulate = yes ? Colors.White : Style.Unready);
         return cell;
     }
 }

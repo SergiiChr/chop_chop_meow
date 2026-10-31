@@ -38,16 +38,10 @@ public partial class InspectPage(SidePanel side) : PagePanel(side) {
     /// <summary>How far away a building is, shown only while it is out of reach.</summary>
     private void Reach(Thing t) {
         var label = Style.Text("", 14, Style.Warn); label.Visible = false; AddChild(label);
-        var text = new LiveText(shown => label.Text = shown);
         // Rewritten only when the distance moves a tenth of a tile or the building comes into reach.
-        int drawn = int.MinValue;
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(label)) return;
-            int tenths = world.Near(t) ? -1 : (int)(world.Player.DistanceTo(world.GatherAt(t, world.Player)) * 10);
-            if (tenths == drawn) return;
-            drawn = tenths;
+        live.Watch(() => world.Near(t) ? -1 : (int)(world.Player.DistanceTo(world.GatherAt(t, world.Player)) * 10), tenths => {
             label.Visible = tenths >= 0;
-            if (tenths >= 0) { text.Clear().Append(tenths / 10).Append('.').Append(tenths % 10).Append(" tiles away · walk closer"); text.Show(); }
+            if (tenths >= 0) label.Text = $"{tenths / 10}.{tenths % 10} tiles away · walk closer";
         });
     }
 }

@@ -27,22 +27,15 @@ public partial class CabinPanel(SidePanel side, Thing hut) : PagePanel(side) {
         var door = kit.BigButton("", Style.Sage, () => { if (world.Sheltered == hut.Id) world.Leave(); else panel.Player.WalkInto(hut); });
         var sleep = kit.BigButton("Sleep", Style.Enamel, () => world.Sleep(hut)); sleep.Name = "sleep";
         buttons.AddChild(door); buttons.AddChild(sleep);
-        var untilText = new LiveText(shown => until.Text = shown);
-        (bool Inside, string? Block, int Minutes) shown = (false, "", -1);
-        live.Add(() => {
-            if (!GodotObject.IsInstanceValid(sleep)) return;
-            bool inside = world.Sheltered == hut.Id;
-            string? blocked = world.SleepBlock();
-            int minutes = (int)(world.SecondsToDawn / world.Data.DaySeconds * 1440);
-            if ((inside, blocked, minutes) == shown) return;
-            shown = (inside, blocked, minutes);
+        live.Watch(() => (world.Sheltered == hut.Id, world.SleepBlock(), (int)(world.SecondsToDawn / world.Data.DaySeconds * 1440)), now => {
+            var (inside, blocked, _) = now;
             tag.Text = inside ? "inside" : "outside";
             tag.AddThemeStyleboxOverride("normal", inside ? Style.TagPill : Style.BlueTag);
             door.Text = inside ? "Step outside" : "Go inside";
             sleep.TooltipText = blocked ?? "Sleep until dawn. Production, hunger, trade and wages advance.";
             sleep.Modulate = blocked == null ? Colors.White : Style.Unready;
             block.Visible = blocked != null; block.Text = blocked == null ? "" : ShortBlock(blocked);
-            AppendGameHours(untilText.Clear().Append("until dawn · +"), world.SecondsToDawn); untilText.Show();
+            until.Text = LiveText.Of(text => AppendGameHours(text.Append("until dawn · +"), world.SecondsToDawn));
             float seconds = world.SecondsToDawn;
             Show(0, world.Health, world.Health);
             Show(1, world.Hunger, world.Hunger - seconds * world.Data.HungerPerSecond);
