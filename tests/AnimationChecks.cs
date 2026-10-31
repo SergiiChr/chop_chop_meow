@@ -10,7 +10,11 @@ public static class AnimationChecks {
         CheckActionsLoopAndWrapByTheirDuration();
         CheckActorsTurnToFaceTheirMovement();
         CheckPlayerActionFollowsToolAndTarget();
-        CheckWorkerActionFollowsItsWork();
+        CheckWorkerHoldingALoadCarriesIt();
+        CheckStationWorkFollowsWorkStateNotItsWording();
+        CheckStrikingWorkerProtestsUntilWalking();
+        CheckGatheringWorkerSwingsTheToolOfItsTarget();
+        CheckWorkerAtLunchSitsOnceThere();
         CheckEveryActionMovesThroughDistinctPoses();
     }
 
@@ -59,7 +63,7 @@ public static class AnimationChecks {
             "inactive gathering should leave the player idle");
     }
 
-    private static void CheckWorkerActionFollowsItsWork() {
+    private static void CheckWorkerHoldingALoadCarriesIt() {
         var worker = new Worker();
         worker.Bag.Add("wood", 2);
         worker.Status = "Carrying wood → chest";
@@ -67,8 +71,10 @@ public static class AnimationChecks {
             "a worker hauling a load while moving should retain the carry action");
         Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Carry,
             "a worker holding a load while stationary should use carry pose");
+    }
 
-        worker.Bag.Remove("wood", 2);
+    private static void CheckStationWorkFollowsWorkStateNotItsWording() {
+        var worker = new Worker();
         worker.Status = "Text can vary";
         worker.WorkState = WorkerWorkState.Pumping;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Reinforced }, false) == ActorAction.Pump,
@@ -81,6 +87,10 @@ public static class AnimationChecks {
         worker.WorkState = WorkerWorkState.Hammering;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Hammer,
             "anvil work should select hammering animation");
+    }
+
+    private static void CheckStrikingWorkerProtestsUntilWalking() {
+        var worker = new Worker();
         worker.Status = "On strike · wages owed";
         worker.WorkState = WorkerWorkState.Idle;
         worker.WageDebt = worker.Wage;
@@ -89,7 +99,10 @@ public static class AnimationChecks {
             "striking workers should stand holding the protest sign instead of working");
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true) == ActorAction.Walk,
             "a striking worker heading home should walk, not protest");
-        worker.WageDebt = 0;
+    }
+
+    private static void CheckGatheringWorkerSwingsTheToolOfItsTarget() {
+        var worker = new Worker();
         worker.Status = "Gathering wood";
         worker.WorkState = WorkerWorkState.Blocked;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Tree }, false) == ActorAction.Idle,
@@ -102,6 +115,14 @@ public static class AnimationChecks {
         worker.Status = "Arbitrary status";
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Iron }, false) == ActorAction.Mine,
             "workers gathering iron should mine");
+        worker.Status = "Available";
+        worker.WorkState = WorkerWorkState.Idle;
+        Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Idle,
+            "available workers should remain idle");
+    }
+
+    private static void CheckWorkerAtLunchSitsOnceThere() {
+        var worker = new Worker();
         worker.WorkState = WorkerWorkState.Resting;
         worker.Bag.Add("wood", 2);
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Perch,
@@ -112,11 +133,6 @@ public static class AnimationChecks {
         worker.Id = 0;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true) == ActorAction.Carry,
             "a worker still walking to lunch should not sit");
-        worker.Bag.Remove("wood", 2);
-        worker.Status = "Available";
-        worker.WorkState = WorkerWorkState.Idle;
-        Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Idle,
-            "available workers should remain idle");
     }
 
     private static void CheckEveryActionMovesThroughDistinctPoses() {

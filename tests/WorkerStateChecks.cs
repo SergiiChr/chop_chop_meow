@@ -11,7 +11,10 @@ using static WorkerSteps;
 public static class WorkerStateChecks {
     public static void Run(GameData data) {
         CheckWorkerStateFollowsGatheringAndReassignment(data);
-        CheckWorkerGoesToNextKnownSpotNotSeenOne(data);
+        CheckWorkerGoesToNextKnownTreeThenWaitsUntilOneIsSeen(data);
+        CheckPickerGoesToNextKnownLooseCoalThenWaits(data);
+        CheckWorkerOutOfPatchesMovesToTheirOtherJob(data);
+        CheckWorkerWhoseBuildingGoesSaysTheyHaveNoJob(data);
         CheckStrikeResetsWorkState(data);
         CheckWorkerWithoutRouteIsBlocked(data);
         CheckOnlyFirstFurnaceWorkerPumpsBellows(data);
@@ -38,23 +41,12 @@ public static class WorkerStateChecks {
                 "an available worker should remain idle after its next simulation tick");
     }
 
-    private static void CheckWorkerGoesToNextKnownSpotNotSeenOne(GameData data) {
-        var world = EmptyWorld(data);
-        var said = new System.Collections.Generic.List<string>();
-        world.Notify += said.Add;
+    private static void CheckWorkerGoesToNextKnownTreeThenWaitsUntilOneIsSeen(GameData data) {
+        var (world, said, post) = KnownSpots(data);
         var at = Terrain.Spawn;
-        var post = world.Add(ThingKind.Signpost, at + new Vector2(-3, 2));
-        world.Add(ThingKind.Chest, at + new Vector2(2, 2));
-        var spent = world.Add(ThingKind.Tree, at + new Vector2(1, 0), 1);
-        var seen = world.Add(ThingKind.Tree, at + new Vector2(6, 0), 2);
-        var coal = world.Add(ThingKind.LooseCoal, at + new Vector2(0, 3), 1);
-        var moreCoal = world.Add(ThingKind.LooseCoal, at + new Vector2(4, 4), 1);
-        world.Player = at; world.Look();
-        // Out of every player's sight, so these stay under black fog.
-        world.Player = at + new Vector2(0, 40); world.Look();
-        var unseen = world.Add(ThingKind.Tree, at + new Vector2(3, 0), 5);
-        world.Add(ThingKind.LooseCoal, at + new Vector2(1, 4), 1);
-
+        var spent = world.Things.Single(t => t.Kind == ThingKind.Tree && t.Pos == at + new Vector2(1, 0));
+        var seen = world.Things.Single(t => t.Kind == ThingKind.Tree && t.Pos == at + new Vector2(6, 0));
+        var unseen = world.Things.Single(t => t.Kind == ThingKind.Tree && t.Pos == at + new Vector2(3, 0));
         var worker = AddWorker(world, spent.Pos);
         worker.Tool = "steel_axe";
         world.Assign(worker, spent);
@@ -73,6 +65,16 @@ public static class WorkerStateChecks {
             "a worker who knows no other tree should wait at the trading post");
         Require(said.Count(m => m.Contains("knows no other tree", StringComparison.Ordinal)) == 1, "a worker who knows no other tree should say so once");
 
+        // The look comes at the end of a tick, so the worker acts on it the tick after.
+        world.Player = at; world.Tick(.1f); world.Tick(.1f);
+        Require(worker.Assignment == unseen.Id, "once a player sees another tree, the waiting worker should go to it");
+    }
+
+    private static void CheckPickerGoesToNextKnownLooseCoalThenWaits(GameData data) {
+        var (world, _, post) = KnownSpots(data);
+        var at = Terrain.Spawn;
+        var coal = world.Things.Single(t => t.Kind == ThingKind.LooseCoal && t.Pos == at + new Vector2(0, 3));
+        var moreCoal = world.Things.Single(t => t.Kind == ThingKind.LooseCoal && t.Pos == at + new Vector2(4, 4));
         var picker = AddWorker(world, coal.Pos);
         world.Assign(picker, coal);
         for (int i = 0; i < 20 && world.Find(coal.Id) != null; i++) world.Tick(.1f);
@@ -83,11 +85,13 @@ public static class WorkerStateChecks {
         Require(picker.Duties.Count == 1, "the worker should keep one duty");
         Require(picker.Duties[0].Kind == ThingKind.LooseCoal, "the worker should keep the loose coal duty");
         Require(picker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f, "the worker should wait at the trading post");
+    }
 
-        // The look comes at the end of a tick, so the worker acts on it the tick after.
-        world.Player = at; world.Tick(.1f); world.Tick(.1f);
-        Require(worker.Assignment == unseen.Id, "once a player sees another tree, the waiting worker should go to it");
-
+    private static void CheckWorkerOutOfPatchesMovesToTheirOtherJob(GameData data) {
+        var world = EmptyWorld(data);
+        var at = Terrain.Spawn;
+        world.Add(ThingKind.Chest, at + new Vector2(2, 2));
+        world.Player = at; world.Look();
         var raker = AddWorker(world, at);
         var raked = world.Add(ThingKind.Leaves, at + new Vector2(-2, -2), 0);
         var bush = world.Add(ThingKind.Berries, at + new Vector2(-4, -2), 6);
@@ -95,7 +99,13 @@ public static class WorkerStateChecks {
         raker.Duties.Add(new Duty { Thing = raked.Id, Job = "gather" }); raker.Duties.Add(new Duty { Thing = bush.Id, Job = "gather" }); raker.Assignment = raked.Id;
         world.Tick(.1f); world.Tick(.1f);
         Require(raker.Assignment == bush.Id && raker.Duties.Count == 2, "a worker who knows no other raked patch should go on to their other job and keep the patch");
+    }
 
+    private static void CheckWorkerWhoseBuildingGoesSaysTheyHaveNoJob(GameData data) {
+        var world = EmptyWorld(data);
+        var said = new System.Collections.Generic.List<string>();
+        world.Notify += said.Add;
+        var at = Terrain.Spawn;
         var crafter = AddWorker(world, at);
         var bench = world.Add(ThingKind.Bench, at + new Vector2(5, 5));
         world.Assign(crafter, bench);

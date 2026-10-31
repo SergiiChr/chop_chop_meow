@@ -64,6 +64,11 @@ public partial class Game {
     }
 
     private async Task GuestNetCheck() {
+        await CheckFirstTimeGuestActsThroughTheHost();
+        await CheckGuestComesBackFromLeavingDroppingAndABrokenSave();
+    }
+
+    private async Task CheckFirstTimeGuestActsThroughTheHost() {
         RemoveCheckFiles(); DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(GuestSave)); await Frames(4);
         await JoinFromStart();
         Require(!startMenu.Visible, "Joining must close the start menu.");
@@ -91,7 +96,9 @@ public partial class Game {
         // The host checks reach from where the guest stood when it clicked, not from where its glide has got to.
         await CloseWithEsc(); await Click(view.Screen(NetHut, .8f));
         await Until(() => world.Sheltered == world.Things.Single(t => t.Kind == ThingKind.Hut).Id, "the host letting the guest into the cabin it walked to");
+    }
 
+    private async Task CheckGuestComesBackFromLeavingDroppingAndABrokenSave() {
         await LeaveGame();
         await JoinFromStart();
         Require(world.Carried("coal") == 2, "A guest must come back with what it carried when it left.");

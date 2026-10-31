@@ -15,6 +15,7 @@ public static class MineChecks {
         CheckMineSitesAlignWithCliffsAndOldSavesUpgrade(data);
         CheckMinesAreMarkedAtCliffsOnceEach(data);
         CheckWorkersDigAndFrameMineWithTheirTools(data);
+        CheckPlayerDeliversOnlyWhatAMineStillNeeds(data);
         CheckMinersBringOreOutAndStopWhenOutputIsFull(data);
         CheckOnlyAvailableMinersUnload(data);
         CheckMiningIsSlowerThanDeposits(data);
@@ -123,8 +124,10 @@ public static class MineChecks {
         started = world.Time;
         Work(world, data.DaySeconds * 3, () => mine.MineStage == MineStage.Open);
         Require(mine.MineStage == MineStage.Open && world.Time - started >= world.MineStageSeconds, "a worker with a hammer must fit the frame in about one working day");
+    }
 
-        // The player can also deliver the materials by hand.
+    private static void CheckPlayerDeliversOnlyWhatAMineStillNeeds(GameData data) {
+        var world = FundedWorld(data);
         var other = MarkMine(world, ThingKind.Coal);
         other.MineStage = MineStage.Dug;
         world.Player = other.Pos + Vector2.One;

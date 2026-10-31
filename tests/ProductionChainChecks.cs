@@ -18,14 +18,13 @@ public static class ProductionChainChecks {
 
     public static void Run(GameData data) {
         CheckPackingStationTakesOnlyItsGoodAndPacksCrates(data);
+        CheckHaulerStocksPackerAndCarriesCratesToStorageAskingForThem(data);
+        CheckPileOfPackedCratesTakesOnlyTheSameGood(data);
         CheckPostsTakeOnlyAskedForCratesAndSendTheCartWhenFull(data);
         CheckWorkersRunEveryChain(data);
     }
 
-    /// <summary>
-    /// A packing station packs only while worked, one item at a time, names the crate after its good, and holds a full crate until it is carried out.
-    /// Its hauler stocks goods and crates from storage and carries the full crate to the nearest storage asking for crates of that good.
-    /// </summary>
+    /// <summary>A packing station packs only while worked, one item at a time, names the crate after its good, and holds a full crate until it is carried out.</summary>
     private static void CheckPackingStationTakesOnlyItsGoodAndPacksCrates(GameData data) {
         var world = EmptyWorld(data);
         var packer = world.Add(ThingKind.Packer, new Vector2(20, 20));
@@ -48,7 +47,17 @@ public static class ProductionChainChecks {
         Require(packer.Inventory["crate"] == 1, $"the packing station should use up one empty crate: {crate}");
         SafeTick(world, 10);
         Require(packer.Output.Count == 1 && packer.Inventory["bread"] == 1, "a full crate should wait in the output and stop packing until it is carried out");
+    }
 
+    /// <summary>A hauler stocks goods and crates from storage, carries the full crate to the nearest storage asking for crates of that good, and clears out the old good when the station changes.</summary>
+    private static void CheckHaulerStocksPackerAndCarriesCratesToStorageAskingForThem(GameData data) {
+        var world = EmptyWorld(data);
+        var packer = world.Add(ThingKind.Packer, new Vector2(20, 20));
+        world.Player = packer.Pos + new Vector2(1, 0);
+        world.SetPacking(packer, "bread");
+        packer.Inventory.Add("bread", 13); packer.Inventory.Add("crate", 2);
+        SafeTick(world, data.PackSeconds * data.CrateCapacity + 1);
+        string crate = packer.Output!.First()!;
         world.Player = new Vector2(40, 40);
         var general = world.Add(ThingKind.Chest, packer.Pos + new Vector2(2, 0));
         var crates = world.Add(ThingKind.Chest, packer.Pos + new Vector2(6, 0));
@@ -64,20 +73,24 @@ public static class ProductionChainChecks {
         Require(Packing() && packer.Inventory["crate"] >= 1,
                 "the worker should restock bread and crates and pack the next crate");
 
-        // A pile of packed crates takes more crates of the same good, but no crate of another good.
+        // Changing the good leaves the old goods for the hauler to carry out.
+        world.SetPacking(packer, "berries");
+        SafeTick(world, 20);
+        Require(packer.Inventory["bread"] == 0, "after switching to berries, the hauler should carry the leftover bread out");
+    }
+
+    /// <summary>A pile of packed crates takes more crates of the same good, but no crate of another good.</summary>
+    private static void CheckPileOfPackedCratesTakesOnlyTheSameGood(GameData data) {
+        var world = EmptyWorld(data);
+        string crate = PackCrate(world, ("bread", data.CrateCapacity));
         var pile = world.Add(ThingKind.Pile, new Vector2(30, 30));
-        pile.Inventory.Add(crate, 1); crates.Inventory.Remove(crate, 1);
+        pile.Inventory.Add(crate, 1); Drop(world, crate, 1);
         world.Tick(.01f);
         string otherBread = PackCrate(world, ("bread", 2)), berryCrate = PackCrate(world, ("berries", 2));
         Require(world.Holds(pile, otherBread), "a pile of bread crates should hold another bread crate");
         Require(pile.Inventory.Accepts(otherBread),
             "a pile of bread crates should accept another bread crate into its inventory");
         Require(!world.Holds(pile, berryCrate), "a pile of bread crates should not hold a crate of berries");
-
-        // Changing the good leaves the old goods for the hauler to carry out.
-        world.SetPacking(packer, "berries");
-        SafeTick(world, 20);
-        Require(packer.Inventory["bread"] == 0, "after switching to berries, the hauler should carry the leftover bread out");
     }
 
     /// <summary>

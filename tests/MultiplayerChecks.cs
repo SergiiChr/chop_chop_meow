@@ -22,10 +22,14 @@ public static class MultiplayerChecks {
         CheckSleepWaitsForEveryone(data);
         CheckGuestComesBackFromSaveWithTheirPackAndSpot(data);
         CheckBrokenGuestSavesStartEmpty(data);
-        CheckGuestInventoryAndRecoveryCommandsLeaveOthersAlone(data);
+        CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(data);
+        CheckOldGuestSaveKeepsItsBottlesAndTheRestOfTheBag(data);
+        CheckGuestCopyForwardsLayoutActionsToTheHost(data);
+        CheckDropOnAnotherItemsChestCellStoresTheStack(data);
+        CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(data);
     }
 
-    private static void CheckGuestInventoryAndRecoveryCommandsLeaveOthersAlone(GameData data) {
+    private static void CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(GameData data) {
         var (world, guest, _) = Hosted(data);
         Give(guest, "wood", 10); Give(guest, "stone", 2);
         world.Run(guest, new Command(Verb.TransferSlot, 0, 0, "wood", 4, new Vector2(0, 7)));
@@ -45,6 +49,9 @@ public static class MultiplayerChecks {
         var returning = returningWorld.AddGuest(GuestId, world.ExportPlayer(guest));
         Require(returning.Backpack.Layout[9].Item == "wood" && returning.Backpack.Layout[0].Item == "stone",
             "a guest leaving and rejoining must retain their exact inventory positions");
+    }
+
+    private static void CheckOldGuestSaveKeepsItsBottlesAndTheRestOfTheBag(GameData data) {
         var legacy = new PlayerState { Backpack = { SavedItems = new Dictionary<string, int> { ["water"] = 64, ["wood"] = 1 } } };
         // An old save holds item totals and no stacks.
         var legacyJson = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(legacy, GameData.Json))!;
@@ -53,13 +60,17 @@ public static class MultiplayerChecks {
         var migrated = legacyWorld.AddGuest(GuestId, legacyJson.ToJsonString());
         Require(migrated.Backpack["wood"] == 1 && migrated.Backpack["water"] + legacyWorld.Things.Where(t => t.Kind == ThingKind.Grave).Sum(t => t.Inventory["water"]) == 64,
             "a legacy guest's stacked bottles must migrate without rejecting or losing the rest of their bag");
+    }
 
+    private static void CheckGuestCopyForwardsLayoutActionsToTheHost(GameData data) {
         var copy = new World(data, false); Give(copy, "wood", 10);
         var sent = new List<Command>(); copy.Host = sent.Add;
         copy.TransferSlot(copy.Backpack, copy.Backpack, 0, 4, "wood", 3); copy.SortBackpack();
         Require(sent.Select(c => c.Verb).SequenceEqual(new[] { Verb.TransferSlot, Verb.SortBag }) && copy.Backpack.Layout[0].Count == 10,
             "a guest copy must forward layout actions without changing its local mirror");
+    }
 
+    private static void CheckDropOnAnotherItemsChestCellStoresTheStack(GameData data) {
         var dropper = new World(data, false); var shelf = dropper.Add(ThingKind.Chest, dropper.Player + new Vector2(1, 0));
         shelf.Inventory.Add("stone", 1); Give(dropper, "wood", 3);
         int woodSlot = dropper.Backpack.Layout.FindIndex(slot => slot.Item == "wood");
@@ -69,7 +80,10 @@ public static class MultiplayerChecks {
             "a drop on another item's cell in a chest should count the wood in the chest");
         Require(shelf.Inventory.Layout[0].Item == "stone",
             "a drop on another item's cell in a chest should leave that item in its cell");
+    }
 
+    private static void CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(GameData data) {
+        var (world, guest, _) = Hosted(data);
         RunUntilPhase(world, .9f); SetRespawn(guest, 20);
         float time = world.Time;
         world.Run(guest, new Command(Verb.SkipMorning, 0, 0, "", 0, default));

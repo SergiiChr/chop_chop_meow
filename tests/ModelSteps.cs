@@ -7,6 +7,34 @@ using static Checks;
 
 /// <summary>Finds the parts of a built model for the model checks.</summary>
 internal static class ModelSteps {
+    /// <summary>Every mesh under a node.</summary>
+    public static List<MeshInstance3D> AllMeshes(Node at) {
+        var meshes = new List<MeshInstance3D>();
+        if (at is MeshInstance3D mesh) meshes.Add(mesh);
+        foreach (var child in at.GetChildren()) meshes.AddRange(AllMeshes(child));
+        return meshes;
+    }
+
+    /// <summary>The solid core that fills a canopy's shadow, separate from the per-mesh proxies.</summary>
+    public static bool CanopyCore(MeshInstance3D mesh) => mesh.MaterialOverride is ShaderMaterial { Shader: var shader } && shader == Tree3DShape.SolidFoliage;
+
+    /// <summary>The shadow-only meshes of a canopy other than its solid core.</summary>
+    public static MeshInstance3D[] CanopyShadows(TreeProp prop) => AllMeshes(prop.Sway).Where(mesh => mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.ShadowsOnly && !CanopyCore(mesh)).ToArray();
+
+    /// <summary>The shadow proxy sharing a visible canopy mesh's parent, mesh, material and transform.</summary>
+    public static MeshInstance3D? ShadowProxy(MeshInstance3D[] shadows, MeshInstance3D mesh, Material material) => shadows.FirstOrDefault(candidate =>
+        ReferenceEquals(candidate.GetParent(), mesh.GetParent()) && ReferenceEquals(candidate.Mesh, mesh.Mesh) && ReferenceEquals(candidate.MaterialOverride, material) && candidate.Transform.Equals(mesh.Transform));
+
+    /// <summary>How opaque foliage is: code-built canopies fade a standard material's albedo alpha, and Tree3D foliage swaps to a blended shader with an opacity.</summary>
+    public static float FoliageOpacity(Material material) => material is ShaderMaterial shader
+        ? shader.Shader == Tree3DShape.FadingFoliage ? shader.GetShaderParameter(Tree3DShape.Opacity).AsSingle() : 1
+        : ((StandardMaterial3D)material).AlbedoColor.A;
+
+    /// <summary>Whether foliage is drawn blended rather than cut out.</summary>
+    public static bool FoliageBlended(Material material) => material is ShaderMaterial shader
+        ? shader.Shader == Tree3DShape.FadingFoliage
+        : ((StandardMaterial3D)material).Transparency == BaseMaterial3D.TransparencyEnum.Alpha;
+
     public static MeshInstance3D? FindCargo(Node node) {
         if (node is MeshInstance3D mesh && mesh.Mesh?.GetInstanceId() == CrateShape.Cargo.GetInstanceId()) return mesh;
         for (int i = 0; i < node.GetChildCount(); i++)

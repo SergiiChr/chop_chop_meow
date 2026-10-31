@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using Godot;
 using static Checks;
+using static ModelSteps;
 using static SetupSteps;
 using static WorldSteps;
 using static WorkerSteps;
@@ -88,6 +89,7 @@ public partial class Game {
         await Frames();
         var old = view.PropOf(tree.Id) as TreeProp;
         Require(old != null, "Every tree must have its model once the world has loaded.");
+        CheckTreeCanopyCastsShadowsOnlyThroughItsProxies(old!);
         CheckFadingCanopyKeepsItsCutoutShadows(old!);
         old!.Fade = .68f; old.Fall = 9;
         await Click(FindButton(startMenu.Screen, "New game")!);
@@ -100,69 +102,46 @@ public partial class Game {
         await CloseWithEsc();
     }
     /// <summary>Canopy fades use separate shadow-only meshes so the original cutout shadows survive alpha blending.</summary>
-    private void CheckFadingCanopyKeepsItsCutoutShadows(TreeProp prop) {
+    private void CheckTreeCanopyCastsShadowsOnlyThroughItsProxies(TreeProp prop) {
         Require(prop.SwayParts.Length > 0, "A tree canopy must expose its visible meshes for fading.");
-        var allMeshes = new List<MeshInstance3D>();
-        void Gather(Node at) {
-            if (at is MeshInstance3D mesh) allMeshes.Add(mesh);
-            foreach (var child in at.GetChildren()) Gather(child);
-        }
-        Gather(prop.Sway);
-        // The solid core that fills a canopy's shadow is separate from the per-mesh proxies.
-        static bool Core(MeshInstance3D mesh) => mesh.MaterialOverride is ShaderMaterial { Shader: var shader } && shader == Tree3DShape.SolidFoliage;
-        Require(allMeshes.Count(mesh => Core(mesh) && mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.ShadowsOnly) == 1,
+        Require(AllMeshes(prop.Sway).Count(mesh => CanopyCore(mesh) && mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.ShadowsOnly) == 1,
             "A tree canopy must have one shadow-only solid core.");
-        var shadows = allMeshes.Where(mesh => mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.ShadowsOnly && !Core(mesh)).ToArray();
+        var shadows = CanopyShadows(prop);
         Require(shadows.Length == prop.SwayParts.Length, "Each visible tree canopy mesh must have exactly one shadow-only proxy.");
-        // Code-built canopies fade a standard material's albedo alpha; Tree3D foliage swaps to a blended shader with an opacity.
-        static float Opacity(Material material) => material is ShaderMaterial shader
-            ? shader.Shader == Tree3DShape.FadingFoliage ? shader.GetShaderParameter(Tree3DShape.Opacity).AsSingle() : 1
-            : ((StandardMaterial3D)material).AlbedoColor.A;
-        static bool Blended(Material material) => material is ShaderMaterial shader
-            ? shader.Shader == Tree3DShape.FadingFoliage
-            : ((StandardMaterial3D)material).Transparency == BaseMaterial3D.TransparencyEnum.Alpha;
-        var originals = new Material[prop.SwayParts.Length];
-        var proxies = new MeshInstance3D[prop.SwayParts.Length];
-        var proxyMaterials = new Material[prop.SwayParts.Length];
-        var proxyAlphas = new float[prop.SwayParts.Length];
-        var proxyBlended = new bool[prop.SwayParts.Length];
-        for (int i = 0; i < prop.SwayParts.Length; i++) {
-            var (mesh, material) = prop.SwayParts[i];
-            originals[i] = material;
+        foreach (var (mesh, material) in prop.SwayParts) {
             Require(mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off,
                 "Visible tree canopy meshes must leave shadow casting to their proxies.");
             Require(ReferenceEquals(mesh.MaterialOverride, material),
                 "A visible tree canopy mesh must start with its original material.");
-            MeshInstance3D? proxy = null;
-            foreach (var candidate in shadows) {
-                if (ReferenceEquals(candidate.GetParent(), mesh.GetParent()) && ReferenceEquals(candidate.Mesh, mesh.Mesh) &&
-                    ReferenceEquals(candidate.MaterialOverride, material) && candidate.Transform.Equals(mesh.Transform)) {
-                    proxy = candidate; break;
-                }
-            }
+            var proxy = ShadowProxy(shadows, mesh, material);
             Require(proxy != null, "Each tree canopy shadow proxy must share its mesh, material and transform with the visible mesh.");
-            proxies[i] = proxy!;
-            proxyMaterials[i] = proxy!.MaterialOverride!;
-            proxyAlphas[i] = Opacity(proxyMaterials[i]);
-            proxyBlended[i] = Blended(proxyMaterials[i]);
-            Require(Mathf.IsEqualApprox(proxyAlphas[i], 1), "A tree shadow proxy must keep fully opaque foliage alpha.");
+            Require(Mathf.IsEqualApprox(FoliageOpacity(proxy!.MaterialOverride!), 1), "A tree shadow proxy must keep fully opaque foliage alpha.");
         }
         Require(prop.SwayParts.All(part => part.Mesh.CastShadow != GeometryInstance3D.ShadowCastingSetting.ShadowsOnly),
             "Shadow-only proxies must be excluded from the tree canopy fade parts.");
+    }
+
+    private void CheckFadingCanopyKeepsItsCutoutShadows(TreeProp prop) {
+        var shadows = CanopyShadows(prop);
+        var originals = prop.SwayParts.Select(part => part.Material).ToArray();
+        var proxies = prop.SwayParts.Select(part => ShadowProxy(shadows, part.Mesh, part.Material)!).ToArray();
+        var proxyMaterials = proxies.Select(proxy => proxy.MaterialOverride!).ToArray();
+        var proxyAlphas = proxyMaterials.Select(FoliageOpacity).ToArray();
+        var proxyBlended = proxyMaterials.Select(FoliageBlended).ToArray();
         ModelKit.SetFade(prop.SwayParts, .68f);
         for (int i = 0; i < prop.SwayParts.Length; i++) {
             var mesh = prop.SwayParts[i].Mesh;
             var faded = mesh.MaterialOverride as Material;
             Require(faded != null, "A faded tree canopy mesh must still have a material.");
-            Require(Blended(faded), "Fading a tree canopy must blend the visible mesh material.");
-            Require(Opacity(faded) < Opacity(originals[i]), "Fading a tree canopy must make the visible mesh material more transparent.");
+            Require(FoliageBlended(faded), "Fading a tree canopy must blend the visible mesh material.");
+            Require(FoliageOpacity(faded) < FoliageOpacity(originals[i]), "Fading a tree canopy must make the visible mesh material more transparent.");
             Require(mesh.CastShadow == GeometryInstance3D.ShadowCastingSetting.Off, "Fading a tree canopy must leave the visible mesh without shadow casting, to its proxy.");
             var proxy = proxies[i];
             Require(ReferenceEquals(proxy.MaterialOverride, originals[i]),
                 "A tree shadow proxy must keep its original material while the visible mesh fades.");
-            Require(Mathf.IsEqualApprox(Opacity(proxyMaterials[i]), proxyAlphas[i]),
+            Require(Mathf.IsEqualApprox(FoliageOpacity(proxyMaterials[i]), proxyAlphas[i]),
                 "A tree shadow proxy must keep its original opacity while the visible mesh fades.");
-            Require(Blended(proxyMaterials[i]) == proxyBlended[i],
+            Require(FoliageBlended(proxyMaterials[i]) == proxyBlended[i],
                 "A tree shadow proxy must keep its original blending while the visible mesh fades.");
         }
         ModelKit.SetFade(prop.SwayParts, 0);
@@ -197,7 +176,7 @@ public partial class Game {
         messages._Process(1);
         Require(messages.Shown.Length == 0 && lines.All(l => !l.Visible), "Every message must disappear once its time is up.");
     }
-    private async Task CheckTradingPostSellsBuysAndHires() {
+    private async Task CheckTradingPostSendsOnlyCratesOffOnACart() {
         await CloseWithEsc();
         var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
         Give(world, "wood", 5); Give(world, Inventory.Coins, 100);
@@ -224,6 +203,15 @@ public partial class Game {
             "The post's filter must not offer a row of goods that workers do not bring.");
         Require(Named("pick_berries") == null, "The post's filter must not offer loose berries.");
         await Click(Named("filters_close")!);
+        world.Tick(world.Data.TradeSeconds); RemoveThings(world, t => t == sign); Drop(world, Inventory.Coins, 999);
+        await CloseWithEsc();
+    }
+
+    private async Task CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker() {
+        await CloseWithEsc();
+        var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
+        Give(world, Inventory.Coins, 100);
+        await Click(view.Screen(sign.Pos, .8f));
         var fetch = Named("fetch");
         Require(panel.SheetShown, "The price sheet must open.");
         Require(panel.OffsetLeft == SidePanel.Left - MarketPanel.SheetWidth, "The price sheet must open beside the panel.");
@@ -235,7 +223,7 @@ public partial class Game {
             "The price sheet must not offer berries, which the village does not sell.");
         Require(Named("buy_water") != null, "The price sheet must offer water, which the village sells.");
         await Click(Named("buy_water")!);
-        Require(world.Orders.Count == 2 && world.Orders[1].Buying, "Buy on the price sheet must order goods.");
+        Require(world.Orders.Count == 1 && world.Orders[0].Buying, "Buy on the price sheet must order goods.");
         await Click(Named("hardhat")!);
         var dear = world.Data.HireOffers.OrderBy(o => o.Upfront).Last();
         await Click(Named($"hire_{dear.Upfront:0}")!);
@@ -457,8 +445,8 @@ public partial class Game {
         Require(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
         Require(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
     }
-    /// <summary>Launch opens the start menu with no save to continue; options keep their choices; New game starts the welcome page.</summary>
-    private async Task CheckStartMenuOptionsAndNewGame() {
+    /// <summary>Launch opens the start menu with no save to continue, and Esc does not leave it.</summary>
+    private async Task CheckLaunchOpensTheStartMenuWithNoSaveToContinue() {
         // A failed earlier run may have left saves behind, which would enable Continue.
         // Going to the options and back rereads the saves the removal just cleared.
         RemoveCheckFiles(); await Frames(4);
@@ -469,6 +457,10 @@ public partial class Game {
         Require(FindButton(startMenu.Screen, "Continue")!.Disabled, "Launch must offer no save to continue.");
         float launchTime = world.Time; await KeyStroke(Key.Escape);
         Require(startMenu.Visible && world.Time == launchTime, "Esc must not leave the start menu, and the world must not advance behind it.");
+    }
+
+    /// <summary>Each option takes effect at once and shows its choice when the options open again.</summary>
+    private async Task CheckOptionsApplyAndKeepTheirChoices() {
         await Click(FindButton(startMenu.Screen, "Options")!);
         var picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
         Require(picker.Selected == Array.IndexOf(StartMenu.Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
@@ -508,6 +500,10 @@ public partial class Game {
         Require(limits.Selected == 0 && taa.ButtonPressed, "Reopened options must show the choices changed back.");
         await KeyStroke(Key.Escape);
         Require(FindButton(startMenu.Screen, "New game") != null, "Esc in options must return to the start menu.");
+    }
+
+    /// <summary>Empty save slots cannot load, and New game closes the menu on the welcome page.</summary>
+    private async Task CheckNewGameStartsTheWelcomePage() {
         await Click(FindButton(startMenu.Screen, "Load game")!);
         Require(Enumerable.Range(0, Saves.SlotCount + 1).All(n => FindButton(startMenu.Screen, $"{Saves.SlotName(n)} · empty")!.Disabled), "Empty save slots must not be loadable.");
         await Click(FindButton(startMenu.Screen, "Back · Esc")!);
@@ -966,7 +962,9 @@ public partial class Game {
     }
     private async void RunUIChecks() {
         try {
-            await CheckStartMenuOptionsAndNewGame();
+            await CheckLaunchOpensTheStartMenuWithNoSaveToContinue();
+            await CheckOptionsApplyAndKeepTheirChoices();
+            await CheckNewGameStartsTheWelcomePage();
             await CheckPauseMenuAsksBeforeNewGameAndQuit();
             await CheckWasdWalksAndShiftSprintsUnlessTooThirsty();
             await CheckMessagesStackFadeAndKeepClearOfHud();
@@ -986,7 +984,8 @@ public partial class Game {
             await CheckPinnedPlayerStaysDownAndDeathCountsDown();
             await CheckMouseWheelOverPanelDoesNotZoom();
             await CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable();
-            await CheckTradingPostSellsBuysAndHires();
+            await CheckTradingPostSendsOnlyCratesOffOnACart();
+            await CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker();
             await CheckPackingStationListsGoodsAndTakesBackpackClicks();
             await CheckEndGoalsShowEndingOnceAndKeepPlaying();
             await CheckBenchLoadsInputsByClickDoubleClickAndSplit();
