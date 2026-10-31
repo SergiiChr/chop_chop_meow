@@ -41,7 +41,7 @@ public partial class PilePanel(SidePanel side, Thing t) : PagePanel(side) {
             });
             var skip = new CheckBox { Text = "Skip food delivery", ButtonPressed = t.SkipFood, FocusMode = Control.FocusModeEnum.None, Name = "skip_food", TooltipText = "Workers bring no food here; food you put in yourself still composts" };
             skip.Toggled += on => { world.SetSkipFood(t, on); skip.SetPressedNoSignal(t.SkipFood); };
-            content.AddChild(skip);
+            AddChild(skip);
             JobButtons(t);
         }
         BagGrid(id => moves.Stack(world.S.Backpack, t.Inventory, id, t), "Click: store one · Ctrl: store all · Drag to move", wanted: id => world.Holds(t, id));

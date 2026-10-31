@@ -54,7 +54,7 @@ public partial class CrewPanel(SidePanel side) : WorkerPage(side) {
 
     /// <summary>A worker's card in the crew overview; clicking it opens the worker.</summary>
     private void WorkerCard(Worker w) {
-        var card = new PanelContainer(); card.AddThemeStyleboxOverride("panel", Style.Well); content.AddChild(card);
+        var card = new PanelContainer(); card.AddThemeStyleboxOverride("panel", Style.Well); AddChild(card);
         var column = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; column.AddThemeConstantOverride("separation", 10); card.AddChild(column);
         var top = new HBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; top.AddThemeConstantOverride("separation", 12); column.AddChild(top);
         top.AddChild(Style.Icon(Hardhat, 40));
@@ -142,6 +142,6 @@ public partial class WorkerPanel(SidePanel side, Worker? w) : WorkerPage(side) {
         buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { panel.Player.Mode = new ClickMode.Assign(w.Id); panel.Close(); kit.Refresh(); }));
         buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); panel.Open("inspect"); }));
         buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); panel.Open("workers"); }));
-        if (w.WageDebt > 0) content.AddChild(kit.BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));
+        if (w.WageDebt > 0) AddChild(kit.BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));
     }
 }

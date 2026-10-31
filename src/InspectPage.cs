@@ -37,7 +37,7 @@ public partial class InspectPage(SidePanel side) : PagePanel(side) {
     }
     /// <summary>How far away a building is, shown only while it is out of reach.</summary>
     private void Reach(Thing t) {
-        var label = Style.Text("", 14, Style.Warn); label.Visible = false; content.AddChild(label);
+        var label = Style.Text("", 14, Style.Warn); label.Visible = false; AddChild(label);
         var text = new LiveText(shown => label.Text = shown);
         // Rewritten only when the distance moves a tenth of a tile or the building comes into reach.
         int drawn = int.MinValue;

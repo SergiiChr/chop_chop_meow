@@ -21,7 +21,7 @@ public partial class MinePanel(SidePanel side, Thing mine) : PagePanel(side) {
                 ("Fit the frame and rails", $"A worker with a hammer for {workday}", "steel_hammer"),
             };
             // The three steps on a line, done in sage, the current one in mustard.
-            var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 0); content.AddChild(line);
+            var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 0); AddChild(line);
             for (int i = 0; i < stages.Length; i++) {
                 if (i > 0) line.AddChild(new ColorRect { Color = i <= stage ? Style.Sage : Style.Line, CustomMinimumSize = new Vector2(0, 6), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
                 var node = new PanelContainer { Name = $"stage_{i + 1}", CustomMinimumSize = new Vector2(48, 48), MouseFilter = Control.MouseFilterEnum.Pass, TooltipText = $"Stage {i + 1} · {stages[i].Title}\n{stages[i].Needs}" };

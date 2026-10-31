@@ -17,8 +17,6 @@ public abstract partial class PagePanel : VBoxContainer {
     protected readonly PageMemory memory;
     protected readonly BackpackDrawer bag;
     protected readonly List<Action> live;
-    /// <summary>Where the pieces go: this page, or for a moment another column being filled.</summary>
-    protected Control content;
     protected HBoxContainer heading => panel.Heading;
     protected TextureRect headingIcon => panel.HeadingIcon;
     protected Label headingTitle => panel.HeadingTitle;
@@ -26,7 +24,7 @@ public abstract partial class PagePanel : VBoxContainer {
     protected PagePanel(SidePanel panel) {
         this.panel = panel;
         kit = panel.Kit; world = kit.World; sounds = kit.Sounds; view = panel.View; moves = panel.Moves; memory = panel.Memory; bag = panel.Bag; live = panel.Live;
-        content = this; SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        SizeFlagsHorizontal = SizeFlags.ExpandFill;
     }
 
     protected static readonly Dictionary<string, string> JobNames = new() {
@@ -60,7 +58,7 @@ public abstract partial class PagePanel : VBoxContainer {
 
     /// <summary>A beige well inside the panel, holding a row or column of things.</summary>
     protected T Well<T>(T inner) where T : Control {
-        var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); content.AddChild(well);
+        var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); AddChild(well);
         well.AddChild(inner);
         return inner;
     }
@@ -165,7 +163,7 @@ public abstract partial class PagePanel : VBoxContainer {
     /// <summary>Every worker, ticked when they do this job here; the circle counts their jobs elsewhere.</summary>
     protected void WorkerList(Thing t, string job) {
         var list = new VBoxContainer(); list.AddThemeConstantOverride("separation", 2);
-        var box = new PanelContainer(); box.AddThemeStyleboxOverride("panel", Style.Dropdown); box.AddChild(list); content.AddChild(box);
+        var box = new PanelContainer(); box.AddThemeStyleboxOverride("panel", Style.Dropdown); box.AddChild(list); AddChild(box);
         if (world.Workers.Count == 0) { list.AddChild(Style.Text("Hire villagers at a trading post.", 14, Style.Ink)); return; }
         foreach (var w in world.Workers) {
             var worker = w;
@@ -256,16 +254,15 @@ public abstract partial class PagePanel : VBoxContainer {
 
     /// <summary>Shows the backpack drawer with a grid that works with the open page: <paramref name="wanted"/> lights up what it takes.</summary>
     protected void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
-        var host = content; content = bag.Content;
-        AddInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns);
-        content = host; bag.Visible = !bag.Dismissed;
+        bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns));
+        bag.Visible = !bag.Dismissed;
     }
-    protected HBoxContainer Row() { var r = new HBoxContainer(); content.AddChild(r); return r; }
-    protected void AddLabel(string text, int size = 15, Color? color = null) => content.AddChild(Style.Wrapped(text, size, color));
-    protected void AddButton(string text, Action action, bool disabled = false) => content.AddChild(kit.Button(text, action, disabled));
+    protected HBoxContainer Row() { var r = new HBoxContainer(); AddChild(r); return r; }
+    protected void AddLabel(string text, int size = 15, Color? color = null) => AddChild(Style.Wrapped(text, size, color));
+    protected void AddButton(string text, Action action, bool disabled = false) => AddChild(kit.Button(text, action, disabled));
     /// <summary>A label whose text <paramref name="write"/> rebuilds on every refresh.</summary>
     protected void Dynamic(Action<StringBuilder> write, int size = 15, Color? color = null) {
-        var l = Style.Wrapped("", size, color); content.AddChild(l);
+        var l = Style.Wrapped("", size, color); AddChild(l);
         var text = new LiveText(shown => l.Text = shown);
         void Update() {
             if (!GodotObject.IsInstanceValid(l)) return;
@@ -297,12 +294,8 @@ public abstract partial class PagePanel : VBoxContainer {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
     }
     /// <summary>A storage's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
-    protected GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) {
-        var host = content; var column = new VBoxContainer(); content = column;
-        var grid = AddInventoryGrid(() => t.Inventory, t, id => moves.Stack(t.Inventory, world.S.Backpack, id, t), "Click: take one · Ctrl: take all · Drag to move", columns: columns, size: size);
-        content = host; column.RemoveChild(grid); column.QueueFree();
-        return grid;
-    }
+    protected GridContainer StorageGrid(Thing t, int columns = GridColumns, float size = 52) =>
+        NewInventoryGrid(() => t.Inventory, t, id => moves.Stack(t.Inventory, world.S.Backpack, id, t), "Click: take one · Ctrl: take all · Drag to move", columns: columns, size: size);
     /// <summary>Moves every material the storage takes from the backpack; tools stay, and so do crates, so one is never packed inside another.</summary>
     protected void StoreAll(Thing t) {
         if (!world.Near(t)) { kit.Notify("Walk closer first."); return; }

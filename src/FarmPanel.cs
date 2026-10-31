@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 /// </summary>
 public partial class FarmPanel(SidePanel side, Thing farm) : PagePanel(side) {
     public override void _Ready() {
-        var stages = new HBoxContainer(); stages.AddThemeConstantOverride("separation", 0); content.AddChild(stages);
+        var stages = new HBoxContainer(); stages.AddThemeConstantOverride("separation", 0); AddChild(stages);
         string?[] looks = { null, "wheat_seeds", "grass", "wheat" };
         string[] names = { "Fallow", "Sown", "Growing", "Ripe" };
         var nodes = new PanelContainer[4]; var links = new ColorRect[3];
@@ -20,7 +20,7 @@ public partial class FarmPanel(SidePanel side, Thing farm) : PagePanel(side) {
             node.AddChild(looks[i] is string look ? Style.Icon(Icons.Of(look), 30) : new ColorRect { Color = new Color("8a6a48"), CustomMinimumSize = new Vector2(24, 10), SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter });
             nodes[i] = node; stages.AddChild(node);
         }
-        var ripe = Style.Text("", 14, Style.Rim); ripe.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; content.AddChild(ripe);
+        var ripe = Style.Text("", 14, Style.Rim); ripe.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; AddChild(ripe);
         var ripeText = new LiveText(shown => ripe.Text = shown);
         (int Stage, int Hours) drawn = (-1, -1);
         live.Add(() => {

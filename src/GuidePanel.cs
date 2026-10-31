@@ -66,7 +66,7 @@ public partial class GuidePanel(SidePanel side) : PagePanel(side) {
     };
 
     public override void _Ready() {
-        var board = new HBoxContainer(); board.AddThemeConstantOverride("separation", 14); content.AddChild(board);
+        var board = new HBoxContainer(); board.AddThemeConstantOverride("separation", 14); AddChild(board);
         var tabs = new VBoxContainer(); tabs.AddThemeConstantOverride("separation", 10); board.AddChild(tabs);
         foreach (var (key, glyph, title) in GuideTopics) {
             var tab = new Button { Name = $"guide_{key}", TooltipText = title, CustomMinimumSize = new Vector2(48, 48), FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand };

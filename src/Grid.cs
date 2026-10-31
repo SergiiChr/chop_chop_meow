@@ -12,23 +12,23 @@ public partial class PagePanel {
     /// <summary>Room between cups for the count pills that sit on their corners.</summary>
     protected const int CupGap = 10;
 
-    protected GridContainer AddGrid(int columns = GridColumns) {
+    /// <summary>An empty grid with room between its cups, for the caller to place.</summary>
+    protected static GridContainer NewGrid(int columns = GridColumns) {
         var grid = new GridContainer { Columns = columns };
         grid.AddThemeConstantOverride("h_separation", CupGap);
         grid.AddThemeConstantOverride("v_separation", CupGap);
-        content.AddChild(grid);
         return grid;
     }
 
     /// <summary>
-    /// One cell per slot, refreshed live from the inventory's stacks.
+    /// A grid with one cell per slot, refreshed live and not yet placed anywhere. from the inventory's stacks.
     /// An inventory with a capacity shows only <see cref="Inventory.ShownSlots"/>; cells grow in and shrink away as that changes.
     /// Cells drag their stack out, or half of it on a right click, and accept stacks dragged in from another inventory, unless <paramref name="accepts"/> narrows that.
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// With <paramref name="wanted"/>, stacks it names are rimmed in orange and the rest fade, so what the open page takes stands out.
     /// </summary>
-    protected GridContainer AddInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52) {
-        var grid = AddGrid(columns);
+    protected GridContainer NewInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52) {
+        var grid = NewGrid(columns);
         if (size < 52) { grid.AddThemeConstantOverride("h_separation", 8); grid.AddThemeConstantOverride("v_separation", 8); }
         var stacks = new (string Item, int Count)?[inventory().Slots];
         var cells = Enumerable.Range(0, stacks.Length).Select(i => ItemSlot.Cup($"slot_{i}", size)).ToArray();

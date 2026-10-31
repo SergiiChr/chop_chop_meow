@@ -32,10 +32,7 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
         var outbound = Well(new VBoxContainer()); outbound.AddThemeConstantOverride("separation", 8);
         outbound.AddChild(Style.WellLabel("Outbound"));
         var ship = new HBoxContainer(); ship.AddThemeConstantOverride("separation", 14); outbound.AddChild(ship);
-        var host = content; content = new VBoxContainer();
-        var crates = AddInventoryGrid(() => sign.Inventory, sign, id => moves.Stack(sign.Inventory, world.S.Backpack, id, sign), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item), columns: 3);
-        content.RemoveChild(crates); content.QueueFree(); content = host;
-        ship.AddChild(crates);
+        ship.AddChild(NewInventoryGrid(() => sign.Inventory, sign, id => moves.Stack(sign.Inventory, world.S.Backpack, id, sign), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item), columns: 3));
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
         var sell = kit.Button("", () => { var load = sign.Inventory.Items.Keys.OrderByDescending(id => sign.Inventory[id]).FirstOrDefault(); if (world.Sell(sign) && load != null) sounds.Play(Sounds.ForItem(load)); });
         sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = GD.Load<Texture2D>("res://assets/ui/line_cart.svg"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
@@ -65,10 +62,7 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
         inbound.AddChild(Style.WellLabel("Inbound"));
         var mail = new HBoxContainer(); mail.AddThemeConstantOverride("separation", 14); inbound.AddChild(mail);
         var glyph = Style.Glyph("line_mail", 30, Style.Ink); glyph.MouseFilter = Control.MouseFilterEnum.Pass; glyph.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(glyph);
-        host = content; content = new VBoxContainer();
-        var boxes = AddInventoryGrid(() => output, sign, id => moves.Stack(output, world.S.Backpack, id, sign), "Click or drag: take", _ => false, columns: 5);
-        content.RemoveChild(boxes); content.QueueFree(); content = host;
-        mail.AddChild(boxes);
+        mail.AddChild(NewInventoryGrid(() => output, sign, id => moves.Stack(output, world.S.Backpack, id, sign), "Click or drag: take", _ => false, columns: 5));
         BagGrid(id => { if (world.CanSell(id)) moves.Stack(world.S.Backpack, sign.Inventory, id, sign); else kit.Notify("Pack goods the village buys in a crate to sell them."); }, "Click: put a packed crate on the cart · Drag onto a box", wanted: world.CanSell);
     }
 
@@ -85,7 +79,7 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
 
     /// <summary>The road to the village with every cart from this post drawn where it is.</summary>
     private void Road() {
-        var strip = new PanelContainer(); strip.AddThemeStyleboxOverride("panel", Style.Round(Style.Line, 22).Item1); content.AddChild(strip);
+        var strip = new PanelContainer(); strip.AddThemeStyleboxOverride("panel", Style.Round(Style.Line, 22).Item1); AddChild(strip);
         var pad = new MarginContainer(); pad.AddThemeConstantOverride("margin_left", 12); pad.AddThemeConstantOverride("margin_right", 12); pad.AddThemeConstantOverride("margin_top", 6); pad.AddThemeConstantOverride("margin_bottom", 6);
         strip.AddChild(pad);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 10); pad.AddChild(row);
@@ -121,7 +115,7 @@ public partial class MarketPanel(SidePanel side, Thing sign) : PagePanel(side) {
             hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = GD.Load<Texture2D>("res://assets/ui/hardhat.svg"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
             hire.CustomMinimumSize = new Vector2(0, 50); hire.Alignment = HorizontalAlignment.Left;
             hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}";
-            content.AddChild(hire);
+            AddChild(hire);
         }
         AddLabel("Wages come out of the bank at dawn, then your backpack. Unpaid workers strike.", 13, Style.Beige);
     }
