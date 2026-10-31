@@ -96,17 +96,12 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
 /// </summary>
 public sealed class LiveUpdates {
     private readonly List<Action> updates = new();
-    // Counts clears, so a run notices when an update replaced the page under it.
-    private int clears;
 
     public void Add(Action update) => updates.Add(update);
-    public void Clear() { updates.Clear(); clears++; }
+    public void Clear() => updates.Clear();
 
-    /// <summary>Runs the updates; once one opens another page, the old page's remaining updates are dropped.</summary>
-    public void Run() {
-        int run = clears;
-        for (int i = 0; i < updates.Count && run == clears; i++) updates[i]();
-    }
+    /// <summary>Runs the updates in the order they were added.</summary>
+    public void Run() { foreach (var update in updates) update(); }
 
     /// <summary>Calls <paramref name="draw"/> on the first refresh and whenever <paramref name="read"/> gives something new.</summary>
     public void Watch<T>(Func<T> read, Action<T> draw) {
