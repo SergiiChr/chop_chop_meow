@@ -23,7 +23,7 @@ public partial class PilePanel(PageTools tools, Thing subject) : ThingPage(tools
             var item = Style.Icon(Icons.Of("leaves"), 40); item.MouseFilter = Control.MouseFilterEnum.Pass;
             var lasts = Style.Text("", 13, Style.Tan);
             var making = Style.Icon(Icons.Of("fertilizer"), 52); making.TooltipText = "Makes fertilizer"; making.MouseFilter = Control.MouseFilterEnum.Pass;
-            var main = new VBoxContainer(); main.AddThemeConstantOverride("separation", 10); main.AddChild(making); main.AddChild(PerBatch("×1"));
+            var main = new VBoxContainer(); main.AddThemeConstantOverride("separation", 10); main.AddChild(making); main.AddChild(Style.PerBatch("×1"));
             float hour = world.Data.DaySeconds / 24;
             AddChild(new ProcessRow(live, Array.Empty<Control>(), "1 h", () => thing.Progress / hour, new FuelRow("line_leaf", new Color("8fae7e"), item, lasts), main, Array.Empty<Control>()));
             live.Watch(() => {

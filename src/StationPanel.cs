@@ -8,7 +8,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
     protected override void Body() {
         var recipes = world.Data.Recipes.Where(p => p.Value.Station == thing.Kind).Select(p => p.Key).ToList();
         if (recipes.Count > 1) RecipePicker(recipes);
-        if (thing.Recipe != "") Machine(thing);
+        if (thing.Recipe != "") AddChild(cups.Machine());
         else AddLabel("Choose what to make.", 14, Style.Beige);
         if (thing.Kind == ThingKind.Reinforced) Bellows();
         BagGrid(id => world.LoadInput(thing, id, ItemMoves.All ? world.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot",

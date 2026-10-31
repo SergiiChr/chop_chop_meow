@@ -60,12 +60,6 @@ public abstract partial class PagePanel : VBoxContainer {
         return inner;
     }
 
-    /// <summary>A label under a cup: what one batch takes or makes.</summary>
-    protected static Label PerBatch(string text) {
-        var label = Style.Text(text, 13, Style.Tan); label.HorizontalAlignment = HorizontalAlignment.Center;
-        return label;
-    }
-
     /// <summary>Shows the backpack drawer with a grid that works with the open page: <paramref name="wanted"/> lights up what it takes.</summary>
     protected void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
         panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns));

@@ -85,7 +85,7 @@ UI and input:
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
 | `src/StationPanel.cs` | A station's panel: recipes, process row, bellows and jobs |
-| `src/Machine.cs` | Draws a station's process row and its input and output slots |
+| `src/Machine.cs` | `Cups`: a building's item cups and a station's process row |
 | `src/CraftPanel.cs` | The crafting menu and the crafting bench panel |
 | `src/RecipeBoard.cs` | The recipe board both of them show |
 | `src/PageText.cs` | How panels word durations and costs |

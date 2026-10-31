@@ -19,7 +19,7 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         pick.AddChild(packs);
         if (memory.PackPicking || thing.Packs == "") GoodPicker();
         if (thing.Packs != "") {
-            var inputs = new Control[] { MachineSlot(thing, thing.Inventory, thing.Packs, true, "×1"), MachineSlot(thing, thing.Inventory, "crate", true, "") };
+            var inputs = new Control[] { cups.StationCup(thing.Packs, true, "×1"), cups.StationCup("crate", true, "") };
             AddChild(new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, world.Data.PackSeconds)), () => thing.Processing ? thing.Progress / world.Data.PackSeconds : 0, null, PackedCrate(), Array.Empty<Control>()));
         }
         BagGrid(id => world.LoadInput(thing, id, ItemMoves.All ? world.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot", wanted: id => world.Holds(thing, id));
@@ -48,7 +48,7 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         cell.Pressed += () => { if (output.First() is string crate) { kit.Act(() => moves.Stack(output, world.S.Backpack, crate, thing)); kit.Refresh(); } };
         cell.Drag = () => output.First() is string crate ? new ItemDrag(crate, 1, output, thing) : null;
         column.AddChild(cell);
-        var fill = PerBatch(""); column.AddChild(fill);
+        var fill = Style.PerBatch(""); column.AddChild(fill);
         live.Watch(() => output.First() is string crate && world.Packed(crate) is Inventory contents ? contents.Count : -1, packed => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, packed >= 0 ? Colors.White : Style.Ghost);
             cell.TooltipText = packed < 0 ? "The crate being packed shows here" : packed == world.Data.CrateCapacity ? "Full crate · click or drag to take" : "Crate being packed · click or drag to take";

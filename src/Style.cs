@@ -187,6 +187,12 @@ public static class Style {
     /// <summary>A small heading at the top of a well.</summary>
     public static Label WellLabel(string text) => Text(text, 13, Tan, Head);
 
+    /// <summary>A label under a cup: what one batch takes or makes.</summary>
+    public static Label PerBatch(string text) {
+        var label = Text(text, 13, Tan); label.HorizontalAlignment = HorizontalAlignment.Center;
+        return label;
+    }
+
     /// <summary>A small pill with a key or count on it.</summary>
     public static Label Pill(string text, StyleBox box, Color color, int size = 12) {
         var label = Text(text, size, color);

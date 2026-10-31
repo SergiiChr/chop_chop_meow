@@ -43,6 +43,9 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     private readonly JobChoice job = new();
     private readonly FilterState filters = new();
 
+    /// <summary>The cups bound to this thing.</summary>
+    protected Cups cups => field ??= new Cups(kit, moves, live, thing);
+
     public override bool Current => world.Find(thing.Id) == thing;
 
     protected override void Build() {

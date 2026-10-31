@@ -37,7 +37,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                     var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); row.AddChild(column);
                     var (cell, count) = ItemSlot.Cup($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
                     cell.Pressed += () => { kit.Act(() => world.SupplyMine(thing)); kit.Refresh(); };
-                    column.AddChild(PerBatch($"/ {amount}"));
+                    column.AddChild(Style.PerBatch($"/ {amount}"));
                     live.Watch(() => thing.Inventory[item], drawn => {
                         count.Text = drawn.ToString();
                         cell.AddThemeStyleboxOverride("normal", drawn >= amount ? Style.Round(Style.CupFill, 14).Item1 : Style.CupNormal);

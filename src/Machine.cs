@@ -4,23 +4,50 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A station's process row; each cup holds a single stack and shows a faint picture of what goes in it while empty.</summary>
-public partial class PagePanel {
+/// <summary>A building's item cups and its station's process row; each cup holds a single stack and shows a faint picture of what goes in it while empty.</summary>
+public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) {
+    private readonly World world = kit.World;
+
+    /// <summary>A cup bound to one item of an inventory: a click or drag takes it, and <paramref name="tooltip"/> words the amount held.</summary>
+    /// <param name="look">The cup's rim, for one other than a plain input's or an output's.</param>
+    public ItemSlot Cup(Inventory box, string item, bool input, Func<int, string> tooltip, float size = 52, StyleBoxFlat? look = null) {
+        var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
+        cell.Icon = Icons.Of(item);
+        if ((look ?? (input ? null : Style.CupWanted)) is StyleBoxFlat rim) cell.AddThemeStyleboxOverride("normal", rim);
+        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, t)); kit.Refresh(); };
+        cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, t) : null;
+        // Redrawn only when the amount held changes.
+        live.Watch(() => box[item], held => {
+            cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
+            count.Text = held > 0 ? held.ToString() : "";
+            cell.TooltipText = tooltip(held);
+        });
+        return cell;
+    }
+
+    /// <summary>A cup with what one batch takes or makes under it.</summary>
+    public static VBoxContainer Labelled(Control cup, string perBatch) {
+        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
+        column.AddChild(cup);
+        if (perBatch != "") column.AddChild(Style.PerBatch(perBatch));
+        return column;
+    }
+
     /// <summary>A station's work: what one batch takes, how long it runs, what it burns and what it makes.</summary>
-    protected void Machine(Thing t) {
+    public ProcessRow Machine() {
         var recipe = world.Data.Recipes[t.Recipe];
         float rate = (t.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * world.Speed(t.Tools != null && recipe.Tool != "" ? world.BenchTool(t, recipe.Tool, recipe.Tier) : null);
         float seconds = recipe.Seconds / Math.Max(.01f, rate);
-        var inputs = world.BatchCost(t).Select(p => (Control)MachineSlot(t, t.Inventory, p.Key, true, $"×{p.Value}"));
+        var inputs = world.BatchCost(t).Select(p => (Control)StationCup(p.Key, true, $"×{p.Value}"));
         // Leftovers from an earlier recipe or fuel stay reachable as side outputs.
-        var side = world.Leftovers(t).Where(item => item != recipe.Output).Select(item => (Control)MachineSlot(t, t.Inventory, item, false, "", 44));
-        AddChild(new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, seconds)), () => t.Processing ? t.Progress / recipe.Seconds : 0,
-            recipe.Fuel && t.Burner != null ? FuelSlot(t, seconds) : null,
-            MachineSlot(t, t.Inventory, recipe.Output, false, recipe.Amount > 1 ? $"×{recipe.Amount}" : "×1", 64), side.ToArray()));
+        var side = world.Leftovers(t).Where(item => item != recipe.Output).Select(item => (Control)StationCup(item, false, "", 44));
+        return new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, seconds)), () => t.Processing ? t.Progress / recipe.Seconds : 0,
+            recipe.Fuel && t.Burner != null ? FuelSlot(seconds) : null,
+            StationCup(recipe.Output, false, recipe.Amount > 1 ? $"×{recipe.Amount}" : "×1", 64), side.ToArray());
     }
 
     /// <summary>The fuel slot under the bar: a flame, its cup, and how long the fuel in it lasts at one per batch.</summary>
-    protected FuelRow FuelSlot(Thing t, float batchSeconds) {
+    private FuelRow FuelSlot(float batchSeconds) {
         var burner = t.Burner!;
         var (cell, count) = ItemSlot.Cup("fuel");
         cell.AddThemeStyleboxOverride("normal", Style.CupFuel);
@@ -43,14 +70,11 @@ public partial class PagePanel {
         return new FuelRow("line_flame", Style.Ember, cell, lasts);
     }
 
-    /// <summary>A cup for one input or output; empty, it shows a faint picture of its item, and under it what one batch takes or makes.</summary>
-    protected VBoxContainer MachineSlot(Thing t, Inventory box, string item, bool input, string perBatch, float size = 52) {
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
-        var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
-        if (!input) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
-        cell.Icon = Icons.Of(item);
-        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, t)); kit.Refresh(); };
-        cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, t) : null;
+    /// <summary>A cup for one input or output of a station, which takes a backpack stack dragged on as an input.</summary>
+    public VBoxContainer StationCup(string item, bool input, string perBatch, float size = 52) {
+        var box = t.Inventory;
+        string hint = input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";
+        var cell = Cup(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size);
         if (input) {
             cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || item == "water" && Water.IsBottle(drag.Item));
             cell.Take = drag => {
@@ -58,14 +82,6 @@ public partial class PagePanel {
                 kit.Act(() => world.LoadInput(t, drag.Item, drag.Count)); kit.Refresh(); return drag.Item == item ? left : 0;
             };
         }
-        string hint = input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";
-        live.Watch(() => box[item], held => {
-            cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
-            count.Text = held > 0 ? held.ToString() : "";
-            cell.TooltipText = $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}";
-        });
-        column.AddChild(cell);
-        if (perBatch != "") column.AddChild(PerBatch(perBatch));
-        return column;
+        return Labelled(cell, perBatch);
     }
 }

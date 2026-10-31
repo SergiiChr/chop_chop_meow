@@ -58,7 +58,7 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
             cell.Pressed += () => { kit.Act(cancel); kit.Refresh(); };
         }
         column.AddChild(cell);
-        if (perBatch != "") column.AddChild(PerBatch(perBatch));
+        if (perBatch != "") column.AddChild(Style.PerBatch(perBatch));
         return column;
     }
 }
@@ -74,7 +74,7 @@ public partial class BenchPanel(PageTools tools, Thing subject) : ThingPage(tool
             id => { world.SetRecipe(thing, id); Redraw(); }, id => thing.Recipe == id, id => world.Backpack.Has(world.Data.Recipes[id].Inputs),
             // A double click also loads one batch of inputs from the backpack.
             id => kit.Act(() => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(thing, item, amount); })));
-        if (thing.Recipe != "") Machine(thing);
+        if (thing.Recipe != "") AddChild(cups.Machine());
         else AddLabel("Choose what to make.", 14, Style.Beige);
         var slotted = World.SlotKinds(thing.Kind);
         BagGrid(id => {

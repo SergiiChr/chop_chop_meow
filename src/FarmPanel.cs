@@ -31,44 +31,27 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
             for (int i = 0; i < 3; i++) links[i].Color = i < at ? Style.Sage : Style.Line;
             ripe.Text = hours >= 0 ? $"ripe in {hours / 24} d {hours % 24} h" : thing.FarmStage == FarmStage.Ripe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in";
         });
-        var output = thing.Output ?? thing.Inventory;
-        var main = FarmCup(output, "wheat", false, $"×{world.Data.Farm.Yield.GetValueOrDefault("wheat")}");
-        var side = world.Data.Farm.Yield.Keys.Where(k => k != "wheat").Select(k => FarmCup(output, k, false, $"×{world.Data.Farm.Yield[k]}", 44)).ToArray();
-        var fertilizer = FarmCup(thing.Inventory, "fertilizer", true, "", 52, Style.CupFuel);
+        var fertilizer = SowingCup("fertilizer", Style.CupFuel);
         var lasts = Style.Text("", 13, Style.Tan);
         int perCrop = world.Data.Farm.Sow.GetValueOrDefault("fertilizer");
         live.Watch(() => thing.Inventory["fertilizer"], stock => lasts.Text = $"×{perCrop} · {stock / Math.Max(1, perCrop)}{(stock == 1 ? " crop" : " crops")}");
-        var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => FarmCup(thing.Inventory, k, true, $"×{world.Data.Farm.Sow[k]}"));
+        var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => (Control)Cups.Labelled(SowingCup(k), $"×{world.Data.Farm.Sow[k]}"));
+        var main = Cups.Labelled(HarvestCup("wheat"), $"×{world.Data.Farm.Yield.GetValueOrDefault("wheat")}");
+        var side = world.Data.Farm.Yield.Keys.Where(k => k != "wheat").Select(k => (Control)Cups.Labelled(HarvestCup(k, 44), $"×{world.Data.Farm.Yield[k]}")).ToArray();
         AddChild(new ProcessRow(live, inputs, $"{world.Data.Farm.GrowDays:0} d", () => thing.FarmStage == FarmStage.Growing ? thing.Progress / world.GrowSeconds : thing.FarmStage == FarmStage.Ripe ? 1 : 0,
-            new FuelRow("line_leaf", new Color("8fae7e"), FuelCup(fertilizer), lasts), main, side));
+            new FuelRow("line_leaf", new Color("8fae7e"), fertilizer, lasts), main, side));
         BagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), "Click: sow seeds or fertilizer · Drag to move", wanted: id => world.Holds(thing, id));
         JobButtons();
     }
-    /// <summary>Takes a cup out of the column it was built in, for the fuel row, and frees the column.</summary>
-    private static Control FuelCup(Control column) {
-        var cup = column.GetChild<Control>(0); column.RemoveChild(cup); column.QueueFree();
-        return cup;
+
+    /// <summary>A cup for what the plot sows from; seed comes back in from the plot's own harvest as well as from the backpack.</summary>
+    private ItemSlot SowingCup(string item, StyleBoxFlat? look = null) {
+        var cell = cups.Cup(thing.Inventory, item, true, held => $"{world.Data.Name(item)} · {held}\nClick: take back · Drag seeds here from the harvest or backpack to sow", look: look);
+        cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == thing.Output) && drag.Item == item;
+        cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, thing.Inventory, thing)); kit.Refresh(); return left; };
+        return cell;
     }
-    /// <summary>A cup bound to one item of a farm's sowing or harvest slots, with what one crop takes or gives under it.</summary>
-    private VBoxContainer FarmCup(Inventory box, string item, bool input, string perBatch, float size = 52, StyleBoxFlat? look = null) {
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
-        var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
-        cell.Icon = Icons.Of(item);
-        if (look != null) cell.AddThemeStyleboxOverride("normal", look); else if (!input) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
-        cell.Pressed += () => { kit.Act(() => moves.Stack(box, world.S.Backpack, item, thing)); kit.Refresh(); };
-        cell.Drag = () => box[item] > 0 ? new ItemDrag(item, box[item], box, thing) : null;
-        if (input) {
-            // Seed comes back in from the plot's own harvest as well as from the backpack.
-            cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == thing.Output) && drag.Item == item;
-            cell.Take = drag => { int left = 0; kit.Act(() => left = moves.Drag(drag, box, thing)); kit.Refresh(); return left; };
-        }
-        live.Watch(() => box[item], held => {
-            cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
-            count.Text = held > 0 ? held.ToString() : "";
-            cell.TooltipText = $"{world.Data.Name(item)} · {held}\n{(input ? "Click: take back · Drag seeds here from the harvest or backpack to sow" : "Click: take · Drag seeds to the sowing slot")}";
-        });
-        column.AddChild(cell);
-        if (perBatch != "") column.AddChild(PerBatch(perBatch));
-        return column;
-    }
+
+    private ItemSlot HarvestCup(string item, float size = 52) =>
+        cups.Cup(thing.Output ?? thing.Inventory, item, false, held => $"{world.Data.Name(item)} · {held}\nClick: take · Drag seeds to the sowing slot", size);
 }
