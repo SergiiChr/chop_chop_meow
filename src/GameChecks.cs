@@ -627,6 +627,31 @@ public partial class Game {
         await Frames(); Require(farm.Progress > 0 && farm.FarmStage == FarmStage.Ripe, "holding RMB on a ripe farm plot must walk over and harvest by hand.");
         RemoveThings(world, t => t == farm);
     }
+    /// <summary>A player harvesting beside a running station is busy with the harvest, so their figure stops hammering.</summary>
+    private async Task CheckHarvestingBesideAStationStopsHammering() {
+        var start = world.Player;
+        var farm = world.Add(ThingKind.Farm, start + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
+        world.Player = farm.Pos + new Vector2(.9f, -.9f);
+        var anvil = world.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -2.2f)); anvil.Inventory.Add("steel_bar", 1);
+        await Until(() => view.PlayerAnimation == ActorAction.Hammer, "the idle player hammering at the anvil beside it", 3);
+        var point = RightPress(farm.Pos);
+        await Until(() => farm.Progress > 0, "holding RMB on a ripe farm plot beside the anvil harvesting by hand", 3);
+        await Frames();
+        Require(anvil.Processing && world.Near(anvil) && view.PlayerAnimation != ActorAction.Hammer, "A player harvesting beside a running anvil must not be shown hammering.");
+        RightRelease(point);
+        await Frames();
+        RemoveThings(world, t => t == farm || t == anvil); world.Player = start;
+    }
+    /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
+    private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
+        var anvil = world.Add(ThingKind.Anvil, world.Player + new Vector2(2, 0)); anvil.Inventory.Add("steel_bar", 4);
+        var smith = AddWorker(world, anvil.Pos + new Vector2(0, 1.2f)); world.Assign(smith, anvil);
+        await Until(() => anvil.Processing && smith.WorkState == WorkerWorkState.Hammering, "the smith hammering a batch at the anvil", 3);
+        smith.WageDebt = 1;
+        await Until(() => view.PlayerAnimation == ActorAction.Hammer, "the player hammering beside a worker on strike", 2);
+        smith.WageDebt = 0; world.Fire(smith);
+        RemoveThings(world, t => t == anvil);
+    }
     private async Task CheckRightClickGathersAndLeavesASelectedWorkerMarked() {
         var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
         var worker = AddWorker(world, world.Player + new Vector2(-2, 2));
@@ -1014,6 +1039,8 @@ public partial class Game {
             await CheckLowFoodGlowsScreenEdges();
             await CheckSoundsRotateCrossfadeAndStaySilentOffScreen();
             await CheckRightClickGathersTreeAndHarvestsFarm();
+            await CheckHarvestingBesideAStationStopsHammering();
+            await CheckStrikerBesideAStationLeavesThePlayerHammering();
             await CheckRightClickGathersAndLeavesASelectedWorkerMarked();
             await CheckHudAndHotbarEatAndDrinkInHand();
             var chest = await CheckBuildPlanPlacesChest();

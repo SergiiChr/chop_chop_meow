@@ -253,6 +253,9 @@ public static class ActorAnimation {
         };
     }
 
+    /// <summary>What someone working at a station does there.</summary>
+    public static ActorAction StationAction(ThingKind station) => station == ThingKind.Packer ? ActorAction.Pack : ActorAction.Hammer;
+
     public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving) {
         // The sign hides any load in the worker's bag, which stays there until the strike ends.
         if (worker.WageDebt > 0 && !moving) return ActorAction.Protest;
@@ -270,8 +273,7 @@ public static class ActorAnimation {
 
         return worker.WorkState switch {
             WorkerWorkState.Pumping => ActorAction.Pump,
-            WorkerWorkState.Hammering when assignment?.Kind == ThingKind.Packer => ActorAction.Pack,
-            WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == ThingKind.Mine) => ActorAction.Hammer,
+            WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == ThingKind.Mine) => StationAction(assignment.Kind),
             WorkerWorkState.Digging => ActorAction.Mine,
             _ => ActorAction.Idle
         };

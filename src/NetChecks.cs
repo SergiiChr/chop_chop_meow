@@ -40,7 +40,7 @@ public partial class Game {
 
         PlayerState Guest() => world.Players.Single(p => p != world.Me);
         await Until(() => world.Players.Count == 2, "a guest joining", 45);
-        Require(Guest().Backpack.Count == 2 && Guest().Backpack["steel_axe"] == 1 && Guest().Backpack["empty_bottle"] == 1 && Guest().Pos == Terrain.Spawn, "A first-time guest must start with an axe and a bottle at the clearing.");
+        Require(HoldsNewcomerKit(Guest().Backpack) && Guest().Pos == Terrain.Spawn, "A first-time guest must start with an axe and a bottle at the clearing.");
         await Until(() => view.ShowsPlayer(Guest().Id), "the guest's figure appearing");
         await Until(() => view.OtherAnimation(Guest().Id) == ActorAction.Hammer, "the host seeing the guest hammer at the anvil beside it");
         Signal("saw-hammering");
@@ -56,7 +56,7 @@ public partial class Game {
         await Until(() => world.Players.Count == 2 && Guest().Backpack["coal"] == 2, "the guest reconnecting by itself with its coal", 90);
         await Until(() => world.Players.Count == 1, "the guest leaving again");
         await Until(() => world.Players.Count == 2, "the guest coming back with a broken save");
-        Require(Guest().Backpack.Count == 2 && Guest().Pos == Terrain.Spawn, "A broken guest save must bring the guest in with an axe and a bottle at the clearing.");
+        Require(HoldsNewcomerKit(Guest().Backpack) && Guest().Pos == Terrain.Spawn, "A broken guest save must bring the guest in with an axe and a bottle at the clearing.");
         // The host drops out again while the guest stops trying, joins by hand, and drops for good when this check ends.
         await Signaled("joined");
         net.Leave();
@@ -78,7 +78,7 @@ public partial class Game {
         Require(world.Players.Count == 2, "Joining must add the guest to the host's world.");
         Require(world.Things.Any(t => t.Kind == ThingKind.Chest && t.Pos == NetChest),
             "Joining must bring the host's chest into the guest's world.");
-        Require(world.Backpack.Count == 2 && world.Backpack["steel_axe"] == 1 && world.Backpack["empty_bottle"] == 1 && world.Player == Terrain.Spawn, "A first-time guest must start with an axe and a bottle at the clearing.");
+        Require(HoldsNewcomerKit(world.Backpack) && world.Player == Terrain.Spawn, "A first-time guest must start with an axe and a bottle at the clearing.");
         await Until(() => view.ShowsPlayer(1), "the host's figure appearing");
         await Until(() => view.OtherAnimation(1) == ActorAction.Hammer, "the guest seeing the host hammer at the anvil beside it");
         await Signaled("saw-hammering");
@@ -126,7 +126,7 @@ public partial class Game {
         await LeaveGame();
         using (var file = Godot.FileAccess.Open(GuestSave, Godot.FileAccess.ModeFlags.Write)) file.StoreString("{ broken");
         await JoinFromStart();
-        Require(world.Backpack.Count == 2 && world.Player == Terrain.Spawn, "A broken save must bring the guest in with an axe and a bottle at the clearing.");
+        Require(HoldsNewcomerKit(world.Backpack) && world.Player == Terrain.Spawn, "A broken save must bring the guest in with an axe and a bottle at the clearing.");
         Signal("joined");
         await Until(() => startMenu.Visible && HasLabel(startMenu.Screen, "RECONNECTING"), "the guest being told it is reconnecting again", 60);
         await Click(FindButton(startMenu.Screen, "Stop · Esc")!);

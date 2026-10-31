@@ -415,7 +415,7 @@ public partial class WorldView : Node3D {
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
-        if (action == ActorAction.Idle && StationToHammer(World.Me) is Thing anvil) { action = anvil.Kind == ThingKind.Packer ? ActorAction.Pack : ActorAction.Hammer; target = anvil.Pos; subject = anvil; }
+        if (action == ActorAction.Idle && StationToHammer(World.Me) is Thing station) { action = ActorAnimation.StationAction(station.Kind); target = station.Pos; subject = station; }
         if (World.Mauled) {
             mauledFrom = PinningWolf()?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
             // Facing away from the wolf at the throat lays the head toward it once the rig tips onto its back.
@@ -471,15 +471,14 @@ public partial class WorldView : Node3D {
         }
     }
 
-    /// <summary>A worked station near a player that is processing with nobody of the crew at it, which the player hammers at when idle.</summary>
+    /// <summary>
+    /// A worked station near a player that is processing with nobody of the crew working it, for an idle player to work at.
+    /// A player holding on to a gather target is busy with that, even with a pose that shows no gathering.
+    /// </summary>
     private Thing? StationToHammer(PlayerState p) {
+        if (p.GatherTarget != 0) return null;
         using var acting = World.ActAs(p);
-        foreach (var t in World.Things) {
-            if (!World.Worked(t) || !t.Processing || !World.Near(t)) continue;
-            bool crewed = false;
-            foreach (var w in World.Workers) if (w.Assignment == t.Id && w.Pos.DistanceTo(t.Pos) < 2) crewed = true;
-            if (!crewed) return t;
-        }
+        foreach (var t in World.Things) if (World.Worked(t) && t.Processing && World.Near(t) && !World.CrewHammers(t)) return t;
         return null;
     }
 
@@ -501,7 +500,10 @@ public partial class WorldView : Node3D {
         }
     }
 
-    /// <summary>The other players, posed from what their machines report: walking, the resource they work on, the station they stand at, the tool in hand and their swings.</summary>
+    /// <summary>
+    /// The other players, posed from what their machines report:
+    /// walking, the resource they work on, the station they stand at, the tool in hand and their swings.
+    /// </summary>
     private void UpdateOthers(float dt) {
         var me = World.Me;
         foreach (var p in World.Players) {
@@ -516,10 +518,10 @@ public partial class WorldView : Node3D {
             var target = World.Find(p.GatherTarget);
             bool gathering = target != null && p.Pos.DistanceTo(World.GatherAt(target, p.Pos)) < 2.5f;
             var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting);
-            var facing = gathering ? World.GatherAt(target!, p.Pos) : p.Pos;
             var subject = gathering ? target : null;
+            var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
             if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; }
-            if (action == ActorAction.Idle && StationToHammer(p) is Thing anvil) { action = anvil.Kind == ThingKind.Packer ? ActorAction.Pack : ActorAction.Hammer; facing = anvil.Pos; subject = anvil; }
+            if (action == ActorAction.Idle && StationToHammer(p) is Thing station) { action = ActorAnimation.StationAction(station.Kind); facing = station.Pos; subject = station; }
             if (p.Mauled) action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
             state.Update(p.Pos, action, facing, dt);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);

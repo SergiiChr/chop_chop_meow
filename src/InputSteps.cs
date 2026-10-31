@@ -159,10 +159,19 @@ public partial class Game {
     }
 
     private async Task RightClick(Vector2 at) {
-        var point = GetViewport().GetFinalTransform() * view.Screen(at, .2f);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = point, GlobalPosition = point, Pressed = true });
+        var point = RightPress(at);
         await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = point, GlobalPosition = point, Pressed = false });
+        RightRelease(point);
         await Frames();
     }
+
+    /// <summary>Presses the right mouse button on a world position, and returns the screen point for the release.</summary>
+    private Vector2 RightPress(Vector2 at) {
+        var point = GetViewport().GetFinalTransform() * view.Screen(at, .2f);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = point, GlobalPosition = point, Pressed = true });
+        return point;
+    }
+
+    private static void RightRelease(Vector2 point) =>
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = point, GlobalPosition = point, Pressed = false });
 }
