@@ -12,8 +12,8 @@ public partial class BlackHole : CanvasLayer {
     private static readonly Color Alarm = new("ff4f7a");
     private readonly UiKit kit;
     private readonly WorldView view;
+    private readonly Saves saves;
     private readonly Action closePanel;
-    private readonly Func<int> latestSlot;
     private readonly Control anomaly;
     private readonly PanelContainer anomalyWarning;
     private readonly PanelContainer singularity;
@@ -51,11 +51,8 @@ void fragment() {
     COLOR = vec4(col, 1.0);
 }";
 
-    /// <param name="latestSlot">The save a reload would use, or -1 when there is none.</param>
-    /// <param name="reload">Loads that save.</param>
-    /// <param name="mainMenu">Opens the start menu.</param>
-    public BlackHole(UiKit kit, WorldView view, Theme theme, Action closePanel, Func<int> latestSlot, Action<int> reload, Action mainMenu) {
-        this.kit = kit; this.view = view; this.closePanel = closePanel; this.latestSlot = latestSlot;
+    public BlackHole(UiKit kit, WorldView view, Theme theme, IGameFlow flow, Saves saves, Action closePanel) {
+        this.kit = kit; this.view = view; this.saves = saves; this.closePanel = closePanel;
         Layer = 20;
         anomaly = new Control { Visible = false, Name = "anomaly" }; anomaly.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); AddChild(anomaly);
         anomaly.Theme = theme;
@@ -77,8 +74,8 @@ void fragment() {
         over.AddChild(ConsoleLabel("SINGULARITY EVENT", 26, Neon));
         over.AddChild(ConsoleLabel("A crate folded into a crate. Space time collapsed around it and took Bramblewick, the woods and you with it.", 16, Style.Rim));
         over.AddChild(ConsoleLabel("SIGNAL LOST · NO TIMELINE TO RESUME", 12, Alarm));
-        reloadAfterCollapse = ConsoleButton("Reload save", Neon, () => { End(); reload(latestSlot()); }); reloadAfterCollapse.Name = "reload_after_collapse"; over.AddChild(reloadAfterCollapse);
-        var menuButton = ConsoleButton("Main menu", Neon, () => { End(); mainMenu(); }); menuButton.Name = "menu_after_collapse"; over.AddChild(menuButton);
+        reloadAfterCollapse = ConsoleButton("Reload save", Neon, () => { End(); flow.LoadSlot(saves.Latest()); }); reloadAfterCollapse.Name = "reload_after_collapse"; over.AddChild(reloadAfterCollapse);
+        var menuButton = ConsoleButton("Main menu", Neon, () => { End(); flow.ShowStart(); }); menuButton.Name = "menu_after_collapse"; over.AddChild(menuButton);
         anomaly.AddChild(singularity);
         kit.World.Replaced += End;
         kit.HoldWhile(() => Showing);
@@ -165,7 +162,7 @@ void fragment() {
         var tween = collapseTween = collapse.CreateTween();
         tween.TweenMethod(Callable.From<float>(p => material.SetShaderParameter("progress", p)), 0f, 1f, 5f);
         tween.TweenCallback(Callable.From(() => {
-            reloadAfterCollapse.Disabled = latestSlot() < 0;
+            reloadAfterCollapse.Disabled = saves.Latest() < 0;
             singularity.Modulate = new Color(1, 1, 1, 0); singularity.Visible = true;
         }));
         tween.TweenProperty(singularity, "modulate:a", 1f, 1.2f);

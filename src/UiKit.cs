@@ -6,6 +6,17 @@ using Godot;
 
 namespace ChopChopMeow;
 
+/// <summary>What ends or replaces the game in progress, for the menus and screens that offer it.</summary>
+public interface IGameFlow {
+    /// <summary>Starts a new game.</summary>
+    void Restart();
+    void Quit();
+    /// <summary>Ends a guest's game after the line closes and shows the start menu.</summary>
+    void Leave();
+    void LoadSlot(int slot);
+    void ShowStart();
+}
+
 /// <summary>
 /// What the interface's parts work with: the world, how a player action runs, and the buttons that run one.
 /// Every button runs its action through <see cref="Act"/> and then refreshes the screen.

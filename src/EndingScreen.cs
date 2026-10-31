@@ -11,7 +11,7 @@ public partial class EndingScreen : PanelContainer {
     /// <summary>Whether this player has seen the ending; a guest's copy of the save flag follows the host's.</summary>
     private bool seen;
 
-    public EndingScreen(UiKit kit, Action closePanel, Action restart) {
+    public EndingScreen(UiKit kit, Action closePanel, IGameFlow flow) {
         this.kit = kit; this.closePanel = closePanel;
         Visible = false;
         SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
@@ -21,7 +21,7 @@ public partial class EndingScreen : PanelContainer {
         var title = Style.Wrapped("A settlement of your own", 26); title.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(title);
         stats = Style.Wrapped("", 16, Style.Beige); stats.HorizontalAlignment = HorizontalAlignment.Center; column.AddChild(stats);
         var keep = kit.Button("Keep playing", () => Visible = false); keep.Name = "keep_playing"; column.AddChild(keep);
-        var again = kit.Button("Restart", restart); again.Name = "restart"; column.AddChild(again);
+        var again = kit.Button("Restart", flow.Restart); again.Name = "restart"; column.AddChild(again);
         kit.World.Replaced += () => Visible = false;
         kit.HoldWhile(() => Visible);
     }

@@ -14,7 +14,8 @@ public partial class StartMenu : ColorRect {
     private readonly Saves saves;
     private readonly Net net;
     private readonly SidePanel panel;
-    private readonly Action hideMenu, restart, quit;
+    private readonly Action hideMenu;
+    private readonly IGameFlow flow;
     private Action? screenBack;
     private Label joinStatus = null!;
     private Label reconnectStatus = null!;
@@ -24,8 +25,8 @@ public partial class StartMenu : ColorRect {
     /// <summary>Why the last joined game ended, shown once on the start menu.</summary>
     public string LeftReason { get; set; } = "";
 
-    public StartMenu(UiKit kit, Saves saves, Net net, SidePanel panel, Action hideMenu, Action restart, Action quit) {
-        this.kit = kit; world = kit.World; this.saves = saves; this.net = net; this.panel = panel; this.hideMenu = hideMenu; this.restart = restart; this.quit = quit;
+    public StartMenu(UiKit kit, Saves saves, Net net, SidePanel panel, Action hideMenu, IGameFlow flow) {
+        this.kit = kit; world = kit.World; this.saves = saves; this.net = net; this.panel = panel; this.hideMenu = hideMenu; this.flow = flow;
         Color = new Color(.07f, .12f, .09f, .86f); Visible = false;
         SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect);
         var center = new CenterContainer(); center.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); AddChild(center);
@@ -54,11 +55,11 @@ public partial class StartMenu : ColorRect {
         if (LeftReason != "") { var note = Style.Wrapped(LeftReason, 14, new Color("f2b38b")); note.HorizontalAlignment = HorizontalAlignment.Center; Screen.AddChild(note); LeftReason = ""; }
         int latest = Saves.Newest();
         AddButton("Continue", () => saves.Load(latest), latest < 0);
-        AddButton("New game", restart);
+        AddButton("New game", flow.Restart);
         AddButton("Load game", () => ShowSlots(false, ShowStart));
         AddButton("Join game", () => ShowJoin(ShowStart, false));
         AddButton("Options", () => ShowOptions(ShowStart));
-        AddButton("Quit", quit);
+        AddButton("Quit", flow.Quit);
     }
 
     public void ShowSlots(bool saving, Action back) {

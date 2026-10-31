@@ -22,8 +22,7 @@ public partial class PauseMenu : PanelContainer {
     /// The pause board: the goal checklist in a well on the left, with the current goal's hint under it and the end goals below,
     /// and the game's buttons stacked on the right.
     /// </summary>
-    /// <param name="leave">Ends a guest's game after the line closes and shows the start menu.</param>
-    public PauseMenu(UiKit kit, Net net, StartMenu startMenu, Action restart, Action quit, Action leave) {
+    public PauseMenu(UiKit kit, Net net, StartMenu startMenu, IGameFlow flow) {
         this.kit = kit; world = kit.World; this.net = net; this.startMenu = startMenu;
         Visible = false; CustomMinimumSize = new Vector2(820, 0);
         AddThemeStyleboxOverride("panel", Style.Board);
@@ -39,11 +38,11 @@ public partial class PauseMenu : PanelContainer {
         SaveButton = MenuButton("Save", Style.Enamel, () => startMenu.ShowSlots(true, BackToPause)); SaveButton.Name = "save"; side.AddChild(SaveButton);
         loadButton = MenuButton("Load", Style.Enamel, () => startMenu.ShowSlots(false, BackToPause)); loadButton.Name = "load"; side.AddChild(loadButton);
         var options = MenuButton("Options", Style.Enamel, () => startMenu.ShowOptions(BackToPause)); options.Name = "options"; side.AddChild(options);
-        newGameButton = MenuButton("New game", Style.Enamel, () => ConfirmLeave("NEW GAME", "Start a new game", restart)); newGameButton.Name = "new_game"; side.AddChild(newGameButton);
-        var quitButton = MenuButton("Quit", Style.Enamel, () => ConfirmLeave("QUIT", "Quit to desktop", quit)); quitButton.Name = "quit"; side.AddChild(quitButton);
+        newGameButton = MenuButton("New game", Style.Enamel, () => ConfirmLeave("NEW GAME", "Start a new game", flow.Restart)); newGameButton.Name = "new_game"; side.AddChild(newGameButton);
+        var quitButton = MenuButton("Quit", Style.Enamel, () => ConfirmLeave("QUIT", "Quit to desktop", flow.Quit)); quitButton.Name = "quit"; side.AddChild(quitButton);
         side.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         HostButton = MenuButton("Host", Style.Sage, HostGame); HostButton.Name = "host"; side.AddChild(HostButton);
-        JoinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
+        JoinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); flow.Leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
         netLine = Style.Text("", 13, Style.Beige, wrap: true); netLine.Name = "net_status"; netLine.HorizontalAlignment = HorizontalAlignment.Center; side.AddChild(netLine);
         world.Replaced += () => Visible = false;
         kit.HoldWhile(() => Visible);

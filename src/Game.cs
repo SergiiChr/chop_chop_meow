@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 /// The runner: creates the world and the interface's parts, holds them, routes input between them and runs the frame.
 /// Each part owns its feature; what several share is in <see cref="UiKit"/>.
 /// </summary>
-public partial class Game : Node {
+public partial class Game : Node, IGameFlow {
     private static readonly bool smokeTest = Launch.Has("--smoke-test");
     private static readonly string? screenshotPath = Launch.Value("--screenshot");
     private static readonly float shotDelay = float.TryParse(Launch.Value("--shot-delay"), System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
@@ -79,7 +79,7 @@ public partial class Game : Node {
     }
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private void BuildHud() {
-        blackHole = new BlackHole(kit, view, ui.Theme, () => panel.Close(), saves.Latest, n => saves.Load(n), () => startMenu.ShowStart()); AddChild(blackHole);
+        blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);
         moves = new ItemMoves(kit, blackHole);
         panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;
         hotbar = new Hotbar(kit, panel);
@@ -94,9 +94,9 @@ public partial class Game : Node {
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         needsPlate = new NeedsPlate(kit, moves, damageEdges); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
-        ending = new EndingScreen(kit, panel.Close, Restart); ui.AddChild(ending);
-        startMenu = new StartMenu(kit, saves, net, panel, () => menu.Visible = false, Restart, () => Quit());
-        menu = new PauseMenu(kit, net, startMenu, Restart, () => Quit(), () => { world.NewGame(); startMenu.ShowStart(); }); ui.AddChild(menu); ui.AddChild(startMenu);
+        ending = new EndingScreen(kit, panel.Close, this); ui.AddChild(ending);
+        startMenu = new StartMenu(kit, saves, net, panel, () => menu.Visible = false, this);
+        menu = new PauseMenu(kit, net, startMenu, this); ui.AddChild(menu); ui.AddChild(startMenu);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
         RefreshLive();
     }
@@ -117,7 +117,7 @@ public partial class Game : Node {
         net.Joined += OnJoined;
         net.Disconnected += ShowReconnecting;
         net.Reconnecting += left => startMenu.ShowRetry(left);
-        net.Left += reason => { startMenu.LeftReason = reason; world.NewGame(); startMenu.ShowStart(); };
+        net.Left += reason => { startMenu.LeftReason = reason; Leave(); };
         net.Failed += reason => startMenu.ShowJoinFailure(reason);
     }
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
@@ -128,7 +128,11 @@ public partial class Game : Node {
         shownHealth = world.Health;
         Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
     }
-    private void Restart() {
+    public void Leave() { world.NewGame(); startMenu.ShowStart(); }
+    public void LoadSlot(int slot) => saves.Load(slot);
+    public void ShowStart() => startMenu.ShowStart();
+    void IGameFlow.Quit() => Quit();
+    public void Restart() {
         net.Leave();
         world.NewGame();
         saves.Slot = 0; autosave = 0;
