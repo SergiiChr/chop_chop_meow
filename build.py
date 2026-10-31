@@ -183,6 +183,7 @@ def run_godot(
     success_marker: str | None = None,
 ) -> None:
     log = BUILD / f"{name}.log"
+    started = time.monotonic()
     with log.open("w") as output:
         try:
             result = subprocess.run(
@@ -213,7 +214,9 @@ def run_godot(
             f"{name} failed (exit {result.returncode}{detail}); see {log.relative_to(ROOT)}"
         )
     if success_marker is not None:
-        print(f"{success_marker} ({log.relative_to(ROOT)})")
+        seconds = time.monotonic() - started
+        limit = f" of {timeout}s" if timeout else ""
+        print(f"{success_marker} in {seconds:.1f}s{limit} ({log.relative_to(ROOT)})")
 
 
 def build_project(env: dict[str, str]) -> None:
@@ -333,7 +336,7 @@ def python_checks() -> None:
     command([bin_dir / "ruff", "format", "--check"])
 
 
-def test(env: dict[str, str]) -> None:
+def test_simulation(env: dict[str, str]) -> None:
     run_godot(
         "test",
         [GODOT, "--headless", "--path", ROOT, "--", "--self-test"],
@@ -341,6 +344,9 @@ def test(env: dict[str, str]) -> None:
         timeout=120,
         success_marker="SELF-TEST PASS",
     )
+
+
+def test_ui(env: dict[str, str]) -> None:
     run_godot(
         "ui-test",
         [GODOT, "--headless", "--path", ROOT, "--", "--ui-test"],
@@ -348,6 +354,9 @@ def test(env: dict[str, str]) -> None:
         timeout=45,
         success_marker="UI-TEST PASS",
     )
+
+
+def test_network(env: dict[str, str]) -> None:
     # The host and guest of the network check talk to each other, so both run at once.
     # The guest joins through a relay that adds lag and packet loss.
     stop = threading.Event()
@@ -371,6 +380,16 @@ def test(env: dict[str, str]) -> None:
         finally:
             stop.set()
             relay.result()
+
+
+TEST_STAGES = {"sim": test_simulation, "ui": test_ui, "net": test_network}
+
+
+def test(env: dict[str, str], stage: str | None = None) -> None:
+    """Run one test stage, or every stage in order."""
+    for name, run in TEST_STAGES.items():
+        if stage in {None, name}:
+            run(env)
 
 
 def fetch_templates(env: dict[str, str]) -> None:
@@ -485,7 +504,8 @@ def build_parser() -> argparse.ArgumentParser:
         "setup": "Download tools if needed, compile C#, and import the project.",
         "check": "Run every offline check: Python types and style, C# compile and "
         "format, then the simulation, UI and two-process network tests.",
-        "test": "Run only the simulation, UI and two-process network tests.",
+        "test": "Run only the simulation, UI and two-process network tests, or one "
+        "stage of them.",
         "build": "Check, export, and smoke-test build/ChopChopMeow.x86_64.",
         "icons": "Render item and building icons from their models into assets/icons.",
     }
@@ -493,6 +513,8 @@ def build_parser() -> argparse.ArgumentParser:
         subparser = commands.add_parser(name, help=text, description=text)
         if name == "play":
             subparser.usage = "build.py play [-h] [-- GAME_ARGS ...]"
+        if name == "test":
+            subparser.add_argument("stage", nargs="?", choices=TEST_STAGES)
     return parser
 
 
@@ -522,7 +544,7 @@ def main() -> int:
         case "check":
             run_check(env)
         case "test":
-            test(env)
+            test(env, args.stage)
         case "build":
             run_build(env)
         case "icons":

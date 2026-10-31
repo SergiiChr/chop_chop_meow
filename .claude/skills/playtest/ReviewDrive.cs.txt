@@ -14,9 +14,12 @@ public partial class ReviewDrive : Node {
     private double waitLeft, poll;
     private int batch;
     private string status = "";
+    private Vector2 cursor;
+    private MouseButtonMask buttons;
 
     public override void _Ready() {
         ProcessMode = ProcessModeEnum.Always;
+        DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
         System.IO.Directory.CreateDirectory(Folder);
         Status("ready");
     }
@@ -81,23 +84,26 @@ public partial class ReviewDrive : Node {
         ShiftPressed = held.Contains(Godot.Key.Shift),
     });
 
-    /// <summary>`ParseInputEvent` does not move the OS cursor and the view reads `GetMousePosition()`, so warp it first.</summary>
+    /// <summary>`ParseInputEvent` does not move the OS cursor and the view reads `GetMousePosition()`, so warp it first. A drag needs the motion's `Relative` and `ButtonMask`.</summary>
     private void Move(Vector2 at) {
         Input.WarpMouse(at);
-        Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
+        Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at, Relative = at - cursor, ButtonMask = buttons });
+        cursor = at;
     }
 
     /// <summary>`click|down|up X Y [left|right] [ctrl] [shift] [double]`.</summary>
     private void Click(string[] p, bool pressed) {
         var at = new Vector2(float.Parse(p[1]), float.Parse(p[2]));
-        if (pressed) Move(at);
         var rest = p.AsSpan(3);
+        var mask = rest.Contains("right") ? MouseButtonMask.Right : MouseButtonMask.Left;
+        Move(at);
+        buttons = pressed ? buttons | mask : buttons & ~mask;
         Input.ParseInputEvent(new InputEventMouseButton {
             Position = at,
             GlobalPosition = at,
             Pressed = pressed,
             ButtonIndex = rest.Contains("right") ? MouseButton.Right : MouseButton.Left,
-            ButtonMask = pressed ? (rest.Contains("right") ? MouseButtonMask.Right : MouseButtonMask.Left) : 0,
+            ButtonMask = buttons,
             CtrlPressed = rest.Contains("ctrl"),
             ShiftPressed = rest.Contains("shift"),
             DoubleClick = pressed && rest.Contains("double"),
