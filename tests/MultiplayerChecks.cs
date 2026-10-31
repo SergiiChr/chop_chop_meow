@@ -31,6 +31,7 @@ public static class MultiplayerChecks {
 
     private static void CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(GameData data) {
         var (world, guest, _) = Hosted(data);
+        Drop(guest, "steel_axe"); Drop(guest, "empty_bottle");
         Give(guest, "wood", 10); Give(guest, "stone", 2);
         world.Run(guest, new Command(Verb.TransferSlot, 0, 0, "wood", 4, new Vector2(0, 7)));
         Require(guest.Backpack.Layout[7].Item == "wood",
@@ -98,7 +99,7 @@ public static class MultiplayerChecks {
     private static void CheckGuestActsThroughCommands(GameData data) {
         var (world, guest, heard) = Hosted(data);
         Require(heard.Contains("A neighbor joined the settlement."), "everyone should hear that a guest joined");
-        Require(guest.Backpack.Count == 0, "a guest without a saved player should start with an empty backpack");
+        Require(guest.Backpack.Count == 2 && guest.Backpack["steel_axe"] == 1 && guest.Backpack["empty_bottle"] == 1, "a guest without a saved player should start with an axe and a bottle");
         Require(guest.Pos == Terrain.Spawn, "a guest without a saved player should start at the clearing");
         Require(guest.Warp == 1, "a guest without a saved player should be told of the move there");
         var lump = world.Add(ThingKind.LooseCoal, Terrain.Spawn + new Vector2(5, 0), 2);
@@ -122,7 +123,7 @@ public static class MultiplayerChecks {
         Require(world.Transfer(chest.Inventory, world.Backpack, "coal", 99) == 2 && world.Backpack["coal"] == hostCoal + 2, "the host should take what a guest stored");
         world.Run(guest, new Command(Verb.Transfer, chest.Id * World.BoxCodes + 2, 0, "coal", 99, default));
         world.Run(guest, new Command(Verb.Hire, chest.Id, 0, "", 99, default));
-        Require(guest.Backpack.Count == 0 && world.Workers.Count == 0, "commands naming boxes or offers that do not exist should do nothing");
+        Require(guest.Backpack.Count == 2 && world.Workers.Count == 0, "commands naming boxes or offers that do not exist should do nothing");
 
         world.RemoveGuest(GuestId);
         Require(world.Players.Count == 1 && heard.Contains("A neighbor left the settlement."), "a leaving guest should leave the world");
@@ -268,7 +269,7 @@ public static class MultiplayerChecks {
         var underwater = new PlayerState { PlayerX = Terrain.Lake.X, PlayerY = Terrain.Lake.Y }; underwater.Backpack.Add("stone", 1);
         foreach (var (saved, why) in new[] { ("{ not json", "garbage"), ("null", "an empty save"), (Json(unknown), "an unknown item"), (Json(crowded), "crates without contents"), (Json(new PlayerState { Health = 0 }), "a dead player"), (Json(new PlayerState { Hunger = 900 }), "hunger out of range") }) {
             var p = world.AddGuest(20, saved);
-            Require(p.Backpack.Count == 0, $"{why} should give an empty backpack");
+            Require(p.Backpack.Count == 2 && p.Backpack["steel_axe"] == 1 && p.Backpack["empty_bottle"] == 1, $"{why} should give an axe and a bottle");
             Require(p.Pos == Terrain.Spawn, $"{why} should start the guest at the clearing");
             Require(p.Health == 100, $"{why} should start the guest at full health");
             world.RemoveGuest(20);

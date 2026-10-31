@@ -18,7 +18,10 @@ internal static class SetupSteps {
     public static int Give(PlayerState player, string item, int count = 1) => player.Backpack.Add(item, count);
 
     /// <summary>Takes goods out of the backpack to clear the ground for the next check: the game can only move them somewhere else.</summary>
-    public static int Drop(World world, string item, int count = int.MaxValue) => world.S.Backpack.Remove(item, count);
+    public static int Drop(World world, string item, int count = int.MaxValue) => Drop(world.S.Actor, item, count);
+
+    /// <summary>Takes items out of a player's backpack, such as a guest's, the way <see cref="Drop(World, string, int)"/> does.</summary>
+    public static int Drop(PlayerState player, string item, int count = int.MaxValue) => player.Backpack.Remove(item, count);
 
     /// <summary>Empties the backpack: the game can only move goods somewhere else.</summary>
     public static void EmptyBackpack(World world) => world.S.Backpack.Clear();

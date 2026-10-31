@@ -54,6 +54,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --trees`, `--bushes` | Show the three tree species or the berry bushes |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
+| `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--animation-review` | Show every actor action on rotating rigs |
@@ -554,7 +555,7 @@ Leaving takes the player back from the host, so nothing in flight is lost or kep
 In between, it is saved a couple of seconds after it changes, and on F5.
 A guest cannot save or load the host's world.
 
-A guest that joins for the first time, or whose save is missing, broken or does not fit the host's world, starts with an empty backpack at the clearing.
+A guest that joins for the first time, or whose save is missing, broken or does not fit the host's world, starts with an axe and a bottle at the clearing.
 Leaving returns a guest to the start menu.
 A guest that loses the connection tries to get back in on its own for up to 120 seconds, with a countdown on screen, and returns with its player as saved on its computer.
 **Stop · Esc** ends the tries, and when the time runs out the guest returns to the start menu.

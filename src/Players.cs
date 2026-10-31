@@ -259,14 +259,20 @@ public sealed partial class World {
 
     /// <summary>
     /// Host: brings a guest in with the player they saved on their machine.
-    /// Anything missing, unknown or out of range gives them a new player instead: an empty backpack at the clearing.
+    /// Anything missing, unknown or out of range gives them a new player instead: an axe and a bottle at the clearing.
     /// </summary>
     public PlayerState AddGuest(int id, string? saved) {
-        var p = Adopt(saved) ?? new PlayerState();
+        var p = Adopt(saved) ?? Newcomer();
         p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(1, 3).First(i => S.Players.All(o => o.Shirt != i));
         S.Players.Add(p);
         NormalizeBottleStorage();
         SayToAll("A neighbor joined the settlement.");
+        return p;
+    }
+
+    private static PlayerState Newcomer() {
+        var p = new PlayerState();
+        p.Backpack.Add("steel_axe", 1); p.Backpack.Add("empty_bottle", 1);
         return p;
     }
 
