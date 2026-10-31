@@ -135,7 +135,7 @@ public partial class Game {
         RunUntilPhase(world, .9f);
         world.Die();
         await Until(() => recovery.Visible, "a downed player's Skip to morning prompt", 2);
-        Require(recovery.Visible && recovery.CanSkip, "A downed player without a cabin must see an enabled Skip to morning prompt.");
+        Require(recovery.Visible && recovery.FindChild("skip_morning", true, false) is Button { Disabled: false }, "A downed player without a cabin must see an enabled Skip to morning prompt.");
         await SurvivalReviewShot("recovery-prompt");
         float previousDay = world.Day;
         await Click((Control)recovery.FindChild("skip_morning", true, false));

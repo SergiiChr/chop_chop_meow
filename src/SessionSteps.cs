@@ -40,10 +40,13 @@ public partial class Game {
             "The rendered survival review capture must save successfully.");
     }
 
+    /// <summary>What the join popup says, or nothing while it is closed.</summary>
+    private string JoinStatus() => startMenu.Screen.FindChild("join_status", true, false) is Label status ? status.Text : "";
+
     /// <summary>Join game on the start menu, the address typed into the popup and the port as it comes; tried again until the host is up.</summary>
     private async Task JoinFromStart() {
         for (ulong until = Time.GetTicksMsec() + 45000; !world.Remote;) {
-            if (Time.GetTicksMsec() > until) Require(false, $"joining the host never happened: {startMenu.JoinStatus}");
+            if (Time.GetTicksMsec() > until) Require(false, $"joining the host never happened: {JoinStatus()}");
             await Click(FindButton(startMenu.Screen, "Join game")!);
             var port = (LineEdit)startMenu.Screen.FindChild("port", true, false);
             Require(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
@@ -57,7 +60,7 @@ public partial class Game {
                 await Click(address); await Type("127.0.0.1");
             } else Require(address.Text == "127.0.0.1", "The join popup must offer the last address joined.");
             await Click(FindButton(startMenu.Screen, "Join")!);
-            for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && startMenu.JoinStatus == "Connecting…";) await Frames(1);
+            for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && JoinStatus() == "Connecting…";) await Frames(1);
             if (!world.Remote) {
                 await Click(FindButton(startMenu.Screen, "Back · Esc")!);
                 await Until(() => FindButton(startMenu.Screen, "Join game") != null, "the start menu after backing out of a failed join", 5);

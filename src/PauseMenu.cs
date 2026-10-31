@@ -17,8 +17,6 @@ public partial class PauseMenu : PanelContainer {
     public Button HostButton { get; }
     public Button JoinButton { get; }
     public Button SaveButton { get; }
-    /// <summary>What the menu says about the game being online.</summary>
-    public string NetStatusLine => netLine.Text;
 
     /// <summary>
     /// The pause board: the goal checklist in a well on the left, with the current goal's hint under it and the end goals below,
@@ -46,7 +44,7 @@ public partial class PauseMenu : PanelContainer {
         side.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         HostButton = MenuButton("Host", Style.Sage, HostGame); HostButton.Name = "host"; side.AddChild(HostButton);
         JoinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
-        netLine = Style.Text("", 13, Style.Beige); netLine.HorizontalAlignment = HorizontalAlignment.Center; netLine.AutowrapMode = TextServer.AutowrapMode.WordSmart; side.AddChild(netLine);
+        netLine = Style.Text("", 13, Style.Beige); netLine.Name = "net_status"; netLine.HorizontalAlignment = HorizontalAlignment.Center; netLine.AutowrapMode = TextServer.AutowrapMode.WordSmart; side.AddChild(netLine);
         world.Replaced += () => Visible = false;
         kit.HoldWhile(() => Visible);
     }

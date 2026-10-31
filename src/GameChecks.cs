@@ -213,7 +213,7 @@ public partial class Game {
         Give(world, Inventory.Coins, 100);
         await Click(view.Screen(sign.Pos, .8f));
         var fetch = Named("fetch");
-        Require(panel.SheetShown, "The price sheet must open.");
+        Require(ShowsChild(panel, "side_board"), "The price sheet must open.");
         Require(panel.OffsetLeft == SidePanel.Left - MarketPanel.SheetWidth, "The price sheet must open beside the panel.");
         Require(fetch != null, "The price sheet must offer a fetch button.");
         Require(fetch.Disabled, "The fetch button must be disabled while no worker is assigned.");
@@ -234,9 +234,9 @@ public partial class Game {
         await Click(Named("fetch")!);
         Require(hired!.Away > 0, "Fetching must send the assigned worker to the village.");
         await Click(Named("prices")!);
-        Require(!panel.SheetShown && panel.OffsetLeft == SidePanel.Left, "The price sheet icon must close the sheet again.");
+        Require(!ShowsChild(panel, "side_board") && panel.OffsetLeft == SidePanel.Left, "The price sheet icon must close the sheet again.");
         await Click(Named("prices")!); await Click(Named("sheet_close")!);
-        Require(!panel.SheetShown && panel.Visible, "The price sheet's close button must close it and leave the panel open.");
+        Require(!ShowsChild(panel, "side_board") && panel.Visible, "The price sheet's close button must close it and leave the panel open.");
         world.Fire(hired); world.Tick(world.Data.TradeSeconds); RemoveThings(world, t => t == sign || t.Kind == ThingKind.Grave); Drop(world, Inventory.Coins, 999);
         await CloseWithEsc();
     }
@@ -389,8 +389,8 @@ public partial class Game {
         Require(world.Find(crate.Id) != null, "No must keep the placed crate on the ground.");
         await DragTo(await Showing(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
         await Click((Control)blackHole.FindChild("anomaly_yes", true, false));
-        Require(blackHole.Collapsing && !blackHole.Asking, "Yes must open the black hole.");
-        await Until(() => blackHole.GameOverShown, "the collapse ending on the game over screen", 10);
+        Require(ShowsChild(blackHole, "collapse") && !blackHole.Asking, "Yes must open the black hole.");
+        await Until(() => blackHole.FindChild("game_over", true, false) is Control { Visible: true, Modulate.A: > .99f }, "the collapse ending on the game over screen", 10);
         await Click((Control)blackHole.FindChild("menu_after_collapse", true, false));
         Require(!blackHole.Showing, "Main menu must leave the black hole.");
         Require(startMenu.Visible, "Main menu must open the start menu.");
@@ -629,11 +629,11 @@ public partial class Game {
     }
     /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item in hand.</summary>
     private async Task CheckHudAndHotbarEatAndDrinkInHand() {
-        Require(!clock.Text.Contains("Health"), "The persistent HUD must not show health.");
-        Require(!clock.Text.Contains("Food"), "The persistent HUD must not show food.");
-        Require(!clock.Text.Contains("Water"), "The persistent HUD must not show water.");
-        Require(!clock.Text.Contains("coins"), "The persistent HUD must not show coins.");
-        Require(!clock.Text.Contains("Pack"), "The persistent HUD must not show the pack.");
+        Require(!HasLabel(clock, "Health"), "The persistent HUD must not show health.");
+        Require(!HasLabel(clock, "Food"), "The persistent HUD must not show food.");
+        Require(!HasLabel(clock, "Water"), "The persistent HUD must not show water.");
+        Require(!HasLabel(clock, "coins"), "The persistent HUD must not show coins.");
+        Require(!HasLabel(clock, "Pack"), "The persistent HUD must not show the pack.");
         Require(hotbar.Buttons.Count == 9 && world.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
         int berries = world.Backpack["berries"];
         await KeyStroke(Key.Key3);
@@ -702,7 +702,7 @@ public partial class Game {
         Require(chest.Inventory["wood"] == storedWood, "The split half must go back into the chest.");
         await Click(Named("filters")!);
         Require(Named("filters_close") != null, "Chest filters must open the filter window.");
-        Require(panel.SheetShown, "Chest filters must show the sheet beside the panel.");
+        Require(ShowsChild(panel, "side_board"), "Chest filters must show the sheet beside the panel.");
         Require(panel.FindChild("filter_in", true, false) != null, "The filter window must show an input filter.");
         Require(panel.FindChild("filter_out", true, false) != null, "The filter window must show an output filter.");
         await DragTo(Cell(0, c => c.TooltipText.StartsWith("Wood")), (Control)panel.FindChild("filter_add_in", true, false));

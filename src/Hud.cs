@@ -11,9 +11,6 @@ public partial class ClockPlate : PanelContainer {
     // What the clock shows, so its text is built only when it changes: building it allocates.
     private (int Day, int Minute, bool Night) shown = (-1, -1, false);
 
-    /// <summary>What the clock reads.</summary>
-    public string Text => time.Text;
-
     public ClockPlate(World world) {
         this.world = world;
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = -200; OffsetRight = -20; OffsetTop = 18; OffsetBottom = 18; MouseFilter = MouseFilterEnum.Ignore;

@@ -23,8 +23,6 @@ public partial class StartMenu : ColorRect {
     public VBoxContainer Screen { get; }
     /// <summary>Why the last joined game ended, shown once on the start menu.</summary>
     public string LeftReason { get; set; } = "";
-    /// <summary>What the join popup last said.</summary>
-    public string JoinStatus => joinStatus.Text;
 
     public StartMenu(UiKit kit, Saves saves, Net net, SidePanel panel, Action hideMenu, Action restart, Action quit) {
         this.kit = kit; world = kit.World; this.saves = saves; this.net = net; this.panel = panel; this.hideMenu = hideMenu; this.restart = restart; this.quit = quit;
@@ -122,7 +120,7 @@ public partial class StartMenu : ColorRect {
             var label = Style.Wrapped(text); label.CustomMinimumSize = new Vector2(80, 0); row.AddChild(label);
             field.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(field);
         }
-        joinStatus = Style.Wrapped("", 14, Style.Beige); Screen.AddChild(joinStatus);
+        joinStatus = Style.Wrapped("", 14, Style.Beige); joinStatus.Name = "join_status"; Screen.AddChild(joinStatus);
         var join = kit.Button("Join", () => {
             if (!int.TryParse(port.Text.Trim(), out int number) || number is < 1 or > 65535) { joinStatus.Text = "The port is a number from 1 to 65535."; return; }
             if (address.Text.Trim() == "") { joinStatus.Text = "Enter the host's address."; return; }

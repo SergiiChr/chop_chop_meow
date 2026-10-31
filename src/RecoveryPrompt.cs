@@ -27,8 +27,6 @@ public partial class RecoveryPrompt : PanelContainer {
         world.Replaced += Refresh;
     }
 
-    public bool CanSkip => !skip.Disabled;
-
     /// <summary>Shows or hides the prompt to match the player's state, unless the player chose to wait.</summary>
     public void Refresh() {
         bool eligible = world.Me.RespawnIn > 0 && !world.HasCabin();

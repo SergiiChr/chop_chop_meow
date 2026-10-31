@@ -67,8 +67,6 @@ public partial class SidePanel : PanelContainer {
     public HBoxContainer Heading { get; private set; } = null!;
     public TextureRect HeadingIcon { get; private set; } = null!;
     public Label HeadingTitle { get; private set; } = null!;
-    /// <summary>Whether the board beside the panel is showing.</summary>
-    public bool SheetShown => sheet.Visible;
     public float ScreenWidth => ui.Size.X;
 
     public SidePanel(UiKit kit, WorldView view, ItemMoves moves, Control ui) {
@@ -89,7 +87,7 @@ public partial class SidePanel : PanelContainer {
         OffsetLeft = Left;
         var frame = new HBoxContainer(); frame.AddThemeConstantOverride("separation", 20); AddChild(frame);
         board = new PanelContainer { Visible = false, SizeFlagsVertical = SizeFlags.ShrinkBegin }; frame.AddChild(board);
-        sheet = new VBoxContainer { Visible = false }; sheet.AddThemeConstantOverride("separation", 12); board.AddChild(sheet);
+        sheet = new VBoxContainer { Name = "side_board", Visible = false }; sheet.AddThemeConstantOverride("separation", 12); board.AddChild(sheet);
         var outer = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; outer.AddThemeConstantOverride("separation", 16); frame.AddChild(outer);
         Heading = new HBoxContainer(); Heading.AddThemeConstantOverride("separation", 12); outer.AddChild(Heading);
         HeadingIcon = Style.Icon(null, 44); HeadingIcon.Visible = false; HeadingIcon.MouseFilter = MouseFilterEnum.Pass; Heading.AddChild(HeadingIcon);

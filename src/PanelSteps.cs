@@ -38,6 +38,9 @@ public partial class Game {
         return Cell(grid, match);
     }
 
+    /// <summary>Whether the control of this name under <paramref name="parent"/> is on screen.</summary>
+    private static bool ShowsChild(Node parent, string name) => parent.FindChild(name, true, false) is Control { Visible: true };
+
     /// <summary>The side panel's title, or nothing while it is closed.</summary>
     private string ShownPage() => panel.Visible ? panel.HeadingTitle.Text : "";
 

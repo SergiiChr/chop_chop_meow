@@ -59,7 +59,7 @@ void fragment() {
         Layer = 20;
         anomaly = new Control { Visible = false, Name = "anomaly" }; anomaly.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); AddChild(anomaly);
         anomaly.Theme = theme;
-        collapse = new ColorRect { Visible = false, Material = new ShaderMaterial { Shader = new Shader { Code = CollapseShader } }, MouseFilter = Control.MouseFilterEnum.Stop };
+        collapse = new ColorRect { Name = "collapse", Visible = false, Material = new ShaderMaterial { Shader = new Shader { Code = CollapseShader } }, MouseFilter = Control.MouseFilterEnum.Stop };
         collapse.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); anomaly.AddChild(collapse);
 
         anomalyWarning = ConsolePanel(Neon);
@@ -72,7 +72,7 @@ void fragment() {
         var yes = ConsoleButton("Yes", Alarm, () => { if (anomalyCrate != null) Collapse(anomalyCrate); }); yes.Name = "anomaly_yes"; answers.AddChild(yes);
         anomaly.AddChild(anomalyWarning);
 
-        singularity = ConsolePanel(Neon);
+        singularity = ConsolePanel(Neon); singularity.Name = "game_over";
         var over = new VBoxContainer(); over.AddThemeConstantOverride("separation", 12); singularity.AddChild(over);
         over.AddChild(ConsoleLabel("SINGULARITY EVENT", 26, Neon));
         over.AddChild(ConsoleLabel("A crate folded into a crate. Space time collapsed around it and took Bramblewick, the woods and you with it.", 16, Style.Rim));
@@ -88,10 +88,6 @@ void fragment() {
     public bool Showing => anomaly.Visible;
     /// <summary>The warning waits for an answer.</summary>
     public bool Asking => anomalyWarning.Visible;
-    /// <summary>The black hole has opened.</summary>
-    public bool Collapsing => collapse.Visible;
-    /// <summary>The game over screen has fully faded in.</summary>
-    public bool GameOverShown => singularity.Visible && singularity.Modulate.A > .99f;
 
     private static PanelContainer ConsolePanel(Color edge) {
         var panel = new PanelContainer { CustomMinimumSize = new Vector2(520, 0) };
