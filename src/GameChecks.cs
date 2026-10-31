@@ -335,18 +335,23 @@ public partial class Game {
         Require(swungWalking, "A torch swing made while walking must keep playing as the player walks on.");
     }
 
-    /// <summary>A stack bigger than a crate's room fills it and the rest stays on the cursor until it is dropped elsewhere.</summary>
+    /// <summary>A stack bigger than a crate's room fills it, and the rest stays on the cursor while the player walks to the next crate and opens it with E.</summary>
     private async Task CheckStackLargerThanCrateFillsItAndRestStaysHeld() {
         Drop(world, "wood", world.Carried("wood"));
         Require(Give(world, "wood", 64) == 64, "The backpack must have room for a stack of wood.");
-        var crates = new[] { world.Add(ThingKind.Crate, world.Player + new Vector2(-1, 0)), world.Add(ThingKind.Crate, world.Player + new Vector2(0, -1)) };
+        var crates = new[] { world.Add(ThingKind.Crate, world.Player + new Vector2(-1, 0)), world.Add(ThingKind.Crate, world.Player + new Vector2(5, -5)) };
         int cap = world.Data.CrateCapacity;
         await ClickOn(crates[0]);
         await DragTo(Cell(1, c => c.TooltipText.Contains("Wood · 64 total")), Cell(0, c => c.TooltipText == ""));
         Require(crates[0].Inventory["wood"] == cap && world.Carried("wood") == 64 - cap, "Dragging a full stack into a crate must fill it and leave the rest in the backpack.");
         Require(GetViewport().GuiIsDragging(), "What did not fit into the crate must stay held.");
-        // A click in the world lets go of a held stack, so no player gets the rest this far: the next crate opens directly.
-        panel.Select(crates[1]); await Frames();
+        // A click in the world would let go of the stack, so the next crate is reached with the keyboard: D walks toward it, and E opens the nearest thing once the first is out of reach.
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
+        await Until(() => !world.Near(crates[0]) && world.Near(crates[1]), "walking out of reach of the first crate and up to the second", 10);
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
+        await KeyStroke(Key.E);
+        Require(view.Selected == crates[1].Id, "E must open the second crate once the first is out of reach.");
+        Require(GetViewport().GuiIsDragging(), "Walking and opening the next crate must keep the rest held.");
         await Click(Cell(0, c => c.TooltipText == ""));
         Require(crates[1].Inventory["wood"] == cap, "The held rest must fill the next crate.");
         Require(world.Carried("wood") == 64 - 2 * cap, "The held rest must leave what fit out of the backpack.");
