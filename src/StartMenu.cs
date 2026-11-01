@@ -54,7 +54,7 @@ public partial class StartMenu : ColorRect {
         panel.Close(); Open("CHOP CHOP MEOW", null);
         if (LeftReason != "") { var note = Style.Wrapped(LeftReason, 14, new Color("f2b38b")); note.HorizontalAlignment = HorizontalAlignment.Center; Screen.AddChild(note); LeftReason = ""; }
         int latest = Saves.Newest();
-        AddButton("Continue", () => saves.Load(latest), latest < 0);
+        AddButton("Continue", () => flow.LoadSlot(latest), latest < 0);
         AddButton("New game", flow.Restart);
         AddButton("Load game", () => ShowSlots(false, ShowStart));
         AddButton("Join game", () => ShowJoin(ShowStart, false));
@@ -67,7 +67,7 @@ public partial class StartMenu : ColorRect {
         // The autosave is written by the game alone, so it is only offered for loading.
         for (int n = saving ? 1 : 0; n <= Saves.SlotCount; n++) {
             int target = n;
-            AddButton(Saves.SlotLabel(n), () => { if (saving) { saves.Save(target); back(); } else saves.Load(target); }, !saving && !Saves.SlotUsed(n));
+            AddButton(Saves.SlotLabel(n), () => { if (saving) { saves.Save(target); back(); } else flow.LoadSlot(target); }, !saving && !Saves.SlotUsed(n));
         }
         AddButton("Back · Esc", back);
     }
@@ -111,7 +111,7 @@ public partial class StartMenu : ColorRect {
     }
 
     /// <summary>The join popup: the host's address and port, which starts out as the port a host opens.</summary>
-    /// <param name="inGame">Opened from the pause menu: the game in progress is autosaved before the host's world replaces it.</param>
+    /// <param name="inGame">Opened from the pause menu: a game this window started is autosaved before the host's world replaces it.</param>
     public void ShowJoin(Action back, bool inGame) {
         Open("JOIN A GAME", () => { if (net.Connecting) net.Leave(); back(); });
         var address = new LineEdit { Name = "address", Text = Settings.Get("net", "address", ""), PlaceholderText = "Host address, such as 192.168.1.20", CustomMinimumSize = new Vector2(0, 38) };
@@ -125,7 +125,7 @@ public partial class StartMenu : ColorRect {
         var join = kit.Button("Join", () => {
             if (!int.TryParse(port.Text.Trim(), out int number) || number is < 1 or > 65535) { joinStatus.Text = "The port is a number from 1 to 65535."; return; }
             if (address.Text.Trim() == "") { joinStatus.Text = "Enter the host's address."; return; }
-            if (inGame && !world.Remote) saves.Save(0);
+            if (inGame && flow.Owns) saves.Save(0);
             var error = net.Join(address.Text.Trim(), number);
             joinStatus.Text = error == Error.Ok ? "Connecting…" : $"Could not connect: {error}.";
         });

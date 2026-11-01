@@ -16,8 +16,6 @@ public partial class Game {
     /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
     private static int CheckPort => Launch.Value("--port") is string port ? int.Parse(port) : Net.DefaultPort;
 
-    private static string GuestSave => $"user://{Launch.FilePrefix}guest-127-0-0-1-{CheckPort}.json";
-
     private static string SignalPath(string name) => $"user://{Launch.FilePrefix}signal-{name}";
 
     /// <summary>Tells the other network check process that this one reached a point, for the times the game itself cannot carry the news.</summary>
@@ -77,6 +75,5 @@ public partial class Game {
         await Click(menu.JoinButton);
         Require(!world.Remote, "Leaving must end the guest's connection.");
         Require(startMenu.Visible, "Leaving must return to the start menu.");
-        Require(Godot.FileAccess.FileExists(GuestSave), "Leaving must save the guest's player.");
     }
 }

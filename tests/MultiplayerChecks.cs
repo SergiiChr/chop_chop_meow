@@ -25,9 +25,7 @@ public static class MultiplayerChecks {
         CheckEachPlayerHasTheirOwnPack(data);
         CheckSleepWaitsForEveryone(data);
         CheckGuestComesBackFromSaveWithTheirPackAndSpot(data);
-        CheckBrokenGuestSavesStartAsNewcomers(data);
         CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(data);
-        CheckOldGuestSaveKeepsItsBottlesAndTheRestOfTheBag(data);
         CheckGuestCopyForwardsLayoutActionsToTheHost(data);
         CheckDropOnAnotherItemsChestCellStoresTheStack(data);
         CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(data);
@@ -111,21 +109,10 @@ public static class MultiplayerChecks {
         Require(guest.Backpack.Layout[1].Count == 10, "guest sorting should stack the wood");
         Require(world.Backpack.Count == 0, "a guest's inventory commands must not change the host's bag");
         world.Run(guest, new Command(Verb.TransferSlot, 0, 0, "wood", 10, new Vector2(1, 9)));
-        var returningWorld = new World(data, false);
-        var returning = returningWorld.AddGuest(GuestId, world.ExportPlayer(guest));
+        world.Depart(GuestId);
+        var returning = world.Arrive("guest", GuestId);
         Require(returning.Backpack.Layout[9].Item == "wood" && returning.Backpack.Layout[0].Item == "stone",
             "a guest leaving and rejoining must retain their exact inventory positions");
-    }
-
-    private static void CheckOldGuestSaveKeepsItsBottlesAndTheRestOfTheBag(GameData data) {
-        var legacy = new PlayerState { Backpack = { SavedItems = new Dictionary<string, int> { ["water"] = 64, ["wood"] = 1 } } };
-        // An old save holds item totals and no stacks.
-        var legacyJson = System.Text.Json.Nodes.JsonNode.Parse(System.Text.Json.JsonSerializer.Serialize(legacy, GameData.Json))!;
-        Require(legacyJson["Backpack"]!.AsObject().Remove("Layout"), "the legacy fixture must drop the saved stacks");
-        var legacyWorld = new World(data, false);
-        var migrated = legacyWorld.AddGuest(GuestId, legacyJson.ToJsonString());
-        Require(migrated.Backpack["wood"] == 1 && migrated.Backpack["water"] + legacyWorld.Things.Where(t => t.Kind == ThingKind.Grave).Sum(t => t.Inventory["water"]) == 64,
-            "a legacy guest's stacked bottles must migrate without rejecting or losing the rest of their bag");
     }
 
     private static void CheckGuestCopyForwardsLayoutActionsToTheHost(GameData data) {
@@ -190,7 +177,7 @@ public static class MultiplayerChecks {
         world.Run(guest, new Command(Verb.Hire, chest.Id, 0, "", 99, default));
         Require(HoldsNewcomerKit(guest.Backpack) && world.Workers.Count == 0, "commands naming boxes or offers that do not exist should do nothing");
 
-        world.RemoveGuest(GuestId);
+        world.Depart(GuestId);
         Require(world.Players.Count == 1 && heard.Contains("A neighbor left the settlement."), "a leaving guest should leave the world");
     }
 
@@ -304,41 +291,19 @@ public static class MultiplayerChecks {
         Require(world.As(guest, () => world.PickUpCrate(crate)), "a guest should pick up a crate");
         string packed = guest.Backpack.Items.Keys.Single(World.IsCrate);
         guest.HotbarSlots[3] = packed;
-        string saved = world.ExportPlayer(guest);
 
-        var hostSave = world.Serialize();
-        Require(!hostSave.Contains("\"coal\": 5") && guest.Crates == null, "the host's save should keep the guest out, and exporting should not change the guest");
-        world.Deserialize(hostSave);
-        Require(world.Players.Count == 1, "a loaded world should start without guests");
-
-        world.RemoveGuest(GuestId);
-        var other = new World(data, false);
-        for (int i = 0; i < 50; i++) other.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 2));
-        var back = other.AddGuest(GuestId, saved);
-        string renamed = back.Backpack.Items.Keys.Single(World.IsCrate);
-        Require(back.Backpack["coal"] == 5 && back.Pos == Terrain.Spawn + new Vector2(6, 1), "a guest should come back with what they carried, where they were");
-        Require(renamed != packed, "a guest's packed crate should come back under a number free in this world");
-        Require(other.Packed(renamed)?["steel_axe"] == 2, "a guest's packed crate should come back with its contents");
-        Require(back.HotbarSlots[3] == renamed, "a guest's hotbar should follow the crate's new number");
-    }
-
-    private static void CheckBrokenGuestSavesStartAsNewcomers(GameData data) {
-        var world = new World(data, false);
-        var good = new PlayerState { Health = 80 };
-        good.Backpack.Add("wood", 3);
-        string Json(PlayerState p) => System.Text.Json.JsonSerializer.Serialize(p, GameData.Json);
-        Require(world.AddGuest(10, Json(good)).Backpack["wood"] == 3, "a sound saved player should come back as saved");
-        var unknown = new PlayerState(); unknown.Backpack.SavedItems = new Dictionary<string, int> { ["diamond"] = 2 };
-        var crowded = new PlayerState(); crowded.Backpack.SavedItems = Enumerable.Range(0, 30).ToDictionary(i => $"{World.PackedPrefix}{900 + i}", _ => 1);
-        var underwater = new PlayerState { PlayerX = Terrain.Lake.X, PlayerY = Terrain.Lake.Y }; underwater.Backpack.Add("stone", 1);
-        foreach (var (saved, why) in new[] { ("{ not json", "garbage"), ("null", "an empty save"), (Json(unknown), "an unknown item"), (Json(crowded), "crates without contents"), (Json(new PlayerState { Health = 0 }), "a dead player"), (Json(new PlayerState { Hunger = 900 }), "hunger out of range") }) {
-            var p = world.AddGuest(20, saved);
-            Require(HoldsNewcomerKit(p.Backpack), $"{why} should give an axe and a bottle");
-            Require(p.Pos == Terrain.Spawn, $"{why} should start the guest at the clearing");
-            Require(p.Health == 100, $"{why} should start the guest at full health");
-            world.RemoveGuest(20);
-        }
-        var drowned = world.AddGuest(21, Json(underwater));
-        Require(drowned.Backpack["stone"] == 1 && drowned.Pos == Terrain.Spawn, "a saved spot nobody can stand on should move the guest to the clearing");
+        var server = new World(data, false);
+        server.Deserialize(world.Serialize());
+        server.Vacate();
+        Require(server.Players.Count == 0, "a server's world should start with nobody playing");
+        var back = server.Arrive("guest", GuestId);
+        Require(back.Backpack["coal"] == 5 && back.Pos == Terrain.Spawn + new Vector2(6, 1), "a guest should come back from the world's save with what they carried, where they were");
+        Require(server.Packed(packed)?["steel_axe"] == 2 && back.HotbarSlots[3] == packed, "a guest's packed crate should come back with its contents and hotbar place");
+        var host = server.Arrive("host", 3);
+        Require(host.Backpack["coal"] == 0 && host.Shirt != back.Shirt, "the save's unclaimed first player should go to the first other machine to join, in a shirt of their own");
+        var stranger = server.Arrive("stranger", 4);
+        Require(HoldsNewcomerKit(stranger.Backpack) && stranger.Pos == Terrain.Spawn, "a machine new to the world should get a newcomer with an axe and a bottle at the clearing");
+        server.Depart(GuestId);
+        Require(server.Players.Count == 2 && server.Serialize().Contains("\"guest\""), "a player who left should stay in the world's save");
     }
 }

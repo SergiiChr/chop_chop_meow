@@ -48,10 +48,9 @@ public sealed class Snapshot : Dictionary<EntryKey, byte[]> {
 /// </summary>
 public sealed class WorldUpdates {
     private static readonly JsonSerializerOptions Compact = new(GameData.Json) { WriteIndented = false };
-    // Lists merged by identity, the fog each machine keeps itself, and the player properties, which the players list carries.
-    // The world's crate contents share a name with a player's, which only a guest's own save uses, and stay in.
-    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered) }
-        .Concat(typeof(PlayerState).GetProperties().Select(p => p.Name).Where(n => n != nameof(SaveState.Crates))).ToHashSet();
+    // Lists merged by identity, the fog each machine keeps itself, every player of the save, and the player properties, which the players list carries.
+    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered), nameof(SaveState.Party) }
+        .Concat(SaveState.ActorFields).ToHashSet();
     // The world's own fields, without the lists and players that have entries of their own, or the fog, which each machine works out from where everyone stands.
     private static readonly JsonSerializerOptions Rest = new(Compact) {
         TypeInfoResolver = new DefaultJsonTypeInfoResolver {

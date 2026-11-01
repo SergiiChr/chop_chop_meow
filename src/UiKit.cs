@@ -15,6 +15,8 @@ public interface IGameFlow {
     void Leave();
     void LoadSlot(int slot);
     void ShowStart();
+    /// <summary>This window started the game it plays, so it saves, loads and opens it to others.</summary>
+    bool Owns { get; }
 }
 
 /// <summary>

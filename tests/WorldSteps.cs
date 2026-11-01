@@ -49,7 +49,7 @@ internal static class WorldSteps {
         var world = EmptyWorld(data);
         var heard = new List<string>();
         world.Relay = (to, message) => { if (to == null || to.Id == GuestId) heard.Add(message); };
-        var guest = world.AddGuest(GuestId, null);
+        var guest = world.Arrive("guest", GuestId);
         return (world, guest, heard);
     }
 

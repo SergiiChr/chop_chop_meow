@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>The save slots: slot 0 is the autosave, the rest are the player's.</summary>
-public sealed class Saves(UiKit kit, Net net, Action loaded) {
+public sealed class Saves(UiKit kit, Net net, IGameFlow flow) {
     public const int SlotCount = 3;
 
     /// <summary>Numbered slot that F5 and F9 use; 0 until the player saves to or loads one.</summary>
@@ -29,31 +29,38 @@ public sealed class Saves(UiKit kit, Net net, Action loaded) {
     /// <summary>The save the player was using, else the most recent one, or -1 when there is none.</summary>
     public int Latest() => Slot > 0 && SlotUsed(Slot) ? Slot : Newest();
 
-    /// <summary>F5: until a numbered slot is chosen, asks which slot to use; a guest saves only its own player.</summary>
+    /// <summary>F5: until a numbered slot is chosen, asks which slot to use; only the player who started the game saves it.</summary>
     public void QuickSave(StartMenu menu) {
-        if (kit.World.Remote) { net.SaveGuest(); kit.Notify("Your player is saved on this computer. The host saves the world."); } else if (Slot > 0) Save(Slot); else menu.ShowSlots(true, menu.Close);
+        if (!flow.Owns) kit.Notify("The host saves the world, and your player with it."); else if (Slot > 0) Save(Slot); else menu.ShowSlots(true, menu.Close);
     }
 
     /// <summary>F9: until a numbered slot is chosen, asks which slot to use; a guest has nothing of its own to load.</summary>
     public void QuickLoad(StartMenu menu) {
-        if (kit.World.Remote) kit.Notify("Leave the host's game to load your own."); else if (Slot > 0) Load(Slot); else menu.ShowSlots(false, menu.Close);
+        if (!flow.Owns) kit.Notify("Leave the host's game to load your own."); else if (Slot > 0) flow.LoadSlot(Slot); else menu.ShowSlots(false, menu.Close);
     }
 
+    /// <summary>Asks the server to save the game to a slot, and it says how that went; the UI checks' world, which runs here, is saved here.</summary>
     public void Save(int n) {
+        if (kit.World.Remote) net.Save(n); else kit.Notify(Write(kit.World, n));
+        if (n > 0) Slot = n;
+    }
+
+    /// <summary>Server: writes the world to a slot and returns what to tell the player who asked.</summary>
+    public static string Write(World world, int n) {
         try {
             using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Write); if (file == null) throw new InvalidOperationException("Cannot open save file");
-            file.StoreString(kit.World.Serialize()); if (n > 0) Slot = n; kit.Notify($"Settlement saved · {SlotName(n)}.");
-        } catch (Exception e) { kit.Notify($"Save failed: {e.Message}"); }
+            file.StoreString(world.Serialize());
+            return $"Settlement saved · {SlotName(n)}.";
+        } catch (Exception e) { return $"Save failed: {e.Message}"; }
     }
 
-    public bool Load(int n) {
+    /// <summary>The world in a slot, or why it cannot be loaded.</summary>
+    public static (World? World, string? Error) Read(GameData data, int n) {
         try {
-            if (!SlotUsed(n)) { kit.Notify($"{SlotName(n)} is empty."); return false; }
-            using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Read); kit.World.Deserialize(file.GetAsText());
-            // Another world ends the game the guests are in.
-            net.Leave();
-            Slot = n; loaded();
-            return true;
-        } catch (Exception e) { kit.Notify($"Load failed: {e.Message}"); return false; }
+            if (!SlotUsed(n)) return (null, $"{SlotName(n)} is empty.");
+            var world = new World(data, false);
+            world.Deserialize(Godot.FileAccess.GetFileAsString(SlotPath(n)));
+            return (world, null);
+        } catch (Exception e) { return (null, $"Load failed: {e.Message}"); }
     }
 }
