@@ -135,8 +135,7 @@ public partial class WorldView : Node3D {
         AddChild(new WorldEnvironment { Environment = environment });
         // UpdateLighting moves it along the day's arc.
         // One shadow map covers the whole view: split maps leave a seam across this tilted overhead view and their soft edges jump as the camera moves.
-        // Shadows come from faces turned away from the sun, so the open ground never shades itself into a fine striped mesh; mountains still shade the valley through their far slopes.
-        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, ShadowBias = .02f, ShadowNormalBias = .4f, ShadowReverseCullFace = true, LightAngularDistance = 2, LightEnergy = DaySun };
+        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, ShadowBias = .02f, ShadowNormalBias = .4f, LightAngularDistance = 2, LightEnergy = DaySun };
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
         explored = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.L8, World.S.Explored);
