@@ -14,6 +14,7 @@ public partial class PauseMenu : PanelContainer {
     private readonly VBoxContainer goals;
     private readonly Button loadButton, newGameButton;
     private readonly Label netLine;
+    private int shownGuests;
 
     public Button HostButton { get; }
     public Button JoinButton { get; }
@@ -107,8 +108,13 @@ public partial class PauseMenu : PanelContainer {
         HostButton.Disabled = !net.Owning || net.Opened; HostButton.Text = net.Opened ? "Hosting" : "Host";
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.
         JoinButton.Text = flow.Owns ? "Join" : "Leave game"; JoinButton.Disabled = net.Opened; SaveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = !flow.Owns;
-        netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
+        shownGuests = Guests; netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
         Visible = true;
+    }
+
+    public override void _Process(double delta) {
+        // Players join and leave while the menu is open.
+        if (Visible && Guests != shownGuests) { shownGuests = Guests; netLine.Text = NetStatus(); }
     }
 
     private void BackToPause() { startMenu.Close(); Open(); }

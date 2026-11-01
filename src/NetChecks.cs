@@ -44,11 +44,13 @@ public partial class Game {
         Require(net.Opened && !menu.Visible, "Host in the pause menu must open the game to other computers and close the menu.");
         Require(await PlayerWalks(), "After hosting the player must be able to walk again.");
         await KeyStroke(Key.Escape);
-        Require(menu.Visible && ((Label)menu.FindChild("net_status", true, false)).Text.StartsWith("Hosting on port 24565"), "While hosting, the pause menu must say so.");
-        await KeyStroke(Key.Escape);
+        var netStatus = (Label)menu.FindChild("net_status", true, false);
+        Require(menu.Visible && netStatus.Text == "Hosting on port 24565 · 0 guests", "While hosting, the pause menu must say so.");
 
         PlayerState Guest() => Hosted.Players.Single(p => p.Key != net.Key);
         await Until(() => Hosted.Players.Count == 2, "a guest joining", 45);
+        await Until(() => netStatus.Text.EndsWith("· 1 guest"), "the open pause menu counting the guest who joined");
+        await KeyStroke(Key.Escape);
         Require(HoldsNewcomerKit(Guest().Backpack) && Guest().Pos == Terrain.Spawn, "A first-time guest must start with an axe and a bottle at the clearing.");
         await Until(() => view.ShowsPlayer(Guest().Id), "the guest's figure appearing");
         await Until(() => view.OtherAnimation(Guest().Id) == ActorAction.Hammer, "the host seeing the guest hammer at the anvil beside it");
