@@ -25,6 +25,9 @@ public static class MultiplayerChecks {
         CheckEachPlayerHasTheirOwnPack(data);
         CheckSleepWaitsForEveryone(data);
         CheckGuestComesBackFromSaveWithTheirPackAndSpot(data);
+        CheckEveryPlayerSurvivesLoadingAndSavingAgain(data);
+        CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole();
+        CheckSaveKeepsItsOwnersPlayerOnANewComputer(data);
         CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(data);
         CheckGuestCopyForwardsLayoutActionsToTheHost(data);
         CheckDropOnAnotherItemsChestCellStoresTheStack(data);
@@ -90,6 +93,45 @@ public static class MultiplayerChecks {
         var after = WorldUpdates.ReadState("""{"Time":10}"""u8.ToArray());
         Require(after.Coins == null && after.Time == 10, "a field a state entry leaves out should not keep the last entry's value");
         Require(before.Coins == 12 && before.Time == 9, "reading a state entry should leave the one read before alone");
+    }
+
+    private static void CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole() {
+        var host = new WorldUpdates();
+        var copy = new PlayerState { Health = 80, Hunger = 60, PlayerX = 5 };
+        byte[] before = PlayerEntry(new PlayerState { Sheltered = 3 });
+        byte[] numbers = PlayerEntry(new PlayerState { Sheltered = 9, Health = 77, Hunger = 42.5f });
+        Require(host.SetNumbers(copy, before, numbers), "an update that only changes numbers should go in place");
+        Require(copy.Hunger == 42.5f && copy.Health == 77 && copy.Sheltered == 9, "whole and fractional numbers should take the update's values");
+        Require(copy.PlayerX == 5, "fields an update does not change should stay as they were");
+        Require(!host.SetNumbers(copy, numbers, PlayerEntry(new PlayerState { Sheltered = 9, Health = 77, Hunger = 42.5f, Mauled = true })) && !copy.Mauled, "a field appearing should be read whole, since entries leave out defaults");
+        var carrying = new PlayerState { Sheltered = 9, Health = 77, Hunger = 42.5f }; carrying.Backpack.Add("wood", 3);
+        Require(!host.SetNumbers(copy, numbers, PlayerEntry(carrying)) && copy.Backpack["wood"] == 0, "an update to anything but numbers should change nothing here, so it is read whole");
+    }
+
+    private static void CheckEveryPlayerSurvivesLoadingAndSavingAgain(GameData data) {
+        var world = new World(data, false);
+        world.Vacate(); world.Claim("home");
+        Give(world.Arrive("home", 2), "coal", 5); Give(world.Arrive("friend", 3), "wood", 7);
+        string save = world.Serialize();
+        for (int load = 0; load < 3; load++) { var again = new World(data, false); again.Deserialize(save); save = again.Serialize(); }
+        var last = new World(data, false); last.Deserialize(save); last.Vacate(); last.Claim("home");
+        Require(last.Arrive("home", 2).Backpack["coal"] == 5 && last.Arrive("friend", 3).Backpack["wood"] == 7, "every player should keep what they carry however many times a save is loaded and saved");
+    }
+
+    private static void CheckSaveKeepsItsOwnersPlayerOnANewComputer(GameData data) {
+        var world = new World(data, false);
+        world.Vacate(); world.Claim("old computer");
+        Give(world.Arrive("old computer", 2), "coal", 5);
+        var moved = new World(data, false); moved.Deserialize(world.Serialize());
+        moved.Vacate(); moved.Claim("new computer");
+        Require(moved.Arrive("new computer", 2).Backpack["coal"] == 5, "the machine that opens a save should get the player of the machine that saved it");
+        var friend = new World(data, false); friend.Deserialize(world.Serialize());
+        friend.Vacate(); friend.Claim("friend");
+        Give(friend.Arrive("friend", 2), "wood", 3);
+        var back = new World(data, false); back.Deserialize(friend.Serialize());
+        back.Vacate(); back.Claim("old computer");
+        var returning = back.Arrive("old computer", 2);
+        Require(returning.Backpack["wood"] == 3 && returning.Backpack["coal"] == 5, "the save should stay with one player as it moves between computers");
     }
 
     private static void CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(GameData data) {

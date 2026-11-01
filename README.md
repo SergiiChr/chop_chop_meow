@@ -543,12 +543,14 @@ A slain wolf falls over and leaves a carcass that lasts until it is butchered: h
 ### Hosting and joining
 
 Every game, alone or together, runs on a small server the game starts in the background on this computer.
-Only this computer can join it until **Host** in the pause menu opens it to others on UDP port 24565.
+Only this computer can join it until **Host** in the pause menu opens it to others on UDP port 24565, or the next free port if another game on this computer holds that one.
 The pause menu then shows the port and the number of guests.
 The world stands still while every player has a menu open, which alone means whenever you have one open.
 
 **Join game** on the start menu, or **Join** in the pause menu, opens a popup with the port already filled in and the address of the last game joined. Join is unavailable while hosting, since it would drop the guests. Up to three guests can join.
 Leaving your own game, by quitting, loading or joining another, ends it for everyone in it.
+If joining another game fails, your own comes back from the autosave written just before it.
+A second window on the same computer cannot join a game the first is playing in.
 
 ### Players in the save
 
@@ -557,7 +559,7 @@ Only the player who started the game saves and loads it, and the autosave runs e
 A guest that comes back to the same world, even after the host loaded a save, finds its player as the save had it.
 
 A player a world has never seen starts with an axe and a bottle at the clearing.
-Loading a save from before this comes to the first computer that joins it, which is yours.
+A save follows its owner: whoever starts it on another computer plays the player who saved it.
 Leaving returns a guest to the start menu.
 A guest that loses the connection tries to get back in on its own for up to 120 seconds, with a countdown on screen.
 **Stop · Esc** ends the tries, and when the time runs out the guest returns to the start menu.
@@ -580,6 +582,7 @@ Thirty times a second the server sends each player only what changed since the l
 ## Saves
 
 There are three save slots and a separate autosave the server writes every 5 minutes.
+A save from another version of the game is refused rather than converted.
 F5 and F9 quick save and load to the current slot.
 
 The launcher keeps its Godot user-data directory under `.tools/xdg-data`.

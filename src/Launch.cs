@@ -9,7 +9,7 @@ public static class Launch {
     public static readonly string[] Args = OS.GetCmdlineUserArgs();
     // Review fixtures and UI checks keep their own files so they never touch the player's saves or settings.
     // A server started by a window writes its saves where that window reads them.
-    public static readonly string FilePrefix = Value("--file-prefix") ?? (Has("--performance-run") ? "performance-" : Has("--showcase") ? "review-" : Has("--ui-test") ? "ui-check-" : Has("--net-check") ? "net-check-" : "");
+    public static readonly string FilePrefix = Value("--file-prefix") ?? (Has("--performance-run") ? "performance-" : Has("--showcase") ? "review-" : Has("--ui-test") ? "ui-check-" : Has("--net-check") ? "net-check-" : Has("--server-check") ? "server-check-" : "");
 
     public static bool Has(string option) => Args.Contains(option);
 

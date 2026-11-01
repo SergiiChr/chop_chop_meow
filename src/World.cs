@@ -150,7 +150,7 @@ public sealed class Wolf {
 }
 /// <summary>
 /// Everything a save holds. The player properties read and write <see cref="Actor"/>, the player whose action or turn the simulation is running.
-/// Saves before version 6 kept their one player in those properties; a save now keeps every player in <see cref="Party"/> and leaves them out.
+/// A save keeps every player in <see cref="Party"/> and leaves those properties out.
 /// </summary>
 public sealed class SaveState {
     /// <summary>Everyone playing now; a new world starts with one player not yet claimed by any machine.</summary>
@@ -166,9 +166,11 @@ public sealed class SaveState {
         get => Players.Concat(Absent.Values).ToDictionary(p => p.Key);
         set { Absent = value; foreach (var (key, p) in value) p.Key = key; }
     }
-    /// <summary>The player properties that read and write <see cref="Actor"/>, which saves since version 6 leave out.</summary>
+    /// <summary>The key of the machine that last started this world, whose player follows the save to another computer.</summary>
+    public string Owner { get; set; } = "";
+    /// <summary>The player properties that read and write <see cref="Actor"/>, which saves leave out.</summary>
     public static readonly HashSet<string> ActorFields = typeof(PlayerState).GetProperties().Select(p => p.Name).Intersect(typeof(SaveState).GetProperties().Select(p => p.Name)).ToHashSet();
-    /// <summary>6 keeps every player in <see cref="Party"/>; 5 aligned mine entrances with their cliff faces; versions 4 and 5 migrate on load.</summary>
+    /// <summary>Saves from any other version are refused.</summary>
     public int Version { get; set; } = 6;
     public List<Thing> Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
@@ -325,7 +327,6 @@ public sealed partial class World {
     public float PlaySeconds => S.PlaySeconds;
     /// <summary>The player whose action or turn is running.</summary>
     public int ActorId => S.Actor.Id;
-    public int SaveVersion => S.Version;
     public bool Priced(string item) => S.Prices.ContainsKey(item);
     public Thing? Remembered(int id) => S.Remembered.GetValueOrDefault(id);
     /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
@@ -2105,13 +2106,11 @@ public sealed partial class World {
         json = json.Replace("\"iron_axe\"", "\"steel_axe\"").Replace("\"iron_pick\"", "\"steel_pick\"").Replace("\"iron_hammer\"", "\"steel_hammer\"").Replace("\"iron_parts\"", "\"steel_parts\"");
         if (json.Contains("\"loose_iron\"") || json.Contains("\"Stage\"")) json = UpgradeThings(json);
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
-        if (loaded.Version < 4) throw new InvalidOperationException("This save is from an older, smaller map and cannot be loaded. Start a new game.");
-        if (loaded.Version is not (4 or 5 or 6) || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
-        // Older saves kept their one player in the top-level player properties, which fill the player a new save starts with.
-        if (loaded.Version < 6) loaded.Absent = new() { [""] = loaded.Actor };
+        if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
+        if (loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Players = new();
         loaded.Absent ??= new();
-        // Older saves' coins and steel tools belong to their one player, who plays on here: the unclaimed one, else the first.
+        // Item fixes below that belong to one player go to the unclaimed one, else the first.
         loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.FirstOrDefault() ?? new PlayerState();
         RebuildAllStacks(loaded);
         loaded.Prices ??= new();
@@ -2124,7 +2123,6 @@ public sealed partial class World {
         if (loaded.Explored?.Length != Terrain.Size * Terrain.Size) loaded.Explored = new byte[Terrain.Size * Terrain.Size];
         loaded.Remembered ??= new();
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
-        if (loaded.Version == 4) AlignMines(loaded);
         loaded.Crates ??= new(); loaded.Profits ??= new();
         foreach (var t in loaded.Things) {
             // A station set to a recipe it doesn't make, as on older saves' anvils, is cleared.

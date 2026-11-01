@@ -291,6 +291,12 @@ public sealed partial class World {
         S.Players.Clear(); S.Actor = new PlayerState();
     }
 
+    /// <summary>Server: the machine starting this world takes it over, with the player of the machine that saved it unless it has one here already.</summary>
+    public void Claim(string key) {
+        if (key != S.Owner && !S.Absent.ContainsKey(key) && S.Absent.Remove(S.Owner, out var p)) { p.Key = key; S.Absent[key] = p; }
+        S.Owner = key;
+    }
+
     /// <summary>A guest takes the host's whole world as its copy.</summary>
     public void Mirror(SaveState state, List<PlayerState> players, int localId) {
         state.Players = players; LocalId = localId; S = state; S.Actor = Me;

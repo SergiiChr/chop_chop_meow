@@ -40,6 +40,7 @@ public partial class Game {
         Require(Hosted.Time == before, "The world must stand still while its only player has the pause menu open.");
         // The server keeps the clock; this window shows it a few updates behind.
         await Until(() => world.Time == before, "this window showing the clock where the server stopped it");
+        await Signaled("refused");
         await Click(menu.HostButton);
         Require(net.Opened && !menu.Visible, "Host in the pause menu must open the game to other computers and close the menu.");
         Require(await PlayerWalks(), "After hosting the player must be able to walk again.");
@@ -93,6 +94,8 @@ public partial class Game {
 
     private async Task CheckFirstTimeGuestActsThroughTheHost() {
         RemoveCheckFiles(); await Frames(4);
+        await JoinUntilRefused("The host has not opened the game to other players.");
+        Signal("refused");
         await JoinFromStart();
         Require(!startMenu.Visible, "Joining must close the start menu.");
         Require(world.Players.Count == 2, "Joining must add the guest to the host's world.");
@@ -126,6 +129,10 @@ public partial class Game {
 
     private async Task CheckGuestComesBackFromLeavingAndDropping() {
         await LeaveGame();
+        // Two windows on one computer share a key, which this check's host and guest do not: no input changes a window's key, so this one borrows the host's.
+        string own = net.Key; net.Key = own.Replace("-guest", "-host");
+        await JoinUntilRefused("This computer is already in this game.");
+        net.Key = own;
         // The start menu covers the world and Esc ends a click mode before Join can be reached, so no input leaves either in place for a join.
         panel.Mark(world.Things.First()); player.Mode = new ClickMode.Build(ThingKind.Chest); await Frames();
         Require(view.Selection != default, "The guest must have something selected before it joins.");

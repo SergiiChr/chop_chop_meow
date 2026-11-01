@@ -124,12 +124,12 @@ public partial class PauseMenu : PanelContainer {
     private void HostGame() {
         net.Open();
         var addresses = IP.GetLocalAddresses().Where(a => a.Contains('.') && !a.StartsWith("127.") && !a.StartsWith("169.254.")).Take(2).ToArray();
-        kit.Notify($"Hosting on port {Net.DefaultPort}. Others join with {(addresses.Length > 0 ? string.Join(" or ", addresses) : "this computer's address")}.");
+        kit.Notify($"Hosting on port {net.Port}. Others join with {(addresses.Length > 0 ? string.Join(" or ", addresses) : "this computer's address")}.");
         Close();
     }
 
     /// <summary>A line for the pause menu while the game is online.</summary>
-    private string NetStatus() => net.Opened ? $"Hosting on port {Net.DefaultPort} · {Guests} {(Guests == 1 ? "guest" : "guests")}"
+    private string NetStatus() => net.Opened ? $"Hosting on port {net.Port} · {Guests} {(Guests == 1 ? "guest" : "guests")}"
         : !flow.Owns ? "Playing in the host's world. The host's saves keep your player." : "";
 
     private int Guests => world.Players.Count - 1;

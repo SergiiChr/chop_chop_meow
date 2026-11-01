@@ -10,6 +10,9 @@ using static WorkerSteps;
 
 /// <summary>World setup and passing time for the simulation checks.</summary>
 internal static class WorldSteps {
+    /// <summary>A player as an update's entry carries them.</summary>
+    public static byte[] PlayerEntry(PlayerState player) => System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(player, UpdateJson.Default.PlayerState);
+
     public const float Step = .25f;
     /// <summary>The id a guest has in the checks that host one.</summary>
     public const int GuestId = 7;

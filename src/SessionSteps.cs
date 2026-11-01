@@ -67,6 +67,29 @@ public partial class Game {
         await Until(() => !startMenu.Visible, "the join popup closing");
     }
 
+    /// <summary>Joins until the server turns this window away for <paramref name="reason"/>; it may not be up yet. No input reads the refusal once the popup is closed, so this calls the join directly.</summary>
+    private async Task JoinUntilRefused(string reason) {
+        string heard = ""; void Refused(string why) => heard = why;
+        net.Failed += Refused;
+        for (ulong until = Time.GetTicksMsec() + 45000; heard != reason;) {
+            Require(Time.GetTicksMsec() < until, $"the server never refused this window: {heard}");
+            heard = ""; net.Join("127.0.0.1", CheckPort);
+            await Until(() => heard != "", "the server answering this window");
+        }
+        net.Failed -= Refused;
+    }
+
+    /// <summary>Types a port into the open join popup and presses Join; the address stays as it is, or becomes this computer.</summary>
+    private async Task JoinFromPopup(string to) {
+        var port = (LineEdit)startMenu.Screen.FindChild("port", true, false);
+        await Click(port); await KeyStroke(Key.End);
+        for (ulong wait = Time.GetTicksMsec() + 5000; port.Text != "" && Time.GetTicksMsec() < wait;) await KeyStroke(Key.Backspace);
+        await Type(to);
+        var address = (LineEdit)startMenu.Screen.FindChild("address", true, false);
+        if (address.Text == "") { await Click(address); await Type("127.0.0.1"); }
+        await Click(FindButton(startMenu.Screen, "Join")!);
+    }
+
     private async Task LeaveGame() {
         await CloseWithEsc(); await KeyStroke(Key.Escape);
         Require(menu.Visible, "A guest's Esc must open the pause menu.");

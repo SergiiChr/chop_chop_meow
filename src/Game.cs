@@ -39,6 +39,18 @@ public partial class Game : Node, IGameFlow {
     private Server? hosted;
     /// <summary>The save slot the game this window started came from, or -1 for a new game, until it joins.</summary>
     private int starting = -1;
+    /// <summary>The server process this window last started; 0 for none.</summary>
+    private int serverProcess;
+    /// <summary>This window started a game it has not joined yet.</summary>
+    private bool startingGame;
+    /// <summary>Whether a join in progress ended this window's own game, which comes back from the autosave if it fails.</summary>
+    private bool returnIfJoinFails;
+    /// <summary>What to say once the game a failed join ended is back.</summary>
+    private string returnNote = "";
+    /// <summary>Seconds a window waits for the server it started: the engine has to start and read the save first.</summary>
+    private const float ServerStartSeconds = 60;
+    /// <summary>Ports to try for a new game; the first is the one guests expect, and the rest let a second game run on this computer.</summary>
+    private const int GamePorts = 16;
     /// <summary>Whether the player had a menu open last frame, as the server was last told.</summary>
     private bool holding;
     private Saves saves = null!;
@@ -74,10 +86,11 @@ public partial class Game : Node, IGameFlow {
             GetViewport().UseTaa = Settings.Taa;
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
-            if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
+            if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
             StartPerformanceRun();
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
+            if (Launch.Has("--server-check")) RunServerCheck();
             if (Launch.Has("--animation-review")) {
                 panel.Close(); ui.Visible = false; view.AnimationReview = true;
                 if (Launch.Value("--animation-capture") is string captures) CaptureAnimations(captures);
@@ -125,22 +138,41 @@ public partial class Game : Node, IGameFlow {
         net.Disconnected += ShowReconnecting;
         net.Reconnecting += left => startMenu.ShowRetry(left);
         net.Left += reason => { startMenu.LeftReason = reason; Leave(); };
-        net.Failed += reason => startMenu.ShowJoinFailure(reason);
+        net.Failed += JoinFailed;
     }
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
     private void ShowReconnecting() { world.NewGame(); startMenu.ShowReconnecting(); }
     public bool Owns => net.Owning || playingHere;
+    public void ReturnIfJoinFails() => returnIfJoinFails = net.Owning;
+    public bool ReturnAfterFailedJoin(string reason) {
+        if (!returnIfJoinFails) return false;
+        returnIfJoinFails = false; returnNote = reason;
+        StartGame(0);
+        return true;
+    }
+    private void JoinFailed(string reason) {
+        if (startingGame) GameFailedToStart(reason);
+        else if (!ReturnAfterFailedJoin(reason)) startMenu.ShowJoinFailure(reason);
+    }
+    private void GameFailedToStart(string reason) {
+        startingGame = false; serverProcess = 0; returnNote = "";
+        startMenu.LeftReason = $"Could not start the game. {reason}"; Leave();
+    }
     /// <summary>The UI checks play their games in this window's own world, without a server, so they can set it up directly.</summary>
     private static readonly bool hereOnly = Launch.Has("--ui-test");
     private bool playingHere;
     private void OnJoined(bool back) {
+        startingGame = false; returnIfJoinFails = false;
         ending.Joined(back);
         shownHealth = world.Health;
         if (!net.Owning) {
             Settings.Store("net", "address", net.Address);
             saves.Slot = 0;
             Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. The host's saves keep your belongings.");
-        } else Begin(starting);
+        } else {
+            Begin(starting);
+            if (returnNote != "") { Notify($"{returnNote} Your game is back from the autosave."); returnNote = ""; }
+        }
     }
     /// <summary>Opens a game this window started: a new one on the welcome page, a loaded one on the backpack.</summary>
     private void Begin(int slot) {
@@ -152,7 +184,7 @@ public partial class Game : Node, IGameFlow {
             panel.Open(Page.Backpack); Notify("Settlement loaded.");
         }
     }
-    public void Leave() { StopHosted(); playingHere = false; world.NewGame(); startMenu.ShowStart(); }
+    public void Leave() { StopHosted(); playingHere = startingGame = false; world.NewGame(); startMenu.ShowStart(); }
     public void ShowStart() { net.Leave(); Leave(); }
     void IGameFlow.Quit() => Quit();
     public void Restart() {
@@ -176,24 +208,40 @@ public partial class Game : Node, IGameFlow {
     private void StartGame(int slot) {
         net.Leave(); StopHosted();
         string key = net.Key;
+        startingGame = true;
+        int port = FreePort();
+        if (port < 0) { GameFailedToStart("Every port it could use is taken."); return; }
+        startMenu.ShowStarting();
         // The network check runs the server inside this window, under a branch with its own network, so it can set its world up directly.
         if (Launch.Has("--net-check")) {
             var branch = new Node { Name = "Hosted" }; GetTree().Root.AddChild(branch);
             GetTree().SetMultiplayer(new SceneMultiplayer(), branch.GetPath());
             var main = new Node { Name = Name }; branch.AddChild(main);
-            hosted = Server.Start(main, data, slot, key, Net.DefaultPort);
+            hosted = Server.Start(main, data, slot, key, port);
             hosted.Ended += StopHosted;
         } else {
             var arguments = new System.Collections.Generic.List<string> { "--headless" };
             // Outside an exported game the engine needs to be told where the project is.
             if (!OS.HasFeature("template")) arguments.AddRange(["--path", ProjectSettings.GlobalizePath("res://")]);
-            arguments.Add("--"); arguments.AddRange(Server.Arguments(Net.DefaultPort, slot, key));
-            if (OS.CreateProcess(OS.GetExecutablePath(), arguments.ToArray()) < 0) { Notify("Could not start the game."); return; }
+            arguments.Add("--"); arguments.AddRange(Server.Arguments(port, slot, key));
+            serverProcess = OS.CreateProcess(OS.GetExecutablePath(), arguments.ToArray());
+            if (serverProcess < 0) { GameFailedToStart("The server process would not run."); return; }
         }
         starting = slot;
-        var error = net.Join("127.0.0.1", Net.DefaultPort);
-        if (error != Error.Ok) { Notify($"Could not start the game: {error}."); return; }
+        var error = net.Join("127.0.0.1", port, ServerStartSeconds);
+        if (error != Error.Ok) { GameFailedToStart(error.ToString()); return; }
         net.Owning = true;
+    }
+
+    /// <summary>The first port no game on this computer holds, or -1 when all are taken.</summary>
+    private static int FreePort() {
+        for (int port = Net.DefaultPort; port < Net.DefaultPort + GamePorts; port++) {
+            using var probe = new PacketPeerUdp();
+            if (probe.Bind(port) != Error.Ok) continue;
+            probe.Close();
+            return port;
+        }
+        return -1;
     }
 
     /// <summary>Ends the server running inside this window, if any.</summary>
@@ -235,6 +283,7 @@ public partial class Game : Node, IGameFlow {
         if (world == null || view == null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;
         player.Update(dt);
+        if (startingGame && serverProcess > 0 && !OS.IsProcessRunning(serverProcess)) { net.Leave(); GameFailedToStart(Net.ServerStopped); }
         // The server holds the world still while every player has a menu open, which in a game alone is whenever this one does.
         if (kit.Paused != holding) { holding = kit.Paused; net.Hold(holding); }
         bool running = world.Remote ? !holding || world.Players.Count > 1 : !kit.Paused;
