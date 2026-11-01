@@ -62,11 +62,6 @@ public partial class WorldView {
         material.Call("set_shader_override_enabled", true);
         var shader = material.Get("shader_override").As<Shader>();
         string code = shader.Code;
-        // Shadow bias offsets along the vertex normal, but the clipmap mesh carries no usable one, so the ground shaded itself into a fine striped mesh.
-        // Straight up is enough, since lighting reads its normal from the height map in fragment().
-        const string meshNormal = "NORMAL = normalize((MODELVIEW_MATRIX * vec4(NORMAL, 0.0)).xyz);";
-        if (!code.Contains(meshNormal, StringComparison.Ordinal)) throw new InvalidOperationException("Pinned Terrain3D shader no longer sets the vertex normal as expected.");
-        code = code.Replace(meshNormal, "NORMAL = normalize((VIEW_MATRIX * vec4(0.0, 1.0, 0.0, 0.0)).xyz);");
         int fragment = code.LastIndexOf("\nvoid fragment()", StringComparison.Ordinal);
         if (fragment < 0) throw new InvalidOperationException("Pinned Terrain3D shader no longer has the expected fragment entry point.");
         code = code.Insert(fragment, GD.Load<ShaderInclude>("res://assets/environment/terrain3d/uniforms.gdshaderinc").Code);
