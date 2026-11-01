@@ -16,8 +16,6 @@ public partial class Game {
     /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
     private static int CheckPort => Launch.Value("--port") is string port ? int.Parse(port) : Net.DefaultPort;
 
-    private static string GuestSave => $"user://{Launch.FilePrefix}guest-127-0-0-1-{CheckPort}.json";
-
     private static string SignalPath(string name) => $"user://{Launch.FilePrefix}signal-{name}";
 
     /// <summary>Tells the other network check process that this one reached a point, for the times the game itself cannot carry the news.</summary>
@@ -69,6 +67,29 @@ public partial class Game {
         await Until(() => !startMenu.Visible, "the join popup closing");
     }
 
+    /// <summary>Joins until the server turns this window away for <paramref name="reason"/>; it may not be up yet. No input reads the refusal once the popup is closed, so this calls the join directly.</summary>
+    private async Task JoinUntilRefused(string reason) {
+        string heard = ""; void Refused(string why) => heard = why;
+        net.Failed += Refused;
+        for (ulong until = Time.GetTicksMsec() + 45000; heard != reason;) {
+            Require(Time.GetTicksMsec() < until, $"the server never refused this window: {heard}");
+            heard = ""; net.Join("127.0.0.1", CheckPort);
+            await Until(() => heard != "", "the server answering this window");
+        }
+        net.Failed -= Refused;
+    }
+
+    /// <summary>Types a port into the open join popup and presses Join; the address stays as it is, or becomes this computer.</summary>
+    private async Task JoinFromPopup(string to) {
+        var port = (LineEdit)startMenu.Screen.FindChild("port", true, false);
+        await Click(port); await KeyStroke(Key.End);
+        for (ulong wait = Time.GetTicksMsec() + 5000; port.Text != "" && Time.GetTicksMsec() < wait;) await KeyStroke(Key.Backspace);
+        await Type(to);
+        var address = (LineEdit)startMenu.Screen.FindChild("address", true, false);
+        if (address.Text == "") { await Click(address); await Type("127.0.0.1"); }
+        await Click(FindButton(startMenu.Screen, "Join")!);
+    }
+
     private async Task LeaveGame() {
         await CloseWithEsc(); await KeyStroke(Key.Escape);
         Require(menu.Visible, "A guest's Esc must open the pause menu.");
@@ -77,6 +98,5 @@ public partial class Game {
         await Click(menu.JoinButton);
         Require(!world.Remote, "Leaving must end the guest's connection.");
         Require(startMenu.Visible, "Leaving must return to the start menu.");
-        Require(Godot.FileAccess.FileExists(GuestSave), "Leaving must save the guest's player.");
     }
 }

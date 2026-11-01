@@ -10,9 +10,11 @@ public partial class PauseMenu : PanelContainer {
     private readonly World world;
     private readonly Net net;
     private readonly StartMenu startMenu;
+    private readonly IGameFlow flow;
     private readonly VBoxContainer goals;
     private readonly Button loadButton, newGameButton;
     private readonly Label netLine;
+    private int shownGuests;
 
     public Button HostButton { get; }
     public Button JoinButton { get; }
@@ -23,7 +25,7 @@ public partial class PauseMenu : PanelContainer {
     /// and the game's buttons stacked on the right.
     /// </summary>
     public PauseMenu(UiKit kit, Net net, StartMenu startMenu, IGameFlow flow) {
-        this.kit = kit; world = kit.World; this.net = net; this.startMenu = startMenu;
+        this.kit = kit; world = kit.World; this.net = net; this.startMenu = startMenu; this.flow = flow;
         Visible = false; CustomMinimumSize = new Vector2(820, 0);
         AddThemeStyleboxOverride("panel", Style.Board);
         SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
@@ -42,7 +44,7 @@ public partial class PauseMenu : PanelContainer {
         var quitButton = MenuButton("Quit", Style.Enamel, () => ConfirmLeave("QUIT", "Quit to desktop", flow.Quit)); quitButton.Name = "quit"; side.AddChild(quitButton);
         side.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         HostButton = MenuButton("Host", Style.Sage, HostGame); HostButton.Name = "host"; side.AddChild(HostButton);
-        JoinButton = MenuButton("Join", Style.Sage, () => { if (world.Remote) { net.Leave(); flow.Leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
+        JoinButton = MenuButton("Join", Style.Sage, () => { if (!flow.Owns) { net.Leave(); flow.Leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
         netLine = Style.Text("", 13, Style.Beige, wrap: true); netLine.Name = "net_status"; netLine.HorizontalAlignment = HorizontalAlignment.Center; side.AddChild(netLine);
         world.Replaced += () => Visible = false;
         kit.HoldWhile(() => Visible);
@@ -103,11 +105,16 @@ public partial class PauseMenu : PanelContainer {
         string yesterday = world.Profits.Count > 0 ? $"yesterday {world.Profits[^1]}" : "no day finished yet";
         var profit = Style.Text($"Profit is sale coins minus wages · {yesterday} · today's sales {world.DayRevenue}", 13, Style.Tan, wrap: true);
         goals.AddChild(profit);
-        HostButton.Disabled = net.Online; HostButton.Text = net.Hosting ? "Hosting" : "Host";
+        HostButton.Disabled = !net.Owning || net.Opened; HostButton.Text = net.Opened ? "Hosting" : "Host";
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.
-        JoinButton.Text = world.Remote ? "Leave game" : "Join"; JoinButton.Disabled = net.Hosting; SaveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = world.Remote;
-        netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
+        JoinButton.Text = flow.Owns ? "Join" : "Leave game"; JoinButton.Disabled = net.Opened; SaveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = !flow.Owns;
+        shownGuests = Guests; netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
         Visible = true;
+    }
+
+    public override void _Process(double delta) {
+        // Players join and leave while the menu is open.
+        if (Visible && Guests != shownGuests) { shownGuests = Guests; netLine.Text = NetStatus(); }
     }
 
     private void BackToPause() { startMenu.Close(); Open(); }
@@ -115,21 +122,22 @@ public partial class PauseMenu : PanelContainer {
     public void Close() => Visible = false;
 
     private void HostGame() {
-        var error = net.Host();
-        if (error != Error.Ok) { kit.Notify($"Could not host on port {Net.DefaultPort}: {error}."); return; }
+        net.Open();
         var addresses = IP.GetLocalAddresses().Where(a => a.Contains('.') && !a.StartsWith("127.") && !a.StartsWith("169.254.")).Take(2).ToArray();
-        kit.Notify($"Hosting on port {Net.DefaultPort}. Others join with {(addresses.Length > 0 ? string.Join(" or ", addresses) : "this computer's address")}.");
+        kit.Notify($"Hosting on port {net.Port}. Others join with {(addresses.Length > 0 ? string.Join(" or ", addresses) : "this computer's address")}.");
         Close();
     }
 
     /// <summary>A line for the pause menu while the game is online.</summary>
-    private string NetStatus() => net.Hosting ? $"Hosting on port {Net.DefaultPort} · {net.Guests} {(net.Guests == 1 ? "guest" : "guests")}"
-        : world.Remote ? "Playing in the host's world. Your player saves on this computer." : "";
+    private string NetStatus() => net.Opened ? $"Hosting on port {net.Port} · {Guests} {(Guests == 1 ? "guest" : "guests")}"
+        : !flow.Owns ? "Playing in the host's world. The host's saves keep your player." : "";
+
+    private int Guests => world.Players.Count - 1;
 
     /// <summary>Asks before leaving the settlement, since anything done after the last save would be lost.</summary>
     private void ConfirmLeave(string heading, string confirm, Action leave) {
         startMenu.Open(heading, BackToPause);
-        var note = Style.Wrapped(net.Hosting ? "Progress since the last save is lost, and your guests are disconnected." : "Progress since the last save is lost.", 14);
+        var note = Style.Wrapped(net.Opened ? "Progress since the last save is lost, and your guests are disconnected." : "Progress since the last save is lost.", 14);
         note.HorizontalAlignment = HorizontalAlignment.Center; startMenu.Screen.AddChild(note);
         startMenu.AddButton(confirm, leave);
         startMenu.AddButton("Back · Esc", BackToPause);

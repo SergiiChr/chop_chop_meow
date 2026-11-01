@@ -40,7 +40,7 @@ Project rules on top of the global coding and testing guides.
   - `Input.ParseInputEvent` and what the player sees catch broken controls and panels, and miss how the game looks.
   - `Net`'s messages between a host and a guest process catch sync breaks and miss a real network.
 - Use representative end-to-end checks plus focused edge cases.
-- UI checks live in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` and `src/NetChecks.cs`; a change to a shared check helper covers all three.
+- UI checks live in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`; a change to a shared check helper covers all four.
 - Input tests go through `Input.ParseInputEvent`, not direct calls to input handlers.
 - UI checks act like a player: they set up through `world`, then use real input and read what the screen shows. A direct call into private `Game` code says in a comment why no input reaches it.
 - Checks never touch `world.S`, the raw save, and never change a player's backpack, needs or respawn timer directly:
@@ -84,10 +84,10 @@ Allocation is fine while loading, setting up and on rare events.
 Allocation budgets:
 
 - `tests/AllocationChecks.cs` holds simulation ticks to their budget after a warm-up with `AllocationChecks.Check()`: walking and a night hunt at 0 bytes, and a working settlement at a commented byte count a tick for stores growing their tables. It counts the calling thread's allocations, so it holds on any machine. A warm-up runs every path its budget allows at least once, so a first-time cost stays out of the measured runs. A new path that runs every tick gets a case there; a path that must allocate passes its measured bytes per run as an explicit, commented budget.
-- `CheckWalkingStaysWithinAllocationBudget` in the UI checks holds real frames to a measured budget: a change that adds a third more garbage fails it, and one that removes some lowers the budget.
+- `CheckWalkingStaysWithinAllocationBudget` holds real frames to a measured budget: a change that adds a third more garbage fails it, and one that removes some lowers the budget. The UI checks run it in a world the window ticks itself, and `src/ServerChecks.cs` on the real server, which is what players run: each update's changed entries are new arrays, while numbers go into the window's copy in place through `WorldUpdates.SetNumbers`.
 - `CheckPanelPagesRefreshWithoutAllocating` holds every panel page to 0 bytes a refresh while what it shows stays the same. Live panel updates go through `LiveUpdates`: `Watch` draws only when a value changes, and `Bind` rebuilds text in a reused buffer and hands Godot a new string only when it changes.
 - Real frames are measured only while walking, so per-frame code for gathering, a mauling or a settlement in view has no allocation check yet; review those paths by hand.
-- The host's network updates, ten a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
+- The server's network updates, thirty a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
 `./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a walking, day/night and staffed-settlement run.

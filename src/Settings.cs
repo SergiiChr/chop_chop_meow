@@ -15,6 +15,18 @@ public static class Settings {
 
     public static float MusicVolume => Get("audio", "music", 1f);
 
+    /// <summary>
+    /// The key this machine joins games with, made once; each world saves this machine's player under it.
+    /// The network check's host and guest share one settings file, so each adds its role to tell them apart.
+    /// </summary>
+    public static string MachineKey {
+        get {
+            string key = Get("net", "key", "");
+            if (key == "") Store("net", "key", key = System.Guid.NewGuid().ToString("N"));
+            return Launch.Value("--net-check") is string role ? $"{key}-{role}" : key;
+        }
+    }
+
     public static T Get<[MustBeVariant] T>(string section, string key, T fallback) {
         var config = new ConfigFile(); config.Load(Path);
         return config.GetValue(section, key, Variant.From(fallback)).As<T>();

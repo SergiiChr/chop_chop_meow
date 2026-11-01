@@ -7,12 +7,11 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>
-/// One player's body and belongings.
-/// The host's own player is saved with the world; a guest's player is in the world only while connected and is saved on the guest's machine.
-/// </summary>
+/// <summary>One player's body and belongings, saved with the world under the key of the machine they play from.</summary>
 public sealed class PlayerState {
-    /// <summary>Network peer id: 1 for the host and in single player.</summary>
+    /// <summary>The key of the machine this player plays from, which the save stores them under; empty until a machine claims them.</summary>
+    [JsonIgnore] public string Key { get; set; } = "";
+    /// <summary>Network peer id while playing on a server; 1 in a world this machine runs itself.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Id { get; set; } = 1;
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float PlayerX { get; set; } = Terrain.Spawn.X;
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float PlayerY { get; set; } = Terrain.Spawn.Y;
@@ -46,10 +45,8 @@ public sealed class PlayerState {
     public float TorchFlare { get; set; }
     /// <summary>Counts moves the simulation made, such as a respawn; a guest only takes its own position from the host when it changes.</summary>
     public int Warp { get; set; }
-    /// <summary>Which shirt colour tells this player apart: 0 for the host, and the first free one for each guest.</summary>
+    /// <summary>Which shirt colour tells this player apart: the first one no other player wears when they join.</summary>
     public int Shirt { get; set; }
-    /// <summary>Contents of the packed crates in the backpack; only a guest's own save carries them.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public Dictionary<int, Inventory>? Crates { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(PlayerX, PlayerY); set { PlayerX = value.X; PlayerY = value.Y; } }
     // Only the host's simulation uses these.
     internal float GatherClock, AttackClock, NightSpawn;
@@ -65,7 +62,7 @@ public readonly record struct Command(Verb Verb, int Target, int Other, string I
 
 /// <summary>The players in the world and the guest side of actions.</summary>
 public sealed partial class World {
-    /// <summary>The player at this machine; the host and a single-player game are 1, a guest gets its peer id.</summary>
+    /// <summary>The player at this machine: 1 in a world it runs itself, its peer id in a server's world, and 0 on a server, which has none.</summary>
     public int LocalId { get; set; } = 1;
     public PlayerState Me {
         get {
@@ -258,15 +255,18 @@ public sealed partial class World {
     }
 
     /// <summary>
-    /// Host: brings a guest in with the player they saved on their machine.
-    /// Anything missing, unknown or out of range gives them a new player instead: an axe and a bottle at the clearing.
+    /// Server: brings in the player who plays from the machine with <paramref name="key"/>: as they left, else the player no machine has claimed yet,
+    /// such as a new world's first, else a newcomer with an axe and a bottle at the clearing.
     /// </summary>
-    public PlayerState AddGuest(int id, string? saved) {
-        var p = Adopt(saved) ?? Newcomer();
-        p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(1, 3).First(i => S.Players.All(o => o.Shirt != i));
+    public PlayerState Arrive(string key, int id) {
+        var p = S.Absent.Remove(key, out var back) ? back : S.Absent.Remove("", out var unclaimed) ? unclaimed : Newcomer();
+        p.Key = key; p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(0, 4).First(i => S.Players.All(o => o.Shirt != i));
+        // What only made sense while they played: a cabin may have gone since, and the other properties follow input they no longer give.
+        if (Find(p.Sheltered)?.Kind != ThingKind.Hut) p.Sheltered = 0;
+        p.GatherTarget = 0; p.Held = ""; p.Sprinting = false; p.TorchKindling = 0;
         S.Players.Add(p);
         NormalizeBottleStorage();
-        SayToAll("A neighbor joined the settlement.");
+        if (S.Players.Count > 1) SayToAll("A neighbor joined the settlement.");
         return p;
     }
 
@@ -276,57 +276,25 @@ public sealed partial class World {
         return p;
     }
 
-    private PlayerState? Adopt(string? saved) {
-        PlayerState? p;
-        try { p = saved == null ? null : JsonSerializer.Deserialize<PlayerState>(saved, GameData.Json); } catch (JsonException) { return null; }
-        var crates = p?.Crates ?? new();
-        if (p == null || !ValidCrates(crates) || !ValidPlayer(p, crates)) return null;
-        var backpack = new Inventory { Slots = 24 };
-        int legacySlots = p.Backpack.Items.Sum(pair => {
-            int stack = Water.IsBottle(pair.Key) ? 64 : backpack.StackOf(pair.Key);
-            return (pair.Value + stack - 1) / stack;
-        });
-        if (!backpack.Fits(p.Backpack.Items) && legacySlots > 24) return null;
-        backpack.Slots = Math.Max(24, p.Backpack.AggregateSlotsNeeded);
-        var renamed = new Dictionary<string, string>();
-        // Packed crates get new numbers here, since the guest's old ones may be taken in this world.
-        foreach (var (item, quantity) in p.Backpack.Items) {
-            string id = item;
-            if (crates.TryGetValue(PackedId(item), out var box)) {
-                var crate = NewCrate(); foreach (var (inside, count) in box.Items) crate.Add(inside, count);
-                id = Pack(crate); p.HotbarSlots = p.HotbarSlots.Select(slot => slot == item ? id : slot).ToList();
-                renamed[item] = id;
-            }
-            backpack.Add(id, quantity);
-        }
-        p.Backpack.RebuildStacks();
-        backpack.Layout = p.Backpack.Layout.Select(slot => new Inventory.Slot {
-            Item = renamed.GetValueOrDefault(slot.Item, slot.Item),
-            Count = slot.Count
-        }).ToList();
-        backpack.Slots = 24;
-        // The guest's own layout may hold fewer cells than the backpack has.
-        backpack.RebuildStacks();
-        p.Backpack = backpack; p.Crates = null;
-        p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
-        p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
-        p.Sheltered = 0; p.Mauled = false; p.TorchKindling = 0; p.TorchLit = p.TorchLit && p.Torch > 0; p.GatherTarget = 0; p.Held = ""; p.TorchFlare = 0;
-        if (!CanStand(p.Pos)) p.Pos = Terrain.Spawn;
-        return p;
-    }
-
-    /// <summary>Host: a guest has gone, with everything they carry; the contents of their packed crates go with them.</summary>
-    public void RemoveGuest(int id) {
-        if (id == Me.Id || S.Players.Find(p => p.Id == id) is not PlayerState p) return;
-        foreach (var item in p.Backpack.Items.Keys) S.Crates.Remove(PackedId(item));
-        S.Players.Remove(p);
+    /// <summary>Server: a player has gone; they stay in the world's save, with everything they carry, until they come back.</summary>
+    public void Depart(int id) {
+        if (S.Players.Find(p => p.Id == id) is not PlayerState p) return;
+        S.Players.Remove(p); S.Absent[p.Key] = p;
+        if (S.Actor == p) S.Actor = S.Players.FirstOrDefault() ?? new PlayerState();
         SayToAll("A neighbor left the settlement.");
     }
 
-    /// <summary>A player as a guest saves them on their own machine, with what their packed crates hold.</summary>
-    public string ExportPlayer(PlayerState p) {
-        p.Crates = p.Backpack.Items.Keys.Where(id => Packed(id) != null).ToDictionary(PackedId, id => Packed(id)!);
-        try { return JsonSerializer.Serialize(p, GameData.Json); } finally { p.Crates = null; }
+    /// <summary>Server: everyone leaves a world it has just made or loaded, to come back as each one joins.</summary>
+    public void Vacate() {
+        LocalId = 0;
+        foreach (var p in S.Players) S.Absent[p.Key] = p;
+        S.Players.Clear(); S.Actor = new PlayerState();
+    }
+
+    /// <summary>Server: the machine starting this world takes it over, with the player of the machine that saved it unless it has one here already.</summary>
+    public void Claim(string key) {
+        if (key != S.Owner && !S.Absent.ContainsKey(key) && S.Absent.Remove(S.Owner, out var p)) { p.Key = key; S.Absent[key] = p; }
+        S.Owner = key;
     }
 
     /// <summary>A guest takes the host's whole world as its copy.</summary>

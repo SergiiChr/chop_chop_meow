@@ -2133,12 +2133,12 @@ public static class SimulationChecks {
         var migrated = System.Text.Json.Nodes.JsonNode.Parse(loaded.Serialize())!;
         Require(migrated["Coins"] == null && migrated["Orders"]!.AsArray().All(order => order!["Item"] == null), "migrated fields should not be written back");
 
-        // Saves from the earlier, smaller maps would place the settlement in the mountains or the lake, so they are refused.
-        var small = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;
-        small["Version"] = 3;
+        // A save from another version keeps its players in another place, so it is refused rather than loaded without them.
+        var older = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;
+        older["Version"] = 5;
         bool refused = false;
-        try { EmptyWorld(data).Deserialize(small.ToJsonString()); } catch (InvalidOperationException error) { refused = error.Message.Contains("older, smaller map"); }
-        Require(refused, "a save from the smaller map should be refused with a clear reason");
+        try { EmptyWorld(data).Deserialize(older.ToJsonString()); } catch (InvalidOperationException error) { refused = error.Message.Contains("another version"); }
+        Require(refused, "a save from another version should be refused with a clear reason");
     }
 
     private static void CheckCrewKeepsForgeHot(GameData data) {

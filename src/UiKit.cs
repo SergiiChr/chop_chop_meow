@@ -15,6 +15,12 @@ public interface IGameFlow {
     void Leave();
     void LoadSlot(int slot);
     void ShowStart();
+    /// <summary>This window started the game it plays, so it saves, loads and opens it to others.</summary>
+    bool Owns { get; }
+    /// <summary>The player is joining another game from their own: should that fail, their game comes back from the autosave.</summary>
+    void ReturnIfJoinFails();
+    /// <summary>Brings back the game a failed join ended, saying why; false when no game is waiting to come back.</summary>
+    bool ReturnAfterFailedJoin(string reason);
 }
 
 /// <summary>

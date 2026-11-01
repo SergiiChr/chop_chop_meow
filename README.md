@@ -542,22 +542,26 @@ A slain wolf falls over and leaves a carcass that lasts until it is butchered: h
 
 ### Hosting and joining
 
-**Host** in the pause menu opens the current game to others on UDP port 24565. The pause menu then shows the port and the number of guests, and the game no longer pauses while a menu is open.
+Every game, alone or together, runs on a small server the game starts in the background on this computer.
+Only this computer can join it until **Host** in the pause menu opens it to others on UDP port 24565, or the next free port if another game on this computer holds that one.
+The pause menu then shows the port and the number of guests.
+The world stands still while every player has a menu open, which alone means whenever you have one open.
 
 **Join game** on the start menu, or **Join** in the pause menu, opens a popup with the port already filled in and the address of the last game joined. Join is unavailable while hosting, since it would drop the guests. Up to three guests can join.
+Leaving your own game, by quitting, loading or joining another, ends it for everyone in it.
+If joining another game fails, your own comes back from the autosave written just before it.
+A second window on the same computer cannot join a game the first is playing in.
 
-### Guest saves
+### Players in the save
 
-The host keeps the world and saves it as usual; guests are not kept in the host's saves.
-Each guest keeps its own player (position, health, needs, backpack, hotbar, crafting queue and carried crates) on its own computer, one file per host address.
+The world's save keeps every player who has played in it (position, health, needs, backpack, hotbar and crafting queue), under a key each computer makes for itself the first time it plays.
+Only the player who started the game saves and loads it, and the autosave runs every 5 minutes on the server.
+A guest that comes back to the same world, even after the host loaded a save, finds its player as the save had it.
 
-Leaving takes the player back from the host, so nothing in flight is lost or kept twice.
-In between, it is saved a couple of seconds after it changes, and on F5.
-A guest cannot save or load the host's world.
-
-A guest that joins for the first time, or whose save is missing, broken or does not fit the host's world, starts with an axe and a bottle at the clearing.
+A player a world has never seen starts with an axe and a bottle at the clearing.
+A save follows its owner: whoever starts it on another computer plays the player who saved it.
 Leaving returns a guest to the start menu.
-A guest that loses the connection tries to get back in on its own for up to 120 seconds, with a countdown on screen, and returns with its player as saved on its computer.
+A guest that loses the connection tries to get back in on its own for up to 120 seconds, with a countdown on screen.
 **Stop · Esc** ends the tries, and when the time runs out the guest returns to the start menu.
 
 ### Shared world
@@ -566,18 +570,19 @@ Everyone shares the world, the market and the workers.
 Sleep needs every player inside a cabin with enough food and water.
 Night wolves hunt each player separately.
 
-Ten times a second the host sends each guest only what changed since the last update that guest confirmed, usually a few hundred bytes, so it plays over the internet as well as at home.
+Thirty times a second the server sends each player only what changed since the last update that player confirmed, usually a few hundred bytes, so it plays over the internet as well as at home.
 
 ### Multiplayer limitations
 
-- A guest's actions on items and buildings wait one round trip to the host (walking does not).
+- Actions on items and buildings wait one round trip to the server (walking does not); on your own computer that is a frame or two.
 - The host's port must be reachable, as there is no address discovery or NAT traversal.
-- Hiring is paid by whoever hires, while daily wages come from the trading post wage slot and then the host's backpack.
-- The host trusts what a guest's save and position reports say, so play with people you trust.
+- Hiring is paid by whoever hires, while daily wages come from the trading post wage slot and then the backpack of the player who started the game.
+- The server trusts what a player's position reports and computer key say, so play with people you trust.
 
 ## Saves
 
-There are three save slots and a separate autosave written every 5 minutes.
+There are three save slots and a separate autosave the server writes every 5 minutes.
+A save from another version of the game is refused rather than converted.
 F5 and F9 quick save and load to the current slot.
 
 The launcher keeps its Godot user-data directory under `.tools/xdg-data`.

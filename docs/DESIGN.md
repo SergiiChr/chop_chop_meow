@@ -36,7 +36,7 @@ Each feature is a node with a small public surface, given what it needs in its c
 `Game` implements `IGameFlow`, what the menus call to start, load, leave or quit a game.
 The interface reads the world through `World`'s read members and keeps `world.S` for writes, and for what needs the real `Inventory`, such as a move between grids.
 `UiKit.Paused` follows which overlays are open: each one registers with `HoldWhile`, so none saves or restores another's pause.
-`World.Replaced` fires whenever the whole state is replaced (a new game, a load, a guest taking the host's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
+`World.Replaced` fires whenever the whole state is replaced (a new game, a load, a player taking the server's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
 The side panel builds a new `PagePanel` node when a page opens; the page holds its own `LiveUpdates`, which run on each refresh, and its own state.
 A tab or other choice on a page calls `Redraw`, which builds its body again and keeps that state; `PageMemory` keeps only what outlasts the page.
 A `ThingPage` is a page about one thing in the world, with its job buttons and filters.
@@ -58,8 +58,9 @@ Simulation and data:
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
-| `src/Players.cs` | Per-player state, the command dispatcher and guest adoption |
-| `src/Net.cs` | The ENet connection, sending and merging world updates, and guest saves |
+| `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
+| `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
+| `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
 | `src/WorldUpdates.cs` | World updates as entries, their differences and compression |
 
 UI and input:
@@ -162,9 +163,18 @@ The side panel only shows the building and sizes itself to what it holds.
 
 ### Multiplayer
 
-Multiplayer is host-authoritative.
-`SaveState.Players` holds one `PlayerState` per player.
-The top-level player fields of `SaveState` pass through to `SaveState.Actor`, so saves keep the host's player where single player always had it.
+Every game runs on a `Server`, alone or together, which owns the only simulation and has no player of its own.
+The window that starts a game runs it as a headless child process of the same executable (`--server`) on the first free port from 24565, and joins it over localhost like any guest, showing a starting screen until it does.
+The network check runs the server inside the window, under a branch with its own `SceneMultiplayer`, so it can set its world up directly.
+The UI checks and the review fixtures run their world in the window instead, which ticks it whenever it is not on a server, so only `src/ServerChecks.cs` plays on the real process.
+The server ends when its owner leaves, or when nobody has joined for 30 seconds.
+
+`SaveState.Players` holds one `PlayerState` per player playing now, and `SaveState.Absent` the rest of the world's players, each by the key of the machine they play from (`Settings.MachineKey`).
+A save writes them all in `SaveState.Party` and leaves out the top-level player fields, which pass through to `SaveState.Actor`.
+`SaveState.Owner` names the machine that last started the world.
+The server sends everyone away on start (`World.Vacate`), then the starting machine takes the world over with the owner's player (`World.Claim`), so a save keeps its player on another computer.
+`World.Arrive` brings back a machine's player, else the unclaimed one, else a newcomer, and `World.Depart` keeps a player who leaves.
+Saves from any other version are refused.
 
 Player actions run in the acting player's context (`World.As`).
 In a guest's copy, `World.Forwarded` sends each action to the host as a `Command`, named by its `Verb`, instead of changing the copy.
@@ -189,10 +199,13 @@ The welcome is a guest's first update, with the fog uncovered so far.
 
 - Updates go unreliably on their own channel, so a lost one never delays the next.
 - The whole world after a long stall, or a change too large for one packet, goes reliably on a third channel, so messages and actions never wait behind it.
-- Guests merge entries into their copy in place, so panels and the view keep their objects.
+- Guests merge entries into their copy in place, so panels and the view keep their objects. A change to numbers alone is set directly (`WorldUpdates.SetNumbers`); anything else reads the entry whole.
+- A player keeps only the updates the server can still build on: confirmations only move forward, so nothing older than the update just taken's baseline is needed.
 - Each action carries where the guest stood, so the host checks reach from there rather than from a position still gliding in.
-- Leaving asks the host for the guest's player before the line closes.
-- A guest whose line drops saves its player from its copy, then `Net.Retry` joins the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, so the host may hold the old player until its side of the line times out.
+- Leaving waits for the server to confirm before the line closes, so actions still in flight arrive; the owner's server closes instead, and the line going is the confirmation.
+- Joining another game from your own ends your server first, so `Game` starts the autosave again if the join fails or is cancelled.
+- A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key.
+- Until the owner opens the game, the server refuses peers that are not on this computer. Only the owner can save; any player can hold the world, and it stands still while all of them do.
 
 Factorio instead runs the same deterministic simulation on every machine and sends only inputs (lockstep).
 This simulation uses floats and frame-length steps, so it is not deterministic, and with hundreds of objects the deltas stay small.

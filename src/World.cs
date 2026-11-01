@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using Godot;
 
 namespace ChopChopMeow;
@@ -148,18 +149,29 @@ public sealed class Wolf {
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
 }
 /// <summary>
-/// Everything a save holds. The player properties read and write <see cref="Actor"/>, the player whose action or turn
-/// the simulation is running, so the save keeps the host's player at the top level as single player always has.
+/// Everything a save holds. The player properties read and write <see cref="Actor"/>, the player whose action or turn the simulation is running.
+/// A save keeps every player in <see cref="Party"/> and leaves those properties out.
 /// </summary>
 public sealed class SaveState {
-    /// <summary>Everyone in the world; the first is the save's own player. Guests are saved on their own machines.</summary>
+    /// <summary>Everyone playing now; a new world starts with one player not yet claimed by any machine.</summary>
     [JsonIgnore] public List<PlayerState> Players { get; set; }
+    /// <summary>Players of this world who are not playing now, by the key of the machine they play from.</summary>
+    [JsonIgnore] public Dictionary<string, PlayerState> Absent { get; set; } = new();
     [JsonIgnore] public PlayerState Actor { get; set; }
     public SaveState() : this(new byte[Terrain.Size * Terrain.Size]) { }
     /// <summary>A save holding the given fog map; a guest reads an update's state into one with an empty map, which it never looks at.</summary>
     internal SaveState(byte[] explored) { Players = new() { new PlayerState() }; Actor = Players[0]; Explored = explored; }
-    /// <summary>5 aligns mine entrances with their cliff faces; version 4 saves migrate on load.</summary>
-    public int Version { get; set; } = 5;
+    /// <summary>Every player of this world, playing or not, by machine key; the empty key is a player no machine has claimed yet.</summary>
+    public Dictionary<string, PlayerState> Party {
+        get => Players.Concat(Absent.Values).ToDictionary(p => p.Key);
+        set { Absent = value; foreach (var (key, p) in value) p.Key = key; }
+    }
+    /// <summary>The key of the machine that last started this world, whose player follows the save to another computer.</summary>
+    public string Owner { get; set; } = "";
+    /// <summary>The player properties that read and write <see cref="Actor"/>, which saves leave out.</summary>
+    public static readonly HashSet<string> ActorFields = typeof(PlayerState).GetProperties().Select(p => p.Name).Intersect(typeof(SaveState).GetProperties().Select(p => p.Name)).ToHashSet();
+    /// <summary>Saves from any other version are refused.</summary>
+    public int Version { get; set; } = 6;
     public List<Thing> Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -315,7 +327,6 @@ public sealed partial class World {
     public float PlaySeconds => S.PlaySeconds;
     /// <summary>The player whose action or turn is running.</summary>
     public int ActorId => S.Actor.Id;
-    public int SaveVersion => S.Version;
     public bool Priced(string item) => S.Prices.ContainsKey(item);
     public Thing? Remembered(int id) => S.Remembered.GetValueOrDefault(id);
     /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
@@ -335,8 +346,8 @@ public sealed partial class World {
     }
     /// <summary>Tells the acting player, or everyone while the tick runs the shared world.</summary>
     public void Say(string message) {
-        if (everyone || S.Actor == Me) Notify?.Invoke(message);
-        if (everyone || S.Actor != Me) Relay?.Invoke(everyone ? null : S.Actor, message);
+        if (everyone || S.Actor.Id == LocalId) Notify?.Invoke(message);
+        if (everyone || S.Actor.Id != LocalId) Relay?.Invoke(everyone ? null : S.Actor, message);
     }
     // Sleep fast-forwards hours in one frame, so its events stay silent instead of playing all at once.
     private void Play(string sound, Vector2 at) { if (!asleep) Sound?.Invoke(sound, at); }
@@ -1800,7 +1811,7 @@ public sealed partial class World {
     /// <summary>The acting player's clocks, hunger and thirst, and the torch in hand; a remote player's held gather also runs here.</summary>
     private void NeedsTick(float dt) {
         attackClock = Math.Max(0, attackClock - dt);
-        if (S.Actor != Me && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
+        if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
             float drain = S.Actor.Sprinting ? Data.SprintDrain : 1;
             S.Hunger = Math.Max(0, S.Hunger - dt * drain * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * drain * Data.ThirstPerSecond);
@@ -2000,7 +2011,12 @@ public sealed partial class World {
         S.Profits.Add(S.DayRevenue - wages); S.DayRevenue = 0;
         if (ProfitStreak >= Data.Goals.ProfitDays) S.Milestones.Add("profit_week");
     }
-    public string Serialize() => JsonSerializer.Serialize(S, GameData.Json);
+    public string Serialize() => JsonSerializer.Serialize(S, SaveJson);
+    private static readonly JsonSerializerOptions SaveJson = new(GameData.Json) {
+        TypeInfoResolver = new DefaultJsonTypeInfoResolver {
+            Modifiers = { info => { if (info.Type == typeof(SaveState)) foreach (var p in info.Properties.Where(p => SaveState.ActorFields.Contains(p.Name)).ToList()) info.Properties.Remove(p); } }
+        }
+    };
     // ---------- Validation of saves and guests ----------
     /// <summary>Whether an id names a known item, or a packed crate whose contents are in <paramref name="crates"/>.</summary>
     private bool KnownItem(string item, Dictionary<int, Inventory> crates) => item.StartsWith(PackedPrefix) ? crates.ContainsKey(PackedId(item)) : Data.Items.ContainsKey(item);
@@ -2040,6 +2056,15 @@ public sealed partial class World {
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }
+    /// <summary>Clears what an edited or older save may hold out of place in a player: hotbar entries for nothing known or carried, a cabin that is gone, recipes not made by hand.</summary>
+    private void FixPlayer(PlayerState p, SaveState save) {
+        var slots = p.HotbarSlots ?? new();
+        p.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack?[id] > 0) ? id : "").ToList();
+        p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
+        if (!save.Things.Any(t => t.Id == p.Sheltered && t.Kind == ThingKind.Hut)) p.Sheltered = 0;
+        p.Crafting ??= new();
+        p.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
+    }
     /// <summary>
     /// Brings older saves' things up to date before they are read: loose iron left the game and no kind names it any more,
     /// and a mine's or farm plot's stage was one number for both.
@@ -2064,7 +2089,7 @@ public sealed partial class World {
     }
     /// <summary>Brings every inventory of a freshly parsed save in line with its totals, since an old save holds totals without stacks.</summary>
     private static void RebuildAllStacks(SaveState save) {
-        foreach (var player in save.Players) { player.Backpack?.RebuildStacks(); RebuildAll(player.Crates?.Values); }
+        foreach (var player in save.Players.Concat(save.Absent.Values)) player?.Backpack?.RebuildStacks();
         RebuildAll(save.Crates?.Values);
         foreach (var worker in save.Workers) worker?.Bag?.RebuildStacks();
         foreach (var thing in save.Things) RebuildThing(thing);
@@ -2081,14 +2106,13 @@ public sealed partial class World {
         json = json.Replace("\"iron_axe\"", "\"steel_axe\"").Replace("\"iron_pick\"", "\"steel_pick\"").Replace("\"iron_hammer\"", "\"steel_hammer\"").Replace("\"iron_parts\"", "\"steel_parts\"");
         if (json.Contains("\"loose_iron\"") || json.Contains("\"Stage\"")) json = UpgradeThings(json);
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
-        if (loaded.Version < 4) throw new InvalidOperationException("This save is from an older, smaller map and cannot be loaded. Start a new game.");
-        if (loaded.Version is not (4 or 5) || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
+        if (loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
+        loaded.Players = new();
+        loaded.Absent ??= new();
+        // Item fixes below that belong to one player go to the unclaimed one, else the first.
+        loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.FirstOrDefault() ?? new PlayerState();
         RebuildAllStacks(loaded);
-        // Edited or older saves may hold missing, extra or unknown hotbar entries.
-        var slots = loaded.HotbarSlots ?? new();
-        loaded.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id)) ? id : "").ToList();
-        loaded.ActiveHotbar = Math.Clamp(loaded.ActiveHotbar, 0, 8);
-        if (!loaded.Things.Any(t => t.Id == loaded.Sheltered && t.Kind == ThingKind.Hut)) loaded.Sheltered = 0;
         loaded.Prices ??= new();
         if (loaded.Coins is float coins) { loaded.Backpack.Add(Inventory.Coins, (int)coins); loaded.Coins = null; }
         foreach (var order in loaded.Orders.Where(o => o.Item != null && o.Goods.Count == 0)) { order.Goods[order.Item!] = order.Quantity; order.Item = null; order.Quantity = 0; }
@@ -2099,9 +2123,7 @@ public sealed partial class World {
         if (loaded.Explored?.Length != Terrain.Size * Terrain.Size) loaded.Explored = new byte[Terrain.Size * Terrain.Size];
         loaded.Remembered ??= new();
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
-        if (loaded.Version == 4) AlignMines(loaded);
-        loaded.Crates ??= new(); loaded.Crafting ??= new(); loaded.Profits ??= new();
-        loaded.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
+        loaded.Crates ??= new(); loaded.Profits ??= new();
         foreach (var t in loaded.Things) {
             // A station set to a recipe it doesn't make, as on older saves' anvils, is cleared.
             // One left with no recipe goes back to its starting recipe.
@@ -2126,9 +2148,14 @@ public sealed partial class World {
                 if (BestTool(tool, loaded.Backpack) == null && loaded.Backpack.Remove("steel_parts", 1) == 1) loaded.Backpack.Add(made, 1);
             if (loaded.Milestones.Contains("steel_parts")) loaded.Milestones.Add("steel_tool");
         }
-        if (!ValidCrates(loaded.Crates) || !ValidPlayer(loaded.Actor, loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
+        foreach (var p in loaded.Absent.Values) if (p != null) FixPlayer(p, loaded);
+        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         // The current goal is worked out again from the milestones, so a save made with a shorter goal chain lands on the right step.
         loaded.Goal = 0;
+        // A server sends this player away again until each player joins.
+        var local = loaded.Actor;
+        loaded.Absent.Remove(local.Key);
+        local.Id = 1; loaded.Players.Add(local);
         S = loaded;
         // Older saves set only a worker's place; it carries every job there.
         foreach (var w in S.Workers)
@@ -2139,7 +2166,7 @@ public sealed partial class World {
         NormalizeBottleStorage();
         // Saves from before raking have no leaf litter.
         if (!S.Things.Any(t => t.Kind == ThingKind.Leaves)) DropLeaves();
-        UpdateGoal(); gatherClock = 0; ExploredRevision++; Look(); Say("Settlement loaded.");
+        UpdateGoal(); gatherClock = 0; ExploredRevision++; Look();
         Replaced?.Invoke();
     }
 }
