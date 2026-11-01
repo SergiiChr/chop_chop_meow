@@ -29,7 +29,7 @@ public static class AllocationChecks {
         Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 1, warmup: 1200);
 
         // The host sends an update ten times a second, against one the guest confirmed a few updates back, as over a long connection, and the guest merges it.
-        // Only entries that changed are new arrays, on the host and again in the guest's merge: about seven worker and station entries an update in a working settlement (measured 12.2 KB an update).
+        // Only entries that changed are new arrays, on the host and again in the guest's merge: about seven worker and station entries an update in a working settlement (measured 10.6 KB an update).
         var hosting = Settlement(data);
         var host = new WorldUpdates(); var guest = new WorldUpdates();
         var sent = new Queue<(Snapshot Host, Snapshot Guest)>();

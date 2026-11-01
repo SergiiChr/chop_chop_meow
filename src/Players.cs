@@ -13,12 +13,12 @@ namespace ChopChopMeow;
 /// </summary>
 public sealed class PlayerState {
     /// <summary>Network peer id: 1 for the host and in single player.</summary>
-    public int Id { get; set; } = 1;
-    public float PlayerX { get; set; } = Terrain.Spawn.X;
-    public float PlayerY { get; set; } = Terrain.Spawn.Y;
-    public float Health { get; set; } = 100;
-    public float Hunger { get; set; } = 100;
-    public float Thirst { get; set; } = 100;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Id { get; set; } = 1;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float PlayerX { get; set; } = Terrain.Spawn.X;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float PlayerY { get; set; } = Terrain.Spawn.Y;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Health { get; set; } = 100;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Hunger { get; set; } = 100;
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Thirst { get; set; } = 100;
     public Inventory Backpack { get; set; } = new() { Slots = 24 };
     public List<string> HotbarSlots { get; set; } = new() { "steel_axe", "steel_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", "water" };
     public int ActiveHotbar { get; set; }

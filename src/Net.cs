@@ -36,7 +36,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = .1f, InputInterval = .05f;
     private const int HostId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 4;
+    private const int Protocol = 5;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember; a guest that confirmed none of the last this many gets the whole world again.</summary>
@@ -402,7 +402,7 @@ public partial class Net : Node {
     /// <summary>Brings the guest's copy from the entries it shows now to <paramref name="entries"/>, touching only what differs.</summary>
     private void Apply(Snapshot entries) {
         var s = World.S;
-        if (Changed(entries, new EntryKey(EntryKey.State, 0)) is byte[] state) CopyExcept(s, WorldUpdates.Read<SaveState>(state), WorldUpdates.Shared);
+        if (Changed(entries, new EntryKey(EntryKey.State, 0)) is byte[] state) CopyExcept(s, WorldUpdates.ReadState(state), WorldUpdates.Shared);
         Sync(s.Things, EntryKey.Thing, static t => t.Id, entries, false, null);
         Sync(s.Workers, EntryKey.Worker, static w => w.Id, entries, true, null);
         Sync(s.Wolves, EntryKey.Wolf, static w => w.Id, entries, true, null);

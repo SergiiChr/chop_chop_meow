@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -27,6 +31,43 @@ public static class MultiplayerChecks {
         CheckGuestCopyForwardsLayoutActionsToTheHost(data);
         CheckDropOnAnotherItemsChestCellStoresTheStack(data);
         CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(data);
+        CheckUpdateFieldsLeftOutStartAsNewObjectsDo();
+        CheckUpdateEntriesReadBackAsTheyWere(data);
+    }
+
+    /// <summary>Updates leave out fields at their type's default, so a guest reading one back must start that field there too.</summary>
+    private static void CheckUpdateFieldsLeftOutStartAsNewObjectsDo() {
+        var nullability = new NullabilityInfoContext();
+        var unwritten = new List<string>();
+        var infos = new JsonSerializerContext[] { UpdateJson.Default, InventoryJson.Default }
+            .SelectMany(context => context.GetType().GetProperties().Select(p => p.GetValue(context)).OfType<JsonTypeInfo>());
+        foreach (var info in infos) {
+            if (info.Kind != JsonTypeInfoKind.Object || info.Type.GetConstructor(Type.EmptyTypes) == null) continue;
+            var fresh = Activator.CreateInstance(info.Type)!;
+            foreach (var field in info.Properties) {
+                if (field.Get == null || field.Set == null || field.AttributeProvider is not PropertyInfo property) continue;
+                if (property.GetCustomAttribute<JsonIgnoreAttribute>()?.Condition == JsonIgnoreCondition.Never) continue;
+                var value = field.Get(fresh);
+                // A reference that is never null is always written.
+                bool leftOut = field.PropertyType.IsValueType || nullability.Create(property).WriteState == NullabilityState.Nullable;
+                if (leftOut && value != null && !value.Equals(field.PropertyType.IsValueType ? Activator.CreateInstance(field.PropertyType) : null)) unwritten.Add($"{info.Type.Name}.{field.Name}");
+            }
+        }
+        Require(unwritten.Count == 0, $"These fields start at other than their type's default, so world updates must always write them; mark each [JsonIgnore(Condition = JsonIgnoreCondition.Never)]: {string.Join(", ", unwritten)}");
+    }
+
+    private static void CheckUpdateEntriesReadBackAsTheyWere(GameData data) {
+        var world = Settlement(data);
+        for (int i = 0; i < 600; i++) world.Tick(1 / 60f);
+        static void Same<T>(T value, JsonTypeInfo<T> info) {
+            string saved = JsonSerializer.Serialize(value, GameData.Json), read = JsonSerializer.Serialize(WorldUpdates.Read<T>(JsonSerializer.SerializeToUtf8Bytes(value, info)), GameData.Json);
+            Require(saved == read, $"A {typeof(T).Name} should read back from a world update as it was:\n{saved}\n{read}");
+        }
+        foreach (var t in world.Things) Same(t, UpdateJson.Default.Thing);
+        foreach (var w in world.Workers) Same(w, UpdateJson.Default.Worker);
+        foreach (var o in world.Orders) Same(o, UpdateJson.Default.TradeOrder);
+        foreach (var p in world.Players) Same(p, UpdateJson.Default.PlayerState);
+        Same(new Wolf { Health = 0, Target = 2 }, UpdateJson.Default.Wolf);
     }
 
     private static void CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(GameData data) {

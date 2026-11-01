@@ -10,7 +10,8 @@ public sealed class Inventory {
     /// <summary>A persisted stack in a particular inventory cell.</summary>
     public sealed class Slot { public string Item { get; set; } = ""; public int Count { get; set; } }
     private readonly Dictionary<string, int> items = new();
-    private int slots = 18, stackSize = 64;
+    private const int NewSlots = 18, NewStackSize = 64;
+    private int slots = NewSlots, stackSize = NewStackSize;
     /// <summary>Read-only view of each item's total across all stacks; the inventory's methods are the only way to change it.</summary>
     [JsonIgnore] public ItemTotals Items { get; }
     /// <summary>
@@ -23,9 +24,9 @@ public sealed class Inventory {
     public HashSet<string> InputFilter { get; set; } = new();
     public HashSet<string> OutputFilter { get; set; } = new();
     /// <summary>Number of cells. Changing it adds empty cells or moves stacks out of removed ones.</summary>
-    public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
     /// <summary>Most units of one item per cell. Changing it splits or merges stacks to fit.</summary>
-    public int StackSize { get => stackSize; set { if (value == stackSize) return; stackSize = value; RebuildStacks(); } }
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int StackSize { get => stackSize; set { if (value == stackSize) return; stackSize = value; RebuildStacks(); } }
     /// <summary>Most units the inventory holds across all its stacks, or 0 for no limit beyond its slots.</summary>
     public int Capacity { get; set; }
     /// <summary>Physical cell a UI action targets when an item id appears in several cells.</summary>
@@ -59,6 +60,8 @@ public sealed class Inventory {
         }
     }
     public int this[string item] => items.GetValueOrDefault(item);
+    /// <summary>Empty with the settings of a new inventory, so it saves the same as one.</summary>
+    [JsonIgnore] public bool Fresh => items.Count == 0 && slots == NewSlots && stackSize == NewStackSize && Capacity == 0 && InputFilter.Count == 0 && OutputFilter.Count == 0 && Layout.Count == NewSlots && UsedSlots == 0;
 
     /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Unstacked = new();
