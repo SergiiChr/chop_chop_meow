@@ -55,7 +55,14 @@ public sealed class WorldUpdates {
     // The world's own fields, without the lists and players that have entries of their own, or the fog, which each machine works out from where everyone stands.
     private static readonly JsonSerializerOptions Rest = new(Compact) {
         TypeInfoResolver = new DefaultJsonTypeInfoResolver {
-            Modifiers = { info => { if (info.Type == typeof(SaveState)) foreach (var p in info.Properties.Where(p => Shared.Contains(p.Name)).ToList()) info.Properties.Remove(p); } }
+            Modifiers = {
+                info => {
+                    if (info.Type != typeof(SaveState)) return;
+                    foreach (var p in info.Properties.Where(p => Shared.Contains(p.Name)).ToList()) info.Properties.Remove(p);
+                    // A whole fog map for every update's state would be wasted: a state entry does not carry one.
+                    info.CreateObject = static () => new SaveState([]);
+                }
+            }
         }
     };
     private static readonly JsonTypeInfo<SaveState> StateInfo = (JsonTypeInfo<SaveState>)Rest.GetTypeInfo(typeof(SaveState));
@@ -164,9 +171,12 @@ public sealed class WorldUpdates {
         return output.AsSpan(0, length);
     }
 
-    /// <summary>Writes only the changed fields of an object entry, unless a field it had is gone or it is not an object.</summary>
+    /// <summary>
+    /// Writes only the changed fields of an object entry, unless it is not an object or its fields are not the ones it had.
+    /// Entries leave out fields at their default, so a field coming or going sends the whole entry, which keeps the guest's copy in the host's field order.
+    /// </summary>
     private bool WritePatch(EntryKey key, byte[] now, byte[] then) {
-        if (!Fields(now, nowFields) || !Fields(then, thenFields)) return false;
+        if (!Fields(now, nowFields) || !Fields(then, thenFields) || nowFields.Count != thenFields.Count) return false;
         foreach (var field in thenFields) if (Find(now, nowFields, Name(then, field)) < 0) return false;
         Span<byte> name = stackalloc byte[EntryKey.MaxName];
         updateWriter.WriteStartObject(name[..key.Format(name, true)]);
@@ -205,7 +215,7 @@ public sealed class WorldUpdates {
         return snapshot;
     }
 
-    /// <summary>An object entry with the fields of <paramref name="changes"/> replaced or added.</summary>
+    /// <summary>An object entry with the fields of <paramref name="changes"/> replaced.</summary>
     private byte[] Patch(byte[] entry, ReadOnlySpan<byte> change) {
         if (!Fields(entry, thenFields) || !Fields(change, patchFields)) throw new JsonException("A patch must change an object entry.");
         merged.ResetWrittenCount(); mergedWriter.Reset(merged);
@@ -215,12 +225,6 @@ public sealed class WorldUpdates {
             int now = Find(change, patchFields, fieldName);
             mergedWriter.WritePropertyName(fieldName);
             mergedWriter.WriteRawValue(now >= 0 ? Value(change, patchFields[now]) : Value(entry, field), skipInputValidation: true);
-        }
-        foreach (var field in patchFields) {
-            var fieldName = Name(change, field);
-            if (Find(entry, thenFields, fieldName) >= 0) continue;
-            mergedWriter.WritePropertyName(fieldName);
-            mergedWriter.WriteRawValue(Value(change, field), skipInputValidation: true);
         }
         mergedWriter.WriteEndObject();
         mergedWriter.Flush();
@@ -252,6 +256,9 @@ public sealed class WorldUpdates {
         for (int i = 0; i < fields.Count; i++) if (Name(json, fields[i]).SequenceEqual(name)) return i;
         return -1;
     }
+
+    /// <summary>The world's own fields from a state entry, in a new object without a fog map.</summary>
+    public static SaveState ReadState(byte[] json) => JsonSerializer.Deserialize(json, StateInfo) ?? throw new JsonException("Empty state");
 
     public static T Read<T>(byte[] json) => JsonSerializer.Deserialize<T>(json, Compact) ?? throw new JsonException("Empty entry");
 

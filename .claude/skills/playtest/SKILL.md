@@ -19,7 +19,12 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
    if (Launch.Value("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
    ```
 
-2. Back up the saves: every worktree's game uses the same `app_userdata` folder, so playing can overwrite the player's real saves. Press New game, not Continue, unless the test needs a save, and restore the backup when done.
+2. Back up the saves. They are in `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/` in the main checkout, not in
+   `~/.local/share/godot`: `build.py` points the game there, and every worktree reaches the same folder through its
+   `.tools` symlink, so playing can overwrite the player's real saves. Copy `autosave.json`, the `settlement*.json`
+   slots and `settings.cfg` out first. Press New game, not Continue, unless the test needs a save. A running game writes
+   the autosave slot every 300 seconds of play, and joining from the pause menu writes it too, so compare the files when
+   done and restore any that changed. Delete any `guest-*.json` the run made.
 3. Start the game in the background with a folder in your scratchpad: `env -u WAYLAND_DISPLAY ./build.py play -- --drive <dir>`. On native Wayland the window runs at about one frame a second. Add `--showcase` and its flags for a late-game fixture instead of a fresh start.
 4. When done, remove both: `git checkout src/Game.cs && rm -f src/ReviewDrive.cs src/ReviewDrive.cs.uid`. Never commit the driver.
 
@@ -47,6 +52,8 @@ Look at every screenshot before deciding the next step.
 
 ## Pitfalls
 
+- A `key Escape` tap can do nothing, so a menu may not have opened or closed. Take a `shot` after it before the next
+  step, and prefer clicking the Resume or Back button.
 - Stop the game by PID from `pgrep -a Godot`. `pkill -f` and `pgrep -f` match the calling shell's own command line: `pkill -f` kills that shell, and a wait loop on `pgrep -f` never ends.
 - A run driven by `scale` or a showcase fixture is not a fair timing or full-playthrough result; say what was skipped.
 - Treat Godot errors in the game output as failures.

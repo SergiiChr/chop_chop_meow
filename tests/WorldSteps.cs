@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.Json;
 using ChopChopMeow;
 using Godot;
 using static Checks;
@@ -122,6 +123,12 @@ internal static class WorldSteps {
 
     /// <summary>A spot in the open middle of the valley, so the progression run has room to build.</summary>
     public static Vector2 Site(float x, float y) => new(x + 60, y + 60);
+
+    /// <summary>Fails when an update's entry reads back as anything but <paramref name="value"/>, compared as a save writes them.</summary>
+    public static void RequireReadsBackAs<T>(Snapshot entries, EntryKey key, T value) {
+        string saved = JsonSerializer.Serialize(value, GameData.Json), read = JsonSerializer.Serialize(WorldUpdates.Read<T>(entries[key]), GameData.Json);
+        Require(saved == read, $"A {typeof(T).Name} should read back from a world update as it was:\n{saved}\n{read}");
+    }
 
     public static List<Thing> Known(World world) {
         var known = new List<Thing>();
