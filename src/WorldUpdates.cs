@@ -52,7 +52,6 @@ public sealed class WorldUpdates {
     // The world's crate contents share a name with a player's, which only a guest's own save uses, and stay in.
     public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered) }
         .Concat(typeof(PlayerState).GetProperties().Select(p => p.Name).Where(n => n != nameof(SaveState.Crates))).ToHashSet();
-    private static readonly SaveState ReadInto = new();
     // The world's own fields, without the lists and players that have entries of their own, or the fog, which each machine works out from where everyone stands.
     private static readonly JsonSerializerOptions Rest = new(Compact) {
         TypeInfoResolver = new DefaultJsonTypeInfoResolver {
@@ -60,9 +59,8 @@ public sealed class WorldUpdates {
                 info => {
                     if (info.Type != typeof(SaveState)) return;
                     foreach (var p in info.Properties.Where(p => Shared.Contains(p.Name)).ToList()) info.Properties.Remove(p);
-                    // A new SaveState makes a whole fog map and a stand-in player, so a guest reads every update's state into this one.
-                    // Each read replaces every field it writes, so the guest's world, which takes them over, never shares a collection with the next read.
-                    info.CreateObject = () => ReadInto;
+                    // A whole fog map for every update's state would be wasted: a state entry does not carry one.
+                    info.CreateObject = static () => new SaveState([]);
                 }
             }
         }
@@ -259,7 +257,7 @@ public sealed class WorldUpdates {
         return -1;
     }
 
-    /// <summary>The world's own fields from a state entry, in an object that the next call reuses.</summary>
+    /// <summary>The world's own fields from a state entry, in a new object without a fog map.</summary>
     public static SaveState ReadState(byte[] json) => JsonSerializer.Deserialize(json, StateInfo) ?? throw new JsonException("Empty state");
 
     public static T Read<T>(byte[] json) => JsonSerializer.Deserialize<T>(json, Compact) ?? throw new JsonException("Empty entry");

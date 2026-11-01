@@ -155,7 +155,9 @@ public sealed class SaveState {
     /// <summary>Everyone in the world; the first is the save's own player. Guests are saved on their own machines.</summary>
     [JsonIgnore] public List<PlayerState> Players { get; set; }
     [JsonIgnore] public PlayerState Actor { get; set; }
-    public SaveState() { Players = new() { new PlayerState() }; Actor = Players[0]; }
+    public SaveState() : this(new byte[Terrain.Size * Terrain.Size]) { }
+    /// <summary>A save holding the given fog map; a guest reads an update's state into one with an empty map, which it never looks at.</summary>
+    internal SaveState(byte[] explored) { Players = new() { new PlayerState() }; Actor = Players[0]; Explored = explored; }
     /// <summary>5 aligns mine entrances with their cliff faces; version 4 saves migrate on load.</summary>
     public int Version { get; set; } = 5;
     public List<Thing> Things { get; set; } = new();
@@ -198,7 +200,7 @@ public sealed class SaveState {
     /// <summary>Profit of each finished day, oldest first.</summary>
     public List<int> Profits { get; set; } = new();
     /// <summary>One byte per map tile, 255 once the player has seen it; serialized as base64.</summary>
-    public byte[] Explored { get; set; } = new byte[Terrain.Size * Terrain.Size];
+    public byte[] Explored { get; set; }
     /// <summary>Things as last seen, kept so the fog shows them unchanged until the player looks again.</summary>
     public Dictionary<int, Thing> Remembered { get; set; } = new();
 }

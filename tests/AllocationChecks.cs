@@ -41,7 +41,7 @@ public static class AllocationChecks {
             var copy = guest.Merge(known.Guest, host.Delta(now, known.Host));
             if (known.Host != null) { host.Release(known.Host); guest.Release(known.Guest); }
             sent.Enqueue((now, copy));
-        }, maxBytesPerRun: 14000, warmup: 200, runs: 300);
+        }, maxBytesPerRun: 12200, warmup: 200, runs: 300);
         foreach (var (hosted, copied) in sent)
             Require(hosted.Count == copied.Count && hosted.All(pair => copied.TryGetValue(pair.Key, out var entry) && entry.AsSpan().SequenceEqual(pair.Value)), "the guest's merged entries should match the host's");
 

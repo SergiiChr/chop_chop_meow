@@ -33,6 +33,8 @@ public static class MultiplayerChecks {
         CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(data);
         CheckUpdateFieldsLeftOutStartAsNewObjectsDo();
         CheckUpdateEntriesReadBackAsTheyWere(data);
+        CheckAChangedInventoryFieldIsNeverFresh();
+        CheckStateReadKeepsNothingFromTheOneBefore();
     }
 
     /// <summary>Updates leave out fields at their type's default, so a guest reading one back must start that field there too.</summary>
@@ -59,15 +61,37 @@ public static class MultiplayerChecks {
     private static void CheckUpdateEntriesReadBackAsTheyWere(GameData data) {
         var world = Settlement(data);
         for (int i = 0; i < 600; i++) world.Tick(1 / 60f);
-        static void Same<T>(T value, JsonTypeInfo<T> info) {
-            string saved = JsonSerializer.Serialize(value, GameData.Json), read = JsonSerializer.Serialize(WorldUpdates.Read<T>(JsonSerializer.SerializeToUtf8Bytes(value, info)), GameData.Json);
-            Require(saved == read, $"A {typeof(T).Name} should read back from a world update as it was:\n{saved}\n{read}");
+        var wolf = PlaceWolf(world, new Wolf { Health = 0, Target = 2 });
+        var entries = new WorldUpdates().Capture(world);
+        foreach (var t in world.Things) RequireReadsBackAs(entries, new EntryKey(EntryKey.Thing, t.Id), t);
+        foreach (var w in world.Workers) RequireReadsBackAs(entries, new EntryKey(EntryKey.Worker, w.Id), w);
+        foreach (var o in world.Orders) RequireReadsBackAs(entries, new EntryKey(EntryKey.Order, o.Id), o);
+        foreach (var p in world.Players) RequireReadsBackAs(entries, new EntryKey(EntryKey.Player, p.Id), p);
+        RequireReadsBackAs(entries, new EntryKey(EntryKey.Wolf, wolf.Id), wolf);
+    }
+
+    /// <summary>An inventory counted as fresh is written as {}, so every field it saves must end that, including one added later: a field type this check does not know fails it.</summary>
+    private static void CheckAChangedInventoryFieldIsNeverFresh() {
+        foreach (var field in InventoryJson.Default.Inventory.Properties) {
+            if (field.Set == null) continue;
+            var inventory = new Inventory();
+            object changed = field.PropertyType switch {
+                var type when type == typeof(int) => 1,
+                var type when type == typeof(HashSet<string>) => new HashSet<string> { "wood" },
+                var type when type == typeof(List<Inventory.Slot>) => new List<Inventory.Slot>(),
+                var type when type == typeof(IReadOnlyDictionary<string, int>) => new Dictionary<string, int> { ["wood"] = 1 },
+                var type => throw new InvalidOperationException($"Change Inventory.{field.Name}, a {type.Name}, here and count it in Inventory.Fresh."),
+            };
+            field.Set(inventory, changed);
+            Require(!inventory.Fresh, $"An inventory with {field.Name} changed should not count as fresh, or a guest loses it.");
         }
-        foreach (var t in world.Things) Same(t, UpdateJson.Default.Thing);
-        foreach (var w in world.Workers) Same(w, UpdateJson.Default.Worker);
-        foreach (var o in world.Orders) Same(o, UpdateJson.Default.TradeOrder);
-        foreach (var p in world.Players) Same(p, UpdateJson.Default.PlayerState);
-        Same(new Wolf { Health = 0, Target = 2 }, UpdateJson.Default.Wolf);
+    }
+
+    private static void CheckStateReadKeepsNothingFromTheOneBefore() {
+        var before = WorldUpdates.ReadState("""{"Coins":12,"Time":9}"""u8.ToArray());
+        var after = WorldUpdates.ReadState("""{"Time":10}"""u8.ToArray());
+        Require(after.Coins == null && after.Time == 10, "a field a state entry leaves out should not keep the last entry's value");
+        Require(before.Coins == 12 && before.Time == 9, "reading a state entry should leave the one read before alone");
     }
 
     private static void CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(GameData data) {
