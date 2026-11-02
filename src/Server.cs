@@ -78,8 +78,11 @@ public partial class Server : Node {
         lonely = 0;
         if (Net.Held) return;
         World.Tick(dt);
-        if ((autosave += dt) >= AutosaveSeconds) { autosave = 0; Net.TellOwner(Saves.Write(World, 0)); }
+        if ((autosave += dt) >= AutosaveSeconds) { autosave = 0; Autosave(); }
     }
+
+    /// <summary>Writes the autosave slot and tells the owner how it went.</summary>
+    public void Autosave() => Net.TellOwner(Saves.Write(World, 0));
 
     /// <summary>Ends the game now.</summary>
     public void End() {

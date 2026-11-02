@@ -52,7 +52,7 @@ public partial class Game {
     }
 
     // Called only for the developer benchmark, after the normal game update. Arrays and input events are prepared outside steady sampling.
-    private void SamplePerformance(double delta) {
+    private void SamplePerformance() {
         ulong now = Time.GetTicksUsec();
         double elapsed = (now - performanceStart) / 1_000_000.0;
         double seconds = elapsed - PerformanceStage.WarmupSeconds;

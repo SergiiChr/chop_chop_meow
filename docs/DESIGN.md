@@ -34,7 +34,7 @@ The project targets Godot 4.7.2 .NET with C#.
 Each feature is a node with a small public surface, given what it needs in its constructor.
 `UiKit` carries the world, sounds and how a player action runs.
 `Game` implements `IGameFlow`, what the menus call to start, load, leave or quit a game.
-The interface reads the world through `World`'s read members and keeps `world.S` for writes, and for what needs the real `Inventory`, such as a move between grids.
+The interface reads the world through `World`'s read members and changes it through `World`'s actions, which go to the server; `world.S` is for what needs the real `Inventory`, such as an end of a move between grids.
 `UiKit.Paused` follows which overlays are open: each one registers with `HoldWhile`, so none saves or restores another's pause.
 `World.Replaced` fires whenever the whole state is replaced (a new game, a load, a player taking the server's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
 The side panel builds a new `PagePanel` node when a page opens; the page holds its own `LiveUpdates`, which run on each refresh, and its own state.
@@ -137,6 +137,7 @@ Checks and review tools:
 | `tests/*Steps.cs` | Steps shared by the simulation checks |
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
+| `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
@@ -167,6 +168,7 @@ The side panel only shows the building and sizes itself to what it holds.
 Every game runs on a `Server`, alone or together, which owns the only simulation and has no player of its own.
 The window that starts a game runs it as a headless child process of the same executable (`--server`).
 The server takes the first free port from 24565 itself when it starts serving, since a port a window picked could be gone by the time the server came up, and writes it to a file named for the window's process.
+A server process logs to `user://logs/server.log`: sharing the window's log, each start would rotate the window's older logs out of the folder.
 The window joins it over localhost like any guest, showing a starting screen until it does.
 `Session` says where a window stands with the game it started: starting it, playing it, away from it to join another, or going back to it.
 The UI and network checks run the server inside the window, under a branch with its own `SceneMultiplayer`, so they can set its world up directly; the UI checks pump the line themselves (`Game.Settle`) rather than wait for it.
@@ -209,11 +211,12 @@ The welcome is a guest's first update, with the fog uncovered so far.
 - A player keeps only the updates the server can still build on: confirmations only move forward, so nothing older than the update just taken's baseline is needed.
 - Each action carries where the guest stood, so the host checks reach from there rather than from a position still gliding in.
 - `Net.SendEveryUpdate` turns off ENet's throttle: it read the hitch of loading a game as a slow line, and let through one update in 32 for several seconds.
-- An action's result comes back with a later update. A window checks what it can before sending, `Net.Made` names a new mine or worker so the panel opens on it, and `UiKit.HearMove` plays an item's sound when the backpack changes. Panels refresh every frame while `Net.AwaitingAnswer` holds, and a building's page draws itself again when what sets its layout changes (`ThingPage.WatchLayout`), since drawing it right after an action would show the world before the answer.
+- An action's result comes back with a later update. A window checks what it can before sending, and `Net.Made` names a new mine or worker so the panel opens on it. Panels refresh with every update while `Net.AwaitingAnswer` holds, and a page draws itself again when what sets its layout changes (`PagePanel.RedrawOnChange`), since drawing it right after an action would show the world before the answer.
 - Leaving waits for the server to confirm before the line closes, so actions still in flight arrive; the owner's server closes instead, and the line going is the confirmation.
-- Joining another game from your own autosaves it and leaves with `Net.StepAway`, which keeps its server up: a failed or cancelled join goes back to it, and after a good one it ends with nobody in it, 30 seconds later.
+- Joining another game from your own autosaves it and leaves with `Game.StepAway`, which keeps its server up: a failed or cancelled join goes back to it, and after a good one it ends with nobody in it, 30 seconds later.
 - A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key. It goes on trying while the server says the game is not open yet, as after the host loads a save.
 - Until the owner opens the game, the server refuses peers that are not on this computer. Only the owner can save; any player can hold the world, and it stands still while all of them do.
+- The server's welcome says whether the player owns the game, from their machine's key, so an owner who types their own game's address into the join popup still owns it.
 
 Factorio instead runs the same deterministic simulation on every machine and sends only inputs (lockstep).
 This simulation uses floats and frame-length steps, so it is not deterministic, and with hundreds of objects the deltas stay small.
@@ -222,7 +225,7 @@ This simulation uses floats and frame-length steps, so it is not deterministic, 
 
 Every world object is a low-poly model assembled from Godot primitive meshes in code.
 Meshes and materials are cached by parameters, so repeated objects share resources.
-`WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, so a building, crate or carcass that first appears mid-game builds no mesh, material or shader; the three trade carts are built then too and reused for every trip.
+`WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, and `WorldView` draws them behind the ground for its first frames, so a building, crate, carcass or wolf that first appears mid-game builds no mesh, material, shader or pipeline; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
 The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
 
@@ -443,8 +446,8 @@ Tools, packed crates and bottles take a slot each everywhere.
 The layout is saved and synchronized: removing one stack never shifts unrelated cells.
 Sort is the only action that packs and regroups stacks.
 Item totals change only through `Inventory` methods, which keep them in line with the stacks.
-Stacks are rebuilt from totals once, where the two can disagree: when a save loads (old saves hold totals only) and when a guest joins.
-A guest's copy takes totals and stacks together from the host, so it does not rebuild.
+Stacks are rebuilt from totals once, where the two can disagree: when a save loads (old saves hold totals only).
+A window's copy takes totals and stacks together from the server, so it does not rebuild.
 
 Input rule for every item cell, in storage and stations alike:
 
@@ -637,7 +640,7 @@ Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
 - The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe and anvil impacts, bellows pumps, storage lids and the cabin door.
-- `UiKit.Act` gives manual inventory moves and spending a sound by item kind when the action made none of its own.
+- `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
 ### Music
 
@@ -658,7 +661,7 @@ The world is a fixed 216-tile valley defined in `src/Terrain.cs`:
 
 `World.Scatter` places resources with a seeded generator, trees more densely toward the mountains.
 Saves from earlier maps are refused.
-`World.Deserialize` upgrades older saves, then refuses one that names unknown items or holds player needs out of range, with the same checks `Adopt` applies to a joining guest.
+`World.Deserialize` upgrades older saves, then refuses one that names unknown items or holds player needs out of range.
 Workers use grid detours around water and buildings.
 
 ## Development and verification

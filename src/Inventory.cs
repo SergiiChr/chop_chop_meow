@@ -148,27 +148,29 @@ public sealed class Inventory {
         PadLayout();
     }
 
-    /// <summary>Moves an exact source cell to a destination cell; matching stacks merge up to their stack limit, otherwise cells swap.</summary>
     /// <summary>
-    /// How much of an item a drop from <paramref name="from"/> on one cell takes: what the cell has room for, or, on another item, what fits anywhere.
-    /// Within one inventory a drop on another item swaps the two, so all of it goes.
+    /// How much a drop of <paramref name="quantity"/> from cell <paramref name="source"/> of <paramref name="from"/> on one cell takes: what the cell has room for, or, on another item, what fits anywhere.
+    /// Within one inventory a drop on another item swaps the two, which takes a whole stack and nothing less.
     /// </summary>
-    public int RoomAt(int target, string item, Inventory from) {
-        if ((uint)target >= (uint)Layout.Count) return 0;
-        var there = Layout[target];
-        int room = ReferenceEquals(from, this) ? int.MaxValue : Room(item);
-        return there.Item == "" || there.Item == item ? Math.Min(room, StackOf(item) - (there.Item == "" ? 0 : there.Count)) : room;
+    public int RoomAt(int target, Inventory from, int source, int quantity) {
+        if ((uint)target >= (uint)Layout.Count || (uint)source >= (uint)from.Layout.Count) return 0;
+        Slot there = Layout[target], held = from.Layout[source];
+        if (there.Item == "" || there.Item == held.Item) return MergeRoom(there, held.Item, from);
+        return !ReferenceEquals(from, this) ? Room(held.Item) : quantity >= held.Count ? int.MaxValue : 0;
     }
 
+    /// <summary>How much of an item from <paramref name="from"/> a cell holding nothing or the same item can take.</summary>
+    private int MergeRoom(Slot there, string item, Inventory from) => Math.Min(ReferenceEquals(from, this) ? int.MaxValue : Room(item), StackOf(item) - (there.Item == "" ? 0 : there.Count));
+
+    /// <summary>Moves an exact source cell to a destination cell; matching stacks merge up to their stack limit, otherwise cells swap.</summary>
     public int MoveSlotTo(int source, Inventory destination, int target, int quantity = int.MaxValue) {
         if ((uint)source >= (uint)Layout.Count || (uint)target >= (uint)destination.Layout.Count) return 0;
         Slot a = Layout[source], b = destination.Layout[target]; if (a.Item == "" || quantity <= 0) return 0;
         bool same = ReferenceEquals(this, destination);
         if (same && source == target) return 0;
         if (b.Item == "" || b.Item == a.Item) {
-            int room = same ? int.MaxValue : destination.Room(a.Item);
             int targetCount = b.Item == "" ? 0 : b.Count;
-            int moved = Math.Min(Math.Min(Math.Min(quantity, a.Count), destination.StackOf(a.Item) - targetCount), room);
+            int moved = Math.Min(Math.Min(quantity, a.Count), destination.MergeRoom(b, a.Item, this));
             if (moved > 0) {
                 if (b.Item == "") b.Item = a.Item;
                 b.Count = targetCount + moved; a.Count -= moved; if (a.Count == 0) a.Item = "";

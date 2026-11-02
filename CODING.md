@@ -24,7 +24,7 @@ Project rules on top of the global coding and testing guides.
 - **Implicit coupling:** pass `World`, `GameData` and views as arguments or fields. Static fields are for shared, immutable or cached resources (meshes, materials, `StringName`s), not game state.
 - **Layer-first folders:** the project keeps the flat `src/` and `tests/` layout; group related code by file name prefix instead of adding folders.
 - **Illegal states:** use enums such as `ActorAction` rather than combinations of flags or strings.
-- **Validation at the boundary:** `GameData` validates `data/game.json` when it loads, `World.Deserialize` checks saves with the same rules `Net` uses for what guests send, and `Net` parses messages when they arrive. Code inside trusts what they produced.
+- **Validation at the boundary:** `GameData` validates `data/game.json` when it loads, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
 - **Old saves:** upgrades to an older save's data run once when it loads, never in the tick.
 
 ## Architecture
@@ -71,6 +71,7 @@ Do all instantiation and compilation during loading to avoid in-game stutter.
 Building mid-game is for rare events: a new building, a hire, a wolf.
 Build-mode placement previews and their faded materials are setup work, made while loading.
 A material builds its shader on its first draw, which stalls that frame, unless loading asks for its RID first (`ModelKit.BuildShaders`, faded copies in `ModelKit`).
+Drawing builds a pipeline the first time too, up to a second on a machine with empty caches, and asking for a RID does not: `WorldView` draws one of every model behind the ground for its first frames (`WorldModels.Warm`).
 Sounds load when the game starts, and music pauses rather than stopping: starting an MP3 partway through decodes it from the beginning.
 
 Code that runs every frame or tick allocates nothing once warmed up: every byte is garbage the runtime collects later in a pause that stalls a frame.

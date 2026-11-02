@@ -112,6 +112,9 @@ public partial class Game {
         await Until(() => world.Remote && !startMenu.Visible, "the game's server taking this window's player", 30);
     }
 
+    /// <summary>Waits for this window to be back in the game it owns.</summary>
+    private async Task BackInOwnGame(string what, double seconds) => await Until(() => net.Owning && world.Remote && !startMenu.Visible, what, seconds);
+
     /// <summary>Leaves a game this window started, and waits for its server to end.</summary>
     private async Task LeaveAndAwaitServerEnd() {
         int server = serverProcess;
@@ -125,7 +128,14 @@ public partial class Game {
         return spots.Where(spot => world.PlacementBlock(kind, spot) == null).MinBy(spot => spot.DistanceTo(world.Player));
     }
 
+    /// <summary>Starts a game on this computer that someone else owns, which has not been opened to anyone, and returns its server's process and port.</summary>
+    private async Task<(int Process, int Port)> StartStrangersServer() {
+        int process = RunServer(-1, "stranger", SignalPath("stranger-port"));
+        return (process, int.Parse(await Signaled("stranger-port")));
+    }
+
     private async Task LeaveGame() {
+        int host = world.Players.First(p => p != world.Me).Id;
         await CloseWithEsc(); await KeyStroke(Key.Escape);
         Require(menu.Visible, "A guest's Esc must open the pause menu.");
         Require(menu.JoinButton.Text == "Leave game", "A guest's pause menu must offer to leave.");
@@ -133,5 +143,7 @@ public partial class Game {
         await Click(menu.JoinButton);
         Require(!world.Remote, "Leaving must end the guest's connection.");
         Require(startMenu.Visible, "Leaving must return to the start menu.");
+        await Frames();
+        Require(!view.ShowsPlayer(host), "The start menu must not show the players of the game left behind.");
     }
 }

@@ -94,7 +94,7 @@ public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, JobChoice choi
             Style.InkCheck(tick);
             tick.AddThemeFontOverride("font", Style.Bold);
             // A full mine refuses the worker, so the box shows what actually happened.
-            tick.Toggled += on => { world.SetDuty(worker, t, job, on); tick.SetPressedNoSignal(World.HasDuty(worker, t.Id, job)); kit.Refresh(); };
+            live.Tick(tick, () => World.HasDuty(worker, t.Id, job), on => world.SetDuty(worker, t, job, on));
             line.AddChild(tick);
             var elsewhere = w.Duties.Where(d => d.Thing != t.Id).ToList();
             if (elsewhere.Count == 0) continue;

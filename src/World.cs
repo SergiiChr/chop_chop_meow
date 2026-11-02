@@ -2101,12 +2101,10 @@ public sealed partial class World {
         if (json.Contains("\"loose_iron\"") || json.Contains("\"Stage\"")) json = UpgradeThings(json);
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
-        if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Absent.Count == 0) throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Players = new();
-        loaded.Absent ??= new();
-        if (loaded.Absent.Count == 0) throw new InvalidOperationException("Unsupported or incomplete save.");
         // Item fixes below that belong to one player go to the unclaimed one, else the first.
-        loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.FirstOrDefault() ?? new PlayerState();
+        loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.First();
         RebuildAllStacks(loaded);
         loaded.Prices ??= new();
         if (loaded.Coins is float coins) { loaded.Backpack.Add(Inventory.Coins, (int)coins); loaded.Coins = null; }

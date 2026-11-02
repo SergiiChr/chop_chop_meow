@@ -107,7 +107,8 @@ public partial class PauseMenu : PanelContainer {
         goals.AddChild(profit);
         HostButton.Disabled = !net.Owning || net.Opened; HostButton.Text = net.Opened ? "Hosting" : "Host";
         // Joining elsewhere would drop the guests without a word, and a guest's saves and loads are the host's.
-        JoinButton.Text = flow.Owns ? "Join" : "Leave game"; JoinButton.Disabled = net.Opened; SaveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = !flow.Owns;
+        bool guest = world.Remote && !flow.Owns;
+        JoinButton.Text = guest ? "Leave game" : "Join"; JoinButton.Disabled = net.Opened; SaveButton.Disabled = loadButton.Disabled = newGameButton.Disabled = guest;
         shownGuests = Guests; netLine.Text = NetStatus(); netLine.Visible = netLine.Text != "";
         Visible = true;
     }
@@ -130,7 +131,7 @@ public partial class PauseMenu : PanelContainer {
 
     /// <summary>A line for the pause menu while the game is online.</summary>
     private string NetStatus() => net.Opened ? $"Hosting on port {net.Port} · {Guests} {(Guests == 1 ? "guest" : "guests")}"
-        : !flow.Owns ? "Playing in the host's world. The host's saves keep your player." : "";
+        : world.Remote && !flow.Owns ? "Playing in the host's world. The host's saves keep your player." : "";
 
     private int Guests => world.Players.Count - 1;
 

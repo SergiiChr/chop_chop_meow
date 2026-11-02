@@ -36,14 +36,14 @@ public partial class Net : Node {
     /// <summary>The pause between a dropped guest's tries to get back in.</summary>
     private const float RetrySeconds = 2;
     /// <summary>Seconds after an action that its answer should arrive in, on anything but a very slow line.</summary>
-    private const float AnswerSeconds = .3f;
+    public const float AnswerSeconds = .3f;
     public const string LostLine = "Lost the connection to the host.";
     public const string ServerStopped = "The game's server stopped.";
     private const string NotOpened = "The host has not opened the game to other players.";
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 7;
+    private const int Protocol = 8;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -84,7 +84,7 @@ public partial class Net : Node {
     // Guest: time left to get back in after a drop, the pause before the next try and the seconds last shown.
     private float reconnectLeft, retryIn;
     private int shownLeft;
-    private bool welcomed, leaving, farewell, comingBack;
+    private bool welcomed, leaving, farewell;
     private float sendClock, answerLeft;
     // Guest: counts what it sends, so the host can tell a position report from before an action.
     private int stamp;
@@ -96,6 +96,8 @@ public partial class Net : Node {
     // Server: the latest stamp heard from each player, and the players holding the game with a menu open.
     private readonly Dictionary<int, int> heard = new();
     private readonly HashSet<int> holding = new();
+    // Server: sounds the world has made, so an action can tell whether it made one.
+    private int echoes;
     // Server: the window each player plays from.
     private readonly Dictionary<int, int> windows = new();
     // Server: the owner's machine key, its peer once joined, and whether other computers may join.
@@ -115,7 +117,6 @@ public partial class Net : Node {
     // Reused while a guest merges an update into its copy.
     private readonly List<EntryKey> differing = new();
     private readonly List<object> gone = new();
-    private readonly List<int> forgotten = new();
 
     public Net() { applied = updates.Empty(); }
 
@@ -128,7 +129,7 @@ public partial class Net : Node {
     public string Address { get; private set; } = "";
     /// <summary>The port of the game this window joined.</summary>
     public int Port => port;
-    /// <summary>This window started the server it plays on, so it saves, loads and opens the game to others.</summary>
+    /// <summary>The server says this window's player owns the game, so it saves, loads and opens it to others.</summary>
     public bool Owning { get; private set; }
     /// <summary>The owner has opened the game to other players.</summary>
     public bool Opened { get; private set; }
@@ -174,17 +175,14 @@ public partial class Net : Node {
         return Error.Ok;
     }
 
-    /// <param name="ip">The server's address.</param>
-    /// <param name="port">The server's port.</param>
-    /// <param name="own">It is the server this window started.</param>
-    public Error Join(string ip, int port, bool own = false) {
+    public Error Join(string ip, int port) {
         Disconnect();
         var peer = new ENetMultiplayerPeer();
         var error = peer.CreateClient(ip, port);
         if (error != Error.Ok) return error;
         if (peer.GetPeer(ServerId) is { } host) TolerateLag(host);
         Multiplayer.MultiplayerPeer = peer;
-        Address = ip; this.port = port; Owning = own;
+        Address = ip; this.port = port;
         // The connect attempt itself would wait out the whole lag timeout; a host that never answers fails sooner.
         var timer = GetTree().CreateTimer(ConnectTimeout); connectTimer = timer;
         timer.Timeout += () => { if (timer == connectTimer && Connecting) Fail($"The host didn't answer within {ConnectTimeout:0} seconds."); };
@@ -192,20 +190,20 @@ public partial class Net : Node {
     }
 
     /// <summary>Ends a joined game, after the server has every action already sent.</summary>
-    public void Leave() {
+    /// <param name="comingBack">The player may come back, so the owner's server stays up a while for them.</param>
+    public void Leave(bool comingBack = false) {
         reconnectLeft = 0;
-        Disconnect();
+        Disconnect(comingBack);
     }
 
-    /// <summary>Leaves this window's own game for another one, and its server stays up a while in case the player comes back.</summary>
-    public void StepAway() {
-        comingBack = true;
+    /// <summary>Closes the line to a server that has died, which would never answer a goodbye.</summary>
+    public void Abandon() {
+        welcomed = false;
         Leave();
-        comingBack = false;
     }
 
     /// <summary>Closes the line and clears what belonged to it, keeping any tries to get back in going.</summary>
-    private void Disconnect() {
+    private void Disconnect(bool comingBack = false) {
         if (leaving) return;
         leaving = true;
         if (welcomed && Multiplayer.MultiplayerPeer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Connected) {
@@ -283,7 +281,7 @@ public partial class Net : Node {
         // The welcome is the guest's first update, which later ones build on.
         var entries = Remember(updates.Capture(World));
         acked[id] = sequence;
-        RpcId(id, MethodName.Welcome, id, sequence, updates.Delta(entries, null).ToArray(), WorldUpdates.Pack(new Fog { Explored = World.S.Explored, Remembered = World.S.Remembered }));
+        RpcId(id, MethodName.Welcome, id, key == owner, sequence, updates.Delta(entries, null).ToArray(), WorldUpdates.Pack(new Fog { Explored = World.S.Explored, Remembered = World.S.Remembered }));
     }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -294,13 +292,13 @@ public partial class Net : Node {
     }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Welcome(int id, int update, byte[] packed, byte[] fog) {
+    private void Welcome(int id, bool owning, int update, byte[] packed, byte[] fog) {
         var uncovered = WorldUpdates.Unpack<Fog>(fog);
         // An empty world with a stand-in for this player, which the first update fills in.
         var state = new SaveState { Explored = uncovered.Explored, Remembered = uncovered.Remembered };
         state.Players[0].Id = id;
         World.Mirror(state, state.Players, id);
-        welcomed = true;
+        welcomed = true; Owning = owning;
         Take(update, 0, packed);
         World.Host = Send;
         bool back = Retrying;
@@ -406,8 +404,17 @@ public partial class Net : Node {
         heard[p.Id] = Math.Max(order, heard.GetValueOrDefault(p.Id));
         // The action happened where the guest stood, so it goes there at once.
         if (Stand(p, standing, warp)) using (World.ActAs(p)) World.MoveTo(standing);
+        var before = new Dictionary<string, int>(p.Backpack.Items);
+        int made = echoes;
         World.Run(p, new Command((Verb)verb, target, other, item, count, at));
+        // Only moving items by hand sounds like them: not what placing things spends, or picking them up off the ground gives.
+        bool placing = (Verb)verb is Verb.Build or Verb.PlaceCrate or Verb.PickUp or Verb.PickUpCrate;
+        if (!placing && echoes == made && MostMoved(before, p.Backpack) is string moved) RpcId(p.Id, MethodName.Hear, Sounds.ForItem(moved), p.Pos);
     }
+
+    /// <summary>The item a backpack changed by most, whose sound an action gets when it made none of its own; null when it did not change.</summary>
+    private static string? MostMoved(Dictionary<string, int> before, Inventory now) =>
+        now.Items.Keys.Union(before.Keys).Where(id => now[id] != before.GetValueOrDefault(id)).OrderByDescending(id => Math.Abs(now[id] - before.GetValueOrDefault(id))).FirstOrDefault();
 
     /// <summary>
     /// Where a guest says it stands, unless a respawn or other move by the simulation came since.
@@ -429,7 +436,7 @@ public partial class Net : Node {
 
     /// <summary>Host: lets the guests hear a sound of the world.</summary>
     public void Echo(string sound, Vector2 at) {
-        if (Hosting) Rpc(MethodName.Hear, sound, at);
+        if (Hosting) { echoes++; Rpc(MethodName.Hear, sound, at); }
     }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Unreliable, TransferChannel = StreamChannel)]
@@ -455,9 +462,7 @@ public partial class Net : Node {
         // Confirmations only move forward, so nobody builds on anything older than the slowest player's.
         int slowest = sequence;
         foreach (var p in World.Players) slowest = Math.Min(slowest, acked.GetValueOrDefault(p.Id));
-        forgotten.Clear();
-        foreach (int old in sent.Keys) if (old < slowest || old <= sequence - History) forgotten.Add(old);
-        foreach (int old in forgotten) if (sent.Remove(old, out var snapshot)) updates.Release(snapshot);
+        foreach (var (old, snapshot) in sent) if (old < slowest || old <= sequence - History) { sent.Remove(old); updates.Release(snapshot); }
         return entries;
     }
 
@@ -493,10 +498,8 @@ public partial class Net : Node {
         if (baseline != 0 && !received.ContainsKey(baseline)) return;
         var entries = updates.Merge(baseline == 0 ? null : received[baseline], packed);
         received[update] = entries;
-        forgotten.Clear();
         // Confirmations only move forward, so the host never builds on anything older than this update did.
-        foreach (int old in received.Keys) if (old < baseline || old <= update - History) forgotten.Add(old);
-        foreach (int old in forgotten) if (received.Remove(old, out var snapshot) && snapshot != applied) updates.Release(snapshot);
+        foreach (var (old, snapshot) in received) if (old < baseline || old <= update - History) { received.Remove(old); if (snapshot != applied) updates.Release(snapshot); }
         Apply(entries);
         var was = applied;
         applied = entries; appliedSequence = update;

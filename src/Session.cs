@@ -5,7 +5,7 @@ internal abstract record Session {
     /// <summary>It has no game of its own: it is at a menu, or a guest in someone else's.</summary>
     public sealed record None : Session;
     /// <summary>Its server process is coming up and has not said which port it took.</summary>
-    public sealed record Launching(int Slot) : Session;
+    public sealed record Launching(int Slot, ulong Deadline) : Session;
     /// <summary>Its server is up and it is joining, for the game in a save slot, or -1 for a new one.</summary>
     public sealed record Starting(int Slot) : Session;
     /// <summary>It plays on its own server.</summary>

@@ -23,8 +23,11 @@ public partial class Game {
             await CheckPlayerComesBackThroughEveryLoad();
             await CheckSecondGameTakesAnotherPort();
             await CheckFailedJoinKeepsTheGameRunning();
+            await CheckCancelledJoinKeepsTheGameRunning();
+            await CheckRefusedJoinKeepsTheGameRunning();
+            await CheckJoiningYourOwnGameKeepsItYours();
             await CheckWalkingStaysWithinAllocationBudget(ServerWalkingBudget);
-            await CheckLeavingEndsTheServer();
+            await LeaveAndAwaitServerEnd();
             await CheckServerDyingEndsTheGame();
             GD.Print("SERVER-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
@@ -86,17 +89,52 @@ public partial class Game {
     private async Task CheckFailedJoinKeepsTheGameRunning() {
         var spot = world.Player;
         int server = serverProcess, port = net.Port;
-        await KeyStroke(Key.Escape); await Click(menu.JoinButton);
+        await KeyStroke(Key.Escape); await Click(menu.SaveButton); await Click(FindButton(startMenu.Screen, Saves.SlotLabel(2))!);
+        await Until(() => Saves.SlotUsed(2), "the server writing the save");
+        await Click(menu.JoinButton);
         await JoinFromPopup("9");
         await Until(() => !world.Remote, "the window stepping out of its game to join");
-        await Until(() => net.Owning && world.Remote && !startMenu.Visible, "the player coming back to their game", 30);
+        await BackInOwnGame("the player coming back to their game", 30);
         Require(serverProcess == server && OS.IsProcessRunning(server) && net.Port == port, "A failed join must leave the game on the server it was on.");
         Require(world.Player.DistanceTo(spot) < 1, "A failed join must leave the player where they were.");
         Require(Saves.SlotUsed(0), "Joining from a game must autosave it first.");
         await CloseWithEsc();
+        await KeyStroke(Key.F5);
+        await Until(() => messages.Shown.Contains("Settlement saved · Slot 2."), "F5 saving to the slot the game was using before the failed join", 5);
     }
 
-    private async Task CheckLeavingEndsTheServer() => await LeaveAndAwaitServerEnd();
+    private async Task CheckCancelledJoinKeepsTheGameRunning() {
+        int server = serverProcess;
+        await KeyStroke(Key.Escape); await Click(menu.JoinButton);
+        await JoinFromPopup("9");
+        Require(net.Connecting, "The check must back out while the join is under way.");
+        await Click(FindButton(startMenu.Screen, "Back · Esc")!);
+        await BackInOwnGame("the player coming back after cancelling", 5);
+        Require(serverProcess == server && OS.IsProcessRunning(server), "Cancelling a join must leave the game on the server it was on.");
+        Require(messages.Shown.Contains("Join cancelled. You are back in your game."), "Cancelling a join must say the player is back.");
+        await CloseWithEsc();
+    }
+
+    private async Task CheckRefusedJoinKeepsTheGameRunning() {
+        var (stranger, port) = await StartStrangersServer();
+        await KeyStroke(Key.Escape); await Click(menu.JoinButton);
+        await JoinFromPopup(port.ToString());
+        await BackInOwnGame("the player coming back after a host refused them", 15);
+        Require(messages.Shown.Contains("The host has not opened the game to other players. You are back in your game."), "A refused join must say why and that the player is back.");
+        using (var server = System.Diagnostics.Process.GetProcessById(stranger)) server.Kill();
+        await CloseWithEsc();
+    }
+
+    /// <summary>The owner may type their own game's address into the join popup, which brings them back to it.</summary>
+    private async Task CheckJoiningYourOwnGameKeepsItYours() {
+        await KeyStroke(Key.Escape); await Click(menu.JoinButton);
+        await JoinFromPopup(net.Port.ToString());
+        await Until(() => world.Remote && !startMenu.Visible, "the player joining their own game", 15);
+        Require(net.Owning, "A player who joins the game they started must still own it, so they can save it.");
+        await CloseWithEsc();
+        await KeyStroke(Key.F5);
+        await Until(() => messages.Shown.Contains("Settlement saved · Slot 2."), "F5 still saving the player's slot in their own game", 5);
+    }
 
     private async Task CheckServerDyingEndsTheGame() {
         await Click(FindButton(startMenu.Screen, "New game")!);

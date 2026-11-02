@@ -327,7 +327,7 @@ public sealed partial class World {
     /// <summary>A guest takes the host's whole world as its copy.</summary>
     public void Mirror(SaveState state, List<PlayerState> players, int localId) {
         state.Players = players; LocalId = localId; S = state; S.Actor = Me;
-        UpdateLunchFire(); ExploredRevision++; Look();
+        UpdateLunchFire(); ExploredRevision++;
         Replaced?.Invoke();
     }
 }

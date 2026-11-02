@@ -135,7 +135,7 @@ public partial class Hotbar : PanelContainer {
     /// <summary>Uses the item in hand toward a point on the ground; items without a use do nothing.</summary>
     public void UseHeld(Vector2 at) {
         if (ActiveItem() is not string id || !HasUse(id)) return;
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Act(() => world.Consume(id));
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id);
         else if (id == "torch") world.UseTorch(at - world.Player);
         else world.Attack();
     }

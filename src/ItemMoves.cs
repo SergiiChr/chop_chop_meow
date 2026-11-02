@@ -32,7 +32,7 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
         if (blackHole.CrateIntoCrate(container, to, drag.Item) || drag.From == null) return 0;
         if (target >= 0 && drag.SourceSlot >= 0) {
             if (drag.From == to && drag.SourceSlot == target) return 0;
-            int rest = Leftover(drag, to.RoomAt(target, drag.Item, drag.From));
+            int rest = Leftover(drag, to.RoomAt(target, drag.From, drag.SourceSlot, drag.Count));
             world.TransferSlot(drag.From, to, drag.SourceSlot, target, drag.Item, drag.Count);
             return rest;
         }

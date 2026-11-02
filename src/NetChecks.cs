@@ -51,6 +51,8 @@ public partial class Game {
         PlayerState Guest() => Hosted.Players.Single(p => p.Key != net.Key);
         await Until(() => Hosted.Players.Count == 2, "a guest joining", 45);
         await Until(() => netStatus.Text.EndsWith("· 1 guest"), "the open pause menu counting the guest who joined");
+        float playing = Hosted.Time;
+        await Until(() => Hosted.Time > playing, "the world going on behind the host's pause menu while a guest plays", 5);
         await KeyStroke(Key.Escape);
         Require(HoldsNewcomerKit(Guest().Backpack) && Guest().Pos == Terrain.Spawn, "A first-time guest must start with an axe and a bottle at the clearing.");
         await Until(() => view.ShowsPlayer(Guest().Id), "the guest's figure appearing");

@@ -7,6 +7,13 @@ namespace ChopChopMeow;
 public abstract partial class WorkerPage(PageTools tools) : PagePanel(tools) {
     protected static readonly Texture2D? Hardhat = Icons.Of("hardhat");
 
+    /// <summary>A number that changes with a worker's jobs.</summary>
+    protected static int DutyCode(Worker w) {
+        int code = 0;
+        foreach (var duty in w.Duties) code = code * 31 + duty.Thing + duty.Job.GetHashCode();
+        return code;
+    }
+
     protected Texture2D? PlaceIcon(Thing at) => Icons.Of(at.IsResource ? World.ResourceItem(at) : at.Kind.Id());
 
     /// <summary>Keeps a worker's two icon cells on what they carry and the tool they hold.</summary>
@@ -27,6 +34,7 @@ public abstract partial class WorkerPage(PageTools tools) : PagePanel(tools) {
 /// </summary>
 public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
     protected override void Build() {
+        RedrawOnChange(() => world.Workers.Count);
         var count = Style.Pill("", Style.BlueTag, Style.Rim, 13); count.MouseFilter = Control.MouseFilterEnum.Pass; count.TooltipText = "Villagers hired, of the most who will come";
         var wages = Style.Pill("", Style.Tag(Style.Brick), Style.Rim, 13); wages.MouseFilter = Control.MouseFilterEnum.Pass; wages.TooltipText = "Wages paid each dawn";
         foreach (var pill in new[] { count, wages }) { pill.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; panel.AddToHeader(pill); }
@@ -62,12 +70,7 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
         // A flat button over the whole card takes the click and rings it on hover.
         var open = new Button { Flat = false, FocusMode = Control.FocusModeEnum.None, MouseDefaultCursorShape = Control.CursorShape.PointingHand, Name = $"crew_{w.Id}" };
         Style.Skin(open, Style.None, Style.CardHover); open.Pressed += () => panel.Select(w); card.AddChild(open);
-        // A job given or taken elsewhere changes the chips, so the page is rebuilt.
-        int duties = w.Duties.Count;
-        live.Add(() => {
-            if (w.Duties.Count == duties) return;
-            duties = w.Duties.Count; RedrawLater();
-        });
+        RedrawOnChange(() => DutyCode(w));
         live.Watch(() => w.Status, shown => status.Text = shown);
         WatchKit(w, carry, carried, tool);
     }
@@ -116,6 +119,7 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
             var drop = kit.HeaderButton("close", "Take this job away", () => world.SetDuty(w, at, duty.Job, false), Style.CloseRound, $"drop_{d.Job}_{at.Id}");
             drop.CustomMinimumSize = new Vector2(30, 30); drop.AddThemeConstantOverride("icon_max_width", 14); row.AddChild(drop);
         }
+        RedrawOnChange(() => DutyCode(w));
         if (first) {
             var none = Style.Text("No jobs. Give one with the job buttons at a building, or send them to gather.", 14, Style.Tan, wrap: true);
             jobs.AddChild(none);

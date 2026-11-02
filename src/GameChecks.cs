@@ -176,7 +176,9 @@ public partial class Game {
         Require(sign.Inventory.Count == 0 && world.Backpack["wood"] == 5, "Loose goods must stay in the backpack: the market only takes crates.");
         await Click(Cell(2, c => c.TooltipText.StartsWith("Wood crate of 12 Berries")));
         Require(sign.Inventory[packed] == 1 && world.Backpack[packed] == 0, "Clicking a packed crate must load it into the market input.");
+        int played = sounds.Played;
         await Click(Named("sell")!);
+        Require(sounds.Played > played, "Sell must play the sound of the goods going.");
         Require(world.Orders.Count == 1 && sign.Inventory.Count == 0, "Sell must send the market input off on a cart.");
         await Click(Named("auto_sell")!);
         Require(sign.AutoSell, "Ticking Send when full must set the post to send the cart on its own.");
@@ -189,6 +191,92 @@ public partial class Game {
         await Click(Named("filters_close")!);
         Hosted.Tick(world.Data.TradeSeconds); RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 999);
         await CloseWithEsc();
+    }
+
+    /// <summary>The autosave comes every five minutes, more than this stage has, so the check asks for it.</summary>
+    private async Task CheckAutosaveTellsTheOwner() {
+        await CloseWithEsc();
+        hosted!.Autosave();
+        await Until(() => messages.Shown.Contains("Settlement saved · Autosave."), "the owner hearing about the autosave", 5);
+        Require(Saves.SlotUsed(0), "The autosave must write its slot.");
+    }
+
+    /// <summary>A window glides what the server moves, and an update that changes one number must not leave the other where the glide had got to.</summary>
+    private async Task CheckOthersGlideAndStopWhereTheServerPutThem() {
+        var worker = AddWorker(Hosted, world.Player + new Vector2(3, 0));
+        // With every menu open the world stands still, so nothing but this check moves the worker.
+        await KeyStroke(Key.Escape);
+        var copy = world.Workers.Single(w => w.Id == worker.Id);
+        worker.Pos += new Vector2(2, 0); await Frames(2);
+        Require(copy.Pos.DistanceTo(worker.Pos) > .1f, "What the server moves must glide there, not jump.");
+        worker.Pos += new Vector2(0, 1);
+        await Until(() => copy.Pos.DistanceTo(worker.Pos) < .01f, "the worker stopping where the server put it", 5);
+        await KeyStroke(Key.Escape);
+        Hosted.Fire(worker); RemoveThings(Hosted, t => t.Kind == ThingKind.Grave);
+        await Frames();
+    }
+
+    private async Task CheckWorkerPageFollowsItsJobs() {
+        await CloseWithEsc();
+        var forge = Hosted.Add(ThingKind.Reinforced, world.Player + new Vector2(-2, 0));
+        var worker = AddWorker(Hosted, world.Player + Vector2.One); Hosted.Assign(worker, forge);
+        await KeyStroke(Key.H); await Click(Named($"crew_{worker.Id}")!);
+        string drop = $"drop_{worker.Duties[0].Job}_{forge.Id}";
+        await Click(Named(drop)!);
+        await Until(() => Named(drop) == null, "the worker's page dropping the job taken away", 2);
+        Hosted.Assign(worker, forge);
+        await Until(() => Named(drop) != null, "the worker's page showing a job given elsewhere", 2);
+        await Click(FindButton(panel, "Clear jobs")!);
+        await Until(() => Named(drop) == null, "the worker's page clearing its jobs", 2);
+        await Click(FindButton(panel, "Dismiss")!);
+        await Until(() => Named($"crew_{worker.Id}") == null, "the crew page dropping the dismissed worker", 2);
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == forge || t.Kind == ThingKind.Grave);
+        await Frames();
+    }
+
+    /// <summary>A tick box asks the server, so it must not read the old answer back at once, and must follow what the server decides.</summary>
+    private async Task CheckTickBoxesFollowTheServer() {
+        await CloseWithEsc();
+        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
+        await Click(view.Screen(sign.Pos, .8f)); await Click(Named("coins")!);
+        var auto = (CheckBox)Named("auto_sell")!;
+        await Click(auto);
+        await Until(() => sign.AutoSell, "the tick turning the post's sending on", 2);
+        await Click(auto);
+        await Until(() => !sign.AutoSell, "a second click turning the post's sending off", 2);
+        await Click(auto);
+        await Until(() => sign.AutoSell, "the tick turning the post's sending on again", 2);
+        // What a refusal leaves: the box said yes and the server says no.
+        sign.AutoSell = false;
+        await Until(() => !auto.ButtonPressed, "the box going back to what the server says", 2);
+        var forge = Hosted.Add(ThingKind.Reinforced, world.Player + new Vector2(-2, 0));
+        var worker = AddWorker(Hosted, world.Player + Vector2.One); await Frames();
+        await ClickOn(forge);
+        string job = world.Jobs(Shown(forge))[0];
+        await Click(Named($"job_{job}")!); await Click(Named($"duty_{worker.Id}")!);
+        await Until(() => World.HasDuty(worker, forge.Id, job), "the tick giving the worker the job", 2);
+        await Click(Named($"duty_{worker.Id}")!);
+        await Until(() => !World.HasDuty(worker, forge.Id, job), "a second click taking the job away", 2);
+        await CloseWithEsc();
+        Hosted.Fire(worker); RemoveThings(Hosted, t => t == sign || t == forge || t.Kind == ThingKind.Grave);
+        await Frames();
+    }
+
+    /// <summary>A window joins before it has the world, which must not read as everything it remembers being gone.</summary>
+    private async Task CheckLoadRemembersWhatIsOutOfSight() {
+        await CloseWithEsc();
+        var home = world.Player;
+        var tree = world.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(Terrain.Spawn))!;
+        var cliff = World.CliffOf(ThingKind.Iron);
+        Warp(Hosted, Terrain.Spawn); await Frames(4);
+        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        Require(world.Remembered(tree.Id) != null && !world.Sees(tree.Pos), "The player must remember a tree they have walked away from.");
+        await KeyStroke(Key.Escape); await Click(menu.SaveButton); await Click(FindButton(startMenu.Screen, Saves.SlotLabel(2))!);
+        await Until(() => Saves.SlotUsed(2), "the server writing the save");
+        await KeyStroke(Key.Escape); await KeyStroke(Key.F9); await StartedGame(); await Frames(4);
+        Require(world.Remembered(tree.Id) != null, "A load must keep what the player remembers around the clearing, where a window stands until the world arrives.");
+        Warp(Hosted, home); await CloseWithEsc(); await Frames(4);
     }
 
     private async Task CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker() {
@@ -432,6 +520,8 @@ public partial class Game {
     }
     /// <summary>Launch opens the start menu with no save to continue, and Esc does not leave it.</summary>
     private async Task CheckLaunchOpensTheStartMenuWithNoSaveToContinue() {
+        await Frames(4);
+        Require(!view.Warming, "The models drawn while loading must be gone by the time the start menu is up.");
         // A failed earlier run may have left saves behind, which would enable Continue.
         // Going to the options and back rereads the saves the removal just cleared.
         RemoveCheckFiles(); await Frames(4);
@@ -1048,6 +1138,11 @@ public partial class Game {
             await CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings();
             await CheckStackLargerThanCrateFillsItAndRestStaysHeld();
             await CheckSurvivalActionsWorkThroughTheInventoryUI();
+            await CheckAutosaveTellsTheOwner();
+            await CheckOthersGlideAndStopWhereTheServerPutThem();
+            await CheckTickBoxesFollowTheServer();
+            await CheckLoadRemembersWhatIsOutOfSight();
+            await CheckWorkerPageFollowsItsJobs();
             await CheckCrateDraggedIntoCrateStopsAtWarning();
             RemoveCheckFiles();
             await CheckRestartBuildsFreshModelsForReusedIds();
