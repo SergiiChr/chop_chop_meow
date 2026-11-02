@@ -382,7 +382,22 @@ def test_network(env: dict[str, str]) -> None:
             relay.result()
 
 
-TEST_STAGES = {"sim": test_simulation, "ui": test_ui, "net": test_network}
+def test_server(env: dict[str, str]) -> None:
+    run_godot(
+        "server-test",
+        [GODOT, "--headless", "--path", ROOT, "--", "--server-check"],
+        env,
+        timeout=90,
+        success_marker="SERVER-TEST PASS",
+    )
+
+
+TEST_STAGES = {
+    "sim": test_simulation,
+    "ui": test_ui,
+    "net": test_network,
+    "server": test_server,
+}
 
 
 def test(env: dict[str, str], stage: str | None = None) -> None:

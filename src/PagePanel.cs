@@ -43,6 +43,15 @@ public abstract partial class PagePanel : VBoxContainer {
         Refresh(); panel.Bag.Refresh();
     }
 
+    /// <summary>
+    /// Draws the page again when <paramref name="read"/> gives something other than it gives now.
+    /// What sets a page's pieces changes on the server, so a page drawn right after an action would show the world before the answer.
+    /// </summary>
+    protected void RedrawOnChange<T>(Func<T> read) {
+        var drawn = read();
+        live.Add(() => { if (!EqualityComparer<T>.Default.Equals(read(), drawn)) RedrawLater(); });
+    }
+
     /// <summary>Draws the page again once the running update is over, unless it has closed by then.</summary>
     protected void RedrawLater() => Callable.From(() => { if (panel.Shows(this)) Redraw(); }).CallDeferred();
 

@@ -34,9 +34,9 @@ The project targets Godot 4.7.2 .NET with C#.
 Each feature is a node with a small public surface, given what it needs in its constructor.
 `UiKit` carries the world, sounds and how a player action runs.
 `Game` implements `IGameFlow`, what the menus call to start, load, leave or quit a game.
-The interface reads the world through `World`'s read members and keeps `world.S` for writes, and for what needs the real `Inventory`, such as a move between grids.
+The interface reads the world through `World`'s read members and changes it through `World`'s actions, which go to the server; `world.S` is for what needs the real `Inventory`, such as an end of a move between grids.
 `UiKit.Paused` follows which overlays are open: each one registers with `HoldWhile`, so none saves or restores another's pause.
-`World.Replaced` fires whenever the whole state is replaced (a new game, a load, a guest taking the host's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
+`World.Replaced` fires whenever the whole state is replaced (a new game, a load, a player taking the server's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
 The side panel builds a new `PagePanel` node when a page opens; the page holds its own `LiveUpdates`, which run on each refresh, and its own state.
 A tab or other choice on a page calls `Redraw`, which builds its body again and keeps that state; `PageMemory` keeps only what outlasts the page.
 A `ThingPage` is a page about one thing in the world, with its job buttons and filters.
@@ -58,8 +58,10 @@ Simulation and data:
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
-| `src/Players.cs` | Per-player state, the command dispatcher and guest adoption |
-| `src/Net.cs` | The ENet connection, sending and merging world updates, and guest saves |
+| `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
+| `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
+| `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
+| `src/Session.cs` | Where a window stands with the game it started |
 | `src/WorldUpdates.cs` | World updates as entries, their differences and compression |
 
 UI and input:
@@ -135,9 +137,10 @@ Checks and review tools:
 | `tests/*Steps.cs` | Steps shared by the simulation checks |
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
+| `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
-| `src/PerformanceRun.cs`, `src/PerformanceFixture.cs` | The rendered performance run |
+| `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
 | `src/AnimationCapture.cs` | Captures the animation review |
 
 ### Simulation, view and UI
@@ -162,9 +165,23 @@ The side panel only shows the building and sizes itself to what it holds.
 
 ### Multiplayer
 
-Multiplayer is host-authoritative.
-`SaveState.Players` holds one `PlayerState` per player.
-The top-level player fields of `SaveState` pass through to `SaveState.Actor`, so saves keep the host's player where single player always had it.
+Every game runs on a `Server`, alone or together, which owns the only simulation and has no player of its own.
+The window that starts a game runs it as a headless child process of the same executable (`--server`).
+The server takes the first free port from 24565 itself when it starts serving, since a port a window picked could be gone by the time the server came up, and writes it to a file named for the window's process.
+A server process logs to `user://logs/server.log`: sharing the window's log, each start would rotate the window's older logs out of the folder.
+The window joins it over localhost like any guest, showing a starting screen until it does.
+`Session` says where a window stands with the game it started: starting it, playing it, away from it to join another, or going back to it.
+The UI and network checks run the server inside the window, under a branch with its own `SceneMultiplayer`, so they can set its world up directly; the UI checks pump the line themselves (`Game.Settle`) rather than wait for it.
+`src/ServerChecks.cs` and the performance run play on the real process, which plays the fixture with `PerformanceStage` driving it.
+The review fixtures run their world in the window, which ticks it whenever it is not on a server.
+The server ends when its owner leaves, or when nobody has joined for 30 seconds.
+
+`SaveState.Players` holds one `PlayerState` per player playing now, and `SaveState.Absent` the rest of the world's players, each by the key of the machine they play from (`Settings.MachineKey`).
+A save writes them all in `SaveState.Party` and leaves out the top-level player fields, which pass through to `SaveState.Actor`.
+`SaveState.Owner` names the machine that last started the world.
+The server sends everyone away on start (`World.Vacate`), then the starting machine takes the world over with the owner's player (`World.Claim`), so a save keeps its player on another computer.
+`World.Arrive` brings back a machine's player, else the unclaimed one, else a newcomer, and `World.Depart` keeps a player who leaves.
+Saves from any other version are refused.
 
 Player actions run in the acting player's context (`World.As`).
 In a guest's copy, `World.Forwarded` sends each action to the host as a `Command`, named by its `Verb`, instead of changing the copy.
@@ -189,10 +206,17 @@ The welcome is a guest's first update, with the fog uncovered so far.
 
 - Updates go unreliably on their own channel, so a lost one never delays the next.
 - The whole world after a long stall, or a change too large for one packet, goes reliably on a third channel, so messages and actions never wait behind it.
-- Guests merge entries into their copy in place, so panels and the view keep their objects.
+- Guests merge entries into their copy in place, so panels and the view keep their objects, and touch only entries that differ from what they show. A change to numbers alone is set directly (`WorldUpdates.SetNumbers`); anything else reads the entry whole.
+- The server writes every entry for each update and compares the bytes. With 876 things that costs 0.7 ms of its own process; marking what changed would save most of it, and one mutation missed would leave a guest's copy wrong without a sound.
+- A player keeps only the updates the server can still build on: confirmations only move forward, so nothing older than the update just taken's baseline is needed.
 - Each action carries where the guest stood, so the host checks reach from there rather than from a position still gliding in.
-- Leaving asks the host for the guest's player before the line closes.
-- A guest whose line drops saves its player from its copy, then `Net.Retry` joins the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, so the host may hold the old player until its side of the line times out.
+- `Net.SendEveryUpdate` turns off ENet's throttle: it read the hitch of loading a game as a slow line, and let through one update in 32 for several seconds.
+- An action's result comes back with a later update. A window checks what it can before sending, and `Net.Made` names a new mine or worker so the panel opens on it. Panels refresh with every update while `Net.AwaitingAnswer` holds, and a page draws itself again when what sets its layout changes (`PagePanel.RedrawOnChange`), since drawing it right after an action would show the world before the answer.
+- Leaving waits for the server to confirm before the line closes, so actions still in flight arrive; the owner's server closes instead, and the line going is the confirmation.
+- Joining another game from your own autosaves it and leaves with `Game.StepAway`, which keeps its server up: a failed or cancelled join goes back to it, and after a good one it ends with nobody in it, 30 seconds later.
+- A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key. It goes on trying while the server says the game is not open yet, as after the host loads a save.
+- Until the owner opens the game, the server refuses peers that are not on this computer. Only the owner can save; any player can hold the world, and it stands still while all of them do.
+- The server's welcome says whether the player owns the game, from their machine's key, so an owner who types their own game's address into the join popup still owns it.
 
 Factorio instead runs the same deterministic simulation on every machine and sends only inputs (lockstep).
 This simulation uses floats and frame-length steps, so it is not deterministic, and with hundreds of objects the deltas stay small.
@@ -201,7 +225,7 @@ This simulation uses floats and frame-length steps, so it is not deterministic, 
 
 Every world object is a low-poly model assembled from Godot primitive meshes in code.
 Meshes and materials are cached by parameters, so repeated objects share resources.
-`WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, so a building, crate or carcass that first appears mid-game builds no mesh, material or shader; the three trade carts are built then too and reused for every trip.
+`WorldModels.Warm` builds one model of every kind in each of its looks while the world loads, and `WorldView` draws them behind the ground for its first frames, so a building, crate, carcass or wolf that first appears mid-game builds no mesh, material, shader or pipeline; the three trade carts are built then too and reused for every trip.
 One tile is one world unit and an adult is about 1.65 units tall.
 The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
 
@@ -422,8 +446,8 @@ Tools, packed crates and bottles take a slot each everywhere.
 The layout is saved and synchronized: removing one stack never shifts unrelated cells.
 Sort is the only action that packs and regroups stacks.
 Item totals change only through `Inventory` methods, which keep them in line with the stacks.
-Stacks are rebuilt from totals once, where the two can disagree: when a save loads (old saves hold totals only) and when a guest joins.
-A guest's copy takes totals and stacks together from the host, so it does not rebuild.
+Stacks are rebuilt from totals once, where the two can disagree: when a save loads (old saves hold totals only).
+A window's copy takes totals and stacks together from the server, so it does not rebuild.
 
 Input rule for every item cell, in storage and stations alike:
 
@@ -616,7 +640,7 @@ Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
 - The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe and anvil impacts, bellows pumps, storage lids and the cabin door.
-- `UiKit.Act` gives manual inventory moves and spending a sound by item kind when the action made none of its own.
+- `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
 ### Music
 
@@ -637,7 +661,7 @@ The world is a fixed 216-tile valley defined in `src/Terrain.cs`:
 
 `World.Scatter` places resources with a seeded generator, trees more densely toward the mountains.
 Saves from earlier maps are refused.
-`World.Deserialize` upgrades older saves, then refuses one that names unknown items or holds player needs out of range, with the same checks `Adopt` applies to a joining guest.
+`World.Deserialize` upgrades older saves, then refuses one that names unknown items or holds player needs out of range.
 Workers use grid detours around water and buildings.
 
 ## Development and verification

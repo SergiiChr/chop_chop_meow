@@ -13,23 +13,43 @@ public partial class Game {
         foreach (var path in Enumerable.Range(0, Saves.SlotCount + 1).Select(Saves.SlotPath).Append(Settings.Path).Concat(signals)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
     }
 
+    /// <summary>The world of the server this window runs for the check, which the check sets up directly.</summary>
+    private World Hosted => hosted?.World ?? throw new InvalidOperationException("No server is running in this window.");
+
+    /// <summary>
+    /// Passes everything on the line to the server inside this window and brings its answer back, at once.
+    /// The UI checks do this rather than wait, so they keep to their time limit: they check what happens, and network and server checks check how long it takes.
+    /// </summary>
+    private void Settle() {
+        if (!Launch.Has("--ui-test") || hosted is not Server server) return;
+        ulong until = Time.GetTicksMsec() + 5000;
+        do {
+            Multiplayer.Poll(); server.Multiplayer.Poll();
+            server.Net.SendUpdates();
+            server.Multiplayer.Poll(); Multiplayer.Poll();
+        } while ((net.Connecting || net.ShownUpdate != server.Net.LastUpdate) && Time.GetTicksMsec() < until);
+    }
+
+    /// <summary>This window's copy of something a check placed on the server.</summary>
+    private Thing Shown(Thing thing) => world.Find(thing.Id) ?? throw new InvalidOperationException($"This window does not show the {thing.Kind}.");
+
     /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
     private static int CheckPort => Launch.Value("--port") is string port ? int.Parse(port) : Net.DefaultPort;
-
-    private static string GuestSave => $"user://{Launch.FilePrefix}guest-127-0-0-1-{CheckPort}.json";
 
     private static string SignalPath(string name) => $"user://{Launch.FilePrefix}signal-{name}";
 
     /// <summary>Tells the other network check process that this one reached a point, for the times the game itself cannot carry the news.</summary>
-    private static void Signal(string name) {
+    private static void Signal(string name, string? said = null) {
         using var file = Godot.FileAccess.Open(SignalPath(name), Godot.FileAccess.ModeFlags.Write);
-        file.StoreString(name);
+        file.StoreString(said ?? name);
     }
 
-    /// <summary>Waits for the other network check process to reach a point, and clears the signal so it can be sent again.</summary>
-    private async Task Signaled(string name) {
-        await Until(() => Godot.FileAccess.FileExists(SignalPath(name)), $"the other process signalling {name}", 90);
+    /// <summary>Waits for the other network check process to reach a point, clears the signal so it can be sent again, and returns what it said.</summary>
+    private async Task<string> Signaled(string name) {
+        await Until(() => Godot.FileAccess.FileExists(SignalPath(name)) && Godot.FileAccess.GetFileAsString(SignalPath(name)) != "", $"the other process signalling {name}", 90);
+        string said = Godot.FileAccess.GetFileAsString(SignalPath(name));
         DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SignalPath(name)));
+        return said;
     }
 
     private async Task SurvivalReviewShot(string name) {
@@ -50,16 +70,10 @@ public partial class Game {
             await Click(FindButton(startMenu.Screen, "Join game")!);
             var port = (LineEdit)startMenu.Screen.FindChild("port", true, false);
             Require(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
-            await Click(port); await KeyStroke(Key.End);
-            for (ulong wait = Time.GetTicksMsec() + 5000; port.Text != "" && Time.GetTicksMsec() < wait;) await KeyStroke(Key.Backspace);
-            Require(port.Text == "", "Backspace must clear the port field.");
-            await Type(CheckPort.ToString());
             var address = (LineEdit)startMenu.Screen.FindChild("address", true, false);
             // The popup offers the address of the last game joined.
-            if (address.Text == "") {
-                await Click(address); await Type("127.0.0.1");
-            } else Require(address.Text == "127.0.0.1", "The join popup must offer the last address joined.");
-            await Click(FindButton(startMenu.Screen, "Join")!);
+            Require(address.Text is "" or "127.0.0.1", "The join popup must offer the last address joined.");
+            await JoinFromPopup(CheckPort.ToString());
             for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && JoinStatus() == "Connecting…";) await Frames(1);
             if (!world.Remote) {
                 await Click(FindButton(startMenu.Screen, "Back · Esc")!);
@@ -69,7 +83,59 @@ public partial class Game {
         await Until(() => !startMenu.Visible, "the join popup closing");
     }
 
+    /// <summary>Joins until the server turns this window away for <paramref name="reason"/>; it may not be up yet. No input reads the refusal once the popup is closed, so this calls the join directly.</summary>
+    private async Task JoinUntilRefused(string reason) {
+        string heard = ""; void Refused(string why) => heard = why;
+        net.Failed += Refused;
+        for (ulong until = Time.GetTicksMsec() + 45000; heard != reason;) {
+            Require(Time.GetTicksMsec() < until, $"the server never refused this window: {heard}");
+            heard = ""; net.Join("127.0.0.1", CheckPort);
+            await Until(() => heard != "", "the server answering this window");
+        }
+        net.Failed -= Refused;
+    }
+
+    /// <summary>Types a port into the open join popup and presses Join; the address stays as it is, or becomes this computer.</summary>
+    private async Task JoinFromPopup(string to) {
+        var port = (LineEdit)startMenu.Screen.FindChild("port", true, false);
+        await Click(port); await KeyStroke(Key.End);
+        for (ulong wait = Time.GetTicksMsec() + 5000; port.Text != "" && Time.GetTicksMsec() < wait;) await KeyStroke(Key.Backspace);
+        Require(port.Text == "", "Backspace must clear the port field.");
+        await Type(to);
+        var address = (LineEdit)startMenu.Screen.FindChild("address", true, false);
+        if (address.Text == "") { await Click(address); await Type("127.0.0.1"); }
+        await Click(FindButton(startMenu.Screen, "Join")!);
+    }
+
+    /// <summary>Waits for a game this window started to have this window's player.</summary>
+    private async Task StartedGame() {
+        await Until(() => world.Remote && !startMenu.Visible, "the game's server taking this window's player", 30);
+    }
+
+    /// <summary>Waits for this window to be back in the game it owns.</summary>
+    private async Task BackInOwnGame(string what, double seconds) => await Until(() => net.Owning && world.Remote && !startMenu.Visible, what, seconds);
+
+    /// <summary>Leaves a game this window started, and waits for its server to end.</summary>
+    private async Task LeaveAndAwaitServerEnd() {
+        int server = serverProcess;
+        ShowStart();
+        await Until(() => !OS.IsProcessRunning(server), "the server ending with its owner", 10);
+    }
+
+    /// <summary>The closest place a building can go.</summary>
+    private Vector2 FreeSpotNearby(ThingKind kind) {
+        var spots = from x in Enumerable.Range(-3, 7) from y in Enumerable.Range(-3, 7) select world.Player.Round() + new Vector2(x, y);
+        return spots.Where(spot => world.PlacementBlock(kind, spot) == null).MinBy(spot => spot.DistanceTo(world.Player));
+    }
+
+    /// <summary>Starts a game on this computer that someone else owns, which has not been opened to anyone, and returns its server's process and port.</summary>
+    private async Task<(int Process, int Port)> StartStrangersServer() {
+        int process = RunServer(-1, "stranger", SignalPath("stranger-port"));
+        return (process, int.Parse(await Signaled("stranger-port")));
+    }
+
     private async Task LeaveGame() {
+        int host = world.Players.First(p => p != world.Me).Id;
         await CloseWithEsc(); await KeyStroke(Key.Escape);
         Require(menu.Visible, "A guest's Esc must open the pause menu.");
         Require(menu.JoinButton.Text == "Leave game", "A guest's pause menu must offer to leave.");
@@ -77,6 +143,7 @@ public partial class Game {
         await Click(menu.JoinButton);
         Require(!world.Remote, "Leaving must end the guest's connection.");
         Require(startMenu.Visible, "Leaving must return to the start menu.");
-        Require(Godot.FileAccess.FileExists(GuestSave), "Leaving must save the guest's player.");
+        await Frames();
+        Require(!view.ShowsPlayer(host), "The start menu must not show the players of the game left behind.");
     }
 }

@@ -8,7 +8,7 @@ using Godot;
 /// Each is for a state real play cannot reach or cannot reach quickly enough, and says why.
 /// <c>./build.py check</c> fails on the raw save anywhere else in the checks.
 /// Checks also set fields directly on things and workers they placed and on players they build as save text.
-/// Placing the player with <c>world.Player</c> and holding a player's input are allowed too.
+/// Placing the player with <c>world.Player</c>, or <see cref="Warp"/> on a server's world, and holding a player's input are allowed too.
 /// </summary>
 internal static class SetupSteps {
     /// <summary>Whether a backpack holds what a new guest starts with and nothing else.</summary>
@@ -58,6 +58,9 @@ internal static class SetupSteps {
 
     /// <summary>Tops up every player, each with their own needs that only eating restores.</summary>
     public static void NourishEveryone(World world) { foreach (var p in world.Players) SetNeeds(p, 100, 100); }
+
+    /// <summary>Moves the player on a server's world as a respawn does: a window walks its own player, and only takes a move the server counts as one.</summary>
+    public static void Warp(World world, Vector2 at) { world.Me.Pos = at; world.Me.Warp++; }
 
     /// <summary>Puts a wolf where the check needs it: real ones arrive at random out of sight.</summary>
     public static Wolf PlaceWolf(World world, Wolf wolf) { world.S.Wolves.Add(wolf); return wolf; }
@@ -110,12 +113,6 @@ internal static class SetupSteps {
         world.S.Workers.Add(worker);
         return worker;
     }
-
-    /// <summary>Puts a thing in the player's memory as an older save held it: old-save fixtures only.</summary>
-    public static void Remember(World world, Thing thing) => world.S.Remembered[thing.Id] = thing;
-
-    /// <summary>Marks the save as an older version: old-save fixtures only.</summary>
-    public static void SetSaveVersion(World world, int version) => world.S.Version = version;
 
     /// <summary>Sets a goal number from an older save: old-save fixtures only.</summary>
     public static void SetGoal(World world, int goal) => world.S.Goal = goal;

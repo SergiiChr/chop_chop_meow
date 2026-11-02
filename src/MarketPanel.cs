@@ -34,7 +34,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         var ship = new HBoxContainer(); ship.AddThemeConstantOverride("separation", 14); outbound.AddChild(ship);
         ship.AddChild(NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), "Click: take back · Drag a packed crate here to sell", drag => drag.From == world.S.Backpack && world.CanSell(drag.Item), columns: 3));
         // Sold goods go on the cart rather than into the backpack, so the sale sounds like its largest stack being loaded.
-        var sell = kit.Button("", () => { var load = thing.Inventory.Items.Keys.OrderByDescending(id => thing.Inventory[id]).FirstOrDefault(); if (world.Sell(thing) && load != null) kit.Sounds.Play(Sounds.ForItem(load)); });
+        var sell = kit.Button("", () => { var load = thing.Inventory.Items.Keys.Where(world.CanSell).OrderByDescending(id => thing.Inventory[id]).FirstOrDefault(); if (world.Sell(thing) && load != null) kit.Sounds.Play(Sounds.ForItem(load)); });
         sell.Name = "sell"; sell.TooltipText = "Send the cart to the village with these crates"; sell.Icon = Icons.Of("line_cart"); sell.ExpandIcon = true; sell.IconAlignment = HorizontalAlignment.Center;
         sell.AddThemeConstantOverride("icon_max_width", 32); sell.CustomMinimumSize = new Vector2(0, 56); sell.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; sell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         Style.SkinPill(sell, Style.Brick);
@@ -42,7 +42,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         ship.AddChild(sell);
         var auto = new CheckBox { Text = "Send when full", ButtonPressed = thing.AutoSell, FocusMode = Control.FocusModeEnum.None, Name = "auto_sell", TooltipText = "Send the cart by itself once every slot holds a crate" };
         Style.InkCheck(auto);
-        auto.Toggled += on => { world.SetAutoSell(thing, on); auto.SetPressedNoSignal(thing.AutoSell); };
+        live.Tick(auto, () => thing.AutoSell, on => world.SetAutoSell(thing, on));
         outbound.AddChild(auto);
         var revenue = Style.Text("", 14, Style.Ink); outbound.AddChild(revenue);
         live.Watch(() => thing.Inventory.Count, _ => {
@@ -99,7 +99,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
 
     private void HireOffers() {
         foreach (var offer in world.Data.HireOffers) {
-            var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => { if (world.Hire(thing, offer) is Worker w) panel.Select(w); });
+            var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => world.Hire(thing, offer));
             hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = Icons.Of("hardhat"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
             hire.CustomMinimumSize = new Vector2(0, 50); hire.Alignment = HorizontalAlignment.Left;
             hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}";

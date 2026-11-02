@@ -33,9 +33,19 @@ public partial class Game : Node, IGameFlow {
     private RecoveryPrompt recovery = null!;
     private PlayerControl player = null!;
     private float uiClock;
-    private float autosave;
-    private const float AutosaveSeconds = 300;
     private Net net = null!;
+    private GameData data = null!;
+    /// <summary>The server running inside this process for the checks, which they set the world up through; real games run theirs in a process of its own.</summary>
+    private Server? hosted;
+    /// <summary>The server process this window last started; 0 for none.</summary>
+    private int serverProcess;
+    private Session session = new Session.None();
+    /// <summary>How long a window waits for the server it started: the engine has to start and read the save first.</summary>
+    private const ulong ServerStartMsec = 60000;
+    /// <summary>The update the screen last refreshed for, so it refreshes once for each while an answer is due.</summary>
+    private int refreshedUpdate;
+    /// <summary>Whether the player had a menu open last frame, as the server was last told.</summary>
+    private bool holding;
     private Saves saves = null!;
     private StartMenu startMenu = null!;
     private PauseMenu menu = null!;
@@ -46,7 +56,9 @@ public partial class Game : Node, IGameFlow {
     private bool quitting;
     public override void _Ready() {
         try {
-            var data = GameData.Load(); world = Launch.Has("--performance-run") ? PerformanceFixture.Create(data) : new World(data);
+            data = GameData.Load();
+            if (Launch.Has("--server")) { Server.Run(this, data); return; }
+            world = new World(data);
             if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             if (Launch.Value("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
             world.Notify = Notify;
@@ -55,10 +67,9 @@ public partial class Game : Node, IGameFlow {
             GetTree().AutoAcceptQuit = false;
             view = new WorldView { World = world, Sounds = sounds, EnvironmentReview = Launch.Has("--environment-review") }; AddChild(view);
             kit = new UiKit(world, sounds, Notify, RefreshLive);
-            net = new Net { Name = "Net", World = world, FilePrefix = Launch.FilePrefix }; AddChild(net);
-            saves = new Saves(kit, net, () => panel.Open(Page.Backpack));
-            world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };
-            world.PlayerActed += (action, at) => net.Echo(world.ActorId, action, at);
+            net = new Net { Name = "Net", World = world, Key = Settings.MachineKey }; AddChild(net);
+            saves = new Saves(kit, net, this);
+            world.Sound = PlayWorldSound;
             ConnectNet();
             sounds.OffScreen = view.OffScreen;
             var layer = new CanvasLayer(); AddChild(layer);
@@ -67,10 +78,11 @@ public partial class Game : Node, IGameFlow {
             GetViewport().UseTaa = Settings.Taa;
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
-            if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
-            StartPerformanceRun();
+            if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
+            if (Launch.Has("--performance-run")) StartGame(-1);
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
+            if (Launch.Has("--server-check")) RunServerCheck();
             if (Launch.Has("--animation-review")) {
                 panel.Close(); ui.Visible = false; view.AnimationReview = true;
                 if (Launch.Value("--animation-capture") is string captures) CaptureAnimations(captures);
@@ -117,27 +129,131 @@ public partial class Game : Node, IGameFlow {
         net.Joined += OnJoined;
         net.Disconnected += ShowReconnecting;
         net.Reconnecting += left => startMenu.ShowRetry(left);
-        net.Left += reason => { startMenu.LeftReason = reason; Leave(); };
-        net.Failed += reason => startMenu.ShowJoinFailure(reason);
+        net.Left += reason => { if (ReturnAfterFailedJoin(reason)) return; startMenu.LeftReason = reason; ShowStart(); };
+        net.Failed += JoinFailed;
+        net.Made += id => panel.SelectWhenHere(id);
     }
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
     private void ShowReconnecting() { world.NewGame(); startMenu.ShowReconnecting(); }
-    private void OnJoined(bool back) {
-        Settings.Store("net", "address", net.Address);
-        saves.Slot = 0; ending.Joined(back);
-        shownHealth = world.Health;
-        Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. Your belongings stay yours when you leave.");
+    public bool Owns => net.Owning;
+
+    public void StepAway() { session = new Session.Away(net.Port); net.Leave(comingBack: true); }
+
+    public bool ReturnAfterFailedJoin(string reason) {
+        if (session is not Session.Away away) return false;
+        startMenu.ShowStarting();
+        JoinOwnServer(new Session.Returning(reason), away.Port);
+        return true;
     }
-    public void Leave() { world.NewGame(); startMenu.ShowStart(); }
-    public void LoadSlot(int slot) => saves.Load(slot);
-    public void ShowStart() => startMenu.ShowStart();
+
+    private void JoinFailed(string reason) {
+        if (session is Session.Starting or Session.Returning) GameFailedToStart(reason);
+        else if (!ReturnAfterFailedJoin(reason)) startMenu.ShowJoinFailure(reason);
+    }
+
+    private void GameFailedToStart(string reason) {
+        startMenu.LeftReason = $"Could not start the game. {reason}"; ShowStart();
+    }
+
+    private void OnJoined(bool back) {
+        ending.Joined(back);
+        shownHealth = world.Health;
+        if (session is Session.Starting starting) Begin(starting.Slot);
+        else if (session is Session.Returning returning) Notify($"{returning.Note} You are back in your game.");
+        else if (net.Owning) Notify("You are back in your game.");
+        else {
+            Settings.Store("net", "address", net.Address);
+            saves.Slot = 0;
+            Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. The host's saves keep your belongings.");
+        }
+        session = net.Owning ? new Session.Playing() : new Session.None();
+        if (Launch.Has("--performance-run")) StartPerformanceRun();
+    }
+
+    /// <summary>Opens a game this window started: a new one on the welcome page, a loaded one on the backpack.</summary>
+    private void Begin(int slot) {
+        saves.Slot = Math.Max(slot, 0);
+        if (slot < 0) {
+            panel.Open(Page.Welcome);
+            Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
+        } else { panel.Open(Page.Backpack); Notify("Settlement loaded."); }
+    }
+
+    public void ShowStart() { LeaveServer(); session = new Session.None(); world.NewGame(); startMenu.ShowStart(); }
     void IGameFlow.Quit() => Quit();
-    public void Restart() {
-        net.Leave();
-        world.NewGame();
-        saves.Slot = 0; autosave = 0;
-        panel.Open(Page.Welcome);
-        Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
+    public void Restart() => StartGame(-1);
+
+    /// <summary>Starts the game in a save slot; a slot that cannot load says why and leaves the game as it was.</summary>
+    public void LoadSlot(int slot) {
+        if (Saves.Read(data, slot).Error is string error) { Notify(error); return; }
+        StartGame(slot);
+    }
+
+    /// <summary>Starts a server for a new game, or the one in <paramref name="slot"/>, and joins it as its owner once it is up.</summary>
+    private void StartGame(int slot) {
+        LeaveServer();
+        startMenu.ShowStarting();
+        // The checks that set the world up directly run the server inside this window, under a branch with its own network.
+        if (Launch.Has("--net-check") || Launch.Has("--ui-test")) {
+            var branch = new Node { Name = "Hosted" }; GetTree().Root.AddChild(branch);
+            GetTree().SetMultiplayer(new SceneMultiplayer(), branch.GetPath());
+            var main = new Node { Name = Name }; branch.AddChild(main);
+            hosted = Server.Start(main, Server.Load(data, slot), net.Key);
+            hosted.Ended += StopHosted;
+            JoinOwnServer(new Session.Starting(slot), hosted.Port);
+            return;
+        }
+        session = new Session.Launching(slot, Time.GetTicksMsec() + ServerStartMsec);
+        DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(PortFile));
+        serverProcess = RunServer(slot, net.Key, PortFile);
+        if (serverProcess < 0) GameFailedToStart("The server process would not run.");
+    }
+
+    /// <summary>Starts a server process and returns its id, or a negative number when it would not run.</summary>
+    private static int RunServer(int slot, string owner, string portFile) {
+        // A log of its own, or each server start would rotate this window's log out of the folder.
+        var arguments = new System.Collections.Generic.List<string> { "--headless", "--log-file", "user://logs/server.log" };
+        // Outside an exported game the engine needs to be told where the project is.
+        if (!OS.HasFeature("template")) arguments.AddRange(["--path", ProjectSettings.GlobalizePath("res://")]);
+        arguments.Add("--"); arguments.AddRange(Server.Arguments(slot, owner, portFile));
+        return OS.CreateProcess(OS.GetExecutablePath(), arguments.ToArray());
+    }
+
+    /// <summary>Where the server process this window started says which port it took; the process id keeps two windows' apart.</summary>
+    private static string PortFile => $"user://{Launch.FilePrefix}port-{OS.GetProcessId()}";
+
+    private void JoinOwnServer(Session next, int port) {
+        session = next;
+        var error = net.Join("127.0.0.1", port);
+        if (error != Error.Ok) GameFailedToStart(error.ToString());
+    }
+
+    /// <summary>Joins the server process this window started once it says which port it took.</summary>
+    private void AwaitServer(Session.Launching launching) {
+        if (Time.GetTicksMsec() >= launching.Deadline) { GameFailedToStart($"The server didn't start within {ServerStartMsec / 1000} seconds."); return; }
+        if (!Godot.FileAccess.FileExists(PortFile) || !int.TryParse(Godot.FileAccess.GetFileAsString(PortFile), out int port)) return;
+        DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(PortFile));
+        JoinOwnServer(new Session.Starting(launching.Slot), port);
+    }
+
+    /// <summary>A server that dies says no goodbye, and the line would take most of a minute to notice.</summary>
+    private void ServerDied() {
+        net.Abandon();
+        if (session is Session.Playing) { startMenu.LeftReason = Net.ServerStopped; ShowStart(); } else GameFailedToStart(Net.ServerStopped);
+    }
+
+    /// <summary>Leaves the game; a server inside this window goes first, since it could not answer a window waiting for it on the same thread.</summary>
+    private void LeaveServer() { StopHosted(); net.Leave(); }
+
+    /// <summary>Ends the server running inside this window, if any.</summary>
+    private void StopHosted() {
+        if (hosted is not Server server) return;
+        hosted = null;
+        // Its line closes now, so its port is free for the next game at once.
+        server.End();
+        var branch = server.GetParent().GetParent();
+        GetTree().SetMultiplayer(null, branch.GetPath());
+        branch.QueueFree();
     }
     public override void _UnhandledInput(InputEvent ev) {
         if (view?.EnvironmentReview == true) return;
@@ -167,21 +283,26 @@ public partial class Game : Node, IGameFlow {
     public override void _Process(double delta) {
         if (world == null || view == null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;
-        player.Update(dt);
-        // Menus pause only a game nobody else is in.
-        bool running = !kit.Paused || net.Hosting || world.Remote;
+        player.Update(dt); panel.ShowAwaited();
+        if (session is Session.Launching launching) AwaitServer(launching);
+        // The server holds the world still while every player has a menu open, which in a game alone is whenever this one does.
+        if (kit.Paused != holding) { holding = kit.Paused; net.Hold(holding); }
+        bool running = !holding || world.Remote && world.Players.Count > 1;
         if (running) {
             float health = world.Remote ? shownHealth : world.Health;
+            // A world not on a server is one of the review fixtures', which runs here.
             if (!world.Remote) world.Tick(dt);
-            ending.ShowOnce(); autosave += dt;
+            ending.ShowOnce();
             needsPlate.DamageFlash(health - world.Health, runTime); shownHealth = world.Health;
-            // A guest saves its player whenever it changes instead; the world is the host's to save.
-            if (autosave >= AutosaveSeconds) { if (!world.Remote && !performanceRunning) saves.Save(0); autosave = 0; }
         }
         view.Paused = !running; view.SelectedTool = hotbar.ActiveItem(); view.Selection = panel.Selection; view.Placing = player.Mode.Placing;
         view.Mouse = GetViewport().GetMousePosition();
         var hover = view.Pick(view.Mouse); view.Hover = hover?.Id ?? 0; view.HoverWorker = view.PickWorker(view.Mouse)?.Id ?? 0;
-        uiClock += dt; if (uiClock > .2f) { uiClock = 0; RefreshLive(); }
+        uiClock += dt;
+        if (uiClock > .2f || net.AwaitingAnswer && net.ShownUpdate != refreshedUpdate) {
+            uiClock = 0; refreshedUpdate = net.ShownUpdate; RefreshLive();
+            if (serverProcess > 0 && session is not (Session.None or Session.Away) && !OS.IsProcessRunning(serverProcess)) ServerDied();
+        }
         // Every frame, so a page that just opened takes its size once its wrapped text has a width.
         panel.Fit();
         // The needs plate grows with the bank count, and an open side panel would cover the messages' right end.
@@ -189,7 +310,7 @@ public partial class Game : Node, IGameFlow {
         if (messages.OffsetLeft != messagesLeft || messages.OffsetRight != messagesRight) { messages.OffsetLeft = messagesLeft; messages.OffsetRight = messagesRight; }
         if (smokeTest && runTime > .5f && !quitting) { GD.Print("SMOKE-TEST PASS"); Quit(); }
         if (screenshotPath != null && runTime > shotDelay && !capturing) { capturing = true; Capture(screenshotPath); }
-        if (performanceRunning) SamplePerformance(delta);
+        if (performanceRunning) SamplePerformance();
     }
     private async void Capture(string path) {
         await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
@@ -201,7 +322,7 @@ public partial class Game : Node, IGameFlow {
     }
     private async void Quit(int code = 0) {
         if (quitting) return;
-        quitting = true; net.Leave(); sounds.StopAll(); await Seconds(.2);
+        quitting = true; LeaveServer(); sounds.StopAll(); await Seconds(.2);
         // Godot objects left to the finalizer must be released before the engine shuts down, or a late finalizer aborts the exit.
         GC.Collect(); GC.WaitForPendingFinalizers(); GetTree().Quit(code);
     }

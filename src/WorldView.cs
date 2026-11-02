@@ -25,6 +25,12 @@ public partial class WorldView : Node3D {
     public Thing? GatheringTarget;
     public string? SelectedTool;
     public bool Paused;
+    private bool worldReplaced;
+    /// <summary>One model of everything, drawn behind the ground for the first frames: a pipeline is built on its first draw, which stalls that frame, up to a second on a machine that has not played yet.</summary>
+    private Node3D? warmStage;
+    private int warmFrames = 3;
+    /// <summary>From the camera along its view: past the ground it looks at, by more than the tallest model, and still inside what it draws and casts shadows for.</summary>
+    private const float WarmStageDepth = 85;
     public bool AnimationReview;
     /// <summary>A fixed daylight landscape view with the lake and sea waves held at one moment, for <c>--environment-review</c>; set before the view enters the tree.</summary>
     public bool EnvironmentReview;
@@ -121,6 +127,7 @@ public partial class WorldView : Node3D {
     private static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
 
     public override void _Ready() {
+        World.Replaced += () => worldReplaced = true;
         camera = new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = BaseSize, Near = 1, Far = 200, Current = true };
         AddChild(camera);
         environment = new Godot.Environment {
@@ -155,7 +162,7 @@ public partial class WorldView : Node3D {
         BuildLook();
         BuildEffects(scene);
         PileShape.Warm(World.Data);
-        WorldModels.Warm();
+        warmStage = new Node3D(); WorldModels.Warm(warmStage); scene.AddChild(warmStage);
         BuildGhosts();
         for (int i = 0; i < World.Carts; i++) idleCarts.Push(NewCart());
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
@@ -257,6 +264,16 @@ public partial class WorldView : Node3D {
         float unitsPerPixel = camera.Size / Math.Max(1, size.Y);
         camera.HOffset = (.5f - Center.X / Math.Max(1, size.X)) * size.X * unitsPerPixel;
         camera.VOffset = (Center.Y / Math.Max(1, size.Y) - .5f) * size.Y * unitsPerPixel;
+    }
+
+    /// <summary>Whether the models drawn while loading are still in the scene.</summary>
+    public bool Warming => warmStage != null;
+
+    private void ShowWarmStage() {
+        if (warmStage == null) return;
+        warmStage.Position = camera.Position - camera.Basis.Z * WarmStageDepth;
+        if (--warmFrames > 0) return;
+        warmStage.QueueFree(); warmStage = null;
     }
 
     private float PixelsPerUnit => GetViewport().GetVisibleRect().Size.Y / camera.Size;
@@ -381,10 +398,14 @@ public partial class WorldView : Node3D {
         float dt = Paused ? 0 : Math.Min((float)delta, .1f);
         Elapsed += dt;
         SyncCamera();
+        ShowWarmStage();
         if (AnimationReview) { UpdateReview(); UpdateFog(); overlay.QueueRedraw(); return; }
-        if (dt > 0 || EnvironmentReview) UpdateActors(dt);
+        // A menu holds everyone still, but what a replaced world had goes at once, or the start menu would show it.
+        bool moved = dt > 0 || worldReplaced;
+        if (moved || EnvironmentReview) UpdateActors(dt);
         SyncThings(dt);
-        if (dt > 0) { SyncWolves(dt); SyncCarts(dt); }
+        if (moved) { SyncWolves(dt); SyncCarts(dt); }
+        worldReplaced = false;
         UpdateEffects(dt);
         UpdateMarkers();
         UpdateLighting();

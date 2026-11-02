@@ -7,12 +7,13 @@ namespace ChopChopMeow;
 public partial class EndingScreen : PanelContainer {
     private readonly UiKit kit;
     private readonly Action closePanel;
+    private readonly IGameFlow flow;
     private readonly Label stats;
     /// <summary>Whether this player has seen the ending; a guest's copy of the save flag follows the host's.</summary>
     private bool seen;
 
     public EndingScreen(UiKit kit, Action closePanel, IGameFlow flow) {
-        this.kit = kit; this.closePanel = closePanel;
+        this.kit = kit; this.closePanel = closePanel; this.flow = flow;
         Visible = false;
         SetAnchorsAndOffsetsPreset(LayoutPreset.Center);
         GrowHorizontal = GrowDirection.Both; GrowVertical = GrowDirection.Both;
@@ -29,9 +30,11 @@ public partial class EndingScreen : PanelContainer {
     /// <summary>Called on every running frame; opens the screen the first time the end goals are complete.</summary>
     public void ShowOnce() {
         var world = kit.World;
-        // A guest's copy takes the host's flag with every update, so a guest remembers its own.
-        if ((world.Remote ? seen : world.EndingShown) || !world.EndGoalsComplete) return;
-        world.S.EndingShown = seen = true; closePanel();
+        // The save's flag is its owner's: a guest's copy takes it with every update, so a guest remembers its own.
+        bool guest = world.Remote && !flow.Owns;
+        if ((guest ? seen : world.EndingShown) || !world.EndGoalsComplete) return;
+        seen = true; closePanel();
+        if (!guest) world.MarkEndingShown();
         int seconds = (int)world.PlaySeconds;
         stats.Text = $"Every ore in the valley has its mine, and the settlement cleared {world.Data.Goals.DailyProfit} coins a day for {world.Data.Goals.ProfitDays} days.\nPlay time {seconds / 60}:{seconds % 60:00} · day {world.Day} · {world.Workers.Count} villagers";
         Visible = true;

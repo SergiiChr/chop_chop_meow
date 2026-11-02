@@ -22,7 +22,7 @@ public static class RecoveryChecks {
         Require(!world.CanSkipMorning, "a cabin anywhere in the world should block the no-shelter skip");
 
         RemoveThings(world, t => t.Kind == ThingKind.Hut);
-        var other = world.AddGuest(2, null);
+        var other = world.Arrive("other", 2);
         Require(!world.CanSkipMorning, "another living player should prevent skipping the shared night");
         SetRespawn(other, 20);
         Require(world.CanSkipMorning, "the skip should be available once every other player is downed");

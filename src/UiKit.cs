@@ -11,10 +11,14 @@ public interface IGameFlow {
     /// <summary>Starts a new game.</summary>
     void Restart();
     void Quit();
-    /// <summary>Ends a guest's game after the line closes and shows the start menu.</summary>
-    void Leave();
     void LoadSlot(int slot);
     void ShowStart();
+    /// <summary>The server says this window's player owns the game, so it saves, loads and opens it to others.</summary>
+    bool Owns { get; }
+    /// <summary>The player is joining another game from their own: its server waits a while in case that fails.</summary>
+    void StepAway();
+    /// <summary>Goes back to the game a failed join stepped out of, saying why; false when no game is waiting.</summary>
+    bool ReturnAfterFailedJoin(string reason);
 }
 
 /// <summary>
@@ -37,25 +41,15 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
     /// <summary>Adds what pauses the game while it is open, so no part writes or restores another's pause.</summary>
     public void HoldWhile(Func<bool> open) => holds.Add(open);
 
+
     /// <summary>Tells the player something through the game's message stack.</summary>
     public void Notify(string message) => notify(message);
 
     /// <summary>Brings everything on screen up to date with the world.</summary>
     public void Refresh() => refresh();
 
-    /// <summary>Runs a player action and gives it a generic sound when it made none of its own: that of the item whose backpack count changed most.</summary>
-    public void Act(Action action) {
-        var state = World.S; int played = Sounds.Played;
-        var before = new Dictionary<string, int>(state.Backpack.Items);
-        action();
-        // Starting or loading a game replaces the whole state; that is not an item moving.
-        if (World.S != state || Sounds.Played != played) return;
-        var moved = state.Backpack.Items.Keys.Union(before.Keys).OrderByDescending(id => Math.Abs(state.Backpack[id] - before.GetValueOrDefault(id))).FirstOrDefault();
-        if (moved != null && state.Backpack[moved] != before.GetValueOrDefault(moved)) Sounds.Play(Sounds.ForItem(moved));
-    }
-
     /// <summary>Runs a player action, then brings the screen up to date.</summary>
-    public void Run(Action action) { Act(action); Refresh(); }
+    public void Run(Action action) { action(); Refresh(); }
 
     /// <summary>Runs a player action that gives a value back, such as what a drag left over, then brings the screen up to date.</summary>
     public T Run<T>(Func<T> action) {
@@ -112,6 +106,16 @@ public sealed class LiveUpdates {
             if (!first && EqualityComparer<T>.Default.Equals(now, shown)) return;
             first = false; shown = now; draw(now);
         });
+    }
+
+    /// <summary>
+    /// Makes a tick box <paramref name="change"/> what <paramref name="read"/> gives, which the server decides.
+    /// A click shows at once, and once the answer has had time to come the box shows what the server said, so a refused tick goes back.
+    /// </summary>
+    public void Tick(BaseButton box, Func<bool> read, Action<bool> change) {
+        ulong trusted = 0;
+        box.Toggled += on => { change(on); trusted = Time.GetTicksMsec() + (ulong)(Net.AnswerSeconds * 1000); };
+        updates.Add(() => { if (Time.GetTicksMsec() >= trusted) box.SetPressedNoSignal(read()); });
     }
 
     /// <summary>Keeps a label's text to what <paramref name="write"/> writes on each refresh.</summary>

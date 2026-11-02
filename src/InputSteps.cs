@@ -9,8 +9,9 @@ namespace ChopChopMeow;
 
 /// <summary>Real input for the UI and network checks: keys, mouse and waiting for the game to react.</summary>
 public partial class Game {
+    /// <summary>Waits for frames; in the UI checks each one starts with what the server has made of everything so far.</summary>
     private async Task Frames(int count = 2) {
-        for (int i = 0; i < count; i++) await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        for (int i = 0; i < count; i++) { Settle(); await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame); }
     }
 
     private async Task Seconds(double seconds) => await ToSignal(GetTree().CreateTimer(seconds), SceneTreeTimer.SignalName.Timeout);

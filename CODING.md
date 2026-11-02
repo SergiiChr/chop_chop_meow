@@ -24,7 +24,7 @@ Project rules on top of the global coding and testing guides.
 - **Implicit coupling:** pass `World`, `GameData` and views as arguments or fields. Static fields are for shared, immutable or cached resources (meshes, materials, `StringName`s), not game state.
 - **Layer-first folders:** the project keeps the flat `src/` and `tests/` layout; group related code by file name prefix instead of adding folders.
 - **Illegal states:** use enums such as `ActorAction` rather than combinations of flags or strings.
-- **Validation at the boundary:** `GameData` validates `data/game.json` when it loads, `World.Deserialize` checks saves with the same rules `Net` uses for what guests send, and `Net` parses messages when they arrive. Code inside trusts what they produced.
+- **Validation at the boundary:** `GameData` validates `data/game.json` when it loads, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
 - **Old saves:** upgrades to an older save's data run once when it loads, never in the tick.
 
 ## Architecture
@@ -40,9 +40,11 @@ Project rules on top of the global coding and testing guides.
   - `Input.ParseInputEvent` and what the player sees catch broken controls and panels, and miss how the game looks.
   - `Net`'s messages between a host and a guest process catch sync breaks and miss a real network.
 - Use representative end-to-end checks plus focused edge cases.
-- UI checks live in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` and `src/NetChecks.cs`; a change to a shared check helper covers all three.
+- UI checks live in `src/GameChecks.cs`, `src/SurvivalUIChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`; a change to a shared check helper covers all four.
 - Input tests go through `Input.ParseInputEvent`, not direct calls to input handlers.
-- UI checks act like a player: they set up through `world`, then use real input and read what the screen shows. A direct call into private `Game` code says in a comment why no input reaches it.
+- UI checks play on a server inside the window: they set up through `Hosted`, its world, then use real input and read what the screen shows or the window's `world`. A direct call into private `Game` code says in a comment why no input reaches it.
+- `Frames` passes everything on the line to that server and back at once, so a window's copy is up to date after any step that waits. Setup followed at once by a read of `world` needs a `Frames` between them. A window keeps its own player's position and hotbar, so those are set with `Warp` and `SetHotbarSlot(world, …)`.
+- How long an answer takes shows only on a real line: measure that in `src/NetChecks.cs` or `src/ServerChecks.cs`.
 - Checks never touch `world.S`, the raw save, and never change a player's backpack, needs or respawn timer directly:
   - They read results through `World`'s public members; a missing read becomes a small read-only member like `Coins`.
   - `World.Backpack` is a read-only `InventoryView`, which `World.Transfer` takes as an end of a move, so a check moves items the way a player does.
@@ -69,6 +71,7 @@ Do all instantiation and compilation during loading to avoid in-game stutter.
 Building mid-game is for rare events: a new building, a hire, a wolf.
 Build-mode placement previews and their faded materials are setup work, made while loading.
 A material builds its shader on its first draw, which stalls that frame, unless loading asks for its RID first (`ModelKit.BuildShaders`, faded copies in `ModelKit`).
+Drawing builds a pipeline the first time too, up to a second on a machine with empty caches, and asking for a RID does not: `WorldView` draws one of every model behind the ground for its first frames (`WorldModels.Warm`).
 Sounds load when the game starts, and music pauses rather than stopping: starting an MP3 partway through decodes it from the beginning.
 
 Code that runs every frame or tick allocates nothing once warmed up: every byte is garbage the runtime collects later in a pause that stalls a frame.
@@ -84,13 +87,14 @@ Allocation is fine while loading, setting up and on rare events.
 Allocation budgets:
 
 - `tests/AllocationChecks.cs` holds simulation ticks to their budget after a warm-up with `AllocationChecks.Check()`: walking and a night hunt at 0 bytes, and a working settlement at a commented byte count a tick for stores growing their tables. It counts the calling thread's allocations, so it holds on any machine. A warm-up runs every path its budget allows at least once, so a first-time cost stays out of the measured runs. A new path that runs every tick gets a case there; a path that must allocate passes its measured bytes per run as an explicit, commented budget.
-- `CheckWalkingStaysWithinAllocationBudget` in the UI checks holds real frames to a measured budget: a change that adds a third more garbage fails it, and one that removes some lowers the budget.
+- `CheckWalkingStaysWithinAllocationBudget` holds real frames to a measured budget: a change that adds a third more garbage fails it, and one that removes some lowers the budget. `src/ServerChecks.cs` runs it on the real server, whose updates are what a window pays for: each update's changed entries are new arrays, while numbers go into the window's copy in place through `WorldUpdates.SetNumbers`.
 - `CheckPanelPagesRefreshWithoutAllocating` holds every panel page to 0 bytes a refresh while what it shows stays the same. Live panel updates go through `LiveUpdates`: `Watch` draws only when a value changes, and `Bind` rebuilds text in a reused buffer and hands Godot a new string only when it changes.
 - Real frames are measured only while walking, so per-frame code for gathering, a mauling or a settlement in view has no allocation check yet; review those paths by hand.
-- The host's network updates, ten a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
+- The server's network updates, thirty a second, go through `WorldUpdates`: its "update: working settlement" case holds an update and the guest's merge of it to a commented budget for the entries that changed, which are new arrays.
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
 `./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a walking, day/night and staffed-settlement run.
+That run plays on a real server process and measures the window, merging its updates included.
 
 Keep models under the triangle ceilings in [assets/README.md](assets/README.md#changing-a-model).
 

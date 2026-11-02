@@ -67,7 +67,7 @@ public partial class BenchPanel(PageTools tools, Thing subject) : ThingPage(tool
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
         var recipes = world.Data.Recipes.Where(p => p.Value.Station == thing.Kind).Select(p => p.Key);
         AddChild(new RecipeBoard(kit, live, memory, Redraw, recipes, group => group.Tool == "" ? null : world.BenchTool(thing, group.Tool, group.Tier), thing,
-            id => { world.SetRecipe(thing, id); Redraw(); }, id => thing.Recipe == id, id => world.Backpack.Has(world.Data.Recipes[id].Inputs),
+            id => world.SetRecipe(thing, id), id => thing.Recipe == id, id => world.Backpack.Has(world.Data.Recipes[id].Inputs),
             // A double click also loads one batch of inputs from the backpack.
             id => { foreach (var (item, amount) in world.Data.Recipes[id].Inputs) world.LoadInput(thing, item, amount); }));
         if (thing.Recipe != "") AddChild(cups.Machine());

@@ -144,19 +144,19 @@ public static class WorldModels {
     public const uint MarkLayer = 1 << 12;
 
     /// <summary>
-    /// Builds one model of every kind in each of its looks, a mine at every ore and a wolf while the world loads, so their meshes, materials, shaders and faded copies are made.
-    /// A building, crate, carcass, dropped backpack or wolf that first appears mid-game then only adds nodes over cached resources.
+    /// Builds one model of every kind in each of its looks, a mine at every ore and a wolf under <paramref name="stage"/> while the world loads, so their meshes, materials, shaders and faded copies are made.
+    /// The view draws the stage once, which builds what drawing needs, so a building, crate, carcass, dropped backpack or wolf that first appears mid-game only adds nodes over what is ready.
     /// </summary>
-    public static void Warm() {
+    public static void Warm(Node3D stage) {
         foreach (var kind in Kinds.All) {
             if (kind == ThingKind.Mine) continue;
             // Natural things and farm plots look different by id; buildings, crates and backpacks look the same.
             int looks = kind == ThingKind.Tree ? TreeVariants * NatureShape.Variants : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
-            for (int id = 0; id < looks; id++) Discard(Build(new Thing { Id = id, Kind = kind }).Root);
+            for (int id = 0; id < looks; id++) Stage(Build(new Thing { Id = id, Kind = kind }).Root);
         }
-        foreach (var ore in World.MineOres) Discard(Build(new Thing { Kind = ThingKind.Mine, Pos = World.MineSpot(World.CliffOf(ore)) }).Root);
-        Discard(new WolfModel().Root);
-        static void Discard(Node3D root) { ModelKit.BuildShaders(root); root.Free(); }
+        foreach (var ore in World.MineOres) Stage(Build(new Thing { Kind = ThingKind.Mine, Pos = World.MineSpot(World.CliffOf(ore)) }).Root);
+        Stage(new WolfModel().Root);
+        void Stage(Node3D root) { ModelKit.BuildShaders(root); root.Position = Vector3.Zero; stage.AddChild(root); }
         _ = BackpackShape.Details; _ = BackpackShape.Flap;
         for (int variant = 0; variant < LeafShape.Variants; variant++) LeafShape.For(variant);
         scorchTexture ??= ScorchTexture();

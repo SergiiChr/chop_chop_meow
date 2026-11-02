@@ -12,7 +12,7 @@ using static WorkerSteps;
 /// <summary>Simulation checks for mines and the end goals.</summary>
 public static class MineChecks {
     public static void Run(GameData data) {
-        CheckMineSitesAlignWithCliffsAndOldSavesUpgrade(data);
+        CheckMineSitesAlignWithCliffs(data);
         CheckMinesAreMarkedAtCliffsOnceEach(data);
         CheckWorkersDigAndFrameMineWithTheirTools(data);
         CheckPlayerDeliversOnlyWhatAMineStillNeeds(data);
@@ -22,8 +22,7 @@ public static class MineChecks {
         CheckDailyProfitIsSalesMinusWagesAndMeetsEndGoals(data);
     }
 
-    private static void CheckMineSitesAlignWithCliffsAndOldSavesUpgrade(GameData data) {
-        var world = FundedWorld(data); var expected = new Dictionary<int, Vector2>();
+    private static void CheckMineSitesAlignWithCliffs(GameData data) {
         foreach (var cliff in World.Cliffs) {
             Require(World.CliffAt(World.MineSpot(cliff)) == cliff, "each aligned site must belong to its own cliff");
             var marking = FundedWorld(data); marking.Player = World.MineSpot(cliff) + cliff.Face * 3;
@@ -36,31 +35,8 @@ public static class MineChecks {
                 "a mine must face outward from its own cliff rather than a common camera direction");
             Require(new Vector2(renderedOut.X, renderedOut.Z).Dot(outward) > .999f && Math.Abs(new Vector2(renderedHeader.X, renderedHeader.Z).Dot(cliff.Along)) > .999f,
                 "the rendered portal must follow the cliff and its rails must face out from it");
-            var oldAlong = cliff.Along * Math.Sign(cliff.Along.Dot(Terrain.Seaward));
-            var end = cliff.Center + oldAlong * (cliff.HalfLength + 6.7f);
-            var oldSpot = end + cliff.Face * Math.Max(2.5f, 6 - Terrain.FromMountains(end));
             Require(World.MineSpot(cliff).IsEqualApprox(cliff.Center + cliff.Face * 4.2f), "each new entrance must project directly from its cliff center");
-            var mine = world.Add(ThingKind.Mine, oldSpot); expected[mine.Id] = World.MineSpot(cliff); mine.MineStage = MineStage.Open; mine.Progress = 2;
-            mine.Inventory.Add("wood", 7); mine.Output!.Add(World.MineOre(mine), 12);
-            Remember(world, new Thing { Id = mine.Id, Kind = ThingKind.Mine, Pos = oldSpot, MineStage = MineStage.Open });
-            var worker = AddWorker(world, oldSpot + cliff.Face * 3); worker.Assignment = mine.Id;
         }
-        SetSaveVersion(world, 4);
-        var loaded = FundedWorld(data); loaded.Deserialize(world.Serialize());
-        Require(loaded.SaveVersion == 5, "version 4 valley saves must upgrade to the current mine layout");
-        foreach (var mine in loaded.Things.Where(t => t.Kind == ThingKind.Mine)) {
-            Require(mine.Pos.IsEqualApprox(expected[mine.Id]) && loaded.Remembered(mine.Id)!.Pos.IsEqualApprox(mine.Pos),
-                "saved mines and their fog memories must use the aligned site");
-            Require(mine.MineStage == MineStage.Open, "aligning an older mine must preserve its construction stage");
-            Require(mine.Progress == 2, "aligning an older mine must preserve its construction progress");
-            Require(mine.Inventory["wood"] == 7, "aligning an older mine must preserve its stocked wood");
-            Require(mine.Output![World.MineOre(mine)] == 12, "aligning an older mine must preserve its output");
-            Require(loaded.Workers.Any(w => w.Assignment == mine.Id && World.HasDuty(w, mine.Id, "mine")), "aligning an older mine must preserve its assigned workers");
-        }
-        Require(loaded.Things.Where(t => t.Kind == ThingKind.Mine).Select(t => t.Pos).Distinct().Count() == World.Cliffs.Length, "migrating all cliffs must keep distinct mine sites");
-        var restored = FundedWorld(data); restored.Deserialize(loaded.Serialize());
-        Require(restored.Things.Where(t => t.Kind == ThingKind.Mine).All(m => m.Pos.IsEqualApprox(loaded.Find(m.Id)!.Pos)),
-            "loading an aligned save must not move its mines again");
     }
 
     private static void CheckMinesAreMarkedAtCliffsOnceEach(GameData data) {

@@ -120,7 +120,7 @@ public partial class Hotbar : PanelContainer {
     /// <summary>Puts a hotbar slot in hand; building plans and crates go straight to placement, everything else waits for a left click in the world.</summary>
     public void Select(int slot) {
         slot = Math.Clamp(slot, 0, 8);
-        world.S.ActiveHotbar = slot;
+        world.HoldHotbar(slot);
         string id = HotbarId(slot);
         panel.Player.Mode = new ClickMode.Normal();
         if (string.IsNullOrEmpty(id)) kit.Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
@@ -135,14 +135,13 @@ public partial class Hotbar : PanelContainer {
     /// <summary>Uses the item in hand toward a point on the ground; items without a use do nothing.</summary>
     public void UseHeld(Vector2 at) {
         if (ActiveItem() is not string id || !HasUse(id)) return;
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Act(() => world.Consume(id));
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id);
         else if (id == "torch") world.UseTorch(at - world.Player);
         else world.Attack();
     }
 
     private void SetHotbar(int slot, string id) {
-        world.S.HotbarSlots[slot] = id;
-        world.S.ActiveHotbar = slot;
+        world.SetHotbar(slot, id);
         if (id != "") kit.Sounds.Play("putting_items_on_hotbar");
         kit.Refresh();
     }

@@ -87,7 +87,7 @@ public sealed class Worker {
     /// <summary>The tool taken from a tool station for the current job, or empty; it goes back to a station when the job no longer needs it.</summary>
     public string Tool { get; set; } = "";
     /// <summary>The tool kind the worker last reported missing, so the message is said once rather than every tick.</summary>
-    [JsonIgnore] public string Missing { get; set; } = "";
+    public string Missing { get; set; } = "";
     /// <summary>The kind of resource the worker last said they know no more of.</summary>
     [JsonIgnore] public ThingKind? Exhausted { get; set; }
     public int Destination { get; set; }
@@ -148,23 +148,32 @@ public sealed class Wolf {
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
 }
 /// <summary>
-/// Everything a save holds. The player properties read and write <see cref="Actor"/>, the player whose action or turn
-/// the simulation is running, so the save keeps the host's player at the top level as single player always has.
+/// Everything a save holds. The player properties read and write <see cref="Actor"/>, the player whose action or turn the simulation is running.
+/// A save keeps every player in <see cref="Party"/> and leaves those properties out.
 /// </summary>
 public sealed class SaveState {
-    /// <summary>Everyone in the world; the first is the save's own player. Guests are saved on their own machines.</summary>
+    /// <summary>Everyone playing now; a new world starts with one player not yet claimed by any machine.</summary>
     [JsonIgnore] public List<PlayerState> Players { get; set; }
+    /// <summary>Players of this world who are not playing now, by the key of the machine they play from.</summary>
+    [JsonIgnore] public Dictionary<string, PlayerState> Absent { get; set; } = new();
     [JsonIgnore] public PlayerState Actor { get; set; }
     public SaveState() : this(new byte[Terrain.Size * Terrain.Size]) { }
     /// <summary>A save holding the given fog map; a guest reads an update's state into one with an empty map, which it never looks at.</summary>
     internal SaveState(byte[] explored) { Players = new() { new PlayerState() }; Actor = Players[0]; Explored = explored; }
-    /// <summary>5 aligns mine entrances with their cliff faces; version 4 saves migrate on load.</summary>
-    public int Version { get; set; } = 5;
+    /// <summary>Every player of this world, playing or not, by machine key; the empty key is a player no machine has claimed yet.</summary>
+    public Dictionary<string, PlayerState> Party {
+        get => Players.Concat(Absent.Values).ToDictionary(p => p.Key);
+        set { Absent = value; foreach (var (key, p) in value) p.Key = key; }
+    }
+    /// <summary>The key of the machine that last started this world, whose player follows the save to another computer.</summary>
+    public string Owner { get; set; } = "";
+    /// <summary>Saves from any other version are refused.</summary>
+    public int Version { get; set; } = 6;
     public List<Thing> Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
     public List<Wolf> Wolves { get; set; } = new();
-    public Inventory Backpack { get => Actor.Backpack; set => Actor.Backpack = value; }
+    [JsonIgnore] public Inventory Backpack { get => Actor.Backpack; set => Actor.Backpack = value; }
     public Dictionary<string, float> Demand { get; set; } = new();
     /// <summary>Sale prices as last reported by someone arriving from the village, and when that was.</summary>
     public Dictionary<string, float> Prices { get; set; } = new();
@@ -172,27 +181,27 @@ public sealed class SaveState {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public float? Coins { get; set; }
     public float PricesTime { get; set; }
     public HashSet<string> Milestones { get; set; } = new();
-    public float PlayerX { get => Actor.PlayerX; set => Actor.PlayerX = value; }
-    public float PlayerY { get => Actor.PlayerY; set => Actor.PlayerY = value; }
+    [JsonIgnore] public float PlayerX { get => Actor.PlayerX; set => Actor.PlayerX = value; }
+    [JsonIgnore] public float PlayerY { get => Actor.PlayerY; set => Actor.PlayerY = value; }
     public float Time { get; set; } = 55;
-    public float Health { get => Actor.Health; set => Actor.Health = value; }
-    public float Hunger { get => Actor.Hunger; set => Actor.Hunger = value; }
-    public float Thirst { get => Actor.Thirst; set => Actor.Thirst = value; }
+    [JsonIgnore] public float Health { get => Actor.Health; set => Actor.Health = value; }
+    [JsonIgnore] public float Hunger { get => Actor.Hunger; set => Actor.Hunger = value; }
+    [JsonIgnore] public float Thirst { get => Actor.Thirst; set => Actor.Thirst = value; }
     public int NextId { get; set; } = 1;
     public int Goal { get; set; }
     public int WageDay { get; set; } = 1;
-    public List<string> HotbarSlots { get => Actor.HotbarSlots; set => Actor.HotbarSlots = value; }
+    [JsonIgnore] public List<string> HotbarSlots { get => Actor.HotbarSlots; set => Actor.HotbarSlots = value; }
     /// <summary>Contents of crates packed into items, keyed by the number in their item id.</summary>
     public Dictionary<int, Inventory> Crates { get; set; } = new();
-    public List<string> Crafting { get => Actor.Crafting; set => Actor.Crafting = value; }
-    public float CraftTime { get => Actor.CraftTime; set => Actor.CraftTime = value; }
-    public float Torch { get => Actor.Torch; set => Actor.Torch = value; }
-    public bool TorchLit { get => Actor.TorchLit; set => Actor.TorchLit = value; }
-    public float TorchKindling { get => Actor.TorchKindling; set => Actor.TorchKindling = value; }
-    public int ActiveHotbar { get => Actor.ActiveHotbar; set => Actor.ActiveHotbar = value; }
-    public float RespawnIn { get => Actor.RespawnIn; set => Actor.RespawnIn = value; }
-    public bool Mauled { get => Actor.Mauled; set => Actor.Mauled = value; }
-    public int Sheltered { get => Actor.Sheltered; set => Actor.Sheltered = value; }
+    [JsonIgnore] public List<string> Crafting { get => Actor.Crafting; set => Actor.Crafting = value; }
+    [JsonIgnore] public float CraftTime { get => Actor.CraftTime; set => Actor.CraftTime = value; }
+    [JsonIgnore] public float Torch { get => Actor.Torch; set => Actor.Torch = value; }
+    [JsonIgnore] public bool TorchLit { get => Actor.TorchLit; set => Actor.TorchLit = value; }
+    [JsonIgnore] public float TorchKindling { get => Actor.TorchKindling; set => Actor.TorchKindling = value; }
+    [JsonIgnore] public int ActiveHotbar { get => Actor.ActiveHotbar; set => Actor.ActiveHotbar = value; }
+    [JsonIgnore] public float RespawnIn { get => Actor.RespawnIn; set => Actor.RespawnIn = value; }
+    [JsonIgnore] public bool Mauled { get => Actor.Mauled; set => Actor.Mauled = value; }
+    [JsonIgnore] public int Sheltered { get => Actor.Sheltered; set => Actor.Sheltered = value; }
     public float PlaySeconds { get; set; }
     public bool EndingShown { get; set; }
     /// <summary>Coins from sales that came back today; wages are taken off at dawn to give the day's profit.</summary>
@@ -315,7 +324,6 @@ public sealed partial class World {
     public float PlaySeconds => S.PlaySeconds;
     /// <summary>The player whose action or turn is running.</summary>
     public int ActorId => S.Actor.Id;
-    public int SaveVersion => S.Version;
     public bool Priced(string item) => S.Prices.ContainsKey(item);
     public Thing? Remembered(int id) => S.Remembered.GetValueOrDefault(id);
     /// <summary>Spends carried coins; coins stored elsewhere do not count.</summary>
@@ -335,8 +343,8 @@ public sealed partial class World {
     }
     /// <summary>Tells the acting player, or everyone while the tick runs the shared world.</summary>
     public void Say(string message) {
-        if (everyone || S.Actor == Me) Notify?.Invoke(message);
-        if (everyone || S.Actor != Me) Relay?.Invoke(everyone ? null : S.Actor, message);
+        if (everyone || S.Actor.Id == LocalId) Notify?.Invoke(message);
+        if (everyone || S.Actor.Id != LocalId) Relay?.Invoke(everyone ? null : S.Actor, message);
     }
     // Sleep fast-forwards hours in one frame, so its events stay silent instead of playing all at once.
     private void Play(string sound, Vector2 at) { if (!asleep) Sound?.Invoke(sound, at); }
@@ -602,7 +610,8 @@ public sealed partial class World {
         if (Forwarded(Verb.Build, item: kind.Id(), at: p)) return null;
         S.Backpack.Spend(Data.Buildings[kind].Cost);
         var t = Add(kind, p); if (kind == ThingKind.Campfire) { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
-        S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) Say($"Marked the {MineName(t)} site. Assign a worker to dig the entrance; they need a pickaxe."); return t;
+        S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Assign a worker to dig the entrance; they need a pickaxe."); Made?.Invoke(S.Actor.Id, t.Id); }
+        return t;
     }
     public void Consume(string item) {
         if (Downed || !Data.Items.TryGetValue(item, out var def) || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
@@ -910,7 +919,7 @@ public sealed partial class World {
     /// <summary>Sends every acceptable crate in the market input on one cart; the coins come back into the market output.</summary>
     public bool Sell(Thing sign) {
         if (CartBlock(sign) is string blocked) { Say(blocked); return false; }
-        if (Forwarded(Verb.Sell, sign.Id)) return false;
+        if (Forwarded(Verb.Sell, sign.Id)) return true;
         if (Ship(sign)) return true;
         Say(sign.Inventory.Count > 0 ? "The village only takes crates packed with goods it buys." : "Put a packed crate in the market first."); return false;
     }
@@ -996,9 +1005,10 @@ public sealed partial class World {
     }
     /// <summary>Lifts a placed crate into the backpack; anything inside stays packed in it.</summary>
     public bool PickUpCrate(Thing crate) {
-        if (crate.Kind != ThingKind.Crate || !Near(crate) || Forwarded(Verb.PickUpCrate, crate.Id)) return false;
+        if (crate.Kind != ThingKind.Crate || !Near(crate)) return false;
         bool empty = crate.Inventory.Count == 0;
         if (S.Backpack.Room(empty ? "crate" : PackedPrefix) == 0) { Say("Backpack full. Make room for the crate."); return false; }
+        if (Forwarded(Verb.PickUpCrate, crate.Id)) return true;
         S.Backpack.Add(empty ? "crate" : Pack(crate.Inventory), 1); S.Things.Remove(crate);
         Play("wood_rocks_inventory", crate.Pos); PlayerActed?.Invoke(ActorAction.PickUp, crate.Pos); return true;
     }
@@ -1113,7 +1123,7 @@ public sealed partial class World {
         if (!Pay(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from your backpack."); return null; }
         string name = WorkerNames.FirstOrDefault(n => S.Workers.All(w => w.Name != n)) ?? "Neighbor";
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
-        S.Workers.Add(w); S.Milestones.Add("hired"); Say($"New worker {name} without a job."); return w;
+        S.Workers.Add(w); S.Milestones.Add("hired"); Say($"New worker {name} without a job."); Made?.Invoke(S.Actor.Id, w.Id); return w;
     }
     /// <summary>The jobs a place offers workers, in the order the panel shows them.</summary>
     public string[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {
@@ -1783,7 +1793,7 @@ public sealed partial class World {
         Look();
         UpdateGoal();
     }
-    private PlayerState? PlayerById(int id) {
+    public PlayerState? PlayerById(int id) {
         foreach (var p in S.Players) if (p.Id == id) return p;
         return null;
     }
@@ -1800,7 +1810,7 @@ public sealed partial class World {
     /// <summary>The acting player's clocks, hunger and thirst, and the torch in hand; a remote player's held gather also runs here.</summary>
     private void NeedsTick(float dt) {
         attackClock = Math.Max(0, attackClock - dt);
-        if (S.Actor != Me && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
+        if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
             float drain = S.Actor.Sprinting ? Data.SprintDrain : 1;
             S.Hunger = Math.Max(0, S.Hunger - dt * drain * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * drain * Data.ThirstPerSecond);
@@ -2040,6 +2050,15 @@ public sealed partial class World {
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }
+    /// <summary>Clears what an edited or older save may hold out of place in a player: hotbar entries for nothing known or carried, a cabin that is gone, recipes not made by hand.</summary>
+    private void FixPlayer(PlayerState p, SaveState save) {
+        var slots = p.HotbarSlots ?? new();
+        p.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack?[id] > 0) ? id : "").ToList();
+        p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
+        if (!save.Things.Any(t => t.Id == p.Sheltered && t.Kind == ThingKind.Hut)) p.Sheltered = 0;
+        p.Crafting ??= new();
+        p.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
+    }
     /// <summary>
     /// Brings older saves' things up to date before they are read: loose iron left the game and no kind names it any more,
     /// and a mine's or farm plot's stage was one number for both.
@@ -2064,7 +2083,7 @@ public sealed partial class World {
     }
     /// <summary>Brings every inventory of a freshly parsed save in line with its totals, since an old save holds totals without stacks.</summary>
     private static void RebuildAllStacks(SaveState save) {
-        foreach (var player in save.Players) { player.Backpack?.RebuildStacks(); RebuildAll(player.Crates?.Values); }
+        foreach (var player in save.Players.Concat(save.Absent.Values)) player?.Backpack?.RebuildStacks();
         RebuildAll(save.Crates?.Values);
         foreach (var worker in save.Workers) worker?.Bag?.RebuildStacks();
         foreach (var thing in save.Things) RebuildThing(thing);
@@ -2081,14 +2100,12 @@ public sealed partial class World {
         json = json.Replace("\"iron_axe\"", "\"steel_axe\"").Replace("\"iron_pick\"", "\"steel_pick\"").Replace("\"iron_hammer\"", "\"steel_hammer\"").Replace("\"iron_parts\"", "\"steel_parts\"");
         if (json.Contains("\"loose_iron\"") || json.Contains("\"Stage\"")) json = UpgradeThings(json);
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
-        if (loaded.Version < 4) throw new InvalidOperationException("This save is from an older, smaller map and cannot be loaded. Start a new game.");
-        if (loaded.Version is not (4 or 5) || loaded.Things == null || loaded.Backpack == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
+        if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Absent.Count == 0) throw new InvalidOperationException("Unsupported or incomplete save.");
+        loaded.Players = new();
+        // Item fixes below that belong to one player go to the unclaimed one, else the first.
+        loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.First();
         RebuildAllStacks(loaded);
-        // Edited or older saves may hold missing, extra or unknown hotbar entries.
-        var slots = loaded.HotbarSlots ?? new();
-        loaded.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id)) ? id : "").ToList();
-        loaded.ActiveHotbar = Math.Clamp(loaded.ActiveHotbar, 0, 8);
-        if (!loaded.Things.Any(t => t.Id == loaded.Sheltered && t.Kind == ThingKind.Hut)) loaded.Sheltered = 0;
         loaded.Prices ??= new();
         if (loaded.Coins is float coins) { loaded.Backpack.Add(Inventory.Coins, (int)coins); loaded.Coins = null; }
         foreach (var order in loaded.Orders.Where(o => o.Item != null && o.Goods.Count == 0)) { order.Goods[order.Item!] = order.Quantity; order.Item = null; order.Quantity = 0; }
@@ -2099,9 +2116,7 @@ public sealed partial class World {
         if (loaded.Explored?.Length != Terrain.Size * Terrain.Size) loaded.Explored = new byte[Terrain.Size * Terrain.Size];
         loaded.Remembered ??= new();
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
-        if (loaded.Version == 4) AlignMines(loaded);
-        loaded.Crates ??= new(); loaded.Crafting ??= new(); loaded.Profits ??= new();
-        loaded.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
+        loaded.Crates ??= new(); loaded.Profits ??= new();
         foreach (var t in loaded.Things) {
             // A station set to a recipe it doesn't make, as on older saves' anvils, is cleared.
             // One left with no recipe goes back to its starting recipe.
@@ -2126,9 +2141,14 @@ public sealed partial class World {
                 if (BestTool(tool, loaded.Backpack) == null && loaded.Backpack.Remove("steel_parts", 1) == 1) loaded.Backpack.Add(made, 1);
             if (loaded.Milestones.Contains("steel_parts")) loaded.Milestones.Add("steel_tool");
         }
-        if (!ValidCrates(loaded.Crates) || !ValidPlayer(loaded.Actor, loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
+        foreach (var p in loaded.Absent.Values) if (p != null) FixPlayer(p, loaded);
+        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         // The current goal is worked out again from the milestones, so a save made with a shorter goal chain lands on the right step.
         loaded.Goal = 0;
+        // A server sends this player away again until each player joins.
+        var local = loaded.Actor;
+        loaded.Absent.Remove(local.Key);
+        local.Id = 1; loaded.Players.Add(local);
         S = loaded;
         // Older saves set only a worker's place; it carries every job there.
         foreach (var w in S.Workers)
@@ -2139,7 +2159,7 @@ public sealed partial class World {
         NormalizeBottleStorage();
         // Saves from before raking have no leaf litter.
         if (!S.Things.Any(t => t.Kind == ThingKind.Leaves)) DropLeaves();
-        UpdateGoal(); gatherClock = 0; ExploredRevision++; Look(); Say("Settlement loaded.");
+        UpdateGoal(); gatherClock = 0; ExploredRevision++; Look();
         Replaced?.Invoke();
     }
 }

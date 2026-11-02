@@ -53,6 +53,15 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         Headline();
         Reach();
         Body();
+        RedrawOnChange(() => (thing.Packs, thing.Recipe, thing.Compost, FilterCode()));
+    }
+
+    /// <summary>A number that changes with the filters' contents.</summary>
+    private int FilterCode() {
+        int code = 0;
+        foreach (string item in thing.Inventory.InputFilter) code += item.GetHashCode();
+        foreach (string item in thing.Inventory.OutputFilter) code += 31 * item.GetHashCode();
+        return code;
     }
 
     /// <summary>What this kind of thing shows under its name.</summary>

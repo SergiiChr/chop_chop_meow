@@ -66,6 +66,11 @@ public static class InventoryLayoutChecks {
         source.Add("wood", 4); destination.Add("wood", 3);
         Require(source.MoveSlotTo(0, destination, 0) == 1, "a cross-inventory merge should move only the target stack's available room");
         Require(source["wood"] == 3 && destination["wood"] == 4, "a partial cross-inventory merge should keep both aggregate counts accurate");
+
+        var mixed = new Inventory { Slots = 2, StackSize = 4 };
+        mixed.Add("wood", 4); mixed.Add("stone", 1);
+        Require(mixed.RoomAt(1, mixed, 0, 2) == 0 && mixed.MoveSlotTo(0, mixed, 1, 2) == 0, "part of a stack dropped on another item should have no room, since only a whole stack swaps");
+        Require(mixed.RoomAt(1, mixed, 0, 4) >= 4 && mixed.MoveSlotTo(0, mixed, 1, 4) == 4, "a whole stack dropped on another item should have room, since the two swap");
     }
 
     private static void CheckReplacedItemKeepsItsCellAndSavesKeepTheLayout() {
