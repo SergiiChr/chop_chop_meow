@@ -13,6 +13,9 @@ public partial class Game {
         foreach (var path in Enumerable.Range(0, Saves.SlotCount + 1).Select(Saves.SlotPath).Append(Settings.Path).Concat(signals)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
     }
 
+    /// <summary>The world of the server this window runs for the check, which the check sets up directly.</summary>
+    private World Hosted => hosted?.World ?? throw new InvalidOperationException("No server is running in this window.");
+
     /// <summary>
     /// Passes everything on the line to the server inside this window and brings its answer back, at once.
     /// The UI checks do this rather than wait, so they keep to their time limit: they check what happens, and network and server checks check how long it takes.

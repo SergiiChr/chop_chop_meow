@@ -8,7 +8,7 @@ using Godot;
 /// Each is for a state real play cannot reach or cannot reach quickly enough, and says why.
 /// <c>./build.py check</c> fails on the raw save anywhere else in the checks.
 /// Checks also set fields directly on things and workers they placed and on players they build as save text.
-/// Placing the player with <c>world.Player</c> and holding a player's input are allowed too.
+/// Placing the player with <c>world.Player</c>, or <see cref="Warp"/> on a server's world, and holding a player's input are allowed too.
 /// </summary>
 internal static class SetupSteps {
     /// <summary>Whether a backpack holds what a new guest starts with and nothing else.</summary>

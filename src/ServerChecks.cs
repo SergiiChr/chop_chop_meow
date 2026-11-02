@@ -6,7 +6,7 @@ using static Checks;
 namespace ChopChopMeow;
 
 /// <summary>
-/// One window playing on the real server process, the way a player does: the UI checks run their world in the window and the network check runs the server inside it.
+/// One window playing on the real server process, the way a player does: the UI and network checks run the server inside the window.
 /// build.py starts it with --server-check, and the server writes to the same log, so its errors fail the check too.
 /// </summary>
 public partial class Game {

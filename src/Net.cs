@@ -35,6 +35,8 @@ public partial class Net : Node {
     private const float ConnectTimeout = 10;
     /// <summary>The pause between a dropped guest's tries to get back in.</summary>
     private const float RetrySeconds = 2;
+    /// <summary>Seconds after an action that its answer should arrive in, on anything but a very slow line.</summary>
+    private const float AnswerSeconds = .3f;
     public const string LostLine = "Lost the connection to the host.";
     public const string ServerStopped = "The game's server stopped.";
     private const string NotOpened = "The host has not opened the game to other players.";
@@ -56,8 +58,6 @@ public partial class Net : Node {
     public World World = null!;
     /// <summary>The key this machine joins with, which the server's world stores its player under.</summary>
     public string Key = "";
-    /// <summary>Seconds after an action that its answer should arrive in, on anything but a very slow line.</summary>
-    private const float AnswerSeconds = .3f;
     /// <summary>Tells this window from another on the same machine, which has the same key.</summary>
     private static readonly int Window = OS.GetProcessId();
     /// <summary>Seconds a dropped guest keeps trying to get back in; the network check shortens it to see a guest give up.</summary>

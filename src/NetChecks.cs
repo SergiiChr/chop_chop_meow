@@ -21,9 +21,6 @@ public partial class Game {
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 
-    /// <summary>The world of the server this window runs for the check, which the check sets up directly.</summary>
-    private World Hosted => hosted?.World ?? throw new InvalidOperationException("No server is running in this window.");
-
     private async Task HostNetCheck() {
         RemoveCheckFiles(); await Frames(4);
         await Click(FindButton(startMenu.Screen, "New game")!);

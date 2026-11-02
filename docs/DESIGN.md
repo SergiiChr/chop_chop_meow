@@ -166,7 +166,7 @@ The side panel only shows the building and sizes itself to what it holds.
 
 Every game runs on a `Server`, alone or together, which owns the only simulation and has no player of its own.
 The window that starts a game runs it as a headless child process of the same executable (`--server`).
-The server takes the first free port from 24565 itself, so two windows starting at once cannot pick the same one, and writes it to a file named for the window's process.
+The server takes the first free port from 24565 itself when it starts serving, since a port a window picked could be gone by the time the server came up, and writes it to a file named for the window's process.
 The window joins it over localhost like any guest, showing a starting screen until it does.
 `Session` says where a window stands with the game it started: starting it, playing it, away from it to join another, or going back to it.
 The UI and network checks run the server inside the window, under a branch with its own `SceneMultiplayer`, so they can set its world up directly; the UI checks pump the line themselves (`Game.Settle`) rather than wait for it.
