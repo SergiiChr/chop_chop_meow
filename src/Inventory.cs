@@ -149,6 +149,17 @@ public sealed class Inventory {
     }
 
     /// <summary>Moves an exact source cell to a destination cell; matching stacks merge up to their stack limit, otherwise cells swap.</summary>
+    /// <summary>
+    /// How much of an item a drop from <paramref name="from"/> on one cell takes: what the cell has room for, or, on another item, what fits anywhere.
+    /// Within one inventory a drop on another item swaps the two, so all of it goes.
+    /// </summary>
+    public int RoomAt(int target, string item, Inventory from) {
+        if ((uint)target >= (uint)Layout.Count) return 0;
+        var there = Layout[target];
+        int room = ReferenceEquals(from, this) ? int.MaxValue : Room(item);
+        return there.Item == "" || there.Item == item ? Math.Min(room, StackOf(item) - (there.Item == "" ? 0 : there.Count)) : room;
+    }
+
     public int MoveSlotTo(int source, Inventory destination, int target, int quantity = int.MaxValue) {
         if ((uint)source >= (uint)Layout.Count || (uint)target >= (uint)destination.Layout.Count) return 0;
         Slot a = Layout[source], b = destination.Layout[target]; if (a.Item == "" || quantity <= 0) return 0;

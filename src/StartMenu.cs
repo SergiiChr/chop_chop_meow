@@ -128,7 +128,7 @@ public partial class StartMenu : ColorRect {
         var join = kit.Button("Join", () => {
             if (!int.TryParse(port.Text.Trim(), out int number) || number is < 1 or > 65535) { joinStatus.Text = "The port is a number from 1 to 65535."; return; }
             if (address.Text.Trim() == "") { joinStatus.Text = "Enter the host's address."; return; }
-            if (inGame && flow.Owns) { saves.Save(0); flow.ReturnIfJoinFails(); }
+            if (inGame && flow.Owns) { saves.Save(0); flow.StepAway(); }
             var error = net.Join(address.Text.Trim(), number);
             joinStatus.Text = error == Error.Ok ? "Connecting…" : $"Could not connect: {error}.";
             if (error != Error.Ok) flow.ReturnAfterFailedJoin(joinStatus.Text);

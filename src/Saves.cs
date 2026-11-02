@@ -39,9 +39,9 @@ public sealed class Saves(UiKit kit, Net net, IGameFlow flow) {
         if (!flow.Owns) kit.Notify("Leave the host's game to load your own."); else if (Slot > 0) flow.LoadSlot(Slot); else menu.ShowSlots(false, menu.Close);
     }
 
-    /// <summary>Asks the server to save the game to a slot, and it says how that went; the UI checks' world, which runs here, is saved here.</summary>
+    /// <summary>Asks the server to save the game to a slot, and it says how that went.</summary>
     public void Save(int n) {
-        if (kit.World.Remote) net.Save(n); else kit.Notify(Write(kit.World, n));
+        net.Save(n);
         if (n > 0) Slot = n;
     }
 

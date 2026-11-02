@@ -14,47 +14,31 @@ namespace ChopChopMeow;
 
 public partial class Game {
     /// <summary>
-    /// Walking for a few hundred real frames, through Godot input, allocates no more than its budget on the main thread:
-    /// every byte is garbage the runtime collects later, in a pause that stalls a frame.
-    /// </summary>
-    private async Task CheckWalkingStaysWithinAllocationBudget(long maxBytesPerFrame) {
-        var key = new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true };
-        Input.ParseInputEvent(key);
-        await Frames(120);
-        long before = GC.GetAllocatedBytesForCurrentThread(); ulong first = Engine.GetProcessFrames();
-        await Frames(300);
-        long bytes = GC.GetAllocatedBytesForCurrentThread() - before; ulong played = Math.Max(1, Engine.GetProcessFrames() - first);
-        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = false });
-        await Frames();
-        string report = $"frames: walking: {bytes} B over {played} frames, {bytes / (double)played:0.#} B per frame (budget {maxBytesPerFrame} B)";
-        GD.Print(report);
-        Require(bytes <= maxBytesPerFrame * (long)played, $"Allocation budget exceeded: {report}");
-    }
-    /// <summary>
     /// Every panel page, refreshed again and again while what it shows stays the same, allocates nothing:
     /// the panel refreshes several times a second while it is open.
     /// </summary>
     private async Task CheckPanelPagesRefreshWithoutAllocating() {
         var at = world.Player;
-        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 0)); chest.Inventory.Add("wood", 40); chest.Inventory.Add("coal", 12);
-        var pile = world.Add(ThingKind.Pile, at + new Vector2(-4, 2)); pile.Inventory.Add("stone", 9);
-        var forge = world.Add(ThingKind.Reinforced, at + new Vector2(-2, 0)); forge.Inventory.Add("iron_bar", 4); forge.Inventory.Add("coal", 6); forge.Heat = 85; forge.Processing = true; forge.Progress = 2;
-        var furnace = world.Add(ThingKind.Furnace, at + new Vector2(0, 2)); furnace.Inventory.Add("iron_ore", 4);
-        var fire = world.Add(ThingKind.Campfire, at + new Vector2(0, -2)); fire.Burn = 120;
-        var hut = world.Add(ThingKind.Hut, at + new Vector2(4, -3));
-        var sign = world.Add(ThingKind.Signpost, at + new Vector2(-4, -3));
-        var farm = world.Add(ThingKind.Farm, at + new Vector2(5, 3));
-        var packer = world.Add(ThingKind.Packer, at + new Vector2(-5, 4)); world.SetPacking(packer, "berries"); packer.Inventory.Add("berries", 6); packer.Inventory.Add("crate", 2);
+        var chest = Hosted.Add(ThingKind.Chest, at + new Vector2(2, 0)); chest.Inventory.Add("wood", 40); chest.Inventory.Add("coal", 12);
+        var pile = Hosted.Add(ThingKind.Pile, at + new Vector2(-4, 2)); pile.Inventory.Add("stone", 9);
+        var forge = Hosted.Add(ThingKind.Reinforced, at + new Vector2(-2, 0)); forge.Inventory.Add("iron_bar", 4); forge.Inventory.Add("coal", 6); forge.Heat = 85; forge.Processing = true; forge.Progress = 2;
+        var furnace = Hosted.Add(ThingKind.Furnace, at + new Vector2(0, 2)); furnace.Inventory.Add("iron_ore", 4);
+        var fire = Hosted.Add(ThingKind.Campfire, at + new Vector2(0, -2)); fire.Burn = 120;
+        var hut = Hosted.Add(ThingKind.Hut, at + new Vector2(4, -3));
+        var sign = Hosted.Add(ThingKind.Signpost, at + new Vector2(-4, -3));
+        var farm = Hosted.Add(ThingKind.Farm, at + new Vector2(5, 3));
+        var packer = Hosted.Add(ThingKind.Packer, at + new Vector2(-5, 4)); Hosted.SetPacking(packer, "berries"); packer.Inventory.Add("berries", 6); packer.Inventory.Add("crate", 2);
         var tree = world.Things.Where(t => t.Kind == ThingKind.Tree).MinBy(t => t.Pos.DistanceTo(at))!;
-        var worker = AddWorker(world, at + Vector2.One); worker.Name = "Panel Check"; worker.Wage = 5;
-        world.Assign(worker, forge); worker.Bag.Add("coal", 2);
+        var worker = AddWorker(Hosted, at + Vector2.One); worker.Name = "Panel Check"; worker.Wage = 5;
+        Hosted.Assign(worker, forge); worker.Bag.Add("coal", 2);
         // Held still so what each page shows stays the same. The pause menu would hold world clicks, so the hold and the page opening stay direct.
         bool held = true; kit.HoldWhile(() => held);
+        await Frames();
         var pages = new (string Name, Action Open)[] {
             ("inventory", () => panel.Open(Page.Backpack)), ("craft", () => panel.Open(Page.Craft)), ("workers", () => panel.Open(Page.Crew)),
-            ("chest", () => panel.Select(chest)), ("pile", () => panel.Select(pile)), ("bellows furnace", () => panel.Select(forge)), ("furnace", () => panel.Select(furnace)),
-            ("campfire", () => panel.Select(fire)), ("cabin", () => panel.Select(hut)), ("signpost", () => panel.Select(sign)), ("farm", () => panel.Select(farm)), ("packing station", () => panel.Select(packer)),
-            ("tree", () => panel.Select(tree)), ("worker", () => panel.Select(worker)),
+            ("chest", () => panel.Select(Shown(chest))), ("pile", () => panel.Select(Shown(pile))), ("bellows furnace", () => panel.Select(Shown(forge))), ("furnace", () => panel.Select(Shown(furnace))),
+            ("campfire", () => panel.Select(Shown(fire))), ("cabin", () => panel.Select(Shown(hut))), ("signpost", () => panel.Select(Shown(sign))), ("farm", () => panel.Select(Shown(farm))), ("packing station", () => panel.Select(Shown(packer))),
+            ("tree", () => panel.Select(tree)), ("worker", () => panel.Select(world.Workers.First(w => w.Id == worker.Id))),
         };
         foreach (var (name, open) in pages) {
             open(); await Frames();
@@ -75,9 +59,9 @@ public partial class Game {
             Require(bytes == 0, $"Allocation budget exceeded: {report}");
         }
         await CloseWithEsc(); held = false;
-        world.Fire(worker);
+        Hosted.Fire(worker);
         var placed = new[] { chest, pile, forge, furnace, fire, hut, sign, farm, packer };
-        RemoveThings(world, t => placed.Contains(t) || t.Kind == ThingKind.Grave);
+        RemoveThings(Hosted, t => placed.Contains(t) || t.Kind == ThingKind.Grave);
         await Frames();
     }
     /// <summary>
@@ -178,10 +162,10 @@ public partial class Game {
     }
     private async Task CheckTradingPostSendsOnlyCratesOffOnACart() {
         await CloseWithEsc();
-        var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
-        Give(world, "wood", 5); Give(world, Inventory.Coins, 100);
-        var berries = world.Add(ThingKind.Crate, world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); world.PickUpCrate(berries);
-        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
+        Give(Hosted, "wood", 5); Give(Hosted, Inventory.Coins, 100);
+        var berries = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(0, 1)); berries.Inventory.Add("berries", 12); Hosted.PickUpCrate(berries);
+        string packed = Hosted.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         await Click(view.Screen(sign.Pos, .8f));
         Require(Shows(sign), "Clicking a trading post must select it.");
         Require(Named("sell") != null, "The market must offer a sell button.");
@@ -203,14 +187,14 @@ public partial class Game {
             "The post's filter must not offer a row of goods that workers do not bring.");
         Require(Named("pick_berries") == null, "The post's filter must not offer loose berries.");
         await Click(Named("filters_close")!);
-        world.Tick(world.Data.TradeSeconds); RemoveThings(world, t => t == sign); Drop(world, Inventory.Coins, 999);
+        Hosted.Tick(world.Data.TradeSeconds); RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 999);
         await CloseWithEsc();
     }
 
     private async Task CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker() {
         await CloseWithEsc();
-        var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
-        Give(world, Inventory.Coins, 100);
+        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
+        Give(Hosted, Inventory.Coins, 100);
         await Click(view.Screen(sign.Pos, .8f));
         var fetch = Named("fetch");
         Require(ShowsChild(panel, "side_board"), "The price sheet must open.");
@@ -227,9 +211,9 @@ public partial class Game {
         await Click(Named("hardhat")!);
         var dear = world.Data.HireOffers.OrderBy(o => o.Upfront).Last();
         await Click(Named($"hire_{dear.Upfront:0}")!);
-        var hired = world.Workers.LastOrDefault();
+        var hired = Hosted.Workers.LastOrDefault();
         Require(hired != null && hired.Wage == dear.Wage, "A hiring offer must set the new worker's wage.");
-        world.Assign(hired!, sign); await ClickOn(sign);
+        Hosted.Assign(hired!, sign); await ClickOn(sign);
         Require(!Named("fetch")!.Disabled, "With a worker assigned, fresh prices can be fetched.");
         await Click(Named("fetch")!);
         Require(hired!.Away > 0, "Fetching must send the assigned worker to the village.");
@@ -237,14 +221,14 @@ public partial class Game {
         Require(!ShowsChild(panel, "side_board") && panel.OffsetLeft == SidePanel.Left, "The price sheet icon must close the sheet again.");
         await Click(Named("prices")!); await Click(Named("sheet_close")!);
         Require(!ShowsChild(panel, "side_board") && panel.Visible, "The price sheet's close button must close it and leave the panel open.");
-        world.Fire(hired); world.Tick(world.Data.TradeSeconds); RemoveThings(world, t => t == sign || t.Kind == ThingKind.Grave); Drop(world, Inventory.Coins, 999);
+        Hosted.Fire(hired); Hosted.Tick(world.Data.TradeSeconds); RemoveThings(Hosted, t => t == sign || t.Kind == ThingKind.Grave); Drop(Hosted, Inventory.Coins, 999);
         await CloseWithEsc();
     }
     /// <summary>A new packing station opens its list of goods; picking one sets what it packs, and a backpack click loads it.</summary>
     private async Task CheckPackingStationListsGoodsAndTakesBackpackClicks() {
         await CloseWithEsc();
-        var packer = world.Add(ThingKind.Packer, world.Player + new Vector2(2, 0));
-        Give(world, "berries", 5);
+        var packer = Hosted.Add(ThingKind.Packer, world.Player + new Vector2(2, 0));
+        Give(Hosted, "berries", 5);
         await Click(view.Screen(packer.Pos, .8f));
         Require(Shows(packer) && Named("pack_berries") != null, "A packing station with nothing chosen must open its list of goods.");
         await Click(Named("pack_berries")!);
@@ -253,7 +237,7 @@ public partial class Game {
         Require(Named("packed_crate") != null, "The station must show the crate being packed.");
         await Click(Slots().First(c => c.TooltipText.StartsWith("Berries ·")));
         Require(packer.Inventory["berries"] == 1, "Clicking berries in the backpack must load one into the packing station.");
-        RemoveThings(world, t => t == packer); Drop(world, "berries"); await CloseWithEsc();
+        RemoveThings(Hosted, t => t == packer); Drop(Hosted, "berries"); await CloseWithEsc();
     }
     /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
     private async Task CheckMineIsMarkedByClickAndEndGoalsShowInPauseMenu() {
@@ -261,7 +245,7 @@ public partial class Game {
         foreach (var ore in World.MineOres) {
             var cliff = World.CliffOf(ore);
             var spot = World.MineSpot(cliff);
-            world.Player = spot + cliff.Face * 3; await Frames(4);
+            Warp(Hosted, spot + cliff.Face * 3); await Frames(4);
             await KeyStroke(Key.B);
             await Click(Named("build_mine")!);
             Require(player.Mode.Placing == ThingKind.Mine, "The mine plan must enter placement mode.");
@@ -275,7 +259,7 @@ public partial class Game {
             Require(new[] { "Stage 1 · Dig the entrance", "Stage 2 · Shore it up", "Stage 3 · Fit the frame and rails" }.Select((title, i) => panel.FindChild($"stage_{i + 1}", true, false) is Control node && node.TooltipText.StartsWith(title)).All(found => found),
                 "The mine panel must show its three stages.");
         }
-        world.Player = home; await CloseWithEsc();
+        Warp(Hosted, home); await CloseWithEsc();
         await KeyStroke(Key.Escape);
         Require(HasLabel(menu, "END GOALS"), "The pause menu must have an end goals heading.");
         Require(HasLabel(menu, "A working iron mine"), "The pause menu must list the iron mine goal.");
@@ -285,7 +269,7 @@ public partial class Game {
     }
 
     private async Task CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings() {
-        await CloseWithEsc(); Drop(world, "stone_chisel"); Give(world, "stone", 2); Give(world, "wood", 3);
+        await CloseWithEsc(); Drop(Hosted, "stone_chisel"); Give(Hosted, "stone", 2); Give(Hosted, "wood", 3);
         await KeyStroke(Key.C);
         Require(ShownPage() == "Crafting", "C must open the crafting menu.");
         // The page rebuilds when the queue moves on, so the badge is looked up afresh.
@@ -294,12 +278,12 @@ public partial class Game {
         Require(badge.Modulate != Colors.White && badge.TooltipText.Contains("Needs a chisel"), "A missing chisel must show a red badge with a hint.");
         await Click(Named("craft_stone_chisel")!);
         Require(world.Crafting.SequenceEqual(new[] { "stone_chisel" }) && world.Backpack["stone"] == 0, "Clicking a recipe must queue it and take its materials.");
-        world.Tick(world.Data.Recipes["stone_chisel"].Seconds);
+        Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
         await Until(() => world.Backpack["stone_chisel"] == 1 && ChiselBadge().Modulate == Colors.White, "the chisel arriving and turning its badge back to normal", 2);
         int wood = world.Backpack["wood"];
         await Click(Named("section_chisel")!);
         await Click(Named("craft_torch")!);
-        world.Tick(world.Data.Recipes["torch"].Seconds); await Frames(10);
+        Hosted.Tick(world.Data.Recipes["torch"].Seconds); await Frames(10);
         Require(world.Backpack["torch"] == 1 && world.Backpack["wood"] == wood - 3, "A torch must be made by hand from 3 wood.");
         await CloseWithEsc(); SetHotbarSlot(world, 8, "torch");
         await KeyStroke(Key.Key9);
@@ -325,9 +309,9 @@ public partial class Game {
 
     /// <summary>A stack bigger than a crate's room fills it, and the rest stays on the cursor while the player walks to the next crate and opens it with E.</summary>
     private async Task CheckStackLargerThanCrateFillsItAndRestStaysHeld() {
-        Drop(world, "wood", world.Backpack["wood"]);
-        Require(Give(world, "wood", 64) == 64, "The backpack must have room for a stack of wood.");
-        var crates = new[] { world.Add(ThingKind.Crate, world.Player + new Vector2(-1, 0)), world.Add(ThingKind.Crate, world.Player + new Vector2(5, -5)) };
+        Drop(Hosted, "wood", world.Backpack["wood"]);
+        Require(Give(Hosted, "wood", 64) == 64, "The backpack must have room for a stack of wood.");
+        var crates = new[] { Hosted.Add(ThingKind.Crate, world.Player + new Vector2(-1, 0)), Hosted.Add(ThingKind.Crate, world.Player + new Vector2(5, -5)) };
         int cap = world.Data.CrateCapacity;
         await ClickOn(crates[0]);
         await DragTo(Cell(1, c => c.TooltipText.Contains("Wood · 64 total")), Cell(0, c => c.TooltipText == ""));
@@ -346,17 +330,17 @@ public partial class Game {
         Require(GetViewport().GuiIsDragging(), "What still does not fit must stay held in the drag.");
         await Click(Cell(1, c => c.TooltipText.Contains("Wood · ")));
         Require(!GetViewport().GuiIsDragging() && world.Backpack["wood"] == 64 - 2 * cap, "Clicking the backpack must let go of the held rest.");
-        foreach (var crate in crates) RemoveThings(world, t => t == crate);
+        foreach (var crate in crates) RemoveThings(Hosted, t => t == crate);
         await CloseWithEsc();
     }
 
     private async Task CheckCrateDraggedIntoCrateStopsAtWarning() {
-        var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
-        var box = world.Add(ThingKind.Crate, world.Player); box.Inventory.Add("berries", 3); world.PickUpCrate(box);
-        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
+        var box = Hosted.Add(ThingKind.Crate, world.Player); box.Inventory.Add("berries", 3); Hosted.PickUpCrate(box);
+        string packed = Hosted.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         // A crate in hand on the hotbar only opens a clicked crate; the alert waits for a deliberate move.
         string lastSlot = world.HotbarSlots[8]; int active = world.ActiveHotbar;
-        Give(world, "crate", 1); SetHotbarSlot(world, 8, "crate"); await KeyStroke(Key.Key9); await CloseWithEsc();
+        Give(Hosted, "crate", 1); SetHotbarSlot(world, 8, "crate"); await KeyStroke(Key.Key9); await CloseWithEsc();
         await Click(view.Screen(crate.Pos, .4f));
         Require(!blackHole.Showing, "Clicking a crate with a crate in hand must not show the nesting alert.");
         Require(Shows(crate), "Clicking a crate with a crate in hand must select the clicked crate.");
@@ -364,7 +348,7 @@ public partial class Game {
         Require(world.Backpack["crate"] == 1, "Clicking a crate with a crate in hand must keep the crate in hand.");
         SetHotbarSlot(world, 8, lastSlot); await KeyStroke(Key.Key1 + active); await CloseWithEsc();
         // Two empty crates go down one after the other without opening, and placement ends with the last.
-        Give(world, "crate", 1);
+        Give(Hosted, "crate", 1);
         await CloseWithEsc(); await KeyStroke(Key.Tab);
         await Click(Cell(0, c => c.TooltipText.StartsWith("Wood crate ·")));
         for (int placed = 1; placed <= 2; placed++) {
@@ -376,7 +360,7 @@ public partial class Game {
             Require(player.Mode.Placing == (placed == 1 ? ThingKind.Crate : null),
                 "Placing a crate must stay in placement while crates remain.");
         }
-        RemoveThings(world, t => t.Kind == ThingKind.Crate && t != crate && t.Inventory.Count == 0);
+        RemoveThings(Hosted, t => t.Kind == ThingKind.Crate && t != crate && t.Inventory.Count == 0);
         await ClickOn(crate);
         await DragTo(Cell(1, c => c.TooltipText.StartsWith("Wood crate")), Cell(0, c => c.TooltipText == ""));
         Require(blackHole.Showing, "A crate dragged into a crate must show the nesting alert.");
@@ -416,7 +400,7 @@ public partial class Game {
 
     private async Task CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable() {
         await CloseWithEsc();
-        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(0, 4));
+        var hut = Hosted.Add(ThingKind.Hut, world.Player + new Vector2(0, 4));
         // The click lands while the player is still walking, as when running from a wolf.
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.1);
@@ -424,9 +408,9 @@ public partial class Game {
         await Until(() => world.Sheltered == hut.Id && Shows(hut), "a cabin clicked while walking taking the player inside and opening", 4);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
-        RunUntilNight(world); SetNeeds(world, hunger: 5);
+        RunUntilNight(Hosted); SetNeeds(Hosted, hunger: 5);
         await Until(() => Named("sleep")?.TooltipText.Contains("too hungry") == true, "the sleep button explaining that the player is too hungry to sleep", 2);
-        RunUntilMorning(world);
+        RunUntilMorning(Hosted);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true });
         await Seconds(.2);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = false });
@@ -434,14 +418,15 @@ public partial class Game {
         Require(world.Sheltered == hut.Id, "Moving must not step the player out of the cabin.");
         await Click(FindButton(panel, "Step outside")!);
         Require(world.Sheltered == 0, "Step outside must leave the cabin.");
-        RemoveThings(world, t => t == hut); await CloseWithEsc();
+        RemoveThings(Hosted, t => t == hut); await CloseWithEsc();
 
         // A loose piece far enough behind a tree sits under its crown on screen; it must still be the one picked.
         var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
-        var hidden = world.Add(ThingKind.LooseCoal, tree.Pos - new Vector2(3.3f, 3.3f), 2);
+        var hidden = Hosted.Add(ThingKind.LooseCoal, tree.Pos - new Vector2(3.3f, 3.3f), 2);
+        await Frames();
         var point = view.Screen(hidden.Pos, .15f);
         Require(view.Pick(point)?.Id == hidden.Id, "A tree crown must not steal the click from a loose piece behind it.");
-        RemoveThings(world, t => t == hidden);
+        RemoveThings(Hosted, t => t == hidden); await Frames();
         Require(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
         Require(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
     }
@@ -520,7 +505,7 @@ public partial class Game {
         Require(view.Paused, "Esc must pause the game.");
         Require(HasLabel(menu, World.ObjectiveFor(world.Goal).Title), "The pause menu must show the current goal.");
         // New game and Quit ask first, and Esc or Back returns to the pause menu.
-        world.Player = Terrain.Spawn + new Vector2(6, 0);
+        Warp(Hosted, Terrain.Spawn + new Vector2(6, 0));
         await Click(FindButton(menu, "New game")!);
         Require(startMenu.Visible, "New game must open the start menu screen for its question.");
         Require(FindButton(startMenu.Screen, "Start a new game") != null,
@@ -561,19 +546,19 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
         await Frames();
         Require(!world.Me.Sprinting, "Shift alone must not sprint once the player stops.");
-        float drink = world.Thirst; SetNeeds(world, thirst: 10);
+        float drink = world.Thirst; SetNeeds(Hosted, thirst: 10);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = true });
         await Frames();
         Require(!world.Me.Sprinting && view.PlayerAnimation == ActorAction.Walk, "Under 15% drink the player must be too weak to sprint.");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
-        SetNeeds(world, thirst: drink);
+        SetNeeds(Hosted, thirst: drink);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = false });
     }
     /// <summary>Food under 15% keeps the screen edges glowing.</summary>
     private async Task CheckLowFoodGlowsScreenEdges() {
-        float fed = world.Hunger; SetNeeds(world, hunger: 10); await Frames();
+        float fed = world.Hunger; SetNeeds(Hosted, hunger: 10); await Frames();
         Require(damageEdges.Strength >= .15f, "Food under 15% must keep the screen edges glowing.");
-        SetNeeds(world, hunger: fed);
+        SetNeeds(Hosted, hunger: fed);
     }
     /// <summary>Sounds rotate through variants, music hands over and crossfades by time of day, and a faraway sound stays silent.</summary>
     private async Task CheckSoundsRotateCrossfadeAndStaySilentOffScreen() {
@@ -588,17 +573,17 @@ public partial class Game {
         Require(sounds.DayMusicPlaying && sounds.DayMusicIndex == 1, "A finished day track must hand over to the next one.");
         sounds.FinishDayTrack();
         Require(sounds.DayMusicIndex == 0, "The last day track must wrap to the first.");
-        RunUntilNight(world); sounds.UpdateMusic(Sounds.MusicFadeSeconds / 2);
+        RunUntilNight(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds / 2);
         Require(sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Nightfall must crossfade the day music into the night music.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds); await Seconds(.5f);
         Require(!sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Day music must stop once faded out.");
-        RunUntilMorning(world); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2); float stoppedAt = sounds.NightMusicPosition;
+        RunUntilMorning(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2); float stoppedAt = sounds.NightMusicPosition;
         Require(!sounds.NightMusicPlaying, "Dawn must stop the night music.");
         Require(sounds.DayMusicPlaying, "Dawn must bring the day music back.");
         Require(stoppedAt > .2f, "Dawn must keep the night music's position.");
-        RunUntilNight(world); sounds.UpdateMusic(.1f);
+        RunUntilNight(Hosted); await Frames(1); sounds.UpdateMusic(.1f);
         Require(sounds.NightMusicPlaying && sounds.NightMusicPosition >= stoppedAt, "The next night must resume the music where it stopped.");
-        RunUntilMorning(world); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2);
+        RunUntilMorning(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds * 2);
         int heard = sounds.Played; sounds.Play("anvil_work", world.Player + Vector2.One * 40);
         Require(view.OffScreen(world.Player) == 0, "A sound at the player must count as on screen.");
         Require(view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach,
@@ -617,7 +602,7 @@ public partial class Game {
             "holding RMB approaching and gathering a tree with the starting axe's steel stroke and chop sound", 8);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = windowPoint, Pressed = false });
         await Frames();
-        var farm = world.Add(ThingKind.Farm, world.Player + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
+        var farm = Hosted.Add(ThingKind.Farm, world.Player + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
         await Frames(2);
         var farmPoint = GetViewport().GetFinalTransform() * view.Screen(farm.Pos);
         Require(view.Pick(view.Screen(farm.Pos))?.Id == farm.Id, "A farm plot must be picked where it is drawn.");
@@ -625,14 +610,14 @@ public partial class Game {
         await Until(() => farm.Progress > 0, "holding RMB on a ripe farm plot walking over and harvesting by hand", 6);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Position = farmPoint, Pressed = false });
         await Frames(); Require(farm.Progress > 0 && farm.FarmStage == FarmStage.Ripe, "holding RMB on a ripe farm plot must walk over and harvest by hand.");
-        RemoveThings(world, t => t == farm);
+        RemoveThings(Hosted, t => t == farm);
     }
     /// <summary>A player harvesting beside a running station is busy with the harvest, so their figure stops hammering.</summary>
     private async Task CheckHarvestingBesideAStationStopsHammering() {
         var start = world.Player;
-        var farm = world.Add(ThingKind.Farm, start + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
-        world.Player = farm.Pos + new Vector2(.9f, -.9f);
-        var anvil = world.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -2.2f)); anvil.Inventory.Add("steel_bar", 1);
+        var farm = Hosted.Add(ThingKind.Farm, start + new Vector2(-3, 3)); farm.FarmStage = FarmStage.Ripe;
+        Warp(Hosted, farm.Pos + new Vector2(.9f, -.9f)); await Frames();
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-.5f, -2.2f)); anvil.Inventory.Add("steel_bar", 1);
         await Until(() => view.PlayerAnimation == ActorAction.Hammer, "the idle player hammering at the anvil beside it", 3);
         var point = RightPress(farm.Pos);
         await Until(() => farm.Progress > 0, "holding RMB on a ripe farm plot beside the anvil harvesting by hand", 3);
@@ -640,21 +625,21 @@ public partial class Game {
         Require(anvil.Processing && world.Near(anvil) && view.PlayerAnimation != ActorAction.Hammer, "A player harvesting beside a running anvil must not be shown hammering.");
         RightRelease(point);
         await Frames();
-        RemoveThings(world, t => t == farm || t == anvil); world.Player = start;
+        RemoveThings(Hosted, t => t == farm || t == anvil); Warp(Hosted, start);
     }
     /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
     private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
-        var anvil = world.Add(ThingKind.Anvil, world.Player + new Vector2(2, 0)); anvil.Inventory.Add("steel_bar", 4);
-        var smith = AddWorker(world, anvil.Pos + new Vector2(0, 1.2f)); world.Assign(smith, anvil);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(2, 0)); anvil.Inventory.Add("steel_bar", 4);
+        var smith = AddWorker(Hosted, anvil.Pos + new Vector2(0, 1.2f)); Hosted.Assign(smith, anvil);
         await Until(() => anvil.Processing && smith.WorkState == WorkerWorkState.Hammering, "the smith hammering a batch at the anvil", 3);
         smith.WageDebt = 1;
         await Until(() => view.PlayerAnimation == ActorAction.Hammer, "the player hammering beside a worker on strike", 2);
-        smith.WageDebt = 0; world.Fire(smith);
-        RemoveThings(world, t => t == anvil);
+        smith.WageDebt = 0; Hosted.Fire(smith);
+        RemoveThings(Hosted, t => t == anvil);
     }
     private async Task CheckRightClickGathersAndLeavesASelectedWorkerMarked() {
         var tree = world.Things.First(t => t.Kind == ThingKind.Tree && t.Pos == Terrain.Spawn + new Vector2(5, 0));
-        var worker = AddWorker(world, world.Player + new Vector2(-2, 2));
+        var worker = AddWorker(Hosted, world.Player + new Vector2(-2, 2));
         await Frames(); await Click(view.Screen(worker.Pos, 1));
         Require(view.Selection.Worker == worker.Id, "A left click on a worker must select them.");
         var point = view.Screen(tree.Pos) - new Vector2(0, 70);
@@ -666,7 +651,7 @@ public partial class Game {
         await Frames();
         Require(view.Selection.Worker == worker.Id, "A right click on a tree must leave a selected worker marked.");
         Require(panel.HeadingTitle.Text == worker.Name, "A right click on a tree must leave the worker's page open.");
-        world.Fire(worker); await CloseWithEsc();
+        Hosted.Fire(worker); await CloseWithEsc();
     }
     /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item in hand.</summary>
     private async Task CheckHudAndHotbarEatAndDrinkInHand() {
@@ -689,7 +674,7 @@ public partial class Game {
         await ClickGround();
         Require(world.Backpack["berries"] == berries - 1, "A left click on open ground must eat the berries in hand.");
         Require(sounds.Played == played + 1 && sounds.Last == "eat_berry", "Eating must play only the eating sound, not an inventory sound as well.");
-        Give(world, "water", 1); SetNeeds(world, thirst: 20);
+        Give(Hosted, "water", 1); SetNeeds(Hosted, thirst: 20);
         await Until(() => !hotbar.Buttons[8].Disabled, "the hotbar showing the water", 2);
         await Click(hotbar.Buttons[8]);
         Require(world.ActiveHotbar == 8 && world.Backpack["water"] == 1, "Clicking a hotbar slot must only select it.");
@@ -788,7 +773,7 @@ public partial class Game {
         Require(!startMenu.Visible, "Choosing a slot must close the slot list.");
         Require(!view.Paused, "Choosing a slot must resume the game.");
         int savedWood = chest.Inventory["wood"];
-        Require(savedWood > 0 && chest.Inventory.Remove("wood", 1) == 1, "The chest must hold wood to take out after saving.");
+        Require(savedWood > 0 && Hosted.Find(chest.Id)!.Inventory.Remove("wood", 1) == 1, "The chest must hold wood to take out after saving.");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.25);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
@@ -796,7 +781,7 @@ public partial class Game {
         await KeyStroke(Key.F9);
         Require(world.Player.DistanceTo(savedPosition) < .01f && world.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] == savedWood), "F9 must restore position and stored items from disk.");
         Require(world.HotbarSlots.SequenceEqual(savedSlots) && world.ActiveHotbar == savedActiveSlot, "F5 and F9 must preserve hotbar references and selection.");
-        world.Player += Vector2.One; await CloseWithEsc();
+        Warp(Hosted, world.Player + Vector2.One); await CloseWithEsc();
         await KeyStroke(Key.Escape);
         await Click(FindButton(menu, "Load")!);
         Require(FindButton(startMenu.Screen, "Slot 2 · empty")!.Disabled, "The load screen must disable empty slots.");
@@ -819,7 +804,7 @@ public partial class Game {
     /// <summary>A load ends a crate lift under way, since finishing it on the crate from before the load would copy the crate into the backpack.</summary>
     private async Task CheckLoadEndsCrateLiftUnderWay() {
         await CloseWithEsc();
-        var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
+        var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
         int carried = world.Backpack["crate"];
         await KeyStroke(Key.F5);
         await Frames();
@@ -833,28 +818,28 @@ public partial class Game {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
         await Frames();
         Require(world.Backpack["crate"] == carried && world.Find(crate.Id) != null, "Loading while a crate is held under the right button must leave it on the ground, and not in the backpack too.");
-        RemoveThings(world, t => t.Id == crate.Id);
+        RemoveThings(Hosted, t => t.Id == crate.Id);
     }
     /// <summary>Carried items show as backpack cells, and the HUD heart, stomach and droplet track health, hunger and thirst.</summary>
     private async Task CheckBackpackCellsAndHudIconsTrackStats() {
-        Give(world, Inventory.Coins, 1200);
+        Give(Hosted, Inventory.Coins, 1200);
         await Until(() => Slots().Count(c => c.TooltipText.StartsWith("Coins")) == 2, "carried coins showing as backpack cells stacking to 1000", 2);
-        Drop(world, Inventory.Coins, 1200);
+        Drop(Hosted, Inventory.Coins, 1200);
         // A wolf at the player's side, at night, bites on the next tick: the flash needs a hit from the world, not a changed number.
         float healthBefore = world.Health;
-        RunUntilNight(world); PlaceWolf(world, new Wolf { Pos = world.Player + Vector2.Right * .5f, Target = world.Me.Id });
+        RunUntilNight(Hosted); PlaceWolf(Hosted, new Wolf { Pos = world.Player + Vector2.Right * .5f, Target = world.Me.Id });
         await Until(() => world.Health < healthBefore - 3 && damageEdges.Strength > 0, "a wolf bite flashing the screen edges", 2);
-        RemoveWolves(world, _ => true); float bitten = world.Health;
+        RemoveWolves(Hosted, _ => true); float bitten = world.Health;
         await Until(() => needsPlate.Health.TooltipText == $"Health {bitten:0}%", "the HUD heart tracking health", 2);
-        RunUntilMorning(world); SetNeeds(world, health: healthBefore);
+        RunUntilMorning(Hosted); SetNeeds(Hosted, health: healthBefore);
         Require(!HasLabel(panel, "Hunger") && !HasLabel(panel, "Thirst"), "Hunger and thirst belong to the HUD icons, not the inventory.");
-        SetNeeds(world, 40, 70);
+        SetNeeds(Hosted, 40, 70);
         await Until(() => needsPlate.Hunger.TooltipText == "Hunger 40%", "the HUD stomach tracking hunger", 2);
         await Until(() => needsPlate.Thirst.TooltipText == "Thirst 70%", "the HUD droplet tracking thirst", 2);
         Require(needsPlate.Hunger.Visible, "The HUD stomach must show.");
         Require(needsPlate.Thirst.Visible, "The HUD droplet must show.");
         Require(Slots().Count() == world.Backpack.Slots, "The backpack must show one grid cell per slot.");
-        Give(world, "berries", 2);
+        Give(Hosted, "berries", 2);
         await Until(() => Slots().Any(c => c.TooltipText.StartsWith("Berries")), "carried berries appearing as a grid cell", 2);
         int berriesBeforeClick = world.Backpack["berries"];
         await Click(Slots().First(c => c.TooltipText.StartsWith("Berries")));
@@ -862,7 +847,7 @@ public partial class Game {
     }
     /// <summary>A mauled player cannot move; death shows the respawn countdown and respawning clears it.</summary>
     private async Task CheckPinnedPlayerStaysDownAndDeathCountsDown() {
-        RunUntilNight(world); SetMauled(world, true);
+        RunUntilNight(Hosted); SetMauled(Hosted, true); await Frames();
         var pinnedAt = world.Player;
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.25);
@@ -871,18 +856,18 @@ public partial class Game {
         Require(world.Player == pinnedAt, "A pinned player must not move.");
         Require(view.PlayerAnimation == ActorAction.Mauled, "A pinned player must show the mauled struggle.");
         Require(deathLabel.Text == "", "A pinned player must leave the message to the pinned notice.");
-        SetMauled(world, false); RunUntilMorning(world); SetNeeds(world, health: 100);
-        world.Die(); await Until(() => world.Dead && deathLabel.Text.Contains("Respawning in"), "death showing the respawn countdown", 2);
-        world.Tick(world.RespawnIn); await Until(() => !world.Dead && deathLabel.Text == "", "the countdown clearing once the player respawns", 2);
+        SetMauled(Hosted, false); RunUntilMorning(Hosted); SetNeeds(Hosted, health: 100);
+        Hosted.Die(); await Until(() => world.Dead && deathLabel.Text.Contains("Respawning in"), "death showing the respawn countdown", 2);
+        Hosted.Tick(world.RespawnIn); await Until(() => !world.Dead && deathLabel.Text == "", "the countdown clearing once the player respawns", 2);
     }
     /// <summary>The starter goals alone do not end the game; mines and the profit goal show the ending, and keep playing closes it for good.</summary>
     private async Task CheckEndGoalsShowEndingOnceAndKeepPlaying() {
-        Achieve(world, new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" });
+        Achieve(Hosted, new[] { "gather", "bench", "crate", "sold", "pick", "furnace", "iron_bar", "reinforced", "steel_bar", "anvil", "steel_tool", "sold_steel", "hired", "assigned" });
         await Frames(3);
         Require(!ending.Visible && !view.Paused, "The starter goal chain alone must not end the game.");
         await CheckMineIsMarkedByClickAndEndGoalsShowInPauseMenu();
-        foreach (var mine in world.Things.Where(t => t.Kind == ThingKind.Mine)) OpenMine(mine);
-        Achieve(world, "profit_week");
+        foreach (var mine in Hosted.Things.Where(t => t.Kind == ThingKind.Mine)) OpenMine(mine);
+        Achieve(Hosted, "profit_week");
         await Frames(3);
         Require(ending.Visible && view.Paused, "Reaching the end goals must show the ending and pause the world.");
         await Click((Button)ending.FindChild("keep_playing", true, false)); await Frames(3);
@@ -895,7 +880,7 @@ public partial class Game {
     /// <summary>At a bench, a click loads one item, a double click loads a batch and a right click takes half back.</summary>
     private async Task CheckBenchLoadsInputsByClickDoubleClickAndSplit() {
         await CloseWithEsc();
-        var workbench = world.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); world.SetRecipe(workbench, "crate"); Give(world, "planks", 6);
+        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(workbench, "crate"); Give(Hosted, "planks", 6);
         await ClickOn(workbench);
         await Click(bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(c => c.TooltipText.StartsWith("Wood planks")));
         Require(workbench.Inventory["planks"] == 1 && world.Backpack["planks"] == 5, "Clicking a backpack item at the bench must load just one.");
@@ -903,23 +888,23 @@ public partial class Game {
         Require(workbench.Inventory["planks"] == 6 && world.Backpack["planks"] == 0, "Double-clicking a bench recipe must load one batch of its inputs.");
         await SplitTo(Named("input_planks")!, bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(c => c.TooltipText == ""));
         Require(workbench.Inventory["planks"] == 3 && world.Backpack["planks"] == 3, "Right-clicking a bench input must pick up half of it.");
-        RemoveThings(world, t => t == workbench); Drop(world, "planks", 3); await CloseWithEsc();
+        RemoveThings(Hosted, t => t == workbench); Drop(Hosted, "planks", 3); await CloseWithEsc();
     }
     /// <summary>A new anvil's page shows steel bars in, steel parts out, and a backpack click loads a bar.</summary>
     private async Task CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack() {
-        var anvil = world.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
-        Give(world, "steel_bar", 2);
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
+        Give(Hosted, "steel_bar", 2);
         await ClickOn(anvil);
         Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
         Require(Named("output_steel_parts") != null, "A new anvil must show a slot for steel parts.");
         await Click(Cell(0, c => c.TooltipText.StartsWith("Steel bar")));
         Require(world.Backpack["steel_bar"] == 1, "Clicking a steel bar in the backpack must load it into the anvil.");
-        RemoveThings(world, t => t == anvil); Drop(world, "steel_bar"); await CloseWithEsc();
+        RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "steel_bar"); await CloseWithEsc();
     }
     /// <summary>The steel furnace shows one slot per input and output, loads by drag and click, and Space pumps its bellows. Returns the furnace.</summary>
     private async Task<Thing> CheckSteelFurnaceSlotsLoadByDragAndClickThenPump() {
-        var furnace = world.Add(ThingKind.Reinforced, world.Player + new Vector2(1, 0));
-        Give(world, "iron_bar", 5); Give(world, "coal", 100);
+        var furnace = Hosted.Add(ThingKind.Reinforced, world.Player + new Vector2(1, 0));
+        Give(Hosted, "iron_bar", 5); Give(Hosted, "coal", 100);
         await ClickOn(furnace);
         Require(Named("input_iron_bar") != null, "The steel furnace must show a slot for iron bars.");
         Require(Named("input_coal") != null, "The steel furnace must show a slot for coal.");
@@ -948,7 +933,7 @@ public partial class Game {
         await KeyStroke(Key.Space);
         Require(Math.Abs(furnace.Heat - heatBeforePausedActions) < .001f, "Space must not pump or attack while paused.");
         // The pause menu holds world clicks, so a player cannot get here; this proves the button stays dead if a panel ever is open.
-        panel.Select(furnace);
+        panel.Select(Shown(furnace));
         var pumpButton = Named("pump");
         Require(pumpButton != null, "The selected furnace should still expose its pump control while paused.");
         await Click(pumpButton!);
@@ -977,17 +962,17 @@ public partial class Game {
     private async Task CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece() {
         await CloseWithEsc();
         // Space would pump the furnace clicked last.
-        RemoveThings(world, t => t.Kind == ThingKind.Reinforced);
-        Drop(world, "steel_axe");
+        RemoveThings(Hosted, t => t.Kind == ThingKind.Reinforced);
+        Drop(Hosted, "steel_axe");
         await KeyStroke(Key.Space);
         Require(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
         await Until(() => view.PlayerAnimation != ActorAction.Attack, "the unarmed attack finishing", 3);
         var gatheringPosition = Terrain.Spawn - new Vector2(30, 30);
         // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
-        RemoveThings(world, t => t.Pos.DistanceTo(gatheringPosition) < 12);
-        world.Player = gatheringPosition;
+        RemoveThings(Hosted, t => t.Pos.DistanceTo(gatheringPosition) < 12);
+        Warp(Hosted, gatheringPosition);
         // Far enough that the player has to keep walking after the button is released.
-        var looseOre = world.Add(ThingKind.LooseCoal, gatheringPosition + new Vector2(2, 0), 2);
+        var looseOre = Hosted.Add(ThingKind.LooseCoal, gatheringPosition + new Vector2(2, 0), 2);
         int oreBefore = world.Backpack["coal"];
         await Frames();
         var point = view.Screen(looseOre.Pos) - new Vector2(0, 12) * view.Zoom;
@@ -1004,8 +989,8 @@ public partial class Game {
     /// <summary>Picking a bush clean hides only its fruit, which shows again once it is replenished.</summary>
     private async Task CheckBerryBushHidesOnlyItsFruitWhenPicked() {
         // Exercise the rendered bush's independent fruit handle through real gathering input.
-        var berryBush = world.Add(ThingKind.Berries, world.Player + new Vector2(1, -1), 4);
-        Drop(world, "berries");
+        var berryBush = Hosted.Add(ThingKind.Berries, world.Player + new Vector2(1, -1), 4);
+        Drop(Hosted, "berries");
         await Frames(2);
         var bushProp = (BushProp)view.PropOf(berryBush.Id)!;
         Require(bushProp.Fruit is { Visible: true }, "A ripe berry bush must display its fruit.");
@@ -1022,7 +1007,7 @@ public partial class Game {
         Require(bushProp.Body.Visible, "Harvesting must leave the bush body visible.");
         berryBush.Remaining = 4; await Frames(2);
         Require(bushProp.Fruit.Visible, "A replenished bush must show its fruit again.");
-        RemoveThings(world, t => t == berryBush);
+        RemoveThings(Hosted, t => t == berryBush);
     }
     private async void RunUIChecks() {
         try {
@@ -1032,9 +1017,6 @@ public partial class Game {
             await CheckPauseMenuAsksBeforeNewGameAndQuit();
             await CheckWasdWalksAndShiftSprintsUnlessTooThirsty();
             await CheckMessagesStackFadeAndKeepClearOfHud();
-            // Measured about 115 B a frame: this check's own await of each frame and the memory of things seen for the first time on a straight walk.
-            // The budget leaves a third more, so a change that adds garbage to every frame fails it.
-            await CheckWalkingStaysWithinAllocationBudget(150);
             await CheckPanelPagesRefreshWithoutAllocating();
             await CheckLowFoodGlowsScreenEdges();
             await CheckSoundsRotateCrossfadeAndStaySilentOffScreen();

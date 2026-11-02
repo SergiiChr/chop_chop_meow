@@ -12,7 +12,7 @@ public partial class PilePanel(PageTools tools, Thing subject) : ThingPage(tools
         headingTitle.Text = thing.Compost ? "Compost" : thing.Inventory.First() is string held ? $"Pile · {world.Data.Name(held).ToLowerInvariant()}" : "Pile";
         if (thing.Compost) { headingIcon.Texture = Icons.Of("leaves"); headingIcon.Visible = true; }
         var compost = new CheckButton { ButtonPressed = thing.Compost, FocusMode = Control.FocusModeEnum.None, TooltipText = "Compost: turns leaves, grass and food into fertilizer", Name = "compost" };
-        compost.Toggled += on => { if (!world.SetCompost(thing, on)) compost.SetPressedNoSignal(thing.Compost); else Redraw(); };
+        compost.Toggled += on => { if (!world.SetCompost(thing, on)) compost.SetPressedNoSignal(thing.Compost); };
         panel.AddToHeader(compost);
         if (thing.Compost) FilterButton();
         else HeaderAction("stash", "Store everything this pile takes", () => moves.StoreAll(thing, moves.Materials), Style.ActionRound, "deposit");

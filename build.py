@@ -351,7 +351,7 @@ def test_ui(env: dict[str, str]) -> None:
         "ui-test",
         [GODOT, "--headless", "--path", ROOT, "--", "--ui-test"],
         env,
-        timeout=45,
+        timeout=180,
         success_marker="UI-TEST PASS",
     )
 

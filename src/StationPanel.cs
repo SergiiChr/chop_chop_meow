@@ -20,7 +20,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         var row = Row(); row.AddThemeConstantOverride("separation", 10);
         foreach (string id in recipes) {
             var r = world.Data.Recipes[id];
-            var pick = kit.Button("", () => { world.SetRecipe(thing, id); Redraw(); }); pick.Name = $"recipe_{id}";
+            var pick = kit.Button("", () => world.SetRecipe(thing, id)); pick.Name = $"recipe_{id}";
             pick.Icon = Icons.Of(r.Output); pick.ExpandIcon = true; pick.AddThemeConstantOverride("icon_max_width", 30); pick.CustomMinimumSize = new Vector2(48, 48);
             pick.TooltipText = r.Name;
             var look = id == thing.Recipe ? Style.TabActive : Style.TabRound;

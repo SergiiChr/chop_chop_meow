@@ -13,6 +13,23 @@ public partial class Game {
         foreach (var path in Enumerable.Range(0, Saves.SlotCount + 1).Select(Saves.SlotPath).Append(Settings.Path).Concat(signals)) DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(path));
     }
 
+    /// <summary>
+    /// Passes everything on the line to the server inside this window and brings its answer back, at once.
+    /// The UI checks do this rather than wait, so they keep to their time limit: they check what happens, and network and server checks check how long it takes.
+    /// </summary>
+    private void Settle() {
+        if (!Launch.Has("--ui-test") || hosted is not Server server) return;
+        ulong until = Time.GetTicksMsec() + 5000;
+        do {
+            Multiplayer.Poll(); server.Multiplayer.Poll();
+            server.Net.SendUpdates();
+            server.Multiplayer.Poll(); Multiplayer.Poll();
+        } while ((net.Connecting || net.ShownUpdate != server.Net.LastUpdate) && Time.GetTicksMsec() < until);
+    }
+
+    /// <summary>This window's copy of something a check placed on the server.</summary>
+    private Thing Shown(Thing thing) => world.Find(thing.Id) ?? throw new InvalidOperationException($"This window does not show the {thing.Kind}.");
+
     /// <summary>Another port for the guest to join on, such as a proxy that adds lag: --net-check guest --port 24575.</summary>
     private static int CheckPort => Launch.Value("--port") is string port ? int.Parse(port) : Net.DefaultPort;
 

@@ -113,7 +113,7 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
             var place = Style.Text(world.Data.Name(at.Kind), 15, Style.Ink); place.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(place);
             int colour = System.Array.IndexOf(world.Jobs(at), d.Job);
             var tag = Style.Pill(JobRow.Title(d.Job), Style.Tag(Style.JobColors[System.Math.Max(0, colour) % Style.JobColors.Length]), Style.Rim, 13); tag.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; row.AddChild(tag);
-            var drop = kit.HeaderButton("close", "Take this job away", () => { world.SetDuty(w, at, duty.Job, false); Redraw(); }, Style.CloseRound, $"drop_{d.Job}_{at.Id}");
+            var drop = kit.HeaderButton("close", "Take this job away", () => world.SetDuty(w, at, duty.Job, false), Style.CloseRound, $"drop_{d.Job}_{at.Id}");
             drop.CustomMinimumSize = new Vector2(30, 30); drop.AddThemeConstantOverride("icon_max_width", 14); row.AddChild(drop);
         }
         if (first) {
@@ -122,7 +122,7 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
         }
         var buttons = Row(); buttons.AddThemeConstantOverride("separation", 12);
         buttons.AddChild(kit.BigButton("Gather…", Style.Sage, () => { panel.Player.Mode = new ClickMode.Assign(w.Id); panel.Close(); kit.Refresh(); }));
-        buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => { world.Assign(w, null); Redraw(); }));
+        buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => world.Assign(w, null)));
         buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); panel.Open(Page.Crew); }));
         if (w.WageDebt > 0) AddChild(kit.BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));
     }

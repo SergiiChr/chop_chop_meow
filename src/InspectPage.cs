@@ -53,6 +53,13 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         Headline();
         Reach();
         Body();
+        WatchLayout();
+    }
+
+    /// <summary>What sets which pieces the page has changes on the server, so the page is drawn again when that comes back.</summary>
+    private void WatchLayout() {
+        var drawn = (thing.Packs, thing.Recipe, thing.Compost);
+        live.Watch(() => (thing.Packs, thing.Recipe, thing.Compost), now => { if (now != drawn) RedrawLater(); });
     }
 
     /// <summary>What this kind of thing shows under its name.</summary>

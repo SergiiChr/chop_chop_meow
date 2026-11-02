@@ -41,7 +41,7 @@ public partial class Net : Node {
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
-    private const int Protocol = 6;
+    private const int Protocol = 7;
     /// <summary>Furthest anything glides; anything further jumps.</summary>
     private const float MaxStep = 3;
     /// <summary>Updates both sides remember, about six seconds' worth; a player that confirmed none of the last this many gets the whole world again.</summary>
@@ -56,6 +56,8 @@ public partial class Net : Node {
     public World World = null!;
     /// <summary>The key this machine joins with, which the server's world stores its player under.</summary>
     public string Key = "";
+    /// <summary>Seconds after an action that its answer should arrive in, on anything but a very slow line.</summary>
+    private const float AnswerSeconds = .3f;
     /// <summary>Tells this window from another on the same machine, which has the same key.</summary>
     private static readonly int Window = OS.GetProcessId();
     /// <summary>Seconds a dropped guest keeps trying to get back in; the network check shortens it to see a guest give up.</summary>
@@ -82,8 +84,8 @@ public partial class Net : Node {
     // Guest: time left to get back in after a drop, the pause before the next try and the seconds last shown.
     private float reconnectLeft, retryIn;
     private int shownLeft;
-    private bool welcomed, leaving, farewell;
-    private float sendClock;
+    private bool welcomed, leaving, farewell, comingBack;
+    private float sendClock, answerLeft;
     // Guest: counts what it sends, so the host can tell a position report from before an action.
     private int stamp;
     private SceneTreeTimer? connectTimer;
@@ -127,9 +129,15 @@ public partial class Net : Node {
     /// <summary>The port of the game this window joined.</summary>
     public int Port => port;
     /// <summary>This window started the server it plays on, so it saves, loads and opens the game to others.</summary>
-    public bool Owning { get; set; }
+    public bool Owning { get; private set; }
     /// <summary>The owner has opened the game to other players.</summary>
     public bool Opened { get; private set; }
+    /// <summary>An action went out just now, so the screen should show its answer as soon as it comes.</summary>
+    public bool AwaitingAnswer => answerLeft > 0;
+    /// <summary>Server: the last update sent.</summary>
+    public int LastUpdate => sequence;
+    /// <summary>The update this window's copy shows.</summary>
+    public int ShownUpdate => appliedSequence;
     /// <summary>Server: whether every player has a menu open, which holds the world still.</summary>
     public bool Held {
         get {
@@ -168,18 +176,18 @@ public partial class Net : Node {
 
     /// <param name="ip">The server's address.</param>
     /// <param name="port">The server's port.</param>
-    /// <param name="patience">Seconds to wait for it to answer; a server this window just started needs longer than one already running.</param>
-    public Error Join(string ip, int port, float patience = ConnectTimeout) {
+    /// <param name="own">It is the server this window started.</param>
+    public Error Join(string ip, int port, bool own = false) {
         Disconnect();
         var peer = new ENetMultiplayerPeer();
         var error = peer.CreateClient(ip, port);
         if (error != Error.Ok) return error;
         if (peer.GetPeer(ServerId) is { } host) TolerateLag(host);
         Multiplayer.MultiplayerPeer = peer;
-        Address = ip; this.port = port;
+        Address = ip; this.port = port; Owning = own;
         // The connect attempt itself would wait out the whole lag timeout; a host that never answers fails sooner.
-        var timer = GetTree().CreateTimer(patience); connectTimer = timer;
-        timer.Timeout += () => { if (timer == connectTimer && Connecting) Fail($"The host didn't answer within {patience:0} seconds."); };
+        var timer = GetTree().CreateTimer(ConnectTimeout); connectTimer = timer;
+        timer.Timeout += () => { if (timer == connectTimer && Connecting) Fail($"The host didn't answer within {ConnectTimeout:0} seconds."); };
         return Error.Ok;
     }
 
@@ -189,14 +197,21 @@ public partial class Net : Node {
         Disconnect();
     }
 
+    /// <summary>Leaves this window's own game for another one, and its server stays up a while in case the player comes back.</summary>
+    public void StepAway() {
+        comingBack = true;
+        Leave();
+        comingBack = false;
+    }
+
     /// <summary>Closes the line and clears what belonged to it, keeping any tries to get back in going.</summary>
     private void Disconnect() {
         if (leaving) return;
         leaving = true;
         if (welcomed && Multiplayer.MultiplayerPeer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Connected) {
             // Actions already sent arrive before this, so the player the server keeps has them all.
-            farewell = false; RpcId(ServerId, MethodName.Bye);
-            // The owner's server closes instead of answering, so the line going tells that window it is done.
+            farewell = false; RpcId(ServerId, MethodName.Bye, comingBack);
+            // The owner's server closes instead of answering, unless they are coming back, so the line going tells that window it is done.
             for (ulong until = Time.GetTicksMsec() + FarewellMsec; !farewell && Multiplayer.MultiplayerPeer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Connected && Time.GetTicksMsec() < until; OS.DelayMsec(5)) Multiplayer.Poll();
         }
         if (Online) Multiplayer.MultiplayerPeer.Close();
@@ -297,8 +312,10 @@ public partial class Net : Node {
     private bool Local(int id) => Multiplayer.MultiplayerPeer is ENetMultiplayerPeer enet && enet.GetPeer(id)?.GetRemoteAddress() is "127.0.0.1" or "::1";
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Bye() {
+    private void Bye(bool comingBack) {
         if (!Hosting || Guest() is not PlayerState p) return;
+        // The owner's next hello makes them the owner again.
+        if (comingBack && p.Id == ownerId) ownerId = 0;
         if (p.Id != ownerId) RpcId(p.Id, MethodName.Farewell);
         Forget(p.Id);
     }
@@ -342,6 +359,7 @@ public partial class Net : Node {
 
     public override void _Process(double delta) {
         if (Retrying) Retry((float)delta);
+        answerLeft -= (float)delta;
         if (!Online) return;
         float dt = Math.Min((float)delta, .1f);
         foreach (var (owner, goal) in goals) Place(owner, Glide(Position(owner), goal, dt));
@@ -352,7 +370,7 @@ public partial class Net : Node {
         if (Hosting && sendClock >= SnapshotInterval) {
             // Only the remainder is dropped: starting again from zero would lose a frame's worth and send far fewer updates.
             sendClock %= SnapshotInterval;
-            if (World.Players.Count > 0) SendUpdates();
+            SendUpdates();
         } else if (welcomed && sendClock >= InputInterval) {
             sendClock = 0;
             var me = World.Me;
@@ -364,7 +382,10 @@ public partial class Net : Node {
     private static Vector2 Glide(Vector2 from, Vector2 to, float dt) => from.DistanceTo(to) > MaxStep ? to : from.Lerp(to, 1 - MathF.Exp(-dt * 12));
 
     /// <summary>Sends an action with where this player stands, so the host checks its reach from there rather than from a position still gliding in.</summary>
-    private void Send(Command c) => RpcId(ServerId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
+    private void Send(Command c) {
+        RpcId(ServerId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
+        answerLeft = AnswerSeconds;
+    }
 
     private PlayerState? Guest() => World.PlayerById(Multiplayer.GetRemoteSenderId());
 
@@ -440,7 +461,9 @@ public partial class Net : Node {
         return entries;
     }
 
-    private void SendUpdates() {
+    /// <summary>Server: sends each player what changed since the last update they confirmed.</summary>
+    public void SendUpdates() {
+        if (World.Players.Count == 0) return;
         var entries = Remember(updates.Capture(World));
         // Guests that confirmed the same update get the same changes.
         int builtOn = -1; byte[] delta = [];

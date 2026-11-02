@@ -22,7 +22,7 @@ public partial class Game {
             await CheckNewGameRunsOnAServerOfItsOwn();
             await CheckPlayerComesBackThroughEveryLoad();
             await CheckSecondGameTakesAnotherPort();
-            await CheckFailedJoinBringsTheGameBack();
+            await CheckFailedJoinKeepsTheGameRunning();
             await CheckWalkingStaysWithinAllocationBudget(ServerWalkingBudget);
             await CheckLeavingEndsTheServer();
             await CheckServerDyingEndsTheGame();
@@ -30,6 +30,23 @@ public partial class Game {
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 
+    /// <summary>
+    /// Walking for a few hundred real frames, through Godot input, allocates no more than its budget on the main thread:
+    /// every byte is garbage the runtime collects later, in a pause that stalls a frame.
+    /// </summary>
+    private async Task CheckWalkingStaysWithinAllocationBudget(long maxBytesPerFrame) {
+        var key = new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true };
+        Input.ParseInputEvent(key);
+        await Frames(120);
+        long before = GC.GetAllocatedBytesForCurrentThread(); ulong first = Engine.GetProcessFrames();
+        await Frames(300);
+        long bytes = GC.GetAllocatedBytesForCurrentThread() - before; ulong played = Math.Max(1, Engine.GetProcessFrames() - first);
+        Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = false });
+        await Frames();
+        string report = $"frames: walking: {bytes} B over {played} frames, {bytes / (double)played:0.#} B per frame (budget {maxBytesPerFrame} B)";
+        GD.Print(report);
+        Require(bytes <= maxBytesPerFrame * (long)played, $"Allocation budget exceeded: {report}");
+    }
     private async Task CheckNewGameRunsOnAServerOfItsOwn() {
         await Click(FindButton(startMenu.Screen, "New game")!);
         Require(HasLabel(startMenu.Screen, "STARTING"), "A game must say it is starting while its server comes up.");
@@ -66,12 +83,16 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    private async Task CheckFailedJoinBringsTheGameBack() {
+    private async Task CheckFailedJoinKeepsTheGameRunning() {
         var spot = world.Player;
+        int server = serverProcess, port = net.Port;
         await KeyStroke(Key.Escape); await Click(menu.JoinButton);
         await JoinFromPopup("9");
-        await Until(() => net.Owning && world.Remote && !startMenu.Visible, "the game coming back from the autosave", 30);
+        await Until(() => !world.Remote, "the window stepping out of its game to join");
+        await Until(() => net.Owning && world.Remote && !startMenu.Visible, "the player coming back to their game", 30);
+        Require(serverProcess == server && OS.IsProcessRunning(server) && net.Port == port, "A failed join must leave the game on the server it was on.");
         Require(world.Player.DistanceTo(spot) < 1, "A failed join must leave the player where they were.");
+        Require(Saves.SlotUsed(0), "Joining from a game must autosave it first.");
         await CloseWithEsc();
     }
 
