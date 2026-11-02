@@ -30,6 +30,11 @@ public static class MultiplayerChecks {
         CheckSaveKeepsItsOwnersPlayerOnANewComputer(data);
         CheckGuestSlotCommandsMoveOnlyTheirOwnStacks(data);
         CheckGuestCopyForwardsLayoutActionsToTheHost(data);
+        CheckHotbarAndEndingReachTheServer(data);
+        CheckPlayerComesBackFreeToWalk(data);
+        CheckServerNamesWhatAPlayerMade(data);
+        CheckCopySaysAnActionWasSent(data);
+        CheckWorkersKeepTheirMissingToolThroughTheSave(data);
         CheckDropOnAnotherItemsChestCellStoresTheStack(data);
         CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(data);
         CheckUpdateFieldsLeftOutStartAsNewObjectsDo();
@@ -155,6 +160,50 @@ public static class MultiplayerChecks {
         var returning = world.Arrive("guest", GuestId);
         Require(returning.Backpack.Layout[9].Item == "wood" && returning.Backpack.Layout[0].Item == "stone",
             "a guest leaving and rejoining must retain their exact inventory positions");
+    }
+
+    private static void CheckHotbarAndEndingReachTheServer(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var copy = new World(data, false); var sent = new List<Command>(); copy.Host = sent.Add;
+        copy.SetHotbar(4, "stone"); copy.HoldHotbar(2); copy.MarkEndingShown();
+        Require(copy.HotbarSlots[4] == "stone" && copy.ActiveHotbar == 2, "a player's own copy should show their hotbar at once");
+        foreach (var command in sent) world.Run(guest, command);
+        Require(guest.HotbarSlots[4] == "stone" && guest.ActiveHotbar == 2, "the server should keep a player's hotbar, since the save is its");
+        Require(world.EndingShown, "the server should keep that the ending was shown, since the save is its");
+        world.Run(guest, new Command(Verb.SetHotbar, 0, 0, "wood", 9, default)); world.Run(guest, new Command(Verb.HoldHotbar, 0, 0, "", -1, default));
+        Require(guest.ActiveHotbar == 2 && !guest.HotbarSlots.Contains("wood"), "a slot that does not exist should do nothing");
+    }
+
+    private static void CheckPlayerComesBackFreeToWalk(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var spot = Terrain.Spawn + new Vector2(6, 1);
+        world.As(guest, () => { world.Player = spot; SetMauled(world, true); });
+        world.Depart(GuestId);
+        world.Add(ThingKind.Chest, spot);
+        var back = world.Arrive("guest", GuestId);
+        Require(!back.Mauled, "a player who left pinned should not come back pinned by a wolf that has gone");
+        Require(back.Pos == Terrain.Spawn, "a player whose spot was built on should come back at the clearing");
+    }
+
+    private static void CheckServerNamesWhatAPlayerMade(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(1, 0)); Give(guest, Inventory.Coins, 500);
+        var made = new List<(int Player, int Id)>(); world.Made = (player, id) => made.Add((player, id));
+        var hired = world.As(guest, () => { world.Player = Terrain.Spawn; return world.Hire(sign, data.HireOffers[0]); });
+        Require(hired != null && made.SequenceEqual([(GuestId, hired.Id)]), "the server should name a worker to the player who hired them");
+    }
+
+    private static void CheckCopySaysAnActionWasSent(GameData data) {
+        var copy = new World(data, false); var sent = new List<Command>(); copy.Host = sent.Add;
+        var crate = copy.Add(ThingKind.Crate, copy.Player + new Vector2(1, 0));
+        Require(copy.PickUpCrate(crate) && sent.Count == 1 && copy.Find(crate.Id) != null, "a copy should say a crate it may lift was sent, and leave the lifting to the server");
+    }
+
+    private static void CheckWorkersKeepTheirMissingToolThroughTheSave(GameData data) {
+        var world = new World(data, false);
+        var worker = AddWorker(world, Terrain.Spawn); worker.Missing = "axe";
+        var copy = new World(data, false); copy.Deserialize(world.Serialize());
+        Require(copy.Workers.Single().Missing == "axe", "what a worker is missing should reach other machines, whose tool rack shows it");
     }
 
     private static void CheckGuestCopyForwardsLayoutActionsToTheHost(GameData data) {

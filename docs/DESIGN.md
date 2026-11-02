@@ -202,9 +202,11 @@ The welcome is a guest's first update, with the fog uncovered so far.
 - Guests merge entries into their copy in place, so panels and the view keep their objects. A change to numbers alone is set directly (`WorldUpdates.SetNumbers`); anything else reads the entry whole.
 - A player keeps only the updates the server can still build on: confirmations only move forward, so nothing older than the update just taken's baseline is needed.
 - Each action carries where the guest stood, so the host checks reach from there rather than from a position still gliding in.
+- `Net.SendEveryUpdate` turns off ENet's throttle: it read the hitch of loading a game as a slow line, and let through one update in 32 for several seconds.
+- An action's result comes back with a later update. A window checks what it can before sending, `Net.Made` names a new mine or worker so the panel opens on it, and `UiKit.HearMove` plays an item's sound when the backpack changes.
 - Leaving waits for the server to confirm before the line closes, so actions still in flight arrive; the owner's server closes instead, and the line going is the confirmation.
 - Joining another game from your own ends your server first, so `Game` starts the autosave again if the join fails or is cancelled.
-- A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key.
+- A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key. It goes on trying while the server says the game is not open yet, as after the host loads a save.
 - Until the owner opens the game, the server refuses peers that are not on this computer. Only the owner can save; any player can hold the world, and it stands still while all of them do.
 
 Factorio instead runs the same deterministic simulation on every machine and sends only inputs (lockstep).

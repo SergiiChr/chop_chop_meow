@@ -19,15 +19,17 @@ public partial class Game {
     private static string SignalPath(string name) => $"user://{Launch.FilePrefix}signal-{name}";
 
     /// <summary>Tells the other network check process that this one reached a point, for the times the game itself cannot carry the news.</summary>
-    private static void Signal(string name) {
+    private static void Signal(string name, string? said = null) {
         using var file = Godot.FileAccess.Open(SignalPath(name), Godot.FileAccess.ModeFlags.Write);
-        file.StoreString(name);
+        file.StoreString(said ?? name);
     }
 
-    /// <summary>Waits for the other network check process to reach a point, and clears the signal so it can be sent again.</summary>
-    private async Task Signaled(string name) {
-        await Until(() => Godot.FileAccess.FileExists(SignalPath(name)), $"the other process signalling {name}", 90);
+    /// <summary>Waits for the other network check process to reach a point, clears the signal so it can be sent again, and returns what it said.</summary>
+    private async Task<string> Signaled(string name) {
+        await Until(() => Godot.FileAccess.FileExists(SignalPath(name)) && Godot.FileAccess.GetFileAsString(SignalPath(name)) != "", $"the other process signalling {name}", 90);
+        string said = Godot.FileAccess.GetFileAsString(SignalPath(name));
         DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(SignalPath(name)));
+        return said;
     }
 
     private async Task SurvivalReviewShot(string name) {
@@ -48,16 +50,10 @@ public partial class Game {
             await Click(FindButton(startMenu.Screen, "Join game")!);
             var port = (LineEdit)startMenu.Screen.FindChild("port", true, false);
             Require(port.Text == Net.DefaultPort.ToString(), "The join popup must come with the port filled in.");
-            await Click(port); await KeyStroke(Key.End);
-            for (ulong wait = Time.GetTicksMsec() + 5000; port.Text != "" && Time.GetTicksMsec() < wait;) await KeyStroke(Key.Backspace);
-            Require(port.Text == "", "Backspace must clear the port field.");
-            await Type(CheckPort.ToString());
             var address = (LineEdit)startMenu.Screen.FindChild("address", true, false);
             // The popup offers the address of the last game joined.
-            if (address.Text == "") {
-                await Click(address); await Type("127.0.0.1");
-            } else Require(address.Text == "127.0.0.1", "The join popup must offer the last address joined.");
-            await Click(FindButton(startMenu.Screen, "Join")!);
+            Require(address.Text is "" or "127.0.0.1", "The join popup must offer the last address joined.");
+            await JoinFromPopup(CheckPort.ToString());
             for (ulong wait = Time.GetTicksMsec() + 4000; Time.GetTicksMsec() < wait && !world.Remote && JoinStatus() == "Connecting…";) await Frames(1);
             if (!world.Remote) {
                 await Click(FindButton(startMenu.Screen, "Back · Esc")!);
@@ -84,10 +80,29 @@ public partial class Game {
         var port = (LineEdit)startMenu.Screen.FindChild("port", true, false);
         await Click(port); await KeyStroke(Key.End);
         for (ulong wait = Time.GetTicksMsec() + 5000; port.Text != "" && Time.GetTicksMsec() < wait;) await KeyStroke(Key.Backspace);
+        Require(port.Text == "", "Backspace must clear the port field.");
         await Type(to);
         var address = (LineEdit)startMenu.Screen.FindChild("address", true, false);
         if (address.Text == "") { await Click(address); await Type("127.0.0.1"); }
         await Click(FindButton(startMenu.Screen, "Join")!);
+    }
+
+    /// <summary>Waits for a game this window started to have this window's player.</summary>
+    private async Task StartedGame() {
+        await Until(() => world.Remote && !startMenu.Visible, "the game's server taking this window's player", 30);
+    }
+
+    /// <summary>Leaves a game this window started, and waits for its server to end.</summary>
+    private async Task LeaveAndAwaitServerEnd() {
+        int server = serverProcess;
+        ShowStart();
+        await Until(() => !OS.IsProcessRunning(server), "the server ending with its owner", 10);
+    }
+
+    /// <summary>The closest place a building can go.</summary>
+    private Vector2 FreeSpotNearby(ThingKind kind) {
+        var spots = from x in Enumerable.Range(-3, 7) from y in Enumerable.Range(-3, 7) select world.Player.Round() + new Vector2(x, y);
+        return spots.Where(spot => world.PlacementBlock(kind, spot) == null).MinBy(spot => spot.DistanceTo(world.Player));
     }
 
     private async Task LeaveGame() {

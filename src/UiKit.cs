@@ -11,8 +11,6 @@ public interface IGameFlow {
     /// <summary>Starts a new game.</summary>
     void Restart();
     void Quit();
-    /// <summary>Ends a guest's game after the line closes and shows the start menu.</summary>
-    void Leave();
     void LoadSlot(int slot);
     void ShowStart();
     /// <summary>This window started the game it plays, so it saves, loads and opens it to others.</summary>
@@ -43,21 +41,40 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
     /// <summary>Adds what pauses the game while it is open, so no part writes or restores another's pause.</summary>
     public void HoldWhile(Func<bool> open) => holds.Add(open);
 
+    private const float MoveWaitSeconds = .5f;
+    private Dictionary<string, int>? moveFrom;
+    private float moveSeconds;
+    private int movePlayed;
+
     /// <summary>Tells the player something through the game's message stack.</summary>
     public void Notify(string message) => notify(message);
 
     /// <summary>Brings everything on screen up to date with the world.</summary>
     public void Refresh() => refresh();
 
-    /// <summary>Runs a player action and gives it a generic sound when it made none of its own: that of the item whose backpack count changed most.</summary>
+    /// <summary>
+    /// Runs a player action and gives it a generic sound when it made none of its own: that of the item whose backpack count changed most.
+    /// On a server the change comes with a later update, so <see cref="HearMove"/> listens for it.
+    /// </summary>
     public void Act(Action action) {
         var state = World.S; int played = Sounds.Played;
         var before = new Dictionary<string, int>(state.Backpack.Items);
         action();
         // Starting or loading a game replaces the whole state; that is not an item moving.
         if (World.S != state || Sounds.Played != played) return;
-        var moved = state.Backpack.Items.Keys.Union(before.Keys).OrderByDescending(id => Math.Abs(state.Backpack[id] - before.GetValueOrDefault(id))).FirstOrDefault();
-        if (moved != null && state.Backpack[moved] != before.GetValueOrDefault(moved)) Sounds.Play(Sounds.ForItem(moved));
+        (moveFrom, moveSeconds, movePlayed) = (before, World.Remote ? MoveWaitSeconds : 0, played);
+        HearMove(0);
+    }
+
+    /// <summary>Called every frame: plays the sound of the backpack change <see cref="Act"/> is waiting for, unless the action made its own.</summary>
+    public void HearMove(float dt) { if (moveFrom != null) ListenForMove(moveFrom, dt); }
+
+    private void ListenForMove(Dictionary<string, int> before, float dt) {
+        var backpack = World.S.Backpack;
+        var moved = backpack.Items.Keys.Union(before.Keys).OrderByDescending(id => Math.Abs(backpack[id] - before.GetValueOrDefault(id))).FirstOrDefault();
+        bool changed = moved != null && backpack[moved] != before.GetValueOrDefault(moved), silent = Sounds.Played == movePlayed;
+        if (changed && silent) Sounds.Play(Sounds.ForItem(moved!));
+        if (changed || !silent || (moveSeconds -= dt) <= 0) moveFrom = null;
     }
 
     /// <summary>Runs a player action, then brings the screen up to date.</summary>

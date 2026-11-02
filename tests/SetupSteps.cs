@@ -111,11 +111,6 @@ internal static class SetupSteps {
         return worker;
     }
 
-    /// <summary>Puts a thing in the player's memory as an older save held it: old-save fixtures only.</summary>
-    public static void Remember(World world, Thing thing) => world.S.Remembered[thing.Id] = thing;
-
-    /// <summary>Marks the save as an older version: old-save fixtures only.</summary>
-
     /// <summary>Sets a goal number from an older save: old-save fixtures only.</summary>
     public static void SetGoal(World world, int goal) => world.S.Goal = goal;
 

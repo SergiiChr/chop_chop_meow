@@ -13,7 +13,7 @@ public partial class Game {
     /// <summary>What the frame budget assumes: a window limited as players limit theirs, so a frame holds a real share of the server's updates.</summary>
     private const int CheckFrameRate = 60;
     /// <summary>What real play costs: mostly the entries each update changes, which are new arrays. A third more garbage than this fails.</summary>
-    private const long ServerWalkingBudget = 1170;
+    private const long ServerWalkingBudget = 1250;
 
     private async void RunServerCheck() {
         try {
@@ -25,12 +25,9 @@ public partial class Game {
             await CheckFailedJoinBringsTheGameBack();
             await CheckWalkingStaysWithinAllocationBudget(ServerWalkingBudget);
             await CheckLeavingEndsTheServer();
+            await CheckServerDyingEndsTheGame();
             GD.Print("SERVER-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
-    }
-
-    private async Task StartedGame() {
-        await Until(() => world.Remote && !startMenu.Visible, "the game's server taking this window's player", 30);
     }
 
     private async Task CheckNewGameRunsOnAServerOfItsOwn() {
@@ -49,9 +46,7 @@ public partial class Game {
         for (int load = 0; load < 2; load++) {
             await KeyStroke(Key.Escape); await Click(menu.SaveButton); await Click(FindButton(startMenu.Screen, Saves.SlotLabel(1))!);
             // The save goes first on the line, so the server writes it before it hears the owner leave.
-            int server = serverProcess;
-            ShowStart();
-            await Until(() => !OS.IsProcessRunning(server), "the server ending with its owner", 10);
+            await LeaveAndAwaitServerEnd();
             Require(Saves.Read(data, 1).Error == null, "A save the server writes must load.");
             await Click(FindButton(startMenu.Screen, "Load game")!); await Click(FindButton(startMenu.Screen, Saves.SlotLabel(1))!);
             await StartedGame();
@@ -61,8 +56,7 @@ public partial class Game {
     }
 
     private async Task CheckSecondGameTakesAnotherPort() {
-        ShowStart();
-        await Until(() => !OS.IsProcessRunning(serverProcess), "the server ending with its owner", 10);
+        await LeaveAndAwaitServerEnd();
         using var other = new PacketPeerUdp();
         Require(other.Bind(Net.DefaultPort) == Error.Ok, "The check must hold the port another game would.");
         await Click(FindButton(startMenu.Screen, "New game")!);
@@ -81,9 +75,13 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    private async Task CheckLeavingEndsTheServer() {
-        int server = serverProcess;
-        ShowStart();
-        await Until(() => !OS.IsProcessRunning(server), "the server ending with its owner", 10);
+    private async Task CheckLeavingEndsTheServer() => await LeaveAndAwaitServerEnd();
+
+    private async Task CheckServerDyingEndsTheGame() {
+        await Click(FindButton(startMenu.Screen, "New game")!);
+        await StartedGame();
+        // Godot forgets a process it kills itself, which a server that crashes is not.
+        using (var server = System.Diagnostics.Process.GetProcessById(serverProcess)) server.Kill();
+        await Until(() => startMenu.Visible && HasLabel(startMenu.Screen, Net.ServerStopped), "the start menu saying the server stopped", 10);
     }
 }

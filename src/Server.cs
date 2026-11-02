@@ -43,7 +43,6 @@ public partial class Server : Node {
         Engine.MaxFps = TicksPerSecond;
         var server = Start(main, data, int.Parse(Launch.Value("--slot") ?? "-1"), Launch.Value("--owner") ?? "", int.Parse(Launch.Value("--server") ?? $"{Net.DefaultPort}"));
         server.Ended += () => main.GetTree().Quit();
-        GD.Print("SERVER READY");
     }
 
     /// <summary>The game's own arguments for a server process: its port, the save slot to load or -1 for a new world, and the owner's key.</summary>
@@ -56,14 +55,13 @@ public partial class Server : Node {
             return;
         }
         lonely = 0;
-        if (!net.Held) World.Tick(dt);
-        if ((autosave += dt) >= AutosaveSeconds) { autosave = 0; GD.Print(Saves.Write(World, 0)); }
+        if (net.Held) return;
+        World.Tick(dt);
+        if ((autosave += dt) >= AutosaveSeconds) { autosave = 0; net.TellOwner(Saves.Write(World, 0)); }
     }
 
     /// <summary>Ends the game now.</summary>
-    public void Stop() => End();
-
-    private void End() {
+    public void End() {
         if (ended) return;
         ended = true;
         net.Leave();

@@ -174,25 +174,29 @@ public sealed class PlayerControl {
 
     private void StoreHeld(Thing t, string item) {
         if (!world.Near(t)) { kit.Notify("Walk closer to the chest to store the selected stack."); return; }
-        int moved = 0;
-        kit.Act(() => moved = world.Transfer(world.Backpack, t.Inventory, item, ItemMoves.All ? world.Backpack[item] : 1));
-        if (!world.Remote && moved == 0) kit.Notify($"No {world.Data.Name(item)} to store, or chest is full.");
+        // The move runs on the server, so the answer comes from what this window shows.
+        if (world.Backpack[item] == 0 || t.Inventory.Room(item) == 0) { kit.Notify($"No {world.Data.Name(item)} to store, or chest is full."); return; }
+        kit.Act(() => world.Transfer(world.Backpack, t.Inventory, item, ItemMoves.All ? world.Backpack[item] : 1));
     }
 
     /// <summary>
     /// Placement stays on without opening what was placed, so several go down in a row until the materials or crates run out.
-    /// A guest's building goes up on the host, so the guest stays in placement until Esc, except after a mine the host was sent.
     /// A mine opens its panel instead, since each cliff takes only one.
+    /// On a server the backpack still holds what a placement just sent will cost, and the mine's panel opens when the server names it.
     /// </summary>
     private void Place(Vector2 at) {
         var built = Mode is ClickMode.Crate crate ? world.PlaceCrate(crate.Item, at) : world.Build(Mode.Placing!.Value, at);
         if (built?.Kind == ThingKind.Mine) { Mode = new ClickMode.Normal(); panel.Select(built); } else if (built != null && !CanPlaceAgain()) Mode = new ClickMode.Normal();
-        else if (world.Remote && Mode.Placing == ThingKind.Mine && world.PlacementBlock(ThingKind.Mine, world.Snap(ThingKind.Mine, at)) == null) Mode = new ClickMode.Normal();
+        else if (world.Remote && Sent(at) && (Mode.Placing == ThingKind.Mine || !CanPlaceAgain(1))) Mode = new ClickMode.Normal();
     }
 
-    private bool CanPlaceAgain() => Mode switch {
-        ClickMode.Crate crate => world.Backpack[crate.Item] > 0,
-        ClickMode.Build build => world.Backpack.Has(world.Data.Buildings[build.Kind].Cost),
+    /// <summary>Whether the placement just tried at <paramref name="at"/> went to the server, which it does when nothing here blocks it.</summary>
+    private bool Sent(Vector2 at) => (Mode is ClickMode.Crate crate ? world.PlacementBlock(ThingKind.Crate, at, crate.Item) : world.PlacementBlock(Mode.Placing!.Value, world.Snap(Mode.Placing.Value, at))) == null;
+
+    /// <summary>Whether another can be paid for, on top of <paramref name="sent"/> already on their way.</summary>
+    private bool CanPlaceAgain(int sent = 0) => Mode switch {
+        ClickMode.Crate crate => world.Backpack[crate.Item] > sent,
+        ClickMode.Build build => world.Data.Buildings[build.Kind].Cost.All(cost => world.Backpack[cost.Key] >= cost.Value * (sent + 1)),
         _ => false
     };
 }

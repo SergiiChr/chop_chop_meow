@@ -67,6 +67,7 @@ public partial class SidePanel : PanelContainer {
     private ScrollContainer? sheetScroll;
     private VBoxContainer? sheetRows;
     private Selection shownInspect;
+    private int awaited;
     /// <summary>The open page, or null while the panel is closed.</summary>
     private PagePanel? page;
 
@@ -99,7 +100,7 @@ public partial class SidePanel : PanelContainer {
         // Room for the pills that sit on the cups' corners.
         inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);
         content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddChild(content);
-        world.Replaced += () => { Selection = default; Close(); };
+        world.Replaced += () => { Selection = default; awaited = 0; Close(); };
     }
 
     /// <summary>Shows a page: the one already showing draws again and keeps its state, any other starts afresh.</summary>
@@ -157,6 +158,16 @@ public partial class SidePanel : PanelContainer {
 
     /// <summary>Selects a worker and shows them.</summary>
     public void Select(Worker w) { Selection = Selection.Of(w); Open(Page.Inspect); }
+
+    /// <summary>Opens a thing or worker the server made for this player, as soon as an update brings it.</summary>
+    public void SelectWhenHere(int id) => awaited = id;
+
+    /// <summary>Called every frame: opens what <see cref="SelectWhenHere"/> is waiting for once it is here.</summary>
+    public void ShowAwaited() {
+        if (awaited == 0) return;
+        if (world.Find(awaited) is Thing t) { awaited = 0; Select(t); return; }
+        foreach (var w in world.Workers) if (w.Id == awaited) { awaited = 0; Select(w); return; }
+    }
 
     /// <summary>Marks a thing as selected without opening its page, as a right click on it does; a selected worker stays selected.</summary>
     public void Mark(Thing t) { if (Selection.Worker == 0) Selection = Selection.Of(t); }

@@ -44,7 +44,7 @@ public partial class PauseMenu : PanelContainer {
         var quitButton = MenuButton("Quit", Style.Enamel, () => ConfirmLeave("QUIT", "Quit to desktop", flow.Quit)); quitButton.Name = "quit"; side.AddChild(quitButton);
         side.AddChild(new Control { SizeFlagsVertical = SizeFlags.ExpandFill });
         HostButton = MenuButton("Host", Style.Sage, HostGame); HostButton.Name = "host"; side.AddChild(HostButton);
-        JoinButton = MenuButton("Join", Style.Sage, () => { if (!flow.Owns) { net.Leave(); flow.Leave(); } else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
+        JoinButton = MenuButton("Join", Style.Sage, () => { if (!flow.Owns) flow.ShowStart(); else startMenu.ShowJoin(BackToPause, true); }); JoinButton.Name = "join_game"; side.AddChild(JoinButton);
         netLine = Style.Text("", 13, Style.Beige, wrap: true); netLine.Name = "net_status"; netLine.HorizontalAlignment = HorizontalAlignment.Center; side.AddChild(netLine);
         world.Replaced += () => Visible = false;
         kit.HoldWhile(() => Visible);

@@ -29,6 +29,7 @@ public partial class Game {
         await Click(FindButton(startMenu.Screen, "New game")!);
         await Until(() => world.Remote && !startMenu.Visible, "the new game's server taking this window's player");
         await CloseWithEsc();
+        await CheckActionsFinishWhenTheServerAnswers();
         RemoveThings(Hosted, t => t.Pos.DistanceTo(Terrain.Spawn) < 6);
         Hosted.Add(ThingKind.LooseCoal, NetOre, 2); Hosted.Add(ThingKind.LooseCoal, NetCoal, 2);
         var chest = Hosted.Add(ThingKind.Chest, NetChest); var hut = Hosted.Add(ThingKind.Hut, NetHut);
@@ -41,6 +42,8 @@ public partial class Game {
         // The server keeps the clock; this window shows it a few updates behind.
         await Until(() => world.Time == before, "this window showing the clock where the server stopped it");
         await Signaled("refused");
+        // Each process may make its own key when the check starts, so the guest cannot work this one out.
+        Signal("host-key", net.Key);
         await Click(menu.HostButton);
         Require(net.Opened && !menu.Visible, "Host in the pause menu must open the game to other computers and close the menu.");
         Require(await PlayerWalks(), "After hosting the player must be able to walk again.");
@@ -77,6 +80,33 @@ public partial class Game {
         await LoadAndHost(1);
         await Until(() => Hosted.Players.Count == 2, "the guest joining by hand after it stopped trying", 90);
         await Signaled("joined");
+    }
+
+    /// <summary>A window sends its player's actions and hears the result later, so what follows one must not need it at once.</summary>
+    private async Task CheckActionsFinishWhenTheServerAnswers() {
+        var me = Hosted.Players.Single();
+        Give(me, "wood", world.Data.Buildings[ThingKind.Chest].Cost["wood"]); Give(me, Inventory.Coins, 100); Give(me, "stone");
+        await Until(() => world.Backpack.Has(world.Data.Buildings[ThingKind.Chest].Cost) && world.Backpack["stone"] == 1, "this window's backpack showing what the server gave it");
+        await KeyStroke(Key.B); await Click(Named("build_chest")!);
+        var spot = FreeSpotNearby(ThingKind.Chest);
+        int chests = world.Things.Count(t => t.Kind == ThingKind.Chest);
+        await Click(view.Screen(spot));
+        Require(player.Mode.Placing == null, "Placing the last chest the backpack pays for must end placement.");
+        await Until(() => world.Things.Count(t => t.Kind == ThingKind.Chest) == chests + 1, "the placed chest coming back from the server");
+        // A drag reaches the same action, and the UI checks cover it; only the sound after it is under test here.
+        string itemSound = Sounds.ForItem("stone");
+        Require(sounds.LastVariant(itemSound) < 0, "Nothing may have played the item's sound before the move.");
+        var placed = world.Things.Last(t => t.Kind == ThingKind.Chest);
+        Require(world.Near(placed), "The chest must be in reach of the player who placed it.");
+        kit.Run(() => world.Transfer(world.Backpack, placed.Inventory, "stone", 1));
+        await Until(() => sounds.LastVariant(itemSound) >= 0, "the item's sound once the move comes back from the server", 1);
+        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
+        await Until(() => world.Find(sign.Id) != null, "this window showing the signpost");
+        await Click(view.Screen(sign.Pos, .8f)); await Click(Named("hardhat")!);
+        await Click(Named($"hire_{world.Data.HireOffers[0].Upfront:0}")!);
+        await Until(() => panel.Selection.Worker != 0, "the panel opening on the worker the server hired");
+        Hosted.Fire(Hosted.Workers[^1]);
+        await CloseWithEsc();
     }
 
     /// <summary>Loads a save slot from the start menu and opens the game to other computers.</summary>
@@ -130,7 +160,7 @@ public partial class Game {
     private async Task CheckGuestComesBackFromLeavingAndDropping() {
         await LeaveGame();
         // Two windows on one computer share a key, which this check's host and guest do not: no input changes a window's key, so this one borrows the host's.
-        string own = net.Key; net.Key = own.Replace("-guest", "-host");
+        string own = net.Key; net.Key = await Signaled("host-key");
         await JoinUntilRefused("This computer is already in this game.");
         net.Key = own;
         // The start menu covers the world and Esc ends a click mode before Join can be reached, so no input leaves either in place for a join.

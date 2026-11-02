@@ -50,9 +50,8 @@ public sealed class Snapshot : Dictionary<EntryKey, byte[]> {
 /// </summary>
 public sealed class WorldUpdates {
     private static readonly JsonSerializerOptions Compact = new(GameData.Json) { WriteIndented = false };
-    // Lists merged by identity, the fog each machine keeps itself, every player of the save and whose it is, and the player properties, which the players list carries.
-    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered), nameof(SaveState.Party), nameof(SaveState.Owner) }
-        .Concat(SaveState.ActorFields).ToHashSet();
+    // Lists merged by identity, the fog each machine keeps itself, every player of the save and whose it is.
+    public static readonly HashSet<string> Shared = new[] { nameof(SaveState.Things), nameof(SaveState.Workers), nameof(SaveState.Wolves), nameof(SaveState.Orders), nameof(SaveState.Explored), nameof(SaveState.Remembered), nameof(SaveState.Party), nameof(SaveState.Owner) }.ToHashSet();
     // The world's own fields, without the lists and players that have entries of their own, or the fog, which each machine works out from where everyone stands.
     private static readonly JsonSerializerOptions Rest = new(Compact) {
         TypeInfoResolver = new DefaultJsonTypeInfoResolver {
@@ -172,19 +171,24 @@ public sealed class WorldUpdates {
         return output.AsSpan(0, length);
     }
 
+    /// <summary>Reads the fields of two entries, and says whether both are objects with the same fields.</summary>
+    private bool SameFields(ReadOnlySpan<byte> now, ReadOnlySpan<byte> then) {
+        if (!Fields(now, nowFields) || !Fields(then, thenFields) || nowFields.Count != thenFields.Count) return false;
+        foreach (var field in thenFields) if (Find(now, nowFields, Name(then, field)) < 0) return false;
+        return true;
+    }
+
     /// <summary>
     /// Writes only the changed fields of an object entry, unless it is not an object or its fields are not the ones it had.
     /// Entries leave out fields at their default, so a field coming or going sends the whole entry, which keeps the guest's copy in the host's field order.
     /// </summary>
     private bool WritePatch(EntryKey key, byte[] now, byte[] then) {
-        if (!Fields(now, nowFields) || !Fields(then, thenFields) || nowFields.Count != thenFields.Count) return false;
-        foreach (var field in thenFields) if (Find(now, nowFields, Name(then, field)) < 0) return false;
+        if (!SameFields(now, then)) return false;
         Span<byte> name = stackalloc byte[EntryKey.MaxName];
         updateWriter.WriteStartObject(name[..key.Format(name, true)]);
         foreach (var field in nowFields) {
             var fieldName = Name(now, field);
-            int was = Find(then, thenFields, fieldName);
-            if (was >= 0 && Value(then, thenFields[was]).SequenceEqual(Value(now, field))) continue;
+            if (Value(then, thenFields[Find(then, thenFields, fieldName)]).SequenceEqual(Value(now, field))) continue;
             updateWriter.WritePropertyName(fieldName);
             updateWriter.WriteRawValue(Value(now, field), skipInputValidation: true);
         }
@@ -232,6 +236,7 @@ public sealed class WorldUpdates {
         return merged.WrittenSpan.ToArray();
     }
 
+    private readonly List<(Range Field, int Number)> changedNumbers = new();
     // Where a field's name and raw value lie in its entry.
     private readonly record struct Range(int NameStart, int NameLength, int ValueStart, int ValueLength);
 
@@ -283,17 +288,18 @@ public sealed class WorldUpdates {
     /// Entries leave out fields at their default, so a number reaching or leaving its default, or any other change, returns false and changes nothing: the entry must be read whole.
     /// </summary>
     public bool SetNumbers<T>(T target, byte[] then, byte[] now) where T : class {
-        if (!Fields(now, nowFields) || !Fields(then, thenFields) || nowFields.Count != thenFields.Count) return false;
-        foreach (var field in nowFields) {
-            int was = Find(then, thenFields, Name(now, field));
-            if (was < 0) return false;
-            if (!Value(then, thenFields[was]).SequenceEqual(Value(now, field)) && Numbers<T>.Of(Name(now, field)) < 0) return false;
-        }
+        if (!SameFields(now, then)) return false;
+        changedNumbers.Clear();
         foreach (var field in nowFields) {
             if (Value(then, thenFields[Find(then, thenFields, Name(now, field))]).SequenceEqual(Value(now, field))) continue;
+            int number = Numbers<T>.Of(Name(now, field));
+            if (number < 0) return false;
+            changedNumbers.Add((field, number));
+        }
+        foreach (var (field, number) in changedNumbers) {
             var reader = new Utf8JsonReader(Value(now, field));
             reader.Read();
-            Numbers<T>.All[Numbers<T>.Of(Name(now, field))].Set(target, ref reader);
+            Numbers<T>.All[number].Set(target, ref reader);
         }
         return true;
     }

@@ -237,22 +237,6 @@ public sealed class Inventory {
         return true;
     }
 
-    public bool Fits(IReadOnlyDictionary<string, int> added) {
-        int total = 0, empty = 0, limit = Math.Min(Slots, Layout.Count);
-        for (int i = 0; i < limit; i++) if (Layout[i].Item == "") empty++;
-        int free = empty;
-        foreach (var pair in added) {
-            if (pair.Value < 0) return false;
-            total += pair.Value;
-            int space = 0; for (int i = 0; i < limit; i++) if (Layout[i].Item == pair.Key) space += Math.Max(0, StackOf(pair.Key) - Layout[i].Count);
-            int remainder = Math.Max(0, pair.Value - space), size = StackOf(pair.Key);
-            int required = (remainder + size - 1) / size;
-            if (required > free) return false;
-            free -= required;
-        }
-        return Capacity == 0 || Count + total <= Capacity;
-    }
-
     public bool Has(Dictionary<string, int> cost) {
         foreach (var pair in cost) if (this[pair.Key] < pair.Value) return false;
         return true;

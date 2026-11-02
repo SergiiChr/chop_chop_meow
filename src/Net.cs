@@ -30,12 +30,14 @@ public partial class Net : Node {
     public const int MaxPlayers = 4;
     /// <summary>ENet drops a peer once a reliable packet stays unanswered this long (or TimeoutMinMsec after TimeoutLimit resends).</summary>
     private const int TimeoutLimit = 64, TimeoutMinMsec = 15000, TimeoutMaxMsec = 45000;
+    private const int ThrottleIntervalMsec = 5000;
     /// <summary>Joining gives up on a host that never answers after this long, instead of waiting out the full timeout.</summary>
     private const float ConnectTimeout = 10;
     /// <summary>The pause between a dropped guest's tries to get back in.</summary>
     private const float RetrySeconds = 2;
     public const string LostLine = "Lost the connection to the host.";
     public const string ServerStopped = "The game's server stopped.";
+    private const string NotOpened = "The host has not opened the game to other players.";
     private const float SnapshotInterval = 1 / 30f, InputInterval = .05f;
     private const int ServerId = 1;
     /// <summary>Raised whenever the messages change, so mismatched builds refuse each other.</summary>
@@ -59,6 +61,8 @@ public partial class Net : Node {
     /// <summary>Seconds a dropped guest keeps trying to get back in; the network check shortens it to see a guest give up.</summary>
     public float ReconnectLimit = 120;
     public event Action<string>? Said;
+    /// <summary>The server made a mine or worker for this player, which an update will bring.</summary>
+    public event Action<int>? Made;
     public event Action<string, Vector2>? Heard;
     public event Action<int, ActorAction, Vector2>? Acted;
     public event Action<bool>? Joined;
@@ -127,7 +131,12 @@ public partial class Net : Node {
     /// <summary>The owner has opened the game to other players.</summary>
     public bool Opened { get; private set; }
     /// <summary>Server: whether every player has a menu open, which holds the world still.</summary>
-    public bool Held => World.Players.Count > 0 && World.Players.All(p => holding.Contains(p.Id));
+    public bool Held {
+        get {
+            foreach (var p in World.Players) if (!holding.Contains(p.Id)) return false;
+            return World.Players.Count > 0;
+        }
+    }
 
     public override void _Ready() {
         // Guests only hear about each other from the host's messages and updates.
@@ -136,10 +145,16 @@ public partial class Net : Node {
         Multiplayer.ConnectedToServer += () => { connectTimer = null; RpcId(ServerId, MethodName.Hello, Protocol, Key, Window); };
         Multiplayer.ConnectionFailed += () => Fail("Could not reach the host.");
         Multiplayer.ServerDisconnected += Dropped;
-        Multiplayer.PeerConnected += id => { if (Hosting && Multiplayer.MultiplayerPeer is ENetMultiplayerPeer enet) TolerateLag(enet.GetPeer((int)id)); };
+        Multiplayer.PeerConnected += id => { if (Hosting && Multiplayer.MultiplayerPeer is ENetMultiplayerPeer enet) { TolerateLag(enet.GetPeer((int)id)); SendEveryUpdate(enet.GetPeer((int)id)); } };
     }
 
     private static void TolerateLag(ENetPacketPeer peer) => peer.SetTimeout(TimeoutLimit, TimeoutMinMsec, TimeoutMaxMsec);
+
+    /// <summary>
+    /// ENet reads a hitch, such as loading a game, as a slow line and sends one update in 32 for seconds; each is small and the next replaces it, so this turns that off.
+    /// Both ends take the setting from this call, which needs a line that is up.
+    /// </summary>
+    private static void SendEveryUpdate(ENetPacketPeer peer) => peer.ThrottleConfigure(ThrottleIntervalMsec, (int)ENetPacketPeer.PacketThrottleScale, 0);
 
     /// <summary>Server: takes players, only from this computer until the player whose machine has <paramref name="ownerKey"/> opens the game.</summary>
     public Error Serve(int port, string ownerKey) {
@@ -147,14 +162,14 @@ public partial class Net : Node {
         var error = peer.CreateServer(port, MaxPlayers);
         if (error != Error.Ok) return error;
         Multiplayer.MultiplayerPeer = peer; Hosting = true; owner = ownerKey;
-        World.Relay = Tell;
+        World.Relay = Tell; World.Made = (player, id) => RpcId(player, MethodName.MadeForYou, id);
         return Error.Ok;
     }
 
     /// <param name="ip">The server's address.</param>
     /// <param name="port">The server's port.</param>
     /// <param name="patience">Seconds to wait for it to answer; a server this window just started needs longer than one already running.</param>
-    public Error Join(string ip, int port = DefaultPort, float patience = ConnectTimeout) {
+    public Error Join(string ip, int port, float patience = ConnectTimeout) {
         Disconnect();
         var peer = new ENetMultiplayerPeer();
         var error = peer.CreateClient(ip, port);
@@ -186,7 +201,7 @@ public partial class Net : Node {
         }
         if (Online) Multiplayer.MultiplayerPeer.Close();
         Multiplayer.MultiplayerPeer = new OfflineMultiplayerPeer(); Hosting = false;
-        World.Host = null; World.Relay = null; World.LocalId = 1;
+        World.Host = null; World.Relay = null; World.Made = null; World.LocalId = 1;
         welcomed = farewell = open = false; Owning = Opened = false; owner = ""; ownerId = 0; connectTimer = null; stamp = 0; goals.Clear(); walks.Clear(); heard.Clear(); holding.Clear(); windows.Clear();
         sequence = 0; acked.Clear(); appliedSequence = 0; work = new();
         foreach (var snapshot in sent.Values) updates.Release(snapshot);
@@ -237,7 +252,7 @@ public partial class Net : Node {
         var stale = World.Players.Find(p => p.Key == key);
         string? refusal = protocol != Protocol ? "The host runs a different version of the game."
             // Until the owner opens the game, only the owner's own window gets in; another window on the same machine waits like any guest.
-            : !open && (key != owner || !Local(id)) ? "The host has not opened the game to other players."
+            : !open && (key != owner || !Local(id)) ? NotOpened
             : key == "" ? "This computer has no key to join with."
             // Another window on the same machine has the same key, and must not take the player from the one playing.
             : stale != null && windows.GetValueOrDefault(stale.Id) != window ? "This computer is already in this game."
@@ -258,7 +273,9 @@ public partial class Net : Node {
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
     private void Refused(string reason) {
-        if (Retrying) End(reason); else Fail(reason);
+        // A host that loaded a game has not opened it again yet, so a dropped guest goes on trying.
+        if (Retrying && reason == NotOpened) Disconnect();
+        else if (Retrying) End(reason); else Fail(reason);
     }
 
     [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
@@ -306,6 +323,12 @@ public partial class Net : Node {
         if (Hosting && id == ownerId && Saver?.Invoke(slot) is string said) RpcId(id, MethodName.Told, said);
     }
 
+    /// <summary>Server: tells the owner something, such as how an autosave went.</summary>
+    public void TellOwner(string message) { if (ownerId != 0) RpcId(ownerId, MethodName.Told, message); }
+
+    [Rpc(TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
+    private void MadeForYou(int id) => Made?.Invoke(id);
+
     /// <summary>Tells the server this player has a menu open or closed; the world stands still while everyone has one open.</summary>
     public void Hold(bool held) { if (welcomed) RpcId(ServerId, MethodName.Holding, held); }
 
@@ -327,7 +350,8 @@ public partial class Net : Node {
         if (World.Remote) World.Look();
         sendClock += dt;
         if (Hosting && sendClock >= SnapshotInterval) {
-            sendClock = 0;
+            // Only the remainder is dropped: starting again from zero would lose a frame's worth and send far fewer updates.
+            sendClock %= SnapshotInterval;
             if (World.Players.Count > 0) SendUpdates();
         } else if (welcomed && sendClock >= InputInterval) {
             sendClock = 0;
@@ -336,13 +360,13 @@ public partial class Net : Node {
         }
     }
 
-    /// <summary>Most of the way there each frame, so ten updates a second read as steady movement; a long way off is a jump.</summary>
+    /// <summary>Most of the way there each frame, so thirty updates a second read as steady movement; a long way off is a jump.</summary>
     private static Vector2 Glide(Vector2 from, Vector2 to, float dt) => from.DistanceTo(to) > MaxStep ? to : from.Lerp(to, 1 - MathF.Exp(-dt * 12));
 
     /// <summary>Sends an action with where this player stands, so the host checks its reach from there rather than from a position still gliding in.</summary>
     private void Send(Command c) => RpcId(ServerId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
 
-    private PlayerState? Guest() => World.Players.Find(p => p.Id == Multiplayer.GetRemoteSenderId());
+    private PlayerState? Guest() => World.PlayerById(Multiplayer.GetRemoteSenderId());
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.UnreliableOrdered, TransferChannel = StreamChannel)]
     private void Walked(int order, Vector2 at, int warp, int gathering, string held, bool sprinting, int seen) {
@@ -404,10 +428,15 @@ public partial class Net : Node {
         foreach (var w in World.Workers) w.WorkState = work.GetValueOrDefault(w.Id);
     }
 
-    /// <summary>Host: keeps a snapshot as the next update, forgetting the one no guest can still build on.</summary>
+    /// <summary>Host: keeps a snapshot as the next update, forgetting those no player can still build on.</summary>
     private Snapshot Remember(Snapshot entries) {
         sent[++sequence] = entries;
-        if (sent.Remove(sequence - History, out var old)) updates.Release(old);
+        // Confirmations only move forward, so nobody builds on anything older than the slowest player's.
+        int slowest = sequence;
+        foreach (var p in World.Players) slowest = Math.Min(slowest, acked.GetValueOrDefault(p.Id));
+        forgotten.Clear();
+        foreach (int old in sent.Keys) if (old < slowest || old <= sequence - History) forgotten.Add(old);
+        foreach (int old in forgotten) if (sent.Remove(old, out var snapshot)) updates.Release(snapshot);
         return entries;
     }
 
@@ -455,7 +484,7 @@ public partial class Net : Node {
     private void Apply(Snapshot entries) {
         var s = World.S;
         var stateKey = new EntryKey(EntryKey.State, 0);
-        if (Changed(entries, stateKey) is byte[] state && !(applied.TryGetValue(stateKey, out var stateBefore) && updates.SetNumbers(s, stateBefore, state))) CopyExcept(s, WorldUpdates.ReadState(state), WorldUpdates.Shared);
+        if (Changed(entries, stateKey) is byte[] state && !SetInPlace(s, stateKey, state)) CopyExcept(s, WorldUpdates.ReadState(state), WorldUpdates.Shared);
         Sync(s.Things, EntryKey.Thing, static t => t.Id, entries, false, null);
         Sync(s.Workers, EntryKey.Worker, static w => w.Id, entries, true, null);
         Sync(s.Wolves, EntryKey.Wolf, static w => w.Id, entries, true, null);
@@ -496,10 +525,15 @@ public partial class Net : Node {
             if (key.Prefix != prefix || have.ContainsKey(key.Id) && Shown(key, json)) continue;
             if (!have.TryGetValue(key.Id, out var old)) { list.Add(WorldUpdates.Read<T>(json)); continue; }
             var from = Position(old);
-            if (!applied.TryGetValue(key, out var before) || !updates.SetNumbers((T)old, before, json)) CopyExcept(old, WorldUpdates.Read<T>(json), null);
+            // Setting numbers leaves those that did not change, so a glider starts from the last update's position, not from how far it has glided.
+            if (glide && goals.TryGetValue(old, out var goal)) Place(old, goal);
+            if (!SetInPlace((T)old, key, json)) CopyExcept(old, WorldUpdates.Read<T>(json), null);
             if (glide && old != except) { goals[old] = Position(old); Place(old, from); }
         }
     }
+
+    /// <summary>Sets the numbers that differ from the entry this copy shows, or says the new entry must be read whole.</summary>
+    private bool SetInPlace<T>(T target, EntryKey key, byte[] json) where T : class => applied.TryGetValue(key, out var before) && updates.SetNumbers(target, before, json);
 
     // ---------- Merging into a guest's copy ----------
 

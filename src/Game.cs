@@ -76,8 +76,7 @@ public partial class Game : Node, IGameFlow {
             kit = new UiKit(world, sounds, Notify, RefreshLive);
             net = new Net { Name = "Net", World = world, Key = Settings.MachineKey }; AddChild(net);
             saves = new Saves(kit, net, this);
-            world.Sound = (name, at) => { PlayWorldSound(name, at); net.Echo(name, at); };
-            world.PlayerActed += (action, at) => net.Echo(world.ActorId, action, at);
+            world.Sound = PlayWorldSound;
             ConnectNet();
             sounds.OffScreen = view.OffScreen;
             var layer = new CanvasLayer(); AddChild(layer);
@@ -137,8 +136,9 @@ public partial class Game : Node, IGameFlow {
         net.Joined += OnJoined;
         net.Disconnected += ShowReconnecting;
         net.Reconnecting += left => startMenu.ShowRetry(left);
-        net.Left += reason => { startMenu.LeftReason = reason; Leave(); };
+        net.Left += reason => { if (ReturnAfterFailedJoin(reason)) return; startMenu.LeftReason = reason; Leave(); };
         net.Failed += JoinFailed;
+        net.Made += id => panel.SelectWhenHere(id);
     }
     /// <summary>Shown while a dropped guest tries to get back in, in place of the host's world, which it can no longer act on.</summary>
     private void ShowReconnecting() { world.NewGame(); startMenu.ShowReconnecting(); }
@@ -180,11 +180,12 @@ public partial class Game : Node, IGameFlow {
             saves.Slot = 0; panel.Open(Page.Welcome);
             Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
         } else {
-            if (slot > 0) saves.Slot = slot;
+            // The autosave a failed join came back from is not the slot the player was using.
+            if (returnNote == "") saves.Slot = slot;
             panel.Open(Page.Backpack); Notify("Settlement loaded.");
         }
     }
-    public void Leave() { StopHosted(); playingHere = startingGame = false; world.NewGame(); startMenu.ShowStart(); }
+    private void Leave() { StopHosted(); playingHere = startingGame = false; world.NewGame(); startMenu.ShowStart(); }
     public void ShowStart() { net.Leave(); Leave(); }
     void IGameFlow.Quit() => Quit();
     public void Restart() {
@@ -249,7 +250,7 @@ public partial class Game : Node, IGameFlow {
         if (hosted is not Server server) return;
         hosted = null;
         // Its line closes now, so its port is free for the next game at once.
-        server.Stop();
+        server.End();
         var branch = server.GetParent().GetParent();
         GetTree().SetMultiplayer(null, branch.GetPath());
         branch.QueueFree();
@@ -282,11 +283,16 @@ public partial class Game : Node, IGameFlow {
     public override void _Process(double delta) {
         if (world == null || view == null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;
-        player.Update(dt);
-        if (startingGame && serverProcess > 0 && !OS.IsProcessRunning(serverProcess)) { net.Leave(); GameFailedToStart(Net.ServerStopped); }
+        player.Update(dt); kit.HearMove(dt); panel.ShowAwaited();
+        // A server that dies says no goodbye, and the line would take most of a minute to notice.
+        if (serverProcess > 0 && (startingGame || net.Owning) && !OS.IsProcessRunning(serverProcess)) {
+            bool playing = !startingGame;
+            net.Leave();
+            if (playing) { serverProcess = 0; startMenu.LeftReason = Net.ServerStopped; Leave(); } else GameFailedToStart(Net.ServerStopped);
+        }
         // The server holds the world still while every player has a menu open, which in a game alone is whenever this one does.
         if (kit.Paused != holding) { holding = kit.Paused; net.Hold(holding); }
-        bool running = world.Remote ? !holding || world.Players.Count > 1 : !kit.Paused;
+        bool running = !holding || world.Remote && world.Players.Count > 1;
         if (running) {
             float health = world.Remote ? shownHealth : world.Health;
             // A world not on a server is one of the review fixtures', which runs here.

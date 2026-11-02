@@ -91,6 +91,7 @@ Allocation budgets:
 
 Measure frame rates on the RTX 4080 at 2560×1440 in a real window launched by `./build.py play`, and check the device line in the log; integrated-GPU and headless numbers don't count.
 `./build.py play -- --performance-run /absolute/path` followed by `python3 tools/performance_report.py /absolute/path` records a walking, day/night and staffed-settlement run.
+That run ticks the world in the window, so it leaves out the server and merging its updates.
 
 Keep models under the triangle ceilings in [assets/README.md](assets/README.md#changing-a-model).
 

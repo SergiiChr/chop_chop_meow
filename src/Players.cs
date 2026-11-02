@@ -55,7 +55,7 @@ public sealed class PlayerState {
 }
 
 /// <summary>The player actions a guest sends to the host.</summary>
-public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Duty, Enter, FetchPrices, Fire, FuelFire, Hire, Leave, LoadBatch, LoadFuel, LoadInput, PickUp, PickUpCrate, PlaceCrate, Pump, Sell, SetCompost, SetFilter, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, UnslotTool }
+public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, HoldHotbar, Leave, LoadBatch, LoadFuel, LoadInput, PickUp, PickUpCrate, PlaceCrate, Pump, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, UnslotTool }
 
 /// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
 public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At);
@@ -75,6 +75,8 @@ public sealed partial class World {
     public bool Remote => Host != null;
     /// <summary>Messages for players at other machines; null means all of them.</summary>
     public Action<PlayerState?, string>? Relay;
+    /// <summary>Server: a player made something their panel opens on, a mine or a worker, given as the player's id and its id.</summary>
+    public Action<int, int>? Made;
     // While the tick runs the shared world, what it says is for everyone.
     private bool everyone;
 
@@ -105,6 +107,26 @@ public sealed partial class World {
         return Host != null;
     }
 
+    /// <summary>Puts a hotbar slot in hand; the server keeps it, so a save has it.</summary>
+    public void HoldHotbar(int slot) {
+        if (slot is < 0 or > 8) return;
+        S.ActiveHotbar = slot;
+        Forwarded(Verb.HoldHotbar, count: slot);
+    }
+
+    /// <summary>Puts an item, or nothing, in a hotbar slot and that slot in hand; the server keeps it, so a save has it.</summary>
+    public void SetHotbar(int slot, string item) {
+        if (slot is < 0 or > 8) return;
+        S.HotbarSlots[slot] = item; S.ActiveHotbar = slot;
+        Forwarded(Verb.SetHotbar, count: slot, item: item);
+    }
+
+    /// <summary>Remembers in the save that its owner has seen the ending.</summary>
+    public void MarkEndingShown() {
+        S.EndingShown = true;
+        Forwarded(Verb.EndingShown);
+    }
+
     /// <summary>Host: runs a guest's action as that guest. The action checks reach and costs as it does for the host.</summary>
     public void Run(PlayerState p, Command c) => As(p, () => {
         var t = Find(c.Target);
@@ -126,6 +148,9 @@ public sealed partial class World {
                 break;
             case Verb.TransferSlot: if (Resolve(c.Target) is Inventory slotFrom && Resolve(c.Other) is Inventory slotTo) TransferSlot(slotFrom, slotTo, (int)c.At.X, (int)c.At.Y, c.Item, c.Count); break;
             case Verb.SortBag: SortBackpack(); break;
+            case Verb.HoldHotbar: HoldHotbar(c.Count); break;
+            case Verb.SetHotbar: SetHotbar(c.Count, c.Item); break;
+            case Verb.EndingShown: MarkEndingShown(); break;
             case Verb.SkipMorning: SkipMorning(); break;
             case Verb.Assign: if (w != null) Assign(w, t); break;
             case Verb.Duty: if (w != null && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, c.Item, c.Count != 0); break;
@@ -261,9 +286,10 @@ public sealed partial class World {
     public PlayerState Arrive(string key, int id) {
         var p = S.Absent.Remove(key, out var back) ? back : S.Absent.Remove("", out var unclaimed) ? unclaimed : Newcomer();
         p.Key = key; p.Id = id; p.Warp++; p.Shirt = Enumerable.Range(0, 4).First(i => S.Players.All(o => o.Shirt != i));
-        // What only made sense while they played: a cabin may have gone since, and the other properties follow input they no longer give.
+        // What only made sense while they played: a cabin may have gone and a building gone up where they stood, a wolf that had them pinned has moved on, and the other properties follow input they no longer give.
         if (Find(p.Sheltered)?.Kind != ThingKind.Hut) p.Sheltered = 0;
-        p.GatherTarget = 0; p.Held = ""; p.Sprinting = false; p.TorchKindling = 0;
+        if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
+        p.Mauled = false; p.GatherTarget = 0; p.Held = ""; p.Sprinting = false; p.TorchKindling = 0;
         S.Players.Add(p);
         NormalizeBottleStorage();
         if (S.Players.Count > 1) SayToAll("A neighbor joined the settlement.");
@@ -278,7 +304,7 @@ public sealed partial class World {
 
     /// <summary>Server: a player has gone; they stay in the world's save, with everything they carry, until they come back.</summary>
     public void Depart(int id) {
-        if (S.Players.Find(p => p.Id == id) is not PlayerState p) return;
+        if (PlayerById(id) is not PlayerState p) return;
         S.Players.Remove(p); S.Absent[p.Key] = p;
         if (S.Actor == p) S.Actor = S.Players.FirstOrDefault() ?? new PlayerState();
         SayToAll("A neighbor left the settlement.");
