@@ -58,8 +58,16 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
 
     /// <summary>What sets which pieces the page has changes on the server, so the page is drawn again when that comes back.</summary>
     private void WatchLayout() {
-        var drawn = (thing.Packs, thing.Recipe, thing.Compost);
-        live.Watch(() => (thing.Packs, thing.Recipe, thing.Compost), now => { if (now != drawn) RedrawLater(); });
+        var drawn = (thing.Packs, thing.Recipe, thing.Compost, FilterCode());
+        live.Watch(() => (thing.Packs, thing.Recipe, thing.Compost, FilterCode()), now => { if (now != drawn) RedrawLater(); });
+    }
+
+    /// <summary>A number that changes with the filters' contents.</summary>
+    private int FilterCode() {
+        int code = 0;
+        foreach (string item in thing.Inventory.InputFilter) code += item.GetHashCode();
+        foreach (string item in thing.Inventory.OutputFilter) code += 31 * item.GetHashCode();
+        return code;
     }
 
     /// <summary>What this kind of thing shows under its name.</summary>

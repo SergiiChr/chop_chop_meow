@@ -113,7 +113,7 @@ public partial class Net : Node {
     private Dictionary<int, WorkerWorkState> work = new();
     private readonly WorldUpdates updates = new();
     // Reused while a guest merges an update into its copy.
-    private readonly Dictionary<int, object> have = new();
+    private readonly List<EntryKey> differing = new();
     private readonly List<object> gone = new();
     private readonly List<int> forgotten = new();
 
@@ -506,6 +506,9 @@ public partial class Net : Node {
     /// <summary>Brings the guest's copy from the entries it shows now to <paramref name="entries"/>, touching only what differs.</summary>
     private void Apply(Snapshot entries) {
         var s = World.S;
+        differing.Clear();
+        foreach (var (key, value) in entries) if (!Shown(key, value)) differing.Add(key);
+        foreach (var key in applied.Keys) if (!entries.ContainsKey(key)) differing.Add(key);
         var stateKey = new EntryKey(EntryKey.State, 0);
         if (Changed(entries, stateKey) is byte[] state && !SetInPlace(s, stateKey, state)) CopyExcept(s, WorldUpdates.ReadState(state), WorldUpdates.Shared);
         Sync(s.Things, EntryKey.Thing, static t => t.Id, entries, false, null);
@@ -535,22 +538,21 @@ public partial class Net : Node {
     private bool Shown(EntryKey key, byte[] value) => applied.TryGetValue(key, out var before) && Snapshot.Same(before, value);
 
     /// <summary>
-    /// Updates the members of <paramref name="list"/> whose entries changed, in place, adds new ones and drops those without an entry.
+    /// Updates the members of <paramref name="list"/> whose entries differ from what the copy shows, in place, adds new ones and drops those without an entry.
     /// Updated members that <paramref name="glide"/> other than <paramref name="except"/> glide from where they were.
     /// </summary>
     private void Sync<T>(List<T> list, byte prefix, Func<T, int> id, Snapshot entries, bool glide, T? except) where T : class {
-        have.Clear();
-        for (int i = list.Count - 1; i >= 0; i--) {
-            var key = new EntryKey(prefix, id(list[i]));
-            if (entries.ContainsKey(key)) have[key.Id] = list[i]; else list.RemoveAt(i);
-        }
-        foreach (var (key, json) in entries) {
-            if (key.Prefix != prefix || have.ContainsKey(key.Id) && Shown(key, json)) continue;
-            if (!have.TryGetValue(key.Id, out var old)) { list.Add(WorldUpdates.Read<T>(json)); continue; }
+        foreach (var key in differing) {
+            if (key.Prefix != prefix) continue;
+            int at = list.Count - 1;
+            while (at >= 0 && id(list[at]) != key.Id) at--;
+            if (!entries.TryGetValue(key, out var json)) { if (at >= 0) list.RemoveAt(at); continue; }
+            if (at < 0) { list.Add(WorldUpdates.Read<T>(json)); continue; }
+            var old = list[at];
             var from = Position(old);
             // Setting numbers leaves those that did not change, so a glider starts from the last update's position, not from how far it has glided.
             if (glide && goals.TryGetValue(old, out var goal)) Place(old, goal);
-            if (!SetInPlace((T)old, key, json)) CopyExcept(old, WorldUpdates.Read<T>(json), null);
+            if (!SetInPlace(old, key, json)) CopyExcept(old, WorldUpdates.Read<T>(json), null);
             if (glide && old != except) { goals[old] = Position(old); Place(old, from); }
         }
     }

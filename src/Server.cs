@@ -15,6 +15,8 @@ public partial class Server : Node {
     private const int TicksPerSecond = 60;
     /// <summary>Ports to try; the first is the one guests expect, and the rest let a second game run on this computer.</summary>
     private const int GamePorts = 16;
+    /// <summary>Plays a performance run's camp, for a window recording one.</summary>
+    private const string PerformanceFlag = "--performance-fixture";
     public World World { get; private set; } = null!;
     /// <summary>The port it took.</summary>
     public int Port { get; private set; }
@@ -24,8 +26,9 @@ public partial class Server : Node {
     /// <summary>The game is over: the owner left or nobody came.</summary>
     public event Action? Ended;
 
-    /// <summary>The world a game starts from: the one in save slot <paramref name="slot"/>, or a new one when that is negative.</summary>
-    public static World Load(GameData data, int slot) => slot >= 0 ? Saves.Read(data, slot).World ?? throw new InvalidOperationException($"Cannot load slot {slot}.") : new World(data);
+    /// <summary>The world a game starts from: the one in save slot <paramref name="slot"/>, or a new one when that is negative, or a performance run's camp.</summary>
+    public static World Load(GameData data, int slot) => Launch.Has(PerformanceFlag) ? PerformanceFixture.Create(data)
+        : slot >= 0 ? Saves.Read(data, slot).World ?? throw new InvalidOperationException($"Cannot load slot {slot}.") : new World(data);
 
     /// <summary>
     /// Serves a world under <paramref name="parent"/> on the first free port.
@@ -58,12 +61,13 @@ public partial class Server : Node {
         Engine.MaxFps = TicksPerSecond;
         var server = Start(main, Load(data, int.Parse(Launch.Value("--slot") ?? "-1")), Launch.Value("--owner") ?? "");
         server.Ended += () => main.GetTree().Quit();
+        if (Launch.Has(PerformanceFlag)) main.AddChild(new PerformanceStage(server.World));
         using var file = Godot.FileAccess.Open(Launch.Value("--port-file") ?? throw new InvalidOperationException("A server needs a file to give its port in."), Godot.FileAccess.ModeFlags.Write);
         file.StoreString($"{server.Port}");
     }
 
     /// <summary>The game's own arguments for a server process: the save slot to load or -1 for a new world, the owner's key and the file to give its port in.</summary>
-    public static string[] Arguments(int slot, string owner, string portFile) => ["--server", "--slot", $"{slot}", "--owner", owner, "--port-file", portFile, "--file-prefix", Launch.FilePrefix];
+    public static string[] Arguments(int slot, string owner, string portFile) => ["--server", "--slot", $"{slot}", "--owner", owner, "--port-file", portFile, "--file-prefix", Launch.FilePrefix, .. Launch.Has("--performance-run") ? new[] { PerformanceFlag } : []];
 
     public override void _Process(double delta) {
         float dt = Math.Min((float)delta, .1f);

@@ -14,7 +14,7 @@ public sealed class FilterState {
 /// Drop an item on a row to add it, click one to take it off; an empty row allows anything.
 /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
 /// </summary>
-/// <param name="redraw">Draws the page again after a change to the filters.</param>
+/// <param name="redraw">Draws the page again after a change to this window; the page does so itself when the filters change.</param>
 public partial class FilterWindow(UiKit kit, Thing t, FilterState state, Action redraw) : VBoxContainer {
     private readonly World world = kit.World;
 
@@ -35,7 +35,7 @@ public partial class FilterWindow(UiKit kit, Thing t, FilterState state, Action 
             foreach (string item in filter.OrderBy(FilterName)) {
                 var cell = FilterCell($"filter_{(output ? "out" : "in")}_{item}", item); cell.TooltipText = $"{FilterName(item)}\nClick to take it off";
                 string id = item;
-                cell.Pressed += () => { world.SetFilter(t, id, output, false); redraw(); };
+                cell.Pressed += () => world.SetFilter(t, id, output, false);
                 row.AddChild(cell);
             }
             if (filter.Count == 0) { var any = Style.Text(post ? "no deliveries" : "anything", 14, Style.Tan); any.CustomMinimumSize = new Vector2(0, 44); row.AddChild(any); }
@@ -47,7 +47,7 @@ public partial class FilterWindow(UiKit kit, Thing t, FilterState state, Action 
             // The item stays where it was: a filter only names it, or for a packed crate the kind of crate it is.
             add.Take = drag => {
                 var kind = World.PackedKind(drag.Item);
-                world.SetFilter(t, kind.IsEmpty ? drag.Item : new string(kind), output, true); Callable.From(redraw).CallDeferred(); return 0;
+                world.SetFilter(t, kind.IsEmpty ? drag.Item : new string(kind), output, true); return 0;
             };
             row.AddChild(add);
         }
@@ -61,7 +61,7 @@ public partial class FilterWindow(UiKit kit, Thing t, FilterState state, Action 
                 picker.AddChild(cell);
             }
         }
-        var clear = kit.Button(post ? "Clear" : "Clear both", () => { world.ClearFilters(t); redraw(); }); clear.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; AddChild(clear);
+        var clear = kit.Button(post ? "Clear" : "Clear both", () => world.ClearFilters(t)); clear.SizeFlagsHorizontal = Control.SizeFlags.ShrinkEnd; AddChild(clear);
     }
 
     /// <summary>What a filter entry names: an item, or a crate of a good.</summary>

@@ -549,7 +549,7 @@ The world stands still while every player has a menu open, which alone means whe
 
 **Join game** on the start menu, or **Join** in the pause menu, opens a popup with the port already filled in and the address of the last game joined. Join is unavailable while hosting, since it would drop the guests. Up to three guests can join.
 Leaving your own game, by quitting, loading or joining another, ends it for everyone in it.
-If joining another game fails, your own comes back from the autosave written just before it.
+If joining another game fails or you cancel it, you go back to your own game, which waits on its server for 30 seconds. It is autosaved just before you try.
 A second window on the same computer cannot join a game the first is playing in.
 
 ### Players in the save

@@ -61,6 +61,7 @@ Simulation and data:
 | `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
 | `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
+| `src/Session.cs` | Where a window stands with the game it started |
 | `src/WorldUpdates.cs` | World updates as entries, their differences and compression |
 
 UI and input:
@@ -138,7 +139,7 @@ Checks and review tools:
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
-| `src/PerformanceRun.cs`, `src/PerformanceFixture.cs` | The rendered performance run |
+| `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
 | `src/AnimationCapture.cs` | Captures the animation review |
 
 ### Simulation, view and UI
@@ -164,9 +165,13 @@ The side panel only shows the building and sizes itself to what it holds.
 ### Multiplayer
 
 Every game runs on a `Server`, alone or together, which owns the only simulation and has no player of its own.
-The window that starts a game runs it as a headless child process of the same executable (`--server`) on the first free port from 24565, and joins it over localhost like any guest, showing a starting screen until it does.
-The network check runs the server inside the window, under a branch with its own `SceneMultiplayer`, so it can set its world up directly.
-The UI checks and the review fixtures run their world in the window instead, which ticks it whenever it is not on a server, so only `src/ServerChecks.cs` plays on the real process.
+The window that starts a game runs it as a headless child process of the same executable (`--server`).
+The server takes the first free port from 24565 itself, so two windows starting at once cannot pick the same one, and writes it to a file named for the window's process.
+The window joins it over localhost like any guest, showing a starting screen until it does.
+`Session` says where a window stands with the game it started: starting it, playing it, away from it to join another, or going back to it.
+The UI and network checks run the server inside the window, under a branch with its own `SceneMultiplayer`, so they can set its world up directly; the UI checks pump the line themselves (`Game.Settle`) rather than wait for it.
+`src/ServerChecks.cs` and the performance run play on the real process, which plays the fixture with `PerformanceStage` driving it.
+The review fixtures run their world in the window, which ticks it whenever it is not on a server.
 The server ends when its owner leaves, or when nobody has joined for 30 seconds.
 
 `SaveState.Players` holds one `PlayerState` per player playing now, and `SaveState.Absent` the rest of the world's players, each by the key of the machine they play from (`Settings.MachineKey`).
@@ -199,13 +204,14 @@ The welcome is a guest's first update, with the fog uncovered so far.
 
 - Updates go unreliably on their own channel, so a lost one never delays the next.
 - The whole world after a long stall, or a change too large for one packet, goes reliably on a third channel, so messages and actions never wait behind it.
-- Guests merge entries into their copy in place, so panels and the view keep their objects. A change to numbers alone is set directly (`WorldUpdates.SetNumbers`); anything else reads the entry whole.
+- Guests merge entries into their copy in place, so panels and the view keep their objects, and touch only entries that differ from what they show. A change to numbers alone is set directly (`WorldUpdates.SetNumbers`); anything else reads the entry whole.
+- The server writes every entry for each update and compares the bytes. With 876 things that costs 0.7 ms of its own process; marking what changed would save most of it, and one mutation missed would leave a guest's copy wrong without a sound.
 - A player keeps only the updates the server can still build on: confirmations only move forward, so nothing older than the update just taken's baseline is needed.
 - Each action carries where the guest stood, so the host checks reach from there rather than from a position still gliding in.
 - `Net.SendEveryUpdate` turns off ENet's throttle: it read the hitch of loading a game as a slow line, and let through one update in 32 for several seconds.
-- An action's result comes back with a later update. A window checks what it can before sending, `Net.Made` names a new mine or worker so the panel opens on it, and `UiKit.HearMove` plays an item's sound when the backpack changes.
+- An action's result comes back with a later update. A window checks what it can before sending, `Net.Made` names a new mine or worker so the panel opens on it, and `UiKit.HearMove` plays an item's sound when the backpack changes. Panels refresh every frame while `Net.AwaitingAnswer` holds, and a building's page draws itself again when what sets its layout changes (`ThingPage.WatchLayout`), since drawing it right after an action would show the world before the answer.
 - Leaving waits for the server to confirm before the line closes, so actions still in flight arrive; the owner's server closes instead, and the line going is the confirmation.
-- Joining another game from your own ends your server first, so `Game` starts the autosave again if the join fails or is cancelled.
+- Joining another game from your own autosaves it and leaves with `Net.StepAway`, which keeps its server up: a failed or cancelled join goes back to it, and after a good one it ends with nobody in it, 30 seconds later.
 - A player whose line drops lets `Net.Retry` join the same address again until `Net.ReconnectLimit` runs out. A new connection gets a new id, and takes the machine's player over from the old line, which the server may not have noticed has gone. Only the same window can: each sends its process id, because two windows on one computer share a key. It goes on trying while the server says the game is not open yet, as after the host loads a save.
 - Until the owner opens the game, the server refuses peers that are not on this computer. Only the owner can save; any player can hold the world, and it stands still while all of them do.
 

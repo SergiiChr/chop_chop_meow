@@ -79,7 +79,7 @@ public partial class Game : Node, IGameFlow {
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
             if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
-            StartPerformanceRun();
+            if (Launch.Has("--performance-run")) StartGame(-1);
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
             if (Launch.Has("--server-check")) RunServerCheck();
@@ -169,6 +169,7 @@ public partial class Game : Node, IGameFlow {
             Notify(back ? "Reconnected to the host's settlement." : "Joined the host's settlement. The host's saves keep your belongings.");
         }
         session = net.Owning ? new Session.Playing() : new Session.None();
+        if (Launch.Has("--performance-run")) StartPerformanceRun();
     }
 
     /// <summary>Opens a game this window started: a new one on the welcome page, a loaded one on the backpack.</summary>
@@ -180,8 +181,8 @@ public partial class Game : Node, IGameFlow {
         } else { panel.Open(Page.Backpack); Notify("Settlement loaded."); }
     }
 
-    private void Leave() { StopHosted(); session = new Session.None(); world.NewGame(); startMenu.ShowStart(); }
-    public void ShowStart() { net.Leave(); Leave(); }
+    private void Leave() { LeaveServer(); session = new Session.None(); world.NewGame(); startMenu.ShowStart(); }
+    public void ShowStart() => Leave();
     void IGameFlow.Quit() => Quit();
     public void Restart() => StartGame(-1);
 
@@ -193,7 +194,7 @@ public partial class Game : Node, IGameFlow {
 
     /// <summary>Starts a server for a new game, or the one in <paramref name="slot"/>, and joins it as its owner once it is up.</summary>
     private void StartGame(int slot) {
-        net.Leave(); StopHosted();
+        LeaveServer();
         startMenu.ShowStarting();
         // The checks that set the world up directly run the server inside this window, under a branch with its own network.
         if (Launch.Has("--net-check") || Launch.Has("--ui-test")) {
@@ -238,6 +239,9 @@ public partial class Game : Node, IGameFlow {
         net.Leave();
         if (playing) { serverProcess = 0; startMenu.LeftReason = Net.ServerStopped; Leave(); } else GameFailedToStart(Net.ServerStopped);
     }
+
+    /// <summary>Leaves the game; a server inside this window goes first, since it could not answer a window waiting for it on the same thread.</summary>
+    private void LeaveServer() { StopHosted(); net.Leave(); }
 
     /// <summary>Ends the server running inside this window, if any.</summary>
     private void StopHosted() {
@@ -313,7 +317,7 @@ public partial class Game : Node, IGameFlow {
     }
     private async void Quit(int code = 0) {
         if (quitting) return;
-        quitting = true; net.Leave(); StopHosted(); sounds.StopAll(); await Seconds(.2);
+        quitting = true; LeaveServer(); sounds.StopAll(); await Seconds(.2);
         // Godot objects left to the finalizer must be released before the engine shuts down, or a late finalizer aborts the exit.
         GC.Collect(); GC.WaitForPendingFinalizers(); GetTree().Quit(code);
     }
