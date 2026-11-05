@@ -232,13 +232,25 @@ public partial class WorldView : Node3D {
         public float Time;
         public float PreviousTime = -1;
         public bool Moving;
+        // The action blended out of after a change, where it was, and how far the blend into the new one has gone.
+        public ActorAction From;
+        public float FromTime;
+        public bool FromMoving;
+        public float Blend = 1;
         public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt) {
-            Moving = position.DistanceSquaredTo(Position) > .000001f;
-            float yaw = ActorAnimation.Yaw(Moving ? position - Position : facingTarget - position, Yaw);
+            bool moving = position.DistanceSquaredTo(Position) > .000001f;
+            float yaw = ActorAnimation.Yaw(moving ? position - Position : facingTarget - position, Yaw);
             Yaw = Mathf.LerpAngle(Yaw, yaw, Math.Min(1, dt * 14));
             Position = position;
-            if (Action != action) { Action = action; Time = 0; PreviousTime = -1; } else { PreviousTime = Time; Time += dt; }
+            if (Action != action) {
+                From = Action; FromTime = Time; FromMoving = Moving; Blend = 0;
+                Action = action; Time = 0; PreviousTime = -1;
+            } else { PreviousTime = Time; Time += dt; }
+            FromTime += dt;
+            Blend = Math.Min(1, Blend + dt / ActorAnimation.BlendSeconds);
+            Moving = moving;
         }
+        public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend);
         /// <summary>True on the frame an action loop passes its impact moment.</summary>
         public bool Struck(float at) {
             if (PreviousTime < 0) return false;
@@ -433,7 +445,7 @@ public partial class WorldView : Node3D {
             playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
         }
         bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
-        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting);
+        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting, World.CraftRate > 0);
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
@@ -539,7 +551,7 @@ public partial class WorldView : Node3D {
             bool moving = p.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var target = World.Find(p.GatherTarget);
             bool gathering = target != null && p.Pos.DistanceTo(World.GatherAt(target, p.Pos)) < 2.5f;
-            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting);
+            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting, p.Making != "" || p.Crafting.Count > 0);
             var subject = gathering ? target : null;
             var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
             if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; subject = ThingAt(other.PulseTarget); }
@@ -582,7 +594,7 @@ public partial class WorldView : Node3D {
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false) {
         rig.Root.Position = To3(state.Position);
         rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
-        var pose = ActorAnimation.PoseAt(state.Action, state.Time, state.Moving);
+        var pose = state.Pose;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
         rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);

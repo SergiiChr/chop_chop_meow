@@ -24,7 +24,8 @@ public enum ActorAction {
     Devoured,
     Protest,
     PickUp,
-    Pack
+    Pack,
+    Craft
 }
 
 /// <summary>
@@ -34,19 +35,20 @@ public enum ActorAction {
 /// Turn splays a thigh outward and Roll turns it about its own length, so a bent knee folds the shin sideways across the body.
 /// Seat is the hip height for sitting on the ground; zero keeps the lower foot on the ground instead.
 /// Sway tips the torso sideways over the hips; positive tips it toward the right side.
+/// Lift raises the body off the ground, for the moment both feet are in the air in a run.
 /// </summary>
 public readonly record struct Pose(
     float Lean = 0, float Twist = 0, float Head = 0,
     float RaiseL = 6, float OutL = 7, float ElbowL = 12,
     float RaiseR = 6, float OutR = 7, float ElbowR = 12,
     float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0,
-    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Seat = 0, float Sway = 0) {
+    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Seat = 0, float Sway = 0, float Lift = 0) {
     public static Pose Lerp(Pose a, Pose b, float t) => new(
         Mathf.Lerp(a.Lean, b.Lean, t), Mathf.Lerp(a.Twist, b.Twist, t), Mathf.Lerp(a.Head, b.Head, t),
         Mathf.Lerp(a.RaiseL, b.RaiseL, t), Mathf.Lerp(a.OutL, b.OutL, t), Mathf.Lerp(a.ElbowL, b.ElbowL, t),
         Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
         Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t),
-        Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), Mathf.Lerp(a.Seat, b.Seat, t), Mathf.Lerp(a.Sway, b.Sway, t));
+        Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), Mathf.Lerp(a.Seat, b.Seat, t), Mathf.Lerp(a.Sway, b.Sway, t), Mathf.Lerp(a.Lift, b.Lift, t));
 }
 
 /// <summary>Pure actor animation selection, timing and keyframed poses.</summary>
@@ -68,6 +70,7 @@ public static class ActorAnimation {
         ActorAction.Protest => 1.6f,
         ActorAction.PickUp => .9f,
         ActorAction.Pack => 2.4f,
+        ActorAction.Craft => 2.4f,
         _ => 1
     };
 
@@ -110,11 +113,23 @@ public static class ActorAnimation {
                 float arm = MathF.Sin((p - .06f) * Mathf.Tau);
                 var loose = Stride(wave, p) with { Twist = wave * 7, RaiseL = 4 - arm * 30, OutL = 9 + Math.Max(0, arm) * 4, ElbowL = 14 + Math.Max(0, -arm) * 28 };
                 return loose with { RaiseR = 4 + arm * 30, OutR = 9 + Math.Max(0, -arm) * 4, ElbowR = 14 + Math.Max(0, arm) * 28 };
-            case ActorAction.Run:
-                // A longer, quicker stride pitched forward, with bent arms pumping against the legs.
-                float push = MathF.Cos(p * Mathf.Tau);
-                return new Pose(Lean: 14, Head: -6, Twist: wave * 8, Sway: push * 2.5f, RaiseL: 20 - wave * 50, OutL: 10, ElbowL: 85, RaiseR: 20 + wave * 50, OutR: 10, ElbowR: 85,
-                    SwingL: wave * 42, KneeL: 14 + Math.Max(0, push) * 70, SwingR: -wave * 42, KneeR: 14 + Math.Max(0, -push) * 70);
+            case ActorAction.Run: {
+                    // Each foot lands ahead, the leg straightens under the body and drives off behind, then the heel folds up high as it swings through.
+                    // After each push-off both feet are off the ground for a moment, and the body rises and leans into it.
+                    var (swingL, kneeL, liftL) = RunLeg(p - .25f);
+                    var (swingR, kneeR, liftR) = RunLeg(p - .75f);
+                    float drive = MathF.Cos(p * Mathf.Tau * 2);
+                    return new Pose(Lean: 15 - drive * 2.5f, Head: -7 + drive * 2, Twist: wave * 9, Sway: MathF.Cos(p * Mathf.Tau) * 2,
+                        RaiseL: 22 - wave * 52, OutL: 10, ElbowL: 92 + wave * 12, RaiseR: 22 + wave * 52, OutR: 10, ElbowR: 92 - wave * 12,
+                        SwingL: swingL, KneeL: kneeL, SwingR: swingR, KneeR: kneeR, Lift: liftL + liftR);
+                }
+            case ActorAction.Craft: {
+                    // Squatting on the heels, leaning over the work in both hands, which keep turning and fitting it.
+                    float a = MathF.Sin(p * Mathf.Tau * 3), b = MathF.Sin(p * Mathf.Tau * 2 + 1.3f), c = MathF.Sin(p * Mathf.Tau * 5 + .4f);
+                    return new Pose(Lean: 30 + b * 2, Head: 24 + a * 3, Twist: a * 4,
+                        RaiseL: 48 + a * 9, OutL: -22 + c * 6, ElbowL: 78 + b * 16, RaiseR: 50 - b * 8, OutR: -22 - c * 5, ElbowR: 76 + a * 14,
+                        SwingL: 98, KneeL: 150, SwingR: 92, KneeR: 146, TurnL: 14, TurnR: 14);
+                }
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
                 return moving ? Stride(wave, p) with { Lean = carry.Lean, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
@@ -217,11 +232,43 @@ public static class ActorAnimation {
         }
     }
 
-    /// <summary>The legs of a walk: the torso tips over the planted leg while the other knee folds to swing through, and dips forward at each step.</summary>
+    /// <summary>
+    /// The legs of a walk: the torso tips over the planted leg and dips forward at each step.
+    /// The planted knee gives a little as the foot takes the weight and straightens to push off; the other folds to swing through.
+    /// </summary>
     private static Pose Stride(float wave, float phase) {
         float lift = MathF.Cos(phase * Mathf.Tau), step = MathF.Cos(phase * Mathf.Tau * 2);
         return new Pose(Lean: 5 + step * 1.5f, Head: -step * 1.5f, Sway: lift * 3.5f,
-            SwingL: wave * 30, SwingR: -wave * 30, KneeL: 10 + Math.Max(0, lift) * 40, KneeR: 10 + Math.Max(0, -lift) * 40);
+            SwingL: wave * 30, SwingR: -wave * 30, KneeL: WalkKnee(phase - .25f), KneeR: WalkKnee(phase - .75f));
+    }
+
+    /// <summary>A walking knee from the moment its foot lands: a small give under the weight, straight at push-off, then folded through the swing.</summary>
+    private static float WalkKnee(float sinceStrike) {
+        float q = sinceStrike - MathF.Floor(sinceStrike);
+        return q < .6f ? 6 + 12 * MathF.Sin(MathF.PI * q / .6f) : 6 + 52 * MathF.Sin(MathF.PI * (q - .6f) / .4f);
+    }
+
+    /// <summary>
+    /// A running leg from the moment its foot lands ahead: it sweeps back straightening to push off by four tenths of the stride,
+    /// then folds high and reaches forward again; the push-off lifts the body for the tenth after it.
+    /// </summary>
+    private static (float Swing, float Knee, float Lift) RunLeg(float sinceStrike) {
+        float q = sinceStrike - MathF.Floor(sinceStrike);
+        float swing = 40 * MathF.Cos(q * Mathf.Tau);
+        float knee = q < .4f ? 8 + 22 * MathF.Sin(MathF.PI * q / .4f) : 8 + 108 * MathF.Sin(MathF.PI * (q - .4f) / .6f);
+        float lift = q is >= .4f and < .5f ? .07f * MathF.Sin(MathF.PI * (q - .4f) / .1f) : 0;
+        return (swing, knee, lift);
+    }
+
+    /// <summary>How long a change of action blends from the old pose into the new one.</summary>
+    public const float BlendSeconds = .22f;
+
+    /// <summary>The pose part way through a change of action, eased from the old action's pose at <paramref name="blend"/> 0 to the new one's at 1.</summary>
+    public static Pose Blended(ActorAction from, float fromTime, bool fromMoving, ActorAction to, float time, bool moving, float blend) {
+        var now = PoseAt(to, time, moving);
+        if (blend >= 1) return now;
+        float t = Math.Clamp(blend, 0, 1);
+        return Pose.Lerp(PoseAt(from, fromTime, fromMoving), now, t * t * (3 - 2 * t));
     }
 
     /// <summary>Loops smoothly through keys sorted by phase; the last key eases back into the first.</summary>
@@ -236,14 +283,16 @@ public static class ActorAnimation {
         return keys[0].Pose;
     }
 
+    /// <param name="crafting">Something is being made by hand, which the player squats over while standing still.</param>
     public static ActorAction PlayerAction(
         ThingKind? resourceKind,
         bool gathering,
         bool moving,
         Inventory backpack,
-        bool sprinting = false) {
+        bool sprinting = false,
+        bool crafting = false) {
         if (moving) return sprinting ? ActorAction.Run : ActorAction.Walk;
-        if (!gathering || resourceKind == null) return ActorAction.Idle;
+        if (!gathering || resourceKind == null) return crafting ? ActorAction.Craft : ActorAction.Idle;
 
         return resourceKind switch {
             ThingKind.Tree => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,

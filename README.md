@@ -276,7 +276,7 @@ Reaching both shows an ending screen with Restart and Keep playing.
 
 The crafting menu (C) works on the go at base speed, about 10 seconds a recipe, and queues up to 99 of each recipe.
 Queueing takes the materials from the backpack at once.
-Crafting goes on only while you stand still: walking pauses it until you stop.
+Crafting goes on only while you stand still, squatting over the work: walking stands you up and pauses it until you stop.
 Recipes are grouped into tabs by the tool they need, red while you carry none.
 
 A stone chisel takes 2 stone and no tool.
