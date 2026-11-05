@@ -150,8 +150,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
 }
 
 /// <summary>What waits in a queue, one cup per recipe in the order first queued; a right-click takes 1, 5 or 10 batches off.</summary>
-/// <param name="queue">The queue as the strip is drawn; the page draws it again when its recipes change.</param>
-/// <param name="waiting">Batches of a recipe waiting now.</param>
+/// <param name="station">The station whose queue it shows, or null for the hand's; the page draws it again when the queue's recipes change.</param>
 public partial class QueueStrip(UiKit kit, LiveUpdates live, Thing? station) : HBoxContainer {
     public override void _Ready() {
         var world = kit.World;

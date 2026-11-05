@@ -284,13 +284,11 @@ public sealed partial class World {
     public const float TripDistance = 8;
     /// <summary>How fast a worker walks, in tiles a second.</summary>
     public const float WorkerSpeed = 2.25f;
-    /// <summary>How far out a cart is, from 0 at the start through 1 at the halfway turn and back to 0.</summary>
-    public static float TripLeg(float phase) => phase < .5f ? phase * 2 : (1 - phase) * 2;
     /// <summary>
     /// How far down the valley a worker walking off is, from 0 at the signpost to 1 out of view, after <paramref name="out"/> seconds away and <paramref name="back"/> seconds before coming back.
-    /// The worker walks at walking pace and waits out of view for the rest of the trip.
+    /// The walker goes at <paramref name="speed"/>, a worker's walking pace unless given, over <paramref name="distance"/>, and waits out of view for the rest of the trip.
     /// </summary>
-    public static float WalkLeg(float @out, float back) => Math.Clamp(Math.Min(@out, back) * WorkerSpeed / TripDistance, 0, 1);
+    public static float WalkLeg(float @out, float back, float speed = WorkerSpeed, float distance = TripDistance) => Math.Clamp(Math.Min(@out, back) * speed / distance, 0, 1);
     public const float LeapSeconds = .4f;
     // A wolf leaps from within LeapRange and lands PinDistance away, where its jaws reach the throat of the downed player.
     private bool packAttack { get => S.Actor.PackAttack; set => S.Actor.PackAttack = value; }
@@ -1600,7 +1598,7 @@ public sealed partial class World {
             return;
         }
         // A gatherer also fetches a tool that only speeds the work up, such as a rake, while a tool station has one.
-        string? need = target is { IsResource: true } && HasDuty(w, target.Id, "gather") ? GatherRules.Of(target.Kind)?.Needs ?? (GatherRules.Of(target.Kind)?.Helps is string helping && HasTool(w, helping) ? helping : null)
+        string? need = target is { IsResource: true } && HasDuty(w, target.Id, "gather") && GatherRules.Of(target.Kind) is GatherRule rule ? rule.Needs ?? (rule.Helps is string helping && HasTool(w, helping) ? helping : null)
             : target is { Kind: ThingKind.Mine } ? MineTool(w, target) : null;
         if (need == null) w.Missing = "";
         if (w.Tool != "" && Data.Items[w.Tool].Tool != need) {

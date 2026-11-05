@@ -136,7 +136,8 @@ public static class WorkerStateChecks {
         world.Assign(cutter, tree);
         for (int i = 0; i < 20; i++) world.Tick(.1f);
         Require(cutter.Missing == "axe", "a woodcutter with no axe anywhere should wait for one");
-        world.SetFilter(rack, "steel_axe", true, false); world.SetFilter(rack, "steel_pick", true, true);
+        // An output filter naming only the pickaxe keeps the axe in.
+        world.SetFilter(rack, "steel_pick", true, true);
         Give(world, "steel_axe", 2); world.Transfer(world.Backpack, rack.Inventory, "steel_axe", 1);
         for (int i = 0; i < 20; i++) world.Tick(.1f);
         Require(cutter.Tool == "" && rack.Inventory["steel_axe"] == 1, "a tool station whose filter keeps its axe in should not give it out");

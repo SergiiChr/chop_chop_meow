@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace ChopChopMeow;
@@ -11,6 +12,7 @@ public enum GatherShape { Patch, Deposit, Loose }
 /// <param name="Helps">A tool kind that only speeds gathering it up, or null.</param>
 /// <param name="ByHand">How many times longer a gather takes without the helping tool.</param>
 /// <param name="Chip">The loose piece a pickaxe hit now and then knocks off it, or null.</param>
+/// <param name="Shape">Whether it is worked down, an ore deposit or a loose piece.</param>
 public readonly record struct GatherRule(string Item, string? Needs = null, string? Helps = null, float ByHand = 1, ThingKind? Chip = null, GatherShape Shape = GatherShape.Patch);
 
 /// <summary>Every gathering rule in one table, so a new resource is one line here.</summary>
@@ -37,8 +39,17 @@ public static class GatherRules {
         [ThingKind.TinChip] = new("tin_ore", Shape: GatherShape.Loose),
     };
 
+    // The same rules by kind, since every resource check in the tick and the view asks for one.
+    private static readonly GatherRule?[] ByKind = ByKindOf(All);
+
+    private static GatherRule?[] ByKindOf(Dictionary<ThingKind, GatherRule> rules) {
+        var byKind = new GatherRule?[Enum.GetValues<ThingKind>().Length];
+        foreach (var (kind, rule) in rules) byKind[(int)kind] = rule;
+        return byKind;
+    }
+
     /// <summary>The rule for gathering a kind, or null for anything that is not gathered.</summary>
-    public static GatherRule? Of(ThingKind kind) => All.TryGetValue(kind, out var rule) ? rule : null;
+    public static GatherRule? Of(ThingKind kind) => ByKind[(int)kind];
 
     /// <summary>The tool kind that spots yielding an item take, such as an axe for wood, or null when every one is gathered by hand.</summary>
     public static string? ToolFor(string item) {

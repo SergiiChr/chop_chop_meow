@@ -1006,7 +1006,7 @@ public partial class WorldView : Node3D {
     // The cart walks at a steady pace until it is well down the valley, waits there out of view, and walks back for the return; the trade delay is unchanged.
     private const float CartSpeed = 2.2f, CartDistance = 16;
     /// <summary>How far out a cart is, from 0 at the signpost to 1 where it has gone from view.</summary>
-    private float CartLeg(float elapsed) => Math.Clamp(Math.Min(elapsed, World.Data.TradeSeconds - elapsed) * CartSpeed / CartDistance, 0, 1);
+    private float CartLeg(float elapsed) => World.WalkLeg(elapsed, World.Data.TradeSeconds - elapsed, CartSpeed, CartDistance);
     /// <summary>Fully drawn for most of the walk, fading out over its last quarter.</summary>
     private static float CartFade(float leg) => Math.Clamp((leg - .75f) / .25f, 0, 1);
     private readonly Dictionary<Node, float> fades = new();
