@@ -228,7 +228,7 @@ public static class WorldModels {
             case ThingKind.Coal: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
             case ThingKind.Tin: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
             case ThingKind.LooseCoal: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "2d2f33", "1d1e21"); break;
-            case ThingKind.LooseStone: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "9a9c95", "7a7d77"); break;
+            case ThingKind.LooseStone: prop = new LooseProp(); var stone = Pivot(prop.Body, Vector3.Zero); stone.Scale = Vector3.One * 1.7f; LooseOre(stone, t.Kind.Id(), t.Id, "9a9c95", "7a7d77"); break;
             case ThingKind.IronChip: prop = new LooseProp(); LooseOre(prop.Body, "loose_iron", t.Id, "a35a2e", "8b4f2b"); break;
             case ThingKind.TinChip: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "b9bcb4", "8f928b"); break;
             case ThingKind.Stick: prop = new LooseProp(); Stick(prop.Body, t.Id); break;
