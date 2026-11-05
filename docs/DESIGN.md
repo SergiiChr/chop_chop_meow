@@ -244,7 +244,7 @@ Actor animation is driven by gameplay state.
 `ActorAnimation` maps state to an action and returns keyframed joint angles (`Pose`) for any time.
 `ActorRig` applies them to a hierarchy of hips, torso, head, shoulders, elbows, thighs and knees, lifting the hips so the lower foot stays on the ground unless `Pose.Hips` sets their height.
 A run sets it: the hips rise and fall smoothly twice a stride, lowest over the planted foot and highest after each push-off, and a planted knee bends just enough to keep its foot on the ground.
-A change of action blends from the old pose into the new one over `ActorAnimation.BlendSeconds`, while the body turns toward where it moves, so standing up from a squat into a walk is one motion.
+A change of action blends from the old pose into the new one over `ActorAnimation.BlendSeconds`, while the body turns toward where it moves, so standing up from a squat into a walk is one motion; a blend into or out of a set hip height, such as a run's crouch, keeps the feet out of the ground.
 Walking and running legs follow each foot from its landing: the knee gives under the weight, straightens to push off behind, and folds to swing through; a run's push-off leaves both feet off the ground for a tenth of a stride.
 A player with something to make by hand squats over it, turning it in both hands (`ActorAction.Craft`), only while standing still.
 

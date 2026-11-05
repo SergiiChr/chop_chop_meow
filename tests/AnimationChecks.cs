@@ -38,6 +38,12 @@ public static class AnimationChecks {
         Require(ActorAnimation.Blended(ActorAction.Craft, .5f, false, ActorAction.Walk, 0, true, 1) == walk, "a finished blend should be the new pose");
         var halfway = ActorAnimation.Blended(ActorAction.Craft, .5f, false, ActorAction.Walk, 0, true, .5f);
         Require(halfway.KneeL < squat.KneeL && halfway.KneeL > walk.KneeL, "halfway through, the knees should be rising out of the squat");
+        // Stopping from a run rises out of its crouch onto the feet: no step of the blend sinks a foot into the ground.
+        for (int i = 0; i <= 10; i++) {
+            var stopping = ActorAnimation.Blended(ActorAction.Run, .3f, true, ActorAction.Idle, 0, false, i / 10f);
+            float lowest = stopping.HipHeight - ActorAnimation.Sole - Math.Max(ActorAnimation.Reach(stopping.SwingL, stopping.KneeL), ActorAnimation.Reach(stopping.SwingR, stopping.KneeR));
+            Require(lowest > -.001f, $"stopping from a run should not sink the feet into the ground: {lowest:0.000} m at {i / 10f:0.0} of the blend");
+        }
     }
 
     /// <summary>A run leaves the ground for a while after each push-off, never sinks a foot into it, and carries the hips up and down smoothly.</summary>

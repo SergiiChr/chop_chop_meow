@@ -261,7 +261,7 @@ public sealed class ActorRig {
         kneeR.RotationDegrees = new Vector3(pose.KneeR, 0, 0);
         foreach (var (skeleton, joint) in limbs)
             skeleton.SetBonePoseRotation(1, joint.Quaternion);
-        hips.Position = new Vector3(0, pose.Hips > 0 ? pose.Hips : Math.Max(ActorAnimation.Reach(pose.SwingL, pose.KneeL), ActorAnimation.Reach(pose.SwingR, pose.KneeR)) + Sole, 0);
+        hips.Position = new Vector3(0, pose.HipHeight, 0);
         rock.Visible = onRock;
         foreach (var (name, node) in tools) node.Visible = name == tool;
         crate.Visible = carrying;
