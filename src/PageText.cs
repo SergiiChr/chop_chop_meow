@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 
 namespace ChopChopMeow;
@@ -30,6 +31,19 @@ public static class PageText {
     }
 
     public static string Needs(World world, Dictionary<string, int> cost) => LiveText.Of(text => AppendNeeds(world, text, cost));
+
+    /// <summary>What a mine takes from marking to mining, stage by stage, and what it makes once complete.</summary>
+    public static string MinePlan(GameData data) {
+        var mine = data.Mine;
+        string materials = string.Join("  ·  ", mine.Materials.Select(p => $"{data.Name(p.Key)} {p.Value}"));
+        int perHour = (int)MathF.Round(data.HourSeconds / mine.Seconds * mine.Workers);
+        string days = mine.StageWorkdays == 1 ? "a working day" : $"{mine.StageWorkdays:0.#} working days";
+        return $"Marking the mine spot is free. It is built in stages, with tools and materials brought along the way.\n\n"
+            + $"Stage 1 · a worker with a pickaxe digs out an opening, in {days}.\n"
+            + $"Stage 2 · delivered: {materials}.\n"
+            + $"Stage 3 · a worker with a hammer finishes the build, in {days}.\n"
+            + $"Complete · {mine.Workers} miners work it at the same time, each with a pickaxe, and bring out about {perHour} ore and {perHour} stone an hour.";
+    }
 
     /// <summary>Each input with how many it takes.</summary>
     public static string Cost(World world, Dictionary<string, int> cost) {

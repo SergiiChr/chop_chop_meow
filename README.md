@@ -497,7 +497,7 @@ An unpaid worker strikes, standing with a "No pay - no work" sign, and owed wage
 
 ## Mines
 
-A mine is marked for free from the building plans.
+A mine is marked for free from the building plans, which list what each of its stages takes and what the finished mine brings out.
 The plan snaps to a rock spur past the seaward end of the nearest ore cliff and shows a see-through green outline.
 Each cliff takes one mine.
 

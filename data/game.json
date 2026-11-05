@@ -396,7 +396,7 @@
     "mine": {
       "name": "Mine",
       "cost": {},
-      "description": "Marking is free and snaps to an ore cliff, one mine per cliff. Dig with a pickaxe, deliver 50 wood, 10 iron bars and 50 stone, then fit it with a hammer. Up to 3 miners with pickaxes bring out ore and rocks for good."
+      "description": "Marking is free and snaps to an ore cliff, one mine per cliff. It is built in stages, then miners with pickaxes bring out ore and rocks for good."
     },
     "pile": {
       "name": "Pile",
