@@ -403,6 +403,11 @@ internal static class NatureShape {
         return v < 0 || u + v > 1 || t <= 0 ? null : t;
     }
 
+    /// <summary>A single flat stone lying half sunk in the ground, a faceted pebble turned by its variant.</summary>
+    public static Mesh Pebble(Color color, int variant) => Cached($"pebble{variant}", s =>
+        Blob(s, new Vector3(0, .05f, 0), new Vector3(.3f, .15f, .24f), 0, 731 + variant * 7, 2, .2f, .08f, 0, true,
+            (_, normal) => color.Lightened(normal.Y * .1f).Darkened(Math.Max(0, -normal.Y) * .3f)));
+
     /// <summary>A few loose lumps lying on the ground, each a faceted nugget seated flat.</summary>
     public static Mesh Loose(string kind, Color light, Color dark, int variant) => Cached($"loose{kind}{variant}", s => {
         var random = new Random(701 + variant);
