@@ -732,7 +732,7 @@ public sealed partial class World {
     }
     /// <summary>Points a station that is between batches at its first queued recipe, else the one it keeps making.</summary>
     private static void Retarget(Thing t) { if (!t.Processing) t.Recipe = t.Queue.Count > 0 ? t.Queue[0].Recipe : t.Keep; }
-    /// <summary>Queues one batch of a recipe and tops the station up from the backpack to one batch of its inputs and one fuel.</summary>
+    /// <summary>Queues one batch of a recipe and loads a whole batch of its inputs and one fuel from the backpack, on top of what the station holds.</summary>
     public void QueueBatch(Thing t, string recipe) {
         if (!Makes(t, recipe)) return;
         if (!Near(t)) { Say("Walk closer to load this building."); return; }
@@ -740,8 +740,8 @@ public sealed partial class World {
         if (Waiting(new(t.Queue), recipe) >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
         QueueRecipe(t, recipe, 1);
         var r = Data.Recipes[recipe];
-        foreach (var (item, amount) in r.Inputs) if (amount > t.Inventory[item]) LoadInput(t, item, amount - t.Inventory[item]);
-        if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost) is string fuel && t.Burner.First() == null) LoadFuel(t, fuel, 1);
+        foreach (var (item, amount) in r.Inputs) LoadInput(t, item, amount);
+        if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost) is string fuel) LoadFuel(t, fuel, 1);
     }
     private static readonly Dictionary<string, int> NoCost = new();
     /// <summary>

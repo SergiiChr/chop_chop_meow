@@ -42,6 +42,7 @@ public static class SimulationChecks {
         CheckFurnacesBurnOneFuelAndWaitForSteelHeat(data);
         CheckHaulerFuelsSmeltingWithCoalAndReturnsWood(data);
         CheckStationMakesItsQueueThenWhatItKeeps(data);
+        CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere(data);
         CheckAnvilNeedsHammering(data);
         CheckFinishedBatchWaitsForOutputRoom(data);
         CheckToolsGateMiningAndFelling(data);
@@ -676,6 +677,19 @@ public static class SimulationChecks {
         world.QueueBatch(furnace, "tin_bar");
         Require(furnace.Recipe == "tin_bar" && furnace.Inventory["tin_ore"] == 2 && furnace.Burner!["coal"] == 1 && world.Backpack["coal"] == 0 && world.Backpack["tin_ore"] == 0,
             "a double-click should queue a batch and load its inputs and one fuel");
+    }
+
+    /// <summary>A double-click loads a whole batch and one fuel from the backpack, whatever the station already holds.</summary>
+    private static void CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
+        world.Player = furnace.Pos + Vector2.One;
+        Give(world, "tin_ore", 3); Give(world, "coal", 2);
+        world.SetRecipe(furnace, "tin_bar");
+        world.LoadInput(furnace, "tin_ore", 1); world.LoadFuel(furnace, "coal", 1);
+        world.QueueBatch(furnace, "tin_bar");
+        Require(furnace.Inventory["tin_ore"] == 3 && furnace.Burner!["coal"] == 2 && world.Backpack["tin_ore"] == 0 && world.Backpack["coal"] == 0,
+            "a double-click should load a whole batch of inputs and one fuel on top of what the station holds");
     }
 
     private static void CheckFurnacesBurnOneFuelAndWaitForSteelHeat(GameData data) {
