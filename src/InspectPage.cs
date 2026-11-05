@@ -13,7 +13,6 @@ public static class InspectPage {
             null => new NothingSelectedPage(tools),
             { IsResource: true } t => new ResourcePanel(tools, t),
             { Kind: ThingKind.Hut } t => new CabinPanel(tools, t),
-            { Tools: not null } t => new BenchPanel(tools, t),
             { Kind: ThingKind.Signpost } t => new MarketPanel(tools, t),
             { Kind: ThingKind.Mine } t => new MinePanel(tools, t),
             { Kind: ThingKind.Farm } t => new FarmPanel(tools, t),
@@ -86,21 +85,24 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
 
     /// <summary>The thing's slots in a grid of cups; click takes one item, Ctrl all of it.</summary>
     protected GridContainer StorageGrid(int columns = GridColumns, float size = 52) =>
-        NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), "Click: take one · Ctrl: take all · Drag to move", columns: columns, size: size);
+        NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), "Click: take one · Shift: a stack · Ctrl: take all · Drag to move", columns: columns, size: size);
 
     /// <summary>The backpack drawer, where a click stores into this thing.</summary>
     protected void StoreBagGrid(string hint, Func<string, bool>? wanted = null) => BagGrid(id => moves.Stack(world.S.Backpack, thing.Inventory, id, thing), hint, wanted: wanted);
 
     /// <summary>The backpack drawer, where a click loads this station.</summary>
     protected void LoadBagGrid(Func<string, bool> wanted) =>
-        BagGrid(id => world.LoadInput(thing, id, ItemMoves.All ? world.Backpack[id] : 1), "Click: add one · Ctrl: all of it · Drag onto a slot", wanted: wanted);
+        BagGrid(id => world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id)), "Click: add one · Shift: a stack · Ctrl: all of it · Drag onto a slot", wanted: wanted);
+
+    /// <summary>Whether the filter window is open beside the panel.</summary>
+    protected bool FiltersOpen => filters.Open;
 
     /// <summary>The funnel that opens the filter window beside the panel, ringed while it is open.</summary>
     protected void FilterButton() {
         var button = HeaderAction("filter", "Filters: what workers bring and take", () => { filters.Open = !filters.Open; filters.Picking = false; Redraw(); }, Style.FilterRound, "filters");
         if (!filters.Open) return;
         Style.Skin(button, Style.Round(Style.Mustard, 18).Item1, Style.FilterRound.Hover);
-        panel.SideBoard(Style.Board, 340).AddChild(new FilterWindow(kit, thing, filters, Redraw));
+        panel.SideBoard(Style.Board, 340).AddChild(new FilterWindow(kit, thing, filters, Redraw, (list, rows) => panel.ShowSheetRows(list, rows, hidesDrawer: true)));
     }
 
     /// <summary>The row of job buttons, for a place that offers jobs.</summary>

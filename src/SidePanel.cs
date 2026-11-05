@@ -13,6 +13,8 @@ public sealed class PageMemory {
     public string CraftTab = "";
     /// <summary>Whether the trading post shows hiring rather than shipping, and whether its price sheet is open.</summary>
     public bool Hiring, SheetOpen = true;
+    /// <summary>A station's worker mark before the last press on its recipe board; the page may redraw between the two presses of a double-click.</summary>
+    public string KeptBefore = "";
 }
 
 /// <summary>What every page is built with.</summary>
@@ -65,7 +67,11 @@ public partial class SidePanel : PanelContainer {
     private readonly MarginContainer inset;
     /// <summary>The price rows' scroll area, sized like the panel's to the room there is.</summary>
     private ScrollContainer? sheetScroll;
-    private VBoxContainer? sheetRows;
+    private Control? sheetRows;
+    // The board's height apart from its scroll area, or null to measure it as it is.
+    private float? sheetRest;
+    // Whether the board's list hides the backpack drawer and reaches down where it was.
+    private bool sheetHidesDrawer;
     private Selection shownInspect;
     private int awaited;
     /// <summary>The open page, or null while the panel is closed.</summary>
@@ -186,8 +192,9 @@ public partial class SidePanel : PanelContainer {
         return sheet;
     }
 
-    /// <summary>Hands over the price rows, so <see cref="Fit"/> sizes their scroll area.</summary>
-    public void ShowPriceRows(ScrollContainer scrollArea, VBoxContainer rows) { sheetScroll = scrollArea; sheetRows = rows; }
+    /// <summary>Hands over the board's long list, so <see cref="Fit"/> sizes its scroll area to the room left; without <paramref name="rest"/> the rest of the board is measured.</summary>
+    /// <param name="hidesDrawer">Hides the backpack drawer while the list shows, so the board reaches down to the hotbar, for a list picked from by click.</param>
+    public void ShowSheetRows(ScrollContainer scrollArea, Control rows, float? rest = null, bool hidesDrawer = false) { sheetScroll = scrollArea; sheetRows = rows; sheetRest = rest; sheetHidesDrawer = hidesDrawer; }
 
     /// <summary>Sizes the panel's scroll area to what it shows, up to the room between the clock and the hotbar.</summary>
     public void Fit() {
@@ -196,8 +203,11 @@ public partial class SidePanel : PanelContainer {
         float want = Math.Min(inset.GetCombinedMinimumSize().Y, room);
         if (sheet.Visible && sheetScroll != null) {
             // The board reaches further left than the panel, over the backpack drawer, so it stops above the drawer.
+            // The page shows the drawer after the list is handed over, so the list hides it here.
+            if (sheetHidesDrawer && Bag.Visible) Bag.Visible = false;
             float clear = Bag.Visible ? ui.Size.Y - Top - BackpackDrawer.Bottom - Bag.Size.Y - 40 : room;
-            float rows = Math.Min(sheetRows!.GetCombinedMinimumSize().Y, Math.Min(room, clear) - 110);
+            float rest = sheetRest ?? sheet.GetCombinedMinimumSize().Y - sheetScroll.CustomMinimumSize.Y + 60;
+            float rows = Math.Max(60, Math.Min(sheetRows!.GetCombinedMinimumSize().Y, Math.Min(room, clear) - rest));
             if (Math.Abs(sheetScroll.CustomMinimumSize.Y - rows) > .5f) sheetScroll.CustomMinimumSize = new Vector2(0, rows);
         }
         // The panel's bottom offset stays at its top, so it hugs this minimum size as it grows and shrinks.

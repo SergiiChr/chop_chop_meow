@@ -50,7 +50,7 @@ internal static class PerformanceFixture {
         }
 
         var bench = Place(ThingKind.Bench, new Vector2(0, -4));
-        bench.Recipe = "planks";
+        world.SetRecipe(bench, "planks");
         bench.Tools!.Add("steel_chisel", 1);
         bench.Inventory.Add("wood", 64);
 

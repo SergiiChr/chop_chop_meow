@@ -10,7 +10,8 @@ public partial class PlansPanel(PageTools tools) : PagePanel(tools) {
         foreach (var (id, def) in world.Data.Buildings) {
             var (cell, _) = ItemSlot.Cup($"build_{id.Id()}"); cell.Icon = Icons.Of(id.Id()); cell.TooltipText = $"{def.Name}\nClick to place · Drag onto the hotbar"; DragReference(cell, id.Id());
             cell.Pressed += () => { panel.Player.Mode = new ClickMode.Build(id); panel.Close(); kit.Refresh(); };
-            cell.MouseEntered += () => details.Text = $"{def.Name}\n{def.Description}\n\nNeeds: {PageText.Needs(world, def.Cost)}";
+            // A mine costs nothing to mark, so it lists what each of its stages takes instead.
+            cell.MouseEntered += () => details.Text = id == ThingKind.Mine ? $"{def.Name}\n{PageText.MinePlan(world)}" : $"{def.Name}\n{def.Description}\n\nNeeds: {PageText.Needs(world, def.Cost)}";
             live.Watch(() => world.Backpack.Has(def.Cost), ready => cell.Modulate = ready ? Colors.White : Style.Unready);
             grid.AddChild(cell);
         }

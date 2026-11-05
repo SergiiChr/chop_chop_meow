@@ -30,10 +30,11 @@ public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, s
     }
 }
 
-/// <summary>The fuel position under a process bar: an icon for what it is, its cup or picture, and how long it lasts.</summary>
-public partial class FuelRow(string glyph, Color tint, Control cup, Label lasts) : HBoxContainer {
+/// <summary>The fuel position under a process bar: an icon for what it is, its cup or picture, how long it lasts, and what else it takes.</summary>
+public partial class FuelRow(string glyph, Color tint, Control cup, Label lasts, Control? accepted = null) : HBoxContainer {
     public override void _Ready() {
         AddThemeConstantOverride("separation", 8);
         AddChild(Style.Glyph(glyph, 24, tint)); AddChild(cup); AddChild(lasts);
+        if (accepted != null) AddChild(accepted);
     }
 }

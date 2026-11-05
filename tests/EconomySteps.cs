@@ -10,13 +10,11 @@ using static WorkerSteps;
 
 /// <summary>Measures value and worker output for the economy checks.</summary>
 internal static class EconomySteps {
-    /// <summary>What one batch of a recipe takes, with the cheapest fuel its station burns.</summary>
+    /// <summary>What one batch of a recipe takes, with the cheapest fuel it burns.</summary>
     public static Dictionary<string, int> BatchCost(World world, string recipe) {
         var r = world.Data.Recipes[recipe];
-        if (r.Station is not ThingKind kind) return new(r.Inputs);
-        var station = new Thing { Kind = kind, Recipe = recipe, Fuel = "wood" };
-        var cost = new Dictionary<string, int>(world.BatchCost(station));
-        if (world.FuelOf(station) is string fuel) cost[fuel] = cost.GetValueOrDefault(fuel) + 1;
+        var cost = new Dictionary<string, int>(r.Inputs);
+        if (r.Burns && r.Fuels.MinBy(fuel => world.Data.Items[fuel].Price) is string fuel) cost[fuel] = cost.GetValueOrDefault(fuel) + 1;
         return cost;
     }
 

@@ -11,17 +11,18 @@ These came from the user; change them only after asking.
 - **Platform and launch:** Linux first, one-command launch from a fresh checkout through the Python launcher.
 - **Look:** smooth isometric 3D, natural and lighthearted, with some of Terraria's approachable feel; no fantasy or industrial styling. Buildings are modern DIY, there are several tree species, and workers wear blue overalls over a cream shirt.
 - **Animation:** every core interaction has an animation, with a dedicated one for every tool.
-- **Progression:** the player starts with a steel axe and no pickaxe; there is no loose iron and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
-- **Mining:** coal, iron and tin deposits need a carried pickaxe; loose coal needs no tool. Charcoal cannot substitute for mined coal.
-- **Steel:** needs iron, mined coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
-- **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, rake for leaves, hammer for fitting a mine) from a tool station and put them back when reassigned or going home. Without one they wait and say so once.
+- **Progression:** the player starts with a steel axe and no pickaxe; no loose iron lies about and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
+- **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
+- **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
+- **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
+- **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they pick up loose pieces of the same resource, or wait and say so once.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. Piles set their own filters from what they hold. Manual transfers bypass automation filters.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
 - **Market:** reached at a trading post; selling lowers a price, which recovers over time; deeper goods are worth more; orders settle after a visible 30-second cart trip.
 - **Workers:** hired individually, paid daily, assigned, reassigned and dismissed; they carry station inputs and outputs, preferring matching filtered storage.
 - **Pacing:** 10–15 minutes to the first goal is a target, not a measured playthrough.
-- **Out of scope:** pollution, vampires, terraforming, charcoal and technology beyond steel.
+- **Out of scope:** pollution, vampires, terraforming and technology beyond steel.
 
 ## Architecture
 
@@ -54,6 +55,8 @@ Simulation and data:
 | `src/GameData.cs` | Loads tunable items, buildings, recipes, trade values and time values from `data/game.json` |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
+| `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
+| `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces |
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
@@ -87,10 +90,10 @@ UI and input:
 | `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
-| `src/StationPanel.cs` | A station's panel: recipes, process row, bellows and jobs |
+| `src/StationPanel.cs` | A station's page: tool slots, recipe board, process row, queue, bellows and jobs |
 | `src/Cups.cs` | `Cups`: a building's item cups and a station's process row |
-| `src/CraftPanel.cs` | The crafting menu and the crafting bench panel |
-| `src/RecipeBoard.cs` | The recipe board both of them show |
+| `src/CraftPanel.cs` | The crafting menu |
+| `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, and the queue strip under it |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
@@ -238,7 +241,10 @@ Fading swaps in cached alpha-blended copies of a model's materials, so faded tre
 
 Actor animation is driven by gameplay state.
 `ActorAnimation` maps state to an action and returns keyframed joint angles (`Pose`) for any time.
-`ActorRig` applies them to a hierarchy of hips, torso, head, shoulders, elbows, thighs and knees, lifting the hips so the lower foot stays on the ground.
+`ActorRig` applies them to a hierarchy of hips, torso, head, shoulders, elbows, thighs and knees, lifting the hips so the lower foot stays on the ground; `Pose.Lift` raises them further for the moment a run leaves the ground.
+A change of action blends from the old pose into the new one over `ActorAnimation.BlendSeconds`, while the body turns toward where it moves, so standing up from a squat into a walk is one motion.
+Walking and running legs follow each foot from its landing: the knee gives under the weight, straightens to push off behind, and folds to swing through; a run's push-off leaves both feet off the ground for a tenth of a stride.
+A player with something to make by hand squats over it, turning it in both hands (`ActorAction.Craft`), only while standing still.
 
 The player's carried tool selects its matching action and the tool shown in hand.
 Workers animate according to movement and an explicit transient `WorkerWorkState`, not localized or presentation status text.
@@ -366,10 +372,12 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 ### Resources
 
 - Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
+- Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
+- `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `World.ChipReach` of a boulder or deposit on `World.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
 - A picked-clean berry bush fruits again after `berryRegrowHours`.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
 - Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
-- Charcoal production is not implemented.
+- The stone furnace burns 2 wood into 1 charcoal.
 
 ### Tools
 
@@ -386,8 +394,9 @@ Tier 1 is unused, since there are no iron tools.
 Recipes name the tool they need, the lowest `tier` that will do, and whether they can be made by hand (`hand`).
 So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
 
-`World.ToolKind` names the tool a resource needs: an axe for trees, a pickaxe for deposits, a rake for leaves.
-Stone, berries and loose coal need none.
+`World.ToolKind` names the tool a resource needs: an axe for trees, a pickaxe for deposits.
+`World.HelpingTool` names one that only speeds gathering up: a pickaxe for rock, a rake for leaves; leaves take three times as long by hand.
+Stone, leaves, berries and loose pieces need none.
 
 Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFreshStart` verifies:
 
@@ -398,13 +407,18 @@ Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFr
 
 ### Crafting and stations
 
-Hand recipes queue in `SaveState.Crafting` and take their inputs at once.
-They run at base speed times the tool's speed while the player carries it, and give the materials back when cancelled.
+Hand recipes queue in `PlayerState.Crafting`, one `Queued` entry per recipe with its count, and take their inputs at once.
+The first one waiting moves to `PlayerState.Making` when work on it starts and can no longer be cancelled; the rest give their materials back when taken off.
+They run at base speed times the tool's speed while the player carries it, and only while the player has stood still for `World.CraftSettle` (`PlayerState.Still`).
+Queues are written by `QueueJson`, since the generic list writer allocates on every world update.
 
 The bench runs at `benchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
 
-A building's `recipe` in `data/game.json` names the recipe a station starts on.
-The anvil and reinforced furnace have no other recipe, so their pages offer no choice.
+A station's `Thing.Queue` holds its queued batches, one entry per recipe in the order first queued; a batch leaves it as it starts.
+`Thing.Keep` is the recipe workers keep it making once the queue is done, and a building's `recipe` in `data/game.json` names the one it starts with.
+`Thing.Recipe` follows the batch in progress, else the first queued, else `Keep` (`World.Retarget`); with none the station stands idle.
+A station takes inputs for any recipe it has queued or kept, and haulers carry out only what none of them takes.
+Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
 
 #### Tool slots
 
@@ -415,12 +429,12 @@ The mortar's recipes are worked, while jam, stew and dough cook unattended and t
 
 #### Fuel
 
-A recipe with `fuel` burns one wood or coal per batch from the station's one-slot fuel box (`Thing.Burner`).
+A recipe's `fuels` list what it can burn, one unit per batch from the station's one-slot fuel box (`Thing.Burner`).
 
-- `Thing.Fuel` follows what was last loaded.
-- `World.FuelFits` limits the reinforced furnace to coal.
+- The fuel slot holds one kind at a time, and the next batch burns it only while the recipe lists it (`World.FuelOf`).
+- `World.FuelFits` takes what the station's recipe burns, or with no recipe what any of its recipes burns.
 - `World.BatchCost` lists materials only.
-- Haulers keep the burner topped up (`Worker.Fueling`).
+- Haulers keep the burner topped up with what it holds, fill an empty one with the first listed fuel storage gives out, and carry a fuel the recipe cannot burn back to storage (`Worker.Fueling`).
 
 The canning station (`cannery`) seals a filling and a `tin_can` into a canned good over fuel.
 
@@ -431,10 +445,10 @@ A smith stays with a running batch and fetches the next load once it is done.
 
 #### Furnaces and steel
 
-The stone furnace accepts wood or mined coal for fuel.
+The stone furnace smelts ore over coal or charcoal, and cooks and makes charcoal over wood, coal or charcoal.
 The reinforced furnace (`reinforced`) burns coal only.
 
-Steel recipes consume iron bars and mined coal.
+Steel recipes consume iron bars and coal.
 Steel only progresses while the heat is at or above the clear bar (`World.SteelHeat`, shown as 1450 °C through `World.Celsius`).
 A batch below it pauses, keeps burning one coal from its fuel slot per batch length while cold, and resumes when reheated, with no failure.
 Once an active crew has the forge hot, it never falls below the bar while they are on duty.
@@ -452,7 +466,7 @@ A window's copy takes totals and stacks together from the server, so it does not
 Input rule for every item cell, in storage and stations alike:
 
 - A click moves exactly one item, in either direction.
-- Ctrl-click, or Shift-click, moves all of that item.
+- Shift-click moves the stack clicked, and Ctrl-click all of that item.
 - Right-click picks up half where a panel supports dragging.
 - Dragging carries a stack or a split portion to its exact destination, merging compatible stacks or swapping cells.
 - Bulk buttons and recipe batch actions say what they move.
@@ -505,7 +519,7 @@ If confirmed, it ends the run in a black hole with a reload or main-menu choice.
 
 #### Tool station
 
-A tool station (`toolstation`) is storage for tools only.
+A tool station (`toolstation`) is storage for tools only: `World.ToolSlots` (4) slots, each taking any tool, and its rack hangs whatever each slot holds.
 
 ### Workers
 
@@ -523,7 +537,8 @@ Workers hold duties (`Worker.Duties`): a place and one of the jobs `World.Jobs` 
 - Tend fetches what a compost pile's filters take from storage and carries its fertilizer out.
 - Deliveries runs price errands and carries the trading post's mail, other than coins, to storage.
 
-A gatherer whose spot is spent moves the duty to the nearest spot of the same kind in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
+A gatherer whose spot is spent moves the duty to the nearest spot yielding the same item in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
+Spots that need a tool count only while the worker can get one, and loose pieces come only after every other spot; a gatherer with no tool to be had goes to known loose pieces at once (`World.LooseSpot`).
 With none known they say so once and go on to their other places, or wait at the nearest trading post until one is seen or the spot comes back.
 A worker with no duties waits at the nearest trading post.
 
@@ -579,7 +594,7 @@ The trading post's input filter names the crates it asks for.
 `DepositFor` treats a post as storage only for an item its filter names, so workers deliver those crates there when it is the nearest storage asking for them.
 With `Thing.AutoSell` set, the cart leaves on its own once every market slot holds a crate and a cart is free.
 Sale coins fill the trading post's one-stack wage slot (`Thing.Wages`, coins only) first and the output after.
-Dawn wages and settled strikes draw on every wage slot before the payer's backpack.
+Dawn wages, settled strikes and hiring payments draw on every wage slot before the payer's backpack; purchases come from the backpack only.
 
 #### Price sheet
 

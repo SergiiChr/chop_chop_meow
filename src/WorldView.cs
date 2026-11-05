@@ -232,13 +232,25 @@ public partial class WorldView : Node3D {
         public float Time;
         public float PreviousTime = -1;
         public bool Moving;
+        // The action blended out of after a change, where it was, and how far the blend into the new one has gone.
+        public ActorAction From;
+        public float FromTime;
+        public bool FromMoving;
+        public float Blend = 1;
         public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt) {
-            Moving = position.DistanceSquaredTo(Position) > .000001f;
-            float yaw = ActorAnimation.Yaw(Moving ? position - Position : facingTarget - position, Yaw);
+            bool moving = position.DistanceSquaredTo(Position) > .000001f;
+            float yaw = ActorAnimation.Yaw(moving ? position - Position : facingTarget - position, Yaw);
             Yaw = Mathf.LerpAngle(Yaw, yaw, Math.Min(1, dt * 14));
             Position = position;
-            if (Action != action) { Action = action; Time = 0; PreviousTime = -1; } else { PreviousTime = Time; Time += dt; }
+            if (Action != action) {
+                From = Action; FromTime = Time; FromMoving = Moving; Blend = 0;
+                Action = action; Time = 0; PreviousTime = -1;
+            } else { PreviousTime = Time; Time += dt; }
+            FromTime += dt;
+            Blend = Math.Min(1, Blend + dt / ActorAnimation.BlendSeconds);
+            Moving = moving;
         }
+        public Pose Pose => ActorAnimation.Blended(From, FromTime, FromMoving, Action, Time, Moving, Blend);
         /// <summary>True on the frame an action loop passes its impact moment.</summary>
         public bool Struck(float at) {
             if (PreviousTime < 0) return false;
@@ -433,7 +445,7 @@ public partial class WorldView : Node3D {
             playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
         }
         bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
-        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting);
+        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting, World.CraftRate > 0);
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
@@ -539,7 +551,7 @@ public partial class WorldView : Node3D {
             bool moving = p.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var target = World.Find(p.GatherTarget);
             bool gathering = target != null && p.Pos.DistanceTo(World.GatherAt(target, p.Pos)) < 2.5f;
-            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting);
+            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting, p.Making != "" || p.Crafting.Count > 0);
             var subject = gathering ? target : null;
             var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
             if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; subject = ThingAt(other.PulseTarget); }
@@ -582,7 +594,7 @@ public partial class WorldView : Node3D {
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false) {
         rig.Root.Position = To3(state.Position);
         rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
-        var pose = ActorAnimation.PoseAt(state.Action, state.Time, state.Moving);
+        var pose = state.Pose;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
         rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
@@ -701,7 +713,17 @@ public partial class WorldView : Node3D {
         prop.Root.Position = To3(t.Pos);
         // A fresh carcass keeps the heading of the wolf model it replaces.
         if (t.Kind == ThingKind.WolfCorpse && Dying(t.Pos) is { } dying) prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
+        // A chip that appears in play was knocked off the rock beside it, and flies from there.
+        if (prop is LooseProp chip && !loadingProps && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
         return prop;
+    }
+
+    /// <summary>The rock or ore deposit a newly appeared chip came off, or null when none is close enough.</summary>
+    private Thing? ChippedFrom(Thing chip) {
+        Thing? rock = null; float nearest = (World.ChipReach + .5f) * (World.ChipReach + .5f);
+        foreach (var t in World.Things)
+            if (World.ChipOf(t.Kind) == chip.Kind && t.Pos.DistanceSquaredTo(chip.Pos) <= nearest) { rock = t; nearest = t.Pos.DistanceSquaredTo(chip.Pos); }
+        return rock;
     }
 
     private void Animate(Prop prop, Thing t, float dt) {
@@ -728,7 +750,14 @@ public partial class WorldView : Node3D {
                 sway.Visible = tree.Fall < 1.7f;
                 tree.Stump.Visible = true;
                 break;
-            case Prop when t.Kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.LooseCoal or ThingKind.Leaves:
+            case LooseProp chip when chip.Flight < WorldModels.ChipFlight:
+                // An arc from the rock with a hop at the end, spinning as it goes.
+                chip.Flight += dt;
+                float flown = Math.Min(1, chip.Flight / WorldModels.ChipFlight);
+                prop.Body.Position = chip.From * (1 - flown) + Vector3.Up * (MathF.Sin(flown * MathF.PI) * .6f + MathF.Abs(MathF.Sin(flown * MathF.PI * 3)) * .08f * flown);
+                prop.Body.Rotation = new Vector3(flown * 9, flown * 4, 0) * (1 - flown);
+                break;
+            case Prop when t.IsLoose || t.Kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Leaves:
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
@@ -753,7 +782,7 @@ public partial class WorldView : Node3D {
                 break;
             case StoveProp stove:
                 // The fire only burns for recipes that take fuel; the mortar's work and kneading dough are cold.
-                bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Fuel;
+                bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Burns;
                 stove.Glow.Visible = cooking;
                 stove.Light.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
                 if (stove.Mortar != null && World.Sees(t.Pos)) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null;
@@ -806,7 +835,13 @@ public partial class WorldView : Node3D {
                 break;
             case RackProp rack:
                 if (!World.Sees(t.Pos)) break;
-                foreach (var (kind, tool) in rack.Racked) tool.Visible = World.BestTool(kind, t.Inventory) != null;
+                // Each peg shows the tool in its slot.
+                var layout = t.Inventory.Layout;
+                for (int slot = 0; slot < rack.Pegs.Length; slot++) {
+                    string held = slot < layout.Count ? layout[slot].Item : "";
+                    string kind = held != "" && World.Data.Items.TryGetValue(held, out var def) ? def.Tool : "";
+                    foreach (var (tool, hook) in rack.Pegs[slot]) hook.Visible = tool == kind;
+                }
                 break;
             case BoxProp box:
                 // Remembered boxes carry no inventory, so the lid stays as it was last seen.
@@ -1032,8 +1067,11 @@ public partial class WorldView : Node3D {
             selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = placeTile.Visible = false;
             return;
         }
-        Mark(selectRing, World.Find(Selection.Thing), 0);
-        Mark(hoverRing, Hover != Selection.Thing ? World.Find(Hover) : null, .004f);
+        // The pond is one thing all along its shore, so its selection ring shows only while the player collects water there.
+        var selected = World.Find(Selection.Thing);
+        if (selected?.Kind == ThingKind.Water && !(Gathering && GatheringTarget?.Kind == ThingKind.Water)) selected = null;
+        Mark(selectRing, selected, 0);
+        Mark(hoverRing, Hover != (selected?.Id ?? 0) ? World.Find(Hover) : null, .004f);
         Worker? worker = null;
         foreach (var w in World.Workers) if (w.Id == Selection.Worker) worker = w;
         workerRing.Visible = worker != null && World.Sees(worker);

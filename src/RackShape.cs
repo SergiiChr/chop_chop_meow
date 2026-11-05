@@ -11,6 +11,10 @@ internal static class RackShape {
     public static Mesh Axe => axe ??= BuildTool("axe");
     public static Mesh Pick => pick ??= BuildTool("pickaxe");
     public static Mesh Rake => rake ??= BuildTool("rake");
+    /// <summary>The hanging shape of every tool kind a peg can show; a kind without one, such as the mortar, hangs nothing.</summary>
+    public static readonly (string Kind, Mesh Mesh)[] Tools = [("axe", Axe), ("pickaxe", Pick), ("rake", Rake), ("hammer", BuildTool("hammer")), ("chisel", BuildTool("chisel"))];
+    /// <summary>Where a slot's peg sits across the board.</summary>
+    public static float PegX(int slot) => -.36f + slot * .24f;
     public static readonly StandardMaterial3D Concrete = Material(.95f);
     public static readonly StandardMaterial3D Timber = Material(.85f);
     public static readonly StandardMaterial3D Tool = Material(.65f, .15f);
@@ -33,8 +37,8 @@ internal static class RackShape {
         Bevel(s, new(1.15f, .06f, .2f), new(0, 1.5f, -.025f), .009f, "99734d");
         Box(s, new(.98f, .07f, .06f), new(0, .48f, -.04f), "8a6a48");
         // The protruding peg ends remain when tools are taken from their slots.
-        foreach (float x in new[] { -.3f, 0, .3f })
-            Box(s, new(.025f, .025f, .115f), new(x, 1.32f, .05f), "8a6a48");
+        for (int slot = 0; slot < World.ToolSlots; slot++)
+            Box(s, new(.025f, .025f, .115f), new(PegX(slot), 1.32f, .05f), "8a6a48");
         return s.Commit();
     }
 
@@ -48,6 +52,13 @@ internal static class RackShape {
                 break;
             case "pickaxe":
                 Prism(s, new[] { new Vector2(-.22f, -.08f), new(-.13f, -.005f), new(-.035f, .025f), new(.035f, .025f), new(.13f, -.005f), new(.22f, -.08f), new(.12f, -.04f), new(.025f, -.025f), new(-.025f, -.025f), new(-.12f, -.04f) }, .035f, "aebabc");
+                break;
+            case "hammer":
+                Box(s, new(.16f, .055f, .05f), new(0, -.02f, 0), "aebabc");
+                break;
+            case "chisel":
+                // A short flat blade in place of a long handle's head.
+                Prism(s, new[] { new Vector2(-.012f, .0f), new(.012f, .0f), new(.018f, .1f), new(-.018f, .1f) }, .012f, "aebabc");
                 break;
             case "rake":
                 Box(s, new(.3f, .04f, .04f), new(0, -.74f, 0), "aebabc");

@@ -19,7 +19,7 @@ internal static class PileShape {
         "wood" => "logs",
         "stone" => "stone",
         "iron_ore" or "tin_ore" => "ore",
-        "coal" => "coal",
+        "coal" or "charcoal" => "coal",
         "planks" => "planks",
         "wood_parts" => "parts",
         "iron_bar" or "steel_bar" or "tin_bar" => "bars",

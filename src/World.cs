@@ -16,8 +16,12 @@ public sealed class Thing {
     public float Y { get; set; }
     public int Remaining { get; set; }
     public Inventory Inventory { get; set; } = new();
+    /// <summary>A station's recipe now: the batch in progress, else the first queued, else <see cref="Keep"/>; empty when it has nothing to make.</summary>
     public string Recipe { get; set; } = "";
-    public string Fuel { get; set; } = "wood";
+    /// <summary>The recipe workers keep a station making once its queue is done, or empty.</summary>
+    public string Keep { get; set; } = "";
+    /// <summary>Batches queued at a station, one entry per recipe in the order first queued; a batch leaves the queue when it starts.</summary>
+    [JsonConverter(typeof(QueueJson))] public List<Queued> Queue { get; set; } = new();
     public float Progress { get; set; }
     public bool Processing { get; set; }
     public float Heat { get; set; }
@@ -48,8 +52,49 @@ public sealed class Thing {
     /// <summary>Ore at the foot of a cliff, mined with a pickaxe.</summary>
     [JsonIgnore] public bool IsDeposit => Kind is ThingKind.Iron or ThingKind.Coal or ThingKind.Tin;
     /// <summary>Loose pieces are picked up whole in one go and vanish, instead of being worked down like a deposit.</summary>
-    [JsonIgnore] public bool IsLoose => Kind is ThingKind.LooseCoal;
+    [JsonIgnore] public bool IsLoose => Kind is ThingKind.LooseCoal or ThingKind.LooseStone or ThingKind.Stick or ThingKind.IronChip or ThingKind.TinChip;
     [JsonIgnore] public bool IsStorage => Kind is ThingKind.Chest or ThingKind.Grave or ThingKind.Crate or ThingKind.Toolstation or ThingKind.Pile;
+}
+/// <summary>Batches of one recipe waiting in a queue.</summary>
+public sealed class Queued {
+    public string Recipe { get; set; } = "";
+    public int Count { get; set; }
+}
+/// <summary>
+/// Reads and writes a queue as an array of its entries with a plain loop.
+/// Every station's entry in a world update carries a queue, and the generic list writer allocates on each call.
+/// </summary>
+public sealed class QueueJson : JsonConverter<List<Queued>> {
+    private static readonly JsonEncodedText RecipeName = JsonEncodedText.Encode(nameof(Queued.Recipe)), CountName = JsonEncodedText.Encode(nameof(Queued.Count));
+
+    public override List<Queued> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) {
+        if (reader.TokenType != JsonTokenType.StartArray) throw new JsonException("A queue is an array.");
+        var queue = new List<Queued>();
+        while (reader.Read() && reader.TokenType != JsonTokenType.EndArray) {
+            if (reader.TokenType != JsonTokenType.StartObject) throw new JsonException("A queue entry is an object.");
+            var q = new Queued();
+            while (reader.Read() && reader.TokenType != JsonTokenType.EndObject) {
+                if (reader.TokenType != JsonTokenType.PropertyName) throw new JsonException("A queue entry holds names and values.");
+                bool recipe = reader.ValueTextEquals(RecipeName.EncodedUtf8Bytes), count = reader.ValueTextEquals(CountName.EncodedUtf8Bytes);
+                reader.Read();
+                if (recipe) q.Recipe = reader.GetString() ?? "";
+                else if (count) q.Count = reader.GetInt32();
+                else reader.Skip();
+            }
+            queue.Add(q);
+        }
+        return queue;
+    }
+
+    public override void Write(Utf8JsonWriter writer, List<Queued> value, JsonSerializerOptions options) {
+        writer.WriteStartArray();
+        for (int i = 0; i < value.Count; i++) {
+            writer.WriteStartObject();
+            writer.WriteString(RecipeName, value[i].Recipe); writer.WriteNumber(CountName, value[i].Count);
+            writer.WriteEndObject();
+        }
+        writer.WriteEndArray();
+    }
 }
 /// <summary>An impassable rock face whose ore deposits sit at its foot, with loose pieces scattered toward the clearing.</summary>
 public readonly record struct Cliff(ThingKind Ore, Vector2 Center, Vector2 Face, float HalfLength) {
@@ -168,7 +213,7 @@ public sealed class SaveState {
     /// <summary>The key of the machine that last started this world, whose player follows the save to another computer.</summary>
     public string Owner { get; set; } = "";
     /// <summary>Saves from any other version are refused.</summary>
-    public int Version { get; set; } = 6;
+    public int Version { get; set; } = 7;
     public List<Thing> Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -193,7 +238,8 @@ public sealed class SaveState {
     [JsonIgnore] public List<string> HotbarSlots { get => Actor.HotbarSlots; set => Actor.HotbarSlots = value; }
     /// <summary>Contents of crates packed into items, keyed by the number in their item id.</summary>
     public Dictionary<int, Inventory> Crates { get; set; } = new();
-    [JsonIgnore] public List<string> Crafting { get => Actor.Crafting; set => Actor.Crafting = value; }
+    [JsonIgnore] public List<Queued> Crafting { get => Actor.Crafting; set => Actor.Crafting = value; }
+    [JsonIgnore] public string Making { get => Actor.Making; set => Actor.Making = value; }
     [JsonIgnore] public float CraftTime { get => Actor.CraftTime; set => Actor.CraftTime = value; }
     [JsonIgnore] public float Torch { get => Actor.Torch; set => Actor.Torch = value; }
     [JsonIgnore] public bool TorchLit { get => Actor.TorchLit; set => Actor.TorchLit = value; }
@@ -309,7 +355,10 @@ public sealed partial class World {
     public int Sheltered => S.Sheltered;
     public int ActiveHotbar => S.ActiveHotbar;
     public ListView<string> HotbarSlots => new(S.HotbarSlots);
-    public ListView<string> Crafting => new(S.Crafting);
+    /// <summary>Hand recipes waiting to be made, one entry per recipe.</summary>
+    public ListView<Queued> Crafting => new(S.Crafting);
+    /// <summary>The hand recipe being made now, or empty.</summary>
+    public string Making => S.Making;
     public float CraftTime => S.CraftTime;
     public ListView<Thing> Things => new(S.Things);
     public ListView<Worker> Workers => new(S.Workers);
@@ -351,15 +400,14 @@ public sealed partial class World {
     /// <summary>The recipe game data names for a station placed or loaded without one, or empty.</summary>
     private string StartingRecipe(ThingKind kind) => Data.Buildings.TryGetValue(kind, out var building) ? building.Recipe : "";
     public Thing Add(ThingKind kind, Vector2 pos, int remaining = 0) {
-        var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining, Recipe = StartingRecipe(kind) };
-        if (kind == ThingKind.Reinforced) t.Fuel = "coal";
+        var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining, Keep = StartingRecipe(kind), Recipe = StartingRecipe(kind) };
         if (kind == ThingKind.Signpost) { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; t.Wages = NewWageSlot(); }
         if (SlotKinds(kind).Length > 0) t.Tools = NewToolSlots(kind);
         if (Burns(kind)) t.Burner = NewBurner();
         if (kind == ThingKind.Crate) t.Inventory = NewCrate();
         if (kind == ThingKind.Packer) { t.Inventory.Slots = Data.CrateCapacity + 1; t.Output = new() { Slots = 1 }; }
         if (kind == ThingKind.Mine) { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
-        if (kind == ThingKind.Toolstation) t.Inventory.Slots = 12;
+        if (kind == ThingKind.Toolstation) t.Inventory.Slots = ToolSlots;
         if (kind == ThingKind.Pile) t.Inventory.Slots = PileStacks;
         if (kind == ThingKind.Chest) t.Inventory.Slots = ChestStacks;
         if (kind == ThingKind.Farm) { t.Inventory.Slots = Data.Farm.Sow.Count; t.Output = new() { Slots = Data.Farm.Yield.Count }; }
@@ -392,6 +440,7 @@ public sealed partial class World {
         // Full-size trees need room for their crowns, so even the woods stay walkable and readable.
         Scatter(rng, ThingKind.Tree, int.MaxValue, 42, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
         DropLeaves();
+        ScatterLoose();
         Look();
         Replaced?.Invoke();
     }
@@ -462,11 +511,18 @@ public sealed partial class World {
     public static readonly Vector2 PackStand = new(-.3f, -.8f);
     public static float Footprint(ThingKind kind) => kind switch { ThingKind.Pile or ThingKind.Farm => 1.5f, ThingKind.Cooktable => .6f, ThingKind.Packer => .7f, ThingKind.Cannery => .5f, ThingKind.Hut => 1.55f, ThingKind.Reinforced => .8f, ThingKind.Furnace => .65f, ThingKind.Bench => .6f, ThingKind.Chest or ThingKind.Anvil or ThingKind.Toolstation => .45f, _ => .35f };
     /// <summary>The tool kind gathering this needs: an axe for trees, a pickaxe for deposits and a rake for leaves; stone, berries and loose pieces need none.</summary>
-    public static string? ToolKind(Thing t) => t.Kind == ThingKind.Tree ? "axe" : t.IsDeposit ? "pickaxe" : t.Kind == ThingKind.Leaves ? "rake" : null;
-    private string A(string word) => Phrase("aeiou".Contains(word[0]) ? "an " : "a ", word);
+    public static string? ToolKind(Thing t) => ToolKind(t.Kind);
+    public static string? ToolKind(ThingKind kind) => kind == ThingKind.Tree ? "axe" : kind is ThingKind.Iron or ThingKind.Coal or ThingKind.Tin ? "pickaxe" : null;
+    /// <summary>A tool that speeds gathering up without being needed: a pickaxe for rock and a rake for leaves.</summary>
+    public static string? HelpingTool(ThingKind kind) => kind == ThingKind.Stone ? "pickaxe" : kind == ThingKind.Leaves ? "rake" : null;
+    /// <summary>How many times longer a gather takes without its helping tool: leaves by hand take three times a rake's time.</summary>
+    private static float BareHanded(ThingKind kind) => kind == ThingKind.Leaves ? 3 : 1;
+    /// <summary>A word with "a" or "an" before it, built once.</summary>
+    public string A(string word) => Phrase("aeiou".Contains(word[0]) ? "an " : "a ", word);
     private string Task(Thing t) => t.Kind switch {
         ThingKind.Tree => "chop wood",
         ThingKind.Leaves => "rake leaves",
+        _ when t.IsLoose => Phrase("pick up ", Lower(Data.Name(t.Kind))),
         ThingKind.Mine => t.MineStage == MineStage.Marked ? "dig the mine" : t.MineStage == MineStage.Supplied ? "fit the mine frame" : Phrase("mine ", CliffAt(t.Pos).Ore.Id()),
         _ => Phrase("mine ", t.Kind.Id())
     };
@@ -478,7 +534,8 @@ public sealed partial class World {
         if (!phrases.TryGetValue((a, b, c, d), out var text)) phrases[(a, b, c, d)] = text = a + b + c + d;
         return text;
     }
-    private string Lower(string text) {
+    /// <summary>Text in lower case, built once.</summary>
+    public string Lower(string text) {
         if (!lowered.TryGetValue(text, out var lower)) lowered[text] = lower = text.ToLowerInvariant();
         return lower;
     }
@@ -513,12 +570,19 @@ public sealed partial class World {
         if (worker || ToolKind(t) is not string kind || BestTool(kind) != null) return null;
         return kind switch {
             "axe" => "An axe is needed. Recover your belongings or buy one at the trading post.",
-            "rake" => "Raking leaves needs a rake. Craft one at a bench.",
             _ => "Mining needs a pickaxe. Sell crates of berries at the trading post and buy one."
         };
     }
     public static string ResourceItem(Thing t) => ResourceItem(t.Kind);
-    public static string ResourceItem(ThingKind kind) => kind switch { ThingKind.Tree => "wood", ThingKind.Iron => "iron_ore", ThingKind.Tin => "tin_ore", ThingKind.LooseCoal => "coal", ThingKind.WolfCorpse => "raw_meat", _ => kind.Id() };
+    public static string ResourceItem(ThingKind kind) => kind switch {
+        ThingKind.Tree or ThingKind.Stick => "wood",
+        ThingKind.Iron or ThingKind.IronChip => "iron_ore",
+        ThingKind.Tin or ThingKind.TinChip => "tin_ore",
+        ThingKind.LooseCoal => "coal",
+        ThingKind.LooseStone => "stone",
+        ThingKind.WolfCorpse => "raw_meat",
+        _ => kind.Id()
+    };
     public void Gather(Thing t, float dt) {
         // A loose piece is a single pick-up; anything else the host works on for as long as the player holds on to it.
         if (t.IsLoose ? Forwarded(Verb.PickUp, t.Id) : Remote) { S.Actor.GatherTarget = t.IsLoose ? 0 : t.Id; return; }
@@ -530,8 +594,8 @@ public sealed partial class World {
         if (t.IsLoose) { PickUp(t); return; }
         if (t.Kind == ThingKind.Farm) { Harvest(t, dt); if (t.FarmStage == FarmStage.Fallow) Say("Harvested. Take the wheat, seeds and grass from the plot, and put seeds back in to sow again."); return; }
         gatherClock += dt;
-        string? tool = t.Kind == ThingKind.Stone ? BestTool("pickaxe") : ToolKind(t) is string kind ? BestTool(kind) : null;
-        float seconds = Data.GatherSeconds / Speed(tool);
+        string? tool = (ToolKind(t) ?? HelpingTool(t.Kind)) is string kind ? BestTool(kind) : null;
+        float seconds = Data.GatherSeconds / Speed(tool) * (tool == null ? BareHanded(t.Kind) : 1);
         if (gatherClock < seconds) return;
         gatherClock = 0;
         if (t.Kind == ThingKind.Water) {
@@ -542,6 +606,7 @@ public sealed partial class World {
         bool small = t.Kind == ThingKind.WolfCorpse || t.Kind == ThingKind.Stone && tool == null;
         int amount = Math.Min(t.Remaining, small ? 2 : 4);
         amount = S.Backpack.Add(ResourceItem(t), amount); t.Remaining -= amount;
+        if (amount > 0) Chip(t, tool);
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
         if (amount > 0) S.Milestones.Add("gather");
     }
@@ -636,34 +701,111 @@ public sealed partial class World {
         if (t.Burn <= 0) Play("start_fire", t.Pos);
         t.Burn += Data.CampfireSeconds; Say($"Campfire fed: +{Data.CampfireHours:0} hours of light.");
     }
+    /// <summary>Marks the recipe workers keep a station making once its queue is done; an empty one clears the mark.</summary>
     public void SetRecipe(Thing t, string recipe) {
-        if (t.Processing) return;
+        if (recipe != "" && !Makes(t, recipe)) return;
         if (Forwarded(Verb.SetRecipe, t.Id, item: recipe)) return;
-        if (Data.Recipes.TryGetValue(recipe, out var r) && r.Station == t.Kind) { t.Recipe = recipe; t.Progress = 0; }
+        t.Keep = recipe; Retarget(t);
     }
-    /// <summary>The fuel a station burns: coal in the reinforced furnace, otherwise its selection, falling back to wood for anything unknown.</summary>
-    public static string BurnedFuel(Thing t) => t.Kind == ThingKind.Reinforced ? "coal" : t.Burner?.First() is "wood" or "coal" ? t.Burner.First()! : t.Fuel is "wood" or "coal" ? t.Fuel : "wood";
-    /// <summary>The fuel one batch of the station's recipe burns, or null when it burns none.</summary>
-    public string? FuelOf(Thing t) => Data.Recipes.TryGetValue(t.Recipe, out var r) && r.Fuel ? BurnedFuel(t) : null;
+    /// <summary>Most batches of one recipe a queue holds.</summary>
+    public const int MaxQueued = 99;
+    private bool Makes(Thing t, string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Station == t.Kind;
+    /// <summary>Queues batches of a recipe at a station, or with a negative count takes waiting ones off; a batch in progress stays.</summary>
+    public void QueueRecipe(Thing t, string recipe, int count) {
+        if (count == 0 || !Makes(t, recipe) || Forwarded(Verb.QueueRecipe, t.Id, item: recipe, count: count)) return;
+        Requeue(t.Queue, recipe, count);
+        Retarget(t);
+    }
+    /// <summary>Adds to or takes from a queue's entry for a recipe, between none and <see cref="MaxQueued"/>, and returns how many it moved.</summary>
+    private static int Requeue(List<Queued> queue, string recipe, int count) {
+        int at = queue.Count - 1;
+        while (at >= 0 && queue[at].Recipe != recipe) at--;
+        if (at < 0) { if (count <= 0) return 0; queue.Add(new Queued { Recipe = recipe }); at = queue.Count - 1; }
+        int before = queue[at].Count, after = Math.Clamp(before + count, 0, MaxQueued);
+        if (after == 0) queue.RemoveAt(at); else queue[at].Count = after;
+        return Math.Abs(after - before);
+    }
+    /// <summary>Batches of a recipe waiting in a queue.</summary>
+    public static int Waiting(ListView<Queued> queue, string recipe) {
+        for (int i = 0; i < queue.Count; i++) if (queue[i].Recipe == recipe) return queue[i].Count;
+        return 0;
+    }
+    /// <summary>Points a station that is between batches at its first queued recipe, else the one it keeps making.</summary>
+    private static void Retarget(Thing t) { if (!t.Processing) t.Recipe = t.Queue.Count > 0 ? t.Queue[0].Recipe : t.Keep; }
+    /// <summary>Queues one batch of a recipe and tops the station up from the backpack to one batch of its inputs and one fuel.</summary>
+    public void QueueBatch(Thing t, string recipe) {
+        if (!Makes(t, recipe)) return;
+        if (!Near(t)) { Say("Walk closer to load this building."); return; }
+        if (Forwarded(Verb.QueueBatch, t.Id, item: recipe)) return;
+        if (Waiting(new(t.Queue), recipe) >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
+        QueueRecipe(t, recipe, 1);
+        var r = Data.Recipes[recipe];
+        foreach (var (item, amount) in r.Inputs) if (amount > t.Inventory[item]) LoadInput(t, item, amount - t.Inventory[item]);
+        if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost) is string fuel && t.Burner.First() == null) LoadFuel(t, fuel, 1);
+    }
+    private static readonly Dictionary<string, int> NoCost = new();
+    /// <summary>
+    /// The fuel loading a recipe burns: what the fuel slot holds, or for an empty slot the first fuel the recipe burns
+    /// that the backpack has beyond what <paramref name="inputs"/> takes. Says why and gives null when there is none.
+    /// </summary>
+    private string? FuelFromBackpack(Thing t, RecipeDef r, Dictionary<string, int> inputs) {
+        if (t.Burner?.First() is string held) {
+            if (r.Fuels.Contains(held)) return held;
+            Say($"The fuel slot holds {Lower(Data.Name(held))}, which {Lower(r.Name)} cannot burn. Take it out first.");
+            return null;
+        }
+        foreach (string fuel in r.Fuels) if (S.Backpack[fuel] > inputs.GetValueOrDefault(fuel)) return fuel;
+        Say(Phrase("Needs ", FuelWords(r.Fuels), " in your backpack for the fire."));
+        return null;
+    }
+    private static readonly List<string> NoFuels = new();
+    /// <summary>The fuels the station's recipe burns, in the order workers look for them; empty when it burns none.</summary>
+    public List<string> Fuels(Thing t) => Data.Recipes.TryGetValue(t.Recipe, out var r) ? r.Fuels : NoFuels;
+    /// <summary>The fuel the next batch burns: what the fuel slot holds while the recipe takes it, or null.</summary>
+    public string? FuelOf(Thing t) => t.Burner?.First() is string held && Fuels(t).Contains(held) ? held : null;
+    /// <summary>The fuel a station shows: what its fuel slot holds, else the first its recipe burns, else the first any of its recipes burns.</summary>
+    public static string ShownFuel(Thing t, GameData data) =>
+        t.Burner?.First() ?? (data.Recipes.TryGetValue(t.Recipe, out var r) && r.Burns ? r.Fuels[0] : FirstFuel(t.Kind, data));
+    // A plain loop, since the view asks every frame and a lambda would allocate its closure.
+    private static string FirstFuel(ThingKind station, GameData data) {
+        foreach (var r in data.Recipes.Values) if (r.Station == station && r.Burns) return r.Fuels[0];
+        throw new InvalidOperationException($"No recipe at {station.Id()} burns fuel.");
+    }
+    /// <summary>The fuels a recipe burns as words, such as "coal or charcoal".</summary>
+    public string FuelWords(List<string> fuels) => fuels.Count == 0 ? "" : fuels.Count == 1 ? Lower(Data.Name(fuels[0])) :
+        Phrase(string.Join(", ", fuels.Take(fuels.Count - 1).Select(f => Lower(Data.Name(f)))), " or ", Lower(Data.Name(fuels[^1])));
     // A batch's cost depends only on its recipe, so each is built once.
     private readonly Dictionary<string, Dictionary<string, int>> batchCosts = new();
     /// <summary>One batch's inputs, without the fuel, which has a slot of its own. Shared between stations, so read it without changing it.</summary>
-    public Dictionary<string, int> BatchCost(Thing t) {
-        if (!batchCosts.TryGetValue(t.Recipe, out var cost)) batchCosts[t.Recipe] = cost = Data.Recipes.TryGetValue(t.Recipe, out var r) ? new(r.Inputs) : new();
+    public Dictionary<string, int> BatchCost(Thing t) => BatchCost(t.Recipe);
+    private Dictionary<string, int> BatchCost(string recipe) {
+        if (!batchCosts.TryGetValue(recipe, out var cost)) batchCosts[recipe] = cost = Data.Recipes.TryGetValue(recipe, out var r) ? new(r.Inputs) : new();
         return cost;
     }
+    /// <summary>Whether a station's current, queued or kept recipe takes an item as an input.</summary>
+    private bool Pending(Thing t, string item) {
+        if (BatchCost(t.Recipe).ContainsKey(item) || BatchCost(t.Keep).ContainsKey(item)) return true;
+        foreach (var q in t.Queue) if (BatchCost(q.Recipe).ContainsKey(item)) return true;
+        return false;
+    }
+    /// <summary>Whether a station takes an item from the player: an input of its current, queued or kept recipe, or a fuel it burns.</summary>
+    public bool Takes(Thing t, string item) => Pending(t, item) || t.Burner != null && FuelFits(t, item);
     /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it.</summary>
-    private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (FuelOf(t) is not string fuel || t.Burner?[fuel] > 0);
+    private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null);
+    /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
     public void LoadBatch(Thing t, int batches = 1) {
         if (!Near(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded(Verb.LoadBatch, t.Id, count: batches)) return;
-        var cost = BatchCost(t);
+        string recipe = t.Recipe;
+        var cost = BatchCost(recipe);
         if (cost.Count == 0) { Say("Choose a recipe first."); return; }
-        string? fuel = FuelOf(t);
+        var r = Data.Recipes[recipe];
+        string? fuel = null;
+        if (r.Burns && (fuel = FuelFromBackpack(t, r, cost)) == null) return;
         if (NeedsFullBottle(cost, S.Backpack)) { Say(Water.FullBottleWarning); return; }
         for (int i = 0; i < batches; i++) {
             if (!S.Backpack.Has(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
-            if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || FuelBlock(t, fuel) != null)) { Say("Input slots are full."); break; }
+            if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
             foreach (var pair in cost) S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
             if (fuel != null) S.Backpack.TransferTo(t.Burner!, fuel, 1);
         }
@@ -673,9 +815,9 @@ public sealed partial class World {
         if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
         if (PartialRecipeBottle(t, item)) { Say(Water.FullBottleWarning); return 0; }
         // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the ingredient slot, and the fuel slot is filled by dragging.
-        if (!BatchCost(t).ContainsKey(item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
+        if (!Pending(t, item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
         if (t.Kind == ThingKind.Packer && HoldBlock(t, item) is string refused) { Say(refused); return 0; }
-        if (t.Kind != ThingKind.Packer && !BatchCost(t).ContainsKey(item)) { Say($"{Data.Name(item)} is not used by this recipe."); return 0; }
+        if (t.Kind != ThingKind.Packer && !Pending(t, item)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
         if (Forwarded(Verb.LoadInput, t.Id, item: item, count: quantity)) return 0;
         int moved = S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, t.Inventory.StackSize - t.Inventory[item]));
         if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(item)} slot is full.");
@@ -688,8 +830,7 @@ public sealed partial class World {
         if (FuelBlock(t, item) is string refused) { Say(refused); return 0; }
         if (Forwarded(Verb.LoadFuel, t.Id, item: item, count: quantity)) return 0;
         int moved = S.Backpack.TransferTo(t.Burner, item, Math.Min(quantity, t.Burner.StackOf(item) - t.Burner[item]));
-        if (moved > 0) t.Fuel = item;
-        else Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : "The fuel slot is full.");
+        if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : "The fuel slot is full.");
         return moved;
     }
     public void Collect(Thing t) {
@@ -697,14 +838,10 @@ public sealed partial class World {
         if (Forwarded(Verb.Collect, t.Id)) return;
         foreach (var item in Leftovers(t).ToArray()) t.Inventory.TransferTo(S.Backpack, item, 999);
     }
-    /// <summary>Finished goods plus anything a previous recipe or fuel choice left behind.</summary>
-    public IEnumerable<string> Leftovers(Thing t) {
-        var cost = BatchCost(t);
-        return t.Inventory.Items.Keys.Where(item => !cost.ContainsKey(item));
-    }
+    /// <summary>Finished goods plus anything no current, queued or kept recipe takes.</summary>
+    public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));
     private string? FirstLeftover(Thing t) {
-        var cost = BatchCost(t);
-        foreach (var pair in t.Inventory.Items) if (!cost.ContainsKey(pair.Key)) return pair.Key;
+        foreach (var pair in t.Inventory.Items) if (!Pending(t, pair.Key)) return pair.Key;
         return null;
     }
     /// <summary>Steps inside a cabin, out of reach of wolves; any movement steps back out.</summary>
@@ -869,15 +1006,22 @@ public sealed partial class World {
     /// <summary>The whole coins one purchase costs, crate included for boxed goods.</summary>
     public int LotPrice(string item) => (int)MathF.Ceiling(1.25f * (Data.Items[item].Price * Lot(item) + (Lot(item) > 1 ? Data.Items["crate"].Price : 0)));
     public const int MarketSlots = 6;
+    /// <summary>Tools a tool station holds, one in each slot and any kind in any of them.</summary>
+    public const int ToolSlots = 4;
     private static Inventory NewBurner() => new() { Slots = 1 };
     // Stations with a recipe that burns fuel, worked out once from the data.
     private HashSet<ThingKind?>? burning;
     public const int MaxWorkers = 40;
     public const int Carts = 3;
     /// <summary>Whether a kind of building has a fuel slot.</summary>
-    public bool Burns(ThingKind kind) => (burning ??= Data.Recipes.Values.Where(r => r.Fuel).Select(r => r.Station).ToHashSet()).Contains(kind);
-    /// <summary>Items a station's fuel slot takes: coal at the reinforced furnace, wood or coal elsewhere.</summary>
-    public static bool FuelFits(Thing t, string item) => t.Kind == ThingKind.Reinforced ? item == "coal" : item is "wood" or "coal";
+    public bool Burns(ThingKind kind) => (burning ??= Data.Recipes.Values.Where(r => r.Burns).Select(r => r.Station).ToHashSet()).Contains(kind);
+    /// <summary>Whether a station's fuel slot takes an item: what its recipe burns, or without one what any of its recipes burns.</summary>
+    public bool FuelFits(Thing t, string item) => Data.Recipes.TryGetValue(t.Recipe, out var r) ? r.Fuels.Contains(item) : AnyRecipeBurns(t.Kind, item);
+    // A plain loop, so a check of a station without a recipe allocates no closure.
+    private bool AnyRecipeBurns(ThingKind station, string item) {
+        foreach (var r in Data.Recipes.Values) if (r.Station == station && r.Fuels.Contains(item)) return true;
+        return false;
+    }
     private static Inventory NewWageSlot() => new() { Slots = 1, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
@@ -885,10 +1029,33 @@ public sealed partial class World {
         box == t.Burner ? FuelBlock(t, item) :
         box == t.Output ? "Things only come out of here." :
         box == t.Inventory ? (PartialRecipeBottle(t, item) ? Water.FullBottleWarning : HoldBlock(t, item)) : null;
+    /// <summary>Whether a fuel slot takes an item now: a fuel that fits, and the same kind as what it holds.</summary>
+    private bool FuelTakes(Thing t, string item) => FuelFits(t, item) && (t.Burner?.First() is not string held || held == item);
     /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
     public string? FuelBlock(Thing t, string item) =>
-        !FuelFits(t, item) ? (t.Kind == ThingKind.Reinforced ? "The reinforced furnace burns only mined coal." : "The fuel slot takes wood or coal.") :
+        !FuelFits(t, item) ? (Data.Recipes.TryGetValue(t.Recipe, out var r) ? $"{r.Name} burns {FuelWords(r.Fuels)}." : "The fuel slot only takes fuel.") :
         t.Burner?.First() is string held && held != item ? $"The fuel slot holds {Data.Name(held).ToLowerInvariant()}. Take it out first." : null;
+    /// <summary>
+    /// The fuel a hauler brings a station and where from: more of what its fuel slot burns while it holds under two batches,
+    /// or for an empty slot the first fuel the recipe burns that storage gives out.
+    /// </summary>
+    private (string Fuel, Thing Source)? FuelToFetch(Thing t, Vector2 from) {
+        if (t.Burner is not Inventory burner) return null;
+        if (burner.First() is string held) return FuelOf(t) == held && burner[held] < 2 && SourceFor(held, from) is Thing source ? (held, source) : null;
+        // One pass over storage: the first fuel in the recipe's order that any of it gives out, from the nearest that does.
+        var fuels = Fuels(t);
+        Thing? best = null; int rank = fuels.Count; float nearest = 0;
+        foreach (var s in S.Things) {
+            if (s.Kind is not (ThingKind.Chest or ThingKind.Pile)) continue;
+            for (int i = 0; i < fuels.Count && i <= rank; i++) {
+                if (s.Inventory[fuels[i]] <= 0 || !s.Inventory.AllowsWithdrawal(fuels[i])) continue;
+                float distance = s.Pos.DistanceSquaredTo(from);
+                if (i < rank || distance < nearest) { best = s; rank = i; nearest = distance; }
+                break;
+            }
+        }
+        return best == null ? null : (fuels[rank], best);
+    }
     /// <summary>Coins kept for wages in every signpost's wage slot.</summary>
     public int WageCoins {
         get {
@@ -1027,7 +1194,7 @@ public sealed partial class World {
         if (r.Tool != "" && BestTool(r.Tool, null, r.Tier) == null) return CraftRefusal.NoTool;
         if (NeedsFullBottle(r.Inputs, S.Backpack)) return CraftRefusal.FullBottle;
         if (!S.Backpack.Has(r.Inputs)) return CraftRefusal.NoInputs;
-        return S.Crafting.Count >= 8 ? CraftRefusal.QueueFull : CraftRefusal.None;
+        return Waiting(Crafting, recipe) >= MaxQueued ? CraftRefusal.QueueFull : CraftRefusal.None;
     }
     /// <summary>Whether a hand recipe can be queued now, without building the reason; the crafting page asks on every refresh.</summary>
     public bool CanCraft(string recipe) => CraftCheck(recipe) == CraftRefusal.None;
@@ -1038,36 +1205,43 @@ public sealed partial class World {
         CraftRefusal.Recovering => "You are still recovering.",
         CraftRefusal.NoTool => $"Needs a {Data.ToolName(Data.Recipes[recipe].Tool, Data.Recipes[recipe].Tier)} in your backpack.",
         CraftRefusal.NoInputs => $"Needs {Goods(Data.Recipes[recipe].Inputs)} in your backpack.",
-        CraftRefusal.QueueFull => "Eight things are already being made.",
+        CraftRefusal.QueueFull => $"{MaxQueued} of these are already queued.",
         _ => null
     };
-    /// <summary>Queues a hand recipe; its inputs leave the backpack now so they cannot be spent twice.</summary>
-    public bool Craft(string recipe) {
+    /// <summary>Queues batches of a hand recipe while the backpack holds their inputs, which leave it now so they cannot be spent twice; false when none queued.</summary>
+    public bool Craft(string recipe, int count = 1) {
         if (CraftBlock(recipe) is string blocked) { Say(blocked); return false; }
-        if (Forwarded(Verb.Craft, item: recipe)) return false;
-        S.Backpack.Spend(Data.Recipes[recipe].Inputs); S.Crafting.Add(recipe); return true;
+        if (Forwarded(Verb.Craft, item: recipe, count: count)) return false;
+        for (int i = 0; i < count && CanCraft(recipe); i++) { S.Backpack.Spend(Data.Recipes[recipe].Inputs); Requeue(S.Crafting, recipe, 1); }
+        return true;
     }
-    /// <summary>Cancels a queued recipe and returns its inputs; what the backpack cannot hold goes into a box at the player's feet.</summary>
-    public void CancelCraft(int index) {
-        if (index < 0 || index >= S.Crafting.Count || Forwarded(Verb.CancelCraft, count: index)) return;
-        foreach (var (item, quantity) in Data.Recipes[S.Crafting[index]].Inputs) Give(item, quantity);
-        S.Crafting.RemoveAt(index); if (index == 0) S.CraftTime = 0;
+    /// <summary>Takes up to <paramref name="count"/> waiting batches of a hand recipe off the queue and returns their inputs; the one being made stays.</summary>
+    public void CancelCraft(string recipe, int count = 1) {
+        if (count <= 0 || Waiting(Crafting, recipe) == 0 || Forwarded(Verb.CancelCraft, item: recipe, count: count)) return;
+        int removed = Requeue(S.Crafting, recipe, -count);
+        foreach (var (item, quantity) in Data.Recipes[recipe].Inputs) Give(item, quantity * removed);
     }
     private void Give(string item, int quantity) {
         int left = quantity - S.Backpack.Add(item, quantity);
         if (left <= 0) return;
         var box = Add(ThingKind.Grave, Player); box.Inventory.Slots = left / box.Inventory.StackOf(item) + 1; box.Inventory.Add(item, left);
     }
-    /// <summary>How fast the first queued recipe progresses: the carried tool's speed, or zero while its tool is missing.</summary>
-    public float CraftRate => S.Crafting.Count == 0 || Downed ? 0 : Data.Recipes[S.Crafting[0]] is var r && r.Tool != "" ? BestTool(r.Tool, null, r.Tier) is string held ? Speed(held) : 0 : 1;
+    /// <summary>The hand recipe being made, else the first waiting, or null.</summary>
+    private RecipeDef? NextCraft => S.Making != "" ? Data.Recipes[S.Making] : S.Crafting.Count > 0 ? Data.Recipes[S.Crafting[0].Recipe] : null;
+    /// <summary>How fast hand crafting progresses: the carried tool's speed, or zero while its tool is missing or nothing is queued.</summary>
+    public float CraftRate => NextCraft is not RecipeDef r || Downed ? 0 : r.Tool != "" ? BestTool(r.Tool, null, r.Tier) is string held ? Speed(held) : 0 : 1;
+    /// <summary>Seconds a player stands still before hand crafting goes on, so walking never crafts between steps.</summary>
+    public const float CraftSettle = .25f;
     private void CraftTick(float dt) {
         float rate = CraftRate;
-        if (rate <= 0) return;
-        var r = Data.Recipes[S.Crafting[0]];
+        if (rate <= 0 || playerBusy || S.Actor.Still < CraftSettle) return;
+        // Work starts on the first waiting recipe, which then leaves the queue and can no longer be taken off.
+        if (S.Making == "") { S.Making = S.Crafting[0].Recipe; Requeue(S.Crafting, S.Making, -1); S.CraftTime = 0; }
+        var r = Data.Recipes[S.Making];
         S.CraftTime = Math.Min(r.Seconds, S.CraftTime + dt * rate);
         // A full backpack holds the finished item back rather than losing it.
         if (S.CraftTime < r.Seconds || S.Backpack.Room(r.Output) < r.Amount) return;
-        S.Backpack.Add(r.Output, r.Amount); S.Crafting.RemoveAt(0); S.CraftTime = 0;
+        S.Backpack.Add(r.Output, r.Amount); S.Making = ""; S.CraftTime = 0;
         if (r.Inputs.TryGetValue("water", out int usedWater)) Give("empty_bottle", usedWater);
         Crafted(r.Output); Play(Sounds.ForItem(r.Output), Player);
     }
@@ -1120,7 +1294,8 @@ public sealed partial class World {
     public Worker? Hire(Thing sign, HireOffer offer) {
         if (!Near(sign) || sign.Kind != ThingKind.Signpost || Forwarded(Verb.Hire, sign.Id, count: Data.HireOffers.IndexOf(offer))) return null;
         if (S.Workers.Count >= MaxWorkers) { Say("The POC supports forty workers."); return null; }
-        if (!Pay(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from your backpack."); return null; }
+        // Hiring is paid from the bank first, like wages; purchases stay paid from the backpack.
+        if (!PayWage(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from the bank or your backpack."); return null; }
         string name = WorkerNames.FirstOrDefault(n => S.Workers.All(w => w.Name != n)) ?? "Neighbor";
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
         S.Workers.Add(w); S.Milestones.Add("hired"); Say($"New worker {name} without a job."); Made?.Invoke(S.Actor.Id, w.Id); return w;
@@ -1393,7 +1568,7 @@ public sealed partial class World {
             // A mine site takes only what it still needs, so a surplus goes back to storage.
             int wanted = dest?.Kind == ThingKind.Mine ? MineNeed(dest, item) : int.MaxValue;
             // Fuel for a station goes into its fuel slot; once that is full or gone, it goes to storage like anything else.
-            var into = w.Fueling && dest?.Burner != null && FuelBlock(dest, item) == null ? dest.Burner : dest?.Inventory;
+            var into = w.Fueling && dest?.Burner != null && FuelTakes(dest, item) ? dest.Burner : dest?.Inventory;
             if (dest == null || into == null || wanted == 0 || into.Room(item) == 0 || !into.Accepts(item) || (dest.Id == target?.Id && target.IsResource)) { dest = DepositFor(item, w.Pos); into = dest?.Inventory; w.Fueling = false; }
             if (dest == null) { w.Status = Phrase("Holding ", Data.Name(item), " · no accepting storage"); return; }
             w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
@@ -1403,7 +1578,9 @@ public sealed partial class World {
             }
             return;
         }
-        string? need = target is { IsResource: true } && HasDuty(w, target.Id, "gather") ? ToolKind(target) : target is { Kind: ThingKind.Mine } ? MineTool(w, target) : null;
+        // A gatherer also fetches a tool that only speeds the work up, such as a rake, while a tool station has one.
+        string? need = target is { IsResource: true } && HasDuty(w, target.Id, "gather") ? ToolKind(target) ?? (HelpingTool(target.Kind) is string helping && HasTool(w, helping) ? helping : null)
+            : target is { Kind: ThingKind.Mine } ? MineTool(w, target) : null;
         if (need == null) w.Missing = "";
         if (w.Tool != "" && Data.Items[w.Tool].Tool != need) {
             if (!ReturnTool(w, dt)) return;
@@ -1424,13 +1601,18 @@ public sealed partial class World {
             if (blocked != null) { w.Status = blocked; return false; }
             string item = ResourceItem(target);
             if (DepositFor(item, target.Pos) == null) { w.Status = "Needs an accepting storage chest"; return false; }
-            if (need != null && w.Tool == "") { FetchTool(w, need, target, dt); return w.Missing == ""; }
+            if (need != null && w.Tool == "") {
+                FetchTool(w, need, target, dt);
+                // With no tool to be had, loose pieces of the same resource are picked up instead.
+                return w.Missing == "" || LooseSpot(w, target);
+            }
             w.Status = Phrase("Gathering ", Data.Name(item));
             if (!Walk(w, target.Pos, dt)) return true;
             w.WorkState = WorkerWorkState.Gathering; w.Exhausted = null;
             w.Timer += dt;
-            if (target.IsLoose || w.Timer >= Data.GatherSeconds * 1.6f / Speed(w.Tool == "" ? null : w.Tool)) {
+            if (target.IsLoose || w.Timer >= Data.GatherSeconds * 1.6f / Speed(w.Tool == "" ? null : w.Tool) * (w.Tool == "" ? BareHanded(target.Kind) : 1)) {
                 w.Timer = 0; target.Remaining -= w.Bag.Add(item, target.Remaining);
+                Chip(target, w.Tool == "" ? null : w.Tool);
                 if (target.Remaining > 0) return true;
                 NextSpot(w, target.Id, target.Kind, target.Pos, dt);
                 if (target.IsLoose) S.Things.Remove(target);
@@ -1460,13 +1642,21 @@ public sealed partial class World {
             if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, "wood", 3, true); w.Destination = target.Id; }
             w.Status = "Fetching firewood"; return true;
         }
-        if (!Data.Recipes.ContainsKey(target.Recipe)) { w.Status = "Choose a building recipe"; return false; }
+        const string Idle = "Nothing queued or marked to make";
+        if (!haul && !Data.Recipes.ContainsKey(target.Recipe)) { w.Status = Idle; return false; }
         if (haul) {
             if (FirstLeftover(target) is string leftover) {
                 var dest = DepositFor(leftover, target.Pos);
                 if (dest == null) { w.Status = "Output blocked · needs accepting storage"; return false; }
                 w.Status = "Collecting finished goods";
                 if (Walk(w, target.Pos, dt)) { target.Inventory.TransferTo(w.Bag, leftover, w.Bag.StackSize, true); w.Destination = dest.Id; }
+                return true;
+            }
+            if (!Data.Recipes.ContainsKey(target.Recipe)) { w.Status = Idle; return false; }
+            // Fuel the recipe does not burn leaves the fuel slot, so the right one can go in.
+            if (!target.Processing && Fuels(target).Count > 0 && FuelOf(target) == null && target.Burner!.First() is string stale && DepositFor(stale, target.Pos) is Thing store) {
+                w.Status = Phrase("Clearing ", Lower(Data.Name(stale)), " from the fire");
+                if (Walk(w, target.Pos, dt)) { target.Burner.TransferTo(w.Bag, stale, w.Bag.StackSize, true); w.Destination = store.Id; }
                 return true;
             }
             var costs = BatchCost(target);
@@ -1481,9 +1671,9 @@ public sealed partial class World {
                 return true;
             }
             // Then two batches' worth of fuel for the fuel slot.
-            if (fetches && FuelOf(target) is string fuel && target.Burner![fuel] < 2 && FuelBlock(target, fuel) == null && SourceFor(fuel, w.Pos) is Thing fuelSource) {
+            if (fetches && FuelToFetch(target, w.Pos) is (string fuel, Thing fuelSource)) {
                 w.Status = Phrase("Fetching ", Data.Name(fuel), " for the fire");
-                if (Walk(w, fuelSource.Pos, dt)) { fuelSource.Inventory.TransferTo(w.Bag, fuel, 2 - target.Burner[fuel], true); w.Destination = target.Id; w.Fueling = true; }
+                if (Walk(w, fuelSource.Pos, dt)) { fuelSource.Inventory.TransferTo(w.Bag, fuel, 2 - target.Burner![fuel], true); w.Destination = target.Id; w.Fueling = true; }
                 return true;
             }
         }
@@ -1565,17 +1755,28 @@ public sealed partial class World {
     /// With none known, they go on to their other jobs, or wait at the trading post; either way they say so once.
     /// </summary>
     private bool NextSpot(Worker w, int spent, ThingKind kind, Vector2 from, float dt) {
-        Thing? next = null; float nearest = 0;
-        foreach (var t in S.Things)
-            if (t.Kind == kind && t.Remaining > 0 && S.Remembered.ContainsKey(t.Id) && !HasDuty(w, t.Id) && (next == null || t.Pos.DistanceSquaredTo(from) < nearest)) { next = t; nearest = t.Pos.DistanceSquaredTo(from); }
-        if (next != null) {
-            foreach (var duty in w.Duties) if (duty.Thing == spent) duty.Thing = next.Id;
-            w.Assignment = next.Id; w.Timer = 0; w.Exhausted = null; return true;
-        }
+        // Spots that need a tool count only while the worker has one or a tool station does; loose pieces come after every other spot.
+        string item = ResourceItem(kind);
+        if (NearestSpot(w, item, from, ToolFor(item) is not string tool || HasTool(w, tool)) is Thing next) { MoveTo(w, spent, next); return true; }
         if (w.Exhausted != kind) { w.Exhausted = kind; Say($"{w.Name} knows no other {Lower(Data.Name(kind))} to gather."); }
         if (w.Duties.Count > 1) return false;
         w.Status = Phrase("No other known ", Lower(Data.Name(kind)), " · waiting at the trading post");
         WaitAtPost(w, dt); return true;
+    }
+    /// <summary>The nearest known spot with stock left that yields an item and the worker has no duty on: one needing a tool when <paramref name="tooled"/>, else a loose piece.</summary>
+    private Thing? NearestSpot(Worker w, string item, Vector2 from, bool tooled) {
+        Thing? next = null, loose = null; float nearest = 0, nearestLoose = 0;
+        foreach (var t in S.Things) {
+            if (t.Remaining <= 0 || !t.IsResource || ResourceItem(t.Kind) != item || !S.Remembered.ContainsKey(t.Id) || HasDuty(w, t.Id)) continue;
+            float distance = t.Pos.DistanceSquaredTo(from);
+            if (t.IsLoose) { if (loose == null || distance < nearestLoose) { loose = t; nearestLoose = distance; } } else if (tooled && (next == null || distance < nearest)) { next = t; nearest = distance; }
+        }
+        return next ?? loose;
+    }
+    /// <summary>Moves a worker's duties on a spent spot to the next one.</summary>
+    private static void MoveTo(Worker w, int spent, Thing next) {
+        foreach (var duty in w.Duties) if (duty.Thing == spent) duty.Thing = next.Id;
+        w.Assignment = next.Id; w.Timer = 0; w.Exhausted = null;
     }
     private void WaitAtPost(Worker w, float dt) => Walk(w, Nearest(ThingKind.Signpost, w.Pos)?.Pos + Vector2.One ?? Terrain.Spawn, dt);
     private static void NextPlace(Worker w) {
@@ -1605,11 +1806,16 @@ public sealed partial class World {
         if (!Walk(w, station.Pos, dt)) return false;
         station.Inventory.Add(w.Tool, 1); w.Tool = ""; return true;
     }
-    /// <summary>Takes the best tool of a kind from the nearest tool station holding one; without one, the worker says once what they need and waits.</summary>
-    private void FetchTool(Worker w, string kind, Thing target, float dt) {
+    /// <summary>The nearest tool station a worker may take a tool of a kind from, or null.</summary>
+    private Thing? ToolStationWith(string kind, Vector2 from) {
         Thing? station = null; float nearest = 0;
         foreach (var t in S.Things)
-            if (t.Kind == ThingKind.Toolstation && BestTool(kind, t.Inventory) is string held && t.Inventory.AllowsWithdrawal(held) && (station == null || t.Pos.DistanceSquaredTo(w.Pos) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(w.Pos); }
+            if (t.Kind == ThingKind.Toolstation && BestTool(kind, t.Inventory) is string held && t.Inventory.AllowsWithdrawal(held) && (station == null || t.Pos.DistanceSquaredTo(from) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(from); }
+        return station;
+    }
+    /// <summary>Takes the best tool of a kind from the nearest tool station holding one; without one, the worker says once what they need and waits.</summary>
+    private void FetchTool(Worker w, string kind, Thing target, float dt) {
+        var station = ToolStationWith(kind, w.Pos);
         if (station == null) {
             w.Status = Phrase("Needs ", A(kind), " to ", Task(target));
             if (w.Missing != kind) { w.Missing = kind; Say($"{w.Name} needs {A(kind)} to {Task(target)}. Put one in a tool station."); }
@@ -1729,6 +1935,7 @@ public sealed partial class World {
                 // So is a crew that has signed out or is at lunch.
                 t.Heat = Math.Max(Crewed(t) && t.Heat >= SteelHeat ? SteelHeat : 0, t.Heat - dt * 3.2f);
             }
+            Retarget(t);
             if (!Data.Recipes.TryGetValue(t.Recipe, out var recipe)) continue;
             bool wasBurning = stillBurning.Remove(t.Id);
             bool hot = t.Kind != ThingKind.Reinforced || t.Heat >= SteelHeat;
@@ -1739,15 +1946,17 @@ public sealed partial class World {
             float rate = (t.Kind == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
             if (!t.Processing && hot && atAnvil && Stocked(t)) {
                 t.Inventory.Spend(BatchCost(t)); t.Processing = true; t.Progress = 0;
+                // A queued batch leaves the queue as it starts, so it can no longer be taken off.
+                if (t.Queue.Count > 0 && t.Queue[0].Recipe == t.Recipe) Requeue(t.Queue, t.Recipe, -1);
                 if (recipe.Inputs.TryGetValue("water", out int usedWater)) t.Inventory.Add("empty_bottle", usedWater);
                 if (FuelOf(t) is string fuel) t.Burner!.Remove(fuel, 1);
-                if (recipe.Fuel && !wasBurning) Play("start_fire", t.Pos);
+                if (recipe.Burns && !wasBurning) Play("start_fire", t.Pos);
             }
             if (t.Processing && !hot) {
                 // A cold forge mid-batch keeps burning coal from its slot at the batch fuel rate, but the steel waits for heat.
                 // Burn is the campfire's fuel clock, reused here to time the next coal.
                 t.Burn = Math.Min(recipe.Seconds, t.Burn + dt);
-                if (t.Burn >= recipe.Seconds && t.Burner?.Remove("coal", 1) > 0) t.Burn = 0;
+                if (t.Burn >= recipe.Seconds && FuelOf(t) is string burning && t.Burner!.Remove(burning, 1) > 0) t.Burn = 0;
             }
             if (t.Processing && hot && atAnvil) {
                 t.Progress = Math.Min(recipe.Seconds, t.Progress + dt * rate);
@@ -1787,6 +1996,7 @@ public sealed partial class World {
                     TickWolves(dt, hunting);
                 }
                 if (!Dead && S.Health <= 0) Die();
+                p.Still = playerBusy ? 0 : p.Still + dt;
                 playerBusy = false;
             }
         everyone = false;
@@ -1976,10 +2186,10 @@ public sealed partial class World {
         5 => ("Something to carry", "Carve a wooden mallet by hand and slot it in the bench beside the chisel. Craft a crate there: 6 planks."),
         6 => ("The road to Bramblewick", "Build a trading post: 10 wood + 4 stone. Put berries in a crate and load it at the market. Sell, then collect the coins."),
         7 => ("Beneath the surface", "Buy your first steel pickaxe from the trading post price sheet. The cart delivers it to the trading post."),
-        8 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. Smelt iron ore with wood or coal."),
+        8 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. It smelts iron ore over coal or charcoal, and burns wood into charcoal."),
         9 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore and fuel; collect iron bars."),
         10 => ("Hotter than fire", "Explore for a dark cliff and mine coal. Build a reinforced furnace: 20 stone, 5 iron bars, 8 wood."),
-        11 => ("Make steel", "Load iron and mined coal into the reinforced furnace and coal into its fuel slot. Pump the bellows: steel requires 1450+ °C."),
+        11 => ("Make steel", "Load iron and coal into the reinforced furnace and coal into its fuel slot. Pump the bellows: steel requires 1450+ °C."),
         12 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. It hammers steel bars into steel parts."),
         13 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),
         14 => ("Steel for sale", "Pack steel tools into a crate and sell it at the trading post, then collect the coins."),
@@ -2033,8 +2243,9 @@ public sealed partial class World {
     /// The crafting queue must hold only recipes made by hand.
     /// </summary>
     private bool ValidPlayer(PlayerState p, Dictionary<int, Inventory> crates) {
-        if (p.HotbarSlots == null || p.Crafting == null || !ValidInventory(p.Backpack, crates)) return false;
-        foreach (string id in p.Crafting) if (!Data.Recipes.TryGetValue(id, out var r) || !r.Hand) return false;
+        if (p.HotbarSlots == null || p.Crafting == null || p.Making == null || !ValidInventory(p.Backpack, crates)) return false;
+        foreach (var q in p.Crafting) if (q == null || !Hand(q.Recipe) || q.Count is <= 0 or > MaxQueued) return false;
+        if (p.Making != "" && !Hand(p.Making)) return false;
         // A player who left while dead comes back still waiting to respawn.
         return (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
             && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
@@ -2057,8 +2268,10 @@ public sealed partial class World {
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
         if (!save.Things.Any(t => t.Id == p.Sheltered && t.Kind == ThingKind.Hut)) p.Sheltered = 0;
         p.Crafting ??= new();
-        p.Crafting.RemoveAll(id => !Data.Recipes.TryGetValue(id, out var r) || !r.Hand);
+        p.Crafting.RemoveAll(q => !Hand(q.Recipe));
+        if (!Hand(p.Making ?? "")) p.Making = "";
     }
+    private bool Hand(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand;
     /// <summary>
     /// Brings older saves' things up to date before they are read: loose iron left the game and no kind names it any more,
     /// and a mine's or farm plot's stage was one number for both.
@@ -2118,10 +2331,12 @@ public sealed partial class World {
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Crates ??= new(); loaded.Profits ??= new();
         foreach (var t in loaded.Things) {
-            // A station set to a recipe it doesn't make, as on older saves' anvils, is cleared.
-            // One left with no recipe goes back to its starting recipe.
-            if (t.Recipe != "" && (!Data.Recipes.TryGetValue(t.Recipe, out var r) || r.Station != t.Kind)) { t.Recipe = ""; t.Processing = false; t.Progress = 0; }
-            if (t.Recipe == "") t.Recipe = StartingRecipe(t.Kind);
+            // A station marked with or working on a recipe it doesn't make, as on older saves' anvils, goes back to its starting recipe; queued batches of one are dropped.
+            if (t.Keep != "" && !Makes(t, t.Keep)) t.Keep = StartingRecipe(t.Kind);
+            if (t.Recipe != "" && !Makes(t, t.Recipe)) { t.Recipe = ""; t.Processing = false; t.Progress = 0; }
+            t.Queue ??= new();
+            t.Queue.RemoveAll(q => q == null || !Makes(t, q.Recipe) || q.Count is <= 0 or > MaxQueued);
+            Retarget(t);
             if (SlotKinds(t.Kind).Length > 0) t.Tools ??= NewToolSlots(t.Kind);
             // A plot from an older save keeps its harvest with the seed; the harvest moves to its own slots.
             if (t.Kind == ThingKind.Farm && t.Output == null) {
@@ -2132,7 +2347,7 @@ public sealed partial class World {
             // A station from an older save keeps its fuel with the ingredients; fuel nothing smelts moves to the fuel slot.
             if (Burns(t.Kind) && t.Burner == null) {
                 t.Burner = NewBurner();
-                string fuel = BurnedFuel(t);
+                string fuel = ShownFuel(t, Data);
                 if (!BatchCost(t).ContainsKey(fuel)) t.Inventory.TransferTo(t.Burner, fuel, t.Inventory[fuel]);
             }
         }

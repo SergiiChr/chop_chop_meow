@@ -67,7 +67,7 @@ internal static class PlayerSteps {
 
     public static void CraftByHand(World world, string recipe, int times) {
         for (int i = 0; i < times; i++) Require(world.Craft(recipe), $"{recipe} should be craftable by hand: {world.CraftBlock(recipe)}");
-        for (int limit = 400; world.Crafting.Count > 0 && limit > 0; limit--) SafeTick(world, Step);
-        Require(world.Crafting.Count == 0, $"hand crafting {recipe} should finish: rate={world.CraftRate}, progress={world.CraftTime}, slots={world.Backpack.UsedSlots}, items={string.Join(",", world.Backpack.Items.Select(p => p.Key + "=" + p.Value))}, room={world.Backpack.Room(world.Data.Recipes[recipe].Output)}");
+        for (int limit = 400; (world.Crafting.Count > 0 || world.Making != "") && limit > 0; limit--) SafeTick(world, Step);
+        Require(world.Crafting.Count == 0 && world.Making == "", $"hand crafting {recipe} should finish: rate={world.CraftRate}, progress={world.CraftTime}, slots={world.Backpack.UsedSlots}, items={string.Join(",", world.Backpack.Items.Select(p => p.Key + "=" + p.Value))}, room={world.Backpack.Room(world.Data.Recipes[recipe].Output)}");
     }
 }

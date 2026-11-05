@@ -16,6 +16,35 @@ public static class AnimationChecks {
         CheckGatheringWorkerSwingsTheToolOfItsTarget();
         CheckWorkerAtLunchSitsOnceThere();
         CheckEveryActionMovesThroughDistinctPoses();
+        CheckCraftingSquatsOnlyWhileStandingStill();
+        CheckChangingActionBlendsBetweenPoses();
+        CheckRunLeavesTheGroundAfterEachPushOff();
+    }
+
+    private static void CheckCraftingSquatsOnlyWhileStandingStill() {
+        var empty = new Inventory();
+        Require(ActorAnimation.PlayerAction(null, false, false, empty, crafting: true) == ActorAction.Craft, "a player crafting by hand should squat over the work while standing still");
+        Require(ActorAnimation.PlayerAction(null, false, true, empty, crafting: true) == ActorAction.Walk, "moving should stand the crafting player up to walk");
+        Require(ActorAnimation.PlayerAction(ThingKind.Berries, true, false, empty, crafting: true) == ActorAction.Gather, "gathering should come before crafting");
+        var squat = ActorAnimation.PoseAt(ActorAction.Craft, .3f, false);
+        Require(squat.KneeL > 120 && squat.KneeR > 120 && squat.SwingL > 80, "the crafting pose should be a deep squat");
+        Require(Math.Abs(squat.ElbowL - ActorAnimation.PoseAt(ActorAction.Craft, 1.1f, false).ElbowL) > 1, "the hands should keep working while squatting");
+    }
+
+    private static void CheckChangingActionBlendsBetweenPoses() {
+        var squat = ActorAnimation.PoseAt(ActorAction.Craft, .5f, false);
+        var walk = ActorAnimation.PoseAt(ActorAction.Walk, 0, true);
+        Require(ActorAnimation.Blended(ActorAction.Craft, .5f, false, ActorAction.Walk, 0, true, 0) == squat, "a change of action should start from the old pose");
+        Require(ActorAnimation.Blended(ActorAction.Craft, .5f, false, ActorAction.Walk, 0, true, 1) == walk, "a finished blend should be the new pose");
+        var halfway = ActorAnimation.Blended(ActorAction.Craft, .5f, false, ActorAction.Walk, 0, true, .5f);
+        Require(halfway.KneeL < squat.KneeL && halfway.KneeL > walk.KneeL, "halfway through, the knees should be rising out of the squat");
+    }
+
+    private static void CheckRunLeavesTheGroundAfterEachPushOff() {
+        int airborne = 0;
+        for (int i = 0; i < 100; i++) if (ActorAnimation.PoseAt(ActorAction.Run, ActorAnimation.Duration(ActorAction.Run) * i / 100f, true).Lift > .01f) airborne++;
+        Require(airborne is > 5 and < 40, $"a run should leave the ground briefly after each push-off, not walk or bound: airborne {airborne} of 100 samples");
+        Require(ActorAnimation.PoseAt(ActorAction.Walk, .3f, true).Lift == 0, "a walk should keep a foot on the ground");
     }
 
     private static void CheckActionsLoopAndWrapByTheirDuration() {

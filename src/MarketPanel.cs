@@ -15,7 +15,8 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         Tab("crew", "hardhat", "Hire", () => memory.Hiring = true, memory.Hiring);
         Tab("guide", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
         FilterButton();
-        if (memory.SheetOpen) PriceSheet();
+        // The filters and the price sheet share the board beside the panel, so the sheet waits while the filters are open.
+        if (memory.SheetOpen && !FiltersOpen) PriceSheet();
         if (memory.Hiring) HireOffers();
         else Shipping();
         JobButtons();
@@ -102,10 +103,10 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
             var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => world.Hire(thing, offer));
             hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = Icons.Of("hardhat"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
             hire.CustomMinimumSize = new Vector2(0, 50); hire.Alignment = HorizontalAlignment.Left;
-            hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}";
+            hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}\nPaid from the bank first, then your backpack";
             AddChild(hire);
         }
-        AddLabel("Wages come out of the bank at dawn, then your backpack. Unpaid workers strike.", 13, Style.Beige);
+        AddLabel("Hiring and wages come out of the bank first, then your backpack. Wages are paid at dawn; unpaid workers strike.", 13, Style.Beige);
     }
 
     /// <summary>Prices as last heard from the village, on an enamel shop sign beside the panel; buying is always at the current price.</summary>
@@ -127,7 +128,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         header.AddChild(new Control { CustomMinimumSize = new Vector2(GoodsColumn, 0) });
         foreach (string column in new[] { "Sell price", "Buy price" }) { var cell = Style.Text(column, 13, Style.Tan); cell.CustomMinimumSize = new Vector2(PriceColumn, 0); cell.HorizontalAlignment = HorizontalAlignment.Center; header.AddChild(cell); }
         var rows = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; rows.AddThemeConstantOverride("separation", 0);
-        var sheetScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; sheetScroll.AddChild(rows); board.AddChild(sheetScroll); panel.ShowPriceRows(sheetScroll, rows);
+        var sheetScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; sheetScroll.AddChild(rows); board.AddChild(sheetScroll); panel.ShowSheetRows(sheetScroll, rows, 110);
         var coins = Icons.Of(Inventory.Coins);
         foreach (string id in world.Data.Market.Sells.Keys.Union(world.Data.Market.Buys.Keys)) {
             bool sells = world.Data.Market.Sells.ContainsKey(id), buys = world.Data.Market.Buys.ContainsKey(id);

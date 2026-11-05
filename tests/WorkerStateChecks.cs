@@ -13,6 +13,8 @@ public static class WorkerStateChecks {
         CheckWorkerStateFollowsGatheringAndReassignment(data);
         CheckWorkerGoesToNextKnownTreeThenWaitsUntilOneIsSeen(data);
         CheckPickerGoesToNextKnownLooseCoalThenWaits(data);
+        CheckMinerWorksDepositsBeforePickingUpChips(data);
+        CheckGathererWithoutAToolPicksUpLoosePieces(data);
         CheckWorkerOutOfPatchesMovesToTheirOtherJob(data);
         CheckWorkerWhoseBuildingGoesSaysTheyHaveNoJob(data);
         CheckStrikeResetsWorkState(data);
@@ -85,6 +87,40 @@ public static class WorkerStateChecks {
         Require(picker.Duties.Count == 1, "the worker should keep one duty");
         Require(picker.Duties[0].Kind == ThingKind.LooseCoal, "the worker should keep the loose coal duty");
         Require(picker.Pos.DistanceTo(post.Pos + Vector2.One) < 1.5f, "the worker should wait at the trading post");
+    }
+
+    /// <summary>A miner moves on to the next known deposit of the same ore, and picks up its loose chips only once no deposit is left.</summary>
+    private static void CheckMinerWorksDepositsBeforePickingUpChips(GameData data) {
+        var world = EmptyWorld(data);
+        var at = Terrain.Spawn;
+        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 2));
+        world.Add(ThingKind.Toolstation, at + new Vector2(-2, 2)).Inventory.Add("steel_pick", 1);
+        var near = world.Add(ThingKind.Iron, at + new Vector2(1, 0), 4);
+        var chip = world.Add(ThingKind.IronChip, at + new Vector2(2, -1.5f), 1);
+        var far = world.Add(ThingKind.Iron, at + new Vector2(6, 0), 4);
+        world.Player = at; world.Look();
+        var miner = AddWorker(world, near.Pos);
+        world.Assign(miner, near);
+        bool chipFirst = false;
+        for (int i = 0; i < 1200 && world.Find(chip.Id) != null; i++) { world.Tick(.1f); chipFirst |= world.Find(chip.Id) == null && far.Remaining > 0; }
+        Require(!chipFirst, "a miner should work the next known deposit before picking up chips");
+        Require(far.Remaining == 0 && world.Find(chip.Id) == null, "a miner out of deposits should pick up the known chips");
+        for (int i = 0; i < 300 && miner.Bag.Count > 0; i++) world.Tick(.1f);
+        Require(chest.Inventory["iron_ore"] >= 9, $"the ore and the chip should end up in storage: {chest.Inventory["iron_ore"]}");
+    }
+
+    /// <summary>A miner with no pickaxe to be had picks up known loose ore instead of waiting at the deposit.</summary>
+    private static void CheckGathererWithoutAToolPicksUpLoosePieces(GameData data) {
+        var world = EmptyWorld(data);
+        var at = Terrain.Spawn;
+        var chest = world.Add(ThingKind.Chest, at + new Vector2(2, 2));
+        var deposit = world.Add(ThingKind.Iron, at + new Vector2(1, 0), 40);
+        var chip = world.Add(ThingKind.IronChip, at + new Vector2(-2, -1.5f), 1);
+        world.Player = at; world.Look();
+        var miner = AddWorker(world, deposit.Pos);
+        world.Assign(miner, deposit);
+        for (int i = 0; i < 300 && chest.Inventory["iron_ore"] == 0; i++) world.Tick(.1f);
+        Require(world.Find(chip.Id) == null && chest.Inventory["iron_ore"] == 1 && deposit.Remaining == 40, "a miner without a pickaxe should pick up the loose ore and leave the deposit");
     }
 
     private static void CheckWorkerOutOfPatchesMovesToTheirOtherJob(GameData data) {

@@ -159,6 +159,20 @@ public partial class Game {
         }
     }
 
+    private async Task RightClick(Control control) {
+        var at = await At(control);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = at, GlobalPosition = at, Pressed = true });
+        await Frames();
+        RightRelease(at);
+        await Frames();
+    }
+
+    /// <summary>Runs a step with a key held down, and lets go of it even when the step fails.</summary>
+    private static async Task Holding(Key key, Func<Task> step) {
+        Input.ParseInputEvent(new InputEventKey { Keycode = key, PhysicalKeycode = key, Pressed = true });
+        try { await step(); } finally { Input.ParseInputEvent(new InputEventKey { Keycode = key, PhysicalKeycode = key, Pressed = false }); }
+    }
+
     private async Task RightClick(Vector2 at) {
         var point = RightPress(at);
         await Frames();

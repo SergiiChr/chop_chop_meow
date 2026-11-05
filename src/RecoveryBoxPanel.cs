@@ -8,6 +8,6 @@ public partial class RecoveryBoxPanel(PageTools tools, Thing subject) : ThingPag
         headingTitle.Text = "Recovery box";
         Well(new VBoxContainer()).AddChild(StorageGrid(5));
         var row = Row(); row.AddChild(kit.BigButton("Take all", Style.Brick, () => moves.TakeAll(thing)));
-        StoreBagGrid("Click: store one · Ctrl: store all · Drag to move");
+        StoreBagGrid("Click: store one · Shift: a stack · Ctrl: store all · Drag to move");
     }
 }

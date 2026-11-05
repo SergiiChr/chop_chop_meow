@@ -87,7 +87,7 @@ Wind sways grass, shrubs and tree foliage, drifting between calm spells and gust
 Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), and world sounds pan with their place on screen.
 A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
-Shrubs, pebbles and twigs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading, and the meadow has soft lusher and drier patches.
+Shrubs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading, and the meadow has soft lusher and drier patches.
 
 ## Controls
 
@@ -109,7 +109,7 @@ Shrubs, pebbles and twigs cast real shadows; grass and small objects darken the 
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
-| Click / Ctrl-click an item cell | Move one item / all of that item (Shift works like Ctrl); this applies across inventory and station panels |
+| Click / Shift-click / Ctrl-click an item cell | Move one item / the stack clicked / all of that item; this applies across inventory and station panels |
 | Drag a cell | Move its stack to another inventory or a station input slot; drop an item or building plan on the hotbar to assign it |
 
 ## Interface
@@ -151,7 +151,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 | Backpack | 24 slots |
 | Chest | 5 slots |
 | Worker | 5 items, like a crate: one stack of 5 or up to 5 different items |
-| Tool station | 12 slots |
+| Tool station | 4 slots, any tool in any slot |
 
 - Inventory cells retain their positions. Drag to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
 - Right-click a stack to pick up half of it, then left-click a slot to drop it there.
@@ -163,13 +163,29 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 
 ### Station panels
 
+Every station and the crafting menu share one layout: round tabs on the left for the tool each group of recipes needs, and square recipe plates beside them.
+A plate shows how many batches wait in the queue at its top right corner.
+The queue sits under the work in progress, one cup per recipe in the order first queued, however many batches of it wait.
+
+| Input on a plate | At a station | In the crafting menu |
+| --- | --- | --- |
+| Click | Mark it for workers to keep making once the queue is done (a thick outline with a hard hat); click again to unmark | Queue one |
+| Double-click | Queue one and load one batch of its inputs and a fuel from the backpack | Queue one |
+| Shift-click, Ctrl-click | Queue 5 or 10 | Queue 5 or 10 |
+| Right-click, with Shift or Ctrl | Take 1, 5 or 10 waiting batches off | Take 1, 5 or 10 off and get their materials back |
+
+A right-click on a cup in the queue takes batches off the same way.
+A batch leaves the queue when it starts, and one in progress cannot be taken off.
+A station page opens on the tab of what the station is making.
+A station with nothing queued and nothing marked stands idle.
+
 Stations show one cup per recipe input, the batch time above a progress bar and the output cup, with what one batch takes or makes under each cup.
-A station that burns fuel has its own fuel cup under the bar, marked by a flame, with how long the fuel in it lasts beside it.
+A station that burns fuel has its own fuel cup under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
+Fuel the recipe cannot burn shows in brick; workers carry it back to storage and bring a fuel it burns.
 Side outputs and leftovers sit in a second row under the output.
 Each cup holds a single stack of 64.
 
-- Click a backpack item to add one to its cup, Ctrl-click to move all of it, or drag it in.
-- Double-click a bench recipe to load one batch of its inputs.
+- Click a backpack item to add one to its cup, Shift-click to move the stack, Ctrl-click to move all of it, or drag it in.
 - Right-click a cup to pick up half.
 - Click or drag a cup to take its contents back.
 
@@ -236,6 +252,8 @@ Impassable mountain ranges close in from the left and right toward the valley's 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
 Iron and coal deposits sit at the foot of rock faces at the base of both ranges and need a pickaxe.
 Loose coal is scattered below the nearer coal face and is picked up whole with one right-click, with no tool.
+Loose stones and sticks lie about the plains: each picks up the same way as 1 stone or 1 wood, and is gone once picked.
+A pickaxe hit on a rock or an ore deposit knocks a loose piece of it off one time in twenty; it flies off and lands within 2 tiles, ready to pick up.
 A pale grey cliff further inland holds tin: mine it with a pickaxe.
 
 ## Progression
@@ -256,9 +274,10 @@ Reaching both shows an ending screen with Restart and Keep playing.
 
 ### Crafting menu
 
-The crafting menu (C) works on the go at base speed, about 10 seconds a recipe, and queues up to eight recipes.
-Clicking a queued one cancels it and returns its materials.
-Recipes are grouped into boxes by the tool they need, with that tool's icon on the box corner, red while you carry none.
+The crafting menu (C) crafts at base speed, about 10 seconds a recipe, and queues up to 99 of each recipe.
+Queueing takes the materials from the backpack at once.
+Crafting goes on only while you stand still, squatting over the work: walking stands you up and pauses it until you stop.
+Recipes are grouped into tabs by the tool they need, red while you carry none.
 
 A stone chisel takes 2 stone and no tool.
 With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wooden mallet and torches (3 wood).
@@ -292,11 +311,9 @@ A small steel tool such as a hammer takes 1 steel part and a big one such as an 
 
 ## Furnaces and steel
 
-- The stone furnace accepts wood or mined coal as fuel.
-- The stone furnace smelts 2 tin ore into a tin bar, sears meat and bakes bread (see Cooking).
-- The reinforced furnace takes iron and mined coal as materials, burns mined coal from its fuel slot, and needs heat from manual or worker-operated bellows. Steel forms from 1450 °C; below that it keeps burning coal without making steel.
-
-Charcoal production is not implemented, and charcoal cannot substitute for mined coal.
+- The stone furnace smelts 2 iron ore into an iron bar and 2 tin ore into a tin bar over coal or charcoal.
+- It also burns 2 wood into 1 charcoal, sears meat and bakes bread (see Cooking) over wood, coal or charcoal.
+- The reinforced furnace takes iron and coal as materials, burns only coal from its fuel slot, and needs heat from manual or worker-operated bellows. Steel forms from 1450 °C; below that it keeps burning coal without making steel.
 
 ## Cooking and canning
 
@@ -309,14 +326,14 @@ You can do both by hand from the crafting menu with a carried mortar.
 
 Its other recipes cook on their own:
 
-- 2 crushed berries → jam, over one wood or coal
-- 1 water + 1 raw meat → meat stew, over one wood or coal
+- 2 crushed berries → jam, over one wood, coal or charcoal
+- 1 water + 1 raw meat → meat stew, over one wood, coal or charcoal
 - 1 flour + 1 water → dough, kneaded with no fire
 
-The canning station (2 steel bars, 8 planks) seals meat stew, jam or raw meat into a tin can over one wood or coal.
+The canning station (2 steel bars, 8 planks) seals meat stew, jam or raw meat into a tin can over one wood, coal or charcoal.
 Canned meat stew is the best food to sell.
 
-Both stations, like the stone furnace, take wood or coal in their fuel slot.
+Both stations, like the stone furnace's food recipes, take wood, coal or charcoal in their fuel slot.
 
 ## Storage
 
@@ -368,23 +385,24 @@ Manual inventory transfers ignore these automation filters.
 
 ### Tool station
 
-The tool station (8 planks, 4 stone) is a rack that holds only tools.
+The tool station (8 planks, 4 stone) is a rack with four slots that each take any tool.
+Its page lists which worker has which tool out and who waits for one.
 Workers need tools for some jobs:
 
 - an axe to chop wood;
 - a pickaxe to mine ore and coal;
-- a rake to rake leaves;
 - a hammer to fit a mine.
 
-Stone, berries and loose coal need no tool.
+Stone, leaves, berries and loose pieces need no tool, though a pickaxe breaks rock faster and a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
 They put it back when reassigned or when heading home at dusk.
-If there is none, the worker waits, a message says once what they need, and they carry on as soon as one is put in.
+If there is none, the worker picks up known loose pieces of the same resource; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
+A gatherer whose spot runs out goes on to the next known spot of the same resource, and to loose pieces of it only once no other spot is left.
 
 A worker on the station's Stock job brings tools from other storage to the rack.
 
 Oaks drop a patch of leaves beside the trunk.
-Rake them with a rake and they fall again every day.
+Gather them by hand, or three times as fast with a rake, and they fall again every day.
 
 ## Farming
 
@@ -428,7 +446,7 @@ Trade carts keep their timing: a cart walks down the valley at a steady pace, fa
 ### Coins and wage slot
 
 Coins are a backpack item that stacks to 1000.
-Purchases and hiring are paid from carried coins.
+Purchases are paid from carried coins; hiring is paid from the bank first, then carried coins.
 
 Sale proceeds fill the wage slot first, a single stack of up to 1000 coins between the input and output boxes, and the rest goes into the output boxes.
 Daily wages are paid from the wage slot first and then from your backpack.
@@ -479,7 +497,7 @@ An unpaid worker strikes, standing with a "No pay - no work" sign, and owed wage
 
 ## Mines
 
-A mine is marked for free from the building plans.
+A mine is marked for free from the building plans, which list what each of its stages takes and what the finished mine brings out.
 The plan snaps to a rock spur past the seaward end of the nearest ore cliff and shows a see-through green outline.
 Each cliff takes one mine.
 
@@ -604,7 +622,7 @@ Nor can a save that names items the game does not know, or holds needs out of ra
 ### Environment
 
 The environment uses a shared human scale, Terrain3D mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones.
-Meadow grass and wildflowers grow in patches; ferns, ordinary shrubs and fallen twigs add woodland ground cover.
+Meadow grass and wildflowers grow in patches; ferns and ordinary shrubs add woodland ground cover.
 Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas.
 A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
 
@@ -652,7 +670,7 @@ Day and night have their own music, which crossfades as the time changes and pic
 
 - Worker automation is limited to gathering and station/furnace tasks.
 - Workers use simple grid detours around water and buildings; this is not a full navigation system.
-- There is no charcoal system, pollution, vampire threat, or technology beyond steel in this POC.
+- There is no pollution, vampire threat, or technology beyond steel in this POC.
 
 ## Licensing
 
