@@ -43,6 +43,7 @@ public static class SimulationChecks {
         CheckHaulerFuelsSmeltingWithCoalAndReturnsWood(data);
         CheckStationMakesItsQueueThenWhatItKeeps(data);
         CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere(data);
+        CheckStationLoadsMidBatchAndFinishesIt(data);
         CheckAnvilNeedsHammering(data);
         CheckFinishedBatchWaitsForOutputRoom(data);
         CheckToolsGateMiningAndFelling(data);
@@ -2051,6 +2052,23 @@ public static class SimulationChecks {
         var queue = loaded.Find(furnace.Id)!.Queue;
         Require(queue.Count == 2 && queue[0].Recipe == "charcoal" && queue[0].Count == 3 && queue[1].Recipe == "iron_bar" && queue[1].Count == 2 && loaded.Find(furnace.Id)!.Recipe == "charcoal",
             "a station's queue should load in order with its counts, and the station on its first recipe");
+    }
+
+    /// <summary>A station saved part way through a batch loads still making it, with its queue waiting behind.</summary>
+    private static void CheckStationLoadsMidBatchAndFinishesIt(GameData data) {
+        var old = EmptyWorld(data);
+        var furnace = old.Add(ThingKind.Furnace, new Vector2(14, 10));
+        old.Player = furnace.Pos + Vector2.One;
+        Give(old, "wood", 3);
+        old.SetRecipe(furnace, "charcoal"); old.LoadInput(furnace, "wood", 2); old.LoadFuel(furnace, "wood", 1);
+        old.Tick(.1f);
+        old.QueueRecipe(furnace, "iron_bar", 1);
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(old.Serialize());
+        var station = loaded.Find(furnace.Id)!;
+        Require(station.Processing && station.Recipe == "charcoal" && station.Queue.Count == 1, "a station saved mid-batch should load making that batch with its queue behind it");
+        SafeTick(loaded, data.Recipes["charcoal"].Seconds + 1);
+        Require(station.Inventory["charcoal"] == 1 && station.Recipe == "iron_bar", "the loaded batch should finish and the queued recipe come next");
     }
 
     /// <summary>

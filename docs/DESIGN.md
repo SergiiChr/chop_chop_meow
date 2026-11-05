@@ -416,7 +416,10 @@ The bench runs at `benchSpeed` times the speed of the tool in its own chisel or 
 
 A station's `Thing.Queue` holds its queued batches, one entry per recipe in the order first queued; a batch leaves it as it starts.
 `Thing.Keep` is the recipe workers keep it making once the queue is done, and a building's `recipe` in `data/game.json` names the one it starts with.
-`Thing.Recipe` follows the batch in progress, else the first queued, else `Keep` (`World.Retarget`); with none the station stands idle.
+`Thing.Making` is the batch in progress, as `PlayerState.Making` is by hand, and both start the next batch through `World.StartNext`.
+`Thing.Recipe` is worked out, not stored: the batch in progress, else the first queued, else `Keep`; with none the station stands idle.
+Saves and world updates leave out an empty mark, queue and batch, so a tree or a rock carries none of them.
+`World.QueueOf` and `World.Enqueue` read and change either queue, a station's or the hand's, for the board and the strip.
 A station takes inputs for any recipe it has queued or kept, and haulers carry out only what none of them takes.
 Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
 
