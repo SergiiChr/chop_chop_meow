@@ -720,9 +720,9 @@ public partial class WorldView : Node3D {
 
     /// <summary>The rock or ore deposit a newly appeared chip came off, or null when none is close enough.</summary>
     private Thing? ChippedFrom(Thing chip) {
-        Thing? rock = null; float nearest = (World.ChipReach + .5f) * (World.ChipReach + .5f);
+        Thing? rock = null; float nearest = (GatherRules.ChipReach + .5f) * (GatherRules.ChipReach + .5f);
         foreach (var t in World.Things)
-            if (World.ChipOf(t.Kind) == chip.Kind && t.Pos.DistanceSquaredTo(chip.Pos) <= nearest) { rock = t; nearest = t.Pos.DistanceSquaredTo(chip.Pos); }
+            if (GatherRules.Of(t.Kind)?.Chip == chip.Kind && t.Pos.DistanceSquaredTo(chip.Pos) <= nearest) { rock = t; nearest = t.Pos.DistanceSquaredTo(chip.Pos); }
         return rock;
     }
 

@@ -32,6 +32,7 @@ Project rules on top of the global coding and testing guides.
 - Simulation lives in `World.cs` and never touches menus or rendering, so headless checks can run gameplay.
 - Inventory rules belong in `Inventory.cs`, not in individual worker jobs.
 - Balance and recipe values belong in `data/game.json`, not in code.
+  Gathering rules are the exception: they live in the `GatherRules` table in code, keyed by `ThingKind`, so code references them directly.
 
 ## Tests
 

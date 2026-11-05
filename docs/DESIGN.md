@@ -55,6 +55,7 @@ Simulation and data:
 | `src/GameData.cs` | Loads tunable items, buildings, recipes, trade values and time values from `data/game.json` |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
+| `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor and its chip |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces |
 | `src/Packing.cs` | Packing stations |
@@ -373,7 +374,7 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 
 - Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
-- `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `World.ChipReach` of a boulder or deposit on `World.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
+- `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `GatherRules.ChipReach` of a boulder or deposit on `GatherRules.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
 - A picked-clean berry bush fruits again after `berryRegrowHours`.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
 - Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
@@ -394,9 +395,9 @@ Tier 1 is unused, since there are no iron tools.
 Recipes name the tool they need, the lowest `tier` that will do, and whether they can be made by hand (`hand`).
 So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
 
-`World.ToolKind` names the tool a resource needs: an axe for trees, a pickaxe for deposits.
-`World.HelpingTool` names one that only speeds gathering up: a pickaxe for rock, a rake for leaves; leaves take three times as long by hand.
-Stone, leaves, berries and loose pieces need none.
+`GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for deposits), one that only speeds gathering up (a pickaxe for rock, a rake for leaves, which take three times as long by hand), and the loose piece a pickaxe chips off it.
+Stone, leaves, berries and loose pieces need no tool.
+Tool stations report changes to what they hold (`Inventory.Changed`), so the world counts the tools they give out only after a change, and a waiting worker checks that count rather than every station.
 
 Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFreshStart` verifies:
 

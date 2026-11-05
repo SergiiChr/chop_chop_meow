@@ -1150,7 +1150,7 @@ public static class SimulationChecks {
         var chips = world.Things.Where(t => t.Kind == ThingKind.IronChip).ToList();
         Require(hits == 300, $"each 600-ore deposit should take 150 hits of 4: {hits}");
         Require(chips.Count is >= 5 and <= 30, $"about one hit in twenty should chip ore off, 15 of 300 on average: {chips.Count}");
-        Require(chips.All(c => deposits.Any(d => d.Pos.DistanceTo(c.Pos) <= World.ChipReach) && world.CanStand(c.Pos)), "a chip should land where it can be reached, within 2 tiles of its deposit");
+        Require(chips.All(c => deposits.Any(d => d.Pos.DistanceTo(c.Pos) <= GatherRules.ChipReach) && world.CanStand(c.Pos)), "a chip should land where it can be reached, within 2 tiles of its deposit");
         PickUp(world, chips[0]);
         Require(world.Backpack["iron_ore"] == 1, "a chip should give one ore");
 

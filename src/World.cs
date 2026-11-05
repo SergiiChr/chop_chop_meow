@@ -58,11 +58,11 @@ public sealed class Thing {
     /// <summary>A trading post that sends the cart by itself once every market slot holds a crate.</summary>
     public bool AutoSell { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
-    [JsonIgnore] public bool IsResource => IsLoose || IsDeposit || Kind is ThingKind.Tree or ThingKind.Stone or ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.Leaves;
+    [JsonIgnore] public bool IsResource => GatherRules.Of(Kind) != null;
     /// <summary>Ore at the foot of a cliff, mined with a pickaxe.</summary>
-    [JsonIgnore] public bool IsDeposit => Kind is ThingKind.Iron or ThingKind.Coal or ThingKind.Tin;
+    [JsonIgnore] public bool IsDeposit => GatherRules.Of(Kind)?.Shape == GatherShape.Deposit;
     /// <summary>Loose pieces are picked up whole in one go and vanish, instead of being worked down like a deposit.</summary>
-    [JsonIgnore] public bool IsLoose => Kind is ThingKind.LooseCoal or ThingKind.LooseStone or ThingKind.Stick or ThingKind.IronChip or ThingKind.TinChip;
+    [JsonIgnore] public bool IsLoose => GatherRules.Of(Kind)?.Shape == GatherShape.Loose;
     [JsonIgnore] public bool IsStorage => Kind is ThingKind.Chest or ThingKind.Grave or ThingKind.Crate or ThingKind.Toolstation or ThingKind.Pile;
 }
 /// <summary>Batches of one recipe waiting in a queue.</summary>
@@ -520,13 +520,6 @@ public sealed partial class World {
     /// <summary>Where a packer stands: behind the packing table, facing the camera, between the open crate and the heap of goods.</summary>
     public static readonly Vector2 PackStand = new(-.3f, -.8f);
     public static float Footprint(ThingKind kind) => kind switch { ThingKind.Pile or ThingKind.Farm => 1.5f, ThingKind.Cooktable => .6f, ThingKind.Packer => .7f, ThingKind.Cannery => .5f, ThingKind.Hut => 1.55f, ThingKind.Reinforced => .8f, ThingKind.Furnace => .65f, ThingKind.Bench => .6f, ThingKind.Chest or ThingKind.Anvil or ThingKind.Toolstation => .45f, _ => .35f };
-    /// <summary>The tool kind gathering this needs: an axe for trees, a pickaxe for deposits and a rake for leaves; stone, berries and loose pieces need none.</summary>
-    public static string? ToolKind(Thing t) => ToolKind(t.Kind);
-    public static string? ToolKind(ThingKind kind) => kind == ThingKind.Tree ? "axe" : kind is ThingKind.Iron or ThingKind.Coal or ThingKind.Tin ? "pickaxe" : null;
-    /// <summary>A tool that speeds gathering up without being needed: a pickaxe for rock and a rake for leaves.</summary>
-    public static string? HelpingTool(ThingKind kind) => kind == ThingKind.Stone ? "pickaxe" : kind == ThingKind.Leaves ? "rake" : null;
-    /// <summary>How many times longer a gather takes without its helping tool: leaves by hand take three times a rake's time.</summary>
-    private static float BareHanded(ThingKind kind) => kind == ThingKind.Leaves ? 3 : 1;
     /// <summary>A word with "a" or "an" before it, built once.</summary>
     public string A(string word) => Phrase("aeiou".Contains(word[0]) ? "an " : "a ", word);
     private string Task(Thing t) => t.Kind switch {
@@ -577,22 +570,14 @@ public sealed partial class World {
         if (!t.IsResource) return "Select a natural resource.";
         if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again in ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Tree => "Only a stump is left. Find another tree.", ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
         // Workers fetch their tools from a tool station instead of needing them carried.
-        if (worker || ToolKind(t) is not string kind || BestTool(kind) != null) return null;
+        if (worker || GatherRules.Of(t.Kind)?.Needs is not string kind || BestTool(kind) != null) return null;
         return kind switch {
             "axe" => "An axe is required to chop a tree.",
             _ => "A pickaxe is required to mine."
         };
     }
     public static string ResourceItem(Thing t) => ResourceItem(t.Kind);
-    public static string ResourceItem(ThingKind kind) => kind switch {
-        ThingKind.Tree or ThingKind.Stick => "wood",
-        ThingKind.Iron or ThingKind.IronChip => "iron_ore",
-        ThingKind.Tin or ThingKind.TinChip => "tin_ore",
-        ThingKind.LooseCoal => "coal",
-        ThingKind.LooseStone => "stone",
-        ThingKind.WolfCorpse => "raw_meat",
-        _ => kind.Id()
-    };
+    public static string ResourceItem(ThingKind kind) => GatherRules.Of(kind)?.Item ?? kind.Id();
     public void Gather(Thing t, float dt) {
         // A loose piece is a single pick-up; anything else the host works on for as long as the player holds on to it.
         if (t.IsLoose ? Forwarded(Verb.PickUp, t.Id) : Remote) { S.Actor.GatherTarget = t.IsLoose ? 0 : t.Id; return; }
@@ -604,8 +589,9 @@ public sealed partial class World {
         if (t.IsLoose) { PickUp(t); return; }
         if (t.Kind == ThingKind.Farm) { Harvest(t, dt); if (t.FarmStage == FarmStage.Fallow) Say("Harvested. Take the wheat, seeds and grass from the plot, and put seeds back in to sow again."); return; }
         gatherClock += dt;
-        string? tool = (ToolKind(t) ?? HelpingTool(t.Kind)) is string kind ? BestTool(kind) : null;
-        float seconds = Data.GatherSeconds / Speed(tool) * (tool == null ? BareHanded(t.Kind) : 1);
+        var rule = GatherRules.Of(t.Kind);
+        string? tool = (rule?.Needs ?? rule?.Helps) is string kind ? BestTool(kind) : null;
+        float seconds = Data.GatherSeconds / Speed(tool) * (tool == null ? rule?.ByHand ?? 1 : 1);
         if (gatherClock < seconds) return;
         gatherClock = 0;
         if (t.Kind == ThingKind.Water) {
@@ -1607,7 +1593,7 @@ public sealed partial class World {
             return;
         }
         // A gatherer also fetches a tool that only speeds the work up, such as a rake, while a tool station has one.
-        string? need = target is { IsResource: true } && HasDuty(w, target.Id, "gather") ? ToolKind(target) ?? (HelpingTool(target.Kind) is string helping && HasTool(w, helping) ? helping : null)
+        string? need = target is { IsResource: true } && HasDuty(w, target.Id, "gather") ? GatherRules.Of(target.Kind)?.Needs ?? (GatherRules.Of(target.Kind)?.Helps is string helping && HasTool(w, helping) ? helping : null)
             : target is { Kind: ThingKind.Mine } ? MineTool(w, target) : null;
         if (need == null) w.Missing = "";
         if (w.Tool != "" && Data.Items[w.Tool].Tool != need) {
@@ -1638,7 +1624,7 @@ public sealed partial class World {
             if (!Walk(w, target.Pos, dt)) return true;
             w.WorkState = WorkerWorkState.Gathering; w.Exhausted = null;
             w.Timer += dt;
-            if (target.IsLoose || w.Timer >= Data.GatherSeconds * 1.6f / Speed(w.Tool == "" ? null : w.Tool) * (w.Tool == "" ? BareHanded(target.Kind) : 1)) {
+            if (target.IsLoose || w.Timer >= Data.GatherSeconds * 1.6f / Speed(w.Tool == "" ? null : w.Tool) * (w.Tool == "" ? GatherRules.Of(target.Kind)?.ByHand ?? 1 : 1)) {
                 w.Timer = 0; target.Remaining -= w.Bag.Add(item, target.Remaining);
                 Chip(target, w.Tool == "" ? null : w.Tool);
                 if (target.Remaining > 0) return true;
@@ -1785,7 +1771,7 @@ public sealed partial class World {
     private bool NextSpot(Worker w, int spent, ThingKind kind, Vector2 from, float dt) {
         // Spots that need a tool count only while the worker has one or a tool station does; loose pieces come after every other spot.
         string item = ResourceItem(kind);
-        if (NearestSpot(w, item, from, ToolFor(item) is not string tool || HasTool(w, tool)) is Thing next) { MoveTo(w, spent, next); return true; }
+        if (NearestSpot(w, item, from, GatherRules.ToolFor(item) is not string tool || HasTool(w, tool)) is Thing next) { MoveTo(w, spent, next); return true; }
         if (w.Exhausted != kind) { w.Exhausted = kind; Say($"{w.Name} knows no other {Lower(Data.Name(kind))} to gather."); }
         if (w.Duties.Count > 1) return false;
         w.Status = Phrase("No other known ", Lower(Data.Name(kind)), " · waiting at the trading post");
