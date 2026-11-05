@@ -244,7 +244,7 @@ public static class ActorAnimation {
 
     /// <summary>A walking knee from the moment its foot lands: a small give under the weight, straight at push-off, then folded through the swing.</summary>
     private static float WalkKnee(float sinceStrike) {
-        float q = sinceStrike - MathF.Floor(sinceStrike);
+        float q = Mathf.PosMod(sinceStrike, 1);
         return q < .6f ? 6 + 12 * MathF.Sin(MathF.PI * q / .6f) : 6 + 52 * MathF.Sin(MathF.PI * (q - .6f) / .4f);
     }
 
@@ -253,7 +253,7 @@ public static class ActorAnimation {
     /// then folds high and reaches forward again; the push-off lifts the body for the tenth after it.
     /// </summary>
     private static (float Swing, float Knee, float Lift) RunLeg(float sinceStrike) {
-        float q = sinceStrike - MathF.Floor(sinceStrike);
+        float q = Mathf.PosMod(sinceStrike, 1);
         float swing = 40 * MathF.Cos(q * Mathf.Tau);
         float knee = q < .4f ? 8 + 22 * MathF.Sin(MathF.PI * q / .4f) : 8 + 108 * MathF.Sin(MathF.PI * (q - .4f) / .6f);
         float lift = q is >= .4f and < .5f ? .07f * MathF.Sin(MathF.PI * (q - .4f) / .1f) : 0;
@@ -267,8 +267,7 @@ public static class ActorAnimation {
     public static Pose Blended(ActorAction from, float fromTime, bool fromMoving, ActorAction to, float time, bool moving, float blend) {
         var now = PoseAt(to, time, moving);
         if (blend >= 1) return now;
-        float t = Math.Clamp(blend, 0, 1);
-        return Pose.Lerp(PoseAt(from, fromTime, fromMoving), now, t * t * (3 - 2 * t));
+        return Pose.Lerp(PoseAt(from, fromTime, fromMoving), now, Mathf.SmoothStep(0, 1, blend));
     }
 
     /// <summary>Loops smoothly through keys sorted by phase; the last key eases back into the first.</summary>

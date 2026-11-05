@@ -163,7 +163,7 @@ public partial class Game {
         var at = await At(control);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = at, GlobalPosition = at, Pressed = true });
         await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = at, GlobalPosition = at, Pressed = false });
+        RightRelease(at);
         await Frames();
     }
 

@@ -57,13 +57,8 @@ public partial class World {
 
     /// <summary>Sends a gatherer who cannot work a spot to the nearest known loose piece of the same resource, and tells whether there was one.</summary>
     private bool LooseSpot(Worker w, Thing spot) {
-        string item = ResourceItem(spot);
-        Thing? loose = null; float nearest = 0;
-        foreach (var t in S.Things)
-            if (t.IsLoose && t.Remaining > 0 && ResourceItem(t.Kind) == item && S.Remembered.ContainsKey(t.Id) && !HasDuty(w, t.Id) && (loose == null || t.Pos.DistanceSquaredTo(w.Pos) < nearest)) { loose = t; nearest = t.Pos.DistanceSquaredTo(w.Pos); }
-        if (loose == null) return false;
-        foreach (var duty in w.Duties) if (duty.Thing == spot.Id) duty.Thing = loose.Id;
-        w.Assignment = loose.Id; w.Timer = 0; w.Missing = "";
+        if (NearestSpot(w, ResourceItem(spot), w.Pos, false) is not Thing loose) return false;
+        MoveTo(w, spot.Id, loose); w.Missing = "";
         return true;
     }
 }

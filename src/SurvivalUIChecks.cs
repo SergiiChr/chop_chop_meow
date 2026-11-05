@@ -99,15 +99,13 @@ public partial class Game {
         await Click(Cell(0, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal)));
         Require(chest.Inventory["coal"] == 4 && world.Backpack["coal"] == 6,
             "Clicking a storage stack must move exactly one item from storage to the backpack.");
-        Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = true });
-        try { await Click(Cell(0, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal))); } finally { Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = false }); }
+        await Holding(Key.Ctrl, () => Click(Cell(0, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal))));
         Require(chest.Inventory["coal"] == 0 && world.Backpack["coal"] == 10,
             "Ctrl-clicking a storage stack must take all remaining units.");
         await Click(Cell(1, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal)));
         Require(chest.Inventory["coal"] == 1 && world.Backpack["coal"] == 9,
             "Clicking one unit in the backpack must store exactly one unit.");
-        Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = true });
-        try { await Click(Cell(1, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal))); } finally { Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = false }); }
+        await Holding(Key.Ctrl, () => Click(Cell(1, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal))));
         Require(chest.Inventory["coal"] == 10 && world.Backpack["coal"] == 0,
             "Ctrl-clicking a backpack stack must store all remaining units.");
         Give(Hosted, "coal", 70); await Frames(3);

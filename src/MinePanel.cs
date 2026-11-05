@@ -14,7 +14,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
         var tag = Style.Pill(open ? "open" : $"{stage + 1} / 3", open ? Style.TagPill : Style.Tag(Style.Mustard), open ? Style.Rim : Style.Line, 13);
         panel.AddToHeader(tag);
         if (!open) {
-            string workday = data.StageWorkdays == 1 ? "1 working day" : $"{data.StageWorkdays:0.#} working days";
+            string workday = PageText.Workdays(data.StageWorkdays);
             (string Title, string Needs, string Icon)[] stages = {
                 ("Dig the entrance", $"A worker with a pickaxe for {workday}", "steel_pick"),
                 ("Shore it up", PageText.Cost(world, data.Materials), "wood"),

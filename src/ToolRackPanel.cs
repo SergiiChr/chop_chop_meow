@@ -19,12 +19,8 @@ public partial class ToolRackPanel(PageTools tools, Thing subject) : ThingPage(t
     /// <summary>Which worker has which tool out, and who waits for one.</summary>
     private void CrewTools(StringBuilder text) {
         foreach (var w in world.Workers) {
-            if (w.Tool != "") {
-                text.Append(w.Name).Append(" has a ");
-                foreach (char c in world.Data.Name(w.Tool)) text.Append(char.ToLowerInvariant(c));
-                text.Append('\n');
-            }
-            if (w.Missing != "") text.Append(w.Name).Append(" waits for ").Append("aeiou".Contains(w.Missing[0]) ? "an " : "a ").Append(w.Missing).Append('\n');
+            if (w.Tool != "") text.Append(w.Name).Append(" has ").Append(world.A(world.Lower(world.Data.Name(w.Tool)))).Append('\n');
+            if (w.Missing != "") text.Append(w.Name).Append(" waits for ").Append(world.A(w.Missing)).Append('\n');
         }
         if (text.Length == 0) text.Append("No worker has a tool out.");
         else text.Length--;

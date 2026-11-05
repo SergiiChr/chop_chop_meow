@@ -517,7 +517,8 @@ public sealed partial class World {
     public static string? HelpingTool(ThingKind kind) => kind == ThingKind.Stone ? "pickaxe" : kind == ThingKind.Leaves ? "rake" : null;
     /// <summary>How many times longer a gather takes without its helping tool: leaves by hand take three times a rake's time.</summary>
     private static float BareHanded(ThingKind kind) => kind == ThingKind.Leaves ? 3 : 1;
-    private string A(string word) => Phrase("aeiou".Contains(word[0]) ? "an " : "a ", word);
+    /// <summary>A word with "a" or "an" before it, built once.</summary>
+    public string A(string word) => Phrase("aeiou".Contains(word[0]) ? "an " : "a ", word);
     private string Task(Thing t) => t.Kind switch {
         ThingKind.Tree => "chop wood",
         ThingKind.Leaves => "rake leaves",
@@ -533,7 +534,8 @@ public sealed partial class World {
         if (!phrases.TryGetValue((a, b, c, d), out var text)) phrases[(a, b, c, d)] = text = a + b + c + d;
         return text;
     }
-    private string Lower(string text) {
+    /// <summary>Text in lower case, built once.</summary>
+    public string Lower(string text) {
         if (!lowered.TryGetValue(text, out var lower)) lowered[text] = lower = text.ToLowerInvariant();
         return lower;
     }
@@ -716,7 +718,8 @@ public sealed partial class World {
     }
     /// <summary>Adds to or takes from a queue's entry for a recipe, between none and <see cref="MaxQueued"/>, and returns how many it moved.</summary>
     private static int Requeue(List<Queued> queue, string recipe, int count) {
-        int at = queue.FindIndex(q => q.Recipe == recipe);
+        int at = queue.Count - 1;
+        while (at >= 0 && queue[at].Recipe != recipe) at--;
         if (at < 0) { if (count <= 0) return 0; queue.Add(new Queued { Recipe = recipe }); at = queue.Count - 1; }
         int before = queue[at].Count, after = Math.Clamp(before + count, 0, MaxQueued);
         if (after == 0) queue.RemoveAt(at); else queue[at].Count = after;
@@ -734,14 +737,26 @@ public sealed partial class World {
         if (!Makes(t, recipe)) return;
         if (!Near(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded(Verb.QueueBatch, t.Id, item: recipe)) return;
-        if (t.Queue.Find(q => q.Recipe == recipe)?.Count >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
+        if (Waiting(new(t.Queue), recipe) >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
         QueueRecipe(t, recipe, 1);
         var r = Data.Recipes[recipe];
         foreach (var (item, amount) in r.Inputs) if (amount > t.Inventory[item]) LoadInput(t, item, amount - t.Inventory[item]);
-        if (!r.Burns || t.Burner == null) return;
-        if (t.Burner.First() is string held) { if (!r.Fuels.Contains(held)) Say($"The fuel slot holds {Lower(Data.Name(held))}, which {Lower(r.Name)} cannot burn. Take it out first."); return; }
-        if (r.Fuels.FirstOrDefault(f => S.Backpack[f] > 0) is string fuel) LoadFuel(t, fuel, 1);
-        else Say(Phrase("Needs ", FuelWords(r.Fuels), " in your backpack for the fire."));
+        if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost) is string fuel && t.Burner.First() == null) LoadFuel(t, fuel, 1);
+    }
+    private static readonly Dictionary<string, int> NoCost = new();
+    /// <summary>
+    /// The fuel loading a recipe burns: what the fuel slot holds, or for an empty slot the first fuel the recipe burns
+    /// that the backpack has beyond what <paramref name="inputs"/> takes. Says why and gives null when there is none.
+    /// </summary>
+    private string? FuelFromBackpack(Thing t, RecipeDef r, Dictionary<string, int> inputs) {
+        if (t.Burner?.First() is string held) {
+            if (r.Fuels.Contains(held)) return held;
+            Say($"The fuel slot holds {Lower(Data.Name(held))}, which {Lower(r.Name)} cannot burn. Take it out first.");
+            return null;
+        }
+        foreach (string fuel in r.Fuels) if (S.Backpack[fuel] > inputs.GetValueOrDefault(fuel)) return fuel;
+        Say(Phrase("Needs ", FuelWords(r.Fuels), " in your backpack for the fire."));
+        return null;
     }
     private static readonly List<string> NoFuels = new();
     /// <summary>The fuels the station's recipe burns, in the order workers look for them; empty when it burns none.</summary>
@@ -773,6 +788,8 @@ public sealed partial class World {
         foreach (var q in t.Queue) if (BatchCost(q.Recipe).ContainsKey(item)) return true;
         return false;
     }
+    /// <summary>Whether a station takes an item from the player: an input of its current, queued or kept recipe, or a fuel it burns.</summary>
+    public bool Takes(Thing t, string item) => Pending(t, item) || t.Burner != null && FuelFits(t, item);
     /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it.</summary>
     private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null);
     /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
@@ -782,15 +799,13 @@ public sealed partial class World {
         string recipe = t.Recipe;
         var cost = BatchCost(recipe);
         if (cost.Count == 0) { Say("Choose a recipe first."); return; }
-        var fuels = Data.Recipes[recipe].Fuels;
-        // The fuel slot keeps burning what it holds; an empty one takes the first fuel the recipe burns that the backpack has spare.
-        string? held = t.Burner?.First();
-        string? fuel = fuels.Count == 0 ? null : held != null ? (fuels.Contains(held) ? held : null) : fuels.FirstOrDefault(f => S.Backpack[f] > cost.GetValueOrDefault(f));
-        if (fuels.Count > 0 && fuel == null) { Say(held != null ? $"The fuel slot holds {Lower(Data.Name(held))}, which {Lower(Data.Recipes[recipe].Name)} cannot burn. Take it out first." : Phrase("Needs ", FuelWords(fuels), " in your backpack for the fire.")); return; }
+        var r = Data.Recipes[recipe];
+        string? fuel = null;
+        if (r.Burns && (fuel = FuelFromBackpack(t, r, cost)) == null) return;
         if (NeedsFullBottle(cost, S.Backpack)) { Say(Water.FullBottleWarning); return; }
         for (int i = 0; i < batches; i++) {
             if (!S.Backpack.Has(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
-            if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || FuelBlock(t, fuel) != null)) { Say("Input slots are full."); break; }
+            if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
             foreach (var pair in cost) S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
             if (fuel != null) S.Backpack.TransferTo(t.Burner!, fuel, 1);
         }
@@ -1027,8 +1042,19 @@ public sealed partial class World {
     private (string Fuel, Thing Source)? FuelToFetch(Thing t, Vector2 from) {
         if (t.Burner is not Inventory burner) return null;
         if (burner.First() is string held) return FuelOf(t) == held && burner[held] < 2 && SourceFor(held, from) is Thing source ? (held, source) : null;
-        foreach (string fuel in Fuels(t)) if (SourceFor(fuel, from) is Thing found) return (fuel, found);
-        return null;
+        // One pass over storage: the first fuel in the recipe's order that any of it gives out, from the nearest that does.
+        var fuels = Fuels(t);
+        Thing? best = null; int rank = fuels.Count; float nearest = 0;
+        foreach (var s in S.Things) {
+            if (s.Kind is not (ThingKind.Chest or ThingKind.Pile)) continue;
+            for (int i = 0; i < fuels.Count && i <= rank; i++) {
+                if (s.Inventory[fuels[i]] <= 0 || !s.Inventory.AllowsWithdrawal(fuels[i])) continue;
+                float distance = s.Pos.DistanceSquaredTo(from);
+                if (i < rank || distance < nearest) { best = s; rank = i; nearest = distance; }
+                break;
+            }
+        }
+        return best == null ? null : (fuels[rank], best);
     }
     /// <summary>Coins kept for wages in every signpost's wage slot.</summary>
     public int WageCoins {
@@ -1731,22 +1757,26 @@ public sealed partial class World {
     private bool NextSpot(Worker w, int spent, ThingKind kind, Vector2 from, float dt) {
         // Spots that need a tool count only while the worker has one or a tool station does; loose pieces come after every other spot.
         string item = ResourceItem(kind);
-        bool tooled = ToolFor(item) is not string tool || HasTool(w, tool);
+        if (NearestSpot(w, item, from, ToolFor(item) is not string tool || HasTool(w, tool)) is Thing next) { MoveTo(w, spent, next); return true; }
+        if (w.Exhausted != kind) { w.Exhausted = kind; Say($"{w.Name} knows no other {Lower(Data.Name(kind))} to gather."); }
+        if (w.Duties.Count > 1) return false;
+        w.Status = Phrase("No other known ", Lower(Data.Name(kind)), " · waiting at the trading post");
+        WaitAtPost(w, dt); return true;
+    }
+    /// <summary>The nearest known spot with stock left that yields an item and the worker has no duty on: one needing a tool when <paramref name="tooled"/>, else a loose piece.</summary>
+    private Thing? NearestSpot(Worker w, string item, Vector2 from, bool tooled) {
         Thing? next = null, loose = null; float nearest = 0, nearestLoose = 0;
         foreach (var t in S.Things) {
             if (t.Remaining <= 0 || !t.IsResource || ResourceItem(t.Kind) != item || !S.Remembered.ContainsKey(t.Id) || HasDuty(w, t.Id)) continue;
             float distance = t.Pos.DistanceSquaredTo(from);
             if (t.IsLoose) { if (loose == null || distance < nearestLoose) { loose = t; nearestLoose = distance; } } else if (tooled && (next == null || distance < nearest)) { next = t; nearest = distance; }
         }
-        next ??= loose;
-        if (next != null) {
-            foreach (var duty in w.Duties) if (duty.Thing == spent) duty.Thing = next.Id;
-            w.Assignment = next.Id; w.Timer = 0; w.Exhausted = null; return true;
-        }
-        if (w.Exhausted != kind) { w.Exhausted = kind; Say($"{w.Name} knows no other {Lower(Data.Name(kind))} to gather."); }
-        if (w.Duties.Count > 1) return false;
-        w.Status = Phrase("No other known ", Lower(Data.Name(kind)), " · waiting at the trading post");
-        WaitAtPost(w, dt); return true;
+        return next ?? loose;
+    }
+    /// <summary>Moves a worker's duties on a spent spot to the next one.</summary>
+    private static void MoveTo(Worker w, int spent, Thing next) {
+        foreach (var duty in w.Duties) if (duty.Thing == spent) duty.Thing = next.Id;
+        w.Assignment = next.Id; w.Timer = 0; w.Exhausted = null;
     }
     private void WaitAtPost(Worker w, float dt) => Walk(w, Nearest(ThingKind.Signpost, w.Pos)?.Pos + Vector2.One ?? Terrain.Spawn, dt);
     private static void NextPlace(Worker w) {
