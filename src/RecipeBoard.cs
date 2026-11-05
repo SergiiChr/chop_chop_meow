@@ -117,18 +117,18 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         } else Style.Skin(cell, Style.PlateNormal, Style.PlateHover);
         // The second press of a double-click undoes what its first press did, then queues one batch with its inputs.
         bool doubled = false;
-        string keptBefore = "";
         cell.Pressed += () => {
             if (doubled) { doubled = false; return; }
-            keptBefore = station?.Keep ?? "";
+            string kept = memory.KeptBefore = station?.Keep ?? "";
             int step = Step;
             if (station == null || step > 1) { kit.Run(() => Queue(id, step)); return; }
-            kit.Run(() => world.SetRecipe(station, keptBefore == id ? "" : id));
+            kit.Run(() => world.SetRecipe(station, kept == id ? "" : id));
         };
         cell.DoubleClicked = () => {
             doubled = true;
             if (station == null) return;
-            kit.Run(() => { world.SetRecipe(station, keptBefore); world.QueueBatch(station, id); });
+            string kept = memory.KeptBefore;
+            kit.Run(() => { world.SetRecipe(station, kept); world.QueueBatch(station, id); });
         };
         cell.RightClicked = () => kit.Run(() => Queue(id, -Step));
         float Time() => r.Seconds / ((station?.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * (tool() is string inUse ? world.Data.Items[inUse].Speed : 1));

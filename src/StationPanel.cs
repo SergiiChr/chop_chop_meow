@@ -18,7 +18,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         foreach (string tool in slotted) panel.AddToHeader(ToolSlot(tool));
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
         var recipes = world.Data.Recipes.Where(p => p.Value.Station == thing.Kind).Select(p => p.Key);
-        string? openOn = opened ? null : thing.Recipe != "" ? thing.Recipe : null;
+        string? openOn = opened ? null : thing.Keep != "" ? thing.Keep : thing.Recipe != "" ? thing.Recipe : null;
         opened = true;
         AddChild(new RecipeBoard(kit, live, memory, Redraw, recipes, group => group.Tool == "" ? null : world.BenchTool(thing, group.Tool, group.Tier), thing, openOn));
         RedrawOnChange(() => CraftPanel.QueueCode(new(thing.Queue)));

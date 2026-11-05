@@ -15,7 +15,7 @@ These came from the user; change them only after asking.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
-- **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, rake for leaves, hammer for fitting a mine) from a tool station and put them back when reassigned or going home. Without one they wait and say so once.
+- **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they pick up loose pieces of the same resource, or wait and say so once.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. Piles set their own filters from what they hold. Manual transfers bypass automation filters.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
@@ -395,7 +395,7 @@ Recipes name the tool they need, the lowest `tier` that will do, and whether the
 So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
 
 `World.ToolKind` names the tool a resource needs: an axe for trees, a pickaxe for deposits.
-`World.HelpingTool` names one that only speeds gathering up: a pickaxe for rock, a rake for leaves, which take three times as long by hand.
+`World.HelpingTool` names one that only speeds gathering up: a pickaxe for rock, a rake for leaves; leaves take three times as long by hand.
 Stone, leaves, berries and loose pieces need none.
 
 Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFreshStart` verifies:

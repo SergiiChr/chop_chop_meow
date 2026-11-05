@@ -13,6 +13,8 @@ public sealed class PageMemory {
     public string CraftTab = "";
     /// <summary>Whether the trading post shows hiring rather than shipping, and whether its price sheet is open.</summary>
     public bool Hiring, SheetOpen = true;
+    /// <summary>A station's worker mark before the last press on its recipe board; the page may redraw between the two presses of a double-click.</summary>
+    public string KeptBefore = "";
 }
 
 /// <summary>What every page is built with.</summary>

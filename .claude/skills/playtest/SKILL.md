@@ -9,8 +9,9 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
 
 ## Set up
 
-1. Copy the driver in and hook it into `Game._Ready`, on the line after the one starting the showcase
-   (`if (Launch.Has("--showcase")) new Showcase(…).Run();`), which every launch reaches:
+1. Copy the driver in and hook it into `Game._Ready`, on the line after
+   `else if (!Launch.Has("--animation-review")) startMenu.ShowStart();`, which every launch reaches.
+   Between that `else if` and the showcase `if` above it, the hook would take the `else` and hide the start menu:
 
    ```sh
    cp .claude/skills/playtest/ReviewDrive.cs.txt src/ReviewDrive.cs
