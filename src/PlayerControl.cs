@@ -50,7 +50,7 @@ public sealed class PlayerControl {
 
     /// <summary>Enters placement for a crate from the backpack.</summary>
     public void PlaceCrate(string item) {
-        if (world.Backpack[item] == 0) { kit.Notify("No empty crate in your backpack. Craft one at a bench."); return; }
+        if (world.Backpack[item] == 0) { kit.Notify("No empty crate in your backpack."); return; }
         Mode = new ClickMode.Crate(item); panel.Close();
     }
 

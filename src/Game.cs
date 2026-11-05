@@ -175,7 +175,7 @@ public partial class Game : Node, IGameFlow {
         saves.Slot = Math.Max(slot, 0);
         if (slot < 0) {
             panel.Open(Page.Welcome);
-            Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
+            Notify("Welcome. Press I to see the guide.");
         } else { panel.Open(Page.Backpack); Notify("Settlement loaded."); }
     }
 

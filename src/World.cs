@@ -562,15 +562,15 @@ public sealed partial class World {
         else { if (CanStand(Player + new Vector2(delta.X, 0))) Player += new Vector2(delta.X, 0); if (CanStand(Player + new Vector2(0, delta.Y))) Player += new Vector2(0, delta.Y); }
     }
     public string? GatherBlock(Thing t, bool worker = false) {
-        if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == "water") return "Your bottles are full. Take a sip before refilling.";
+        if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == "water") return "Your bottles are filled.";
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (!t.IsResource) return "Select a natural resource.";
         if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again in ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Tree => "Only a stump is left. Find another tree.", ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
         // Workers fetch their tools from a tool station instead of needing them carried.
         if (worker || ToolKind(t) is not string kind || BestTool(kind) != null) return null;
         return kind switch {
-            "axe" => "An axe is needed. Recover your belongings or buy one at the trading post.",
-            _ => "Mining needs a pickaxe. Sell crates of berries at the trading post and buy one."
+            "axe" => "An axe is required to chop a tree.",
+            _ => "A pickaxe is required to mine."
         };
     }
     public static string ResourceItem(Thing t) => ResourceItem(t.Kind);
@@ -856,7 +856,7 @@ public sealed partial class World {
     public float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
     /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
     public string? SleepBlock() {
-        if (Hour is >= 6 and < SleepHour) return "You can sleep after 10 pm. Keep food and water for the morning.";
+        if (Hour is >= 6 and < SleepHour) return "You can only sleep after 10 pm.";
         bool hungry = S.Hunger - SecondsToDawn * Data.HungerPerSecond <= 0, thirsty = S.Thirst - SecondsToDawn * Data.ThirstPerSecond <= 0;
         if (hungry || thirsty) return hungry && thirsty ? "You are too hungry and thirsty to sleep." : hungry ? "You are too hungry to sleep." : "You are too thirsty to sleep.";
         // The night passes for everyone at once, so the others have to be inside and fed too.
@@ -1168,7 +1168,7 @@ public sealed partial class World {
         S.Backpack.Remove(item, 1);
         var crate = Add(ThingKind.Crate, p);
         if (Packed(item) is Inventory contents) { crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
-        Play("close_chest", p); Say($"Placed {Data.Name("crate")}. Left click to open it; hold right click to pick it up."); return crate;
+        Play("close_chest", p); return crate;
     }
     /// <summary>Lifts a placed crate into the backpack; anything inside stays packed in it.</summary>
     public bool PickUpCrate(Thing crate) {
@@ -1298,7 +1298,7 @@ public sealed partial class World {
         if (!PayWage(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from the bank or your backpack."); return null; }
         string name = WorkerNames.FirstOrDefault(n => S.Workers.All(w => w.Name != n)) ?? "Neighbor";
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
-        S.Workers.Add(w); S.Milestones.Add("hired"); Say($"New worker {name} without a job."); Made?.Invoke(S.Actor.Id, w.Id); return w;
+        S.Workers.Add(w); S.Milestones.Add("hired"); Say($"New worker {name} is ready for a task."); Made?.Invoke(S.Actor.Id, w.Id); return w;
     }
     /// <summary>The jobs a place offers workers, in the order the panel shows them.</summary>
     public string[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {
@@ -1897,10 +1897,10 @@ public sealed partial class World {
         if (Day > S.WageDay) {
             // Workers on strike are not charged, so their wage does not count against the day.
             int wages = S.Workers.Where(w => w.WageDebt <= 0).Sum(w => w.Wage);
-            PayWages(); CloseDay(wages); S.WageDay = Day; Say($"Day {Day}. Wages settled where funds allow.");
+            PayWages(); CloseDay(wages); S.WageDay = Day; Say(Phrase("Day ", Number(Day), "."));
             foreach (var leaves in S.Things.Where(t => t.Kind == ThingKind.Leaves)) leaves.Remaining = LeafPatch;
         }
-        if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Your workers head home to Bramblewick until morning.");
+        if (S.Workers.Count > 0 && Dusk && !wasDusk) Say("Dusk. Workers head home until morning.");
         if (S.Workers.Count > 0 && Lunch && !wasLunch) Say("Midday. Your workers gather by the campfire for an hour of lunch.");
         // A day restores what selling the daily amount takes, so selling it every day keeps the price steady.
         demanded.Clear(); demanded.AddRange(S.Demand.Keys);
