@@ -121,8 +121,8 @@ public sealed class PackerProp : Prop {
 }
 
 public sealed class RackProp : Prop {
-    /// <summary>The hanging tools by kind, each shown while the station holds one.</summary>
-    public readonly Dictionary<string, Node3D> Racked = new();
+    /// <summary>One peg per tool slot, each with a hanging tool of every kind it can show; the view shows the one its slot holds.</summary>
+    public readonly Dictionary<string, Node3D>[] Pegs = new Dictionary<string, Node3D>[World.ToolSlots];
 }
 
 public sealed class SignpostProp : Prop {
@@ -267,7 +267,7 @@ public static class WorldModels {
         switch (id) {
             case "steel_axe" or "steel_pick" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
-            case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Racked["rake"]);
+            case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
             case "water" or "water_2" or "water_1" or "empty_bottle": return BottleShape.Create(Water.BottleSips(id));
@@ -613,19 +613,23 @@ public static class WorldModels {
         return prop;
     }
 
-    /// <summary>A plank pegboard on two posts set in a cinder-block footing, with an axe, a pickaxe and a rake hanging on it.</summary>
+    /// <summary>A plank pegboard on two posts set in a cinder-block footing, with four pegs for whatever tools the station holds.</summary>
     private static RackProp ToolRack() {
         var prop = new RackProp();
         // Turned to face down the valley, toward the camera, so the hanging tools show.
         var body = Pivot(prop.Body, Vector3.Zero, new Vector3(0, 45, 0));
         Add(body, RackShape.Feet, RackShape.Concrete, Vector3.Zero);
         Add(body, RackShape.Frame, RackShape.Timber, Vector3.Zero);
-        Node3D Hang(float x, Mesh mesh) {
-            var hook = Pivot(body, new Vector3(x, 1.3f, .06f));
-            Add(hook, mesh, RackShape.Tool, Vector3.Zero);
-            return hook;
+        for (int slot = 0; slot < World.ToolSlots; slot++) {
+            var peg = prop.Pegs[slot] = new();
+            float x = RackShape.PegX(slot);
+            foreach (var (kind, mesh) in RackShape.Tools) {
+                var hook = Pivot(body, new Vector3(x, 1.3f, .06f));
+                Add(hook, mesh, RackShape.Tool, Vector3.Zero);
+                hook.Visible = false;
+                peg[kind] = hook;
+            }
         }
-        prop.Racked["axe"] = Hang(-.3f, RackShape.Axe); prop.Racked["pickaxe"] = Hang(0, RackShape.Pick); prop.Racked["rake"] = Hang(.3f, RackShape.Rake);
         return prop;
     }
 

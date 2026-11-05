@@ -151,7 +151,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 | Backpack | 24 slots |
 | Chest | 5 slots |
 | Worker | 5 items, like a crate: one stack of 5 or up to 5 different items |
-| Tool station | 12 slots |
+| Tool station | 4 slots, any tool in any slot |
 
 - Inventory cells retain their positions. Drag to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
 - Right-click a stack to pick up half of it, then left-click a slot to drop it there.
@@ -383,7 +383,8 @@ Manual inventory transfers ignore these automation filters.
 
 ### Tool station
 
-The tool station (8 planks, 4 stone) is a rack that holds only tools.
+The tool station (8 planks, 4 stone) is a rack with four slots that each take any tool.
+Its page lists which worker has which tool out and who waits for one.
 Workers need tools for some jobs:
 
 - an axe to chop wood;

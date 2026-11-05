@@ -511,7 +511,7 @@ If confirmed, it ends the run in a black hole with a reload or main-menu choice.
 
 #### Tool station
 
-A tool station (`toolstation`) is storage for tools only.
+A tool station (`toolstation`) is storage for tools only: `World.ToolSlots` (4) slots, each taking any tool, and its rack hangs whatever each slot holds.
 
 ### Workers
 

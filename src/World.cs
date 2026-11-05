@@ -407,7 +407,7 @@ public sealed partial class World {
         if (kind == ThingKind.Crate) t.Inventory = NewCrate();
         if (kind == ThingKind.Packer) { t.Inventory.Slots = Data.CrateCapacity + 1; t.Output = new() { Slots = 1 }; }
         if (kind == ThingKind.Mine) { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
-        if (kind == ThingKind.Toolstation) t.Inventory.Slots = 12;
+        if (kind == ThingKind.Toolstation) t.Inventory.Slots = ToolSlots;
         if (kind == ThingKind.Pile) t.Inventory.Slots = PileStacks;
         if (kind == ThingKind.Chest) t.Inventory.Slots = ChestStacks;
         if (kind == ThingKind.Farm) { t.Inventory.Slots = Data.Farm.Sow.Count; t.Output = new() { Slots = Data.Farm.Yield.Count }; }
@@ -972,6 +972,8 @@ public sealed partial class World {
     /// <summary>The whole coins one purchase costs, crate included for boxed goods.</summary>
     public int LotPrice(string item) => (int)MathF.Ceiling(1.25f * (Data.Items[item].Price * Lot(item) + (Lot(item) > 1 ? Data.Items["crate"].Price : 0)));
     public const int MarketSlots = 6;
+    /// <summary>Tools a tool station holds, one in each slot and any kind in any of them.</summary>
+    public const int ToolSlots = 4;
     private static Inventory NewBurner() => new() { Slots = 1 };
     // Stations with a recipe that burns fuel, worked out once from the data.
     private HashSet<ThingKind?>? burning;

@@ -49,8 +49,11 @@ internal sealed class ChainSite(World world) {
         Give(world, Inventory.Coins, 5000);
         foreach (string product in products) world.SetFilter(sign, World.CrateOf(product), false, true);
         world.SetAutoSell(sign, true);
+        // A tool station holds four tools, so the crew's six hang on two.
         var rack = Place(ThingKind.Toolstation);
-        rack.Inventory.Add("steel_axe", 2); rack.Inventory.Add("steel_pick", 3); rack.Inventory.Add("rake", 1);
+        rack.Inventory.Add("steel_axe", 2); rack.Inventory.Add("steel_pick", 2);
+        var spare = Place(ThingKind.Toolstation);
+        spare.Inventory.Add("steel_pick", 1); spare.Inventory.Add("rake", 1);
         Place(ThingKind.Campfire);
 
         foreach (string item in new[] { "wood", "planks", "crate", "iron_ore", "coal", "tin_ore", "iron_bar", "tin_bar", "steel_bar", "steel_parts", "wood_parts", "tin_can",

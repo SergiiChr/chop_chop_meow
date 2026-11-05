@@ -806,7 +806,13 @@ public partial class WorldView : Node3D {
                 break;
             case RackProp rack:
                 if (!World.Sees(t.Pos)) break;
-                foreach (var (kind, tool) in rack.Racked) tool.Visible = World.BestTool(kind, t.Inventory) != null;
+                // Each peg shows the tool in its slot.
+                var layout = t.Inventory.Layout;
+                for (int slot = 0; slot < rack.Pegs.Length; slot++) {
+                    string held = slot < layout.Count ? layout[slot].Item : "";
+                    string kind = held != "" && World.Data.Items.TryGetValue(held, out var def) ? def.Tool : "";
+                    foreach (var (tool, hook) in rack.Pegs[slot]) hook.Visible = tool == kind;
+                }
                 break;
             case BoxProp box:
                 // Remembered boxes carry no inventory, so the lid stays as it was last seen.
