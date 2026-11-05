@@ -24,6 +24,9 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
     private string? Held((string Tool, int Tier) group) =>
         group.Tool == "" ? null : station == null ? world.BestTool(group.Tool, null, group.Tier) : world.BenchTool(station, group.Tool, group.Tier);
 
+    /// <summary>How far the worker mark's hard hat stands out over the top of a plate.</summary>
+    private const int HatRise = 18;
+
     /// <summary>How many batches a click queues or takes off: 10 with Ctrl, 5 with Shift, else 1.</summary>
     public static int Step => Input.IsKeyPressed(Key.Ctrl) ? 10 : Input.IsKeyPressed(Key.Shift) ? 5 : 1;
 
@@ -59,7 +62,10 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         AddThemeConstantOverride("separation", 14);
         var tabs = new VBoxContainer { SizeFlagsVertical = Control.SizeFlags.ShrinkBegin }; tabs.AddThemeConstantOverride("separation", 10); AddChild(tabs);
         var plates = new GridContainer { Columns = 4, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkBegin };
-        plates.AddThemeConstantOverride("h_separation", 10); plates.AddThemeConstantOverride("v_separation", 14); AddChild(plates);
+        plates.AddThemeConstantOverride("h_separation", 10); plates.AddThemeConstantOverride("v_separation", 14);
+        // Room above the first row for the hard hat that marks what workers keep making, which stands out over a plate's top edge.
+        var platesRoom = new MarginContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkBegin };
+        platesRoom.AddThemeConstantOverride("margin_top", station != null ? HatRise : 0); platesRoom.AddChild(plates); AddChild(platesRoom);
         foreach (var group in groups) {
             var (kind, tier) = group.Key;
             string key = GroupKey(group.Key);
@@ -107,7 +113,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         live.Watch(() => Waiting(id), waiting => queued.Text = waiting > 0 ? waiting.ToString() : "");
         if (station != null) {
             // The worker mark: a thick outline with a hard hat on top.
-            var hat = Style.Corner(Style.Glyph("hardhat", 34, Colors.White), .5f, 0, 18); hat.Name = "kept"; cell.AddChild(hat);
+            var hat = Style.Corner(Style.Glyph("hardhat", 34, Colors.White), .5f, 0, HatRise); hat.Name = "kept"; cell.AddChild(hat);
             live.Watch(() => station.Keep == id, kept => {
                 Style.Skin(cell, kept ? Style.PlateKept : Style.PlateNormal, kept ? Style.PlateKept : Style.PlateHover);
                 hat.Visible = kept;
