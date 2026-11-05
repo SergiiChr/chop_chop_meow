@@ -10,18 +10,18 @@ To tune: change the data, run the tests, and read those lines before and after.
 Every item has a `price`.
 For goods the village trades, it is the trade price; for the rest it is a reference value used only to keep recipes in line.
 
-- Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1. Iron ore, mined coal and tin ore are worth 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful and four make one fertilizer. Wheat is 1.5.
+- Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1. Iron ore, coal and tin ore are worth 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful and four make one fertilizer. Wheat is 1.5.
 - A recipe's output is worth its inputs plus the cheapest fuel its station burns, plus a markup that shrinks with each step from raw goods: 50% for the first step, then 40%, 30% and 20%.
 - So lower tiers keep a bigger share of their price as profit, and deeper goods are worth more coins in total. A steel axe earns 6 coins over its parts and an iron bar 2, though the bar's margin is far higher.
 
 | Step | Markup | Recipes |
 |---|---|---|
-| 1 | 50% | iron bar, tin bar, burnt steak, planks, wood parts, stone chisel, torch, mortar and pestle, crushed berries, flour, meat stew |
+| 1 | 50% | charcoal, iron bar, tin bar, burnt steak, planks, wood parts, stone chisel, torch, mortar and pestle, crushed berries, flour, meat stew |
 | 2 | 40% | steel bar, crate, wooden mallet, tin cans, berry jam, dough |
 | 3 | 30% | steel parts, bread, canned meat stew, canned jam, canned food |
 | 4 | 20% | steel axe, steel pickaxe, steel hammer, steel chisel, rake |
 
-Canned food, which the village also sells, is canned raw meat at 5.35.
+Canned food, which the village also sells, is canned raw meat at 5.65.
 
 A new recipe gets its price from this rule.
 The check fails if any recipe loses value or a deeper recipe marks up more than a shallower one.

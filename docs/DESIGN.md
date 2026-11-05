@@ -12,8 +12,9 @@ These came from the user; change them only after asking.
 - **Look:** smooth isometric 3D, natural and lighthearted, with some of Terraria's approachable feel; no fantasy or industrial styling. Buildings are modern DIY, there are several tree species, and workers wear blue overalls over a cream shirt.
 - **Animation:** every core interaction has an animation, with a dedicated one for every tool.
 - **Progression:** the player starts with a steel axe and no pickaxe; there is no loose iron and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
-- **Mining:** coal, iron and tin deposits need a carried pickaxe; loose coal needs no tool. Charcoal cannot substitute for mined coal.
-- **Steel:** needs iron, mined coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
+- **Mining:** coal, iron and tin deposits need a carried pickaxe; loose coal needs no tool.
+- **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
+- **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
 - **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, rake for leaves, hammer for fitting a mine) from a tool station and put them back when reassigned or going home. Without one they wait and say so once.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. Piles set their own filters from what they hold. Manual transfers bypass automation filters.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
@@ -21,7 +22,7 @@ These came from the user; change them only after asking.
 - **Market:** reached at a trading post; selling lowers a price, which recovers over time; deeper goods are worth more; orders settle after a visible 30-second cart trip.
 - **Workers:** hired individually, paid daily, assigned, reassigned and dismissed; they carry station inputs and outputs, preferring matching filtered storage.
 - **Pacing:** 10–15 minutes to the first goal is a target, not a measured playthrough.
-- **Out of scope:** pollution, vampires, terraforming, charcoal and technology beyond steel.
+- **Out of scope:** pollution, vampires, terraforming and technology beyond steel.
 
 ## Architecture
 
@@ -369,7 +370,7 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - A picked-clean berry bush fruits again after `berryRegrowHours`.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
 - Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
-- Charcoal production is not implemented.
+- The stone furnace burns 2 wood into 1 charcoal.
 
 ### Tools
 
@@ -415,12 +416,12 @@ The mortar's recipes are worked, while jam, stew and dough cook unattended and t
 
 #### Fuel
 
-A recipe with `fuel` burns one wood or coal per batch from the station's one-slot fuel box (`Thing.Burner`).
+A recipe's `fuels` list what it can burn, one unit per batch from the station's one-slot fuel box (`Thing.Burner`).
 
-- `Thing.Fuel` follows what was last loaded.
-- `World.FuelFits` limits the reinforced furnace to coal.
+- The fuel slot holds one kind at a time, and the next batch burns it only while the recipe lists it (`World.FuelOf`).
+- `World.FuelFits` takes what the station's recipe burns, or with no recipe what any of its recipes burns.
 - `World.BatchCost` lists materials only.
-- Haulers keep the burner topped up (`Worker.Fueling`).
+- Haulers keep the burner topped up with what it holds, fill an empty one with the first listed fuel storage gives out, and carry a fuel the recipe cannot burn back to storage (`Worker.Fueling`).
 
 The canning station (`cannery`) seals a filling and a `tin_can` into a canned good over fuel.
 
@@ -431,10 +432,10 @@ A smith stays with a running batch and fetches the next load once it is done.
 
 #### Furnaces and steel
 
-The stone furnace accepts wood or mined coal for fuel.
+The stone furnace smelts ore over coal or charcoal, and cooks and makes charcoal over wood, coal or charcoal.
 The reinforced furnace (`reinforced`) burns coal only.
 
-Steel recipes consume iron bars and mined coal.
+Steel recipes consume iron bars and coal.
 Steel only progresses while the heat is at or above the clear bar (`World.SteelHeat`, shown as 1450 °C through `World.Celsius`).
 A batch below it pauses, keeps burning one coal from its fuel slot per batch length while cold, and resumes when reheated, with no failure.
 Once an active crew has the forge hot, it never falls below the bar while they are on duty.

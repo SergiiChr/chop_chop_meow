@@ -1001,9 +1001,9 @@ public partial class Game {
         Require(Named("output_steel_bar") != null, "The steel furnace must show a slot for steel bars.");
         await DragTo(Cell(0, c => c.TooltipText.StartsWith("Iron bar")), Named("input_iron_bar")!);
         Require(furnace.Inventory["iron_bar"] == 5 && world.Backpack["iron_bar"] == 0, "Dragging bars onto the matching input slot must load them.");
-        await DragTo(Cell(0, c => c.TooltipText.StartsWith("Mined coal")), Named("input_iron_bar")!);
+        await DragTo(Cell(0, c => c.TooltipText.StartsWith("Coal")), Named("input_iron_bar")!);
         Require(furnace.Inventory["coal"] == 0, "An input slot must reject a different item.");
-        await Click(Cell(0, c => c.TooltipText.StartsWith("Mined coal")));
+        await Click(Cell(0, c => c.TooltipText.StartsWith("Coal")));
         Require(furnace.Inventory["coal"] == 1, "Clicking a backpack item must add one to its input slot.");
         await Click(Named("input_iron_bar")!);
         Require(furnace.Inventory["iron_bar"] == 4 && world.Backpack["iron_bar"] == 1, "Clicking an input slot must return exactly one item.");

@@ -164,7 +164,8 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 ### Station panels
 
 Stations show one cup per recipe input, the batch time above a progress bar and the output cup, with what one batch takes or makes under each cup.
-A station that burns fuel has its own fuel cup under the bar, marked by a flame, with how long the fuel in it lasts beside it.
+A station that burns fuel has its own fuel cup under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
+Fuel the recipe cannot burn shows in brick; workers carry it back to storage and bring a fuel it burns.
 Side outputs and leftovers sit in a second row under the output.
 Each cup holds a single stack of 64.
 
@@ -292,11 +293,9 @@ A small steel tool such as a hammer takes 1 steel part and a big one such as an 
 
 ## Furnaces and steel
 
-- The stone furnace accepts wood or mined coal as fuel.
-- The stone furnace smelts 2 tin ore into a tin bar, sears meat and bakes bread (see Cooking).
-- The reinforced furnace takes iron and mined coal as materials, burns mined coal from its fuel slot, and needs heat from manual or worker-operated bellows. Steel forms from 1450 °C; below that it keeps burning coal without making steel.
-
-Charcoal production is not implemented, and charcoal cannot substitute for mined coal.
+- The stone furnace smelts 2 iron ore into an iron bar and 2 tin ore into a tin bar over coal or charcoal.
+- It also burns 2 wood into 1 charcoal, sears meat and bakes bread (see Cooking) over wood, coal or charcoal.
+- The reinforced furnace takes iron and coal as materials, burns only coal from its fuel slot, and needs heat from manual or worker-operated bellows. Steel forms from 1450 °C; below that it keeps burning coal without making steel.
 
 ## Cooking and canning
 
@@ -309,14 +308,14 @@ You can do both by hand from the crafting menu with a carried mortar.
 
 Its other recipes cook on their own:
 
-- 2 crushed berries → jam, over one wood or coal
-- 1 water + 1 raw meat → meat stew, over one wood or coal
+- 2 crushed berries → jam, over one wood, coal or charcoal
+- 1 water + 1 raw meat → meat stew, over one wood, coal or charcoal
 - 1 flour + 1 water → dough, kneaded with no fire
 
-The canning station (2 steel bars, 8 planks) seals meat stew, jam or raw meat into a tin can over one wood or coal.
+The canning station (2 steel bars, 8 planks) seals meat stew, jam or raw meat into a tin can over one wood, coal or charcoal.
 Canned meat stew is the best food to sell.
 
-Both stations, like the stone furnace, take wood or coal in their fuel slot.
+Both stations, like the stone furnace's food recipes, take wood, coal or charcoal in their fuel slot.
 
 ## Storage
 
@@ -652,7 +651,7 @@ Day and night have their own music, which crossfades as the time changes and pic
 
 - Worker automation is limited to gathering and station/furnace tasks.
 - Workers use simple grid detours around water and buildings; this is not a full navigation system.
-- There is no charcoal system, pollution, vampire threat, or technology beyond steel in this POC.
+- There is no pollution, vampire threat, or technology beyond steel in this POC.
 
 ## Licensing
 

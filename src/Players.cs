@@ -208,10 +208,7 @@ public sealed partial class World {
         if (a < 0 || b < 0 || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
         if (new[] { a, b }.Where(at => at > 0).Any(at => !Near(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
         if (b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
-        int moved = from.TransferTo(to, item, quantity);
-        // What goes into a fuel slot becomes the fuel workers keep it stocked with.
-        if (moved > 0 && b > 0 && Find(b / BoxCodes) is Thing station && to == station.Burner) station.Fuel = item;
-        return moved;
+        return from.TransferTo(to, item, quantity);
     }
 
     /// <summary>Moves items out of the backpack a view shows.</summary>
@@ -246,7 +243,6 @@ public sealed partial class World {
             from.PreferredSlot = sourceSlot;
             try { moved = from.TransferTo(to, item, quantity); } finally { from.PreferredSlot = -1; }
         } else moved = from.MoveSlotTo(sourceSlot, to, targetSlot, quantity);
-        if (moved > 0 && b > 0 && Find(b / BoxCodes) is Thing station && to == station.Burner) station.Fuel = item;
         return moved;
     }
 

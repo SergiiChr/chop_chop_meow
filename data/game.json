@@ -92,23 +92,28 @@
       "color": "cc8a60"
     },
     "coal": {
-      "name": "Mined coal",
+      "name": "Coal",
       "price": 1.5,
       "color": "81818c"
     },
+    "charcoal": {
+      "name": "Charcoal",
+      "price": 4.5,
+      "color": "4a3f38"
+    },
     "iron_bar": {
       "name": "Iron bar",
-      "price": 6,
+      "price": 6.75,
       "color": "c2c9c9"
     },
     "steel_bar": {
       "name": "Steel bar",
-      "price": 11.55,
+      "price": 12.25,
       "color": "b5d8e4"
     },
     "steel_parts": {
       "name": "Steel parts",
-      "price": 15,
+      "price": 16,
       "color": "b5d8e4"
     },
     "wood_hammer": {
@@ -119,7 +124,7 @@
     },
     "steel_hammer": {
       "name": "Steel hammer",
-      "price": 19,
+      "price": 20,
       "color": "e7c978",
       "tool": "hammer",
       "speed": 1.8,
@@ -127,7 +132,7 @@
     },
     "steel_axe": {
       "name": "Steel axe",
-      "price": 37,
+      "price": 39,
       "color": "e7c978",
       "tool": "axe",
       "speed": 1.8,
@@ -135,7 +140,7 @@
     },
     "steel_pick": {
       "name": "Steel pickaxe",
-      "price": 37,
+      "price": 39,
       "color": "e7c978",
       "tool": "pickaxe",
       "speed": 1.8,
@@ -151,30 +156,30 @@
     },
     "water": {
       "name": "Water bottle",
-      "price": 11.45,
+      "price": 12.5,
       "color": "88cbe0",
       "thirst": 33.333336
     },
     "water_2": {
       "name": "Water bottle (2 sips)",
-      "price": 10.7833,
+      "price": 11.8333,
       "color": "88cbe0",
       "thirst": 33.333336
     },
     "water_1": {
       "name": "Water bottle (1 sip)",
-      "price": 10.1167,
+      "price": 11.1667,
       "color": "88cbe0",
       "thirst": 33.333336
     },
     "empty_bottle": {
       "name": "Empty bottle",
-      "price": 9.45,
+      "price": 10.5,
       "color": "a8bdc3"
     },
     "canned_food": {
       "name": "Canned food",
-      "price": 5.35,
+      "price": 5.65,
       "color": "c8574a",
       "food": true,
       "hunger": 35,
@@ -201,17 +206,17 @@
     },
     "tin_bar": {
       "name": "Tin bar",
-      "price": 6,
+      "price": 6.75,
       "color": "dfe2dc"
     },
     "tin_can": {
       "name": "Tin can",
-      "price": 2.1,
+      "price": 2.35,
       "color": "d4d9d6"
     },
     "steel_chisel": {
       "name": "Steel chisel",
-      "price": 19,
+      "price": 20,
       "color": "b5d8e4",
       "tool": "chisel",
       "speed": 2,
@@ -219,7 +224,7 @@
     },
     "rake": {
       "name": "Rake",
-      "price": 19.8,
+      "price": 21,
       "color": "e7c978",
       "tool": "rake",
       "tier": 2
@@ -303,7 +308,7 @@
     },
     "canned_jam": {
       "name": "Canned jam",
-      "price": 11.3,
+      "price": 11.65,
       "color": "9b2f4f",
       "food": true,
       "hunger": 30,
@@ -311,7 +316,7 @@
     },
     "canned_meat_stew": {
       "name": "Canned meat stew",
-      "price": 11.85,
+      "price": 12.15,
       "color": "a8643a",
       "food": true,
       "hunger": 60,
@@ -359,7 +364,7 @@
         "stone": 16,
         "wood": 6
       },
-      "description": "Smelts iron and tin ore, sears meat and bakes bread. Uses wood or mined coal as fuel.",
+      "description": "Smelts iron and tin ore with coal or charcoal; sears meat, bakes bread and makes charcoal over wood, coal or charcoal.",
       "recipe": "iron_bar"
     },
     "anvil": {
@@ -385,7 +390,7 @@
         "iron_bar": 5,
         "wood": 8
       },
-      "description": "Steel from iron + mined coal. Coal fuel only. Pump bellows to reach 80\u00b0.",
+      "description": "Steel from iron + coal. Coal fuel only. Pump the bellows to reach 1450\u00b0C.",
       "recipe": "steel_bar"
     },
     "mine": {
@@ -422,7 +427,7 @@
         "stone": 6,
         "planks": 8
       },
-      "description": "A steel grill over a firebox, with a mortar slot. Crushing berries and grinding wheat need the mortar and someone working it; jam and stew cook on their own over wood or coal, and dough needs no fire."
+      "description": "A steel grill over a firebox, with a mortar slot. Crushing berries and grinding wheat need the mortar and someone working it; jam and stew cook on their own over wood, coal or charcoal, and dough needs no fire."
     },
     "cannery": {
       "name": "Canning station",
@@ -430,7 +435,7 @@
         "steel_bar": 2,
         "planks": 8
       },
-      "description": "Seals stew, jam or meat into tin cans over a wood or coal fire. Canned goods keep and sell for the most."
+      "description": "Seals stew, jam or meat into tin cans over a wood, coal or charcoal fire. Canned goods keep and sell for the most."
     },
     "packer": {
       "name": "Packing station",
@@ -450,10 +455,21 @@
     }
   },
   "recipes": {
+    "charcoal": {
+      "name": "Make charcoal",
+      "station": "furnace",
+      "fuels": ["wood", "coal", "charcoal"],
+      "inputs": {
+        "wood": 2
+      },
+      "output": "charcoal",
+      "amount": 1,
+      "seconds": 8
+    },
     "iron_bar": {
       "name": "Smelt iron",
       "station": "furnace",
-      "fuel": true,
+      "fuels": ["coal", "charcoal"],
       "inputs": {
         "iron_ore": 2
       },
@@ -464,7 +480,7 @@
     "tin_bar": {
       "name": "Smelt tin",
       "station": "furnace",
-      "fuel": true,
+      "fuels": ["coal", "charcoal"],
       "inputs": {
         "tin_ore": 2
       },
@@ -475,7 +491,7 @@
     "burnt_steak": {
       "name": "Sear meat",
       "station": "furnace",
-      "fuel": true,
+      "fuels": ["wood", "coal", "charcoal"],
       "inputs": {
         "raw_meat": 2
       },
@@ -486,7 +502,7 @@
     "steel_bar": {
       "name": "Smelt steel",
       "station": "reinforced",
-      "fuel": true,
+      "fuels": ["coal"],
       "inputs": {
         "iron_bar": 2,
         "coal": 2
@@ -684,7 +700,7 @@
     "bread": {
       "name": "Bake bread",
       "station": "furnace",
-      "fuel": true,
+      "fuels": ["wood", "coal", "charcoal"],
       "inputs": {
         "dough": 1
       },
@@ -719,7 +735,7 @@
     "berry_jam": {
       "name": "Cook jam",
       "station": "cooktable",
-      "fuel": true,
+      "fuels": ["wood", "coal", "charcoal"],
       "inputs": {
         "crushed_berries": 2
       },
@@ -730,7 +746,7 @@
     "meat_stew": {
       "name": "Cook meat stew",
       "station": "cooktable",
-      "fuel": true,
+      "fuels": ["wood", "coal", "charcoal"],
       "inputs": {
         "water": 1,
         "raw_meat": 1
@@ -753,7 +769,7 @@
     "canned_meat_stew": {
       "name": "Can meat stew",
       "station": "cannery",
-      "fuel": true,
+      "fuels": ["wood", "coal", "charcoal"],
       "inputs": {
         "meat_stew": 1,
         "tin_can": 1
@@ -765,7 +781,7 @@
     "canned_jam": {
       "name": "Can jam",
       "station": "cannery",
-      "fuel": true,
+      "fuels": ["wood", "coal", "charcoal"],
       "inputs": {
         "berry_jam": 1,
         "tin_can": 1
@@ -777,7 +793,7 @@
     "canned_food": {
       "name": "Can meat",
       "station": "cannery",
-      "fuel": true,
+      "fuels": ["wood", "coal", "charcoal"],
       "inputs": {
         "raw_meat": 1,
         "tin_can": 1

@@ -11,7 +11,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         if (thing.Recipe != "") AddChild(cups.Machine());
         else AddLabel("Choose what to make.", 14, Style.Beige);
         if (thing.Kind == ThingKind.Reinforced) Bellows();
-        LoadBagGrid(id => thing.Recipe != "" && (world.BatchCost(thing).ContainsKey(id) || thing.Burner != null && World.FuelFits(thing, id)));
+        LoadBagGrid(id => thing.Recipe != "" && (world.BatchCost(thing).ContainsKey(id) || thing.Burner != null && world.FuelFits(thing, id)));
         JobButtons();
     }
 

@@ -45,8 +45,9 @@ public sealed class RecipeDef {
     public int Tier { get; set; }
     /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
     public bool Hand { get; set; }
-    /// <summary>Each batch burns one wood or coal, from the station's fuel slot; the reinforced furnace burns coal.</summary>
-    public bool Fuel { get; set; }
+    /// <summary>The fuels a batch can burn, one unit per batch from the station's fuel slot, in the order workers look for them; empty for a recipe that burns none.</summary>
+    public List<string> Fuels { get; set; } = new();
+    [JsonIgnore] public bool Burns => Fuels.Count > 0;
 }
 /// <summary>How the village's appetite for a good it takes moves with sales.</summary>
 public sealed class DemandDef {
@@ -177,6 +178,8 @@ public sealed class GameData {
                 throw new InvalidOperationException($"Invalid recipe: {recipe.Key}.");
             foreach (var input in recipe.Value.Inputs)
                 if (!Items.ContainsKey(input.Key) || input.Value <= 0) throw new InvalidOperationException($"Invalid input for {recipe.Key}: {input.Key}.");
+            if (recipe.Value.Fuels.Any(fuel => !Items.ContainsKey(fuel)) || recipe.Value.Burns && recipe.Value.Station == null)
+                throw new InvalidOperationException($"Invalid fuel for {recipe.Key}.");
         }
         if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Health < 0 || i.Hunger > 0 && !i.Food) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in data/game.json.");

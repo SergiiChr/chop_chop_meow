@@ -281,6 +281,7 @@ public static class WorldModels {
             case "crate": return Build(new Thing { Kind = ThingKind.Crate }).Root;
             // Loose iron left the world, but its lump still makes the iron ore icon.
             case "iron_ore": { var lump = new Node3D(); LooseOre(lump, "loose_iron", 0, "a35a2e", "8b4f2b"); return lump; }
+            case "charcoal": { var lump = new Node3D(); LooseOre(lump, "charcoal", 0, "3b302a", "231c18"); return lump; }
             case "coal" or "tin_ore": return Build(new Thing { Kind = id == "coal" ? ThingKind.LooseCoal : ThingKind.Tin }).Root;
             case "mine": {
                     var prop = Mine(ThingKind.Iron);
@@ -304,7 +305,7 @@ public static class WorldModels {
 
     /// <summary>The outdoor pile shows stocked fuel, excluding fuel already burning in a batch: a pile of it for every two.</summary>
     public static void SyncFuel(FurnaceProp prop, Thing t, GameData data) {
-        string fuel = World.BurnedFuel(t);
+        string fuel = World.ShownFuel(t, data);
         prop.Stock.Fill(fuel, t.Burner?[fuel] ?? 0, 2, data);
     }
 

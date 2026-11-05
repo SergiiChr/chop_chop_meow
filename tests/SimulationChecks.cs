@@ -377,7 +377,7 @@ public static class SimulationChecks {
         float coinsBeforeBuy = world.Coins;
         Require(!world.Buy(sign, "wood", 1) && world.Orders.Count == 0, "the village should not sell goods missing from its list");
         Require(world.Buy(sign, "water", 1), "market should accept an affordable buy order");
-        Require(world.Coins == coinsBeforeBuy - 15, "buy order should reserve coins immediately");
+        Require(world.Coins == coinsBeforeBuy - 16, "buy order should reserve coins immediately");
         Require(world.Orders.Count == 1, "buy order should put one cart on the road");
         Require(output.Count == 0, "buy order should leave goods in transit, not in the output");
         SafeTick(world, 29.9f);
@@ -622,18 +622,22 @@ public static class SimulationChecks {
     private static void CheckFurnacesBurnOneFuelAndWaitForSteelHeat(GameData data) {
         var world = EmptyWorld(data);
         var basic = world.Add(ThingKind.Furnace, new Vector2(10, 10));
-        Require(world.FuelOf(basic) == "wood", "basic furnace should burn wood by default");
-        Require(!world.BatchCost(basic).ContainsKey("wood"),
-            "basic furnace's wood fuel should not count as an ingredient");
         Require(basic.Burner != null, "basic furnace should have its own fuel slot");
+        world.SetRecipe(basic, "iron_bar");
+        Require(world.FuelBlock(basic, "wood") != null && world.FuelBlock(basic, "coal") == null && world.FuelBlock(basic, "charcoal") == null,
+            "smelting iron should burn coal or charcoal and refuse wood");
+        world.SetRecipe(basic, "burnt_steak");
+        Require(world.FuelBlock(basic, "wood") == null && !world.BatchCost(basic).ContainsKey("wood"),
+            "searing meat should burn wood, which does not count as an ingredient");
         basic.Burner!.Add("coal", 4);
         Require(world.FuelOf(basic) == "coal" && world.FuelBlock(basic, "wood") != null,
                 "basic furnace should burn the coal in its fuel slot and take one kind of fuel at a time");
 
         var reinforced = world.Add(ThingKind.Reinforced, new Vector2(15, 10));
-        reinforced.Fuel = "wood"; // Even malformed or edited state must not make wood a valid steel fuel.
-        Require(world.FuelOf(reinforced) == "coal" && world.FuelBlock(reinforced, "wood") != null,
-                "the reinforced furnace should only ever burn coal, even if Fuel is tampered with");
+        reinforced.Burner!.Add("charcoal", 4); // Even malformed or edited state must not make charcoal a steel fuel.
+        Require(world.FuelOf(reinforced) == null && world.FuelBlock(reinforced, "wood") != null && world.FuelBlock(reinforced, "charcoal") != null,
+                "the reinforced furnace should only ever burn coal, even with other fuel in its slot");
+        reinforced.Burner.Remove("charcoal", 4);
         var steelCost = world.BatchCost(reinforced);
         Require(steelCost["coal"] == 2, "a steel batch should need two coal");
         Require(steelCost["iron_bar"] == 2, "a steel batch should need two iron bars");
@@ -703,7 +707,7 @@ public static class SimulationChecks {
         furnace.Inventory.Slots = 2;
         world.Player = furnace.Pos;
         Give(world, "iron_ore", 2);
-        Give(world, "wood", 1);
+        Give(world, "coal", 1);
         world.LoadBatch(furnace);
         world.Tick(.25f);
         Require(furnace.Processing && furnace.Inventory.Count == 0,
@@ -724,7 +728,7 @@ public static class SimulationChecks {
 
         furnace.Inventory.Slots = 18; furnace.Inventory.Remove("stone", 64);
         furnace.Inventory.Add("iron_bar", furnace.Inventory.StackSize - 1);
-        Give(world, "iron_ore", 2); Give(world, "wood", 1);
+        Give(world, "iron_ore", 2); Give(world, "coal", 1);
         world.LoadBatch(furnace);
         world.Tick(.25f); world.Tick(cookSeconds + 1);
         Require(furnace.Processing && furnace.Inventory["iron_bar"] == furnace.Inventory.StackSize,
@@ -1141,10 +1145,10 @@ public static class SimulationChecks {
 
     private static void CheckMinedOreBecomesSteelTools(World world, Thing iron, Thing coal, Thing bench) {
         GatherUntil(world, iron, "iron_ore", 22);
-        GatherUntil(world, coal, "coal", 6);
+        GatherUntil(world, coal, "coal", 17);
         var furnace = BuildAt(world, ThingKind.Furnace, Site(25, 25));
         world.LoadBatch(furnace, 11);
-        Require(furnace.Inventory["iron_ore"] == 22 && furnace.Burner!["wood"] == 11,
+        Require(furnace.Inventory["iron_ore"] == 22 && furnace.Burner!["coal"] == 11,
                 "loading the furnace should transfer the recipe inputs, and one fuel per batch into its fuel slot");
         CompleteBatches(world, furnace, "iron_bar", 11);
         world.Player = furnace.Pos;
@@ -1157,13 +1161,13 @@ public static class SimulationChecks {
         int bars = world.Backpack["iron_bar"];
         world.LoadBatch(reinforced, 1);
         Require(reinforced.Inventory["iron_bar"] == 2, "the reinforced furnace should load iron");
-        Require(reinforced.Inventory["coal"] == 2, "the reinforced furnace should load mined coal");
+        Require(reinforced.Inventory["coal"] == 2, "the reinforced furnace should load coal");
         Require(reinforced.Burner!["coal"] == 1, "the reinforced furnace should load coal fuel into its fuel slot");
         CompleteBatches(world, reinforced, "steel_bar", 2, true);
         world.Player = reinforced.Pos;
         world.Collect(reinforced);
         Require(world.Backpack["steel_bar"] == 2 && world.Backpack["iron_bar"] == bars - 2,
-                "one smelt of 2 iron bars and mined coal should make two steel bars from real inputs");
+                "one smelt of 2 iron bars and coal should make two steel bars from real inputs");
 
         var anvil = BuildAt(world, ThingKind.Anvil, Site(28, 25));
         world.Player = anvil.Pos + Vector2.One;
@@ -1478,7 +1482,7 @@ public static class SimulationChecks {
 
         var furnace = world.Add(ThingKind.Furnace, Site(3, 0));
         world.Player = furnace.Pos + new Vector2(1.2f, 0);
-        Give(world, "wood", 2);
+        Give(world, "coal", 2);
         world.SetRecipe(furnace, "tin_bar");
         world.LoadBatch(furnace, 2);
         SafeTick(world, data.Recipes["tin_bar"].Seconds * 2 + 1);
@@ -1700,9 +1704,9 @@ public static class SimulationChecks {
         world.Player = table.Pos + new Vector2(1, 0);
         world.Collect(table);
         world.SetRecipe(table, "berry_jam");
-        table.Fuel = "coal"; Give(world, "coal", 1);
-        Require(world.BatchCost(table).SequenceEqual(new Dictionary<string, int> { ["crushed_berries"] = 2 }) && world.FuelOf(table) == "coal", "jam should take crushed berries and burn the chosen fuel");
+        Give(world, "coal", 1);
         world.LoadBatch(table);
+        Require(world.BatchCost(table).SequenceEqual(new Dictionary<string, int> { ["crushed_berries"] = 2 }) && world.FuelOf(table) == "coal", "jam should take crushed berries and burn the coal it is loaded with");
         world.Player = new Vector2(40, 40);
         SafeTick(world, data.Recipes["berry_jam"].Seconds + 1);
         Require(table.Inventory["berry_jam"] == 1 && table.Burner!["coal"] == 0, "jam should cook on its own over the fire");
@@ -1723,7 +1727,7 @@ public static class SimulationChecks {
 
         var furnace = world.Add(ThingKind.Furnace, new Vector2(28, 20));
         world.SetRecipe(furnace, "bread");
-        Require(world.BatchCost(furnace).Keys.SequenceEqual(new[] { "dough" }) && world.FuelOf(furnace) == "wood", "bread should bake from dough over the furnace's fire");
+        Require(world.BatchCost(furnace).Keys.SequenceEqual(new[] { "dough" }) && world.FuelBlock(furnace, "wood") == null, "bread should bake from dough over the furnace's fire");
     }
 
     /// <summary>By hand, the mortar is carried like any other tool.</summary>
@@ -1861,7 +1865,7 @@ public static class SimulationChecks {
         SetCoins(world, 1000);
         Require(world.Buy(sign, "canned_food", 2), "boxed goods should be bought from the post");
         Require(world.Orders.Last().Crates == 2, "boxed goods should be bought by the crate");
-        Require(world.Coins == 830, "boxed goods should cost the crate price");
+        Require(world.Coins == 822, "boxed goods should cost the crate price");
         Require(world.LotPrice("canned_food") > data.Market.Buys["canned_food"] * world.UnitPrice("canned_food", false), "a bought crate costs more than its contents would sell for");
         SafeTick(world, data.TradeSeconds + .1f);
         var bought = sign.Output!.Items.Keys.Where(World.IsCrate).ToList();
@@ -2068,7 +2072,7 @@ public static class SimulationChecks {
         world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("steel_axe", 1)), 1);
         Require(world.Sell(sign), "a loaded crate should sell");
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(world.Coins == 5 && sign.Wages![Inventory.Coins] == 40, "sale proceeds for the goods and their crate should arrive as whole coins in the wage slot");
+        Require(world.Coins == 5 && sign.Wages![Inventory.Coins] == 42, "sale proceeds for the goods and their crate should arrive as whole coins in the wage slot");
         sign.Inventory.Add(Inventory.Coins, 1);
         Require(!world.Sell(sign) && sign.Inventory[Inventory.Coins] == 1, "coins themselves cannot be sold");
         Require(!world.Buy(sign, Inventory.Coins, 1), "coins themselves cannot be bought");

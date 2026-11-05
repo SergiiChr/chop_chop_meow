@@ -17,7 +17,6 @@ public sealed class Thing {
     public int Remaining { get; set; }
     public Inventory Inventory { get; set; } = new();
     public string Recipe { get; set; } = "";
-    public string Fuel { get; set; } = "wood";
     public float Progress { get; set; }
     public bool Processing { get; set; }
     public float Heat { get; set; }
@@ -352,7 +351,6 @@ public sealed partial class World {
     private string StartingRecipe(ThingKind kind) => Data.Buildings.TryGetValue(kind, out var building) ? building.Recipe : "";
     public Thing Add(ThingKind kind, Vector2 pos, int remaining = 0) {
         var t = new Thing { Id = S.NextId++, Kind = kind, Pos = pos, Remaining = remaining, Recipe = StartingRecipe(kind) };
-        if (kind == ThingKind.Reinforced) t.Fuel = "coal";
         if (kind == ThingKind.Signpost) { t.Inventory.Slots = MarketSlots; t.Output = new() { Slots = MarketSlots }; t.Wages = NewWageSlot(); }
         if (SlotKinds(kind).Length > 0) t.Tools = NewToolSlots(kind);
         if (Burns(kind)) t.Burner = NewBurner();
@@ -641,10 +639,19 @@ public sealed partial class World {
         if (Forwarded(Verb.SetRecipe, t.Id, item: recipe)) return;
         if (Data.Recipes.TryGetValue(recipe, out var r) && r.Station == t.Kind) { t.Recipe = recipe; t.Progress = 0; }
     }
-    /// <summary>The fuel a station burns: coal in the reinforced furnace, otherwise its selection, falling back to wood for anything unknown.</summary>
-    public static string BurnedFuel(Thing t) => t.Kind == ThingKind.Reinforced ? "coal" : t.Burner?.First() is "wood" or "coal" ? t.Burner.First()! : t.Fuel is "wood" or "coal" ? t.Fuel : "wood";
-    /// <summary>The fuel one batch of the station's recipe burns, or null when it burns none.</summary>
-    public string? FuelOf(Thing t) => Data.Recipes.TryGetValue(t.Recipe, out var r) && r.Fuel ? BurnedFuel(t) : null;
+    private static readonly List<string> NoFuels = new();
+    /// <summary>The fuels the station's recipe burns, in the order workers look for them; empty when it burns none.</summary>
+    public List<string> Fuels(Thing t) => Data.Recipes.TryGetValue(t.Recipe, out var r) ? r.Fuels : NoFuels;
+    /// <summary>The fuel the next batch burns: what the fuel slot holds while the recipe takes it, or null.</summary>
+    public string? FuelOf(Thing t) => t.Burner?.First() is string held && Fuels(t).Contains(held) ? held : null;
+    /// <summary>The fuel a station shows: what its fuel slot holds, else the first its recipe burns, else the first any of its recipes burns.</summary>
+    public static string ShownFuel(Thing t, GameData data) =>
+        t.Burner?.First() ?? (data.Recipes.TryGetValue(t.Recipe, out var r) && r.Burns ? r.Fuels[0] : FirstFuel(t.Kind, data));
+    // Apart from ShownFuel, whose every call would otherwise allocate this lambda's closure.
+    private static string FirstFuel(ThingKind station, GameData data) => data.Recipes.Values.First(r => r.Station == station && r.Burns).Fuels[0];
+    /// <summary>The fuels a recipe burns as words, such as "coal or charcoal".</summary>
+    public string FuelWords(List<string> fuels) => fuels.Count == 0 ? "" : fuels.Count == 1 ? Lower(Data.Name(fuels[0])) :
+        Phrase(string.Join(", ", fuels.Take(fuels.Count - 1).Select(f => Lower(Data.Name(f)))), " or ", Lower(Data.Name(fuels[^1])));
     // A batch's cost depends only on its recipe, so each is built once.
     private readonly Dictionary<string, Dictionary<string, int>> batchCosts = new();
     /// <summary>One batch's inputs, without the fuel, which has a slot of its own. Shared between stations, so read it without changing it.</summary>
@@ -653,13 +660,15 @@ public sealed partial class World {
         return cost;
     }
     /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it.</summary>
-    private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (FuelOf(t) is not string fuel || t.Burner?[fuel] > 0);
+    private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null);
     public void LoadBatch(Thing t, int batches = 1) {
         if (!Near(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded(Verb.LoadBatch, t.Id, count: batches)) return;
         var cost = BatchCost(t);
         if (cost.Count == 0) { Say("Choose a recipe first."); return; }
-        string? fuel = FuelOf(t);
+        // The fuel slot keeps burning what it holds; an empty one takes the first fuel the recipe burns that the backpack has spare.
+        string? fuel = Fuels(t).Count == 0 ? null : FuelOf(t) ?? (t.Burner!.First() == null ? Fuels(t).FirstOrDefault(f => S.Backpack[f] > cost.GetValueOrDefault(f)) : null);
+        if (Fuels(t).Count > 0 && fuel == null) { Say(t.Burner!.First() is string held ? FuelBlock(t, held)! : Phrase("Needs ", FuelWords(Fuels(t)), " in your backpack for the fire.")); return; }
         if (NeedsFullBottle(cost, S.Backpack)) { Say(Water.FullBottleWarning); return; }
         for (int i = 0; i < batches; i++) {
             if (!S.Backpack.Has(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
@@ -688,8 +697,7 @@ public sealed partial class World {
         if (FuelBlock(t, item) is string refused) { Say(refused); return 0; }
         if (Forwarded(Verb.LoadFuel, t.Id, item: item, count: quantity)) return 0;
         int moved = S.Backpack.TransferTo(t.Burner, item, Math.Min(quantity, t.Burner.StackOf(item) - t.Burner[item]));
-        if (moved > 0) t.Fuel = item;
-        else Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : "The fuel slot is full.");
+        if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : "The fuel slot is full.");
         return moved;
     }
     public void Collect(Thing t) {
@@ -875,9 +883,11 @@ public sealed partial class World {
     public const int MaxWorkers = 40;
     public const int Carts = 3;
     /// <summary>Whether a kind of building has a fuel slot.</summary>
-    public bool Burns(ThingKind kind) => (burning ??= Data.Recipes.Values.Where(r => r.Fuel).Select(r => r.Station).ToHashSet()).Contains(kind);
-    /// <summary>Items a station's fuel slot takes: coal at the reinforced furnace, wood or coal elsewhere.</summary>
-    public static bool FuelFits(Thing t, string item) => t.Kind == ThingKind.Reinforced ? item == "coal" : item is "wood" or "coal";
+    public bool Burns(ThingKind kind) => (burning ??= Data.Recipes.Values.Where(r => r.Burns).Select(r => r.Station).ToHashSet()).Contains(kind);
+    /// <summary>Whether a station's fuel slot takes an item: what its recipe burns, or without one what any of its recipes burns.</summary>
+    public bool FuelFits(Thing t, string item) => Data.Recipes.TryGetValue(t.Recipe, out var r) ? r.Fuels.Contains(item) : AnyRecipeBurns(t.Kind, item);
+    // Apart from FuelFits, whose every call would otherwise allocate this lambda's closure.
+    private bool AnyRecipeBurns(ThingKind station, string item) => Data.Recipes.Values.Any(r => r.Station == station && r.Fuels.Contains(item));
     private static Inventory NewWageSlot() => new() { Slots = 1, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
@@ -885,10 +895,22 @@ public sealed partial class World {
         box == t.Burner ? FuelBlock(t, item) :
         box == t.Output ? "Things only come out of here." :
         box == t.Inventory ? (PartialRecipeBottle(t, item) ? Water.FullBottleWarning : HoldBlock(t, item)) : null;
+    /// <summary>Whether a fuel slot takes an item now: a fuel that fits, and the same kind as what it holds.</summary>
+    private bool FuelTakes(Thing t, string item) => FuelFits(t, item) && (t.Burner?.First() is not string held || held == item);
     /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
     public string? FuelBlock(Thing t, string item) =>
-        !FuelFits(t, item) ? (t.Kind == ThingKind.Reinforced ? "The reinforced furnace burns only mined coal." : "The fuel slot takes wood or coal.") :
+        !FuelFits(t, item) ? (Data.Recipes.TryGetValue(t.Recipe, out var r) ? $"{r.Name} burns {FuelWords(r.Fuels)}." : "The fuel slot only takes fuel.") :
         t.Burner?.First() is string held && held != item ? $"The fuel slot holds {Data.Name(held).ToLowerInvariant()}. Take it out first." : null;
+    /// <summary>
+    /// The fuel a hauler brings a station and where from: more of what its fuel slot burns while it holds under two batches,
+    /// or for an empty slot the first fuel the recipe burns that storage gives out.
+    /// </summary>
+    private (string Fuel, Thing Source)? FuelToFetch(Thing t, Vector2 from) {
+        if (t.Burner is not Inventory burner) return null;
+        if (burner.First() is string held) return FuelOf(t) == held && burner[held] < 2 && SourceFor(held, from) is Thing source ? (held, source) : null;
+        foreach (string fuel in Fuels(t)) if (SourceFor(fuel, from) is Thing found) return (fuel, found);
+        return null;
+    }
     /// <summary>Coins kept for wages in every signpost's wage slot.</summary>
     public int WageCoins {
         get {
@@ -1393,7 +1415,7 @@ public sealed partial class World {
             // A mine site takes only what it still needs, so a surplus goes back to storage.
             int wanted = dest?.Kind == ThingKind.Mine ? MineNeed(dest, item) : int.MaxValue;
             // Fuel for a station goes into its fuel slot; once that is full or gone, it goes to storage like anything else.
-            var into = w.Fueling && dest?.Burner != null && FuelBlock(dest, item) == null ? dest.Burner : dest?.Inventory;
+            var into = w.Fueling && dest?.Burner != null && FuelTakes(dest, item) ? dest.Burner : dest?.Inventory;
             if (dest == null || into == null || wanted == 0 || into.Room(item) == 0 || !into.Accepts(item) || (dest.Id == target?.Id && target.IsResource)) { dest = DepositFor(item, w.Pos); into = dest?.Inventory; w.Fueling = false; }
             if (dest == null) { w.Status = Phrase("Holding ", Data.Name(item), " · no accepting storage"); return; }
             w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
@@ -1469,6 +1491,12 @@ public sealed partial class World {
                 if (Walk(w, target.Pos, dt)) { target.Inventory.TransferTo(w.Bag, leftover, w.Bag.StackSize, true); w.Destination = dest.Id; }
                 return true;
             }
+            // Fuel the recipe does not burn leaves the fuel slot, so the right one can go in.
+            if (!target.Processing && Fuels(target).Count > 0 && FuelOf(target) == null && target.Burner!.First() is string stale && DepositFor(stale, target.Pos) is Thing store) {
+                w.Status = Phrase("Clearing ", Lower(Data.Name(stale)), " from the fire");
+                if (Walk(w, target.Pos, dt)) { target.Burner.TransferTo(w.Bag, stale, w.Bag.StackSize, true); w.Destination = store.Id; }
+                return true;
+            }
             var costs = BatchCost(target);
             // A worked station only works while worked, so its crafter stays put until the batch is done before fetching the next one.
             bool fetches = !Worked(target) || !target.Processing || !HasDuty(w, target.Id, "craft");
@@ -1481,9 +1509,9 @@ public sealed partial class World {
                 return true;
             }
             // Then two batches' worth of fuel for the fuel slot.
-            if (fetches && FuelOf(target) is string fuel && target.Burner![fuel] < 2 && FuelBlock(target, fuel) == null && SourceFor(fuel, w.Pos) is Thing fuelSource) {
+            if (fetches && FuelToFetch(target, w.Pos) is (string fuel, Thing fuelSource)) {
                 w.Status = Phrase("Fetching ", Data.Name(fuel), " for the fire");
-                if (Walk(w, fuelSource.Pos, dt)) { fuelSource.Inventory.TransferTo(w.Bag, fuel, 2 - target.Burner[fuel], true); w.Destination = target.Id; w.Fueling = true; }
+                if (Walk(w, fuelSource.Pos, dt)) { fuelSource.Inventory.TransferTo(w.Bag, fuel, 2 - target.Burner![fuel], true); w.Destination = target.Id; w.Fueling = true; }
                 return true;
             }
         }
@@ -1741,13 +1769,13 @@ public sealed partial class World {
                 t.Inventory.Spend(BatchCost(t)); t.Processing = true; t.Progress = 0;
                 if (recipe.Inputs.TryGetValue("water", out int usedWater)) t.Inventory.Add("empty_bottle", usedWater);
                 if (FuelOf(t) is string fuel) t.Burner!.Remove(fuel, 1);
-                if (recipe.Fuel && !wasBurning) Play("start_fire", t.Pos);
+                if (recipe.Burns && !wasBurning) Play("start_fire", t.Pos);
             }
             if (t.Processing && !hot) {
                 // A cold forge mid-batch keeps burning coal from its slot at the batch fuel rate, but the steel waits for heat.
                 // Burn is the campfire's fuel clock, reused here to time the next coal.
                 t.Burn = Math.Min(recipe.Seconds, t.Burn + dt);
-                if (t.Burn >= recipe.Seconds && t.Burner?.Remove("coal", 1) > 0) t.Burn = 0;
+                if (t.Burn >= recipe.Seconds && FuelOf(t) is string burning && t.Burner!.Remove(burning, 1) > 0) t.Burn = 0;
             }
             if (t.Processing && hot && atAnvil) {
                 t.Progress = Math.Min(recipe.Seconds, t.Progress + dt * rate);
@@ -1979,7 +2007,7 @@ public sealed partial class World {
         8 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. Smelt iron ore with wood or coal."),
         9 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore and fuel; collect iron bars."),
         10 => ("Hotter than fire", "Explore for a dark cliff and mine coal. Build a reinforced furnace: 20 stone, 5 iron bars, 8 wood."),
-        11 => ("Make steel", "Load iron and mined coal into the reinforced furnace and coal into its fuel slot. Pump the bellows: steel requires 1450+ °C."),
+        11 => ("Make steel", "Load iron and coal into the reinforced furnace and coal into its fuel slot. Pump the bellows: steel requires 1450+ °C."),
         12 => ("A proper workshop", "Build an anvil: 4 iron bars + 6 stone. It hammers steel bars into steel parts."),
         13 => ("Tools for the village", "Hammer steel parts at the anvil, then craft a steel axe, pickaxe or hammer at the bench."),
         14 => ("Steel for sale", "Pack steel tools into a crate and sell it at the trading post, then collect the coins."),
@@ -2132,7 +2160,7 @@ public sealed partial class World {
             // A station from an older save keeps its fuel with the ingredients; fuel nothing smelts moves to the fuel slot.
             if (Burns(t.Kind) && t.Burner == null) {
                 t.Burner = NewBurner();
-                string fuel = BurnedFuel(t);
+                string fuel = ShownFuel(t, Data);
                 if (!BatchCost(t).ContainsKey(fuel)) t.Inventory.TransferTo(t.Burner, fuel, t.Inventory[fuel]);
             }
         }

@@ -753,7 +753,7 @@ public partial class WorldView : Node3D {
                 break;
             case StoveProp stove:
                 // The fire only burns for recipes that take fuel; the mortar's work and kneading dough are cold.
-                bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Fuel;
+                bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Burns;
                 stove.Glow.Visible = cooking;
                 stove.Light.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
                 if (stove.Mortar != null && World.Sees(t.Pos)) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null;
