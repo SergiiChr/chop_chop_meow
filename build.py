@@ -313,16 +313,25 @@ def lag_proxy(stop: threading.Event, delay: float = 0.08, loss: float = 0.05) ->
 
 
 def python_checks() -> None:
-    """Install the pinned check tools into .tools/python when their list changes, then run them."""
-    bin_dir = PYTHON_TOOLS / "bin"
+    """Install the pinned check tools into .tools/python when their list changes, then run them.
+
+    The tools run through the environment's own interpreter rather than their launcher scripts,
+    which hard-code the path the environment was made at; a worktree's .tools links to another checkout's
+    and the environment keeps working after that worktree is gone.
+    """
+    python = PYTHON_TOOLS / "bin" / "python"
     stamp = PYTHON_TOOLS / "requirements.txt"
-    if not stamp.is_file() or stamp.read_text() != REQUIREMENTS.read_text():
+    current = stamp.is_file() and stamp.read_text() == REQUIREMENTS.read_text()
+    # A system Python upgrade leaves the environment's interpreter link dangling.
+    if not current or not python.exists():
         print("Installing pinned Python check tools into .tools/python...")
         shutil.rmtree(PYTHON_TOOLS, ignore_errors=True)
-        command([sys.executable, "-m", "venv", PYTHON_TOOLS])
+        command([sys.executable, "-m", "venv", PYTHON_TOOLS.resolve()])
         command(
             [
-                bin_dir / "pip",
+                python,
+                "-m",
+                "pip",
                 "install",
                 "-q",
                 "--disable-pip-version-check",
@@ -331,9 +340,9 @@ def python_checks() -> None:
             ]
         )
         shutil.copyfile(REQUIREMENTS, stamp)
-    command([bin_dir / "mypy"])
-    command([bin_dir / "ruff", "check"])
-    command([bin_dir / "ruff", "format", "--check"])
+    command([python, "-m", "mypy"])
+    command([python, "-m", "ruff", "check"])
+    command([python, "-m", "ruff", "format", "--check"])
 
 
 def test_simulation(env: dict[str, str]) -> None:
