@@ -40,6 +40,7 @@ public static class SimulationChecks {
         CheckWorkersHaulLeftoversAfterRecipeSwitch(data);
         CheckDeathLeavesRecoveryBoxAndRespawnsAndSavesKeepState(data);
         CheckFurnacesBurnOneFuelAndWaitForSteelHeat(data);
+        CheckHaulerFuelsSmeltingWithCoalAndReturnsWood(data);
         CheckAnvilNeedsHammering(data);
         CheckFinishedBatchWaitsForOutputRoom(data);
         CheckToolsGateMiningAndFelling(data);
@@ -617,6 +618,29 @@ public static class SimulationChecks {
         Require(loaded.Workers[0].Destination == furnace.Id, "save/load should preserve the worker's destination");
         Require(Math.Abs(loaded.Demand("wood") - 1.4f) < .01f,
                 "save/load should preserve market demand");
+    }
+
+    /// <summary>A stone furnace smelting iron with wood in its fuel slot and only coal in storage: the hauler swaps the fuel and the iron gets smelted.</summary>
+    private static void CheckHaulerFuelsSmeltingWithCoalAndReturnsWood(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
+        world.SetRecipe(furnace, "iron_bar");
+        furnace.Burner!.Add("wood", 3);
+        var chest = world.Add(ThingKind.Chest, new Vector2(24, 20));
+        chest.Inventory.Add("iron_ore", 4); chest.Inventory.Add("coal", 4);
+        world.Assign(AddWorker(world, furnace.Pos), furnace);
+        SafeTick(world, 60);
+        Require(chest.Inventory["wood"] == 3, "the hauler should carry the wood iron cannot burn back to storage");
+        Require(furnace.Inventory["iron_bar"] + chest.Inventory["iron_bar"] >= 1 && chest.Inventory["coal"] < 4,
+            "the hauler should fuel the furnace with coal from storage and the iron should smelt");
+
+        // A recipe that also burns wood, with an empty fuel slot and no wood anywhere, still gets coal.
+        var grill = world.Add(ThingKind.Furnace, new Vector2(20, 26));
+        world.SetRecipe(grill, "burnt_steak");
+        chest.Inventory.Add("raw_meat", 2);
+        world.Assign(AddWorker(world, grill.Pos), grill);
+        SafeTick(world, 60);
+        Require(grill.Inventory["burnt_steak"] + chest.Inventory["burnt_steak"] == 2, "a hauler should fuel an empty fuel slot with coal when storage has no wood");
     }
 
     private static void CheckFurnacesBurnOneFuelAndWaitForSteelHeat(GameData data) {
