@@ -945,7 +945,7 @@ public sealed partial class World {
         if (Downed || S.Sheltered != 0 || S.TorchKindling > 0 || Forwarded(Verb.Torch, at: aim)) return;
         if (S.TorchLit) { SwingTorch(aim); return; }
         if (S.Torch <= 0) {
-            if (S.Backpack.Remove("torch", 1) == 0) { Say("No torch in your backpack. Make one with a chisel from the crafting menu."); return; }
+            if (S.Backpack.Remove("torch", 1) == 0) { Say("No torch in your backpack."); return; }
             S.Torch = Data.CampfireSeconds;
         }
         S.TorchKindling = KindleSeconds; PlayerActed?.Invoke(ActorAction.Kindle, Player);
