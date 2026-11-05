@@ -120,9 +120,9 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         string keptBefore = "";
         cell.Pressed += () => {
             if (doubled) { doubled = false; return; }
+            keptBefore = station?.Keep ?? "";
             int step = Step;
             if (station == null || step > 1) { kit.Run(() => Queue(id, step)); return; }
-            keptBefore = station.Keep;
             kit.Run(() => world.SetRecipe(station, keptBefore == id ? "" : id));
         };
         cell.DoubleClicked = () => {

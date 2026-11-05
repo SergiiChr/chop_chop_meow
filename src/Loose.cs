@@ -53,11 +53,7 @@ public partial class World {
     }
 
     /// <summary>Whether a worker has a tool of a kind in hand or can take one from a tool station.</summary>
-    private bool HasTool(Worker w, string kind) {
-        if (w.Tool != "" && Data.Items[w.Tool].Tool == kind) return true;
-        foreach (var t in S.Things) if (t.Kind == ThingKind.Toolstation && BestTool(kind, t.Inventory) is string held && t.Inventory.AllowsWithdrawal(held)) return true;
-        return false;
-    }
+    private bool HasTool(Worker w, string kind) => w.Tool != "" && Data.Items[w.Tool].Tool == kind || ToolStationWith(kind, w.Pos) != null;
 
     /// <summary>Sends a gatherer who cannot work a spot to the nearest known loose piece of the same resource, and tells whether there was one.</summary>
     private bool LooseSpot(Worker w, Thing spot) {

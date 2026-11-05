@@ -87,7 +87,7 @@ Wind sways grass, shrubs and tree foliage, drifting between calm spells and gust
 Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), and world sounds pan with their place on screen.
 A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
-Shrubs, pebbles and twigs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading, and the meadow has soft lusher and drier patches.
+Shrubs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading, and the meadow has soft lusher and drier patches.
 
 ## Controls
 
@@ -622,7 +622,7 @@ Nor can a save that names items the game does not know, or holds needs out of ra
 ### Environment
 
 The environment uses a shared human scale, Terrain3D mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones.
-Meadow grass and wildflowers grow in patches; ferns, ordinary shrubs and fallen twigs add woodland ground cover.
+Meadow grass and wildflowers grow in patches; ferns and ordinary shrubs add woodland ground cover.
 Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas.
 A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
 

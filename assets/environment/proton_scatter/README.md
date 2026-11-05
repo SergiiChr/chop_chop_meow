@@ -13,8 +13,9 @@ The bake has no terrain or gameplay masking and creates no scene instances.
 
 The game filters the points at load.
 It drops wet ground, the clearing, the cart trail, resource footprints and mine approaches.
-It then builds six shared MultiMeshes: meadow patches, ferns, ordinary bushes, flowers, pebbles and twigs.
-The forest fixture ends up with 7,600 meadow patches, 331 ferns, 269 bushes, 183 flowers, 60 pebbles and 35 twigs.
+It then builds four shared MultiMeshes: meadow patches, ferns, ordinary bushes and flowers.
+Every 127th point is a loose stone and every 293rd a stick, which a new world places as things to pick up (`Scenery.Loose`).
+The forest fixture ends up with 7,600 meadow patches, 331 ferns, 269 bushes and 183 flowers.
 These are decorative; resource trees and berry bushes keep their simulation positions and gathering rules.
 A shared disturbance texture also clears plants around placed buildings, mine approaches and the cart trail, and shades worn soil on native terrain.
 It updates only when the world layout changes.

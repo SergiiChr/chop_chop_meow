@@ -734,6 +734,7 @@ public sealed partial class World {
         if (!Makes(t, recipe)) return;
         if (!Near(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded(Verb.QueueBatch, t.Id, item: recipe)) return;
+        if (t.Queue.Find(q => q.Recipe == recipe)?.Count >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
         QueueRecipe(t, recipe, 1);
         var r = Data.Recipes[recipe];
         foreach (var (item, amount) in r.Inputs) if (amount > t.Inventory[item]) LoadInput(t, item, amount - t.Inventory[item]);
@@ -750,8 +751,11 @@ public sealed partial class World {
     /// <summary>The fuel a station shows: what its fuel slot holds, else the first its recipe burns, else the first any of its recipes burns.</summary>
     public static string ShownFuel(Thing t, GameData data) =>
         t.Burner?.First() ?? (data.Recipes.TryGetValue(t.Recipe, out var r) && r.Burns ? r.Fuels[0] : FirstFuel(t.Kind, data));
-    // Apart from ShownFuel, whose every call would otherwise allocate this lambda's closure.
-    private static string FirstFuel(ThingKind station, GameData data) => data.Recipes.Values.First(r => r.Station == station && r.Burns).Fuels[0];
+    // A plain loop, since the view asks every frame and a lambda would allocate its closure.
+    private static string FirstFuel(ThingKind station, GameData data) {
+        foreach (var r in data.Recipes.Values) if (r.Station == station && r.Burns) return r.Fuels[0];
+        throw new InvalidOperationException($"No recipe at {station.Id()} burns fuel.");
+    }
     /// <summary>The fuels a recipe burns as words, such as "coal or charcoal".</summary>
     public string FuelWords(List<string> fuels) => fuels.Count == 0 ? "" : fuels.Count == 1 ? Lower(Data.Name(fuels[0])) :
         Phrase(string.Join(", ", fuels.Take(fuels.Count - 1).Select(f => Lower(Data.Name(f)))), " or ", Lower(Data.Name(fuels[^1])));
@@ -771,13 +775,13 @@ public sealed partial class World {
     }
     /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it.</summary>
     private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null);
-    /// <summary>Loads batches of a recipe's inputs and one fuel each from the backpack; an empty recipe means the station's current one.</summary>
-    public void LoadBatch(Thing t, int batches = 1, string recipe = "") {
+    /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
+    public void LoadBatch(Thing t, int batches = 1) {
         if (!Near(t)) { Say("Walk closer to load this building."); return; }
-        if (recipe == "") recipe = t.Recipe;
-        if (Forwarded(Verb.LoadBatch, t.Id, item: recipe, count: batches)) return;
+        if (Forwarded(Verb.LoadBatch, t.Id, count: batches)) return;
+        string recipe = t.Recipe;
         var cost = BatchCost(recipe);
-        if (cost.Count == 0 || !Makes(t, recipe)) { Say("Choose a recipe first."); return; }
+        if (cost.Count == 0) { Say("Choose a recipe first."); return; }
         var fuels = Data.Recipes[recipe].Fuels;
         // The fuel slot keeps burning what it holds; an empty one takes the first fuel the recipe burns that the backpack has spare.
         string? held = t.Burner?.First();
@@ -998,8 +1002,11 @@ public sealed partial class World {
     public bool Burns(ThingKind kind) => (burning ??= Data.Recipes.Values.Where(r => r.Burns).Select(r => r.Station).ToHashSet()).Contains(kind);
     /// <summary>Whether a station's fuel slot takes an item: what its recipe burns, or without one what any of its recipes burns.</summary>
     public bool FuelFits(Thing t, string item) => Data.Recipes.TryGetValue(t.Recipe, out var r) ? r.Fuels.Contains(item) : AnyRecipeBurns(t.Kind, item);
-    // Apart from FuelFits, whose every call would otherwise allocate this lambda's closure.
-    private bool AnyRecipeBurns(ThingKind station, string item) => Data.Recipes.Values.Any(r => r.Station == station && r.Fuels.Contains(item));
+    // A plain loop, so a check of a station without a recipe allocates no closure.
+    private bool AnyRecipeBurns(ThingKind station, string item) {
+        foreach (var r in Data.Recipes.Values) if (r.Station == station && r.Fuels.Contains(item)) return true;
+        return false;
+    }
     private static Inventory NewWageSlot() => new() { Slots = 1, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
@@ -1769,11 +1776,16 @@ public sealed partial class World {
         if (!Walk(w, station.Pos, dt)) return false;
         station.Inventory.Add(w.Tool, 1); w.Tool = ""; return true;
     }
-    /// <summary>Takes the best tool of a kind from the nearest tool station holding one; without one, the worker says once what they need and waits.</summary>
-    private void FetchTool(Worker w, string kind, Thing target, float dt) {
+    /// <summary>The nearest tool station a worker may take a tool of a kind from, or null.</summary>
+    private Thing? ToolStationWith(string kind, Vector2 from) {
         Thing? station = null; float nearest = 0;
         foreach (var t in S.Things)
-            if (t.Kind == ThingKind.Toolstation && BestTool(kind, t.Inventory) is string held && t.Inventory.AllowsWithdrawal(held) && (station == null || t.Pos.DistanceSquaredTo(w.Pos) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(w.Pos); }
+            if (t.Kind == ThingKind.Toolstation && BestTool(kind, t.Inventory) is string held && t.Inventory.AllowsWithdrawal(held) && (station == null || t.Pos.DistanceSquaredTo(from) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(from); }
+        return station;
+    }
+    /// <summary>Takes the best tool of a kind from the nearest tool station holding one; without one, the worker says once what they need and waits.</summary>
+    private void FetchTool(Worker w, string kind, Thing target, float dt) {
+        var station = ToolStationWith(kind, w.Pos);
         if (station == null) {
             w.Status = Phrase("Needs ", A(kind), " to ", Task(target));
             if (w.Missing != kind) { w.Missing = kind; Say($"{w.Name} needs {A(kind)} to {Task(target)}. Put one in a tool station."); }
@@ -2144,7 +2156,7 @@ public sealed partial class World {
         5 => ("Something to carry", "Carve a wooden mallet by hand and slot it in the bench beside the chisel. Craft a crate there: 6 planks."),
         6 => ("The road to Bramblewick", "Build a trading post: 10 wood + 4 stone. Put berries in a crate and load it at the market. Sell, then collect the coins."),
         7 => ("Beneath the surface", "Buy your first steel pickaxe from the trading post price sheet. The cart delivers it to the trading post."),
-        8 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. Smelt iron ore with wood or coal."),
+        8 => ("Stone and embers", "Build a stone furnace: 16 stone + 6 wood. It smelts iron ore over coal or charcoal, and burns wood into charcoal."),
         9 => ("The first iron", "Explore for a rust-streaked cliff and mine iron ore at its foot. Load the furnace with ore and fuel; collect iron bars."),
         10 => ("Hotter than fire", "Explore for a dark cliff and mine coal. Build a reinforced furnace: 20 stone, 5 iron bars, 8 wood."),
         11 => ("Make steel", "Load iron and coal into the reinforced furnace and coal into its fuel slot. Pump the bellows: steel requires 1450+ °C."),
