@@ -8,7 +8,7 @@ public partial class WorldView {
     private readonly byte[] disturbed = new byte[Terrain.Size * Terrain.Size];
     private Image disturbanceImage = null!;
     private ImageTexture disturbanceTexture = null!;
-    private ShaderMaterial dressingMaterial = null!, solidDressingMaterial = null!, stillDressingMaterial = null!;
+    private ShaderMaterial dressingMaterial = null!, solidDressingMaterial = null!;
 
     // Baked ground shade: four texels a tile under scenery, two under world objects so restamping them stays cheap.
     // Scenery shade is baked once while loading and fades where worn ground shrinks the plants.
@@ -21,7 +21,7 @@ public partial class WorldView {
 
     /// <summary>
     /// Plants shrink away on worn ground; wear is read at each plant's origin so the whole plant scales evenly.
-    /// Plants sway in the wind and part around the player; pebbles and twigs use the still variant.
+    /// Plants sway in the wind and part around the player.
     /// </summary>
     private static readonly string DressingShader = $$"""
         shader_type spatial;
@@ -35,11 +35,9 @@ public partial class WorldView {
             vec2 uv = MODEL_MATRIX[3].xz / {{Terrain.Size}}.0;
             float wear = max(texture(disturbance, uv).r, texture(traffic, uv).r);
             VERTEX *= 1.0 - smoothstep(0.12, 0.65, wear);
-            #ifndef STILL
             vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
             float bend = clamp(VERTEX.y / 0.3, 0.0, 1.0);
             VERTEX += to_local(MODEL_MATRIX, wind_offset(world, bend, 0.12) + push_offset(world, bend));
-            #endif
             // The same sRGB to linear conversion StandardMaterial3D applies to sRGB vertex colors.
             tint = COLOR.rgb;
             if (!OUTPUT_IS_SRGB) {
@@ -60,8 +58,6 @@ public partial class WorldView {
         // Closed shapes such as shrubs keep back faces culled, or their unlit insides show where they meet a slope.
         solidDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader.Replace("cull_disabled", "cull_back") } };
         solidDressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
-        stillDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader.Replace("cull_disabled;", "cull_back;\n#define STILL") } };
-        stillDressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
         sceneryShadeImage = Image.CreateFromData(ShadeSize, ShadeSize, false, Image.Format.R8, sceneryShade);
         sceneryShadeTexture = ImageTexture.CreateFromImage(sceneryShadeImage);
         objectShadeImage = Image.CreateFromData(ContactSize, ContactSize, false, Image.Format.Rg8, objectShade);

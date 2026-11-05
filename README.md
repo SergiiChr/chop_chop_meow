@@ -252,6 +252,8 @@ Impassable mountain ranges close in from the left and right toward the valley's 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
 Iron and coal deposits sit at the foot of rock faces at the base of both ranges and need a pickaxe.
 Loose coal is scattered below the nearer coal face and is picked up whole with one right-click, with no tool.
+Loose stones and sticks lie about the plains: each picks up the same way as 1 stone or 1 wood, and is gone once picked.
+A pickaxe hit on a rock or an ore deposit knocks a loose piece of it off one time in twenty; it flies off and lands within 2 tiles, ready to pick up.
 A pale grey cliff further inland holds tin: mine it with a pickaxe.
 
 ## Progression
@@ -389,18 +391,18 @@ Workers need tools for some jobs:
 
 - an axe to chop wood;
 - a pickaxe to mine ore and coal;
-- a rake to rake leaves;
 - a hammer to fit a mine.
 
-Stone, berries and loose coal need no tool.
+Stone, leaves, berries and loose pieces need no tool, though a pickaxe breaks rock faster and a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
 They put it back when reassigned or when heading home at dusk.
-If there is none, the worker waits, a message says once what they need, and they carry on as soon as one is put in.
+If there is none, the worker picks up known loose pieces of the same resource; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
+A gatherer whose spot runs out goes on to the next known spot of the same resource, and to loose pieces of it only once no other spot is left.
 
 A worker on the station's Stock job brings tools from other storage to the rack.
 
 Oaks drop a patch of leaves beside the trunk.
-Rake them with a rake and they fall again every day.
+Gather them by hand, or three times as fast with a rake, and they fall again every day.
 
 ## Farming
 

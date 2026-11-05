@@ -11,8 +11,8 @@ These came from the user; change them only after asking.
 - **Platform and launch:** Linux first, one-command launch from a fresh checkout through the Python launcher.
 - **Look:** smooth isometric 3D, natural and lighthearted, with some of Terraria's approachable feel; no fantasy or industrial styling. Buildings are modern DIY, there are several tree species, and workers wear blue overalls over a cream shirt.
 - **Animation:** every core interaction has an animation, with a dedicated one for every tool.
-- **Progression:** the player starts with a steel axe and no pickaxe; there is no loose iron and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
-- **Mining:** coal, iron and tin deposits need a carried pickaxe; loose coal needs no tool.
+- **Progression:** the player starts with a steel axe and no pickaxe; no loose iron lies about and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
+- **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
 - **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, rake for leaves, hammer for fitting a mine) from a tool station and put them back when reassigned or going home. Without one they wait and say so once.
@@ -55,6 +55,8 @@ Simulation and data:
 | `src/GameData.cs` | Loads tunable items, buildings, recipes, trade values and time values from `data/game.json` |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
+| `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
+| `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces |
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
@@ -367,6 +369,8 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 ### Resources
 
 - Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
+- Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
+- `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `World.ChipReach` of a boulder or deposit on `World.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
 - A picked-clean berry bush fruits again after `berryRegrowHours`.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
 - Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
@@ -387,8 +391,9 @@ Tier 1 is unused, since there are no iron tools.
 Recipes name the tool they need, the lowest `tier` that will do, and whether they can be made by hand (`hand`).
 So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
 
-`World.ToolKind` names the tool a resource needs: an axe for trees, a pickaxe for deposits, a rake for leaves.
-Stone, berries and loose coal need none.
+`World.ToolKind` names the tool a resource needs: an axe for trees, a pickaxe for deposits.
+`World.HelpingTool` names one that only speeds gathering up: a pickaxe for rock, a rake for leaves, which take three times as long by hand.
+Stone, leaves, berries and loose pieces need none.
 
 Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFreshStart` verifies:
 
@@ -529,7 +534,8 @@ Workers hold duties (`Worker.Duties`): a place and one of the jobs `World.Jobs` 
 - Tend fetches what a compost pile's filters take from storage and carries its fertilizer out.
 - Deliveries runs price errands and carries the trading post's mail, other than coins, to storage.
 
-A gatherer whose spot is spent moves the duty to the nearest spot of the same kind in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
+A gatherer whose spot is spent moves the duty to the nearest spot yielding the same item in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
+Spots that need a tool count only while the worker can get one, and loose pieces come only after every other spot; a gatherer with no tool to be had goes to known loose pieces at once (`World.LooseSpot`).
 With none known they say so once and go on to their other places, or wait at the nearest trading post until one is seen or the spot comes back.
 A worker with no duties waits at the nearest trading post.
 

@@ -211,6 +211,10 @@ public sealed class GameData {
         ThingKind.Iron => "Iron deposit",
         ThingKind.Tin => "Tin deposit",
         ThingKind.LooseCoal => "Coal",
+        ThingKind.LooseStone => "Loose stone",
+        ThingKind.Stick => "Stick",
+        ThingKind.IronChip => "Iron ore",
+        ThingKind.TinChip => "Tin ore",
         ThingKind.Grave => "Recovery box",
         ThingKind.WolfCorpse => "Wolf carcass",
         _ => kind.Id().Replace('_', ' ')

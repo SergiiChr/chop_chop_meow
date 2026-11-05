@@ -701,7 +701,17 @@ public partial class WorldView : Node3D {
         prop.Root.Position = To3(t.Pos);
         // A fresh carcass keeps the heading of the wolf model it replaces.
         if (t.Kind == ThingKind.WolfCorpse && Dying(t.Pos) is { } dying) prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
+        // A chip that appears in play was knocked off the rock beside it, and flies from there.
+        if (prop is LooseProp chip && !loadingProps && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
         return prop;
+    }
+
+    /// <summary>The rock or ore deposit a newly appeared chip came off, or null when none is close enough.</summary>
+    private Thing? ChippedFrom(Thing chip) {
+        Thing? rock = null; float nearest = (World.ChipReach + .5f) * (World.ChipReach + .5f);
+        foreach (var t in World.Things)
+            if (World.ChipOf(t.Kind) == chip.Kind && t.Pos.DistanceSquaredTo(chip.Pos) <= nearest) { rock = t; nearest = t.Pos.DistanceSquaredTo(chip.Pos); }
+        return rock;
     }
 
     private void Animate(Prop prop, Thing t, float dt) {
@@ -728,7 +738,14 @@ public partial class WorldView : Node3D {
                 sway.Visible = tree.Fall < 1.7f;
                 tree.Stump.Visible = true;
                 break;
-            case Prop when t.Kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.LooseCoal or ThingKind.Leaves:
+            case LooseProp chip when chip.Flight < WorldModels.ChipFlight:
+                // An arc from the rock with a hop at the end, spinning as it goes.
+                chip.Flight += dt;
+                float flown = Math.Min(1, chip.Flight / WorldModels.ChipFlight);
+                prop.Body.Position = chip.From * (1 - flown) + Vector3.Up * (MathF.Sin(flown * MathF.PI) * .6f + MathF.Abs(MathF.Sin(flown * MathF.PI * 3)) * .08f * flown);
+                prop.Body.Rotation = new Vector3(flown * 9, flown * 4, 0) * (1 - flown);
+                break;
+            case Prop when t.IsLoose || t.Kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Leaves:
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);

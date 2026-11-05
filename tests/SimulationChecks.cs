@@ -48,6 +48,8 @@ public static class SimulationChecks {
         CheckCliffsHaveDepositsAndLooseCoal(data);
         CheckResourcesScatterAcrossTheOpenValley(data);
         CheckLoosePiecesNeedNoToolOrGatherTime(data);
+        CheckValleyHasLooseStonesAndSticksToPickUp(data);
+        CheckPickaxeHitsSometimesChipRock(data);
         CheckSteelPickaxeYieldsFullStone(data);
         CheckSunAndMoonFollowTheirArcs(data);
         CheckWolvesHurtUnprotectedPlayerAtNightAndAvoidFire(data);
@@ -1079,7 +1081,7 @@ public static class SimulationChecks {
         }
         {
             var cliff = World.CliffOf(ThingKind.Coal);
-            var loose = world.Things.Where(t => t.IsLoose).ToList();
+            var loose = world.Things.Where(t => t.Kind == ThingKind.LooseCoal).ToList();
             Require(loose.Count > 0 && loose.All(t => cliff.DistanceTo(t.Pos) is > 3 and < 12 && world.CanStand(t.Pos)),
                     $"loose {cliff.Ore} should spread further than the deposits but stay near the nearer cliff");
             Require(loose.All(a => loose.All(b => a == b || a.Pos.DistanceTo(b.Pos) >= 2)), $"loose {cliff.Ore} pieces should lie apart");
@@ -1103,6 +1105,43 @@ public static class SimulationChecks {
     }
 
     /// <summary>Loose pieces need no tool and no gather time: the whole piece goes into the backpack, or a worker's bag at once.</summary>
+    /// <summary>A new valley has loose stones and sticks on open ground, each picked up whole as one stone or one wood.</summary>
+    private static void CheckValleyHasLooseStonesAndSticksToPickUp(GameData data) {
+        var world = new World(data);
+        var stones = world.Things.Where(t => t.Kind == ThingKind.LooseStone).ToList();
+        var sticks = world.Things.Where(t => t.Kind == ThingKind.Stick).ToList();
+        Require(stones.Count >= 20 && sticks.Count >= 10, $"the valley should have loose stones and sticks lying about: {stones.Count} stones, {sticks.Count} sticks");
+        Require(stones.Concat(sticks).All(t => Terrain.Open(t.Pos)), "loose stones and sticks should lie on open ground");
+        int stone = world.Backpack["stone"], wood = world.Backpack["wood"];
+        PickUp(world, stones[0]); PickUp(world, sticks[0]);
+        Require(world.Backpack["stone"] == stone + 1 && world.Backpack["wood"] == wood + 1, "a loose stone should give one stone and a stick one wood");
+        Require(world.Find(stones[0].Id) == null && world.Find(sticks[0].Id) == null, "a picked-up stone or stick should be gone");
+    }
+
+    /// <summary>About one pickaxe hit in twenty on ore knocks a loose piece of it off nearby; hits by hand chip nothing.</summary>
+    private static void CheckPickaxeHitsSometimesChipRock(GameData data) {
+        var world = EmptyWorld(data);
+        var deposits = new[] { world.Add(ThingKind.Iron, new Vector2(20, 20), World.DepositOre), world.Add(ThingKind.Iron, new Vector2(40, 20), World.DepositOre) };
+        Give(world, "steel_pick", 1);
+        int hits = 0;
+        foreach (var deposit in deposits) {
+            world.Player = deposit.Pos + new Vector2(1, 0);
+            while (deposit.Remaining > 0) { world.Gather(deposit, data.GatherSeconds); hits++; Drop(world, "iron_ore", world.Backpack["iron_ore"]); }
+        }
+        var chips = world.Things.Where(t => t.Kind == ThingKind.IronChip).ToList();
+        Require(hits == 300, $"each 600-ore deposit should take 150 hits of 4: {hits}");
+        Require(chips.Count is >= 5 and <= 30, $"about one hit in twenty should chip ore off, 15 of 300 on average: {chips.Count}");
+        Require(chips.All(c => deposits.Any(d => d.Pos.DistanceTo(c.Pos) <= World.ChipReach) && world.CanStand(c.Pos)), "a chip should land where it can be reached, within 2 tiles of its deposit");
+        PickUp(world, chips[0]);
+        Require(world.Backpack["iron_ore"] == 1, "a chip should give one ore");
+
+        var boulder = world.Add(ThingKind.Stone, new Vector2(60, 20), World.StonePile);
+        Drop(world, "steel_pick");
+        world.Player = boulder.Pos + new Vector2(1, 0);
+        while (boulder.Remaining > 0) world.Gather(boulder, data.GatherSeconds);
+        Require(!world.Things.Any(t => t.Kind == ThingKind.LooseStone), "a boulder broken by hand should chip nothing");
+    }
+
     private static void CheckLoosePiecesNeedNoToolOrGatherTime(GameData data) {
         var world = new World(data);
         var piece = world.Things.First(t => t.Kind == ThingKind.LooseCoal);
@@ -1656,7 +1695,7 @@ public static class SimulationChecks {
         Require(world.Things.Any(t => t.Kind == ThingKind.Grave && t.Inventory["steel_pick"] == 1), "a dismissed worker's tool should be left in a recovery box");
     }
 
-    /// <summary>Leaves lie under oaks, need a rake, and fall again every day.</summary>
+    /// <summary>Leaves lie under oaks, come three times as fast with a rake as by hand, and fall again every day.</summary>
     private static void CheckRakeClearsLeavesWhichFallAgain(GameData data) {
         var fresh = new World(data);
         var oaks = fresh.Things.Where(t => t.Kind == ThingKind.Tree && t.Id % 3 == 0).Select(t => t.Pos + World.LeafOffset).ToHashSet();
@@ -1665,8 +1704,14 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         var leaves = world.Add(ThingKind.Leaves, new Vector2(10, 10), World.LeafPatch);
         world.Player = leaves.Pos;
-        Require(world.GatherBlock(leaves)?.Contains("rake") == true, "raking should need a rake");
+        Require(world.GatherBlock(leaves) == null, "leaves should be gathered by hand without a rake");
+        world.Gather(leaves, data.GatherSeconds); world.Gather(leaves, data.GatherSeconds);
+        Require(world.Backpack["leaves"] == 0, "leaves by hand should take longer than two rake strokes");
+        world.Gather(leaves, data.GatherSeconds);
+        Require(world.Backpack["leaves"] == 4, "leaves by hand should come in three times a rake stroke's time");
         Give(world, "rake", 1);
+        world.Gather(leaves, data.GatherSeconds);
+        Require(world.Backpack["leaves"] == 8, "a rake should gather leaves in one stroke's time");
         GatherUntil(world, leaves, "leaves", World.LeafPatch);
         Require(leaves.Remaining == 0 && world.GatherBlock(leaves) != null, "a raked patch should be empty until it refills");
         SafeTick(world, data.DaySeconds - world.Time % data.DaySeconds + 1);

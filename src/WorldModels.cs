@@ -35,6 +35,14 @@ public sealed class TreeProp : Prop {
     public float Fade;
 }
 
+/// <summary>A loose stone, stick or chip; a chip knocked off rock flies there from where it was hit.</summary>
+public sealed class LooseProp : Prop {
+    /// <summary>Where a chip flew from, relative to where it lands.</summary>
+    public Vector3 From;
+    /// <summary>Seconds into the chip's flight, or past <see cref="WorldModels.ChipFlight"/> once it lies still.</summary>
+    public float Flight = float.MaxValue;
+}
+
 public sealed class BushProp : Prop {
     public Node3D Fruit = null!;
 }
@@ -185,7 +193,8 @@ public static class WorldModels {
         },
         ThingKind.Stone => new[] { new Hit(.75f, 0, .9f) },
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => new[] { new Hit(.8f, 0, 1) },
-        ThingKind.LooseCoal => new[] { new Hit(.45f, 0, .35f) },
+        ThingKind.LooseCoal or ThingKind.LooseStone or ThingKind.IronChip or ThingKind.TinChip => new[] { new Hit(.45f, 0, .35f) },
+        ThingKind.Stick => new[] { new Hit(.5f, 0, .3f) },
         ThingKind.WolfCorpse => new[] { new Hit(.65f, 0, .5f) },
         ThingKind.Berries => new[] { new Hit(.65f, 0, 1) },
         ThingKind.Water => new[] { new Hit(1.2f, 0, .5f) },
@@ -218,7 +227,11 @@ public static class WorldModels {
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case ThingKind.Coal: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
             case ThingKind.Tin: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
-            case ThingKind.LooseCoal: prop = new Prop(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "2d2f33", "1d1e21"); break;
+            case ThingKind.LooseCoal: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "2d2f33", "1d1e21"); break;
+            case ThingKind.LooseStone: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "9a9c95", "7a7d77"); break;
+            case ThingKind.IronChip: prop = new LooseProp(); LooseOre(prop.Body, "loose_iron", t.Id, "a35a2e", "8b4f2b"); break;
+            case ThingKind.TinChip: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "b9bcb4", "8f928b"); break;
+            case ThingKind.Stick: prop = new LooseProp(); Stick(prop.Body, t.Id); break;
             case ThingKind.Leaves: prop = new Prop(); LeafLitter(prop.Body, t.Id); break;
             case ThingKind.WolfCorpse: prop = Carcass(); break;
             case ThingKind.Berries: prop = Bush(t.Id); break;
@@ -337,6 +350,16 @@ public static class WorldModels {
         float roughness = kind == ThingKind.Coal ? .58f : .4f, metallic = kind == ThingKind.Coal ? 0 : .3f;
         Add(body, NatureShape.Ore(variant, true), NatureShape.OreMaterial(vein, roughness, metallic), Vector3.Zero);
         Add(body, NatureShape.OreChips(variant), NatureShape.OreMaterial(chunks, roughness, metallic), Vector3.Zero);
+    }
+
+    /// <summary>How long a chip takes to fly from the rock it came off to where it lands.</summary>
+    public const float ChipFlight = .55f;
+
+    /// <summary>A fallen stick lying on the ground, turned by its id.</summary>
+    private static void Stick(Node3D body, int id) {
+        var stick = Pivot(body, new Vector3(0, .05f, 0), new Vector3(0, Jitter(id, 5) * 360, 0));
+        Cylinder(stick, .045f, .03f, .8f, Vector3.Zero, Mat("78644a", .95f), new Vector3(0, 0, 90), 5);
+        Cylinder(stick, .025f, .015f, .25f, new Vector3(.12f, .06f, .05f), Mat("6e5b43", .95f), new Vector3(30, 0, 60), 4);
     }
 
     private static void LooseOre(Node3D body, string kind, int id, string light, string dark) =>
