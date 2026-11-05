@@ -9,7 +9,8 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
 
 ## Set up
 
-1. Copy the driver in and hook it into `Game._Ready`, right after `StartPerformanceRun();`:
+1. Copy the driver in and hook it into `Game._Ready`, on the line after the one starting the showcase
+   (`if (Launch.Has("--showcase")) new Showcase(…).Run();`), which every launch reaches:
 
    ```sh
    cp .claude/skills/playtest/ReviewDrive.cs.txt src/ReviewDrive.cs
@@ -31,6 +32,7 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
 Write commands, one per line, to `<dir>/cmd.txt`.
 The driver runs them, renames the file to `cmd-N.done`, appends `ok …` or `failed …` per line to `log.txt`, and sets `status.txt` to `ready` when idle.
 Wait for `ready` before writing the next `cmd.txt`.
+`.claude/skills/playtest/drive.sh <dir> "cmd" …` does both: it waits for `ready`, sends the commands, waits until they ran and prints their log lines.
 
 | Command | Does |
 | --- | --- |
@@ -53,5 +55,9 @@ Look at every screenshot before deciding the next step.
 - A `key Escape` tap can do nothing, so a menu may not have opened or closed. Take a `shot` after it before the next
   step, and prefer clicking the Resume or Back button.
 - Stop the game by PID from `pgrep -a Godot`. `pkill -f` and `pgrep -f` match the calling shell's own command line: `pkill -f` kills that shell, and a wait loop on `pgrep -f` never ends.
+- A showcase switches panels and pages on its own, so a click there can land on a different page than the last
+  screenshot showed. Take a `shot` right before clicking, or play a normal game for input checks.
+- A playtest game left running holds the game's network port, and `./build.py check` or `test net` then fails or
+  crawls. Quit the game before running checks.
 - A run driven by `scale` or a showcase fixture is not a fair timing or full-playthrough result; say what was skipped.
 - Treat Godot errors in the game output as failures.
