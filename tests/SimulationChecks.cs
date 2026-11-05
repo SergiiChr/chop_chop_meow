@@ -455,6 +455,10 @@ public static class SimulationChecks {
         Require(runner != null, "a hiring offer should bring a worker");
         Require(runner.Wage == dear.Wage, "a hiring offer should fix the worker's wage");
         Require(world.Coins == 0, "a hiring offer should charge its payment up front");
+        SetCoins(world, (int)dear.Upfront + 5);
+        world.Transfer(world.Backpack, sign.Wages!, Inventory.Coins, (int)dear.Upfront - 2);
+        Require(world.Hire(sign, dear) != null && sign.Wages![Inventory.Coins] == 0 && world.Coins == 5,
+            "hiring should be paid from the bank first and the backpack for the rest");
         world.Assign(runner!, sign);
         Require(!world.Reached("assigned"), "minding the signpost is not the first automation goal");
         Require(world.FetchPrices(sign), "the assigned worker should agree to fetch prices");

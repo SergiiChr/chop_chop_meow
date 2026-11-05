@@ -102,10 +102,10 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
             var hire = kit.Button($"{offer.Upfront:0} now  ·  {offer.Wage:0} a day", () => world.Hire(thing, offer));
             hire.Name = $"hire_{offer.Upfront:0}"; hire.Icon = Icons.Of("hardhat"); hire.ExpandIcon = true; hire.AddThemeConstantOverride("icon_max_width", 28);
             hire.CustomMinimumSize = new Vector2(0, 50); hire.Alignment = HorizontalAlignment.Left;
-            hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}";
+            hire.TooltipText = $"Hire for {offer.Upfront:0} coins up front and a daily wage of {offer.Wage:0}\nPaid from the bank first, then your backpack";
             AddChild(hire);
         }
-        AddLabel("Wages come out of the bank at dawn, then your backpack. Unpaid workers strike.", 13, Style.Beige);
+        AddLabel("Hiring and wages come out of the bank first, then your backpack. Wages are paid at dawn; unpaid workers strike.", 13, Style.Beige);
     }
 
     /// <summary>Prices as last heard from the village, on an enamel shop sign beside the panel; buying is always at the current price.</summary>

@@ -446,7 +446,7 @@ Trade carts keep their timing: a cart walks down the valley at a steady pace, fa
 ### Coins and wage slot
 
 Coins are a backpack item that stacks to 1000.
-Purchases and hiring are paid from carried coins.
+Purchases are paid from carried coins; hiring is paid from the bank first, then carried coins.
 
 Sale proceeds fill the wage slot first, a single stack of up to 1000 coins between the input and output boxes, and the rest goes into the output boxes.
 Daily wages are paid from the wage slot first and then from your backpack.

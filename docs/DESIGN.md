@@ -591,7 +591,7 @@ The trading post's input filter names the crates it asks for.
 `DepositFor` treats a post as storage only for an item its filter names, so workers deliver those crates there when it is the nearest storage asking for them.
 With `Thing.AutoSell` set, the cart leaves on its own once every market slot holds a crate and a cart is free.
 Sale coins fill the trading post's one-stack wage slot (`Thing.Wages`, coins only) first and the output after.
-Dawn wages and settled strikes draw on every wage slot before the payer's backpack.
+Dawn wages, settled strikes and hiring payments draw on every wage slot before the payer's backpack; purchases come from the backpack only.
 
 #### Price sheet
 

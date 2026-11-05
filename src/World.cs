@@ -1261,7 +1261,8 @@ public sealed partial class World {
     public Worker? Hire(Thing sign, HireOffer offer) {
         if (!Near(sign) || sign.Kind != ThingKind.Signpost || Forwarded(Verb.Hire, sign.Id, count: Data.HireOffers.IndexOf(offer))) return null;
         if (S.Workers.Count >= MaxWorkers) { Say("The POC supports forty workers."); return null; }
-        if (!Pay(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from your backpack."); return null; }
+        // Hiring is paid from the bank first, like wages; purchases stay paid from the backpack.
+        if (!PayWage(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from the bank or your backpack."); return null; }
         string name = WorkerNames.FirstOrDefault(n => S.Workers.All(w => w.Name != n)) ?? "Neighbor";
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
         S.Workers.Add(w); S.Milestones.Add("hired"); Say($"New worker {name} without a job."); Made?.Invoke(S.Actor.Id, w.Id); return w;
