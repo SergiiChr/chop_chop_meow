@@ -565,8 +565,9 @@ At the `lunchHour` in `data/game.json` workers break for one in-game hour.
 They sit in a circle around the campfire closest to the whole crew (`World.LunchFire`): every other one cross-legged on the ground and the rest on a rock, or where they stand without one.
 
 As dusk begins (`GameData.DuskStarts`, a tenth of a day before night) they walk to the nearest trading post, or the clearing without one.
-Then they walk a cart's trip down the valley over half a trade trip while fading out (`Worker.Commute`), and sign out (`Worker.Home`).
-At dawn they walk back the same way, fading in, and return to work.
+Then they walk a cart's trip down the valley at walking pace while fading out, wait out of view for the rest of half a trade trip (`Worker.Commute`, `World.WalkLeg`), and sign out (`Worker.Home`).
+At dawn they walk back the same way, fading in, and return to work; a runner off for prices walks the same way out and back.
+Workers on these walks keep to their way rather than being pushed apart by the crew.
 
 Assignments and carried items are kept throughout.
 A crew at lunch or signed out does not hold the forge at the clear bar or hammer an anvil, and cannot run price errands.

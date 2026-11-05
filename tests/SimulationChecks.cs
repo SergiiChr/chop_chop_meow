@@ -70,6 +70,7 @@ public static class SimulationChecks {
         CheckCrewKeepsForgeHot(data);
         CheckCrewLunchesAtTheNearestFireAndGoesBackToWork(data);
         CheckCrewSignsOutAtDuskKeepingLoadsAndJobs(data);
+        CheckWorkersWalkOffDownTheValleyAtWalkingPace(data);
         CheckCrewWalksBackAtDawnPaidAndKeepsItsJobs(data);
         CheckFogHidesUnseenGroundAndRemembersExploredGround(data);
         CheckCratesShowOneSlotPerItemTheyCanHold(data);
@@ -2349,6 +2350,25 @@ public static class SimulationChecks {
         var loaded = EmptyWorld(data);
         loaded.Deserialize(world.Serialize());
         Require(loaded.Workers.All(w => w.Home), "signed-out workers should stay signed out after loading");
+    }
+
+    /// <summary>A worker signing out at dusk and a runner off for prices walk down the valley as fast as a worker walks, not stretched over the whole trip.</summary>
+    private static void CheckWorkersWalkOffDownTheValleyAtWalkingPace(GameData data) {
+        var world = EmptyWorld(data);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(30, 20));
+        var walker = AddWorker(world, sign.Pos + Vector2.One);
+        RunUntil(world, data.DuskStarts * data.DaySeconds + .2f);
+        var from = walker.Pos;
+        SafeTick(world, 1);
+        Require(Math.Abs(walker.Pos.DistanceTo(from) - World.WorkerSpeed) < .3f, $"a worker heading home should walk at walking pace, not {walker.Pos.DistanceTo(from):0.00} tiles a second");
+        world = EmptyWorld(data);
+        sign = world.Add(ThingKind.Signpost, new Vector2(30, 20));
+        var runner = AddWorker(world, sign.Pos + Vector2.One);
+        world.Assign(runner, sign);
+        Require(world.FetchPrices(sign), "a morning runner should set off for prices");
+        from = runner.Pos;
+        SafeTick(world, 1);
+        Require(Math.Abs(runner.Pos.DistanceTo(from) - World.WorkerSpeed) < .3f, $"a runner off for prices should walk at walking pace, not {runner.Pos.DistanceTo(from):0.00} tiles a second");
     }
 
     private static void CheckCrewWalksBackAtDawnPaidAndKeepsItsJobs(GameData data) {

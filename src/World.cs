@@ -282,8 +282,15 @@ public sealed partial class World {
     public Action<string, Vector2>? Sound;
     /// <summary>How far down the valley an errand runner walks before fading from view on the way to Bramblewick.</summary>
     public const float TripDistance = 8;
-    /// <summary>How far out a cart or runner is, from 0 at the start through 1 at the halfway turn and back to 0.</summary>
+    /// <summary>How fast a worker walks, in tiles a second.</summary>
+    public const float WorkerSpeed = 2.25f;
+    /// <summary>How far out a cart is, from 0 at the start through 1 at the halfway turn and back to 0.</summary>
     public static float TripLeg(float phase) => phase < .5f ? phase * 2 : (1 - phase) * 2;
+    /// <summary>
+    /// How far down the valley a worker walking off is, from 0 at the signpost to 1 out of view, after <paramref name="out"/> seconds away and <paramref name="back"/> seconds before coming back.
+    /// The worker walks at walking pace and waits out of view for the rest of the trip.
+    /// </summary>
+    public static float WalkLeg(float @out, float back) => Math.Clamp(Math.Min(@out, back) * WorkerSpeed / TripDistance, 0, 1);
     public const float LeapSeconds = .4f;
     // A wolf leaps from within LeapRange and lands PinDistance away, where its jaws reach the throat of the downed player.
     private bool packAttack { get => S.Actor.PackAttack; set => S.Actor.PackAttack = value; }
@@ -1523,13 +1530,13 @@ public sealed partial class World {
         if (distance < reach) return true;
         if (w.RouteTarget.DistanceTo(destination) > .2f) { w.Route.Clear(); w.RouteTarget = destination; }
         // Stop at arrival range rather than overshooting into the target's footprint, where the step would be refused.
-        var next = w.Pos.MoveToward(destination, Math.Min(dt * 2.25f, distance - reach + .05f));
+        var next = w.Pos.MoveToward(destination, Math.Min(dt * WorkerSpeed, distance - reach + .05f));
         if (w.Route.Count == 0 && CanStand(next)) { w.Pos = next; return false; }
         if (w.Route.Count > 0 && !CanStand(w.Route[0])) w.Route.Clear();
         if (w.Route.Count == 0) FindRoute(w.Pos, destination, w.Route);
         if (w.Route.Count == 0 && distance < 1.2f) return true;
         if (w.Route.Count == 0) { w.Status = "Path blocked · clear a route"; w.WorkState = WorkerWorkState.Blocked; return false; }
-        w.Pos = w.Pos.MoveToward(w.Route[0], dt * 2.25f);
+        w.Pos = w.Pos.MoveToward(w.Route[0], dt * WorkerSpeed);
         if (w.Pos.DistanceTo(w.Route[0]) < .06f) w.Route.RemoveAt(0);
         return false;
     }
@@ -1538,17 +1545,17 @@ public sealed partial class World {
         if (w.Away > 0) {
             w.Away = Math.Max(0, w.Away - dt); w.Status = Phrase("Fetching village prices · back in ", Number(w.Away), "s");
             // Like a cart, the runner walks a little way down the valley and fades from view rather than pathing around the woods.
-            if (Find(w.Assignment) is { Kind: ThingKind.Signpost } post) w.Pos = post.Pos + Vector2.One + Terrain.Seaward * TripDistance * TripLeg(1 - w.Away / Data.TradeSeconds);
+            if (Find(w.Assignment) is { Kind: ThingKind.Signpost } post) w.Pos = post.Pos + Vector2.One + Terrain.Seaward * TripDistance * WalkLeg(Data.TradeSeconds - w.Away, w.Away);
             if (w.Away == 0) { UpdatePrices(); Say($"{w.Name} is back with fresh prices from Bramblewick."); }
             return;
         }
-        // Like a cart, the walk home goes a little way down the valley over half a trade trip while the worker fades out, and back at dawn.
-        float half = Data.TradeSeconds / 2, pace = TripDistance / half;
+        // Like a cart, the walk home goes a little way down the valley while the worker fades out, and back at dawn, over half a trade trip in all.
+        float half = Data.TradeSeconds / 2;
         if (w.Home && Dusk) { w.Status = "Signed out · back in the morning"; return; }
         if (!Dusk && w.Commute > 0) {
             w.Home = false; w.Status = "Walking in from Bramblewick";
-            float step = Math.Min(dt, w.Commute);
-            w.Commute -= step; w.Pos -= Terrain.Seaward * pace * step;
+            float step = Math.Min(dt, w.Commute), before = WalkLeg(w.Commute, half);
+            w.Commute -= step; w.Pos -= Terrain.Seaward * TripDistance * (before - WalkLeg(w.Commute, half));
             if (w.Commute == 0) w.Route.Clear();
             return;
         }
@@ -1563,8 +1570,8 @@ public sealed partial class World {
                 if (!Walk(w, post?.Pos + Vector2.One ?? Terrain.Spawn, dt) && w.WorkState != WorkerWorkState.Blocked) return;
                 w.WorkState = WorkerWorkState.Idle;
             }
-            float step = Math.Min(dt, half - w.Commute);
-            w.Commute += step; w.Pos += Terrain.Seaward * pace * step;
+            float step = Math.Min(dt, half - w.Commute), before = WalkLeg(w.Commute, half);
+            w.Commute += step; w.Pos += Terrain.Seaward * TripDistance * (WalkLeg(w.Commute, half) - before);
             if (w.Commute >= half) { w.Home = true; w.Status = "Signed out · back in the morning"; }
             return;
         }
@@ -1792,6 +1799,7 @@ public sealed partial class World {
         foreach (var duty in w.Duties) if (duty.Thing == spent) duty.Thing = next.Id;
         w.Assignment = next.Id; w.Timer = 0; w.Exhausted = null;
     }
+    private static bool Crowds(Worker w) => !w.Home && w.Commute == 0 && w.Away == 0 && w.WorkState != WorkerWorkState.Underground;
     private void WaitAtPost(Worker w, float dt) => Walk(w, Nearest(ThingKind.Signpost, w.Pos)?.Pos + Vector2.One ?? Terrain.Spawn, dt);
     private static void NextPlace(Worker w) {
         if (w.Duties.Count < 2) return;
@@ -2008,8 +2016,8 @@ public sealed partial class World {
         foreach (var w in crew) WorkerTick(w, dt);
         for (int i = 0; i < S.Workers.Count; i++) for (int j = i + 1; j < S.Workers.Count; j++) {
             var a = S.Workers[i]; var b = S.Workers[j]; var offset = a.Pos - b.Pos;
-            // Miners underground are inside the hill, so they never crowd anyone at the entrance.
-            if (!a.Home && !b.Home && a.WorkState != WorkerWorkState.Underground && b.WorkState != WorkerWorkState.Underground && offset.LengthSquared() < .64f) {
+            // Miners underground are inside the hill, so they never crowd anyone at the entrance; workers on the walk to or from the village keep to their way.
+            if (Crowds(a) && Crowds(b) && offset.LengthSquared() < .64f) {
                 var push = (offset.LengthSquared() > .001f ? offset.Normalized() : Vector2.Right) * Math.Min(dt, .08f);
                 if (CanStand(a.Pos + push)) a.Pos += push;
                 if (CanStand(b.Pos - push)) b.Pos -= push;
