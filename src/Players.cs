@@ -256,6 +256,7 @@ public sealed partial class World {
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || !(Data.Items.ContainsKey(item) || CrateGood(item) != null) || Forwarded(Verb.SetFilter, chest.Id, item: item, count: (output ? 1 : 0) | (allowed ? 2 : 0))) return;
         var filter = output ? chest.Inventory.OutputFilter : chest.Inventory.InputFilter;
         if (allowed) filter.Add(item); else filter.Remove(item);
+        ToolsChanged();
     }
 
     /// <summary>Stops or restarts workers bringing food to a compost.</summary>
@@ -267,6 +268,7 @@ public sealed partial class World {
     public void ClearFilters(Thing chest) {
         if (!(chest.IsStorage || chest.Kind == ThingKind.Signpost) || Forwarded(Verb.ClearFilters, chest.Id)) return;
         chest.Inventory.InputFilter.Clear(); chest.Inventory.OutputFilter.Clear();
+        ToolsChanged();
     }
 
     /// <summary>Gives new wolves and trade carts ids, which other machines tell them apart by.</summary>

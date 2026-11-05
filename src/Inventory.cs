@@ -34,6 +34,8 @@ public sealed class Inventory {
     private readonly Dictionary<string, int> layoutRemainder = new();
     public const string Coins = "coins";
     public Inventory() { Items = new ItemTotals(items); PadLayout(); }
+    /// <summary>Called whenever the items held change, for an owner that keeps a count of them up to date.</summary>
+    public Action? Changed;
     public int Count {
         get {
             int count = 0;
@@ -146,6 +148,7 @@ public sealed class Inventory {
         items.Clear();
         foreach (var slot in Layout) { slot.Item = ""; slot.Count = 0; }
         PadLayout();
+        Changed?.Invoke();
     }
 
     /// <summary>
@@ -185,6 +188,7 @@ public sealed class Inventory {
 
     private void SyncAggregate() {
         items.Clear(); foreach (var s in Layout) if (s.Item != "") items[s.Item] = items.GetValueOrDefault(s.Item) + s.Count;
+        Changed?.Invoke();
     }
 
     /// <summary>Stacks loose items and orders player inventory by item name for predictable access.</summary>
@@ -216,6 +220,7 @@ public sealed class Inventory {
             int limit = Math.Min(Slots, Layout.Count);
             for (int i = 0; i < limit; i++) { var s = Layout[i]; if (s.Item == item && s.Count < StackOf(item)) { int n = Math.Min(left, StackOf(item) - s.Count); s.Count += n; left -= n; if (left == 0) break; } }
             for (int i = 0; i < limit && left > 0; i++) if (Layout[i].Item == "") { int n = Math.Min(left, StackOf(item)); Layout[i].Item = item; Layout[i].Count = n; left -= n; }
+            Changed?.Invoke();
         }
         return amount;
     }
@@ -227,6 +232,7 @@ public sealed class Inventory {
         int left = amount;
         if ((uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == item) left -= RemoveFromSlot(Layout[PreferredSlot], left);
         for (int i = Layout.Count - 1; i >= 0 && left > 0; i--) if (i != PreferredSlot && Layout[i].Item == item) left -= RemoveFromSlot(Layout[i], left);
+        if (amount > 0) Changed?.Invoke();
         return amount;
     }
 
@@ -247,6 +253,7 @@ public sealed class Inventory {
         slot.Item = newItem;
         items[oldItem] -= quantity; if (items[oldItem] <= 0) items.Remove(oldItem);
         items[newItem] = items.GetValueOrDefault(newItem) + quantity;
+        Changed?.Invoke();
         return true;
     }
 

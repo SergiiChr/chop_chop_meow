@@ -53,7 +53,7 @@ public partial class World {
     }
 
     /// <summary>Whether a worker has a tool of a kind in hand or can take one from a tool station.</summary>
-    private bool HasTool(Worker w, string kind) => w.Tool != "" && Data.Items[w.Tool].Tool == kind || ToolStationWith(kind, w.Pos) != null;
+    private bool HasTool(Worker w, string kind) => w.Tool != "" && Data.Items[w.Tool].Tool == kind || StationsHold(kind);
 
     /// <summary>Sends a gatherer who cannot work a spot to the nearest known loose piece of the same resource, and tells whether there was one.</summary>
     private bool LooseSpot(Worker w, Thing spot) {
