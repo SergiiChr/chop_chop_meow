@@ -13,7 +13,6 @@ public static class InspectPage {
             null => new NothingSelectedPage(tools),
             { IsResource: true } t => new ResourcePanel(tools, t),
             { Kind: ThingKind.Hut } t => new CabinPanel(tools, t),
-            { Tools: not null } t => new BenchPanel(tools, t),
             { Kind: ThingKind.Signpost } t => new MarketPanel(tools, t),
             { Kind: ThingKind.Mine } t => new MinePanel(tools, t),
             { Kind: ThingKind.Farm } t => new FarmPanel(tools, t),

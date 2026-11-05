@@ -41,6 +41,7 @@ public static class SimulationChecks {
         CheckDeathLeavesRecoveryBoxAndRespawnsAndSavesKeepState(data);
         CheckFurnacesBurnOneFuelAndWaitForSteelHeat(data);
         CheckHaulerFuelsSmeltingWithCoalAndReturnsWood(data);
+        CheckStationMakesItsQueueThenWhatItKeeps(data);
         CheckAnvilNeedsHammering(data);
         CheckFinishedBatchWaitsForOutputRoom(data);
         CheckToolsGateMiningAndFelling(data);
@@ -95,7 +96,7 @@ public static class SimulationChecks {
         CheckFoodsFeedWaterAndHealByTheirData(data);
         CheckMarketTakesOnlyCrates(data);
         CheckOlderSavesResetMadeToolAnvilsAndStartWaterGoal(data);
-        CheckAnvilSavedWithNoRecipeLoadsSetToSteelParts(data);
+        CheckStationQueueAndMarkSurviveALoad(data);
         CheckLoadedSaveDropsOldStageNumber(data);
         CheckEverythingIsReachableFromFreshStart(data);
         CheckTorchLightsAndBurnsOut(data);
@@ -641,6 +642,34 @@ public static class SimulationChecks {
         world.Assign(AddWorker(world, grill.Pos), grill);
         SafeTick(world, 60);
         Require(grill.Inventory["burnt_steak"] + chest.Inventory["burnt_steak"] == 2, "a hauler should fuel an empty fuel slot with coal when storage has no wood");
+    }
+
+    /// <summary>Queued batches run first, each leaving the queue as it starts; then the station keeps making its marked recipe, and with no mark it stops.</summary>
+    private static void CheckStationMakesItsQueueThenWhatItKeeps(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
+        Require(furnace.Keep == "iron_bar" && furnace.Recipe == "iron_bar", "a stone furnace should start out keeping to iron");
+        world.Player = furnace.Pos + Vector2.One;
+        Give(world, "iron_ore", 4); Give(world, "raw_meat", 2); Give(world, "coal", 4);
+        world.QueueRecipe(furnace, "burnt_steak", 1);
+        Require(furnace.Recipe == "burnt_steak", "a queued batch should come before the marked recipe");
+        Require(world.LoadInput(furnace, "iron_ore", 4) == 4 && world.LoadInput(furnace, "raw_meat", 2) == 2 && world.LoadFuel(furnace, "coal", 4) == 4,
+            "a station should take inputs for what is queued and what it keeps to");
+        world.Tick(.1f);
+        Require(furnace.Processing && furnace.Queue.Count == 0, "a batch should leave the queue as it starts");
+        world.QueueRecipe(furnace, "burnt_steak", -1);
+        Require(furnace.Processing && furnace.Recipe == "burnt_steak", "taking batches off should leave the one in progress");
+        SafeTick(world, data.Recipes["burnt_steak"].Seconds + data.Recipes["iron_bar"].Seconds * 2 + 1);
+        Require(furnace.Inventory["burnt_steak"] == 2 && furnace.Inventory["iron_bar"] == 2, "after its queue the furnace should go on with the iron it keeps to");
+        world.SetRecipe(furnace, "");
+        Give(world, "iron_ore", 2); world.LoadInput(furnace, "iron_ore", 2);
+        SafeTick(world, data.Recipes["iron_bar"].Seconds + 1);
+        Require(furnace.Recipe == "" && furnace.Inventory["iron_bar"] == 2, "with nothing queued or marked the furnace should stop");
+        world.Transfer(furnace.Burner!, world.Backpack, "coal", 9);
+        Give(world, "tin_ore", 2);
+        world.QueueBatch(furnace, "tin_bar");
+        Require(furnace.Recipe == "tin_bar" && furnace.Inventory["tin_ore"] == 2 && furnace.Burner!["coal"] == 1 && world.Backpack["coal"] == 0 && world.Backpack["tin_ore"] == 0,
+            "a double-click should queue a batch and load its inputs and one fuel");
     }
 
     private static void CheckFurnacesBurnOneFuelAndWaitForSteelHeat(GameData data) {
@@ -1322,23 +1351,27 @@ public static class SimulationChecks {
         Require(world.Backpack["stone_chisel"] == 0, "hand crafting should take its time");
         SafeTick(world, 1);
         Require(world.Backpack["stone_chisel"] == 1 && world.BestTool("chisel") == "stone_chisel", "the chisel should arrive once its time is up");
+        Require(world.Backpack["wood"] == 3, "the check starts with three wood");
         Require(world.Craft("planks"), "planks should queue with a chisel");
-        Require(world.Craft("wood_parts"), "wood parts should queue with a chisel");
-        Require(world.Backpack["wood"] == 1, "the two queued recipes should each take their wood");
-        world.MovePlayer(new Vector2(.5f, 0));
-        SafeTick(world, data.Recipes["planks"].Seconds + .25f);
-        Require(world.Backpack["planks"] == 4 && world.Crafting.Count == 1, "crafting by hand should keep going on the go, one recipe at a time");
-        world.CancelCraft(0);
-        Require(world.Crafting.Count == 0, "cancelling should clear the queue");
-        Require(world.Backpack["wood"] == 2, "cancelling should give the materials back");
-        Require(world.CraftTime == 0, "cancelling should reset the craft clock");
+        Require(world.Craft("wood_parts", 5) && world.Backpack["wood"] == 0, "queueing five wood parts should queue as many as the wood allows");
+        Require(world.Crafting.Count == 2 && World.Waiting(world.Crafting, "wood_parts") == 2, "the queue should hold one entry per recipe with its count");
+        for (int i = 0; i < 60 * data.Recipes["planks"].Seconds; i++) { world.MovePlayer(new Vector2(i % 2 == 0 ? .05f : -.05f, 0)); SafeTick(world, Step); }
+        Require(world.Backpack["planks"] == 0 && world.CraftTime == 0, "crafting by hand should pause while the player walks");
+        SafeTick(world, data.Recipes["planks"].Seconds + World.CraftSettle + .1f);
+        Require(world.Backpack["planks"] == 4 && world.Making == "wood_parts" && World.Waiting(world.Crafting, "wood_parts") == 1,
+            "standing still should finish the planks and start the next recipe, one at a time");
+        world.CancelCraft("wood_parts", 5);
+        Require(world.Crafting.Count == 0 && world.Backpack["wood"] == 1, "taking batches off should return the waiting one's wood");
+        Require(world.Making == "wood_parts", "the batch being made cannot be taken off");
+        SafeTick(world, data.Recipes["wood_parts"].Seconds);
+        Require(world.Backpack["wood_parts"] == 2 && world.Making == "", "the started batch should finish");
         world.Craft("wood_parts");
         Drop(world, "stone_chisel", 1);
         SafeTick(world, 20);
-        Require(world.Backpack["wood_parts"] == 0 && world.CraftRate == 0, "a queued recipe should wait while its tool is not carried");
+        Require(world.Backpack["wood_parts"] == 2 && world.CraftRate == 0, "a queued recipe should wait while its tool is not carried");
         Give(world, "stone_chisel", 1);
         SafeTick(world, data.Recipes["wood_parts"].Seconds);
-        Require(world.Backpack["wood_parts"] == 2, "it should continue once the tool is back");
+        Require(world.Backpack["wood_parts"] == 4, "it should continue once the tool is back");
     }
 
     private static void CheckTorchLightsAndBurnsOut(GameData data) {
@@ -1851,7 +1884,7 @@ public static class SimulationChecks {
 
         var old = EmptyWorld(data);
         var furnace = old.Add(ThingKind.Furnace, new Vector2(10, 10));
-        furnace.Recipe = "burnt_steak"; furnace.Inventory.Add("burnt_steak", 2);
+        old.SetRecipe(furnace, "burnt_steak"); furnace.Inventory.Add("burnt_steak", 2);
         Give(old, "burnt_steak", 3);
         var json = Patch(old.Serialize(), ("\"burnt_steak\"", "\"cooked_meat\""));
         var loaded = EmptyWorld(data);
@@ -1925,7 +1958,7 @@ public static class SimulationChecks {
     private static void CheckOlderSavesResetMadeToolAnvilsAndStartWaterGoal(GameData data) {
         var old = EmptyWorld(data);
         var anvil = old.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Recipe = "steel_pick"; anvil.Inventory.Add("iron_bar", 3);
+        anvil.Keep = "steel_pick"; anvil.Inventory.Add("iron_bar", 3);
         Give(old, "steel_pick", 1); Give(old, "steel_hammer", 1); Give(old, "iron_bar", 2);
         old.Add(ThingKind.Stone, new Vector2(20, 20), 2);
         Achieve(old, "gather", "furnace", "iron_bar", "anvil", "pick");
@@ -1943,13 +1976,18 @@ public static class SimulationChecks {
         Require(loaded.Goal == 0, "an older save should begin with the new collect-water survival goal");
     }
 
-    private static void CheckAnvilSavedWithNoRecipeLoadsSetToSteelParts(GameData data) {
+    private static void CheckStationQueueAndMarkSurviveALoad(GameData data) {
         var old = EmptyWorld(data);
         var anvil = old.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Recipe = "";
+        old.SetRecipe(anvil, "");
+        var furnace = old.Add(ThingKind.Furnace, new Vector2(14, 10));
+        old.QueueRecipe(furnace, "charcoal", 3); old.QueueRecipe(furnace, "iron_bar", 2);
         var loaded = EmptyWorld(data);
         loaded.Deserialize(old.Serialize());
-        Require(loaded.Find(anvil.Id)!.Recipe == "steel_parts", "an anvil saved with no recipe should load set to steel parts");
+        Require(loaded.Find(anvil.Id)!.Keep == "" && loaded.Find(anvil.Id)!.Recipe == "", "an anvil the player unmarked should load unmarked");
+        var queue = loaded.Find(furnace.Id)!.Queue;
+        Require(queue.Count == 2 && queue[0].Recipe == "charcoal" && queue[0].Count == 3 && queue[1].Recipe == "iron_bar" && queue[1].Count == 2 && loaded.Find(furnace.Id)!.Recipe == "charcoal",
+            "a station's queue should load in order with its counts, and the station on its first recipe");
     }
 
     /// <summary>

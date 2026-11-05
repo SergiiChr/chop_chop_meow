@@ -38,8 +38,9 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
         float rate = (t.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * world.Speed(t.Tools != null && recipe.Tool != "" ? world.BenchTool(t, recipe.Tool, recipe.Tier) : null);
         float seconds = recipe.Seconds / Math.Max(.01f, rate);
         var inputs = world.BatchCost(t).Select(p => (Control)StationCup(p.Key, true, $"×{p.Value}"));
-        // Leftovers from an earlier recipe or fuel stay reachable as side outputs.
-        var side = world.Leftovers(t).Where(item => item != recipe.Output).Select(item => (Control)StationCup(item, false, "", 44));
+        // Leftovers and inputs loaded for a later recipe stay reachable as side outputs.
+        var cost = world.BatchCost(t);
+        var side = t.Inventory.Items.Keys.Where(item => !cost.ContainsKey(item) && item != recipe.Output).Select(item => (Control)StationCup(item, false, "", 44));
         return new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, seconds)), () => t.Processing ? t.Progress / recipe.Seconds : 0,
             recipe.Burns && t.Burner != null ? FuelSlot(recipe, seconds) : null,
             StationCup(recipe.Output, false, recipe.Amount > 1 ? $"×{recipe.Amount}" : "×1", 64), side.ToArray());

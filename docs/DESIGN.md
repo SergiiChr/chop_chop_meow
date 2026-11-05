@@ -88,10 +88,10 @@ UI and input:
 | `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
-| `src/StationPanel.cs` | A station's panel: recipes, process row, bellows and jobs |
+| `src/StationPanel.cs` | A station's page: tool slots, recipe board, process row, queue, bellows and jobs |
 | `src/Cups.cs` | `Cups`: a building's item cups and a station's process row |
-| `src/CraftPanel.cs` | The crafting menu and the crafting bench panel |
-| `src/RecipeBoard.cs` | The recipe board both of them show |
+| `src/CraftPanel.cs` | The crafting menu |
+| `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, and the queue strip under it |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
@@ -399,13 +399,18 @@ Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFr
 
 ### Crafting and stations
 
-Hand recipes queue in `SaveState.Crafting` and take their inputs at once.
-They run at base speed times the tool's speed while the player carries it, and give the materials back when cancelled.
+Hand recipes queue in `PlayerState.Crafting`, one `Queued` entry per recipe with its count, and take their inputs at once.
+The first one waiting moves to `PlayerState.Making` when work on it starts and can no longer be cancelled; the rest give their materials back when taken off.
+They run at base speed times the tool's speed while the player carries it, and only while the player has stood still for `World.CraftSettle` (`PlayerState.Still`).
+Queues are written by `QueueJson`, since the generic list writer allocates on every world update.
 
 The bench runs at `benchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
 
-A building's `recipe` in `data/game.json` names the recipe a station starts on.
-The anvil and reinforced furnace have no other recipe, so their pages offer no choice.
+A station's `Thing.Queue` holds its queued batches, one entry per recipe in the order first queued; a batch leaves it as it starts.
+`Thing.Keep` is the recipe workers keep it making once the queue is done, and a building's `recipe` in `data/game.json` names the one it starts with.
+`Thing.Recipe` follows the batch in progress, else the first queued, else `Keep` (`World.Retarget`); with none the station stands idle.
+A station takes inputs for any recipe it has queued or kept, and haulers carry out only what none of them takes.
+Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
 
 #### Tool slots
 

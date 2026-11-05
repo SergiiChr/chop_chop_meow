@@ -21,9 +21,11 @@ public sealed class PlayerState {
     public Inventory Backpack { get; set; } = new() { Slots = 24 };
     public List<string> HotbarSlots { get; set; } = new() { "steel_axe", "steel_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", "water" };
     public int ActiveHotbar { get; set; }
-    /// <summary>Recipes queued in the personal crafting menu; their inputs are already taken from the backpack.</summary>
-    public List<string> Crafting { get; set; } = new();
-    /// <summary>Seconds spent on the first queued recipe, at the speed of the tool used.</summary>
+    /// <summary>Recipes waiting in the personal crafting menu, one entry per recipe in the order first queued; their inputs are already taken from the backpack.</summary>
+    [JsonConverter(typeof(QueueJson))] public List<Queued> Crafting { get; set; } = new();
+    /// <summary>The hand recipe being made now, taken off the queue when work on it started, or empty.</summary>
+    public string Making { get; set; } = "";
+    /// <summary>Seconds spent on <see cref="Making"/>, at the speed of the tool used.</summary>
     public float CraftTime { get; set; }
     /// <summary>Burn time left on the torch in the player's left hand, or zero when the hand is empty; it only burns while lit.</summary>
     public float Torch { get; set; }
@@ -50,12 +52,14 @@ public sealed class PlayerState {
     [JsonIgnore] public Vector2 Pos { get => new(PlayerX, PlayerY); set { PlayerX = value.X; PlayerY = value.Y; } }
     // Only the host's simulation uses these.
     internal float GatherClock, AttackClock, NightSpawn;
+    /// <summary>Seconds since the player last moved or gathered; hand crafting only goes on while they stand still.</summary>
+    internal float Still;
     internal bool Busy, PackAttack;
     internal readonly List<float> TorchSwings = new();
 }
 
 /// <summary>The player actions a guest sends to the host.</summary>
-public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, HoldHotbar, Leave, LoadBatch, LoadFuel, LoadInput, PickUp, PickUpCrate, PlaceCrate, Pump, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, UnslotTool }
+public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, HoldHotbar, Leave, LoadBatch, LoadFuel, LoadInput, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, QueueRecipe, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, UnslotTool }
 
 /// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
 public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At);
@@ -138,8 +142,8 @@ public sealed partial class World {
             case Verb.Torch: UseTorch(c.At); break;
             case Verb.Attack: Attack(); break;
             case Verb.Leave: Leave(); break;
-            case Verb.Craft: Craft(c.Item); break;
-            case Verb.CancelCraft: CancelCraft(c.Count); break;
+            case Verb.Craft: Craft(c.Item, c.Count); break;
+            case Verb.CancelCraft: CancelCraft(c.Item, c.Count); break;
             case Verb.Transfer:
                 if (Resolve(c.Target) is Inventory from && Resolve(c.Other) is Inventory to) {
                     from.PreferredSlot = c.At.Y == -1 ? (int)c.At.X : -1;
@@ -163,12 +167,14 @@ public sealed partial class World {
             case Verb.Pump: Pump(t); break;
             case Verb.FuelFire: FuelFire(t); break;
             case Verb.SetRecipe: SetRecipe(t, c.Item); break;
+            case Verb.QueueRecipe: QueueRecipe(t, c.Item, c.Count); break;
+            case Verb.QueueBatch: QueueBatch(t, c.Item); break;
             case Verb.SetFilter: SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
             case Verb.ClearFilters: ClearFilters(t); break;
             case Verb.SetCompost: SetCompost(t, c.Count != 0); break;
             case Verb.SkipFood: SetSkipFood(t, c.Count != 0); break;
             case Verb.SupplyMine: SupplyMine(t); break;
-            case Verb.LoadBatch: LoadBatch(t, Math.Clamp(c.Count, 1, 5)); break;
+            case Verb.LoadBatch: LoadBatch(t, Math.Clamp(c.Count, 1, 5), c.Item); break;
             case Verb.LoadInput: LoadInput(t, c.Item, c.Count); break;
             case Verb.LoadFuel: LoadFuel(t, c.Item, c.Count); break;
             case Verb.Collect: Collect(t); break;

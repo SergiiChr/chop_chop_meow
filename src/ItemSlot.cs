@@ -43,11 +43,12 @@ public partial class ItemSlot : Button {
         return (cell, count);
     }
 
-    private static Badge CountBadge() {
+    /// <summary>A count pill for a corner of a cup: 0 or 1 for left or right, top or bottom.</summary>
+    public static Badge CountBadge(float x = 1, float y = 1) {
         var count = new Badge { MouseFilter = MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center, Visible = false };
         count.AddThemeStyleboxOverride("normal", Style.CountPill);
         count.AddThemeFontOverride("font", Style.Bold); count.AddThemeFontSizeOverride("font_size", 12); count.AddThemeColorOverride("font_color", Style.Rim);
-        return Style.Corner(count, 1, 1);
+        return Style.Corner(count, x, y);
     }
 
     // Godot drag data must be a Variant, so the C# payload rides alongside it for the drag's lifetime.
@@ -58,6 +59,8 @@ public partial class ItemSlot : Button {
     public Func<ItemDrag, int>? Take { get; set; }
     /// <summary>Runs on the second press of a double click, besides the press itself.</summary>
     public Action? DoubleClicked { get; set; }
+    /// <summary>Runs on a right click, on a slot that has nothing to drag.</summary>
+    public Action? RightClicked { get; set; }
     /// <summary>Builds a richer tooltip than plain text; the tooltip text must still be non-empty for Godot to show it.</summary>
     public Func<Control>? Popup { get; set; }
 
@@ -81,7 +84,7 @@ public partial class ItemSlot : Button {
             dragging = half;
             ForceDrag(half.Item, Preview());
             AcceptEvent();
-        }
+        } else if (click.ButtonIndex == MouseButton.Right && RightClicked != null) { RightClicked(); AcceptEvent(); }
     }
 
     private Control Preview() {
