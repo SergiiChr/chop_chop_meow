@@ -494,8 +494,7 @@ public partial class WorldView : Node3D {
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
             entry.Rig.Root.Visible = World.Sees(worker);
-            float trip = worker.Away > 0 ? World.WalkLeg(World.Data.TradeSeconds - worker.Away, worker.Away) : World.WalkLeg(worker.Commute, World.Data.TradeSeconds / 2);
-            Fade(entry.Parts, entry.Rig.Root, TripFade(trip));
+            Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest ? null : assignment);
         }
         // Removing while walking a dictionary is allowed, so no copy of its keys is needed.

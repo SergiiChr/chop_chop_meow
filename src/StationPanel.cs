@@ -20,7 +20,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         string? openOn = opened ? null : thing.Keep != "" ? thing.Keep : thing.Recipe != "" ? thing.Recipe : null;
         opened = true;
         AddChild(new RecipeBoard(kit, live, memory, Redraw, thing, openOn));
-        RedrawOnChange(() => World.QueueCode(new(thing.Queue)));
+        RedrawOnChange(() => World.QueueCode(world.QueueOf(thing)));
         if (thing.Recipe != "") AddChild(cups.Machine());
         else AddLabel("Click a recipe for workers to keep making it, or Shift-click to queue some.", 14, Style.Beige);
         AddChild(new QueueStrip(kit, live, thing));

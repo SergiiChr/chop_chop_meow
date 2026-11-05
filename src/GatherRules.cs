@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 
 namespace ChopChopMeow;
@@ -43,7 +42,7 @@ public static class GatherRules {
     private static readonly GatherRule?[] ByKind = ByKindOf(All);
 
     private static GatherRule?[] ByKindOf(Dictionary<ThingKind, GatherRule> rules) {
-        var byKind = new GatherRule?[Enum.GetValues<ThingKind>().Length];
+        var byKind = new GatherRule?[Kinds.All.Length];
         foreach (var (kind, rule) in rules) byKind[(int)kind] = rule;
         return byKind;
     }

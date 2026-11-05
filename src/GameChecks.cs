@@ -1003,7 +1003,7 @@ public partial class Game {
         await Until(() => Named("queued_tin_bar") != null, "the second recipe joining the queue", 2);
         Require(panel.FindChildren("queued_*", "", true, false).Count == 2, "The queue must show one cup per recipe.");
         await RightClick(Named("queued_charcoal")!);
-        await Until(() => World.Waiting(new(furnace.Queue), "charcoal") == 9, "a right-click on the queue taking one batch off", 2);
+        await Until(() => world.Waiting(furnace, "charcoal") == 9, "a right-click on the queue taking one batch off", 2);
         RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
 
         Give(Hosted, "stone", 4);

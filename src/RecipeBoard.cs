@@ -17,21 +17,16 @@ namespace ChopChopMeow;
 public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, Action redraw, Thing? station, string? openOn) : HBoxContainer {
     private readonly World world = kit.World;
     private readonly List<IGrouping<(string Tool, int Tier), string>> groups =
-        (station is Thing at ? kit.World.Data.Recipes.Where(p => p.Value.Station == at.Kind).Select(p => p.Key) : kit.World.HandRecipes)
-        .GroupBy(id => (kit.World.Data.Recipes[id].Tool, kit.World.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
+        kit.World.RecipesAt(station).GroupBy(id => (kit.World.Data.Recipes[id].Tool, kit.World.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
 
     /// <summary>The tool in use for a group: carried by hand, slotted at a station; null when it is missing or none is needed.</summary>
-    private string? Held((string Tool, int Tier) group) =>
-        group.Tool == "" ? null : station == null ? world.BestTool(group.Tool, null, group.Tier) : world.BenchTool(station, group.Tool, group.Tier);
+    private string? Held((string Tool, int Tier) group) => world.ToolInUse(station, group.Tool, group.Tier);
 
     /// <summary>How far the worker mark's hard hat stands out over the top of a plate.</summary>
     private const int HatRise = 18;
 
     /// <summary>How many batches a click queues or takes off: 10 with Ctrl, 5 with Shift, else 1.</summary>
     public static int Step => Input.IsKeyPressed(Key.Ctrl) ? 10 : Input.IsKeyPressed(Key.Shift) ? 5 : 1;
-
-    private int Waiting(string id) => World.Waiting(world.QueueOf(station), id);
-    private void Queue(string id, int count) => world.Enqueue(station, id, count);
 
     /// <summary>A recipe's hover popup: its name, each input as an icon with the amount (brick while the backpack is short), the time where it is crafted and what clicks do.</summary>
     private Control RecipePopup(RecipeDef r, float seconds) {
@@ -110,7 +105,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         }
         count.Text = r.Amount > 1 ? $"×{r.Amount}" : ""; count.MoveToFront();
         var queued = ItemSlot.CountBadge(1, 0); queued.Name = "queued"; cell.AddChild(queued);
-        live.Watch(() => Waiting(id), waiting => queued.Text = waiting > 0 ? waiting.ToString() : "");
+        live.Watch(() => world.Waiting(station, id), waiting => queued.Text = waiting > 0 ? waiting.ToString() : "");
         if (station != null) {
             // The worker mark: a thick outline with a hard hat on top.
             var hat = Style.Corner(Style.Glyph("hardhat", 34, Colors.White), .5f, 0, HatRise); hat.Name = "kept"; cell.AddChild(hat);
@@ -125,7 +120,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             if (doubled) { doubled = false; return; }
             string kept = memory.KeptBefore = station?.Keep ?? "";
             int step = Step;
-            if (station == null || step > 1) { kit.Run(() => Queue(id, step)); return; }
+            if (station == null || step > 1) { kit.Run(() => world.Enqueue(station, id, step)); return; }
             kit.Run(() => world.SetRecipe(station, kept == id ? "" : id));
         };
         cell.DoubleClicked = () => {
@@ -134,7 +129,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             string kept = memory.KeptBefore;
             kit.Run(() => { world.SetRecipe(station, kept); world.QueueBatch(station, id); });
         };
-        cell.RightClicked = () => kit.Run(() => Queue(id, -Step));
+        cell.RightClicked = () => kit.Run(() => world.Enqueue(station, id, -Step));
         float Time() => r.Seconds / ((station?.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * (tool() is string inUse ? world.Data.Items[inUse].Speed : 1));
         void Describe(StringBuilder text) {
             text.Append(r.Name);
@@ -164,7 +159,7 @@ public partial class QueueStrip(UiKit kit, LiveUpdates live, Thing? station) : H
             var (cell, count) = ItemSlot.Cup($"queued_{q.Recipe}", 44); cell.Icon = Icons.Of(r.Output);
             cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
             string id = q.Recipe;
-            live.Watch(() => World.Waiting(world.QueueOf(station), id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
+            live.Watch(() => world.Waiting(station, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
             cell.RightClicked = () => kit.Run(() => world.Enqueue(station, id, -RecipeBoard.Step));
             AddChild(cell);
         }
