@@ -28,8 +28,8 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         if (thing.Kind == ThingKind.Reinforced) Bellows();
         BagGrid(id => {
             if (slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(thing, world.Data.Items[id].Tool) == null) world.SlotTool(thing, id);
-            else world.LoadInput(thing, id, ItemMoves.All ? world.Backpack[id] : 1);
-        }, slotted.Length > 0 ? "Click: slot a tool, or add one · Ctrl: all of it · Drag onto a slot" : "Click: add one · Ctrl: all of it · Drag onto a slot",
+            else world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id));
+        }, slotted.Length > 0 ? "Click: slot a tool, or add one · Shift: a stack · Ctrl: all of it · Drag onto a slot" : "Click: add one · Shift: a stack · Ctrl: all of it · Drag onto a slot",
             wanted: id => thing.Recipe != "" && (world.BatchCost(thing).ContainsKey(id) || thing.Burner != null && world.FuelFits(thing, id))
                 || slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(thing, world.Data.Items[id].Tool) == null);
         JobButtons();

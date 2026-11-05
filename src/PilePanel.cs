@@ -40,6 +40,6 @@ public partial class PilePanel(PageTools tools, Thing subject) : ThingPage(tools
             AddChild(skip);
             JobButtons();
         }
-        StoreBagGrid("Click: store one · Ctrl: store all · Drag to move", id => world.Holds(thing, id));
+        StoreBagGrid("Click: store one · Shift: a stack · Ctrl: store all · Drag to move", id => world.Holds(thing, id));
     }
 }

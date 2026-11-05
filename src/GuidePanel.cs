@@ -22,7 +22,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
             ("key:Space", "Swing the tool in hand, or pump a selected reinforced furnace."),
             ("key:1–9", "Put a hotbar slot in hand. Drag an item or plan onto a slot to assign it."),
             ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Your crew."), ("key:I", "This guide."),
-            ("key:Click / Ctrl-click", "Click moves one item; Ctrl-click moves all of an item. Right-click picks up half."),
+            ("key:Click / Shift / Ctrl", "Click moves one item, Shift-click the stack clicked and Ctrl-click all of that item. Right-click picks up half."),
             ("key:F5 · F9", "Quick save and load."),
             ("key:Esc", "Cancel, close a panel, or pause.")
         },

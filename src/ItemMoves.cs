@@ -8,8 +8,16 @@ namespace ChopChopMeow;
 public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
     private readonly World world = kit.World;
 
-    /// <summary>Whether a click moves every unit of an item rather than one item: while Ctrl or Shift is held.</summary>
+    /// <summary>Whether a click takes more than one, such as five lots at the market: while Ctrl or Shift is held.</summary>
     public static bool All => Input.IsKeyPressed(Key.Ctrl) || Input.IsKeyPressed(Key.Shift);
+
+    /// <summary>How many of an item a click moves out of an inventory: all of it with Ctrl, the clicked stack with Shift, otherwise one.</summary>
+    public static int Amount(Inventory from, string item) {
+        if (Input.IsKeyPressed(Key.Ctrl)) return from[item];
+        if (!Input.IsKeyPressed(Key.Shift)) return 1;
+        int slot = from.PreferredSlot;
+        return slot >= 0 && slot < from.Layout.Count && from.Layout[slot].Item == item ? from.Layout[slot].Count : Math.Min(from[item], from.StackOf(item));
+    }
 
     /// <summary>Whether the player can reach a thing; if not, says so.</summary>
     private bool InReach(Thing t) {
@@ -17,12 +25,12 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
         kit.Notify("Walk closer first."); return false;
     }
 
-    /// <summary>Moves one item, or every unit of the item while Ctrl or Shift is held.</summary>
+    /// <summary>Moves one item, the clicked stack while Shift is held, or every unit of the item while Ctrl is held.</summary>
     public void Stack(Inventory from, Inventory to, string item, Thing near) {
         if (!InReach(near)) return;
         if (world.BoxBlock(near, to, item) is string refused) { kit.Notify(refused); return; }
         if (blackHole.CrateIntoCrate(near, to, item)) return;
-        world.Transfer(from, to, item, All ? from[item] : 1);
+        world.Transfer(from, to, item, Amount(from, item));
     }
 
     /// <summary>Drops a dragged stack into an inventory and returns what did not fit; the building on either end must be within reach.</summary>

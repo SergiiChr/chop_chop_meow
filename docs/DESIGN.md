@@ -463,7 +463,7 @@ A window's copy takes totals and stacks together from the server, so it does not
 Input rule for every item cell, in storage and stations alike:
 
 - A click moves exactly one item, in either direction.
-- Ctrl-click, or Shift-click, moves all of that item.
+- Shift-click moves the stack clicked, and Ctrl-click all of that item.
 - Right-click picks up half where a panel supports dragging.
 - Dragging carries a stack or a split portion to its exact destination, merging compatible stacks or swapping cells.
 - Bulk buttons and recipe batch actions say what they move.

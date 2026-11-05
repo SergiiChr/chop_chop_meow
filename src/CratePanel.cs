@@ -23,6 +23,6 @@ public partial class CratePanel(PageTools tools, Thing subject) : ThingPage(tool
         Well(new VBoxContainer()).AddChild(StorageGrid());
         var hint = Row(); hint.AddThemeConstantOverride("separation", 8);
         hint.AddChild(Style.Text("Hold", 14, Style.Beige)); hint.AddChild(Style.Glyph("line_mouse", 24, Style.Rim)); hint.AddChild(Style.Text("to pick up", 14, Style.Beige));
-        StoreBagGrid("Click: store one · Ctrl: store all · Drag to move");
+        StoreBagGrid("Click: store one · Shift: a stack · Ctrl: store all · Drag to move");
     }
 }

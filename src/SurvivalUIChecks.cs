@@ -89,7 +89,7 @@ public partial class Game {
 
         await SurvivalReviewShot("sorted-inventory");
     }
-    /// <summary>A normal click moves one unit; Ctrl-click moves the entire remaining stack.</summary>
+    /// <summary>A normal click moves one unit, Shift-click the stack clicked and Ctrl-click every unit of the item.</summary>
     private async Task CheckClickMovesOneUnitAndCtrlClickMovesRemainingStack() {
         await CloseWithEsc();
         Give(Hosted, "coal", 5);
@@ -110,6 +110,11 @@ public partial class Game {
         try { await Click(Cell(1, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal))); } finally { Input.ParseInputEvent(new InputEventKey { Keycode = Key.Ctrl, PhysicalKeycode = Key.Ctrl, Pressed = false }); }
         Require(chest.Inventory["coal"] == 10 && world.Backpack["coal"] == 0,
             "Ctrl-clicking a backpack stack must store all remaining units.");
+        Give(Hosted, "coal", 70); await Frames(3);
+        await Holding(Key.Shift, () => Click(Cell(1, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal) && ((Label)c.GetChild(0)).Text == "6")));
+        Require(chest.Inventory["coal"] == 16 && world.Backpack["coal"] == 64, "Shift-clicking a backpack stack must store just that stack.");
+        await Holding(Key.Shift, () => Click(Cell(0, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal))));
+        Require(chest.Inventory["coal"] == 0 && world.Backpack["coal"] == 80, "Shift-clicking a storage stack must take that stack.");
     }
     /// <summary>A recipe water slot refuses a partial bottle, by click or by drag, and shows the full-bottle warning.</summary>
     private async Task CheckPartialBottleIsRefusedByRecipeWithWarning() {

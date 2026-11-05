@@ -109,7 +109,7 @@ Shrubs, pebbles and twigs cast real shadows; grass and small objects darken the 
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
-| Click / Ctrl-click an item cell | Move one item / all of that item (Shift works like Ctrl); this applies across inventory and station panels |
+| Click / Shift-click / Ctrl-click an item cell | Move one item / the stack clicked / all of that item; this applies across inventory and station panels |
 | Drag a cell | Move its stack to another inventory or a station input slot; drop an item or building plan on the hotbar to assign it |
 
 ## Interface
@@ -185,7 +185,7 @@ Fuel the recipe cannot burn shows in brick; workers carry it back to storage and
 Side outputs and leftovers sit in a second row under the output.
 Each cup holds a single stack of 64.
 
-- Click a backpack item to add one to its cup, Ctrl-click to move all of it, or drag it in.
+- Click a backpack item to add one to its cup, Shift-click to move the stack, Ctrl-click to move all of it, or drag it in.
 - Right-click a cup to pick up half.
 - Click or drag a cup to take its contents back.
 
