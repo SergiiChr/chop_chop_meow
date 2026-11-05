@@ -94,6 +94,9 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     protected void LoadBagGrid(Func<string, bool> wanted) =>
         BagGrid(id => world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id)), "Click: add one · Shift: a stack · Ctrl: all of it · Drag onto a slot", wanted: wanted);
 
+    /// <summary>Whether the filter window is open beside the panel.</summary>
+    protected bool FiltersOpen => filters.Open;
+
     /// <summary>The funnel that opens the filter window beside the panel, ringed while it is open.</summary>
     protected void FilterButton() {
         var button = HeaderAction("filter", "Filters: what workers bring and take", () => { filters.Open = !filters.Open; filters.Picking = false; Redraw(); }, Style.FilterRound, "filters");

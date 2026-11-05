@@ -15,7 +15,8 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         Tab("crew", "hardhat", "Hire", () => memory.Hiring = true, memory.Hiring);
         Tab("guide", "prices", "Prices", () => memory.SheetOpen = !memory.SheetOpen, memory.SheetOpen);
         FilterButton();
-        if (memory.SheetOpen) PriceSheet();
+        // The filters and the price sheet share the board beside the panel, so the sheet waits while the filters are open.
+        if (memory.SheetOpen && !FiltersOpen) PriceSheet();
         if (memory.Hiring) HireOffers();
         else Shipping();
         JobButtons();
