@@ -1055,8 +1055,11 @@ public partial class WorldView : Node3D {
             selectRing.Visible = hoverRing.Visible = workerRing.Visible = playerRing.Visible = placeTile.Visible = false;
             return;
         }
-        Mark(selectRing, World.Find(Selection.Thing), 0);
-        Mark(hoverRing, Hover != Selection.Thing ? World.Find(Hover) : null, .004f);
+        // The pond is one thing all along its shore, so its selection ring shows only while the player collects water there.
+        var selected = World.Find(Selection.Thing);
+        if (selected?.Kind == ThingKind.Water && !(Gathering && GatheringTarget?.Kind == ThingKind.Water)) selected = null;
+        Mark(selectRing, selected, 0);
+        Mark(hoverRing, Hover != (selected?.Id ?? 0) ? World.Find(Hover) : null, .004f);
         Worker? worker = null;
         foreach (var w in World.Workers) if (w.Id == Selection.Worker) worker = w;
         workerRing.Visible = worker != null && World.Sees(worker);
