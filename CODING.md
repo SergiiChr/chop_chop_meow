@@ -31,7 +31,8 @@ Project rules on top of the global coding and testing guides.
 
 - Simulation lives in `World.cs` and never touches menus or rendering, so headless checks can run gameplay.
 - Inventory rules belong in `Inventory.cs`, not in individual worker jobs.
-- Store parameters, variables and configs in code files, unless they need to be persisted or passed between different programs or languages.
+- Keep parameters, tuning values and configuration in C# as constants, enums and static tables, so code references them directly and the compiler checks them.
+  A data file such as JSON is only for what has to be saved, like saves and settings, or read by another program or language.
 
 ## Tests
 
