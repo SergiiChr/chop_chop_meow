@@ -12,7 +12,7 @@ public enum ActorSkin { Player, Worker, Courier }
 /// The rig faces +Z; the hips are lifted so the lower foot always stays on the ground.
 /// </summary>
 public sealed class ActorRig {
-    private const float Thigh = .38f, Shin = .37f, Sole = .07f;
+    private const float Thigh = ActorAnimation.Thigh, Shin = ActorAnimation.Shin, Sole = ActorAnimation.Sole;
     public readonly Node3D Root = new();
     private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     private readonly Dictionary<string, Node3D> tools = new();
@@ -261,7 +261,7 @@ public sealed class ActorRig {
         kneeR.RotationDegrees = new Vector3(pose.KneeR, 0, 0);
         foreach (var (skeleton, joint) in limbs)
             skeleton.SetBonePoseRotation(1, joint.Quaternion);
-        hips.Position = new Vector3(0, (pose.Seat > 0 ? pose.Seat : Math.Max(Reach(pose.SwingL, pose.KneeL), Reach(pose.SwingR, pose.KneeR)) + Sole) + pose.Lift, 0);
+        hips.Position = new Vector3(0, pose.Hips > 0 ? pose.Hips : Math.Max(ActorAnimation.Reach(pose.SwingL, pose.KneeL), ActorAnimation.Reach(pose.SwingR, pose.KneeR)) + Sole, 0);
         rock.Visible = onRock;
         foreach (var (name, node) in tools) node.Visible = name == tool;
         crate.Visible = carrying;
@@ -271,7 +271,4 @@ public sealed class ActorRig {
     /// <summary>Splays the thigh outward, swings it forward, then rolls it about its own length; the left side turns toward +X.</summary>
     private static Basis HipTurn(float swing, float turn, float roll) =>
         new Basis(Vector3.Up, Mathf.DegToRad(turn)) * new Basis(Vector3.Right, Mathf.DegToRad(-swing)) * new Basis(Vector3.Up, Mathf.DegToRad(roll));
-
-    private static float Reach(float swing, float knee) =>
-        Thigh * MathF.Cos(Mathf.DegToRad(swing)) + Shin * MathF.Cos(Mathf.DegToRad(swing - knee));
 }
