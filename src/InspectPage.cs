@@ -99,7 +99,7 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         var button = HeaderAction("filter", "Filters: what workers bring and take", () => { filters.Open = !filters.Open; filters.Picking = false; Redraw(); }, Style.FilterRound, "filters");
         if (!filters.Open) return;
         Style.Skin(button, Style.Round(Style.Mustard, 18).Item1, Style.FilterRound.Hover);
-        panel.SideBoard(Style.Board, 340).AddChild(new FilterWindow(kit, thing, filters, Redraw));
+        panel.SideBoard(Style.Board, 340).AddChild(new FilterWindow(kit, thing, filters, Redraw, (list, rows) => panel.ShowSheetRows(list, rows, hidesDrawer: true)));
     }
 
     /// <summary>The row of job buttons, for a place that offers jobs.</summary>

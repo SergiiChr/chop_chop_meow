@@ -15,7 +15,8 @@ public sealed class FilterState {
 /// A crate of a good the village buys can be named too; a trading post has only the row of crates workers bring, and an empty one takes no deliveries.
 /// </summary>
 /// <param name="redraw">Draws the page again after a change to this window; the page does so itself when the filters change.</param>
-public partial class FilterWindow(UiKit kit, Thing t, FilterState state, Action redraw) : VBoxContainer {
+/// <param name="scrolls">Takes the item list's scroll area and the list, so the panel fits it to the screen.</param>
+public partial class FilterWindow(UiKit kit, Thing t, FilterState state, Action redraw, Action<ScrollContainer, Control> scrolls) : VBoxContainer {
     private readonly World world = kit.World;
 
     public override void _Ready() {
@@ -53,7 +54,10 @@ public partial class FilterWindow(UiKit kit, Thing t, FilterState state, Action 
         }
         if (state.Picking) {
             var picker = new GridContainer { Columns = 6 }; picker.AddThemeConstantOverride("h_separation", 6); picker.AddThemeConstantOverride("v_separation", 6);
-            AddChild(Style.InWell(picker));
+            // The list of every item outgrows short screens, so it scrolls.
+            var list = new ScrollContainer { Name = "filter_list", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
+            list.AddChild(picker); AddChild(Style.InWell(list));
+            scrolls(list, picker);
             var crates = world.Data.Market.Sells.Keys.Select(World.CrateOf).Where(id => post || world.Holds(t, id));
             foreach (var id in (post ? crates : world.Data.Items.Keys.Where(id => world.Holds(t, id)).Concat(crates)).OrderBy(FilterName)) {
                 var cell = FilterCell($"pick_{id}", id); cell.TooltipText = FilterName(id);
