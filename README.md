@@ -73,6 +73,7 @@ These options are developer review tools; they do not represent a normal fresh-s
 ./build.py play -- --animation-review --animation-capture /tmp/chop-chop-meow-animation
 ./tools/environment_review.py             # landscape views, saved in build/environment-review/
 ./tools/environment_review.py --shoreline # coast, lake edge and mine views
+./tools/animation_review.py "player run"   # one clip from the side, front and game camera, in build/animation-review/
 ```
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
