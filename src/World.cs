@@ -2130,6 +2130,10 @@ public sealed partial class World {
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size && S.Explored[(int)p.Y * Terrain.Size + (int)p.X] != 0;
     /// <summary>Moves the pack hunting the acting player.</summary>
+    /// <summary>A wolf closing in stops a muzzle's length short of the player, where its bite reaches, instead of running onto them.</summary>
+    public const float BiteStand = .9f;
+    private void Approach(Wolf wolf, float step) => wolf.Pos = wolf.Pos.MoveToward(Player, Math.Min(step, Math.Max(0, wolf.Pos.DistanceTo(Player) - BiteStand)));
+
     private void TickWolves(float dt, List<Wolf> hunters) {
         if (!Dead) {
             nightSpawn -= dt;
@@ -2189,14 +2193,14 @@ public sealed partial class World {
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
             } else if (wary) {
                 wolf.Chase = 0;
-                wolf.Pos = wolf.Pos.MoveToward(Player, dt * speed * .35f);
+                Approach(wolf, dt * speed * .35f);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
             }
               // A wolf already on the player's heels follows briefly into firelight, but backs off from a cabin at once.
               else if (inside || (lit || Protected(wolf.Pos)) && wolf.Chase <= 0) { wolf.Chase = 0; wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + AwayFromPlayer(wolf) * 3, dt * 3); } else {
                 wolf.Chase = lit || Protected(wolf.Pos) ? wolf.Chase - dt : ChaseSeconds;
-                wolf.Pos = wolf.Pos.MoveToward(Player, dt * chase);
+                Approach(wolf, dt * chase);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
             }

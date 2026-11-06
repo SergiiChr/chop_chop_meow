@@ -199,53 +199,67 @@ public partial class WorldView {
         ("worker hammer", ActorSkin.Worker, ActorAction.Hammer), ("worker pump", ActorSkin.Worker, ActorAction.Pump), ("worker idle", ActorSkin.Worker, ActorAction.Idle),
         ("worker sit", ActorSkin.Worker, ActorAction.Sit), ("worker sit on rock", ActorSkin.Worker, ActorAction.Perch), ("player pick up", ActorSkin.Player, ActorAction.PickUp), ("player craft", ActorSkin.Player, ActorAction.Craft),
     };
-    private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall", "wolf hit" };
+    private static readonly (string Name, WolfState State)[] ReviewWolves = {
+        ("wolf idle", WolfState.Idle), ("wolf stalk", WolfState.Stalk), ("wolf trot", WolfState.Trot), ("wolf gallop", WolfState.Gallop), ("wolf bite", WolfState.Bite),
+        ("wolf leap", WolfState.Leap), ("wolf feed", WolfState.Feed), ("wolf hit", WolfState.Recoil), ("wolf fall", WolfState.Fall) };
     private readonly List<ActorRig> reviewRigs = new();
     private readonly List<WorldModels.WolfModel> reviewWolves = new();
     private Node3D? review;
     private static readonly Vector3 ScreenRight = new Vector3(1, 0, -1).Normalized(), ScreenDown = new Vector3(1, 0, 1).Normalized();
     private static Vector3 ReviewCenter => new(0, 1, 0);
     private static Vector3 ReviewSpot(int index) => ScreenRight * ((index % 7 - 3) * 2f) + ScreenDown * ((index / 7 - 2f) * 3.3f);
+    /// <summary>With <c>--wolves</c> the review shows only the wolf clips, in two close rows.</summary>
+    private readonly bool wolfReview = Launch.Has("--wolves");
+    private Vector3 WolfSpot(int index) => wolfReview ? ScreenRight * ((index % 5 - 2f) * 1.7f) + ScreenDown * ((index / 5 - .5f) * 3.2f) : ReviewSpot(ReviewClips.Length + index);
 
-    private void UpdateReview() {
+    /// <summary>The rigs turn to show every side, or hold the heading <c>--review-yaw</c> gives in degrees: 135 is a profile facing screen right.</summary>
+    private float ReviewYaw => float.TryParse(Launch.Value("--review-yaw"), System.Globalization.CultureInfo.InvariantCulture, out float yaw) ? Mathf.DegToRad(yaw) : Elapsed * .7f + Mathf.Pi / 4;
+
+    private void UpdateReview(float dt) {
         if (review == null) {
             scene.Visible = false;
             review = new Node3D(); AddChild(review);
             Cylinder(review, 40, 40, .02f, new Vector3(0, -.01f, 0), Mat("4b5e45", 1), null, 32);
-            for (int i = 0; i < ReviewClips.Length; i++) {
+            for (int i = 0; i < ReviewClips.Length && !wolfReview; i++) {
                 var rig = new ActorRig(ReviewClips[i].Skin);
                 review.AddChild(rig.Root); rig.Root.Position = ReviewSpot(i);
                 reviewRigs.Add(rig);
             }
             for (int i = 0; i < ReviewWolves.Length; i++) {
                 var wolf = new WorldModels.WolfModel();
-                review.AddChild(wolf.Root); wolf.Root.Position = ReviewSpot(ReviewClips.Length + i);
+                review.AddChild(wolf.Root); wolf.Root.Position = WolfSpot(i);
                 reviewWolves.Add(wolf);
             }
         }
-        // Moving wolves stride as they would at their speed in the world: a trot at 3 tiles a second and a gallop at a chase's 6.3.
-        reviewWolves[0].Idle(Elapsed); reviewWolves[1].Trot(Elapsed * 3 * 5); reviewWolves[2].Gallop(Elapsed * 6.3f * 2.6f);
-        reviewWolves[3].Leap(Elapsed % 1.2f / World.LeapSeconds); reviewWolves[4].Feed(Elapsed); reviewWolves[5].Fall(Elapsed % 3 / 1.5f);
-        reviewWolves[6].Recoil(Elapsed % 1.2f / World.StaggerSeconds);
-        foreach (var wolf in reviewWolves) wolf.Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
-        for (int i = 0; i < ReviewClips.Length; i++) {
+        // Moving wolves stride as they would at their speed in the world: a stalk at 1.2 tiles a second, a trot at 3 and a gallop at a chase's 6.3.
+        // The leap, the hit and the fall replay at their world pace with a pause between, blending back into the standing pose like a wolf in play.
+        for (int i = 0; i < reviewWolves.Count; i++) {
+            var (_, state) = ReviewWolves[i];
+            float cycle = state switch { WolfState.Bite or WolfState.Leap or WolfState.Recoil => 1.2f, WolfState.Fall => 3, _ => 0 };
+            float length = state switch { WolfState.Bite => WolfAnimation.BiteSeconds, WolfState.Leap => World.LeapSeconds, WolfState.Recoil => World.StaggerSeconds, WolfState.Fall => .9f, _ => 1 };
+            float t = state switch { WolfState.Stalk => Elapsed * 1.2f, WolfState.Trot => Elapsed * 3, WolfState.Gallop => Elapsed * 6.3f, _ => Elapsed };
+            bool playing = cycle == 0 || Elapsed % cycle < length;
+            reviewWolves[i].Show(playing ? state : WolfState.Idle, playing && cycle > 0 ? Elapsed % cycle / length : t, dt);
+            reviewWolves[i].Root.Rotation = new Vector3(0, ReviewYaw, 0);
+        }
+        for (int i = 0; i < reviewRigs.Count; i++) {
             var action = ReviewClips[i].Action;
-            reviewRigs[i].Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
+            reviewRigs[i].Root.Rotation = new Vector3(0, ReviewYaw, 0);
             reviewRigs[i].Show(ActorAnimation.PoseAt(action, Elapsed, action is ActorAction.Walk or ActorAction.Carry), ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch);
         }
     }
 
     private void PaintReview() {
         overlay.DrawString(font, new Vector2(28, 40), "ANIMATION REVIEW · keyframed 3D rig, rotating to show every side", HorizontalAlignment.Left, -1, 23, new Color("f2e8cf"));
-        for (int i = 0; i < ReviewClips.Length; i++) {
+        for (int i = 0; i < reviewRigs.Count; i++) {
             var at = camera.UnprojectPosition(ReviewSpot(i));
             var size = font.GetStringSize(ReviewClips[i].Name, HorizontalAlignment.Left, -1, 17);
             overlay.DrawString(font, at + new Vector2(-size.X / 2, 30), ReviewClips[i].Name, HorizontalAlignment.Left, -1, 17, new Color("f2e8cf"));
         }
         for (int i = 0; i < ReviewWolves.Length; i++) {
-            var at = camera.UnprojectPosition(ReviewSpot(ReviewClips.Length + i));
-            var size = font.GetStringSize(ReviewWolves[i], HorizontalAlignment.Left, -1, 17);
-            overlay.DrawString(font, at + new Vector2(-size.X / 2, 30), ReviewWolves[i], HorizontalAlignment.Left, -1, 17, new Color("f2e8cf"));
+            var at = camera.UnprojectPosition(WolfSpot(i));
+            var size = font.GetStringSize(ReviewWolves[i].Name, HorizontalAlignment.Left, -1, 17);
+            overlay.DrawString(font, at + new Vector2(-size.X / 2, 30), ReviewWolves[i].Name, HorizontalAlignment.Left, -1, 17, new Color("f2e8cf"));
         }
     }
 }

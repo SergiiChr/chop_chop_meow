@@ -19,6 +19,7 @@ public static class SimulationChecks {
         Test(EconomyChecks.Run, data);
         Test(AnimationChecks.Run);
         Test(HumanModelChecks.Run);
+        Test(WolfAnimationChecks.Run);
         Test(NatureModelChecks.Run);
         Test(PileModelChecks.Run, data);
         Test(MineRockChecks.Run);
