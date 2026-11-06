@@ -976,8 +976,9 @@ public sealed partial class World {
             foreach (var w in S.Wolves.Where(w => w.Pos.DistanceTo(Player) < ScareRange && (w.Pos - Player).Normalized().Dot(direction) > .7f)) w.Scared = true;
     }
     public const float StaggerSeconds = .45f;
-    /// <summary>Throws a struck wolf back from the player; the view slides it there over the stagger.</summary>
-    private void KnockBack(Wolf wolf) { wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f; wolf.Stagger = StaggerSeconds; }
+    /// <summary>How far a blow throws a wolf back: a short hop, which the view plays as the wolf jumping clear.</summary>
+    public const float KnockBackDistance = .5f;
+    private void KnockBack(Wolf wolf) { wolf.Pos += (wolf.Pos - Player).Normalized() * KnockBackDistance; wolf.Stagger = StaggerSeconds; }
     /// <summary>Leaves a carcass where a struck wolf fell, within the map.</summary>
     private void KillWolf(Wolf wolf) {
         S.Wolves.Remove(wolf); Add(ThingKind.WolfCorpse, wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (Terrain.Size - 3)), WolfMeat);

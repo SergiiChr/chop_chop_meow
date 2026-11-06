@@ -268,8 +268,8 @@ public partial class WorldView {
         reviewWolves[0].Stand(Elapsed, dt, false); reviewWolves[1].Move(3 * dt, dt, false, false); reviewWolves[2].Move(6.3f * dt, dt, true, false);
         float leap = Elapsed % 1.2f / World.LeapSeconds;
         if (leap < .7f) reviewWolves[3].Leap(leap, .7f, dt); else reviewWolves[3].Feed(Elapsed, dt, true, (leap - .7f) * World.LeapSeconds / KnockSeconds);
-        reviewWolves[4].Feed(Elapsed, dt, false); reviewWolves[5].Fall(Elapsed % 3 / 1.5f);
-        reviewWolves[6].Recoil(Elapsed % 1.2f / WolfModel.RecoilSeconds, Elapsed % 1.2f < WolfModel.RecoilSeconds ? dt * 2 : 0, dt);
+        reviewWolves[4].Feed(Elapsed, dt, false); reviewWolves[5].Fall(Elapsed % 2 / WolfModel.FallSeconds);
+        reviewWolves[6].Recoil(Elapsed % 1.2f / WolfModel.RecoilSeconds, dt);
         foreach (var wolf in reviewWolves) wolf.Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
         for (int i = 0; i < ReviewClips.Length; i++) {
             var action = ReviewClips[i].Action;

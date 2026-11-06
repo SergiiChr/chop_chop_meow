@@ -25,6 +25,8 @@ internal static class WolfShape {
 
     /// <summary>How far the sole sits below the paw bone when the paw is flat on the ground.</summary>
     public const float Sole = .035f;
+    /// <summary>Where the jaws close on what the wolf bites, just behind the nose, at rest.</summary>
+    public static readonly Vector3 Bite = new(0, .826f, .76f);
 
     /// <summary>Each bone's parent and resting position in the model, built facing +Z with the ground at zero.</summary>
     public static readonly (int Parent, Vector3 At)[] Bones = BuildBones();
@@ -53,7 +55,7 @@ internal static class WolfShape {
     private static readonly Color Dark = new("4a4e46"), Grey = new("7b7d71"), Tan = new("8b7f64"), Pale = new("cbc5b0"),
         Black = new("1e1f1c"), Mouth = new("6b2e2b"), InnerEar = new("b7a596");
     public static readonly StandardMaterial3D Fur = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .95f };
-    private static readonly StandardMaterial3D EyeShine = new() { AlbedoColor = new Color("d9a046"), Roughness = .35f, EmissionEnabled = true, Emission = new Color("d9a046"), EmissionEnergyMultiplier = .5f };
+    private static readonly StandardMaterial3D EyeShine = new() { AlbedoColor = new Color("d9a046"), Roughness = .35f, EmissionEnabled = true, Emission = new Color("d9a046"), EmissionEnergyMultiplier = 1.2f };
     private static ArrayMesh? fur, eyes;
     private static Skin? skin;
 

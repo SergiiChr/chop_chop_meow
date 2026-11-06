@@ -786,8 +786,9 @@ public partial class WorldView : Node3D {
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
                 break;
             case CarcassProp carcass:
-                float since = t.Progress - carcass.HitIn, dying = Math.Clamp(since / .9f, 0, 1);
-                carcass.Body.Position = carcass.From * MathF.Pow(1 - Math.Clamp(since / .45f, 0, 1), 3);
+                // Thrown, the carcass covers the knockback while it is in the air and stays where it lands.
+                float since = t.Progress - carcass.HitIn, dying = Math.Clamp(since / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
+                carcass.Body.Position = carcass.From * (1 - thrown * (2 - thrown));
                 carcass.Wolf.Fall(dying);
                 // Butchering flattens the carcass while the blood pool spreads out from under it.
                 carcass.Wolf.Root.Scale = new Vector3(1, .6f + .4f * WorldModels.Fullness(t), 1);
@@ -1042,27 +1043,21 @@ public partial class WorldView : Node3D {
                 model.Knock = at - wolf.Pos;
                 if (model.HitIn == 0) { model.Recoiling = WolfModel.RecoilSeconds; model.KnockFrom = model.Knock; FurAndEmbers(To3(at, .6f)); }
             } else if (model.Recoiling > 0) {
+                // The wolf goes back only while it is in the air, so its paws never slide.
                 model.Recoiling = Math.Max(0, model.Recoiling - dt);
-                float recoil = 1 - model.Recoiling / WolfModel.RecoilSeconds;
-                var knock = model.KnockFrom * MathF.Pow(1 - Math.Min(1, recoil / .7f), 3);
-                back = (model.Knock - knock).Length(); model.Knock = knock;
+                float hop = Math.Min(1, (1 - model.Recoiling / WolfModel.RecoilSeconds) / WolfModel.HopShare);
+                model.Knock = model.KnockFrom * (1 - hop * (2 - hop));
             } else model.Knock = Vector2.Zero;
             bool struck = model.HitIn > 0 || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;
             // A struck wolf keeps facing whoever hit it; a running one turns into its path.
             var facing = struck ? model.Striker - wolf.Pos - model.Knock : running ? moved : hunted - wolf.Pos;
             model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(facing, model.Yaw), Math.Min(1, dt * (struck ? 16 : 10)));
-            // A wolf whose jaws have the throat rides the player down rather than landing through them, closing in as they go over.
-            var shown = wolf.Pos + model.Knock;
-            if (model.Pinned > 0 && model.Pinned < KnockSeconds * 2 && wolf.Pos != hunted) {
-                float gap = Mathf.Lerp(WolfModel.ContactReach, World.PinDistance, Ease(Math.Min(1, model.Pinned / KnockSeconds)));
-                shown = hunted + (wolf.Pos - hunted).Normalized() * Math.Max(gap, wolf.Pos.DistanceTo(hunted));
-            }
-            model.Root.Position = To3(shown);
             model.Root.Visible = World.Sees(wolf.Pos);
             model.Root.Rotation = new Vector3(0, model.Yaw, 0);
             bool wary = wolf.Scared || HuntedTorchLit(wolf);
+            float flight = 0;
             if (model.HitIn > 0) model.Move(-back, dt, false, true);
-            else if (model.Recoiling > 0) model.Recoil(1 - model.Recoiling / WolfModel.RecoilSeconds, back, dt);
+            else if (model.Recoiling > 0) model.Recoil(1 - model.Recoiling / WolfModel.RecoilSeconds, dt);
             else if (wolf.Leap > 0) {
                 // The world closes the leap's gap evenly, so the start, and the point where the jaws reach the throat, follow from how far it has come.
                 float progress = 1 - wolf.Leap / World.LeapSeconds, gap = wolf.Pos.DistanceTo(hunted);
@@ -1070,15 +1065,45 @@ public partial class WorldView : Node3D {
                 float contact = start <= WolfModel.ContactReach ? 0 : (start - WolfModel.ContactReach) / (start - World.PinDistance);
                 model.Pinned = gap <= WolfModel.ContactReach ? model.Pinned + dt : 0;
                 if (model.Pinned > 0) model.Feed(Elapsed, dt, true, model.Pinned / KnockSeconds);
-                else model.Leap(progress, contact, dt);
+                else { model.Leap(progress, contact, dt); flight = contact > 0 ? progress / contact : 1; }
+                if (model.Pinned == 0) model.Toward = (wolf.Pos - hunted).Normalized();
             } else if (wolf.Feeding) {
                 if (wolf.Pinning) model.Pinned += dt;
                 model.Feed(Elapsed + wolf.GetHashCode() % 7, dt, wolf.Pinning, model.Pinned / KnockSeconds);
             } else if (running) model.Move(moved.Length(), dt, wolf.Chase > 0, wary);
             else model.Stand(Elapsed + wolf.GetHashCode() % 7, dt, wary);
+            var place = To3(wolf.Pos + model.Knock);
+            if (wolf.Leap > 0 || wolf.Pinning) {
+                if (model.Toward == Vector2.Zero) model.Toward = (wolf.Pos - hunted).Normalized();
+                place = AtTheThroat(model, hunted, place, flight);
+            } else model.Toward = Vector2.Zero;
+            model.Root.Position = place;
         }
         foreach (var (wolf, model) in wolves)
             if (!World.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
+    }
+
+    /// <summary>
+    /// Where a leaping or pinning wolf stands so its jaws are at the hunted player's throat.
+    /// The flight eases from the world's path onto the throat by the moment of contact; the jaws then ride the throat down as the player goes over, and the wolf holds that spot once they are down.
+    /// </summary>
+    private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted, Vector3 path, float flight) {
+        if (model.Pinned > KnockSeconds) return model.Held;
+        var held = Throat(hunted, model.Toward, model.Pinned) - model.Root.Basis * model.Bite;
+        held.Y = Math.Max(0, held.Y);
+        if (model.Pinned > 0) return model.Held = held;
+        return path.Lerp(held, Ease(Math.Clamp(flight, 0, 1)));
+    }
+
+    /// <summary>The rig's throat: above the feet and a little in front, before a knockdown tips it back.</summary>
+    private const float ThroatHeight = 1.31f, ThroatAhead = .06f;
+
+    /// <summary>Where the throat of a player at <paramref name="at"/> facing <paramref name="toward"/> is, <paramref name="downedFor"/> seconds into being knocked down; it follows KnockDown.</summary>
+    public static Vector3 Throat(Vector2 at, Vector2 toward, float downedFor) {
+        float tip = Ease(Math.Min(1, downedFor / KnockSeconds)), back = Mathf.Pi / 2 * tip;
+        var forward = To3(toward.Normalized());
+        return To3(at) + forward * (KnockSlide * tip + ThroatAhead * MathF.Cos(back) - ThroatHeight * MathF.Sin(back))
+            + Vector3.Up * (.17f * tip + ThroatHeight * MathF.Cos(back) + ThroatAhead * MathF.Sin(back));
     }
 
     /// <summary>Tufts of fur knocked loose by a hit, and embers off a burning torch.</summary>

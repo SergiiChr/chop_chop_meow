@@ -60,13 +60,18 @@ public sealed class WolfModel {
     /// </summary>
     public float HitIn, HitSeconds, Recoiling, Pinned;
     public Vector2 HitFrom, Striker, KnockFrom;
+    /// <summary>A leap's bearing from the player to the wolf, and where it holds the throat once the player is down.</summary>
+    public Vector2 Toward;
+    public Vector3 Held;
 
-    /// <summary>How far ahead of its root a leaping wolf's jaws reach the throat of a standing player.</summary>
-    public const float ContactReach = 1.05f;
+    /// <summary>How far ahead of its root a leaping wolf's jaws reach the throat of a standing player: the reach of the bite plus the throat's own depth.</summary>
+    public const float ContactReach = .65f;
     /// <summary>How close to the swinger a struck wolf lunges before the blow lands: about the reach of an arm and a muzzle.</summary>
-    public const float StrikeReach = 1.15f;
-    /// <summary>How long the recoil from a blow plays, from the moment it lands.</summary>
-    public const float RecoilSeconds = .6f;
+    public const float StrikeReach = 1.35f;
+    /// <summary>How long the recoil from a blow plays, from the moment it lands, and the share of it spent hopping back.</summary>
+    public const float RecoilSeconds = .6f, HopShare = .4f;
+    /// <summary>How long a killed wolf takes to go down, and the share of that it is thrown through the air before it hits the ground.</summary>
+    public const float FallSeconds = .7f, ThrowShare = .35f;
 
     private WolfMotion motion = WolfMotion.Stand;
     private WolfPose shown, from;
@@ -196,7 +201,8 @@ public sealed class WolfModel {
     public void Leap(float progress, float contact, float dt) {
         float t = Math.Clamp(progress / Math.Max(contact, .05f), 0, 1);
         float push = Mathf.SmoothStep(0, .3f, t), air = Mathf.SmoothStep(.15f, 1, t), reach = Mathf.SmoothStep(.4f, 1, t);
-        var body = new WolfPose(Lift: Mathf.Lerp(-.06f, .44f, air * air * (3 - 2 * air)) + .06f * push * (1 - air), Pitch: -12 * push - 22 * air, Flex: Mathf.Lerp(8, -12, air),
+        // The body arcs up and comes down onto the throat, which sits lower than the top of the leap.
+        var body = new WolfPose(Lift: Mathf.Lerp(-.06f, .14f, air) + .22f * MathF.Sin(MathF.PI * air) + .06f * push * (1 - air), Pitch: -12 * push - 22 * air, Flex: Mathf.Lerp(8, -12, air),
             Neck: Mathf.Lerp(10, 16, air), Head: Mathf.Lerp(-8, 8, reach), Jaw: 34 * reach, Ears: Mathf.Lerp(0, 22, air), Tail: Mathf.Lerp(-50, -10, air), Curl: -8);
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
@@ -232,37 +238,60 @@ public sealed class WolfModel {
     }
 
     /// <summary>
-    /// Struck: the head snaps away from the blow, the ears go flat and the tail tucks as the wolf is thrown back, scrambling with its paws, then gathers itself.
-    /// <paramref name="progress"/> runs 0 to 1 over the recoil and <paramref name="back"/> is how far it was pushed back this frame.
+    /// Struck: the head snaps away from the blow and the wolf hops back off its forelegs, lands hind paws first and ducks low with its ears flat and tail tucked, then rises wary.
+    /// <paramref name="progress"/> runs 0 to 1 over the recoil; the view moves the wolf back only while it is in the air, the first HopShare of it.
     /// </summary>
-    public void Recoil(float progress, float back, float dt) {
-        float t = Math.Clamp(progress, 0, 1), jolt = t < .12f ? Mathf.SmoothStep(0, 1, t / .12f) : 1 - Mathf.SmoothStep(.12f, 1, t);
-        float shudder = MathF.Sin(t * 40) * (1 - t) * .5f;
-        cycle = Mathf.PosMod(cycle - back / TrotGait.Length, 1);
-        var body = new WolfPose(Lift: -.05f * jolt, Pitch: -9 * jolt, Roll: 7 * jolt, Bend: -12 * jolt, Flex: 8 * jolt,
-            Neck: -18 * jolt + 6 * shudder, Head: -10 * jolt, HeadTurn: -38 * jolt + 10 * shudder, HeadTilt: -16 * jolt, Jaw: 26 * jolt * (1 - t),
-            Ears: 45 * jolt, Tail: Mathf.Lerp(-60, -100, jolt), Curl: -35 * jolt);
-        var scramble = Stride(body, TrotGait, cycle);
-        // The scramble fades into a braced stand as the push back runs out.
-        Show(WolfMotion.Recoil, WolfPose.Lerp(scramble, Planted(body, 1.2f), Mathf.SmoothStep(.5f, 1, t)), dt);
-    }
-
-    /// <summary>A killed wolf buckles, then rolls onto its side with stiff legs as <paramref name="progress"/> runs 0 to 1; it starts from a stand, so a carcass never blends.</summary>
-    public void Fall(float progress) {
-        float buckle = Mathf.SmoothStep(0, 1, Math.Clamp(progress / .35f, 0, 1)), roll = Mathf.SmoothStep(0, 1, Math.Clamp((progress - .25f) / .5f, 0, 1));
-        float twitch = progress < 1 ? MathF.Sin(progress * 40) * 6 * roll * (1 - roll) : 0, fold = buckle * (1 - roll);
-        // Rolled onto its side the body sinks until its flank lies on the ground.
-        var body = new WolfPose(Lift: -.3f * fold - .52f * roll, Roll: 90 * roll, Pitch: 8 * fold, Shift: -.05f * roll, Flex: 10 * fold - 6 * roll,
-            Neck: 30 * fold - 10 * roll, Head: 10 * fold, HeadTilt: -20 * roll, Jaw: 14 * roll, Ears: 20, Tail: Mathf.Lerp(-65, -10, roll), Curl: -10 * roll);
-        var standing = Planted(new WolfPose(), 1);
+    public void Recoil(float progress, float dt) {
+        float t = Math.Clamp(progress, 0, 1), air = t < HopShare ? MathF.Sin(MathF.PI * t / HopShare) : 0;
+        float snap = Mathf.SmoothStep(0, .08f, t) * (1 - Mathf.SmoothStep(.15f, .55f, t));
+        // The duck eases into the wary stand the wolf goes on to, rather than out of it.
+        float duck = Mathf.SmoothStep(HopShare - .12f, HopShare + .08f, t) * (1 - .45f * Mathf.SmoothStep(.7f, 1, t)), cower = Math.Max(snap, duck);
+        var body = new WolfPose(Lift: .1f * air - .15f * duck, Pitch: -6 * air + 6 * duck, Roll: 6 * snap, Bend: -12 * snap, Flex: 10 * air + 4 * duck,
+            Neck: -16 * snap + 40 * duck, Head: -10 * snap - 30 * duck, HeadTurn: -36 * snap, HeadTilt: -14 * snap, Jaw: 24 * snap + 12 * duck,
+            Ears: 45 * cower, Tail: -62 - 36 * cower, Curl: -30 * cower);
         for (int leg = 0; leg < 4; leg++) {
             bool hind = leg >= 2;
-            var knees = new WolfLeg(hind ? 40 : -20, hind ? -95 : 70, hind ? 70 : -60, 0);
-            var stiff = new WolfLeg(hind ? -18 + twitch : 22 - twitch, hind ? -14 : 12, hind ? 18 : -6, hind ? 30 : -20, leg % 2 == 0 ? 6 : -6);
-            body = body.WithLeg(leg, WolfLeg.Lerp(WolfLeg.Lerp(standing.Leg(leg), knees, buckle), stiff, roll));
+            // In the air the hind paws reach back for the landing and the forepaws trail where they pushed off; landed, the legs spread to brace the crouch.
+            var at = new Vector3(WolfShape.Pivot(leg).X * (1 + .2f * duck), WolfShape.Sole + .15f * air, Home(leg) + (hind ? -.1f : .07f) * air + (hind ? 0 : .05f * duck));
+            body = body.WithLeg(leg, Reach(body, leg, at, hind ? 2 - 24 * air : 10 - 50 * air, hind ? 0 : -30 * air));
+        }
+        Show(WolfMotion.Recoil, body, dt);
+    }
+
+    /// <summary>
+    /// A killed wolf is thrown off its feet, twisting onto its right side in the air, and slams down with a bounce that whips the head and legs.
+    /// It then lies limp, legs stretched out and the upper ones resting on the lower, as a dog lies on its side.
+    /// <paramref name="progress"/> runs 0 to 1 over FallSeconds; it starts from a stand, so a carcass never blends.
+    /// </summary>
+    public void Fall(float progress) {
+        float p = Math.Clamp(progress, 0, 1), fly = Math.Min(1, p / ThrowShare), down = Mathf.SmoothStep(0, 1, fly), air = MathF.Sin(MathF.PI * fly);
+        float after = Math.Max(0, (p - ThrowShare) / (1 - ThrowShare)), bounce = after < .3f ? MathF.Sin(MathF.PI * after / .3f) : 0;
+        // The head lags the body and hits the ground a moment after it.
+        float slam = p < ThrowShare ? 0 : Mathf.SmoothStep(0, .25f, after), kick = after is > .55f and < .8f ? MathF.Sin(MathF.PI * (after - .55f) / .25f) : 0;
+        // Rolled onto its side the body sinks until its flank lies on the ground.
+        var body = new WolfPose(Lift: -.52f * down + .12f * air + .07f * bounce, Pitch: -14 * air, Roll: 90 * down + 6 * bounce, Shift: -.05f * down,
+            Flex: -12 * air - 4 * down, Bend: 6 * down, Neck: -34 * air + 10 * bounce - 8 * slam, NeckTurn: -12 * slam, Head: 12 * air, HeadTilt: -10 * slam,
+            Jaw: 26 * air + 14 * down, Ears: 30 * down, Tail: Mathf.Lerp(-65, -6, down) + 30 * air, Curl: -10 * down);
+        var standing = Planted(new WolfPose(), 1);
+        for (int leg = 0; leg < 4; leg++) {
+            bool hind = leg >= 2, upper = leg % 2 == 0;
+            // Knocked off its feet the legs buckle and fold under; on the ground the forelegs stretch forward and the hind legs back, the upper pair drooping onto the lower.
+            var flung = hind ? new WolfLeg(45, -100, 70, 20) : new WolfLeg(-35, 30, -90, -20);
+            var limp = hind ? new WolfLeg(-30 - 14 * kick, -12, 16 + 10 * kick, 25, upper ? -12 : 4) : new WolfLeg(32, 14, -10, -25, upper ? -12 : 4);
+            var at = WolfLeg.Lerp(WolfLeg.Lerp(standing.Leg(leg), limp, down), flung, .8f * air);
+            body = body.WithLeg(leg, at with { Upper = at.Upper + (hind ? -14 : 14) * bounce });
         }
         motion = WolfMotion.Fall; blend = 1; shown = body;
         Apply(body);
+    }
+
+    /// <summary>Where the jaws close, in the model, under the pose shown.</summary>
+    public Vector3 Bite {
+        get {
+            var neck = Frame(shown, false) * Posed(WolfShape.Neck, Vector3.Zero, Turn(shown.Neck, shown.NeckTurn));
+            var head = neck * Posed(WolfShape.Head, Vector3.Zero, Turn(shown.Head, shown.HeadTurn, shown.HeadTilt));
+            return head * (WolfShape.Bite - WolfShape.Bones[WolfShape.Head].At);
+        }
     }
 
     // ---------- Blending and posing ----------

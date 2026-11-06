@@ -280,9 +280,11 @@ A change of motion blends from the last shown pose over a short smoothstep, so s
 
 `WorldView` times the wolf against the player:
 
-- a leap rises, stretches and reaches for the throat; contact at `WolfModel.ContactReach` knocks the player onto their back facing the wolf, and the wolf rides them down to stand over them at `World.PinDistance`;
-- a wolf a swing will hit lunges into it to `WolfModel.StrikeReach`, and is thrown back only when the swing lands (`ActorAnimation.Contact`);
-- a killing blow knocks the carcass back over the same moment before it falls.
+- a leap arcs up and comes down jaws first on the throat (`WorldView.Throat`); contact at `WolfModel.ContactReach` knocks the player onto their back facing the wolf, and the jaws stay on the throat as they go over, so the wolf ends standing over them;
+- a wolf a swing will hit lunges into it to `WolfModel.StrikeReach`; when the swing lands (`ActorAnimation.Contact`) it hops back `World.KnockBackDistance`, moving only while in the air, and ducks low before rising wary;
+- a killing blow throws the wolf off its feet onto its side, covering the knockback in the air, and it lands with a bounce and lies limp.
+
+Wolf eyes glow faintly, so they show in the dark.
 
 ## Gameplay
 
