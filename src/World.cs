@@ -339,7 +339,7 @@ public sealed partial class World {
     public float Moonlight => (1 + MathF.Cos(MathF.Tau * S.Time / Data.DaySeconds / Data.MoonCycleDays)) / 2;
     /// <summary>Clock hour, with the day starting at 06:00.</summary>
     public float Hour => (DayPhase * 24 + 6) % 24;
-    /// <summary>From the first fading light until dawn; workers are off duty.</summary>
+    /// <summary>From the first fading light until dawn; workers are off duty and wolves hunt.</summary>
     public bool Dusk => DayPhase >= Data.DuskStarts;
     public bool Lunch => Hour >= Data.LunchHour && Hour < Data.LunchHour + 1;
     /// <summary>On the map and neither signed out nor at lunch.</summary>
@@ -2015,7 +2015,6 @@ public sealed partial class World {
                 if (CanStand(b.Pos - push)) b.Pos -= push;
             }
         }
-        // Wolves come out with the fading light, so the evening before bed is not safe.
         if (!Dusk) S.Wolves.Clear();
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
