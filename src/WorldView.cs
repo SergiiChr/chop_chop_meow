@@ -466,9 +466,9 @@ public partial class WorldView : Node3D {
         } else downedFor = 0;
         player.Update(World.Player, action, target, dt);
         // A foot lands at each extreme of the stride.
-        if (action is ActorAction.Walk or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
+        if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
-        string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(SelectedTool, World.S.Backpack) : null);
+        string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
         Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
@@ -566,8 +566,8 @@ public partial class WorldView : Node3D {
             } else other.DownedFor = 0;
             state.Update(p.Pos, action, facing, dt);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
-            if (action is ActorAction.Walk or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
-            Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(p.Held, p.Backpack) : null), p.Held, p.Backpack), p.Torch > 0 && p.RespawnIn <= 0);
+            if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
+            Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run ? HeldTool(p.Held, p.Backpack) : null), p.Held, p.Backpack), p.Torch > 0 && p.RespawnIn <= 0);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             if (other.DownedFor > 0) KnockDown(other.Rig, state, other.DownedFor);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
@@ -615,7 +615,7 @@ public partial class WorldView : Node3D {
         rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
         var pose = state.Pose;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
-        if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
+        if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
         rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
     }
 
@@ -1159,7 +1159,7 @@ public partial class WorldView : Node3D {
             cart.Root.Rotation = new Vector3(0, cart.Yaw, 0);
             cart.Roll(cart.Distance);
             // The courier walks with arms trailing back to the cart handle.
-            var stride = ActorAnimation.PoseAt(ActorAction.Walk, cart.Distance / 2.1f, true) with { RaiseL = -22, RaiseR = -22, OutL = 12, OutR = 12, ElbowL = 8, ElbowR = 8, Lean = 10 };
+            var stride = ActorAnimation.PoseAt(ActorAction.Walk, ActorAnimation.Advance(ActorAction.Walk, 0, cart.Distance), true) with { RaiseL = -22, RaiseR = -22, OutL = 12, OutR = 12, ElbowL = 8, ElbowR = 8, Lean = 10 };
             cart.Courier.Show(stride, null, false);
             // A sale leaves with its crates and returns with the payment; a purchase leaves with the payment and returns with the goods.
             bool back = phase >= .5f;

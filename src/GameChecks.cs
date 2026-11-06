@@ -625,12 +625,12 @@ public partial class Game {
         await KeyStroke(Key.Escape);
         Require(!menu.Visible && !view.Paused, "Esc must close the pause menu and resume.");
     }
-    /// <summary>WASD walks and Shift while moving sprints, unless the player is too thirsty.</summary>
-    private async Task CheckWasdWalksAndShiftSprintsUnlessTooThirsty() {
+    /// <summary>WASD jogs and Shift while moving sprints, unless the player is too thirsty.</summary>
+    private async Task CheckWasdJogsAndShiftSprintsUnlessTooThirsty() {
         var start = world.Player;
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
-        await Until(() => view.PlayerAnimation == ActorAction.Walk && world.Player.DistanceTo(start) > .25f && sounds.Last == "footsteps_default",
-            "WASD moving the player through Godot input with the full walking cycle and grass footsteps", 2);
+        await Until(() => view.PlayerAnimation == ActorAction.Jog && world.Player.DistanceTo(start) > .25f && sounds.Last == "footsteps_default",
+            "WASD moving the player through Godot input with the full jogging cycle and grass footsteps", 2);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = true });
@@ -642,7 +642,7 @@ public partial class Game {
         float drink = world.Thirst; SetNeeds(Hosted, thirst: 10);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = true });
         await Frames();
-        Require(!world.Me.Sprinting && view.PlayerAnimation == ActorAction.Walk, "Under 15% drink the player must be too weak to sprint.");
+        Require(!world.Me.Sprinting && view.PlayerAnimation == ActorAction.Jog, "Under 15% drink the player must be too weak to sprint.");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
         SetNeeds(Hosted, thirst: drink);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = false });
@@ -1145,7 +1145,7 @@ public partial class Game {
             await Test(CheckOptionsApplyAndKeepTheirChoices);
             await Test(CheckNewGameStartsTheWelcomePage);
             await Test(CheckPauseMenuAsksBeforeNewGameAndQuit);
-            await Test(CheckWasdWalksAndShiftSprintsUnlessTooThirsty);
+            await Test(CheckWasdJogsAndShiftSprintsUnlessTooThirsty);
             await Test(CheckMessagesStackFadeAndKeepClearOfHud);
             await Test(CheckPanelPagesRefreshWithoutAllocating);
             await Test(CheckLowFoodGlowsScreenEdges);

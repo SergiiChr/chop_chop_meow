@@ -191,7 +191,7 @@ public partial class WorldView {
 
     private static readonly (string Name, ActorSkin Skin, ActorAction Action)[] ReviewClips =
     {
-        ("player walk", ActorSkin.Player, ActorAction.Walk), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop),
+        ("player jog", ActorSkin.Player, ActorAction.Jog), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop),
         ("player pick", ActorSkin.Player, ActorAction.Mine), ("player steel pick", ActorSkin.Player, ActorAction.SteelMine), ("player gather", ActorSkin.Player, ActorAction.Gather),
         ("player hammer", ActorSkin.Player, ActorAction.Hammer), ("player pump", ActorSkin.Player, ActorAction.Pump), ("player punch", ActorSkin.Player, ActorAction.Attack),
         ("player idle", ActorSkin.Player, ActorAction.Idle), ("worker walk", ActorSkin.Worker, ActorAction.Walk), ("worker axe", ActorSkin.Worker, ActorAction.Chop),
@@ -221,7 +221,8 @@ public partial class WorldView {
 
     /// <summary>Tiles a second an action carries an actor across the ground.</summary>
     private float ReviewSpeed(ActorAction action) => action switch {
-        ActorAction.Walk or ActorAction.Carry => World.Data.MoveSpeed(sprinting: false),
+        ActorAction.Walk or ActorAction.Carry => World.WorkerSpeed,
+        ActorAction.Jog => World.Data.MoveSpeed(sprinting: false),
         ActorAction.Run => World.Data.MoveSpeed(sprinting: true),
         _ => 0
     };
@@ -370,7 +371,7 @@ public partial class WorldView {
         for (int i = 0; i < ReviewClips.Length; i++) {
             var action = ReviewClips[i].Action;
             reviewRigs[i].Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
-            reviewRigs[i].Show(ActorAnimation.PoseAt(action, Elapsed, action is ActorAction.Walk or ActorAction.Carry), ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch);
+            reviewRigs[i].Show(ActorAnimation.PoseAt(action, Elapsed, action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Carry), ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch);
         }
     }
 

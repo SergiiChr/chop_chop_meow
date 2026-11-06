@@ -101,20 +101,23 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 ## This game's rigs
 
 - People: `Pose` in `src/ActorAnimation.cs` lists joint angles, and `src/ActorRig.cs` applies them to hips, torso, head,
-  shoulders, elbows, thighs, knees and ankles. [docs/DESIGN.md](../../../docs/DESIGN.md) describes the run.
+  shoulders, elbows, thighs, knees and ankles. [docs/DESIGN.md](../../../docs/DESIGN.md) describes the walk, jog and
+  sprint.
 - Wolves: `src/WolfShape.cs` builds one skinned mesh on a skeleton, and `WolfModel` in `src/WolfModel.cs` poses it from
   a `WolfPose` of spine, neck, head, jaw, ears, tail and leg angles. Gait legs are solved by IK from where each paw stands
   (`Reach`), and `WolfModel.Paw` and `WolfModel.Bite` give where a paw and the jaws are under the pose shown.
   `SyncWolves` in `src/WorldView.cs` times the wolf against the player.
 - The pelvis is part of the torso model, so it cannot turn or drop on its own.
-- Only the run sets the ankle. Other people's actions leave the boot square to the shin, so toes can dip into the ground
-  at a steep shin.
-- The run's clock moves with distance through `ActorAnimation.Advance`, with `RunStride` matched to sprint speed: a
-  change of walk or sprint speed fails a check until the stride is changed too.
+- Only the walk, jog and sprint set the ankle. Other actions leave the boot square to the shin, so toes can dip into the
+  ground at a steep shin.
+- The walk's, jog's and sprint's clocks move with distance through `ActorAnimation.Advance`, each `Stride` matched to
+  the speed it is timed for: a change of a worker's, walking or sprint speed fails a check until the gait is retimed.
+- A gait's planted leg is solved from where its foot touches the ground, and its swinging leg is keyed. A key change can
+  push a toe through the ground: the gait check in `tests/AnimationChecks.cs` catches that.
 
 ## Review
 
-`tools/animation_review.py` captures one people's clip close up, moving over marked ground, from the side, front and
+`tools/animation_review.py` captures one clip close up, moving over marked ground, from the side, front and
 game camera:
 
 ```sh
@@ -123,10 +126,12 @@ git fetch origin
 ./tools/animation_review.py "player run" --base origin/main --views side --slow 1  # add the same views from main
 ```
 
-- Frames land in `build/animation-review/<current or ref>/<view>/`, 96 a view at 30 a second.
+- Frames land in `build/animation-review/<clip>/<current or ref>/<view>/`, 96 a view at 30 a second.
 - The first frames show the start from standing: pick frames after it for a steady cycle.
 - `--base` captures a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
   A ref without the close-up review (`--animation-clip`) cannot be captured.
+- `--base-clip` names the clip in `--base` when it was renamed since, such as `--base-clip "player walk"` for
+  `"player jog"`; both land in the current clip's folder.
 - Wolves have close-ups too: `wolf idle`, `wolf walk`, `wolf trot`, `wolf gallop`, `wolf speeds` (stand to gallop and
   back, for blends), `wolf leap`, `wolf hit`, `wolf feed` and `wolf fall`. The last four play against a player, as
   `SyncWolves` sets them up. `./build.py play -- --animation-review` shows every clip on one screen.

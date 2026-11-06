@@ -18,7 +18,7 @@ public static class AnimationChecks {
         CheckEveryActionMovesThroughDistinctPoses();
         CheckCraftingSquatsOnlyWhileStandingStill();
         CheckChangingActionBlendsBetweenPoses();
-        CheckRunPlantsEachFootAndLeavesTheGroundAfterPushOff();
+        CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning();
         CheckWolfGaitsPlantEachPaw();
     }
 
@@ -52,7 +52,7 @@ public static class AnimationChecks {
     private static void CheckCraftingSquatsOnlyWhileStandingStill() {
         var empty = new Inventory();
         Require(ActorAnimation.PlayerAction(null, false, false, empty, crafting: true) == ActorAction.Craft, "a player crafting by hand should squat over the work while standing still");
-        Require(ActorAnimation.PlayerAction(null, false, true, empty, crafting: true) == ActorAction.Walk, "moving should stand the crafting player up to walk");
+        Require(ActorAnimation.PlayerAction(null, false, true, empty, crafting: true) == ActorAction.Jog, "moving should stand the crafting player up to jog");
         Require(ActorAnimation.PlayerAction(ThingKind.Berries, true, false, empty, crafting: true) == ActorAction.Gather, "gathering should come before crafting");
         var squat = ActorAnimation.PoseAt(ActorAction.Craft, .3f, false);
         Require(squat.KneeL > 120 && squat.KneeR > 120 && squat.SwingL > 80, "the crafting pose should be a deep squat");
@@ -75,52 +75,63 @@ public static class AnimationChecks {
     }
 
     /// <summary>
-    /// A run leaves the ground for a while after each push-off, never sinks a foot into it, and carries the hips up and down smoothly.
-    /// A foot on the ground holds its place there while the body runs on over it.
+    /// Each way of moving keeps every foot on the ground where it landed while the body passes over it, never sinks one into the ground and carries the hips up and down smoothly.
+    /// A sprint is in the air for most of each step, a jog for some of it, and a walk never, with both feet down for a moment at each step.
     /// </summary>
-    private static void CheckRunPlantsEachFootAndLeavesTheGroundAfterPushOff() {
+    private static void CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning() {
         const int samples = 400;
-        int airborne = 0;
-        float lastHips = 0, steepest = 0, deepest = 0, slide = 0;
-        var planted = new float?[2];
-        for (int i = 0; i <= samples; i++) {
-            // Two steps carry the body a run's stride along the ground.
-            float travelled = ActorAnimation.RunStride * i / samples;
-            var run = ActorAnimation.PoseAt(ActorAction.Run, ActorAnimation.Advance(ActorAction.Run, 0, travelled), true);
-            bool grounded = false;
-            for (int side = 0; side < 2; side++) {
-                var (toe, heel) = side == 0 ? ActorAnimation.SoleOf(run.SwingL, run.KneeL, run.FootL) : ActorAnimation.SoleOf(run.SwingR, run.KneeR, run.FootR);
-                float toeClear = run.Hips - toe.Y, heelClear = run.Hips - heel.Y;
-                deepest = Math.Min(deepest, Math.Min(toeClear, heelClear));
-                if (toeClear > .002f) { planted[side] = null; continue; }
-                grounded = true;
-                float at = travelled + toe.X;
-                planted[side] ??= at;
-                slide = Math.Max(slide, Math.Abs(at - planted[side]!.Value));
+        // Shares of the cycle with both feet off the ground: sprint and jog figures from running studies, scaled to these legs.
+        foreach (var (gait, minAirborne, maxAirborne) in new[] { (ActorAction.Run, .5f, .8f), (ActorAction.Jog, .2f, .55f), (ActorAction.Walk, 0f, 0f), (ActorAction.Carry, 0f, 0f) }) {
+            int airborne = 0, doubleSupport = 0;
+            float lastHips = 0, steepest = 0, deepest = 0, slide = 0;
+            // Where each foot's toe and heel touched down, while they stay down.
+            var planted = new float?[4];
+            for (int i = 0; i <= samples; i++) {
+                // Two steps carry the body one stride along the ground.
+                float travelled = ActorAnimation.Stride(gait) * i / samples;
+                var pose = ActorAnimation.PoseAt(gait, ActorAnimation.Advance(gait, 0, travelled), true);
+                int down = 0;
+                for (int side = 0; side < 2; side++) {
+                    var (toe, heel) = side == 0 ? ActorAnimation.SoleOf(pose.SwingL, pose.KneeL, pose.FootL) : ActorAnimation.SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
+                    bool touching = false;
+                    for (int end = 0; end < 2; end++) {
+                        var point = end == 0 ? toe : heel;
+                        float clear = pose.Hips - point.Y;
+                        deepest = Math.Min(deepest, clear);
+                        if (clear > .002f) { planted[side * 2 + end] = null; continue; }
+                        touching = true;
+                        float at = travelled + point.X;
+                        planted[side * 2 + end] ??= at;
+                        slide = Math.Max(slide, Math.Abs(at - planted[side * 2 + end]!.Value));
+                    }
+                    if (touching) down++;
+                }
+                if (i < samples && down == 0) airborne++;
+                if (i < samples && down == 2) doubleSupport++;
+                if (i > 0) steepest = Math.Max(steepest, Math.Abs(pose.Hips - lastHips));
+                lastHips = pose.Hips;
             }
-            if (i < samples && !grounded) airborne++;
-            if (i > 0) steepest = Math.Max(steepest, Math.Abs(run.Hips - lastHips));
-            lastHips = run.Hips;
+            Require(airborne >= samples * minAirborne && airborne <= samples * maxAirborne,
+                $"{gait} should be off the ground for {minAirborne:0%} to {maxAirborne:0%} of its cycle: {airborne} of {samples} samples");
+            if (maxAirborne == 0) Require(doubleSupport > samples * .05f, $"{gait} should have both feet down for a moment at each step: {doubleSupport} of {samples} samples");
+            Require(deepest > -.002f, $"{gait} should never sink a foot into the ground: {deepest:0.000} m");
+            Require(slide < .01f, $"{gait} should keep a planted foot where it is while the body passes over it: it slid {slide:0.000} m");
+            // Several centimetres up and down twice a stride moves the hips under 3 mm between these samples.
+            Require(steepest < .003f, $"{gait} should carry the hips up and down smoothly, not jump: {steepest:0.0000} m between samples");
         }
-        // A sprint is in the air for over half of each step; a jog or a walk would be on the ground most of it.
-        Require(airborne > samples * .5f && airborne < samples * .8f, $"a run should leave the ground for most of each step, not walk or bound: airborne {airborne} of {samples} samples");
-        Require(deepest > -.002f, $"a running foot should never sink into the ground: {deepest:0.000} m");
-        Require(slide < .01f, $"a planted foot should stay where it landed while the body runs over it: it slid {slide:0.000} m");
-        // Six centimetres up and down twice a stride moves the hips under 3 mm between these samples.
-        Require(steepest < .003f, $"the hips should rise and fall smoothly through a run, not jump: {steepest:0.0000} m between samples");
-        Require(ActorAnimation.PoseAt(ActorAction.Walk, .3f, true).Hips == 0, "a walk should keep a foot on the ground");
-        // The bounce under gravity and the tenth of a second on the ground are timed for a cycle at sprint speed.
+        // The bounces and the time on the ground are timed for a cycle at the speed each gait moves at.
         var data = GameData.Create();
-        float sprintCycle = ActorAnimation.RunStride / data.MoveSpeed(sprinting: true);
-        Require(Math.Abs(sprintCycle - ActorAnimation.Duration(ActorAction.Run)) < .02f,
-            $"a run's stride should take as long at sprint speed as its timing assumes: {sprintCycle:0.000} s against {ActorAnimation.Duration(ActorAction.Run):0.000} s");
+        foreach (var (gait, speed) in new[] { (ActorAction.Run, data.MoveSpeed(sprinting: true)), (ActorAction.Jog, data.MoveSpeed(sprinting: false)), (ActorAction.Walk, World.WorkerSpeed) }) {
+            float cycle = ActorAnimation.Stride(gait) / speed;
+            Require(Math.Abs(cycle - ActorAnimation.Duration(gait)) < .02f,
+                $"{gait}'s stride should take as long at its speed as its timing assumes: {cycle:0.000} s against {ActorAnimation.Duration(gait):0.000} s");
+        }
     }
 
     private static void CheckActionsLoopAndWrapByTheirDuration() {
         Require(ActorAnimation.Phase(ActorAction.Chop, .25f) == .25f, "a one-second chop should be a quarter through after .25s");
         Require(ActorAnimation.Phase(ActorAction.Chop, 1) == 0, "action loops should wrap after their duration");
         Require(Math.Abs(ActorAnimation.Phase(ActorAction.Chop, -.125f) - .875f) < 1e-5f, "negative elapsed time should wrap safely");
-        Require(Math.Abs(ActorAnimation.Phase(ActorAction.Walk, .4f) - .5f) < 1e-5f, "walking should loop every .8 seconds");
         Require(ActorAnimation.Phase(ActorAction.Attack, ActorAnimation.Duration(ActorAction.Attack)) == 0, "punches should wrap at their own duration");
         Require(ActorAnimation.Phase(ActorAction.Idle, float.NaN) == 0, "invalid time should fall back to the first pose");
     }
@@ -137,7 +148,7 @@ public static class AnimationChecks {
         bag.Add("steel_axe", 1);
         bag.Add("steel_pick", 1);
 
-        Require(ActorAnimation.PlayerAction(ThingKind.Tree, true, true, bag) == ActorAction.Walk,
+        Require(ActorAnimation.PlayerAction(ThingKind.Tree, true, true, bag) == ActorAction.Jog,
             "movement toward a resource should animate as walking");
         Require(ActorAnimation.PlayerAction(ThingKind.Tree, true, false, bag) == ActorAction.SteelChop,
             "a stationary player with a steel axe should chop a tree");
@@ -254,7 +265,7 @@ public static class AnimationChecks {
         Require(ActorAnimation.PoseAt(ActorAction.PickUp, .32f * ActorAnimation.Duration(ActorAction.PickUp), false).KneeL > 80, "picking up a loose piece should crouch for it");
         var swingWalking = ActorAnimation.PoseAt(ActorAction.TorchSwing, .27f, true);
         var swingStanding = ActorAnimation.PoseAt(ActorAction.TorchSwing, .27f, false);
-        Require(swingWalking.RaiseL == swingStanding.RaiseL && swingWalking.SwingL == ActorAnimation.PoseAt(ActorAction.Walk, .27f, true).SwingL,
+        Require(swingWalking.RaiseL == swingStanding.RaiseL && swingWalking.SwingL == ActorAnimation.PoseAt(ActorAction.Jog, .27f, true).SwingL,
             "a torch swing on the move should keep the swinging arm while the legs keep walking");
         Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Hips is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Hips == 0,
             "a cross-legged worker should sit on the ground, and one on a rock should not");
