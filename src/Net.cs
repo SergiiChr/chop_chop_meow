@@ -577,8 +577,9 @@ public partial class Net : Node {
     private static void CopyExcept(object target, object source, HashSet<string>? skip) {
         var type = target.GetType();
         if (!properties.TryGetValue(type, out var list))
-            properties[type] = list = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0 && p.GetCustomAttribute<JsonIgnoreAttribute>() is not { Condition: JsonIgnoreCondition.Always }).ToArray();
+            properties[type] = list = type.GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .Where(p => p.CanRead && p.CanWrite && p.GetIndexParameters().Length == 0 && (p.GetMethod!.IsPublic || p.GetCustomAttribute<JsonIncludeAttribute>() != null)
+                    && p.GetCustomAttribute<JsonIgnoreAttribute>() is not { Condition: JsonIgnoreCondition.Always }).ToArray();
         foreach (var property in list) {
             if (skip?.Contains(property.Name) == true) continue;
             var value = property.GetValue(source);

@@ -8,7 +8,7 @@ using static WorldSteps;
 using static EconomySteps;
 
 /// <summary>
-/// Checks the economy rules in docs/ECONOMY.md against data/game.json.
+/// Checks the economy rules in docs/ECONOMY.md against the game tables.
 /// Worker output is measured by running real workers through a whole day, so the numbers follow walking, hauling, lunch and the commute.
 /// </summary>
 public static class EconomyChecks {

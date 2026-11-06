@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
-using System.Text.Json.Serialization;
-using Godot;
 
 namespace ChopChopMeow;
 
@@ -34,7 +32,7 @@ public sealed class BuildingDef {
 public sealed class RecipeDef {
     public string Name { get; set; } = "";
     /// <summary>The station that makes it, or null for a recipe made only by hand.</summary>
-    [JsonConverter(typeof(OptionalKind))] public ThingKind? Station { get; set; }
+    public ThingKind? Station { get; set; }
     public Dictionary<string, int> Inputs { get; set; } = new();
     public string Output { get; set; } = "";
     public int Amount { get; set; } = 1;
@@ -47,7 +45,7 @@ public sealed class RecipeDef {
     public bool Hand { get; set; }
     /// <summary>The fuels a batch can burn, one unit per batch from the station's fuel slot, in the order workers look for them; empty for a recipe that burns none.</summary>
     public List<string> Fuels { get; set; } = new();
-    [JsonIgnore] public bool Burns => Fuels.Count > 0;
+    public bool Burns => Fuels.Count > 0;
 }
 /// <summary>How the village's appetite for a good it takes moves with sales.</summary>
 public sealed class DemandDef {
@@ -94,76 +92,68 @@ public sealed class GoalsDef {
     /// <summary>Consecutive days that have to clear it.</summary>
     public int ProfitDays { get; set; }
 }
-public sealed class GameData {
+public sealed partial class GameData {
     public const int MinutesPerDay = 1440;
-    public float DaySeconds { get; set; } = 420;
-    public float NightStarts { get; set; } = .7f;
+    public float DaySeconds { get; } = 840;
+    public float NightStarts { get; } = .7f;
     /// <summary>Day phase where the light starts to fade, a tenth of a day before night; workers sign out then.</summary>
     public float DuskStarts => NightStarts - .1f;
     /// <summary>Day phase where the sun sets and the moon rises, halfway through the fading light.</summary>
     public float Sunset => (DuskStarts + NightStarts) / 2;
     /// <summary>Clock hour when workers break for an hour of lunch; the day starts at 06:00.</summary>
-    public float LunchHour { get; set; } = 12;
+    public float LunchHour { get; } = 12;
     /// <summary>Days from one full moon to the next; new-moon nights are the darkest.</summary>
-    public float MoonCycleDays { get; set; } = 8;
-    public float TradeSeconds { get; set; } = 30;
-    public List<HireOffer> HireOffers { get; set; } = new();
-    public float GatherSeconds { get; set; } = 1.5f;
+    public float MoonCycleDays { get; } = 8;
+    public float TradeSeconds { get; } = 30;
+    public float GatherSeconds { get; } = 2;
     /// <summary>Tiles a second the player walks.</summary>
-    public float WalkSpeed { get; set; } = 4.2f;
+    public float WalkSpeed { get; } = 4.2f;
     /// <summary>How many times faster than walking a wolf chases: above 1 so walking never outpaces it, below <see cref="SprintSpeed"/> so sprinting does.</summary>
-    public float WolfChase { get; set; } = 1.5f;
+    public float WolfChase { get; } = 1.5f;
     /// <summary>How many times faster the player moves with Shift held.</summary>
-    public float SprintSpeed { get; set; } = 1.6f;
+    public float SprintSpeed { get; } = 1.6f;
     /// <summary>How many times faster food and drink drain while sprinting.</summary>
-    public float SprintDrain { get; set; } = 1.7f;
+    public float SprintDrain { get; } = 1.7f;
     /// <summary>Food or drink percentage below which the player is too weak to sprint and the screen edges warn.</summary>
     public const float LowNeed = 15;
-    public float RespawnSeconds { get; set; } = 30;
+    public float RespawnSeconds { get; } = 30;
     /// <summary>In-game hours a picked-clean berry bush takes to fruit again.</summary>
-    public float BerryRegrowHours { get; set; } = 24;
+    public float BerryRegrowHours { get; } = 24;
     public float HourSeconds => DaySeconds / 24;
     /// <summary>Seconds of play as whole in-game minutes.</summary>
     public int GameMinutes(float seconds) => (int)(seconds / DaySeconds * MinutesPerDay);
     public float BerryRegrowSeconds => BerryRegrowHours / 24 * DaySeconds;
     /// <summary>In-game hours a full hunger or thirst bar lasts, so the drain follows the day length.</summary>
-    public float HungerHours { get; set; } = 24;
-    public float ThirstHours { get; set; } = 12;
+    public float HungerHours { get; } = 24;
+    public float ThirstHours { get; } = 24;
     /// <summary>In-game hours one log keeps a campfire burning.</summary>
-    public float CampfireHours { get; set; } = 4;
+    public float CampfireHours { get; } = 4;
     public float CampfireSeconds => CampfireHours / 24 * DaySeconds;
     public float HungerPerSecond => 100 / (HungerHours / 24 * DaySeconds);
     public float ThirstPerSecond => 100 / (ThirstHours / 24 * DaySeconds);
     /// <summary>Radius in tiles of the player's live view; sized to fill a 16:10 screen at full zoom-out.</summary>
-    public float SightRadius { get; set; } = 20;
+    public float SightRadius { get; } = 20;
     /// <summary>Items one crate holds in total, in stacks of one item each.</summary>
-    public int CrateCapacity { get; set; } = 12;
+    public int CrateCapacity { get; } = 12;
     /// <summary>Seconds a packing station takes to pack one item into a crate.</summary>
-    public float PackSeconds { get; set; } = 1;
+    public float PackSeconds { get; } = 1.5f;
     /// <summary>How much faster a crafting bench works than crafting by hand.</summary>
-    public float BenchSpeed { get; set; } = 2;
-    public MarketDef Market { get; set; } = new();
-    public MineDef Mine { get; set; } = new();
-    public FarmDef Farm { get; set; } = new();
-    public GoalsDef Goals { get; set; } = new();
+    public float BenchSpeed { get; } = 2;
     /// <summary>A worker's time on duty in a day: dawn to dusk, less lunch and the walk in.</summary>
     public float WorkdaySeconds => DuskStarts * DaySeconds - HourSeconds - TradeSeconds / 2;
-    public Dictionary<string, ItemDef> Items { get; set; } = new();
-    public Dictionary<ThingKind, BuildingDef> Buildings { get; set; } = new();
-    public Dictionary<string, RecipeDef> Recipes { get; set; } = new();
     public static readonly JsonSerializerOptions Json = new() { PropertyNameCaseInsensitive = true, WriteIndented = true };
-    public static GameData Load() {
-        using var file = Godot.FileAccess.Open("res://data/game.json", Godot.FileAccess.ModeFlags.Read);
-        var data = JsonSerializer.Deserialize<GameData>(file.GetAsText(), Json) ?? throw new InvalidOperationException("Missing game data");
+    /// <summary>The game's values, checked to fit together.</summary>
+    public static GameData Create() {
+        var data = new GameData();
         data.Validate();
         Inventory.Unstacked.Clear();
         foreach (var (id, item) in data.Items) if (item.Tool != "") Inventory.Unstacked.Add(id);
         foreach (var id in Water.BottleItems) Inventory.Unstacked.Add(id);
         return data;
     }
-    public void Validate() {
+    private void Validate() {
         if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
-            throw new InvalidOperationException("Invalid time or economy balance in data/game.json.");
+            throw new InvalidOperationException("Invalid time or economy balance in GameData.");
         foreach (var building in Buildings) {
             foreach (var cost in building.Value.Cost)
                 if (!Items.ContainsKey(cost.Key) || cost.Value <= 0) throw new InvalidOperationException($"Invalid cost for {building.Key}: {cost.Key}.");
@@ -182,11 +172,11 @@ public sealed class GameData {
                 throw new InvalidOperationException($"Invalid fuel for {recipe.Key}.");
         }
         if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Health < 0 || i.Hunger > 0 && !i.Food) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
-            throw new InvalidOperationException("Invalid tool speed or market goods in data/game.json.");
+            throw new InvalidOperationException("Invalid tool speed or market goods in GameData.");
         if (Mine.Materials.Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Mine.StageWorkdays <= 0 || Mine.Seconds <= 0 || Mine.Workers <= 0 || Goals.DailyProfit <= 0 || Goals.ProfitDays <= 0)
-            throw new InvalidOperationException("Invalid mine or goals in data/game.json.");
+            throw new InvalidOperationException("Invalid mine or goals in GameData.");
         if (Farm.Sow.Count == 0 || Farm.Yield.Count == 0 || Farm.Sow.Concat(Farm.Yield).Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Farm.GrowDays <= 0 || Farm.HarvestWorkdays <= 0)
-            throw new InvalidOperationException("Invalid farm in data/game.json.");
+            throw new InvalidOperationException("Invalid farm in GameData.");
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
     public bool IsConsumable(string item) => Water.BottleSips(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);

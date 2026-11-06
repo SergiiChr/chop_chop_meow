@@ -15,6 +15,7 @@ public static class WorkerStateChecks {
         CheckPickerGoesToNextKnownLooseCoalThenWaits(data);
         CheckMinerWorksDepositsBeforePickingUpChips(data);
         CheckGathererWithoutAToolPicksUpLoosePieces(data);
+        CheckWaitingWorkerTakesAToolOnceOneIsHung(data);
         CheckWorkerOutOfPatchesMovesToTheirOtherJob(data);
         CheckWorkerWhoseBuildingGoesSaysTheyHaveNoJob(data);
         CheckStrikeResetsWorkState(data);
@@ -121,6 +122,28 @@ public static class WorkerStateChecks {
         world.Assign(miner, deposit);
         for (int i = 0; i < 300 && chest.Inventory["iron_ore"] == 0; i++) world.Tick(.1f);
         Require(world.Find(chip.Id) == null && chest.Inventory["iron_ore"] == 1 && deposit.Remaining == 40, "a miner without a pickaxe should pick up the loose ore and leave the deposit");
+    }
+
+    /// <summary>A worker waiting for a tool takes one as soon as it hangs in a tool station that gives it out, and not while its filter keeps it in.</summary>
+    private static void CheckWaitingWorkerTakesAToolOnceOneIsHung(GameData data) {
+        var world = EmptyWorld(data);
+        var at = Terrain.Spawn;
+        world.Add(ThingKind.Chest, at + new Vector2(2, 2));
+        var rack = world.Add(ThingKind.Toolstation, at + new Vector2(-2, 2));
+        var tree = world.Add(ThingKind.Tree, at + new Vector2(1, 0), 40);
+        world.Player = at; world.Look();
+        var cutter = AddWorker(world, tree.Pos);
+        world.Assign(cutter, tree);
+        for (int i = 0; i < 20; i++) world.Tick(.1f);
+        Require(cutter.Missing == "axe", "a woodcutter with no axe anywhere should wait for one");
+        // An output filter naming only the pickaxe keeps the axe in.
+        world.SetFilter(rack, "steel_pick", true, true);
+        Give(world, "steel_axe", 2); world.Transfer(world.Backpack, rack.Inventory, "steel_axe", 1);
+        for (int i = 0; i < 20; i++) world.Tick(.1f);
+        Require(cutter.Tool == "" && rack.Inventory["steel_axe"] == 1, "a tool station whose filter keeps its axe in should not give it out");
+        world.ClearFilters(rack);
+        for (int i = 0; i < 100 && cutter.Tool == ""; i++) world.Tick(.1f);
+        Require(cutter.Tool == "steel_axe" && rack.Inventory["steel_axe"] == 0, "a waiting woodcutter should take the axe once the tool station gives it out");
     }
 
     private static void CheckWorkerOutOfPatchesMovesToTheirOtherJob(GameData data) {

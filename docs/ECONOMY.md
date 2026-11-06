@@ -1,13 +1,13 @@
 # Economy rules
 
-Prices, wages and demand live in `data/game.json`.
+Prices, wages and demand live in `src/GameTables.cs`.
 `tests/EconomyChecks.cs` runs these rules on every `./build.py check` and prints the numbers it measured as `Economy:` lines in `build/test.log`.
 
 To tune: change the data, run the tests, and read those lines before and after.
 
 ## 1. Value ladder
 
-Every item has a `price`.
+Every item has a `Price`.
 For goods the village trades, it is the trade price; for the rest it is a reference value used only to keep recipes in line.
 
 - Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1. Iron ore, coal and tin ore are worth 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful and four make one fertilizer. Wheat is 1.5.
@@ -42,7 +42,7 @@ The slot holds one stack (1000 coins); sale coins beyond it go to the market out
 Worker output is measured by running one worker through a whole day: walking, hauling, lunch and the commute included, with chests 2.5 tiles away and steel tools at the bench.
 A product's worker-days are its materials' worker-days plus one over its station's daily output.
 
-- A hired berry picker barely breaks even: 0.9 to 1.25 times a worker-day's cost. Bushes fruit once a day (`berryRegrowHours`), so one picker brings in two crates of berries a day, within what the village takes at the full price.
+- A hired berry picker barely breaks even: 0.9 to 1.25 times a worker-day's cost. Bushes fruit once a day (`BerryRegrowHours`), so one picker brings in two crates of berries a day, within what the village takes at the full price.
 - A worker in a steel tool chain earns at least 4 times their pay.
 - A cook earns at least 1.5 times their pay.
 - A longer chain earns more per worker-day than a shorter one, comparing tools with tools and food with food.
@@ -56,10 +56,10 @@ A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced
 
 ## 3. Demand
 
-Each good the village takes has `daily`, `steady` and `drop` in `market.sells`:
+Each good the village takes has `Daily`, `Steady` and `Drop` in `Market.Sells`:
 
-- The first `steady` units sell at the full price. Past them, each crate's worth sold takes `drop` off the full price, down to a quarter of it.
-- A day restores what selling `daily` units takes, so selling each good's daily amount every day is sustainable: the next day's sale pays the same.
+- The first `Steady` units sell at the full price. Past them, each crate's worth sold takes `Drop` off the full price, down to a quarter of it.
+- A day restores what selling `Daily` units takes, so selling each good's daily amount every day is sustainable: the next day's sale pays the same.
 
 | Good | Daily | Steady | Drop per crate |
 |---|---|---|---|

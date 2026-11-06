@@ -494,8 +494,7 @@ public partial class WorldView : Node3D {
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
             entry.Rig.Root.Visible = World.Sees(worker);
-            float trip = worker.Away > 0 ? World.TripLeg(1 - worker.Away / World.Data.TradeSeconds) : worker.Commute / (World.Data.TradeSeconds / 2);
-            Fade(entry.Parts, entry.Rig.Root, TripFade(trip));
+            Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
             Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest ? null : assignment);
         }
         // Removing while walking a dictionary is allowed, so no copy of its keys is needed.
@@ -720,9 +719,9 @@ public partial class WorldView : Node3D {
 
     /// <summary>The rock or ore deposit a newly appeared chip came off, or null when none is close enough.</summary>
     private Thing? ChippedFrom(Thing chip) {
-        Thing? rock = null; float nearest = (World.ChipReach + .5f) * (World.ChipReach + .5f);
+        Thing? rock = null; float nearest = (GatherRules.ChipReach + .5f) * (GatherRules.ChipReach + .5f);
         foreach (var t in World.Things)
-            if (World.ChipOf(t.Kind) == chip.Kind && t.Pos.DistanceSquaredTo(chip.Pos) <= nearest) { rock = t; nearest = t.Pos.DistanceSquaredTo(chip.Pos); }
+            if (GatherRules.Of(t.Kind)?.Chip == chip.Kind && t.Pos.DistanceSquaredTo(chip.Pos) <= nearest) { rock = t; nearest = t.Pos.DistanceSquaredTo(chip.Pos); }
         return rock;
     }
 
@@ -1006,7 +1005,7 @@ public partial class WorldView : Node3D {
     // The cart walks at a steady pace until it is well down the valley, waits there out of view, and walks back for the return; the trade delay is unchanged.
     private const float CartSpeed = 2.2f, CartDistance = 16;
     /// <summary>How far out a cart is, from 0 at the signpost to 1 where it has gone from view.</summary>
-    private float CartLeg(float elapsed) => Math.Clamp(Math.Min(elapsed, World.Data.TradeSeconds - elapsed) * CartSpeed / CartDistance, 0, 1);
+    private float CartLeg(float elapsed) => World.WalkLeg(elapsed, World.Data.TradeSeconds - elapsed, CartSpeed, CartDistance);
     /// <summary>Fully drawn for most of the walk, fading out over its last quarter.</summary>
     private static float CartFade(float leg) => Math.Clamp((leg - .75f) / .25f, 0, 1);
     private readonly Dictionary<Node, float> fades = new();

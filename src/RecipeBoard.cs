@@ -12,25 +12,21 @@ namespace ChopChopMeow;
 /// By hand a click queues a batch. At a station a click marks the recipe workers keep making, and a double-click queues a batch and loads it from the backpack.
 /// Shift queues 5 and Ctrl 10; a right-click takes as many waiting batches off.
 /// </summary>
-/// <param name="held">Names the tool in use for a group, or null when it is missing or none is needed.</param>
 /// <param name="station">Null when crafting by hand.</param>
 /// <param name="openOn">A recipe whose tab the board opens on, for a page opening rather than drawing again.</param>
-public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, Action redraw, IEnumerable<string> recipes, Func<(string Tool, int Tier), string?> held, Thing? station, string? openOn) : HBoxContainer {
+public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, Action redraw, Thing? station, string? openOn) : HBoxContainer {
     private readonly World world = kit.World;
-    private readonly List<IGrouping<(string Tool, int Tier), string>> groups = recipes.GroupBy(id => (kit.World.Data.Recipes[id].Tool, kit.World.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
+    private readonly List<IGrouping<(string Tool, int Tier), string>> groups =
+        kit.World.RecipesAt(station).GroupBy(id => (kit.World.Data.Recipes[id].Tool, kit.World.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
+
+    /// <summary>The tool in use for a group: carried by hand, slotted at a station; null when it is missing or none is needed.</summary>
+    private string? Held((string Tool, int Tier) group) => world.ToolInUse(station, group.Tool, group.Tier);
+
+    /// <summary>How far the worker mark's hard hat stands out over the top of a plate.</summary>
+    private const int HatRise = 18;
 
     /// <summary>How many batches a click queues or takes off: 10 with Ctrl, 5 with Shift, else 1.</summary>
     public static int Step => Input.IsKeyPressed(Key.Ctrl) ? 10 : Input.IsKeyPressed(Key.Shift) ? 5 : 1;
-
-    /// <summary>Batches of a recipe waiting in this board's queue.</summary>
-    private int Waiting(string id) => station != null ? World.Waiting(new(station.Queue), id) : World.Waiting(world.Crafting, id);
-
-    /// <summary>Queues batches of a recipe, or takes waiting ones off with a negative count.</summary>
-    private void Queue(string id, int count) {
-        if (station != null) world.QueueRecipe(station, id, count);
-        else if (count > 0) world.Craft(id, count);
-        else world.CancelCraft(id, -count);
-    }
 
     /// <summary>A recipe's hover popup: its name, each input as an icon with the amount (brick while the backpack is short), the time where it is crafted and what clicks do.</summary>
     private Control RecipePopup(RecipeDef r, float seconds) {
@@ -61,7 +57,10 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         AddThemeConstantOverride("separation", 14);
         var tabs = new VBoxContainer { SizeFlagsVertical = Control.SizeFlags.ShrinkBegin }; tabs.AddThemeConstantOverride("separation", 10); AddChild(tabs);
         var plates = new GridContainer { Columns = 4, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkBegin };
-        plates.AddThemeConstantOverride("h_separation", 10); plates.AddThemeConstantOverride("v_separation", 14); AddChild(plates);
+        plates.AddThemeConstantOverride("h_separation", 10); plates.AddThemeConstantOverride("v_separation", 14);
+        // Room above the first row for the hard hat that marks what workers keep making, which stands out over a plate's top edge.
+        var platesRoom = new MarginContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkBegin };
+        platesRoom.AddThemeConstantOverride("margin_top", station != null ? HatRise : 0); platesRoom.AddChild(plates); AddChild(platesRoom);
         foreach (var group in groups) {
             var (kind, tier) = group.Key;
             string key = GroupKey(group.Key);
@@ -75,7 +74,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
                 string plainest = world.Data.PlainestTool(kind, tier);
                 string name = world.Data.ToolName(kind, tier);
                 badge.Texture = Icons.Of(plainest);
-                live.Watch(() => held(group.Key), inUse => {
+                live.Watch(() => Held(group.Key), inUse => {
                     if (inUse != null) badge.Texture = Icons.Of(inUse);
                     badge.Modulate = inUse != null ? Colors.White : new Color(1, .35f, .3f);
                     badge.TooltipText = inUse != null
@@ -84,7 +83,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
                 });
             }
             if (!open) continue;
-            foreach (string id in group) plates.AddChild(Plate(id, () => held(group.Key)));
+            foreach (string id in group) plates.AddChild(Plate(id, () => Held(group.Key)));
         }
     }
 
@@ -106,10 +105,10 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         }
         count.Text = r.Amount > 1 ? $"×{r.Amount}" : ""; count.MoveToFront();
         var queued = ItemSlot.CountBadge(1, 0); queued.Name = "queued"; cell.AddChild(queued);
-        live.Watch(() => Waiting(id), waiting => queued.Text = waiting > 0 ? waiting.ToString() : "");
+        live.Watch(() => world.Waiting(station, id), waiting => queued.Text = waiting > 0 ? waiting.ToString() : "");
         if (station != null) {
             // The worker mark: a thick outline with a hard hat on top.
-            var hat = Style.Corner(Style.Glyph("hardhat", 34, Colors.White), .5f, 0, 18); hat.Name = "kept"; cell.AddChild(hat);
+            var hat = Style.Corner(Style.Glyph("hardhat", 34, Colors.White), .5f, 0, HatRise); hat.Name = "kept"; cell.AddChild(hat);
             live.Watch(() => station.Keep == id, kept => {
                 Style.Skin(cell, kept ? Style.PlateKept : Style.PlateNormal, kept ? Style.PlateKept : Style.PlateHover);
                 hat.Visible = kept;
@@ -121,7 +120,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             if (doubled) { doubled = false; return; }
             string kept = memory.KeptBefore = station?.Keep ?? "";
             int step = Step;
-            if (station == null || step > 1) { kit.Run(() => Queue(id, step)); return; }
+            if (station == null || step > 1) { kit.Run(() => world.Enqueue(station, id, step)); return; }
             kit.Run(() => world.SetRecipe(station, kept == id ? "" : id));
         };
         cell.DoubleClicked = () => {
@@ -130,7 +129,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             string kept = memory.KeptBefore;
             kit.Run(() => { world.SetRecipe(station, kept); world.QueueBatch(station, id); });
         };
-        cell.RightClicked = () => kit.Run(() => Queue(id, -Step));
+        cell.RightClicked = () => kit.Run(() => world.Enqueue(station, id, -Step));
         float Time() => r.Seconds / ((station?.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * (tool() is string inUse ? world.Data.Items[inUse].Speed : 1));
         void Describe(StringBuilder text) {
             text.Append(r.Name);
@@ -146,10 +145,11 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
 }
 
 /// <summary>What waits in a queue, one cup per recipe in the order first queued; a right-click takes 1, 5 or 10 batches off.</summary>
-/// <param name="queue">The queue as the strip is drawn; the page draws it again when its recipes change.</param>
-/// <param name="waiting">Batches of a recipe waiting now.</param>
-public partial class QueueStrip(UiKit kit, LiveUpdates live, IReadOnlyList<Queued> queue, Func<string, int> waiting, Action<string, int> unqueue) : HBoxContainer {
+/// <param name="station">The station whose queue it shows, or null for the hand's; the page draws it again when the queue's recipes change.</param>
+public partial class QueueStrip(UiKit kit, LiveUpdates live, Thing? station) : HBoxContainer {
     public override void _Ready() {
+        var world = kit.World;
+        var queue = world.QueueOf(station);
         Name = "queue";
         AddThemeConstantOverride("separation", 10);
         if (queue.Count == 0) return;
@@ -159,8 +159,8 @@ public partial class QueueStrip(UiKit kit, LiveUpdates live, IReadOnlyList<Queue
             var (cell, count) = ItemSlot.Cup($"queued_{q.Recipe}", 44); cell.Icon = Icons.Of(r.Output);
             cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
             string id = q.Recipe;
-            live.Watch(() => waiting(id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
-            cell.RightClicked = () => kit.Run(() => unqueue(id, RecipeBoard.Step));
+            live.Watch(() => world.Waiting(station, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
+            cell.RightClicked = () => kit.Run(() => world.Enqueue(station, id, -RecipeBoard.Step));
             AddChild(cell);
         }
     }

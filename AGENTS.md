@@ -12,7 +12,7 @@ Icons and models are committed; playing does not call an image-generation servic
 | [docs/DESIGN.md](docs/DESIGN.md) | Changing game code: source files, simulation rules, confirmed design decisions |
 | [README.md](README.md) | Changing anything the player sees: controls, rules, panels, saves |
 | [docs/ECONOMY.md](docs/ECONOMY.md) | Changing prices, wages, recipes or demand |
-| [data/game.json](data/game.json) | Tuning items, recipes, building costs and pacing |
+| [src/GameTables.cs](src/GameTables.cs) and [src/GameData.cs](src/GameData.cs) | Tuning items, recipes, building costs and pacing |
 | [assets/README.md](assets/README.md) | Changing models, icons, sounds, music or their sources |
 | [docs/RELEASE.md](docs/RELEASE.md) | Branching, checking and handing off a change |
 
@@ -22,7 +22,7 @@ Icons and models are committed; playing does not call an image-generation servic
 - `src/WorldView.cs`: reads world state and draws it.
 - `src/Game.cs`: creates and holds the interface's parts, routes input.
 - `src/SidePanel.cs` and `src/*Panel.cs`: the side panel and its pages, one node per feature.
-- `src/GameData.cs`: loads and validates `data/game.json`.
+- `src/GameData.cs` and `src/GameTables.cs`: items, buildings, recipes, trade and time values, checked to fit together.
 - `src/Inventory.cs`: inventory rules, used by every worker job.
 - `src/Server.cs`: the headless server every game runs on.
 - `src/Net.cs`: the connection between a server and its players.

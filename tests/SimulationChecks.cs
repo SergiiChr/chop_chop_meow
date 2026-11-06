@@ -42,6 +42,8 @@ public static class SimulationChecks {
         CheckFurnacesBurnOneFuelAndWaitForSteelHeat(data);
         CheckHaulerFuelsSmeltingWithCoalAndReturnsWood(data);
         CheckStationMakesItsQueueThenWhatItKeeps(data);
+        CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere(data);
+        CheckStationLoadsMidBatchAndFinishesIt(data);
         CheckAnvilNeedsHammering(data);
         CheckFinishedBatchWaitsForOutputRoom(data);
         CheckToolsGateMiningAndFelling(data);
@@ -68,6 +70,7 @@ public static class SimulationChecks {
         CheckCrewKeepsForgeHot(data);
         CheckCrewLunchesAtTheNearestFireAndGoesBackToWork(data);
         CheckCrewSignsOutAtDuskKeepingLoadsAndJobs(data);
+        CheckWorkersWalkOffDownTheValleyAtWalkingPace(data);
         CheckCrewWalksBackAtDawnPaidAndKeepsItsJobs(data);
         CheckFogHidesUnseenGroundAndRemembersExploredGround(data);
         CheckCratesShowOneSlotPerItemTheyCanHold(data);
@@ -678,6 +681,19 @@ public static class SimulationChecks {
             "a double-click should queue a batch and load its inputs and one fuel");
     }
 
+    /// <summary>A double-click loads a whole batch and one fuel from the backpack, whatever the station already holds.</summary>
+    private static void CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
+        world.Player = furnace.Pos + Vector2.One;
+        Give(world, "tin_ore", 3); Give(world, "coal", 2);
+        world.SetRecipe(furnace, "tin_bar");
+        world.LoadInput(furnace, "tin_ore", 1); world.LoadFuel(furnace, "coal", 1);
+        world.QueueBatch(furnace, "tin_bar");
+        Require(furnace.Inventory["tin_ore"] == 3 && furnace.Burner!["coal"] == 2 && world.Backpack["tin_ore"] == 0 && world.Backpack["coal"] == 0,
+            "a double-click should load a whole batch of inputs and one fuel on top of what the station holds");
+    }
+
     private static void CheckFurnacesBurnOneFuelAndWaitForSteelHeat(GameData data) {
         var world = EmptyWorld(data);
         var basic = world.Add(ThingKind.Furnace, new Vector2(10, 10));
@@ -1135,7 +1151,7 @@ public static class SimulationChecks {
         var chips = world.Things.Where(t => t.Kind == ThingKind.IronChip).ToList();
         Require(hits == 300, $"each 600-ore deposit should take 150 hits of 4: {hits}");
         Require(chips.Count is >= 5 and <= 30, $"about one hit in twenty should chip ore off, 15 of 300 on average: {chips.Count}");
-        Require(chips.All(c => deposits.Any(d => d.Pos.DistanceTo(c.Pos) <= World.ChipReach) && world.CanStand(c.Pos)), "a chip should land where it can be reached, within 2 tiles of its deposit");
+        Require(chips.All(c => deposits.Any(d => d.Pos.DistanceTo(c.Pos) <= GatherRules.ChipReach) && world.CanStand(c.Pos)), "a chip should land where it can be reached, within 2 tiles of its deposit");
         PickUp(world, chips[0]);
         Require(world.Backpack["iron_ore"] == 1, "a chip should give one ore");
 
@@ -2039,6 +2055,23 @@ public static class SimulationChecks {
             "a station's queue should load in order with its counts, and the station on its first recipe");
     }
 
+    /// <summary>A station saved part way through a batch loads still making it, with its queue waiting behind.</summary>
+    private static void CheckStationLoadsMidBatchAndFinishesIt(GameData data) {
+        var old = EmptyWorld(data);
+        var furnace = old.Add(ThingKind.Furnace, new Vector2(14, 10));
+        old.Player = furnace.Pos + Vector2.One;
+        Give(old, "wood", 3);
+        old.SetRecipe(furnace, "charcoal"); old.LoadInput(furnace, "wood", 2); old.LoadFuel(furnace, "wood", 1);
+        old.Tick(.1f);
+        old.QueueRecipe(furnace, "iron_bar", 1);
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(old.Serialize());
+        var station = loaded.Find(furnace.Id)!;
+        Require(station.Processing && station.Recipe == "charcoal" && station.Queue.Count == 1, "a station saved mid-batch should load making that batch with its queue behind it");
+        SafeTick(loaded, data.Recipes["charcoal"].Seconds + 1);
+        Require(station.Inventory["charcoal"] == 1 && station.Recipe == "iron_bar", "the loaded batch should finish and the queued recipe come next");
+    }
+
     /// <summary>
     /// Every item and building must be reachable from a fresh start with only gathering, recipes and berry trade, and the tools that unlock the loop must never be lost.
     /// Resources need their tool first: trees an axe, deposits a pickaxe; stone, berries, water and loose pieces need none.
@@ -2317,6 +2350,25 @@ public static class SimulationChecks {
         var loaded = EmptyWorld(data);
         loaded.Deserialize(world.Serialize());
         Require(loaded.Workers.All(w => w.Home), "signed-out workers should stay signed out after loading");
+    }
+
+    /// <summary>A worker signing out at dusk and a runner off for prices walk down the valley as fast as a worker walks, not stretched over the whole trip.</summary>
+    private static void CheckWorkersWalkOffDownTheValleyAtWalkingPace(GameData data) {
+        var world = EmptyWorld(data);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(30, 20));
+        var walker = AddWorker(world, sign.Pos + Vector2.One);
+        RunUntil(world, data.DuskStarts * data.DaySeconds + .2f);
+        var from = walker.Pos;
+        SafeTick(world, 1);
+        Require(Math.Abs(walker.Pos.DistanceTo(from) - World.WorkerSpeed) < .3f, $"a worker heading home should walk at walking pace, not {walker.Pos.DistanceTo(from):0.00} tiles a second");
+        world = EmptyWorld(data);
+        sign = world.Add(ThingKind.Signpost, new Vector2(30, 20));
+        var runner = AddWorker(world, sign.Pos + Vector2.One);
+        world.Assign(runner, sign);
+        Require(world.FetchPrices(sign), "a morning runner should set off for prices");
+        from = runner.Pos;
+        SafeTick(world, 1);
+        Require(Math.Abs(runner.Pos.DistanceTo(from) - World.WorkerSpeed) < .3f, $"a runner off for prices should walk at walking pace, not {runner.Pos.DistanceTo(from):0.00} tiles a second");
     }
 
     private static void CheckCrewWalksBackAtDawnPaidAndKeepsItsJobs(GameData data) {

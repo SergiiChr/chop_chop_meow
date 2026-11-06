@@ -38,13 +38,31 @@ public static class AnimationChecks {
         Require(ActorAnimation.Blended(ActorAction.Craft, .5f, false, ActorAction.Walk, 0, true, 1) == walk, "a finished blend should be the new pose");
         var halfway = ActorAnimation.Blended(ActorAction.Craft, .5f, false, ActorAction.Walk, 0, true, .5f);
         Require(halfway.KneeL < squat.KneeL && halfway.KneeL > walk.KneeL, "halfway through, the knees should be rising out of the squat");
+        // Stopping from a run rises out of its crouch onto the feet: no step of the blend sinks a foot into the ground.
+        for (int i = 0; i <= 10; i++) {
+            var stopping = ActorAnimation.Blended(ActorAction.Run, .3f, true, ActorAction.Idle, 0, false, i / 10f);
+            float lowest = stopping.HipHeight - ActorAnimation.Sole - Math.Max(ActorAnimation.Reach(stopping.SwingL, stopping.KneeL), ActorAnimation.Reach(stopping.SwingR, stopping.KneeR));
+            Require(lowest > -.001f, $"stopping from a run should not sink the feet into the ground: {lowest:0.000} m at {i / 10f:0.0} of the blend");
+        }
     }
 
+    /// <summary>A run leaves the ground for a while after each push-off, never sinks a foot into it, and carries the hips up and down smoothly.</summary>
     private static void CheckRunLeavesTheGroundAfterEachPushOff() {
-        int airborne = 0;
-        for (int i = 0; i < 100; i++) if (ActorAnimation.PoseAt(ActorAction.Run, ActorAnimation.Duration(ActorAction.Run) * i / 100f, true).Lift > .01f) airborne++;
-        Require(airborne is > 5 and < 40, $"a run should leave the ground briefly after each push-off, not walk or bound: airborne {airborne} of 100 samples");
-        Require(ActorAnimation.PoseAt(ActorAction.Walk, .3f, true).Lift == 0, "a walk should keep a foot on the ground");
+        int airborne = 0, samples = 200;
+        float lastHips = 0, steepest = 0, deepest = 0;
+        for (int i = 0; i <= samples; i++) {
+            var run = ActorAnimation.PoseAt(ActorAction.Run, ActorAnimation.Duration(ActorAction.Run) * i / samples, true);
+            float clearL = run.Hips - ActorAnimation.Sole - ActorAnimation.Reach(run.SwingL, run.KneeL), clearR = run.Hips - ActorAnimation.Sole - ActorAnimation.Reach(run.SwingR, run.KneeR);
+            if (i < samples && Math.Min(clearL, clearR) > .005f) airborne++;
+            deepest = Math.Min(deepest, Math.Min(clearL, clearR));
+            if (i > 0) steepest = Math.Max(steepest, Math.Abs(run.Hips - lastHips));
+            lastHips = run.Hips;
+        }
+        Require(airborne > samples * .15f && airborne < samples * .4f, $"a run should leave the ground for a while after each push-off, not walk or bound: airborne {airborne} of {samples} samples");
+        Require(deepest > -.001f, $"a running foot should never sink into the ground: {deepest:0.000} m");
+        // Two centimetres up and down twice a stride moves the hips at most about 1.3 mm between these samples; the old lift jumped several centimetres in a few.
+        Require(steepest < .0015f, $"the hips should rise and fall smoothly through a run, not jump: {steepest:0.0000} m between samples");
+        Require(ActorAnimation.PoseAt(ActorAction.Walk, .3f, true).Hips == 0, "a walk should keep a foot on the ground");
     }
 
     private static void CheckActionsLoopAndWrapByTheirDuration() {
@@ -187,7 +205,7 @@ public static class AnimationChecks {
         var swingStanding = ActorAnimation.PoseAt(ActorAction.TorchSwing, .27f, false);
         Require(swingWalking.RaiseL == swingStanding.RaiseL && swingWalking.SwingL == ActorAnimation.PoseAt(ActorAction.Walk, .27f, true).SwingL,
             "a torch swing on the move should keep the swinging arm while the legs keep walking");
-        Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Seat is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Seat == 0,
+        Require(ActorAnimation.PoseAt(ActorAction.Sit, 0, false).Hips is > 0 and < .2f && ActorAnimation.PoseAt(ActorAction.Perch, 0, false).Hips == 0,
             "a cross-legged worker should sit on the ground, and one on a rock should not");
         Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick", "steel mining should show the steel pick");
         Require(ActorAnimation.Tool(ActorAction.Hammer) == "hammer", "hammering should show the hammer");

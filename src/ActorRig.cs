@@ -12,7 +12,6 @@ public enum ActorSkin { Player, Worker, Courier }
 /// The rig faces +Z; the hips are lifted so the lower foot always stays on the ground.
 /// </summary>
 public sealed class ActorRig {
-    private const float Thigh = .38f, Shin = .37f, Sole = .07f;
     public readonly Node3D Root = new();
     private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     private readonly Dictionary<string, Node3D> tools = new();
@@ -30,7 +29,7 @@ public sealed class ActorRig {
             _ => ("d9a27c", "5a3b25", "2f7f86", "34465e", "6b4428"),
         };
         shirt = shirtColor ?? shirt;
-        hips = Pivot(Root, new Vector3(0, Thigh + Shin + Sole, 0));
+        hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
         (legL, kneeL) = Leg(.09f, legs, boots);
         (legR, kneeR) = Leg(-.09f, legs, boots);
         torso = Pivot(hips, Vector3.Zero);
@@ -133,8 +132,8 @@ public sealed class ActorRig {
 
     private (Node3D Hip, Node3D Knee) Leg(float x, string trousers, string boots) {
         var hip = Pivot(hips, new Vector3(x, -.02f, 0));
-        var knee = Pivot(hip, new Vector3(0, -Thigh, 0));
-        limbs.Add((HumanShape.Leg(hip, Thigh, trousers, boots), knee));
+        var knee = Pivot(hip, new Vector3(0, -ActorAnimation.Thigh, 0));
+        limbs.Add((HumanShape.Leg(hip, ActorAnimation.Thigh, trousers, boots), knee));
         return (hip, knee);
     }
 
@@ -261,7 +260,7 @@ public sealed class ActorRig {
         kneeR.RotationDegrees = new Vector3(pose.KneeR, 0, 0);
         foreach (var (skeleton, joint) in limbs)
             skeleton.SetBonePoseRotation(1, joint.Quaternion);
-        hips.Position = new Vector3(0, (pose.Seat > 0 ? pose.Seat : Math.Max(Reach(pose.SwingL, pose.KneeL), Reach(pose.SwingR, pose.KneeR)) + Sole) + pose.Lift, 0);
+        hips.Position = new Vector3(0, pose.HipHeight, 0);
         rock.Visible = onRock;
         foreach (var (name, node) in tools) node.Visible = name == tool;
         crate.Visible = carrying;
@@ -271,7 +270,4 @@ public sealed class ActorRig {
     /// <summary>Splays the thigh outward, swings it forward, then rolls it about its own length; the left side turns toward +X.</summary>
     private static Basis HipTurn(float swing, float turn, float roll) =>
         new Basis(Vector3.Up, Mathf.DegToRad(turn)) * new Basis(Vector3.Right, Mathf.DegToRad(-swing)) * new Basis(Vector3.Up, Mathf.DegToRad(roll));
-
-    private static float Reach(float swing, float knee) =>
-        Thigh * MathF.Cos(Mathf.DegToRad(swing)) + Shin * MathF.Cos(Mathf.DegToRad(swing - knee));
 }

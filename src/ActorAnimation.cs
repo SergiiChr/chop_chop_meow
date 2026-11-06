@@ -33,22 +33,31 @@ public enum ActorAction {
 /// Raise lifts an arm forward from hanging (90 is horizontal, 180 overhead), Out swings it sideways (negative crosses the body),
 /// and Swing moves a thigh forward while Knee folds the shin back.
 /// Turn splays a thigh outward and Roll turns it about its own length, so a bent knee folds the shin sideways across the body.
-/// Seat is the hip height for sitting on the ground; zero keeps the lower foot on the ground instead.
+/// Hips sets the hip height above the ground, as for sitting or running; zero keeps the lower foot on the ground instead.
 /// Sway tips the torso sideways over the hips; positive tips it toward the right side.
-/// Lift raises the body off the ground, for the moment both feet are in the air in a run.
 /// </summary>
 public readonly record struct Pose(
     float Lean = 0, float Twist = 0, float Head = 0,
     float RaiseL = 6, float OutL = 7, float ElbowL = 12,
     float RaiseR = 6, float OutR = 7, float ElbowR = 12,
     float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0,
-    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Seat = 0, float Sway = 0, float Lift = 0) {
-    public static Pose Lerp(Pose a, Pose b, float t) => new(
-        Mathf.Lerp(a.Lean, b.Lean, t), Mathf.Lerp(a.Twist, b.Twist, t), Mathf.Lerp(a.Head, b.Head, t),
-        Mathf.Lerp(a.RaiseL, b.RaiseL, t), Mathf.Lerp(a.OutL, b.OutL, t), Mathf.Lerp(a.ElbowL, b.ElbowL, t),
-        Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
-        Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t),
-        Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), Mathf.Lerp(a.Seat, b.Seat, t), Mathf.Lerp(a.Sway, b.Sway, t), Mathf.Lerp(a.Lift, b.Lift, t));
+    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Hips = 0, float Sway = 0) {
+    /// <summary>Blends two poses; set hips blend by how far they sit above or below a standing foot, so a foot on or above the ground in both poses stays there.</summary>
+    public static Pose Lerp(Pose a, Pose b, float t) {
+        var blend = new Pose(
+            Mathf.Lerp(a.Lean, b.Lean, t), Mathf.Lerp(a.Twist, b.Twist, t), Mathf.Lerp(a.Head, b.Head, t),
+            Mathf.Lerp(a.RaiseL, b.RaiseL, t), Mathf.Lerp(a.OutL, b.OutL, t), Mathf.Lerp(a.ElbowL, b.ElbowL, t),
+            Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
+            Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t),
+            Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), 0, Mathf.Lerp(a.Sway, b.Sway, t));
+        return a.Hips == 0 && b.Hips == 0 ? blend : blend with { Hips = blend.Standing + Mathf.Lerp(a.Hips > 0 ? a.Hips - a.Standing : 0, b.Hips > 0 ? b.Hips - b.Standing : 0, t) };
+    }
+
+    /// <summary>The hip height above the ground: Hips when set, otherwise standing on the lower foot.</summary>
+    public float HipHeight => Hips > 0 ? Hips : Standing;
+
+    /// <summary>The hip height that puts the lower foot on the ground.</summary>
+    private float Standing => Math.Max(ActorAnimation.Reach(SwingL, KneeL), ActorAnimation.Reach(SwingR, KneeR)) + ActorAnimation.Sole;
 }
 
 /// <summary>Pure actor animation selection, timing and keyframed poses.</summary>
@@ -115,13 +124,15 @@ public static class ActorAnimation {
                 return loose with { RaiseR = 4 + arm * 30, OutR = 9 + Math.Max(0, -arm) * 4, ElbowR = 14 + Math.Max(0, arm) * 28 };
             case ActorAction.Run: {
                     // Each foot lands ahead, the leg straightens under the body and drives off behind, then the heel folds up high as it swings through.
-                    // After each push-off both feet are off the ground for a moment, and the body rises and leans into it.
-                    var (swingL, kneeL, liftL) = RunLeg(p - .25f);
-                    var (swingR, kneeR, liftR) = RunLeg(p - .75f);
+                    // The hips rise and fall smoothly twice a stride, lowest over the planted foot and highest after each push-off, when both feet are off the ground;
+                    // a planted knee bends just enough to keep its foot on the ground under them.
+                    float hips = RunHips + RunBob * MathF.Cos(Mathf.Tau * 2 * (p - .7f));
+                    var (swingL, kneeL) = RunLeg(p - .25f, hips);
+                    var (swingR, kneeR) = RunLeg(p - .75f, hips);
                     float drive = MathF.Cos(p * Mathf.Tau * 2);
                     return new Pose(Lean: 15 - drive * 2.5f, Head: -7 + drive * 2, Twist: wave * 9, Sway: MathF.Cos(p * Mathf.Tau) * 2,
                         RaiseL: 22 - wave * 52, OutL: 10, ElbowL: 92 + wave * 12, RaiseR: 22 + wave * 52, OutR: 10, ElbowR: 92 - wave * 12,
-                        SwingL: swingL, KneeL: kneeL, SwingR: swingR, KneeR: kneeR, Lift: liftL + liftR);
+                        SwingL: swingL, KneeL: kneeL, SwingR: swingR, KneeR: kneeR, Hips: hips);
                 }
             case ActorAction.Craft: {
                     // Squatting on the heels, leaning over the work in both hands, which keep turning and fitting it.
@@ -204,7 +215,7 @@ public static class ActorAnimation {
                 // Now and then a bite goes up to the mouth.
                 var seated = action == ActorAction.Sit
                     ? new Pose(Lean: 6, Head: 2, RaiseL: 30, OutL: 22, ElbowL: 34, RaiseR: 30, OutR: 22, ElbowR: 34,
-                        SwingL: 86, KneeL: 150, TurnL: 40, RollL: 90, SwingR: 82, KneeR: 150, TurnR: 40, RollR: 90, Seat: .15f)
+                        SwingL: 86, KneeL: 150, TurnL: 40, RollL: 90, SwingR: 82, KneeR: 150, TurnR: 40, RollR: 90, Hips: .15f)
                     : new Pose(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, SwingL: 112, KneeL: 100, SwingR: 108, KneeR: 96);
                 var bite = seated with { Head = seated.Head + 6, Lean = seated.Lean + 6, RaiseR = 40, OutR = -24, ElbowR = 140 };
                 var eating = Keys(p, (0, seated), (.55f, seated), (.68f, bite), (.8f, bite), (.92f, seated));
@@ -248,16 +259,26 @@ public static class ActorAnimation {
         return q < .6f ? 6 + 12 * MathF.Sin(MathF.PI * q / .6f) : 6 + 52 * MathF.Sin(MathF.PI * (q - .6f) / .4f);
     }
 
+    /// <summary>Thigh and shin lengths and the height of the foot under the ankle, in metres.</summary>
+    public const float Thigh = .38f, Shin = .37f, Sole = .07f;
+    // A run carries the hips a hand lower than standing, rising and falling two centimetres about that.
+    private const float RunHips = Thigh + Shin + Sole - .1f, RunBob = .02f;
+
+    /// <summary>How far below the hip a leg's ankle is, for a thigh swung forward and a knee folded back by these angles.</summary>
+    public static float Reach(float swing, float knee) => Thigh * MathF.Cos(Mathf.DegToRad(swing)) + Shin * MathF.Cos(Mathf.DegToRad(swing - knee));
+
     /// <summary>
-    /// A running leg from the moment its foot lands ahead: it sweeps back straightening to push off by four tenths of the stride,
-    /// then folds high and reaches forward again; the push-off lifts the body for the tenth after it.
+    /// A running leg from the moment its foot lands ahead: it sweeps back to push off by four tenths of the stride, then folds high and reaches forward again.
+    /// Its knee bends at least enough to keep the foot from going below the ground with the hips at <paramref name="hips"/>.
     /// </summary>
-    private static (float Swing, float Knee, float Lift) RunLeg(float sinceStrike) {
+    private static (float Swing, float Knee) RunLeg(float sinceStrike, float hips) {
         float q = Mathf.PosMod(sinceStrike, 1);
         float swing = 40 * MathF.Cos(q * Mathf.Tau);
         float knee = q < .4f ? 8 + 22 * MathF.Sin(MathF.PI * q / .4f) : 8 + 108 * MathF.Sin(MathF.PI * (q - .4f) / .6f);
-        float lift = q is >= .4f and < .5f ? .07f * MathF.Sin(MathF.PI * (q - .4f) / .1f) : 0;
-        return (swing, knee, lift);
+        // The knee angle that puts the ankle exactly at the ground: the shin's cosine to the vertical from what the thigh leaves of the reach.
+        float shin = (hips - Sole - Thigh * MathF.Cos(Mathf.DegToRad(swing))) / Shin;
+        if (shin < 1) knee = Math.Max(knee, swing + Mathf.RadToDeg(MathF.Acos(Math.Max(-1, shin))));
+        return (swing, knee);
     }
 
     /// <summary>How long a change of action blends from the old pose into the new one.</summary>

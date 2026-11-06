@@ -56,7 +56,7 @@ public partial class Game : Node, IGameFlow {
     private bool quitting;
     public override void _Ready() {
         try {
-            data = GameData.Load();
+            data = GameData.Create();
             if (Launch.Has("--server")) { Server.Run(this, data); return; }
             world = new World(data);
             if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
@@ -175,7 +175,7 @@ public partial class Game : Node, IGameFlow {
         saves.Slot = Math.Max(slot, 0);
         if (slot < 0) {
             panel.Open(Page.Welcome);
-            Notify("Welcome. WASD to move; hold right mouse to approach and gather. I shows the field guide.");
+            Notify("Welcome. Press I to see the guide.");
         } else { panel.Open(Page.Backpack); Notify("Settlement loaded."); }
     }
 

@@ -39,6 +39,7 @@ public static class MultiplayerChecks {
         CheckGuestSkipsTheNightOnlyOnceEveryoneIsDown(data);
         CheckUpdateFieldsLeftOutStartAsNewObjectsDo();
         CheckUpdateEntriesReadBackAsTheyWere(data);
+        CheckATreeUpdateCarriesNoStationFields(data);
         CheckAChangedInventoryFieldIsNeverFresh();
         CheckStateReadKeepsNothingFromTheOneBefore();
     }
@@ -62,6 +63,14 @@ public static class MultiplayerChecks {
             }
         }
         Require(unwritten.Count == 0, $"These fields start at other than their type's default, so world updates must always write them; mark each [JsonIgnore(Condition = JsonIgnoreCondition.Never)]: {string.Join(", ", unwritten)}");
+    }
+
+    /// <summary>A tree's update entry leaves out what only stations use: a recipe in progress, a mark and a queue.</summary>
+    private static void CheckATreeUpdateCarriesNoStationFields(GameData data) {
+        var world = EmptyWorld(data);
+        var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 40);
+        string entry = System.Text.Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(tree, UpdateJson.Default.Thing));
+        Require(!entry.Contains("\"Recipe\"") && !entry.Contains("\"Keep\"") && !entry.Contains("\"Queue\""), $"a tree's update should carry no station fields: {entry}");
     }
 
     private static void CheckUpdateEntriesReadBackAsTheyWere(GameData data) {

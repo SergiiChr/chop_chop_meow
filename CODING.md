@@ -24,14 +24,15 @@ Project rules on top of the global coding and testing guides.
 - **Implicit coupling:** pass `World`, `GameData` and views as arguments or fields. Static fields are for shared, immutable or cached resources (meshes, materials, `StringName`s), not game state.
 - **Layer-first folders:** the project keeps the flat `src/` and `tests/` layout; group related code by file name prefix instead of adding folders.
 - **Illegal states:** use enums such as `ActorAction` rather than combinations of flags or strings.
-- **Validation at the boundary:** `GameData` validates `data/game.json` when it loads, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
+- **Validation at the boundary:** `GameData` checks its tables fit together when the game starts, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
 - **Old saves:** upgrades to an older save's data run once when it loads, never in the tick.
 
 ## Architecture
 
 - Simulation lives in `World.cs` and never touches menus or rendering, so headless checks can run gameplay.
 - Inventory rules belong in `Inventory.cs`, not in individual worker jobs.
-- Balance and recipe values belong in `data/game.json`, not in code.
+- Keep parameters, tuning values and configuration in C# as constants, enums and static tables, so code references them directly and the compiler checks them.
+  A data file such as JSON is only for what has to be saved, like saves and settings, or read by another program or language.
 
 ## Tests
 
