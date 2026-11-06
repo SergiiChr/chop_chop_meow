@@ -101,7 +101,7 @@ public static class SimulationChecks {
         Test(CheckPlotHarvestedAloneKeepsSeedInItsOutput, data);
         Test(CheckWorkerFinishesHarvestHaulsCropAndSowsAgain, data);
         Test(CheckFoodsFeedWaterAndHealByTheirData, data);
-        Test(CheckMarketTakesOnlyCrates, data);
+        Test(CheckMarketTakesCratesAndDonations, data);
         Test(CheckOlderSavesResetMadeToolAnvilsAndStartWaterGoal, data);
         Test(CheckStationQueueAndMarkSurviveALoad, data);
         Test(CheckLoadedSaveDropsOldStageNumber, data);
@@ -2001,28 +2001,31 @@ public static class SimulationChecks {
         Require(f.Inventory["burnt_steak"] == 2, "cooked meat in an older save's furnace should become burnt steak");
     }
 
-    private static void CheckMarketTakesOnlyCrates(GameData data) {
+    private static void CheckMarketTakesCratesAndDonations(GameData data) {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
         world.Player = sign.Pos;
-        string axes = PackCrate(world, ("steel_chisel", 1), ("steel_axe", 1));
+        string chisel = PackCrate(world, ("steel_chisel", 1));
         string empty = PackCrate(world);
-        Require(!world.CanSell(axes), "the village should not take a crate holding tools it does not buy");
+        Require(world.CanSell(chisel), "the village should take a crate of goods it does not buy as a donation");
         Require(!world.CanSell(empty), "the village should not take an empty crate");
         Require(!world.CanSell("crate"), "the village should not take a bare crate");
         Require(!world.CanSell("steel_axe"), "the village should not take a loose steel axe");
-        // The post refuses this crate by hand, so this is what an old save might hold.
-        Drop(world, axes, 1); sign.Inventory.Add(axes, 1);
-        Require(!world.Sell(sign) && world.Packed(axes) != null, "a crate holding a tool the village does not buy stays put");
         string meat = PackCrate(world, ("raw_meat", 6), ("burnt_steak", 6));
         string tools = PackCrate(world, ("steel_hammer", 1), ("steel_pick", 1));
         world.Player = sign.Pos;
         world.Transfer(world.Backpack, sign.Inventory, meat, 1); world.Transfer(world.Backpack, sign.Inventory, tools, 1);
-        Require(world.Sell(sign), "a cart should take every acceptable crate");
+        Require(world.Sell(sign), "a cart should take every packed crate");
         Require(world.Orders.Single().Crates == 2, "a cart should count the crates it takes");
-        Require(sign.Inventory[axes] == 1, "a cart should leave the crate of tools the village does not buy");
         Require(world.Packed(meat) == null, "a cart should take away the crate of meat it sells");
         Require(world.Orders.Single().Goods["raw_meat"] == 6 && world.Orders.Single().Goods["steel_pick"] == 1, "the sale should pay for what the crates hold");
+        // Donated goods ride along for nothing: the crate alone is paid for.
+        world.Transfer(world.Backpack, sign.Inventory, chisel, 1);
+        Require(world.Sell(sign), "a cart should take a crate of goods the village does not buy");
+        Require(world.Orders.Last().Value == MathF.Floor(data.Items["crate"].Price), "donated goods should pay nothing beyond the crate");
+        var said = new List<string>(); world.Notify = said.Add;
+        SafeTick(world, data.TradeSeconds + .1f);
+        Require(said.Any(m => m.EndsWith("Donated 1 Steel chisel.")), "the returning cart should say what was donated");
         SetCoins(world, 1000);
         Require(world.Buy(sign, "canned_food", 2), "boxed goods should be bought from the post");
         Require(world.Orders.Last().Crates == 2, "boxed goods should be bought by the crate");
