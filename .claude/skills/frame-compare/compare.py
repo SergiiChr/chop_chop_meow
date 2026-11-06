@@ -66,8 +66,10 @@ def build_filter(panels: list[Panel], options: argparse.Namespace, labels: Path)
     if output.suffix == ".gif":
         stack += ",split[a][b];[a]palettegen=max_colors=128[pal];[b][pal]paletteuse=dither=bayer:bayer_scale=4"
     elif output.suffix == ".png":
-        rows = -(-options.count // (options.step * options.columns))
-        stack += f",trim=end_frame={options.count},select='not(mod(n\\,{options.step}))',tile={options.columns}x{rows}:color={BACKGROUND}"
+        frames = -(-options.count // options.step)
+        columns = min(options.columns, frames)
+        rows = -(-frames // columns)
+        stack += f",trim=end_frame={options.count},select='not(mod(n\\,{options.step}))',tile={columns}x{rows}:color={BACKGROUND}"
     return ";".join([*parts, stack])
 
 

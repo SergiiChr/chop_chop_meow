@@ -47,6 +47,8 @@ public partial class Game {
         await KeyStroke(Key.Escape);
         var netStatus = (Label)menu.FindChild("net_status", true, false);
         Require(menu.Visible && netStatus.Text == "Hosting on port 24565 · 0 guests", "While hosting, the pause menu must say so.");
+        // The guest joins only now, so the count above cannot already include it.
+        Signal("hosting");
 
         PlayerState Guest() => Hosted.Players.Single(p => p.Key != net.Key);
         await Until(() => Hosted.Players.Count == 2, "a guest joining", 45);
@@ -125,6 +127,7 @@ public partial class Game {
         RemoveCheckFiles(); await Frames(4);
         await JoinUntilRefused("The host has not opened the game to other players.");
         Signal("refused");
+        await Signaled("hosting");
         await JoinFromStart();
         Require(!startMenu.Visible, "Joining must close the start menu.");
         Require(world.Players.Count == 2, "Joining must add the guest to the host's world.");
