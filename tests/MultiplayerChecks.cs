@@ -346,7 +346,7 @@ public static class MultiplayerChecks {
         var hostPack = world.Wolves.Where(w => w.Target == world.Me.Id).ToList();
         var guestPack = world.Wolves.Where(w => w.Target == GuestId).ToList();
         Require(hostPack.Count > 0 && guestPack.Count > 0, "each player out at night should draw their own wolves");
-        Require(guestPack.All(w => w.Pos.DistanceTo(guest.Pos) < data.SightRadius + 8) && hostPack.All(w => w.Pos.DistanceTo(world.Player) < data.SightRadius + 8), "wolves should come out near the player they hunt");
+        Require(guestPack.All(w => w.Pos.DistanceTo(guest.Pos) < data.SightRadius + 12) && hostPack.All(w => w.Pos.DistanceTo(world.Player) < data.SightRadius + 12), "wolves should come out near the player they hunt");
 
         Give(guest, "stone", 2); SetNeeds(guest, health: -1);
         world.Tick(.25f);

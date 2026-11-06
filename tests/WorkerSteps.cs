@@ -35,7 +35,7 @@ internal static class WorkerSteps {
         crew.Chest.Inventory.InputFilter.Add("iron_bar");
         var sign = world.Add(ThingKind.Signpost, new Vector2(30, 20));
         world.Assign(AddWorker(world, sign.Pos), sign);
-        SafeTick(world, 40);
+        Work(world, 40);
         return sign;
     }
 

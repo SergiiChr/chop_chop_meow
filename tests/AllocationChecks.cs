@@ -59,7 +59,7 @@ public static class AllocationChecks {
         var night = new World(data);
         RunUntilPhase(night, data.NightStarts + .05f);
         // Long enough for the pack to gather around the player; the player is kept on their feet so the hunt never ends.
-        Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }, warmup: 3600);
+        Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }, warmup: 6000);
     }
 
     /// <summary>

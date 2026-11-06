@@ -1366,6 +1366,8 @@ public static class SimulationChecks {
         var data = world.Data;
         var worker = world.Hire(sign, offer);
         Require(worker != null, "sale proceeds should fund a new worker");
+        // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning.
+        for (int i = 0; i < 4000 && !world.OnDuty(worker!); i++) { SafeTick(world, Step); SetNeeds(world, health: 100); }
         var chest = BuildAt(world, ThingKind.Chest, Site(37, 25));
         // A woodcutter takes an axe from a tool station, so the player racks theirs: a station is 8 planks and 4 stone.
         GatherUntil(world, tree, "wood", 2);
@@ -1380,8 +1382,6 @@ public static class SimulationChecks {
         Require(worker.Duties.Count == 1, "the hired worker should have one duty");
         Require(World.HasDuty(worker, workerTree.Id, "gather"), "the hired worker's duty should be gathering from that resource");
         Require(world.Reached("assigned"), "assigning a worker should reach the assigned milestone");
-        // Selling for the first pickaxe takes the opening day, so a worker hired at night starts in the morning.
-        for (int i = 0; i < 4000 && !world.OnDuty(worker); i++) { SafeTick(world, Step); SetNeeds(world, health: 100); }
         for (int i = 0; i < 480 && chest.Inventory["wood"] == 0; i++) SafeTick(world, Step);
         Require(chest.Inventory["wood"] > 0 && worker.Bag["wood"] == 0,
                 "hired worker should gather actual wood and deliver it to a built chest");

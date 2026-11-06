@@ -2015,11 +2015,12 @@ public sealed partial class World {
                 if (CanStand(b.Pos - push)) b.Pos -= push;
             }
         }
-        if (!Night) S.Wolves.Clear();
+        // Wolves come out with the fading light, so the evening before bed is not safe.
+        if (!Dusk) S.Wolves.Clear();
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
             using (ActAs(p)) {
-                if (!Night) {
+                if (!Dusk) {
                     nightSpawn = 0;
                     if (!Dead) S.Mauled = false;
                 } else if (!sleeping) {
@@ -2143,12 +2144,12 @@ public sealed partial class World {
             nightSpawn -= dt;
             // A torch draws the whole pack in, but slowly.
             if (nightSpawn <= 0 && hunters.Count < (S.TorchLit ? 6 : Math.Min(6, 2 + Day))) {
-                nightSpawn = S.TorchLit ? 25 : 15; float angle = S.Time * 2.4f;
-                // Wolves come out of the woods, never the sea or the mountains, and just beyond every player's sight, so none appears on screen.
+                nightSpawn = S.TorchLit ? 40 : 30; float angle = S.Time * 2.4f;
+                // Wolves come out of the woods, never the sea or the mountains, and well beyond every player's sight, so none appears on screen.
                 // Without such a spot this time, the wolf comes on a later try.
                 var p = Player;
                 for (int turn = 0; turn < 24 && p == Player; turn++) {
-                    var at = Player + new Vector2(MathF.Cos(angle + turn * .52f), MathF.Sin(angle + turn * .52f)) * (Data.SightRadius + 2 + turn / 12 * 4);
+                    var at = Player + new Vector2(MathF.Cos(angle + turn * .52f), MathF.Sin(angle + turn * .52f)) * (Data.SightRadius + 6 + turn / 12 * 4);
                     if (Open(at) && Unseen(at)) p = at;
                 }
                 if (p != Player) {

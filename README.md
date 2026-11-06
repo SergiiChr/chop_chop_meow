@@ -526,7 +526,8 @@ With none, a message says the mine is full with no output available.
 
 ## Wolves and night
 
-Wolves hunt at night.
+Wolves hunt from dusk at 20:24 until dawn, so the hour or two before bed is risky too.
+They come out one at a time, about every 30 seconds, or 40 while your torch burns.
 A chasing wolf gallops faster than you walk, but sprinting outruns it.
 They come out of the dark beyond what you can see, never on screen.
 

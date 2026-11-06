@@ -380,7 +380,8 @@ It draws one screen-wide quad after everything else, placing each pixel in the w
 
 ### Night and wolves
 
-Wolves come out of open ground just beyond every player's sight radius, so none appears on screen.
+Wolves hunt from `GameData.DuskStarts` (20:24) until dawn, so over an hour before `World.SleepHour`.
+They come out of open ground six tiles beyond every player's sight radius, so none appears on screen.
 A chasing wolf (`Wolf.Chase` above zero) gallops at `WolfChase` times `WalkSpeed`, which data validation keeps above walking and below `SprintSpeed`.
 Stalking, creeping and backing off stay at the slower trot.
 
