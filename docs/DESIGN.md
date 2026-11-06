@@ -270,6 +270,20 @@ Manual bellows pumping and the unarmed punch trigger one loop of their action.
 Each work action has an impact moment that shakes its target and spawns chips, leaves, splashes or sparks.
 Pausing freezes animation and effects.
 
+### Wolf animation
+
+`WolfShape` builds one skinned wolf mesh on a skeleton of spine, neck, head, jaw, ears, a three-bone tail and four legs of three segments and a paw; `WolfModel` poses it.
+Legs are placed by two-bone IK from where each paw should stand, with the front elbow bending back and the hind stifle forward as in a real canine.
+A stance moves the paw back at exactly the body's speed, so paws stay where they land.
+`WolfModel.Move` picks a lateral-sequence walk, a diagonal trot or a rotary gallop from the wolf's smoothed speed; the gallop folds the spine at the gathered float and stretches it at the extended one.
+A change of motion blends from the last shown pose over a short smoothstep, so standing, walking, trotting, galloping, leaping and recoiling run into each other.
+
+`WorldView` times the wolf against the player:
+
+- a leap rises, stretches and reaches for the throat; contact at `WolfModel.ContactReach` knocks the player onto their back facing the wolf, and the wolf rides them down to stand over them at `World.PinDistance`;
+- a wolf a swing will hit lunges into it to `WolfModel.StrikeReach`, and is thrown back only when the swing lands (`ActorAnimation.Contact`);
+- a killing blow knocks the carcass back over the same moment before it falls.
+
 ## Gameplay
 
 ### Player loop
@@ -376,7 +390,7 @@ A direct torch hit sets `Wolf.Flee`.
 
 #### Mauling and wolf meat
 
-At half health or less, an unprotected player can be pinned by a leaping wolf.
+At half health or less, an unprotected player can be pinned by a leaping wolf, which knocks them onto their back and stands over them.
 The pinned state (`SaveState.Mauled`) blocks movement and actions and drains health while the pack feeds.
 The death that follows strips food from the recovery box.
 

@@ -201,7 +201,7 @@ public partial class WorldView {
     };
     private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall", "wolf hit" };
     private readonly List<ActorRig> reviewRigs = new();
-    private readonly List<WorldModels.WolfModel> reviewWolves = new();
+    private readonly List<WolfModel> reviewWolves = new();
     private Node3D? review;
     private static readonly Vector3 ScreenRight = new Vector3(1, 0, -1).Normalized(), ScreenDown = new Vector3(1, 0, 1).Normalized();
     private static Vector3 ReviewCenter => new(0, 1, 0);
@@ -258,15 +258,18 @@ public partial class WorldView {
                 reviewRigs.Add(rig);
             }
             for (int i = 0; i < ReviewWolves.Length; i++) {
-                var wolf = new WorldModels.WolfModel();
+                var wolf = new WolfModel();
                 review.AddChild(wolf.Root); wolf.Root.Position = ReviewSpot(ReviewClips.Length + i);
                 reviewWolves.Add(wolf);
             }
         }
         // Moving wolves stride as they would at their speed in the world: a trot at 3 tiles a second and a gallop at a chase's 6.3.
-        reviewWolves[0].Idle(Elapsed); reviewWolves[1].Trot(Elapsed * 3 * 5); reviewWolves[2].Gallop(Elapsed * 6.3f * 2.6f);
-        reviewWolves[3].Leap(Elapsed % 1.2f / World.LeapSeconds); reviewWolves[4].Feed(Elapsed); reviewWolves[5].Fall(Elapsed % 3 / 1.5f);
-        reviewWolves[6].Recoil(Elapsed % 1.2f / World.StaggerSeconds);
+        float dt = (float)GetProcessDeltaTime();
+        reviewWolves[0].Stand(Elapsed, dt, false); reviewWolves[1].Move(3 * dt, dt, false, false); reviewWolves[2].Move(6.3f * dt, dt, true, false);
+        float leap = Elapsed % 1.2f / World.LeapSeconds;
+        if (leap < .7f) reviewWolves[3].Leap(leap, .7f, dt); else reviewWolves[3].Feed(Elapsed, dt, true, (leap - .7f) * World.LeapSeconds / KnockSeconds);
+        reviewWolves[4].Feed(Elapsed, dt, false); reviewWolves[5].Fall(Elapsed % 3 / 1.5f);
+        reviewWolves[6].Recoil(Elapsed % 1.2f / WolfModel.RecoilSeconds, Elapsed % 1.2f < WolfModel.RecoilSeconds ? dt * 2 : 0, dt);
         foreach (var wolf in reviewWolves) wolf.Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
         for (int i = 0; i < ReviewClips.Length; i++) {
             var action = ReviewClips[i].Action;

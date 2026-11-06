@@ -292,9 +292,13 @@ public sealed partial class World {
     /// <summary>How far down the valley a worker is, from 0 at the signpost to 1 out of view: running off for prices, or walking home or back over half a trade trip.</summary>
     public float TripLeg(Worker w) => w.Away > 0 ? WalkLeg(Data.TradeSeconds - w.Away, w.Away) : WalkLeg(w.Commute, Data.TradeSeconds / 2);
     public const float LeapSeconds = .4f;
-    // A wolf leaps from within LeapRange and lands PinDistance away, where its jaws reach the throat of the downed player.
+    /// <summary>
+    /// A wolf leaps from within LeapRange and lands this far short of the player's tile, standing over them once they are knocked onto their back.
+    /// Landing short, rather than across the tile, keeps the leap on one bearing from start to finish.
+    /// </summary>
+    public const float PinDistance = .1f;
     private bool packAttack { get => S.Actor.PackAttack; set => S.Actor.PackAttack = value; }
-    private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f, ChaseSeconds = 3;
+    private const float LeapRange = 3.5f, FeastSeat = 1.1f, FeastSpeed = 5.5f, ChaseSeconds = 3;
     /// <summary>Minimum reinforced furnace heat: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
     /// <summary>Heat as degrees Celsius for display: the steel line sits where steel forms, 1450 °C.</summary>
@@ -998,9 +1002,10 @@ public sealed partial class World {
         }
     }
     public void Die() {
-        // After a mauling the box lands past the feet, away from the wolf at the throat, so the feeding stays visible.
+        // After a mauling the box lands past the feet, behind the wolf standing over the player, so the feeding stays visible.
+        // The player falls backwards facing the wolf that leapt, so the feet point back the way it came.
         var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
-        var box = Add(ThingKind.Grave, killer == null ? Player : Player + (Player - killer.Pos).Normalized() * 1.5f); box.Inventory = S.Backpack;
+        var box = Add(ThingKind.Grave, killer == null ? Player : Player + (killer.Pos - Player).Normalized() * 1.5f); box.Inventory = S.Backpack;
         S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
         if (S.Mauled) {
             // The pack eats every scrap of food and stays to feed until the player respawns.
