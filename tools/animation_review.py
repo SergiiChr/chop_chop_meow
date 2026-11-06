@@ -56,8 +56,6 @@ def capture(checkout: Path, clip: str, view: str, slow: float, folder: Path) -> 
         clip,
         "--animation-pitch",
         str(pitch),
-    ]
-    flags += [
         "--animation-turn",
         str(turn),
         "--animation-slow",
@@ -78,11 +76,22 @@ def capture(checkout: Path, clip: str, view: str, slow: float, folder: Path) -> 
             check=False,
         )
     text = log.read_text(errors="replace")
-    if result.returncode or MARKER not in text or build.ERRORS.search(text):
+    errors = list(
+        dict.fromkeys(
+            line.strip() for line in text.splitlines() if build.ERRORS.search(line)
+        )
+    )
+    if errors:
+        print("\n".join(errors[:20]), file=sys.stderr)
+    if result.returncode or MARKER not in text:
         raise SystemExit(
             f"Capture of {view} failed (exit {result.returncode}); see {log}"
         )
-    print(f"Captured {folder}")
+    # A machine without a GPU or sound device logs engine errors yet saves every frame, so they only warn.
+    print(
+        f"Captured {folder}"
+        + (f" with the engine errors above; see {log}" if errors else "")
+    )
 
 
 def capture_all(checkout: Path, name: str, options: argparse.Namespace) -> None:

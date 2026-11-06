@@ -103,11 +103,13 @@ game camera:
 
 ```sh
 ./tools/animation_review.py "player run"                       # side, front and game views at 4x slow motion
-./tools/animation_review.py "player run" --base main --views side --slow 1  # add the same views from main
+git fetch origin
+./tools/animation_review.py "player run" --base origin/main --views side --slow 1  # add the same views from main
 ```
 
 - Frames land in `build/animation-review/<current or ref>/<view>/`, 96 a view at 30 a second.
 - The first frames show the start from standing: pick frames after it for a steady cycle.
-- A capture of another ref works only where that ref has the close-up review (`--animation-clip`).
+- `--base` captures a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
+  A ref without the close-up review (`--animation-clip`) cannot be captured.
 - Wolves have no close-up: `./build.py play -- --animation-review` shows every clip, wolves included, on one screen.
 - Turn the frames into a video or a numbered contact sheet with the `frame-compare` skill.
