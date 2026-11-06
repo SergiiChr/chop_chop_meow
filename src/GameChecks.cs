@@ -312,7 +312,7 @@ public partial class Game {
         Hosted.Fire(hired); Hosted.Tick(world.Data.TradeSeconds); RemoveThings(Hosted, t => t == sign || t.Kind == ThingKind.Grave); Drop(Hosted, Inventory.Coins, 999);
         await CloseWithEsc();
     }
-    /// <summary>A new packing station opens its list of goods; picking one sets what it packs, and a backpack click loads it.</summary>
+    /// <summary>A new packing station opens its list of goods; picking one sets what it packs, a backpack click loads it, and the idle player beside it packs.</summary>
     private async Task CheckPackingStationListsGoodsAndTakesBackpackClicks() {
         await CloseWithEsc();
         var packer = Hosted.Add(ThingKind.Packer, world.Player + new Vector2(2, 0));
@@ -325,6 +325,8 @@ public partial class Game {
         Require(Named("packed_crate") != null, "The station must show the crate being packed.");
         await Click(Slots().First(c => c.TooltipText.StartsWith("Berries ·")));
         Require(packer.Inventory["berries"] == 1, "Clicking berries in the backpack must load one into the packing station.");
+        packer.Inventory.Add("crate", 1);
+        await Until(() => view.PlayerAnimation == ActorAction.Pack, "the idle player packing at the station beside it", 3);
         RemoveThings(Hosted, t => t == packer); Drop(Hosted, "berries"); await CloseWithEsc();
     }
     /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>

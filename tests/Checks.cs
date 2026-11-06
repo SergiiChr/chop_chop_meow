@@ -11,7 +11,7 @@ using Godot;
 /// <summary>Shared assertion and time limit for simulation, model, UI and network checks.</summary>
 internal static class Checks {
     /// <summary>How long one check may run, and one tagged slow; past it the process stops, since the check has locked up.</summary>
-    public const double TestLimit = 20, SlowTestLimit = 60;
+    public const double TestLimit = 20, SlowTestLimit = 180;
 
     private static readonly Lock running = new();
     private static string current = "";
@@ -29,21 +29,17 @@ internal static class Checks {
     /// <summary>Runs one check within <see cref="TestLimit"/>, or <see cref="SlowTestLimit"/> when tagged slow, and logs how long it took.</summary>
     public static void Test(Action check, bool slow = false, [CallerArgumentExpression(nameof(check))] string name = "") {
         Start(name, slow);
-        check();
-        Finish();
+        try { check(); } finally { Finish(); }
     }
     public static void Test(Action<GameData> check, GameData data, bool slow = false, [CallerArgumentExpression(nameof(check))] string name = "") =>
         Test(() => check(data), slow, name);
     public static async Task Test(Func<Task> check, bool slow = false, [CallerArgumentExpression(nameof(check))] string name = "") {
         Start(name, slow);
-        await check();
-        Finish();
+        try { await check(); } finally { Finish(); }
     }
     public static async Task<T> Test<T>(Func<Task<T>> check, bool slow = false, [CallerArgumentExpression(nameof(check))] string name = "") {
         Start(name, slow);
-        var result = await check();
-        Finish();
-        return result;
+        try { return await check(); } finally { Finish(); }
     }
 
     /// <summary>What the running check waits for, named when it runs out of time; empty when it waits for nothing.</summary>

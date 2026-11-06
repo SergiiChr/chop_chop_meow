@@ -60,7 +60,7 @@ Project rules on top of the global coding and testing guides.
 - A check that a load restores something changes that thing between saving and loading.
 - Check files hold only checks and their runners. Steps live in feature files: `tests/WorldSteps.cs`, `PlayerSteps.cs`, `WorkerSteps.cs`, `EconomySteps.cs`, `ModelSteps.cs`, `ChainSteps.cs` and `SetupSteps.cs` for simulation checks, and `src/InputSteps.cs`, `PanelSteps.cs` and `SessionSteps.cs` for UI and network checks.
 - Checks fail through the shared `Checks.Require` in `tests/Checks.cs`.
-- A runner calls each check through `Checks.Test`, which logs its time and stops the process when it runs past 20 seconds. A check that needs longer, such as a whole network session, is tagged `slow: true` for 60 seconds. `./build.py` also gives all test stages together 300 seconds.
+- A runner calls each check through `Checks.Test`, which logs its time and stops the process when it runs past 20 seconds. A check that needs longer, such as a whole network session, is tagged `slow: true` for 180 seconds, since the lossy relay makes reconnects vary from 20 to over 130 seconds. `./build.py` also gives all test stages together 300 seconds.
 - A check over 50 lines is long: split it into one check per behaviour, or move its setup into steps. A longer one stays only when it is a single scenario that loses its point when split, and says so in its summary.
 - Do not weaken assertions to make broken behavior pass.
 

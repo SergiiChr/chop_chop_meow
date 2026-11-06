@@ -629,6 +629,7 @@ public sealed partial class World {
     public bool PlayerHammers(Thing anvil) => !playerBusy && Near(anvil);
     /// <summary>Stations that can need someone working at them.</summary>
     public static bool Worked(ThingKind kind) => kind is ThingKind.Anvil or ThingKind.Bench or ThingKind.Cooktable or ThingKind.Packer;
+    public static readonly ThingKind[] WorkedKinds = Array.FindAll(Kinds.All, Worked);
     /// <summary>Whether the station's current recipe only advances while someone works at it; at the cooking table that is the mortar's recipes.</summary>
     public bool Worked(Thing t) => Worked(t.Kind) && (t.Kind != ThingKind.Cooktable || Data.Recipes.TryGetValue(t.Recipe, out var r) && r.Tool != "");
     /// <summary>An anvil or bench only works while the player or a paid worker is hammering at it, not merely standing near.</summary>

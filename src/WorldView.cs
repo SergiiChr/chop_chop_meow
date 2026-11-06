@@ -511,7 +511,7 @@ public partial class WorldView : Node3D {
     private Thing? StationToHammer(PlayerState p) {
         if (p.GatherTarget != 0) return null;
         using var acting = World.ActAs(p);
-        foreach (var kind in World.StationKinds)
+        foreach (var kind in World.WorkedKinds)
             foreach (var t in World.ThingsOf(kind)) if (World.Worked(t) && t.Processing && World.Near(t) && !World.CrewHammers(t)) return t;
         return null;
     }
