@@ -41,6 +41,8 @@ def require_clip(ref: str | None, clip: str) -> None:
     if "--animation-clip" not in source:
         raise SystemExit(f"{where} has no --animation-clip close-up review")
     names = re.findall(r'\("([^"]+)", ActorSkin\.', source)
+    wolves = re.search(r"WolfClips = \{([^}]*)\}", source)
+    names += re.findall(r'"([^"]+)"', wolves.group(1)) if wolves else []
     if clip not in names:
         raise SystemExit(f"No clip {clip!r} in {where}; clips: {', '.join(names)}")
 

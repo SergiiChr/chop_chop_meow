@@ -90,6 +90,17 @@ public static class ActorAnimation {
     public static float Advance(ActorAction action, float seconds, float metres) =>
         action == ActorAction.Run ? metres / RunStride * Duration(action) : seconds;
 
+    /// <summary>Seconds into a swing at which it lands: the punch at full stretch, the torch crossing in front, or the axe at the bottom of its stroke; zero for anything else.</summary>
+    public static float Contact(ActorAction action) => action switch {
+        ActorAction.Attack => .32f * Duration(action),
+        ActorAction.TorchSwing => .3f * Duration(action),
+        ActorAction.Chop or ActorAction.SteelChop => .5f * Duration(action),
+        _ => 0
+    };
+
+    /// <summary>Seconds left until a swing with <paramref name="remaining"/> seconds still to play lands; zero once it has.</summary>
+    public static float UntilContact(ActorAction action, float remaining) => Math.Max(0, Contact(action) - (Duration(action) - remaining));
+
     /// <summary>Position within the current loop, from 0 inclusive to 1 exclusive.</summary>
     public static float Phase(ActorAction action, float elapsed) {
         if (!float.IsFinite(elapsed)) return 0;
