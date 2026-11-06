@@ -83,10 +83,8 @@ public partial class Game : Node, IGameFlow {
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
             if (Launch.Has("--server-check")) RunServerCheck();
-            if (Launch.Has("--animation-review")) {
-                panel.Close(); ui.Visible = false; view.AnimationReview = true;
-                if (Launch.Value("--animation-capture") is string captures) CaptureAnimations(captures);
-            }
+            if (Launch.Has("--animation-review")) { panel.Close(); ui.Visible = false; view.AnimationReview = true; if (Launch.Has("--wolves")) view.Zoom = 2f; }
+            if (Launch.Value("--animation-capture") is string captures) CaptureAnimations(captures);
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);

@@ -4,7 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Smooth elliptical profiles, with optional two-bone weights across a limb's joint.</summary>
+/// <summary>Smooth elliptical profiles, with optional bone weights across a limb's joints.</summary>
 internal static class ActorShape {
     internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0, float Tone = 0);
 
@@ -99,7 +99,7 @@ internal static class ActorShape {
         return surface.Commit();
     }
 
-    private static ArrayMesh BuildProfile(Ring[] rings, float joint) {
+    private static ArrayMesh BuildProfile(Ring[] rings, Vector3[] joints) {
         const int sides = 12;
         var surface = new SurfaceTool();
         surface.Begin(Mesh.PrimitiveType.Triangles);
@@ -115,11 +115,7 @@ internal static class ActorShape {
                 surface.SetNormal(tangent.Cross(down).Normalized());
                 surface.SetColor(ring.Color);
                 surface.SetUV(new Vector2(ring.Tone, .5f));
-                if (joint > 0) {
-                    float weight = Mathf.SmoothStep(joint - .065f, joint + .065f, -ring.Y);
-                    surface.SetBones(new[] { 0, 1, 0, 0 });
-                    surface.SetWeights(new[] { 1 - weight, weight, 0f, 0f });
-                }
+                Weigh(surface, ring.Y, joints);
                 surface.AddVertex(new Vector3(ring.Width * x + ring.Sideways, ring.Y, ring.Depth * z + ring.Forward));
             }
         }
@@ -137,11 +133,7 @@ internal static class ActorShape {
             surface.SetNormal(end == 0 ? Vector3.Up : Vector3.Down);
             surface.SetColor(ring.Color);
             surface.SetUV(new Vector2(ring.Tone, .5f));
-            if (joint > 0) {
-                surface.SetBones(new[] { 0, 1, 0, 0 });
-                float weight = Mathf.SmoothStep(joint - .065f, joint + .065f, -ring.Y);
-                surface.SetWeights(new[] { 1 - weight, weight, 0f, 0f });
-            }
+            Weigh(surface, ring.Y, joints);
             int center = rings.Length * sides + end;
             surface.AddVertex(new Vector3(ring.Sideways, ring.Y, ring.Forward));
             for (int side = 0; side < sides; side++) {
@@ -152,14 +144,34 @@ internal static class ActorShape {
         return surface.Commit();
     }
 
-    public static MeshInstance3D Add(Node3D parent, Ring[] rings, float joint = 0, Material? material = null) {
-        string key = $"profile|{joint}|{string.Join("|", rings)}";
-        if (!meshes.TryGetValue(key, out var profile)) meshes[key] = profile = BuildProfile(rings, joint);
+    /// <summary>
+    /// Skins a vertex at height <paramref name="y"/> to the bone above it, blending to the next over the 0.13 around each joint;
+    /// bone 0 hangs from the limb's root and each later bone from the joint at the same index of <paramref name="joints"/>.
+    /// </summary>
+    private static readonly int[] bones = new int[4];
+    private static readonly float[] weights = new float[4];
+    private static void Weigh(SurfaceTool surface, float y, Vector3[] joints) {
+        if (joints.Length == 0) return;
+        Span<float> below = stackalloc float[joints.Length];
+        for (int j = 0; j < joints.Length; j++) below[j] = Mathf.SmoothStep(-joints[j].Y - .065f, -joints[j].Y + .065f, -y);
+        Array.Clear(bones); Array.Clear(weights);
+        weights[0] = 1 - below[0];
+        for (int j = 0; j < joints.Length; j++) { bones[j + 1] = j + 1; weights[j + 1] = below[j] - (j + 1 < joints.Length ? below[j + 1] : 0); }
+        surface.SetBones(bones); surface.SetWeights(weights);
+    }
+
+    public static MeshInstance3D Add(Node3D parent, Ring[] rings, float joint = 0, Material? material = null) =>
+        Add(parent, rings, joint > 0 ? new[] { new Vector3(0, -joint, 0) } : Array.Empty<Vector3>(), material);
+
+    /// <summary>A profile skinned to a chain of bones at <paramref name="joints"/>, in the skeleton's space; the mesh is cached across every limb with the same profile and joints.</summary>
+    public static MeshInstance3D Add(Node3D parent, Ring[] rings, Vector3[] joints, Material? material = null) {
+        string key = $"profile|{string.Join("|", joints)}|{string.Join("|", rings)}";
+        if (!meshes.TryGetValue(key, out var profile)) meshes[key] = profile = BuildProfile(rings, joints);
         var mesh = new MeshInstance3D { Mesh = profile, MaterialOverride = material ?? Surface };
-        if (joint > 0) {
+        if (joints.Length > 0) {
             var skin = new Skin();
             skin.AddBind(0, Transform3D.Identity);
-            skin.AddBind(1, new Transform3D(Basis.Identity, new Vector3(0, joint, 0)));
+            for (int j = 0; j < joints.Length; j++) skin.AddBind(j + 1, new Transform3D(Basis.Identity, -joints[j]));
             mesh.Skin = skin;
             mesh.Skeleton = new NodePath("..");
         }
@@ -167,15 +179,20 @@ internal static class ActorShape {
         return mesh;
     }
 
-    public static Skeleton3D Limb(Node3D parent, Ring[] rings, float joint, Material? material = null) {
+    public static Skeleton3D Limb(Node3D parent, Ring[] rings, float joint, Material? material = null) => Limb(parent, rings, new[] { new Vector3(0, -joint, 0) }, material);
+
+    /// <summary>A limb hanging from <paramref name="parent"/> that bends at each of <paramref name="joints"/>, top to bottom: bone 1 turns about the first joint, bone 2 about the second.</summary>
+    public static Skeleton3D Limb(Node3D parent, Ring[] rings, Vector3[] joints, Material? material = null) {
         var skeleton = new Skeleton3D();
         parent.AddChild(skeleton);
-        skeleton.AddBone("upper"); skeleton.AddBone("lower");
-        skeleton.SetBoneParent(1, 0);
+        skeleton.AddBone("root");
         skeleton.SetBoneRest(0, Transform3D.Identity);
-        skeleton.SetBoneRest(1, new Transform3D(Basis.Identity, new Vector3(0, -joint, 0)));
+        for (int j = 0; j < joints.Length; j++) {
+            skeleton.AddBone($"joint{j + 1}"); skeleton.SetBoneParent(j + 1, j);
+            skeleton.SetBoneRest(j + 1, new Transform3D(Basis.Identity, joints[j] - (j == 0 ? Vector3.Zero : joints[j - 1])));
+        }
         skeleton.ResetBonePoses();
-        Add(skeleton, rings, joint, material);
+        Add(skeleton, rings, joints, material);
         return skeleton;
     }
 }

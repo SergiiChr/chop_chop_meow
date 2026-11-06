@@ -48,7 +48,7 @@ Play accepts Godot arguments after `--`:
 | Option | Effect |
 | --- | --- |
 | `--showcase` | Load a populated review fixture instead of a fresh game |
-| `--showcase --wolves` | Add a night ambush to that fixture |
+| `--showcase --wolves` | Add a night ambush to that fixture; add `--hit` for one wolf taking three torch swings |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
 | `--showcase --trees`, `--bushes` | Show the three tree species or the berry bushes |
@@ -57,8 +57,10 @@ Play accepts Godot arguments after `--`:
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
+| `--zoom 2` | Scale the showcase camera's zoom |
 | `--animation-review` | Show every actor action on rotating rigs |
-| `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection |
+| `--animation-review --wolves` | Show only the wolf clips, larger; `--review-yaw 135` holds every rig in profile instead of rotating |
+| `--animation-capture /absolute/directory` | Save the rendered frames of any mode for visual inspection: `--capture-frames 96` sets how many and `--capture-delay 2` seconds to wait first; pass `--fixed-fps 30` before `--` for one fixed step per frame |
 | `--performance-run /absolute/directory` | Record a walking, day/night and staffed-settlement benchmark; summarise it with `python3 tools/performance_report.py /absolute/directory` |
 
 Other showcase flags are parsed in `src/Showcase.cs`.
@@ -67,6 +69,7 @@ These options are developer review tools; they do not represent a normal fresh-s
 ```sh
 ./build.py play -- --showcase --screenshot /tmp/chop-chop-meow.png
 ./build.py play -- --animation-review --animation-capture /tmp/chop-chop-meow-animation
+./build.py play -- --fixed-fps 30 -- --showcase --wolves --hit --day-phase .705 --animation-capture /tmp/chop-chop-meow-hit
 ./tools/environment_review.py             # landscape views, saved in build/environment-review/
 ./tools/environment_review.py --shoreline # coast, lake edge and mine views
 ```

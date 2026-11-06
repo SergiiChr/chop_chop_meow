@@ -215,13 +215,26 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Player = sign.Pos + new Vector2(2.5f, 1.5f); world.Tick(.25f); panel.Close(); view.Zoom = 2.2f;
         }
         if (Launch.Has("--mine")) MineReview(sign);
-        if (!Launch.Has("--wolves")) return;
-        // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
+        if (Launch.Has("--wolves")) Wolves();
+        // --zoom sets the camera zoom of any review scene.
+        if (float.TryParse(Launch.Value("--zoom"), System.Globalization.CultureInfo.InvariantCulture, out float zoom)) view.Zoom = zoom;
+    }
+
+    /// <summary>
+    /// Night ambush review: a wounded player, one wolf a short charge from leaping range, the pack further out and a fresh carcass.
+    /// <c>--hit</c> instead sets a healthy player with a steel axe against one charging wolf, swinging at it until it falls, for reviewing the hit and death.
+    /// <c>--day-phase</c> keeps its time of day.
+    /// </summary>
+    private void Wolves() {
         var spot = Terrain.Spawn + new Vector2(11, 8);
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(spot) < 6);
-        world.S.Time = world.Data.DaySeconds * .78f; world.Player = spot; world.S.Health = 45;
-        foreach (var offset in new[] { new Vector2(2.5f, -1), new Vector2(-6, 3), new Vector2(5, 5) }) world.S.Wolves.Add(new Wolf { Pos = spot + offset });
-        world.Add(ThingKind.WolfCorpse, spot + new Vector2(-2, -2), 4);
+        if (!Launch.Has("--day-phase")) world.S.Time = world.Data.DaySeconds * .78f;
+        world.Player = spot; world.S.Health = Launch.Has("--hit") ? 100 : 45;
+        var offsets = Launch.Has("--hit") ? new[] { new Vector2(3.4f, -1.2f) } : new[] { new Vector2(4.4f, -1.6f), new Vector2(-6, 3), new Vector2(5, 5) };
+        foreach (var offset in offsets) world.S.Wolves.Add(new Wolf { Pos = spot + offset });
+        if (!Launch.Has("--hit")) world.Add(ThingKind.WolfCorpse, spot + new Vector2(-2, -2), 4);
+        // Three swings a second apart: the steel axe takes two hits off its health and the third kills it.
+        if (Launch.Has("--hit")) for (int swing = 1; swing <= 3; swing++) panel.GetTree().CreateTimer(swing).Timeout += world.Attack;
         panel.Close(); view.Zoom = 1.6f;
     }
 }

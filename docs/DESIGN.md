@@ -132,6 +132,7 @@ Rendering and sound:
 | `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake surface and wet banks |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
+| `src/WolfAnimation.cs` | The wolf rig's joints and the keyframed poses of each wolf state |
 | `src/IconRender.cs` | Renders item and building icons from the models (`./build.py icons`) |
 | `src/Sounds.cs` | Plays sound effects |
 
@@ -147,7 +148,7 @@ Checks and review tools:
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
-| `src/AnimationCapture.cs` | Captures the animation review |
+| `src/AnimationCapture.cs` | Saves the rendered frames of any mode |
 
 ### Simulation, view and UI
 
@@ -251,6 +252,12 @@ Walking and running legs follow each foot from its landing: the knee gives under
 A player with something to make by hand squats over it, turning it in both hands (`ActorAction.Craft`), only while standing still.
 
 The player's carried tool selects its matching action and the tool shown in hand.
+
+Wolves work the same way with their own rig and states.
+`WolfAnimation.PoseAt` gives a `WolfPose` for any time in a state: a canine body with a flexing loin, a neck and head above the withers, a jaw, laid-back ears, a tail, and three-segment legs whose elbows and wrists fold backward while the stifles and hocks fold forward.
+`WorldView` picks the state from the simulation: a stalk, trot or gallop by speed and chase, a bite from the attack cooldown, a leap, a hit's recoil, feeding and the death fall, and `WolfModel.Show` blends each change over `WolfAnimation.BlendSeconds`.
+Gaits are keyed by distance travelled, so paws keep pace with the ground: the stalk walks in lateral sequence, the trot swings diagonal pairs, and the gallop is a rotary gallop after Muybridge's plates, each paw planted for a third of the stride, the body carried on whichever paws are down and flying a shallow arc between the last foreleg's push-off and the first hind leg's landing.
+`WolfAnimation.Paw` places every paw by the same arithmetic the rig uses, and the checks hold the two together.
 Workers animate according to movement and an explicit transient `WorkerWorkState`, not localized or presentation status text.
 The transient state is excluded from saves and recalculated on the next simulation tick.
 
@@ -343,6 +350,7 @@ It draws one screen-wide quad after everything else, placing each pixel in the w
 Wolves come out of open ground just beyond every player's sight radius, so none appears on screen.
 A chasing wolf (`Wolf.Chase` above zero) gallops at `WolfChase` times `WalkSpeed`, which data validation keeps above walking and below `SprintSpeed`.
 Stalking, creeping and backing off stay at the slower trot.
+A wolf closing on the player stops `World.BiteStand` short, so a bite lunges across the gap instead of standing inside the player's model.
 
 Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
 A wolf already chasing the player still follows into the light for a few seconds.

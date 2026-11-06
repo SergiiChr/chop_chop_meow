@@ -411,7 +411,7 @@ public partial class WorldView : Node3D {
         Elapsed += dt;
         SyncCamera();
         ShowWarmStage();
-        if (AnimationReview) { UpdateReview(); UpdateFog(); overlay.QueueRedraw(); return; }
+        if (AnimationReview) { UpdateReview(dt); UpdateFog(); overlay.QueueRedraw(); return; }
         // A menu holds everyone still, but what a replaced world had goes at once, or the start menu would show it.
         bool moved = dt > 0 || worldReplaced;
         if (moved || EnvironmentReview) UpdateActors(dt);
@@ -764,7 +764,7 @@ public partial class WorldView : Node3D {
                 break;
             case CarcassProp carcass:
                 float dying = Math.Clamp(t.Progress / .9f, 0, 1);
-                carcass.Wolf.Fall(dying);
+                carcass.Wolf.Pose(WolfAnimation.PoseAt(WolfState.Fall, dying));
                 // Butchering flattens the carcass while the blood pool spreads out from under it.
                 carcass.Wolf.Root.Scale = new Vector3(1, .6f + .4f * WorldModels.Fullness(t), 1);
                 carcass.Wolf.Root.Position = new Vector3(wobble * .03f, 0, 0);
@@ -976,21 +976,25 @@ public partial class WorldView : Node3D {
             // A hit throws the wolf back at once in the world; the model slides there instead, fast at first and settling.
             if (wolf.Stagger > model.Stagger) { model.Knock = -moved; moved = Vector2.Zero; FurAndEmbers(To3(model.Last, .6f)); }
             model.Stagger = wolf.Stagger;
-            bool staggering = wolf.Stagger > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !staggering, galloping = running && wolf.Chase > 0;
-            // A gallop covers more ground a stride than a trot.
-            model.Stride += running ? moved.Length() * (galloping ? 2.6f : 5) : 0;
+            bool staggering = wolf.Stagger > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !staggering;
+            model.Travelled += running ? moved.Length() : 0;
             model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(running ? moved : World.Player - wolf.Pos, model.Yaw), Math.Min(1, dt * 10));
             model.Last = wolf.Pos;
             float recoil = 1 - wolf.Stagger / World.StaggerSeconds, slide = staggering ? MathF.Pow(1 - recoil, 3) : 0;
             model.Root.Position = To3(wolf.Pos + model.Knock * slide);
             model.Root.Visible = World.Sees(wolf.Pos);
             model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-            if (staggering) model.Recoil(recoil);
-            else if (wolf.Leap > 0) model.Leap(1 - wolf.Leap / World.LeapSeconds);
-            else if (wolf.Feeding) model.Feed(Elapsed + wolf.GetHashCode() % 7);
-            else if (galloping) model.Gallop(model.Stride);
-            else if (running) model.Trot(model.Stride);
-            else model.Idle(Elapsed + wolf.GetHashCode() % 7);
+            // A fresh bite shows as its cooldown starting; a chase gallops, a wolf creeping in behind a torch stalks at a walk, and any other move is a trot.
+            var state = staggering ? WolfState.Recoil : wolf.Leap > 0 ? WolfState.Leap : wolf.Feeding ? WolfState.Feed : wolf.Attack > 1 - WolfAnimation.BiteSeconds ? WolfState.Bite
+                : running && wolf.Chase > 0 ? WolfState.Gallop : running && moved.Length() < dt * 1.5f ? WolfState.Stalk : running ? WolfState.Trot : WolfState.Idle;
+            float t = state switch {
+                WolfState.Recoil => recoil,
+                WolfState.Leap => 1 - wolf.Leap / World.LeapSeconds,
+                WolfState.Bite => (1 - wolf.Attack) / WolfAnimation.BiteSeconds,
+                WolfState.Gallop or WolfState.Trot or WolfState.Stalk => model.Travelled,
+                _ => Elapsed + wolf.GetHashCode() % 7,
+            };
+            model.Show(state, t, dt);
         }
         foreach (var (wolf, model) in wolves)
             if (!World.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
