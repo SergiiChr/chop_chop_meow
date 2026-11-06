@@ -269,7 +269,7 @@ public sealed class WolfModel {
         // The head lags the body and hits the ground a moment after it.
         float slam = p < ThrowShare ? 0 : Mathf.SmoothStep(0, .25f, after), kick = after is > .55f and < .8f ? MathF.Sin(MathF.PI * (after - .55f) / .25f) : 0;
         // Rolled onto its side the body sinks until its flank lies on the ground.
-        var body = new WolfPose(Lift: -.52f * down + .12f * air + .07f * bounce, Pitch: -14 * air, Roll: 90 * down + 6 * bounce, Shift: -.05f * down,
+        var body = new WolfPose(Lift: -.5f * down + .12f * air + .07f * bounce, Pitch: -14 * air, Roll: 90 * down + 6 * bounce, Shift: -.05f * down,
             Flex: -12 * air - 4 * down, Bend: 6 * down, Neck: -34 * air + 10 * bounce - 8 * slam, NeckTurn: -12 * slam, Head: 12 * air, HeadTilt: -10 * slam,
             Jaw: 26 * air + 14 * down, Ears: 30 * down, Tail: Mathf.Lerp(-65, -6, down) + 30 * air, Curl: -10 * down);
         var standing = Planted(new WolfPose(), 1);

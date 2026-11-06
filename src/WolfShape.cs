@@ -41,7 +41,7 @@ internal static class WolfShape {
         bones[Jaw] = (Head, new Vector3(0, .818f, .6f));
         bones[EarL] = (Head, new Vector3(.052f, .925f, .55f));
         bones[EarR] = (Head, new Vector3(-.052f, .925f, .55f));
-        for (int i = 0; i < TailBones; i++) bones[Tail + i] = (i == 0 ? Pelvis : Tail + i - 1, new Vector3(0, .7f, -.48f - .17f * i));
+        for (int i = 0; i < TailBones; i++) bones[Tail + i] = (i == 0 ? Pelvis : Tail + i - 1, new Vector3(0, .665f, -.46f - .17f * i));
         for (int leg = 0; leg < 4; leg++) {
             var at = Pivot(leg); var lengths = Lengths(leg);
             bones[Leg(leg)] = (leg < 2 ? Chest : Pelvis, at);
@@ -157,15 +157,15 @@ internal static class WolfShape {
     private static ArrayMesh BuildFur() {
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         int start = 0;
-        // Back line, belly line and half width along the body: deep narrow chest, tucked waist, then the haunches.
+        // Back line, belly line and half width along the body: a deep chest, a full belly with only a slight tuck, and a croup that slopes down into the thighs.
         (float Z, float Top, float Bottom, float Half, float Keel)[] body = {
-            (-.57f, .745f, .68f, .03f, 0), (-.53f, .78f, .58f, .1f, .1f), (-.45f, .795f, .52f, .14f, .15f), (-.34f, .79f, .51f, .145f, .2f),
-            (-.22f, .785f, .58f, .12f, .2f), (-.08f, .79f, .55f, .13f, .3f), (.07f, .81f, .46f, .155f, .4f), (.19f, .83f, .42f, .165f, .45f),
-            (.3f, .83f, .425f, .16f, .45f) };
+            (-.53f, .67f, .6f, .03f, 0), (-.5f, .72f, .54f, .1f, .1f), (-.44f, .755f, .5f, .145f, .15f), (-.34f, .775f, .49f, .155f, .2f),
+            (-.22f, .785f, .51f, .145f, .2f), (-.08f, .795f, .47f, .15f, .3f), (.07f, .815f, .41f, .17f, .4f), (.19f, .835f, .37f, .178f, .45f),
+            (.3f, .835f, .38f, .17f, .45f) };
         // The thick maned neck carries on from the chest as one surface, its sections tipping back as it rises to the head.
         var neck = new[] {
-            new Ring(new Vector3(0, .655f, .385f), .145f, .18f, Chest, -1, 0, .4f, 18), new Ring(new Vector3(0, .72f, .445f), .13f, .145f, Chest, Neck, .5f, .3f, 38),
-            new Ring(new Vector3(0, .77f, .495f), .115f, .12f, Neck, -1, 0, .25f, 50), new Ring(new Vector3(0, .822f, .535f), .095f, .1f, Neck, Head, .3f, .2f, 55),
+            new Ring(new Vector3(0, .64f, .385f), .16f, .2f, Chest, -1, 0, .4f, 18), new Ring(new Vector3(0, .71f, .45f), .148f, .165f, Chest, Neck, .5f, .3f, 38),
+            new Ring(new Vector3(0, .765f, .5f), .13f, .138f, Neck, -1, 0, .25f, 50), new Ring(new Vector3(0, .82f, .54f), .105f, .11f, Neck, Head, .3f, .2f, 55),
             new Ring(new Vector3(0, .865f, .565f), .08f, .085f, Neck, Head, .7f, 0, 58) };
         var rings = new Ring[body.Length + neck.Length];
         for (int i = 0; i < body.Length; i++) {
@@ -203,10 +203,10 @@ internal static class WolfShape {
             Vector3.Right, Vector3.Up, 8, (_, _, _) => Black);
         for (int leg = 0; leg < 4; leg++) LegTube(s, ref start, leg);
         // A full brush tail, dark on top and at the tip.
-        (float Z, float Y, float W, float H)[] brush = { (-.46f, .71f, .04f, .045f), (-.52f, .7f, .052f, .058f), (-.6f, .695f, .066f, .072f), (-.7f, .69f, .074f, .08f), (-.8f, .69f, .072f, .075f), (-.9f, .69f, .055f, .058f), (-.97f, .69f, .03f, .032f), (-1, .69f, .006f, .006f) };
+        (float Z, float Y, float W, float H)[] brush = { (-.44f, .675f, .04f, .045f), (-.5f, .665f, .052f, .058f), (-.58f, .66f, .066f, .072f), (-.68f, .655f, .074f, .08f), (-.78f, .655f, .072f, .075f), (-.88f, .655f, .055f, .058f), (-.95f, .655f, .03f, .032f), (-.98f, .655f, .006f, .006f) };
         var tail = new Ring[brush.Length];
         for (int i = 0; i < brush.Length; i++) {
-            float along = (-.48f - brush[i].Z) / .17f;
+            float along = (-.46f - brush[i].Z) / .17f;
             int bone = Math.Clamp((int)along, 0, TailBones - 1);
             tail[i] = new Ring(new Vector3(0, brush[i].Y, brush[i].Z), brush[i].W, brush[i].H, Tail + bone, bone < TailBones - 1 ? Tail + bone + 1 : -1, bone < TailBones - 1 ? Mathf.SmoothStep(.5f, 1, along - bone) : 0);
         }
@@ -231,11 +231,11 @@ internal static class WolfShape {
         float elbow = pivot.Y - lengths.X, wrist = elbow - lengths.Y, fetlock = wrist - lengths.Z;
         // Height, half width, half depth and how far the section sits forward of the column.
         (float Y, float W, float D, float Forward)[] column = hind
-            ? new[] { (pivot.Y + .06f, .055f, .09f, 0f), (pivot.Y - .04f, .06f, .105f, .015f), (pivot.Y - .14f, .062f, .1f, .015f), (elbow + .03f, .05f, .074f, .005f),
-                (elbow - .05f, .046f, .064f, -.01f), (elbow - .15f, .034f, .045f, -.014f), (wrist + .03f, .025f, .032f, -.012f), (wrist, .027f, .036f, -.018f),
+            ? new[] { (pivot.Y + .06f, .062f, .1f, -.01f), (pivot.Y - .04f, .068f, .125f, -.005f), (pivot.Y - .14f, .068f, .118f, .005f), (elbow + .03f, .056f, .085f, .005f),
+                (elbow - .05f, .05f, .07f, -.01f), (elbow - .15f, .034f, .045f, -.014f), (wrist + .03f, .025f, .032f, -.012f), (wrist, .027f, .036f, -.018f),
                 (wrist - .07f, .022f, .026f, 0f), (fetlock + .015f, .024f, .028f, 0f) }
-            : new[] { (pivot.Y + .04f, .05f, .08f, 0f), (pivot.Y - .1f, .055f, .085f, .005f), (elbow + .09f, .05f, .07f, 0f), (elbow + .01f, .045f, .058f, -.012f),
-                (elbow - .06f, .037f, .046f, 0f), (elbow - .17f, .028f, .033f, .004f), (wrist + .02f, .026f, .03f, .004f), (wrist - .01f, .027f, .032f, .006f),
+            : new[] { (pivot.Y + .04f, .058f, .092f, 0f), (pivot.Y - .1f, .062f, .096f, .005f), (elbow + .09f, .056f, .08f, 0f), (elbow + .01f, .05f, .064f, -.012f),
+                (elbow - .06f, .041f, .05f, 0f), (elbow - .17f, .031f, .036f, .004f), (wrist + .02f, .026f, .03f, .004f), (wrist - .01f, .027f, .032f, .006f),
                 (wrist - .06f, .024f, .028f, .004f), (fetlock + .015f, .025f, .029f, .006f) };
         float[] joints = { elbow, wrist, fetlock };
         var rings = new Ring[column.Length];

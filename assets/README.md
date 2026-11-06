@@ -67,7 +67,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 - `src/HumanShape.cs` — the common neutral torso and continuous skinned limb profiles for players, workers and couriers. It shares five neutral mesh resources (hips, torso, leg, left arm and right arm) across all human roles and player shirt colors. Each actor keeps its own skeletons and pose. Cached three-color texture palettes preserve sleeve/skin, trousers/boots and sole transitions using the fade-compatible StandardMaterial3D path.
 - `src/ActorShape.cs` — profile, skinning and curved strap builders. Outfit colors use cached palette materials rather than duplicating body geometry. These meshes are cached across actors while each rig poses its own joints.
 - `CourierShape` — fits a reflective hi-vis vest and curved cap to the same core, with the common face details.
-- `src/WolfShape.cs` — one cached skinned wolf mesh on a skeleton: deep chest, tucked waist, neck ruff, wedge muzzle with a jaw and teeth, upright ears, legs with elbows, hocks and paws, and a three-bone brush tail. The coat darkens along the back, warms to tan on the flanks and pales underneath.
+- `src/WolfShape.cs` — one cached skinned wolf mesh on a skeleton: deep chest, full belly with a slight tuck, a croup sloping into heavy thighs, thick maned neck, wedge muzzle with a jaw and teeth, upright ears, legs with elbows, hocks and paws, and a three-bone brush tail. The coat darkens along the back, warms to tan on the flanks and pales underneath.
 - `src/WolfModel.cs` — poses the wolf skeleton for gaits, standing, leaping, pinning, feeding, recoil and falling, with IK legs and blending between motions.
 
 ### Buildings and stations
