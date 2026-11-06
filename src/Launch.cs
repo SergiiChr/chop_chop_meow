@@ -18,4 +18,8 @@ public static class Launch {
         int at = Array.IndexOf(Args, option);
         return at >= 0 && at + 1 < Args.Length ? Args[at + 1] : null;
     }
+
+    /// <summary>The number after <paramref name="option"/>, or <paramref name="fallback"/> when it is missing or not a number.</summary>
+    public static float Number(string option, float fallback) =>
+        float.TryParse(Value(option), System.Globalization.CultureInfo.InvariantCulture, out float number) ? number : fallback;
 }

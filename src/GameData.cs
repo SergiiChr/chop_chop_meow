@@ -112,6 +112,8 @@ public sealed partial class GameData {
     public float WolfChase { get; } = 1.5f;
     /// <summary>How many times faster the player moves with Shift held.</summary>
     public float SprintSpeed { get; } = 1.6f;
+    /// <summary>Tiles a second the player moves, walking or sprinting.</summary>
+    public float MoveSpeed(bool sprinting) => WalkSpeed * (sprinting ? SprintSpeed : 1);
     /// <summary>How many times faster food and drink drain while sprinting.</summary>
     public float SprintDrain { get; } = 1.7f;
     /// <summary>Food or drink percentage below which the player is too weak to sprint and the screen edges warn.</summary>

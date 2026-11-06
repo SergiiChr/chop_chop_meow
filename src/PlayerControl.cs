@@ -115,7 +115,7 @@ public sealed class PlayerControl {
     private void Walk(Vector2 direction, bool right, float dt) {
         // Under 15% food or drink the player is too weak to sprint.
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
-        world.MovePlayer(direction * dt * world.Data.WalkSpeed * (world.Me.Sprinting ? world.Data.SprintSpeed : 1)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
+        world.MovePlayer(direction * dt * world.Data.MoveSpeed(world.Me.Sprinting)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
         world.Me.Held = hotbar.ActiveItem() ?? "";
     }

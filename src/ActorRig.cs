@@ -17,6 +17,8 @@ public sealed class ActorRig {
     private readonly Dictionary<string, Node3D> tools = new();
     private readonly Node3D torch;
     private readonly List<(Skeleton3D Skeleton, Node3D Joint)> limbs = new();
+    // The leg skins, whose third bone turns the foot at the ankle.
+    private readonly Skeleton3D footL, footR;
     /// <summary>The torch flame and its light, animated by the view while the torch burns.</summary>
     public readonly Node3D Flame;
     public readonly OmniLight3D TorchLight;
@@ -30,8 +32,8 @@ public sealed class ActorRig {
         };
         shirt = shirtColor ?? shirt;
         hips = Pivot(Root, new Vector3(0, ActorAnimation.Thigh + ActorAnimation.Shin + ActorAnimation.Sole, 0));
-        (legL, kneeL) = Leg(.09f, legs, boots);
-        (legR, kneeR) = Leg(-.09f, legs, boots);
+        (legL, kneeL, footL) = Leg(.09f, legs, boots);
+        (legR, kneeR, footR) = Leg(-.09f, legs, boots);
         torso = Pivot(hips, Vector3.Zero);
         HumanShape.Torso(torso, shirt, legs);
         Cylinder(torso, .055f, .05f, .08f, new Vector3(0, .54f, 0), Mat(skinTone));
@@ -130,11 +132,12 @@ public sealed class ActorRig {
         return (holder, flame, light);
     }
 
-    private (Node3D Hip, Node3D Knee) Leg(float x, string trousers, string boots) {
+    private (Node3D Hip, Node3D Knee, Skeleton3D Skin) Leg(float x, string trousers, string boots) {
         var hip = Pivot(hips, new Vector3(x, -.02f, 0));
         var knee = Pivot(hip, new Vector3(0, -ActorAnimation.Thigh, 0));
-        limbs.Add((HumanShape.Leg(hip, ActorAnimation.Thigh, trousers, boots), knee));
-        return (hip, knee);
+        var skin = HumanShape.Leg(hip, ActorAnimation.Thigh, ActorAnimation.Thigh + ActorAnimation.Shin, trousers, boots);
+        limbs.Add((skin, knee));
+        return (hip, knee, skin);
     }
 
     /// <summary>Every role shares the continuous arm and its skin weights; the palette selects sleeve length.</summary>
@@ -254,12 +257,14 @@ public sealed class ActorRig {
         shoulderR.RotationDegrees = new Vector3(-pose.RaiseR, 0, -pose.OutR);
         elbowL.RotationDegrees = new Vector3(-pose.ElbowL, 0, 0);
         elbowR.RotationDegrees = new Vector3(-pose.ElbowR, 0, 0);
-        legL.Basis = HipTurn(pose.SwingL, pose.TurnL, pose.RollL);
-        legR.Basis = HipTurn(pose.SwingR, -pose.TurnR, -pose.RollR);
+        legL.Basis = HipTurn(pose.Splay, pose.SwingL, pose.TurnL, pose.RollL);
+        legR.Basis = HipTurn(-pose.Splay, pose.SwingR, -pose.TurnR, -pose.RollR);
         kneeL.RotationDegrees = new Vector3(pose.KneeL, 0, 0);
         kneeR.RotationDegrees = new Vector3(pose.KneeR, 0, 0);
         foreach (var (skeleton, joint) in limbs)
             skeleton.SetBonePoseRotation(1, joint.Quaternion);
+        footL.SetBonePoseRotation(2, new Quaternion(Vector3.Right, Mathf.DegToRad(pose.FootL)));
+        footR.SetBonePoseRotation(2, new Quaternion(Vector3.Right, Mathf.DegToRad(pose.FootR)));
         hips.Position = new Vector3(0, pose.HipHeight, 0);
         rock.Visible = onRock;
         foreach (var (name, node) in tools) node.Visible = name == tool;
@@ -267,7 +272,7 @@ public sealed class ActorRig {
         torch.Visible = lit;
     }
 
-    /// <summary>Splays the thigh outward, swings it forward, then rolls it about its own length; the left side turns toward +X.</summary>
-    private static Basis HipTurn(float swing, float turn, float roll) =>
-        new Basis(Vector3.Up, Mathf.DegToRad(turn)) * new Basis(Vector3.Right, Mathf.DegToRad(-swing)) * new Basis(Vector3.Up, Mathf.DegToRad(roll));
+    /// <summary>Tips the leg sideways, turns the thigh outward, swings it forward, then rolls it about its own length; the left side turns toward +X.</summary>
+    private static Basis HipTurn(float splay, float swing, float turn, float roll) =>
+        new Basis(Vector3.Back, Mathf.DegToRad(splay)) * new Basis(Vector3.Up, Mathf.DegToRad(turn)) * new Basis(Vector3.Right, Mathf.DegToRad(-swing)) * new Basis(Vector3.Up, Mathf.DegToRad(roll));
 }

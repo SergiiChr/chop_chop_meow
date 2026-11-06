@@ -11,7 +11,7 @@ namespace ChopChopMeow;
 public partial class Game : Node, IGameFlow {
     private static readonly bool smokeTest = Launch.Has("--smoke-test");
     private static readonly string? screenshotPath = Launch.Value("--screenshot");
-    private static readonly float shotDelay = float.TryParse(Launch.Value("--shot-delay"), System.Globalization.CultureInfo.InvariantCulture, out float wait) ? wait : 2;
+    private static readonly float shotDelay = Launch.Number("--shot-delay", 2);
     private World world = null!;
     private WorldView view = null!;
     private Sounds sounds = null!;
@@ -85,7 +85,13 @@ public partial class Game : Node, IGameFlow {
             if (Launch.Has("--server-check")) RunServerCheck();
             if (Launch.Has("--animation-review")) {
                 panel.Close(); ui.Visible = false; view.AnimationReview = true;
-                if (Launch.Value("--animation-capture") is string captures) CaptureAnimations(captures);
+                if (Launch.Value("--animation-capture") is string captures) {
+                    // Thirty frames a second of animation time, slowed by --animation-slow for a closer look.
+                    float slow = Launch.Number("--animation-slow", 1);
+                    if (!(slow > 0 && float.IsFinite(slow))) throw new ArgumentException($"--animation-slow must be a positive number: {slow}");
+                    view.CaptureStep = 1f / 30 / slow;
+                    CaptureAnimations(captures);
+                }
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
