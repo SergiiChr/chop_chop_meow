@@ -168,7 +168,7 @@ public sealed partial class World {
             case Verb.FuelFire: FuelFire(t); break;
             case Verb.SetRecipe: SetRecipe(t, c.Item); break;
             case Verb.QueueRecipe: QueueRecipe(t, c.Item, c.Count); break;
-            case Verb.QueueBatch: QueueBatch(t, c.Item); break;
+            case Verb.QueueBatch: QueueBatch(t, c.Item, c.Count); break;
             case Verb.SetFilter: SetFilter(t, c.Item, (c.Count & 1) != 0, (c.Count & 2) != 0); break;
             case Verb.ClearFilters: ClearFilters(t); break;
             case Verb.SetCompost: SetCompost(t, c.Count != 0); break;

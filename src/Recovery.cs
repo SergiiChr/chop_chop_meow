@@ -13,10 +13,7 @@ public sealed partial class World {
         }
     }
 
-    internal bool HasCabin() {
-        foreach (var thing in S.Things) if (thing.Kind == ThingKind.Hut) return true;
-        return false;
-    }
+    internal bool HasCabin() => S.Things.Of(ThingKind.Hut).Count > 0;
 
     private bool NoLivingNeighbors() {
         foreach (var player in S.Players) if (player != S.Actor && player.RespawnIn <= 0) return false;

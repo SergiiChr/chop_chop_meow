@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 /// Round tabs for the tools recipes need, beside a grid of square recipe plates.
 /// Each plate shows the product big and its inputs small, each count in brick while the backpack is short, and how many are queued at its top right corner.
 /// By hand a click queues a batch. At a station a click marks the recipe workers keep making, and a double-click queues a batch and loads it from the backpack.
-/// Shift queues 5 and Ctrl 10; a right-click takes as many waiting batches off.
+/// Shift queues 5 and Ctrl 10, at a station loading them too; a right-click takes as many waiting batches off.
 /// </summary>
 /// <param name="station">Null when crafting by hand.</param>
 /// <param name="openOn">A recipe whose tab the board opens on, for a page opening rather than drawing again.</param>
@@ -44,7 +44,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
     }
 
     private string Hint => station != null
-        ? "Click: workers keep making it · Double-click: queue one and load it\nShift/Ctrl-click: queue 5/10 · Right-click: take 1, 5 or 10 off"
+        ? "Click: workers keep making it · Double-click: queue one and load it\nShift/Ctrl-click: queue and load 5/10 · Right-click: take 1, 5 or 10 off"
         : "Click: queue one · Shift/Ctrl-click: queue 5/10\nRight-click: take 1, 5 or 10 off";
 
     private static string GroupKey((string Tool, int Tier) group) => $"{(group.Tool == "" ? "hand" : group.Tool)}{(group.Tier > 0 ? $"_{group.Tier}" : "")}";
@@ -120,8 +120,9 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             if (doubled) { doubled = false; return; }
             string kept = memory.KeptBefore = station?.Keep ?? "";
             int step = Step;
-            if (station == null || step > 1) { kit.Run(() => world.Enqueue(station, id, step)); return; }
-            kit.Run(() => world.SetRecipe(station, kept == id ? "" : id));
+            if (station == null) kit.Run(() => world.Enqueue(null, id, step));
+            else if (step > 1) kit.Run(() => world.QueueBatch(station, id, step));
+            else kit.Run(() => world.SetRecipe(station, kept == id ? "" : id));
         };
         cell.DoubleClicked = () => {
             doubled = true;

@@ -13,108 +13,110 @@ using static WorkerSteps;
 /// <summary>Deterministic checks for the playable simulation, independent of the rendered scene.</summary>
 public static class SimulationChecks {
     public static void Run(GameData data) {
-        InventoryLayoutChecks.Run(data);
-        ChopChopMeow.Tests.WaterChecks.Run(data);
-        PondChecks.Run(data);
-        EconomyChecks.Run(data);
-        AnimationChecks.Run();
-        HumanModelChecks.Run();
-        NatureModelChecks.Run();
-        PileModelChecks.Run(data);
-        MineRockChecks.Run();
-        WorkerStateChecks.Run(data);
-        CheckOutputFilterBlocksAutomatedWithdrawal(data);
-        CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest(data);
-        CheckWorkerGathersWoodAndRetargetsWhenFilterChanges(data);
-        CheckWorkerDetoursAroundLake(data);
-        CheckCampfireWorkerFetchesFuelFromAllowedStorage(data);
-        CheckFurnaceCrewSplitsBellowsAndHauling(data);
-        CheckCartDeliversAfterFullTrip(data);
-        CheckLooseGoodsNeverSellOrSendACart(data);
-        CheckSaleLowersDemandAndNewsTravels(data);
-        CheckHiredRunnerFetchesCurrentPrices(data);
-        CheckUnpaidWorkerStrikes(data);
-        CheckBoughtToolsArriveOneByOneAndSellBackInCrate(data);
-        RecoveryChecks.Run(data);
-        CheckRecoveryBoxesStayPrivate(data);
-        CheckWorkersHaulLeftoversAfterRecipeSwitch(data);
-        CheckDeathLeavesRecoveryBoxAndRespawnsAndSavesKeepState(data);
-        CheckFurnacesBurnOneFuelAndWaitForSteelHeat(data);
-        CheckHaulerFuelsSmeltingWithCoalAndReturnsWood(data);
-        CheckStationMakesItsQueueThenWhatItKeeps(data);
-        CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere(data);
-        CheckStationLoadsMidBatchAndFinishesIt(data);
-        CheckAnvilNeedsHammering(data);
-        CheckFinishedBatchWaitsForOutputRoom(data);
-        CheckToolsGateMiningAndFelling(data);
-        CheckCliffsHaveDepositsAndLooseCoal(data);
-        CheckResourcesScatterAcrossTheOpenValley(data);
-        CheckLoosePiecesNeedNoToolOrGatherTime(data);
-        CheckValleyHasLooseStonesAndSticksToPickUp(data);
-        CheckPickaxeHitsSometimesChipRock(data);
-        CheckSteelPickaxeYieldsFullStone(data);
-        CheckSunAndMoonFollowTheirArcs(data);
-        CheckWolvesHurtUnprotectedPlayerAtNightAndAvoidFire(data);
-        CheckWolvesHuntAndCarcassesYieldMeat(data);
-        CheckWolvesLeaveHealthyOrFirelitPlayersAlone(data);
-        CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth(data);
-        CheckSleepingPassesTheNightForTheWorld(data);
-        CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst(data);
-        CheckSleepNeedsFoodAndWater(data);
-        CheckSprintBurnsFood(data);
-        CheckCabinShelterAndChasingWolfGivesUpInLight(data);
-        CheckSprintOutrunsWolf(data);
-        CheckOnlyCoinsUseTheLargerStack(data);
-        CheckOlderSaveMigratesCoinsMarketBoxesAndOrders(data);
-        CheckSaveWithUnknownItemRefused(data);
-        CheckCrewKeepsForgeHot(data);
-        CheckCrewLunchesAtTheNearestFireAndGoesBackToWork(data);
-        CheckCrewSignsOutAtDuskKeepingLoadsAndJobs(data);
-        CheckWorkersWalkOffDownTheValleyAtWalkingPace(data);
-        CheckCrewWalksBackAtDawnPaidAndKeepsItsJobs(data);
-        CheckFogHidesUnseenGroundAndRemembersExploredGround(data);
-        CheckCratesShowOneSlotPerItemTheyCanHold(data);
-        CheckHandCraftingNeedsChiselAndTakesTime(data);
-        CheckBenchRecipesWaitForSlottedTools(data);
-        CheckTinNeedsPickaxeAndSmeltsIntoBars(data);
-        CheckTinCansNeedASteelHammer(data);
-        CheckSteelChiselCarvesAMortarAndWorksTwiceAsFast(data);
-        CheckVillageSellsSeedsAndFertilizerByTheCrate(data);
-        CheckWorkerTakesAxeFromStationAndPutsItBackForAJobWithoutTools(data);
-        CheckFullStationLeavesWorkerHoldingTheWrongToolUntilThereIsRoom(data);
-        CheckWorkerPutsToolBackGoingHomeAndLeavesItWhenDismissed(data);
-        CheckRakeClearsLeavesWhichFallAgain(data);
-        CheckPilesSnapTogetherHoldOneResourceAndMakeCompost(data);
-        CheckCookingTableCrushesBerriesAndCooksJam(data);
-        CheckCanneryAndFurnaceTakeTheirFoodRecipes(data);
-        CheckCrushingBerriesByHandNeedsACarriedMortar(data);
-        CheckWorkerWithTwoJobsTakesTurns(data);
-        CheckHaulerStocksBenchForCrafter(data);
-        CheckStockerFillsToolRack(data);
-        CheckTenderFeedsCompostWithoutFood(data);
-        CheckRunnerCarriesDeliveriesIntoStorage(data);
-        CheckWorkerLeavesToolTheFilterHolds(data);
-        CheckFarmPlotBuildsBesidePileAndTakesOnlyFarmGoods(data);
-        CheckSownWheatGrowsToRipeInItsDays(data);
-        CheckPlotHarvestedAloneKeepsSeedInItsOutput(data);
-        CheckWorkerFinishesHarvestHaulsCropAndSowsAgain(data);
-        CheckFoodsFeedWaterAndHealByTheirData(data);
-        CheckMarketTakesOnlyCrates(data);
-        CheckOlderSavesResetMadeToolAnvilsAndStartWaterGoal(data);
-        CheckStationQueueAndMarkSurviveALoad(data);
-        CheckLoadedSaveDropsOldStageNumber(data);
-        CheckEverythingIsReachableFromFreshStart(data);
-        CheckTorchLightsAndBurnsOut(data);
-        CheckTorchSwingScaresOnlyWolvesItIsAimedAt(data);
-        CheckDirectTorchHitKnocksAWolfBack(data);
-        CheckWolfKilledNearTheEdgeLeavesItsCorpseOnTheMap(data);
-        CheckFullPackGathersSlowlyAndIgnoresASwing(data);
-        CheckEachToolTakesItsOwnSlot(data);
-        MineChecks.Run(data);
-        ProductionChainChecks.Run(data);
-        CheckPlayerProgressesFromRawMaterialsToFirstAutomation(data);
-        MultiplayerChecks.Run(data);
-        AllocationChecks.Run(data);
+        Test(InventoryLayoutChecks.Run, data);
+        Test(ChopChopMeow.Tests.WaterChecks.Run, data);
+        Test(PondChecks.Run, data);
+        Test(EconomyChecks.Run, data);
+        Test(AnimationChecks.Run);
+        Test(HumanModelChecks.Run);
+        Test(NatureModelChecks.Run);
+        Test(PileModelChecks.Run, data);
+        Test(MineRockChecks.Run);
+        Test(WorkerStateChecks.Run, data);
+        Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
+        Test(CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest, data);
+        Test(CheckWorkerGathersWoodAndRetargetsWhenFilterChanges, data);
+        Test(CheckWorkerDetoursAroundLake, data);
+        Test(CheckCampfireWorkerFetchesFuelFromAllowedStorage, data);
+        Test(CheckFurnaceCrewSplitsBellowsAndHauling, data);
+        Test(CheckCartDeliversAfterFullTrip, data);
+        Test(CheckLooseGoodsNeverSellOrSendACart, data);
+        Test(CheckSaleLowersDemandAndNewsTravels, data);
+        Test(CheckHiredRunnerFetchesCurrentPrices, data);
+        Test(CheckUnpaidWorkerStrikes, data);
+        Test(CheckBoughtToolsArriveOneByOneAndSellBackInCrate, data);
+        Test(RecoveryChecks.Run, data);
+        Test(CheckRecoveryBoxesStayPrivate, data);
+        Test(CheckWorkersHaulLeftoversAfterRecipeSwitch, data);
+        Test(CheckDeathLeavesRecoveryBoxAndRespawnsAndSavesKeepState, data);
+        Test(CheckFurnacesBurnOneFuelAndWaitForSteelHeat, data);
+        Test(CheckHaulerFuelsSmeltingWithCoalAndReturnsWood, data);
+        Test(CheckStationMakesItsQueueThenWhatItKeeps, data);
+        Test(CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere, data);
+        Test(CheckQueuingSeveralBatchesLoadsEachOfThem, data);
+        Test(CheckStationLoadsMidBatchAndFinishesIt, data);
+        Test(CheckAnvilNeedsHammering, data);
+        Test(CheckFinishedBatchWaitsForOutputRoom, data);
+        Test(CheckToolsGateMiningAndFelling, data);
+        Test(CheckCliffsHaveDepositsAndLooseCoal, data);
+        Test(CheckResourcesScatterAcrossTheOpenValley, data);
+        Test(CheckLoosePiecesNeedNoToolOrGatherTime, data);
+        Test(CheckValleyHasLooseStonesAndSticksToPickUp, data);
+        Test(CheckThingsOfAKindStayListedAsTheyComeAndGo, data);
+        Test(CheckPickaxeHitsSometimesChipRock, data);
+        Test(CheckSteelPickaxeYieldsFullStone, data);
+        Test(CheckSunAndMoonFollowTheirArcs, data);
+        Test(CheckWolvesHurtUnprotectedPlayerAtNightAndAvoidFire, data);
+        Test(CheckWolvesHuntAndCarcassesYieldMeat, data);
+        Test(CheckWolvesLeaveHealthyOrFirelitPlayersAlone, data);
+        Test(CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth, data);
+        Test(CheckSleepingPassesTheNightForTheWorld, data);
+        Test(CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst, data);
+        Test(CheckSleepNeedsFoodAndWater, data);
+        Test(CheckSprintBurnsFood, data);
+        Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
+        Test(CheckSprintOutrunsWolf, data);
+        Test(CheckOnlyCoinsUseTheLargerStack, data);
+        Test(CheckOlderSaveMigratesCoinsMarketBoxesAndOrders, data);
+        Test(CheckSaveWithUnknownItemRefused, data);
+        Test(CheckCrewKeepsForgeHot, data);
+        Test(CheckCrewLunchesAtTheNearestFireAndGoesBackToWork, data);
+        Test(CheckCrewSignsOutAtDuskKeepingLoadsAndJobs, data);
+        Test(CheckWorkersWalkOffDownTheValleyAtWalkingPace, data);
+        Test(CheckCrewWalksBackAtDawnPaidAndKeepsItsJobs, data);
+        Test(CheckFogHidesUnseenGroundAndRemembersExploredGround, data);
+        Test(CheckCratesShowOneSlotPerItemTheyCanHold, data);
+        Test(CheckHandCraftingNeedsChiselAndTakesTime, data);
+        Test(CheckBenchRecipesWaitForSlottedTools, data);
+        Test(CheckTinNeedsPickaxeAndSmeltsIntoBars, data);
+        Test(CheckTinCansNeedASteelHammer, data);
+        Test(CheckSteelChiselCarvesAMortarAndWorksTwiceAsFast, data);
+        Test(CheckVillageSellsSeedsAndFertilizerByTheCrate, data);
+        Test(CheckWorkerTakesAxeFromStationAndPutsItBackForAJobWithoutTools, data);
+        Test(CheckFullStationLeavesWorkerHoldingTheWrongToolUntilThereIsRoom, data);
+        Test(CheckWorkerPutsToolBackGoingHomeAndLeavesItWhenDismissed, data);
+        Test(CheckRakeClearsLeavesWhichFallAgain, data);
+        Test(CheckPilesSnapTogetherHoldOneResourceAndMakeCompost, data);
+        Test(CheckCookingTableCrushesBerriesAndCooksJam, data);
+        Test(CheckCanneryAndFurnaceTakeTheirFoodRecipes, data);
+        Test(CheckCrushingBerriesByHandNeedsACarriedMortar, data);
+        Test(CheckWorkerWithTwoJobsTakesTurns, data);
+        Test(CheckHaulerStocksBenchForCrafter, data);
+        Test(CheckStockerFillsToolRack, data);
+        Test(CheckTenderFeedsCompostWithoutFood, data);
+        Test(CheckRunnerCarriesDeliveriesIntoStorage, data);
+        Test(CheckWorkerLeavesToolTheFilterHolds, data);
+        Test(CheckFarmPlotBuildsBesidePileAndTakesOnlyFarmGoods, data);
+        Test(CheckSownWheatGrowsToRipeInItsDays, data);
+        Test(CheckPlotHarvestedAloneKeepsSeedInItsOutput, data);
+        Test(CheckWorkerFinishesHarvestHaulsCropAndSowsAgain, data);
+        Test(CheckFoodsFeedWaterAndHealByTheirData, data);
+        Test(CheckMarketTakesOnlyCrates, data);
+        Test(CheckOlderSavesResetMadeToolAnvilsAndStartWaterGoal, data);
+        Test(CheckStationQueueAndMarkSurviveALoad, data);
+        Test(CheckLoadedSaveDropsOldStageNumber, data);
+        Test(CheckEverythingIsReachableFromFreshStart, data);
+        Test(CheckTorchLightsAndBurnsOut, data);
+        Test(CheckTorchSwingScaresOnlyWolvesItIsAimedAt, data);
+        Test(CheckDirectTorchHitKnocksAWolfBack, data);
+        Test(CheckWolfKilledNearTheEdgeLeavesItsCorpseOnTheMap, data);
+        Test(CheckFullPackGathersSlowlyAndIgnoresASwing, data);
+        Test(CheckEachToolTakesItsOwnSlot, data);
+        Test(MineChecks.Run, data);
+        Test(ProductionChainChecks.Run, data);
+        Test(CheckPlayerProgressesFromRawMaterialsToFirstAutomation, data);
+        Test(MultiplayerChecks.Run, data);
+        Test(AllocationChecks.Run, data);
         GD.Print("SELF-TEST PASS");
     }
 
@@ -694,6 +696,23 @@ public static class SimulationChecks {
             "a double-click should load a whole batch of inputs and one fuel on top of what the station holds");
     }
 
+    /// <summary>Queuing several batches at once loads inputs and a fuel for each, and only for the batches the queue still has room for.</summary>
+    private static void CheckQueuingSeveralBatchesLoadsEachOfThem(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
+        world.Player = furnace.Pos + Vector2.One;
+        Give(world, "tin_ore", 12); Give(world, "coal", 7);
+        world.QueueBatch(furnace, "tin_bar", 5);
+        Require(world.QueueOf(furnace).Single().Count == 5 && furnace.Inventory["tin_ore"] == 10 && furnace.Burner!["coal"] == 5
+            && world.Backpack["tin_ore"] == 2 && world.Backpack["coal"] == 2,
+            "queuing 5 batches should load 5 batches of inputs and 5 fuel");
+        world.QueueRecipe(furnace, "tin_bar", 92);
+        Give(world, "tin_ore", 8); Give(world, "coal", 3);
+        world.QueueBatch(furnace, "tin_bar", 5);
+        Require(world.QueueOf(furnace).Single().Count == 99 && furnace.Inventory["tin_ore"] == 14 && furnace.Burner!["coal"] == 7,
+            "queuing 5 batches with room for 2 should load only 2 batches of inputs and 2 fuel");
+    }
+
     private static void CheckFurnacesBurnOneFuelAndWaitForSteelHeat(GameData data) {
         var world = EmptyWorld(data);
         var basic = world.Add(ThingKind.Furnace, new Vector2(10, 10));
@@ -1136,6 +1155,26 @@ public static class SimulationChecks {
         PickUp(world, stones[0]); PickUp(world, sticks[0]);
         Require(world.Backpack["stone"] == stone + 1 && world.Backpack["wood"] == wood + 1, "a loose stone should give one stone and a stick one wood");
         Require(world.Find(stones[0].Id) == null && world.Find(sticks[0].Id) == null, "a picked-up stone or stick should be gone");
+    }
+
+    /// <summary>Asking for one kind of thing gives every thing of that kind and no other, after placing, picking up, clearing and loading a save.</summary>
+    private static void CheckThingsOfAKindStayListedAsTheyComeAndGo(GameData data) {
+        var world = EmptyWorld(data);
+        var picked = world.Add(ThingKind.LooseStone, new Vector2(20, 20), 1);
+        var left = world.Add(ThingKind.LooseStone, new Vector2(24, 20), 1);
+        var chest = world.Add(ThingKind.Chest, new Vector2(30, 20));
+        PickUp(world, picked);
+        RemoveThings(world, t => t == chest);
+        var pile = world.Add(ThingKind.Pile, new Vector2(40, 20));
+        Require(world.ThingsOf(ThingKind.LooseStone).Count == 1 && world.ThingsOf(ThingKind.LooseStone)[0] == left && world.ThingsOf(ThingKind.Chest).Count == 0,
+            "a picked-up stone and a cleared chest should leave the lists of their kinds");
+        Require(world.ThingsOf(ThingKind.Pile).Count == 1 && world.ThingsOf(ThingKind.Pile)[0] == pile, "a placed pile should be listed with its kind");
+        var loaded = EmptyWorld(data);
+        loaded.Add(ThingKind.Chest, new Vector2(50, 20));
+        loaded.Deserialize(world.Serialize());
+        Require(loaded.ThingsOf(ThingKind.LooseStone).Count == 1 && loaded.ThingsOf(ThingKind.LooseStone)[0].Id == left.Id && loaded.ThingsOf(ThingKind.Chest).Count == 0
+            && loaded.ThingsOf(ThingKind.Pile).Count == 1 && loaded.Find(pile.Id)?.Kind == ThingKind.Pile,
+            "a loaded save should list its own things by kind and none from before");
     }
 
     /// <summary>About one pickaxe hit in twenty on ore knocks a loose piece of it off nearby; hits by hand chip nothing.</summary>

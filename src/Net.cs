@@ -544,7 +544,7 @@ public partial class Net : Node {
     /// Updates the members of <paramref name="list"/> whose entries differ from what the copy shows, in place, adds new ones and drops those without an entry.
     /// Updated members that <paramref name="glide"/> other than <paramref name="except"/> glide from where they were.
     /// </summary>
-    private void Sync<T>(List<T> list, byte prefix, Func<T, int> id, Snapshot entries, bool glide, T? except) where T : class {
+    private void Sync<T>(IList<T> list, byte prefix, Func<T, int> id, Snapshot entries, bool glide, T? except) where T : class {
         foreach (var key in differing) {
             if (key.Prefix != prefix) continue;
             int at = list.Count - 1;

@@ -124,7 +124,7 @@ public partial class NeedsPlate : PanelContainer {
 
     /// <summary>The trading post within reach that has coins or room for them, or null.</summary>
     private Thing? NearPost() {
-        foreach (var t in world.Things) if (t.Kind == ThingKind.Signpost && t.Wages != null && world.Near(t)) return t;
+        foreach (var t in world.ThingsOf(ThingKind.Signpost)) if (t.Wages != null && world.Near(t)) return t;
         return null;
     }
 

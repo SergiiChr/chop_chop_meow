@@ -50,7 +50,7 @@ Project rules on top of the global coding and testing guides.
   - They read results through `World`'s public members; a missing read becomes a small read-only member like `Coins`.
   - `World.Backpack` is a read-only `InventoryView`, which `World.Transfer` takes as an end of a move, so a check moves items the way a player does.
   - They set up through real play: `Build`, `Buy`, `Consume`, `Tick` and the like, with `Add` for placing things. A time of day comes from a named step that ticks there, such as `RunUntilDawn`.
-  - A state real play cannot reach, or cannot reach within the stage's time limit, goes behind a named step in `tests/SetupSteps.cs` whose comment says why. Old-save fixtures use steps there too.
+  - A state real play cannot reach, or cannot reach within a check's time limit, goes behind a named step in `tests/SetupSteps.cs` whose comment says why. Old-save fixtures use steps there too.
   - `./build.py check` fails on the raw save anywhere else in `tests/`, `src/*Checks.cs` or `src/*Steps.cs`.
   - A check may set fields directly on things and workers it placed, such as a farm's stage or a worker's tool, and on a `PlayerState` it builds as save text.
   - A check may place the player, with `world.Player = position`, and hold a player's input, with `Sprinting` or `GatherTarget`.
@@ -60,6 +60,7 @@ Project rules on top of the global coding and testing guides.
 - A check that a load restores something changes that thing between saving and loading.
 - Check files hold only checks and their runners. Steps live in feature files: `tests/WorldSteps.cs`, `PlayerSteps.cs`, `WorkerSteps.cs`, `EconomySteps.cs`, `ModelSteps.cs`, `ChainSteps.cs` and `SetupSteps.cs` for simulation checks, and `src/InputSteps.cs`, `PanelSteps.cs` and `SessionSteps.cs` for UI and network checks.
 - Checks fail through the shared `Checks.Require` in `tests/Checks.cs`.
+- A runner calls each check through `Checks.Test`, which logs its time and stops the process when it runs past 20 seconds. A check that needs longer, such as a whole network session, is tagged `slow: true` for 180 seconds, since the lossy relay makes reconnects vary from 20 to over 130 seconds. `./build.py` also gives all test stages together 300 seconds.
 - A check over 50 lines is long: split it into one check per behaviour, or move its setup into steps. A longer one stays only when it is a single scenario that loses its point when split, and says so in its summary.
 - Do not weaken assertions to make broken behavior pass.
 
@@ -76,6 +77,7 @@ Drawing builds a pipeline the first time too, up to a second on a machine with e
 Sounds load when the game starts, and music pauses rather than stopping: starting an MP3 partway through decodes it from the beginning.
 
 Code that runs every frame or tick allocates nothing once warmed up: every byte is garbage the runtime collects later in a pause that stalls a frame.
+It takes no `params ReadOnlySpan<T>` either: a call to one allocated on every tick, where a plain `ReadOnlySpan<T>` parameter did not.
 Allocation is fine while loading, setting up and on rare events.
 
 - Keep a temporary collection a feature needs every frame as a field and refill it (`Clear()`, then fill): a `List<T>` keeps its capacity. Hand out its contents as `CollectionsMarshal.AsSpan(list)` where a loop needs an array's speed.

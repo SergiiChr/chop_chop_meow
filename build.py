@@ -50,6 +50,9 @@ BASE_URL = (
 OUTPUT = BUILD / "ChopChopMeow.x86_64"
 PYTHON_TOOLS = TOOLS / "python"
 REQUIREMENTS = ROOT / "requirements-dev.txt"
+# Seconds all test stages together may take, so a run that hangs outside any check still stops.
+# Each check has its own limit in tests/Checks.cs.
+TEST_LIMIT = 300
 ERRORS = re.compile(r"SCRIPT ERROR|Parse Error|ERROR:|Unhandled exception")
 
 
@@ -179,7 +182,7 @@ def run_godot(
     args: list[str | Path],
     env: dict[str, str],
     *,
-    timeout: int | None = None,
+    timeout: float | None = None,
     success_marker: str | None = None,
 ) -> None:
     log = BUILD / f"{name}.log"
@@ -197,7 +200,7 @@ def run_godot(
             )
         except subprocess.TimeoutExpired as error:
             raise SystemExit(
-                f"{name} exceeded its {timeout}s time limit; see {log.relative_to(ROOT)}"
+                f"{name} ran out of time; see {log.relative_to(ROOT)}"
             ) from error
     text = log.read_text(errors="replace")
     failures = list(
@@ -215,8 +218,7 @@ def run_godot(
         )
     if success_marker is not None:
         seconds = time.monotonic() - started
-        limit = f" of {timeout}s" if timeout else ""
-        print(f"{success_marker} in {seconds:.1f}s{limit} ({log.relative_to(ROOT)})")
+        print(f"{success_marker} in {seconds:.1f}s ({log.relative_to(ROOT)})")
 
 
 def build_project(env: dict[str, str]) -> None:
@@ -345,27 +347,27 @@ def python_checks() -> None:
     command([python, "-m", "ruff", "format", "--check"])
 
 
-def test_simulation(env: dict[str, str]) -> None:
+def test_simulation(env: dict[str, str], deadline: float) -> None:
     run_godot(
         "test",
         [GODOT, "--headless", "--path", ROOT, "--", "--self-test"],
         env,
-        timeout=120,
+        timeout=deadline - time.monotonic(),
         success_marker="SELF-TEST PASS",
     )
 
 
-def test_ui(env: dict[str, str]) -> None:
+def test_ui(env: dict[str, str], deadline: float) -> None:
     run_godot(
         "ui-test",
         [GODOT, "--headless", "--path", ROOT, "--", "--ui-test"],
         env,
-        timeout=45,
+        timeout=deadline - time.monotonic(),
         success_marker="UI-TEST PASS",
     )
 
 
-def test_network(env: dict[str, str]) -> None:
+def test_network(env: dict[str, str], deadline: float) -> None:
     # The host and guest of the network check talk to each other, so both run at once.
     # The guest joins through a relay that adds lag and packet loss.
     stop = threading.Event()
@@ -378,7 +380,7 @@ def test_network(env: dict[str, str]) -> None:
                 f"net-{role}",
                 [GODOT, "--headless", "--path", ROOT, "--", "--net-check", *args],
                 env,
-                timeout=240,
+                timeout=deadline - time.monotonic(),
                 success_marker=f"NET-{role.upper()} PASS",
             )
             for role, args in roles.items()
@@ -391,12 +393,12 @@ def test_network(env: dict[str, str]) -> None:
             relay.result()
 
 
-def test_server(env: dict[str, str]) -> None:
+def test_server(env: dict[str, str], deadline: float) -> None:
     run_godot(
         "server-test",
         [GODOT, "--headless", "--path", ROOT, "--", "--server-check"],
         env,
-        timeout=90,
+        timeout=deadline - time.monotonic(),
         success_marker="SERVER-TEST PASS",
     )
 
@@ -410,10 +412,12 @@ TEST_STAGES = {
 
 
 def test(env: dict[str, str], stage: str | None = None) -> None:
-    """Run one test stage, or every stage in order."""
+    """Run one test stage, or every stage in order, all within TEST_LIMIT."""
+    started = time.monotonic()
     for name, run in TEST_STAGES.items():
         if stage in {None, name}:
-            run(env)
+            run(env, started + TEST_LIMIT)
+    print(f"Tests took {time.monotonic() - started:.0f}s of {TEST_LIMIT}s")
 
 
 def fetch_templates(env: dict[str, str]) -> None:
