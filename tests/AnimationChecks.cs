@@ -18,7 +18,7 @@ public static class AnimationChecks {
         CheckEveryActionMovesThroughDistinctPoses();
         CheckCraftingSquatsOnlyWhileStandingStill();
         CheckChangingActionBlendsBetweenPoses();
-        CheckRunLeavesTheGroundAfterEachPushOff();
+        CheckRunPlantsEachFootAndLeavesTheGroundAfterPushOff();
     }
 
     private static void CheckCraftingSquatsOnlyWhileStandingStill() {
@@ -46,23 +46,46 @@ public static class AnimationChecks {
         }
     }
 
-    /// <summary>A run leaves the ground for a while after each push-off, never sinks a foot into it, and carries the hips up and down smoothly.</summary>
-    private static void CheckRunLeavesTheGroundAfterEachPushOff() {
-        int airborne = 0, samples = 200;
-        float lastHips = 0, steepest = 0, deepest = 0;
+    /// <summary>
+    /// A run leaves the ground for a while after each push-off, never sinks a foot into it, and carries the hips up and down smoothly.
+    /// A foot on the ground holds its place there while the body runs on over it.
+    /// </summary>
+    private static void CheckRunPlantsEachFootAndLeavesTheGroundAfterPushOff() {
+        const int samples = 400;
+        int airborne = 0;
+        float lastHips = 0, steepest = 0, deepest = 0, slide = 0;
+        var planted = new float?[2];
         for (int i = 0; i <= samples; i++) {
-            var run = ActorAnimation.PoseAt(ActorAction.Run, ActorAnimation.Duration(ActorAction.Run) * i / samples, true);
-            float clearL = run.Hips - ActorAnimation.Sole - ActorAnimation.Reach(run.SwingL, run.KneeL), clearR = run.Hips - ActorAnimation.Sole - ActorAnimation.Reach(run.SwingR, run.KneeR);
-            if (i < samples && Math.Min(clearL, clearR) > .005f) airborne++;
-            deepest = Math.Min(deepest, Math.Min(clearL, clearR));
+            // Two steps carry the body a run's stride along the ground.
+            float travelled = ActorAnimation.RunStride * i / samples;
+            var run = ActorAnimation.PoseAt(ActorAction.Run, ActorAnimation.Advance(ActorAction.Run, 0, travelled), true);
+            bool grounded = false;
+            for (int side = 0; side < 2; side++) {
+                var (toe, heel) = side == 0 ? ActorAnimation.SoleOf(run.SwingL, run.KneeL, run.FootL) : ActorAnimation.SoleOf(run.SwingR, run.KneeR, run.FootR);
+                float toeClear = run.Hips - toe.Y, heelClear = run.Hips - heel.Y;
+                deepest = Math.Min(deepest, Math.Min(toeClear, heelClear));
+                if (toeClear > .002f) { planted[side] = null; continue; }
+                grounded = true;
+                float at = travelled + toe.X;
+                planted[side] ??= at;
+                slide = Math.Max(slide, Math.Abs(at - planted[side]!.Value));
+            }
+            if (i < samples && !grounded) airborne++;
             if (i > 0) steepest = Math.Max(steepest, Math.Abs(run.Hips - lastHips));
             lastHips = run.Hips;
         }
-        Require(airborne > samples * .15f && airborne < samples * .4f, $"a run should leave the ground for a while after each push-off, not walk or bound: airborne {airborne} of {samples} samples");
-        Require(deepest > -.001f, $"a running foot should never sink into the ground: {deepest:0.000} m");
-        // Two centimetres up and down twice a stride moves the hips at most about 1.3 mm between these samples; the old lift jumped several centimetres in a few.
-        Require(steepest < .0015f, $"the hips should rise and fall smoothly through a run, not jump: {steepest:0.0000} m between samples");
+        // A sprint is in the air for over half of each step; a jog or a walk would be on the ground most of it.
+        Require(airborne > samples * .5f && airborne < samples * .8f, $"a run should leave the ground for most of each step, not walk or bound: airborne {airborne} of {samples} samples");
+        Require(deepest > -.002f, $"a running foot should never sink into the ground: {deepest:0.000} m");
+        Require(slide < .01f, $"a planted foot should stay where it landed while the body runs over it: it slid {slide:0.000} m");
+        // Six centimetres up and down twice a stride moves the hips under 3 mm between these samples.
+        Require(steepest < .003f, $"the hips should rise and fall smoothly through a run, not jump: {steepest:0.0000} m between samples");
         Require(ActorAnimation.PoseAt(ActorAction.Walk, .3f, true).Hips == 0, "a walk should keep a foot on the ground");
+        // The bounce under gravity and the tenth of a second on the ground are timed for a cycle at sprint speed.
+        var data = GameData.Create();
+        float sprintCycle = ActorAnimation.RunStride / data.MoveSpeed(sprinting: true);
+        Require(Math.Abs(sprintCycle - ActorAnimation.Duration(ActorAction.Run)) < .02f,
+            $"a run's stride should take as long at sprint speed as its timing assumes: {sprintCycle:0.000} s against {ActorAnimation.Duration(ActorAction.Run):0.000} s");
     }
 
     private static void CheckActionsLoopAndWrapByTheirDuration() {

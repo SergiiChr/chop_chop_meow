@@ -32,6 +32,8 @@ public partial class WorldView : Node3D {
     /// <summary>From the camera along its view: past the ground it looks at, by more than the tallest model, and still inside what it draws and casts shadows for.</summary>
     private const float WarmStageDepth = 85;
     public bool AnimationReview;
+    /// <summary>Seconds the clock moves each frame while the animation review is captured, so frames are evenly spaced whatever the frame rate; null follows real time.</summary>
+    public float? CaptureStep;
     /// <summary>A fixed daylight landscape view with the lake and sea waves held at one moment, for <c>--environment-review</c>; set before the view enters the tree.</summary>
     public bool EnvironmentReview;
     public bool EnvironmentReviewFog;
@@ -238,15 +240,16 @@ public partial class WorldView : Node3D {
         public bool FromMoving;
         public float Blend = 1;
         public void Update(Vector2 position, ActorAction action, Vector2 facingTarget, float dt) {
-            bool moving = position.DistanceSquaredTo(Position) > .000001f;
+            float moved = position.DistanceTo(Position);
+            bool moving = moved > .001f;
             float yaw = ActorAnimation.Yaw(moving ? position - Position : facingTarget - position, Yaw);
             Yaw = Mathf.LerpAngle(Yaw, yaw, Math.Min(1, dt * 14));
             Position = position;
             if (Action != action) {
                 From = Action; FromTime = Time; FromMoving = Moving; Blend = 0;
                 Action = action; Time = 0; PreviousTime = -1;
-            } else { PreviousTime = Time; Time += dt; }
-            FromTime += dt;
+            } else { PreviousTime = Time; Time += ActorAnimation.Advance(action, dt, moved); }
+            FromTime += ActorAnimation.Advance(From, dt, moved);
             Blend = Math.Min(1, Blend + dt / ActorAnimation.BlendSeconds);
             Moving = moving;
         }
@@ -266,10 +269,10 @@ public partial class WorldView : Node3D {
     /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
     private void SyncCamera() {
         var size = GetViewport().GetVisibleRect().Size;
-        camera.Size = (AnimationReview ? 11 : BaseSize) / Zoom;
-        float pitch = Mathf.DegToRad(Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
+        camera.Size = (AnimationReview ? ReviewClip >= 0 ? 2.6f : 11 : BaseSize) / Zoom;
+        float pitch = Mathf.DegToRad(AnimationReview ? ReviewPitch : Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         var back = new Vector3(across, MathF.Sin(pitch), across);
-        var target = AnimationReview ? ReviewCenter : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
+        var target = AnimationReview ? ReviewCenter + To3(reviewActor.Position) : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
         camera.Position = target + back * (EnvironmentReview ? EnvironmentCameraDistance : 60);
         if (EnvironmentReview && EnvironmentCameraDistance > 60) sun.DirectionalShadowMaxDistance = EnvironmentCameraDistance + 40;
@@ -407,11 +410,12 @@ public partial class WorldView : Node3D {
 
     public override void _Process(double delta) {
         if (World == null) return;
-        float dt = Paused ? 0 : Math.Min((float)delta, .1f);
+        float dt = Paused ? 0 : CaptureStep ?? Math.Min((float)delta, .1f);
         Elapsed += dt;
         SyncCamera();
         ShowWarmStage();
-        if (AnimationReview) { UpdateReview(); UpdateFog(); overlay.QueueRedraw(); return; }
+        // The review camera follows its actor to where it moved this frame.
+        if (AnimationReview) { UpdateReview(dt); SyncCamera(); UpdateFog(); overlay.QueueRedraw(); return; }
         // A menu holds everyone still, but what a replaced world had goes at once, or the start menu would show it.
         bool moved = dt > 0 || worldReplaced;
         if (moved || EnvironmentReview) UpdateActors(dt);

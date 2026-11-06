@@ -206,12 +206,52 @@ public partial class WorldView {
     private static readonly Vector3 ScreenRight = new Vector3(1, 0, -1).Normalized(), ScreenDown = new Vector3(1, 0, 1).Normalized();
     private static Vector3 ReviewCenter => new(0, 1, 0);
     private static Vector3 ReviewSpot(int index) => ScreenRight * ((index % 7 - 3) * 2f) + ScreenDown * ((index / 7 - 2f) * 3.3f);
+    /// <summary>The clip <c>--animation-clip</c> names, shown alone and close up, moving across marked ground at its speed in the world; -1 shows every clip.</summary>
+    private static readonly int ReviewClip = Array.FindIndex(ReviewClips, clip => clip.Name == Launch.Value("--animation-clip"));
+    /// <summary>The camera's pitch in degrees for <c>--animation-pitch</c>, low for a side view; the game's otherwise.</summary>
+    private static readonly float ReviewPitch = Launch.Number("--animation-pitch", Pitch);
+    /// <summary>Degrees <c>--animation-turn</c> turns the close-up clip's rig from where it moves, to see it from the front or behind.</summary>
+    private static readonly float ReviewTurn = Launch.Number("--animation-turn", 0);
+    /// <summary>The close-up clip's actor, moved and posed the way the game moves and poses everyone.</summary>
+    private readonly ActorState reviewActor = new();
 
-    private void UpdateReview() {
+    /// <summary>Tiles a second an action carries an actor across the ground.</summary>
+    private float ReviewSpeed(ActorAction action) => action switch {
+        ActorAction.Walk or ActorAction.Carry => World.Data.MoveSpeed(sprinting: false),
+        ActorAction.Run => World.Data.MoveSpeed(sprinting: true),
+        _ => 0
+    };
+
+    /// <summary>Hides the world and lays plain ground of this radius for the review to stand on.</summary>
+    private Node3D ReviewStage(float radius) {
+        scene.Visible = false;
+        var stage = new Node3D(); AddChild(stage);
+        Cylinder(stage, radius, radius, .02f, new Vector3(0, -.01f, 0), Mat("4b5e45", 1), null, 32);
+        return stage;
+    }
+
+    private void UpdateClipReview(float dt) {
+        var (_, skin, action) = ReviewClips[ReviewClip];
         if (review == null) {
-            scene.Visible = false;
-            review = new Node3D(); AddChild(review);
-            Cylinder(review, 40, 40, .02f, new Vector3(0, -.01f, 0), Mat("4b5e45", 1), null, 32);
+            review = ReviewStage(60);
+            // Marks every half metre along the track show whether a planted foot slides.
+            for (int i = -60; i <= 60; i++) Box(review, new Vector3(.03f, .005f, i % 2 == 0 ? .5f : .25f), ScreenRight * (i * .5f), Mat(i % 2 == 0 ? "d8cfb4" : "8e9478", 1), new Vector3(0, 45, 0));
+            var rig = new ActorRig(skin);
+            review.AddChild(rig.Root); reviewRigs.Add(rig);
+        }
+        // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
+        var track = new Vector2(ScreenRight.X, ScreenRight.Z);
+        float along = Mathf.PosMod(Elapsed * ReviewSpeed(action) + 20, 40) - 20;
+        if (reviewActor.Position.Dot(track) > along + 1) reviewActor.Position -= track * 40;
+        reviewActor.Update(track * along, action, track * (along + 1), dt);
+        Pose(reviewRigs[0], reviewActor, ActorAnimation.Tool(action));
+        reviewRigs[0].Root.Rotation += new Vector3(0, Mathf.DegToRad(ReviewTurn), 0);
+    }
+
+    private void UpdateReview(float dt) {
+        if (ReviewClip >= 0) { UpdateClipReview(dt); return; }
+        if (review == null) {
+            review = ReviewStage(40);
             for (int i = 0; i < ReviewClips.Length; i++) {
                 var rig = new ActorRig(ReviewClips[i].Skin);
                 review.AddChild(rig.Root); rig.Root.Position = ReviewSpot(i);
@@ -236,6 +276,10 @@ public partial class WorldView {
     }
 
     private void PaintReview() {
+        if (ReviewClip >= 0) {
+            overlay.DrawString(font, new Vector2(28, 40), $"{ReviewClips[ReviewClip].Name} · {Elapsed:0.000} s", HorizontalAlignment.Left, -1, 23, new Color("f2e8cf"));
+            return;
+        }
         overlay.DrawString(font, new Vector2(28, 40), "ANIMATION REVIEW · keyframed 3D rig, rotating to show every side", HorizontalAlignment.Left, -1, 23, new Color("f2e8cf"));
         for (int i = 0; i < ReviewClips.Length; i++) {
             var at = camera.UnprojectPosition(ReviewSpot(i));

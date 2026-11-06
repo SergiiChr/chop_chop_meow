@@ -99,7 +99,16 @@ internal static class ActorShape {
         return surface.Commit();
     }
 
-    private static ArrayMesh BuildProfile(Ring[] rings, float joint) {
+    /// <summary>Skins a ring to the upper bone, blending into the lower one across the joint and, past an ankle, into the foot.</summary>
+    private static void SetWeights(SurfaceTool surface, float y, float joint, float ankle) {
+        float lower = Mathf.SmoothStep(joint - .065f, joint + .065f, -y);
+        // The boot top flexes with the shin; the rings from the ankle down turn with the foot.
+        float foot = ankle > 0 ? Mathf.SmoothStep(ankle - .03f, ankle + .015f, -y) : 0;
+        surface.SetBones(new[] { 0, 1, ankle > 0 ? 2 : 0, 0 });
+        surface.SetWeights(new[] { 1 - lower, lower * (1 - foot), lower * foot, 0f });
+    }
+
+    private static ArrayMesh BuildProfile(Ring[] rings, float joint, float ankle) {
         const int sides = 12;
         var surface = new SurfaceTool();
         surface.Begin(Mesh.PrimitiveType.Triangles);
@@ -115,11 +124,7 @@ internal static class ActorShape {
                 surface.SetNormal(tangent.Cross(down).Normalized());
                 surface.SetColor(ring.Color);
                 surface.SetUV(new Vector2(ring.Tone, .5f));
-                if (joint > 0) {
-                    float weight = Mathf.SmoothStep(joint - .065f, joint + .065f, -ring.Y);
-                    surface.SetBones(new[] { 0, 1, 0, 0 });
-                    surface.SetWeights(new[] { 1 - weight, weight, 0f, 0f });
-                }
+                if (joint > 0) SetWeights(surface, ring.Y, joint, ankle);
                 surface.AddVertex(new Vector3(ring.Width * x + ring.Sideways, ring.Y, ring.Depth * z + ring.Forward));
             }
         }
@@ -137,11 +142,7 @@ internal static class ActorShape {
             surface.SetNormal(end == 0 ? Vector3.Up : Vector3.Down);
             surface.SetColor(ring.Color);
             surface.SetUV(new Vector2(ring.Tone, .5f));
-            if (joint > 0) {
-                surface.SetBones(new[] { 0, 1, 0, 0 });
-                float weight = Mathf.SmoothStep(joint - .065f, joint + .065f, -ring.Y);
-                surface.SetWeights(new[] { 1 - weight, weight, 0f, 0f });
-            }
+            if (joint > 0) SetWeights(surface, ring.Y, joint, ankle);
             int center = rings.Length * sides + end;
             surface.AddVertex(new Vector3(ring.Sideways, ring.Y, ring.Forward));
             for (int side = 0; side < sides; side++) {
@@ -152,14 +153,15 @@ internal static class ActorShape {
         return surface.Commit();
     }
 
-    public static MeshInstance3D Add(Node3D parent, Ring[] rings, float joint = 0, Material? material = null) {
-        string key = $"profile|{joint}|{string.Join("|", rings)}";
-        if (!meshes.TryGetValue(key, out var profile)) meshes[key] = profile = BuildProfile(rings, joint);
+    public static MeshInstance3D Add(Node3D parent, Ring[] rings, float joint = 0, Material? material = null, float ankle = 0) {
+        string key = $"profile|{joint}|{ankle}|{string.Join("|", rings)}";
+        if (!meshes.TryGetValue(key, out var profile)) meshes[key] = profile = BuildProfile(rings, joint, ankle);
         var mesh = new MeshInstance3D { Mesh = profile, MaterialOverride = material ?? Surface };
         if (joint > 0) {
             var skin = new Skin();
             skin.AddBind(0, Transform3D.Identity);
             skin.AddBind(1, new Transform3D(Basis.Identity, new Vector3(0, joint, 0)));
+            if (ankle > 0) skin.AddBind(2, new Transform3D(Basis.Identity, new Vector3(0, ankle, 0)));
             mesh.Skin = skin;
             mesh.Skeleton = new NodePath("..");
         }
@@ -167,15 +169,21 @@ internal static class ActorShape {
         return mesh;
     }
 
-    public static Skeleton3D Limb(Node3D parent, Ring[] rings, float joint, Material? material = null) {
+    /// <summary>A limb skinned to an upper and a lower bone that meet at <paramref name="joint"/> below the top, and to a foot bone from <paramref name="ankle"/> down when it is set.</summary>
+    public static Skeleton3D Limb(Node3D parent, Ring[] rings, float joint, Material? material = null, float ankle = 0) {
         var skeleton = new Skeleton3D();
         parent.AddChild(skeleton);
         skeleton.AddBone("upper"); skeleton.AddBone("lower");
         skeleton.SetBoneParent(1, 0);
         skeleton.SetBoneRest(0, Transform3D.Identity);
         skeleton.SetBoneRest(1, new Transform3D(Basis.Identity, new Vector3(0, -joint, 0)));
+        if (ankle > 0) {
+            skeleton.AddBone("foot");
+            skeleton.SetBoneParent(2, 1);
+            skeleton.SetBoneRest(2, new Transform3D(Basis.Identity, new Vector3(0, joint - ankle, 0)));
+        }
         skeleton.ResetBonePoses();
-        Add(skeleton, rings, joint, material);
+        Add(skeleton, rings, joint, material, ankle);
         return skeleton;
     }
 }

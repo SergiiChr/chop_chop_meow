@@ -244,10 +244,19 @@ Fading swaps in cached alpha-blended copies of a model's materials, so faded tre
 
 Actor animation is driven by gameplay state.
 `ActorAnimation` maps state to an action and returns keyframed joint angles (`Pose`) for any time.
-`ActorRig` applies them to a hierarchy of hips, torso, head, shoulders, elbows, thighs and knees, lifting the hips so the lower foot stays on the ground unless `Pose.Hips` sets their height.
-A run sets it: the hips rise and fall smoothly twice a stride, lowest over the planted foot and highest after each push-off, and a planted knee bends just enough to keep its foot on the ground.
-A change of action blends from the old pose into the new one over `ActorAnimation.BlendSeconds`, while the body turns toward where it moves, so standing up from a squat into a walk is one motion; a blend into or out of a set hip height, such as a run's crouch, keeps the feet out of the ground.
-Walking and running legs follow each foot from its landing: the knee gives under the weight, straightens to push off behind, and folds to swing through; a run's push-off leaves both feet off the ground for a tenth of a stride.
+`ActorRig` applies them to a hierarchy of hips, torso, head, shoulders, elbows, thighs, knees and ankles, lifting the hips so the lower foot stays on the ground unless `Pose.Hips` sets their height.
+A change of action blends from the old pose into the new one over `ActorAnimation.BlendSeconds`, while the body turns toward where it moves, so standing up from a squat into a walk is one motion; a blend into or out of a set hip height, such as a run's bounce, keeps the feet out of the ground.
+Walking legs follow each foot from its landing: the knee gives under the weight, straightens to push off behind, and folds to swing through.
+
+A run is a sprint built from real running mechanics, checked against Muybridge's photographs of a man running at full speed:
+
+- The run's clock moves with the ground the actor covers, `ActorAnimation.RunStride` metres a cycle, so a planted foot holds its place on the ground whatever the speed.
+- Each foot is down for under a fifth of the cycle, about a tenth of a second at sprint speed; the rest of each step is spent in the air.
+- The front of the boot lands about a third of a metre ahead of the hips, and the leg is solved to keep it there as the body passes over: the knee gives under the weight, then the heel lifts and the foot rolls onto its toe to push off.
+- The hips bounce as gravity moves them: a parabola while both feet are off the ground, and a dip on the planted leg that takes the landing speed, about six centimetres in all.
+- The swinging heel folds up under the hip, the knee drives forward and up, and the shin reaches out and sweeps back to land, joining the planted leg's motion smoothly at push-off and landing.
+- The feet land close to one line, the trunk leans into the run and tips over the planted foot, the shoulders turn against the hips, and the head keeps the eyes level.
+- Each arm swings with the opposite thigh to balance it, the elbow bent most in front, bringing the hand up toward the chin, and opening behind.
 A player with something to make by hand squats over it, turning it in both hands (`ActorAction.Craft`), only while standing still.
 
 The player's carried tool selects its matching action and the tool shown in hand.

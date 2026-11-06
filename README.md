@@ -58,7 +58,11 @@ Play accepts Godot arguments after `--`:
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
 | `--animation-review` | Show every actor action on rotating rigs |
-| `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection |
+| `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection, evenly spaced at 30 a second |
+| `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following |
+| `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
+| `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
+| `--animation-slow 4` | Slow a capture down this many times |
 | `--performance-run /absolute/directory` | Record a walking, day/night and staffed-settlement benchmark; summarise it with `python3 tools/performance_report.py /absolute/directory` |
 
 Other showcase flags are parsed in `src/Showcase.cs`.
@@ -634,7 +638,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, hand gathering, axe and pick strokes, hammering, packing crates, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, sprinting, hand gathering, axe and pick strokes, hammering, packing crates, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 
 The world reacts too:

@@ -44,8 +44,8 @@ internal static class HumanShape {
         ActorShape.Add(parent, hips, material: ModelKit.Mat(trousers)).Name = "HumanHips";
         ActorShape.Add(parent, torso, material: ModelKit.Mat(shirt)).Name = "HumanTorso";
     }
-    public static Skeleton3D Leg(Node3D parent, float joint, string trousers, string boots) {
-        var skeleton = ActorShape.Limb(parent, leg, joint, Palette(trousers, boots, "302d29"));
+    public static Skeleton3D Leg(Node3D parent, float joint, float ankle, string trousers, string boots) {
+        var skeleton = ActorShape.Limb(parent, leg, joint, Palette(trousers, boots, "302d29"), ankle);
         skeleton.GetChild<MeshInstance3D>(0).Name = "HumanLeg";
         return skeleton;
     }
