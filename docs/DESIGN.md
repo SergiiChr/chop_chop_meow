@@ -51,6 +51,7 @@ Simulation and data:
 | --- | --- |
 | `src/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
+| `src/ThingList.cs` | `ThingList`, the world's things, also kept by kind and by id |
 | `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView` |
 | `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
@@ -399,7 +400,8 @@ So a steel chisel does everything a stone chisel does, faster, while tin cans ne
 
 `GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for deposits), one that only speeds gathering up (a pickaxe for rock, a rake for leaves, which take three times as long by hand), and the loose piece a pickaxe chips off it.
 Stone, leaves, berries and loose pieces need no tool.
-The world keeps its own list of tool stations, so fetching or putting back a tool looks through those rather than every thing in the world.
+The world's things are also kept by kind (`ThingList.Of`), so a search for one kind, such as tool stations, stores or campfires, and the tick, which runs only kinds that change by themselves, pass over trees and rocks.
+Searches by place, such as what a player sees and room to build, still look at every thing.
 Tool stations report changes to what they hold and to their filters (`Inventory.Changed`), so the world works out which tool kinds they give out only after a change, and a waiting worker checks that rather than every station.
 
 Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFreshStart` verifies:

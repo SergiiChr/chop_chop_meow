@@ -19,7 +19,9 @@ public partial class Game {
     /// <summary>Waits frame by frame until <paramref name="done"/> holds, and fails naming <paramref name="what"/> if it still does not after <paramref name="seconds"/> real seconds.</summary>
     private async Task Until(Func<bool> done, string what, double seconds = 60, [CallerFilePath] string file = "") {
         ulong end = Time.GetTicksMsec() + (ulong)(seconds * 1000);
+        WaitingFor(what);
         while (!done() && Time.GetTicksMsec() < end) await Frames(1);
+        WaitingFor("");
         Require(done(), $"{what} never happened.", file);
     }
 

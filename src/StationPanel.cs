@@ -22,7 +22,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         AddChild(new RecipeBoard(kit, live, memory, Redraw, thing, openOn));
         RedrawOnChange(() => World.QueueCode(world.QueueOf(thing)));
         if (thing.Recipe != "") AddChild(cups.Machine());
-        else AddLabel("Click a recipe for workers to keep making it, or Shift-click to queue some.", 14, Style.Beige);
+        else AddLabel("Click a recipe for workers to keep making it, or Shift-click to queue and load some.", 14, Style.Beige);
         AddChild(new QueueStrip(kit, live, thing));
         if (thing.Kind == ThingKind.Reinforced) Bellows();
         // A tool whose cup is empty goes into it.

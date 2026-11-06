@@ -46,7 +46,7 @@ Icons and models are committed; playing does not call an image-generation servic
 
 ## Checks
 
-`./build.py check` runs every offline check: C# compile with warnings as errors, C# format, Python `mypy --strict` and `ruff`, then the simulation, UI, network and server tests, printing each stage's time against its limit.
+`./build.py check` runs every offline check: C# compile with warnings as errors, C# format, Python `mypy --strict` and `ruff`, then the simulation, UI, network and server tests, printing each stage's time and the total against its limit.
 `./build.py test sim`, `ui`, `net` or `server` runs one stage.
 CI runs the same command.
 Treat Godot error output as a failure even when the process exits zero; `build.py` does.

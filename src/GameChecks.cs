@@ -983,7 +983,7 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); Drop(Hosted, "planks", 3); await CloseWithEsc();
     }
     /// <summary>
-    /// At a station a click marks or unmarks what workers keep making, Shift and Ctrl queue 5 and 10 with the count on the plate,
+    /// At a station a click marks or unmarks what workers keep making, Shift and Ctrl queue and load 5 and 10 with the count on the plate,
     /// a right-click takes batches off, and the queue below shows one cup per recipe. By hand a double-click queues just one.
     /// </summary>
     private async Task CheckRecipeBoardsMarkAndQueueWithModifiers() {
@@ -1139,52 +1139,52 @@ public partial class Game {
     }
     private async void RunUIChecks() {
         try {
-            await CheckLaunchOpensTheStartMenuWithNoSaveToContinue();
-            await CheckOptionsApplyAndKeepTheirChoices();
-            await CheckNewGameStartsTheWelcomePage();
-            await CheckPauseMenuAsksBeforeNewGameAndQuit();
-            await CheckWasdWalksAndShiftSprintsUnlessTooThirsty();
-            await CheckMessagesStackFadeAndKeepClearOfHud();
-            await CheckPanelPagesRefreshWithoutAllocating();
-            await CheckLowFoodGlowsScreenEdges();
-            await CheckSoundsRotateCrossfadeAndStaySilentOffScreen();
-            await CheckRightClickGathersTreeAndHarvestsFarm();
-            await CheckHarvestingBesideAStationStopsHammering();
-            await CheckStrikerBesideAStationLeavesThePlayerHammering();
-            await CheckRightClickGathersAndLeavesASelectedWorkerMarked();
-            await CheckHudAndHotbarEatAndDrinkInHand();
-            var chest = await CheckBuildPlanPlacesChest();
-            await CheckChestMovesSplitsAndFiltersStacks(chest);
-            await CheckQuickSaveAndLoadRestorePlayerAndChest(chest);
-            await CheckLoadEndsClickModeAndSelection();
-            await CheckLoadEndsCrateLiftUnderWay();
-            await CheckBackpackCellsAndHudIconsTrackStats();
-            await CheckPinnedPlayerStaysDownAndDeathCountsDown();
-            await CheckMouseWheelOverPanelDoesNotZoom();
-            await CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable();
-            await CheckTradingPostSendsOnlyCratesOffOnACart();
-            await CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker();
-            await CheckPackingStationListsGoodsAndTakesBackpackClicks();
-            await CheckEndGoalsShowEndingOnceAndKeepPlaying();
-            await CheckBenchLoadsInputsByClickDoubleClickAndSplit();
-            await CheckRecipeBoardsMarkAndQueueWithModifiers();
-            await CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack();
-            var furnace = await CheckSteelFurnaceSlotsLoadByDragAndClickThenPump();
-            await CheckPauseFreezesPumpingAttackAndAnimations(furnace);
-            CheckForegroundCanopyFadesOnlyOverBuildings();
-            await CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece();
-            await CheckBerryBushHidesOnlyItsFruitWhenPicked();
-            await CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings();
-            await CheckStackLargerThanCrateFillsItAndRestStaysHeld();
-            await CheckSurvivalActionsWorkThroughTheInventoryUI();
-            await CheckAutosaveTellsTheOwner();
-            await CheckOthersGlideAndStopWhereTheServerPutThem();
-            await CheckTickBoxesFollowTheServer();
-            await CheckLoadRemembersWhatIsOutOfSight();
-            await CheckWorkerPageFollowsItsJobs();
-            await CheckCrateDraggedIntoCrateStopsAtWarning();
+            await Test(CheckLaunchOpensTheStartMenuWithNoSaveToContinue);
+            await Test(CheckOptionsApplyAndKeepTheirChoices);
+            await Test(CheckNewGameStartsTheWelcomePage);
+            await Test(CheckPauseMenuAsksBeforeNewGameAndQuit);
+            await Test(CheckWasdWalksAndShiftSprintsUnlessTooThirsty);
+            await Test(CheckMessagesStackFadeAndKeepClearOfHud);
+            await Test(CheckPanelPagesRefreshWithoutAllocating);
+            await Test(CheckLowFoodGlowsScreenEdges);
+            await Test(CheckSoundsRotateCrossfadeAndStaySilentOffScreen);
+            await Test(CheckRightClickGathersTreeAndHarvestsFarm);
+            await Test(CheckHarvestingBesideAStationStopsHammering);
+            await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
+            await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
+            await Test(CheckHudAndHotbarEatAndDrinkInHand);
+            var chest = await Test(CheckBuildPlanPlacesChest);
+            await Test(() => CheckChestMovesSplitsAndFiltersStacks(chest));
+            await Test(() => CheckQuickSaveAndLoadRestorePlayerAndChest(chest));
+            await Test(CheckLoadEndsClickModeAndSelection);
+            await Test(CheckLoadEndsCrateLiftUnderWay);
+            await Test(CheckBackpackCellsAndHudIconsTrackStats);
+            await Test(CheckPinnedPlayerStaysDownAndDeathCountsDown);
+            await Test(CheckMouseWheelOverPanelDoesNotZoom);
+            await Test(CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable);
+            await Test(CheckTradingPostSendsOnlyCratesOffOnACart);
+            await Test(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
+            await Test(CheckPackingStationListsGoodsAndTakesBackpackClicks);
+            await Test(CheckEndGoalsShowEndingOnceAndKeepPlaying);
+            await Test(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
+            await Test(CheckRecipeBoardsMarkAndQueueWithModifiers);
+            await Test(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
+            var furnace = await Test(CheckSteelFurnaceSlotsLoadByDragAndClickThenPump);
+            await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));
+            Test(CheckForegroundCanopyFadesOnlyOverBuildings);
+            await Test(CheckUnarmedAttackAndRightClickPicksUpWholeLoosePiece);
+            await Test(CheckBerryBushHidesOnlyItsFruitWhenPicked);
+            await Test(CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings);
+            await Test(CheckStackLargerThanCrateFillsItAndRestStaysHeld);
+            await Test(CheckSurvivalActionsWorkThroughTheInventoryUI);
+            await Test(CheckAutosaveTellsTheOwner);
+            await Test(CheckOthersGlideAndStopWhereTheServerPutThem);
+            await Test(CheckTickBoxesFollowTheServer);
+            await Test(CheckLoadRemembersWhatIsOutOfSight);
+            await Test(CheckWorkerPageFollowsItsJobs);
+            await Test(CheckCrateDraggedIntoCrateStopsAtWarning);
             RemoveCheckFiles();
-            await CheckRestartBuildsFreshModelsForReusedIds();
+            await Test(CheckRestartBuildsFreshModelsForReusedIds);
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }

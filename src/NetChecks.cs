@@ -16,7 +16,7 @@ public partial class Game {
 
     private async void RunNetCheck(bool hosting) {
         try {
-            if (hosting) await HostNetCheck(); else await GuestNetCheck();
+            if (hosting) await Test(HostNetCheck, slow: true); else await Test(GuestNetCheck, slow: true);
             GD.Print(hosting ? "NET-HOST PASS" : "NET-GUEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }

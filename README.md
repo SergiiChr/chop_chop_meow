@@ -171,7 +171,7 @@ The queue sits under the work in progress, one cup per recipe in the order first
 | --- | --- | --- |
 | Click | Mark it for workers to keep making once the queue is done (a thick outline with a hard hat); click again to unmark | Queue one |
 | Double-click | Queue one and load one batch of its inputs and a fuel from the backpack | Queue one |
-| Shift-click, Ctrl-click | Queue 5 or 10 | Queue 5 or 10 |
+| Shift-click, Ctrl-click | Queue 5 or 10 and load their inputs and a fuel each from the backpack | Queue 5 or 10 |
 | Right-click, with Shift or Ctrl | Take 1, 5 or 10 waiting batches off | Take 1, 5 or 10 off and get their materials back |
 
 A right-click on a cup in the queue takes batches off the same way.

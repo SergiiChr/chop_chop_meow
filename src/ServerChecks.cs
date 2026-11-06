@@ -19,16 +19,16 @@ public partial class Game {
         try {
             Engine.MaxFps = CheckFrameRate;
             RemoveCheckFiles(); await Frames(4);
-            await CheckNewGameRunsOnAServerOfItsOwn();
-            await CheckPlayerComesBackThroughEveryLoad();
-            await CheckSecondGameTakesAnotherPort();
-            await CheckFailedJoinKeepsTheGameRunning();
-            await CheckCancelledJoinKeepsTheGameRunning();
-            await CheckRefusedJoinKeepsTheGameRunning();
-            await CheckJoiningYourOwnGameKeepsItYours();
-            await CheckWalkingStaysWithinAllocationBudget(ServerWalkingBudget);
+            await Test(CheckNewGameRunsOnAServerOfItsOwn);
+            await Test(CheckPlayerComesBackThroughEveryLoad);
+            await Test(CheckSecondGameTakesAnotherPort);
+            await Test(CheckFailedJoinKeepsTheGameRunning);
+            await Test(CheckCancelledJoinKeepsTheGameRunning);
+            await Test(CheckRefusedJoinKeepsTheGameRunning);
+            await Test(CheckJoiningYourOwnGameKeepsItYours);
+            await Test(() => CheckWalkingStaysWithinAllocationBudget(ServerWalkingBudget));
             await LeaveAndAwaitServerEnd();
-            await CheckServerDyingEndsTheGame();
+            await Test(CheckServerDyingEndsTheGame);
             GD.Print("SERVER-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }

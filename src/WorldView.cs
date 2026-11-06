@@ -356,7 +356,7 @@ public partial class WorldView : Node3D {
         if (best != null) return best;
         var point = ToWorld(screen);
         if (Terrain.WaterRing(point) && World.Sees(point))
-            foreach (var thing in World.Things) if (thing.Kind == ThingKind.Water) return thing;
+            foreach (var thing in World.ThingsOf(ThingKind.Water)) return thing;
         return null;
     }
 
@@ -511,7 +511,8 @@ public partial class WorldView : Node3D {
     private Thing? StationToHammer(PlayerState p) {
         if (p.GatherTarget != 0) return null;
         using var acting = World.ActAs(p);
-        foreach (var t in World.Things) if (World.Worked(t) && t.Processing && World.Near(t) && !World.CrewHammers(t)) return t;
+        foreach (var kind in World.StationKinds)
+            foreach (var t in World.ThingsOf(kind)) if (World.Worked(t) && t.Processing && World.Near(t) && !World.CrewHammers(t)) return t;
         return null;
     }
 
@@ -945,10 +946,11 @@ public partial class WorldView : Node3D {
         var bounds = GetViewport().GetVisibleRect().Grow(300);
         float ppu = PixelsPerUnit;
         structures.Clear();
-        foreach (var o in World.Things)
-            if (!o.IsResource && seen.Contains(o.Id) && bounds.HasPoint(camera.UnprojectPosition(To3(o.Pos)))) structures.Add(o);
-        foreach (var t in World.Things) {
-            if (t.Kind != ThingKind.Tree || t.Remaining <= 0 || !seen.Contains(t.Id) || props.GetValueOrDefault(t.Id) is not TreeProp tree) continue;
+        foreach (var kind in World.Structures)
+            foreach (var o in World.ThingsOf(kind))
+                if (seen.Contains(o.Id) && bounds.HasPoint(camera.UnprojectPosition(To3(o.Pos)))) structures.Add(o);
+        foreach (var t in World.ThingsOf(ThingKind.Tree)) {
+            if (t.Remaining <= 0 || !seen.Contains(t.Id) || props.GetValueOrDefault(t.Id) is not TreeProp tree) continue;
             if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
             float fade = Mathf.MoveToward(tree.Fade, CoversSomething(t, ppu) ? .68f : 0, Math.Max(dt, .016f) * 3);
             if (Math.Abs(fade - tree.Fade) < .001f) continue;
@@ -1168,15 +1170,16 @@ public partial class WorldView : Node3D {
         if (EnvironmentReview) return;
         if (World == null) return;
         if (AnimationReview) { PaintReview(); return; }
-        foreach (var t in World.Things) {
-            if (!t.Processing || !World.Sees(t.Pos) || !World.Data.Recipes.TryGetValue(t.Recipe, out var r)) continue;
-            var p = Screen(t.Pos);
-            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), BarTrack);
-            overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), BarFill);
-        }
+        foreach (var kind in World.StationKinds)
+            foreach (var t in World.ThingsOf(kind)) {
+                if (!t.Processing || !World.Sees(t.Pos) || !World.Data.Recipes.TryGetValue(t.Recipe, out var r)) continue;
+                var p = Screen(t.Pos);
+                overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56, 5)), BarTrack);
+                overlay.DrawRect(new Rect2(p + new Vector2(-28, 10), new Vector2(56 * Math.Min(1, t.Progress / r.Seconds), 5)), BarFill);
+            }
         // Forge heat under each reinforced furnace, with a tick at the clear bar steel needs.
-        foreach (var t in World.Things) {
-            if (t.Kind != ThingKind.Reinforced || !World.Sees(t.Pos)) continue;
+        foreach (var t in World.ThingsOf(ThingKind.Reinforced)) {
+            if (!World.Sees(t.Pos)) continue;
             var p = Screen(t.Pos) + new Vector2(-28, 18);
             overlay.DrawRect(new Rect2(p, new Vector2(56, 5)), BarTrack);
             overlay.DrawRect(new Rect2(p, new Vector2(56 * Math.Clamp(t.Heat / 100, 0, 1), 5)), t.Heat >= World.SteelHeat ? HeatReady : HeatLow);

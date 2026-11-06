@@ -67,7 +67,7 @@ public sealed partial class World {
         var cliff = CliffAt(p);
         if (!NearMineSite(cliff, p)) return "Mark a mine at the foot of an ore cliff.";
         var spot = MineSpot(cliff);
-        foreach (var t in S.Things) if (t.Kind == ThingKind.Mine && t.Pos.DistanceTo(spot) < .1f) return "This cliff already has a mine.";
+        foreach (var t in S.Things.Of(ThingKind.Mine)) if (t.Pos.DistanceTo(spot) < .1f) return "This cliff already has a mine.";
         return Player.DistanceTo(spot) > 8 ? "Walk closer to the cliff." : null;
     }
 
