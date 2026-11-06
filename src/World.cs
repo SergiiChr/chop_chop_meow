@@ -298,7 +298,9 @@ public sealed partial class World {
     /// </summary>
     public const float PinDistance = .1f;
     private bool packAttack { get => S.Actor.PackAttack; set => S.Actor.PackAttack = value; }
-    private const float LeapRange = 3.5f, FeastSeat = 1.1f, FeastSpeed = 5.5f, ChaseSeconds = 3;
+    private const float LeapRange = 3.5f, FeastSpeed = 5.5f, ChaseSeconds = 3;
+    /// <summary>How far from a downed player's tile each feeding wolf stands.</summary>
+    public const float FeastSeat = 1.1f;
     /// <summary>Minimum reinforced furnace heat: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
     /// <summary>Heat as degrees Celsius for display: the steel line sits where steel forms, 1450 °C.</summary>

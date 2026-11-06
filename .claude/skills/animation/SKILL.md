@@ -15,7 +15,8 @@ description: Make a character or creature animation look physically right, check
 4. Change the poses, capture again and compare from the side in slow motion, frame by frame, then from the front and the
    game camera.
 5. Add or extend a check in `tests/AnimationChecks.cs` for what can be measured: feet on the ground, no sliding, nothing
-   below it, time in the air.
+   below it, time in the air. `CheckWolfGaitsPlantEachPaw` and `CheckRunPlantsEachFootAndLeavesTheGroundAfterPushOff`
+   show how.
 6. Play it in the real window with the `playtest` skill: speeds, blends into and out of the motion, and turns.
 7. Share a before/after video made with the `frame-compare` skill.
 
@@ -85,11 +86,26 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 - The head bobs to balance the front legs. The tail trails the body and swings out to balance turns.
 - The contact, ground and timing rules above apply to every paw.
 
+## Two bodies meeting
+
+- Place one body from the other's contact point, not from a tuned distance. A leaping wolf is moved so `WolfModel.Bite`
+  lands on `WorldView.Throat`, which follows the knocked-down player's tip, so the jaws stay on the throat as both go down.
+- Time a reaction to the moment of contact, not the start of the action: a struck wolf recoils at
+  `ActorAnimation.Contact`, when the swing lands.
+- A body moves across the ground only while its feet are planted and stepping, or while it is in the air. A knockback
+  played as a slide reads as ice: cover it with a hop or a throw, and keep the distance short.
+- Check proportions against a side-on reference photo: render the model side-on and orthographic at the photo's scale and
+  put the two side by side.
+- Look at anything that glows, such as eyes, in a dark scene as well.
+
 ## This game's rigs
 
 - People: `Pose` in `src/ActorAnimation.cs` lists joint angles, and `src/ActorRig.cs` applies them to hips, torso, head,
   shoulders, elbows, thighs, knees and ankles. [docs/DESIGN.md](../../../docs/DESIGN.md) describes the run.
-- Wolves: `WorldModels.WolfModel` in `src/WorldModels.cs` moves the body, four legs, head and tail.
+- Wolves: `src/WolfShape.cs` builds one skinned mesh on a skeleton, and `WolfModel` in `src/WolfModel.cs` poses it from
+  a `WolfPose` of spine, neck, head, jaw, ears, tail and leg angles. Gait legs are solved by IK from where each paw stands
+  (`Reach`), and `WolfModel.Paw` and `WolfModel.Bite` give where a paw and the jaws are under the pose shown.
+  `SyncWolves` in `src/WorldView.cs` times the wolf against the player.
 - The pelvis is part of the torso model, so it cannot turn or drop on its own.
 - Only the run sets the ankle. Other people's actions leave the boot square to the shin, so toes can dip into the ground
   at a steep shin.
@@ -111,5 +127,8 @@ git fetch origin
 - The first frames show the start from standing: pick frames after it for a steady cycle.
 - `--base` captures a ref as git has it here: fetch first and use `origin/main`, since a local `main` may be old.
   A ref without the close-up review (`--animation-clip`) cannot be captured.
-- Wolves have no close-up: `./build.py play -- --animation-review` shows every clip, wolves included, on one screen.
+- Wolves have close-ups too: `wolf idle`, `wolf walk`, `wolf trot`, `wolf gallop`, `wolf speeds` (stand to gallop and
+  back, for blends), `wolf leap`, `wolf hit`, `wolf feed` and `wolf fall`. The last four play against a player, as
+  `SyncWolves` sets them up. `./build.py play -- --animation-review` shows every clip on one screen.
+- A machine without a display, such as a cloud container, captures under `xvfb-run -a ./tools/animation_review.py ...`.
 - Turn the frames into a video or a numbered contact sheet with the `frame-compare` skill.

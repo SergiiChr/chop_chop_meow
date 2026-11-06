@@ -285,6 +285,15 @@ public sealed class WolfModel {
         Apply(body);
     }
 
+    /// <summary>Where a paw bone is, in the model, under the pose shown; it stands WolfShape.Sole above the ground when the paw is planted.</summary>
+    public Vector3 Paw(int leg) {
+        var l = shown.Leg(leg);
+        int bone = WolfShape.Leg(leg);
+        var at = Frame(shown, leg >= 2) * Posed(bone, Vector3.Zero, Turn(-l.Upper, 0, l.Splay)) * Posed(bone + 1, Vector3.Zero, Turn(-l.Middle))
+            * Posed(bone + 2, Vector3.Zero, Turn(-l.Lower)) * Posed(bone + 3, Vector3.Zero, Turn(-l.Paw));
+        return at.Origin;
+    }
+
     /// <summary>Where the jaws close, in the model, under the pose shown.</summary>
     public Vector3 Bite {
         get {

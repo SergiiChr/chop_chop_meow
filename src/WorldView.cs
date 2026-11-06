@@ -271,7 +271,7 @@ public partial class WorldView : Node3D {
     /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
     private void SyncCamera() {
         var size = GetViewport().GetVisibleRect().Size;
-        camera.Size = (AnimationReview ? ReviewClip >= 0 ? 2.6f : 11 : BaseSize) / Zoom;
+        camera.Size = (AnimationReview ? ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : 11 : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(AnimationReview ? ReviewPitch : Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         var back = new Vector3(across, MathF.Sin(pitch), across);
         var target = AnimationReview ? ReviewCenter + To3(reviewActor.Position) : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
