@@ -47,6 +47,8 @@ public partial class WorldView : Node3D {
     private Camera3D camera = null!;
     private DirectionalLight3D sun = null!;
     private Godot.Environment environment = null!;
+    /// <summary>Never drawn: its light from above and bounce from below is the ambient light, so a roof and a wall differ in shade.</summary>
+    private ProceduralSkyMaterial skylight = null!;
     private Node3D scene = null!;
     private Overlay overlay = null!;
     private readonly Dictionary<int, Prop> props = new();
@@ -132,14 +134,25 @@ public partial class WorldView : Node3D {
         World.Replaced += () => worldReplaced = true;
         camera = new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = BaseSize, Near = 1, Far = 200, Current = true };
         AddChild(camera);
+        // At half energy the sky gives as much light as the flat ambient colour did; the sun's disc stays small so the sun does not light the scene twice.
+        skylight = new ProceduralSkyMaterial { SunAngleMax = 1, SkyEnergyMultiplier = .5f, GroundEnergyMultiplier = .5f };
         environment = new Godot.Environment {
             BackgroundMode = Godot.Environment.BGMode.Color,
             BackgroundColor = new Color("879c69"),
-            AmbientLightSource = Godot.Environment.AmbientSource.Color,
-            AmbientLightColor = new Color("c7d3dc"),
+            AmbientLightSource = Godot.Environment.AmbientSource.Sky,
+            ReflectedLightSource = Godot.Environment.ReflectionSource.Sky,
+            Sky = new Sky { SkyMaterial = skylight },
             AmbientLightEnergy = DayAmbientEnergy,
             // Light bounced from what is on screen, such as firelight off the ground onto nearby walls.
             SsilEnabled = true,
+            // Contact shade under and between things; it darkens the sun's light too, since the sun is most of the light.
+            SsaoEnabled = true,
+            SsaoIntensity = 3,
+            SsaoLightAffect = .4f,
+            // AgX keeps hues as light brightens and adds contrast of its own, where linear output clipped and flattened.
+            TonemapMode = Godot.Environment.ToneMapper.Agx,
+            TonemapAgxContrast = 1.25f,
+            TonemapExposure = 1.2f,
         };
         AddChild(new WorldEnvironment { Environment = environment });
         // UpdateLighting moves it along the day's arc.
@@ -1156,7 +1169,10 @@ public partial class WorldView : Node3D {
         // A low sun gives warm light at sunrise and sunset.
         float low = moon ? 0 : 1 - Mathf.SmoothStep(.1f, .45f, height);
         sun.LightColor = NoonLight.Lerp(LowSunLight, low).Lerp(MoonLight, night);
-        environment.AmbientLightColor = DayAmbient.Lerp(LowSunAmbient, low * .6f).Lerp(NightAmbient, night);
+        var ambient = DayAmbient.Lerp(LowSunAmbient, low * .6f).Lerp(NightAmbient, night);
+        // Sky light from above, and below it that light bounced off the grass.
+        skylight.SkyTopColor = ambient; skylight.SkyHorizonColor = ambient;
+        skylight.GroundHorizonColor = ambient * DayGround; skylight.GroundBottomColor = ambient * DayGround;
         environment.AmbientLightEnergy = Mathf.Lerp(DayAmbientEnergy, Mathf.Lerp(NewMoonAmbient, .3f, moonlight), night);
         environment.BackgroundColor = DayGround.Lerp(NightGround, night);
     }
