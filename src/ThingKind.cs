@@ -5,7 +5,7 @@ using System.Text.Json.Serialization;
 
 namespace ChopChopMeow;
 
-/// <summary>What a world object is. Saves, network updates and data/game.json name each kind by its id, the member name in snake case, such as "wolf_corpse".</summary>
+/// <summary>What a world object is. Saves and network updates name each kind by its id, the member name in snake case, such as "wolf_corpse".</summary>
 [JsonConverter(typeof(KindConverter))]
 public enum ThingKind {
     Tree,

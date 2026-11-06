@@ -157,7 +157,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - Right-click a stack to pick up half of it, then left-click a slot to drop it there.
 - A dropped stack that does not all fit fills the slot, and the rest stays held until you drop it elsewhere or click somewhere it cannot go.
 - Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, and a crate click starts placement.
-- Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `data/game.json`.
+- Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A selected raw-material stack can be deposited by clicking a nearby chest.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
 
@@ -237,7 +237,7 @@ In multiplayer, every player must be downed before skipping.
 
 Fog of war covers the map.
 Ground you have never seen is black.
-You see live only within a circle around you (`sightRadius` in `data/game.json`, 20 tiles), which fills the screen at full zoom-out.
+You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 tiles), which fills the screen at full zoom-out.
 
 Ground you have seen before is greyed out and shows things as you last saw them: a tree felled out of sight still stands there until you look again.
 Remembered fires and furnaces show unlit, and wolves, workers and carts are not shown.
@@ -628,7 +628,7 @@ A worn trail runs down to the shore, and there are three tree types (oak, spruce
 
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.
 The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset.
-The moon takes the same path at night and waxes and wanes over a cycle of `moonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by.
+The moon takes the same path at night and waxes and wanes over a cycle of `MoonCycleDays` (8): a full moon casts a faint blue light, while a new moon leaves only firelight, torches and cabin windows to see by.
 Night is lit by the moon, ambient light and real fire light from campfires, furnaces and cabin windows.
 Trees in front of the player, a worker or a structure turn see-through.
 

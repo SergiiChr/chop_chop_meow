@@ -52,7 +52,8 @@ Simulation and data:
 | `src/World.cs` | The `World` simulation and `SaveState` |
 | `src/ThingKind.cs` | `ThingKind`, what a world object is, and its ids in saves, data and hotbar slots |
 | `src/Inventory.cs` | Inventories and their filter-aware transfers, and the read-only views `World`'s read members hand out: `ItemTotals`, `ListView` and `InventoryView` |
-| `src/GameData.cs` | Loads tunable items, buildings, recipes, trade values and time values from `data/game.json` |
+| `src/GameData.cs` | Time, pace and need values, the shapes of the game tables, and the check that they fit together |
+| `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor and its chip |
@@ -149,7 +150,7 @@ Checks and review tools:
 
 ### Simulation, view and UI
 
-Keep balance and recipe values in `data/game.json` so they can be adjusted without changing simulation code.
+Keep balance and recipe values in `GameData` and `GameTables`, apart from the rules in the simulation code.
 Keep rendering and input separate from state transitions, so headless checks can exercise gameplay rules without relying on screenshots.
 
 - `tests/SimulationChecks.cs` covers filters, worker routing, furnace work, trade, wages, recovery after death, saves and a material-driven progression run.
@@ -307,7 +308,7 @@ Food, water, the day/night cycle, shelter, wages and wolf encounters support the
 - Items carry what eating or drinking one restores (`hunger`, `thirst`, `health`) and a `food` flag.
 - Food is what wolves eat and compost will take, cooked or not.
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
-- `hungerHours` and `thirstHours` in `data/game.json` set how many in-game hours a full bar lasts.
+- `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.
 
 Sleeping in a cabin advances time toward dawn.
 It is allowed from `World.SleepHour` (22:00), a little before night falls.
@@ -315,8 +316,8 @@ It is refused if hunger or thirst would run out first.
 
 #### Sprinting
 
-Holding Shift while moving sprints at `sprintSpeed` times the walking speed (`PlayerState.Sprinting`, sent by guests with their walk).
-Hunger and thirst drain `sprintDrain` times as fast meanwhile.
+Holding Shift while moving sprints at `SprintSpeed` times the walking speed (`PlayerState.Sprinting`, sent by guests with their walk).
+Hunger and thirst drain `SprintDrain` times as fast meanwhile.
 Under 15% food or drink (`GameData.LowNeed`) the player cannot sprint and the screen edges pulse red.
 
 #### Death and recovery boxes
@@ -339,10 +340,10 @@ It draws one screen-wide quad after everything else, placing each pixel in the w
 ### Night and wolves
 
 Wolves come out of open ground just beyond every player's sight radius, so none appears on screen.
-A chasing wolf (`Wolf.Chase` above zero) gallops at `wolfChase` times `walkSpeed`, which data validation keeps above walking and below `sprintSpeed`.
+A chasing wolf (`Wolf.Chase` above zero) gallops at `WolfChase` times `WalkSpeed`, which data validation keeps above walking and below `SprintSpeed`.
 Stalking, creeping and backing off stay at the slower trot.
 
-Campfire light repels wolves, and `campfireHours` sets how long one log burns.
+Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
 A wolf already chasing the player still follows into the light for a few seconds.
 Inside a cabin (`SaveState.Sheltered`) the player is hidden and wolves back off at once.
 
@@ -376,16 +377,16 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
 - `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `GatherRules.ChipReach` of a boulder or deposit on `GatherRules.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
-- A picked-clean berry bush fruits again after `berryRegrowHours`.
+- A picked-clean berry bush fruits again after `BerryRegrowHours`.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
 - Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
 - The stone furnace burns 2 wood into 1 charcoal.
 
 ### Tools
 
-Tools carry a `tool` kind (axe, pickaxe, hammer, chisel, rake, mortar), a `speed` and a `tier` in `data/game.json`:
+Tools carry a `Tool` kind (axe, pickaxe, hammer, chisel, rake, mortar), a `Speed` and a `Tier` in `GameTables`:
 
-| `tier` | Material |
+| `Tier` | Material |
 | --- | --- |
 | 0 | wood or stone |
 | 2 | steel |
@@ -393,7 +394,7 @@ Tools carry a `tool` kind (axe, pickaxe, hammer, chisel, rake, mortar), a `speed
 Tier 1 is unused, since there are no iron tools.
 
 `World.BestTool` picks the fastest carried tool at or above a tier.
-Recipes name the tool they need, the lowest `tier` that will do, and whether they can be made by hand (`hand`).
+Recipes name the tool they need, the lowest `Tier` that will do, and whether they can be made by hand (`Hand`).
 So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
 
 `GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for deposits), one that only speeds gathering up (a pickaxe for rock, a rake for leaves, which take three times as long by hand), and the loose piece a pickaxe chips off it.
@@ -414,10 +415,10 @@ The first one waiting moves to `PlayerState.Making` when work on it starts and c
 They run at base speed times the tool's speed while the player carries it, and only while the player has stood still for `World.CraftSettle` (`PlayerState.Still`).
 Queues are written by `QueueJson`, since the generic list writer allocates on every world update.
 
-The bench runs at `benchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
+The bench runs at `BenchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
 
 A station's `Thing.Queue` holds its queued batches, one entry per recipe in the order first queued; a batch leaves it as it starts.
-`Thing.Keep` is the recipe workers keep it making once the queue is done, and a building's `recipe` in `data/game.json` names the one it starts with.
+`Thing.Keep` is the recipe workers keep it making once the queue is done, and a building's `Recipe` in `GameTables` names the one it starts with.
 `Thing.Making` is the batch in progress, as `PlayerState.Making` is by hand, and both start the next batch through `World.StartNext`.
 `Thing.Recipe` is worked out, not stored: the batch in progress, else the first queued, else `Keep`; with none the station stands idle.
 Saves and world updates leave out an empty mark, queue and batch, so a tree or a rock carries none of them.
@@ -434,7 +435,7 @@ The mortar's recipes are worked, while jam, stew and dough cook unattended and t
 
 #### Fuel
 
-A recipe's `fuels` list what it can burn, one unit per batch from the station's one-slot fuel box (`Thing.Burner`).
+A recipe's `Fuels` list what it can burn, one unit per batch from the station's one-slot fuel box (`Thing.Burner`).
 
 - The fuel slot holds one kind at a time, and the next batch burns it only while the recipe lists it (`World.FuelOf`).
 - `World.FuelFits` takes what the station's recipe burns, or with no recipe what any of its recipes burns.
@@ -503,7 +504,7 @@ It keeps the player's filters rather than setting its own, and `Thing.SkipFood` 
 
 #### Crates
 
-A wood crate holds `crateCapacity` (12) units.
+A wood crate holds `CrateCapacity` (12) units.
 A picked-up crate becomes an item `crate_<n>` whose contents live in `SaveState.Crates`; an empty one is the stackable item `crate`.
 A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
 A pile of crates holds crates of one good.
@@ -513,7 +514,7 @@ Placed crates are manual storage only.
 
 A packing station (`packer`, `src/Packing.cs`) packs the good in `Thing.Packs` into crates, anything a crate holds but crates and coins.
 Its inventory takes only that good and empty crates; `Thing.Output` holds the crate being packed.
-While worked like an anvil, it moves one item every `packSeconds` into that crate, opening an empty crate for the first.
+While worked like an anvil, it moves one item every `PackSeconds` into that crate, opening an empty crate for the first.
 A full crate, or one of another good after the choice changes, waits in the output.
 
 - Haul carries that crate to `DepositFor` and the station's leftovers to storage, then keeps a crate's worth of the good and two empty crates there.
@@ -529,7 +530,7 @@ A tool station (`toolstation`) is storage for tools only: `World.ToolSlots` (4) 
 ### Workers
 
 Workers are tracked individually.
-`hireOffers` in `data/game.json` lists hiring deals, and each worker keeps the daily wage of the deal they were hired on (`Worker.Wage`).
+`HireOffers` in `GameTables` lists hiring deals, and each worker keeps the daily wage of the deal they were hired on (`Worker.Wage`).
 
 #### Duties
 
@@ -562,7 +563,7 @@ A dismissed worker's tool goes into their recovery box.
 
 #### Schedule
 
-At the `lunchHour` in `data/game.json` workers break for one in-game hour.
+At the `LunchHour` in `GameData` workers break for one in-game hour.
 They sit in a circle around the campfire closest to the whole crew (`World.LunchFire`): every other one cross-legged on the ground and the rest on a rock, or where they stand without one.
 
 As dusk begins (`GameData.DuskStarts`, a tenth of a day before night) they walk to the nearest trading post, or the clearing without one.
@@ -580,15 +581,15 @@ Prices, wages and demand follow the rules in [ECONOMY.md](ECONOMY.md).
 
 #### Market
 
-The market only accepts packed crates of the goods in `market.sells`.
+The market only accepts packed crates of the goods in `Market.Sells`.
 A sale pays for the contents unit by unit plus the crate.
 
 `market.buys` lists what the village sells and in what lot, as the [README price sheet](../README.md#price-sheet) shows.
 
 #### Demand and prices
 
-In `market.sells` each good's first `steady` units sell at the full price, and each crate's worth past them takes `drop` off it.
-A day restores what selling `daily` units takes (`World.Demand`, which runs above 1 by the steady amount).
+In `Market.Sells` each good's first `Steady` units sell at the full price, and each crate's worth past them takes `Drop` off it.
+A day restores what selling `Daily` units takes (`World.Demand`, which runs above 1 by the steady amount).
 Buying costs a fixed 1.25× the base price.
 
 #### Carts and coins
@@ -610,7 +611,7 @@ Trades always use the live price, so the sheet can be out of date.
 
 ### Mines
 
-A mine (`src/Mine.cs`, `mine` in `data/game.json`) is marked free and snaps to `World.MineSpot`, directly in front of an ore cliff, one per cliff.
+A mine (`src/Mine.cs`, `Mine` in `GameTables`) is marked free and snaps to `World.MineSpot`, directly in front of an ore cliff, one per cliff.
 Each portal follows its own cliff face, its tunnel runs into the rock, and its rails point outward toward the valley.
 A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`World.InSpur`), and holds the tunnel, which `WorldModels.Mine` darkens step by step to black.
 Loading a save made on an older valley moves only the mine cart anchor to this site and keeps stock, stages and worker assignments.
@@ -623,7 +624,7 @@ Loading a save made on an older valley moves only the mine cart anchor to this s
 | Supplied | `mine.materials` delivered | `MineStage.Supplied` |
 | Fitted | a worker with a hammer | `MineStage.Open` |
 
-The two worker stages take `stageWorkdays` of `GameData.WorkdaySeconds`.
+The two worker stages take `StageWorkdays` of `GameData.WorkdaySeconds`.
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
 
 Up to `mine.workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).
@@ -634,7 +635,7 @@ The first free miner then carries the whole stack to storage (`Worker.Bag` grows
 ### Farming
 
 A farm plot (`farm`, `src/Farm.cs`) is a zone like a pile and snaps with piles.
-`farm` in `data/game.json` sets what sows it, how many days the wheat grows, how many working days the harvest takes and what it yields.
+`Farm` in `GameTables` sets what sows it, how many days the wheat grows, how many working days the harvest takes and what it yields.
 
 `Thing.FarmStage` is `Fallow`, `Growing` or `Ripe`.
 `Thing.Progress` counts growth seconds, then harvest work.

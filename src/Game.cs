@@ -56,7 +56,7 @@ public partial class Game : Node, IGameFlow {
     private bool quitting;
     public override void _Ready() {
         try {
-            data = GameData.Load();
+            data = GameData.Create();
             if (Launch.Has("--server")) { Server.Run(this, data); return; }
             world = new World(data);
             if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }

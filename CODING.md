@@ -24,7 +24,7 @@ Project rules on top of the global coding and testing guides.
 - **Implicit coupling:** pass `World`, `GameData` and views as arguments or fields. Static fields are for shared, immutable or cached resources (meshes, materials, `StringName`s), not game state.
 - **Layer-first folders:** the project keeps the flat `src/` and `tests/` layout; group related code by file name prefix instead of adding folders.
 - **Illegal states:** use enums such as `ActorAction` rather than combinations of flags or strings.
-- **Validation at the boundary:** `GameData` validates `data/game.json` when it loads, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
+- **Validation at the boundary:** `GameData` checks its tables fit together when the game starts, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
 - **Old saves:** upgrades to an older save's data run once when it loads, never in the tick.
 
 ## Architecture
