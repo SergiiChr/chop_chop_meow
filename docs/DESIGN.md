@@ -399,7 +399,8 @@ So a steel chisel does everything a stone chisel does, faster, while tin cans ne
 
 `GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for deposits), one that only speeds gathering up (a pickaxe for rock, a rake for leaves, which take three times as long by hand), and the loose piece a pickaxe chips off it.
 Stone, leaves, berries and loose pieces need no tool.
-Tool stations report changes to what they hold (`Inventory.Changed`), so the world counts the tools they give out only after a change, and a waiting worker checks that count rather than every station.
+The world keeps its own list of tool stations, so fetching or putting back a tool looks through those rather than every thing in the world.
+Tool stations report changes to what they hold and to their filters (`Inventory.Changed`), so the world works out which tool kinds they give out only after a change, and a waiting worker checks that rather than every station.
 
 Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFreshStart` verifies:
 

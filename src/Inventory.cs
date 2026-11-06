@@ -34,7 +34,7 @@ public sealed class Inventory {
     private readonly Dictionary<string, int> layoutRemainder = new();
     public const string Coins = "coins";
     public Inventory() { Items = new ItemTotals(items); PadLayout(); }
-    /// <summary>Called whenever the items held change, for an owner that keeps a count of them up to date.</summary>
+    /// <summary>Called whenever the items held or the filters change, for an owner that keeps a count of them up to date.</summary>
     public Action? Changed;
     public int Count {
         get {
@@ -202,6 +202,14 @@ public sealed class Inventory {
         PadLayout();
     }
 
+    /// <summary>Lets an item in or out through a filter, or stops naming it there.</summary>
+    public void Filter(string item, bool output, bool allowed) {
+        var filter = output ? OutputFilter : InputFilter;
+        if (allowed) filter.Add(item); else filter.Remove(item);
+        Changed?.Invoke();
+    }
+    /// <summary>Empties both filters, so anything goes in and out.</summary>
+    public void ClearFilters() { InputFilter.Clear(); OutputFilter.Clear(); Changed?.Invoke(); }
     public bool Accepts(string item) => InputFilter.Count == 0 || Names(InputFilter, item);
     public bool AllowsWithdrawal(string item) => OutputFilter.Count == 0 || Names(OutputFilter, item);
     /// <summary>Whether the input filter asks for this item by name, so automation prefers this storage over unrestricted ones.</summary>

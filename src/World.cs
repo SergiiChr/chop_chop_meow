@@ -424,14 +424,14 @@ public sealed partial class World {
         if (kind == ThingKind.Crate) t.Inventory = NewCrate();
         if (kind == ThingKind.Packer) { t.Inventory.Slots = Data.CrateCapacity + 1; t.Output = new() { Slots = 1 }; }
         if (kind == ThingKind.Mine) { t.Inventory.Slots = Data.Mine.Materials.Values.Sum(n => (n + t.Inventory.StackSize - 1) / t.Inventory.StackSize); t.Output = new() { Slots = 2 }; }
-        if (kind == ThingKind.Toolstation) { t.Inventory.Slots = ToolSlots; WatchTools(t); }
+        if (kind == ThingKind.Toolstation) { t.Inventory.Slots = ToolSlots; AddToolStation(t); }
         if (kind == ThingKind.Pile) t.Inventory.Slots = PileStacks;
         if (kind == ThingKind.Chest) t.Inventory.Slots = ChestStacks;
         if (kind == ThingKind.Farm) { t.Inventory.Slots = Data.Farm.Sow.Count; t.Output = new() { Slots = Data.Farm.Yield.Count }; }
         S.Things.Add(t); return t;
     }
     public void NewGame() {
-        S = new SaveState(); toolsChanged = true;
+        S = new SaveState(); toolStations.Clear(); toolsChanged = true;
         S.Backpack.Add("steel_axe", 1); S.Backpack.Add("berries", 10); S.Backpack.Add("wood", 6);
         S.Backpack.Add("empty_bottle", 1);
         var rng = new Random(4271);
@@ -1828,28 +1828,30 @@ public sealed partial class World {
     /// <summary>Walks a tool the job no longer needs to the nearest tool station with room, and reports when it is put back; with no such station the worker keeps it.</summary>
     private bool ReturnTool(Worker w, float dt) {
         Thing? station = null; float nearest = 0;
-        foreach (var t in S.Things)
-            if (t.Kind == ThingKind.Toolstation && t.Inventory.Room(w.Tool) > 0 && t.Inventory.Accepts(w.Tool) && (station == null || t.Pos.DistanceSquaredTo(w.Pos) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(w.Pos); }
+        foreach (var t in toolStations)
+            if (t.Inventory.Room(w.Tool) > 0 && t.Inventory.Accepts(w.Tool) && (station == null || t.Pos.DistanceSquaredTo(w.Pos) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(w.Pos); }
         if (station == null) return true;
         w.Status = Phrase("Putting back the ", Lower(Data.Name(w.Tool)));
         if (!Walk(w, station.Pos, dt)) return false;
         station.Inventory.Add(w.Tool, 1); w.Tool = ""; return true;
     }
+    // Tool stations, which are never taken down, so finding one walks a short list rather than every thing in the world.
+    private readonly List<Thing> toolStations = new();
     // The tool kinds tool stations give out; a tool station's contents or filters changing marks it out of date, and it is worked out again when next asked.
     private readonly HashSet<string> stationTools = new();
     private bool toolsChanged = true;
     private void ToolsChanged() => toolsChanged = true;
-    /// <summary>Has a tool station's contents report to the tool kinds stations give out.</summary>
-    private void WatchTools(Thing station) { station.Inventory.Changed = ToolsChanged; toolsChanged = true; }
+    /// <summary>Lists a tool station, and has its contents and filters report to the tool kinds stations give out.</summary>
+    private void AddToolStation(Thing station) { toolStations.Add(station); station.Inventory.Changed = ToolsChanged; toolsChanged = true; }
+    /// <summary>The tool of a kind a tool station gives out: its best, when its filter lets that one out; otherwise null.</summary>
+    private string? ToolGivenOut(Thing station, string kind) => BestTool(kind, station.Inventory) is string best && station.Inventory.AllowsWithdrawal(best) ? best : null;
     /// <summary>Whether any tool station gives out a tool of a kind.</summary>
     private bool StationsHold(string kind) {
         if (toolsChanged) {
             stationTools.Clear();
-            foreach (var t in S.Things) {
-                if (t.Kind != ThingKind.Toolstation) continue;
+            foreach (var t in toolStations)
                 foreach (var (item, _) in t.Inventory.Items)
-                    if (Data.Items.TryGetValue(item, out var def) && def.Tool != "" && t.Inventory.AllowsWithdrawal(item)) stationTools.Add(def.Tool);
-            }
+                    if (Data.Items.TryGetValue(item, out var def) && def.Tool != "" && ToolGivenOut(t, def.Tool) != null) stationTools.Add(def.Tool);
             toolsChanged = false;
         }
         return stationTools.Contains(kind);
@@ -1858,8 +1860,8 @@ public sealed partial class World {
     private Thing? ToolStationWith(string kind, Vector2 from) {
         if (!StationsHold(kind)) return null;
         Thing? station = null; float nearest = 0;
-        foreach (var t in S.Things)
-            if (t.Kind == ThingKind.Toolstation && BestTool(kind, t.Inventory) is string held && t.Inventory.AllowsWithdrawal(held) && (station == null || t.Pos.DistanceSquaredTo(from) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(from); }
+        foreach (var t in toolStations)
+            if (ToolGivenOut(t, kind) != null && (station == null || t.Pos.DistanceSquaredTo(from) < nearest)) { station = t; nearest = t.Pos.DistanceSquaredTo(from); }
         return station;
     }
     /// <summary>Takes the best tool of a kind from the nearest tool station holding one; without one, the worker says once what they need and waits.</summary>
@@ -1873,7 +1875,7 @@ public sealed partial class World {
         w.Missing = "";
         w.Status = Phrase("Fetching ", A(kind), " from the tool station");
         if (!Walk(w, station.Pos, dt)) return;
-        w.Tool = BestTool(kind, station.Inventory)!; station.Inventory.Remove(w.Tool, 1);
+        w.Tool = ToolGivenOut(station, kind)!; station.Inventory.Remove(w.Tool, 1);
     }
     /// <summary>Walks to an evenly spaced seat around the lunch fire and sits; without a campfire the worker sits where they are.</summary>
     private void EatLunch(Worker w, float dt) {
@@ -2410,7 +2412,8 @@ public sealed partial class World {
         loaded.Absent.Remove(local.Key);
         local.Id = 1; loaded.Players.Add(local);
         S = loaded;
-        foreach (var t in S.Things) if (t.Kind == ThingKind.Toolstation) WatchTools(t);
+        toolStations.Clear();
+        foreach (var t in S.Things) if (t.Kind == ThingKind.Toolstation) AddToolStation(t);
         // Older saves set only a worker's place; it carries every job there.
         foreach (var w in S.Workers)
             if (w.Duties.Count == 0 && w.Assignment > 0 && Find(w.Assignment) is Thing place) foreach (string job in Jobs(place)) w.Duties.Add(NewDuty(place, job));
