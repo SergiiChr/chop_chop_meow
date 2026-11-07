@@ -947,7 +947,9 @@ public partial class Game {
     }
     /// <summary>A mauled player cannot move; death shows the respawn countdown and respawning clears it.</summary>
     private async Task CheckPinnedPlayerStaysDownAndDeathCountsDown() {
-        RunUntilNight(Hosted); SetMauled(Hosted, true); await Frames();
+        RunUntilNight(Hosted); SetMauled(Hosted, true);
+        // The pin lasts only while a wolf holds it.
+        PlaceWolf(Hosted, new Wolf { Pos = world.Player + Vector2.Right * .8f, Feeding = true, Pinning = true }); await Frames();
         var pinnedAt = world.Player;
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.25);

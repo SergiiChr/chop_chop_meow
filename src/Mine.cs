@@ -26,19 +26,22 @@ public sealed partial class World {
     public static Vector2 MineSpot(Cliff c) => c.Center + c.Face * MineOut;
     /// <summary>Whether a point lies within the solid rock skin; the tunnel approach at depth -1.4 stays open.</summary>
     private static bool InSpur(Vector2 p, float margin = 0) {
-        foreach (var c in Cliffs) {
-            var offset = p - MineSpot(c);
-            float depth = offset.Dot(c.Face);
-            // The margin reaches twice as far out in front, so scattered trees and rocks also stay off the rails and cart.
-            if (depth > -2.28f + margin * 2) continue;
-            float across = Math.Abs(offset.Dot(c.Along));
-            float width = depth >= -4.2f ? 2.55f + (depth + 2.28f) * (2.8f - 2.55f) / (-4.2f + 2.28f)
-                : depth >= -6 ? 2.8f + (depth + 4.2f) * (3.35f - 2.8f) / (-6 + 4.2f)
-                : depth >= -32 ? 3.35f + (depth + 6) * (4.6f - 3.35f) / (-32 + 6)
-                : 4.6f;
-            if (across < width + margin) return true;
-        }
+        foreach (var c in Cliffs) if (InOutcrop(p - MineSpot(c), c.Face, margin)) return true;
+        // A den is the same outcrop at a smaller size.
+        foreach (var den in Dens) if (InOutcrop((p - den.Spot) / Den.Scale, den.Face, margin / Den.Scale)) return true;
         return false;
+    }
+    /// <summary>Whether a point <paramref name="offset"/> from a mine's spot lies within its outcrop, which faces <paramref name="face"/>.</summary>
+    private static bool InOutcrop(Vector2 offset, Vector2 face, float margin) {
+        float depth = offset.Dot(face);
+        // The margin reaches twice as far out in front, so scattered trees and rocks also stay off the rails and cart.
+        if (depth > -2.28f + margin * 2) return false;
+        float across = Math.Abs(offset.Dot(new Vector2(-face.Y, face.X)));
+        float width = depth >= -4.2f ? 2.55f + (depth + 2.28f) * (2.8f - 2.55f) / (-4.2f + 2.28f)
+            : depth >= -6 ? 2.8f + (depth + 4.2f) * (3.35f - 2.8f) / (-6 + 4.2f)
+            : depth >= -32 ? 3.35f + (depth + 6) * (4.6f - 3.35f) / (-32 + 6)
+            : 4.6f;
+        return across < width + margin;
     }
 
     /// <summary>Where diggers and miners stand: at the entrance, against the rock.</summary>

@@ -44,13 +44,11 @@ public partial class WorldView {
 
     /// <summary>A wolf den: a mine's rock outcrop and dark tunnel at half size, with no timber, rails or cart, so the mouth is about a wolf's height.</summary>
     private static void BuildDen(Node3D parent, Den den) {
-        const float Scale = .5f;
-        // The outcrop is built around a cliff's mine spot; this cliff puts its mouth at the den's.
-        var rock = new Cliff(ThingKind.Stone, den.Mouth - den.Face * (World.MineOut + WorldModels.MineDoor * Scale), den.Face, 0);
-        var spot = World.MineSpot(rock);
-        var cave = Pivot(parent, new Vector3(spot.X, 0, spot.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(den.Face.X, den.Face.Y)), 0));
-        cave.Scale = Vector3.One * Scale;
-        Add(cave, MineRockShape.Mesh(rock, new[] { "5b5a52", "66645a", "4f4f48" }, Scale), MineRockShape.Rock, Vector3.Zero);
+        // The outcrop is built around a cliff's mine spot; this cliff puts that spot at the den's.
+        var rock = new Cliff(ThingKind.Stone, den.Spot - den.Face * World.MineOut, den.Face, 0);
+        var cave = Pivot(parent, new Vector3(den.Spot.X, 0, den.Spot.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(den.Face.X, den.Face.Y)), 0));
+        cave.Scale = Vector3.One * Den.Scale;
+        Add(cave, MineRockShape.Mesh(rock, new[] { "5b5a52", "66645a", "4f4f48" }, Den.Scale), MineRockShape.Rock, Vector3.Zero);
         Add(Pivot(cave, new Vector3(0, 0, WorldModels.MineDoor)), MineShape.Tunnel, MineShape.Unlit, Vector3.Zero);
     }
 

@@ -70,6 +70,8 @@ public static class SimulationChecks {
         Test(CheckWolvesKeepToGroundAPlayerCanWalk, data);
         Test(CheckSmelledPlayerDrawsAHowlAndThePack, data);
         Test(CheckWolvesGoHomeBeforeDawn, data);
+        Test(CheckDensStayOpen, data);
+        Test(CheckWolvesLetGoCleanly, data);
         Test(CheckOnlyCoinsUseTheLargerStack, data);
         Test(CheckOlderSaveMigratesCoinsMarketBoxesAndOrders, data);
         Test(CheckSaveWithUnknownItemRefused, data);
@@ -2174,8 +2176,10 @@ public static class SimulationChecks {
         SafeTick(world, .9f);
         Require(world.Wolves.Count == 0, "no wolf should come out before dusk");
         SafeTick(world, 1);
-        Require(!world.Night && World.Dens.All(den => world.Wolves.Count(w => w.Pos.DistanceTo(den.Door) < 4) == data.WolvesPerDen),
-                "each den should let its wolves out as soon as dusk starts, well before night");
+        Require(world.Wolves.Count == data.WolvesPerDen && world.Wolves.All(w => w.Pos.DistanceTo(World.Dens[0].Door) < 4),
+                "the first den should let its wolves out as soon as dusk starts, and the others in turn after it");
+        SafeTick(world, World.Dens.Length * World.DenGapSeconds);
+        Require(!world.Night && world.Wolves.Count == World.Dens.Length * data.WolvesPerDen, "every den should have let its wolves out well before night");
         Require(world.Wolves.All(w => w.Target == 0 && w.Mode == WolfMode.Patrol), "wolves out of their dens should patrol until they smell someone");
     }
 
@@ -2195,6 +2199,59 @@ public static class SimulationChecks {
             Require(lake.CanStand(hunter.Pos), $"a hunting wolf should go round the lake, not through it: {hunter.Pos}");
         }
         Require(hunter.Pos.DistanceTo(lake.Player) <= 2, "a hunting wolf should find its way round the lake to the player");
+        // Behind a row of cabins a wolf goes round them rather than through a wall.
+        var camp = NightWorld(data);
+        camp.Player = Terrain.Point(120, 0);
+        for (int i = -2; i <= 2; i++) camp.Add(ThingKind.Hut, camp.Player + Terrain.Seaward * 3 + Terrain.Sideways * i * 1.5f);
+        var stalker = PlaceWolf(camp, new Wolf { Pos = camp.Player + Terrain.Seaward * 8 + Terrain.Sideways * .4f });
+        for (int i = 0; i < 300 && stalker.Pos.DistanceTo(camp.Player) > 2; i++) {
+            SafeTick(camp, .1f); SetNeeds(camp, health: 100);
+            Require(camp.CanStand(stalker.Pos), $"a hunting wolf should go round cabins, not through them: {stalker.Pos}");
+        }
+        Require(stalker.Pos.DistanceTo(camp.Player) <= 2, "a hunting wolf should find its way round cabins to the player");
+        // Patrolling wolves keep out of firelight.
+        var lit = NightWorld(data);
+        lit.Player = Terrain.Point(30, 0);
+        var fire = lit.Add(ThingKind.Campfire, Terrain.Point(120, 0)); fire.Burn = 9999;
+        var patrol = PatrolWolf(lit, new Wolf { Pos = fire.Pos + Terrain.Seaward * (World.FireReach + 3), Heading = (-Terrain.Seaward).Angle() });
+        for (int i = 0; i < 200; i++) {
+            SafeTick(lit, .1f);
+            Require(!lit.Protected(patrol.Pos), $"a patrolling wolf should keep out of firelight: {patrol.Pos}");
+        }
+    }
+
+    private static void CheckDensStayOpen(GameData data) {
+        var world = new World(data);
+        foreach (var den in World.Dens) {
+            Require(world.CanStand(den.Door) && !world.CanStand(den.Mouth - den.Face * .5f), "a den's rock should be solid and the ground at its door open");
+            world.Player = den.Door + den.Face * 3;
+            Require(world.PlacementBlock(ThingKind.Hut, den.Door + den.Face * 2) != null, "nothing should be built over a den's mouth");
+        }
+    }
+
+    private static void CheckWolvesLetGoCleanly(GameData data) {
+        // A player stepping into a cabin mid-howl leaves the wolf patrolling, not howling or fleeing as it walks off.
+        var world = NightWorld(data);
+        var hut = world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0));
+        var howler = PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(-8, 0), Howl = 5, HowlLength = 5, Flee = 2, Stagger = 1 });
+        Require(world.Enter(hut), "the player should step into the cabin");
+        SafeTick(world, .1f);
+        Require(howler.Target == 0 && howler.Mode == WolfMode.Patrol && howler.Howl == 0 && howler.Flee == 0 && howler.Stagger == 0,
+                "a wolf whose player took shelter should drop its howl and flight and patrol");
+        // A wolf whose player left the game lets go of them.
+        var gone = NightWorld(data);
+        var feeder = PlaceWolf(gone, new Wolf { Pos = gone.Player + new Vector2(5, 0), Target = 999, Feeding = true, Pinning = true, Leap = 1, Chase = 3 });
+        SafeTick(gone, .1f);
+        Require(feeder.Target != 999 && !feeder.Feeding && !feeder.Pinning && feeder.Leap == 0 && feeder.Chase == 0,
+                "a wolf whose player left should stop feeding, leaping and chasing");
+        // A pinned player goes free when the wolf heads home before dawn.
+        var dawn = NightWorld(data);
+        dawn.Player = Terrain.Point(120, 0);
+        PlaceWolf(dawn, new Wolf { Pos = dawn.Player + Terrain.Seaward * .8f, Feeding = true, Pinning = true });
+        SetMauled(dawn, true);
+        RunUntil(dawn, (dawn.Day - 1 + data.WolfRetreatStarts) * data.DaySeconds + .1f);
+        SafeTick(dawn, .2f);
+        Require(!dawn.Mauled, "a pinned player should go free once the wolves head home");
     }
 
     private static void CheckSmelledPlayerDrawsAHowlAndThePack(GameData data) {

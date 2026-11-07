@@ -9,12 +9,20 @@ public interface IWalker {
     Vector2 Pos { get; set; }
     List<Vector2> Route { get; }
     Vector2 RouteTarget { get; set; }
+    /// <summary>When a walker that found no way to its destination looks again.</summary>
+    float RouteRetry { get; set; }
 }
 
 /// <summary>A small cave at the foot of the mountains, <see cref="Face"/> pointing out into the valley; its wolves come out at dusk and go back in before dawn.</summary>
 public readonly record struct Den(Vector2 Mouth, Vector2 Face) {
+    /// <summary>The den is a mine outcrop at this size.</summary>
+    public const float Scale = .5f;
     /// <summary>Open ground in front of the mouth, where the wolves come out and go back in.</summary>
     public Vector2 Door => Mouth + Face * 1.5f;
+    /// <summary>Where a mine's cart would stand: a mine's tunnel opens 2.2 m in from it, so at half size the den's opens at <see cref="Mouth"/>.</summary>
+    public Vector2 Spot => Mouth + Face * 1.1f;
+    /// <summary>How far from the door nothing may be built, so the wolves always have a way out.</summary>
+    public const float Clearance = 4;
 }
 
 /// <summary>Wolves at night: they come out of the dens at dusk and patrol until one smells a player, howls and goes after them, and before dawn they all go home.</summary>
@@ -35,11 +43,19 @@ public sealed partial class World {
     /// <summary>From an hour before dawn every wolf gives up and heads back to the nearest den.</summary>
     public bool WolvesRetreat => DayPhase >= Data.WolfRetreatStarts;
 
-    /// <summary>Lets each den's wolves out once nobody can see its door, and moves every wolf that hunts nobody.</summary>
+    /// <summary>Seconds after dusk between one den opening and the next, so their wolves do not all appear on the same frame.</summary>
+    public const float DenGapSeconds = 2;
+    public static bool NearDen(Vector2 p, float distance) {
+        foreach (var den in Dens) if (den.Door.DistanceTo(p) < distance) return true;
+        return false;
+    }
+
+    /// <summary>Lets each den's wolves out in turn once nobody can see its door, and moves every wolf that hunts nobody.</summary>
     private void TickDens(float dt) {
+        float sinceDusk = (DayPhase - Data.DuskStarts) * Data.DaySeconds;
         if (!WolvesRetreat)
             for (int i = 0; i < Dens.Length; i++) {
-                if ((S.DensOut & 1 << i) != 0 || !Unseen(Dens[i].Door)) continue;
+                if ((S.DensOut & 1 << i) != 0 || sinceDusk < i * DenGapSeconds || !Unseen(Dens[i].Door)) continue;
                 S.DensOut |= 1 << i;
                 // Each wolf of a den sets off its own way.
                 float heading = (float)wolfRandom.NextDouble() * MathF.Tau;
@@ -67,22 +83,32 @@ public sealed partial class World {
             }
         }
     }
-    /// <summary>Walks a patrolling wolf on its heading; ground ahead nobody can stand on turns it a new random way it can take.</summary>
+    /// <summary>
+    /// Walks a patrolling wolf on its heading; ground ahead nobody can stand on, or firelight, turns it a new random way it can take.
+    /// A wolf already in firelight, such as one let out of a den beside a camp, may walk on to get out of it.
+    /// </summary>
     private void Wander(Wolf wolf, float step) {
+        bool lit = Protected(wolf.Pos);
         var ahead = wolf.Pos + Vector2.Right.Rotated(wolf.Heading) * step;
-        for (int tries = 0; !CanStand(ahead) && tries < 12; tries++) {
+        for (int tries = 0; !Roams(ahead, lit) && tries < 12; tries++) {
             wolf.Heading = (float)wolfRandom.NextDouble() * MathF.Tau;
             ahead = wolf.Pos + Vector2.Right.Rotated(wolf.Heading) * step;
         }
-        if (CanStand(ahead)) wolf.Pos = ahead;
+        if (Roams(ahead, lit)) wolf.Pos = ahead;
     }
+    private bool Roams(Vector2 p, bool lit) => CanStand(p) && (lit || !Protected(p));
     /// <summary>Sends a wolf back to patrolling on a heading, hunting nobody.</summary>
     private static void Patrol(Wolf wolf, float heading) {
-        wolf.Target = 0; wolf.Mode = WolfMode.Patrol; wolf.Heading = heading; wolf.Chase = 0; wolf.Scared = wolf.Sprinted = false; wolf.Route.Clear();
+        Calm(wolf); wolf.Mode = WolfMode.Patrol; wolf.Heading = heading;
     }
     /// <summary>Calls a wolf off whatever it is doing and sends it to the nearest den.</summary>
     private static void GoHome(Wolf wolf) {
-        wolf.Target = 0; wolf.Mode = WolfMode.Home; wolf.Howl = wolf.Leap = wolf.Chase = wolf.Flee = 0; wolf.Feeding = wolf.Pinning = wolf.Scared = wolf.Sprinted = false; wolf.Route.Clear();
+        Calm(wolf); wolf.Mode = WolfMode.Home;
+    }
+    /// <summary>Clears everything a wolf was doing to the player it hunted.</summary>
+    private static void Calm(Wolf wolf) {
+        wolf.Target = 0; wolf.Howl = wolf.Leap = wolf.Chase = wolf.Flee = wolf.Stagger = 0;
+        wolf.Feeding = wolf.Pinning = wolf.Scared = wolf.Growled = wolf.Sprinted = false; wolf.Route.Clear();
     }
     /// <summary>
     /// A wolf that smells a player out in the open within <see cref="GameData.SmellRadius"/> takes them as its prey and howls before it goes after them.
