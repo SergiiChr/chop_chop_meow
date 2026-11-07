@@ -112,12 +112,21 @@ public partial class Sounds : Node {
         _ => "moving_leather_in_inventory"
     };
 
-    /// <summary>Plays a sound; one with a world position is faint off screen and silent beyond <paramref name="reach"/> tiles past the screen edge.</summary>
+    // A howl carries across the valley: it fades with distance from the player, on screen too, and falls silent where wolves stop hearing it.
+    private static bool Carries(string name) => name is "wolf_howl" or "wolf_howl_group";
+    /// <summary>The volume scale of the last sound started, from one at full volume.</summary>
+    public float LastFade { get; private set; }
+
+    /// <summary>
+    /// Plays a sound; one with a world position pans with its place on screen.
+    /// A howl fades with distance from the player; any other placed sound is faint off screen and silent beyond <paramref name="reach"/> tiles past the screen edge.
+    /// </summary>
     public void Play(string name, Vector2? at = null, float reach = Reach) {
         var streams = Variants(name);
         if (streams.Length == 0 || silenced) return;
-        float outside = at is Vector2 p ? OffScreen(p) : 0;
-        float fade = outside <= 0 ? 1 : EdgeVolume * MathF.Pow(1 - Math.Min(1, outside / reach), 2);
+        float fade = at is not Vector2 p ? 1
+            : Carries(name) ? MathF.Pow(1 - Math.Min(1, World.Player.DistanceTo(p) / World.Data.HowlRadius), 2)
+            : OffScreen(p) is var outside && outside <= 0 ? 1 : EdgeVolume * MathF.Pow(1 - Math.Min(1, outside / reach), 2);
         if (fade <= 0) return;
         int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
         if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
@@ -134,7 +143,7 @@ public partial class Sounds : Node {
             player.Stream = streams[pick]; player.PitchScale = pitch; player.VolumeDb = volume;
             player.Play();
         }
-        Played++; Last = name;
+        Played++; Last = name; LastFade = fade;
     }
 
     /// <summary>The next idle player in turn; with all of them busy, the next in turn is cut off.</summary>
