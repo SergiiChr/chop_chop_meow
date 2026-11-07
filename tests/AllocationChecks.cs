@@ -58,8 +58,11 @@ public static class AllocationChecks {
 
         var night = new World(data);
         RunUntilPhase(night, data.NightStarts + .05f);
-        // Long enough for the pack to gather around the player; the player is kept on their feet so the hunt never ends.
-        Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }, warmup: 6000);
+        // The player is kept on their feet so the hunt never ends, and measuring waits for the whole first-day pack, since a wolf coming out allocates.
+        void Hunt() { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }
+        for (int i = 0; i < 60 * 600 && night.Wolves.Count < 2 + night.Day; i++) Hunt();
+        Require(night.Wolves.Count == 2 + night.Day, "the first-day pack should be out before measuring the hunt");
+        Check("tick: night, wolves hunting", Hunt);
     }
 
     /// <summary>

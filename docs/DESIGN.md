@@ -307,7 +307,7 @@ Wolf eyes glow faintly, so they show in the dark.
 
 The intended fresh-start loop starts by securing water, shelter and fire, then uses the steel axe the player carries:
 
-1. Collect water, wood, stone and berries; build a cabin and campfire before night.
+1. Collect water, wood, stone and berries; build a cabin and campfire before dusk.
 2. Fell trees with the starting steel axe; gather stone and berries by hand.
 3. Knap a stone chisel, then carve planks and a mallet.
 4. Build a crafting bench and make crates there.
@@ -381,7 +381,7 @@ It draws one screen-wide quad after everything else, placing each pixel in the w
 ### Night and wolves
 
 Wolves hunt from `GameData.DuskStarts` (20:24) until dawn, so over an hour before `World.SleepHour`.
-They come out of open ground six tiles beyond every player's sight radius, so none appears on screen.
+They come out of open ground `WolfSpawnPastSight` tiles beyond every player's sight radius, one every `WolfSpawnSeconds` (`WolfSpawnSecondsTorch` with a torch lit), so none appears on screen.
 A chasing wolf (`Wolf.Chase` above zero) gallops at `WolfChase` times `WalkSpeed`, which data validation keeps above walking and below `SprintSpeed`.
 Stalking, creeping and backing off stay at the slower trot.
 

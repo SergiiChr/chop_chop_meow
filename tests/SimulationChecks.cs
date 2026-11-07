@@ -66,6 +66,7 @@ public static class SimulationChecks {
         Test(CheckSprintBurnsFood, data);
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
         Test(CheckSprintOutrunsWolf, data);
+        Test(CheckWolvesComeOutAtDusk, data);
         Test(CheckOnlyCoinsUseTheLargerStack, data);
         Test(CheckOlderSaveMigratesCoinsMarketBoxesAndOrders, data);
         Test(CheckSaveWithUnknownItemRefused, data);
@@ -2178,6 +2179,15 @@ public static class SimulationChecks {
         var (walking, sprinting) = (Burned(false), Burned(true));
         Require(Math.Abs(sprinting.Hunger / walking.Hunger - data.SprintDrain) < .001f && Math.Abs(sprinting.Thirst / walking.Thirst - data.SprintDrain) < .001f,
                 "sprinting must drain food and drink sprintDrain times as fast");
+    }
+
+    private static void CheckWolvesComeOutAtDusk(GameData data) {
+        var world = new World(data);
+        RunUntil(world, data.DuskStarts * data.DaySeconds - 1);
+        SafeTick(world, .9f);
+        Require(world.Wolves.Count == 0, "no wolf should come out before dusk");
+        SafeTick(world, 1);
+        Require(world.Wolves.Count > 0 && !world.Night, "a wolf should come out as soon as dusk starts, well before night");
     }
 
     private static void CheckSprintOutrunsWolf(GameData data) {

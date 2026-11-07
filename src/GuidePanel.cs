@@ -51,7 +51,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
         ["survive"] = new[] {
             ("berries", "A full stomach lasts a day. Gather berries early to keep your strength up."),
             ("water", "Your bottle holds three sips. Refill it at the lake; the sea is salt. Without a bottle, drink at the source."),
-            ("hut", "Build a cabin and campfire before night. A cabin shelters you; a lit fire keeps wolves away. Sleep inside after 10 pm if your food and water will last until dawn."),
+            ("hut", "Build a cabin and campfire before dusk. A cabin shelters you; a lit fire keeps wolves away. Sleep inside after 10 pm if your food and water will last until dawn."),
             ("campfire", "Wolves hunt from dusk and keep out of fire light. A log burns about 4 hours."),
             ("torch", "Click to light a torch, click to swing it. Four quick swings put it out."),
             ("raw_meat", "Butcher a slain wolf for raw meat and cook it before eating.")

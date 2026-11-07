@@ -342,11 +342,14 @@ public static class MultiplayerChecks {
         world.Tick(.25f);
         Require(world.Wolves.Count > 0 && world.Wolves.All(w => world.Players.All(p => p.Pos.DistanceTo(w.Pos) > data.SightRadius - 1)),
                 "wolves should come out beyond every player's sight, never on screen");
+        // A wolf only keeps out of the other players' sight, but comes out WolfSpawnPastSight tiles past its own player's.
+        Require(world.Wolves.All(w => world.Players.Single(p => p.Id == w.Target).Pos.DistanceTo(w.Pos) > data.SightRadius + data.WolfSpawnPastSight - 2),
+                "wolves should come out well beyond the sight of the player they hunt");
         for (int i = 0; i < 3; i++) { world.Tick(.25f); SetNeeds(world, health: 100); SetNeeds(guest, health: 100); }
         var hostPack = world.Wolves.Where(w => w.Target == world.Me.Id).ToList();
         var guestPack = world.Wolves.Where(w => w.Target == GuestId).ToList();
         Require(hostPack.Count > 0 && guestPack.Count > 0, "each player out at night should draw their own wolves");
-        Require(guestPack.All(w => w.Pos.DistanceTo(guest.Pos) < data.SightRadius + 12) && hostPack.All(w => w.Pos.DistanceTo(world.Player) < data.SightRadius + 12), "wolves should come out near the player they hunt");
+        Require(guestPack.All(w => w.Pos.DistanceTo(guest.Pos) < data.SightRadius + data.WolfSpawnPastSight + 6) && hostPack.All(w => w.Pos.DistanceTo(world.Player) < data.SightRadius + data.WolfSpawnPastSight + 6), "wolves should come out near the player they hunt");
 
         Give(guest, "stone", 2); SetNeeds(guest, health: -1);
         world.Tick(.25f);

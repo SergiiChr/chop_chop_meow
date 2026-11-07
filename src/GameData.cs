@@ -110,6 +110,12 @@ public sealed partial class GameData {
     public float WalkSpeed { get; } = 4.2f;
     /// <summary>How many times faster than walking a wolf chases: above 1 so walking never outpaces it, below <see cref="SprintSpeed"/> so sprinting does.</summary>
     public float WolfChase { get; } = 1.5f;
+    /// <summary>Seconds between wolves coming out for a player from dusk, while the pack is not full.</summary>
+    public float WolfSpawnSeconds { get; } = 30;
+    /// <summary>Seconds between wolves while the player's torch burns; a torch draws a bigger pack, but slowly.</summary>
+    public float WolfSpawnSecondsTorch { get; } = 40;
+    /// <summary>Tiles past <see cref="SightRadius"/> where a wolf comes out, so it has a way to walk before anyone sees it.</summary>
+    public float WolfSpawnPastSight { get; } = 6;
     /// <summary>How many times faster the player moves with Shift held.</summary>
     public float SprintSpeed { get; } = 1.6f;
     /// <summary>Tiles a second the player moves, walking or sprinting.</summary>
@@ -154,7 +160,7 @@ public sealed partial class GameData {
         return data;
     }
     private void Validate() {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || WolfSpawnSeconds <= 0 || WolfSpawnSecondsTorch <= 0 || WolfSpawnPastSight < 0 || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
             throw new InvalidOperationException("Invalid time or economy balance in GameData.");
         foreach (var building in Buildings) {
             foreach (var cost in building.Value.Cost)
