@@ -1107,12 +1107,9 @@ public sealed partial class World {
         foreach (var t in S.Things.Of(ThingKind.Signpost)) if (t.Wages != null) amount -= t.Wages.Remove(Inventory.Coins, amount);
         return Pay(amount);
     }
-    /// <summary>The village only takes packed crates holding nothing but goods it buys.</summary>
-    public bool CanSell(string item) {
-        if (Packed(item) is not { Count: > 0 } contents) return false;
-        foreach (var pair in contents.Items) if (!Data.Market.Sells.ContainsKey(pair.Key)) return false;
-        return true;
-    }
+    /// <summary>The village takes any packed crate that holds something; goods it does not buy go as donations.</summary>
+    public bool CanSell(string item) => Packed(item) is { Count: > 0 };
+    private bool VillageBuys(string item) => Data.Market.Sells.ContainsKey(item);
     /// <summary>The sale price as last reported from the village; it goes stale until someone arrives with news.</summary>
     public float KnownPrice(string item) => S.Prices.TryGetValue(item, out float price) ? price : Data.Items[item].Price;
     public int PriceAge => Day - (int)(S.PricesTime / Data.DaySeconds) - 1;
@@ -1125,7 +1122,7 @@ public sealed partial class World {
         if (CartBlock(sign) is string blocked) { Say(blocked); return false; }
         if (Forwarded(Verb.Sell, sign.Id)) return true;
         if (Ship(sign)) return true;
-        Say(sign.Inventory.Count > 0 ? "The village only takes crates packed with goods it buys." : "Put a packed crate in the market first."); return false;
+        Say(sign.Inventory.Count > 0 ? "The village only takes packed crates." : "Put a packed crate in the market first."); return false;
     }
     /// <summary>Sends the cart once every market slot holds a crate, for a post set to sell on its own.</summary>
     private void AutoSell(Thing sign) {
@@ -1147,6 +1144,7 @@ public sealed partial class World {
         // The crates go with the goods.
         float price = crates.Count * Data.Items["crate"].Price;
         foreach (var (item, quantity) in goods) {
+            if (!VillageBuys(item)) continue;
             // A sale lowers demand unit by unit, so a bulk sale is not paid entirely at the pre-sale price.
             float demand = Demand(item);
             for (int i = 0; i < quantity; i++) { price += Data.Items[item].Price * Math.Min(1, demand); demand = Math.Max(.25f, demand - DemandStep(item)); }
@@ -1154,9 +1152,9 @@ public sealed partial class World {
         }
         // Coins are whole: sales round down and purchases round up, so a round trip never profits.
         S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count });
-        Say($"Goods sold: {string.Join(", ", goods.Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;
+        Say($"Goods sent: {string.Join(", ", goods.Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;
     }
-    private string Goods(IReadOnlyDictionary<string, int> goods) => string.Join(", ", goods.Select(p => $"{p.Value} {Data.Name(p.Key)}"));
+    private string Goods(IEnumerable<KeyValuePair<string, int>> goods) => string.Join(", ", goods.Select(p => $"{p.Value} {Data.Name(p.Key)}"));
     /// <summary>Orders <paramref name="lots"/> purchases of a good the village sells: tools one by one, the rest in crates.</summary>
     public bool Buy(Thing sign, string item, int lots) {
         if (!Data.Market.Buys.ContainsKey(item) || lots <= 0) return false;
@@ -1419,7 +1417,7 @@ public sealed partial class World {
         HoldRefusal.CompostOnly => "The compost takes leaves, grass and food.",
         HoldRefusal.OtherResource => $"This pile holds {Data.Name(HeldOtherThan(t.Inventory, item)!)}. Empty it to store something else.",
         HoldRefusal.PackerOnly => t.Packs == "" ? "Choose what to pack first." : $"The packing station takes {Data.Name(t.Packs).ToLowerInvariant()} and empty crates.",
-        HoldRefusal.SellOnly => "The village only takes crates packed with goods it buys.",
+        HoldRefusal.SellOnly => "The village only takes packed crates.",
         HoldRefusal.FarmOnly => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}.",
         _ => null
     };
@@ -1940,13 +1938,18 @@ public sealed partial class World {
             delivery.Inventory.Slots = overflow / delivery.Inventory.StackOf(item) + 1;
             delivery.Inventory.Add(item, overflow);
         }
-        if (!order.Buying) S.Milestones.Add("sold");
-        if (!order.Buying && order.Goods.Keys.Any(id => id.StartsWith("steel_") && Data.Items[id].Tool != "")) S.Milestones.Add("sold_steel");
+        if (!order.Buying) {
+            var bought = order.Goods.Keys.Where(VillageBuys).ToList();
+            if (bought.Count > 0) S.Milestones.Add("sold");
+            if (bought.Any(id => id.StartsWith("steel_") && Data.Items[id].Tool != "")) S.Milestones.Add("sold_steel");
+        }
         if (order.Buying && order.Goods.Keys.Any(id => Data.Items[id].Tool == "pickaxe")) S.Milestones.Add("pick");
         // Played at the player, not the signpost, so a payment is heard wherever the player is.
         if (!order.Buying) { Play("payment_from_village_arrives", Player); S.DayRevenue += (int)order.Value; }
         S.Orders.Remove(order); UpdatePrices();
-        Say(order.Buying ? $"Cart returned with {Goods(order.Goods)}." : $"Cart returned with {(int)order.Value} coins.");
+        if (order.Buying) { Say($"Cart returned with {Goods(order.Goods)}."); return; }
+        var donated = order.Goods.Where(p => !VillageBuys(p.Key)).ToList();
+        Say($"Cart returned with {(int)order.Value} coins.{(donated.Count > 0 ? $" Donated {Goods(donated)}." : "")}");
     }
     /// <summary>
     /// Advances the world. It runs as the world's own player, whoever's action started it, such as a guest's sleep:

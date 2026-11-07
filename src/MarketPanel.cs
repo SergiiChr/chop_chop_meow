@@ -57,7 +57,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
         var mail = new HBoxContainer(); mail.AddThemeConstantOverride("separation", 14); inbound.AddChild(mail);
         var glyph = Style.Glyph("line_mail", 30, Style.Ink); glyph.MouseFilter = Control.MouseFilterEnum.Pass; glyph.TooltipText = "Mailbox: what the cart brought back · click to take"; mail.AddChild(glyph);
         mail.AddChild(NewInventoryGrid(() => output, thing, id => moves.Stack(output, world.S.Backpack, id, thing), "Click or drag: take", _ => false, columns: 5));
-        BagGrid(id => { if (world.CanSell(id)) moves.Stack(world.S.Backpack, thing.Inventory, id, thing); else kit.Notify("Pack goods the village buys in a crate to sell them."); }, "Click: put a packed crate on the cart · Drag onto a box", wanted: world.CanSell);
+        BagGrid(id => { if (world.CanSell(id)) moves.Stack(world.S.Backpack, thing.Inventory, id, thing); else kit.Notify("Pack goods in a crate to send them to the village."); }, "Click: put a packed crate on the cart · Drag onto a box", wanted: world.CanSell);
     }
 
     /// <summary>What the crates waiting at the post would fetch at the last known prices.</summary>

@@ -624,7 +624,9 @@ Prices, wages and demand follow the rules in [ECONOMY.md](ECONOMY.md).
 
 #### Market
 
-The market only accepts packed crates of the goods in `Market.Sells`.
+The market accepts any packed crate.
+Goods outside `Market.Sells` are donated: they pay nothing and leave demand alone.
+The returning cart names them.
 A sale pays for the contents unit by unit plus the crate.
 
 `market.buys` lists what the village sells and in what lot, as the [README price sheet](../README.md#price-sheet) shows.
