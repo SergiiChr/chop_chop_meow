@@ -30,8 +30,19 @@ Terrain collision does not drive walking, building placement or other simulation
 The simulation owns the level floor and mountain checks.
 There are no walkable hills, sculpting UI or digging.
 
+The ground keeps the project's own meadow, stone and path colours and takes grain and bump from three photoscan sets in
+`textures/`, each an albedo PNG with the height in its alpha and an OpenGL normal PNG with the roughness in its alpha,
+the way Terrain3D reads them: grass (id 0) on flat ground, rock (id 1) on slopes through Terrain3D's auto shader, and
+dirt (id 2) where the ground is worn.
+Each photoscan's brightness around its mean modulates the palette at partial strength, so the colours stay and the detail shows.
+A grass or dirt tile spans 4 world units and a rock tile 6, with a little detiling rotation and shift.
+`tools/ground_textures.py` packs them from the pinned ambientCG archives; the `.import` files keep the alpha channels
+(VRAM compressed, high quality, no normal-map compression, no alpha border fix).
+
 The shader insertion in `Terrain3DView` keeps the pinned generated Terrain3D shader core.
-It adds the project meadow/rock palette, exploration fog, and fragment clipping for the five mine openings so their separately modeled rock shells stay open.
+It adds the meadow and stone palette with lusher and drier patches, the photoscan grain over it, the dirt blended into
+worn ground and footpaths by its height, baked shade, and fragment clipping for the five mine openings so their
+separately modeled rock shells stay open.
 
 The first Godot 4.7.2 editor import after installing the runtime can exit with signal 11 during editor shutdown.
 Setup keeps that log and retries once, only when editor initialization completed and Godot reported no engine errors.
