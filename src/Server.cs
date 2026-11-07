@@ -53,6 +53,7 @@ public partial class Server : Node {
         using var probe = new PacketPeerUdp();
         bool free = probe.Bind(port) == Error.Ok;
         probe.Close();
+        if (!free) Net.Log($"Server: port {port} is taken, trying the next.");
         return free;
     }
 
@@ -67,12 +68,12 @@ public partial class Server : Node {
     }
 
     /// <summary>The game's own arguments for a server process: the save slot to load or -1 for a new world, the owner's key and the file to give its port in.</summary>
-    public static string[] Arguments(int slot, string owner, string portFile) => ["--server", "--slot", $"{slot}", "--owner", owner, "--port-file", portFile, "--file-prefix", Launch.FilePrefix, .. Launch.Has("--performance-run") ? new[] { PerformanceFlag } : []];
+    public static string[] Arguments(int slot, string owner, string portFile) => ["--server", "--slot", $"{slot}", "--owner", owner, "--port-file", portFile, "--file-prefix", Launch.FilePrefix, .. Launch.Has("--performance-run") ? new[] { PerformanceFlag } : [], .. Net.Logging ? new[] { Net.DebugFlag } : []];
 
     public override void _Process(double delta) {
         float dt = Math.Min((float)delta, .1f);
         if (World.Players.Count == 0) {
-            if ((lonely += dt) >= LonelySeconds) End();
+            if ((lonely += dt) >= LonelySeconds && !ended) { Net.Log($"Server: nobody has been in the game for {LonelySeconds:0} seconds, which ends it."); End(); }
             return;
         }
         lonely = 0;

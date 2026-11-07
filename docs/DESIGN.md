@@ -176,6 +176,7 @@ Every game runs on a `Server`, alone or together, which owns the only simulation
 The window that starts a game runs it as a headless child process of the same executable (`--server`).
 The server takes the first free port from 24565 itself when it starts serving, since a port a window picked could be gone by the time the server came up, and writes it to a file named for the window's process.
 A server process logs to `user://logs/server.log`: sharing the window's log, each start would rotate the window's older logs out of the folder.
+With `--debug`, which a window passes on to its server, `Net.Log` prints connecting, joining, refusals and leaving on both ends, and the network and server checks run with it.
 The window joins it over localhost like any guest, showing a starting screen until it does.
 `Session` says where a window stands with the game it started: starting it, playing it, away from it to join another, or going back to it.
 The UI and network checks run the server inside the window, under a branch with its own `SceneMultiplayer`, so they can set its world up directly; the UI checks pump the line themselves (`Game.Settle`) rather than wait for it.
