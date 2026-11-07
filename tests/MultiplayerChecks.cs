@@ -339,17 +339,13 @@ public static class MultiplayerChecks {
         var far = Enumerable.Range(0, 63).Select(i => Terrain.Spawn + Vector2.Right.Rotated(i * .1f) * 35).First(world.CanStand);
         world.As(guest, () => world.MoveTo(far));
         RunUntilNight(world);
-        world.Tick(.25f);
-        Require(world.Wolves.Count > 0 && world.Wolves.All(w => world.Players.All(p => p.Pos.DistanceTo(w.Pos) > data.SightRadius - 1)),
-                "wolves should come out beyond every player's sight, never on screen");
-        // A wolf only keeps out of the other players' sight, but comes out WolfSpawnPastSight tiles past its own player's.
-        Require(world.Wolves.All(w => world.Players.Single(p => p.Id == w.Target).Pos.DistanceTo(w.Pos) > data.SightRadius + data.WolfSpawnPastSight - 2),
-                "wolves should come out well beyond the sight of the player they hunt");
+        ShutDens(world);
+        // A patrolling wolf near each player smells the nearer one.
+        Vector2 Near(Vector2 at, Vector2 other) => Enumerable.Range(0, 63).Select(i => at + Vector2.Right.Rotated(i * .1f) * 10).First(p => world.CanStand(p) && p.DistanceTo(other) > 30);
+        var hostWolf = new Wolf { Pos = Near(world.Player, guest.Pos) }; var guestWolf = new Wolf { Pos = Near(guest.Pos, world.Player) };
+        PatrolWolf(world, hostWolf); PatrolWolf(world, guestWolf);
         for (int i = 0; i < 3; i++) { world.Tick(.25f); SetNeeds(world, health: 100); SetNeeds(guest, health: 100); }
-        var hostPack = world.Wolves.Where(w => w.Target == world.Me.Id).ToList();
-        var guestPack = world.Wolves.Where(w => w.Target == GuestId).ToList();
-        Require(hostPack.Count > 0 && guestPack.Count > 0, "each player out at night should draw their own wolves");
-        Require(guestPack.All(w => w.Pos.DistanceTo(guest.Pos) < data.SightRadius + data.WolfSpawnPastSight + 6) && hostPack.All(w => w.Pos.DistanceTo(world.Player) < data.SightRadius + data.WolfSpawnPastSight + 6), "wolves should come out near the player they hunt");
+        Require(hostWolf.Target == world.Me.Id && guestWolf.Target == GuestId, "each player out at night should draw the wolves that smell them");
 
         Give(guest, "stone", 2); SetNeeds(guest, health: -1);
         world.Tick(.25f);

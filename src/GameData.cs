@@ -110,12 +110,20 @@ public sealed partial class GameData {
     public float WalkSpeed { get; } = 4.2f;
     /// <summary>How many times faster than walking a wolf chases: above 1 so walking never outpaces it, below <see cref="SprintSpeed"/> so sprinting does.</summary>
     public float WolfChase { get; } = 1.5f;
-    /// <summary>Seconds between wolves coming out for a player from dusk, while the pack is not full.</summary>
-    public float WolfSpawnSeconds { get; } = 30;
-    /// <summary>Seconds between wolves while the player's torch burns; a torch draws a bigger pack, but slowly.</summary>
-    public float WolfSpawnSecondsTorch { get; } = 40;
-    /// <summary>Tiles past <see cref="SightRadius"/> where a wolf comes out, so it has a way to walk before anyone sees it.</summary>
-    public float WolfSpawnPastSight { get; } = 6;
+    /// <summary>Wolves that come out of each den at dusk.</summary>
+    public int WolvesPerDen { get; } = 2;
+    /// <summary>Metres within which a wolf smells a player out in the open; it howls and goes after them.</summary>
+    public float SmellRadius { get; } = 30;
+    /// <summary>Metres within which a wolf closing in on a player outside firelight sees them and breaks into a sprint.</summary>
+    public float WolfSightRange { get; } = 12;
+    /// <summary>Metres a howl carries; patrolling wolves within it run to the howl.</summary>
+    public float HowlRadius { get; } = 80;
+    /// <summary>Seconds a wolf stands howling before it goes after the player it smelled.</summary>
+    public float HowlSeconds { get; } = 2.5f;
+    /// <summary>Hours before dawn when every wolf gives up and heads back to its den.</summary>
+    public float WolfRetreatHours { get; } = 1;
+    /// <summary>Day phase when the wolves head home.</summary>
+    public float WolfRetreatStarts => 1 - WolfRetreatHours / 24;
     /// <summary>How many times faster the player moves with Shift held.</summary>
     public float SprintSpeed { get; } = 1.6f;
     /// <summary>Tiles a second the player moves, walking or sprinting.</summary>
@@ -160,7 +168,7 @@ public sealed partial class GameData {
         return data;
     }
     private void Validate() {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || WolfSpawnSeconds <= 0 || WolfSpawnSecondsTorch <= 0 || WolfSpawnPastSight < 0 || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || WolvesPerDen < 1 || WolfSightRange <= 0 || WolfSightRange >= SmellRadius || HowlRadius <= 0 || HowlSeconds <= 0 || WolfRetreatStarts <= NightStarts || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
             throw new InvalidOperationException("Invalid time or economy balance in GameData.");
         foreach (var building in Buildings) {
             foreach (var cost in building.Value.Cost)

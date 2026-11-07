@@ -20,8 +20,10 @@ public sealed partial class World {
         foreach (var c in Cliffs) if (c.DistanceTo(p) < nearest.DistanceTo(p)) nearest = c;
         return nearest;
     }
+    /// <summary>How far out from its cliff's spine a mine's spot stands.</summary>
+    public const float MineOut = 4.2f;
     /// <summary>The cart's spot, outward from the cliff center, with the portal projecting from the mountain foot.</summary>
-    public static Vector2 MineSpot(Cliff c) => c.Center + c.Face * 4.2f;
+    public static Vector2 MineSpot(Cliff c) => c.Center + c.Face * MineOut;
     /// <summary>Whether a point lies within the solid rock skin; the tunnel approach at depth -1.4 stays open.</summary>
     private static bool InSpur(Vector2 p, float margin = 0) {
         foreach (var c in Cliffs) {

@@ -4,7 +4,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>What a wolf model shows; a change blends from the pose it had into the new one.</summary>
-public enum WolfMotion { Stand, Walk, Trot, Gallop, Leap, Feed, Pin, Recoil, Fall }
+public enum WolfMotion { Stand, Walk, Trot, Gallop, Leap, Feed, Pin, Recoil, Fall, Howl }
 
 /// <summary>
 /// A leg's joint angles in degrees, each swinging the segment below forward from its parent's line; Splay swings the whole leg out from the body.
@@ -182,6 +182,18 @@ public sealed class WolfModel {
                 Head: -6 + breath, HeadTurn: look * 10, HeadTilt: look * 4, Jaw: 2 + 2 * Math.Max(0, MathF.Sin(time * 7)), Ears: 4 + 6 * Math.Max(0, MathF.Sin(time * .9f + 1)),
                 Tail: -66 + 3 * MathF.Sin(time * .8f), Wag: 8 * MathF.Sin(time * 1.1f), Curl: 8 + 4 * MathF.Sin(time * 1.1f + .8f));
         return Planted(body, wary ? 1.15f : 1, settle * .015f);
+    }
+
+    /// <summary>
+    /// Howling: the wolf braces on all four paws, lifts its chest and throws its head back with the muzzle to the sky, the jaw opening as the note swells and closing as it fades.
+    /// <paramref name="progress"/> runs 0 to 1 over the howl.
+    /// </summary>
+    public void Howl(float progress, float dt) {
+        float p = Math.Clamp(progress, 0, 1), up = Mathf.SmoothStep(0, .2f, p) * (1 - Mathf.SmoothStep(.85f, 1, p));
+        float note = MathF.Sin(MathF.PI * Math.Clamp((p - .12f) / .76f, 0, 1));
+        var body = new WolfPose(Lift: .02f * up, Pitch: -12 * up, Neck: 6 - 50 * up, Head: -6 - 40 * up, HeadTilt: 3 * note, Jaw: 2 + 22 * note * up,
+            Ears: 14 * up, Tail: -66 - 10 * up, Curl: 8 - 6 * up);
+        Show(WolfMotion.Howl, Planted(body, 1.05f, .04f * up), dt);
     }
 
     /// <summary>All four paws flat on the ground at home, spread by <paramref name="spread"/>; <paramref name="shift"/> moves the hind paws forward.</summary>
