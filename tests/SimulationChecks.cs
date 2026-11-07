@@ -102,6 +102,7 @@ public static class SimulationChecks {
         Test(CheckWorkerFinishesHarvestHaulsCropAndSowsAgain, data);
         Test(CheckFoodsFeedWaterAndHealByTheirData, data);
         Test(CheckMarketTakesCratesAndDonations, data);
+        Test(CheckDonationIsNoSale, data);
         Test(CheckOlderSavesResetMadeToolAnvilsAndStartWaterGoal, data);
         Test(CheckStationQueueAndMarkSurviveALoad, data);
         Test(CheckLoadedSaveDropsOldStageNumber, data);
@@ -2001,6 +2002,17 @@ public static class SimulationChecks {
         Require(f.Inventory["burnt_steak"] == 2, "cooked meat in an older save's furnace should become burnt steak");
     }
 
+    private static void CheckDonationIsNoSale(GameData data) {
+        var world = EmptyWorld(data);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
+        world.Player = sign.Pos;
+        // A steel chisel is a steel tool, so only the village not buying it keeps this from counting as selling steel.
+        world.Transfer(world.Backpack, sign.Inventory, PackCrate(world, ("steel_chisel", 1)), 1);
+        Require(world.Sell(sign), "a cart should take a crate of goods the village does not buy");
+        SafeTick(world, data.TradeSeconds + .1f);
+        Require(world.Orders.Count == 0 && !world.Reached("sold") && !world.Reached("sold_steel"), "a donation should not count as a sale");
+    }
+
     private static void CheckMarketTakesCratesAndDonations(GameData data) {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
@@ -2022,7 +2034,7 @@ public static class SimulationChecks {
         // Donated goods ride along for nothing: the crate alone is paid for.
         world.Transfer(world.Backpack, sign.Inventory, chisel, 1);
         Require(world.Sell(sign), "a cart should take a crate of goods the village does not buy");
-        Require(world.Orders.Last().Value == MathF.Floor(data.Items["crate"].Price), "donated goods should pay nothing beyond the crate");
+        Require(world.Orders.Last().Value == 3, "donated goods should pay nothing beyond the crate");
         var said = new List<string>(); world.Notify = said.Add;
         SafeTick(world, data.TradeSeconds + .1f);
         Require(said.Any(m => m.EndsWith("Donated 1 Steel chisel.")), "the returning cart should say what was donated");

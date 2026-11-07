@@ -1109,7 +1109,7 @@ public sealed partial class World {
     }
     /// <summary>The village takes any packed crate that holds something; goods it does not buy go as donations.</summary>
     public bool CanSell(string item) => Packed(item) is { Count: > 0 };
-    private bool Donated(string item) => !Data.Market.Sells.ContainsKey(item);
+    private bool VillageBuys(string item) => Data.Market.Sells.ContainsKey(item);
     /// <summary>The sale price as last reported from the village; it goes stale until someone arrives with news.</summary>
     public float KnownPrice(string item) => S.Prices.TryGetValue(item, out float price) ? price : Data.Items[item].Price;
     public int PriceAge => Day - (int)(S.PricesTime / Data.DaySeconds) - 1;
@@ -1144,7 +1144,7 @@ public sealed partial class World {
         // The crates go with the goods.
         float price = crates.Count * Data.Items["crate"].Price;
         foreach (var (item, quantity) in goods) {
-            if (Donated(item)) continue;
+            if (!VillageBuys(item)) continue;
             // A sale lowers demand unit by unit, so a bulk sale is not paid entirely at the pre-sale price.
             float demand = Demand(item);
             for (int i = 0; i < quantity; i++) { price += Data.Items[item].Price * Math.Min(1, demand); demand = Math.Max(.25f, demand - DemandStep(item)); }
@@ -1938,14 +1938,17 @@ public sealed partial class World {
             delivery.Inventory.Slots = overflow / delivery.Inventory.StackOf(item) + 1;
             delivery.Inventory.Add(item, overflow);
         }
-        if (!order.Buying && order.Goods.Keys.Any(id => !Donated(id))) S.Milestones.Add("sold");
-        if (!order.Buying && order.Goods.Keys.Any(id => !Donated(id) && id.StartsWith("steel_") && Data.Items[id].Tool != "")) S.Milestones.Add("sold_steel");
+        if (!order.Buying) {
+            var bought = order.Goods.Keys.Where(VillageBuys).ToList();
+            if (bought.Count > 0) S.Milestones.Add("sold");
+            if (bought.Any(id => id.StartsWith("steel_") && Data.Items[id].Tool != "")) S.Milestones.Add("sold_steel");
+        }
         if (order.Buying && order.Goods.Keys.Any(id => Data.Items[id].Tool == "pickaxe")) S.Milestones.Add("pick");
         // Played at the player, not the signpost, so a payment is heard wherever the player is.
         if (!order.Buying) { Play("payment_from_village_arrives", Player); S.DayRevenue += (int)order.Value; }
         S.Orders.Remove(order); UpdatePrices();
         if (order.Buying) { Say($"Cart returned with {Goods(order.Goods)}."); return; }
-        var donated = order.Goods.Where(p => Donated(p.Key)).ToList();
+        var donated = order.Goods.Where(p => !VillageBuys(p.Key)).ToList();
         Say($"Cart returned with {(int)order.Value} coins.{(donated.Count > 0 ? $" Donated {Goods(donated)}." : "")}");
     }
     /// <summary>

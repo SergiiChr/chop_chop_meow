@@ -435,12 +435,14 @@ The trading post has three icon buttons: Market, Workers and the price sheet.
 ### Market
 
 The market works like a station with six unlabeled input boxes and six output boxes.
-It only takes packed crates. The village pays for:
+It only takes packed crates.
+The village pays for:
 
 - raw meat, burnt steak, berries, bread, berry jam, meat stew, canned jam, canned meat stew;
 - steel axes, pickaxes and hammers.
 
-Anything else in a crate goes as a donation: the cart takes it, pays nothing for it, and says what was donated when it returns.
+Anything else in a crate goes as a donation: the cart takes it and pays nothing for it.
+The returning cart says what was donated.
 A sale pays for the goods and the crate.
 Load crates, press Sell, and a cart takes them to Bramblewick and returns 30 seconds later with the coins.
 Bought goods also arrive in the output boxes.
