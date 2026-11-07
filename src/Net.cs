@@ -204,7 +204,8 @@ public partial class Net : Node {
         var timer = GetTree().CreateTimer(ConnectTimeout); connectTimer = timer;
         timer.Timeout += () => {
             if (timer != connectTimer || !Connecting) return;
-            Log($"Nothing at {ip}:{port} answered over UDP: no game is served there, or a firewall or router drops the packets.");
+            // A dropped guest's tries most likely meet a host that is restarting or loading, not a blocked port.
+            if (!Retrying) Log($"Nothing at {ip}:{port} answered over UDP: no game is served there, or a firewall or router drops the packets.");
             Fail($"The host didn't answer within {ConnectTimeout:0} seconds.");
         };
         return Error.Ok;
@@ -232,7 +233,7 @@ public partial class Net : Node {
             farewell = false; RpcId(ServerId, MethodName.Bye, comingBack);
             // The owner's server closes instead of answering, unless they are coming back, so the line going tells that window it is done.
             for (ulong until = Time.GetTicksMsec() + FarewellMsec; !farewell && Multiplayer.MultiplayerPeer.GetConnectionStatus() == MultiplayerPeer.ConnectionStatus.Connected && Time.GetTicksMsec() < until; OS.DelayMsec(5)) Multiplayer.Poll();
-            if (farewell || !Owning) Log(farewell ? "The server confirmed the goodbye." : "Left without the server confirming the goodbye.");
+            if (farewell || !Owning || comingBack) Log(farewell ? "The server confirmed the goodbye." : "Left without the server confirming the goodbye.");
         }
         if (Online) { Log(Hosting ? "Server: closed." : "Closed the line to the server."); Multiplayer.MultiplayerPeer.Close(); }
         Multiplayer.MultiplayerPeer = new OfflineMultiplayerPeer(); Hosting = false;
@@ -253,7 +254,7 @@ public partial class Net : Node {
         OwnerLeft?.Invoke();
     }
 
-    private void Fail(string reason) { Log($"Join failed: {reason}"); Disconnect(); Failed?.Invoke(reason); }
+    private void Fail(string reason) { Log(Retrying ? $"A try to get back in failed: {reason}" : $"Join failed: {reason}"); Disconnect(); Failed?.Invoke(reason); }
 
     private void End(string reason) { Log($"Left the game: {reason}"); Leave(); Left?.Invoke(reason); }
 

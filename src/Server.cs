@@ -53,7 +53,7 @@ public partial class Server : Node {
         using var probe = new PacketPeerUdp();
         bool free = probe.Bind(port) == Error.Ok;
         probe.Close();
-        if (!free) Net.Log($"Server: port {port} is taken, trying the next.");
+        if (!free) Net.Log($"Server: port {port} is taken.");
         return free;
     }
 
