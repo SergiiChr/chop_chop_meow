@@ -43,6 +43,8 @@ public partial class Sounds : Node {
         ["start_fire"] = -9,
         ["payment_from_village_arrives"] = -6,
         ["wolf_growl_distance"] = -11,
+        ["wolf_howl"] = -11,
+        ["wolf_howl_group"] = -11,
         ["wolf_growl_approaching"] = -3,
         ["wolf_bite"] = -3,
     };

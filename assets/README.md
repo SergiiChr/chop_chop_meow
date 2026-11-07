@@ -178,6 +178,8 @@ Variants of one sound are matched in loudness, and a numbered suffix marks them.
 - A pickaxe strike is an anvil clink pitched down over the rock footstep and a low axe knock.
 - A bellows pump is shaped brown noise over a soft, muffled fire catch.
 
+`wolf_howl` (a lone wolf, the night's first howl) and `wolf_howl_group` (the pack answering) were supplied for this project.
+
 Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com)).
 
 ## Provenance

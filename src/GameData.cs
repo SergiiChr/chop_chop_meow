@@ -115,7 +115,7 @@ public sealed partial class GameData {
     /// <summary>Metres within which a wolf smells a player out in the open; it howls and goes after them.</summary>
     public float SmellRadius { get; } = 30;
     /// <summary>Metres within which a wolf closing in on a player outside firelight sees them and breaks into a sprint.</summary>
-    public float WolfSightRange { get; } = 12;
+    public float WolfSightRange { get; } = 15;
     /// <summary>Metres a howl carries; patrolling wolves within it run to the howl.</summary>
     public float HowlRadius { get; } = 80;
     /// <summary>Seconds a wolf stands howling before it goes after the player it smelled.</summary>

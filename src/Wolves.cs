@@ -94,8 +94,9 @@ public sealed partial class World {
             if (p.RespawnIn <= 0 && p.Sheltered == 0 && p.Pos.DistanceTo(wolf.Pos) <= Data.SmellRadius && (prey == null || p.Pos.DistanceTo(wolf.Pos) < prey.Pos.DistanceTo(wolf.Pos))) prey = p;
         if (prey == null) return;
         wolf.Target = prey.Id; wolf.Mode = WolfMode.Patrol; wolf.Howl = Data.HowlSeconds; wolf.Route.Clear();
-        // The distant growl stands in until the game has a howl recording.
-        Play("wolf_growl_distance", wolf.Pos);
+        // The night's first howl is a lone wolf; every later one sounds like the pack answering.
+        Play(S.Howled ? "wolf_howl_group" : "wolf_howl", wolf.Pos);
+        S.Howled = true;
         foreach (var other in S.Wolves)
             if (other.Target == 0 && other.Mode != WolfMode.Home && other.Pos.DistanceTo(wolf.Pos) <= Data.HowlRadius) { other.Mode = WolfMode.Called; other.Call = wolf.Pos; other.Route.Clear(); }
     }

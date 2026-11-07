@@ -243,6 +243,8 @@ public sealed class SaveState {
     public List<Wolf> Wolves { get; set; } = new();
     /// <summary>One bit for each of <see cref="World.Dens"/> whose wolves are out tonight.</summary>
     public int DensOut { get; set; }
+    /// <summary>A wolf has howled tonight.</summary>
+    public bool Howled { get; set; }
     [JsonIgnore] public Inventory Backpack { get => Actor.Backpack; set => Actor.Backpack = value; }
     public Dictionary<string, float> Demand { get; set; } = new();
     /// <summary>Sale prices as last reported by someone arriving from the village, and when that was.</summary>
@@ -2050,7 +2052,7 @@ public sealed partial class World {
                 if (CanStand(b.Pos - push)) b.Pos -= push;
             }
         }
-        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; } else if (!sleeping) TickDens(dt);
+        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.Howled = false; } else if (!sleeping) TickDens(dt);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
             using (ActAs(p)) {
