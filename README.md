@@ -48,7 +48,6 @@ Play accepts Godot arguments after `--`:
 
 | Option | Effect |
 | --- | --- |
-| `--debug` | Print network events, also from the game's server, to the terminal; `./build.py play --debug` passes it |
 | `--showcase` | Load a populated review fixture instead of a fresh game |
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
@@ -592,8 +591,8 @@ Leaving your own game, by quitting, loading or joining another, ends it for ever
 If joining another game fails or you cancel it, you go back to your own game, which waits on its server for 30 seconds. It is autosaved just before you try.
 A second window on the same computer cannot join a game the first is playing in.
 
-To find out why a join fails, start the game with `./build.py play --debug` on both computers.
-The terminal then shows each step: the guest reaching the address, the server hearing it, and why it refuses or welcomes it.
+To find out why a join fails, look at the terminal the game runs in on both computers, or the `logs` folder beside the [saves](#saves).
+They show each step of joining: the guest reaching the address, the server hearing it, and why it refuses or welcomes it.
 No line saying the guest reached the address means nothing answered on that address and UDP port.
 
 ### Players in the save

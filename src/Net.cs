@@ -54,9 +54,6 @@ public partial class Net : Node {
     private const int FarewellMsec = 2000;
     // Updates and the steady streams go on their own channels: unreliable messages wait behind a lost reliable one on the same channel.
     private const int StreamChannel = 1, BulkChannel = 2;
-    /// <summary>Launched with this, joining, hosting and leaving print what happens on the line, for finding out why a join fails.</summary>
-    public const string DebugFlag = "--debug";
-    public static readonly bool Logging = Launch.Has(DebugFlag);
 
     public World World = null!;
     /// <summary>The key this machine joins with, which the server's world stores its player under.</summary>
@@ -169,8 +166,8 @@ public partial class Net : Node {
         };
     }
 
-    /// <summary>Prints a line about the connection when launched with <see cref="DebugFlag"/>, stamped with the clock time so the window's and server's lines line up.</summary>
-    public static void Log(string message) { if (Logging) GD.Print($"NET {DateTime.Now:HH:mm:ss.fff}: {message}"); }
+    /// <summary>Prints a line about joining, hosting or leaving, stamped with the clock time so the window's and server's lines line up.</summary>
+    public static void Log(string message) => GD.Print($"NET {DateTime.Now:HH:mm:ss.fff}: {message}");
 
     /// <summary>The start of a machine key, enough to tell machines apart in the log.</summary>
     private static string Short(string key) => key.Length > 8 ? key[..8] : key;

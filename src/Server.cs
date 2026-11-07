@@ -68,7 +68,7 @@ public partial class Server : Node {
     }
 
     /// <summary>The game's own arguments for a server process: the save slot to load or -1 for a new world, the owner's key and the file to give its port in.</summary>
-    public static string[] Arguments(int slot, string owner, string portFile) => ["--server", "--slot", $"{slot}", "--owner", owner, "--port-file", portFile, "--file-prefix", Launch.FilePrefix, .. Launch.Has("--performance-run") ? new[] { PerformanceFlag } : [], .. Net.Logging ? new[] { Net.DebugFlag } : []];
+    public static string[] Arguments(int slot, string owner, string portFile) => ["--server", "--slot", $"{slot}", "--owner", owner, "--port-file", portFile, "--file-prefix", Launch.FilePrefix, .. Launch.Has("--performance-run") ? new[] { PerformanceFlag } : []];
 
     public override void _Process(double delta) {
         float dt = Math.Min((float)delta, .1f);

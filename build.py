@@ -380,11 +380,7 @@ def test_network(env: dict[str, str], deadline: float) -> None:
     # The host and guest of the network check talk to each other, so both run at once.
     # The guest joins through a relay that adds lag and packet loss.
     stop = threading.Event()
-    # Their network log shows in build/net-*.log when a check fails.
-    roles = {
-        "host": ["host", "--debug"],
-        "guest": ["guest", "--port", str(LAG_PORT), "--debug"],
-    }
+    roles = {"host": ["host"], "guest": ["guest", "--port", str(LAG_PORT)]}
     with ThreadPoolExecutor() as pool:
         relay = pool.submit(lag_proxy, stop)
         checks = [
@@ -409,7 +405,7 @@ def test_network(env: dict[str, str], deadline: float) -> None:
 def test_server(env: dict[str, str], deadline: float) -> None:
     run_godot(
         "server-test",
-        [GODOT, "--headless", "--path", ROOT, "--", "--server-check", "--debug"],
+        [GODOT, "--headless", "--path", ROOT, "--", "--server-check"],
         env,
         timeout=deadline - time.monotonic(),
         success_marker="SERVER-TEST PASS",
@@ -553,13 +549,7 @@ def build_parser() -> argparse.ArgumentParser:
     for name, text in helps.items():
         subparser = commands.add_parser(name, help=text, description=text)
         if name == "play":
-            subparser.usage = "build.py play [-h] [--debug] [-- GAME_ARGS ...]"
-            # Godot's own --debug starts its terminal debugger, so the game's goes after --.
-            subparser.add_argument(
-                "--debug",
-                action="store_true",
-                help="print network events from the game and its server",
-            )
+            subparser.usage = "build.py play [-h] [-- GAME_ARGS ...]"
         if name == "test":
             subparser.add_argument("stage", nargs="?", choices=TEST_STAGES)
     return parser
@@ -582,7 +572,6 @@ def main() -> int:
     env = setup()
     match args.action:
         case "play":
-            game_args += ["--debug"] if args.debug else []
             forwarded = ["--", *game_args] if game_args else []
             os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *forwarded], env)
         case "editor":
