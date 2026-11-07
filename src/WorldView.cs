@@ -134,7 +134,7 @@ public partial class WorldView : Node3D {
         World.Replaced += () => worldReplaced = true;
         camera = new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = BaseSize, Near = 1, Far = 200, Current = true };
         AddChild(camera);
-        // At half energy the sky gives as much light as the flat ambient colour did; the sun's disc stays small so the sun does not light the scene twice.
+        // Half energy puts the sky's light at DayAmbientEnergy; the sun's disc stays small so the sun does not light the scene twice.
         skylight = new ProceduralSkyMaterial { SunAngleMax = 1, SkyEnergyMultiplier = .5f, GroundEnergyMultiplier = .5f };
         environment = new Godot.Environment {
             BackgroundMode = Godot.Environment.BGMode.Color,
@@ -149,7 +149,7 @@ public partial class WorldView : Node3D {
             SsaoEnabled = true,
             SsaoIntensity = 3,
             SsaoLightAffect = .4f,
-            // AgX keeps hues as light brightens and adds contrast of its own, where linear output clipped and flattened.
+            // AgX keeps hues as light brightens and adds contrast of its own.
             TonemapMode = Godot.Environment.ToneMapper.Agx,
             TonemapAgxContrast = 1.25f,
             TonemapExposure = 1.2f,
@@ -1172,8 +1172,9 @@ public partial class WorldView : Node3D {
         sun.LightColor = NoonLight.Lerp(LowSunLight, low).Lerp(MoonLight, night);
         var ambient = DayAmbient.Lerp(LowSunAmbient, low * .6f).Lerp(NightAmbient, night);
         // Sky light from above, and below it that light bounced off the grass.
+        var bounce = ambient * DayGround;
         skylight.SkyTopColor = ambient; skylight.SkyHorizonColor = ambient;
-        skylight.GroundHorizonColor = ambient * DayGround; skylight.GroundBottomColor = ambient * DayGround;
+        skylight.GroundHorizonColor = bounce; skylight.GroundBottomColor = bounce;
         environment.AmbientLightEnergy = Mathf.Lerp(DayAmbientEnergy, Mathf.Lerp(NewMoonAmbient, .3f, moonlight), night);
         environment.BackgroundColor = DayGround.Lerp(NightGround, night);
     }

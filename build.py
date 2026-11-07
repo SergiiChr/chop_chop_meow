@@ -105,6 +105,15 @@ def dotnet_env() -> dict[str, str]:
     return env
 
 
+def isolated_env(home: Path) -> dict[str, str]:
+    """The dotnet environment with Godot's user data under home, so a throwaway project leaves nothing in .tools."""
+    env = dotnet_env()
+    env["XDG_DATA_HOME"] = str(home / "xdg-data")
+    env["XDG_CONFIG_HOME"] = str(home / "xdg-config")
+    env["XDG_CACHE_HOME"] = str(home / "xdg-cache")
+    return env
+
+
 def dotnet_supported(executable: str | Path, env: dict[str, str]) -> bool:
     sdk = subprocess.run(
         [str(executable), "--list-sdks"],

@@ -59,7 +59,6 @@ public partial class WorldView {
                 throw new InvalidOperationException($"Terrain3D region height mismatch at {p}: {actual} instead of {expected}");
         }
 
-        // Grass over the valley floor and rock on steep slopes, blended by the slope; dirt is drawn by the fragment include where the ground is worn.
         // The include keeps the meadow's own colours and takes only grain and bump from these photoscans.
         var assets = ClassDB.Instantiate("Terrain3DAssets").AsGodotObject()!;
         terrain.Set("assets", assets);
@@ -77,10 +76,12 @@ public partial class WorldView {
         }
         var material = terrain.Get("material").AsGodotObject()!;
         material.Set("show_checkered", false);
-        // Enabled before the override is generated, so the generated code blends the two textures by slope: the base covers slopes, the overlay flat ground.
+        // Set before the override is generated, so the generated code blends the base rock into the overlay grass by slope.
         material.Set("auto_shader_enabled", true);
         material.Call("set_shader_param", "auto_base_texture", 1);
         material.Call("set_shader_param", "auto_overlay_texture", 0);
+        // Terrain3D damps the ground's specular where it faces away from this light; without it the shader normalises a zero vector.
+        terrain.Set("light_target", sun);
         material.Call("set_shader_override_enabled", true);
         var shader = material.Get("shader_override").As<Shader>();
         string code = shader.Code;

@@ -77,10 +77,7 @@ def main() -> None:
         (project / "project.godot").write_text(PROJECT_SOURCE, encoding="utf-8")
         (project / "bake_scatter.gd").write_bytes(BAKE_SCRIPT.read_bytes())
 
-        env = build.dotnet_env()
-        env["XDG_DATA_HOME"] = str(Path(temporary) / "xdg-data")
-        env["XDG_CONFIG_HOME"] = str(Path(temporary) / "xdg-config")
-        env["XDG_CACHE_HOME"] = str(Path(temporary) / "xdg-cache")
+        env = build.isolated_env(Path(temporary))
         build.run_godot(
             "scatter-import",
             [build.GODOT, "--headless", "--path", project, "--import"],

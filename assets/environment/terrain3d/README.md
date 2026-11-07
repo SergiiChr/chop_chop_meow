@@ -30,14 +30,18 @@ Terrain collision does not drive walking, building placement or other simulation
 The simulation owns the level floor and mountain checks.
 There are no walkable hills, sculpting UI or digging.
 
-The ground keeps the project's own meadow, stone and path colours and takes grain and bump from three photoscan sets in
-`textures/`, each an albedo PNG with the height in its alpha and an OpenGL normal PNG with the roughness in its alpha,
-the way Terrain3D reads them: grass (id 0) on flat ground, rock (id 1) on slopes through Terrain3D's auto shader, and
-dirt (id 2) where the ground is worn.
-Each photoscan's brightness around its mean modulates the palette at partial strength, so the colours stay and the detail shows.
-A grass or dirt tile spans 4 world units and a rock tile 6, with a little detiling rotation and shift.
-`tools/ground_textures.py` packs them from the pinned ambientCG archives; the `.import` files keep the alpha channels
-(VRAM compressed, high quality, no normal-map compression, no alpha border fix).
+The ground keeps the project's own meadow, stone and path colours and takes grain and bump from three photoscan sets
+in `textures/`, each an albedo PNG with the height in its alpha and an OpenGL normal PNG with the roughness in its
+alpha, the way Terrain3D reads them: grass (id 0) on flat ground, rock (id 1) on slopes through Terrain3D's auto
+shader, and dirt (id 2) where the ground is worn.
+Each photoscan's brightness around its mean modulates the palette at partial strength, so the colours stay and the
+detail shows; `tools/pack_ground.gd` scales every set to one mean linear brightness, which the shader divides the
+grain by.
+A grass or dirt tile spans 4 world units and a rock tile 6; grass and rock get a little detiling rotation and shift
+from Terrain3D, and the dirt, read by the include itself, tiles plainly.
+Roughness, specular and the height-based ambient occlusion come from Terrain3D's own material defaults.
+`tools/ground_textures.py` packs the sets from the pinned ambientCG archives; the `.import` files keep the alpha
+channels (VRAM compressed, high quality, no normal-map compression, no alpha border fix).
 
 The shader insertion in `Terrain3DView` keeps the pinned generated Terrain3D shader core.
 It adds the meadow and stone palette with lusher and drier patches, the photoscan grain over it, the dirt blended into

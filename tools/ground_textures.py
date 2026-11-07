@@ -52,7 +52,8 @@ def main() -> None:
     build.BUILD.mkdir(exist_ok=True)
     CACHE.mkdir(parents=True, exist_ok=True)
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    # Godot ignores projects nested under the repository's .tools/.gdignore, so the packer runs from a temporary project.
+    # Godot ignores projects nested under the repository's .tools/.gdignore, so the packer runs from a temporary
+    # project.
     with tempfile.TemporaryDirectory(prefix="chop-chop-ground-") as temporary:
         source = Path(temporary) / "source"
         source.mkdir()
@@ -68,10 +69,7 @@ def main() -> None:
         project.mkdir()
         (project / "project.godot").write_text(PROJECT_SOURCE, encoding="utf-8")
         shutil.copy(PACK_SCRIPT, project / PACK_SCRIPT.name)
-        env = build.dotnet_env()
-        env["XDG_DATA_HOME"] = str(Path(temporary) / "xdg-data")
-        env["XDG_CONFIG_HOME"] = str(Path(temporary) / "xdg-config")
-        env["XDG_CACHE_HOME"] = str(Path(temporary) / "xdg-cache")
+        env = build.isolated_env(Path(temporary))
         build.run_godot(
             "ground-pack",
             [

@@ -15,7 +15,8 @@ From the project directory:
 ./build.py play
 ```
 
-The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates and build output under `.tools/` and `build/`.
+The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates and build output under `.tools/`
+and `build/`.
 First-time setup downloads missing tools and needs internet access.
 To use an installed Godot 4.7.2 .NET binary, set `GODOT_BIN=/path/to/godot`.
 
