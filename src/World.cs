@@ -190,6 +190,8 @@ public sealed class Wolf : IWalker {
     public bool Pinning { get; set; }
     /// <summary>The wolf has growled at the player while closing in; it growls only once.</summary>
     [JsonIgnore] public bool Growled { get; set; }
+    /// <summary>The wolf has broken from a walk into a sprint at the player; it growls once as it does.</summary>
+    [JsonIgnore] public bool Sprinted { get; set; }
     /// <summary>Seconds a chasing wolf keeps following the player into firelight before it gives up; above zero the wolf gallops.</summary>
     public float Chase { get; set; }
     /// <summary>A torch swing toward this wolf made it keep its distance; it lasts while the torch burns.</summary>
@@ -209,6 +211,8 @@ public sealed class Wolf : IWalker {
     [JsonIgnore] public Vector2 Call { get => new(CallX, CallY); set { CallX = value.X; CallY = value.Y; } }
     /// <summary>Seconds left howling at a player it smelled; it stands still until it is done.</summary>
     public float Howl { get; set; }
+    /// <summary>Seconds the current howl lasts in all, the length of its recording.</summary>
+    public float HowlLength { get; set; }
     [JsonIgnore] public List<Vector2> Route { get; } = new();
     [JsonIgnore] public Vector2 RouteTarget { get; set; } = new(-100, -100);
     /// <summary>Tells wolves apart for other machines; zero until <see cref="World.NumberWolvesAndOrders"/>.</summary>
@@ -2231,6 +2235,7 @@ public sealed partial class World {
                 // Out of the light a wolf closes in unseen, then sprints once it is near enough to see the player.
                 Travel(wolf, Player, dt * speed, dt * speed, RouteSlack);
             } else {
+                if (!wolf.Sprinted && !lit && !Protected(wolf.Pos)) { wolf.Sprinted = true; Play("wolf_growl_distance", wolf.Pos); }
                 wolf.Chase = lit || Protected(wolf.Pos) ? wolf.Chase - dt : ChaseSeconds;
                 Travel(wolf, Player, dt * chase, dt * chase, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }

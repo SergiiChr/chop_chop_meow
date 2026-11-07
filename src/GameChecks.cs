@@ -682,6 +682,8 @@ public partial class Game {
         Require(view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach,
             "A sound far from the player must count as beyond reach.");
         Require(sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
+        Require(Math.Abs(sounds.Length("wolf_howl") - world.Data.LoneHowlSeconds) < .1 && Math.Abs(sounds.Length("wolf_howl_group") - world.Data.PackHowlSeconds) < .1,
+            "A wolf must hold its howl as long as the howl recording plays.");
         sounds.Play("wolf_howl", world.Player + new Vector2(5, 0)); float near = sounds.LastFade;
         sounds.Play("wolf_howl", world.Player + new Vector2(40, 0)); float far = sounds.LastFade;
         Require(near < 1 && far > 0 && far < near, "A howl must fade with distance from the player, on screen too.");

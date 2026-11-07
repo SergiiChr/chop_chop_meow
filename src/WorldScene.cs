@@ -304,7 +304,7 @@ public partial class WorldView {
         float downed = 0;
         switch (clip) {
             case "wolf idle": wolf.Stand(Elapsed, dt, Elapsed % 8 > 4); break;
-            case "wolf howl": wolf.Howl(Elapsed % (World.Data.HowlSeconds + 1) / World.Data.HowlSeconds, dt); break;
+            case "wolf howl": wolf.Howl(Elapsed % (World.Data.LoneHowlSeconds + 1) / World.Data.LoneHowlSeconds, dt); break;
             case "wolf fall": {
                     // Thrown back by the killing blow while in the air, as a carcass is.
                     float dying = Math.Clamp((Elapsed % 2.2f - .4f) / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);

@@ -1070,7 +1070,7 @@ public partial class WorldView : Node3D {
             } else if (wolf.Feeding) {
                 if (wolf.Pinning) model.Pinned += dt;
                 model.Feed(Elapsed + wolf.GetHashCode() % 7, dt, wolf.Pinning, model.Pinned / KnockSeconds);
-            } else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / World.Data.HowlSeconds, dt);
+            } else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
             else if (running) model.Move(moved.Length(), dt, wolf.Chase > 0, wary);
             else model.Stand(Elapsed + wolf.GetHashCode() % 7, dt, wary);
             var place = To3(wolf.Pos + model.Knock);

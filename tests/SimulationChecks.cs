@@ -2203,19 +2203,22 @@ public static class SimulationChecks {
         var smeller = new Wolf { Pos = world.Player + Terrain.Seaward * (data.SmellRadius - 5) };
         var called = new Wolf { Pos = smeller.Pos + Terrain.Seaward * (data.HowlRadius - 10) };
         var deaf = new Wolf { Pos = smeller.Pos - Terrain.Seaward * (data.HowlRadius + 10) };
+        var heard = new List<string>(); world.Sound = (name, _) => heard.Add(name);
         foreach (var wolf in new[] { smeller, called, deaf }) PatrolWolf(world, wolf);
         SafeTick(world, .1f);
         Require(smeller.Target == world.Me.Id && smeller.Howl > 0, "a wolf within smell of the player should howl and take them as its prey");
+        Require(heard.Contains("wolf_howl") && smeller.HowlLength == data.LoneHowlSeconds, "the night's first howl should be a lone wolf, held as long as its recording");
         Require(called.Mode == WolfMode.Called && called.Call.DistanceTo(smeller.Pos) < .5f && deaf.Mode == WolfMode.Patrol,
                 "a howl should call the patrolling wolves within its reach, and only them");
         var at = smeller.Pos;
-        SafeTick(world, data.HowlSeconds - .3f);
+        SafeTick(world, smeller.HowlLength - .3f);
         Require(smeller.Pos == at, "a howling wolf should stand still");
         SafeTick(world, .5f);
         Require(smeller.Pos.DistanceTo(world.Player) < at.DistanceTo(world.Player) && smeller.Chase <= 0, "after its howl a wolf should close in without sprinting while the player is out of its sight");
         for (int i = 0; i < 100 && smeller.Pos.DistanceTo(world.Player) > data.WolfSightRange - .5f; i++) { SafeTick(world, .1f); SetNeeds(world, health: 100); }
         SafeTick(world, .1f);
         Require(smeller.Chase > 0, "a wolf should sprint once it can see the player");
+        Require(heard.Count(name => name == "wolf_growl_distance") == 1, "a wolf should growl once as it breaks into a sprint");
         for (int i = 0; i < 400 && called.Target == 0; i++) { SafeTick(world, .1f); SetNeeds(world, health: 100); }
         Require(called.Target == world.Me.Id, $"a wolf answering a howl should smell the player on its way and go after them too");
     }

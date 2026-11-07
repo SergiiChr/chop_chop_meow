@@ -118,8 +118,10 @@ public sealed partial class GameData {
     public float WolfSightRange { get; } = 15;
     /// <summary>Metres a howl carries; patrolling wolves within it run to the howl.</summary>
     public float HowlRadius { get; } = 80;
-    /// <summary>Seconds a wolf stands howling before it goes after the player it smelled.</summary>
-    public float HowlSeconds { get; } = 2.5f;
+    /// <summary>Seconds of the night's first howl, a lone wolf; the wolf stands howling as long before it goes after the player it smelled.</summary>
+    public float LoneHowlSeconds { get; } = 5.9f;
+    /// <summary>Seconds of every later howl, the pack answering.</summary>
+    public float PackHowlSeconds { get; } = 7.6f;
     /// <summary>Hours before dawn when every wolf gives up and heads back to its den.</summary>
     public float WolfRetreatHours { get; } = 1;
     /// <summary>Day phase when the wolves head home.</summary>
@@ -168,7 +170,7 @@ public sealed partial class GameData {
         return data;
     }
     private void Validate() {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || WolvesPerDen < 1 || WolfSightRange <= 0 || WolfSightRange >= SmellRadius || HowlRadius <= 0 || HowlSeconds <= 0 || WolfRetreatStarts <= NightStarts || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || WolvesPerDen < 1 || WolfSightRange <= 0 || WolfSightRange >= SmellRadius || HowlRadius <= 0 || LoneHowlSeconds <= 0 || PackHowlSeconds <= 0 || WolfRetreatStarts <= NightStarts || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
             throw new InvalidOperationException("Invalid time or economy balance in GameData.");
         foreach (var building in Buildings) {
             foreach (var cost in building.Value.Cost)

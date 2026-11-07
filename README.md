@@ -670,7 +670,7 @@ Sound effects follow the same actions:
 - axes, pickaxes, anvils and swings have impacts;
 - bellows puff;
 - fires crackle as they catch, including a furnace lighting a new batch;
-- wolves growl from afar, growl again as they close in, and bite.
+- wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, and bite.
 
 Repeated sounds rotate between variants.
 Sounds on screen play at full volume and fade out just past its edge, so zooming out lets you hear further.
