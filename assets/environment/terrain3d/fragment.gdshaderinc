@@ -8,7 +8,7 @@
     }
     // Terrain3D supplies height, clipmap LOD, terrain normals and the grass and rock photoscans blended by slope.
     // The project supplies the colours; the photoscans add only their grain, as brightness around their mean, and their bump.
-    const float DETAIL = 0.6;
+    const float DETAIL = 0.4;
     // tools/pack_ground.gd scales every photoscan to this mean linear brightness, so any blend of them has it too.
     const float MEAN = 0.14;
     const vec3 LUMA = vec3(0.3, 0.59, 0.11);
@@ -36,9 +36,12 @@
     float worn = clamp(wear + (dirt.a - mat.albedo_height.a) * wear, 0.0, 1.0);
     ALBEDO = mix(ALBEDO, path, worn);
     NORMAL_MAP = mix(NORMAL_MAP, dirt_bump.rgb, worn);
-    ROUGHNESS = mix(ROUGHNESS, dirt_bump.a, worn);
     // Scenery shrinks away on worn ground, and its shade with it.
     float scenery = texture(shade, v_vertex.xz / 216.0).r;
     vec2 objectShade = texture(contact, v_vertex.xz / 216.0).rg;
     ALBEDO = mix(ALBEDO, vec3(0.2, 0.17, 0.11), objectShade.g * 0.6 * (1.0 - bare));
     ALBEDO *= 1.0 - min(scenery * (1.0 - wear) * 0.6 + objectShade.r * 0.6, 0.65) * (1.0 - bare);
+    // Matte ground: a low sun turns the photoscans' roughness into a sheen that washes out the meadow.
+    ROUGHNESS = 1.0;
+    SPECULAR = 0.12;
+    NORMAL_MAP_DEPTH = 0.5;

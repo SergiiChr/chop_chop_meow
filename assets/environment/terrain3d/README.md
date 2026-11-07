@@ -39,7 +39,8 @@ detail shows; `tools/pack_ground.gd` scales every set to one mean linear brightn
 grain by.
 A grass or dirt tile spans 4 world units and a rock tile 6; grass and rock get a little detiling rotation and shift
 from Terrain3D, and the dirt, read by the include itself, tiles plainly.
-Roughness, specular and the height-based ambient occlusion come from Terrain3D's own material defaults.
+The ground is matte, with the bump at half depth: at a low sun the photoscans' roughness turned into a sheen that
+washed out the meadow. The height-based ambient occlusion comes from Terrain3D's material defaults.
 `tools/ground_textures.py` packs the sets from the pinned ambientCG archives; the `.import` files keep the alpha
 channels (VRAM compressed, high quality, no normal-map compression, no alpha border fix).
 
