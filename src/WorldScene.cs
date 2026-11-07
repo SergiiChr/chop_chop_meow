@@ -12,7 +12,7 @@ public partial class WorldView {
 
     private void BuildGround(Node3D parent) {
         InitializeDressing();
-        // Fine grass grain with occasional bare-earth flecks at the top of the ramp.
+        // The meadow's colours: fine grass grain with occasional bare-earth flecks at the top of the ramp.
         var ramp = new Gradient { Offsets = new[] { 0f, .35f, .6f, .84f, .9f, 1f }, Colors = new[] { new Color("72895a"), new Color("7e9563"), new Color("889e6b"), new Color("91a573"), new Color("9a9467"), new Color("a39a6c") } };
         var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
         var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };

@@ -15,7 +15,8 @@ From the project directory:
 ./build.py play
 ```
 
-The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates and build output under `.tools/` and `build/`.
+The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates and build output under `.tools/`
+and `build/`.
 First-time setup downloads missing tools and needs internet access.
 To use an installed Godot 4.7.2 .NET binary, set `GODOT_BIN=/path/to/godot`.
 
@@ -78,6 +79,7 @@ These options are developer review tools; they do not represent a normal fresh-s
 ```
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
+`./tools/ground_textures.py` repacks the committed ground textures from their pinned CC0 sources.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
@@ -91,9 +93,14 @@ The display choices are stored in `settings.cfg` and applied at launch.
 
 Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
 Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved.
-Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), and world sounds pan with their place on screen.
+Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
+meet (SSAO), and world sounds pan with their place on screen.
+Ambient light comes from a sky that is never drawn: light from above and grass-coloured bounce from below, so roofs and walls differ in shade.
+The picture is tonemapped with AgX, which keeps colours as light brightens.
 A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
-Shrubs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading, and the meadow has soft lusher and drier patches.
+The ground has grain and bump from grass, rock and dirt photoscans under its own colours: meadow over the valley with
+soft lusher and drier patches, stone on the mountain slopes, and dirt showing through where the ground is worn.
+Shrubs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading.
 
 ## Controls
 

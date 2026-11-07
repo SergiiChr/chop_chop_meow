@@ -10,6 +10,8 @@ public partial class WorldView {
     private Node3D? terrainTarget;
     // RenderingServer uniforms take RIDs, so retain the texture resource for their lifetime.
     private Texture2D? terrainGrass;
+    /// <summary>The ground texture sets, in Terrain3D id order, with the world units one tile spans: the auto shader puts grass on flat ground and rock on slopes, and the include draws dirt on worn ground.</summary>
+    private static readonly (string Name, float Tile)[] GroundTextures = { ("grass", 4), ("rock", 6), ("dirt", 4) };
     /// <summary>Soft noise over the whole map, about fifteen tiles a blob, for lusher and drier patches of meadow.</summary>
     private readonly NoiseTexture2D terrainPatches = new() { Width = 256, Height = 256, Noise = new FastNoiseLite { Seed = 913, Frequency = .05f, FractalOctaves = 3 } };
 
@@ -26,7 +28,7 @@ public partial class WorldView {
         parent.AddChild(terrainTarget);
         terrain.Set("clipmap_target", terrainTarget);
         terrain.Set("free_editor_textures", false);
-        terrain.Set("collision_mode", 0); // Simulation still owns movement/building rules on the level valley floor.
+        terrain.Set("collision_mode", 0);
         terrain.Call("set_camera", camera);
         parent.AddChild(terrain);
         var data = terrain.Get("data").AsGodotObject()!;
@@ -57,8 +59,29 @@ public partial class WorldView {
                 throw new InvalidOperationException($"Terrain3D region height mismatch at {p}: {actual} instead of {expected}");
         }
 
+        // The include keeps the meadow's own colours and takes only grain and bump from these photoscans.
+        var assets = ClassDB.Instantiate("Terrain3DAssets").AsGodotObject()!;
+        terrain.Set("assets", assets);
+        for (int id = 0; id < GroundTextures.Length; id++) {
+            var (name, tile) = GroundTextures[id];
+            var asset = ClassDB.Instantiate("Terrain3DTextureAsset").AsGodotObject()!;
+            asset.Set("name", name);
+            asset.Set("id", id);
+            asset.Set("albedo_texture", GD.Load<Texture2D>($"res://assets/environment/terrain3d/textures/{name}_albedo.png"));
+            asset.Set("normal_texture", GD.Load<Texture2D>($"res://assets/environment/terrain3d/textures/{name}_normal.png"));
+            asset.Set("uv_scale", 1 / tile);
+            asset.Set("detiling_rotation", .25f);
+            asset.Set("detiling_shift", .25f);
+            assets.Call("set_texture_asset", id, asset);
+        }
         var material = terrain.Get("material").AsGodotObject()!;
         material.Set("show_checkered", false);
+        // Set before the override is generated, so the generated code blends the base rock into the overlay grass by slope.
+        material.Set("auto_shader_enabled", true);
+        material.Call("set_shader_param", "auto_base_texture", 1);
+        material.Call("set_shader_param", "auto_overlay_texture", 0);
+        // Terrain3D damps the ground's specular where it faces away from this light; without it the shader normalises a zero vector.
+        terrain.Set("light_target", sun);
         material.Call("set_shader_override_enabled", true);
         var shader = material.Get("shader_override").As<Shader>();
         string code = shader.Code;

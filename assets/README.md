@@ -186,4 +186,7 @@ Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound 
 
 The item atlas was generated with the built-in image generation tool for this project.
 Its prompt is preserved in [PROMPTS.md](PROMPTS.md).
-No external copyrighted game art or third-party packs are used.
+The ground textures in `environment/terrain3d/textures/` are packed from three [ambientCG](https://ambientcg.com)
+photoscans, Grass004, Ground037 and Rock030, released under CC0 1.0; `tools/ground_textures.py` downloads the pinned
+1K PNG archives, checks their SHA-256 and packs them at 512 px with `tools/pack_ground.gd`.
+No other external game art or third-party packs are used.
