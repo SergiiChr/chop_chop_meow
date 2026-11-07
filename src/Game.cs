@@ -95,6 +95,7 @@ public partial class Game : Node, IGameFlow {
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
+    // A wolf breaks into its sprint some way off, so its growl carries further off screen than other sounds.
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private void BuildHud() {
         blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);

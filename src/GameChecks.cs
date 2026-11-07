@@ -682,6 +682,13 @@ public partial class Game {
         Require(view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach,
             "A sound far from the player must count as beyond reach.");
         Require(sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
+        Require(Math.Abs(sounds.Length("wolf_howl") - world.Data.LoneHowlSeconds) < .1 && Math.Abs(sounds.Length("wolf_howl_group") - world.Data.PackHowlSeconds) < .1,
+            "A wolf must hold its howl as long as the howl recording plays.");
+        sounds.Play("wolf_howl", world.Player + new Vector2(5, 0)); float near = sounds.LastFade;
+        sounds.Play("wolf_howl", world.Player + new Vector2(40, 0)); float far = sounds.LastFade;
+        Require(near < 1 && far > 0 && far < near, "A howl must fade with distance from the player, on screen too.");
+        heard = sounds.Played; sounds.Play("wolf_howl", world.Player + new Vector2(world.Data.HowlRadius + 1, 0));
+        Require(sounds.Played == heard, "A howl beyond the howl radius must stay silent.");
     }
     /// <summary>Holding the right mouse button on a tree or a ripe farm plot walks over and works it.</summary>
     private async Task CheckRightClickGathersTreeAndHarvestsFarm() {
@@ -940,7 +947,9 @@ public partial class Game {
     }
     /// <summary>A mauled player cannot move; death shows the respawn countdown and respawning clears it.</summary>
     private async Task CheckPinnedPlayerStaysDownAndDeathCountsDown() {
-        RunUntilNight(Hosted); SetMauled(Hosted, true); await Frames();
+        RunUntilNight(Hosted); SetMauled(Hosted, true);
+        // The pin lasts only while a wolf holds it.
+        PlaceWolf(Hosted, new Wolf { Pos = world.Player + Vector2.Right * .8f, Feeding = true, Pinning = true }); await Frames();
         var pinnedAt = world.Player;
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.25);

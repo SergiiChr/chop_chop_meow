@@ -57,6 +57,7 @@ Simulation and data:
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
+| `src/Wolves.cs` | Wolf dens, patrols, smell, howls and the way home |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor and its chip |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces |
@@ -298,6 +299,7 @@ A change of motion blends from the last shown pose over a short smoothstep, so s
 - a leap arcs up and comes down jaws first on the throat (`WorldView.Throat`); contact at `WolfModel.ContactReach` knocks the player onto their back facing the wolf, and the jaws stay on the throat as they go over, so the wolf ends standing over them;
 - a wolf a swing will hit lunges into it to `WolfModel.StrikeReach`; when the swing lands (`ActorAnimation.Contact`) it hops back `World.KnockBackDistance`, moving only while in the air, and ducks low before rising wary;
 - a killing blow throws the wolf off its feet onto its side, covering the knockback in the air, and it lands with a bounce and lies limp.
+- a howling wolf (`Wolf.Howl`) braces, lifts its chest and throws its head back, muzzle to the sky, its jaw opening as the note swells (`WolfModel.Howl`).
 
 Wolf eyes glow faintly, so they show in the dark.
 
@@ -307,7 +309,7 @@ Wolf eyes glow faintly, so they show in the dark.
 
 The intended fresh-start loop starts by securing water, shelter and fire, then uses the steel axe the player carries:
 
-1. Collect water, wood, stone and berries; build a cabin and campfire before night.
+1. Collect water, wood, stone and berries; build a cabin and campfire before dusk.
 2. Fell trees with the starting steel axe; gather stone and berries by hand.
 3. Knap a stone chisel, then carve planks and a mallet.
 4. Build a crafting bench and make crates there.
@@ -380,13 +382,26 @@ It draws one screen-wide quad after everything else, placing each pixel in the w
 
 ### Night and wolves
 
-Wolves come out of open ground just beyond every player's sight radius, so none appears on screen.
-A chasing wolf (`Wolf.Chase` above zero) gallops at `WolfChase` times `WalkSpeed`, which data validation keeps above walking and below `SprintSpeed`.
-Stalking, creeping and backing off stay at the slower trot.
+`src/Wolves.cs` runs the wolves that hunt nobody; `World.TickWolves` runs each player's hunters.
+Every wolf, like players and workers, moves only onto ground `World.CanStand` allows: `World.Slide` for a step that may slide along what blocks it, and `World.Travel` for a walk to a goal that routes around it.
+`Travel` swerves round anything a route's straight leg clips instead of walking through it, and after a search finds no way it waits `RouteRetrySeconds` before the next.
+
+- **Dens.** `World.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
+  The outcrop is solid like a mine's (`World.InSpur`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
+  From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
+- **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at the trot it stalks at, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
+- **Smell and howl.** A patrolling or called wolf within `SmellRadius` of a player out in the open takes them as its target and howls, standing still, for as long as the howl recording plays (`LoneHowlSeconds` or `PackHowlSeconds`, `Wolf.Howl` counting down `Wolf.HowlLength`).
+  The night's first howl plays `wolf_howl`, a lone wolf, and later ones `wolf_howl_group` (`SaveState.Howled`).
+  A howl fades with distance from the player, on screen too, and is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it pans with its direction.
+  The howl calls every patrolling wolf within `HowlRadius` to where it stood (`WolfMode.Called`, `Wolf.Call`); a called wolf still smells on its way and goes back to patrolling once there.
+- **Approach.** After its howl a wolf trots at its player out of firelight until within `WolfSightRange`, then sprints (`Wolf.Chase` above zero) at `WolfChase` times `WalkSpeed` with one distant growl (`Wolf.Sprinted`), which data validation keeps above walking and below `SprintSpeed`.
+- **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
+  A player a wolf had pinned goes free as it leaves.
+  Patrolling, going home or losing its player (who sheltered or left the game) clears everything a wolf was doing to them (`World.Calm`).
 
 Campfire light repels wolves, and `CampfireHours` sets how long one log burns.
 A wolf already chasing the player still follows into the light for a few seconds.
-Inside a cabin (`SaveState.Sheltered`) the player is hidden and wolves back off at once.
+Inside a cabin (`SaveState.Sheltered`) the player is hidden: their hunters give up at once and patrol on away from it.
 
 #### Torch
 
@@ -399,8 +414,7 @@ While the torch burns and fewer than `World.PackSize` wolves are near:
 
 - an unscared wolf creeps in at a third of its speed and can bite;
 - a swing aimed within about 45° of a wolf in `World.ScareRange` sets `Wolf.Scared`;
-- a scared wolf keeps its bearing at `World.StalkDistance` without biting or leaping;
-- spawns slow down, but the cap rises to six.
+- a scared wolf keeps its bearing at `World.StalkDistance` without biting or leaping.
 
 Once the pack is complete, swings no longer scare and the wolves attack.
 A direct torch hit sets `Wolf.Flee`.
@@ -701,7 +715,7 @@ Sound effects are one-shot MP3s in `assets/sounds`; `x_1.mp3`, `x_2.mp3` and so 
 Each play picks a variant other than the previous one with a small random pitch and volume change.
 
 Audibility follows the camera, so zooming out lets the player hear further.
-A sound on screen plays at full volume, one just past the screen edge is faint, and it fades to silence 5 tiles beyond the edge (14 for a distant wolf growl).
+A sound on screen plays at full volume, one just past the screen edge is faint, and it fades to silence 5 tiles beyond the edge (14 for the growl of a wolf breaking into its sprint).
 
 Sounds come from three places:
 

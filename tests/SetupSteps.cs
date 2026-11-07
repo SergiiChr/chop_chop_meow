@@ -62,8 +62,14 @@ internal static class SetupSteps {
     /// <summary>Moves the player on a server's world as a respawn does: a window walks its own player, and only takes a move the server counts as one.</summary>
     public static void Warp(World world, Vector2 at) { world.Me.Pos = at; world.Me.Warp++; }
 
-    /// <summary>Puts a wolf where the check needs it: real ones arrive at random out of sight.</summary>
-    public static Wolf PlaceWolf(World world, Wolf wolf) { world.S.Wolves.Add(wolf); return wolf; }
+    /// <summary>Puts a wolf where the check needs it: real ones come out of the dens. One placed without a target hunts the local player, as if it had smelled them.</summary>
+    public static Wolf PlaceWolf(World world, Wolf wolf) { if (wolf.Target == 0) wolf.Target = world.Me.Id; world.S.Wolves.Add(wolf); return wolf; }
+
+    /// <summary>Puts a wolf out patrolling where the check needs it, hunting nobody until it smells someone.</summary>
+    public static Wolf PatrolWolf(World world, Wolf wolf) { world.S.Wolves.Add(wolf); return wolf; }
+
+    /// <summary>Keeps every den shut tonight, so a check meets only the wolves it places.</summary>
+    public static void ShutDens(World world) => world.S.DensOut = (1 << World.Dens.Length) - 1;
 
     /// <summary>Takes wolves away, which the game does only at dawn or on a respawn.</summary>
     public static void RemoveWolves(World world, Predicate<Wolf> match) => world.S.Wolves.RemoveAll(match);

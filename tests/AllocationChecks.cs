@@ -49,17 +49,25 @@ public static class AllocationChecks {
         // A crate fills about every twenty seconds and goes to the post, whose cart leaves once six are there; a hundred seconds see several crates and a cart.
         // The warm-up lasts until a cart has been out and back: the first crate carried out costs a one-off 98 KB in about one process in a hundred, which must not land in the measured runs.
         // Opening a crate names it and gives it contents, and a cart leaving or coming back builds its order: those rare events are what this budget allows (measured 0.6 bytes a tick).
-        Check("tick: packing for the post", () => { packing.Tick(1 / 60f); Fed(packing); stock.Inventory.Add("berries", 64 - stock.Inventory["berries"]); stock.Inventory.Add("crate", 64 - stock.Inventory["crate"]); }, maxBytesPerRun: 1, warmup: 12000, runs: 6000);
+        // The measured runs cross dusk, so the dens stay shut: wolves coming out are not packing.
+        Check("tick: packing for the post", () => { ShutDens(packing); packing.Tick(1 / 60f); Fed(packing); stock.Inventory.Add("berries", 64 - stock.Inventory["berries"]); stock.Inventory.Add("crate", 64 - stock.Inventory["crate"]); }, maxBytesPerRun: 1, warmup: 12000, runs: 6000);
 
         var mine = WorkingMine(data, out var shaft);
         // Emptying the output each tick keeps the crew digging underground instead of hauling.
         Check("tick: miners underground", () => { mine.Tick(1 / 60f); Fed(mine); shaft.Output!.Clear(); }, warmup: 1200);
         Require(mine.Workers.All(w => w.WorkState == WorkerWorkState.Underground), "the mine crew should be underground");
 
+        var dusk = new World(data);
+        RunUntilPhase(dusk, data.DuskStarts + .01f);
+        // Every den lets its wolves out on the first tick; after that they patrol, smell and howl without allocating.
+        Check("tick: dusk, wolves patrolling", () => { dusk.Tick(1 / 60f); Fed(dusk); FreePlayer(dusk); }, warmup: 600);
+
         var night = new World(data);
         RunUntilPhase(night, data.NightStarts + .05f);
-        // Long enough for the pack to gather around the player; the player is kept on their feet so the hunt never ends.
-        Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }, warmup: 3600);
+        ShutDens(night);
+        // A pack that has smelled the player closes in; the player is kept on their feet so the hunt never ends.
+        for (int i = 0; i < 3; i++) PlaceWolf(night, new Wolf { Pos = night.Slide(night.Player, Vector2.Right.Rotated(i * 2.1f) * 15) });
+        Check("tick: night, wolves hunting", () => { night.Tick(1 / 60f); Fed(night); FreePlayer(night); }, warmup: 600);
     }
 
     /// <summary>

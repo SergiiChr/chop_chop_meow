@@ -38,7 +38,18 @@ public partial class WorldView {
         ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
         BuildLake(parent);
         foreach (var cliff in World.Cliffs) BuildCliff(parent, cliff);
+        foreach (var den in World.Dens) BuildDen(parent, den);
         BuildPlacedEnvironment(parent);
+    }
+
+    /// <summary>A wolf den: a mine's rock outcrop and dark tunnel at half size, with no timber, rails or cart, so the mouth is about a wolf's height.</summary>
+    private static void BuildDen(Node3D parent, Den den) {
+        // The outcrop is built around a cliff's mine spot; this cliff puts that spot at the den's.
+        var rock = new Cliff(ThingKind.Stone, den.Spot - den.Face * World.MineOut, den.Face, 0);
+        var cave = Pivot(parent, new Vector3(den.Spot.X, 0, den.Spot.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(den.Face.X, den.Face.Y)), 0));
+        cave.Scale = Vector3.One * Den.Scale;
+        Add(cave, MineRockShape.Mesh(rock, new[] { "5b5a52", "66645a", "4f4f48" }, Den.Scale), MineRockShape.Rock, Vector3.Zero);
+        Add(Pivot(cave, new Vector3(0, 0, WorldModels.MineDoor)), MineShape.Tunnel, MineShape.Unlit, Vector3.Zero);
     }
 
     /// <summary>A jagged wall of faceted columns with ore seams on the face and scree at its foot.</summary>
@@ -209,7 +220,7 @@ public partial class WorldView {
     /// <summary>The clip <c>--animation-clip</c> names, shown alone and close up, moving across marked ground at its speed in the world; -1 shows every clip.</summary>
     private static readonly int ReviewClip = Array.FindIndex(ReviewClips, clip => clip.Name == Launch.Value("--animation-clip"));
     /// <summary>Wolf close-ups for <c>--animation-clip</c>; the leap, hit and feed play against a player the way SyncWolves sets them up.</summary>
-    private static readonly string[] WolfClips = { "wolf idle", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf leap", "wolf hit", "wolf feed", "wolf fall" };
+    private static readonly string[] WolfClips = { "wolf idle", "wolf howl", "wolf walk", "wolf trot", "wolf gallop", "wolf speeds", "wolf leap", "wolf hit", "wolf feed", "wolf fall" };
     private static readonly int ReviewWolfClip = Array.IndexOf(WolfClips, Launch.Value("--animation-clip"));
     private string? ReviewCloseUpName => ReviewClip >= 0 ? ReviewClips[ReviewClip].Name : ReviewWolfClip >= 0 ? WolfClips[ReviewWolfClip] : null;
     /// <summary>The camera's pitch in degrees for <c>--animation-pitch</c>, low for a side view; the game's otherwise.</summary>
@@ -291,6 +302,7 @@ public partial class WorldView {
         float downed = 0;
         switch (clip) {
             case "wolf idle": wolf.Stand(Elapsed, dt, Elapsed % 8 > 4); break;
+            case "wolf howl": wolf.Howl(Elapsed % (World.Data.LoneHowlSeconds + 1) / World.Data.LoneHowlSeconds, dt); break;
             case "wolf fall": {
                     // Thrown back by the killing blow while in the air, as a carcass is.
                     float dying = Math.Clamp((Elapsed % 2.2f - .4f) / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
