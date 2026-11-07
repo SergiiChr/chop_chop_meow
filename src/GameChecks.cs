@@ -682,6 +682,11 @@ public partial class Game {
         Require(view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach,
             "A sound far from the player must count as beyond reach.");
         Require(sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
+        sounds.Play("wolf_howl", world.Player + new Vector2(5, 0)); float near = sounds.LastFade;
+        sounds.Play("wolf_howl", world.Player + new Vector2(40, 0)); float far = sounds.LastFade;
+        Require(near < 1 && far > 0 && far < near, "A howl must fade with distance from the player, on screen too.");
+        heard = sounds.Played; sounds.Play("wolf_howl", world.Player + new Vector2(world.Data.HowlRadius + 1, 0));
+        Require(sounds.Played == heard, "A howl beyond the howl radius must stay silent.");
     }
     /// <summary>Holding the right mouse button on a tree or a ripe farm plot walks over and works it.</summary>
     private async Task CheckRightClickGathersTreeAndHarvestsFarm() {

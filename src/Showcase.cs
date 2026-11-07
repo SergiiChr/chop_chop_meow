@@ -40,6 +40,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
                 "coast" => coastCenter - Terrain.Seaward * 3,
                 "mine" => World.MineSpot(reviewCliff) + reviewCliff.Face,
                 "terrain" => Terrain.Point(125, -18),
+                "den" => World.Dens[3].Door + World.Dens[3].Face * 2.5f,
                 _ => Terrain.Spawn,
             };
             world.S.Time = world.Data.DaySeconds * .2f;
@@ -54,7 +55,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             }
             // The wide terrain camera must sit above the peaks rather than inside a near mountain face.
             if (location is "terrain" or "coast" or "mine") view.EnvironmentCameraDistance = 140;
-            view.Zoom = location switch { "lake" => .44f, "terrain" => .24f, "coast" => .36f, "mine" => .85f, _ => .75f };
+            view.Zoom = location switch { "den" => 1.6f, "lake" => .44f, "terrain" => .24f, "coast" => .36f, "mine" => .85f, _ => .75f };
             panel.Close(); ui.Visible = false; kit.HoldWhile(() => true);
             return;
         }
@@ -220,7 +221,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var spot = Terrain.Spawn + new Vector2(11, 8);
         world.S.Things.RemoveAll(t => t.Pos.DistanceTo(spot) < 6);
         world.S.Time = world.Data.DaySeconds * .78f; world.Player = spot; world.S.Health = 45;
-        foreach (var offset in new[] { new Vector2(2.5f, -1), new Vector2(-6, 3), new Vector2(5, 5) }) world.S.Wolves.Add(new Wolf { Pos = spot + offset });
+        foreach (var offset in new[] { new Vector2(2.5f, -1), new Vector2(-6, 3), new Vector2(5, 5) }) world.S.Wolves.Add(new Wolf { Pos = spot + offset, Target = world.Me.Id });
         world.Add(ThingKind.WolfCorpse, spot + new Vector2(-2, -2), 4);
         panel.Close(); view.Zoom = 1.6f;
     }

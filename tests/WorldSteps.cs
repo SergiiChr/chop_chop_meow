@@ -31,6 +31,7 @@ internal static class WorldSteps {
         var world = EmptyWorld(data);
         world.Player = new Vector2(20, 20);
         RunUntilNight(world);
+        ShutDens(world);
         return world;
     }
 

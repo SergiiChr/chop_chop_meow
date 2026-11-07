@@ -529,9 +529,14 @@ With none, a message says the mine is full with no output available.
 
 ## Wolves and night
 
-Wolves hunt at night.
-A chasing wolf gallops faster than you walk, but sprinting outruns it.
-They come out of the dark beyond what you can see, never on screen.
+Five wolf dens, small caves at the foot of the mountains, each let two wolves out at dusk (20:24), so the hour or two before bed is risky too.
+They patrol the valley, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
+
+A wolf that smells you within 30 metres while you are out in the open howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
+After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
+A sprinting wolf gallops faster than you walk, but sprinting outruns it.
+
+An hour before dawn every wolf gives up and heads back to the nearest den.
 
 ### Fire
 
@@ -549,13 +554,13 @@ Swinging four times within 2 seconds, as fast as swings go, puts it out with a m
 Relighting takes the same 2 seconds and keeps the burn time it had left.
 
 While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into following you at the edge of the light.
-More wolves gather over time, and once five are around you they attack together and swings no longer scare them.
+Once five are around you they attack together and swings no longer scare them.
 A direct hit with the torch hurts a wolf and sends it running for a moment.
 
 ### Cabins
 
 Click a cabin to step inside, even while walking.
-Wolves back off at once and give up once out of sight, and you stay in until you press Step outside in its panel.
+Wolves cannot smell you there: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
 
 ### Wolf kills
 
