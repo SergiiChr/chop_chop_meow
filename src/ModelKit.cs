@@ -69,6 +69,7 @@ public static class ModelKit {
         if (surface == Surface.Flat) return;
         var maps = Maps(surface);
         material.DetailEnabled = true; material.DetailBlendMode = BaseMaterial3D.BlendModeEnum.Mul;
+        material.TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic;
         material.DetailAlbedo = maps.Grain; material.DetailNormal = maps.Bump;
         material.DetailUVLayer = BaseMaterial3D.DetailUV.UV2; material.UV2Triplanar = true; material.UV2Scale = Vector3.One / Tile(surface);
         var tint = material.AlbedoColor;

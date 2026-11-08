@@ -31,7 +31,7 @@ public partial class WorldView {
         uniform sampler2D traffic : filter_linear, repeat_disable;
         // The foliage surface's grain on shrubs, laid over each in its own space; it is packed at half brightness.
         uniform bool grained = false;
-        uniform sampler2D grain : source_color, filter_linear_mipmap, repeat_enable;
+        uniform sampler2D grain : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
         uniform float tile = 1.0;
         varying vec3 tint;
         varying vec3 local;
