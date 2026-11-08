@@ -6,8 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>One neutral human core: outfits use palette textures while geometry and skin weights are shared.</summary>
 internal static class HumanShape {
-    // Texel centres of the five-texel palette; its end tones are doubled at the edges, so a wide filter footprint never wraps to the far end.
-    private const float Cloth = .3f, Middle = .5f, End = .7f;
+    private const float Cloth = 1f / 6, Middle = .5f, End = 5f / 6;
     private static readonly Color Neutral = Colors.White;
     private static readonly Dictionary<(string, string, string, bool), StandardMaterial3D> palettes = new();
     private static readonly Ring[] hips = {
@@ -59,15 +58,16 @@ internal static class HumanShape {
     private static StandardMaterial3D Palette(string cloth, string middle, string end, bool middleCloth) {
         var key = (cloth, middle, end, middleCloth);
         if (palettes.TryGetValue(key, out var material)) return material;
-        // Texel centers map the same neutral limb to clothing, exposed skin, boots and soles.
-        // StandardMaterial3D keeps the existing fog/trade-fade path and blends the original color transitions.
-        // The tones the weave leaves out are stored masked, since the dressed material's tint is doubled for the grain.
-        var image = Image.CreateFromData(5, 1, false, Image.Format.Rgba8, new byte[20]);
-        var weave = Image.CreateFromData(5, 1, false, Image.Format.Rgba8, new byte[20]);
-        Color[] tones = { new(cloth), new(cloth), middleCloth ? new(middle) : ModelKit.Masked(new(middle)), ModelKit.Masked(new(end)), ModelKit.Masked(new(end)) };
-        for (int i = 0; i < tones.Length; i++) { image.SetPixel(i, 0, tones[i]); weave.SetPixel(i, 0, i < 2 || i == 2 && middleCloth ? Colors.White : Colors.Black); }
+        // Texel centres map the same neutral limb to clothing, exposed skin, boots and soles, blended between them along the limb.
+        // A StandardMaterial3D, so fades treat a limb like any other mesh.
+        var image = Image.CreateFromData(3, 1, false, Image.Format.Rgba8, new byte[12]);
+        var weave = Image.CreateFromData(3, 1, false, Image.Format.Rgba8, new byte[12]);
+        Color[] tones = { new(cloth), new(middle), new(end) };
+        for (int i = 0; i < tones.Length; i++) { image.SetPixel(i, 0, tones[i]); weave.SetPixel(i, 0, i == 0 || i == 1 && middleCloth ? Colors.White : Colors.Black); }
         material = new StandardMaterial3D { AlbedoTexture = ImageTexture.CreateFromImage(image), DetailMask = ImageTexture.CreateFromImage(weave), Roughness = .85f };
         ModelKit.Dress(material, Surface.Cloth);
+        // A limb is a few centimetres wide: plain filtering, since an anisotropic footprint would reach past the end texels and wrap.
+        material.TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmaps;
         palettes[key] = material;
         return material;
     }

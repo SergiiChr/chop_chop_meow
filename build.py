@@ -25,8 +25,10 @@ import threading
 import time
 import urllib.request
 import zipfile
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Literal
 
 GODOT_VERSION = "4.7.2"
 DOTNET_CHANNEL = "10.0"
@@ -117,11 +119,15 @@ def pack_photoscans(
     maps: tuple[str, ...],
     size: int,
     output: Path,
-    kind: str,
+    kind: Literal["ground", "surface"],
+    detail: Mapping[str, float] | None = None,
 ) -> None:
-    """Fetches each set's pinned ambientCG archive, extracts its maps and packs them into output as kind, "ground" or "surface".
+    """Fetches each set's pinned ambientCG archive, extracts its maps and packs them into output as the kind says.
 
-    A set maps its name in the game to the ambientCG asset and the SHA-256 of that asset's 1K PNG zip.
+    A set maps its name in the game to the ambientCG asset and the SHA-256 of that asset's 1K PNG zip; detail gives a
+    surface set the share of the photoscan's brightness variation its grain keeps, where the packer's default is not
+    wanted.
+
     """
     fetch_godot()
     BUILD.mkdir(exist_ok=True)
@@ -158,7 +164,11 @@ def pack_photoscans(
                 source,
                 output,
                 str(size),
-                *(f"{name}={asset}" for name, (asset, _) in sets.items()),
+                *(
+                    f"{name}={asset}"
+                    + (f":{detail[name]}" if detail and name in detail else "")
+                    for name, (asset, _) in sets.items()
+                ),
             ],
             isolated_env(Path(temporary)),
             timeout=600,

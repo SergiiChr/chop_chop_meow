@@ -36,8 +36,11 @@ public partial class Game {
     private async Task<Vector2> At(Control control) {
         for (Node? n = control.GetParent(); n != null; n = n.GetParent()) if (n is ScrollContainer scroll) scroll.EnsureControlVisible(control);
         await Frames();
-        return GetViewport().GetFinalTransform() * (control.GetGlobalTransformWithCanvas() * (control.Size / 2));
+        return WindowPoint(control);
     }
+
+    /// <summary>Where a control's centre is in the window, through its canvas layer and the window's stretch.</summary>
+    public static Vector2 WindowPoint(Control control) => control.GetViewport().GetFinalTransform() * (control.GetGlobalTransformWithCanvas() * (control.Size / 2));
 
     /// <summary>Moves the mouse onto a control.</summary>
     private async Task Hover(Control control) {

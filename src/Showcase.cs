@@ -31,7 +31,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
     /// <summary>Sets up the scene the flags ask for; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
     public void Run() {
         Place();
-        if (Launch.Value("--zoom") is string zoom) view.Zoom = float.Parse(zoom, System.Globalization.CultureInfo.InvariantCulture);
+        view.Zoom = Launch.Number("--zoom", view.Zoom);
     }
 
     private void Place() {
@@ -202,7 +202,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--hover")) panel.GetTree().CreateTimer(.5).Timeout += () => {
             if (panel.FindChild("craft_torch", true, false) is not Button cell) return;
             cell.EmitSignal(Control.SignalName.MouseEntered);
-            var at = panel.GetViewport().GetFinalTransform() * (cell.GetGlobalTransformWithCanvas() * (cell.Size / 2));
+            var at = Game.WindowPoint(cell);
             Input.WarpMouse(at); Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
         };
         if (Launch.Has("--torch")) { world.Player = Terrain.Spawn + new Vector2(-5, 6); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!Launch.Has("--kindle")) world.Tick(World.KindleSeconds); panel.Close(); view.Zoom = 1.6f; }

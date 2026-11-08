@@ -103,17 +103,17 @@ public partial class StartMenu : ColorRect {
             kit.Sounds.MusicVolume = (float)value / 100;
         };
         musicRow.AddChild(slider);
-        var taaRow = new HBoxContainer(); Screen.AddChild(taaRow);
-        var taaLabel = Style.Wrapped("Temporal anti-aliasing"); taaLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; taaRow.AddChild(taaLabel);
-        var taa = new CheckButton { Name = "taa", ButtonPressed = Settings.Taa, FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
-        taa.Toggled += on => { Settings.Store("display", "taa", on); GetViewport().UseTaa = on; };
-        taaRow.AddChild(taa);
-        var fpsRow = new HBoxContainer(); Screen.AddChild(fpsRow);
-        var fpsLabel = Style.Wrapped("Frame rate counter"); fpsLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; fpsRow.AddChild(fpsLabel);
-        var counter = new CheckButton { Name = "fps", ButtonPressed = Settings.FrameRate, FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
-        counter.Toggled += on => { Settings.Store("display", "fps", on); flow.ShowFrameRate(on); };
-        fpsRow.AddChild(counter);
+        Toggle("Temporal anti-aliasing", "taa", Settings.Taa, on => { Settings.Store("display", "taa", on); GetViewport().UseTaa = on; });
+        Toggle("Frame rate counter", "fps", Settings.FrameRate, on => { Settings.Store("display", "fps", on); flow.ShowFrameRate(on); });
         AddButton("Back · Esc", back);
+    }
+
+    /// <summary>A labelled switch on its own row, which stores and applies its setting as it is toggled.</summary>
+    private void Toggle(string text, string name, bool on, Action<bool> change) {
+        var row = new HBoxContainer(); Screen.AddChild(row);
+        var label = Style.Wrapped(text); label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(label);
+        var toggle = new CheckButton { Name = name, ButtonPressed = on, FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
+        toggle.Toggled += value => change(value); row.AddChild(toggle);
     }
 
     /// <summary>The join popup: the host's address and port, which starts out as the port a host opens.</summary>

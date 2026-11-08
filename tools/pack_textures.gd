@@ -3,21 +3,17 @@ extends SceneTree
 # Packs ambientCG photoscans into the game's textures, one of two ways.
 # ground: the way Terrain3D reads them, albedo RGB with height in alpha and OpenGL normal RGB with roughness in alpha,
 # every albedo scaled to the same mean linear brightness, so the terrain shader divides any blend by MEAN.
-# surface: the way the model kit tints them, a grey grain PNG holding each pixel's brightness around the set's mean,
-# at DETAIL strength and halved so a tint of twice the colour restores it, and the OpenGL normal PNG with its slope
-# scaled to DEPTH.
-# Arguments: <ground|surface> <source dir> <output dir> <size> <name=ambientCG id>...
+# surface: the way the model kit tints them, a grain EXR holding each pixel's brightness around the set's mean as a
+# multiplier, at the set's detail share, and the OpenGL normal PNG.
+# Arguments: <ground|surface> <source dir> <output dir> <size> <name=ambientCG id[:detail]>...
 
 # The mean the terrain shader's fragment include divides the grain by.
 const MEAN := 0.14
 # Luminance weights, the same as the terrain shader's LUMA.
 const LUMA := Vector3(0.3, 0.59, 0.11)
-# How much of the photoscan's brightness variation a surface's grain keeps; the ground keeps the same share.
+# How much of the photoscan's brightness variation a surface's grain keeps unless its set says otherwise; the ground
+# keeps the same share.
 const DETAIL := 0.4
-# Cloth scans are nearly even at the game's distance, so the weave keeps all of its contrast to show at all.
-const FULL_DETAIL := ["cloth"]
-# How deep a surface's bump reads, the same as the ground's; a material's detail layer has no depth setting of its own.
-const DEPTH := 0.5
 
 
 func _initialize() -> void:
@@ -36,11 +32,13 @@ func _pack() -> void:
 	var size := int(args[3])
 	for spec in args.slice(4):
 		var parts := spec.split("=")
-		if parts.size() != 2:
-			push_error("Expected <name=ambientCG id>, got " + spec)
+		var set := parts[1].split(":") if parts.size() == 2 else PackedStringArray()
+		if set.size() == 0 or set.size() > 2:
+			push_error("Expected <name=ambientCG id[:detail]>, got " + spec)
 			quit(1)
 			return
-		var packed := _pack_ground(source, output, size, parts[0], parts[1]) if ground else _pack_surface(source, output, size, parts[0], parts[1])
+		var detail := float(set[1]) if set.size() == 2 else DETAIL
+		var packed := _pack_ground(source, output, size, parts[0], set[0]) if ground else _pack_surface(source, output, size, parts[0], set[0], detail)
 		if not packed:
 			quit(1)
 			return
@@ -48,7 +46,9 @@ func _pack() -> void:
 	quit(0)
 
 
-func _load(path: String, size: int) -> Image:
+# Loads one of a set's maps at the packed size.
+func _load(source: String, id: String, map: String, size: int) -> Image:
+	var path := "%s/%s_1K-PNG_%s.png" % [source, id, map]
 	var image := Image.load_from_file(path)
 	if image == null:
 		push_error("Cannot load " + path)
@@ -73,11 +73,10 @@ func _mean_luminance(albedo: Image, size: int) -> float:
 
 # Packs one ground set and returns whether every map loaded.
 func _pack_ground(source: String, output: String, size: int, name: String, id: String) -> bool:
-	var prefix := "%s/%s_1K-PNG_" % [source, id]
-	var albedo := _load(prefix + "Color.png", size)
-	var height := _load(prefix + "Displacement.png", size)
-	var normal := _load(prefix + "NormalGL.png", size)
-	var roughness := _load(prefix + "Roughness.png", size)
+	var albedo := _load(source, id, "Color", size)
+	var height := _load(source, id, "Displacement", size)
+	var normal := _load(source, id, "NormalGL", size)
+	var roughness := _load(source, id, "Roughness", size)
 	if albedo == null or height == null or normal == null or roughness == null:
 		return false
 	var scale := MEAN / _mean_luminance(albedo, size)
@@ -97,24 +96,18 @@ func _pack_ground(source: String, output: String, size: int, name: String, id: S
 
 
 # Packs one surface set and returns whether every map loaded.
-func _pack_surface(source: String, output: String, size: int, name: String, id: String) -> bool:
-	var prefix := "%s/%s_1K-PNG_" % [source, id]
-	var albedo := _load(prefix + "Color.png", size)
-	var normal := _load(prefix + "NormalGL.png", size)
+func _pack_surface(source: String, output: String, size: int, name: String, id: String, detail: float) -> bool:
+	var albedo := _load(source, id, "Color", size)
+	var normal := _load(source, id, "NormalGL", size)
 	if albedo == null or normal == null:
 		return false
 	var mean := _mean_luminance(albedo, size)
-	var detail := 1.0 if name in FULL_DETAIL else DETAIL
-	var grain := Image.create(size, size, false, Image.FORMAT_RGBA8)
+	var grain := Image.create(size, size, false, Image.FORMAT_RH)
 	for y in size:
 		for x in size:
-			var factor := lerpf(1.0, _luminance(albedo.get_pixel(x, y)) / mean, detail) / 2.0
-			var grey := Color(factor, factor, factor).linear_to_srgb().clamp()
-			grain.set_pixel(x, y, grey)
-			var bump := normal.get_pixel(x, y)
-			var slope := (Vector2(bump.r, bump.g) * 2.0 - Vector2.ONE) * DEPTH
-			normal.set_pixel(x, y, Color(slope.x * 0.5 + 0.5, slope.y * 0.5 + 0.5, sqrt(maxf(0.0, 1.0 - slope.length_squared()))))
-	grain.save_png("%s/%s_grain.png" % [output, name])
+			var factor := lerpf(1.0, _luminance(albedo.get_pixel(x, y)) / mean, detail)
+			grain.set_pixel(x, y, Color(factor, factor, factor))
+	grain.save_exr("%s/%s_grain.exr" % [output, name], true)
 	normal.save_png("%s/%s_bump.png" % [output, name])
 	print("Packed %s from %s, mean brightness %.3f" % [name, id, mean])
 	return true

@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bshdjwoaun1sw"
-path.bptc="res://.godot/imported/foliage_grain.png-c12cbaff3ae840981c753140b603e59e.bptc.ctex"
+uid="uid://yecj06rr0pyh"
+path.bptc="res://.godot/imported/wood_grain.exr-be36d94bacfee23b7d7d40990df67537.bptc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/models/surfaces/foliage_grain.png"
-dest_files=["res://.godot/imported/foliage_grain.png-c12cbaff3ae840981c753140b603e59e.bptc.ctex"]
+source_file="res://assets/models/surfaces/wood_grain.exr"
+dest_files=["res://.godot/imported/wood_grain.exr-be36d94bacfee23b7d7d40990df67537.bptc.ctex"]
 
 [params]
 
@@ -32,7 +32,7 @@ process/channel_remap/red=0
 process/channel_remap/green=1
 process/channel_remap/blue=2
 process/channel_remap/alpha=3
-process/fix_alpha_border=false
+process/fix_alpha_border=true
 process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false

@@ -14,22 +14,20 @@ public enum Surface { Flat, Wood, Metal, Stone, Cloth, Earth, Foliage }
 public static class ModelKit {
     // Keyed by their parameters as values, so looking one up allocates nothing even when an effect asks every frame.
     private static readonly Dictionary<(string, float, float, float, Surface), StandardMaterial3D> materials = new();
-    private static readonly Dictionary<Surface, (Texture2D Grain, Texture2D Bump)> surfaces = new();
-    /// <summary>The grain is packed at half brightness, since a texture holds no more than one, so the tint is twice the colour.</summary>
-    private const float GrainRange = 2;
+    /// <summary>How deep a surface's bump reads; the ground uses the same depth.</summary>
+    private const float BumpDepth = .5f;
     private static readonly Dictionary<(Color, bool), StandardMaterial3D> flats = new();
     private static readonly Dictionary<(ulong, int), Material> faded = new();
     private static readonly Dictionary<string, Mesh> meshes = new();
     /// <summary>Where a faded mesh keeps its own material; made once, since a plain string converts to a new StringName on every call.</summary>
     public static readonly StringName BaseMaterial = "base";
 
-    public static StandardMaterial3D Mat(string hex, float roughness = .85f, float metallic = 0, float glow = 0) => Mat(hex, roughness, metallic, glow, Surface.Flat);
-    public static StandardMaterial3D Wood(string hex, float roughness = .85f) => Mat(hex, roughness, 0, 0, Surface.Wood);
-    public static StandardMaterial3D Metal(string hex, float roughness, float metallic) => Mat(hex, roughness, metallic, 0, Surface.Metal);
-    public static StandardMaterial3D Stone(string hex, float roughness = .95f, float metallic = 0) => Mat(hex, roughness, metallic, 0, Surface.Stone);
-    public static StandardMaterial3D Cloth(string hex, float roughness = .85f) => Mat(hex, roughness, 0, 0, Surface.Cloth);
+    public static StandardMaterial3D Wood(string hex, float roughness = .85f) => Mat(hex, roughness, surface: Surface.Wood);
+    public static StandardMaterial3D Metal(string hex, float roughness, float metallic) => Mat(hex, roughness, metallic, surface: Surface.Metal);
+    public static StandardMaterial3D Stone(string hex, float roughness = .95f, float metallic = 0) => Mat(hex, roughness, metallic, surface: Surface.Stone);
+    public static StandardMaterial3D Cloth(string hex, float roughness = .85f) => Mat(hex, roughness, surface: Surface.Cloth);
 
-    private static StandardMaterial3D Mat(string hex, float roughness, float metallic, float glow, Surface surface) {
+    public static StandardMaterial3D Mat(string hex, float roughness = .85f, float metallic = 0, float glow = 0, Surface surface = Surface.Flat) {
         var key = (hex, roughness, metallic, glow, surface);
         if (materials.TryGetValue(key, out var cached)) return cached;
         var color = new Color(hex);
@@ -47,22 +45,13 @@ public static class ModelKit {
         return material;
     }
 
-    /// <summary>The colour a material was made with: a surfaced material's tint is doubled for its grain.</summary>
-    public static Color Tint(StandardMaterial3D material) => material.DetailEnabled ? Masked(material.AlbedoColor) : material.AlbedoColor;
-
-    /// <summary>
-    /// Half the colour, for a dressed material's albedo texture where its detail mask leaves the grain out: the doubled tint brings it back to the colour.
-    /// </summary>
-    public static Color Masked(Color color) => (color.SrgbToLinear() / GrainRange).LinearToSrgb() with { A = color.A };
-
     /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, and a cloth weave is drawn coarse so it shows at the game's distance.</summary>
     public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, _ => 1 };
 
-    /// <summary>A surface's grain, a grey texture at half brightness, and its bump, a normal map at the ground's depth.</summary>
+    /// <summary>A surface's grain, a multiplier around one, and its bump, a normal map; the engine hands out one copy of each.</summary>
     public static (Texture2D Grain, Texture2D Bump) Maps(Surface surface) {
-        if (surfaces.TryGetValue(surface, out var maps)) return maps;
         string name = surface.ToString().ToLowerInvariant();
-        return surfaces[surface] = (GD.Load<Texture2D>($"res://assets/models/surfaces/{name}_grain.png"), GD.Load<Texture2D>($"res://assets/models/surfaces/{name}_bump.png"));
+        return (GD.Load<Texture2D>($"res://assets/models/surfaces/{name}_grain.exr"), GD.Load<Texture2D>($"res://assets/models/surfaces/{name}_bump.png"));
     }
 
     /// <summary>
@@ -76,8 +65,8 @@ public static class ModelKit {
         material.TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic;
         material.DetailAlbedo = maps.Grain; material.DetailNormal = maps.Bump;
         material.DetailUVLayer = BaseMaterial3D.DetailUV.UV2; material.UV2Triplanar = true; material.UV2Scale = Vector3.One / Tile(surface);
-        var tint = material.AlbedoColor;
-        material.AlbedoColor = (tint.SrgbToLinear() * GrainRange).LinearToSrgb() with { A = tint.A };
+        // The depth applies to the bump once it is mixed into the normal map, which has no texture of its own here.
+        material.NormalEnabled = true; material.NormalScale = BumpDepth;
     }
 
     /// <summary>Unshaded, alpha-blended material for flat markers, flames and smoke.</summary>

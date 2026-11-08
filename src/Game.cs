@@ -17,8 +17,7 @@ public partial class Game : Node, IGameFlow {
     private Sounds sounds = null!;
     private Control ui = null!;
     private CanvasLayer layer = null!;
-    private ClockPlate clock = null!;
-    private FrameRate frameRate = null!;
+    private Corner corner = null!;
     private MessageStack messages = null!;
     private NeedsPlate needsPlate = null!;
     private DamageEdges damageEdges = null!;
@@ -78,14 +77,14 @@ public partial class Game : Node, IGameFlow {
             ui = new Control { Name = "Interface", MouseFilter = Control.MouseFilterEnum.Ignore }; layer.AddChild(ui);
             ui.Theme = Style.Interface();
             blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);
-            FitInterface();
+            // Play renders at the player's pick; a review run or check at the design size, unless --resolution asks for one such as "2560x1440".
+            bool review = Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run");
+            ApplyResolution(Launch.Size("--resolution") ?? (review ? GetWindow().ContentScaleSize : Settings.Resolution));
+            if (!review) Engine.MaxFps = Settings.FrameLimit;
             BuildHud();
             GetViewport().UseTaa = Settings.Taa;
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
-            if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run")) { ApplyResolution(Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
-            // A review run renders at a chosen size, such as the player's own, as "2560x1440".
-            if (Launch.Size("--resolution") is Vector2I resolution) ApplyResolution(resolution);
             if (Launch.Has("--performance-run")) StartGame(-1);
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
@@ -108,8 +107,7 @@ public partial class Game : Node, IGameFlow {
         panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;
         hotbar = new Hotbar(kit, panel);
         player = new PlayerControl(kit, view, panel, hotbar); panel.Player = player;
-        clock = new ClockPlate(world); ui.AddChild(clock);
-        frameRate = new FrameRate(); ui.AddChild(frameRate);
+        corner = new Corner(world); ui.AddChild(corner);
         modeLabel = new ModeLabel(kit, player); ui.AddChild(modeLabel);
         ui.AddChild(hotbar);
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
@@ -131,7 +129,7 @@ public partial class Game : Node, IGameFlow {
     }
     private void RefreshLive() {
         if (recovery == null) return;
-        clock.Refresh(); frameRate.Refresh(); deathLabel.Refresh(); modeLabel.Refresh(); recovery.Refresh();
+        corner.Refresh(); deathLabel.Refresh(); modeLabel.Refresh(); recovery.Refresh();
         panel.Refresh();
         hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
     }
@@ -184,7 +182,7 @@ public partial class Game : Node, IGameFlow {
     }
 
     public void ApplyResolution(Vector2I size) { Settings.ApplyResolution(GetWindow(), size); FitInterface(); }
-    public void ShowFrameRate(bool on) => frameRate.Visible = on;
+    public void ShowFrameRate(bool on) => corner.FrameRate.Visible = on;
 
     /// <summary>The interface is laid out for the design size and drawn larger at a taller render size, keeping its share of the screen.</summary>
     private void FitInterface() {

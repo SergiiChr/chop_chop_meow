@@ -54,10 +54,8 @@ public static class HumanModelChecks {
         var workerArm = core[1].Single(m => m.Name == "HumanArmRight");
         var playerTexture = (ImageTexture)((StandardMaterial3D)playerArm.MaterialOverride!).AlbedoTexture!;
         var workerTexture = (ImageTexture)((StandardMaterial3D)workerArm.MaterialOverride!).AlbedoTexture!;
-        // Skin is stored masked for the doubled tint, and a texel holds it to 8 bits.
-        var skin = ModelKit.Masked(new Color("d9a27c")) - playerTexture.GetImage().GetPixel(2, 0);
-        Require(Math.Max(Math.Abs(skin.R), Math.Max(Math.Abs(skin.G), Math.Abs(skin.B))) <= 1 / 255f, "player short sleeves should expose the player's skin tone");
-        Require(workerTexture.GetImage().GetPixel(2, 0).IsEqualApprox(new Color("e9dfc6")), "worker long sleeves should keep the shirt color through the forearm");
+        Require(playerTexture.GetImage().GetPixel(1, 0).IsEqualApprox(new Color("d9a27c")), "player short sleeves should expose the player's skin tone");
+        Require(workerTexture.GetImage().GetPixel(1, 0).IsEqualApprox(new Color("e9dfc6")), "worker long sleeves should keep the shirt color through the forearm");
         var original = (StandardMaterial3D)playerArm.MaterialOverride!;
         ModelKit.SetFade(playerArm, original, .5f);
         var faded = playerArm.MaterialOverride as StandardMaterial3D;

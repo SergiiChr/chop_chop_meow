@@ -660,8 +660,7 @@ public static class WorldModels {
     private static PileProp Pile() {
         var prop = new PileProp();
         var body = prop.Body;
-        Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
-        Add(body, PileShape.Frame, PileShape.Timber, new Vector3(0, .01f, 0));
+        Yard(body);
         var slots = new List<Vector3>();
         foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
             for (int x = 0; x < count; x++)
@@ -686,12 +685,17 @@ public static class WorldModels {
         }
     }
 
+    /// <summary>The packed-earth yard with its log frame that a pile or a farm plot stands on.</summary>
+    private static void Yard(Node3D body) {
+        Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
+        Add(body, PileShape.Frame, PileShape.Timber, new Vector3(0, .01f, 0));
+    }
+
     /// <summary>A farm plot: an empty pile's yard that, once sown, shows dark tilled rows and then the wheat growing on them.</summary>
     private static FarmProp Farm(int id) {
         var prop = new FarmProp();
         var body = prop.Body;
-        Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
-        Add(body, PileShape.Frame, PileShape.Timber, new Vector3(0, .01f, 0));
+        Yard(body);
         int variant = id % 3;
         var soil = Pivot(body, Vector3.Zero);
         Add(soil, FarmShape.Soil, FarmShape.Earth, Vector3.Zero);
