@@ -543,6 +543,7 @@ public partial class Game {
         var picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
         Require(picker.Selected == Array.IndexOf(StartMenu.Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
         await Choose(picker, 0);
+        Require(GetWindow().ContentScaleSize == StartMenu.Resolutions[0], "Choosing a resolution must render at it.");
         var limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
         Require(limits.Selected == 0, "The frame rate limit must start on its first choice.");
         Require(limits.GetItemText(0) == "Off", "The frame rate limit's first choice must be Off.");
@@ -570,6 +571,8 @@ public partial class Game {
         Require(limits.Selected == 2, "Reopened options must show the chosen frame rate limit.");
         Require(!taa.ButtonPressed, "Reopened options must show temporal anti-aliasing off.");
         Require(musicSlider.Value == 50, "Reopened options must show the chosen music volume.");
+        // The later checks measure the screen at the design size.
+        await Choose(picker, Array.IndexOf(StartMenu.Resolutions, Settings.DesignSize));
         await Choose(limits, 0);
         Require(Engine.MaxFps == 0, "Turning the frame rate limit off must lift the cap.");
         await Click(taa);

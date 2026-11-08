@@ -36,7 +36,7 @@ public partial class Game {
     private async Task<Vector2> At(Control control) {
         for (Node? n = control.GetParent(); n != null; n = n.GetParent()) if (n is ScrollContainer scroll) scroll.EnsureControlVisible(control);
         await Frames();
-        return GetViewport().GetFinalTransform() * control.GetGlobalRect().GetCenter();
+        return GetViewport().GetFinalTransform() * (control.GetGlobalTransformWithCanvas() * (control.Size / 2));
     }
 
     /// <summary>Moves the mouse onto a control.</summary>

@@ -16,6 +16,7 @@ public partial class Game : Node, IGameFlow {
     private WorldView view = null!;
     private Sounds sounds = null!;
     private Control ui = null!;
+    private CanvasLayer layer = null!;
     private ClockPlate clock = null!;
     private MessageStack messages = null!;
     private NeedsPlate needsPlate = null!;
@@ -72,13 +73,16 @@ public partial class Game : Node, IGameFlow {
             world.Sound = PlayWorldSound;
             ConnectNet();
             sounds.OffScreen = view.OffScreen;
-            var layer = new CanvasLayer(); AddChild(layer);
-            ui = new Control { Name = "Interface" }; ui.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); layer.AddChild(ui); ui.MouseFilter = Control.MouseFilterEnum.Ignore;
+            layer = new CanvasLayer(); AddChild(layer);
+            ui = new Control { Name = "Interface", MouseFilter = Control.MouseFilterEnum.Ignore }; layer.AddChild(ui);
+            FitInterface();
             ui.Theme = Style.Interface(); BuildHud();
             GetViewport().UseTaa = Settings.Taa;
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
-            if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run")) { Settings.ApplyResolution(GetWindow(), Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
+            if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run")) { ApplyResolution(Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
+            // A review run renders at a chosen size, such as the player's own, as "2560x1440".
+            if (Launch.Value("--resolution") is string resolution) { var parts = resolution.Split('x'); ApplyResolution(new Vector2I(int.Parse(parts[0]), int.Parse(parts[1]))); }
             if (Launch.Has("--performance-run")) StartGame(-1);
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
@@ -174,6 +178,15 @@ public partial class Game : Node, IGameFlow {
         }
         session = net.Owning ? new Session.Playing() : new Session.None();
         if (Launch.Has("--performance-run")) StartPerformanceRun();
+    }
+
+    public void ApplyResolution(Vector2I size) { Settings.ApplyResolution(GetWindow(), size); FitInterface(); }
+
+    /// <summary>The interface is laid out for the design size and drawn larger at a taller render size, keeping its share of the screen.</summary>
+    private void FitInterface() {
+        var size = (Vector2)GetWindow().ContentScaleSize;
+        float scale = size.Y / Settings.DesignSize.Y;
+        layer.Scale = Vector2.One * scale; ui.Size = size / scale;
     }
 
     /// <summary>Opens a game this window started: a new one on the welcome page, a loaded one on the backpack.</summary>

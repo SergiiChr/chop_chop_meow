@@ -40,7 +40,7 @@ public partial class Game {
         Directory.CreateDirectory(performanceFolder);
         startMenu.Close(); panel.Close();
         Engine.MaxFps = 0; DisplayServer.WindowSetVsyncMode(DisplayServer.VSyncMode.Disabled);
-        DisplayServer.WindowSetSize(new Vector2I(2560, 1440));
+        ApplyResolution(new Vector2I(2560, 1440));
         RenderingServer.ViewportSetMeasureRenderTime(GetViewport().GetViewportRid(), true);
         performanceSamples = new PerformanceSample[500_000];
         foreach (var thing in world.Things)
