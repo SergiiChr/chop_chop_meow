@@ -441,6 +441,7 @@ A harvest takes one worker about 1 working day and gives 4 wheat, 2 wheat seeds 
 
 Seeds do not sow themselves: move them from the output into the sowing slot by hand, or let a hauler do it.
 Its panel shows seeds as the input, fertilizer as its fuel and wheat, seeds and grass as outputs.
+While the wheat grows it says how long until it is ripe, such as "Growing, 2 days until ripe", and offers the harvest only once it is.
 
 - A worker on Farm harvests.
 - A worker on Haul first moves seeds from the output into the sowing slot, then carries out the rest of the harvest and brings fertilizer and any missing seeds from storage.
