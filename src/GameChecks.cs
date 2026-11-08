@@ -738,6 +738,22 @@ public partial class Game {
         await Frames();
         RemoveThings(Hosted, t => t == farm || t == anvil); Warp(Hosted, start);
     }
+    /// <summary>Holding the right mouse button on a marked mine walks the player to its entrance and digs it with the pickaxe.</summary>
+    private async Task CheckRightMouseOnAMarkedMineDigsItWithAPickaxe() {
+        // The server's position, since the window's copy may not have caught up with the last check's warp.
+        var start = Hosted.Player;
+        var cliff = World.CliffOf(ThingKind.Iron);
+        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        var mine = Hosted.Build(ThingKind.Mine, World.MineSpot(cliff))!;
+        Give(Hosted, "steel_pick", 1);
+        await Frames(2);
+        var point = RightPress(mine.Pos);
+        await Until(() => mine.Progress > 0 && view.PlayerAnimation == ActorAction.SteelMine, "holding RMB on a marked mine walking to its entrance and digging with the pickaxe", 6);
+        RightRelease(point);
+        await Frames();
+        Drop(Hosted, "steel_pick", 1);
+        RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
     /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
     private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(2, 0)); anvil.Inventory.Add("steel_bar", 4);
@@ -1172,6 +1188,7 @@ public partial class Game {
             await Test(CheckSoundsRotateCrossfadeAndStaySilentOffScreen);
             await Test(CheckRightClickGathersTreeAndHarvestsFarm);
             await Test(CheckHarvestingBesideAStationStopsHammering);
+            await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
             await Test(CheckHudAndHotbarEatAndDrinkInHand);

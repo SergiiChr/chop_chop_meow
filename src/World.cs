@@ -383,7 +383,7 @@ public sealed partial class World {
         foreach (var t in S.Remembered.Values) if (!Sees(t.Pos)) known.Add(t);
     }
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
-    public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind == ThingKind.Water ? Terrain.WaterPoint(from) : t.Pos;
+    public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind switch { ThingKind.Water => Terrain.WaterPoint(from), ThingKind.Mine => MineDoor(t), _ => t.Pos };
     /// <summary>How far, in metres, the player reaches to move items in and out of storage and stations.</summary>
     public const float ItemReach = 15;
     /// <summary>Whether the player can move items to or from a thing.</summary>
@@ -614,6 +614,7 @@ public sealed partial class World {
     }
     public string? GatherBlock(Thing t, bool worker = false) {
         if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == "water") return "Your bottles are filled.";
+        if (t.Kind == ThingKind.Mine) return MineBuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (!t.IsResource) return "Select a natural resource.";
         if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again in ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Tree => "Only a stump is left. Find another tree.", ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
@@ -637,6 +638,7 @@ public sealed partial class World {
         var blocked = GatherBlock(t);
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
+        if (t.Kind == ThingKind.Mine) { BuildMine(t, dt); return; }
         if (t.Kind == ThingKind.Farm) { Harvest(t, dt); if (t.FarmStage == FarmStage.Fallow) Say("Harvested. Take the wheat, seeds and grass from the plot, and put seeds back in to sow again."); return; }
         gatherClock += dt;
         var rule = GatherRules.Of(t.Kind);
@@ -722,7 +724,7 @@ public sealed partial class World {
         if (Forwarded(Verb.Build, item: kind.Id(), at: p)) return null;
         S.Backpack.Spend(Data.Buildings[kind].Cost);
         var t = Add(kind, p); if (kind == ThingKind.Campfire) { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
-        S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Assign a worker to dig the entrance; they need a pickaxe."); Made?.Invoke(S.Actor.Id, t.Id); }
+        S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); Made?.Invoke(S.Actor.Id, t.Id); }
         return t;
     }
     public void Consume(string item) {

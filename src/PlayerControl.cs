@@ -143,7 +143,7 @@ public sealed class PlayerControl {
 
     private void RightPress(Vector2 at) {
         var t = view.Pick(at);
-        if (t?.IsResource == true || t?.Kind == ThingKind.Farm) { gathering = t; panel.Mark(t); } else gathering = null;
+        if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind == ThingKind.Crate ? t : null; liftClock = 0;
     }
 

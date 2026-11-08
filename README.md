@@ -535,6 +535,8 @@ Clicking the mine shows its three stages:
 2. 50 wood, 10 iron bars and 50 stone go in, hauled from storage by assigned workers or delivered from the backpack.
 3. A worker with a hammer fits the timber frame and the rails, which run into the dark tunnel, in another working day.
 
+You can dig and fit too: hold right mouse on the mine with a pickaxe or a hammer in your backpack, and your work adds to the workers'.
+
 Workers take the pickaxe and hammer from a tool station.
 
 A finished mine takes up to 3 workers with pickaxes, who mine out of sight underground.

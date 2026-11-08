@@ -15,6 +15,7 @@ public static class MineChecks {
         CheckMineSitesAlignWithCliffs(data);
         CheckMinesAreMarkedAtCliffsOnceEach(data);
         CheckWorkersDigAndFrameMineWithTheirTools(data);
+        CheckPlayerDigsAndFitsAMineWithTheirTools(data);
         CheckPlayerDeliversOnlyWhatAMineStillNeeds(data);
         CheckMinersBringOreOutAndStopWhenOutputIsFull(data);
         CheckOnlyAvailableMinersUnload(data);
@@ -101,6 +102,25 @@ public static class MineChecks {
         started = world.Time;
         Work(world, data.DaySeconds * 3, () => mine.MineStage == MineStage.Open);
         Require(mine.MineStage == MineStage.Open && world.Time - started >= world.MineStageSeconds, "a worker with a hammer must fit the frame in about one working day");
+    }
+
+    private static void CheckPlayerDigsAndFitsAMineWithTheirTools(GameData data) {
+        var world = FundedWorld(data);
+        var mine = MarkMine(world);
+        world.Player = World.MineDoor(mine);
+        world.Gather(mine, 1);
+        Require(mine.Progress == 0 && world.GatherBlock(mine)?.Contains("pickaxe") == true, $"digging the entrance should need a pickaxe: {world.GatherBlock(mine)}");
+        Give(world, "steel_pick", 1);
+        for (float held = 0; held <= world.MineStageSeconds && mine.MineStage == MineStage.Marked; held++) world.Gather(mine, 1);
+        Require(mine.MineStage == MineStage.Dug, "a player holding right mouse on a marked mine with a pickaxe should dig its entrance in a working day");
+        foreach (var (item, amount) in data.Mine.Materials) Give(world, item, amount);
+        world.SupplyMine(mine); world.Tick(.1f);
+        Require(mine.MineStage == MineStage.Supplied, "the delivered materials should shore the mine up");
+        world.Gather(mine, 1);
+        Require(mine.Progress == 0 && world.GatherBlock(mine)?.Contains("hammer") == true, $"fitting the frame should need a hammer: {world.GatherBlock(mine)}");
+        Give(world, "wood_hammer", 1);
+        for (float held = 0; held <= world.MineStageSeconds && mine.MineStage == MineStage.Supplied; held++) world.Gather(mine, 1);
+        Require(mine.MineStage == MineStage.Open, "a player holding right mouse on a supplied mine with a hammer should fit its frame in a working day");
     }
 
     private static void CheckPlayerDeliversOnlyWhatAMineStillNeeds(GameData data) {

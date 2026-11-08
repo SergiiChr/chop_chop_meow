@@ -467,7 +467,7 @@ public partial class WorldView : Node3D {
             playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
         }
         bool moving = World.Player.DistanceSquaredTo(player.Position) > .000001f;
-        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting, World.CraftRate > 0);
+        ActorAction action = ActorAnimation.PlayerAction(GatheringTarget?.Kind, Gathering, moving, World.S.Backpack, World.Me.Sprinting, World.CraftRate > 0, Fitting(GatheringTarget));
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
@@ -569,7 +569,7 @@ public partial class WorldView : Node3D {
             bool moving = p.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var target = World.Find(p.GatherTarget);
             bool gathering = target != null && p.Pos.DistanceTo(World.GatherAt(target, p.Pos)) < 2.5f;
-            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting, p.Making != "" || p.Crafting.Count > 0);
+            var action = ActorAnimation.PlayerAction(target?.Kind, gathering, moving, p.Backpack, p.Sprinting, p.Making != "" || p.Crafting.Count > 0, Fitting(target));
             var subject = gathering ? target : null;
             var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
             if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; subject = ThingAt(other.PulseTarget); }
@@ -643,6 +643,9 @@ public partial class WorldView : Node3D {
         slot.GetChild<Node3D>(0).Visible = !steel;
         slot.GetChild<Node3D>(1).Visible = steel;
     }
+
+    /// <summary>Whether working on a thing hammers in a mine's frame and rails rather than digging.</summary>
+    private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
 
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
     private void Work(ActorState actor, Thing? subject) {

@@ -690,6 +690,7 @@ Loading a save made on an older valley moves only the mine cart anchor to this s
 | Fitted | a worker with a hammer | `MineStage.Open` |
 
 The two worker stages take `StageWorkdays` of `GameData.WorkdaySeconds`.
+The player holding a gather on the mine (`World.Gather`, standing at `World.MineDoor`) adds to the same progress with a pickaxe or hammer carried (`World.BuildMine`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
 
 Up to `mine.workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).
