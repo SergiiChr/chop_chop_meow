@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>The start menu and the save, load and options screens it shares with the pause menu.</summary>
 public partial class StartMenu : ColorRect {
-    /// <summary>Render sizes to pick from: 16:9 and 16:10 at each common height.</summary>
+    /// <summary>Render sizes to pick from, 16:9 and 16:10.</summary>
     public static readonly Vector2I[] Resolutions = { new(1280, 720), new(1440, 900), new(1600, 900), new(1920, 1080), new(1920, 1200), new(2560, 1440), new(2560, 1600), new(3840, 2160), new(3840, 2400) };
     /// <summary>Frame rate caps offered in the options; 0 leaves the rate to vsync alone.</summary>
     private static readonly int[] FrameLimits = { 0, 60, 90 };

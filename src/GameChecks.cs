@@ -544,6 +544,7 @@ public partial class Game {
         Require(picker.Selected == Array.IndexOf(StartMenu.Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
         await Choose(picker, 0);
         Require(GetWindow().ContentScaleSize == StartMenu.Resolutions[0], "Choosing a resolution must render at it.");
+        Require(layer.Scale == Vector2.One * .8f && ui.Size == new Vector2(1600, 900), "Choosing a resolution must keep the interface's share of the screen.");
         var limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
         Require(limits.Selected == 0, "The frame rate limit must start on its first choice.");
         Require(limits.GetItemText(0) == "Off", "The frame rate limit's first choice must be Off.");

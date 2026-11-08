@@ -9,7 +9,7 @@
     // Terrain3D supplies height, clipmap LOD, terrain normals and the grass and rock photoscans blended by slope.
     // The project supplies the colours; the photoscans add only their grain, as brightness around their mean, and their bump.
     const float DETAIL = 0.4;
-    // tools/pack_ground.gd scales every photoscan to this mean linear brightness, so any blend of them has it too.
+    // tools/pack_textures.gd scales every photoscan to this mean linear brightness, so any blend of them has it too.
     const float MEAN = 0.14;
     const vec3 LUMA = vec3(0.3, 0.59, 0.11);
     vec3 meadow = texture(grass, v_vertex.xz / 9.0 + vec2(0.5)).rgb;

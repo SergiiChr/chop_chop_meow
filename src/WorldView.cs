@@ -160,7 +160,7 @@ public partial class WorldView : Node3D {
         // One shadow map covers the whole view: split maps leave a seam across this tilted overhead view and their soft edges jump as the camera moves.
         // Shadows this soft need the Ultra filter set in project.godot: lower qualities break their wide edges into a hatched pattern that flickers.
         // The blur has one width everywhere: a penumbra that widens with the caster's height is shaded per pixel, and at low sun the trees' long shadows cost 20 ms a frame at 1440p.
-        // The sun lights the scene directly and stays out of the sky, so its turning does not rebuild the sky's light each frame.
+        // The sun lights the scene directly and stays out of the sky, so its turning does not rebuild the sky's light.
         sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = DaySun, SkyMode = DirectionalLight3D.SkyModeEnum.LightOnly };
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
@@ -1153,6 +1153,9 @@ public partial class WorldView : Node3D {
     /// <summary>Night's ambient light without a moon: dark enough that fires and torches matter.</summary>
     private const float NewMoonAmbient = .1f;
 
+    /// <summary>The sky light last written.</summary>
+    private Color skyAmbient;
+
     private void UpdateLighting() {
         // The sun rises at dawn and sets halfway through dusk, then the moon takes the same path until dawn.
         // Each fades out near the horizon, so the hand-over at sunset moves no visible shadow.
@@ -1173,10 +1176,13 @@ public partial class WorldView : Node3D {
         float low = moon ? 0 : 1 - Mathf.SmoothStep(.1f, .45f, height);
         sun.LightColor = NoonLight.Lerp(LowSunLight, low).Lerp(MoonLight, night);
         var ambient = DayAmbient.Lerp(LowSunAmbient, low * .6f).Lerp(NightAmbient, night);
-        // Sky light from above, and below it that light bounced off the grass.
-        var bounce = ambient * DayGround;
-        skylight.SkyTopColor = ambient; skylight.SkyHorizonColor = ambient;
-        skylight.GroundHorizonColor = bounce; skylight.GroundBottomColor = bounce;
+        // Sky light from above, and below it that light bounced off the grass; each write rebuilds the sky's light, so a steady sky gets none.
+        if (ambient != skyAmbient) {
+            skyAmbient = ambient;
+            var bounce = ambient * DayGround;
+            skylight.SkyTopColor = ambient; skylight.SkyHorizonColor = ambient;
+            skylight.GroundHorizonColor = bounce; skylight.GroundBottomColor = bounce;
+        }
         environment.AmbientLightEnergy = Mathf.Lerp(DayAmbientEnergy, Mathf.Lerp(NewMoonAmbient, .3f, moonlight), night);
         environment.BackgroundColor = DayGround.Lerp(NightGround, night);
     }

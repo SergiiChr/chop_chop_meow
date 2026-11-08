@@ -78,7 +78,7 @@ public partial class WorldView {
         // Closed shapes such as shrubs keep back faces culled, or their unlit insides show where they meet a slope.
         solidDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingCode(true) } };
         solidDressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
-        solidDressingMaterial.SetShaderParameter("grain", ModelKit.Maps(Surface.Foliage).Grain);
+        solidDressingMaterial.SetShaderParameter("grain", ModelKit.Grain(Surface.Foliage));
         solidDressingMaterial.SetShaderParameter("tile", ModelKit.Tile(Surface.Foliage));
         sceneryShadeImage = Image.CreateFromData(ShadeSize, ShadeSize, false, Image.Format.R8, sceneryShade);
         sceneryShadeTexture = ImageTexture.CreateFromImage(sceneryShadeImage);

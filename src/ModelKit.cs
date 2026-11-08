@@ -48,11 +48,10 @@ public static class ModelKit {
     /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, and a cloth weave is drawn coarse so it shows at the game's distance.</summary>
     public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, _ => 1 };
 
-    /// <summary>A surface's grain, a multiplier around one, and its bump, a normal map; the engine hands out one copy of each.</summary>
-    public static (Texture2D Grain, Texture2D Bump) Maps(Surface surface) {
-        string name = surface.ToString().ToLowerInvariant();
-        return (GD.Load<Texture2D>($"res://assets/models/surfaces/{name}_grain.exr"), GD.Load<Texture2D>($"res://assets/models/surfaces/{name}_bump.png"));
-    }
+    /// <summary>A surface's grain, a multiplier around one; the engine hands out one copy per file.</summary>
+    public static Texture2D Grain(Surface surface) => GD.Load<Texture2D>($"res://assets/models/surfaces/{surface.ToString().ToLowerInvariant()}_grain.exr");
+    /// <summary>A surface's bump, an OpenGL normal map.</summary>
+    private static Texture2D Bump(Surface surface) => GD.Load<Texture2D>($"res://assets/models/surfaces/{surface.ToString().ToLowerInvariant()}_bump.png");
 
     /// <summary>
     /// Lays the surface's grain and bump over the material in its own space, so the marks stay put when the model moves.
@@ -60,10 +59,9 @@ public static class ModelKit {
     /// </summary>
     public static void Dress(StandardMaterial3D material, Surface surface) {
         if (surface == Surface.Flat) return;
-        var maps = Maps(surface);
         material.DetailEnabled = true; material.DetailBlendMode = BaseMaterial3D.BlendModeEnum.Mul;
         material.TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic;
-        material.DetailAlbedo = maps.Grain; material.DetailNormal = maps.Bump;
+        material.DetailAlbedo = Grain(surface); material.DetailNormal = Bump(surface);
         material.DetailUVLayer = BaseMaterial3D.DetailUV.UV2; material.UV2Triplanar = true; material.UV2Scale = Vector3.One / Tile(surface);
         // The depth applies to the bump once it is mixed into the normal map, which has no texture of its own here.
         material.NormalEnabled = true; material.NormalScale = BumpDepth;

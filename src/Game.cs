@@ -79,7 +79,7 @@ public partial class Game : Node, IGameFlow {
             blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);
             // Play renders at the player's pick; a review run or check at the design size, unless --resolution asks for one such as "2560x1440".
             bool review = Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run");
-            ApplyResolution(Launch.Size("--resolution") ?? (review ? GetWindow().ContentScaleSize : Settings.Resolution));
+            ApplyResolution(Launch.Size("--resolution") ?? (review ? Settings.DesignSize : Settings.Resolution));
             if (!review) Engine.MaxFps = Settings.FrameLimit;
             BuildHud();
             GetViewport().UseTaa = Settings.Taa;

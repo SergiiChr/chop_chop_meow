@@ -48,6 +48,8 @@ OUTPUT = ROOT / "assets" / "models" / "surfaces"
 
 def main() -> None:
     build.pack_photoscans(SETS, MAPS, SIZE, OUTPUT, "surface", DETAIL)
+    # The shrub shader lays on the foliage grain alone, so its bump stays out of the game.
+    (OUTPUT / "foliage_bump.png").unlink()
 
 
 if __name__ == "__main__":

@@ -38,7 +38,10 @@ func _pack() -> void:
 			quit(1)
 			return
 		var detail := float(set[1]) if set.size() == 2 else DETAIL
-		var packed := _pack_ground(source, output, size, parts[0], set[0]) if ground else _pack_surface(source, output, size, parts[0], set[0], detail)
+		var packed := (
+			_pack_ground(source, output, size, parts[0], set[0]) if ground
+			else _pack_surface(source, output, size, parts[0], set[0], detail)
+		)
 		if not packed:
 			quit(1)
 			return
