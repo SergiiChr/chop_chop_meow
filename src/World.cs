@@ -907,8 +907,9 @@ public sealed partial class World {
     }
     /// <summary>Finished goods plus anything no current, queued or kept recipe takes.</summary>
     public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));
-    private string? FirstLeftover(Thing t) {
-        foreach (var pair in t.Inventory.Items) if (!Pending(t, pair.Key)) return pair.Key;
+    /// <summary>The first of a station's leftovers that some storage takes, and that storage.</summary>
+    private (string Item, Thing Store)? LeftoverToStore(Thing t) {
+        foreach (var pair in t.Inventory.Items) if (!Pending(t, pair.Key) && DepositFor(pair.Key, t.Pos) is Thing store) return (pair.Key, store);
         return null;
     }
     /// <summary>Steps inside a cabin, out of reach of wolves; any movement steps back out.</summary>
@@ -1495,31 +1496,41 @@ public sealed partial class World {
     }
     // Only chests and piles take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
     private static readonly ThingKind[] Stores = { ThingKind.Chest, ThingKind.Pile };
-    // Trading posts also take deliveries, of the crates they ask for.
-    private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Signpost };
+    // Trading posts also take deliveries, of the crates they ask for, and packing stations of the good they pack.
+    private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Signpost, ThingKind.Packer };
     public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) {
         Thing? best = null; int bestRank = 0; float bestDistance = 0;
         foreach (var kind in Depots)
             foreach (var t in S.Things.Of(kind)) {
                 // A trading post takes deliveries only of crates its filter asks for, which is how it asks for goods to sell.
-                if (kind == ThingKind.Signpost && !t.Inventory.Wants(item) || t.Id == exclude || t.Inventory.Room(item) <= 0 || !t.Inventory.Accepts(item) || !Holds(t, item)) continue;
+                if (kind == ThingKind.Signpost && !t.Inventory.Wants(item) || kind == ThingKind.Packer && !PackerTakes(t, item) || t.Id == exclude || t.Inventory.Room(item) <= 0 || !t.Inventory.Accepts(item) || !Holds(t, item)) continue;
                 // Compost names every food in its filter, but takes food only when nothing else will, so harvests and picked berries are not left to rot.
                 if (t.Compost && t.SkipFood && Data.IsFood(item)) continue;
-                int rank = t.Compost && Data.IsFood(item) ? 2 : t.Inventory.Wants(item) ? 0 : 1;
+                int rank = t.Compost && Data.IsFood(item) ? 2 : kind == ThingKind.Packer || t.Inventory.Wants(item) ? 0 : 1;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || rank < bestRank || rank == bestRank && distance < bestDistance) { best = t; bestRank = rank; bestDistance = distance; }
             }
         return best;
     }
+    /// <summary>
+    /// Whether a packing station takes a delivery of an item: only the good it packs, and only while a delivery of up to a stack still leaves a slot for empty crates.
+    /// </summary>
+    private static bool PackerTakes(Thing packer, string item) =>
+        item == packer.Packs && packer.Inventory[item] <= (packer.Inventory.Slots - 2) * packer.Inventory.StackOf(item);
+    /// <summary>The nearest chest or pile that gives out an item, or station holding it as a finished good, or null.</summary>
     public Thing? SourceFor(string item, Vector2 origin, int exclude = 0) {
         Thing? best = null; float bestDistance = 0;
-        foreach (var kind in Stores)
+        foreach (var kind in Stores) Nearer(kind, false);
+        foreach (var kind in stationKinds) Nearer(kind, true);
+        return best;
+
+        void Nearer(ThingKind kind, bool station) {
             foreach (var t in S.Things.Of(kind)) {
-                if (t.Id == exclude || t.Inventory[item] <= 0 || !t.Inventory.AllowsWithdrawal(item)) continue;
+                if (t.Id == exclude || t.Inventory[item] <= 0 || !t.Inventory.AllowsWithdrawal(item) || station && Pending(t, item)) continue;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || distance < bestDistance) { best = t; bestDistance = distance; }
             }
-        return best;
+        }
     }
     /// <summary>The nearest thing of a kind, or null.</summary>
     private Thing? Nearest(ThingKind kind, Vector2 origin) => Nearest(new ReadOnlySpan<ThingKind>(in kind), origin);
@@ -1744,9 +1755,8 @@ public sealed partial class World {
         const string Idle = "Nothing queued or marked to make";
         if (!haul && !Data.Recipes.ContainsKey(target.Recipe)) { w.Status = Idle; return false; }
         if (haul) {
-            if (FirstLeftover(target) is string leftover) {
-                var dest = DepositFor(leftover, target.Pos);
-                if (dest == null) { w.Status = "Output blocked · needs accepting storage"; return false; }
+            // Finished goods with nowhere to go stay in the station, which keeps working until it is full.
+            if (LeftoverToStore(target) is (string leftover, Thing dest)) {
                 w.Status = "Collecting finished goods";
                 if (Walk(w, target.Pos, dt)) { target.Inventory.TransferTo(w.Bag, leftover, w.Bag.StackSize, true); w.Destination = dest.Id; }
                 return true;

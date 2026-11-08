@@ -21,6 +21,8 @@ public static class ProductionChainChecks {
         CheckHaulerStocksPackerAndCarriesCratesToStorageAskingForThem(data);
         CheckPileOfPackedCratesTakesOnlyTheSameGood(data);
         CheckPostsTakeOnlyAskedForCratesAndSendTheCartWhenFull(data);
+        CheckBenchKeepsMakingToolsWithNowhereElseToPutThem(data);
+        CheckHaulerFetchesInputsFromTheStationThatMadeThem(data);
         CheckWorkersRunEveryChain(data);
     }
 
@@ -125,6 +127,36 @@ public static class ProductionChainChecks {
     /// A settlement by the lake, run only by workers, sells each end product by cart within a few days.
     /// Workers mine, chop, rake, pick and fetch water; they smelt, forge, hammer, grind, bake, cook and can; and they make crates, pack them and stock the post.
     /// </summary>
+    /// <summary>With no storage taking pickaxes, the bench keeps its finished pickaxes and its worker goes on making more.</summary>
+    private static void CheckBenchKeepsMakingToolsWithNowhereElseToPutThem(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(20, 20));
+        world.SetRecipe(bench, "steel_pick");
+        bench.Tools!.Add("steel_hammer", 1);
+        // Piles take only the one resource they hold, so nothing takes a pickaxe.
+        world.Add(ThingKind.Pile, bench.Pos + new Vector2(4, 0)).Inventory.Add("steel_parts", 20);
+        world.Add(ThingKind.Pile, bench.Pos + new Vector2(8, 0)).Inventory.Add("wood_parts", 10);
+        var worker = AddWorker(world, bench.Pos + new Vector2(0, 1));
+        worker.Wage = 18;
+        world.SetDuty(worker, bench, "craft", true); world.SetDuty(worker, bench, "haul", true);
+        Work(world, 180, () => bench.Inventory["steel_pick"] >= 3);
+        Require(bench.Inventory["steel_pick"] >= 3, $"the bench should keep making pickaxes it has nowhere else to put: {bench.Inventory["steel_pick"]} made");
+    }
+
+    /// <summary>A bench's hauler takes steel parts straight from the anvil that hammered them.</summary>
+    private static void CheckHaulerFetchesInputsFromTheStationThatMadeThem(GameData data) {
+        var world = EmptyWorld(data);
+        var anvil = world.Add(ThingKind.Anvil, new Vector2(20, 20));
+        anvil.Inventory.Add("steel_parts", 6);
+        var bench = world.Add(ThingKind.Bench, new Vector2(26, 20));
+        world.SetRecipe(bench, "steel_hammer");
+        var worker = AddWorker(world, bench.Pos + new Vector2(0, 1));
+        worker.Wage = 18;
+        world.SetDuty(worker, bench, "haul", true);
+        Work(world, 30, () => bench.Inventory["steel_parts"] > 0);
+        Require(bench.Inventory["steel_parts"] == 2 && anvil.Inventory["steel_parts"] == 4, "the bench's hauler should fetch two batches of steel parts from the anvil's finished goods");
+    }
+
     private static void CheckWorkersRunEveryChain(GameData data) {
         var world = EmptyWorld(data);
         var site = new ChainSite(world);

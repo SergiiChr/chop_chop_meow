@@ -482,6 +482,8 @@ A station's `Thing.Queue` holds its queued batches, one entry per recipe in the 
 Saves and world updates leave out an empty mark, queue and batch, so a tree or a rock carries none of them.
 `World.QueueOf` and `World.Enqueue` read and change either queue, a station's or the hand's, for the board and the strip.
 A station takes inputs for any recipe it has queued or kept, and haulers carry out only what none of them takes.
+What no storage takes stays in the station, which goes on working until its output stack is full.
+`World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
 
 #### Tool slots
@@ -540,7 +542,7 @@ A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (5) items i
 #### Chests
 
 Chests have separate item allowlists for input and output, and empty lists allow all items.
-Automated deposits prefer a chest with a matching input filter, then a nearby unrestricted chest.
+Automated deposits prefer a chest with a matching input filter, or a packing station packing the item, then a nearby unrestricted chest.
 Automated withdrawals respect output filters.
 Manual transfers ignore those filters.
 
@@ -576,6 +578,7 @@ While worked like an anvil, it moves one item every `PackSeconds` into that crat
 A full crate, or one of another good after the choice changes, waits in the output.
 
 - Haul carries that crate to `DepositFor` and the station's leftovers to storage, then keeps a crate's worth of the good and two empty crates there.
+- `DepositFor` counts the station as storage for its good, ranked with explicit filters, while a stack's delivery still leaves a slot for empty crates (`World.PackerTakes`).
 - A worker with both jobs fetches only once the station runs dry, crates first.
 
 Putting a packed crate into a placed crate asks for confirmation.

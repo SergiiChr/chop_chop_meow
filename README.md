@@ -374,6 +374,8 @@ The crate being packed shows on the right with how full it is; a full crate wait
 - Craft: works the station.
 - Haul: carries out the full crate, and anything it no longer packs, to storage; then keeps a crate's worth of the good and two empty crates there.
 
+Workers deliver the good it packs straight to it, before other storage, as long as a slot stays free for empty crates.
+
 A crate of one good is a kind of item that filters can name: "Crate of bread" in a chest's filter, or in the trading post's.
 A full crate goes to the nearest storage whose filter asks for that crate, otherwise to the nearest open storage.
 A pile of crates takes more crates of the same good.
@@ -401,6 +403,9 @@ Storage input filters govern automated deposits; output filters govern worker wi
 Empty filters allow all items.
 Workers prefer explicitly accepting chests and reroute cargo when filters change.
 Manual inventory transfers ignore these automation filters.
+
+A station keeps the goods it makes when no storage takes them, and goes on working until its output stack is full.
+Workers fetching a station's inputs take them from storage or straight from another station's finished goods, such as steel parts from the anvil.
 
 ### Tool station
 
@@ -537,7 +542,7 @@ When nobody is working, the cart stands outside, loaded once there is output.
 
 Each miner brings out one ore and one rock every 1.6 seconds, about half what a worker gets from a deposit, but a mine never runs out.
 Output fills two slots, ore and rocks, of one stack each.
-When either is full, mining stops and a miner carries the full stack out to the nearest storage that takes it.
+When either is full, mining stops and a miner carries the full stack out to the nearest storage that takes it, or to a packing station packing it.
 With none, a message says the mine is full with no output available.
 
 ## Wolves and night

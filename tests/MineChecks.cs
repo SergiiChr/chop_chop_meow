@@ -18,6 +18,7 @@ public static class MineChecks {
         CheckPlayerDeliversOnlyWhatAMineStillNeeds(data);
         CheckMinersBringOreOutAndStopWhenOutputIsFull(data);
         CheckOnlyAvailableMinersUnload(data);
+        CheckFullMineUnloadsIntoAPackingStationPackingItsOre(data);
         CheckMiningIsSlowerThanDeposits(data);
         CheckDailyProfitIsSalesMinusWagesAndMeetsEndGoals(data);
     }
@@ -163,6 +164,19 @@ public static class MineChecks {
         var carrier = crew.First(w => w.Bag.Count > 0);
         world.Fire(carrier);
         Require(world.Things.Any(t => t.Kind == ThingKind.Grave && t.Inventory["stone"] == mine.Output.StackSize), "dismissing a miner must not lose the stack they carry");
+    }
+
+    private static void CheckFullMineUnloadsIntoAPackingStationPackingItsOre(GameData data) {
+        var world = FundedWorld(data);
+        var mine = MarkMine(world); mine.MineStage = MineStage.Open;
+        var cliff = World.CliffAt(mine.Pos);
+        var packer = world.Add(ThingKind.Packer, mine.Pos + cliff.Face * 3);
+        world.SetPacking(packer, "iron_ore");
+        var miner = AddWorker(world, packer.Pos + cliff.Along);
+        miner.Tool = "steel_pick"; world.Assign(miner, mine);
+        mine.Output!.Add("iron_ore", mine.Output.StackSize);
+        Work(world, 60, () => packer.Inventory["iron_ore"] > 0);
+        Require(packer.Inventory["iron_ore"] == mine.Output.StackSize, "with no chest, a full mine's ore should go to a packing station packing iron ore");
     }
 
     private static void CheckOnlyAvailableMinersUnload(GameData data) {
