@@ -59,7 +59,7 @@ public sealed class PlayerState {
 }
 
 /// <summary>The player actions a guest sends to the host.</summary>
-public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, HoldHotbar, Leave, LoadBatch, LoadFuel, LoadInput, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, QueueRecipe, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, UnslotTool }
+public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, HoldHotbar, Leave, LoadBatch, LoadFuel, LoadInput, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, QueueRecipe, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, UnslotTool }
 
 /// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
 public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At);
@@ -185,6 +185,7 @@ public sealed partial class World {
             case Verb.SetPacking: SetPacking(t, c.Item); break;
             case Verb.Buy: Buy(t, c.Item, Math.Min(c.Count, 5)); break;
             case Verb.PickUpCrate: PickUpCrate(t); break;
+            case Verb.Dismantle: Dismantle(t); break;
             case Verb.SlotTool: SlotTool(t, c.Item); break;
             case Verb.UnslotTool: UnslotTool(t, c.Item); break;
             case Verb.FetchPrices: FetchPrices(t); break;

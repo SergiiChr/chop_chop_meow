@@ -230,6 +230,13 @@ A worker can hold several jobs, at one place or several, and works through them 
 
 The crew button opens an overview with each worker's daily pay and the total above.
 
+### Taking buildings down
+
+A building's page has a red X at the left of its header.
+Click it, then click "Remove?" to take the building down.
+Its cost and everything in it go to your backpack, and what does not fit waits in a recovery box where it stood; a mine also gives back the timber, iron and stone delivered to it.
+A cabin someone is in, or a trading post with a cart out, stays up until they come out or the cart is back.
+
 ## Survival
 
 ### Food, water and time

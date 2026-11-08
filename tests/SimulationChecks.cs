@@ -25,6 +25,8 @@ public static class SimulationChecks {
         Test(WorkerStateChecks.Run, data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
+        Test(CheckDismantlingABuildingReturnsItsCostAndContents, data);
+        Test(CheckDismantlingWhatDoesNotFitLeavesItInABox, data);
         Test(CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest, data);
         Test(CheckWorkerGathersWoodAndRetargetsWhenFilterChanges, data);
         Test(CheckWorkerDetoursAroundLake, data);
@@ -227,6 +229,37 @@ public static class SimulationChecks {
         world.SetFilter(heldRack, "steel_pick", true, false);
         SafeTick(world, 10);
         Require(cutter.Tool == "steel_axe", "with the filter cleared, the worker should take the axe");
+    }
+
+    private static void CheckDismantlingABuildingReturnsItsCostAndContents(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(20, 20);
+        Give(world, "wood", 8); Give(world, "stone", 30);
+        var chest = world.Build(ThingKind.Chest, world.Player + new Vector2(2, 0))!;
+        world.Transfer(world.Backpack, chest.Inventory, "stone", 30);
+        Require(world.Backpack["wood"] == 0 && world.Backpack["stone"] == 0, "building the chest and filling it should empty the backpack");
+        Require(world.Dismantle(chest), "the player should dismantle a chest in reach");
+        Require(world.Find(chest.Id) == null, "a dismantled chest should be gone");
+        Require(world.Backpack["wood"] == 8 && world.Backpack["stone"] == 30, "dismantling a chest should return its 8 wood and the 30 stone in it");
+        Require(!world.Things.Any(t => t.Kind == ThingKind.Grave), "with room in the backpack nothing should go into a box");
+
+        Give(world, "wood", 12); Give(world, "stone", 8);
+        var cabin = world.Build(ThingKind.Hut, world.Player + new Vector2(-4, 0))!;
+        world.Player = cabin.Pos + new Vector2(2, 0);
+        Require(world.Enter(cabin), "the player should step into the cabin");
+        Require(!world.Dismantle(cabin) && world.Find(cabin.Id) != null, "a cabin someone shelters in should not come down");
+    }
+
+    private static void CheckDismantlingWhatDoesNotFitLeavesItInABox(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(20, 20);
+        Give(world, "planks", 10);
+        var bench = world.Build(ThingKind.Bench, world.Player + new Vector2(2, 0))!;
+        Give(world, "stone", 24 * 64);
+        Require(world.Backpack.Room("planks") == 0, "the fixture should fill the backpack");
+        Require(world.Dismantle(bench), "the player should dismantle a bench in reach");
+        var box = world.Things.Single(t => t.Kind == ThingKind.Grave);
+        Require(box.Inventory["planks"] == 10 && box.Pos == bench.Pos, "the planks that do not fit should wait in a recovery box where the bench stood");
     }
 
     private static void CheckPlayerMovesItemsWithinFifteenMetres(GameData data) {

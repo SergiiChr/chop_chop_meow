@@ -519,6 +519,12 @@ Steel only progresses while the heat is at or above the clear bar (`World.SteelH
 A batch below it pauses, keeps burning one coal from its fuel slot per batch length while cold, and resumes when reheated, with no failure.
 Once an active crew has the forge hot, it never falls below the bar while they are on duty.
 
+### Taking buildings down
+
+`World.Dismantle` removes a building in reach and puts its cost, a supplied mine's materials and everything its boxes hold into the backpack, and the rest into a recovery box where it stood.
+`World.DismantleBlock` keeps up a cabin someone shelters in and a trading post with a cart out.
+The red X on `ThingPage`'s header turns into "Remove?" on the first click and dismantles on the second.
+
 ### Storage, filters and automation
 
 Inventories are slot grids with stacks of 64.

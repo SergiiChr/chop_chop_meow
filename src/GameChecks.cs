@@ -735,6 +735,19 @@ public partial class Game {
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == farm);
     }
+    /// <summary>The red X on a building's page asks first, then takes the building down and gives its cost and contents back.</summary>
+    private async Task CheckRedXTakesABuildingDownOnTheSecondClick() {
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("coal", 5);
+        int wood = world.Backpack["wood"], coal = world.Backpack["coal"];
+        await ClickOn(chest);
+        await Click(Named("dismantle")!);
+        Require(world.Find(chest.Id) != null && Named("dismantle")!.Text == "Remove?", "The first click on the red X must ask before taking the chest down.");
+        await Click(Named("dismantle")!);
+        await Until(() => world.Find(chest.Id) == null, "the second click taking the chest down", 2);
+        Require(world.Backpack["wood"] == wood + 8 && world.Backpack["coal"] == coal + 5, "Taking the chest down must give back its 8 wood and the coal in it.");
+        Require(!panel.Visible, "Taking the chest down must close its page.");
+        Drop(Hosted, "wood", 8); Drop(Hosted, "coal", 5); await Frames();
+    }
     /// <summary>A player harvesting beside a running station is busy with the harvest, so their figure stops hammering.</summary>
     private async Task CheckHarvestingBesideAStationStopsHammering() {
         var start = world.Player;
@@ -1200,6 +1213,7 @@ public partial class Game {
             await Test(CheckSoundsRotateCrossfadeAndStaySilentOffScreen);
             await Test(CheckRightClickGathersTreeAndHarvestsFarm);
             await Test(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
+            await Test(CheckRedXTakesABuildingDownOnTheSecondClick);
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);

@@ -727,6 +727,36 @@ public sealed partial class World {
         S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); Made?.Invoke(S.Actor.Id, t.Id); }
         return t;
     }
+    /// <summary>Why a building cannot come down now, or null: someone shelters in it, or a cart is out from it.</summary>
+    private string? DismantleBlock(Thing t) {
+        foreach (var p in S.Players) if (p.Sheltered == t.Id) return "Someone is inside. It can come down once they step out.";
+        foreach (var order in S.Orders) if (order.Signpost == t.Id) return "A cart is out from this trading post. Wait for it to come back.";
+        return null;
+    }
+    /// <summary>
+    /// Takes a building down: its cost, anything delivered to build it and everything it holds go to the backpack,
+    /// and what does not fit waits in a recovery box where it stood.
+    /// </summary>
+    public bool Dismantle(Thing t) {
+        if (Downed || !Data.Buildings.TryGetValue(t.Kind, out var def)) return false;
+        if (!Reaches(t)) { Say("Walk closer first."); return false; }
+        if (DismantleBlock(t) is string refused) { Say(refused); return false; }
+        if (Forwarded(Verb.Dismantle, t.Id)) return true;
+        var back = new Dictionary<string, int>(def.Cost);
+        if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
+        foreach (var box in Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
+        S.Things.Remove(t);
+        if (t.Kind == ThingKind.Toolstation) toolsChanged = true;
+        Inventory? rest = null;
+        foreach (var (item, amount) in back) {
+            int left = amount - S.Backpack.Add(item, amount);
+            if (left <= 0) continue;
+            if (rest == null) { rest = Add(ThingKind.Grave, t.Pos).Inventory; rest.Slots = 0; }
+            rest.Slots += (left + rest.StackOf(item) - 1) / rest.StackOf(item); rest.Add(item, left);
+        }
+        Say(rest == null ? $"The {Lower(def.Name)} is down. Everything is back in your backpack." : $"The {Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.");
+        return true;
+    }
     public void Consume(string item) {
         if (Downed || !Data.Items.TryGetValue(item, out var def) || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
         if (Water.IsBottle(item)) {
