@@ -9,8 +9,8 @@ internal static class CartShape {
     public static Mesh Frame => frame ??= BuildFrame();
     public static Mesh Wheel => wheel ??= BuildWheel();
     public static Mesh Payment => payment ??= BuildPayment();
-    public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .65f, Metallic = .35f };
-    public static readonly StandardMaterial3D WheelSurface = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f };
+    public static readonly StandardMaterial3D Steel = ModelKit.Vertex(Surface.Metal, .65f, .35f);
+    public static readonly StandardMaterial3D WheelSurface = ModelKit.Vertex(Surface.Flat, .9f);
 
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 

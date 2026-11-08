@@ -4,27 +4,67 @@ using Godot;
 
 namespace ChopChopMeow;
 
+/// <summary>The photoscan a material takes its grain and bump from; its colour stays the model's own. Foliage is drawn by the shrub shader.</summary>
+public enum Surface { Flat, Wood, Metal, Stone, Cloth, Earth, Foliage }
+
 /// <summary>
 /// Low-poly primitive helpers shared by every code-built model.
 /// Meshes and materials are cached by their parameters, so hundreds of trees share a handful of resources.
 /// </summary>
 public static class ModelKit {
     // Keyed by their parameters as values, so looking one up allocates nothing even when an effect asks every frame.
-    private static readonly Dictionary<(string, float, float, float), StandardMaterial3D> materials = new();
+    private static readonly Dictionary<(string, float, float, float, Surface), StandardMaterial3D> materials = new();
+    /// <summary>How deep a surface's bump reads; the ground uses the same depth.</summary>
+    private const float BumpDepth = .5f;
     private static readonly Dictionary<(Color, bool), StandardMaterial3D> flats = new();
     private static readonly Dictionary<(ulong, int), Material> faded = new();
     private static readonly Dictionary<string, Mesh> meshes = new();
     /// <summary>Where a faded mesh keeps its own material; made once, since a plain string converts to a new StringName on every call.</summary>
     public static readonly StringName BaseMaterial = "base";
 
-    public static StandardMaterial3D Mat(string hex, float roughness = .85f, float metallic = 0, float glow = 0) {
-        var key = (hex, roughness, metallic, glow);
+    public static StandardMaterial3D Wood(string hex, float roughness = .85f) => Mat(hex, roughness, surface: Surface.Wood);
+    public static StandardMaterial3D Metal(string hex, float roughness, float metallic) => Mat(hex, roughness, metallic, surface: Surface.Metal);
+    public static StandardMaterial3D Stone(string hex, float roughness = .95f, float metallic = 0) => Mat(hex, roughness, metallic, surface: Surface.Stone);
+    public static StandardMaterial3D Cloth(string hex, float roughness = .85f) => Mat(hex, roughness, surface: Surface.Cloth);
+
+    public static StandardMaterial3D Mat(string hex, float roughness = .85f, float metallic = 0, float glow = 0, Surface surface = Surface.Flat) {
+        var key = (hex, roughness, metallic, glow, surface);
         if (materials.TryGetValue(key, out var cached)) return cached;
         var color = new Color(hex);
         var material = new StandardMaterial3D { AlbedoColor = color, Roughness = roughness, Metallic = metallic };
         if (glow > 0) { material.EmissionEnabled = true; material.Emission = color; material.EmissionEnergyMultiplier = glow; }
+        Dress(material, surface);
         materials[key] = material;
         return material;
+    }
+
+    /// <summary>A material for a mesh that carries its own colours, tinted and dressed with a surface's grain and bump.</summary>
+    public static StandardMaterial3D Vertex(Surface surface, float roughness, float metallic = 0, string tint = "ffffff") {
+        var material = new StandardMaterial3D { AlbedoColor = new Color(tint), VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = roughness, Metallic = metallic };
+        Dress(material, surface);
+        return material;
+    }
+
+    /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, and a cloth weave is drawn coarse so it shows at the game's distance.</summary>
+    public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, _ => 1 };
+
+    /// <summary>A surface's grain, a multiplier around one; the engine hands out one copy per file.</summary>
+    public static Texture2D Grain(Surface surface) => GD.Load<Texture2D>($"res://assets/models/surfaces/{surface.ToString().ToLowerInvariant()}_grain.exr");
+    /// <summary>A surface's bump, an OpenGL normal map.</summary>
+    private static Texture2D Bump(Surface surface) => GD.Load<Texture2D>($"res://assets/models/surfaces/{surface.ToString().ToLowerInvariant()}_bump.png");
+
+    /// <summary>
+    /// Lays the surface's grain and bump over the material in its own space, so the marks stay put when the model moves.
+    /// They go in the detail layer, which leaves the albedo texture free for a model's own colours.
+    /// </summary>
+    public static void Dress(StandardMaterial3D material, Surface surface) {
+        if (surface == Surface.Flat) return;
+        material.DetailEnabled = true; material.DetailBlendMode = BaseMaterial3D.BlendModeEnum.Mul;
+        material.TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic;
+        material.DetailAlbedo = Grain(surface); material.DetailNormal = Bump(surface);
+        material.DetailUVLayer = BaseMaterial3D.DetailUV.UV2; material.UV2Triplanar = true; material.UV2Scale = Vector3.One / Tile(surface);
+        // The depth applies to the bump once it is mixed into the normal map, which has no texture of its own here.
+        material.NormalEnabled = true; material.NormalScale = BumpDepth;
     }
 
     /// <summary>Unshaded, alpha-blended material for flat markers, flames and smoke.</summary>

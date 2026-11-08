@@ -543,6 +543,8 @@ public partial class Game {
         var picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
         Require(picker.Selected == Array.IndexOf(StartMenu.Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
         await Choose(picker, 0);
+        Require(GetWindow().ContentScaleSize == StartMenu.Resolutions[0], "Choosing a resolution must render at it.");
+        Require(layer.Scale == Vector2.One * .8f && ui.Size == new Vector2(1600, 900), "Choosing a resolution must keep the interface's share of the screen.");
         var limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
         Require(limits.Selected == 0, "The frame rate limit must start on its first choice.");
         Require(limits.GetItemText(0) == "Off", "The frame rate limit's first choice must be Off.");
@@ -553,6 +555,11 @@ public partial class Game {
         Require(taa.ButtonPressed && GetViewport().UseTaa, "Temporal anti-aliasing must start on.");
         await Click(taa);
         Require(!GetViewport().UseTaa, "Switching temporal anti-aliasing off must apply it at once.");
+        var counter = (CheckButton)startMenu.Screen.FindChild("fps", true, false);
+        var frameRate = (Label)ui.FindChild("frame_rate", true, false);
+        Require(counter.ButtonPressed && frameRate.Visible && frameRate.Text.EndsWith(" fps"), "The frame rate counter must start on and show a rate.");
+        await Click(counter);
+        Require(!frameRate.Visible, "Switching the frame rate counter off must hide it at once.");
         var musicSlider = (HSlider)startMenu.Screen.FindChild("music", true, false);
         Require(musicSlider.Value == 100, "Music must start at full volume.");
         await Click(musicSlider);
@@ -563,13 +570,17 @@ public partial class Game {
             picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
             limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
             taa = (CheckButton)startMenu.Screen.FindChild("taa", true, false);
+            counter = (CheckButton)startMenu.Screen.FindChild("fps", true, false);
             musicSlider = (HSlider)startMenu.Screen.FindChild("music", true, false);
         }
         await ReopenOptions();
         Require(picker.Selected == 0, "Reopened options must show the chosen resolution.");
         Require(limits.Selected == 2, "Reopened options must show the chosen frame rate limit.");
         Require(!taa.ButtonPressed, "Reopened options must show temporal anti-aliasing off.");
+        Require(!counter.ButtonPressed, "Reopened options must show the frame rate counter off.");
         Require(musicSlider.Value == 50, "Reopened options must show the chosen music volume.");
+        // The later checks measure the screen at the design size.
+        await Choose(picker, Array.IndexOf(StartMenu.Resolutions, Settings.DesignSize));
         await Choose(limits, 0);
         Require(Engine.MaxFps == 0, "Turning the frame rate limit off must lift the cap.");
         await Click(taa);
@@ -755,11 +766,11 @@ public partial class Game {
     }
     /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item in hand.</summary>
     private async Task CheckHudAndHotbarEatAndDrinkInHand() {
-        Require(!HasLabel(clock, "Health"), "The persistent HUD must not show health.");
-        Require(!HasLabel(clock, "Food"), "The persistent HUD must not show food.");
-        Require(!HasLabel(clock, "Water"), "The persistent HUD must not show water.");
-        Require(!HasLabel(clock, "coins"), "The persistent HUD must not show coins.");
-        Require(!HasLabel(clock, "Pack"), "The persistent HUD must not show the pack.");
+        Require(!HasLabel(corner, "Health"), "The persistent HUD must not show health.");
+        Require(!HasLabel(corner, "Food"), "The persistent HUD must not show food.");
+        Require(!HasLabel(corner, "Water"), "The persistent HUD must not show water.");
+        Require(!HasLabel(corner, "coins"), "The persistent HUD must not show coins.");
+        Require(!HasLabel(corner, "Pack"), "The persistent HUD must not show the pack.");
         Require(hotbar.Buttons.Count == 9 && world.HotbarSlots.Count == 9, "The bottom toolbar must show nine saved hotbar references.");
         int berries = world.Backpack["berries"];
         await KeyStroke(Key.Key3);

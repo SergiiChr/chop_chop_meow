@@ -79,7 +79,7 @@ UI and input:
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
 | `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates` and `LiveText` |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
-| `src/Hud.cs` | The clock plate and the mode, full-bottle and death labels |
+| `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode, full-bottle and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |

@@ -9,8 +9,8 @@ internal static class SignpostShape {
     public static Mesh Timber => timber ??= BuildTimber();
     public static Mesh Mailbox => mailbox ??= BuildMailbox();
     public static Mesh Flag => flag ??= BuildFlag();
-    public static readonly StandardMaterial3D Wood = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f };
-    public static readonly StandardMaterial3D Steel = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .55f, Metallic = .35f };
+    public static readonly StandardMaterial3D Wood = ModelKit.Vertex(Surface.Wood, .9f);
+    public static readonly StandardMaterial3D Steel = ModelKit.Vertex(Surface.Metal, .55f, .35f);
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
     private static ArrayMesh BuildTimber() {

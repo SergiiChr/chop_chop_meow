@@ -23,18 +23,20 @@ public partial class WorldView {
     /// Plants shrink away on worn ground; wear is read at each plant's origin so the whole plant scales evenly.
     /// Plants sway in the wind and part around the player.
     /// </summary>
-    private static readonly string DressingShader = $$"""
+    private static string DressingCode(bool shrubs) => $$"""
         shader_type spatial;
-        render_mode cull_disabled;
+        render_mode {{(shrubs ? "cull_back" : "cull_disabled")}};
         uniform sampler2D disturbance : filter_linear, repeat_disable;
         // Footpaths worn by walking.
         uniform sampler2D traffic : filter_linear, repeat_disable;
         varying vec3 tint;
+        {{(shrubs ? GrainUniforms : "")}}
         {{Wind.ShaderCode}}
         void vertex() {
             vec2 uv = MODEL_MATRIX[3].xz / {{Terrain.Size}}.0;
             float wear = max(texture(disturbance, uv).r, texture(traffic, uv).r);
             VERTEX *= 1.0 - smoothstep(0.12, 0.65, wear);
+            {{(shrubs ? GrainVertex : "")}}
             vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
             float bend = clamp(VERTEX.y / 0.3, 0.0, 1.0);
             VERTEX += to_local(MODEL_MATRIX, wind_offset(world, bend, 0.12) + push_offset(world, bend));
@@ -46,18 +48,38 @@ public partial class WorldView {
         }
         void fragment() {
             ALBEDO = tint;
+            {{(shrubs ? GrainFragment : "")}}
             ROUGHNESS = 1.0;
         }
+        """;
+
+    // The foliage surface's grain on the shrubs, laid over each in its own space before the wind moves it, with the
+    // three projections weighted per vertex: the lobes are smooth.
+    private const string GrainUniforms = """
+        uniform sampler2D grain : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+        uniform float tile = 1.0;
+        varying vec3 local;
+        varying vec3 weight;
+        """;
+    private const string GrainVertex = """
+            local = mat3(MODEL_MATRIX) * VERTEX;
+            vec3 facing = abs(mat3(MODEL_MATRIX) * NORMAL);
+            weight = facing / (facing.x + facing.y + facing.z);
+        """;
+    private const string GrainFragment = """
+            ALBEDO *= texture(grain, local.yz / tile).rgb * weight.x + texture(grain, local.xz / tile).rgb * weight.y + texture(grain, local.xy / tile).rgb * weight.z;
         """;
 
     private void InitializeDressing() {
         disturbanceImage = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.R8, disturbed);
         disturbanceTexture = ImageTexture.CreateFromImage(disturbanceImage);
-        dressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader } };
+        dressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingCode(false) } };
         dressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
         // Closed shapes such as shrubs keep back faces culled, or their unlit insides show where they meet a slope.
-        solidDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader.Replace("cull_disabled", "cull_back") } };
+        solidDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingCode(true) } };
         solidDressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
+        solidDressingMaterial.SetShaderParameter("grain", ModelKit.Grain(Surface.Foliage));
+        solidDressingMaterial.SetShaderParameter("tile", ModelKit.Tile(Surface.Foliage));
         sceneryShadeImage = Image.CreateFromData(ShadeSize, ShadeSize, false, Image.Format.R8, sceneryShade);
         sceneryShadeTexture = ImageTexture.CreateFromImage(sceneryShadeImage);
         objectShadeImage = Image.CreateFromData(ContactSize, ContactSize, false, Image.Format.Rg8, objectShade);

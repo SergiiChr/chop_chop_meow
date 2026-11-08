@@ -13,6 +13,10 @@ public interface IGameFlow {
     void Quit();
     void LoadSlot(int slot);
     void ShowStart();
+    /// <summary>Renders at the given size and fits the window and the interface to it.</summary>
+    void ApplyResolution(Vector2I size);
+    /// <summary>Shows or hides the frame rate counter.</summary>
+    void ShowFrameRate(bool on);
     /// <summary>The server says this window's player owns the game, so it saves, loads and opens it to others.</summary>
     bool Owns { get; }
     /// <summary>The player is joining another game from their own: its server waits a while in case that fails.</summary>

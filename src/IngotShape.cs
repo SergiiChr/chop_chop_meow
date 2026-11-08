@@ -12,10 +12,10 @@ internal static class IngotShape {
     public static Node3D Create(string item) {
         int kind = item switch { "steel_bar" => 1, "tin_bar" => 2, _ => 0 };
         var root = new Node3D();
-        ModelKit.Add(root, Mesh, ModelKit.Mat(metals[kind], .38f, .72f), Vector3.Zero);
+        ModelKit.Add(root, Mesh, ModelKit.Metal(metals[kind], .38f, .72f), Vector3.Zero);
         // A shallow dark runner mark reads as a casting detail without adding letter-like text.
         ModelKit.Box(root, new Vector3(.17f, .008f, .025f), new Vector3(-.08f, .102f, 0),
-            ModelKit.Mat(kind == 2 ? "59452f" : "566061", .52f, .55f));
+            ModelKit.Metal(kind == 2 ? "59452f" : "566061", .52f, .55f));
         return root;
     }
 

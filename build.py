@@ -20,12 +20,15 @@ import socket
 import subprocess
 import sys
 import tarfile
+import tempfile
 import threading
 import time
 import urllib.request
 import zipfile
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Literal
 
 GODOT_VERSION = "4.7.2"
 DOTNET_CHANNEL = "10.0"
@@ -95,6 +98,83 @@ def fetch_pinned(url: str, archive: Path, sha256: str) -> None:
         raise SystemExit(
             f"{archive.name} SHA-256 mismatch: expected {sha256}, got {actual}"
         )
+
+
+AMBIENTCG = TOOLS / "ambientcg"
+# The Godot script that packs photoscans into the game's textures; it runs from a temporary project.
+PACK_SCRIPT = ROOT / "tools" / "pack_textures.gd"
+PACKER_PROJECT = """; Isolated project for packing textures.
+config_version=5
+
+[application]
+config/name="Texture packer"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+"""
+
+
+def pack_photoscans(
+    sets: dict[str, tuple[str, str]],
+    maps: tuple[str, ...],
+    size: int,
+    output: Path,
+    kind: Literal["ground", "surface"],
+    detail: Mapping[str, float] | None = None,
+) -> None:
+    """Fetches each set's pinned ambientCG archive, extracts its maps and packs them into output as the kind says.
+
+    A set maps its name in the game to the ambientCG asset and the SHA-256 of that asset's 1K PNG zip; detail gives a
+    surface set the share of the photoscan's brightness variation its grain keeps, where the packer's default is not
+    wanted.
+
+    """
+    fetch_godot()
+    BUILD.mkdir(exist_ok=True)
+    AMBIENTCG.mkdir(parents=True, exist_ok=True)
+    output.mkdir(parents=True, exist_ok=True)
+    # Godot ignores projects nested under the repository's .tools/.gdignore, so the packer runs from a temporary
+    # project.
+    with tempfile.TemporaryDirectory(prefix="chop-chop-textures-") as temporary:
+        source = Path(temporary) / "source"
+        source.mkdir()
+        for asset, sha256 in sets.values():
+            archive = AMBIENTCG / f"{asset}_1K-PNG.zip"
+            fetch_pinned(
+                f"https://ambientcg.com/get?file={archive.name}", archive, sha256
+            )
+            with zipfile.ZipFile(archive) as bundle:
+                for name in maps:
+                    bundle.extract(f"{asset}_1K-PNG_{name}.png", source)
+        project = Path(temporary) / "project"
+        project.mkdir()
+        (project / "project.godot").write_text(PACKER_PROJECT, encoding="utf-8")
+        shutil.copy(PACK_SCRIPT, project / PACK_SCRIPT.name)
+        run_godot(
+            PACK_SCRIPT.stem,
+            [
+                GODOT,
+                "--headless",
+                "--path",
+                project,
+                "--script",
+                f"res://{PACK_SCRIPT.name}",
+                "--",
+                kind,
+                source,
+                output,
+                str(size),
+                *(
+                    f"{name}={asset}"
+                    + (f":{detail[name]}" if detail and name in detail else "")
+                    for name, (asset, _) in sets.items()
+                ),
+            ],
+            isolated_env(Path(temporary)),
+            timeout=600,
+            success_marker="TEXTURE-PACK PASS",
+        )
+    print(f"Packed {len(sets)} texture sets into {output.relative_to(ROOT)}")
 
 
 def dotnet_env() -> dict[str, str]:

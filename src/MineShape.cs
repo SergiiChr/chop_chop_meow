@@ -16,10 +16,9 @@ internal static class MineShape {
     public static Mesh DeepRails => deepRails ??= BuildRails(true);
     public static Mesh Cart => cart ??= BuildCart();
     public static Mesh Load => load ??= BuildLoad();
-    public static readonly StandardMaterial3D Timber = VertexMaterial(.9f);
-    public static readonly StandardMaterial3D Steel = VertexMaterial(.5f, .6f);
+    public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .9f);
+    public static readonly StandardMaterial3D Steel = ModelKit.Vertex(Surface.Metal, .5f, .6f);
     public static readonly StandardMaterial3D Unlit = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
-    private static StandardMaterial3D VertexMaterial(float roughness, float metallic = 0) => new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = roughness, Metallic = metallic };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
     private static string Shade(string tint, int step) => new Color(tint).Lerp(Colors.Black, MathF.Pow((step + 1) / 6f, .45f)).ToHtml(false);
 

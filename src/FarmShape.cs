@@ -9,7 +9,7 @@ internal static class FarmShape {
     private static readonly ArrayMesh?[,] crops = new ArrayMesh?[3, 3];
     public static Mesh Soil => soil ??= BuildSoil();
     public static Mesh Crop(int stage, int variant) => crops[stage, variant] ??= BuildField(stage, variant);
-    public static readonly StandardMaterial3D Earth = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = 1 };
+    public static readonly StandardMaterial3D Earth = ModelKit.Vertex(Surface.Earth, 1);
     // Thin plant leaves are deliberately two-sided; solid stems and grain heads share the same cached material.
     public static readonly StandardMaterial3D Foliage = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }

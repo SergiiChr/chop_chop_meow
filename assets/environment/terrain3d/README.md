@@ -35,11 +35,12 @@ in `textures/`, each an albedo PNG with the height in its alpha and an OpenGL no
 alpha, the way Terrain3D reads them: grass (id 0) on flat ground, rock (id 1) on slopes through Terrain3D's auto
 shader, and dirt (id 2) where the ground is worn.
 Each photoscan's brightness around its mean modulates the palette at partial strength, so the colours stay and the
-detail shows; `tools/pack_ground.gd` scales every set to one mean linear brightness, which the shader divides the
+detail shows; `tools/pack_textures.gd` scales every set to one mean linear brightness, which the shader divides the
 grain by.
 A grass or dirt tile spans 4 world units and a rock tile 6; grass and rock get a little detiling rotation and shift
 from Terrain3D, and the dirt, read by the include itself, tiles plainly.
-Roughness, specular and the height-based ambient occlusion come from Terrain3D's own material defaults.
+The ground is matte, with the bump at half depth: at a low sun the photoscans' roughness turned into a sheen that
+washed out the meadow. The height-based ambient occlusion comes from Terrain3D's material defaults.
 `tools/ground_textures.py` packs the sets from the pinned ambientCG archives; the `.import` files keep the alpha
 channels (VRAM compressed, high quality, no normal-map compression, no alpha border fix).
 

@@ -56,9 +56,9 @@ public partial class WorldView {
     private static void BuildCliff(Node3D parent, Cliff cliff) {
         // Host rock follows the mountain; distinctive ore colors remain in the seams.
         (string[] rock, var seam, int seed) = cliff.Ore switch {
-            ThingKind.Iron => (new[] { "686650", "716b56", "5b5e4c" }, Mat("b4622a", .5f), 11),
-            ThingKind.Tin => (new[] { "656d5d", "717665", "586252" }, Mat("e9ebe4", .35f), 37),
-            _ => (new[] { "535d4b", "606753", "495440" }, Mat("15161a", .5f, .3f), 23),
+            ThingKind.Iron => (new[] { "686650", "716b56", "5b5e4c" }, Stone("b4622a", .5f), 11),
+            ThingKind.Tin => (new[] { "656d5d", "717665", "586252" }, Stone("e9ebe4", .35f), 37),
+            _ => (new[] { "535d4b", "606753", "495440" }, Stone("15161a", .5f, .3f), 23),
         };
         // Local +Z is the face, so everything toward the camera and the deposits is built on the positive side.
         var wall = Pivot(parent, new Vector3(cliff.Center.X, 0, cliff.Center.Y), new Vector3(0, Mathf.RadToDeg(MathF.Atan2(cliff.Face.X, cliff.Face.Y)), 0));
@@ -71,12 +71,12 @@ public partial class WorldView {
             // The ends taper down so the wall reads as a rock outcrop rather than a cut block.
             float edge = 1 - Math.Clamp((Math.Abs(x) - cliff.HalfLength + 1.5f) / 2.5f, 0, 1) * .6f;
             float height = (2.8f + R() * 1.8f) * edge, z = -.4f + R() * .5f;
-            Cylinder(wall, .95f + R() * .2f, .55f + R() * .25f, height, new Vector3(x, height / 2, z), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3((R() - .5f) * 8, R() * 360, (R() - .5f) * 8), 5);
-            Sphere(wall, .55f + R() * .3f, new Vector3(x + (R() - .5f) * .4f, height + .05f, z - .1f), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3(1.2f, .6f, 1), 5);
+            Cylinder(wall, .95f + R() * .2f, .55f + R() * .25f, height, new Vector3(x, height / 2, z), Stone(rock[rng.Next(rock.Length)]), new Vector3((R() - .5f) * 8, R() * 360, (R() - .5f) * 8), 5);
+            Sphere(wall, .55f + R() * .3f, new Vector3(x + (R() - .5f) * .4f, height + .05f, z - .1f), Stone(rock[rng.Next(rock.Length)]), new Vector3(1.2f, .6f, 1), 5);
             for (int i = 0; i < 2; i++)
                 Box(wall, new Vector3(.35f + R() * .3f, .08f + R() * .06f, .12f), new Vector3(x + (R() - .5f) * .5f, .5f + R() * (height - .9f), z + .95f), seam, new Vector3(0, 0, (R() - .5f) * 40));
             for (int i = 0; i < 2; i++)
-                Sphere(wall, .14f + R() * .16f, new Vector3(x + (R() - .5f) * .8f, .06f, 1.1f + R() * .6f), Mat(rock[rng.Next(rock.Length)], .95f), new Vector3(1.2f, .6f, 1), 5);
+                Sphere(wall, .14f + R() * .16f, new Vector3(x + (R() - .5f) * .8f, .06f, 1.1f + R() * .6f), Stone(rock[rng.Next(rock.Length)]), new Vector3(1.2f, .6f, 1), 5);
         }
     }
 
@@ -92,7 +92,7 @@ public partial class WorldView {
             // Stones collect in irregular patches instead of forming an evenly spaced border.
             if (MathF.Sin(angle * 7 + 1.2f) + .55f * MathF.Sin(angle * 13) < -.05f) continue;
             float r = Terrain.Shore(angle) + .12f + (float)rng.NextDouble() * .95f;
-            var stone = Sphere(parent, .1f + (float)rng.NextDouble() * .14f, at + new Vector3(MathF.Cos(angle) * r, .03f, MathF.Sin(angle) * r), Mat(i % 3 == 0 ? "a3a7a3" : "8d918e", .9f), new Vector3(1.2f, .5f, 1), 6);
+            var stone = Sphere(parent, .1f + (float)rng.NextDouble() * .14f, at + new Vector3(MathF.Cos(angle) * r, .03f, MathF.Sin(angle) * r), Stone(i % 3 == 0 ? "a3a7a3" : "8d918e", .9f), new Vector3(1.2f, .5f, 1), 6);
             stone.RotationDegrees = new Vector3(0, i * 47, 0);
         }
         // Reed clumps with cattails along the banks, lily pads near the shore.

@@ -6,7 +6,8 @@ namespace ChopChopMeow;
 
 /// <summary>The start menu and the save, load and options screens it shares with the pause menu.</summary>
 public partial class StartMenu : ColorRect {
-    public static readonly Vector2I[] Resolutions = { new(1280, 720), new(1440, 900), new(1600, 900), new(1920, 1080), new(2560, 1440) };
+    /// <summary>Render sizes to pick from, 16:9 and 16:10.</summary>
+    public static readonly Vector2I[] Resolutions = { new(1280, 720), new(1440, 900), new(1600, 900), new(1920, 1080), new(1920, 1200), new(2560, 1440), new(2560, 1600), new(3840, 2160), new(3840, 2400) };
     /// <summary>Frame rate caps offered in the options; 0 leaves the rate to vsync alone.</summary>
     private static readonly int[] FrameLimits = { 0, 60, 90 };
     private readonly UiKit kit;
@@ -81,7 +82,7 @@ public partial class StartMenu : ColorRect {
         picker.Selected = Array.IndexOf(Resolutions, Settings.Resolution);
         picker.ItemSelected += index => {
             Settings.Store("display", "resolution", Resolutions[index]);
-            Settings.ApplyResolution(GetWindow(), Resolutions[index]);
+            flow.ApplyResolution(Resolutions[index]);
         };
         row.AddChild(picker);
         var limitRow = new HBoxContainer(); Screen.AddChild(limitRow);
@@ -102,12 +103,17 @@ public partial class StartMenu : ColorRect {
             kit.Sounds.MusicVolume = (float)value / 100;
         };
         musicRow.AddChild(slider);
-        var taaRow = new HBoxContainer(); Screen.AddChild(taaRow);
-        var taaLabel = Style.Wrapped("Temporal anti-aliasing"); taaLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; taaRow.AddChild(taaLabel);
-        var taa = new CheckButton { Name = "taa", ButtonPressed = Settings.Taa, FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
-        taa.Toggled += on => { Settings.Store("display", "taa", on); GetViewport().UseTaa = on; };
-        taaRow.AddChild(taa);
+        Toggle("Temporal anti-aliasing", "taa", Settings.Taa, on => { Settings.Store("display", "taa", on); GetViewport().UseTaa = on; });
+        Toggle("Frame rate counter", "fps", Settings.FrameRate, on => { Settings.Store("display", "fps", on); flow.ShowFrameRate(on); });
         AddButton("Back · Esc", back);
+    }
+
+    /// <summary>A labelled switch on its own row, which stores and applies its setting as it is toggled.</summary>
+    private void Toggle(string text, string name, bool on, Action<bool> change) {
+        var row = new HBoxContainer(); Screen.AddChild(row);
+        var label = Style.Wrapped(text); label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(label);
+        var toggle = new CheckButton { Name = name, ButtonPressed = on, FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
+        toggle.Toggled += value => change(value); row.AddChild(toggle);
     }
 
     /// <summary>The join popup: the host's address and port, which starts out as the port a host opens.</summary>

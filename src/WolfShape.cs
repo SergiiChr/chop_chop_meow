@@ -54,7 +54,7 @@ internal static class WolfShape {
 
     private static readonly Color Dark = new("4a4e46"), Grey = new("7b7d71"), Tan = new("8b7f64"), Pale = new("cbc5b0"),
         Black = new("1e1f1c"), Mouth = new("6b2e2b"), InnerEar = new("b7a596");
-    public static readonly StandardMaterial3D Fur = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .95f };
+    public static readonly StandardMaterial3D Fur = ModelKit.Vertex(Surface.Flat, .95f);
     private static readonly StandardMaterial3D EyeShine = new() { AlbedoColor = new Color("d9a046"), Roughness = .35f, EmissionEnabled = true, Emission = new Color("d9a046"), EmissionEnergyMultiplier = 1.2f };
     private static ArrayMesh? fur, eyes;
     private static Skin? skin;

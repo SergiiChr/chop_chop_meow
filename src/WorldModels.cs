@@ -231,7 +231,7 @@ public static class WorldModels {
             case ThingKind.Coal: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
             case ThingKind.Tin: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
             case ThingKind.LooseCoal: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "2d2f33", "1d1e21"); break;
-            case ThingKind.LooseStone: prop = new LooseProp(); Add(prop.Body, NatureShape.Pebble(new Color("939184"), t.Id % NatureShape.Variants), NatureShape.Natural, Vector3.Zero, new Vector3(0, t.Id * 47 % 360, 0)); break;
+            case ThingKind.LooseStone: prop = new LooseProp(); Add(prop.Body, NatureShape.Pebble(new Color("939184"), t.Id % NatureShape.Variants), NatureShape.Rock, Vector3.Zero, new Vector3(0, t.Id * 47 % 360, 0)); break;
             case ThingKind.IronChip: prop = new LooseProp(); LooseOre(prop.Body, "loose_iron", t.Id, "a35a2e", "8b4f2b"); break;
             case ThingKind.TinChip: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "b9bcb4", "8f928b"); break;
             case ThingKind.Stick: prop = new LooseProp(); Stick(prop.Body, t.Id); break;
@@ -335,7 +335,7 @@ public static class WorldModels {
         var leaves = Tree3DShape.Add(sway, id % TreeVariants, variant);
         PreserveShadows(sway);
         Tree3DShape.AddShadowCore(sway, id % TreeVariants, leaves);
-        var stump = Add(prop.Root, NatureShape.Stump, NatureShape.Natural, Vector3.Zero);
+        var stump = Add(prop.Root, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
         stump.Visible = false;
         prop.Stump = stump;
         prop.SwayParts = FadeParts(sway);
@@ -346,7 +346,7 @@ public static class WorldModels {
     private static void Rocks(Node3D body, ThingKind kind, int id, string stone, string? vein = null, string? chunks = null) {
         int variant = id % NatureShape.Variants;
         if (vein == null || chunks == null) {
-            Add(body, NatureShape.Rocks(kind.Id(), new Color(stone), variant), NatureShape.Natural, Vector3.Zero);
+            Add(body, NatureShape.Rocks(kind.Id(), new Color(stone), variant), NatureShape.Rock, Vector3.Zero);
             return;
         }
         Add(body, NatureShape.Ore(variant, false), NatureShape.OreMaterial(stone, .92f, 0), Vector3.Zero);
@@ -361,12 +361,12 @@ public static class WorldModels {
     /// <summary>A fallen stick lying on the ground, turned by its id.</summary>
     private static void Stick(Node3D body, int id) {
         var stick = Pivot(body, new Vector3(0, .05f, 0), new Vector3(0, Jitter(id, 5) * 360, 0));
-        Cylinder(stick, .045f, .03f, .8f, Vector3.Zero, Mat("78644a", .95f), new Vector3(0, 0, 90), 5);
-        Cylinder(stick, .025f, .015f, .25f, new Vector3(.12f, .06f, .05f), Mat("6e5b43", .95f), new Vector3(30, 0, 60), 4);
+        Cylinder(stick, .045f, .03f, .8f, Vector3.Zero, Wood("78644a", .95f), new Vector3(0, 0, 90), 5);
+        Cylinder(stick, .025f, .015f, .25f, new Vector3(.12f, .06f, .05f), Wood("6e5b43", .95f), new Vector3(30, 0, 60), 4);
     }
 
     private static void LooseOre(Node3D body, string kind, int id, string light, string dark) =>
-        Add(body, NatureShape.Loose(kind, new Color(light), new Color(dark), id % NatureShape.Variants), NatureShape.Natural, Vector3.Zero);
+        Add(body, NatureShape.Loose(kind, new Color(light), new Color(dark), id % NatureShape.Variants), NatureShape.Rock, Vector3.Zero);
 
     private static CarcassProp Carcass() {
         var prop = new CarcassProp();
@@ -412,7 +412,7 @@ public static class WorldModels {
     private static ForgeProp DrumForge() {
         var prop = new ForgeProp();
         var body = prop.Body;
-        var steel = Mat("3b3f42", .5f, .7f);
+        var steel = Metal("3b3f42", .5f, .7f);
         foreach (var (x, z) in new[] { (-.35f, -.3f), (.35f, -.3f), (-.35f, .3f), (.35f, .3f) }) Box(body, new Vector3(.05f, .5f, .05f), new Vector3(x, .25f, z), steel);
         Box(body, new Vector3(.8f, .04f, .7f), new Vector3(0, .5f, 0), steel);
         Add(body, ForgeShape.Shell, FurnaceShape.Steel, Vector3.Zero);
@@ -441,14 +441,14 @@ public static class WorldModels {
         var rig = Pivot(body, Vector3.Zero, new Vector3(0, 90, 0));
         Post(rig, .05f, .05f, .5f, new Vector3(.5f, .28f, 0), steel, 8);
         var hinge = new Vector3(.66f, .26f, 0);
-        var wood = Mat("8a5f3c");
+        var wood = Wood("8a5f3c");
         var leather = Mat("3b2619", .9f);
-        foreach (float x in new[] { .95f, 1.4f }) Box(rig, new Vector3(.08f, .2f, .5f), new Vector3(x, .1f, 0), Mat("6f5a40"));
+        foreach (float x in new[] { .95f, 1.4f }) Box(rig, new Vector3(.08f, .2f, .5f), new Vector3(x, .1f, 0), Wood("6f5a40"));
         Add(rig, ForgeShape.Board, wood, hinge + new Vector3(0, -.03f, 0));
-        Cylinder(rig, .07f, .025f, .22f, new Vector3(.55f, .3f, 0), Mat("b8893a", .4f, .8f), new Vector3(0, 0, 90), 10);
+        Cylinder(rig, .07f, .025f, .22f, new Vector3(.55f, .3f, 0), Metal("b8893a", .4f, .8f), new Vector3(0, 0, 90), 10);
         var lever = Pivot(rig, hinge);
         Add(lever, ForgeShape.Board, wood, new Vector3(0, .13f, 0));
-        Box(lever, new Vector3(.06f, .62f, .06f), new Vector3(1f, .44f, 0), Mat("8a5a32"));
+        Box(lever, new Vector3(.06f, .62f, .06f), new Vector3(1f, .44f, 0), Wood("8a5a32"));
         Cylinder(lever, .03f, .03f, .34f, new Vector3(1f, .75f, 0), Mat("222222"), new Vector3(90, 0, 0), 8);
         prop.Lever = lever;
         // Each pleat hangs from the hinge and follows a share of the lid's swing, so the leather folds as it closes.
@@ -467,8 +467,8 @@ public static class WorldModels {
     private static HutProp Cabin() {
         var prop = new HutProp();
         var body = prop.Body;
-        foreach (var (x, z) in new[] { (-1.1f, -1f), (1.1f, -1f), (-1.1f, 1f), (1.1f, 1f) }) Box(body, new Vector3(.3f, .3f, .3f), new Vector3(x, .15f, z), Mat("9a9b97"));
-        Box(body, new Vector3(2.6f, .12f, 2.4f), new Vector3(0, .36f, 0), Mat("7d5f43"));
+        foreach (var (x, z) in new[] { (-1.1f, -1f), (1.1f, -1f), (-1.1f, 1f), (1.1f, 1f) }) Box(body, new Vector3(.3f, .3f, .3f), new Vector3(x, .15f, z), Stone("9a9b97", .85f));
+        Box(body, new Vector3(2.6f, .12f, 2.4f), new Vector3(0, .36f, 0), Wood("7d5f43"));
         Add(body, CabinShape.Walls, CabinShape.WallMaterial, Vector3.Zero);
         Add(body, CabinShape.Interior, CabinShape.WallMaterial, Vector3.Zero);
         var trim = Mat("3d4245");
@@ -478,30 +478,30 @@ public static class WorldModels {
         }
         foreach (float x in new[] { -.95f, .15f, 1.03f }) {
             float height = CabinShape.WallTop(1) - .42f;
-            Box(body, new Vector3(.025f, height, .015f), new Vector3(x, .42f + height / 2, 1.005f), Mat("b08c55"));
+            Box(body, new Vector3(.025f, height, .015f), new Vector3(x, .42f + height / 2, 1.005f), Wood("b08c55"));
         }
         foreach (float z in new[] { -.8f, .65f }) {
             float height = CabinShape.WallTop(z) - .42f;
-            Box(body, new Vector3(.015f, height, .025f), new Vector3(1.205f, .42f + height / 2, z), Mat("b08c55"));
+            Box(body, new Vector3(.015f, height, .025f), new Vector3(1.205f, .42f + height / 2, z), Wood("b08c55"));
         }
         // Shed roof pitched toward the back, overhanging the door.
         var roof = Pivot(body, new Vector3(0, 2.68f, -.05f), new Vector3(-9, 0, 0));
-        Add(roof, CabinShape.Roof, Mat("6f7a80", .45f, .6f), Vector3.Zero);
+        Add(roof, CabinShape.Roof, Metal("6f7a80", .45f, .6f), Vector3.Zero);
         Box(roof, new Vector3(1.1f, .05f, .8f), new Vector3(.55f, .085f, -.4f), Mat("1f2c44", .25f, .4f));
-        Box(roof, new Vector3(1.14f, .03f, .84f), new Vector3(.55f, .065f, -.4f), Mat("c9ced2", .4f, .7f));
-        Post(body, .08f, .08f, 1.1f, new Vector3(-.75f, 2.4f, -.6f), Mat("8e9396", .45f, .7f));
-        Post(body, .14f, 0, .12f, new Vector3(-.75f, 3.48f, -.6f), Mat("8e9396", .45f, .7f), 8);
+        Box(roof, new Vector3(1.14f, .03f, .84f), new Vector3(.55f, .065f, -.4f), Metal("c9ced2", .4f, .7f));
+        Post(body, .08f, .08f, 1.1f, new Vector3(-.75f, 2.4f, -.6f), Metal("8e9396", .45f, .7f));
+        Post(body, .14f, 0, .12f, new Vector3(-.75f, 3.48f, -.6f), Metal("8e9396", .45f, .7f), 8);
         // Door hinged on its left edge, painted teal.
         // The hinge axis sits just ahead of the jamb so the open leaf clears the frame.
         var door = Pivot(body, new Vector3(-.75f, .42f, 1.075f));
-        Box(door, new Vector3(.82f, 1.86f, .05f), new Vector3(.41f, .93f, -.025f), Mat("3e6e6a", .6f));
-        Sphere(door, .035f, new Vector3(.72f, .95f, .025f), Mat("c9ced2", .3f, .8f));
+        Box(door, new Vector3(.82f, 1.86f, .05f), new Vector3(.41f, .93f, -.025f), Wood("3e6e6a", .6f));
+        Sphere(door, .035f, new Vector3(.72f, .95f, .025f), Metal("c9ced2", .3f, .8f));
         prop.Door = door;
         foreach (float x in new[] { -.79f, .11f })
             Box(body, new Vector3(.06f, 1.93f, .1f), new Vector3(x, 1.385f, 1.015f), trim);
         Box(body, new Vector3(.96f, .06f, .1f), new Vector3(-.34f, 2.32f, 1.015f), trim);
-        Box(body, new Vector3(1, .14f, .45f), new Vector3(-.34f, .07f, 1.375f), Mat("a9824f"));
-        Box(body, new Vector3(1, .28f, .26f), new Vector3(-.34f, .14f, 1.25f), Mat("a9824f"));
+        Box(body, new Vector3(1, .14f, .45f), new Vector3(-.34f, .07f, 1.375f), Wood("a9824f"));
+        Box(body, new Vector3(1, .28f, .26f), new Vector3(-.34f, .14f, 1.25f), Wood("a9824f"));
         var glass = Mat("8fb4c4", .15f, .2f);
         Box(body, new Vector3(.7f, .6f, .06f), new Vector3(.55f, 1.65f, 1.0f), trim);
         prop.Window = Box(body, new Vector3(.6f, .5f, .07f), new Vector3(.55f, 1.65f, 1.0f), glass);
@@ -566,7 +566,7 @@ public static class WorldModels {
     private static BenchProp Workbench() {
         var prop = new BenchProp();
         var body = prop.Body;
-        var steel = Mat("4a4d50", .4f, .6f);
+        var steel = Metal("4a4d50", .4f, .6f);
         Add(body, BenchShape.Wood, BenchShape.Timber, Vector3.Zero);
         Add(body, BenchShape.Vise, BenchShape.Steel, Vector3.Zero);
         Cylinder(body, .014f, .014f, .19f, new Vector3(.35f, .86f, .37f), steel, new Vector3(90, 0, 0), 10);
@@ -663,7 +663,7 @@ public static class WorldModels {
     private static PileProp Pile() {
         var prop = new PileProp();
         var body = prop.Body;
-        Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
+        Yard(body);
         var slots = new List<Vector3>();
         foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
             for (int x = 0; x < count; x++)
@@ -688,11 +688,17 @@ public static class WorldModels {
         }
     }
 
+    /// <summary>The packed-earth yard with its log frame that a pile or a farm plot stands on.</summary>
+    private static void Yard(Node3D body) {
+        Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
+        Add(body, PileShape.Frame, PileShape.Timber, new Vector3(0, .01f, 0));
+    }
+
     /// <summary>A farm plot: an empty pile's yard that, once sown, shows dark tilled rows and then the wheat growing on them.</summary>
     private static FarmProp Farm(int id) {
         var prop = new FarmProp();
         var body = prop.Body;
-        Add(body, PileShape.Yard, PileShape.Ground, new Vector3(0, .01f, 0));
+        Yard(body);
         int variant = id % 3;
         var soil = Pivot(body, Vector3.Zero);
         Add(soil, FarmShape.Soil, FarmShape.Earth, Vector3.Zero);
@@ -715,7 +721,7 @@ public static class WorldModels {
     private static AnvilProp Anvil() {
         var prop = new AnvilProp();
         var body = prop.Body;
-        var tube = Mat("5d6a4f", .6f, .4f);
+        var tube = Metal("5d6a4f", .6f, .4f);
         foreach (var (x, z) in new[] { (-.2f, -.15f), (.2f, -.15f), (-.2f, .15f), (.2f, .15f) }) Box(body, new Vector3(.06f, .46f, .06f), new Vector3(x * 1.1f, .23f, z * 1.1f), tube);
         Box(body, new Vector3(.52f, .05f, .4f), new Vector3(0, .47f, 0), tube);
         Box(body, new Vector3(.5f, .04f, .05f), new Vector3(0, .12f, .17f), tube);
@@ -816,9 +822,9 @@ public static class WorldModels {
         prop.Hole = hole;
         // Delivered materials wait beside the entrance: a log pile, stones and a few iron bars.
         var supplies = Pivot(body, Vector3.Zero);
-        for (int i = 0; i < 5; i++) Cylinder(supplies, .11f, .11f, .9f, new Vector3(1.3f + (i % 3) * .23f + (i > 2 ? .11f : 0), .11f + (i > 2 ? .19f : 0), -.6f), Mat(i % 2 == 0 ? "8a5f3c" : "7a5235"), new Vector3(90, 0, 0), 7);
-        for (int i = 0; i < 4; i++) Sphere(supplies, .17f, new Vector3(-1.35f + (i % 2) * .26f, .1f + (i / 2) * .18f, -.2f + (i % 2) * .1f), Mat("a3a7a3", .9f), new Vector3(1.2f, .7f, 1), 6);
-        for (int i = 0; i < 3; i++) Box(supplies, new Vector3(.12f, .06f, .5f), new Vector3(-1.3f, .03f + i * .06f, -1f), Mat("c2c9c9", .4f, .6f), new Vector3(0, i * 12, 0));
+        for (int i = 0; i < 5; i++) Cylinder(supplies, .11f, .11f, .9f, new Vector3(1.3f + (i % 3) * .23f + (i > 2 ? .11f : 0), .11f + (i > 2 ? .19f : 0), -.6f), Wood(i % 2 == 0 ? "8a5f3c" : "7a5235"), new Vector3(90, 0, 0), 7);
+        for (int i = 0; i < 4; i++) Sphere(supplies, .17f, new Vector3(-1.35f + (i % 2) * .26f, .1f + (i / 2) * .18f, -.2f + (i % 2) * .1f), Stone("a3a7a3", .9f), new Vector3(1.2f, .7f, 1), 6);
+        for (int i = 0; i < 3; i++) Box(supplies, new Vector3(.12f, .06f, .5f), new Vector3(-1.3f, .03f + i * .06f, -1f), Metal("c2c9c9", .4f, .6f), new Vector3(0, i * 12, 0));
         prop.Supplies = supplies;
         // Rough timber sets: a weathered portal with a plank hood and a warning board, then sets down the tunnel fading into the dark.
         var frame = Pivot(body, new Vector3(0, 0, Door));
@@ -826,7 +832,7 @@ public static class WorldModels {
         Add(frame, MineShape.Supports, MineShape.Unlit, Vector3.Zero);
         // A lantern hangs from the header on a hook; its flame and light burn only while someone works.
         var lantern = Pivot(frame, new Vector3(.55f, 1.46f, .32f));
-        var iron = Mat("2f3134", .5f, .6f);
+        var iron = Metal("2f3134", .5f, .6f);
         Box(lantern, new Vector3(.03f, .3f, .03f), new Vector3(0, .3f, -.08f), iron);
         Box(lantern, new Vector3(.03f, .03f, .14f), new Vector3(0, .44f, -.02f), iron);
         Cylinder(lantern, .04f, .1f, .07f, new Vector3(0, .2f, 0), iron, null, 6);
@@ -847,7 +853,7 @@ public static class WorldModels {
         var cart = Pivot(body, Vector3.Zero);
         Add(cart, MineShape.Cart, MineShape.Steel, Vector3.Zero);
         var load = Pivot(cart, Vector3.Zero);
-        Add(load, MineShape.Load, Mat(OreColor(ore), .8f), Vector3.Zero);
+        Add(load, MineShape.Load, Stone(OreColor(ore), .8f), Vector3.Zero);
         prop.Load = load;
         prop.Cart = cart;
         // Lamplight deep inside while someone works underground: a faint warm haze at the dark end.

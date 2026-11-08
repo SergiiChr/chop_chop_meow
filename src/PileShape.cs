@@ -4,12 +4,14 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Shared pile ground and cached stock shapes derived from existing resource meshes, with a block fallback.</summary>
+/// <summary>Shared pile ground, its log frame and cached stock shapes derived from existing resource meshes, with a block fallback.</summary>
 internal static class PileShape {
-    private static ArrayMesh? yard, stack;
+    private static ArrayMesh? yard, frame, stack;
     public static Mesh Yard => yard ??= BuildYard();
+    public static Mesh Frame => frame ??= BuildFrame();
     public static Mesh Stack => stack ??= BuildStack();
-    public static readonly StandardMaterial3D Ground = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = 1 };
+    public static readonly StandardMaterial3D Ground = ModelKit.Vertex(Surface.Earth, 1);
+    public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .9f);
 
     private static readonly Dictionary<string, Mesh> contents = new();
 
@@ -26,8 +28,13 @@ internal static class PileShape {
         _ => "fallback"
     };
 
-    private static StandardMaterial3D Material(string family, string color) =>
-        ModelKit.Mat(family == "coal" ? "292c30" : color, family == "bars" ? .45f : .95f, family == "bars" ? .5f : 0);
+    private static StandardMaterial3D Material(string family, string color) => family switch {
+        "bars" => ModelKit.Metal(color, .45f, .5f),
+        "coal" => ModelKit.Stone("292c30"),
+        "stone" or "ore" => ModelKit.Stone(color),
+        "logs" or "planks" or "parts" => ModelKit.Wood(color, .95f),
+        _ => ModelKit.Mat(color, .95f),
+    };
 
     /// <summary>Builds every stock mesh and item material while loading, so a pile showing a new item mid-game swaps cached resources only.</summary>
     public static void Warm(GameData data) {
@@ -155,7 +162,12 @@ internal static class PileShape {
     private static ArrayMesh BuildYard() {
         var s = Begin();
         Block(s, 1.45f, 1.45f, .02f, .06f, "7a6548");
-        // The cross logs butt against the long side logs rather than crossing through their ends.
+        return s.Commit();
+    }
+
+    /// <summary>The logs edging the yard; the cross logs butt against the long side logs rather than crossing through their ends.</summary>
+    private static ArrayMesh BuildFrame() {
+        var s = Begin();
         foreach (float side in new[] { -1.4f, 1.4f }) {
             Log(s, new(side, .08f, -1.49f), new(side, .08f, 1.49f));
             Log(s, new(-1.31f, .08f, side), new(1.31f, .08f, side));

@@ -9,8 +9,8 @@ internal static class FirePitShape {
     public static Mesh Stones => stones ??= BuildStones();
     public static Mesh Fuel => fuel ??= BuildFuel();
     public static Mesh Flames => flames ??= BuildFlames();
-    public static readonly StandardMaterial3D Stone = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = 1 };
-    public static readonly StandardMaterial3D Wood = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = 1 };
+    public static readonly StandardMaterial3D Stone = ModelKit.Vertex(Surface.Stone, 1);
+    public static readonly StandardMaterial3D Wood = ModelKit.Vertex(Surface.Wood, 1);
     public static readonly StandardMaterial3D Flame = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
     private static Vector3 Ring(float radius, float y, float angle) => new(MathF.Cos(angle) * radius, y, MathF.Sin(angle) * radius);

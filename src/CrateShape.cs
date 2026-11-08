@@ -9,7 +9,7 @@ internal static class CrateShape {
     public static Mesh Lid => lid ??= BuildLid();
     /// <summary>A compact closed transport crate for cart loads, without the full crate's hollow interior and hardware.</summary>
     public static Mesh Cargo => cargo ??= BuildCargo();
-    public static readonly StandardMaterial3D Timber = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f };
+    public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .9f);
 
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
     private static ArrayMesh BuildBody() {

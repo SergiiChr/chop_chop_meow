@@ -58,6 +58,8 @@ Play accepts Godot arguments after `--`:
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
+| `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
+| `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
 | `--animation-review` | Show every actor action on rotating rigs |
 | `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection, evenly spaced at 30 a second |
 | `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following |
@@ -79,7 +81,8 @@ These options are developer review tools; they do not represent a normal fresh-s
 ```
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
-`./tools/ground_textures.py` repacks the committed ground textures from their pinned CC0 sources.
+`./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
+from their pinned CC0 sources.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
@@ -88,7 +91,10 @@ The game opens on a start menu with Continue (the most recent save), New game, L
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
 
-Options holds a window resolution picker, a frame rate limit (off, 60 or 90 fps), a temporal anti-aliasing switch (on by default) and a music volume slider.
+Options holds a render resolution picker, a frame rate limit (off, 60 or 90 fps), a temporal anti-aliasing switch (on by
+default), a frame rate counter switch (on by default, shown under the clock) and a music volume slider.
+The game renders at the picked size, 16:9 or 16:10 from 1280 × 720 to 3840 × 2400; the window opens at that size, or as
+large as the screen allows, and resizing it only stretches the image, with bars when the shapes differ.
 The display choices are stored in `settings.cfg` and applied at launch.
 
 Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.

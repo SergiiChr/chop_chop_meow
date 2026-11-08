@@ -3,7 +3,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The day dial and clock on a plate in the top right corner; the side panel opens below it.</summary>
+/// <summary>The day dial and clock on a plate at the top of the right-hand corner column; the side panel opens below it.</summary>
 public partial class ClockPlate : PanelContainer {
     private readonly World world;
     private readonly DayDial dial;
@@ -13,7 +13,7 @@ public partial class ClockPlate : PanelContainer {
 
     public ClockPlate(World world) {
         this.world = world;
-        AnchorLeft = 1; AnchorRight = 1; OffsetLeft = -200; OffsetRight = -20; OffsetTop = 18; OffsetBottom = 18; MouseFilter = MouseFilterEnum.Ignore;
+        MouseFilter = MouseFilterEnum.Ignore;
         AddThemeStyleboxOverride("panel", Style.Plate);
         var column = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore }; column.AddThemeConstantOverride("separation", 6); AddChild(column);
         dial = new DayDial { Arc = () => world.SkyArc, Night = () => world.MoonUp, CustomMinimumSize = new Vector2(0, 62), MouseFilter = MouseFilterEnum.Ignore }; column.AddChild(dial);
@@ -27,6 +27,39 @@ public partial class ClockPlate : PanelContainer {
         int hour = (int)world.Hour;
         time.Text = $"Day {world.Day} · {hour}:{(int)(world.DayPhase * GameData.MinutesPerDay) % 60:00}";
         dial.QueueRedraw();
+    }
+}
+
+/// <summary>The right-hand corner column: the clock plate with the frame rate under it.</summary>
+public partial class Corner : VBoxContainer {
+    public readonly ClockPlate Clock;
+    public readonly FrameRate FrameRate = new();
+
+    public Corner(World world) {
+        AnchorLeft = 1; AnchorRight = 1; OffsetLeft = -200; OffsetRight = -20; OffsetTop = 18; OffsetBottom = 18; MouseFilter = MouseFilterEnum.Ignore;
+        AddThemeConstantOverride("separation", 4);
+        Clock = new ClockPlate(world); AddChild(Clock); AddChild(FrameRate);
+    }
+
+    public void Refresh() { Clock.Refresh(); FrameRate.Refresh(); }
+}
+
+/// <summary>The frame rate under the clock, built only when the whole number changes: building it allocates.</summary>
+public partial class FrameRate : Label {
+    private int shown = -1;
+
+    public FrameRate() {
+        Name = "frame_rate";
+        AddThemeFontSizeOverride("font_size", 15); Style.Outlined(this);
+        HorizontalAlignment = HorizontalAlignment.Right; MouseFilter = MouseFilterEnum.Ignore; Visible = Settings.FrameRate;
+    }
+
+    public void Refresh() {
+        if (!Visible) return;
+        int now = (int)Engine.GetFramesPerSecond();
+        if (now == shown) return;
+        shown = now;
+        Text = $"{now} fps";
     }
 }
 
