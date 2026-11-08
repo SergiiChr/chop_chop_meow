@@ -8,8 +8,8 @@ internal static class CourierShape {
     private static ArrayMesh? vest, cap;
     public static Mesh Vest => vest ??= BuildVest();
     public static Mesh Cap => cap ??= BuildCap();
-    public static readonly StandardMaterial3D VestMaterial = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f };
-    public static readonly StandardMaterial3D CapMaterial = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .85f };
+    public static readonly StandardMaterial3D VestMaterial = ModelKit.Vertex(Surface.Cloth, .9f);
+    public static readonly StandardMaterial3D CapMaterial = ModelKit.Vertex(Surface.Cloth, .85f);
 
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 

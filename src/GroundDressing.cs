@@ -29,12 +29,20 @@ public partial class WorldView {
         uniform sampler2D disturbance : filter_linear, repeat_disable;
         // Footpaths worn by walking.
         uniform sampler2D traffic : filter_linear, repeat_disable;
+        // The foliage surface's grain on shrubs, laid over each in its own space; it is packed at half brightness.
+        uniform bool grained = false;
+        uniform sampler2D grain : source_color, filter_linear_mipmap, repeat_enable;
+        uniform float tile = 1.0;
         varying vec3 tint;
+        varying vec3 local;
+        varying vec3 local_normal;
         {{Wind.ShaderCode}}
         void vertex() {
             vec2 uv = MODEL_MATRIX[3].xz / {{Terrain.Size}}.0;
             float wear = max(texture(disturbance, uv).r, texture(traffic, uv).r);
             VERTEX *= 1.0 - smoothstep(0.12, 0.65, wear);
+            local = mat3(MODEL_MATRIX) * VERTEX;
+            local_normal = mat3(MODEL_MATRIX) * NORMAL;
             vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
             float bend = clamp(VERTEX.y / 0.3, 0.0, 1.0);
             VERTEX += to_local(MODEL_MATRIX, wind_offset(world, bend, 0.12) + push_offset(world, bend));
@@ -46,6 +54,11 @@ public partial class WorldView {
         }
         void fragment() {
             ALBEDO = tint;
+            if (grained) {
+                vec3 weight = abs(local_normal);
+                weight /= weight.x + weight.y + weight.z;
+                ALBEDO *= (texture(grain, local.yz / tile).rgb * weight.x + texture(grain, local.xz / tile).rgb * weight.y + texture(grain, local.xy / tile).rgb * weight.z) * 2.0;
+            }
             ROUGHNESS = 1.0;
         }
         """;
@@ -58,6 +71,9 @@ public partial class WorldView {
         // Closed shapes such as shrubs keep back faces culled, or their unlit insides show where they meet a slope.
         solidDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingShader.Replace("cull_disabled", "cull_back") } };
         solidDressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
+        solidDressingMaterial.SetShaderParameter("grained", true);
+        solidDressingMaterial.SetShaderParameter("grain", ModelKit.Maps(Surface.Foliage).Grain);
+        solidDressingMaterial.SetShaderParameter("tile", ModelKit.Tile(Surface.Foliage));
         sceneryShadeImage = Image.CreateFromData(ShadeSize, ShadeSize, false, Image.Format.R8, sceneryShade);
         sceneryShadeTexture = ImageTexture.CreateFromImage(sceneryShadeImage);
         objectShadeImage = Image.CreateFromData(ContactSize, ContactSize, false, Image.Format.Rg8, objectShade);

@@ -15,10 +15,9 @@ internal static class RackShape {
     public static readonly (string Kind, Mesh Mesh)[] Tools = [("axe", Axe), ("pickaxe", Pick), ("rake", Rake), ("hammer", BuildTool("hammer")), ("chisel", BuildTool("chisel"))];
     /// <summary>Where a slot's peg sits across the board.</summary>
     public static float PegX(int slot) => -.36f + slot * .24f;
-    public static readonly StandardMaterial3D Concrete = Material(.95f);
-    public static readonly StandardMaterial3D Timber = Material(.85f);
-    public static readonly StandardMaterial3D Tool = Material(.65f, .15f);
-    private static StandardMaterial3D Material(float roughness, float metallic = 0) => new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = roughness, Metallic = metallic };
+    public static readonly StandardMaterial3D Concrete = ModelKit.Vertex(Surface.Stone, .95f);
+    public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .85f);
+    public static readonly StandardMaterial3D Tool = ModelKit.Vertex(Surface.Metal, .65f, .15f);
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
     private static ArrayMesh BuildFeet() {

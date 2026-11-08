@@ -48,6 +48,13 @@ Models are assembled from code-built Godot meshes.
 - `src/WorldModels.cs` — world objects, wolf and trade cart.
 - `src/ActorRig.cs` — player, worker and courier.
 - `src/ModelKit.cs` — shared primitive, material and fade helpers.
+  A material is flat colour or one of the surfaces wood, metal, stone, cloth and earth: the colour stays the model's
+  own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
+  layer, so the marks stay put as it moves and a model's own albedo texture stays free.
+  `Mat` makes a flat material and `Wood`, `Metal`, `Stone` and `Cloth` a surfaced one for primitives; `Vertex` dresses
+  a mesh that carries its own colours and `Dress` any standard material. The foliage surface is laid on the meadow's
+  shrubs by the ground dressing shader. Skin, hair, fur, glass, leaf cards and flames stay flat.
+  The surfaces' grain and bump textures are in `models/surfaces/`, packed by `tools/surface_textures.py`.
 - `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons and pile stock.
 - `StockPile` in `src/PileShape.cs` — piled resources on any model: fixed slots that each show one item's cached pile stock.
@@ -186,4 +193,9 @@ Its prompt is preserved in [PROMPTS.md](PROMPTS.md).
 The ground textures in `environment/terrain3d/textures/` are packed from three [ambientCG](https://ambientcg.com)
 photoscans, Grass004, Ground037 and Rock030, released under CC0 1.0; `tools/ground_textures.py` downloads the pinned
 1K PNG archives, checks their SHA-256 and packs them at 512 px with `tools/pack_ground.gd`.
+The model surfaces in `models/surfaces/` come the same way from Wood049, Metal038, Rock030, Fabric061, Ground037 and
+Moss002, packed at 256 px by `tools/surface_textures.py` with `tools/pack_surfaces.gd`: a grey grain PNG holding each
+pixel's brightness around the photoscan's mean at the ground's detail strength, halved so a tint of twice the colour
+restores it, and the normal PNG with its slope at the ground's bump depth. The cloth weave keeps all of its contrast
+and is drawn coarse, since a fabric scan is nearly even at the game's distance.
 No other external game art or third-party packs are used.

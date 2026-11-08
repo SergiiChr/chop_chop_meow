@@ -46,7 +46,7 @@ public static class NatureModelChecks {
             Require(parts[2][part].MaterialOverride!.GetInstanceId() != parts[4][part].MaterialOverride!.GetInstanceId(),
                 $"{PartName(part)} palette materials should be distinct between iron and tin");
         }
-        Require(((StandardMaterial3D)parts[0][2].MaterialOverride!).AlbedoColor.IsEqualApprox(new Color("0c0e10")),
+        Require(ModelKit.Tint((StandardMaterial3D)parts[0][2].MaterialOverride!).IsEqualApprox(new Color("0c0e10")),
             "mineable coal chips should use the near-black palette");
     }
 

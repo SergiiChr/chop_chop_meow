@@ -65,8 +65,8 @@ public sealed class ActorRig {
         Add(crate, CrateShape.Cargo, CrateShape.Timber, new Vector3(0, -.14f, 0), scale: new Vector3(.7f, .62f, .73f));
         // A low boulder to sit on, under the hips.
         rock = Pivot(Root, Vector3.Zero);
-        Sphere(rock, .24f, new Vector3(0, .1f, -.04f), Mat("8d918c"), new Vector3(1.15f, .85f, 1));
-        Sphere(rock, .13f, new Vector3(.15f, .05f, .1f), Mat("7a7e79"), new Vector3(1, .7f, 1));
+        Sphere(rock, .24f, new Vector3(0, .1f, -.04f), Stone("8d918c", .85f), new Vector3(1.15f, .85f, 1));
+        Sphere(rock, .13f, new Vector3(.15f, .05f, .1f), Stone("7a7e79", .85f), new Vector3(1, .7f, 1));
         BuildTools();
         (torch, Flame, TorchLight) = BuildTorch();
     }
@@ -121,8 +121,8 @@ public sealed class ActorRig {
     /// <summary>A torch gripped at the origin, shaft along +Z, with its unlit flame light; the icon renderer shows it on its own.</summary>
     public static (Node3D Torch, Node3D Flame, OmniLight3D Light) Torch() {
         var holder = new Node3D();
-        Cylinder(holder, .024f, .03f, .52f, new Vector3(0, 0, .12f), Mat("6e4a2e", .8f), new Vector3(90, 0, 0), 6);
-        Cylinder(holder, .045f, .04f, .1f, new Vector3(0, 0, .37f), Mat("3a2a20", .9f), new Vector3(90, 0, 0), 7);
+        Cylinder(holder, .024f, .03f, .52f, new Vector3(0, 0, .12f), Wood("6e4a2e", .8f), new Vector3(90, 0, 0), 6);
+        Cylinder(holder, .045f, .04f, .1f, new Vector3(0, 0, .37f), Wood("3a2a20", .9f), new Vector3(90, 0, 0), 7);
         var flame = Pivot(holder, new Vector3(0, 0, .42f), new Vector3(90, 0, 0));
         // The flame wraps its own light, so it casts no shadow; everything else around the torch does.
         Post(flame, .07f, 0, .24f, Vector3.Zero, Flat(new Color("ff8a2a", .9f)), 7).CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
@@ -167,13 +167,13 @@ public sealed class ActorRig {
         float metal = steelTool ? .85f : .45f;
         var tool = new Node3D();
         const float length = .72f;
-        Cylinder(tool, .022f, .022f, length, new Vector3(0, .08f - length / 2, 0), Mat(handle, .7f));
+        Cylinder(tool, .022f, .022f, length, new Vector3(0, .08f - length / 2, 0), Wood(handle, .7f));
         if (steelTool) Cylinder(tool, .027f, .027f, .16f, new Vector3(0, -.02f, 0), Mat("222222"));
         float end = .06f - length;
-        var steel = Mat(head, .35f, metal);
+        var steel = Metal(head, .35f, metal);
         if (name.EndsWith("axe")) {
             Box(tool, new Vector3(.045f, .1f, .15f), new Vector3(0, end, -.05f), steel);
-            Box(tool, new Vector3(.03f, .17f, .05f), new Vector3(0, end, -.14f), Mat(steelTool ? "e9eef0" : "8d9294", .3f, metal));
+            Box(tool, new Vector3(.03f, .17f, .05f), new Vector3(0, end, -.14f), Metal(steelTool ? "e9eef0" : "8d9294", .3f, metal));
         } else {
             Cylinder(tool, .035f, 0, .3f, new Vector3(0, end, -.15f), steel, new Vector3(-90, 0, 0), 6);
             Cylinder(tool, .035f, 0, .22f, new Vector3(0, end, .11f), steel, new Vector3(90, 0, 0), 6);
@@ -187,17 +187,17 @@ public sealed class ActorRig {
     private static Node3D Hammer(bool steel) {
         var tool = new Node3D();
         const float length = .38f, end = .06f - length;
-        Cylinder(tool, .02f, .024f, length, new Vector3(0, .08f - length / 2, 0), Mat(steel ? "e87d1e" : "8a5a32", .7f));
+        Cylinder(tool, .02f, .024f, length, new Vector3(0, .08f - length / 2, 0), steel ? Mat("e87d1e", .7f) : Wood("8a5a32", .7f));
         if (steel) {
-            var metal = Mat("c9d3d8", .35f, .85f);
+            var metal = Metal("c9d3d8", .35f, .85f);
             Cylinder(tool, .027f, .027f, .12f, new Vector3(0, -.01f, 0), Mat("222222"));
             Cylinder(tool, .028f, .028f, .1f, new Vector3(0, end, -.03f), metal, new Vector3(90, 0, 0), 8);
             Cylinder(tool, .034f, .034f, .02f, new Vector3(0, end, -.085f), metal, new Vector3(90, 0, 0), 8);
             // The claw tapers away from the face and curves down toward the handle.
             Cylinder(tool, .024f, .006f, .1f, new Vector3(0, end - .015f, .06f), metal, new Vector3(110, 0, 0), 6).Scale = new Vector3(.6f, 1, 1);
         } else {
-            Cylinder(tool, .052f, .052f, .15f, new Vector3(0, end, 0), Mat("b98552", .8f), new Vector3(90, 0, 0), 10);
-            foreach (float z in new[] { -.06f, .06f }) Cylinder(tool, .055f, .055f, .016f, new Vector3(0, end, z), Mat("7a5233", .8f), new Vector3(90, 0, 0), 10);
+            Cylinder(tool, .052f, .052f, .15f, new Vector3(0, end, 0), Wood("b98552", .8f), new Vector3(90, 0, 0), 10);
+            foreach (float z in new[] { -.06f, .06f }) Cylinder(tool, .055f, .055f, .016f, new Vector3(0, end, z), Wood("7a5233", .8f), new Vector3(90, 0, 0), 10);
         }
         return tool;
     }
@@ -209,16 +209,16 @@ public sealed class ActorRig {
     private static Node3D Chisel(bool steel) {
         var tool = new Node3D();
         if (steel) {
-            var metal = Mat("c9d3d8", .3f, .85f);
+            var metal = Metal("c9d3d8", .3f, .85f);
             Cylinder(tool, .02f, .025f, .14f, Vector3.Zero, Mat("e87d1e", .7f), sides: 8);
             Cylinder(tool, .026f, .026f, .02f, new Vector3(0, .075f, 0), Mat("222222"), sides: 8);
             Cylinder(tool, .021f, .021f, .02f, new Vector3(0, -.08f, 0), metal, sides: 8);
             Box(tool, new Vector3(.016f, .1f, .016f), new Vector3(0, -.14f, 0), metal);
             Box(tool, new Vector3(.012f, .06f, .05f), new Vector3(0, -.21f, 0), metal);
-            Box(tool, new Vector3(.005f, .016f, .05f), new Vector3(0, -.248f, 0), Mat("e9eef0", .25f, .85f));
+            Box(tool, new Vector3(.005f, .016f, .05f), new Vector3(0, -.248f, 0), Metal("e9eef0", .25f, .85f));
         } else {
-            var stone = Mat("9aa29f", .9f);
-            Cylinder(tool, .02f, .024f, .18f, new Vector3(0, -.01f, 0), Mat("8a5a32", .8f), sides: 8);
+            var stone = Stone("9aa29f", .9f);
+            Cylinder(tool, .02f, .024f, .18f, new Vector3(0, -.01f, 0), Wood("8a5a32", .8f), sides: 8);
             // The blade's butt sits in the split handle end under the cord wrap.
             Cylinder(tool, .014f, .032f, .12f, new Vector3(0, -.15f, 0), stone, sides: 5).Scale = new Vector3(.45f, 1, 1);
             Cylinder(tool, .028f, .028f, .05f, new Vector3(0, -.1f, 0), Mat("c9b48a", .95f), sides: 8);
@@ -232,7 +232,7 @@ public sealed class ActorRig {
     /// </summary>
     private static Node3D ProtestSign() {
         var sign = new Node3D();
-        Cylinder(sign, .02f, .02f, 1.3f, new Vector3(0, .033f, .45f), Mat("8a5a32", .8f), new Vector3(90, 0, 0), 6);
+        Cylinder(sign, .02f, .02f, 1.3f, new Vector3(0, .033f, .45f), Wood("8a5a32", .8f), new Vector3(90, 0, 0), 6);
         Box(sign, new Vector3(.72f, .025f, .4f), new Vector3(0, 0, 1.08f), Mat("d9c49a", .95f));
         foreach (float side in new[] { -1f, 1f })
             sign.AddChild(new Label3D {

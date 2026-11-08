@@ -11,11 +11,10 @@ internal static class CanneryShape {
     public static Mesh Pot => pot ??= BuildPot();
     public static Mesh Press => press ??= BuildPress();
     public static Mesh Fire => fire ??= BuildFire();
-    public static readonly StandardMaterial3D Iron = Material(.6f, .55f);
-    public static readonly StandardMaterial3D Wood = Material(.85f);
-    public static readonly StandardMaterial3D Steel = Material(.4f, .4f);
+    public static readonly StandardMaterial3D Iron = ModelKit.Vertex(Surface.Metal, .6f, .55f);
+    public static readonly StandardMaterial3D Wood = ModelKit.Vertex(Surface.Wood, .85f);
+    public static readonly StandardMaterial3D Steel = ModelKit.Vertex(Surface.Metal, .4f, .4f);
     public static readonly StandardMaterial3D Flame = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
-    private static StandardMaterial3D Material(float roughness, float metallic = 0) => new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = roughness, Metallic = metallic };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
     private static ArrayMesh BuildStove() {

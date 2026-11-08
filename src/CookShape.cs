@@ -11,12 +11,11 @@ internal static class CookShape {
     public static Mesh Metal => metal ??= BuildMetal();
     public static Mesh Mortar => mortar ??= BuildMortar();
     public static Mesh Fire => fire ??= BuildFire();
-    public static readonly StandardMaterial3D Stone = Material(.95f);
-    public static readonly StandardMaterial3D Wood = Material(.85f);
-    public static readonly StandardMaterial3D Steel = Material(.5f, .35f);
-    public static readonly StandardMaterial3D Ceramic = Material(.9f);
+    public static readonly StandardMaterial3D Stone = ModelKit.Vertex(Surface.Stone, .95f);
+    public static readonly StandardMaterial3D Wood = ModelKit.Vertex(Surface.Wood, .85f);
+    public static readonly StandardMaterial3D Steel = ModelKit.Vertex(Surface.Metal, .5f, .35f);
+    public static readonly StandardMaterial3D Ceramic = ModelKit.Vertex(Surface.Flat, .9f);
     public static readonly StandardMaterial3D Flame = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded };
-    private static StandardMaterial3D Material(float roughness, float metallic = 0) => new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = roughness, Metallic = metallic };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
     private static ArrayMesh BuildMasonry() {

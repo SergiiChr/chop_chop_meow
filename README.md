@@ -58,6 +58,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
 | `--showcase --day-phase 0.3` | Set the time of day, from 0 at dawn |
+| `--showcase --zoom 2` | Set the camera zoom, for a close look at a model |
 | `--animation-review` | Show every actor action on rotating rigs |
 | `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection, evenly spaced at 30 a second |
 | `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following |
@@ -78,7 +79,8 @@ These options are developer review tools; they do not represent a normal fresh-s
 ```
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
-`./tools/ground_textures.py` repacks the committed ground textures from their pinned CC0 sources.
+`./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
+from their pinned CC0 sources.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options

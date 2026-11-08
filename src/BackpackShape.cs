@@ -8,7 +8,7 @@ internal static class BackpackShape {
     private static ArrayMesh? details, flap;
     public static Mesh Details => details ??= BuildDetails();
     public static Mesh Flap => flap ??= BuildFlap();
-    public static readonly StandardMaterial3D Canvas = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .95f };
+    public static readonly StandardMaterial3D Canvas = ModelKit.Vertex(Surface.Cloth, .95f);
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
     private static ArrayMesh BuildDetails() {

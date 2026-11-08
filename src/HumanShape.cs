@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 internal static class HumanShape {
     private const float Cloth = 1f / 6, Middle = .5f, End = 5f / 6;
     private static readonly Color Neutral = Colors.White;
-    private static readonly Dictionary<(string, string, string), StandardMaterial3D> palettes = new();
+    private static readonly Dictionary<(string, string, string, bool), StandardMaterial3D> palettes = new();
     private static readonly Ring[] hips = {
         new(.13f,.13f,.085f,Neutral),new(.08f,.155f,.1f,Neutral),
         new(.02f,.165f,.09f,Neutral),new(-.015f,.165f,.088f,Neutral)
@@ -41,27 +41,31 @@ internal static class HumanShape {
     };
 
     public static void Torso(Node3D parent, string shirt, string trousers) {
-        ActorShape.Add(parent, hips, material: ModelKit.Mat(trousers)).Name = "HumanHips";
-        ActorShape.Add(parent, torso, material: ModelKit.Mat(shirt)).Name = "HumanTorso";
+        ActorShape.Add(parent, hips, material: ModelKit.Cloth(trousers)).Name = "HumanHips";
+        ActorShape.Add(parent, torso, material: ModelKit.Cloth(shirt)).Name = "HumanTorso";
     }
     public static Skeleton3D Leg(Node3D parent, float joint, float ankle, string trousers, string boots) {
-        var skeleton = ActorShape.Limb(parent, leg, joint, Palette(trousers, boots, "302d29"), ankle);
+        var skeleton = ActorShape.Limb(parent, leg, joint, Palette(trousers, boots, "302d29", false), ankle);
         skeleton.GetChild<MeshInstance3D>(0).Name = "HumanLeg";
         return skeleton;
     }
     public static Skeleton3D Arm(Node3D parent, float joint, bool left, string shirt, string skin, bool shortSleeve) {
-        var skeleton = ActorShape.Limb(parent, left ? leftArm : rightArm, joint, Palette(shirt, shortSleeve ? skin : shirt, skin));
+        var skeleton = ActorShape.Limb(parent, left ? leftArm : rightArm, joint, Palette(shirt, shortSleeve ? skin : shirt, skin, !shortSleeve));
         skeleton.GetChild<MeshInstance3D>(0).Name = left ? "HumanArmLeft" : "HumanArmRight";
         return skeleton;
     }
-    private static StandardMaterial3D Palette(string cloth, string middle, string end) {
-        var key = (cloth, middle, end);
+    /// <param name="middleCloth">Whether the middle tone is cloth too; the weave covers the cloth tones and leaves skin and boots smooth.</param>
+    private static StandardMaterial3D Palette(string cloth, string middle, string end, bool middleCloth) {
+        var key = (cloth, middle, end, middleCloth);
         if (palettes.TryGetValue(key, out var material)) return material;
         // Texel centers map the same neutral limb to clothing, exposed skin, boots and soles.
         // StandardMaterial3D keeps the existing fog/trade-fade path and blends the original color transitions.
         var image = Image.CreateFromData(3, 1, false, Image.Format.Rgba8, new byte[12]);
         image.SetPixel(0, 0, new Color(cloth)); image.SetPixel(1, 0, new Color(middle)); image.SetPixel(2, 0, new Color(end));
-        material = new StandardMaterial3D { AlbedoTexture = ImageTexture.CreateFromImage(image), TextureFilter = BaseMaterial3D.TextureFilterEnum.Linear, TextureRepeat = false, Roughness = .85f };
+        var weave = Image.CreateFromData(3, 1, false, Image.Format.Rgba8, new byte[12]);
+        weave.SetPixel(0, 0, Colors.White); weave.SetPixel(1, 0, middleCloth ? Colors.White : Colors.Black); weave.SetPixel(2, 0, Colors.Black);
+        material = new StandardMaterial3D { AlbedoTexture = ImageTexture.CreateFromImage(image), DetailMask = ImageTexture.CreateFromImage(weave), Roughness = .85f };
+        ModelKit.Dress(material, Surface.Cloth);
         palettes[key] = material;
         return material;
     }

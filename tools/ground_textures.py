@@ -3,10 +3,7 @@
 
 from __future__ import annotations
 
-import shutil
 import sys
-import tempfile
-import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -32,64 +29,12 @@ SETS = {
 MAPS = ("Color", "Displacement", "NormalGL", "Roughness")
 # Half the source size: a tile spans a few world units and about a hundred screen pixels each.
 SIZE = 512
-CACHE = ROOT / ".tools" / "ambientcg"
 OUTPUT = ROOT / "assets" / "environment" / "terrain3d" / "textures"
 PACK_SCRIPT = ROOT / "tools" / "pack_ground.gd"
 
-PROJECT_SOURCE = """; Isolated project for packing ground textures.
-config_version=5
-
-[application]
-config/name="Ground texture packer"
-
-[rendering]
-renderer/rendering_method="gl_compatibility"
-"""
-
 
 def main() -> None:
-    build.fetch_godot()
-    build.BUILD.mkdir(exist_ok=True)
-    CACHE.mkdir(parents=True, exist_ok=True)
-    OUTPUT.mkdir(parents=True, exist_ok=True)
-    # Godot ignores projects nested under the repository's .tools/.gdignore, so the packer runs from a temporary
-    # project.
-    with tempfile.TemporaryDirectory(prefix="chop-chop-ground-") as temporary:
-        source = Path(temporary) / "source"
-        source.mkdir()
-        for asset, sha256 in SETS.values():
-            archive = CACHE / f"{asset}_1K-PNG.zip"
-            build.fetch_pinned(
-                f"https://ambientcg.com/get?file={archive.name}", archive, sha256
-            )
-            with zipfile.ZipFile(archive) as bundle:
-                for name in MAPS:
-                    bundle.extract(f"{asset}_1K-PNG_{name}.png", source)
-        project = Path(temporary) / "project"
-        project.mkdir()
-        (project / "project.godot").write_text(PROJECT_SOURCE, encoding="utf-8")
-        shutil.copy(PACK_SCRIPT, project / PACK_SCRIPT.name)
-        env = build.isolated_env(Path(temporary))
-        build.run_godot(
-            "ground-pack",
-            [
-                build.GODOT,
-                "--headless",
-                "--path",
-                project,
-                "--script",
-                f"res://{PACK_SCRIPT.name}",
-                "--",
-                source,
-                OUTPUT,
-                str(SIZE),
-                *(f"{name}={asset}" for name, (asset, _) in SETS.items()),
-            ],
-            env,
-            timeout=600,
-            success_marker="GROUND-PACK PASS",
-        )
-    print(f"Packed {len(SETS)} ground texture sets into {OUTPUT.relative_to(ROOT)}")
+    build.pack_photoscans(SETS, MAPS, SIZE, OUTPUT, PACK_SCRIPT, "GROUND-PACK PASS")
 
 
 if __name__ == "__main__":

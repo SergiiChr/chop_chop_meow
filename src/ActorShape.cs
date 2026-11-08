@@ -9,7 +9,7 @@ internal static class ActorShape {
     internal readonly record struct Ring(float Y, float Width, float Depth, Color Color, float Forward = 0, float Sideways = 0, float Tone = 0);
 
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
-    private static readonly StandardMaterial3D Surface = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .85f };
+    private static readonly StandardMaterial3D Skin = ModelKit.Vertex(Surface.Flat, .85f);
 
     private static readonly Ring[] backpack = {
         new(.18f, .025f, .025f, new Color("6c7849")), new(.16f, .115f, .07f, new Color("6c7849")),
@@ -42,14 +42,14 @@ internal static class ActorShape {
                 }
             meshes["bib"] = mesh = surface.Commit();
         }
-        parent.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = ModelKit.Mat(color) });
+        parent.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = ModelKit.Cloth(color) });
     }
 
     /// <summary>A thin, closed webbing strip swept along a smooth path, including its edge thickness.</summary>
     public static void Strap(Node3D parent, Vector3[] anchors, string color = "485335") {
         string key = $"strap|{string.Join("|", anchors)}";
         if (!meshes.TryGetValue(key, out var mesh)) meshes[key] = mesh = BuildStrap(anchors);
-        parent.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = ModelKit.Mat(color) });
+        parent.AddChild(new MeshInstance3D { Mesh = mesh, MaterialOverride = ModelKit.Cloth(color) });
     }
 
     private static ArrayMesh BuildStrap(Vector3[] anchors) {
@@ -156,7 +156,7 @@ internal static class ActorShape {
     public static MeshInstance3D Add(Node3D parent, Ring[] rings, float joint = 0, Material? material = null, float ankle = 0) {
         string key = $"profile|{joint}|{ankle}|{string.Join("|", rings)}";
         if (!meshes.TryGetValue(key, out var profile)) meshes[key] = profile = BuildProfile(rings, joint, ankle);
-        var mesh = new MeshInstance3D { Mesh = profile, MaterialOverride = material ?? Surface };
+        var mesh = new MeshInstance3D { Mesh = profile, MaterialOverride = material ?? Skin };
         if (joint > 0) {
             var skin = new Skin();
             skin.AddBind(0, Transform3D.Identity);

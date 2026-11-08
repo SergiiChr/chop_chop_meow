@@ -12,8 +12,10 @@ internal static class NatureShape {
     internal readonly record struct Step(float Y, float Radius, Color Color);
 
     public const int Variants = 3;
-    public static readonly StandardMaterial3D Natural = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .92f };
-    public static readonly StandardMaterial3D Glossy = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .4f };
+    public static readonly StandardMaterial3D Natural = ModelKit.Vertex(Surface.Flat, .92f);
+    public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .92f);
+    public static readonly StandardMaterial3D Rock = ModelKit.Vertex(Surface.Stone, .92f);
+    public static readonly StandardMaterial3D Glossy = ModelKit.Vertex(Surface.Flat, .4f);
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
 
     private static readonly Dictionary<(string Color, float Roughness, float Metallic), StandardMaterial3D> oreMaterials = new();
@@ -22,13 +24,7 @@ internal static class NatureShape {
     public static StandardMaterial3D OreMaterial(string color, float roughness, float metallic) {
         var key = (color, roughness, metallic);
         if (!oreMaterials.TryGetValue(key, out var material))
-            oreMaterials[key] = material = new StandardMaterial3D {
-                AlbedoColor = new Color(color),
-                VertexColorUseAsAlbedo = true,
-                VertexColorIsSrgb = true,
-                Roughness = roughness,
-                Metallic = metallic
-            };
+            oreMaterials[key] = material = ModelKit.Vertex(Surface.Stone, roughness, metallic, color);
         return material;
     }
 

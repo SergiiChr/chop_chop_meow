@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 /// <summary>A continuous cave outcrop, rooted below the mountain surface instead of capped as a separate mound.</summary>
 internal static class MineRockShape {
     private static readonly Dictionary<Cliff, ArrayMesh> meshes = new();
-    public static readonly StandardMaterial3D Rock = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .95f };
+    public static readonly StandardMaterial3D Rock = ModelKit.Vertex(Surface.Stone, .95f);
 
     public static Mesh Mesh(Cliff cliff, string[] palette) {
         if (meshes.TryGetValue(cliff, out var mesh)) return mesh;
