@@ -21,7 +21,7 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
 
     /// <summary>Whether the player can reach a thing; if not, says so.</summary>
     private bool InReach(Thing t) {
-        if (world.Near(t)) return true;
+        if (world.Reaches(t)) return true;
         kit.Notify("Walk closer first."); return false;
     }
 

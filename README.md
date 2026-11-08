@@ -172,6 +172,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 | Worker | 5 items, like a crate: one stack of 5 or up to 5 different items |
 | Tool station | 4 slots, any tool in any slot |
 
+- You can move items in and out of storage and stations up to 15 metres away (`World.ItemReach`).
 - Inventory cells retain their positions. Drag to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
 - Right-click a stack to pick up half of it, then left-click a slot to drop it there.
 - A dropped stack that does not all fit fills the slot, and the rest stays held until you drop it elsewhere or click somewhere it cannot go.

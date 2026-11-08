@@ -24,6 +24,7 @@ public static class SimulationChecks {
         Test(MineRockChecks.Run);
         Test(WorkerStateChecks.Run, data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
+        Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
         Test(CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest, data);
         Test(CheckWorkerGathersWoodAndRetargetsWhenFilterChanges, data);
         Test(CheckWorkerDetoursAroundLake, data);
@@ -226,6 +227,18 @@ public static class SimulationChecks {
         world.SetFilter(heldRack, "steel_pick", true, false);
         SafeTick(world, 10);
         Require(cutter.Tool == "steel_axe", "with the filter cleared, the worker should take the axe");
+    }
+
+    private static void CheckPlayerMovesItemsWithinFifteenMetres(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(20, 20);
+        var chest = world.Add(ThingKind.Chest, world.Player + new Vector2(14, 0));
+        var furnace = world.Add(ThingKind.Furnace, world.Player + new Vector2(0, 14));
+        var far = world.Add(ThingKind.Chest, world.Player + new Vector2(-17, 0));
+        Give(world, "wood", 6); Give(world, "iron_ore", 4);
+        Require(world.Transfer(world.Backpack, chest.Inventory, "wood", 2) == 2, "a chest 14 m away should take items from the backpack");
+        Require(world.LoadInput(furnace, "iron_ore", 4) == 4, "a station 14 m away should take its inputs from the backpack");
+        Require(world.Transfer(world.Backpack, far.Inventory, "wood", 2) == 0, "a chest 17 m away should be out of reach");
     }
 
     private static void CheckOutputFilterBlocksAutomatedWithdrawal(GameData data) {

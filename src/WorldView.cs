@@ -891,7 +891,7 @@ public partial class WorldView : Node3D {
                 if (!first && count != box.LastCount) box.Puff = .9f;
                 box.LastCount = count;
                 box.Puff = Math.Max(0, box.Puff - dt);
-                bool open = box.Puff > 0 || t.Id == Selection.Thing && PanelOpen && World.Near(t);
+                bool open = box.Puff > 0 || t.Id == Selection.Thing && PanelOpen && World.Reaches(t);
                 if (dt > 0 && (open ? box.Open == 0 : box.Open == 1)) Sounds?.Play(open ? "open_chest" : "close_chest", t.Pos);
                 box.Open = Mathf.MoveToward(box.Open, open ? 1 : 0, dt * 4);
                 box.Lid.RotationDegrees = new Vector3(-80 * Ease(box.Open), 0, 0);

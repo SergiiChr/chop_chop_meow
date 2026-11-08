@@ -173,7 +173,7 @@ public sealed class PlayerControl {
     }
 
     private void StoreHeld(Thing t, string item) {
-        if (!world.Near(t)) { kit.Notify("Walk closer to the chest to store the selected stack."); return; }
+        if (!world.Reaches(t)) { kit.Notify("Walk closer to the chest to store the selected stack."); return; }
         // The move runs on the server, so the answer comes from what this window shows.
         if (world.Backpack[item] == 0 || t.Inventory.Room(item) == 0) { kit.Notify($"No {world.Data.Name(item)} to store, or chest is full."); return; }
         world.Transfer(world.Backpack, t.Inventory, item, ItemMoves.Amount(world.S.Backpack, item));

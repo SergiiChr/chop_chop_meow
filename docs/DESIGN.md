@@ -529,6 +529,8 @@ Item totals change only through `Inventory` methods, which keep them in line wit
 Stacks are rebuilt from totals once, where the two can disagree: when a save loads (old saves hold totals only).
 A window's copy takes totals and stacks together from the server, so it does not rebuild.
 
+The player moves items in and out of storage and stations within `World.ItemReach` (15 m, `World.Reaches`); gathering, working a station and pumping need `World.Near`'s 3.2 m.
+
 Input rule for every item cell, in storage and stations alike:
 
 - A click moves exactly one item, in either direction.

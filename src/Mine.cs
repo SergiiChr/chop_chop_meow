@@ -78,7 +78,7 @@ public sealed partial class World {
 
     /// <summary>Hands the site whatever it still needs from the backpack.</summary>
     public void SupplyMine(Thing mine) {
-        if (!Near(mine)) { Say("Walk closer to the mine."); return; }
+        if (!Reaches(mine)) { Say("Walk closer to the mine."); return; }
         var needs = MineNeeds(mine);
         if (needs.Count == 0 || Forwarded(Verb.SupplyMine, mine.Id)) return;
         if (needs.Sum(p => S.Backpack.TransferTo(mine.Inventory, p.Key, p.Value)) == 0) Say($"The mine still needs {Goods(needs)}.");

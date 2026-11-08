@@ -77,7 +77,7 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     private void Reach() {
         var label = Style.Text("", 14, Style.Warn); label.Visible = false; AddChild(label);
         // Rewritten only when the distance moves a tenth of a tile or the building comes into reach.
-        live.Watch(() => world.Near(thing) ? -1 : (int)(world.Player.DistanceTo(world.GatherAt(thing, world.Player)) * 10), tenths => {
+        live.Watch(() => world.Reaches(thing) ? -1 : (int)(world.Player.DistanceTo(world.GatherAt(thing, world.Player)) * 10), tenths => {
             label.Visible = tenths >= 0;
             if (tenths >= 0) label.Text = $"{tenths / 10}.{tenths % 10} tiles away · walk closer";
         });

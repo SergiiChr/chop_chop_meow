@@ -384,6 +384,10 @@ public sealed partial class World {
     }
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
     public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind == ThingKind.Water ? Terrain.WaterPoint(from) : t.Pos;
+    /// <summary>How far, in metres, the player reaches to move items in and out of storage and stations.</summary>
+    public const float ItemReach = 15;
+    /// <summary>Whether the player can move items to or from a thing.</summary>
+    public bool Reaches(Thing t) => Near(t, ItemReach);
     public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(GatherAt(t, Player)) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
     /// <summary>What every worker's wage comes to each dawn.</summary>
@@ -738,7 +742,7 @@ public sealed partial class World {
         t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos);
     }
     public void FuelFire(Thing t) {
-        if (!Near(t) || Forwarded(Verb.FuelFire, t.Id)) return;
+        if (!Reaches(t) || Forwarded(Verb.FuelFire, t.Id)) return;
         int n = S.Backpack.Remove("wood", 1);
         if (n == 0) { Say("You need wood to feed the fire."); return; }
         if (t.Burn <= 0) Play("start_fire", t.Pos);
@@ -802,7 +806,7 @@ public sealed partial class World {
     /// <summary>Queues batches of a recipe and loads their inputs and one fuel each from the backpack, on top of what the station holds.</summary>
     public void QueueBatch(Thing t, string recipe, int batches = 1) {
         if (batches <= 0 || !Makes(t, recipe)) return;
-        if (!Near(t)) { Say("Walk closer to load this building."); return; }
+        if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded(Verb.QueueBatch, t.Id, item: recipe, count: batches)) return;
         if (Waiting(t, recipe) >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
         batches = Requeue(t.Queue, recipe, batches);
@@ -861,7 +865,7 @@ public sealed partial class World {
     private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null);
     /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
     public void LoadBatch(Thing t, int batches = 1) {
-        if (!Near(t)) { Say("Walk closer to load this building."); return; }
+        if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded(Verb.LoadBatch, t.Id, count: batches)) return;
         string recipe = t.Recipe;
         var cost = BatchCost(recipe);
@@ -879,7 +883,7 @@ public sealed partial class World {
     }
     /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
     public int LoadInput(Thing t, string item, int quantity) {
-        if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
+        if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
         if (PartialRecipeBottle(t, item)) { Say(Water.FullBottleWarning); return 0; }
         // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the ingredient slot, and the fuel slot is filled by dragging.
         if (!Pending(t, item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
@@ -892,7 +896,7 @@ public sealed partial class World {
     }
     /// <summary>Manual loading of the fuel slot, which holds one kind of fuel at a time.</summary>
     public int LoadFuel(Thing t, string item, int quantity) {
-        if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
+        if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
         if (t.Burner == null) return 0;
         if (FuelBlock(t, item) is string refused) { Say(refused); return 0; }
         if (Forwarded(Verb.LoadFuel, t.Id, item: item, count: quantity)) return 0;
@@ -901,7 +905,7 @@ public sealed partial class World {
         return moved;
     }
     public void Collect(Thing t) {
-        if (!Near(t)) { Say("Walk closer to collect items."); return; }
+        if (!Reaches(t)) { Say("Walk closer to collect items."); return; }
         if (Forwarded(Verb.Collect, t.Id)) return;
         foreach (var item in Leftovers(t).ToArray()) t.Inventory.TransferTo(S.Backpack, item, 999);
     }
@@ -1324,7 +1328,7 @@ public sealed partial class World {
     /// <summary>Puts a tool from the backpack into the station's empty slot for its kind.</summary>
     public bool SlotTool(Thing bench, string item) {
         string name = Data.Name(bench.Kind).ToLowerInvariant();
-        if (bench.Tools == null || !Near(bench)) { Say($"Walk closer to the {name}."); return false; }
+        if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {name}."); return false; }
         string tool = Data.Items.TryGetValue(item, out var def) ? def.Tool : "";
         var kinds = SlotKinds(bench.Kind);
         if (!kinds.Contains(tool)) { Say($"The {name} has slots for {(kinds.Length == 1 ? A(kinds[0]) : $"a {kinds[0]} and a {kinds[1]}")}."); return false; }
@@ -1333,7 +1337,7 @@ public sealed partial class World {
         return S.Backpack.TransferTo(bench.Tools, item, 1) == 1;
     }
     public void UnslotTool(Thing bench, string item) {
-        if (bench.Tools == null || !Near(bench)) { Say($"Walk closer to the {Data.Name(bench.Kind).ToLowerInvariant()}."); return; }
+        if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {Data.Name(bench.Kind).ToLowerInvariant()}."); return; }
         if (Forwarded(Verb.UnslotTool, bench.Id, item: item)) return;
         if (bench.Tools.TransferTo(S.Backpack, item, 1) == 0 && bench.Tools[item] > 0) Say("Backpack full.");
     }
