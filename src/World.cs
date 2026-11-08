@@ -1040,14 +1040,14 @@ public sealed partial class World {
         var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
         var box = Add(ThingKind.Grave, killer == null ? Player : Player + (killer.Pos - Player).Normalized() * 1.5f); box.Inventory = S.Backpack;
         S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
-        if (S.Mauled) {
-            // The pack eats every scrap of food and stays to feed until the player respawns.
-            foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
-            Say($"{(Hunters.Count() > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.");
-            return;
-        }
+        // A wolf that pinned the player, or bit them down without a leap, eats every scrap of food.
+        bool wolfKill = S.Mauled || Hunters.Any(w => w.Pos.DistanceTo(Player) < LeapRange);
+        if (wolfKill) foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
+        string ate = $"{(Hunters.Count() > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.";
+        // A pack that pinned the player stays to feed until they respawn.
+        if (S.Mauled) { Say(ate); return; }
         S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
-        Say($"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
+        Say(wolfKill ? ate : $"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
     }
     private void Respawn() {
         // The player wakes inside the cabin nearest to where they fell, or in the clearing without one.

@@ -60,6 +60,7 @@ public static class SimulationChecks {
         Test(CheckWolvesHuntAndCarcassesYieldMeat, data);
         Test(CheckWolvesLeaveHealthyOrFirelitPlayersAlone, data);
         Test(CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth, data);
+        Test(CheckWolfThatBitesAPlayerToDeathEatsTheirFood, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
         Test(CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst, data);
         Test(CheckSleepNeedsFoodAndWater, data);
@@ -67,6 +68,7 @@ public static class SimulationChecks {
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
+        Test(CheckPatrollingWolfWalksAtHalfItsTrot, data);
         Test(CheckWolvesKeepToGroundAPlayerCanWalk, data);
         Test(CheckSmelledPlayerDrawsAHowlAndThePack, data);
         Test(CheckWolvesGoHomeBeforeDawn, data);
@@ -998,6 +1000,19 @@ public static class SimulationChecks {
         PlaceWolf(sheltered, circling);
         sheltered.Tick(.2f);
         Require(circling.Leap == 0 && !sheltered.Mauled, "campfire light should prevent the throat leap");
+    }
+
+    private static void CheckWolfThatBitesAPlayerToDeathEatsTheirFood(GameData data) {
+        // Behind a lit torch a lone wolf creeps in and bites rather than leaping, so the bite is what kills.
+        var world = TorchNight(data);
+        SetNeeds(world, health: 5);
+        Give(world, "berries", 3); Give(world, "wood", 4);
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        for (int i = 0; i < 30 && !world.Dead; i++) world.Tick(.1f);
+        Require(world.Dead && !world.Mauled, "a wolf's bite should kill a player on 5 health without pinning them");
+        var box = world.Things.Single(t => t.Kind == ThingKind.Grave);
+        Require(box.Inventory["berries"] == 0, "a wolf that bites a player to death should eat their berries");
+        Require(box.Inventory["wood"] == 4, "a wolf that bites a player to death should leave the rest in the recovery box");
     }
 
     private static void CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth(GameData data) {
@@ -2191,11 +2206,21 @@ public static class SimulationChecks {
         SafeTick(world, .9f);
         Require(world.Wolves.Count == 0, "no wolf should come out before dusk");
         SafeTick(world, 1);
-        Require(world.Wolves.Count == data.WolvesPerDen && world.Wolves.All(w => w.Pos.DistanceTo(World.Dens[0].Door) < 4),
-                "the first den should let its wolves out as soon as dusk starts, and the others in turn after it");
+        Require(world.Wolves.Count == 1 && world.Wolves.All(w => w.Pos.DistanceTo(World.Dens[0].Door) < 4),
+                "the first den should let its one wolf out as soon as dusk starts, and the others in turn after it");
         SafeTick(world, World.Dens.Length * World.DenGapSeconds);
-        Require(!world.Night && world.Wolves.Count == World.Dens.Length * data.WolvesPerDen, "every den should have let its wolves out well before night");
+        Require(!world.Night && world.Wolves.Count == World.Dens.Length, "every den should have let its one wolf out well before night");
         Require(world.Wolves.All(w => w.Target == 0 && w.Mode == WolfMode.Patrol), "wolves out of their dens should patrol until they smell someone");
+    }
+
+    private static void CheckPatrollingWolfWalksAtHalfItsTrot(GameData data) {
+        var world = NightWorld(data);
+        world.Player = Terrain.Point(30, 0);
+        var start = Terrain.Point(120, 0);
+        var wolf = PatrolWolf(world, new Wolf { Pos = start, Heading = Terrain.Sideways.Angle() });
+        SafeTick(world, 1);
+        // On the first night a wolf trots at 3.1 m/s, so it patrols at 1.55 m/s.
+        Require(Math.Abs(wolf.Pos.DistanceTo(start) - 1.55f) < .05f, $"a patrolling wolf should walk at half its trot, not {wolf.Pos.DistanceTo(start):0.00} m/s");
     }
 
     private static void CheckWolvesKeepToGroundAPlayerCanWalk(GameData data) {

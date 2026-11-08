@@ -542,8 +542,8 @@ With none, a message says the mine is full with no output available.
 
 ## Wolves and night
 
-Five wolf dens, small caves at the foot of the mountains, each let two wolves out at dusk (20:24), so the hour or two before bed is risky too.
-They patrol the valley, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
+Five wolf dens, small caves at the foot of the mountains, each let one wolf out at dusk (20:24), so the hour or two before bed is risky too.
+They patrol the valley at a walk, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
 
 A wolf that smells you within 30 metres while you are out in the open howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
 After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
@@ -579,7 +579,7 @@ Wolves cannot smell you there: they give up at once and patrol on, and you stay 
 
 At half health or less, away from fire and shelter, a nearby wolf leaps for your throat.
 You are pinned and cannot move or fight, the rest of the pack runs in to feed, and you die within seconds.
-A wolf kill destroys all food in the recovery box; the pack keeps feeding until you respawn.
+A wolf kill, by a pin or a bite, destroys all food in the recovery box; after a pin the pack keeps feeding until you respawn.
 
 A slain wolf falls over and leaves a carcass that lasts until it is butchered: hold right mouse on it for 4 raw meat.
 

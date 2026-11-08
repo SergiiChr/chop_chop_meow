@@ -390,7 +390,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 - **Dens.** `World.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
   The outcrop is solid like a mine's (`World.InSpur`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
   From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
-- **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at the trot it stalks at, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
+- **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at `PatrolPace` (half) of the trot it stalks at, a walk, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
 - **Smell and howl.** A patrolling or called wolf within `SmellRadius` of a player out in the open takes them as its target and howls, standing still, for as long as the howl recording plays (`LoneHowlSeconds` or `PackHowlSeconds`, `Wolf.Howl` counting down `Wolf.HowlLength`).
   The night's first howl plays `wolf_howl`, a lone wolf, and later ones `wolf_howl_group` (`SaveState.Howled`).
   A howl fades with distance from the player, on screen too, and is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it pans with its direction.
@@ -424,7 +424,7 @@ A direct torch hit sets `Wolf.Flee`.
 
 At half health or less, an unprotected player can be pinned by a leaping wolf, which knocks them onto their back and stands over them.
 The pinned state (`SaveState.Mauled`) blocks movement and actions and drains health while the pack feeds.
-The death that follows strips food from the recovery box.
+The death that follows strips food from the recovery box, as does a death with a hunting wolf within `LeapRange`, such as one bitten down behind a torch.
 
 Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the stone furnace cooks into edible meat.
 
