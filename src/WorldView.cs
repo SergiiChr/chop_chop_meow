@@ -134,14 +134,15 @@ public partial class WorldView : Node3D {
         World.Replaced += () => worldReplaced = true;
         camera = new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = BaseSize, Near = 1, Far = 200, Current = true };
         AddChild(camera);
-        // Half energy puts the sky's light at DayAmbientEnergy; the sun's disc stays small so the sun does not light the scene twice.
-        skylight = new ProceduralSkyMaterial { SunAngleMax = 1, SkyEnergyMultiplier = .5f, GroundEnergyMultiplier = .5f };
+        // Half energy puts the sky's light at DayAmbientEnergy.
+        skylight = new ProceduralSkyMaterial { SkyEnergyMultiplier = .5f, GroundEnergyMultiplier = .5f };
         environment = new Godot.Environment {
             BackgroundMode = Godot.Environment.BGMode.Color,
             BackgroundColor = new Color("879c69"),
             AmbientLightSource = Godot.Environment.AmbientSource.Sky,
             ReflectedLightSource = Godot.Environment.ReflectionSource.Sky,
-            Sky = new Sky { SkyMaterial = skylight },
+            // Two flat colours need no detail in the sky's light map, and a small one is cheap to rebuild as the day changes.
+            Sky = new Sky { SkyMaterial = skylight, RadianceSize = Sky.RadianceSizeEnum.Size64 },
             AmbientLightEnergy = DayAmbientEnergy,
             // Light bounced from what is on screen, such as firelight off the ground onto nearby walls.
             SsilEnabled = true,
@@ -159,7 +160,8 @@ public partial class WorldView : Node3D {
         // One shadow map covers the whole view: split maps leave a seam across this tilted overhead view and their soft edges jump as the camera moves.
         // Shadows this soft need the Ultra filter set in project.godot: lower qualities break their wide edges into a hatched pattern that flickers.
         // The blur has one width everywhere: a penumbra that widens with the caster's height is shaded per pixel, and at low sun the trees' long shadows cost 20 ms a frame at 1440p.
-        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = DaySun };
+        // The sun lights the scene directly and stays out of the sky, so its turning does not rebuild the sky's light each frame.
+        sun = new DirectionalLight3D { ShadowEnabled = true, DirectionalShadowMode = DirectionalLight3D.ShadowMode.Orthogonal, DirectionalShadowMaxDistance = 90, ShadowBlur = 1.5f, LightEnergy = DaySun, SkyMode = DirectionalLight3D.SkyModeEnum.LightOnly };
         AddChild(sun);
         scene = new Node3D(); AddChild(scene);
         explored = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.L8, World.S.Explored);
