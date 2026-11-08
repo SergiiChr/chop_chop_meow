@@ -18,6 +18,7 @@ public partial class Game : Node, IGameFlow {
     private Control ui = null!;
     private CanvasLayer layer = null!;
     private ClockPlate clock = null!;
+    private FrameRate frameRate = null!;
     private MessageStack messages = null!;
     private NeedsPlate needsPlate = null!;
     private DamageEdges damageEdges = null!;
@@ -107,6 +108,7 @@ public partial class Game : Node, IGameFlow {
         hotbar = new Hotbar(kit, panel);
         player = new PlayerControl(kit, view, panel, hotbar); panel.Player = player;
         clock = new ClockPlate(world); ui.AddChild(clock);
+        frameRate = new FrameRate(); ui.AddChild(frameRate);
         modeLabel = new ModeLabel(kit, player); ui.AddChild(modeLabel);
         ui.AddChild(hotbar);
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
@@ -128,7 +130,7 @@ public partial class Game : Node, IGameFlow {
     }
     private void RefreshLive() {
         if (recovery == null) return;
-        clock.Refresh(); deathLabel.Refresh(); modeLabel.Refresh(); recovery.Refresh();
+        clock.Refresh(); frameRate.Refresh(); deathLabel.Refresh(); modeLabel.Refresh(); recovery.Refresh();
         panel.Refresh();
         hotbar.Refresh(); needsPlate.Refresh(); bag.Refresh();
     }
@@ -181,6 +183,7 @@ public partial class Game : Node, IGameFlow {
     }
 
     public void ApplyResolution(Vector2I size) { Settings.ApplyResolution(GetWindow(), size); FitInterface(); }
+    public void ShowFrameRate(bool on) => frameRate.Visible = on;
 
     /// <summary>The interface is laid out for the design size and drawn larger at a taller render size, keeping its share of the screen.</summary>
     private void FitInterface() {

@@ -108,6 +108,11 @@ public partial class StartMenu : ColorRect {
         var taa = new CheckButton { Name = "taa", ButtonPressed = Settings.Taa, FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
         taa.Toggled += on => { Settings.Store("display", "taa", on); GetViewport().UseTaa = on; };
         taaRow.AddChild(taa);
+        var fpsRow = new HBoxContainer(); Screen.AddChild(fpsRow);
+        var fpsLabel = Style.Wrapped("Frame rate counter"); fpsLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; fpsRow.AddChild(fpsLabel);
+        var counter = new CheckButton { Name = "fps", ButtonPressed = Settings.FrameRate, FocusMode = Control.FocusModeEnum.None, CustomMinimumSize = new Vector2(0, 38) };
+        counter.Toggled += on => { Settings.Store("display", "fps", on); flow.ShowFrameRate(on); };
+        fpsRow.AddChild(counter);
         AddButton("Back · Esc", back);
     }
 

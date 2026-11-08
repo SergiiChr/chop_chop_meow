@@ -30,6 +30,25 @@ public partial class ClockPlate : PanelContainer {
     }
 }
 
+/// <summary>The frame rate under the clock, built only when the whole number changes: building it allocates.</summary>
+public partial class FrameRate : Label {
+    private int shown = -1;
+
+    public FrameRate() {
+        Name = "frame_rate";
+        AddThemeFontSizeOverride("font_size", 15); Style.Outlined(this);
+        AnchorLeft = 1; AnchorRight = 1; OffsetRight = -20; OffsetTop = 134; GrowHorizontal = GrowDirection.Begin; HorizontalAlignment = HorizontalAlignment.Right;
+        MouseFilter = MouseFilterEnum.Ignore; Visible = Settings.FrameRate;
+    }
+
+    public void Refresh() {
+        int now = (int)Engine.GetFramesPerSecond();
+        if (now == shown) return;
+        shown = now;
+        Text = $"{now} fps";
+    }
+}
+
 /// <summary>Says what the next click in the world does while a placement or a work order is under way.</summary>
 public partial class ModeLabel : Label {
     private readonly World world;

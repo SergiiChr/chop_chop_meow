@@ -14,6 +14,7 @@ public static class Settings {
 
     public static int FrameLimit => Get("display", "frame_limit", 0);
     public static bool Taa => Get("display", "taa", true);
+    public static bool FrameRate => Get("display", "fps", true);
 
     public static float MusicVolume => Get("audio", "music", 1f);
 

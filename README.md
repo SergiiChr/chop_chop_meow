@@ -90,7 +90,8 @@ The game opens on a start menu with Continue (the most recent save), New game, L
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
 
-Options holds a render resolution picker, a frame rate limit (off, 60 or 90 fps), a temporal anti-aliasing switch (on by default) and a music volume slider.
+Options holds a render resolution picker, a frame rate limit (off, 60 or 90 fps), a temporal anti-aliasing switch (on by default),
+a frame rate counter switch (on by default, shown under the clock) and a music volume slider.
 The game renders at the picked size, 16:9 or 16:10 from 1280 × 720 to 3840 × 2400; the window opens at that size, or as large as the screen allows,
 and resizing it only stretches the image, with bars when the shapes differ.
 The display choices are stored in `settings.cfg` and applied at launch.

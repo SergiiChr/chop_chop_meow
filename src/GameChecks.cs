@@ -554,6 +554,11 @@ public partial class Game {
         Require(taa.ButtonPressed && GetViewport().UseTaa, "Temporal anti-aliasing must start on.");
         await Click(taa);
         Require(!GetViewport().UseTaa, "Switching temporal anti-aliasing off must apply it at once.");
+        var counter = (CheckButton)startMenu.Screen.FindChild("fps", true, false);
+        var frameRate = (Label)ui.FindChild("frame_rate", true, false);
+        Require(counter.ButtonPressed && frameRate.Visible && frameRate.Text.EndsWith(" fps"), "The frame rate counter must start on and show a rate.");
+        await Click(counter);
+        Require(!frameRate.Visible, "Switching the frame rate counter off must hide it at once.");
         var musicSlider = (HSlider)startMenu.Screen.FindChild("music", true, false);
         Require(musicSlider.Value == 100, "Music must start at full volume.");
         await Click(musicSlider);
@@ -564,12 +569,14 @@ public partial class Game {
             picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
             limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
             taa = (CheckButton)startMenu.Screen.FindChild("taa", true, false);
+            counter = (CheckButton)startMenu.Screen.FindChild("fps", true, false);
             musicSlider = (HSlider)startMenu.Screen.FindChild("music", true, false);
         }
         await ReopenOptions();
         Require(picker.Selected == 0, "Reopened options must show the chosen resolution.");
         Require(limits.Selected == 2, "Reopened options must show the chosen frame rate limit.");
         Require(!taa.ButtonPressed, "Reopened options must show temporal anti-aliasing off.");
+        Require(!counter.ButtonPressed, "Reopened options must show the frame rate counter off.");
         Require(musicSlider.Value == 50, "Reopened options must show the chosen music volume.");
         // The later checks measure the screen at the design size.
         await Choose(picker, Array.IndexOf(StartMenu.Resolutions, Settings.DesignSize));
