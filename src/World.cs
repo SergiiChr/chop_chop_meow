@@ -1239,7 +1239,8 @@ public sealed partial class World {
     /// </summary>
     public const string PackedPrefix = "crate_";
     public static bool IsCrate(string item) => item == "crate" || item.StartsWith(PackedPrefix);
-    private static int PackedId(string item) => item.StartsWith(PackedPrefix) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
+    /// <summary>The number that keys a packed crate's contents, or 0 for any other item.</summary>
+    public static int PackedId(string item) => item.StartsWith(PackedPrefix) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
     /// <summary>The filter entry that stands for any packed crate of one good, such as <c>crate_bread</c>.</summary>
     public static string CrateOf(string item) => PackedPrefix + item;
     /// <summary>The <see cref="CrateOf"/> entry a packed crate of one good matches, or empty for anything else.</summary>
@@ -1262,6 +1263,25 @@ public sealed partial class World {
     }
     /// <summary>An item's name, with what a packed crate holds.</summary>
     public string Describe(string item) => Packed(item) is Inventory contents ? $"{Data.Name("crate")} of {Goods(contents.Items)}" : Data.Name(item);
+    /// <summary>The packed crate with this number in the acting player's backpack, or null once it has gone or been emptied.</summary>
+    public string? CarriedCrate(int id) {
+        foreach (var pair in S.Backpack.Items) if (PackedId(pair.Key) == id) return pair.Key;
+        return null;
+    }
+    /// <summary>
+    /// Moves items between a packed crate in the backpack and the backpack itself, then names the crate after what it holds, keeping its number.
+    /// An emptied crate becomes a plain empty crate.
+    /// </summary>
+    public int MoveInCrate(int id, string item, int quantity, bool packing) {
+        if (Downed || CarriedCrate(id) is not string crate || Packed(crate) is not Inventory contents) return 0;
+        if (packing && IsCrate(item)) { Say("Never put a crate in a crate."); return 0; }
+        if (Forwarded(Verb.MoveInCrate, id, packing ? 1 : 0, item, quantity)) return 0;
+        int moved = packing ? S.Backpack.TransferTo(contents, item, quantity) : contents.TransferTo(S.Backpack, item, quantity);
+        if (moved == 0) { Say(packing ? "The crate is full." : "Your backpack is full."); return 0; }
+        S.Backpack.Replace(crate, contents.Count == 0 ? "crate" : contents.Items.Count == 1 && contents.First() is string good ? $"{PackedPrefix}{good}_{id}" : PackedPrefix + id);
+        if (contents.Count == 0) S.Crates.Remove(id);
+        return moved;
+    }
     /// <summary>Puts a crate from the backpack down, still holding whatever it was packed with.</summary>
     public Thing? PlaceCrate(string item, Vector2 p) {
         if (!IsCrate(item)) return null;

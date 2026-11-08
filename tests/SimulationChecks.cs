@@ -87,6 +87,7 @@ public static class SimulationChecks {
         Test(CheckCrewWalksBackAtDawnPaidAndKeepsItsJobs, data);
         Test(CheckFogHidesUnseenGroundAndRemembersExploredGround, data);
         Test(CheckCratesShowOneSlotPerItemTheyCanHold, data);
+        Test(CheckPlayerMovesItemsInAndOutOfACarriedCrate, data);
         Test(CheckHandCraftingNeedsChiselAndTakesTime, data);
         Test(CheckBenchRecipesWaitForSlottedTools, data);
         Test(CheckTinNeedsPickaxeAndSmeltsIntoBars, data);
@@ -1463,6 +1464,25 @@ public static class SimulationChecks {
         world.Player = Site(3, 3);
         Require(world.Build(ThingKind.Hut, Site(5, 3)) != null, "gathered materials should build the opening shelter");
         Require(world.Build(ThingKind.Campfire, Site(3, 6)) != null, "gathered materials should build the opening fire");
+    }
+
+    private static void CheckPlayerMovesItemsInAndOutOfACarriedCrate(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(20, 20);
+        Give(world, "crate", 1); Give(world, "berries", 12); Give(world, "wood", 2); Give(world, "crate", 1);
+        var placed = world.PlaceCrate("crate", world.Player + new Vector2(0, 2))!;
+        world.Transfer(world.Backpack, placed.Inventory, "berries", 12);
+        Require(world.PickUpCrate(placed), "the filled crate should be picked up");
+        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        int id = World.PackedId(packed);
+
+        Require(world.MoveInCrate(id, "berries", 3, packing: false) == 3 && world.Backpack["berries"] == 3, "taking 3 berries out of a carried crate should put them in the backpack");
+        Require(world.CarriedCrate(id) == World.CrateOf("berries") + $"_{id}" && world.Packed(world.CarriedCrate(id)!)!["berries"] == 9, "a crate of berries should stay one with 9 left");
+        Require(world.MoveInCrate(id, "wood", 2, packing: true) == 2 && world.Backpack["wood"] == 0, "packing 2 wood into the carried crate should take them from the backpack");
+        Require(world.CarriedCrate(id) == World.PackedPrefix + id, "a crate of berries and wood should be named as a mixed crate");
+        Require(world.MoveInCrate(id, "crate", 1, packing: true) == 0 && world.Backpack["crate"] == 1, "a crate should never go into a crate");
+        world.MoveInCrate(id, "berries", 9, packing: false); world.MoveInCrate(id, "wood", 2, packing: false);
+        Require(world.CarriedCrate(id) == null && world.Backpack["crate"] == 2 && world.Packed(packed) == null, "an emptied crate should become a plain empty crate");
     }
 
     private static void CheckCratesShowOneSlotPerItemTheyCanHold(GameData data) {

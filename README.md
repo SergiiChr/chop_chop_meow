@@ -176,7 +176,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - Inventory cells retain their positions. Drag to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
 - Right-click a stack to pick up half of it, then left-click a slot to drop it there.
 - A dropped stack that does not all fit fills the slot, and the rest stays held until you drop it elsewhere or click somewhere it cannot go.
-- Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, and a crate click starts placement.
+- Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, a packed crate click opens it and an empty crate click starts placement.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A selected raw-material stack can be deposited by clicking a nearby chest.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
@@ -368,6 +368,7 @@ Both stations, like the stone furnace's food recipes, take wood, coal or charcoa
 
 A wood crate holds 12 items in total, as one stack or as single items, and its slots grow and shrink with its contents.
 Place one from the backpack or hotbar, click it to open it, and hold right mouse on it to pick it up with its contents packed inside.
+Click a packed crate in the backpack to open it where it is: click what it holds to take it out, click backpack items to pack them in, or put it down from there.
 
 Workers never open or place crates; they pack them at a packing station.
 Putting a crate inside a crate asks first; saying yes ends the game.

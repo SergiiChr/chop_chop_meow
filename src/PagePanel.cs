@@ -81,8 +81,8 @@ public abstract partial class PagePanel : VBoxContainer {
         var l = Style.Wrapped("", size, color); AddChild(l);
         live.Bind(l, write);
     }
-    protected const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
+    protected const string UseHint = "Food and water: click to consume. Crates: click to open, an empty one to place. Torch: click to light. Drag onto the hotbar to assign.";
     protected void UseFromBag(string id) {
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (world.Packed(id) != null) panel.OpenCrate(World.PackedId(id)); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
     }
 }

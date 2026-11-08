@@ -748,6 +748,22 @@ public partial class Game {
         Require(!panel.Visible, "Taking the chest down must close its page.");
         Drop(Hosted, "wood", 8); Drop(Hosted, "coal", 5); await Frames();
     }
+    /// <summary>Clicking a packed crate in the backpack opens it at once, and its contents move to the backpack and back by click.</summary>
+    private async Task CheckPackedCrateOpensFromTheBackpack() {
+        Give(Hosted, "crate", 1); Give(Hosted, "berries", 5);
+        var placed = Hosted.PlaceCrate("crate", Hosted.Player + new Vector2(0, 2))!;
+        Hosted.Transfer(Hosted.Backpack, placed.Inventory, "berries", 5); Hosted.PickUpCrate(placed);
+        int berries = Hosted.Backpack["berries"];
+        await KeyStroke(Key.Tab);
+        await Click(await Showing(0, c => c.TooltipText.StartsWith("Wood crate of")));
+        Require(panel.Visible && panel.HeadingTitle.Text == "Wood crate", "Clicking a packed crate in the backpack must open it.");
+        await Click(await Showing(0, c => c.TooltipText.StartsWith("Berries")));
+        Require(world.Backpack["berries"] == berries + 1, "Clicking berries in the open crate must take one out into the backpack.");
+        await Click(await Showing(1, c => c.TooltipText.StartsWith("Berries")));
+        Require(world.Backpack["berries"] == berries, "Clicking berries in the backpack must pack one back into the open crate.");
+        await CloseWithEsc();
+        Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
+    }
     /// <summary>A player harvesting beside a running station is busy with the harvest, so their figure stops hammering.</summary>
     private async Task CheckHarvestingBesideAStationStopsHammering() {
         var start = world.Player;
@@ -1214,6 +1230,7 @@ public partial class Game {
             await Test(CheckRightClickGathersTreeAndHarvestsFarm);
             await Test(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
             await Test(CheckRedXTakesABuildingDownOnTheSecondClick);
+            await Test(CheckPackedCrateOpensFromTheBackpack);
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);

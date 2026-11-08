@@ -109,7 +109,7 @@ UI and input:
 | `src/ResourcePanel.cs` | A resource in the world |
 | `src/PilePanel.cs` | A pile or compost heap |
 | `src/ToolRackPanel.cs` | A tool station |
-| `src/CratePanel.cs` | A placed crate |
+| `src/CratePanel.cs` | A placed crate, and a packed crate opened from the backpack |
 | `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |
@@ -574,6 +574,7 @@ It keeps the player's filters rather than setting its own, and `Thing.SkipFood` 
 
 A wood crate holds `CrateCapacity` (12) units.
 A picked-up crate becomes an item `crate_<n>` whose contents live in `SaveState.Crates`; an empty one is the stackable item `crate`.
+`World.MoveInCrate` moves items between a packed crate in the backpack and the backpack, and renames the crate after what it then holds under the same number; emptied, it becomes a plain `crate`.
 A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
 A pile of crates holds crates of one good.
 Placed crates are manual storage only.
