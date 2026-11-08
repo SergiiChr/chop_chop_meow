@@ -156,6 +156,7 @@ The bottom bar holds round badges for building, the backpack, crafting, the crew
 Assign a hotbar slot by dragging an item from the backpack or a plan from the building plans onto it.
 Slots reference carried items or building plans; they are not extra storage.
 Consumable slots use one item, building slots enter placement, and tools select a working reference.
+With a building's page or an opened crate showing, clicking a hotbar slot moves its item there as clicking it in the backpack does: one, a stack with Shift, all of it with Ctrl.
 Hotbar assignments persist in saves.
 
 Building plans are an icon grid; hovering a plan shows its description and what it still needs.

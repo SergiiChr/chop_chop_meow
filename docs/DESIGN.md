@@ -166,6 +166,7 @@ Health, hunger and thirst are HUD icons.
 Coins are a backpack item that stacks to 1000.
 
 Every page that works with the backpack shows it in one place, a drawer above the hotbar (`PagePanel.BagGrid`).
+On a page about a building or an opened crate (`PagePanel.StoresFromHotbar`), the drawer's click (`BackpackDrawer.Store`) also runs for a mouse click on a hotbar slot; number keys still put the slot in hand.
 The stacks that page takes are rimmed in brick and the rest are faded.
 A close button hides the drawer until another page or building opens.
 The side panel only shows the building and sizes itself to what it holds.

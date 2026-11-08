@@ -37,6 +37,7 @@ public partial class CratePanel(PageTools tools, Thing subject) : ThingPage(tool
 /// <summary>A packed crate opened from the backpack: its contents move to and from the backpack by click, and it can be put down from here.</summary>
 public partial class CarriedCratePanel(PageTools tools, int crate) : PagePanel(tools) {
     public override bool Current => world.CarriedCrate(crate) != null;
+    protected override bool StoresFromHotbar => true;
 
     /// <summary>What the crate holds now, or an empty crate once it has gone.</summary>
     private Inventory Contents => world.CarriedCrate(crate) is string item && world.Packed(item) is Inventory held ? held : gone;

@@ -72,7 +72,10 @@ public abstract partial class PagePanel : VBoxContainer {
     protected void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
         panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns));
         panel.Bag.Visible = !panel.Bag.Dismissed;
+        if (StoresFromHotbar) panel.Bag.Store = click;
     }
+    /// <summary>Whether a click on the hotbar moves items here as a click in the backpack drawer does: true on pages about a building or an opened crate.</summary>
+    protected virtual bool StoresFromHotbar => false;
     protected HBoxContainer Row() { var r = new HBoxContainer(); AddChild(r); return r; }
     protected void AddLabel(string text, int size = 15, Color? color = null) => AddChild(Style.Wrapped(text, size, color));
     protected void AddButton(string text, Action action, bool disabled = false) => AddChild(kit.Button(text, action, disabled));

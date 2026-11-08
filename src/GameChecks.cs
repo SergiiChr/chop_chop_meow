@@ -764,6 +764,18 @@ public partial class Game {
         await CloseWithEsc();
         Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
     }
+    /// <summary>With a building's page open, clicking an item on the hotbar moves it in as a click on it in the backpack does.</summary>
+    private async Task CheckHotbarClickMovesItemsIntoAnOpenBuilding() {
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2));
+        string before = world.HotbarSlots[4];
+        Give(Hosted, "stone", 3); SetHotbarSlot(world, 4, "stone");
+        int stone = Hosted.Backpack["stone"];
+        await ClickOn(chest);
+        await Click(hotbar.Buttons[4]);
+        Require(chest.Inventory["stone"] == 1 && world.Backpack["stone"] == stone - 1, "Clicking stone on the hotbar must store one in the open chest.");
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == chest); Drop(Hosted, "stone", 2); SetHotbarSlot(world, 4, before); await Frames();
+    }
     /// <summary>A player harvesting beside a running station is busy with the harvest, so their figure stops hammering.</summary>
     private async Task CheckHarvestingBesideAStationStopsHammering() {
         var start = world.Player;
@@ -1231,6 +1243,7 @@ public partial class Game {
             await Test(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
             await Test(CheckRedXTakesABuildingDownOnTheSecondClick);
             await Test(CheckPackedCrateOpensFromTheBackpack);
+            await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);

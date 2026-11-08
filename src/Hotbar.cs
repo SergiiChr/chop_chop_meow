@@ -44,7 +44,7 @@ public partial class Hotbar : PanelContainer {
     /// <summary>A hotbar slot; dropping an item or building plan on it assigns that reference.</summary>
     private ItemSlot HotbarButton(int slot) {
         var button = new ItemSlot { FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand };
-        button.Pressed += () => Select(slot);
+        button.Pressed += () => Click(slot);
         button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.IsBuilding(drag.Item);
         button.Take = drag => { SetHotbar(slot, drag.Item); return 0; };
         button.CustomMinimumSize = new Vector2(56, 56);
@@ -116,6 +116,16 @@ public partial class Hotbar : PanelContainer {
     }
 
     public bool IsTransferable(string id) => world.Data.Items[id].Tool == "" && !world.Data.IsConsumable(id);
+
+    /// <summary>
+    /// A click on a slot: with a building's page open, its item moves there as a click on it in the backpack drawer does (Shift a stack, Ctrl all of it);
+    /// otherwise the slot goes in hand.
+    /// </summary>
+    private void Click(int slot) {
+        string id = HotbarId(slot);
+        if (panel.Visible && panel.Bag.Store is Action<string> store && world.Backpack[id] > 0) { kit.Run(() => store(id)); return; }
+        Select(slot);
+    }
 
     /// <summary>Puts a hotbar slot in hand; building plans and crates go straight to placement, everything else waits for a left click in the world.</summary>
     public void Select(int slot) {

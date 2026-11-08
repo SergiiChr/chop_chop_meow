@@ -14,6 +14,8 @@ public partial class BackpackDrawer : PanelContainer {
     public VBoxContainer Content { get; }
     /// <summary>Set by the close button; the drawer stays hidden until another page or building opens.</summary>
     public bool Dismissed { get; set; }
+    /// <summary>What a click on a backpack item does for the open building's page, which a click on the hotbar does too; null on other pages.</summary>
+    public System.Action<string>? Store { get; set; }
 
     public BackpackDrawer(UiKit kit, SidePanel panel) {
         world = kit.World;
@@ -33,7 +35,7 @@ public partial class BackpackDrawer : PanelContainer {
     /// <summary>Empties the drawer for the next page.</summary>
     public void Clear() {
         foreach (var child in Content.GetChildren()) { Content.RemoveChild(child); child.QueueFree(); }
-        Visible = false; shownFill = (-1, -1);
+        Visible = false; shownFill = (-1, -1); Store = null;
     }
 
     /// <summary>Shows how full the backpack is.</summary>

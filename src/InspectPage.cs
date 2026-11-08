@@ -47,6 +47,7 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     protected Cups cups => field ??= new Cups(kit, moves, live, thing);
 
     public override bool Current => world.Find(thing.Id) == thing;
+    protected override bool StoresFromHotbar => true;
 
     protected override void Build() {
         Headline();
