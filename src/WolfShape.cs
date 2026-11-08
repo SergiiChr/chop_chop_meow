@@ -3,115 +3,281 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Cached anatomical profiles for the wolf; all poses keep the original rig pivots.</summary>
+/// <summary>
+/// The wolf's skeleton and its skinned fur, shared by every wolf and carcass.
+/// Every bone rests unrotated, so a pose is only rotations: the spine and tail run along the body and each leg rests as a straight column under its shoulder or hip.
+/// </summary>
 internal static class WolfShape {
-    private readonly record struct Section(float Z, float Y, float Width, float Height);
-    private static ArrayMesh? body, head;
-    public static readonly StandardMaterial3D Fur = ModelKit.Vertex(Surface.Flat, .95f);
-    public static Mesh Body => body ??= Loft(new[] {
-        new Section(-.51f, .64f, .025f, .055f), new(-.46f, .64f, .13f, .16f),
-        new(-.33f, .64f, .185f, .195f), new(-.15f, .66f, .16f, .165f),
-        new(.02f, .65f, .18f, .20f), new(.22f, .65f, .205f, .235f),
-        new(.34f, .68f, .19f, .23f), new(.44f, .75f, .145f, .195f),
-        new(.51f, .79f, .105f, .13f) }, false);
-    public static Mesh Head => head ??= BuildHead();
+    public const int Loin = 0, Chest = 1, Pelvis = 2, Neck = 3, Head = 4, Jaw = 5, EarL = 6, EarR = 7, Tail = 8;
+    /// <summary>The tail has three bones, from the root out.</summary>
+    public const int TailBones = 3;
+    private const int LegBones = Tail + TailBones;
 
-    private static ArrayMesh Loft(Section[] sections, bool muzzle) {
-        var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
-        AppendLoft(s, sections, muzzle);
-        return s.Commit();
+    /// <summary>A leg's first bone; it is followed by the middle, lower and paw bones. Legs run front left, front right, hind left, hind right.</summary>
+    public static int Leg(int leg) => LegBones + leg * 4;
+
+    /// <summary>Upper, middle and lower segment lengths: shoulder to elbow, forearm and pastern in front; thigh, shin and hock to fetlock behind.</summary>
+    public static readonly Vector3 FrontLengths = new(.3f, .27f, .1f), HindLengths = new(.25f, .28f, .16f);
+    public static Vector3 Lengths(int leg) => leg < 2 ? FrontLengths : HindLengths;
+
+    /// <summary>Where each leg hangs from the chest or pelvis.</summary>
+    public static Vector3 Pivot(int leg) => leg switch { 0 => new(.085f, .64f, .31f), 1 => new(-.085f, .64f, .31f), 2 => new(.085f, .62f, -.36f), _ => new(-.085f, .62f, -.36f) };
+
+    /// <summary>How far the sole sits below the paw bone when the paw is flat on the ground.</summary>
+    public const float Sole = .035f;
+    /// <summary>Where the jaws close on what the wolf bites, just behind the nose, at rest.</summary>
+    public static readonly Vector3 Bite = new(0, .826f, .76f);
+
+    /// <summary>Each bone's parent and resting position in the model, built facing +Z with the ground at zero.</summary>
+    public static readonly (int Parent, Vector3 At)[] Bones = BuildBones();
+
+    private static (int, Vector3)[] BuildBones() {
+        var bones = new (int, Vector3)[LegBones + 16];
+        bones[Loin] = (-1, new Vector3(0, .66f, -.04f));
+        bones[Chest] = (Loin, new Vector3(0, .69f, .22f));
+        bones[Pelvis] = (Loin, new Vector3(0, .66f, -.3f));
+        bones[Neck] = (Chest, new Vector3(0, .74f, .4f));
+        bones[Head] = (Neck, new Vector3(0, .86f, .56f));
+        bones[Jaw] = (Head, new Vector3(0, .818f, .6f));
+        bones[EarL] = (Head, new Vector3(.052f, .925f, .55f));
+        bones[EarR] = (Head, new Vector3(-.052f, .925f, .55f));
+        for (int i = 0; i < TailBones; i++) bones[Tail + i] = (i == 0 ? Pelvis : Tail + i - 1, new Vector3(0, .665f, -.46f - .17f * i));
+        for (int leg = 0; leg < 4; leg++) {
+            var at = Pivot(leg); var lengths = Lengths(leg);
+            bones[Leg(leg)] = (leg < 2 ? Chest : Pelvis, at);
+            bones[Leg(leg) + 1] = (Leg(leg), at -= new Vector3(0, lengths.X, 0));
+            bones[Leg(leg) + 2] = (Leg(leg) + 1, at -= new Vector3(0, lengths.Y, 0));
+            bones[Leg(leg) + 3] = (Leg(leg) + 2, at - new Vector3(0, lengths.Z, 0));
+        }
+        return bones;
     }
 
-    private static void AppendLoft(SurfaceTool s, Section[] sections, bool muzzle) {
-        const int sides = 12;
-        const int start = 0;
-        // Vertex colors follow the same surface: dark back, grey flanks, pale jaw/chest.
-        for (int row = 0; row < sections.Length; row++) {
-            var r = sections[row]; var before = sections[Math.Max(0, row - 1)]; var after = sections[Math.Min(sections.Length - 1, row + 1)];
+    private static readonly Color Dark = new("4a4e46"), Grey = new("7b7d71"), Tan = new("8b7f64"), Pale = new("cbc5b0"),
+        Black = new("1e1f1c"), Mouth = new("6b2e2b"), InnerEar = new("b7a596");
+    public static readonly StandardMaterial3D Fur = ModelKit.Vertex(Surface.Flat, .95f);
+    private static readonly StandardMaterial3D EyeShine = new() { AlbedoColor = new Color("d9a046"), Roughness = .35f, EmissionEnabled = true, Emission = new Color("d9a046"), EmissionEnergyMultiplier = 1.2f };
+    private static ArrayMesh? fur, eyes;
+    private static Skin? skin;
+
+    /// <summary>A new skeleton in its resting pose under <paramref name="parent"/>, wearing the shared fur and eyes.</summary>
+    public static Skeleton3D Build(Node3D parent) {
+        var skeleton = new Skeleton3D();
+        parent.AddChild(skeleton);
+        for (int i = 0; i < Bones.Length; i++) {
+            skeleton.AddBone($"b{i}");
+            var (up, at) = Bones[i];
+            if (up >= 0) skeleton.SetBoneParent(i, up);
+            skeleton.SetBoneRest(i, new Transform3D(Basis.Identity, up >= 0 ? at - Bones[up].At : at));
+        }
+        skeleton.ResetBonePoses();
+        skin ??= BuildSkin();
+        fur ??= BuildFur();
+        eyes ??= BuildEyes();
+        skeleton.AddChild(new MeshInstance3D { Mesh = fur, MaterialOverride = Fur, Skin = skin, Skeleton = new NodePath("..") });
+        skeleton.AddChild(new MeshInstance3D { Mesh = eyes, MaterialOverride = EyeShine, Skin = skin, Skeleton = new NodePath(".."), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        return skeleton;
+    }
+
+    private static Skin BuildSkin() {
+        var built = new Skin();
+        for (int i = 0; i < Bones.Length; i++) built.AddBind(i, new Transform3D(Basis.Identity, -Bones[i].At));
+        return built;
+    }
+
+    /// <summary>One cross-section of a tube: an ellipse across <paramref name="U"/> and <paramref name="V"/>, skinned to a bone or blended toward the next.</summary>
+    /// <param name="Keel">Narrows the lower half, for a chest that is deeper than it is wide.</param>
+    /// <param name="Tilt">Tips the section back by this many degrees, for a tube that turns upward, such as the neck rising out of the chest.</param>
+    private readonly record struct Ring(Vector3 Center, float Width, float Height, int Bone, int Next = -1, float Blend = 0, float Keel = 0, float Tilt = 0);
+
+    /// <summary>How a tube is coloured at a ring index, from the side (-1 to 1 across) and the height around its section (-1 underneath to 1 on top).</summary>
+    private delegate Color Shade(int ring, float across, float up);
+
+    /// <summary>
+    /// Appends a closed tube through <paramref name="rings"/>.
+    /// Each ring's section lies across <paramref name="u"/> and <paramref name="v"/>; normals come from the neighbouring vertices so the surface shades smoothly.
+    /// </summary>
+    private static void Tube(SurfaceTool s, ref int start, Ring[] rings, Vector3 u, Vector3 v, int sides, Shade shade) {
+        var points = new Vector3[rings.Length, sides];
+        for (int r = 0; r < rings.Length; r++)
             for (int i = 0; i < sides; i++) {
                 float a = i * Mathf.Tau / sides, x = MathF.Cos(a), y = MathF.Sin(a);
-                var around = new Vector3(-r.Width * y, r.Height * x, 0);
-                var along = new Vector3((after.Width - before.Width) * x, after.Y - before.Y + (after.Height - before.Height) * y, after.Z - before.Z);
-                s.SetNormal(around.Cross(along).Normalized());
-                Color dark = new("525750"), grey = new("7c8077"), pale = new("b6b6a8");
-                var tint = y > .15f ? grey.Lerp(dark, (y - .15f) / .85f) : grey.Lerp(pale, Math.Clamp((-y + .15f) / 1.15f, 0, 1));
-                if (muzzle && r.Z > .18f) tint = pale.Lerp(grey, Math.Max(0, y) * .45f);
-                s.SetColor(tint); s.AddVertex(new Vector3(r.Width * x, r.Y + r.Height * y, r.Z));
+                var ring = rings[r];
+                float width = ring.Width * (y < 0 ? 1 - ring.Keel * y * y : 1);
+                points[r, i] = ring.Center + u * (width * x) + v.Rotated(u, -Mathf.DegToRad(ring.Tilt)) * (ring.Height * y);
             }
-        }
-        for (int row = 0; row < sections.Length - 1; row++)
+        for (int r = 0; r < rings.Length; r++)
             for (int i = 0; i < sides; i++) {
-                int a = start + row * sides + i, b = start + (row + 1) * sides + i;
-                int c = start + row * sides + (i + 1) % sides, d = start + (row + 1) * sides + (i + 1) % sides;
-                s.AddIndex(a); s.AddIndex(b); s.AddIndex(c); s.AddIndex(c); s.AddIndex(b); s.AddIndex(d);
+                var around = points[r, (i + 1) % sides] - points[r, (i + sides - 1) % sides];
+                var along = points[Math.Min(r + 1, rings.Length - 1), i] - points[Math.Max(r - 1, 0), i];
+                var normal = around.Cross(along).Normalized();
+                if (normal.Dot(points[r, i] - rings[r].Center) < 0) normal = -normal;
+                float a = i * Mathf.Tau / sides;
+                Vertex(s, points[r, i], normal, shade(r, MathF.Cos(a), MathF.Sin(a)), rings[r]);
             }
+        for (int r = 0; r < rings.Length - 1; r++)
+            for (int i = 0; i < sides; i++) {
+                int a = start + r * sides + i, b = start + (r + 1) * sides + i, c = start + r * sides + (i + 1) % sides, d = start + (r + 1) * sides + (i + 1) % sides;
+                Triangle(s, a, b, c, points[r, i], points[r + 1, i], points[r, (i + 1) % sides], rings[r].Center);
+                Triangle(s, c, b, d, points[r, (i + 1) % sides], points[r + 1, i], points[r + 1, (i + 1) % sides], rings[r].Center);
+            }
+        // Both ends close on a centre point.
+        int next = start + rings.Length * sides;
         for (int end = 0; end < 2; end++) {
-            int row = end == 0 ? 0 : sections.Length - 1;
-            s.SetNormal(end == 0 ? Vector3.Forward : Vector3.Back); s.SetColor(new Color("7c8077"));
-            int center = start + sections.Length * sides + end;
-            s.AddVertex(new Vector3(0, sections[row].Y, sections[row].Z));
+            int r = end == 0 ? 0 : rings.Length - 1;
+            var outward = (rings[r].Center - rings[end == 0 ? 1 : rings.Length - 2].Center).Normalized();
+            Vertex(s, rings[r].Center + outward * .004f, outward, shade(r, 0, 0), rings[r]);
             for (int i = 0; i < sides; i++) {
-                int a = start + row * sides + i, b = start + row * sides + (i + 1) % sides;
-                s.AddIndex(center); s.AddIndex(end == 0 ? a : b); s.AddIndex(end == 0 ? b : a);
+                int a = start + r * sides + i, b = start + r * sides + (i + 1) % sides;
+                Triangle(s, next, a, b, rings[r].Center + outward, points[r, i], points[r, (i + 1) % sides], rings[r].Center);
             }
+            next++;
         }
+        start = next;
     }
 
-    private static ArrayMesh BuildHead() {
+    private static void Vertex(SurfaceTool s, Vector3 at, Vector3 normal, Color color, Ring ring) {
+        s.SetNormal(normal); s.SetColor(color);
+        s.SetBones(new[] { ring.Bone, ring.Next < 0 ? ring.Bone : ring.Next, 0, 0 });
+        s.SetWeights(new[] { 1 - ring.Blend, ring.Blend, 0, 0 });
+        s.AddVertex(at);
+    }
+
+    /// <summary>Adds a triangle wound to face away from <paramref name="inside"/>.</summary>
+    private static void Triangle(SurfaceTool s, int a, int b, int c, Vector3 pa, Vector3 pb, Vector3 pc, Vector3 inside) {
+        bool outward = (pb - pa).Cross(pc - pa).Dot(pa - inside) < 0;
+        s.AddIndex(a); s.AddIndex(outward ? b : c); s.AddIndex(outward ? c : b);
+    }
+
+    /// <summary>The coat around the body: a dark saddle, grey flanks warming to tan low down, and a pale belly and throat.</summary>
+    private static Color Coat(float up, float tan) {
+        var color = up > 0 ? Grey.Lerp(Dark, Mathf.SmoothStep(.2f, .95f, up)) : Grey.Lerp(Tan, tan * Mathf.SmoothStep(0, -.4f, up));
+        return color.Lerp(Pale, Mathf.SmoothStep(-.45f, -.95f, up));
+    }
+
+    private static ArrayMesh BuildFur() {
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
-        AppendLoft(s, new[] { new Section(-.12f, -.015f, .08f, .095f), new(-.045f, .025f, .145f, .145f),
-            new(.07f, .025f, .14f, .14f), new(.15f, -.005f, .10f, .105f),
-            new(.22f, -.035f, .075f, .065f), new(.34f, -.04f, .05f, .042f), new(.365f, -.035f, .038f, .032f) }, true);
-        // Broad triangular ears, with a small thickness and a recessed dark inner face.
-        int index = 7 * 12 + 2;
-        foreach (float side in new[] { -1f, 1f }) {
-            var a = new Vector3(side * .045f, .115f, .025f); var b = new Vector3(side * .135f, .105f, .015f);
-            var tip = new Vector3(side * .115f, .275f, -.025f); var back = new Vector3(side * .09f, .13f, -.055f);
-            Triangle(s, ref index, a, b, tip, new Color("73796e"), Vector3.Back);
-            Triangle(s, ref index, b, back, tip, new Color("525750"), new Vector3(side, 0, -1));
-            Triangle(s, ref index, back, a, tip, new Color("646b60"), new Vector3(-side, 0, -1));
-            Triangle(s, ref index, a, back, b, new Color("646b60"), Vector3.Down);
-            Triangle(s, ref index, a.Lerp(tip, .2f) + Vector3.Back * .002f, b.Lerp(tip, .2f) + Vector3.Back * .002f,
-                tip.Lerp((a + b) / 2, .22f) + Vector3.Back * .002f, new Color("444a43"), Vector3.Back);
+        int start = 0;
+        // Back line, belly line and half width along the body: a deep chest, a full belly with only a slight tuck, and a croup that slopes down into the thighs.
+        (float Z, float Top, float Bottom, float Half, float Keel)[] body = {
+            (-.53f, .67f, .6f, .03f, 0), (-.5f, .72f, .54f, .1f, .1f), (-.44f, .755f, .5f, .145f, .15f), (-.34f, .775f, .49f, .155f, .2f),
+            (-.22f, .785f, .51f, .145f, .2f), (-.08f, .795f, .47f, .15f, .3f), (.07f, .815f, .41f, .17f, .4f), (.19f, .835f, .37f, .178f, .45f),
+            (.3f, .835f, .38f, .17f, .45f) };
+        // The thick maned neck carries on from the chest as one surface, its sections tipping back as it rises to the head.
+        var neck = new[] {
+            new Ring(new Vector3(0, .64f, .385f), .16f, .2f, Chest, -1, 0, .4f, 18), new Ring(new Vector3(0, .71f, .45f), .148f, .165f, Chest, Neck, .5f, .3f, 38),
+            new Ring(new Vector3(0, .765f, .5f), .13f, .138f, Neck, -1, 0, .25f, 50), new Ring(new Vector3(0, .82f, .54f), .105f, .11f, Neck, Head, .3f, .2f, 55),
+            new Ring(new Vector3(0, .865f, .565f), .08f, .085f, Neck, Head, .7f, 0, 58) };
+        var rings = new Ring[body.Length + neck.Length];
+        for (int i = 0; i < body.Length; i++) {
+            var (z, top, bottom, half, keel) = body[i];
+            var (bone, next, blend) = z < -.3f ? (Pelvis, -1, 0f) : z < -.04f ? (Pelvis, Loin, (z + .3f) / .26f) : z < .22f ? (Loin, Chest, (z + .04f) / .26f) : (Chest, -1, 0f);
+            rings[i] = new Ring(new Vector3(0, (top + bottom) / 2, z), half, (top - bottom) / 2, bone, next, Mathf.SmoothStep(0, 1, blend), keel);
         }
+        neck.CopyTo(rings, body.Length);
+        Tube(s, ref start, rings, Vector3.Right, Vector3.Up, 16, (r, _, up) => Coat(up, r >= body.Length || rings[r].Center.Z is > .05f or < -.3f ? 1 : .5f));
+        // Skull and muzzle, with the pale cheeks and darker bridge of a grey wolf's face.
+        (float Z, float Y, float W, float H)[] skull = {
+            (.47f, .865f, .08f, .08f), (.52f, .88f, .115f, .1f), (.585f, .88f, .108f, .09f), (.645f, .862f, .078f, .066f),
+            (.7f, .848f, .056f, .047f), (.755f, .842f, .043f, .037f), (.795f, .842f, .031f, .028f), (.81f, .842f, .014f, .013f) };
+        var head = new Ring[skull.Length];
+        for (int i = 0; i < skull.Length; i++) head[i] = new Ring(new Vector3(0, skull[i].Y, skull[i].Z), skull[i].W, skull[i].H, Head);
+        Tube(s, ref start, head, Vector3.Right, Vector3.Up, 14, (r, across, up) =>
+            r >= 6 ? Black : r >= 4 ? (up > .45f ? Tan.Lerp(Grey, .4f) : Pale) : r == 0 ? Coat(up, 1) : up > .5f ? Grey.Lerp(Dark, (up - .5f) * 1.6f) : up < .3f ? Pale : Grey.Lerp(Pale, .5f));
+        // The lower jaw hangs from its own bone and shows a dark mouth on top when it opens.
+        var jaw = new[] {
+            new Ring(new Vector3(0, .815f, .6f), .055f, .024f, Jaw), new Ring(new Vector3(0, .806f, .68f), .04f, .02f, Jaw),
+            new Ring(new Vector3(0, .808f, .76f), .029f, .014f, Jaw), new Ring(new Vector3(0, .81f, .785f), .013f, .008f, Jaw) };
+        Tube(s, ref start, jaw, Vector3.Right, Vector3.Up, 10, (_, _, up) => up > .5f ? Mouth : Pale);
+        Teeth(s, ref start);
+        foreach (int side in new[] { 1, -1 }) {
+            int ear = side > 0 ? EarL : EarR;
+            var at = Bones[ear].At;
+            // Upright triangular ears, cupped forward: pale inside, grey outside.
+            var ears = new[] {
+                new Ring(at + new Vector3(side * .004f, -.015f, 0), .048f, .04f, ear), new Ring(at + new Vector3(side * .012f, .055f, -.005f), .034f, .026f, ear),
+                new Ring(at + new Vector3(side * .02f, .105f, -.01f), .014f, .008f, ear), new Ring(at + new Vector3(side * .022f, .125f, -.012f), .002f, .002f, ear) };
+            Tube(s, ref start, ears, new Vector3(1, 0, side * .35f).Normalized(), new Vector3(-side * .35f, 0, 1).Normalized(), 8, (_, _, up) => up > .2f ? InnerEar : Dark.Lerp(Grey, .4f));
+        }
+        // A black nose on the tip of the muzzle.
+        Tube(s, ref start, new[] { new Ring(new Vector3(0, .85f, .79f), .012f, .01f, Head), new Ring(new Vector3(0, .852f, .805f), .021f, .017f, Head), new Ring(new Vector3(0, .848f, .822f), .006f, .006f, Head) },
+            Vector3.Right, Vector3.Up, 8, (_, _, _) => Black);
+        for (int leg = 0; leg < 4; leg++) LegTube(s, ref start, leg);
+        // A full brush tail, dark on top and at the tip.
+        (float Z, float Y, float W, float H)[] brush = { (-.44f, .675f, .04f, .045f), (-.5f, .665f, .052f, .058f), (-.58f, .66f, .066f, .072f), (-.68f, .655f, .074f, .08f), (-.78f, .655f, .072f, .075f), (-.88f, .655f, .055f, .058f), (-.95f, .655f, .03f, .032f), (-.98f, .655f, .006f, .006f) };
+        var tail = new Ring[brush.Length];
+        for (int i = 0; i < brush.Length; i++) {
+            float along = (-.46f - brush[i].Z) / .17f;
+            int bone = Math.Clamp((int)along, 0, TailBones - 1);
+            tail[i] = new Ring(new Vector3(0, brush[i].Y, brush[i].Z), brush[i].W, brush[i].H, Tail + bone, bone < TailBones - 1 ? Tail + bone + 1 : -1, bone < TailBones - 1 ? Mathf.SmoothStep(.5f, 1, along - bone) : 0);
+        }
+        Tube(s, ref start, tail, Vector3.Right, Vector3.Up, 12, (r, _, up) => r >= 5 ? Dark.Darkened(.2f) : up > .1f ? Dark.Lerp(Grey, .3f) : Tan.Lerp(Pale, .5f));
         return s.Commit();
     }
 
-    private static void Triangle(SurfaceTool s, ref int index, Vector3 a, Vector3 b, Vector3 c, Color tint, Vector3 outward) {
-        var normal = (c - a).Cross(b - a).Normalized();
-        if (normal.Dot(outward) < 0) { (b, c) = (c, b); normal = -normal; }
-        // Match the existing indexed loft when appending the ears.
-        s.SetColor(tint); s.SetNormal(normal); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);
-        s.AddIndex(index); s.AddIndex(index + 1); s.AddIndex(index + 2); index += 3;
+    /// <summary>Two small white fangs on each side of the upper jaw, out of sight until the mouth opens.</summary>
+    private static void Teeth(SurfaceTool s, ref int start) {
+        foreach (var at in new[] { new Vector3(.024f, .812f, .762f), new Vector3(-.024f, .812f, .762f) })
+            Tube(s, ref start, new[] { new Ring(at + new Vector3(0, .012f, 0), .006f, .006f, Head), new Ring(at - new Vector3(0, .014f, 0), .001f, .001f, Head) }, Vector3.Right, Vector3.Back, 5, (_, _, _) => new Color("eee8d8"));
     }
 
-    /// <summary>How far down the leg its one bend sits: the front wrist, or the hind hock.</summary>
-    public static float Joint(bool hind) => hind ? .25f : .3f;
-
-    /// <summary>A leg hanging from its shoulder or hip, skinned to bend at <see cref="Joint"/>.</summary>
-    public static Skeleton3D Leg(Node3D parent, bool hind) {
-        Color fur = new("777d72"), pale = new("a8ad9d"), dark = new("5d655c");
-        return ActorShape.Limb(parent, new[] {
-            new ActorShape.Ring(.13f, hind ? .10f : .075f, .11f, fur),
-            new ActorShape.Ring(.035f, hind ? .105f : .075f, .105f, fur),
-            new ActorShape.Ring(-.10f, .065f, .075f, fur, hind ? .065f : -.015f),
-            new ActorShape.Ring(-.22f, .042f, .047f, pale, hind ? -.035f : -.025f),
-            new ActorShape.Ring(-.32f, .032f, .035f, pale, hind ? -.08f : 0),
-            new ActorShape.Ring(-.405f, .034f, .04f, pale, hind ? -.035f : .015f),
-            new ActorShape.Ring(-.44f, .055f, .085f, dark, .04f),
-            new ActorShape.Ring(-.485f, .06f, .09f, dark, .045f),
-            new ActorShape.Ring(-.49f, .048f, .072f, dark, .045f) }, Joint(hind));
+    /// <summary>
+    /// A leg as one skinned tube down its resting column, then the paw forward along the ground.
+    /// Hind legs carry the heavy thigh of the haunch; forelegs are slimmer, with the elbow just below the chest.
+    /// </summary>
+    private static void LegTube(SurfaceTool s, ref int start, int leg) {
+        bool hind = leg >= 2;
+        int bone = Leg(leg);
+        var pivot = Pivot(leg); var lengths = Lengths(leg);
+        float elbow = pivot.Y - lengths.X, wrist = elbow - lengths.Y, fetlock = wrist - lengths.Z;
+        // Height, half width, half depth and how far the section sits forward of the column.
+        (float Y, float W, float D, float Forward)[] column = hind
+            ? new[] { (pivot.Y + .06f, .062f, .1f, -.01f), (pivot.Y - .04f, .068f, .125f, -.005f), (pivot.Y - .14f, .068f, .118f, .005f), (elbow + .03f, .056f, .085f, .005f),
+                (elbow - .05f, .05f, .07f, -.01f), (elbow - .15f, .034f, .045f, -.014f), (wrist + .03f, .025f, .032f, -.012f), (wrist, .027f, .036f, -.018f),
+                (wrist - .07f, .022f, .026f, 0f), (fetlock + .015f, .024f, .028f, 0f) }
+            : new[] { (pivot.Y + .04f, .058f, .092f, 0f), (pivot.Y - .1f, .062f, .096f, .005f), (elbow + .09f, .056f, .08f, 0f), (elbow + .01f, .05f, .064f, -.012f),
+                (elbow - .06f, .041f, .05f, 0f), (elbow - .17f, .031f, .036f, .004f), (wrist + .02f, .026f, .03f, .004f), (wrist - .01f, .027f, .032f, .006f),
+                (wrist - .06f, .024f, .028f, .004f), (fetlock + .015f, .025f, .029f, .006f) };
+        float[] joints = { elbow, wrist, fetlock };
+        var rings = new Ring[column.Length];
+        for (int i = 0; i < column.Length; i++) {
+            var (y, w, d, forward) = column[i];
+            var (b, next, blend) = Weight(y, joints, bone);
+            rings[i] = new Ring(new Vector3(pivot.X, y, pivot.Z + forward), w, d, b, next, blend);
+        }
+        float top = pivot.Y;
+        float outside = Math.Sign(pivot.X);
+        Tube(s, ref start, rings, Vector3.Right, Vector3.Back, 10, (r, across, front) => {
+            float y = column[r].Y;
+            var color = y > top - .12f ? Grey : y > elbow - .05f ? Grey.Lerp(Tan, .6f) : Tan.Lerp(Pale, .15f);
+            return color.Lerp(Pale, Math.Clamp(-front * .5f - across * outside * .4f, 0, .55f));
+        });
+        // The paw: a rounded pad from the heel forward to the toes, dark underneath.
+        float sole = fetlock - Sole;
+        var paw = new[] {
+            new Ring(new Vector3(pivot.X, fetlock + .005f, pivot.Z - .03f), .022f, .02f, bone + 3), new Ring(new Vector3(pivot.X, sole + .03f, pivot.Z - .005f), .033f, .03f, bone + 3),
+            new Ring(new Vector3(pivot.X, sole + .025f, pivot.Z + .03f), .036f, .025f, bone + 3), new Ring(new Vector3(pivot.X, sole + .016f, pivot.Z + .058f), .03f, .016f, bone + 3),
+            new Ring(new Vector3(pivot.X, sole + .012f, pivot.Z + .07f), .012f, .008f, bone + 3) };
+        Tube(s, ref start, paw, Vector3.Right, Vector3.Up, 10, (_, _, up) => up < -.6f ? Dark.Darkened(.3f) : Tan.Lerp(Pale, .3f));
     }
 
-    /// <summary>The tail hanging down from its root, skinned so the outer half can curl.</summary>
-    public static Skeleton3D Tail(Node3D parent) {
-        Color grey = new("777d72"), dark = new("4e574e");
-        return ActorShape.Limb(parent, new[] {
-            new ActorShape.Ring(0, .045f, .045f, grey),
-            new ActorShape.Ring(-.08f, .065f, .06f, grey),
-            new ActorShape.Ring(-.22f, .085f, .075f, grey),
-            new ActorShape.Ring(-.35f, .075f, .065f, grey, -.01f),
-            new ActorShape.Ring(-.46f, .04f, .04f, dark, -.025f),
-            new ActorShape.Ring(-.51f, .008f, .008f, dark, -.035f) }, .22f);
+    /// <summary>The bone a leg ring at height <paramref name="y"/> follows, handing over to the next across four centimetres either side of each joint.</summary>
+    private static (int Bone, int Next, float Blend) Weight(float y, float[] joints, int first) {
+        for (int j = 0; j < joints.Length; j++) {
+            if (y > joints[j] + .04f) return (first + j, -1, 0);
+            if (y >= joints[j] - .04f) return (first + j, first + j + 1, Mathf.SmoothStep(0, 1, (joints[j] + .04f - y) / .08f));
+        }
+        return (first + joints.Length, -1, 0);
+    }
+
+    private static ArrayMesh BuildEyes() {
+        var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
+        int start = 0;
+        foreach (int side in new[] { 1, -1 }) {
+            var at = new Vector3(side * .08f, .886f, .628f);
+            var across = new Vector3(side, 0, .55f).Normalized();
+            Tube(s, ref start, new[] { new Ring(at - across * .006f, .006f, .006f, Head), new Ring(at, .014f, .01f, Head), new Ring(at + across * .006f, .006f, .005f, Head) },
+                Vector3.Up.Cross(across).Normalized(), Vector3.Up, 8, (_, _, _) => Colors.White);
+        }
+        return s.Commit();
     }
 }

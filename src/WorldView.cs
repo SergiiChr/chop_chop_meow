@@ -60,7 +60,7 @@ public partial class WorldView : Node3D {
     // The host keeps the original teal; each guest keeps the first one free when it joined.
     private static readonly string[] Shirts = { "2f7f86", "a8473a", "7a5c9e", "c9a23b" };
     private readonly Dictionary<int, (ActorRig Rig, ActorState State, (MeshInstance3D Mesh, Material Material)[] Parts)> crew = new();
-    private readonly Dictionary<Wolf, WorldModels.WolfModel> wolves = new();
+    private readonly Dictionary<Wolf, WolfModel> wolves = new();
     private readonly Dictionary<TradeOrder, WorldModels.CartModel> carts = new();
     /// <summary>The village's carts no order holds, built while loading and reused for every trip.</summary>
     private readonly Stack<WorldModels.CartModel> idleCarts = new();
@@ -232,6 +232,8 @@ public partial class WorldView : Node3D {
         public ActorAction Pulse;
         public Vector2 PulseTarget;
         public float PulseRemaining;
+        /// <summary>Seconds since a wolf knocked this player down, zero while they stand.</summary>
+        public float DownedFor;
     }
 
     public bool ShowsPlayer(int id) => others.ContainsKey(id);
@@ -285,7 +287,7 @@ public partial class WorldView : Node3D {
     /// <summary>Keeps the camera on the player; called before any projection so input sees the current frame.</summary>
     private void SyncCamera() {
         var size = GetViewport().GetVisibleRect().Size;
-        camera.Size = (AnimationReview ? ReviewClip >= 0 ? 2.6f : 11 : BaseSize) / Zoom;
+        camera.Size = (AnimationReview ? ReviewWolfClip >= 0 ? 3.2f : ReviewClip >= 0 ? 2.6f : 11 : BaseSize) / Zoom;
         float pitch = Mathf.DegToRad(AnimationReview ? ReviewPitch : Pitch), across = MathF.Cos(pitch) * Mathf.Sqrt2 / 2;
         var back = new Vector3(across, MathF.Sin(pitch), across);
         var target = AnimationReview ? ReviewCenter + To3(reviewActor.Position) : To3(EnvironmentReview ? EnvironmentCenter ?? World.Player : World.Player);
@@ -470,27 +472,23 @@ public partial class WorldView : Node3D {
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
         if (action == ActorAction.Idle && StationToHammer(World.Me) is Thing station) { action = ActorAnimation.StationAction(station.Kind); target = station.Pos; subject = station; }
-        if (World.Mauled) {
-            mauledFrom = PinningWolf()?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
-            // Facing away from the wolf at the throat lays the head toward it once the rig tips onto its back.
-            action = World.Dead ? ActorAction.Devoured : ActorAction.Mauled; target = World.Player * 2 - mauledFrom; subject = null;
+        // A leaping wolf knocks the player over as its jaws reach them, before it lands; a pinned player stays down.
+        var knocker = Knocking(World.Me);
+        if (World.Mauled || knocker != null) {
+            mauledFrom = (knocker ?? PinningWolf(World.Me.Id))?.Pos ?? (downedFor == 0 ? World.Player + Vector2.Down : mauledFrom);
+            // Facing the wolf, the player goes over backwards with it on top.
+            action = World.Dead ? ActorAction.Devoured : ActorAction.Mauled; target = mauledFrom; subject = null;
             downedFor += dt;
         } else downedFor = 0;
         player.Update(World.Player, action, target, dt);
         // A foot lands at each extreme of the stride.
-        if (action is ActorAction.Walk or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
+        if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (player.Struck(.25f) || player.Struck(.75f))) Sounds?.Play(FootstepSound(World.Player));
         pulseRemaining = Math.Max(0, pulseRemaining - dt);
-        string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(SelectedTool, World.S.Backpack) : null);
+        string? tool = ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run ? HeldTool(SelectedTool, World.S.Backpack) : null);
         bool torch = World.Torch > 0 && !World.Dead;
         Pose(playerRig, player, Grade(tool, SelectedTool, World.S.Backpack), torch);
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
-        if (World.Mauled) {
-            // Tip backwards about the feet, then slide forward so the body lies centred on the player's tile.
-            float tip = Ease(Math.Min(1, downedFor / .3f));
-            var forward = new Vector3(MathF.Sin(player.Yaw), 0, MathF.Cos(player.Yaw));
-            playerRig.Root.Position = To3(player.Position) + forward * .8f * tip + Vector3.Up * .17f * tip;
-            playerRig.Root.Rotation = new Vector3(-Mathf.Pi / 2 * tip, player.Yaw, 0);
-        }
+        if (downedFor > 0) KnockDown(playerRig, player, downedFor);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
         Work(player, subject);
         UpdateOthers(dt);
@@ -576,12 +574,18 @@ public partial class WorldView : Node3D {
             var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
             if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; subject = ThingAt(other.PulseTarget); }
             if (action == ActorAction.Idle && StationToHammer(p) is Thing station) { action = ActorAnimation.StationAction(station.Kind); facing = station.Pos; subject = station; }
-            if (p.Mauled) action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
+            var knocker = Knocking(p);
+            if (p.Mauled || knocker != null) {
+                action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
+                facing = (knocker ?? PinningWolf(p.Id))?.Pos ?? p.Pos + Vector2.Down;
+                other.DownedFor += dt;
+            } else other.DownedFor = 0;
             state.Update(p.Pos, action, facing, dt);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
-            if (action is ActorAction.Walk or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
-            Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run ? HeldTool(p.Held, p.Backpack) : null), p.Held, p.Backpack), p.Torch > 0 && p.RespawnIn <= 0);
+            if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
+            Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run ? HeldTool(p.Held, p.Backpack) : null), p.Held, p.Backpack), p.Torch > 0 && p.RespawnIn <= 0);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
+            if (other.DownedFor > 0) KnockDown(other.Rig, state, other.DownedFor);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
             Work(state, subject);
         }
@@ -611,12 +615,23 @@ public partial class WorldView : Node3D {
         return "footsteps_default";
     }
 
+    /// <summary>How long a knocked-down player takes to go over onto their back, and how far their feet slide toward the wolf as they go.</summary>
+    public const float KnockSeconds = .3f, KnockSlide = .65f;
+
+    /// <summary>Tips a knocked-down player back about the feet, then slides the body forward so it lies centred on their tile, under the wolf.</summary>
+    private static void KnockDown(ActorRig rig, ActorState state, float downedFor) {
+        float tip = Ease(Math.Min(1, downedFor / KnockSeconds));
+        var forward = new Vector3(MathF.Sin(state.Yaw), 0, MathF.Cos(state.Yaw));
+        rig.Root.Position = To3(state.Position) + forward * KnockSlide * tip + Vector3.Up * .17f * tip;
+        rig.Root.Rotation = new Vector3(-Mathf.Pi / 2 * tip, state.Yaw, 0);
+    }
+
     private static void Pose(ActorRig rig, ActorState state, string? tool, bool torch = false) {
         rig.Root.Position = To3(state.Position);
         rig.Root.Rotation = new Vector3(0, state.Yaw, 0);
         var pose = state.Pose;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
-        if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
+        if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
         rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
     }
 
@@ -732,7 +747,11 @@ public partial class WorldView : Node3D {
         props[t.Id] = prop;
         prop.Root.Position = To3(t.Pos);
         // A fresh carcass keeps the heading of the wolf model it replaces.
-        if (t.Kind == ThingKind.WolfCorpse && Dying(t.Pos) is { } dying) prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
+        // It also waits for the killing blow to land, and is thrown back from where the wolf stood.
+        if (prop is CarcassProp carcass && Dying(t.Pos) is { } dying) {
+            prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
+            carcass.From = dying.Root.Position - To3(t.Pos); carcass.HitIn = SwingLands(dying.Last + dying.Knock).In;
+        }
         // A chip that appears in play was knocked off the rock beside it, and flies from there.
         if (prop is LooseProp chip && !loadingProps && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
         return prop;
@@ -783,7 +802,9 @@ public partial class WorldView : Node3D {
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
                 break;
             case CarcassProp carcass:
-                float dying = Math.Clamp(t.Progress / .9f, 0, 1);
+                // Thrown, the carcass covers the knockback while it is in the air and stays where it lands.
+                float since = t.Progress - carcass.HitIn, dying = Math.Clamp(since / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
+                carcass.Body.Position = carcass.From * (1 - thrown * (2 - thrown));
                 carcass.Wolf.Fall(dying);
                 // Butchering flattens the carcass while the blood pool spreads out from under it.
                 carcass.Wolf.Root.Scale = new Vector3(1, .6f + .4f * WorldModels.Fullness(t), 1);
@@ -925,13 +946,38 @@ public partial class WorldView : Node3D {
     private static float Ease(float t) => t * t * (3 - 2 * t);
 
     // Lookups that would otherwise capture the thing in a lambda, which allocates on every call for every thing drawn.
-    private WorldModels.WolfModel? Dying(Vector2 at) {
+    private WolfModel? Dying(Vector2 at) {
         foreach (var (wolf, model) in wolves) if (!World.Wolves.Contains(wolf) && model.Last.DistanceTo(at) < 2) return model;
         return null;
     }
-    private Wolf? PinningWolf() {
-        foreach (var w in World.Wolves) if (w.Pinning) return w;
+    private Wolf? PinningWolf(int player) {
+        foreach (var w in World.Wolves) if (w.Pinning && w.Target == player) return w;
         return null;
+    }
+    /// <summary>A wolf in the air at <paramref name="p"/> whose jaws have reached them.</summary>
+    private Wolf? Knocking(PlayerState p) {
+        foreach (var w in World.Wolves) if (w.Leap > 0 && w.Target == p.Id && w.Pos.DistanceTo(p.Pos) <= WolfModel.ContactReach) return w;
+        return null;
+    }
+    private Vector2 Hunted(Wolf wolf) {
+        foreach (var p in World.Players) if (p.Id == wolf.Target) return p.Pos;
+        return World.Player;
+    }
+    private bool HuntedTorchLit(Wolf wolf) {
+        foreach (var p in World.Players) if (p.Id == wolf.Target) return p.TorchLit;
+        return false;
+    }
+    /// <summary>Seconds until the swing of the player nearest <paramref name="at"/> lands, or zero when nobody is mid-swing; and where that player stands.</summary>
+    private (float In, Vector2 From) SwingLands(Vector2 at) {
+        float best = float.MaxValue, lands = 0;
+        var from = World.Player;
+        if (pulseRemaining > 0) { best = World.Player.DistanceTo(at); lands = ActorAnimation.UntilContact(pulseAction, pulseRemaining); }
+        foreach (var (_, other) in others)
+            if (other.PulseRemaining > 0 && other.State.Position.DistanceTo(at) < best) {
+                best = other.State.Position.DistanceTo(at); from = other.State.Position;
+                lands = ActorAnimation.UntilContact(other.Pulse, other.PulseRemaining);
+            }
+        return (lands, best == float.MaxValue ? World.Player : from);
     }
     private bool AnyPlayerNear(Vector2 at, float radius) {
         foreach (var p in World.Players) if (p.RespawnIn <= 0 && p.Pos.DistanceTo(at) < radius) return true;
@@ -989,31 +1035,92 @@ public partial class WorldView : Node3D {
     private void SyncWolves(float dt) {
         foreach (var wolf in World.Wolves) {
             if (!wolves.TryGetValue(wolf, out var model)) {
-                model = new WorldModels.WolfModel { Last = wolf.Pos, Yaw = ActorAnimation.Yaw(World.Player - wolf.Pos, 0) };
+                model = new WolfModel { Last = wolf.Pos, Yaw = ActorAnimation.Yaw(Hunted(wolf) - wolf.Pos, 0) };
                 scene.AddChild(model.Root); wolves[wolf] = model;
             }
+            var hunted = Hunted(wolf);
             var moved = wolf.Pos - model.Last;
-            // A hit throws the wolf back at once in the world; the model slides there instead, fast at first and settling.
-            if (wolf.Stagger > model.Stagger) { model.Knock = -moved; moved = Vector2.Zero; FurAndEmbers(To3(model.Last, .6f)); }
-            model.Stagger = wolf.Stagger;
-            bool staggering = wolf.Stagger > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !staggering, galloping = running && wolf.Chase > 0;
-            // A gallop covers more ground a stride than a trot.
-            model.Stride += running ? moved.Length() * (galloping ? 2.6f : 5) : 0;
-            model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(running ? moved : World.Player - wolf.Pos, model.Yaw), Math.Min(1, dt * 10));
             model.Last = wolf.Pos;
-            float recoil = 1 - wolf.Stagger / World.StaggerSeconds, slide = staggering ? MathF.Pow(1 - recoil, 3) : 0;
-            model.Root.Position = To3(wolf.Pos + model.Knock * slide);
+            // A hit throws the wolf back at once in the world; the model holds its place and lunges into the swing, then is thrown back when it lands.
+            if (wolf.Stagger > model.Stagger) {
+                model.Knock -= moved; moved = Vector2.Zero;
+                (model.HitIn, model.Striker) = SwingLands(wolf.Pos + model.Knock);
+                model.HitSeconds = model.HitIn; model.HitFrom = wolf.Pos + model.Knock; model.Recoiling = 0;
+            }
+            model.Stagger = wolf.Stagger;
+            float back = 0;
+            if (model.HitIn > 0) {
+                model.HitIn = Math.Max(0, model.HitIn - dt);
+                // The lunge closes to striking distance of the swing; a wolf already that close stays put.
+                var toward = model.HitFrom - model.Striker;
+                var strike = model.Striker + toward.Normalized() * Math.Min(toward.Length(), WolfModel.StrikeReach);
+                var at = model.HitFrom.Lerp(strike, Ease(1 - model.HitIn / Math.Max(model.HitSeconds, .001f)));
+                back = -(at - wolf.Pos - model.Knock).Length();
+                model.Knock = at - wolf.Pos;
+                if (model.HitIn == 0) { model.Recoiling = WolfModel.RecoilSeconds; model.KnockFrom = model.Knock; FurAndEmbers(To3(at, .6f)); }
+            } else if (model.Recoiling > 0) {
+                // The wolf goes back only while it is in the air, so its paws never slide.
+                model.Recoiling = Math.Max(0, model.Recoiling - dt);
+                float hop = Math.Min(1, (1 - model.Recoiling / WolfModel.RecoilSeconds) / WolfModel.HopShare);
+                model.Knock = model.KnockFrom * (1 - hop * (2 - hop));
+            } else model.Knock = Vector2.Zero;
+            bool struck = model.HitIn > 0 || model.Recoiling > 0, running = moved.LengthSquared() > 1e-6f && !wolf.Feeding && !struck;
+            // A struck wolf keeps facing whoever hit it; a running one turns into its path.
+            var facing = struck ? model.Striker - wolf.Pos - model.Knock : running ? moved : hunted - wolf.Pos;
+            model.Yaw = Mathf.LerpAngle(model.Yaw, ActorAnimation.Yaw(facing, model.Yaw), Math.Min(1, dt * (struck ? 16 : 10)));
             model.Root.Visible = World.Sees(wolf.Pos);
             model.Root.Rotation = new Vector3(0, model.Yaw, 0);
-            if (staggering) model.Recoil(recoil);
-            else if (wolf.Leap > 0) model.Leap(1 - wolf.Leap / World.LeapSeconds);
-            else if (wolf.Feeding) model.Feed(Elapsed + wolf.GetHashCode() % 7);
-            else if (galloping) model.Gallop(model.Stride);
-            else if (running) model.Trot(model.Stride);
-            else model.Idle(Elapsed + wolf.GetHashCode() % 7);
+            bool wary = wolf.Scared || HuntedTorchLit(wolf);
+            float flight = 0;
+            if (model.HitIn > 0) model.Move(-back, dt, false, true);
+            else if (model.Recoiling > 0) model.Recoil(1 - model.Recoiling / WolfModel.RecoilSeconds, dt);
+            else if (wolf.Leap > 0) {
+                // The world closes the leap's gap evenly, so the start, and the point where the jaws reach the throat, follow from how far it has come.
+                float progress = 1 - wolf.Leap / World.LeapSeconds, gap = wolf.Pos.DistanceTo(hunted);
+                float start = progress < 1 ? (gap - World.PinDistance * progress) / (1 - progress) : gap;
+                float contact = start <= WolfModel.ContactReach ? 0 : (start - WolfModel.ContactReach) / (start - World.PinDistance);
+                model.Pinned = gap <= WolfModel.ContactReach ? model.Pinned + dt : 0;
+                if (model.Pinned > 0) model.Feed(Elapsed, dt, true, model.Pinned / KnockSeconds);
+                else { model.Leap(progress, contact, dt); flight = contact > 0 ? progress / contact : 1; }
+                if (model.Pinned == 0) model.Toward = (wolf.Pos - hunted).Normalized();
+            } else if (wolf.Feeding) {
+                if (wolf.Pinning) model.Pinned += dt;
+                model.Feed(Elapsed + wolf.GetHashCode() % 7, dt, wolf.Pinning, model.Pinned / KnockSeconds);
+            } else if (wolf.Howl > 0) model.Howl(1 - wolf.Howl / wolf.HowlLength, dt);
+            else if (running) model.Move(moved.Length(), dt, wolf.Chase > 0, wary);
+            else model.Stand(Elapsed + wolf.GetHashCode() % 7, dt, wary);
+            var place = To3(wolf.Pos + model.Knock);
+            if (wolf.Leap > 0 || wolf.Pinning) {
+                if (model.Toward == Vector2.Zero) model.Toward = (wolf.Pos - hunted).Normalized();
+                place = AtTheThroat(model, hunted, place, flight);
+            } else model.Toward = Vector2.Zero;
+            model.Root.Position = place;
         }
         foreach (var (wolf, model) in wolves)
             if (!World.Wolves.Contains(wolf)) { model.Root.QueueFree(); wolves.Remove(wolf); }
+    }
+
+    /// <summary>
+    /// Where a leaping or pinning wolf stands so its jaws are at the hunted player's throat.
+    /// The flight eases from the world's path onto the throat by the moment of contact; the jaws then ride the throat down as the player goes over, and the wolf holds that spot once they are down.
+    /// </summary>
+    private static Vector3 AtTheThroat(WolfModel model, Vector2 hunted, Vector3 path, float flight) {
+        if (model.Pinned > KnockSeconds) return model.Held;
+        var held = Throat(hunted, model.Toward, model.Pinned) - model.Root.Basis * model.Bite;
+        held.Y = Math.Max(0, held.Y);
+        if (model.Pinned > 0) return model.Held = held;
+        return path.Lerp(held, Ease(Math.Clamp(flight, 0, 1)));
+    }
+
+    /// <summary>The rig's throat: above the feet and a little in front, before a knockdown tips it back.</summary>
+    private const float ThroatHeight = 1.31f, ThroatAhead = .06f;
+
+    /// <summary>Where the throat of a player at <paramref name="at"/> facing <paramref name="toward"/> is, <paramref name="downedFor"/> seconds into being knocked down; it follows KnockDown.</summary>
+    public static Vector3 Throat(Vector2 at, Vector2 toward, float downedFor) {
+        float tip = Ease(Math.Min(1, downedFor / KnockSeconds)), back = Mathf.Pi / 2 * tip;
+        var forward = To3(toward.Normalized());
+        return To3(at) + forward * (KnockSlide * tip + ThroatAhead * MathF.Cos(back) - ThroatHeight * MathF.Sin(back))
+            + Vector3.Up * (.17f * tip + ThroatHeight * MathF.Cos(back) + ThroatAhead * MathF.Sin(back));
     }
 
     /// <summary>Tufts of fur knocked loose by a hit, and embers off a burning torch.</summary>
@@ -1069,7 +1176,7 @@ public partial class WorldView : Node3D {
             cart.Root.Rotation = new Vector3(0, cart.Yaw, 0);
             cart.Roll(cart.Distance);
             // The courier walks with arms trailing back to the cart handle.
-            var stride = ActorAnimation.PoseAt(ActorAction.Walk, cart.Distance / 2.1f, true) with { RaiseL = -22, RaiseR = -22, OutL = 12, OutR = 12, ElbowL = 8, ElbowR = 8, Lean = 10 };
+            var stride = ActorAnimation.PoseAt(ActorAction.Walk, ActorAnimation.Advance(ActorAction.Walk, 0, cart.Distance), true) with { RaiseL = -22, RaiseR = -22, OutL = 12, OutR = 12, ElbowL = 8, ElbowR = 8, Lean = 10 };
             cart.Courier.Show(stride, null, false);
             // A sale leaves with its crates and returns with the payment; a purchase leaves with the payment and returns with the goods.
             bool back = phase >= .5f;

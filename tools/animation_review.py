@@ -41,6 +41,8 @@ def require_clip(ref: str | None, clip: str) -> None:
     if "--animation-clip" not in source:
         raise SystemExit(f"{where} has no --animation-clip close-up review")
     names = re.findall(r'\("([^"]+)", ActorSkin\.', source)
+    wolves = re.search(r"WolfClips = \{([^}]*)\}", source)
+    names += re.findall(r'"([^"]+)"', wolves.group(1)) if wolves else []
     if clip not in names:
         raise SystemExit(f"No clip {clip!r} in {where}; clips: {', '.join(names)}")
 
@@ -94,9 +96,18 @@ def capture(checkout: Path, clip: str, view: str, slow: float, folder: Path) -> 
     )
 
 
-def capture_all(checkout: Path, name: str, options: argparse.Namespace) -> None:
+def slug(text: str) -> str:
+    """Turns a clip name or ref into a folder name."""
+    return re.sub(r"[^\w.-]", "-", text)
+
+
+def capture_all(
+    checkout: Path, clip: str, name: str, options: argparse.Namespace
+) -> None:
+    """Captures a checkout's clip into the folder of the clip named on the command line."""
     for view in options.views:
-        capture(checkout, options.clip, view, options.slow, OUTPUT / name / view)
+        folder = OUTPUT / slug(options.clip) / name / view
+        capture(checkout, clip, view, options.slow, folder)
 
 
 def capture_base(ref: str, options: argparse.Namespace) -> None:
@@ -108,7 +119,7 @@ def capture_base(ref: str, options: argparse.Namespace) -> None:
         )
         try:
             (checkout / ".tools").symlink_to(build.TOOLS.resolve())
-            capture_all(checkout, re.sub(r"[^\w.-]", "-", ref), options)
+            capture_all(checkout, options.base_clip, slug(ref), options)
         finally:
             subprocess.run(
                 ["git", "worktree", "remove", "--force", checkout], cwd=ROOT, check=True
@@ -133,16 +144,26 @@ def main() -> None:
     parser.add_argument(
         "--base", metavar="REF", help="also capture this branch or commit, such as main"
     )
+    parser.add_argument(
+        "--base-clip",
+        metavar="CLIP",
+        help="the clip's name in --base, when it was renamed since (default: the clip)",
+    )
     options = parser.parse_args()
     if not options.slow > 0:
         parser.error("--slow must be positive")
     require_clip(None, options.clip)
+    options.base_clip = options.base_clip or options.clip
     if options.base:
-        require_clip(options.base, options.clip)
-    capture_all(ROOT, "current", options)
+        require_clip(options.base, options.base_clip)
+    elif options.base_clip != options.clip:
+        parser.error("--base-clip needs --base")
+    capture_all(ROOT, options.clip, "current", options)
     if options.base:
         capture_base(options.base, options)
-    print(f"96 frames a view at 30 a second of {options.slow}x slow motion in {OUTPUT}")
+    print(
+        f"96 frames a view at 30 a second of {options.slow}x slow motion in {OUTPUT / slug(options.clip)}"
+    )
 
 
 if __name__ == "__main__":

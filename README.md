@@ -63,6 +63,7 @@ Play accepts Godot arguments after `--`:
 | `--animation-review` | Show every actor action on rotating rigs |
 | `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection, evenly spaced at 30 a second |
 | `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following |
+| `--animation-review --animation-clip "wolf leap"` | Show one wolf clip close up; the leap, hit and feed play against a player |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
 | `--animation-slow 4` | Slow a capture down this many times |
@@ -447,11 +448,14 @@ The trading post has three icon buttons: Market, Workers and the price sheet.
 ### Market
 
 The market works like a station with six unlabeled input boxes and six output boxes.
-It only takes crates, and only of:
+It only takes packed crates.
+The village pays for:
 
 - raw meat, burnt steak, berries, bread, berry jam, meat stew, canned jam, canned meat stew;
 - steel axes, pickaxes and hammers.
 
+Anything else in a crate goes as a donation: the cart takes it and pays nothing for it.
+The returning cart says what was donated.
 A sale pays for the goods and the crate.
 Load crates, press Sell, and a cart takes them to Bramblewick and returns 30 seconds later with the coins.
 Bought goods also arrive in the output boxes.
@@ -538,9 +542,14 @@ With none, a message says the mine is full with no output available.
 
 ## Wolves and night
 
-Wolves hunt at night.
-A chasing wolf gallops faster than you walk, but sprinting outruns it.
-They come out of the dark beyond what you can see, never on screen.
+Five wolf dens, small caves at the foot of the mountains, each let two wolves out at dusk (20:24), so the hour or two before bed is risky too.
+They patrol the valley, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
+
+A wolf that smells you within 30 metres while you are out in the open howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
+After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
+A sprinting wolf gallops faster than you walk, but sprinting outruns it.
+
+An hour before dawn every wolf gives up and heads back to the nearest den.
 
 ### Fire
 
@@ -558,13 +567,13 @@ Swinging four times within 2 seconds, as fast as swings go, puts it out with a m
 Relighting takes the same 2 seconds and keeps the burn time it had left.
 
 While it burns, a lone wolf still creeps in slowly, but a swing toward it scares it into following you at the edge of the light.
-More wolves gather over time, and once five are around you they attack together and swings no longer scare them.
+Once five are around you they attack together and swings no longer scare them.
 A direct hit with the torch hurts a wolf and sends it running for a moment.
 
 ### Cabins
 
 Click a cabin to step inside, even while walking.
-Wolves back off at once and give up once out of sight, and you stay in until you press Step outside in its panel.
+Wolves cannot smell you there: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
 
 ### Wolf kills
 
@@ -587,6 +596,10 @@ The world stands still while every player has a menu open, which alone means whe
 Leaving your own game, by quitting, loading or joining another, ends it for everyone in it.
 If joining another game fails or you cancel it, you go back to your own game, which waits on its server for 30 seconds. It is autosaved just before you try.
 A second window on the same computer cannot join a game the first is playing in.
+
+To find out why a join fails, look at the terminal the game runs in on both computers, or the `logs` folder beside the [saves](#saves).
+They show each step of joining: the guest reaching the address, the server hearing it, and why it refuses or welcomes it.
+No line saying the guest reached the address means nothing answered on that address and UDP port.
 
 ### Players in the save
 
@@ -652,7 +665,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, sprinting, hand gathering, axe and pick strokes, hammering, packing crates, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, hammering, packing crates, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 
 The world reacts too:
@@ -677,7 +690,7 @@ Sound effects follow the same actions:
 - axes, pickaxes, anvils and swings have impacts;
 - bellows puff;
 - fires crackle as they catch, including a furnace lighting a new batch;
-- wolves growl from afar, growl again as they close in, and bite.
+- wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, and bite.
 
 Repeated sounds rotate between variants.
 Sounds on screen play at full volume and fade out just past its edge, so zooming out lets you hear further.

@@ -53,6 +53,7 @@ public partial class Server : Node {
         using var probe = new PacketPeerUdp();
         bool free = probe.Bind(port) == Error.Ok;
         probe.Close();
+        if (!free) Net.Log($"Server: port {port} is taken.");
         return free;
     }
 
@@ -72,7 +73,7 @@ public partial class Server : Node {
     public override void _Process(double delta) {
         float dt = Math.Min((float)delta, .1f);
         if (World.Players.Count == 0) {
-            if ((lonely += dt) >= LonelySeconds) End();
+            if ((lonely += dt) >= LonelySeconds && !ended) { Net.Log($"Server: nobody has been in the game for {LonelySeconds:0} seconds, which ends it."); End(); }
             return;
         }
         lonely = 0;

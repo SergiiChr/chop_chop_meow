@@ -636,12 +636,12 @@ public partial class Game {
         await KeyStroke(Key.Escape);
         Require(!menu.Visible && !view.Paused, "Esc must close the pause menu and resume.");
     }
-    /// <summary>WASD walks and Shift while moving sprints, unless the player is too thirsty.</summary>
-    private async Task CheckWasdWalksAndShiftSprintsUnlessTooThirsty() {
+    /// <summary>WASD jogs and Shift while moving sprints, unless the player is too thirsty.</summary>
+    private async Task CheckWasdJogsAndShiftSprintsUnlessTooThirsty() {
         var start = world.Player;
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
-        await Until(() => view.PlayerAnimation == ActorAction.Walk && world.Player.DistanceTo(start) > .25f && sounds.Last == "footsteps_default",
-            "WASD moving the player through Godot input with the full walking cycle and grass footsteps", 2);
+        await Until(() => view.PlayerAnimation == ActorAction.Jog && world.Player.DistanceTo(start) > .25f && sounds.Last == "footsteps_default",
+            "WASD moving the player through Godot input with the full jogging cycle and grass footsteps", 2);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = true });
@@ -653,7 +653,7 @@ public partial class Game {
         float drink = world.Thirst; SetNeeds(Hosted, thirst: 10);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = true });
         await Frames();
-        Require(!world.Me.Sprinting && view.PlayerAnimation == ActorAction.Walk, "Under 15% drink the player must be too weak to sprint.");
+        Require(!world.Me.Sprinting && view.PlayerAnimation == ActorAction.Jog, "Under 15% drink the player must be too weak to sprint.");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.A, Keycode = Key.A, Pressed = false });
         SetNeeds(Hosted, thirst: drink);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Shift, Keycode = Key.Shift, Pressed = false });
@@ -693,6 +693,13 @@ public partial class Game {
         Require(view.OffScreen(world.Player + Vector2.One * 40) > Sounds.Reach,
             "A sound far from the player must count as beyond reach.");
         Require(sounds.Played == heard, "A sound well beyond the screen edge must stay silent.");
+        Require(Math.Abs(sounds.Length("wolf_howl") - world.Data.LoneHowlSeconds) < .1 && Math.Abs(sounds.Length("wolf_howl_group") - world.Data.PackHowlSeconds) < .1,
+            "A wolf must hold its howl as long as the howl recording plays.");
+        sounds.Play("wolf_howl", world.Player + new Vector2(5, 0)); float near = sounds.LastFade;
+        sounds.Play("wolf_howl", world.Player + new Vector2(40, 0)); float far = sounds.LastFade;
+        Require(near < 1 && far > 0 && far < near, "A howl must fade with distance from the player, on screen too.");
+        heard = sounds.Played; sounds.Play("wolf_howl", world.Player + new Vector2(world.Data.HowlRadius + 1, 0));
+        Require(sounds.Played == heard, "A howl beyond the howl radius must stay silent.");
     }
     /// <summary>Holding the right mouse button on a tree or a ripe farm plot walks over and works it.</summary>
     private async Task CheckRightClickGathersTreeAndHarvestsFarm() {
@@ -951,7 +958,9 @@ public partial class Game {
     }
     /// <summary>A mauled player cannot move; death shows the respawn countdown and respawning clears it.</summary>
     private async Task CheckPinnedPlayerStaysDownAndDeathCountsDown() {
-        RunUntilNight(Hosted); SetMauled(Hosted, true); await Frames();
+        RunUntilNight(Hosted); SetMauled(Hosted, true);
+        // The pin lasts only while a wolf holds it.
+        PlaceWolf(Hosted, new Wolf { Pos = world.Player + Vector2.Right * .8f, Feeding = true, Pinning = true }); await Frames();
         var pinnedAt = world.Player;
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = true });
         await Seconds(.25);
@@ -1156,7 +1165,7 @@ public partial class Game {
             await Test(CheckOptionsApplyAndKeepTheirChoices);
             await Test(CheckNewGameStartsTheWelcomePage);
             await Test(CheckPauseMenuAsksBeforeNewGameAndQuit);
-            await Test(CheckWasdWalksAndShiftSprintsUnlessTooThirsty);
+            await Test(CheckWasdJogsAndShiftSprintsUnlessTooThirsty);
             await Test(CheckMessagesStackFadeAndKeepClearOfHud);
             await Test(CheckPanelPagesRefreshWithoutAllocating);
             await Test(CheckLowFoodGlowsScreenEdges);

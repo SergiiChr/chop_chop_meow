@@ -43,6 +43,8 @@ public partial class Game : Node, IGameFlow {
     private Session session = new Session.None();
     /// <summary>How long a window waits for the server it started: the engine has to start and read the save first.</summary>
     private const ulong ServerStartMsec = 60000;
+    /// <summary>A server process's own log, or each server start would rotate this window's log out of the folder.</summary>
+    private const string ServerLog = "user://logs/server.log";
     /// <summary>The update the screen last refreshed for, so it refreshes once for each while an answer is due.</summary>
     private int refreshedUpdate;
     /// <summary>Whether the player had a menu open last frame, as the server was last told.</summary>
@@ -101,6 +103,7 @@ public partial class Game : Node, IGameFlow {
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
+    // A wolf breaks into its sprint some way off, so its growl carries further off screen than other sounds.
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private void BuildHud() {
         moves = new ItemMoves(kit, blackHole);
@@ -163,6 +166,7 @@ public partial class Game : Node, IGameFlow {
     }
 
     private void GameFailedToStart(string reason) {
+        Net.Log($"Could not start the game: {reason}");
         startMenu.LeftReason = $"Could not start the game. {reason}"; ShowStart();
     }
 
@@ -233,12 +237,13 @@ public partial class Game : Node, IGameFlow {
 
     /// <summary>Starts a server process and returns its id, or a negative number when it would not run.</summary>
     private static int RunServer(int slot, string owner, string portFile) {
-        // A log of its own, or each server start would rotate this window's log out of the folder.
-        var arguments = new System.Collections.Generic.List<string> { "--headless", "--log-file", "user://logs/server.log" };
+        var arguments = new System.Collections.Generic.List<string> { "--headless", "--log-file", ServerLog };
         // Outside an exported game the engine needs to be told where the project is.
         if (!OS.HasFeature("template")) arguments.AddRange(["--path", ProjectSettings.GlobalizePath("res://")]);
         arguments.Add("--"); arguments.AddRange(Server.Arguments(slot, owner, portFile));
-        return OS.CreateProcess(OS.GetExecutablePath(), arguments.ToArray());
+        int id = OS.CreateProcess(OS.GetExecutablePath(), arguments.ToArray());
+        if (id >= 0) Net.Log($"Started the server process {id}, which logs to {ProjectSettings.GlobalizePath(ServerLog)}.");
+        return id;
     }
 
     /// <summary>Where the server process this window started says which port it took; the process id keeps two windows' apart.</summary>
@@ -255,11 +260,13 @@ public partial class Game : Node, IGameFlow {
         if (Time.GetTicksMsec() >= launching.Deadline) { GameFailedToStart($"The server didn't start within {ServerStartMsec / 1000} seconds."); return; }
         if (!Godot.FileAccess.FileExists(PortFile) || !int.TryParse(Godot.FileAccess.GetFileAsString(PortFile), out int port)) return;
         DirAccess.RemoveAbsolute(ProjectSettings.GlobalizePath(PortFile));
+        Net.Log($"The server process took port {port}.");
         JoinOwnServer(new Session.Starting(launching.Slot), port);
     }
 
     /// <summary>A server that dies says no goodbye, and the line would take most of a minute to notice.</summary>
     private void ServerDied() {
+        Net.Log("The server process this window started has stopped.");
         net.Abandon();
         if (session is Session.Playing) { startMenu.LeftReason = Net.ServerStopped; ShowStart(); } else GameFailedToStart(Net.ServerStopped);
     }

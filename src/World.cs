@@ -122,7 +122,7 @@ public sealed class Duty {
 }
 public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting, Digging, Underground }
 
-public sealed class Worker {
+public sealed class Worker : IWalker {
     public int Id { get; set; }
     public string Name { get; set; } = "";
     public float X { get; set; }
@@ -158,6 +158,7 @@ public sealed class Worker {
     public float Commute { get; set; }
     [JsonIgnore] public List<Vector2> Route { get; } = new();
     [JsonIgnore] public Vector2 RouteTarget { get; set; } = new(-100, -100);
+    [JsonIgnore] public float RouteRetry { get; set; }
     [JsonIgnore] public WorkerWorkState WorkState { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
 }
@@ -175,7 +176,9 @@ public sealed class TradeOrder {
     /// <summary>Tells carts apart for other machines; zero until <see cref="World.NumberWolvesAndOrders"/>.</summary>
     public int Id { get; set; }
 }
-public sealed class Wolf {
+/// <summary>What a wolf that hunts nobody is doing.</summary>
+public enum WolfMode { Patrol, Called, Home }
+public sealed class Wolf : IWalker {
     public float X { get; set; }
     public float Y { get; set; }
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Health { get; set; } = 4;
@@ -188,6 +191,8 @@ public sealed class Wolf {
     public bool Pinning { get; set; }
     /// <summary>The wolf has growled at the player while closing in; it growls only once.</summary>
     [JsonIgnore] public bool Growled { get; set; }
+    /// <summary>The wolf has broken from a walk into a sprint at the player; it growls once as it does.</summary>
+    [JsonIgnore] public bool Sprinted { get; set; }
     /// <summary>Seconds a chasing wolf keeps following the player into firelight before it gives up; above zero the wolf gallops.</summary>
     public float Chase { get; set; }
     /// <summary>A torch swing toward this wolf made it keep its distance; it lasts while the torch burns.</summary>
@@ -196,8 +201,22 @@ public sealed class Wolf {
     public float Flee { get; set; }
     /// <summary>Seconds left reeling from a hit, knocked back and holding still before it runs or attacks again.</summary>
     public float Stagger { get; set; }
-    /// <summary>Id of the player this wolf hunts; each player draws their own pack.</summary>
+    /// <summary>Id of the player this wolf hunts, or zero while it patrols, answers a howl or heads home.</summary>
     public int Target { get; set; }
+    public WolfMode Mode { get; set; }
+    /// <summary>The way a patrolling wolf walks, in radians; it keeps it until the ground ahead is impassable.</summary>
+    public float Heading { get; set; }
+    /// <summary>Where the howl that called this wolf came from.</summary>
+    public float CallX { get; set; }
+    public float CallY { get; set; }
+    [JsonIgnore] public Vector2 Call { get => new(CallX, CallY); set { CallX = value.X; CallY = value.Y; } }
+    /// <summary>Seconds left howling at a player it smelled; it stands still until it is done.</summary>
+    public float Howl { get; set; }
+    /// <summary>Seconds the current howl lasts in all, the length of its recording.</summary>
+    public float HowlLength { get; set; }
+    [JsonIgnore] public List<Vector2> Route { get; } = new();
+    [JsonIgnore] public Vector2 RouteTarget { get; set; } = new(-100, -100);
+    [JsonIgnore] public float RouteRetry { get; set; }
     /// <summary>Tells wolves apart for other machines; zero until <see cref="World.NumberWolvesAndOrders"/>.</summary>
     public int Id { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(X, Y); set { X = value.X; Y = value.Y; } }
@@ -228,6 +247,10 @@ public sealed class SaveState {
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
     public List<Wolf> Wolves { get; set; } = new();
+    /// <summary>One bit for each of <see cref="World.Dens"/> whose wolves are out tonight.</summary>
+    public int DensOut { get; set; }
+    /// <summary>A wolf has howled tonight.</summary>
+    public bool Howled { get; set; }
     [JsonIgnore] public Inventory Backpack { get => Actor.Backpack; set => Actor.Backpack = value; }
     public Dictionary<string, float> Demand { get; set; } = new();
     /// <summary>Sale prices as last reported by someone arriving from the village, and when that was.</summary>
@@ -292,9 +315,15 @@ public sealed partial class World {
     /// <summary>How far down the valley a worker is, from 0 at the signpost to 1 out of view: running off for prices, or walking home or back over half a trade trip.</summary>
     public float TripLeg(Worker w) => w.Away > 0 ? WalkLeg(Data.TradeSeconds - w.Away, w.Away) : WalkLeg(w.Commute, Data.TradeSeconds / 2);
     public const float LeapSeconds = .4f;
-    // A wolf leaps from within LeapRange and lands PinDistance away, where its jaws reach the throat of the downed player.
+    /// <summary>
+    /// A wolf leaps from within LeapRange and lands this far short of the player's tile, standing over them once they are knocked onto their back.
+    /// Landing short, rather than across the tile, keeps the leap on one bearing from start to finish.
+    /// </summary>
+    public const float PinDistance = .1f;
     private bool packAttack { get => S.Actor.PackAttack; set => S.Actor.PackAttack = value; }
-    private const float LeapRange = 3.5f, PinDistance = 1.45f, FeastSeat = 1.1f, FeastSpeed = 5.5f, ChaseSeconds = 3;
+    private const float LeapRange = 3.5f, FeastSpeed = 5.5f, ChaseSeconds = 3;
+    /// <summary>How far from a downed player's tile each feeding wolf stands.</summary>
+    public const float FeastSeat = 1.1f;
     /// <summary>Minimum reinforced furnace heat: steel only progresses at or above it.</summary>
     public const float SteelHeat = 80;
     /// <summary>Heat as degrees Celsius for display: the steel line sits where steel forms, 1450 °C.</summary>
@@ -307,7 +336,6 @@ public sealed partial class World {
     public static Cliff CliffOf(ThingKind ore) => Cliffs.First(c => c.Ore == ore);
     private float gatherClock { get => S.Actor.GatherClock; set => S.Actor.GatherClock = value; }
     private float attackClock { get => S.Actor.AttackClock; set => S.Actor.AttackClock = value; }
-    private float nightSpawn { get => S.Actor.NightSpawn; set => S.Actor.NightSpawn = value; }
     private bool asleep;
     // Furnaces whose batch finished on the previous tick: starting the next batch keeps the fire going rather than lighting it.
     private readonly HashSet<int> stillBurning = new();
@@ -333,7 +361,7 @@ public sealed partial class World {
     public float Moonlight => (1 + MathF.Cos(MathF.Tau * S.Time / Data.DaySeconds / Data.MoonCycleDays)) / 2;
     /// <summary>Clock hour, with the day starting at 06:00.</summary>
     public float Hour => (DayPhase * 24 + 6) % 24;
-    /// <summary>From the first fading light until dawn; workers are off duty.</summary>
+    /// <summary>From the first fading light until dawn; workers are off duty and wolves hunt.</summary>
     public bool Dusk => DayPhase >= Data.DuskStarts;
     public bool Lunch => Hour >= Data.LunchHour && Hour < Data.LunchHour + 1;
     /// <summary>On the map and neither signed out nor at lunch.</summary>
@@ -487,13 +515,22 @@ public sealed partial class World {
         }
         for (int placed = 0, tried = 0; placed < count && tried < tries; tried++) {
             var p = new Vector2(rng.Next(3, Terrain.Size - 3), rng.Next(3, Terrain.Size - 3));
-            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InSpur(p, 2.5f)) continue;
+            if (p.DistanceTo(Terrain.Spawn) < clearing || !Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 3.5f) || Cliffs.Any(c => c.DistanceTo(p) < Cliff.Depth + 2.5f) || InSpur(p, 2.5f) || NearDen(p, 5)) continue;
             if (rng.NextDouble() > chance(p) || Crowded(p)) continue;
             var t = Add(kind, p, remaining); placed++;
             if (!near.TryGetValue(Cell(p), out var cellList)) near[Cell(p)] = cellList = new();
             cellList.Add(t);
         }
     }
+    /// <summary>Where a step of <paramref name="delta"/> from <paramref name="from"/> ends on ground a player can stand on, sliding along whatever blocks it.</summary>
+    public Vector2 Slide(Vector2 from, Vector2 delta) {
+        if (CanStand(from + delta)) return from + delta;
+        var p = from;
+        if (CanStand(p + new Vector2(delta.X, 0))) p += new Vector2(delta.X, 0);
+        if (CanStand(p + new Vector2(0, delta.Y))) p += new Vector2(0, delta.Y);
+        return p;
+    }
+    /// <summary>Whether a player, worker or wolf can stand on a spot: walkable ground with nothing built in the way.</summary>
     public bool CanStand(Vector2 p) {
         if (!Open(p)) return false;
         foreach (var kind in Blockers) foreach (var t in S.Things.Of(kind)) if (Blocks(t, p)) return false;
@@ -569,9 +606,7 @@ public sealed partial class World {
         if (Downed || S.Sheltered != 0) return;
         if (delta == Vector2.Zero) return;
         playerBusy = true;
-        var p = Player + delta;
-        if (CanStand(p)) Player = p;
-        else { if (CanStand(Player + new Vector2(delta.X, 0))) Player += new Vector2(delta.X, 0); if (CanStand(Player + new Vector2(0, delta.Y))) Player += new Vector2(0, delta.Y); }
+        Player = Slide(Player, delta);
     }
     public string? GatherBlock(Thing t, bool worker = false) {
         if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == "water") return "Your bottles are filled.";
@@ -648,6 +683,7 @@ public sealed partial class World {
         if (!crate && !Data.Buildings.ContainsKey(kind)) return "Unknown building.";
         if (Downed) return "You are still recovering.";
         if (S.Sheltered != 0) return "Leave the cabin first.";
+        if (NearDen(p, Den.Clearance)) return "Leave the wolf den's mouth clear.";
         if (kind == ThingKind.Mine) return MineBlock(p);
         if (IsZone(kind)) return ZoneBlock(kind, p);
         if (Player.DistanceTo(p) > 5.5f) return "Build within 5 tiles of yourself.";
@@ -972,11 +1008,12 @@ public sealed partial class World {
             foreach (var w in S.Wolves.Where(w => w.Pos.DistanceTo(Player) < ScareRange && (w.Pos - Player).Normalized().Dot(direction) > .7f)) w.Scared = true;
     }
     public const float StaggerSeconds = .45f;
-    /// <summary>Throws a struck wolf back from the player; the view slides it there over the stagger.</summary>
-    private void KnockBack(Wolf wolf) { wolf.Pos += (wolf.Pos - Player).Normalized() * 1.2f; wolf.Stagger = StaggerSeconds; }
-    /// <summary>Leaves a carcass where a struck wolf fell, within the map.</summary>
+    /// <summary>How far a blow throws a wolf back: a short hop, which the view plays as the wolf jumping clear.</summary>
+    public const float KnockBackDistance = .5f;
+    private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; }
+    /// <summary>Leaves a carcass where a struck wolf fell.</summary>
     private void KillWolf(Wolf wolf) {
-        S.Wolves.Remove(wolf); Add(ThingKind.WolfCorpse, wolf.Pos.Clamp(Vector2.One * 2, Vector2.One * (Terrain.Size - 3)), WolfMeat);
+        S.Wolves.Remove(wolf); Add(ThingKind.WolfCorpse, wolf.Pos, WolfMeat);
         Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
     }
     private void PutOutTorch() {
@@ -998,9 +1035,10 @@ public sealed partial class World {
         }
     }
     public void Die() {
-        // After a mauling the box lands past the feet, away from the wolf at the throat, so the feeding stays visible.
+        // After a mauling the box lands past the feet, behind the wolf standing over the player, so the feeding stays visible.
+        // The player falls backwards facing the wolf that leapt, so the feet point back the way it came.
         var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
-        var box = Add(ThingKind.Grave, killer == null ? Player : Player + (Player - killer.Pos).Normalized() * 1.5f); box.Inventory = S.Backpack;
+        var box = Add(ThingKind.Grave, killer == null ? Player : Player + (killer.Pos - Player).Normalized() * 1.5f); box.Inventory = S.Backpack;
         S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
         if (S.Mauled) {
             // The pack eats every scrap of food and stays to feed until the player respawns.
@@ -1099,12 +1137,9 @@ public sealed partial class World {
         foreach (var t in S.Things.Of(ThingKind.Signpost)) if (t.Wages != null) amount -= t.Wages.Remove(Inventory.Coins, amount);
         return Pay(amount);
     }
-    /// <summary>The village only takes packed crates holding nothing but goods it buys.</summary>
-    public bool CanSell(string item) {
-        if (Packed(item) is not { Count: > 0 } contents) return false;
-        foreach (var pair in contents.Items) if (!Data.Market.Sells.ContainsKey(pair.Key)) return false;
-        return true;
-    }
+    /// <summary>The village takes any packed crate that holds something; goods it does not buy go as donations.</summary>
+    public bool CanSell(string item) => Packed(item) is { Count: > 0 };
+    private bool VillageBuys(string item) => Data.Market.Sells.ContainsKey(item);
     /// <summary>The sale price as last reported from the village; it goes stale until someone arrives with news.</summary>
     public float KnownPrice(string item) => S.Prices.TryGetValue(item, out float price) ? price : Data.Items[item].Price;
     public int PriceAge => Day - (int)(S.PricesTime / Data.DaySeconds) - 1;
@@ -1117,7 +1152,7 @@ public sealed partial class World {
         if (CartBlock(sign) is string blocked) { Say(blocked); return false; }
         if (Forwarded(Verb.Sell, sign.Id)) return true;
         if (Ship(sign)) return true;
-        Say(sign.Inventory.Count > 0 ? "The village only takes crates packed with goods it buys." : "Put a packed crate in the market first."); return false;
+        Say(sign.Inventory.Count > 0 ? "The village only takes packed crates." : "Put a packed crate in the market first."); return false;
     }
     /// <summary>Sends the cart once every market slot holds a crate, for a post set to sell on its own.</summary>
     private void AutoSell(Thing sign) {
@@ -1139,6 +1174,7 @@ public sealed partial class World {
         // The crates go with the goods.
         float price = crates.Count * Data.Items["crate"].Price;
         foreach (var (item, quantity) in goods) {
+            if (!VillageBuys(item)) continue;
             // A sale lowers demand unit by unit, so a bulk sale is not paid entirely at the pre-sale price.
             float demand = Demand(item);
             for (int i = 0; i < quantity; i++) { price += Data.Items[item].Price * Math.Min(1, demand); demand = Math.Max(.25f, demand - DemandStep(item)); }
@@ -1146,9 +1182,9 @@ public sealed partial class World {
         }
         // Coins are whole: sales round down and purchases round up, so a round trip never profits.
         S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count });
-        Say($"Goods sold: {string.Join(", ", goods.Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;
+        Say($"Goods sent: {string.Join(", ", goods.Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;
     }
-    private string Goods(IReadOnlyDictionary<string, int> goods) => string.Join(", ", goods.Select(p => $"{p.Value} {Data.Name(p.Key)}"));
+    private string Goods(IEnumerable<KeyValuePair<string, int>> goods) => string.Join(", ", goods.Select(p => $"{p.Value} {Data.Name(p.Key)}"));
     /// <summary>Orders <paramref name="lots"/> purchases of a good the village sells: tools one by one, the rest in crates.</summary>
     public bool Buy(Thing sign, string item, int lots) {
         if (!Data.Market.Buys.ContainsKey(item) || lots <= 0) return false;
@@ -1411,7 +1447,7 @@ public sealed partial class World {
         HoldRefusal.CompostOnly => "The compost takes leaves, grass and food.",
         HoldRefusal.OtherResource => $"This pile holds {Data.Name(HeldOtherThan(t.Inventory, item)!)}. Empty it to store something else.",
         HoldRefusal.PackerOnly => t.Packs == "" ? "Choose what to pack first." : $"The packing station takes {Data.Name(t.Packs).ToLowerInvariant()} and empty crates.",
-        HoldRefusal.SellOnly => "The village only takes crates packed with goods it buys.",
+        HoldRefusal.SellOnly => "The village only takes packed crates.",
         HoldRefusal.FarmOnly => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}.",
         _ => null
     };
@@ -1511,6 +1547,20 @@ public sealed partial class World {
     private static int RouteIndex(Vector2I p) => p.Y * Terrain.Size + p.X;
     private static bool OnMap(Vector2I p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size;
     /// <summary>Appends the tiles from <paramref name="from"/> to within reach of <paramref name="destination"/> to <paramref name="route"/>, or nothing when there is no way.</summary>
+    private const float RouteRetrySeconds = 1;
+    private static readonly float[] Swerves = { 0, MathF.PI / 4, -MathF.PI / 4, MathF.PI / 2, -MathF.PI / 2 };
+    /// <summary>
+    /// A step toward <paramref name="to"/> on ground a player can stand on.
+    /// A route runs between open tiles, so its straight legs can clip the shore or something built: the step then swerves round it, or holds still.
+    /// A walker already on blocked ground, such as one built over, may step anywhere to get out.
+    /// </summary>
+    private Vector2 StepAround(Vector2 from, Vector2 to, float step) {
+        var ahead = from.MoveToward(to, step);
+        if (ahead == from || !CanStand(from)) return ahead;
+        var heading = ahead - from;
+        foreach (float swerve in Swerves) if (CanStand(from + heading.Rotated(swerve))) return from + heading.Rotated(swerve);
+        return from;
+    }
     private void FindRoute(Vector2 from, Vector2 destination, List<Vector2> route) {
         routeSeen ??= new int[Terrain.Size * Terrain.Size]; routeFrom ??= new int[Terrain.Size * Terrain.Size];
         int search = ++routeSearch;
@@ -1542,17 +1592,31 @@ public sealed partial class World {
     private bool Walk(Worker w, Vector2 destination, float dt, float reach = 1.2f) {
         float distance = w.Pos.DistanceTo(destination);
         if (distance < reach) return true;
-        if (w.RouteTarget.DistanceTo(destination) > .2f) { w.Route.Clear(); w.RouteTarget = destination; }
         // Stop at arrival range rather than overshooting into the target's footprint, where the step would be refused.
-        var next = w.Pos.MoveToward(destination, Math.Min(dt * WorkerSpeed, distance - reach + .05f));
-        if (w.Route.Count == 0 && CanStand(next)) { w.Pos = next; return false; }
-        if (w.Route.Count > 0 && !CanStand(w.Route[0])) w.Route.Clear();
-        if (w.Route.Count == 0) FindRoute(w.Pos, destination, w.Route);
-        if (w.Route.Count == 0 && distance < 1.2f) return true;
-        if (w.Route.Count == 0) { w.Status = "Path blocked · clear a route"; w.WorkState = WorkerWorkState.Blocked; return false; }
-        w.Pos = w.Pos.MoveToward(w.Route[0], dt * WorkerSpeed);
-        if (w.Pos.DistanceTo(w.Route[0]) < .06f) w.Route.RemoveAt(0);
+        if (Travel(w, destination, Math.Min(dt * WorkerSpeed, distance - reach + .05f), dt * WorkerSpeed)) return false;
+        if (distance < 1.2f) return true;
+        w.Status = "Path blocked · clear a route"; w.WorkState = WorkerWorkState.Blocked;
         return false;
+    }
+    /// <summary>
+    /// Moves a walker toward <paramref name="destination"/> over ground a player can stand on: up to <paramref name="direct"/> straight at it while that way is clear,
+    /// otherwise <paramref name="step"/> along a route around what blocks it, found again once the destination has moved more than <paramref name="repath"/>.
+    /// False when no way leads there.
+    /// </summary>
+    private bool Travel(IWalker walker, Vector2 destination, float direct, float step, float repath = .2f) {
+        if (walker.RouteTarget.DistanceTo(destination) > repath) { walker.Route.Clear(); walker.RouteTarget = destination; walker.RouteRetry = 0; }
+        var next = walker.Pos.MoveToward(destination, direct);
+        if (walker.Route.Count == 0 && CanStand(next)) { walker.Pos = next; return true; }
+        if (walker.Route.Count > 0 && !CanStand(walker.Route[0])) walker.Route.Clear();
+        // A search covers the whole map when no way leads there, so a failed one waits a while before the next.
+        if (walker.Route.Count == 0 && S.Time >= walker.RouteRetry) {
+            FindRoute(walker.Pos, destination, walker.Route);
+            if (walker.Route.Count == 0) walker.RouteRetry = S.Time + RouteRetrySeconds;
+        }
+        if (walker.Route.Count == 0) return false;
+        walker.Pos = StepAround(walker.Pos, walker.Route[0], step);
+        if (walker.Pos.DistanceTo(walker.Route[0]) < .06f) walker.Route.RemoveAt(0);
+        return true;
     }
     private void WorkerTick(Worker w, float dt) {
         w.WorkState = WorkerWorkState.Idle;
@@ -1932,13 +1996,18 @@ public sealed partial class World {
             delivery.Inventory.Slots = overflow / delivery.Inventory.StackOf(item) + 1;
             delivery.Inventory.Add(item, overflow);
         }
-        if (!order.Buying) S.Milestones.Add("sold");
-        if (!order.Buying && order.Goods.Keys.Any(id => id.StartsWith("steel_") && Data.Items[id].Tool != "")) S.Milestones.Add("sold_steel");
+        if (!order.Buying) {
+            var bought = order.Goods.Keys.Where(VillageBuys).ToList();
+            if (bought.Count > 0) S.Milestones.Add("sold");
+            if (bought.Any(id => id.StartsWith("steel_") && Data.Items[id].Tool != "")) S.Milestones.Add("sold_steel");
+        }
         if (order.Buying && order.Goods.Keys.Any(id => Data.Items[id].Tool == "pickaxe")) S.Milestones.Add("pick");
         // Played at the player, not the signpost, so a payment is heard wherever the player is.
         if (!order.Buying) { Play("payment_from_village_arrives", Player); S.DayRevenue += (int)order.Value; }
         S.Orders.Remove(order); UpdatePrices();
-        Say(order.Buying ? $"Cart returned with {Goods(order.Goods)}." : $"Cart returned with {(int)order.Value} coins.");
+        if (order.Buying) { Say($"Cart returned with {Goods(order.Goods)}."); return; }
+        var donated = order.Goods.Where(p => !VillageBuys(p.Key)).ToList();
+        Say($"Cart returned with {(int)order.Value} coins.{(donated.Count > 0 ? $" Donated {Goods(donated)}." : "")}");
     }
     /// <summary>
     /// Advances the world. It runs as the world's own player, whoever's action started it, such as a guest's sleep:
@@ -1950,7 +2019,8 @@ public sealed partial class World {
         everyone = true;
         S.Time += dt;
         if (!sleeping) S.PlaySeconds += dt;
-        foreach (var wolf in S.Wolves) if (PlayerById(wolf.Target) == null) wolf.Target = NearestPlayer(wolf.Pos).Id;
+        // A wolf whose player left the game goes back to patrolling.
+        foreach (var wolf in S.Wolves) if (wolf.Target != 0 && PlayerById(wolf.Target) == null) Patrol(wolf, wolf.Heading);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) NeedsTick(dt);
         if (Day > S.WageDay) {
@@ -2007,12 +2077,11 @@ public sealed partial class World {
                 if (CanStand(b.Pos - push)) b.Pos -= push;
             }
         }
-        if (!Night) S.Wolves.Clear();
+        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.Howled = false; } else if (!sleeping) TickDens(dt);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
             using (ActAs(p)) {
-                if (!Night) {
-                    nightSpawn = 0;
+                if (!Dusk) {
                     if (!Dead) S.Mauled = false;
                 } else if (!sleeping) {
                     hunting.Clear();
@@ -2068,11 +2137,6 @@ public sealed partial class World {
     public PlayerState? PlayerById(int id) {
         foreach (var p in S.Players) if (p.Id == id) return p;
         return null;
-    }
-    private PlayerState NearestPlayer(Vector2 at) {
-        PlayerState nearest = S.Players[0];
-        foreach (var p in S.Players) if (p.Pos.DistanceSquaredTo(at) < nearest.Pos.DistanceSquaredTo(at)) nearest = p;
-        return nearest;
     }
     private static readonly Comparison<Worker> ById = (a, b) => a.Id.CompareTo(b.Id);
     private bool Crewed(Thing t) {
@@ -2131,40 +2195,30 @@ public sealed partial class World {
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size && S.Explored[(int)p.Y * Terrain.Size + (int)p.X] != 0;
     /// <summary>Moves the pack hunting the acting player.</summary>
     private void TickWolves(float dt, List<Wolf> hunters) {
-        if (!Dead) {
-            nightSpawn -= dt;
-            // A torch draws the whole pack in, but slowly.
-            if (nightSpawn <= 0 && hunters.Count < (S.TorchLit ? 6 : Math.Min(6, 2 + Day))) {
-                nightSpawn = S.TorchLit ? 25 : 15; float angle = S.Time * 2.4f;
-                // Wolves come out of the woods, never the sea or the mountains, and just beyond every player's sight, so none appears on screen.
-                // Without such a spot this time, the wolf comes on a later try.
-                var p = Player;
-                for (int turn = 0; turn < 24 && p == Player; turn++) {
-                    var at = Player + new Vector2(MathF.Cos(angle + turn * .52f), MathF.Sin(angle + turn * .52f)) * (Data.SightRadius + 2 + turn / 12 * 4);
-                    if (Open(at) && Unseen(at)) p = at;
-                }
-                if (p != Player) {
-                    var wolf = new Wolf { Pos = p, Health = 4 + Day * .4f, Target = S.Actor.Id }; S.Wolves.Add(wolf); hunters.Add(wolf);
-                    Play("wolf_growl_distance", p);
-                } else nightSpawn = 1;
-            }
+        // A wolf that let go, such as one heading home before dawn, frees the player it pinned.
+        if (S.Mauled && !Dead && !AnyPinning(hunters)) S.Mauled = false;
+        // A sheltered player is out of reach and out of smell: the pack gives up at once and patrols on away from the cabin.
+        if (S.Sheltered != 0) {
+            foreach (var wolf in hunters) Patrol(wolf, AwayFromPlayer(wolf).Angle());
+            return;
         }
-        bool lit = Protected(Player), inside = S.Sheltered != 0;
+        bool lit = Protected(Player);
         // Behind a torch a lone wolf creeps in until a swing scares it off; once the pack is complete they attack together.
         bool torch = Torchlit, pack = torch && PackAround >= PackSize, wary = torch && !pack;
         if (pack && !packAttack) Say("The pack has you surrounded. They attack!");
         packAttack = pack;
         // A wounded player away from fire and shelter invites a leap for the throat.
-        if (!Downed && S.Health <= 50 && !lit && !inside && !wary && !AnyLeaping(hunters)) {
+        if (!Downed && S.Health <= 50 && !lit && !wary && !AnyLeaping(hunters)) {
             Wolf? hunter = null;
             foreach (var w in hunters)
-                if (!Protected(w.Pos) && w.Flee <= 0 && w.Stagger <= 0 && w.Pos.DistanceTo(Player) < LeapRange && (hunter == null || w.Pos.DistanceTo(Player) < hunter.Pos.DistanceTo(Player))) hunter = w;
+                if (!Protected(w.Pos) && w.Howl <= 0 && w.Flee <= 0 && w.Stagger <= 0 && w.Pos.DistanceTo(Player) < LeapRange && (hunter == null || w.Pos.DistanceTo(Player) < hunter.Pos.DistanceTo(Player))) hunter = w;
             if (hunter != null) { hunter.Leap = LeapSeconds; Say("A wolf leaps for your throat!"); }
         }
-        // Stalking and backing off speed up a little each day; a chase always outpaces a walk but not a sprint.
-        float speed = Math.Min(3.8f, 3 + Day * .1f), chase = Data.WalkSpeed * Data.WolfChase;
+        // A chase always outpaces a walk but not a sprint.
+        float speed = WolfTrot, chase = Data.WalkSpeed * Data.WolfChase;
         foreach (var wolf in hunters) {
             wolf.Attack -= dt;
+            if (wolf.Howl > 0) { wolf.Howl = Math.Max(0, wolf.Howl - dt); continue; }
             if (wolf.Leap > 0) {
                 // Closing the remaining gap evenly makes every leap last LeapSeconds.
                 var landing = Player + (wolf.Pos - Player).Normalized() * PinDistance;
@@ -2180,37 +2234,38 @@ public sealed partial class World {
                 wolf.Stagger = Math.Max(0, wolf.Stagger - dt); wolf.Chase = 0;
             } else if (wolf.Flee > 0) {
                 wolf.Flee -= dt; wolf.Chase = 0;
-                wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + AwayFromPlayer(wolf) * 3, dt * speed);
+                wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * speed);
             } else if (wary && wolf.Scared) {
                 // Each scared wolf keeps its bearing at the edge of the torchlight, so a growing pack surrounds the player.
                 wolf.Chase = 0;
                 var away = AwayFromPlayer(wolf);
-                wolf.Pos = wolf.Pos.MoveToward(Player + away * StalkDistance, dt * speed * .6f);
+                wolf.Pos = Slide(wolf.Pos, (Player + away * StalkDistance - wolf.Pos).LimitLength(dt * speed * .6f));
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
             } else if (wary) {
                 wolf.Chase = 0;
-                wolf.Pos = wolf.Pos.MoveToward(Player, dt * speed * .35f);
+                Travel(wolf, Player, dt * speed * .35f, dt * speed * .35f, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
-            }
-              // A wolf already on the player's heels follows briefly into firelight, but backs off from a cabin at once.
-              else if (inside || (lit || Protected(wolf.Pos)) && wolf.Chase <= 0) { wolf.Chase = 0; wolf.Pos = wolf.Pos.MoveToward(wolf.Pos + AwayFromPlayer(wolf) * 3, dt * 3); } else {
-                wolf.Chase = lit || Protected(wolf.Pos) ? wolf.Chase - dt : ChaseSeconds;
-                wolf.Pos = wolf.Pos.MoveToward(Player, dt * chase);
+            } else if ((lit || Protected(wolf.Pos)) is var safe && safe && wolf.Chase <= 0) {
+                // Firelight turns a wolf back, unless it is already on the player's heels: then it follows in briefly.
+                wolf.Chase = 0; wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * 3);
+            } else if (wolf.Chase <= 0 && wolf.Pos.DistanceTo(Player) > Data.WolfSightRange) {
+                // Out of the light a wolf closes in unseen, then sprints once it is near enough to see the player.
+                Travel(wolf, Player, dt * speed, dt * speed, RouteSlack);
+            } else {
+                if (!wolf.Sprinted && !safe) { wolf.Sprinted = true; Play("wolf_growl_distance", wolf.Pos); }
+                wolf.Chase = safe ? wolf.Chase - dt : ChaseSeconds;
+                Travel(wolf, Player, dt * chase, dt * chase, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
                 if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
             }
         }
-        // A sheltered player's pack gives up once it has backed out of sight, instead of waiting at the cabin.
-        if (inside)
-            for (int i = hunters.Count - 1; i >= 0; i--)
-                if (hunters[i].Pos.DistanceTo(Player) > Data.SightRadius) { S.Wolves.Remove(hunters[i]); hunters.RemoveAt(i); }
         // Feeding wolves crowd around the player without stacking on one spot.
         for (int i = 0; i < hunters.Count; i++) for (int j = i + 1; j < hunters.Count; j++) {
             var a = hunters[i]; var b = hunters[j]; var offset = a.Pos - b.Pos;
             if (a.Leap > 0 || b.Leap > 0 || offset.LengthSquared() >= .5f) continue;
             var push = (offset.LengthSquared() > .001f ? offset.Normalized() : Vector2.Right) * Math.Min(dt, .08f);
-            a.Pos += push; b.Pos -= push;
+            a.Pos = Slide(a.Pos, push); b.Pos = Slide(b.Pos, -push);
         }
         if (S.Mauled && !Dead) {
             int feeding = 0;
@@ -2220,12 +2275,17 @@ public sealed partial class World {
     }
     /// <summary>The way a wolf backs off; one standing right on the player still has somewhere to go.</summary>
     private Vector2 AwayFromPlayer(Wolf wolf) => wolf.Pos == Player ? Vector2.Right : (wolf.Pos - Player).Normalized();
+    /// <summary>Whether no player can see a spot.</summary>
     private bool Unseen(Vector2 p) {
         foreach (var player in S.Players) if (player.Pos.DistanceTo(p) <= Data.SightRadius) return false;
         return true;
     }
     private static bool AnyLeaping(List<Wolf> wolves) {
         foreach (var w in wolves) if (w.Leap > 0) return true;
+        return false;
+    }
+    private static bool AnyPinning(List<Wolf> wolves) {
+        foreach (var w in wolves) if (w.Pinning) return true;
         return false;
     }
     private static readonly string[] Milestones = {
@@ -2240,7 +2300,7 @@ public sealed partial class World {
     public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
     public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch {
         0 => ("Carry fresh water", "Collect water around the pond shore. It holds three sips and stays with you when empty; without a bottle, drink at the source."),
-        1 => ("A safe place", "Gather wood and stone, then build a cabin before night. Step inside to shelter from wolves."),
+        1 => ("A safe place", "Gather wood and stone, then build a cabin before dusk. Step inside to shelter from wolves."),
         2 => ("Keep the fire lit", "Build and light a campfire. Firelight keeps wolves away; feed it wood to keep it burning."),
         3 => ("Gather by hand", "You start with a steel axe. Hold right mouse on trees to fell them; gather stone and berries by hand."),
         4 => ("A workbench", "Press C to craft. Knap a stone chisel from 2 stone, carve planks, then build a crafting bench: 10 planks."),

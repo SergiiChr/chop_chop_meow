@@ -51,7 +51,7 @@ public sealed class PlayerState {
     public int Shirt { get; set; }
     [JsonIgnore] public Vector2 Pos { get => new(PlayerX, PlayerY); set { PlayerX = value.X; PlayerY = value.Y; } }
     // Only the host's simulation uses these.
-    internal float GatherClock, AttackClock, NightSpawn;
+    internal float GatherClock, AttackClock;
     /// <summary>Seconds since the player last moved or gathered; hand crafting only goes on while they stand still.</summary>
     internal float Still;
     internal bool Busy, PackAttack;

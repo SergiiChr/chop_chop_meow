@@ -6,13 +6,17 @@ namespace ChopChopMeow;
 
 /// <summary>A continuous cave outcrop, rooted below the mountain surface instead of capped as a separate mound.</summary>
 internal static class MineRockShape {
-    private static readonly Dictionary<Cliff, ArrayMesh> meshes = new();
+    private static readonly Dictionary<(Cliff, float), ArrayMesh> meshes = new();
     public static readonly StandardMaterial3D Rock = ModelKit.Vertex(Surface.Stone, .95f);
 
-    public static Mesh Mesh(Cliff cliff, string[] palette) {
-        if (meshes.TryGetValue(cliff, out var mesh)) return mesh;
+    /// <summary>
+    /// The outcrop around a cliff's mine spot, to be shown at <paramref name="scale"/>: a smaller one still sinks into the mountain where it stands.
+    /// </summary>
+    public static Mesh Mesh(Cliff cliff, string[] palette, float scale = 1) {
+        if (meshes.TryGetValue((cliff, scale), out var mesh)) return mesh;
         var spot = World.MineSpot(cliff); var outwards = cliff.Face; var across = new Vector2(outwards.Y, -outwards.X);
-        Vector2 WorldPoint(float x, float z) => spot + across * x + outwards * z;
+        Vector2 WorldPoint(float x, float z) => spot + (across * x + outwards * z) * scale;
+        float Ground(float x, float z) => MountainShape.Surface(WorldPoint(x, z)) / scale;
         float root = -7;
         while (root > -32 && (Terrain.FromMountains(WorldPoint(-4.6f, root)) > -6 || Terrain.FromMountains(WorldPoint(0, root)) > -6 || Terrain.FromMountains(WorldPoint(4.6f, root)) > -6)) root -= 1;
         float[] depth = { WorldModels.MineDoor - .08f, -4.2f, -6, root };
@@ -30,7 +34,7 @@ internal static class MineRockShape {
             for (int i = 0; i < section.Length; i++) {
                 float edge = i == 0 || i == section.Length - 1 ? 0 : Hash(cliff, row, i);
                 float x = section[i].X * width[row] + edge * (row == 0 ? .08f : .22f);
-                float ground = MountainShape.Surface(WorldPoint(x, depth[row]));
+                float ground = Ground(x, depth[row]);
                 float y = row == 3 ? Math.Min(section[i].Y * 4.3f, ground - .8f) : i == 0 || i == section.Length - 1 ? -.12f : section[i].Y * crown[row] + edge * (row == 0 ? .08f : .34f);
                 y = Math.Min(4.3f, y);
                 float z = depth[row] + (row == 3 ? 0 : edge * (row == 0 ? .22f : .3f));
@@ -110,11 +114,11 @@ internal static class MineRockShape {
             float side = (i % 2 == 0 ? -1 : 1), x = side * (3.1f + (i % 3) * .58f);
             float z = depth[0] + .35f + (i / 2) * .28f;
             float rx = .22f + Math.Abs(Hash(cliff, 7, i)) * .2f, ry = .2f + Math.Abs(Hash(cliff, 8, i)) * .16f;
-            float y = MountainShape.Surface(WorldPoint(x, z)) - ry * .28f;
+            float y = Ground(x, z) - ry * .28f;
             if (y + ry > 4.3f) continue;
             AddAngularRock(new(x, y, z), rx, ry, rx * .78f, 10 + i, 10 + i, .9f);
         }
-        return meshes[cliff] = s.Commit();
+        return meshes[(cliff, scale)] = s.Commit();
     }
 
     private static float Hash(Cliff cliff, int row, int point) {

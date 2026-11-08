@@ -6,6 +6,7 @@ namespace ChopChopMeow;
 public enum ActorAction {
     Idle,
     Walk,
+    Jog,
     Run,
     Chop,
     Mine,
@@ -46,6 +47,7 @@ public readonly record struct Pose(
     float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Hips = 0, float Sway = 0, float FootL = 0, float FootR = 0, float Splay = 0) {
     /// <summary>Blends two poses; set hips blend by how far they sit above or below a standing foot, so a foot on or above the ground in both poses stays there.</summary>
     public static Pose Lerp(Pose a, Pose b, float t) {
+        if (t <= 0) return a;
         var blend = new Pose(
             Mathf.Lerp(a.Lean, b.Lean, t), Mathf.Lerp(a.Twist, b.Twist, t), Mathf.Lerp(a.Head, b.Head, t),
             Mathf.Lerp(a.RaiseL, b.RaiseL, t), Mathf.Lerp(a.OutL, b.OutL, t), Mathf.Lerp(a.ElbowL, b.ElbowL, t),
@@ -68,8 +70,9 @@ public static class ActorAnimation {
     /// <summary>Seconds per loop; player action pulses last exactly one loop.</summary>
     public static float Duration(ActorAction action) => action switch {
         ActorAction.Idle => 3,
-        ActorAction.Walk or ActorAction.Carry => .8f,
-        ActorAction.Run => RunCycle,
+        ActorAction.Walk or ActorAction.Carry => WalkCycle,
+        ActorAction.Jog => Jogging.Cycle,
+        ActorAction.Run => Sprinting.Cycle,
         ActorAction.SteelChop or ActorAction.SteelMine => .8f,
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
@@ -86,9 +89,20 @@ public static class ActorAnimation {
         _ => 1
     };
 
-    /// <summary>How far an action's clock moves on: a run's by the ground covered, so its planted feet keep their place, and the rest by the time passed.</summary>
+    /// <summary>How far an action's clock moves on: a walk's, jog's or run's by the ground covered, so its planted feet keep their place, and the rest by the time passed.</summary>
     public static float Advance(ActorAction action, float seconds, float metres) =>
-        action == ActorAction.Run ? metres / RunStride * Duration(action) : seconds;
+        Stride(action) > 0 ? metres / Stride(action) * Duration(action) : seconds;
+
+    /// <summary>Seconds into a swing at which it lands: the punch at full stretch, the torch crossing in front, or the axe at the bottom of its stroke; zero for anything else.</summary>
+    public static float Contact(ActorAction action) => action switch {
+        ActorAction.Attack => .32f * Duration(action),
+        ActorAction.TorchSwing => .3f * Duration(action),
+        ActorAction.Chop or ActorAction.SteelChop => .5f * Duration(action),
+        _ => 0
+    };
+
+    /// <summary>Seconds left until a swing with <paramref name="remaining"/> seconds still to play lands; zero once it has.</summary>
+    public static float UntilContact(ActorAction action, float remaining) => Math.Max(0, Contact(action) - (Duration(action) - remaining));
 
     /// <summary>Position within the current loop, from 0 inclusive to 1 exclusive.</summary>
     public static float Phase(ActorAction action, float elapsed) {
@@ -118,19 +132,19 @@ public static class ActorAnimation {
 
     public static Pose PoseAt(ActorAction action, float elapsed, bool moving) {
         if (moving && SwingsOnTheMove(action)) {
-            var legs = PoseAt(ActorAction.Walk, elapsed, true);
-            return PoseAt(action, elapsed, false) with { SwingL = legs.SwingL, KneeL = legs.KneeL, SwingR = legs.SwingR, KneeR = legs.KneeR, Sway = legs.Sway };
+            // The swing keeps its own clock, which keeps the jog's pace at the player's speed.
+            var legs = PoseAt(ActorAction.Jog, elapsed, true);
+            return PoseAt(action, elapsed, false) with { SwingL = legs.SwingL, KneeL = legs.KneeL, FootL = legs.FootL, SwingR = legs.SwingR, KneeR = legs.KneeR, FootR = legs.FootR, Sway = legs.Sway, Hips = legs.Hips, Splay = legs.Splay };
         }
         float p = Phase(action, elapsed);
         float wave = MathF.Sin(p * Mathf.Tau);
         switch (action) {
             case ActorAction.Walk:
-                // Loose arms trail the legs a little and fold at the elbow as they come forward; the shoulders turn with them.
-                float arm = MathF.Sin((p - .06f) * Mathf.Tau);
-                var loose = Stride(wave, p) with { Twist = wave * 7, RaiseL = 4 - arm * 30, OutL = 9 + Math.Max(0, arm) * 4, ElbowL = 14 + Math.Max(0, -arm) * 28 };
-                return loose with { RaiseR = 4 + arm * 30, OutR = 9 + Math.Max(0, -arm) * 4, ElbowR = 14 + Math.Max(0, arm) * 28 };
+                return Walk(p);
+            case ActorAction.Jog:
+                return Run(Jogging, p);
             case ActorAction.Run:
-                return Run(p);
+                return Run(Sprinting, p);
             case ActorAction.Craft: {
                     // Squatting on the heels, leaning over the work in both hands, which keep turning and fitting it.
                     float a = MathF.Sin(p * Mathf.Tau * 3), b = MathF.Sin(p * Mathf.Tau * 2 + 1.3f), c = MathF.Sin(p * Mathf.Tau * 5 + .4f);
@@ -140,7 +154,7 @@ public static class ActorAnimation {
                 }
             case ActorAction.Carry:
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
-                return moving ? Stride(wave, p) with { Lean = carry.Lean, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
+                return moving ? Walk(p) with { Lean = carry.Lean, Head = -carry.Lean / 2, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
             case ActorAction.Chop or ActorAction.SteelChop:
                 var ready = Stance with { Lean = 6, RaiseL = 50, OutL = -24, ElbowL = 35, RaiseR = 55, OutR = -16, ElbowR = 25 };
                 return Keys(p, (0, ready),
@@ -240,27 +254,22 @@ public static class ActorAnimation {
         }
     }
 
-    /// <summary>
-    /// The legs of a walk: the torso tips over the planted leg and dips forward at each step.
-    /// The planted knee gives a little as the foot takes the weight and straightens to push off; the other folds to swing through.
-    /// </summary>
-    private static Pose Stride(float wave, float phase) {
-        float lift = MathF.Cos(phase * Mathf.Tau), step = MathF.Cos(phase * Mathf.Tau * 2);
-        return new Pose(Lean: 5 + step * 1.5f, Head: -step * 1.5f, Sway: lift * 3.5f,
-            SwingL: wave * 30, SwingR: -wave * 30, KneeL: WalkKnee(phase - .25f), KneeR: WalkKnee(phase - .75f));
-    }
+    // ---------- Walking, jogging and running ----------
 
-    /// <summary>A walking knee from the moment its foot lands: a small give under the weight, straight at push-off, then folded through the swing.</summary>
-    private static float WalkKnee(float sinceStrike) {
-        float q = Mathf.PosMod(sinceStrike, 1);
-        return q < .6f ? 6 + 12 * MathF.Sin(MathF.PI * q / .6f) : 6 + 52 * MathF.Sin(MathF.PI * (q - .6f) / .4f);
-    }
+    /// <summary>Metres a cycle of two steps carries the body in a way of moving, or zero for an action done in place.</summary>
+    public static float Stride(ActorAction action) => action switch {
+        ActorAction.Walk or ActorAction.Carry => WalkStride,
+        ActorAction.Jog => Jogging.Stride,
+        ActorAction.Run => Sprinting.Stride,
+        _ => 0
+    };
 
     /// <summary>Thigh and shin lengths and the height of the foot under the ankle, in metres.</summary>
     public const float Thigh = .38f, Shin = .37f, Sole = .07f;
     // The legs hang from this far below the hips, so the ankle is the rest of Sole above the bottom of the boot.
     // The boot's sole reaches this far ahead of the ankle to the toe and behind it to the heel, as HumanShape builds it.
-    private const float LegDrop = .02f, Toe = .155f, Heel = .065f;
+    private const float LegDrop = .02f, Toe = .155f, Heel = .065f, AboveSole = Sole - LegDrop;
+    private const float Gravity = 9.8f;
     /// <summary>How far below the hip a leg's ankle is, for a thigh swung forward and a knee folded back by these angles.</summary>
     public static float Reach(float swing, float knee) => Ankle(swing, knee).Y;
 
@@ -277,23 +286,9 @@ public static class ActorAnimation {
         float down = Mathf.DegToRad(foot - swing + knee);
         var ankle = Ankle(swing, knee) + new Vector2(0, LegDrop);
         var forward = new Vector2(MathF.Cos(down), MathF.Sin(down));
-        var under = new Vector2(-MathF.Sin(down), MathF.Cos(down)) * (Sole - LegDrop);
+        var under = new Vector2(-MathF.Sin(down), MathF.Cos(down)) * AboveSole;
         return (ankle + forward * Toe + under, ankle - forward * Heel + under);
     }
-
-    // ---------- Running ----------
-
-    /// <summary>Metres a run cycle of two steps carries the body; the view moves the cycle on by distance, so a planted foot holds its place on the ground.</summary>
-    public const float RunStride = 3.7f;
-    // Seconds a run cycle takes at sprint speed, which the bounce under gravity is timed for.
-    private const float RunCycle = .55f;
-    // Each foot is on the ground for under a fifth of the cycle, about a tenth of a second at a sprint.
-    // It lands on the front of the foot, the toe this far ahead of the hips, which are this high then.
-    private const float RunStance = .18f, RunLanding = .35f, RunHipHeight = .795f;
-    // By push-off the heel has lifted the foot this many degrees off the ground.
-    private const float PushOffTilt = 45;
-    // The hips come down from each flight at the speed gravity gave them.
-    private const float Gravity = 9.8f, LandingSpeed = Gravity * (.5f - RunStance) * RunCycle / 2;
 
     /// <summary>A leg's thigh swing, knee bend and foot tip in degrees, as in <see cref="Pose"/>.</summary>
     private readonly record struct LegAngles(float Swing, float Knee, float Foot) {
@@ -302,89 +297,25 @@ public static class ActorAnimation {
         public static LegAngles operator *(LegAngles a, float by) => new(a.Swing * by, a.Knee * by, a.Foot * by);
     }
 
-    // The swinging leg after push-off, as a share of the cycle since its foot landed, and the angles it passes through.
-    // The heel folds up under the hip, the knee drives forward and up, and the shin reaches out and sweeps back to land.
-    private static readonly (float At, LegAngles Leg)[] SwingKeys = {
-        (.3f, new(-12, 86, 30)), (.5f, new(8, 138, 8)), (.62f, new(30, 136, -4)), (.78f, new(56, 96, -10)), (.9f, new(46, 58, -6))
-    };
-    // The whole swing from push-off to the next landing, with how fast the angles change at each key per share of the cycle.
-    // It leaves and arrives with the planted leg's angles and rates, so the leg never jerks at push-off or landing.
-    private static readonly (float At, LegAngles Leg, LegAngles Rate)[] SwingCurve = BuildSwing();
-
-    private static (float At, LegAngles Leg, LegAngles Rate)[] BuildSwing() {
+    /// <summary>
+    /// A swinging leg's whole path from push-off to the next landing, through keys given as shares of the cycle since its foot landed, with how fast the angles change at each key.
+    /// It leaves and arrives with the planted leg's angles and rates, so the leg never jerks at push-off or landing.
+    /// </summary>
+    private static (float At, LegAngles Leg, LegAngles Rate)[] SwingCurve(float stance, Func<float, LegAngles> planted, (float At, LegAngles Leg)[] keys) {
         const float step = .002f;
-        var curve = new (float At, LegAngles Leg, LegAngles Rate)[SwingKeys.Length + 2];
-        curve[0] = (RunStance, Planted(RunStance), (Planted(RunStance) - Planted(RunStance - step)) * (1 / step));
-        curve[^1] = (1, Planted(0), (Planted(step) - Planted(0)) * (1 / step));
-        for (int i = 0; i < SwingKeys.Length; i++) curve[i + 1] = (SwingKeys[i].At, SwingKeys[i].Leg, default);
+        var curve = new (float At, LegAngles Leg, LegAngles Rate)[keys.Length + 2];
+        curve[0] = (stance, planted(stance), (planted(stance) - planted(stance - step)) * (1 / step));
+        curve[^1] = (1, planted(0), (planted(step) - planted(0)) * (1 / step));
+        for (int i = 0; i < keys.Length; i++) curve[i + 1] = (keys[i].At, keys[i].Leg, default);
         for (int i = 1; i < curve.Length - 1; i++) curve[i].Rate = (curve[i + 1].Leg - curve[i - 1].Leg) * (1 / (curve[i + 1].At - curve[i - 1].At));
         return curve;
     }
 
-    /// <summary>
-    /// A sprint, the left foot landing a quarter into the loop and the right three quarters in, as in a walk.
-    /// The hips bounce as a ball would: a dip on the planted leg, then a rise and fall under gravity while both feet are off the ground.
-    /// The feet land close to one line under the body.
-    /// The trunk leans into the run, the shoulders turn against the hips, and each arm swings with the opposite thigh to balance it.
-    /// </summary>
-    private static Pose Run(float p) {
-        var left = RunLeg(p - .25f);
-        var right = RunLeg(p - .75f);
-        var (raiseL, outL, elbowL) = RunArm(right.Swing);
-        var (raiseR, outR, elbowR) = RunArm(left.Swing);
-        // Leaning furthest and tipping sideways over each planted foot as it takes the landing, with the head pitching against the lean to keep the eyes level.
-        float settled = p - .25f - RunStance / 2;
-        float lean = 13 + 1.5f * MathF.Cos(Mathf.Tau * 2 * settled);
-        return new Pose(Lean: lean, Head: -5 - (lean - 13) * .6f, Twist: (left.Swing - right.Swing) * .12f, Sway: -2 * MathF.Cos(Mathf.Tau * settled),
-            RaiseL: raiseL, OutL: outL, ElbowL: elbowL, RaiseR: raiseR, OutR: outR, ElbowR: elbowR,
-            SwingL: left.Swing, KneeL: left.Knee, FootL: left.Foot, SwingR: right.Swing, KneeR: right.Knee, FootR: right.Foot,
-            Hips: RunHips(p - .25f), Splay: -3.5f);
-    }
-
-    /// <summary>
-    /// An arm swinging with the opposite thigh: about as far forward as the thigh drives and further back.
-    /// The elbow bends most in front, bringing the hand up toward the chin, and opens behind; the arm drifts in toward the middle as it comes forward.
-    /// </summary>
-    private static (float Raise, float Out, float Elbow) RunArm(float oppositeThigh) {
-        float raise = -42 + (oppositeThigh + 18) * 1.3f;
-        return (raise, 12 - Math.Max(0, raise) * .12f, 82 + raise * .45f);
-    }
-
-    /// <summary>
-    /// The hip height a share <paramref name="sinceLanding"/> of the cycle after either foot lands.
-    /// The hips dip on the planted leg as far as their landing speed carries them, then rise and fall in a parabola.
-    /// </summary>
-    private static float RunHips(float sinceLanding) {
-        float q = Mathf.PosMod(sinceLanding, .5f);
-        if (q < RunStance) return RunHipHeight - LandingSpeed * RunStance * RunCycle / MathF.PI * MathF.Sin(MathF.PI * q / RunStance);
-        float t = (q - RunStance) * RunCycle;
-        return RunHipHeight + LandingSpeed * t - Gravity * t * t / 2;
-    }
-
-    /// <summary>A running leg's angles a share <paramref name="sinceLanding"/> of the cycle after its foot lands.</summary>
-    private static LegAngles RunLeg(float sinceLanding) {
-        float q = Mathf.PosMod(sinceLanding, 1);
-        return q < RunStance ? Planted(q) : Swinging(q);
-    }
-
-    /// <summary>
-    /// A planted leg a share <paramref name="q"/> of the cycle after landing: the toe of the boot stays where it landed while the hips pass over it.
-    /// The foot lands nearly flat, settles flat, then the heel lifts and the foot rolls onto its toe to push off.
-    /// </summary>
-    private static LegAngles Planted(float q) {
-        float u = Math.Min(q / RunStance, 1);
-        float tilt = Mathf.DegToRad(u < .3f ? 5 * (1 - MathF.Sin(u / .3f * MathF.PI / 2)) : u < .5f ? 0 : PushOffTilt * (u - .5f) * (u - .5f) / .25f);
-        float toe = RunLanding - RunStride * q, above = Sole - LegDrop;
-        // Tipping the foot up about its toe carries the ankle up and back.
-        var (swing, knee) = LegTo(toe - Toe * MathF.Cos(tilt) + above * MathF.Sin(tilt), RunHips(q) - LegDrop - above * MathF.Cos(tilt) - Toe * MathF.Sin(tilt));
-        return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
-    }
-
-    /// <summary>The swinging leg a share <paramref name="q"/> of the cycle after landing, on a smooth curve through the swing keys.</summary>
-    private static LegAngles Swinging(float q) {
+    /// <summary>A swinging leg a share <paramref name="q"/> of the cycle after its foot landed, on a smooth curve through its keys.</summary>
+    private static LegAngles Swinging((float At, LegAngles Leg, LegAngles Rate)[] curve, float q) {
         int k = 0;
-        while (q >= SwingCurve[k + 1].At) k++;
-        var (from, to) = (SwingCurve[k], SwingCurve[k + 1]);
+        while (q >= curve[k + 1].At) k++;
+        var (from, to) = (curve[k], curve[k + 1]);
         float h = to.At - from.At, t = (q - from.At) / h, t2 = t * t, t3 = t2 * t;
         return from.Leg * (2 * t3 - 3 * t2 + 1) + from.Rate * ((t3 - 2 * t2 + t) * h) + to.Leg * (3 * t2 - 2 * t3) + to.Rate * ((t3 - t2) * h);
     }
@@ -395,6 +326,177 @@ public static class ActorAnimation {
         float knee = MathF.Acos(Math.Clamp((Thigh * Thigh + Shin * Shin - reach * reach) / (2 * Thigh * Shin), -1, 1));
         float thigh = MathF.Acos(Math.Clamp((Thigh * Thigh + reach * reach - Shin * Shin) / (2 * Thigh * reach), -1, 1));
         return (Mathf.RadToDeg(MathF.Atan2(ahead, below) + thigh), 180 - Mathf.RadToDeg(knee));
+    }
+
+    /// <summary>The leg angles that put the boot's toe on the ground <paramref name="toe"/> ahead of the hips, with the foot tipped <paramref name="tilt"/> radians up about it.</summary>
+    private static LegAngles OnToe(float toe, float hips, float tilt) {
+        var (swing, knee) = LegTo(toe - Toe * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt), hips - LegDrop - AboveSole * MathF.Cos(tilt) - Toe * MathF.Sin(tilt));
+        return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
+    }
+
+    /// <summary>The leg angles that put the boot's heel on the ground <paramref name="heel"/> ahead of the hips, with the toes tipped <paramref name="tilt"/> radians down about it.</summary>
+    private static LegAngles OnHeel(float heel, float hips, float tilt) {
+        var (swing, knee) = LegTo(heel + Heel * MathF.Cos(tilt) + AboveSole * MathF.Sin(tilt), hips - LegDrop - AboveSole * MathF.Cos(tilt) + Heel * MathF.Sin(tilt));
+        return new LegAngles(swing, knee, Mathf.RadToDeg(tilt) + swing - knee);
+    }
+
+    // ---------- Walking ----------
+
+    // A brisk walk at a worker's pace: a cycle of two steps takes this long and covers this much ground.
+    private const float WalkCycle = .66f, WalkStride = 1.485f;
+    // Each foot is down for this share of the cycle, so both are down for a moment after each landing.
+    // The heel lands this far ahead of the hips with the toes up this many degrees, and the foot rolls flat by this share of its time down.
+    private const float WalkStance = .56f, WalkLanding = .251f, HeelStrikeTilt = 19, FootFlat = .16f;
+    // The knee straightens to this bend in mid-stance, then from this share of the stance bends to this much at push-off; the heel lifts as the body passes over it.
+    private const float StanceKnee = 5.5f, KneeGives = .74f, PushOffKnee = 30.5f;
+    // The swinging leg after push-off, as a share of the cycle since its foot landed: the knee folds most, the toes clear the ground and the shin reaches out to land on the heel.
+    private static readonly (float At, LegAngles Leg)[] WalkSwingKeys = {
+        (.66f, new(-4, 54, 5)), (.74f, new(12, 62, -4)), (.8f, new(20, 52, -10)), (.87f, new(26, 30, -6)), (.94f, new(28, 8, 0))
+    };
+    private static readonly (float At, LegAngles Leg, LegAngles Rate)[] WalkSwing = SwingCurve(WalkStance, WalkPlanted, WalkSwingKeys);
+
+    /// <summary>
+    /// A walk, the left heel landing a quarter into the loop and the right three quarters in.
+    /// The hips vault over each planted leg, highest over it and lowest while both feet are down, and the torso tips over the planted foot.
+    /// The shoulders turn against the hips, and each arm swings with the opposite thigh, the elbow bending as it comes forward.
+    /// </summary>
+    private static Pose Walk(float p) {
+        var left = WalkLeg(p - .25f);
+        var right = WalkLeg(p - .75f);
+        float settled = p - .25f - WalkStance / 2, lean = 4 + MathF.Cos(Mathf.Tau * 2 * settled);
+        float raiseL = (right.Swing - 5) * .9f, raiseR = (left.Swing - 5) * .9f;
+        return new Pose(Lean: lean, Head: 4 - lean, Twist: (left.Swing - right.Swing) * .15f, Sway: -3 * MathF.Cos(Mathf.Tau * settled),
+            RaiseL: raiseL, OutL: 9, ElbowL: 20 + Math.Max(0, raiseL) * .9f, RaiseR: raiseR, OutR: 9, ElbowR: 20 + Math.Max(0, raiseR) * .9f,
+            SwingL: left.Swing, KneeL: left.Knee, FootL: left.Foot, SwingR: right.Swing, KneeR: right.Knee, FootR: right.Foot,
+            Hips: WalkHips(p - .25f), Splay: -1.5f);
+    }
+
+    /// <summary>The hip height a share <paramref name="sinceLanding"/> of the cycle after the left heel lands: highest over each planted leg, lowest while both feet are down.</summary>
+    private static float WalkHips(float sinceLanding) =>
+        .8f + .019f * MathF.Cos(2 * Mathf.Tau * (sinceLanding - WalkStance / 2 + .033f)) - .003f * MathF.Cos(4 * Mathf.Tau * (sinceLanding - .04f));
+
+    /// <summary>A walking leg's angles a share <paramref name="sinceLanding"/> of the cycle after its heel lands.</summary>
+    private static LegAngles WalkLeg(float sinceLanding) {
+        float q = Mathf.PosMod(sinceLanding, 1);
+        return q < WalkStance ? WalkPlanted(q) : Swinging(WalkSwing, q);
+    }
+
+    /// <summary>
+    /// A planted walking leg a share <paramref name="q"/> of the cycle after its heel landed.
+    /// The foot rolls down flat about the heel and stays flat while the knee straightens under the weight.
+    /// Once the body has passed far enough over it that the knee would have to straighten past its bend, the heel lifts and the foot rolls onto its toe.
+    /// </summary>
+    private static LegAngles WalkPlanted(float q) {
+        float u = q / WalkStance, hips = WalkHips(q), heel = WalkLanding - WalkStride * q;
+        if (u < FootFlat) return OnHeel(heel, hips, -Mathf.DegToRad(HeelStrikeTilt) * (1 - MathF.Sin(MathF.PI / 2 * u / FootFlat)));
+        float knee = StanceKnee + (PushOffKnee - StanceKnee) * Mathf.SmoothStep(0, 1, (u - KneeGives) / (1 - KneeGives));
+        var flat = OnHeel(heel, hips, 0);
+        float ahead = heel + Heel, below = hips - LegDrop - AboveSole;
+        if (flat.Knee >= knee && ahead * ahead + below * below < (Thigh + Shin) * (Thigh + Shin)) return flat;
+        // The ankle circles the toe as the heel lifts: find the lift that leaves the hip the reach of a leg bent by this much.
+        float toe = heel + Heel + Toe, pivot = MathF.Sqrt(Toe * Toe + AboveSole * AboveSole);
+        var centre = new Vector2(toe, hips - LegDrop);
+        float reach = Thigh * Thigh + Shin * Shin + 2 * Thigh * Shin * MathF.Cos(Mathf.DegToRad(knee));
+        float along = (centre.LengthSquared() + pivot * pivot - reach) / (2 * pivot * centre.Length());
+        float tilt = MathF.Atan2(centre.Y, centre.X) - MathF.Acos(Math.Clamp(along, -1, 1)) - MathF.Atan2(AboveSole, Toe);
+        return OnToe(toe, hips, Math.Max(0, tilt));
+    }
+
+    // ---------- Running ----------
+
+    /// <summary>A run's timing, landing, bounce and leg swing; a sprint and a jog differ only in these.</summary>
+    private sealed class RunGait {
+        /// <summary>Metres and seconds of a cycle of two steps at the speed the gait is timed for.</summary>
+        public readonly float Stride, Cycle;
+        /// <summary>The share of the cycle each foot is down, how far ahead of the hips its toe lands, and the hip height then.</summary>
+        public readonly float Stance, Landing, HipHeight;
+        /// <summary>Degrees the heel has lifted the foot by push-off.</summary>
+        public readonly float PushOffTilt;
+        /// <summary>How fast the hips come down from each flight under gravity.</summary>
+        public readonly float LandingSpeed;
+        /// <summary>The trunk's lean and the feet's draw toward one line, in degrees.</summary>
+        public readonly float Lean, Splay;
+        /// <summary>Degrees an arm raises for each degree of the opposite thigh's swing, and the thigh swing that leaves the arm hanging.</summary>
+        public readonly float ArmGain, ArmPivot;
+        public readonly (float At, LegAngles Leg, LegAngles Rate)[] Swing;
+
+        public RunGait(float speed, float cycle, float stance, float landing, float hipHeight, float pushOffTilt, float lean, float splay, float armGain, float armPivot, (float At, LegAngles Leg)[] swing) {
+            (Stride, Cycle, Stance, Landing, HipHeight, PushOffTilt) = (speed * cycle, cycle, stance, landing, hipHeight, pushOffTilt);
+            (Lean, Splay, ArmGain, ArmPivot) = (lean, splay, armGain, armPivot);
+            LandingSpeed = Gravity * (.5f - stance) * cycle / 2;
+            Swing = SwingCurve(stance, q => Planted(this, q), swing);
+        }
+    }
+
+    /// <summary>
+    /// The sprint, Shift's run: each foot down for under a fifth of the cycle, about a tenth of a second, landing on the front of the foot.
+    /// The swinging heel folds up under the hip, the knee drives forward and up, and the shin reaches out and sweeps back to land.
+    /// </summary>
+    private static readonly RunGait Sprinting = new(6.72f, .55f, .18f, .35f, .795f, 45, 13, -3.5f, 1.3f, 14.3f, new (float, LegAngles)[] {
+        (.3f, new(-12, 86, 30)), (.5f, new(8, 138, 8)), (.62f, new(30, 136, -4)), (.78f, new(56, 96, -10)), (.9f, new(46, 58, -6))
+    });
+
+    /// <summary>
+    /// The jog, the player's pace without Shift: longer on the ground and lower knees than the sprint, with a shorter flight and less lean.
+    /// </summary>
+    private static readonly RunGait Jogging = new(4.2f, .64f, .26f, .34f, .795f, 55, 7, -2.5f, 1, 8, new (float, LegAngles)[] {
+        (.36f, new(-14, 72, 26)), (.52f, new(6, 108, 8)), (.64f, new(26, 106, -2)), (.8f, new(40, 66, -8)), (.92f, new(32, 36, -4))
+    });
+
+    /// <summary>
+    /// A run, the left foot landing a quarter into the loop and the right three quarters in, as in a walk.
+    /// The hips bounce as a ball would: a dip on the planted leg, then a rise and fall under gravity while both feet are off the ground.
+    /// The feet land close to one line under the body.
+    /// The trunk leans into the run, the shoulders turn against the hips, and each arm swings with the opposite thigh to balance it.
+    /// </summary>
+    private static Pose Run(RunGait gait, float p) {
+        var left = RunLeg(gait, p - .25f);
+        var right = RunLeg(gait, p - .75f);
+        var (raiseL, outL, elbowL) = RunArm(gait, right.Swing);
+        var (raiseR, outR, elbowR) = RunArm(gait, left.Swing);
+        // Leaning furthest and tipping sideways over each planted foot as it takes the landing, with the head pitching against the lean to keep the eyes level.
+        float settled = p - .25f - gait.Stance / 2;
+        float lean = gait.Lean + 1.5f * MathF.Cos(Mathf.Tau * 2 * settled);
+        return new Pose(Lean: lean, Head: -.4f * gait.Lean - (lean - gait.Lean) * .6f, Twist: (left.Swing - right.Swing) * .12f, Sway: -2 * MathF.Cos(Mathf.Tau * settled),
+            RaiseL: raiseL, OutL: outL, ElbowL: elbowL, RaiseR: raiseR, OutR: outR, ElbowR: elbowR,
+            SwingL: left.Swing, KneeL: left.Knee, FootL: left.Foot, SwingR: right.Swing, KneeR: right.Knee, FootR: right.Foot,
+            Hips: RunHips(gait, p - .25f), Splay: gait.Splay);
+    }
+
+    /// <summary>
+    /// An arm swinging with the opposite thigh, further back than forward.
+    /// The elbow bends most in front, bringing the hand up toward the chin, and opens behind; the arm drifts in toward the middle as it comes forward.
+    /// </summary>
+    private static (float Raise, float Out, float Elbow) RunArm(RunGait gait, float oppositeThigh) {
+        float raise = (oppositeThigh - gait.ArmPivot) * gait.ArmGain;
+        return (raise, 12 - Math.Max(0, raise) * .12f, 82 + raise * .45f);
+    }
+
+    /// <summary>
+    /// The hip height a share <paramref name="sinceLanding"/> of the cycle after either foot lands.
+    /// The hips dip on the planted leg as far as their landing speed carries them, then rise and fall in a parabola.
+    /// </summary>
+    private static float RunHips(RunGait gait, float sinceLanding) {
+        float q = Mathf.PosMod(sinceLanding, .5f);
+        if (q < gait.Stance) return gait.HipHeight - gait.LandingSpeed * gait.Stance * gait.Cycle / MathF.PI * MathF.Sin(MathF.PI * q / gait.Stance);
+        float t = (q - gait.Stance) * gait.Cycle;
+        return gait.HipHeight + gait.LandingSpeed * t - Gravity * t * t / 2;
+    }
+
+    /// <summary>A running leg's angles a share <paramref name="sinceLanding"/> of the cycle after its foot lands.</summary>
+    private static LegAngles RunLeg(RunGait gait, float sinceLanding) {
+        float q = Mathf.PosMod(sinceLanding, 1);
+        return q < gait.Stance ? Planted(gait, q) : Swinging(gait.Swing, q);
+    }
+
+    /// <summary>
+    /// A planted running leg a share <paramref name="q"/> of the cycle after landing: the toe of the boot stays where it landed while the hips pass over it.
+    /// The foot lands nearly flat, settles flat, then the heel lifts and the foot rolls onto its toe to push off.
+    /// </summary>
+    private static LegAngles Planted(RunGait gait, float q) {
+        float u = Math.Min(q / gait.Stance, 1);
+        float tilt = u < .3f ? 5 * (1 - MathF.Sin(u / .3f * MathF.PI / 2)) : u < .5f ? 0 : gait.PushOffTilt * (u - .5f) * (u - .5f) / .25f;
+        return OnToe(gait.Landing - gait.Stride * q, RunHips(gait, q), Mathf.DegToRad(tilt));
     }
 
     /// <summary>How long a change of action blends from the old pose into the new one.</summary>
@@ -427,7 +529,7 @@ public static class ActorAnimation {
         Inventory backpack,
         bool sprinting = false,
         bool crafting = false) {
-        if (moving) return sprinting ? ActorAction.Run : ActorAction.Walk;
+        if (moving) return sprinting ? ActorAction.Run : ActorAction.Jog;
         if (!gathering || resourceKind == null) return crafting ? ActorAction.Craft : ActorAction.Idle;
 
         return resourceKind switch {
