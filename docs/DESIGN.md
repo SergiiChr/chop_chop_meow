@@ -524,7 +524,7 @@ Once an active crew has the forge hot, it never falls below the bar while they a
 
 `World.Dismantle` removes a building in reach and puts its cost, a supplied mine's materials and everything its boxes hold into the backpack, and the rest into a recovery box where it stood.
 `World.DismantleBlock` keeps up a cabin someone shelters in and a trading post with a cart out.
-The red X on `ThingPage`'s header turns into "Remove?" on the first click and dismantles on the second.
+The red trash can on `ThingPage`'s header turns into "Remove?" on the first click and dismantles on the second.
 
 ### Storage, filters and automation
 

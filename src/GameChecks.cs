@@ -736,13 +736,13 @@ public partial class Game {
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == farm);
     }
-    /// <summary>The red X on a building's page asks first, then takes the building down and gives its cost and contents back.</summary>
+    /// <summary>The red trash can on a building's page asks first, then takes the building down and gives its cost and contents back.</summary>
     private async Task CheckRedXTakesABuildingDownOnTheSecondClick() {
         var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("coal", 5);
         int wood = world.Backpack["wood"], coal = world.Backpack["coal"];
         await ClickOn(chest);
         await Click(Named("dismantle")!);
-        Require(world.Find(chest.Id) != null && Named("dismantle")!.Text == "Remove?", "The first click on the red X must ask before taking the chest down.");
+        Require(world.Find(chest.Id) != null && Named("dismantle")!.Text == "Remove?", "The first click on the red trash can must ask before taking the chest down.");
         await Click(Named("dismantle")!);
         await Until(() => world.Find(chest.Id) == null, "the second click taking the chest down", 2);
         Require(world.Backpack["wood"] == wood + 8 && world.Backpack["coal"] == coal + 5, "Taking the chest down must give back its 8 wood and the coal in it.");

@@ -76,12 +76,12 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     }
 
     /// <summary>
-    /// A red X in the header that takes the building down: the first click turns it into "Remove?", the second dismantles it and closes the page.
+    /// A red trash can in the header that takes the building down: the first click turns it into "Remove?", the second dismantles it and closes the page.
     /// </summary>
     private void DismantleButton() {
         Button? button = null;
         bool armed = false;
-        button = HeaderAction("close", "Take this building down · everything comes back", () => {
+        button = HeaderAction("trash", "Take this building down · everything comes back", () => {
             if (armed) { if (kit.Run(() => world.Dismantle(thing))) panel.Close(); return; }
             armed = true;
             button!.Icon = null; button.Text = "Remove?"; button.TooltipText = "Click again to take it down";
