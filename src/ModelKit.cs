@@ -48,8 +48,12 @@ public static class ModelKit {
     }
 
     /// <summary>The colour a material was made with: a surfaced material's tint is doubled for its grain.</summary>
-    public static Color Tint(StandardMaterial3D material) =>
-        material.DetailEnabled ? (material.AlbedoColor.SrgbToLinear() / GrainRange).LinearToSrgb() with { A = material.AlbedoColor.A } : material.AlbedoColor;
+    public static Color Tint(StandardMaterial3D material) => material.DetailEnabled ? Masked(material.AlbedoColor) : material.AlbedoColor;
+
+    /// <summary>
+    /// Half the colour, for a dressed material's albedo texture where its detail mask leaves the grain out: the doubled tint brings it back to the colour.
+    /// </summary>
+    public static Color Masked(Color color) => (color.SrgbToLinear() / GrainRange).LinearToSrgb() with { A = color.A };
 
     /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, and a cloth weave is drawn coarse so it shows at the game's distance.</summary>
     public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, _ => 1 };

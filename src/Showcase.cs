@@ -26,14 +26,15 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.Player = mine.Pos - cliff.Face * .8f;
         view.Zoom = 1.25f;
     }
-    /// <summary>--zoom overrides a scene's camera zoom, for looking closely at a model in review screenshots.</summary>
-    private void Zoom() {
+    private void Press(string button) => panel.FindChild(button, true, false).EmitSignal(BaseButton.SignalName.Pressed);
+
+    /// <summary>Sets up the scene the flags ask for; --zoom then overrides its camera zoom, for looking closely at a model.</summary>
+    public void Run() {
+        Place();
         if (Launch.Value("--zoom") is string zoom) view.Zoom = float.Parse(zoom, System.Globalization.CultureInfo.InvariantCulture);
     }
 
-    private void Press(string button) => panel.FindChild(button, true, false).EmitSignal(BaseButton.SignalName.Pressed);
-
-    public void Run() {
+    private void Place() {
         if (Launch.Has("--environment-review")) {
             string location = Launch.Value("--environment-review") ?? "forest";
             float coastAcross = Terrain.Across(Terrain.Spawn);
@@ -61,7 +62,6 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             if (location is "terrain" or "coast" or "mine") view.EnvironmentCameraDistance = 140;
             view.Zoom = location switch { "lake" => .44f, "terrain" => .24f, "coast" => .36f, "mine" => .85f, _ => .75f };
             panel.Close(); ui.Visible = false; kit.HoldWhile(() => true);
-            Zoom();
             return;
         }
         if (Launch.Has("--bushes")) {
@@ -202,7 +202,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--hover")) panel.GetTree().CreateTimer(.5).Timeout += () => {
             if (panel.FindChild("craft_torch", true, false) is not Button cell) return;
             cell.EmitSignal(Control.SignalName.MouseEntered);
-            var at = panel.GetViewport().GetFinalTransform() * cell.GetGlobalRect().GetCenter();
+            var at = panel.GetViewport().GetFinalTransform() * (cell.GetGlobalTransformWithCanvas() * (cell.Size / 2));
             Input.WarpMouse(at); Input.ParseInputEvent(new InputEventMouseMotion { Position = at, GlobalPosition = at });
         };
         if (Launch.Has("--torch")) { world.Player = Terrain.Spawn + new Vector2(-5, 6); world.S.Backpack.Add("torch", 1); world.UseTorch(Vector2.Zero); if (!Launch.Has("--kindle")) world.Tick(World.KindleSeconds); panel.Close(); view.Zoom = 1.6f; }
@@ -221,7 +221,6 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Player = sign.Pos + new Vector2(2.5f, 1.5f); world.Tick(.25f); panel.Close(); view.Zoom = 2.2f;
         }
         if (Launch.Has("--mine")) MineReview(sign);
-        Zoom();
         if (!Launch.Has("--wolves")) return;
         // Night ambush review: a wounded player, one wolf in leaping range, the pack further out and a fresh carcass.
         var spot = Terrain.Spawn + new Vector2(11, 8);
@@ -230,6 +229,5 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         foreach (var offset in new[] { new Vector2(2.5f, -1), new Vector2(-6, 3), new Vector2(5, 5) }) world.S.Wolves.Add(new Wolf { Pos = spot + offset });
         world.Add(ThingKind.WolfCorpse, spot + new Vector2(-2, -2), 4);
         panel.Close(); view.Zoom = 1.6f;
-        Zoom();
     }
 }

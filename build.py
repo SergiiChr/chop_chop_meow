@@ -99,6 +99,8 @@ def fetch_pinned(url: str, archive: Path, sha256: str) -> None:
 
 
 AMBIENTCG = TOOLS / "ambientcg"
+# The Godot script that packs photoscans into the game's textures; it runs from a temporary project.
+PACK_SCRIPT = ROOT / "tools" / "pack_textures.gd"
 PACKER_PROJECT = """; Isolated project for packing textures.
 config_version=5
 
@@ -115,10 +117,9 @@ def pack_photoscans(
     maps: tuple[str, ...],
     size: int,
     output: Path,
-    script: Path,
-    marker: str,
+    kind: str,
 ) -> None:
-    """Fetches each set's pinned ambientCG archive, extracts its maps and packs them into output with the Godot script.
+    """Fetches each set's pinned ambientCG archive, extracts its maps and packs them into output as kind, "ground" or "surface".
 
     A set maps its name in the game to the ambientCG asset and the SHA-256 of that asset's 1K PNG zip.
     """
@@ -142,17 +143,18 @@ def pack_photoscans(
         project = Path(temporary) / "project"
         project.mkdir()
         (project / "project.godot").write_text(PACKER_PROJECT, encoding="utf-8")
-        shutil.copy(script, project / script.name)
+        shutil.copy(PACK_SCRIPT, project / PACK_SCRIPT.name)
         run_godot(
-            script.stem,
+            PACK_SCRIPT.stem,
             [
                 GODOT,
                 "--headless",
                 "--path",
                 project,
                 "--script",
-                f"res://{script.name}",
+                f"res://{PACK_SCRIPT.name}",
                 "--",
+                kind,
                 source,
                 output,
                 str(size),
@@ -160,7 +162,7 @@ def pack_photoscans(
             ],
             isolated_env(Path(temporary)),
             timeout=600,
-            success_marker=marker,
+            success_marker="TEXTURE-PACK PASS",
         )
     print(f"Packed {len(sets)} texture sets into {output.relative_to(ROOT)}")
 

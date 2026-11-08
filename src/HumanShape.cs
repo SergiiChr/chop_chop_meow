@@ -6,7 +6,8 @@ namespace ChopChopMeow;
 
 /// <summary>One neutral human core: outfits use palette textures while geometry and skin weights are shared.</summary>
 internal static class HumanShape {
-    private const float Cloth = 1f / 6, Middle = .5f, End = 5f / 6;
+    // Texel centres of the five-texel palette; its end tones are doubled at the edges, so a wide filter footprint never wraps to the far end.
+    private const float Cloth = .3f, Middle = .5f, End = .7f;
     private static readonly Color Neutral = Colors.White;
     private static readonly Dictionary<(string, string, string, bool), StandardMaterial3D> palettes = new();
     private static readonly Ring[] hips = {
@@ -60,10 +61,11 @@ internal static class HumanShape {
         if (palettes.TryGetValue(key, out var material)) return material;
         // Texel centers map the same neutral limb to clothing, exposed skin, boots and soles.
         // StandardMaterial3D keeps the existing fog/trade-fade path and blends the original color transitions.
-        var image = Image.CreateFromData(3, 1, false, Image.Format.Rgba8, new byte[12]);
-        image.SetPixel(0, 0, new Color(cloth)); image.SetPixel(1, 0, new Color(middle)); image.SetPixel(2, 0, new Color(end));
-        var weave = Image.CreateFromData(3, 1, false, Image.Format.Rgba8, new byte[12]);
-        weave.SetPixel(0, 0, Colors.White); weave.SetPixel(1, 0, middleCloth ? Colors.White : Colors.Black); weave.SetPixel(2, 0, Colors.Black);
+        // The tones the weave leaves out are stored masked, since the dressed material's tint is doubled for the grain.
+        var image = Image.CreateFromData(5, 1, false, Image.Format.Rgba8, new byte[20]);
+        var weave = Image.CreateFromData(5, 1, false, Image.Format.Rgba8, new byte[20]);
+        Color[] tones = { new(cloth), new(cloth), middleCloth ? new(middle) : ModelKit.Masked(new(middle)), ModelKit.Masked(new(end)), ModelKit.Masked(new(end)) };
+        for (int i = 0; i < tones.Length; i++) { image.SetPixel(i, 0, tones[i]); weave.SetPixel(i, 0, i < 2 || i == 2 && middleCloth ? Colors.White : Colors.Black); }
         material = new StandardMaterial3D { AlbedoTexture = ImageTexture.CreateFromImage(image), DetailMask = ImageTexture.CreateFromImage(weave), Roughness = .85f };
         ModelKit.Dress(material, Surface.Cloth);
         palettes[key] = material;

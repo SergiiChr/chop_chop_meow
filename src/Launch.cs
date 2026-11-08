@@ -22,4 +22,13 @@ public static class Launch {
     /// <summary>The number after <paramref name="option"/>, or <paramref name="fallback"/> when it is missing or not a number.</summary>
     public static float Number(string option, float fallback) =>
         float.TryParse(Value(option), System.Globalization.CultureInfo.InvariantCulture, out float number) ? number : fallback;
+
+    /// <summary>The size after <paramref name="option"/>, written as 2560x1440; null when it is missing, with an error when it is malformed.</summary>
+    public static Vector2I? Size(string option) {
+        if (Value(option) is not string value) return null;
+        var parts = value.Split('x');
+        if (parts.Length == 2 && int.TryParse(parts[0], out int width) && int.TryParse(parts[1], out int height)) return new Vector2I(width, height);
+        GD.PushError($"{option} expects a size such as 2560x1440, not {value}");
+        return null;
+    }
 }

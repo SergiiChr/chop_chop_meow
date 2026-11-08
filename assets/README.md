@@ -192,9 +192,9 @@ The item atlas was generated with the built-in image generation tool for this pr
 Its prompt is preserved in [PROMPTS.md](PROMPTS.md).
 The ground textures in `environment/terrain3d/textures/` are packed from three [ambientCG](https://ambientcg.com)
 photoscans, Grass004, Ground037 and Rock030, released under CC0 1.0; `tools/ground_textures.py` downloads the pinned
-1K PNG archives, checks their SHA-256 and packs them at 512 px with `tools/pack_ground.gd`.
+1K PNG archives, checks their SHA-256 and packs them at 512 px with `tools/pack_textures.gd`.
 The model surfaces in `models/surfaces/` come the same way from Wood049, Metal038, Rock030, Fabric061, Ground037 and
-Moss002, packed at 256 px by `tools/surface_textures.py` with `tools/pack_surfaces.gd`: a grey grain PNG holding each
+Moss002, packed at 256 px by `tools/surface_textures.py` with the same script: a grey grain PNG holding each
 pixel's brightness around the photoscan's mean at the ground's detail strength, halved so a tint of twice the colour
 restores it, and the normal PNG with its slope at the ground's bump depth. The cloth weave keeps all of its contrast
 and is drawn coarse, since a fabric scan is nearly even at the game's distance.

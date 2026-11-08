@@ -30,11 +30,10 @@ MAPS = ("Color", "Displacement", "NormalGL", "Roughness")
 # Half the source size: a tile spans a few world units and about a hundred screen pixels each.
 SIZE = 512
 OUTPUT = ROOT / "assets" / "environment" / "terrain3d" / "textures"
-PACK_SCRIPT = ROOT / "tools" / "pack_ground.gd"
 
 
 def main() -> None:
-    build.pack_photoscans(SETS, MAPS, SIZE, OUTPUT, PACK_SCRIPT, "GROUND-PACK PASS")
+    build.pack_photoscans(SETS, MAPS, SIZE, OUTPUT, "ground")
 
 
 if __name__ == "__main__":

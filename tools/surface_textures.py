@@ -42,11 +42,10 @@ MAPS = ("Color", "NormalGL")
 # A quarter of the source size: a tile spans a model or two and a model is well under a hundred screen pixels.
 SIZE = 256
 OUTPUT = ROOT / "assets" / "models" / "surfaces"
-PACK_SCRIPT = ROOT / "tools" / "pack_surfaces.gd"
 
 
 def main() -> None:
-    build.pack_photoscans(SETS, MAPS, SIZE, OUTPUT, PACK_SCRIPT, "SURFACE-PACK PASS")
+    build.pack_photoscans(SETS, MAPS, SIZE, OUTPUT, "surface")
 
 
 if __name__ == "__main__":

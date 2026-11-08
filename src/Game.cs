@@ -76,14 +76,16 @@ public partial class Game : Node, IGameFlow {
             sounds.OffScreen = view.OffScreen;
             layer = new CanvasLayer(); AddChild(layer);
             ui = new Control { Name = "Interface", MouseFilter = Control.MouseFilterEnum.Ignore }; layer.AddChild(ui);
+            ui.Theme = Style.Interface();
+            blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);
             FitInterface();
-            ui.Theme = Style.Interface(); BuildHud();
+            BuildHud();
             GetViewport().UseTaa = Settings.Taa;
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
             if (!Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run")) { ApplyResolution(Settings.Resolution); Engine.MaxFps = Settings.FrameLimit; }
             // A review run renders at a chosen size, such as the player's own, as "2560x1440".
-            if (Launch.Value("--resolution") is string resolution) { var parts = resolution.Split('x'); ApplyResolution(new Vector2I(int.Parse(parts[0]), int.Parse(parts[1]))); }
+            if (Launch.Size("--resolution") is Vector2I resolution) ApplyResolution(resolution);
             if (Launch.Has("--performance-run")) StartGame(-1);
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
@@ -102,7 +104,6 @@ public partial class Game : Node, IGameFlow {
     }
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private void BuildHud() {
-        blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);
         moves = new ItemMoves(kit, blackHole);
         panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;
         hotbar = new Hotbar(kit, panel);
@@ -190,6 +191,7 @@ public partial class Game : Node, IGameFlow {
         var size = (Vector2)GetWindow().ContentScaleSize;
         float scale = size.Y / Settings.DesignSize.Y;
         layer.Scale = Vector2.One * scale; ui.Size = size / scale;
+        blackHole.Fit(layer.Scale, ui.Size);
     }
 
     /// <summary>Opens a game this window started: a new one on the welcome page, a loaded one on the backpack.</summary>

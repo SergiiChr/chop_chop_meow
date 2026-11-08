@@ -54,7 +54,7 @@ void fragment() {
     public BlackHole(UiKit kit, WorldView view, Theme theme, IGameFlow flow, Saves saves, Action closePanel) {
         this.kit = kit; this.view = view; this.saves = saves; this.closePanel = closePanel;
         Layer = 20;
-        anomaly = new Control { Visible = false, Name = "anomaly" }; anomaly.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); AddChild(anomaly);
+        anomaly = new Control { Visible = false, Name = "anomaly" }; AddChild(anomaly);
         anomaly.Theme = theme;
         collapse = new ColorRect { Name = "collapse", Visible = false, Material = new ShaderMaterial { Shader = new Shader { Code = CollapseShader } }, MouseFilter = Control.MouseFilterEnum.Stop };
         collapse.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); anomaly.AddChild(collapse);
@@ -80,6 +80,9 @@ void fragment() {
         kit.World.Replaced += End;
         kit.HoldWhile(() => Showing);
     }
+
+    /// <summary>Draws the overlay at the interface's scale and size, so it matches the rest of the interface at any render size.</summary>
+    public void Fit(Vector2 scale, Vector2 size) { Scale = scale; anomaly.Size = size; }
 
     /// <summary>The warning or the black hole is on screen, and takes all input.</summary>
     public bool Showing => anomaly.Visible;
