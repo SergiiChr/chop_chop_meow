@@ -479,7 +479,7 @@ public partial class Game {
         foreach (var (page, key) in new[] { (Page.Backpack, Key.Tab), (Page.Build, Key.B), (Page.Craft, Key.C), (Page.Guide, Key.I) }) {
             await KeyStroke(key);
             // The backpack shows only its drawer, so the wheel goes over that.
-            var box = page == Page.Backpack ? bag.GetGlobalRect() : panel.GetGlobalRect();
+            var box = layer.Transform * (page == Page.Backpack ? bag.GetGlobalRect() : panel.GetGlobalRect());
             foreach (var spot in new[] { box.GetCenter(), box.Position + new Vector2(30, 30), box.End - new Vector2(30, 30) }) await Wheel(spot);
             Require(view.Zoom == zoom, $"The mouse wheel over the {page} panel must not zoom the world.");
         }
@@ -544,7 +544,8 @@ public partial class Game {
         Require(picker.Selected == Array.IndexOf(StartMenu.Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
         await Choose(picker, 0);
         Require(GetWindow().ContentScaleSize == StartMenu.Resolutions[0], "Choosing a resolution must render at it.");
-        Require(layer.Scale == Vector2.One * .8f && ui.Size == new Vector2(1600, 900), "Choosing a resolution must keep the interface's share of the screen.");
+        // 720 rows against the 900 the interface is laid out for, at 0.8 of its size.
+        Require(layer.Scale.IsEqualApprox(Vector2.One * .64f) && ui.Size.IsEqualApprox(new Vector2(2000, 1125)), "Choosing a resolution must keep the interface's share of the screen.");
         var limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
         Require(limits.Selected == 0, "The frame rate limit must start on its first choice.");
         Require(limits.GetItemText(0) == "Off", "The frame rate limit's first choice must be Off.");

@@ -96,6 +96,7 @@ default), a frame rate counter switch (on by default, shown under the clock) and
 The game renders at the picked size, 16:9 or 16:10 from 1280 × 720 to 3840 × 2400; the window opens at that size, or as
 large as the screen allows, and resizing it only stretches the image, with bars when the shapes differ.
 The display choices are stored in `settings.cfg` and applied at launch.
+The interface keeps the same share of the screen at every size, drawn at 0.8 of the size it is laid out for (`Game.InterfaceScale`).
 
 Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
 Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved.
@@ -123,7 +124,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | C | Open the crafting menu |
 | H | Open the crew overview |
 | I | Open or close the field guide |
-| 1–9 or click a hotbar slot | Put that slot in hand, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
+| 1–9 or click a hotbar slot | With a building's page open, a click moves the slot's item there instead; otherwise put that slot in hand, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
 | Space | Swing axe, or pump the selected nearby reinforced furnace |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
