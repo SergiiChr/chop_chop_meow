@@ -39,6 +39,8 @@ Icons and models are committed; playing does not call an image-generation servic
 - Keep tool downloads and build output ignored, and never depend on another local checkout.
 - Always run Godot through `./build.py`. The binary in `.tools/` picks up the system .NET and crashes when called directly; add a `build.py` action or pass flags after `./build.py play --` instead.
 - Docs describe the game as it is now. Update them in the same change as the code; git keeps the history.
+- `./build.py play` runs the optimized release export, which leaves out Godot's debug-only warnings.
+  A clean `play` log does not replace the checks, which run the debug build.
 - For a visual change, look at a rendered screenshot (`./build.py play -- --showcase --screenshot /absolute/path.png`); headless checks cannot verify presentation.
 - To play the real window with keyboard and mouse, use the `playtest` skill (`.claude/skills/playtest`).
 - After a scripted rename, run `python3 tools/compare_strings.py <base>`: checks do not read most text, and a rename can reach into it.

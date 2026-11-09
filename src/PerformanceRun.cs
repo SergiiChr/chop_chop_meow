@@ -37,8 +37,9 @@ public partial class Game {
         int WorkersActive, int MachinesActive, int Site, bool Night, bool Settlement, long Pipelines);
 
     /// <summary>
-    /// Reads the process's resident memory from Linux's /proc/self/statm without allocating, so sampling it every frame leaves
-    /// the measured frames alone. Godot's own memory monitors count only in debug builds.
+    /// Reads the process's resident memory from Linux's /proc/self/statm without allocating,
+    /// so sampling it every frame leaves the measured frames alone.
+    /// Godot's own memory monitors count only in debug builds.
     /// </summary>
     private sealed class ResidentMemory : IDisposable {
         private readonly FileStream file = new("/proc/self/statm", FileMode.Open, System.IO.FileAccess.Read, FileShare.ReadWrite, bufferSize: 0);

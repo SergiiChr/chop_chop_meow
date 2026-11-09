@@ -26,8 +26,9 @@ import threading
 import time
 import urllib.request
 import zipfile
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -313,6 +314,14 @@ def run_godot(
         print(f"{success_marker} in {seconds:.1f}s ({log.relative_to(ROOT)})")
 
 
+@contextmanager
+def build_lock() -> Iterator[None]:
+    """Make launchers in this checkout take turns at work that writes Godot's C# build and import folders."""
+    with (BUILD / "build.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        yield
+
+
 def build_project(env: dict[str, str]) -> None:
     command(
         ["dotnet", "build", "--nologo", "-v", "quiet", ROOT / "ChopChopMeow.csproj"],
@@ -352,7 +361,8 @@ def setup() -> dict[str, str]:
 
     terrain3d.install_runtime()
     env = ensure_dotnet()
-    build_project(env)
+    with build_lock():
+        build_project(env)
     return env
 
 
@@ -582,9 +592,7 @@ def export_release(name: str, output: Path, env: dict[str, str]) -> None:
         f"Exporting the optimized release build to {output.relative_to(ROOT)}...",
         flush=True,
     )
-    # Exports share Godot's C# build folder, so launchers started together take turns.
-    with (BUILD / "export.lock").open("w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
+    with build_lock():
         run_godot(
             name,
             [
