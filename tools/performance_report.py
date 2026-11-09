@@ -64,8 +64,7 @@ def summarize(rows: list[dict[str, str]]) -> dict[str, float | int]:
         - int(rows[0]["pipelines_total"]),
         "resident_start_mb": float(rows[0]["resident_bytes"]) / 1024**2,
         "resident_end_mb": float(rows[-1]["resident_bytes"]) / 1024**2,
-        "resident_peak_mb": max(float(row["resident_bytes"]) for row in rows)
-        / 1024**2,
+        "resident_peak_mb": max(float(row["resident_bytes"]) for row in rows) / 1024**2,
         "video_peak_mb": max(float(row["video_bytes"]) for row in rows) / 1024**2,
         "draw_calls_max": max(int(row["draw_calls"]) for row in rows),
         "primitives_max": max(int(row["primitives"]) for row in rows),
