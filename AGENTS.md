@@ -41,6 +41,11 @@ Icons and models are committed; playing does not call an image-generation servic
 - Docs describe the game as it is now. Update them in the same change as the code; git keeps the history.
 - `./build.py play` runs the optimized release export, which leaves out Godot's debug-only warnings.
   A clean `play` log does not replace the checks, which run the debug build.
+  Until Godot 4.8, its log also shows `Attempt to disconnect a nonexistent connection` for `tree_exited` or
+  `focus_entered` when a game ends or a dropdown closes.
+  This is a harmless engine bug in release builds ([godotengine/godot#87626](https://github.com/godotengine/godot/issues/87626)),
+  with a fix pending in [godotengine/godot#123998](https://github.com/godotengine/godot/pull/123998).
+  Remove this note after upgrading.
 - For a visual change, look at a rendered screenshot (`./build.py play -- --showcase --screenshot /absolute/path.png`); headless checks cannot verify presentation.
 - To play the real window with keyboard and mouse, use the `playtest` skill (`.claude/skills/playtest`).
 - After a scripted rename, run `python3 tools/compare_strings.py <base>`: checks do not read most text, and a rename can reach into it.

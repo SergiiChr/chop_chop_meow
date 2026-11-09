@@ -65,4 +65,6 @@ Look at every screenshot before deciding the next step.
 - A playtest game left running holds the game's network port, and `./build.py check` or `test net` then fails or
   crawls. Quit the game before running checks.
 - A run driven by `scale` or a showcase fixture is not a fair timing or full-playthrough result; say what was skipped.
-- Treat Godot errors in the game output as failures.
+- Treat Godot errors in the game output as failures, except the release-build engine bug AGENTS.md describes:
+  `Attempt to disconnect a nonexistent connection` for `tree_exited` or `focus_entered` when a game ends or a dropdown
+  closes.
