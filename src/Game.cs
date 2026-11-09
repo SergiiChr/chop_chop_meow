@@ -57,8 +57,6 @@ public partial class Game : Node, IGameFlow {
     private float runTime;
     private bool capturing;
     private bool quitting;
-    /// <summary>The interface grows with the render size; review runs and checks start with it on whatever the player chose.</summary>
-    private bool scaleInterface;
     /// <summary>The window fills the screen; review runs and checks start in a window whatever the player chose.</summary>
     private bool fullscreen;
     public override void _Ready() {
@@ -86,7 +84,6 @@ public partial class Game : Node, IGameFlow {
             // Play renders at the player's pick; a review run or check at the design size, unless --resolution asks for one such as "2560x1440".
             bool review = Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run");
             fullscreen = !review && Settings.Fullscreen;
-            scaleInterface = review || Settings.ScaleInterface;
             ApplyResolution(Launch.Size("--resolution") ?? (review ? Settings.DesignSize : Settings.Resolution));
             if (!review) Engine.MaxFps = Settings.FrameLimit;
             BuildHud();
@@ -192,24 +189,21 @@ public partial class Game : Node, IGameFlow {
     }
 
     public void ApplyResolution(Vector2I size) { Settings.ApplyResolution(GetWindow(), size, fullscreen); FitInterface(); }
-    public void ApplyInterfaceScaling(bool on) { scaleInterface = on; FitInterface(); }
     public void ApplyFullscreen(bool on) { fullscreen = on; ApplyResolution(GetWindow().ContentScaleSize); }
     public void ShowFrameRate(bool on) => corner.FrameRate.Visible = on;
 
     /// <summary>How large the interface is drawn against the size it is laid out for.</summary>
     public const float InterfaceScale = .8f;
 
-    /// <summary>A render height an interface that does not scale stops growing at: taller renders draw it as at this height, taking a smaller share.</summary>
-    public const float FixedInterfaceHeight = 1080;
-
     /// <summary>
     /// The interface is laid out for the design size and drawn at <see cref="InterfaceScale"/> of it, larger at a taller render size, keeping its share of the screen.
-    /// Without interface scaling it grows only up to <see cref="FixedInterfaceHeight"/> lines and is laid out over the extra room above that.
     /// </summary>
     private void FitInterface() {
         var size = (Vector2)GetWindow().ContentScaleSize;
-        float scale = (scaleInterface ? size.Y : Mathf.Min(size.Y, FixedInterfaceHeight)) / Settings.DesignSize.Y * InterfaceScale;
+        float scale = size.Y / Settings.DesignSize.Y * InterfaceScale;
         layer.Scale = Vector2.One * scale; ui.Size = size / scale;
+        // Letters are rasterised at the size they show rather than drawn at the laid-out size and stretched.
+        GetViewport().OversamplingOverride = scale;
         blackHole.Fit(layer.Scale, ui.Size);
     }
 

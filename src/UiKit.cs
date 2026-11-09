@@ -15,8 +15,6 @@ public interface IGameFlow {
     void ShowStart();
     /// <summary>Renders at the given size and fits the window and the interface to it.</summary>
     void ApplyResolution(Vector2I size);
-    /// <summary>Keeps the interface's share of the screen at any render size, or stops it growing past <see cref="Game.FixedInterfaceHeight"/> lines.</summary>
-    void ApplyInterfaceScaling(bool on);
     /// <summary>Fills the whole screen with no window frame, or goes back to a window at the render size.</summary>
     void ApplyFullscreen(bool on);
     /// <summary>Shows or hides the frame rate counter.</summary>
