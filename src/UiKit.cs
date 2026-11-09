@@ -152,3 +152,35 @@ public sealed class LiveText(Action<string> show) {
         var text = new StringBuilder(); write(text); return text.ToString();
     }
 }
+
+/// <summary>
+/// A window the player moves by dragging an empty spot on it.
+/// It stays on screen, and <see cref="ResetPlace"/> puts it back where it opens.
+/// </summary>
+public abstract partial class MovableWindow : PanelContainer {
+    /// <summary>Where on the window the held mouse grabbed it, or null while it is not being moved.</summary>
+    private Vector2? grab;
+
+    /// <summary>How far the player has moved the window from where it opens; code that places the window adds it to its offsets.</summary>
+    protected Vector2 Moved { get; private set; }
+
+    /// <summary>Puts the window back where it opens.</summary>
+    public void ResetPlace() { Shift(-Moved); grab = null; }
+
+    public override void _GuiInput(InputEvent ev) {
+        // A press while an item is carried drops the item rather than grabbing the window.
+        if (ev is InputEventMouseButton { ButtonIndex: MouseButton.Left } click && !GetViewport().GuiIsDragging()) {
+            grab = click.Pressed ? click.Position : null; AcceptEvent();
+        } else if (ev is InputEventMouseMotion motion && grab is Vector2 held && (motion.ButtonMask & MouseButtonMask.Left) != 0) {
+            var to = (Position + motion.Position - held).Clamp(Vector2.Zero, (GetParentAreaSize() - Size).Max(Vector2.Zero));
+            Shift(to - Position); AcceptEvent();
+        }
+    }
+
+    /// <summary>Moves the window by this much from where it is.</summary>
+    protected void Shift(Vector2 by) {
+        Moved += by;
+        // Offsets rather than Position: setting Position would also pin the size, and the side panel hugs what it shows.
+        OffsetLeft += by.X; OffsetRight += by.X; OffsetTop += by.Y; OffsetBottom += by.Y;
+    }
+}

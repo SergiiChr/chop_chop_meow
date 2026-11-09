@@ -143,6 +143,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Mouse wheel | Zoom |
 | Click / Shift-click / Ctrl-click an item cell | Move one item / the stack clicked / all of that item; this applies across inventory and station panels |
 | Drag a cell | Move its stack to another inventory or a station input slot; drop an item or building plan on the hotbar to assign it |
+| Drag an empty spot on a panel | Move the side panel or the backpack drawer |
 
 ## Interface
 
@@ -189,6 +190,8 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - You can move items in and out of storage and stations up to 15 metres away (`World.ItemReach`).
 - Inventory cells retain their positions. Drag to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
 - Right-click a stack to pick up half of it, then left-click a slot to drop it there.
+- A carried stack shows its count beside the cursor, as its cell does.
+- Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
 - A dropped stack that does not all fit fills the slot, and the rest stays held until you drop it elsewhere or click somewhere it cannot go.
 - Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, a packed crate click opens it and an empty crate click starts placement.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.

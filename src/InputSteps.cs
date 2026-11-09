@@ -40,7 +40,10 @@ public partial class Game {
     }
 
     /// <summary>Where a control's centre is in the window, through its canvas layer and the window's stretch.</summary>
-    public static Vector2 WindowPoint(Control control) => control.GetViewport().GetFinalTransform() * (control.GetGlobalTransformWithCanvas() * (control.Size / 2));
+    public static Vector2 WindowPoint(Control control) => WindowPoint(control, control.Size / 2);
+
+    /// <summary>Where a point given in a control's own units is in the window.</summary>
+    private static Vector2 WindowPoint(Control control, Vector2 local) => control.GetViewport().GetFinalTransform() * (control.GetGlobalTransformWithCanvas() * local);
 
     /// <summary>Moves the mouse onto a control.</summary>
     private async Task Hover(Control control) {
@@ -85,8 +88,10 @@ public partial class Game {
     }
 
     /// <summary>A real mouse drag: press, move in steps past the drag threshold, release over the target.</summary>
-    private async Task DragTo(Control from, Control to) {
-        var start = await At(from); var end = await At(to);
+    private async Task DragTo(Control from, Control to) => await LetGo(await HoldOver(await At(from), await At(to)));
+
+    /// <summary>Presses the left button at one window point and moves in steps to another, keeping it held; returns where it ends.</summary>
+    private async Task<Vector2> HoldOver(Vector2 start, Vector2 end) {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = start, GlobalPosition = start, Pressed = true });
         await Frames();
         for (int i = 1; i <= 8; i++) {
@@ -94,8 +99,19 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventMouseMotion { ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Relative = (end - start) / 8 });
             await Frames(1);
         }
+        return end;
+    }
+
+    /// <summary>Lets go of the left button at a window point.</summary>
+    private async Task LetGo(Vector2 end) {
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
         await Frames();
+    }
+
+    /// <summary>Drags a window by a spot just inside its top left corner, clear of what it holds, by a distance in the interface's units.</summary>
+    private async Task MoveWindow(Control window, Vector2 by) {
+        var corner = new Vector2(6, 6);
+        await LetGo(await HoldOver(WindowPoint(window, corner), WindowPoint(window, corner + by)));
     }
 
     /// <summary>A right click on a stack, a move to the target and a left click there.</summary>

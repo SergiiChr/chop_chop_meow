@@ -10,7 +10,7 @@ namespace ChopChopMeow;
 /// </summary>
 public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) : PanelContainer {
     public override void _Ready() {
-        AddThemeStyleboxOverride("panel", Style.Well);
+        AddThemeStyleboxOverride("panel", Style.Well); MouseFilter = MouseFilterEnum.Pass;
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); AddChild(row);
         var left = new HBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkBegin }; left.AddThemeConstantOverride("separation", 12); row.AddChild(left);
         foreach (var input in inputs) left.AddChild(input);

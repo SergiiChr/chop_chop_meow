@@ -38,6 +38,9 @@ public partial class Game {
         return Cell(grid, match);
     }
 
+    /// <summary>The count pill on the stack carried on the cursor, or empty while it shows none.</summary>
+    private string CarriedCount() => GetTree().Root.FindChild("carried_count", true, false) is Badge { Visible: true } pill ? pill.Text : "";
+
     /// <summary>Whether the control of this name under <paramref name="parent"/> is on screen.</summary>
     private static bool ShowsChild(Node parent, string name) => parent.FindChild(name, true, false) is Control { Visible: true };
 

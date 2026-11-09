@@ -2,8 +2,8 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The backpack as a drawer above the hotbar, always in the same place, whenever a page works with it.</summary>
-public partial class BackpackDrawer : PanelContainer {
+/// <summary>The backpack as a drawer above the hotbar whenever a page works with it; each new page opens it there, wherever the player moved it before.</summary>
+public partial class BackpackDrawer : MovableWindow {
     /// <summary>Bottom of the drawer, measured up from the bottom of the screen, just above the hotbar.</summary>
     public const int Bottom = 112;
     private readonly World world;
