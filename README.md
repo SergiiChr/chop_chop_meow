@@ -15,6 +15,11 @@ From the project directory:
 ./build.py play
 ```
 
+`play` exports the optimized release build into `build/play/` and runs it, so every launch first spends a little
+time exporting.
+The game's log says which build runs: `Build: optimized release export`.
+The checks and `editor` run the debug build from the project folder.
+
 The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates and build output under `.tools/`
 and `build/`.
 First-time setup downloads missing tools and needs internet access.
@@ -26,6 +31,7 @@ The project uses Godot's Forward+ renderer, which picks a discrete GPU over an i
 ### Launcher commands
 
 ```sh
+./build.py play     # export the optimized release build and run it
 ./build.py setup    # prepare local tools, compile C#, and import assets
 ./build.py editor   # open the Godot editor
 ./build.py check    # run every check: C# and Python types and format, then all tests

@@ -51,6 +51,8 @@ BASE_URL = (
     f"https://github.com/godotengine/godot/releases/download/{GODOT_VERSION}-stable"
 )
 OUTPUT = BUILD / "ChopChopMeow.x86_64"
+# Each play launch exports into a folder named after its process id, which the game keeps after exec.
+PLAY_EXPORTS = BUILD / "play"
 PYTHON_TOOLS = TOOLS / "python"
 REQUIREMENTS = ROOT / "requirements-dev.txt"
 # Seconds all test stages together may take, so a run that hangs outside any check still stops.
@@ -572,15 +574,47 @@ def run_check(env: dict[str, str]) -> None:
     test(env)
 
 
+def export_release(name: str, output: Path, env: dict[str, str]) -> None:
+    """Export the optimized game to output: Godot's release template with Release C# and native libraries."""
+    fetch_templates(env)
+    run_godot(
+        name,
+        [GODOT, "--headless", "--path", ROOT, "--export-release", "Linux/X11", output],
+        env,
+    )
+
+
+def running_folders() -> set[Path]:
+    """The folders holding the executables of this user's running processes."""
+    folders = set()
+    for process in Path("/proc").iterdir():
+        try:
+            folders.add(Path(os.readlink(process / "exe")).parent)
+        except OSError:
+            continue
+    return folders
+
+
+def export_play(env: dict[str, str]) -> Path:
+    """Export the optimized game for this launch and return its executable.
+
+    Each launch gets its own folder, since a running game and its server process keep using theirs.
+    Folders of launches that ended are removed first.
+    """
+    busy = running_folders()
+    for folder in PLAY_EXPORTS.glob("*"):
+        if folder not in busy and not Path("/proc", folder.name).exists():
+            shutil.rmtree(folder)
+    output = PLAY_EXPORTS / str(os.getpid()) / OUTPUT.name
+    output.parent.mkdir(parents=True)
+    export_release("play-export", output, env)
+    return output
+
+
 def run_build(env: dict[str, str]) -> None:
     """Run every check, export the Linux build, smoke-test it and bundle it."""
     run_check(env)
-    fetch_templates(env)
-    run_godot(
-        "export",
-        [GODOT, "--headless", "--path", ROOT, "--export-release", "Linux/X11", OUTPUT],
-        env,
-    )
+    export_release("export", OUTPUT, env)
     run_godot(
         "export-smoke",
         [OUTPUT, "--headless", "--", "--smoke-test"],
@@ -616,7 +650,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     commands = parser.add_subparsers(dest="action", metavar="command")
     helps = {
-        "play": "Set up the local tools, then run the game. Forward flags after --.",
+        "play": "Set up the local tools, export the optimized release build, then run "
+        "it. Forward flags after --.",
         "editor": "Set up the project and open the Godot editor.",
         "setup": "Download tools if needed, compile C#, and import the project.",
         "check": "Run every offline check: Python types and style, C# compile and "
@@ -652,8 +687,13 @@ def main() -> int:
     env = setup()
     match args.action:
         case "play":
+            game = export_play(env)
+            print(
+                f"Playing the optimized release export {game.relative_to(ROOT)}",
+                flush=True,
+            )
             forwarded = ["--", *game_args] if game_args else []
-            os.execve(GODOT, [str(GODOT), "--path", str(ROOT), *forwarded], env)
+            os.execve(game, [str(game), *forwarded], env)
         case "editor":
             os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], env)
         case "setup":
