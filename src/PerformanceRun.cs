@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Text;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -18,6 +19,7 @@ public partial class Game {
     private readonly List<object> performanceEvents = new();
     private readonly Dictionary<int, (float Progress, int Batches)> performanceMachines = new();
     private PerformanceSample[] performanceSamples = Array.Empty<PerformanceSample>();
+    private ResidentMemory? residentMemory;
     private static readonly Key[] PerformanceKeys = { Key.D, Key.S, Key.A, Key.W };
     private static readonly string[] PerformanceSites = { "forest", "lake", "coast", "iron", "tin", "coal", "upper-valley", "forest-edge" };
     private static readonly Performance.Monitor[] PipelineMonitors = {
@@ -31,8 +33,26 @@ public partial class Game {
         return (long)total;
     }
     private readonly record struct PerformanceSample(double Seconds, double FrameMs, double ProcessMs, double RenderCpuMs, double GpuMs,
-        long Allocated, int Gen0, int Gen1, int Gen2, double StaticBytes, double VideoBytes, int DrawCalls, int Primitives,
+        long Allocated, int Gen0, int Gen1, int Gen2, long ResidentBytes, double VideoBytes, int DrawCalls, int Primitives,
         int WorkersActive, int MachinesActive, int Site, bool Night, bool Settlement, long Pipelines);
+
+    /// <summary>
+    /// Reads the process's resident memory from Linux's /proc/self/statm without allocating,
+    /// so sampling it every frame leaves the measured frames alone.
+    /// Godot's own memory monitors count only in debug builds.
+    /// </summary>
+    private sealed class ResidentMemory : IDisposable {
+        private readonly FileStream file = new("/proc/self/statm", FileMode.Open, System.IO.FileAccess.Read, FileShare.ReadWrite, bufferSize: 0);
+        private readonly byte[] text = new byte[128];
+        public long Bytes() {
+            file.Position = 0;
+            var line = text.AsSpan(0, file.Read(text));
+            // The line lists the process's total pages, then its resident pages.
+            Utf8Parser.TryParse(line[(line.IndexOf((byte)' ') + 1)..], out long pages, out _);
+            return pages * System.Environment.SystemPageSize;
+        }
+        public void Dispose() => file.Dispose();
+    }
 
     /// <summary>Starts sampling, once this window has joined the server playing the fixture.</summary>
     private void StartPerformanceRun() {
@@ -43,6 +63,7 @@ public partial class Game {
         ApplyResolution(new Vector2I(2560, 1440));
         RenderingServer.ViewportSetMeasureRenderTime(GetViewport().GetViewportRid(), true);
         performanceSamples = new PerformanceSample[500_000];
+        residentMemory = new ResidentMemory();
         foreach (var thing in world.Things)
             if (thing.Kind is ThingKind.Reinforced or ThingKind.Furnace or ThingKind.Bench) performanceMachines[thing.Id] = (thing.Progress, 0);
         performanceLastPosition = world.Player;
@@ -103,7 +124,7 @@ public partial class Game {
                 Performance.GetMonitor(Performance.Monitor.TimeProcess) * 1000,
                 RenderingServer.ViewportGetMeasuredRenderTimeCpu(viewport), RenderingServer.ViewportGetMeasuredRenderTimeGpu(viewport),
                 GC.GetAllocatedBytesForCurrentThread(), GC.CollectionCount(0), GC.CollectionCount(1), GC.CollectionCount(2),
-                Performance.GetMonitor(Performance.Monitor.MemoryStatic), Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed),
+                residentMemory!.Bytes(), Performance.GetMonitor(Performance.Monitor.RenderVideoMemUsed),
                 (int)Performance.GetMonitor(Performance.Monitor.RenderTotalDrawCallsInFrame), (int)Performance.GetMonitor(Performance.Monitor.RenderTotalPrimitivesInFrame),
                 activeWorkers, activeMachines, performanceSite, world.Night, performanceSettlement,
                 PipelineCompilations());
@@ -125,12 +146,13 @@ public partial class Game {
 
     private void FinishPerformanceRun() {
         performanceRunning = false;
+        residentMemory?.Dispose(); residentMemory = null;
         if (performanceKey >= 0) Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = PerformanceKeys[performanceKey], Keycode = PerformanceKeys[performanceKey], Pressed = false });
         using (var csv = new StreamWriter(Path.Combine(performanceFolder, "frames.csv"))) {
-            csv.WriteLine("seconds,frame_ms,process_ms,render_cpu_ms,gpu_ms,allocated_total,gen0_total,gen1_total,gen2_total,static_bytes,video_bytes,draw_calls,primitives,workers_active,machines_active,site,night,settlement,pipelines_total");
+            csv.WriteLine("seconds,frame_ms,process_ms,render_cpu_ms,gpu_ms,allocated_total,gen0_total,gen1_total,gen2_total,resident_bytes,video_bytes,draw_calls,primitives,workers_active,machines_active,site,night,settlement,pipelines_total");
             for (int i = 0; i < performanceCount; i++) {
                 var s = performanceSamples[i];
-                csv.WriteLine(FormattableString.Invariant($"{s.Seconds:F6},{s.FrameMs:F4},{s.ProcessMs:F4},{s.RenderCpuMs:F4},{s.GpuMs:F4},{s.Allocated},{s.Gen0},{s.Gen1},{s.Gen2},{s.StaticBytes},{s.VideoBytes},{s.DrawCalls},{s.Primitives},{s.WorkersActive},{s.MachinesActive},{PerformanceSites[s.Site]},{s.Night},{s.Settlement},{s.Pipelines}"));
+                csv.WriteLine(FormattableString.Invariant($"{s.Seconds:F6},{s.FrameMs:F4},{s.ProcessMs:F4},{s.RenderCpuMs:F4},{s.GpuMs:F4},{s.Allocated},{s.Gen0},{s.Gen1},{s.Gen2},{s.ResidentBytes},{s.VideoBytes},{s.DrawCalls},{s.Primitives},{s.WorkersActive},{s.MachinesActive},{PerformanceSites[s.Site]},{s.Night},{s.Settlement},{s.Pipelines}"));
             }
         }
         var stations = world.Things.Where(t => performanceMachines.ContainsKey(t.Id)).Select(t => new {
