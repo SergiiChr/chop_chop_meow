@@ -103,7 +103,18 @@ public partial class StartMenu : ColorRect {
             kit.Sounds.MusicVolume = (float)value / 100;
         };
         musicRow.AddChild(slider);
-        Toggle("Temporal anti-aliasing", "taa", Settings.Taa, on => { Settings.Store("display", "taa", on); GetViewport().UseTaa = on; });
+        var smoothingRow = new HBoxContainer(); Screen.AddChild(smoothingRow);
+        var smoothingLabel = Style.Wrapped("Anti-aliasing"); smoothingLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; smoothingRow.AddChild(smoothingLabel);
+        var smoothing = new OptionButton { Name = "anti_aliasing", CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
+        foreach (string choice in new[] { "Off", "FSR", "TAA" }) smoothing.AddItem(choice);
+        smoothing.Selected = (int)Settings.AntiAliasing;
+        smoothing.ItemSelected += index => {
+            Settings.Store("display", "anti_aliasing", (int)index);
+            Settings.ApplyAntiAliasing(GetViewport(), (AntiAliasing)index);
+        };
+        smoothingRow.AddChild(smoothing);
+        Toggle("Scale interface with resolution", "scale_interface", Settings.ScaleInterface, on => { Settings.Store("display", "scale_interface", on); flow.ApplyInterfaceScaling(on); });
+        Toggle("Fullscreen", "fullscreen", Settings.Fullscreen, on => { Settings.Store("display", "fullscreen", on); flow.ApplyFullscreen(on); });
         Toggle("Frame rate counter", "fps", Settings.FrameRate, on => { Settings.Store("display", "fps", on); flow.ShowFrameRate(on); });
         AddButton("Back · Esc", back);
     }
