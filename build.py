@@ -578,11 +578,26 @@ def run_check(env: dict[str, str]) -> None:
 def export_release(name: str, output: Path, env: dict[str, str]) -> None:
     """Export the optimized game to output: Godot's release template with Release C# and native libraries."""
     fetch_templates(env)
-    run_godot(
-        name,
-        [GODOT, "--headless", "--path", ROOT, "--export-release", "Linux/X11", output],
-        env,
+    print(
+        f"Exporting the optimized release build to {output.relative_to(ROOT)}...",
+        flush=True,
     )
+    # Exports share Godot's C# build folder, so launchers started together take turns.
+    with (BUILD / "export.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        run_godot(
+            name,
+            [
+                GODOT,
+                "--headless",
+                "--path",
+                ROOT,
+                "--export-release",
+                "Linux/X11",
+                output,
+            ],
+            env,
+        )
 
 
 def running_folders() -> set[Path]:
@@ -602,17 +617,15 @@ def export_play(env: dict[str, str]) -> Path:
     Each launch gets its own folder, since a running game and its server process keep using theirs.
     Folders of launches that ended are removed first.
     """
-    # Exports share Godot's C# build folder and log, so launches started together take turns.
-    with (BUILD / "play-export.lock").open("w") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        busy = running_folders()
-        for folder in PLAY_EXPORTS.glob("*"):
-            if folder not in busy and not Path("/proc", folder.name).exists():
-                shutil.rmtree(folder)
-        output = PLAY_EXPORTS / str(os.getpid()) / OUTPUT.name
-        # A launch that ended can leave a folder under a process id this one now reuses.
-        output.parent.mkdir(parents=True, exist_ok=True)
-        export_release("play-export", output, env)
+    busy = running_folders()
+    for folder in PLAY_EXPORTS.glob("*"):
+        if folder not in busy and not Path("/proc", folder.name).exists():
+            # Another launch starting at the same time may be removing it too.
+            shutil.rmtree(folder, ignore_errors=True)
+    output = PLAY_EXPORTS / str(os.getpid()) / OUTPUT.name
+    # A launch that ended can leave a folder under a process id this one now reuses.
+    output.parent.mkdir(parents=True, exist_ok=True)
+    export_release("play-export", output, env)
     return output
 
 
@@ -698,6 +711,8 @@ def main() -> int:
                 flush=True,
             )
             forwarded = ["--", *game_args] if game_args else []
+            # Relative paths in the game's flags start from the project folder, as Godot's --path made them.
+            os.chdir(ROOT)
             os.execve(game, [str(game), *forwarded], env)
         case "editor":
             os.execve(GODOT, [str(GODOT), "--editor", "--path", str(ROOT)], env)
