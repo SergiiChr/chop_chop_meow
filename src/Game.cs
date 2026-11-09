@@ -59,7 +59,7 @@ public partial class Game : Node, IGameFlow {
     private bool quitting;
     public override void _Ready() {
         try {
-            GD.Print(OS.IsDebugBuild() ? "Build: debug, run from the project folder" : "Build: optimized release export");
+            GD.Print(OS.IsDebugBuild() ? "Build: debug, from the project folder" : "Build: optimized release export");
             data = GameData.Create();
             if (Launch.Has("--server")) { Server.Run(this, data); return; }
             world = new World(data);

@@ -8,6 +8,7 @@ existing Godot 4.7.2 .NET executable.
 from __future__ import annotations
 
 import argparse
+import fcntl
 import hashlib
 import heapq
 import itertools
@@ -601,13 +602,17 @@ def export_play(env: dict[str, str]) -> Path:
     Each launch gets its own folder, since a running game and its server process keep using theirs.
     Folders of launches that ended are removed first.
     """
-    busy = running_folders()
-    for folder in PLAY_EXPORTS.glob("*"):
-        if folder not in busy and not Path("/proc", folder.name).exists():
-            shutil.rmtree(folder)
-    output = PLAY_EXPORTS / str(os.getpid()) / OUTPUT.name
-    output.parent.mkdir(parents=True)
-    export_release("play-export", output, env)
+    # Exports share Godot's C# build folder and log, so launches started together take turns.
+    with (BUILD / "play-export.lock").open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        busy = running_folders()
+        for folder in PLAY_EXPORTS.glob("*"):
+            if folder not in busy and not Path("/proc", folder.name).exists():
+                shutil.rmtree(folder)
+        output = PLAY_EXPORTS / str(os.getpid()) / OUTPUT.name
+        # A launch that ended can leave a folder under a process id this one now reuses.
+        output.parent.mkdir(parents=True, exist_ok=True)
+        export_release("play-export", output, env)
     return output
 
 

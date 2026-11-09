@@ -18,7 +18,7 @@ From the project directory:
 `play` exports the optimized release build into `build/play/` and runs it, so every launch first spends a little
 time exporting.
 The game's log says which build runs: `Build: optimized release export`.
-The checks and `editor` run the debug build from the project folder.
+The checks, `editor` and `icons` run the debug build from the project folder.
 
 The launcher keeps Godot 4.7.2 .NET, .NET 10, import files, export templates and build output under `.tools/`
 and `build/`.
