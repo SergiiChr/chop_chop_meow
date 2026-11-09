@@ -20,7 +20,7 @@ COLUMNS = {
     "gen0_total",
     "gen1_total",
     "gen2_total",
-    "static_bytes",
+    "resident_bytes",
     "video_bytes",
     "draw_calls",
     "primitives",
@@ -62,9 +62,10 @@ def summarize(rows: list[dict[str, str]]) -> dict[str, float | int]:
         "gen2": int(rows[-1]["gen2_total"]) - int(rows[0]["gen2_total"]),
         "pipeline_compilations": int(rows[-1]["pipelines_total"])
         - int(rows[0]["pipelines_total"]),
-        "static_start_mb": float(rows[0]["static_bytes"]) / 1024**2,
-        "static_end_mb": float(rows[-1]["static_bytes"]) / 1024**2,
-        "static_peak_mb": max(float(row["static_bytes"]) for row in rows) / 1024**2,
+        "resident_start_mb": float(rows[0]["resident_bytes"]) / 1024**2,
+        "resident_end_mb": float(rows[-1]["resident_bytes"]) / 1024**2,
+        "resident_peak_mb": max(float(row["resident_bytes"]) for row in rows)
+        / 1024**2,
         "video_peak_mb": max(float(row["video_bytes"]) for row in rows) / 1024**2,
         "draw_calls_max": max(int(row["draw_calls"]) for row in rows),
         "primitives_max": max(int(row["primitives"]) for row in rows),
