@@ -552,10 +552,11 @@ public partial class Game {
         Require(Engine.MaxFps == 0, "The engine must start with no frame rate limit.");
         await Choose(limits, 2);
         Require(Engine.MaxFps == 90, "Choosing a frame rate limit must cap the frame rate.");
-        var taa = (CheckButton)startMenu.Screen.FindChild("taa", true, false);
-        Require(taa.ButtonPressed && GetViewport().UseTaa, "Temporal anti-aliasing must start on.");
-        await Click(taa);
-        Require(!GetViewport().UseTaa, "Switching temporal anti-aliasing off must apply it at once.");
+        var fullscreen = (CheckButton)startMenu.Screen.FindChild("fullscreen", true, false);
+        // The headless display these checks run on has no window modes, so the screen filling is checked by playing the real window.
+        Require(!fullscreen.ButtonPressed, "The game must start in a window.");
+        await Click(fullscreen);
+        Require(GetWindow().ContentScaleSize == StartMenu.Resolutions[0], "Switching fullscreen on must keep rendering at the chosen resolution.");
         var counter = (CheckButton)startMenu.Screen.FindChild("fps", true, false);
         var frameRate = (Label)ui.FindChild("frame_rate", true, false);
         Require(counter.ButtonPressed && frameRate.Visible && frameRate.Text.EndsWith(" fps"), "The frame rate counter must start on and show a rate.");
@@ -570,26 +571,65 @@ public partial class Game {
             await Click(FindButton(startMenu.Screen, "Options")!);
             picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
             limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
-            taa = (CheckButton)startMenu.Screen.FindChild("taa", true, false);
             counter = (CheckButton)startMenu.Screen.FindChild("fps", true, false);
+            fullscreen = (CheckButton)startMenu.Screen.FindChild("fullscreen", true, false);
             musicSlider = (HSlider)startMenu.Screen.FindChild("music", true, false);
         }
         await ReopenOptions();
         Require(picker.Selected == 0, "Reopened options must show the chosen resolution.");
         Require(limits.Selected == 2, "Reopened options must show the chosen frame rate limit.");
-        Require(!taa.ButtonPressed, "Reopened options must show temporal anti-aliasing off.");
+        Require(fullscreen.ButtonPressed, "Reopened options must show fullscreen on.");
         Require(!counter.ButtonPressed, "Reopened options must show the frame rate counter off.");
         Require(musicSlider.Value == 50, "Reopened options must show the chosen music volume.");
         // The later checks measure the screen at the design size.
         await Choose(picker, Array.IndexOf(StartMenu.Resolutions, Settings.DesignSize));
         await Choose(limits, 0);
         Require(Engine.MaxFps == 0, "Turning the frame rate limit off must lift the cap.");
-        await Click(taa);
-        Require(GetViewport().UseTaa, "Switching temporal anti-aliasing back on must apply it.");
+        await Click(fullscreen);
         await ReopenOptions();
-        Require(limits.Selected == 0 && taa.ButtonPressed, "Reopened options must show the choices changed back.");
+        Require(limits.Selected == 0 && !fullscreen.ButtonPressed, "Reopened options must show the choices changed back.");
         await KeyStroke(Key.Escape);
         Require(FindButton(startMenu.Screen, "New game") != null, "Esc in options must return to the start menu.");
+    }
+
+    /// <summary>Anti-aliasing offers off, FSR upscaling, FSR at full size and TAA, names the size each draws the world at for the chosen resolution, and keeps its choice.</summary>
+    private async Task CheckAntiAliasingChoicesNameTheSizeTheWorldIsDrawnAt() {
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        var smoothing = (OptionButton)startMenu.Screen.FindChild("anti_aliasing", true, false);
+        var picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
+        string[] Names() => Enumerable.Range(0, smoothing.ItemCount).Select(smoothing.GetItemText).ToArray();
+        Require(Names().SequenceEqual(["Off", "FSR Upscale (964 × 603)", "FSR Native (1440 × 900)", "TAA"]), "Anti-aliasing must offer Off, FSR Upscale and FSR Native with the size they draw at, and TAA.");
+        Require(smoothing.Selected == 2 && !GetViewport().UseTaa && GetViewport().Scaling3DMode == Viewport.Scaling3DModeEnum.Fsr2 && GetViewport().Scaling3DScale == 1, "Anti-aliasing must start on FSR Native.");
+        await Choose(smoothing, 1);
+        Require(!GetViewport().UseTaa && GetViewport().Scaling3DMode == Viewport.Scaling3DModeEnum.Fsr2 && Mathf.IsEqualApprox(GetViewport().Scaling3DScale, .67f), "FSR Upscale must upscale with FSR 2 from two thirds of the render size, without TAA.");
+        await Choose(smoothing, 2);
+        Require(!GetViewport().UseTaa && GetViewport().Scaling3DMode == Viewport.Scaling3DModeEnum.Fsr2 && GetViewport().Scaling3DScale == 1, "FSR Native must smooth with FSR 2 at full render size, without TAA.");
+        await Choose(picker, Array.IndexOf(StartMenu.Resolutions, new Vector2I(1280, 720)));
+        Require(Names()[1] == "FSR Upscale (857 × 482)" && Names()[2] == "FSR Native (1280 × 720)", "The FSR choices must name the sizes for a newly chosen resolution.");
+        await KeyStroke(Key.Escape);
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        smoothing = (OptionButton)startMenu.Screen.FindChild("anti_aliasing", true, false);
+        Require(smoothing.Selected == 2 && Names()[2] == "FSR Native (1280 × 720)", "Reopened options must show FSR Native chosen, at the chosen resolution.");
+        await Choose(smoothing, 0);
+        Require(!GetViewport().UseTaa && GetViewport().Scaling3DMode == Viewport.Scaling3DModeEnum.Bilinear && GetViewport().Scaling3DScale == 1, "Turning anti-aliasing off must render at full size without TAA or FSR.");
+        await Choose(smoothing, 3);
+        Require(GetViewport().UseTaa && GetViewport().Scaling3DMode == Viewport.Scaling3DModeEnum.Bilinear && GetViewport().Scaling3DScale == 1, "Choosing TAA must turn it on at full render size.");
+        await Choose(smoothing, 2);
+        // The later checks measure the screen at the design size.
+        await Choose((OptionButton)startMenu.Screen.FindChild("resolution", true, false), Array.IndexOf(StartMenu.Resolutions, Settings.DesignSize));
+        await KeyStroke(Key.Escape);
+    }
+
+    /// <summary>At 4K the interface keeps its share of the screen, and its text is drawn at the size it shows rather than drawn small and stretched.</summary>
+    private async Task CheckInterfaceTextIsDrawnAtTheSizeItShows() {
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        var picker = (OptionButton)startMenu.Screen.FindChild("resolution", true, false);
+        await Choose(picker, Array.IndexOf(StartMenu.Resolutions, new Vector2I(3840, 2160)));
+        Require(layer.Scale.IsEqualApprox(Vector2.One * 1.92f) && ui.Size.IsEqualApprox(new Vector2(2000, 1125)) && Mathf.IsEqualApprox(GetViewport().GetOversampling(), 1.92f), "At 4K the interface must keep its share of the screen, with text drawn at the size it shows.");
+        // The later checks measure the screen at the design size.
+        await Choose(picker, Array.IndexOf(StartMenu.Resolutions, Settings.DesignSize));
+        Require(layer.Scale.IsEqualApprox(Vector2.One * .8f) && Mathf.IsEqualApprox(GetViewport().GetOversampling(), .8f), "At the design size the interface and its text must be drawn at 0.8.");
+        await KeyStroke(Key.Escape);
     }
 
     /// <summary>Empty save slots cannot load, and New game closes the menu on the welcome page.</summary>
@@ -1233,6 +1273,8 @@ public partial class Game {
         try {
             await Test(CheckLaunchOpensTheStartMenuWithNoSaveToContinue);
             await Test(CheckOptionsApplyAndKeepTheirChoices);
+            await Test(CheckAntiAliasingChoicesNameTheSizeTheWorldIsDrawnAt);
+            await Test(CheckInterfaceTextIsDrawnAtTheSizeItShows);
             await Test(CheckNewGameStartsTheWelcomePage);
             await Test(CheckPauseMenuAsksBeforeNewGameAndQuit);
             await Test(CheckWasdJogsAndShiftSprintsUnlessTooThirsty);

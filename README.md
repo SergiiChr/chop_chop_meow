@@ -91,12 +91,18 @@ The game opens on a start menu with Continue (the most recent save), New game, L
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
 
-Options holds a render resolution picker, a frame rate limit (off, 60 or 90 fps), a temporal anti-aliasing switch (on by
-default), a frame rate counter switch (on by default, shown under the clock) and a music volume slider.
+Options holds a render resolution picker, a frame rate limit (off, 60 or 90 fps), an anti-aliasing picker, a fullscreen
+switch (off by default), a frame rate counter switch (on by default, shown under the clock) and a music volume slider.
+Anti-aliasing is off, FSR Upscale, FSR Native (the default) or TAA; each FSR choice names the size it draws the world at.
+FSR Upscale renders the world at two thirds of the render size and upscales it with AMD FSR 2, which smooths edges too
+and costs less than full size; FSR Native smooths with FSR 2 at full size.
+The interface always draws at full size.
 The game renders at the picked size, 16:9 or 16:10 from 1280 × 720 to 3840 × 2400; the window opens at that size, or as
 large as the screen allows, and resizing it only stretches the image, with bars when the shapes differ.
+Fullscreen covers the whole screen with no window frame, still rendering at the picked size.
 The display choices are stored in `settings.cfg` and applied at launch.
-The interface keeps the same share of the screen at every size, drawn at 0.8 of the size it is laid out for (`Game.InterfaceScale`).
+The interface is drawn at 0.8 of the size it is laid out for (`Game.InterfaceScale`).
+It keeps that share of the screen at every resolution, with its text drawn at the size it shows.
 
 Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
 Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved.

@@ -15,6 +15,8 @@ public interface IGameFlow {
     void ShowStart();
     /// <summary>Renders at the given size and fits the window and the interface to it.</summary>
     void ApplyResolution(Vector2I size);
+    /// <summary>Fills the whole screen with no window frame, or goes back to a window at the render size.</summary>
+    void ApplyFullscreen(bool on);
     /// <summary>Shows or hides the frame rate counter.</summary>
     void ShowFrameRate(bool on);
     /// <summary>The server says this window's player owns the game, so it saves, loads and opens it to others.</summary>
