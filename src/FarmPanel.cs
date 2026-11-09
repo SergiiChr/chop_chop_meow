@@ -22,7 +22,11 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
         live.Watch(() => thing.FarmStage == FarmStage.Ripe ? 3 : thing.FarmStage == FarmStage.Growing ? (thing.Progress < world.GrowSeconds / 3 ? 1 : 2) : 0, track.At);
         live.Watch(() => (thing.FarmStage, thing.FarmStage == FarmStage.Growing ? (int)((world.GrowSeconds - thing.Progress) / world.Data.DaySeconds * 24) : -1), now => {
             var (stage, hours) = now;
-            ripe.Text = hours >= 0 ? $"ripe in {hours / 24} d {hours % 24} h" : stage == FarmStage.Ripe ? "ripe · hold right mouse on the plot to harvest" : "sows once seeds and fertilizer are in";
+            ripe.Text = stage switch {
+                FarmStage.Growing => $"Growing, {Until(hours)} until ripe",
+                FarmStage.Ripe => "Ripe · hold right mouse on the plot to harvest",
+                _ => "Sows once seeds and fertilizer are in"
+            };
         });
         var fertilizer = SowingCup("fertilizer", Style.CupFuel);
         var lasts = Style.Text("", 13, Style.Tan);
@@ -36,6 +40,10 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
         StoreBagGrid("Click: sow seeds or fertilizer · Drag to move", id => world.Holds(thing, id));
         JobButtons();
     }
+
+    /// <summary>Whole days left while a day or more remains, then hours.</summary>
+    private static string Until(int hours) => hours >= 24 ? Count(hours / 24, "day") : Count(Math.Max(1, hours), "hour");
+    private static string Count(int n, string unit) => n == 1 ? $"1 {unit}" : $"{n} {unit}s";
 
     /// <summary>A cup for what the plot sows from; seed comes back in from the plot's own harvest as well as from the backpack.</summary>
     private ItemSlot SowingCup(string item, StyleBoxFlat? look = null) {

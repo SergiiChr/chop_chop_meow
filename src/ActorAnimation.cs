@@ -528,7 +528,8 @@ public static class ActorAnimation {
         bool moving,
         Inventory backpack,
         bool sprinting = false,
-        bool crafting = false) {
+        bool crafting = false,
+        bool fitting = false) {
         if (moving) return sprinting ? ActorAction.Run : ActorAction.Jog;
         if (!gathering || resourceKind == null) return crafting ? ActorAction.Craft : ActorAction.Idle;
 
@@ -536,6 +537,8 @@ public static class ActorAnimation {
             ThingKind.Tree => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,
             ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => backpack["steel_pick"] > 0 ? ActorAction.SteelMine : ActorAction.Gather,
             ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.Leaves => ActorAction.Gather,
+            // A mine is dug with a pickaxe, then its frame and rails are hammered in.
+            ThingKind.Mine => fitting ? ActorAction.Hammer : ActorAction.SteelMine,
             _ => ActorAction.Idle
         };
     }

@@ -24,6 +24,9 @@ public static class SimulationChecks {
         Test(MineRockChecks.Run);
         Test(WorkerStateChecks.Run, data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
+        Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
+        Test(CheckDismantlingABuildingReturnsItsCostAndContents, data);
+        Test(CheckDismantlingWhatDoesNotFitLeavesItInABox, data);
         Test(CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest, data);
         Test(CheckWorkerGathersWoodAndRetargetsWhenFilterChanges, data);
         Test(CheckWorkerDetoursAroundLake, data);
@@ -60,6 +63,7 @@ public static class SimulationChecks {
         Test(CheckWolvesHuntAndCarcassesYieldMeat, data);
         Test(CheckWolvesLeaveHealthyOrFirelitPlayersAlone, data);
         Test(CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth, data);
+        Test(CheckWolfThatBitesAPlayerToDeathEatsTheirFood, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
         Test(CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst, data);
         Test(CheckSleepNeedsFoodAndWater, data);
@@ -67,6 +71,7 @@ public static class SimulationChecks {
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
+        Test(CheckPatrollingWolfWalksAtHalfItsTrot, data);
         Test(CheckWolvesKeepToGroundAPlayerCanWalk, data);
         Test(CheckSmelledPlayerDrawsAHowlAndThePack, data);
         Test(CheckWolvesGoHomeBeforeDawn, data);
@@ -82,6 +87,7 @@ public static class SimulationChecks {
         Test(CheckCrewWalksBackAtDawnPaidAndKeepsItsJobs, data);
         Test(CheckFogHidesUnseenGroundAndRemembersExploredGround, data);
         Test(CheckCratesShowOneSlotPerItemTheyCanHold, data);
+        Test(CheckPlayerMovesItemsInAndOutOfACarriedCrate, data);
         Test(CheckHandCraftingNeedsChiselAndTakesTime, data);
         Test(CheckBenchRecipesWaitForSlottedTools, data);
         Test(CheckTinNeedsPickaxeAndSmeltsIntoBars, data);
@@ -224,6 +230,49 @@ public static class SimulationChecks {
         world.SetFilter(heldRack, "steel_pick", true, false);
         SafeTick(world, 10);
         Require(cutter.Tool == "steel_axe", "with the filter cleared, the worker should take the axe");
+    }
+
+    private static void CheckDismantlingABuildingReturnsItsCostAndContents(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(20, 20);
+        Give(world, "wood", 8); Give(world, "stone", 30);
+        var chest = world.Build(ThingKind.Chest, world.Player + new Vector2(2, 0))!;
+        world.Transfer(world.Backpack, chest.Inventory, "stone", 30);
+        Require(world.Backpack["wood"] == 0 && world.Backpack["stone"] == 0, "building the chest and filling it should empty the backpack");
+        Require(world.Dismantle(chest), "the player should dismantle a chest in reach");
+        Require(world.Find(chest.Id) == null, "a dismantled chest should be gone");
+        Require(world.Backpack["wood"] == 8 && world.Backpack["stone"] == 30, "dismantling a chest should return its 8 wood and the 30 stone in it");
+        Require(!world.Things.Any(t => t.Kind == ThingKind.Grave), "with room in the backpack nothing should go into a box");
+
+        Give(world, "wood", 12); Give(world, "stone", 8);
+        var cabin = world.Build(ThingKind.Hut, world.Player + new Vector2(-4, 0))!;
+        world.Player = cabin.Pos + new Vector2(2, 0);
+        Require(world.Enter(cabin), "the player should step into the cabin");
+        Require(!world.Dismantle(cabin) && world.Find(cabin.Id) != null, "a cabin someone shelters in should not come down");
+    }
+
+    private static void CheckDismantlingWhatDoesNotFitLeavesItInABox(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(20, 20);
+        Give(world, "planks", 10);
+        var bench = world.Build(ThingKind.Bench, world.Player + new Vector2(2, 0))!;
+        Give(world, "stone", 24 * 64);
+        Require(world.Backpack.Room("planks") == 0, "the fixture should fill the backpack");
+        Require(world.Dismantle(bench), "the player should dismantle a bench in reach");
+        var box = world.Things.Single(t => t.Kind == ThingKind.Grave);
+        Require(box.Inventory["planks"] == 10 && box.Pos == bench.Pos, "the planks that do not fit should wait in a recovery box where the bench stood");
+    }
+
+    private static void CheckPlayerMovesItemsWithinFifteenMetres(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(20, 20);
+        var chest = world.Add(ThingKind.Chest, world.Player + new Vector2(14, 0));
+        var furnace = world.Add(ThingKind.Furnace, world.Player + new Vector2(0, 14));
+        var far = world.Add(ThingKind.Chest, world.Player + new Vector2(-17, 0));
+        Give(world, "wood", 6); Give(world, "iron_ore", 4);
+        Require(world.Transfer(world.Backpack, chest.Inventory, "wood", 2) == 2, "a chest 14 m away should take items from the backpack");
+        Require(world.LoadInput(furnace, "iron_ore", 4) == 4, "a station 14 m away should take its inputs from the backpack");
+        Require(world.Transfer(world.Backpack, far.Inventory, "wood", 2) == 0, "a chest 17 m away should be out of reach");
     }
 
     private static void CheckOutputFilterBlocksAutomatedWithdrawal(GameData data) {
@@ -1000,6 +1049,19 @@ public static class SimulationChecks {
         Require(circling.Leap == 0 && !sheltered.Mauled, "campfire light should prevent the throat leap");
     }
 
+    private static void CheckWolfThatBitesAPlayerToDeathEatsTheirFood(GameData data) {
+        // Behind a lit torch a lone wolf creeps in and bites rather than leaping, so the bite is what kills.
+        var world = TorchNight(data);
+        SetNeeds(world, health: 5);
+        Give(world, "berries", 3); Give(world, "wood", 4);
+        PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+        for (int i = 0; i < 30 && !world.Dead; i++) world.Tick(.1f);
+        Require(world.Dead && !world.Mauled, "a wolf's bite should kill a player on 5 health without pinning them");
+        var box = world.Things.Single(t => t.Kind == ThingKind.Grave);
+        Require(box.Inventory["berries"] == 0, "a wolf that bites a player to death should eat their berries");
+        Require(box.Inventory["wood"] == 4, "a wolf that bites a player to death should leave the rest in the recovery box");
+    }
+
     private static void CheckWolfLeapPinsAndKillsAPlayerOnHalfHealth(GameData data) {
         var maul = NightWorld(data);
         SetNeeds(maul, health: 49);
@@ -1402,6 +1464,25 @@ public static class SimulationChecks {
         world.Player = Site(3, 3);
         Require(world.Build(ThingKind.Hut, Site(5, 3)) != null, "gathered materials should build the opening shelter");
         Require(world.Build(ThingKind.Campfire, Site(3, 6)) != null, "gathered materials should build the opening fire");
+    }
+
+    private static void CheckPlayerMovesItemsInAndOutOfACarriedCrate(GameData data) {
+        var world = EmptyWorld(data);
+        world.Player = new Vector2(20, 20);
+        Give(world, "crate", 1); Give(world, "berries", 12); Give(world, "wood", 2); Give(world, "crate", 1);
+        var placed = world.PlaceCrate("crate", world.Player + new Vector2(0, 2))!;
+        world.Transfer(world.Backpack, placed.Inventory, "berries", 12);
+        Require(world.PickUpCrate(placed), "the filled crate should be picked up");
+        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        int id = World.PackedId(packed);
+
+        Require(world.MoveInCrate(id, "berries", 3, packing: false) == 3 && world.Backpack["berries"] == 3, "taking 3 berries out of a carried crate should put them in the backpack");
+        Require(world.CarriedCrate(id) == World.CrateOf("berries") + $"_{id}" && world.Packed(world.CarriedCrate(id)!)!["berries"] == 9, "a crate of berries should stay one with 9 left");
+        Require(world.MoveInCrate(id, "wood", 2, packing: true) == 2 && world.Backpack["wood"] == 0, "packing 2 wood into the carried crate should take them from the backpack");
+        Require(world.CarriedCrate(id) == World.PackedPrefix + id, "a crate of berries and wood should be named as a mixed crate");
+        Require(world.MoveInCrate(id, "crate", 1, packing: true) == 0 && world.Backpack["crate"] == 1, "a crate should never go into a crate");
+        world.MoveInCrate(id, "berries", 9, packing: false); world.MoveInCrate(id, "wood", 2, packing: false);
+        Require(world.CarriedCrate(id) == null && world.Backpack["crate"] == 2 && world.Packed(packed) == null, "an emptied crate should become a plain empty crate");
     }
 
     private static void CheckCratesShowOneSlotPerItemTheyCanHold(GameData data) {
@@ -2191,11 +2272,21 @@ public static class SimulationChecks {
         SafeTick(world, .9f);
         Require(world.Wolves.Count == 0, "no wolf should come out before dusk");
         SafeTick(world, 1);
-        Require(world.Wolves.Count == data.WolvesPerDen && world.Wolves.All(w => w.Pos.DistanceTo(World.Dens[0].Door) < 4),
-                "the first den should let its wolves out as soon as dusk starts, and the others in turn after it");
+        Require(world.Wolves.Count == 1 && world.Wolves.All(w => w.Pos.DistanceTo(World.Dens[0].Door) < 4),
+                "the first den should let its one wolf out as soon as dusk starts, and the others in turn after it");
         SafeTick(world, World.Dens.Length * World.DenGapSeconds);
-        Require(!world.Night && world.Wolves.Count == World.Dens.Length * data.WolvesPerDen, "every den should have let its wolves out well before night");
+        Require(!world.Night && world.Wolves.Count == World.Dens.Length, "every den should have let its one wolf out well before night");
         Require(world.Wolves.All(w => w.Target == 0 && w.Mode == WolfMode.Patrol), "wolves out of their dens should patrol until they smell someone");
+    }
+
+    private static void CheckPatrollingWolfWalksAtHalfItsTrot(GameData data) {
+        var world = NightWorld(data);
+        world.Player = Terrain.Point(30, 0);
+        var start = Terrain.Point(120, 0);
+        var wolf = PatrolWolf(world, new Wolf { Pos = start, Heading = Terrain.Sideways.Angle() });
+        SafeTick(world, 1);
+        // On the first night a wolf trots at 3.1 m/s, so it patrols at 1.55 m/s.
+        Require(Math.Abs(wolf.Pos.DistanceTo(start) - 1.55f) < .05f, $"a patrolling wolf should walk at half its trot, not {wolf.Pos.DistanceTo(start):0.00} m/s");
     }
 
     private static void CheckWolvesKeepToGroundAPlayerCanWalk(GameData data) {

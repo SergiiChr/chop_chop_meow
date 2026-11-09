@@ -59,8 +59,9 @@ public static class AllocationChecks {
 
         var dusk = new World(data);
         RunUntilPhase(dusk, data.DuskStarts + .01f);
-        // Every den lets its wolves out on the first tick; after that they patrol, smell and howl without allocating.
-        Check("tick: dusk, wolves patrolling", () => { dusk.Tick(1 / 60f); Fed(dusk); FreePlayer(dusk); }, warmup: 600);
+        // Every den lets its wolf out on the first tick; after that they patrol, smell and howl without allocating.
+        // Patrolling wolves walk slowly, so the warm-up runs long enough for their first-time costs to land before the measured runs.
+        Check("tick: dusk, wolves patrolling", () => { dusk.Tick(1 / 60f); Fed(dusk); FreePlayer(dusk); }, warmup: 2400);
 
         var night = new World(data);
         RunUntilPhase(night, data.NightStarts + .05f);

@@ -383,7 +383,11 @@ public sealed partial class World {
         foreach (var t in S.Remembered.Values) if (!Sees(t.Pos)) known.Add(t);
     }
     /// <summary>From inside a cabin only that cabin is within reach.</summary>
-    public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind == ThingKind.Water ? Terrain.WaterPoint(from) : t.Pos;
+    public Vector2 GatherAt(Thing t, Vector2 from) => t.Kind switch { ThingKind.Water => Terrain.WaterPoint(from), ThingKind.Mine => MineDoor(t), _ => t.Pos };
+    /// <summary>How far, in metres, the player reaches to move items in and out of storage and stations.</summary>
+    public const float ItemReach = 15;
+    /// <summary>Whether the player can move items to or from a thing.</summary>
+    public bool Reaches(Thing t) => Near(t, ItemReach);
     public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(GatherAt(t, Player)) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
     /// <summary>What every worker's wage comes to each dawn.</summary>
@@ -610,6 +614,7 @@ public sealed partial class World {
     }
     public string? GatherBlock(Thing t, bool worker = false) {
         if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == "water") return "Your bottles are filled.";
+        if (t.Kind == ThingKind.Mine) return MineBuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (!t.IsResource) return "Select a natural resource.";
         if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again in ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Tree => "Only a stump is left. Find another tree.", ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
@@ -633,6 +638,7 @@ public sealed partial class World {
         var blocked = GatherBlock(t);
         if (blocked != null) { gatherClock = 0; return; }
         if (t.IsLoose) { PickUp(t); return; }
+        if (t.Kind == ThingKind.Mine) { BuildMine(t, dt); return; }
         if (t.Kind == ThingKind.Farm) { Harvest(t, dt); if (t.FarmStage == FarmStage.Fallow) Say("Harvested. Take the wheat, seeds and grass from the plot, and put seeds back in to sow again."); return; }
         gatherClock += dt;
         var rule = GatherRules.Of(t.Kind);
@@ -718,8 +724,38 @@ public sealed partial class World {
         if (Forwarded(Verb.Build, item: kind.Id(), at: p)) return null;
         S.Backpack.Spend(Data.Buildings[kind].Cost);
         var t = Add(kind, p); if (kind == ThingKind.Campfire) { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
-        S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Assign a worker to dig the entrance; they need a pickaxe."); Made?.Invoke(S.Actor.Id, t.Id); }
+        S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); Made?.Invoke(S.Actor.Id, t.Id); }
         return t;
+    }
+    /// <summary>Why a building cannot come down now, or null: someone shelters in it, or a cart is out from it.</summary>
+    private string? DismantleBlock(Thing t) {
+        foreach (var p in S.Players) if (p.Sheltered == t.Id) return "Someone is inside. It can come down once they step out.";
+        foreach (var order in S.Orders) if (order.Signpost == t.Id) return "A cart is out from this trading post. Wait for it to come back.";
+        return null;
+    }
+    /// <summary>
+    /// Takes a building down: its cost, anything delivered to build it and everything it holds go to the backpack,
+    /// and what does not fit waits in a recovery box where it stood.
+    /// </summary>
+    public bool Dismantle(Thing t) {
+        if (Downed || !Data.Buildings.TryGetValue(t.Kind, out var def)) return false;
+        if (!Reaches(t)) { Say("Walk closer first."); return false; }
+        if (DismantleBlock(t) is string refused) { Say(refused); return false; }
+        if (Forwarded(Verb.Dismantle, t.Id)) return true;
+        var back = new Dictionary<string, int>(def.Cost);
+        if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
+        foreach (var box in Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
+        S.Things.Remove(t);
+        if (t.Kind == ThingKind.Toolstation) toolsChanged = true;
+        Inventory? rest = null;
+        foreach (var (item, amount) in back) {
+            int left = amount - S.Backpack.Add(item, amount);
+            if (left <= 0) continue;
+            if (rest == null) { rest = Add(ThingKind.Grave, t.Pos).Inventory; rest.Slots = 0; }
+            rest.Slots += (left + rest.StackOf(item) - 1) / rest.StackOf(item); rest.Add(item, left);
+        }
+        Say(rest == null ? $"The {Lower(def.Name)} is down. Everything is back in your backpack." : $"The {Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.");
+        return true;
     }
     public void Consume(string item) {
         if (Downed || !Data.Items.TryGetValue(item, out var def) || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
@@ -738,7 +774,7 @@ public sealed partial class World {
         t.Heat = Math.Min(100, t.Heat + 24); PlayerActed?.Invoke(ActorAction.Pump, t.Pos);
     }
     public void FuelFire(Thing t) {
-        if (!Near(t) || Forwarded(Verb.FuelFire, t.Id)) return;
+        if (!Reaches(t) || Forwarded(Verb.FuelFire, t.Id)) return;
         int n = S.Backpack.Remove("wood", 1);
         if (n == 0) { Say("You need wood to feed the fire."); return; }
         if (t.Burn <= 0) Play("start_fire", t.Pos);
@@ -802,7 +838,7 @@ public sealed partial class World {
     /// <summary>Queues batches of a recipe and loads their inputs and one fuel each from the backpack, on top of what the station holds.</summary>
     public void QueueBatch(Thing t, string recipe, int batches = 1) {
         if (batches <= 0 || !Makes(t, recipe)) return;
-        if (!Near(t)) { Say("Walk closer to load this building."); return; }
+        if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded(Verb.QueueBatch, t.Id, item: recipe, count: batches)) return;
         if (Waiting(t, recipe) >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
         batches = Requeue(t.Queue, recipe, batches);
@@ -861,7 +897,7 @@ public sealed partial class World {
     private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null);
     /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
     public void LoadBatch(Thing t, int batches = 1) {
-        if (!Near(t)) { Say("Walk closer to load this building."); return; }
+        if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded(Verb.LoadBatch, t.Id, count: batches)) return;
         string recipe = t.Recipe;
         var cost = BatchCost(recipe);
@@ -879,7 +915,7 @@ public sealed partial class World {
     }
     /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
     public int LoadInput(Thing t, string item, int quantity) {
-        if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
+        if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
         if (PartialRecipeBottle(t, item)) { Say(Water.FullBottleWarning); return 0; }
         // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the ingredient slot, and the fuel slot is filled by dragging.
         if (!Pending(t, item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
@@ -892,7 +928,7 @@ public sealed partial class World {
     }
     /// <summary>Manual loading of the fuel slot, which holds one kind of fuel at a time.</summary>
     public int LoadFuel(Thing t, string item, int quantity) {
-        if (!Near(t)) { Say("Walk closer to load this building."); return 0; }
+        if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
         if (t.Burner == null) return 0;
         if (FuelBlock(t, item) is string refused) { Say(refused); return 0; }
         if (Forwarded(Verb.LoadFuel, t.Id, item: item, count: quantity)) return 0;
@@ -901,14 +937,15 @@ public sealed partial class World {
         return moved;
     }
     public void Collect(Thing t) {
-        if (!Near(t)) { Say("Walk closer to collect items."); return; }
+        if (!Reaches(t)) { Say("Walk closer to collect items."); return; }
         if (Forwarded(Verb.Collect, t.Id)) return;
         foreach (var item in Leftovers(t).ToArray()) t.Inventory.TransferTo(S.Backpack, item, 999);
     }
     /// <summary>Finished goods plus anything no current, queued or kept recipe takes.</summary>
     public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));
-    private string? FirstLeftover(Thing t) {
-        foreach (var pair in t.Inventory.Items) if (!Pending(t, pair.Key)) return pair.Key;
+    /// <summary>The first of a station's leftovers that some storage takes, and that storage.</summary>
+    private (string Item, Thing Store)? LeftoverToStore(Thing t) {
+        foreach (var pair in t.Inventory.Items) if (!Pending(t, pair.Key) && DepositFor(pair.Key, t.Pos) is Thing store) return (pair.Key, store);
         return null;
     }
     /// <summary>Steps inside a cabin, out of reach of wolves; any movement steps back out.</summary>
@@ -1040,14 +1077,14 @@ public sealed partial class World {
         var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
         var box = Add(ThingKind.Grave, killer == null ? Player : Player + (killer.Pos - Player).Normalized() * 1.5f); box.Inventory = S.Backpack;
         S.Backpack = new Inventory { Slots = 24 }; S.RespawnIn = Data.RespawnSeconds; S.Sheltered = 0; S.Torch = 0; PutOutTorch();
-        if (S.Mauled) {
-            // The pack eats every scrap of food and stays to feed until the player respawns.
-            foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
-            Say($"{(Hunters.Count() > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.");
-            return;
-        }
+        // A wolf that pinned the player, or bit them down without a leap, eats every scrap of food.
+        bool wolfKill = S.Mauled || Hunters.Any(w => w.Pos.DistanceTo(Player) < LeapRange);
+        if (wolfKill) foreach (var item in box.Inventory.Items.Keys.Where(Data.IsFood).ToArray()) box.Inventory.Remove(item, box.Inventory[item]);
+        string ate = $"{(Hunters.Count() > 1 ? "The wolves" : "A wolf")} brought you down and ate all your food. The rest is in a recovery box. Respawning in {Data.RespawnSeconds:0} seconds.";
+        // A pack that pinned the player stays to feed until they respawn.
+        if (S.Mauled) { Say(ate); return; }
         S.Wolves.RemoveAll(w => w.Target == S.Actor.Id);
-        Say($"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
+        Say(wolfKill ? ate : $"You collapsed. Your belongings are in a recovery box where you fell. Respawning in {Data.RespawnSeconds:0} seconds.");
     }
     private void Respawn() {
         // The player wakes inside the cabin nearest to where they fell, or in the clearing without one.
@@ -1202,7 +1239,8 @@ public sealed partial class World {
     /// </summary>
     public const string PackedPrefix = "crate_";
     public static bool IsCrate(string item) => item == "crate" || item.StartsWith(PackedPrefix);
-    private static int PackedId(string item) => item.StartsWith(PackedPrefix) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
+    /// <summary>The number that keys a packed crate's contents, or 0 for any other item.</summary>
+    public static int PackedId(string item) => item.StartsWith(PackedPrefix) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
     /// <summary>The filter entry that stands for any packed crate of one good, such as <c>crate_bread</c>.</summary>
     public static string CrateOf(string item) => PackedPrefix + item;
     /// <summary>The <see cref="CrateOf"/> entry a packed crate of one good matches, or empty for anything else.</summary>
@@ -1225,6 +1263,25 @@ public sealed partial class World {
     }
     /// <summary>An item's name, with what a packed crate holds.</summary>
     public string Describe(string item) => Packed(item) is Inventory contents ? $"{Data.Name("crate")} of {Goods(contents.Items)}" : Data.Name(item);
+    /// <summary>The packed crate with this number in the acting player's backpack, or null once it has gone or been emptied.</summary>
+    public string? CarriedCrate(int id) {
+        foreach (var pair in S.Backpack.Items) if (PackedId(pair.Key) == id) return pair.Key;
+        return null;
+    }
+    /// <summary>
+    /// Moves items between a packed crate in the backpack and the backpack itself, then names the crate after what it holds, keeping its number.
+    /// An emptied crate becomes a plain empty crate.
+    /// </summary>
+    public int MoveInCrate(int id, string item, int quantity, bool packing) {
+        if (Downed || CarriedCrate(id) is not string crate || Packed(crate) is not Inventory contents) return 0;
+        if (packing && IsCrate(item)) { Say("Never put a crate in a crate."); return 0; }
+        if (Forwarded(Verb.MoveInCrate, id, packing ? 1 : 0, item, quantity)) return 0;
+        int moved = packing ? S.Backpack.TransferTo(contents, item, quantity) : contents.TransferTo(S.Backpack, item, quantity);
+        if (moved == 0) { Say(packing ? "The crate is full." : "Your backpack is full."); return 0; }
+        S.Backpack.Replace(crate, contents.Count == 0 ? "crate" : contents.Items.Count == 1 && contents.First() is string good ? $"{PackedPrefix}{good}_{id}" : PackedPrefix + id);
+        if (contents.Count == 0) S.Crates.Remove(id);
+        return moved;
+    }
     /// <summary>Puts a crate from the backpack down, still holding whatever it was packed with.</summary>
     public Thing? PlaceCrate(string item, Vector2 p) {
         if (!IsCrate(item)) return null;
@@ -1323,7 +1380,7 @@ public sealed partial class World {
     /// <summary>Puts a tool from the backpack into the station's empty slot for its kind.</summary>
     public bool SlotTool(Thing bench, string item) {
         string name = Data.Name(bench.Kind).ToLowerInvariant();
-        if (bench.Tools == null || !Near(bench)) { Say($"Walk closer to the {name}."); return false; }
+        if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {name}."); return false; }
         string tool = Data.Items.TryGetValue(item, out var def) ? def.Tool : "";
         var kinds = SlotKinds(bench.Kind);
         if (!kinds.Contains(tool)) { Say($"The {name} has slots for {(kinds.Length == 1 ? A(kinds[0]) : $"a {kinds[0]} and a {kinds[1]}")}."); return false; }
@@ -1332,7 +1389,7 @@ public sealed partial class World {
         return S.Backpack.TransferTo(bench.Tools, item, 1) == 1;
     }
     public void UnslotTool(Thing bench, string item) {
-        if (bench.Tools == null || !Near(bench)) { Say($"Walk closer to the {Data.Name(bench.Kind).ToLowerInvariant()}."); return; }
+        if (bench.Tools == null || !Reaches(bench)) { Say($"Walk closer to the {Data.Name(bench.Kind).ToLowerInvariant()}."); return; }
         if (Forwarded(Verb.UnslotTool, bench.Id, item: item)) return;
         if (bench.Tools.TransferTo(S.Backpack, item, 1) == 0 && bench.Tools[item] > 0) Say("Backpack full.");
     }
@@ -1495,31 +1552,41 @@ public sealed partial class World {
     }
     // Only chests and piles take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
     private static readonly ThingKind[] Stores = { ThingKind.Chest, ThingKind.Pile };
-    // Trading posts also take deliveries, of the crates they ask for.
-    private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Signpost };
+    // Trading posts also take deliveries, of the crates they ask for, and packing stations of the good they pack.
+    private static readonly ThingKind[] Depots = { ThingKind.Chest, ThingKind.Pile, ThingKind.Signpost, ThingKind.Packer };
     public Thing? DepositFor(string item, Vector2 origin, int exclude = 0) {
         Thing? best = null; int bestRank = 0; float bestDistance = 0;
         foreach (var kind in Depots)
             foreach (var t in S.Things.Of(kind)) {
                 // A trading post takes deliveries only of crates its filter asks for, which is how it asks for goods to sell.
-                if (kind == ThingKind.Signpost && !t.Inventory.Wants(item) || t.Id == exclude || t.Inventory.Room(item) <= 0 || !t.Inventory.Accepts(item) || !Holds(t, item)) continue;
+                if (kind == ThingKind.Signpost && !t.Inventory.Wants(item) || kind == ThingKind.Packer && !PackerTakes(t, item) || t.Id == exclude || t.Inventory.Room(item) <= 0 || !t.Inventory.Accepts(item) || !Holds(t, item)) continue;
                 // Compost names every food in its filter, but takes food only when nothing else will, so harvests and picked berries are not left to rot.
                 if (t.Compost && t.SkipFood && Data.IsFood(item)) continue;
-                int rank = t.Compost && Data.IsFood(item) ? 2 : t.Inventory.Wants(item) ? 0 : 1;
+                int rank = t.Compost && Data.IsFood(item) ? 2 : kind == ThingKind.Packer || t.Inventory.Wants(item) ? 0 : 1;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || rank < bestRank || rank == bestRank && distance < bestDistance) { best = t; bestRank = rank; bestDistance = distance; }
             }
         return best;
     }
+    /// <summary>
+    /// Whether a packing station takes a delivery of an item: only the good it packs, and only while a delivery of up to a stack still leaves a slot for empty crates.
+    /// </summary>
+    private static bool PackerTakes(Thing packer, string item) =>
+        item == packer.Packs && packer.Inventory[item] <= (packer.Inventory.Slots - 2) * packer.Inventory.StackOf(item);
+    /// <summary>The nearest chest or pile that gives out an item, or station holding it as a finished good, or null.</summary>
     public Thing? SourceFor(string item, Vector2 origin, int exclude = 0) {
         Thing? best = null; float bestDistance = 0;
-        foreach (var kind in Stores)
+        foreach (var kind in Stores) Nearer(kind, false);
+        foreach (var kind in stationKinds) Nearer(kind, true);
+        return best;
+
+        void Nearer(ThingKind kind, bool station) {
             foreach (var t in S.Things.Of(kind)) {
-                if (t.Id == exclude || t.Inventory[item] <= 0 || !t.Inventory.AllowsWithdrawal(item)) continue;
+                if (t.Id == exclude || t.Inventory[item] <= 0 || !t.Inventory.AllowsWithdrawal(item) || station && Pending(t, item)) continue;
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || distance < bestDistance) { best = t; bestDistance = distance; }
             }
-        return best;
+        }
     }
     /// <summary>The nearest thing of a kind, or null.</summary>
     private Thing? Nearest(ThingKind kind, Vector2 origin) => Nearest(new ReadOnlySpan<ThingKind>(in kind), origin);
@@ -1744,9 +1811,8 @@ public sealed partial class World {
         const string Idle = "Nothing queued or marked to make";
         if (!haul && !Data.Recipes.ContainsKey(target.Recipe)) { w.Status = Idle; return false; }
         if (haul) {
-            if (FirstLeftover(target) is string leftover) {
-                var dest = DepositFor(leftover, target.Pos);
-                if (dest == null) { w.Status = "Output blocked · needs accepting storage"; return false; }
+            // Finished goods with nowhere to go stay in the station, which keeps working until it is full.
+            if (LeftoverToStore(target) is (string leftover, Thing dest)) {
                 w.Status = "Collecting finished goods";
                 if (Walk(w, target.Pos, dt)) { target.Inventory.TransferTo(w.Bag, leftover, w.Bag.StackSize, true); w.Destination = dest.Id; }
                 return true;

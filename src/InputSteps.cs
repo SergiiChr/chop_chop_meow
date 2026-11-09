@@ -130,7 +130,7 @@ public partial class Game {
     }
 
     /// <summary>Whether a click at this point reaches the world rather than a panel over it.</summary>
-    private bool Uncovered(Vector2 point) => ui.GetChildren().OfType<Control>().All(c => !c.Visible || c.MouseFilter == Control.MouseFilterEnum.Ignore || !c.GetGlobalRect().HasPoint(point));
+    private bool Uncovered(Vector2 point) => ui.GetChildren().OfType<Control>().All(c => !c.Visible || c.MouseFilter == Control.MouseFilterEnum.Ignore || !(layer.Transform * c.GetGlobalRect()).HasPoint(point));
 
     /// <summary>Esc until no placement, side panel or backpack drawer is left; with nothing open it does nothing, so it never opens the pause menu.</summary>
     private async Task CloseWithEsc() {

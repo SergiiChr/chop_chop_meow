@@ -72,7 +72,10 @@ public abstract partial class PagePanel : VBoxContainer {
     protected void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
         panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns));
         panel.Bag.Visible = !panel.Bag.Dismissed;
+        if (StoresFromHotbar) panel.Bag.Store = click;
     }
+    /// <summary>Whether a click on the hotbar moves items here as a click in the backpack drawer does: true on pages about a building or an opened crate.</summary>
+    protected virtual bool StoresFromHotbar => false;
     protected HBoxContainer Row() { var r = new HBoxContainer(); AddChild(r); return r; }
     protected void AddLabel(string text, int size = 15, Color? color = null) => AddChild(Style.Wrapped(text, size, color));
     protected void AddButton(string text, Action action, bool disabled = false) => AddChild(kit.Button(text, action, disabled));
@@ -81,8 +84,8 @@ public abstract partial class PagePanel : VBoxContainer {
         var l = Style.Wrapped("", size, color); AddChild(l);
         live.Bind(l, write);
     }
-    protected const string UseHint = "Food and water: click to consume. Crates: click to place. Torch: click to light. Drag onto the hotbar to assign.";
+    protected const string UseHint = "Food and water: click to consume. Crates: click to open, an empty one to place. Torch: click to light. Drag onto the hotbar to assign.";
     protected void UseFromBag(string id) {
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (world.Packed(id) != null) panel.OpenCrate(World.PackedId(id)); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
     }
 }

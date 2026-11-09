@@ -148,7 +148,7 @@ Every other icon comes from `icons/` or `ui/`.
 
 `ui/` holds hand-written SVG icons:
 
-- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, guide, close, filter, stash and so on), tinted in code.
+- Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, guide, close, filter, stash, trash and so on), tinted in code.
 - A hard hat for workers.
 - Icons named by item id for items without a model of their own: steel parts, tin cans, grass, fertilizer, wheat seeds, wheat, flour, dough, and the foods: raw meat, burnt steak, bread, crushed berries, berry jam, meat stew and the canned goods.
 

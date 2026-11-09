@@ -188,10 +188,15 @@ public partial class Game : Node, IGameFlow {
     public void ApplyResolution(Vector2I size) { Settings.ApplyResolution(GetWindow(), size); FitInterface(); }
     public void ShowFrameRate(bool on) => corner.FrameRate.Visible = on;
 
-    /// <summary>The interface is laid out for the design size and drawn larger at a taller render size, keeping its share of the screen.</summary>
+    /// <summary>How large the interface is drawn against the size it is laid out for.</summary>
+    public const float InterfaceScale = .8f;
+
+    /// <summary>
+    /// The interface is laid out for the design size and drawn at <see cref="InterfaceScale"/> of it, larger at a taller render size, keeping its share of the screen.
+    /// </summary>
     private void FitInterface() {
         var size = (Vector2)GetWindow().ContentScaleSize;
-        float scale = size.Y / Settings.DesignSize.Y;
+        float scale = size.Y / Settings.DesignSize.Y * InterfaceScale;
         layer.Scale = Vector2.One * scale; ui.Size = size / scale;
         blackHole.Fit(layer.Scale, ui.Size);
     }

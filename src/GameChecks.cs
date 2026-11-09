@@ -479,7 +479,7 @@ public partial class Game {
         foreach (var (page, key) in new[] { (Page.Backpack, Key.Tab), (Page.Build, Key.B), (Page.Craft, Key.C), (Page.Guide, Key.I) }) {
             await KeyStroke(key);
             // The backpack shows only its drawer, so the wheel goes over that.
-            var box = page == Page.Backpack ? bag.GetGlobalRect() : panel.GetGlobalRect();
+            var box = layer.Transform * (page == Page.Backpack ? bag.GetGlobalRect() : panel.GetGlobalRect());
             foreach (var spot in new[] { box.GetCenter(), box.Position + new Vector2(30, 30), box.End - new Vector2(30, 30) }) await Wheel(spot);
             Require(view.Zoom == zoom, $"The mouse wheel over the {page} panel must not zoom the world.");
         }
@@ -544,7 +544,8 @@ public partial class Game {
         Require(picker.Selected == Array.IndexOf(StartMenu.Resolutions, new Vector2I(1440, 900)), "Options must show the default resolution before one is chosen.");
         await Choose(picker, 0);
         Require(GetWindow().ContentScaleSize == StartMenu.Resolutions[0], "Choosing a resolution must render at it.");
-        Require(layer.Scale == Vector2.One * .8f && ui.Size == new Vector2(1600, 900), "Choosing a resolution must keep the interface's share of the screen.");
+        // 720 rows against the 900 the interface is laid out for, at 0.8 of its size.
+        Require(layer.Scale.IsEqualApprox(Vector2.One * .64f) && ui.Size.IsEqualApprox(new Vector2(2000, 1125)), "Choosing a resolution must keep the interface's share of the screen.");
         var limits = (OptionButton)startMenu.Screen.FindChild("frame_limit", true, false);
         Require(limits.Selected == 0, "The frame rate limit must start on its first choice.");
         Require(limits.GetItemText(0) == "Off", "The frame rate limit's first choice must be Off.");
@@ -723,6 +724,59 @@ public partial class Game {
         await Frames(); Require(farm.Progress > 0 && farm.FarmStage == FarmStage.Ripe, "holding RMB on a ripe farm plot must walk over and harvest by hand.");
         RemoveThings(Hosted, t => t == farm);
     }
+    /// <summary>A growing plot's page says how long until the wheat is ripe without a word of harvesting, which it offers once ripe.</summary>
+    private async Task CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest() {
+        var farm = Hosted.Add(ThingKind.Farm, world.Player + new Vector2(-3, 3));
+        farm.FarmStage = FarmStage.Growing; farm.Progress = Hosted.GrowSeconds - 2.5f * world.Data.DaySeconds;
+        await ClickOn(farm);
+        await Until(() => HasLabel(panel, "Growing, 2 days until ripe"), "a growing plot's page saying it ripens in 2 days", 2);
+        Require(!HasLabel(panel, "harvest"), "A growing plot's page must not mention harvesting.");
+        farm.FarmStage = FarmStage.Ripe; farm.Progress = 0;
+        await Until(() => HasLabel(panel, "Ripe") && HasLabel(panel, "harvest"), "a ripe plot's page offering the harvest", 2);
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == farm);
+    }
+    /// <summary>The red trash can on a building's page asks first, then takes the building down and gives its cost and contents back.</summary>
+    private async Task CheckRedXTakesABuildingDownOnTheSecondClick() {
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2)); chest.Inventory.Add("coal", 5);
+        int wood = world.Backpack["wood"], coal = world.Backpack["coal"];
+        await ClickOn(chest);
+        await Click(Named("dismantle")!);
+        Require(world.Find(chest.Id) != null && Named("dismantle")!.Text == "Remove?", "The first click on the red trash can must ask before taking the chest down.");
+        await Click(Named("dismantle")!);
+        await Until(() => world.Find(chest.Id) == null, "the second click taking the chest down", 2);
+        Require(world.Backpack["wood"] == wood + 8 && world.Backpack["coal"] == coal + 5, "Taking the chest down must give back its 8 wood and the coal in it.");
+        Require(!panel.Visible, "Taking the chest down must close its page.");
+        Drop(Hosted, "wood", 8); Drop(Hosted, "coal", 5); await Frames();
+    }
+    /// <summary>Clicking a packed crate in the backpack opens it at once, and its contents move to the backpack and back by click.</summary>
+    private async Task CheckPackedCrateOpensFromTheBackpack() {
+        Give(Hosted, "crate", 1); Give(Hosted, "berries", 5);
+        var placed = Hosted.PlaceCrate("crate", Hosted.Player + new Vector2(0, 2))!;
+        Hosted.Transfer(Hosted.Backpack, placed.Inventory, "berries", 5); Hosted.PickUpCrate(placed);
+        int berries = Hosted.Backpack["berries"];
+        await KeyStroke(Key.Tab);
+        await Click(await Showing(0, c => c.TooltipText.StartsWith("Wood crate of")));
+        Require(panel.Visible && panel.HeadingTitle.Text == "Wood crate", "Clicking a packed crate in the backpack must open it.");
+        await Click(await Showing(0, c => c.TooltipText.StartsWith("Berries")));
+        Require(world.Backpack["berries"] == berries + 1, "Clicking berries in the open crate must take one out into the backpack.");
+        await Click(await Showing(1, c => c.TooltipText.StartsWith("Berries")));
+        Require(world.Backpack["berries"] == berries, "Clicking berries in the backpack must pack one back into the open crate.");
+        await CloseWithEsc();
+        Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
+    }
+    /// <summary>With a building's page open, clicking an item on the hotbar moves it in as a click on it in the backpack does.</summary>
+    private async Task CheckHotbarClickMovesItemsIntoAnOpenBuilding() {
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2));
+        string before = world.HotbarSlots[4];
+        Give(Hosted, "stone", 3); SetHotbarSlot(world, 4, "stone");
+        int stone = Hosted.Backpack["stone"];
+        await ClickOn(chest);
+        await Click(hotbar.Buttons[4]);
+        Require(chest.Inventory["stone"] == 1 && world.Backpack["stone"] == stone - 1, "Clicking stone on the hotbar must store one in the open chest.");
+        await CloseWithEsc();
+        RemoveThings(Hosted, t => t == chest); Drop(Hosted, "stone", 2); SetHotbarSlot(world, 4, before); await Frames();
+    }
     /// <summary>A player harvesting beside a running station is busy with the harvest, so their figure stops hammering.</summary>
     private async Task CheckHarvestingBesideAStationStopsHammering() {
         var start = world.Player;
@@ -737,6 +791,22 @@ public partial class Game {
         RightRelease(point);
         await Frames();
         RemoveThings(Hosted, t => t == farm || t == anvil); Warp(Hosted, start);
+    }
+    /// <summary>Holding the right mouse button on a marked mine walks the player to its entrance and digs it with the pickaxe.</summary>
+    private async Task CheckRightMouseOnAMarkedMineDigsItWithAPickaxe() {
+        // The server's position, since the window's copy may not have caught up with the last check's warp.
+        var start = Hosted.Player;
+        var cliff = World.CliffOf(ThingKind.Iron);
+        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        var mine = Hosted.Build(ThingKind.Mine, World.MineSpot(cliff))!;
+        Give(Hosted, "steel_pick", 1);
+        await Frames(2);
+        var point = RightPress(mine.Pos);
+        await Until(() => mine.Progress > 0 && view.PlayerAnimation == ActorAction.SteelMine, "holding RMB on a marked mine walking to its entrance and digging with the pickaxe", 6);
+        RightRelease(point);
+        await Frames();
+        Drop(Hosted, "steel_pick", 1);
+        RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
     /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
     private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
@@ -1171,7 +1241,12 @@ public partial class Game {
             await Test(CheckLowFoodGlowsScreenEdges);
             await Test(CheckSoundsRotateCrossfadeAndStaySilentOffScreen);
             await Test(CheckRightClickGathersTreeAndHarvestsFarm);
+            await Test(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
+            await Test(CheckRedXTakesABuildingDownOnTheSecondClick);
+            await Test(CheckPackedCrateOpensFromTheBackpack);
+            await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHarvestingBesideAStationStopsHammering);
+            await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
             await Test(CheckHudAndHotbarEatAndDrinkInHand);

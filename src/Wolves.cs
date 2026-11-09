@@ -40,6 +40,8 @@ public sealed partial class World {
     private readonly Random wolfRandom = new(1913);
     /// <summary>Metres a second a wolf patrols, stalks and backs off at; it speeds up a little each day.</summary>
     private float WolfTrot => Math.Min(3.8f, 3 + Day * .1f);
+    /// <summary>A wolf hunting nobody walks its patrol at this share of its trot.</summary>
+    private const float PatrolPace = .5f;
     /// <summary>From an hour before dawn every wolf gives up and heads back to the nearest den.</summary>
     public bool WolvesRetreat => DayPhase >= Data.WolfRetreatStarts;
 
@@ -68,7 +70,7 @@ public sealed partial class World {
             float step = dt * WolfTrot;
             switch (wolf.Mode) {
                 case WolfMode.Patrol:
-                    Wander(wolf, step); Smell(wolf);
+                    Wander(wolf, step * PatrolPace); Smell(wolf);
                     break;
                 case WolfMode.Called:
                     // A called wolf still noses the air on the way, so it does not run past a player it meets.

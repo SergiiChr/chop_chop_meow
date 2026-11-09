@@ -54,7 +54,7 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
         moves.TakeCell(cell, burner, burner.First, t);
         cell.CanTake = drag => drag.From == world.S.Backpack && world.FuelFits(t, drag.Item);
         cell.Take = drag => {
-            int left = world.Near(t) ? ItemMoves.Leftover(drag, burner.First() is string held && held != drag.Item ? 0 : burner.StackOf(drag.Item) - burner[drag.Item]) : 0;
+            int left = world.Reaches(t) ? ItemMoves.Leftover(drag, burner.First() is string held && held != drag.Item ? 0 : burner.StackOf(drag.Item) - burner[drag.Item]) : 0;
             kit.Run(() => world.LoadFuel(t, drag.Item, drag.Count)); return left;
         };
         var lasts = Style.Text("", 14, Style.Ink);
@@ -84,7 +84,7 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
         if (input) {
             cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || item == "water" && Water.IsBottle(drag.Item));
             cell.Take = drag => {
-                int left = world.Near(t) ? ItemMoves.Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
+                int left = world.Reaches(t) ? ItemMoves.Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
                 kit.Run(() => world.LoadInput(t, drag.Item, drag.Count)); return drag.Item == item ? left : 0;
             };
         }

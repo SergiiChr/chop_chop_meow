@@ -109,7 +109,7 @@ UI and input:
 | `src/ResourcePanel.cs` | A resource in the world |
 | `src/PilePanel.cs` | A pile or compost heap |
 | `src/ToolRackPanel.cs` | A tool station |
-| `src/CratePanel.cs` | A placed crate |
+| `src/CratePanel.cs` | A placed crate, and a packed crate opened from the backpack |
 | `src/RecoveryBoxPanel.cs` | A recovery box |
 | `src/WelcomePage.cs`, `src/PlansPanel.cs`, `src/BackpackPage.cs` | The welcome page, the building plans and the backpack page |
 | `src/StoragePanel.cs` | A chest or other plain storage |
@@ -166,6 +166,7 @@ Health, hunger and thirst are HUD icons.
 Coins are a backpack item that stacks to 1000.
 
 Every page that works with the backpack shows it in one place, a drawer above the hotbar (`PagePanel.BagGrid`).
+On a page about a building or an opened crate (`PagePanel.StoresFromHotbar`), the drawer's click (`BackpackDrawer.Store`) also runs for a mouse click on a hotbar slot; number keys still put the slot in hand.
 The stacks that page takes are rimmed in brick and the rest are faded.
 A close button hides the drawer until another page or building opens.
 The side panel only shows the building and sizes itself to what it holds.
@@ -390,7 +391,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 - **Dens.** `World.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
   The outcrop is solid like a mine's (`World.InSpur`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
   From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
-- **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at the trot it stalks at, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
+- **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at `PatrolPace` (half) of the trot it stalks at, a walk, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
 - **Smell and howl.** A patrolling or called wolf within `SmellRadius` of a player out in the open takes them as its target and howls, standing still, for as long as the howl recording plays (`LoneHowlSeconds` or `PackHowlSeconds`, `Wolf.Howl` counting down `Wolf.HowlLength`).
   The night's first howl plays `wolf_howl`, a lone wolf, and later ones `wolf_howl_group` (`SaveState.Howled`).
   A howl fades with distance from the player, on screen too, and is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it pans with its direction.
@@ -424,7 +425,7 @@ A direct torch hit sets `Wolf.Flee`.
 
 At half health or less, an unprotected player can be pinned by a leaping wolf, which knocks them onto their back and stands over them.
 The pinned state (`SaveState.Mauled`) blocks movement and actions and drains health while the pack feeds.
-The death that follows strips food from the recovery box.
+The death that follows strips food from the recovery box, as does a death with a hunting wolf within `LeapRange`, such as one bitten down behind a torch.
 
 Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the stone furnace cooks into edible meat.
 
@@ -482,6 +483,8 @@ A station's `Thing.Queue` holds its queued batches, one entry per recipe in the 
 Saves and world updates leave out an empty mark, queue and batch, so a tree or a rock carries none of them.
 `World.QueueOf` and `World.Enqueue` read and change either queue, a station's or the hand's, for the board and the strip.
 A station takes inputs for any recipe it has queued or kept, and haulers carry out only what none of them takes.
+What no storage takes stays in the station, which goes on working until its output stack is full.
+`World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
 
 #### Tool slots
@@ -517,6 +520,12 @@ Steel only progresses while the heat is at or above the clear bar (`World.SteelH
 A batch below it pauses, keeps burning one coal from its fuel slot per batch length while cold, and resumes when reheated, with no failure.
 Once an active crew has the forge hot, it never falls below the bar while they are on duty.
 
+### Taking buildings down
+
+`World.Dismantle` removes a building in reach and puts its cost, a supplied mine's materials and everything its boxes hold into the backpack, and the rest into a recovery box where it stood.
+`World.DismantleBlock` keeps up a cabin someone shelters in and a trading post with a cart out.
+The red trash can on `ThingPage`'s header turns into "Remove?" on the first click and dismantles on the second.
+
 ### Storage, filters and automation
 
 Inventories are slot grids with stacks of 64.
@@ -526,6 +535,8 @@ Sort is the only action that packs and regroups stacks.
 Item totals change only through `Inventory` methods, which keep them in line with the stacks.
 Stacks are rebuilt from totals once, where the two can disagree: when a save loads (old saves hold totals only).
 A window's copy takes totals and stacks together from the server, so it does not rebuild.
+
+The player moves items in and out of storage and stations within `World.ItemReach` (15 m, `World.Reaches`); gathering, working a station and pumping need `World.Near`'s 3.2 m.
 
 Input rule for every item cell, in storage and stations alike:
 
@@ -540,7 +551,7 @@ A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (5) items i
 #### Chests
 
 Chests have separate item allowlists for input and output, and empty lists allow all items.
-Automated deposits prefer a chest with a matching input filter, then a nearby unrestricted chest.
+Automated deposits prefer a chest with a matching input filter, or a packing station packing the item, then a nearby unrestricted chest.
 Automated withdrawals respect output filters.
 Manual transfers ignore those filters.
 
@@ -564,6 +575,7 @@ It keeps the player's filters rather than setting its own, and `Thing.SkipFood` 
 
 A wood crate holds `CrateCapacity` (12) units.
 A picked-up crate becomes an item `crate_<n>` whose contents live in `SaveState.Crates`; an empty one is the stackable item `crate`.
+`World.MoveInCrate` moves items between a packed crate in the backpack and the backpack, and renames the crate after what it then holds under the same number; emptied, it becomes a plain `crate`.
 A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
 A pile of crates holds crates of one good.
 Placed crates are manual storage only.
@@ -576,6 +588,7 @@ While worked like an anvil, it moves one item every `PackSeconds` into that crat
 A full crate, or one of another good after the choice changes, waits in the output.
 
 - Haul carries that crate to `DepositFor` and the station's leftovers to storage, then keeps a crate's worth of the good and two empty crates there.
+- `DepositFor` counts the station as storage for its good, ranked with explicit filters, while a stack's delivery still leaves a slot for empty crates (`World.PackerTakes`).
 - A worker with both jobs fetches only once the station runs dry, crates first.
 
 Putting a packed crate into a placed crate asks for confirmation.
@@ -685,6 +698,7 @@ Loading a save made on an older valley moves only the mine cart anchor to this s
 | Fitted | a worker with a hammer | `MineStage.Open` |
 
 The two worker stages take `StageWorkdays` of `GameData.WorkdaySeconds`.
+The player holding a gather on the mine (`World.Gather`, standing at `World.MineDoor`) adds to the same progress with a pickaxe or hammer carried (`World.BuildMine`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
 
 Up to `mine.workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).

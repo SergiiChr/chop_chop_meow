@@ -47,9 +47,11 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     protected Cups cups => field ??= new Cups(kit, moves, live, thing);
 
     public override bool Current => world.Find(thing.Id) == thing;
+    protected override bool StoresFromHotbar => true;
 
     protected override void Build() {
         Headline();
+        if (world.Data.Buildings.ContainsKey(thing.Kind)) DismantleButton();
         Reach();
         Body();
         RedrawOnChange(() => (thing.Packs, thing.Recipe, thing.Compost, FilterCode()));
@@ -73,11 +75,26 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         headingIcon.TooltipText = world.Data.Buildings.TryGetValue(thing.Kind, out var def) ? def.Description : "";
     }
 
+    /// <summary>
+    /// A red trash can in the header that takes the building down: the first click turns it into "Remove?", the second dismantles it and closes the page.
+    /// </summary>
+    private void DismantleButton() {
+        Button? button = null;
+        bool armed = false;
+        button = HeaderAction("trash", "Take this building down · everything comes back", () => {
+            if (armed) { if (kit.Run(() => world.Dismantle(thing))) panel.Close(); return; }
+            armed = true;
+            button!.Icon = null; button.Text = "Remove?"; button.TooltipText = "Click again to take it down";
+            Style.SkinPill(button, Style.Brick);
+        }, Style.FilterRound, "dismantle");
+        button.AddThemeColorOverride("icon_normal_color", Style.Brick); button.AddThemeColorOverride("icon_hover_color", Style.Brick);
+    }
+
     /// <summary>How far away a building is, shown only while it is out of reach.</summary>
     private void Reach() {
         var label = Style.Text("", 14, Style.Warn); label.Visible = false; AddChild(label);
         // Rewritten only when the distance moves a tenth of a tile or the building comes into reach.
-        live.Watch(() => world.Near(thing) ? -1 : (int)(world.Player.DistanceTo(world.GatherAt(thing, world.Player)) * 10), tenths => {
+        live.Watch(() => world.Reaches(thing) ? -1 : (int)(world.Player.DistanceTo(world.GatherAt(thing, world.Player)) * 10), tenths => {
             label.Visible = tenths >= 0;
             if (tenths >= 0) label.Text = $"{tenths / 10}.{tenths % 10} tiles away · walk closer";
         });

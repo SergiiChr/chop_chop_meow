@@ -96,6 +96,7 @@ default), a frame rate counter switch (on by default, shown under the clock) and
 The game renders at the picked size, 16:9 or 16:10 from 1280 × 720 to 3840 × 2400; the window opens at that size, or as
 large as the screen allows, and resizing it only stretches the image, with bars when the shapes differ.
 The display choices are stored in `settings.cfg` and applied at launch.
+The interface keeps the same share of the screen at every size, drawn at 0.8 of the size it is laid out for (`Game.InterfaceScale`).
 
 Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
 Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved.
@@ -123,7 +124,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | C | Open the crafting menu |
 | H | Open the crew overview |
 | I | Open or close the field guide |
-| 1–9 or click a hotbar slot | Put that slot in hand, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
+| 1–9 or click a hotbar slot | With a building's page open, a click moves the slot's item there instead; otherwise put that slot in hand, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
 | Space | Swing axe, or pump the selected nearby reinforced furnace |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
@@ -156,6 +157,7 @@ The bottom bar holds round badges for building, the backpack, crafting, the crew
 Assign a hotbar slot by dragging an item from the backpack or a plan from the building plans onto it.
 Slots reference carried items or building plans; they are not extra storage.
 Consumable slots use one item, building slots enter placement, and tools select a working reference.
+With a building's page or an opened crate showing, clicking a hotbar slot moves its item there as clicking it in the backpack does: one, a stack with Shift, all of it with Ctrl.
 Hotbar assignments persist in saves.
 
 Building plans are an icon grid; hovering a plan shows its description and what it still needs.
@@ -172,10 +174,11 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 | Worker | 5 items, like a crate: one stack of 5 or up to 5 different items |
 | Tool station | 4 slots, any tool in any slot |
 
+- You can move items in and out of storage and stations up to 15 metres away (`World.ItemReach`).
 - Inventory cells retain their positions. Drag to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
 - Right-click a stack to pick up half of it, then left-click a slot to drop it there.
 - A dropped stack that does not all fit fills the slot, and the rest stays held until you drop it elsewhere or click somewhere it cannot go.
-- Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, and a crate click starts placement.
+- Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, a packed crate click opens it and an empty crate click starts placement.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A selected raw-material stack can be deposited by clicking a nearby chest.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
@@ -228,6 +231,13 @@ A circled number beside a worker counts their other jobs, and hovering it lists 
 A worker can hold several jobs, at one place or several, and works through them in turn, moving on when one place has nothing to do.
 
 The crew button opens an overview with each worker's daily pay and the total above.
+
+### Taking buildings down
+
+A building's page has a red trash can at the left of its header.
+Click it, then click "Remove?" to take the building down.
+Its cost and everything in it go to your backpack, and what does not fit waits in a recovery box where it stood; a mine also gives back the timber, iron and stone delivered to it.
+A cabin someone is in, or a trading post with a cart out, stays up until they come out or the cart is back.
 
 ## Survival
 
@@ -360,6 +370,7 @@ Both stations, like the stone furnace's food recipes, take wood, coal or charcoa
 
 A wood crate holds 12 items in total, as one stack or as single items, and its slots grow and shrink with its contents.
 Place one from the backpack or hotbar, click it to open it, and hold right mouse on it to pick it up with its contents packed inside.
+Click a packed crate in the backpack to open it where it is: click what it holds to take it out, click backpack items to pack them in, or put it down from there.
 
 Workers never open or place crates; they pack them at a packing station.
 Putting a crate inside a crate asks first; saying yes ends the game.
@@ -373,6 +384,8 @@ The crate being packed shows on the right with how full it is; a full crate wait
 
 - Craft: works the station.
 - Haul: carries out the full crate, and anything it no longer packs, to storage; then keeps a crate's worth of the good and two empty crates there.
+
+Workers deliver the good it packs straight to it, before other storage, as long as a slot stays free for empty crates.
 
 A crate of one good is a kind of item that filters can name: "Crate of bread" in a chest's filter, or in the trading post's.
 A full crate goes to the nearest storage whose filter asks for that crate, otherwise to the nearest open storage.
@@ -401,6 +414,9 @@ Storage input filters govern automated deposits; output filters govern worker wi
 Empty filters allow all items.
 Workers prefer explicitly accepting chests and reroute cargo when filters change.
 Manual inventory transfers ignore these automation filters.
+
+A station keeps the goods it makes when no storage takes them, and goes on working until its output stack is full.
+Workers fetching a station's inputs take them from storage or straight from another station's finished goods, such as steel parts from the anvil.
 
 ### Tool station
 
@@ -435,6 +451,7 @@ A harvest takes one worker about 1 working day and gives 4 wheat, 2 wheat seeds 
 
 Seeds do not sow themselves: move them from the output into the sowing slot by hand, or let a hauler do it.
 Its panel shows seeds as the input, fertilizer as its fuel and wheat, seeds and grass as outputs.
+While the wheat grows it says how long until it is ripe, such as "Growing, 2 days until ripe", and offers the harvest only once it is.
 
 - A worker on Farm harvests.
 - A worker on Haul first moves seeds from the output into the sowing slot, then carries out the rest of the harvest and brings fertilizer and any missing seeds from storage.
@@ -529,6 +546,8 @@ Clicking the mine shows its three stages:
 2. 50 wood, 10 iron bars and 50 stone go in, hauled from storage by assigned workers or delivered from the backpack.
 3. A worker with a hammer fits the timber frame and the rails, which run into the dark tunnel, in another working day.
 
+You can dig and fit too: hold right mouse on the mine with a pickaxe or a hammer in your backpack, and your work adds to the workers'.
+
 Workers take the pickaxe and hammer from a tool station.
 
 A finished mine takes up to 3 workers with pickaxes, who mine out of sight underground.
@@ -537,13 +556,13 @@ When nobody is working, the cart stands outside, loaded once there is output.
 
 Each miner brings out one ore and one rock every 1.6 seconds, about half what a worker gets from a deposit, but a mine never runs out.
 Output fills two slots, ore and rocks, of one stack each.
-When either is full, mining stops and a miner carries the full stack out to the nearest storage that takes it.
+When either is full, mining stops and a miner carries the full stack out to the nearest storage that takes it, or to a packing station packing it.
 With none, a message says the mine is full with no output available.
 
 ## Wolves and night
 
-Five wolf dens, small caves at the foot of the mountains, each let two wolves out at dusk (20:24), so the hour or two before bed is risky too.
-They patrol the valley, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
+Five wolf dens, small caves at the foot of the mountains, each let one wolf out at dusk (20:24), so the hour or two before bed is risky too.
+They patrol the valley at a walk, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
 
 A wolf that smells you within 30 metres while you are out in the open howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
 After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
@@ -579,7 +598,7 @@ Wolves cannot smell you there: they give up at once and patrol on, and you stay 
 
 At half health or less, away from fire and shelter, a nearby wolf leaps for your throat.
 You are pinned and cannot move or fight, the rest of the pack runs in to feed, and you die within seconds.
-A wolf kill destroys all food in the recovery box; the pack keeps feeding until you respawn.
+A wolf kill, by a pin or a bite, destroys all food in the recovery box; after a pin the pack keeps feeding until you respawn.
 
 A slain wolf falls over and leaves a carcass that lasts until it is butchered: hold right mouse on it for 4 raw meat.
 

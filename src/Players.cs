@@ -59,7 +59,7 @@ public sealed class PlayerState {
 }
 
 /// <summary>The player actions a guest sends to the host.</summary>
-public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, HoldHotbar, Leave, LoadBatch, LoadFuel, LoadInput, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, QueueRecipe, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, UnslotTool }
+public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, HoldHotbar, Leave, LoadBatch, LoadFuel, LoadInput, MoveInCrate, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, QueueRecipe, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, UnslotTool }
 
 /// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
 public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At);
@@ -138,6 +138,7 @@ public sealed partial class World {
         switch (c.Verb) {
             case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Build(kind, c.At); break;
             case Verb.PlaceCrate: PlaceCrate(c.Item, c.At); break;
+            case Verb.MoveInCrate: MoveInCrate(c.Target, c.Item, c.Count, c.Other != 0); break;
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
             case Verb.Torch: UseTorch(c.At); break;
             case Verb.Attack: Attack(); break;
@@ -185,6 +186,7 @@ public sealed partial class World {
             case Verb.SetPacking: SetPacking(t, c.Item); break;
             case Verb.Buy: Buy(t, c.Item, Math.Min(c.Count, 5)); break;
             case Verb.PickUpCrate: PickUpCrate(t); break;
+            case Verb.Dismantle: Dismantle(t); break;
             case Verb.SlotTool: SlotTool(t, c.Item); break;
             case Verb.UnslotTool: UnslotTool(t, c.Item); break;
             case Verb.FetchPrices: FetchPrices(t); break;
@@ -212,7 +214,7 @@ public sealed partial class World {
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {
         int a = Locate(from), b = Locate(to);
         if (a < 0 || b < 0 || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
-        if (new[] { a, b }.Where(at => at > 0).Any(at => !Near(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
+        if (new[] { a, b }.Where(at => at > 0).Any(at => !Reaches(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
         if (b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
         return from.TransferTo(to, item, quantity);
     }
@@ -239,7 +241,7 @@ public sealed partial class World {
         if (a < 0 || b < 0 || Downed) return 0;
         if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
         if (Forwarded(Verb.TransferSlot, a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
-        if (a > 0 && !Near(Find(a / BoxCodes)!) || b > 0 && !Near(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
+        if (a > 0 && !Reaches(Find(a / BoxCodes)!) || b > 0 && !Reaches(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
         // Reject a stale drag rather than moving a different item.
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
         if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }

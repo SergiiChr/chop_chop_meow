@@ -111,7 +111,7 @@ public sealed partial class GameData {
     /// <summary>How many times faster than walking a wolf chases: above 1 so walking never outpaces it, below <see cref="SprintSpeed"/> so sprinting does.</summary>
     public float WolfChase { get; } = 1.5f;
     /// <summary>Wolves that come out of each den at dusk.</summary>
-    public int WolvesPerDen { get; } = 2;
+    public int WolvesPerDen { get; } = 1;
     /// <summary>Metres within which a wolf smells a player out in the open; it howls and goes after them.</summary>
     public float SmellRadius { get; } = 30;
     /// <summary>Metres within which a wolf closing in on a player outside firelight sees them and breaks into a sprint.</summary>

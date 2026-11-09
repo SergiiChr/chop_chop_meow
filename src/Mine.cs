@@ -78,15 +78,33 @@ public sealed partial class World {
 
     /// <summary>Hands the site whatever it still needs from the backpack.</summary>
     public void SupplyMine(Thing mine) {
-        if (!Near(mine)) { Say("Walk closer to the mine."); return; }
+        if (!Reaches(mine)) { Say("Walk closer to the mine."); return; }
         var needs = MineNeeds(mine);
         if (needs.Count == 0 || Forwarded(Verb.SupplyMine, mine.Id)) return;
         if (needs.Sum(p => S.Backpack.TransferTo(mine.Inventory, p.Key, p.Value)) == 0) Say($"The mine still needs {Goods(needs)}.");
     }
 
+    /// <summary>Why the player cannot work on a mine now, or null: a pickaxe digs the entrance and a hammer fits the frame and rails.</summary>
+    private string? MineBuildBlock(Thing mine) => mine.MineStage switch {
+        MineStage.Marked => BestTool("pickaxe") == null ? "A pickaxe is required to dig the entrance." : null,
+        MineStage.Dug => "Deliver the timber, iron and stone first.",
+        MineStage.Supplied => BestTool("hammer") == null ? "A hammer is required to fit the frame and rails." : null,
+        _ => "The mine is open. Workers with pickaxes mine it."
+    };
+    /// <summary>Adds the player's digging or fitting to the stage's one shared progress, which workers add to as well.</summary>
+    private void BuildMine(Thing mine, float dt) {
+        mine.Progress += dt;
+        if (mine.Progress >= MineStageSeconds) FinishMineStage(mine);
+    }
+    private void FinishMineStage(Thing mine) {
+        bool dug = mine.MineStage == MineStage.Marked;
+        mine.MineStage++; mine.Progress = 0;
+        Say(dug ? $"The {MineName(mine)} entrance is dug. Deliver {Goods(Data.Mine.Materials)}." : $"The {MineName(mine)} is open. Up to {Data.Mine.Workers} workers with pickaxes can mine it.");
+    }
+
     private void MineTick(Thing mine, float dt) {
         if (mine.MineStage == MineStage.Dug && mine.Inventory.Spend(Data.Mine.Materials)) {
-            mine.MineStage = MineStage.Supplied; mine.Progress = 0; Say($"The {MineName(mine)} has its timber, iron and stone. A worker with a hammer can fit the frame and rails.");
+            mine.MineStage = MineStage.Supplied; mine.Progress = 0; Say($"The {MineName(mine)} has its timber, iron and stone. You or a worker with a hammer can fit the frame and rails.");
         }
         if (mine.MineStage != MineStage.Open || MineFull(mine)) return;
         int miners = 0;
@@ -130,10 +148,7 @@ public sealed partial class World {
             w.Status = digging ? "Digging the mine entrance" : "Fitting the mine frame and rails";
             if (!Walk(w, MineDoor(mine), dt, .5f)) return true;
             w.WorkState = digging ? WorkerWorkState.Digging : WorkerWorkState.Hammering;
-            mine.Progress += dt;
-            if (mine.Progress < MineStageSeconds) return true;
-            mine.MineStage++; mine.Progress = 0;
-            Say(digging ? $"The {MineName(mine)} entrance is dug. Deliver {Goods(Data.Mine.Materials)}." : $"The {MineName(mine)} is open. Up to {Data.Mine.Workers} workers with pickaxes can mine it.");
+            BuildMine(mine, dt);
             return true;
         }
         if (!HasDuty(w, mine.Id, "mine")) { w.Status = "The mine is open"; return false; }

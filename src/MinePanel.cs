@@ -16,9 +16,9 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
         if (!open) {
             string workday = PageText.Workdays(data.StageWorkdays);
             (string Title, string Needs, string Icon)[] stages = {
-                ("Dig the entrance", $"A worker with a pickaxe for {workday}", "steel_pick"),
+                ("Dig the entrance", $"You or a worker with a pickaxe for {workday}", "steel_pick"),
                 ("Shore it up", PageText.Cost(world, data.Materials), "wood"),
-                ("Fit the frame and rails", $"A worker with a hammer for {workday}", "steel_hammer"),
+                ("Fit the frame and rails", $"You or a worker with a hammer for {workday}", "steel_hammer"),
             };
             var nodes = new PanelContainer[stages.Length];
             for (int i = 0; i < stages.Length; i++) {

@@ -15,13 +15,15 @@ public sealed class PageMemory {
     public bool Hiring, SheetOpen = true;
     /// <summary>A station's worker mark before the last press on its recipe board; the page may redraw between the two presses of a double-click.</summary>
     public string KeptBefore = "";
+    /// <summary>The number of the packed crate opened from the backpack.</summary>
+    public int CarriedCrate;
 }
 
 /// <summary>What every page is built with.</summary>
 public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory);
 
 /// <summary>The pages of the side panel.</summary>
-public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect }
+public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, Crate }
 
 /// <summary>What the side panel inspects: a thing, a worker or nothing, never both.</summary>
 public readonly record struct Selection {
@@ -50,6 +52,7 @@ public partial class SidePanel : PanelContainer {
         ("Your crew", (tools, _) => new CrewPanel(tools)),
         ("Crafting", (tools, _) => new CraftPanel(tools)),
         ("Inspect", InspectPage.For),
+        ("Wood crate", (tools, _) => new CarriedCratePanel(tools, tools.Memory.CarriedCrate)),
     };
     private readonly World world;
     private readonly UiKit kit;
@@ -160,6 +163,13 @@ public partial class SidePanel : PanelContainer {
         // A work order carries on: it waits for a click on a resource, whatever the panel shows meanwhile.
         if (Player.Mode.Placing != null) Player.Mode = new ClickMode.Normal();
         Open(Page.Inspect);
+    }
+
+    /// <summary>Opens a packed crate from the backpack.</summary>
+    public void OpenCrate(int crate) {
+        if (tools.Memory.CarriedCrate != crate) Page = Page.None;
+        tools.Memory.CarriedCrate = crate;
+        Open(Page.Crate);
     }
 
     /// <summary>Selects a worker and shows them.</summary>
