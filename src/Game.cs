@@ -57,6 +57,8 @@ public partial class Game : Node, IGameFlow {
     private float runTime;
     private bool capturing;
     private bool quitting;
+    /// <summary>The window fills the screen; review runs and checks start in a window whatever the player chose.</summary>
+    private bool fullscreen;
     public override void _Ready() {
         try {
             GD.Print(OS.IsDebugBuild() ? "Build: debug, from the project folder" : "Build: optimized release export");
@@ -82,10 +84,11 @@ public partial class Game : Node, IGameFlow {
             blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);
             // Play renders at the player's pick; a review run or check at the design size, unless --resolution asks for one such as "2560x1440".
             bool review = Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run");
+            fullscreen = !review && Settings.Fullscreen;
             ApplyResolution(Launch.Size("--resolution") ?? (review ? Settings.DesignSize : Settings.Resolution));
             if (!review) Engine.MaxFps = Settings.FrameLimit;
             BuildHud();
-            GetViewport().UseTaa = Settings.Taa;
+            Settings.ApplyAntiAliasing(GetViewport(), Settings.AntiAliasing);
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
             if (Launch.Has("--performance-run")) StartGame(-1);
@@ -186,7 +189,8 @@ public partial class Game : Node, IGameFlow {
         if (Launch.Has("--performance-run")) StartPerformanceRun();
     }
 
-    public void ApplyResolution(Vector2I size) { Settings.ApplyResolution(GetWindow(), size); FitInterface(); }
+    public void ApplyResolution(Vector2I size) { Settings.ApplyResolution(GetWindow(), size, fullscreen); FitInterface(); }
+    public void ApplyFullscreen(bool on) { fullscreen = on; ApplyResolution(GetWindow().ContentScaleSize); }
     public void ShowFrameRate(bool on) => corner.FrameRate.Visible = on;
 
     /// <summary>How large the interface is drawn against the size it is laid out for.</summary>
@@ -199,6 +203,8 @@ public partial class Game : Node, IGameFlow {
         var size = (Vector2)GetWindow().ContentScaleSize;
         float scale = size.Y / Settings.DesignSize.Y * InterfaceScale;
         layer.Scale = Vector2.One * scale; ui.Size = size / scale;
+        // Letters are rasterised at the size they show rather than drawn at the laid-out size and stretched.
+        GetViewport().OversamplingOverride = scale;
         blackHole.Fit(layer.Scale, ui.Size);
     }
 

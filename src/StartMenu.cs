@@ -10,6 +10,7 @@ public partial class StartMenu : ColorRect {
     public static readonly Vector2I[] Resolutions = { new(1280, 720), new(1440, 900), new(1600, 900), new(1920, 1080), new(1920, 1200), new(2560, 1440), new(2560, 1600), new(3840, 2160), new(3840, 2400) };
     /// <summary>Frame rate caps offered in the options; 0 leaves the rate to vsync alone.</summary>
     private static readonly int[] FrameLimits = { 0, 60, 90 };
+    private static readonly AntiAliasing[] AntiAliasings = { AntiAliasing.Off, AntiAliasing.FsrUpscale, AntiAliasing.FsrNative, AntiAliasing.Taa };
     private readonly UiKit kit;
     private readonly World world;
     private readonly Saves saves;
@@ -77,12 +78,14 @@ public partial class StartMenu : ColorRect {
         Open("OPTIONS", back);
         var row = new HBoxContainer(); Screen.AddChild(row);
         var label = Style.Wrapped("Resolution"); label.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; row.AddChild(label);
+        var smoothing = new OptionButton { Name = "anti_aliasing", CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
         var picker = new OptionButton { Name = "resolution", CustomMinimumSize = new Vector2(180, 38), FocusMode = Control.FocusModeEnum.None };
         foreach (var size in Resolutions) picker.AddItem($"{size.X} × {size.Y}");
         picker.Selected = Array.IndexOf(Resolutions, Settings.Resolution);
         picker.ItemSelected += index => {
             Settings.Store("display", "resolution", Resolutions[index]);
             flow.ApplyResolution(Resolutions[index]);
+            NameAntiAliasings(smoothing);
         };
         row.AddChild(picker);
         var limitRow = new HBoxContainer(); Screen.AddChild(limitRow);
@@ -103,9 +106,30 @@ public partial class StartMenu : ColorRect {
             kit.Sounds.MusicVolume = (float)value / 100;
         };
         musicRow.AddChild(slider);
-        Toggle("Temporal anti-aliasing", "taa", Settings.Taa, on => { Settings.Store("display", "taa", on); GetViewport().UseTaa = on; });
+        var smoothingRow = new HBoxContainer(); Screen.AddChild(smoothingRow);
+        var smoothingLabel = Style.Wrapped("Anti-aliasing"); smoothingLabel.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; smoothingRow.AddChild(smoothingLabel);
+        foreach (var _ in AntiAliasings) smoothing.AddItem("");
+        NameAntiAliasings(smoothing);
+        smoothing.Selected = Array.IndexOf(AntiAliasings, Settings.AntiAliasing);
+        smoothing.ItemSelected += index => {
+            Settings.Store("display", "anti_aliasing", (int)AntiAliasings[index]);
+            Settings.ApplyAntiAliasing(GetViewport(), AntiAliasings[index]);
+        };
+        smoothingRow.AddChild(smoothing);
+        Toggle("Fullscreen", "fullscreen", Settings.Fullscreen, on => { Settings.Store("display", "fullscreen", on); flow.ApplyFullscreen(on); });
         Toggle("Frame rate counter", "fps", Settings.FrameRate, on => { Settings.Store("display", "fps", on); flow.ShowFrameRate(on); });
         AddButton("Back · Esc", back);
+    }
+
+    /// <summary>Names each anti-aliasing choice, with the size the FSR ones draw the world at for the current render size.</summary>
+    private void NameAntiAliasings(OptionButton smoothing) {
+        var render = GetWindow().ContentScaleSize; var upscale = Settings.FsrUpscaleSize(render);
+        for (int i = 0; i < AntiAliasings.Length; i++) smoothing.SetItemText(i, AntiAliasings[i] switch {
+            AntiAliasing.Off => "Off",
+            AntiAliasing.FsrUpscale => $"FSR Upscale ({upscale.X} × {upscale.Y})",
+            AntiAliasing.FsrNative => $"FSR Native ({render.X} × {render.Y})",
+            _ => "TAA"
+        });
     }
 
     /// <summary>A labelled switch on its own row, which stores and applies its setting as it is toggled.</summary>
