@@ -425,6 +425,64 @@ public partial class Game {
         await CloseWithEsc();
     }
 
+    /// <summary>A stack on the cursor shows how many it carries: the whole stack by drag, half of one by right click.</summary>
+    private async Task CheckCarriedStackShowsItsCount() {
+        Drop(Hosted, "wood", world.Backpack["wood"]);
+        Require(Give(Hosted, "wood", 10) == 10, "The backpack must have room for ten wood.");
+        var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(-1, 0));
+        await ClickOn(crate);
+        var end = await HoldOver(await At(await Showing(1, c => c.TooltipText.Contains("Wood · 10 total"))), await At(Cell(0, c => c.TooltipText == "")));
+        Require(GetViewport().GuiIsDragging() && CarriedCount() == "10", "A dragged stack of ten must show 10 on the cursor.");
+        await LetGo(end);
+        Require(crate.Inventory["wood"] == 10, "Letting go over the crate must drop the ten wood there.");
+        await RightClick(await Showing(0, c => c.TooltipText.StartsWith("Wood")));
+        Require(GetViewport().GuiIsDragging() && CarriedCount() == "5", "A right click on ten wood must pick up half and show 5 on the cursor.");
+        await Click(Cell(1, c => c.TooltipText == ""));
+        Require(world.Backpack["wood"] == 5 && crate.Inventory["wood"] == 5, "The picked up half must drop into the backpack.");
+        RemoveThings(Hosted, t => t == crate);
+        await CloseWithEsc();
+    }
+
+    /// <summary>The side panel and the backpack drawer move where they are dragged and stay on screen, and open in their usual spots next time.</summary>
+    private async Task CheckWindowsMoveByDragAndOpenInTheirUsualSpots() {
+        var crates = new[] { Hosted.Add(ThingKind.Crate, world.Player + new Vector2(-1, 0)), Hosted.Add(ThingKind.Crate, world.Player + new Vector2(1, 1)) };
+        await ClickOn(crates[0]);
+        await Until(() => bag.Visible, "the backpack drawer opening beside the crate", 2);
+        var (panelAt, bagAt) = (panel.GlobalPosition, bag.GlobalPosition);
+        var (panelBy, bagBy) = (new Vector2(-300, 80), new Vector2(250, -120));
+        await MoveWindow(panel, panelBy);
+        Require(panel.GlobalPosition.IsEqualApprox(panelAt + panelBy), $"Dragging the side panel must move it with the mouse: from {panelAt} to {panel.GlobalPosition}.");
+        await MoveWindow(bag, bagBy);
+        Require(bag.GlobalPosition.IsEqualApprox(bagAt + bagBy), $"Dragging the backpack drawer must move it with the mouse: from {bagAt} to {bag.GlobalPosition}.");
+        await MoveWindow(bag, new Vector2(-2000, 0));
+        Require(bag.GlobalPosition.X == 0, $"The backpack drawer must stop at the left edge of the screen, not at {bag.GlobalPosition.X}.");
+        Give(Hosted, "wood", 1);
+        await Click(await Showing(1, c => c.TooltipText.StartsWith("Wood")));
+        await Until(() => crates[0].Inventory["wood"] == 1, "the wood reaching the crate", 2);
+        Require(panel.GlobalPosition.IsEqualApprox(panelAt + panelBy) && bag.GlobalPosition.X == 0, "Moving items must leave both windows where they were dragged.");
+        await ClickOn(crates[1]);
+        await Until(() => bag.Visible, "the backpack drawer opening beside the second crate", 2);
+        Require(panel.GlobalPosition.IsEqualApprox(panelAt) && bag.GlobalPosition.IsEqualApprox(bagAt), "Another crate's page must open both windows in their usual spots.");
+        RemoveThings(Hosted, crates.Contains);
+        await CloseWithEsc();
+    }
+
+    /// <summary>A panel dragged to the left edge makes room for the filter window, and a press on a well's own surface moves the panel too.</summary>
+    private async Task CheckFilterWindowOpensOnScreenBesideAMovedPanel() {
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2));
+        await ClickOn(chest);
+        await MoveWindow(panel, new Vector2(-4000, 0));
+        Require(panel.GlobalPosition.X == 0, $"The side panel must stop at the left edge of the screen, not at {panel.GlobalPosition.X}.");
+        await Click(Named("filters")!);
+        await Until(() => ShowsChild(panel, "filter_in"), "the filter window opening", 2);
+        Require(panel.GlobalPosition.X >= 0, $"The filter window must open on screen beside a panel at the left edge, not at {panel.GlobalPosition.X}.");
+        var at = panel.GlobalPosition;
+        await MoveWindow((Control)panel.FindChild("filter_in", true, false)!.GetParent(), new Vector2(0, 60));
+        Require(panel.GlobalPosition.IsEqualApprox(at + new Vector2(0, 60)), $"Dragging a well in the filter window must move the panel: from {at} to {panel.GlobalPosition}.");
+        RemoveThings(Hosted, t => t == chest);
+        await CloseWithEsc();
+    }
+
     private async Task CheckCrateDraggedIntoCrateStopsAtWarning() {
         var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
         var box = Hosted.Add(ThingKind.Crate, world.Player); box.Inventory.Add("berries", 3); Hosted.PickUpCrate(box);
@@ -1315,6 +1373,9 @@ public partial class Game {
             await Test(CheckBerryBushHidesOnlyItsFruitWhenPicked);
             await Test(CheckCraftingMenuMakesChiselAndTorchWhichLightsAndSwings);
             await Test(CheckStackLargerThanCrateFillsItAndRestStaysHeld);
+            await Test(CheckCarriedStackShowsItsCount);
+            await Test(CheckWindowsMoveByDragAndOpenInTheirUsualSpots);
+            await Test(CheckFilterWindowOpensOnScreenBesideAMovedPanel);
             await Test(CheckSurvivalActionsWorkThroughTheInventoryUI);
             await Test(CheckAutosaveTellsTheOwner);
             await Test(CheckOthersGlideAndStopWhereTheServerPutThem);

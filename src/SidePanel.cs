@@ -37,7 +37,7 @@ public readonly record struct Selection {
 /// The panel on the right: one page at a time under a shared header, with the board beside it for the price sheet or the filter window.
 /// A page is built afresh when it opens and keeps its own state and updates; opening the page already showing draws it again.
 /// </summary>
-public partial class SidePanel : PanelContainer {
+public partial class SidePanel : MovableWindow {
     /// <summary>Left edge of the panel and the clock above it, measured from the right of the screen.</summary>
     public const int Left = -476;
     /// <summary>Top of the panel, below the clock.</summary>
@@ -89,6 +89,8 @@ public partial class SidePanel : PanelContainer {
     public TextureRect HeadingIcon { get; }
     public Label HeadingTitle { get; }
     public float ScreenWidth => ui.Size.X;
+    /// <summary>Left edge of the panel beside any board, measured from the right of the screen, where the player moved it.</summary>
+    private float LeftEdge => Left + Moved.X;
 
     public SidePanel(UiKit kit, WorldView view, ItemMoves moves, Control ui) {
         this.kit = kit; this.view = view; this.ui = ui; world = kit.World;
@@ -97,7 +99,8 @@ public partial class SidePanel : PanelContainer {
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top; Visible = false;
         Bag = new BackpackDrawer(kit, this);
         var frame = new HBoxContainer(); frame.AddThemeConstantOverride("separation", 20); AddChild(frame);
-        board = new PanelContainer { Visible = false, SizeFlagsVertical = SizeFlags.ShrinkBegin }; frame.AddChild(board);
+        // Boxes on the panel pass a press on their own surface on, so it moves the panel.
+        board = new PanelContainer { Visible = false, SizeFlagsVertical = SizeFlags.ShrinkBegin, MouseFilter = MouseFilterEnum.Pass }; frame.AddChild(board);
         sheet = new VBoxContainer { Name = "side_board", Visible = false }; sheet.AddThemeConstantOverride("separation", 12); board.AddChild(sheet);
         var outer = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; outer.AddThemeConstantOverride("separation", 16); frame.AddChild(outer);
         heading = new HBoxContainer(); heading.AddThemeConstantOverride("separation", 12); outer.AddChild(heading);
@@ -118,8 +121,8 @@ public partial class SidePanel : PanelContainer {
         shownInspect = Selection;
         Visible = true; view.PanelOpen = true;
         if (same && page is { Current: true }) { page.Redraw(); return; }
-        // A different page or building leaves the backpack drawer's close button behind.
-        if (!same) Bag.Dismissed = false;
+        // A different page or building leaves the backpack drawer's close button behind, and opens both windows where they open first.
+        if (!same) { Bag.Dismissed = false; ResetPlace(); Bag.ResetPlace(); }
         Page = name;
         foreach (var child in content.GetChildren()) { content.RemoveChild(child); child.QueueFree(); }
         ClearFrame();
@@ -135,7 +138,7 @@ public partial class SidePanel : PanelContainer {
         HeadingTitle.Text = Pages[(int)Page].Title;
         foreach (var child in sheet.GetChildren()) { sheet.RemoveChild(child); child.QueueFree(); }
         board.Visible = false; sheet.Visible = false; sheetScroll = null;
-        OffsetLeft = Left; scroll.ScrollVertical = 0;
+        OffsetLeft = LeftEdge; scroll.ScrollVertical = 0;
         Bag.Clear();
     }
 
@@ -198,7 +201,9 @@ public partial class SidePanel : PanelContainer {
     public VBoxContainer SideBoard(StyleBox look, float width) {
         board.AddThemeStyleboxOverride("panel", look);
         board.Visible = true; sheet.Visible = true; sheet.CustomMinimumSize = new Vector2(width, 0);
-        OffsetLeft = Left - width - 56;
+        // The board opens to the left of a panel moved near the left edge of the screen, so the panel makes room for it.
+        if (ui.Size.X + LeftEdge - width - 56 is < 0 and float past) Shift(new Vector2(-past, 0));
+        OffsetLeft = LeftEdge - width - 56;
         return sheet;
     }
 
@@ -209,13 +214,13 @@ public partial class SidePanel : PanelContainer {
     /// <summary>Sizes the panel's scroll area to what it shows, up to the room between the clock and the hotbar.</summary>
     public void Fit() {
         if (!Visible) return;
-        float room = Math.Max(160, ui.Size.Y - Top - 120);
+        float room = Math.Max(160, ui.Size.Y - Position.Y - 120);
         float want = Math.Min(inset.GetCombinedMinimumSize().Y, room);
         if (sheet.Visible && sheetScroll != null) {
             // The board reaches further left than the panel, over the backpack drawer, so it stops above the drawer.
             // The page shows the drawer after the list is handed over, so the list hides it here.
             if (sheetHidesDrawer && Bag.Visible) Bag.Visible = false;
-            float clear = Bag.Visible ? ui.Size.Y - Top - BackpackDrawer.Bottom - Bag.Size.Y - 40 : room;
+            float clear = Bag.Visible && Bag.Position.Y > Position.Y ? Bag.Position.Y - Position.Y - 40 : room;
             float rest = sheetRest ?? sheet.GetCombinedMinimumSize().Y - sheetScroll.CustomMinimumSize.Y + 60;
             float rows = Math.Max(60, Math.Min(sheetRows!.GetCombinedMinimumSize().Y, Math.Min(room, clear) - rest));
             if (Math.Abs(sheetScroll.CustomMinimumSize.Y - rows) > .5f) sheetScroll.CustomMinimumSize = new Vector2(0, rows);

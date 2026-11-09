@@ -104,7 +104,8 @@ public partial class WaterWarning : Label {
     public void Warn(string message) { Text = message; clock = ShowSeconds; SetProcess(true); }
 
     public override void _Process(double delta) {
-        Position = new Vector2(20, bag.Visible ? bag.Position.Y - 36 : screen.Size.Y - 148);
+        // Below the drawer when it was moved up against the top of the screen.
+        Position = bag.Visible ? bag.Position + new Vector2(0, bag.Position.Y >= 36 ? -36 : bag.Size.Y + 6) : new Vector2(20, screen.Size.Y - 148);
         clock -= Math.Min((float)delta, .1f);
         if (clock <= 0) { Text = ""; SetProcess(false); }
     }

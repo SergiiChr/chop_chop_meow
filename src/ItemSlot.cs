@@ -36,7 +36,7 @@ public partial class ItemSlot : Button {
         Style.Skin(cell, Style.CupNormal, Style.CupHover, Style.CupPressed);
         cell.AddThemeConstantOverride("icon_max_width", (int)(size * .74f));
         var count = CountBadge();
-        cell.AddChild(count);
+        cell.AddChild(count); cell.shownCount = count;
         // A packed crate shows what it holds on a round badge at the other corner.
         var badge = Style.Corner(Style.Icon(null, 24), 0, 0); badge.Name = "badge"; badge.Visible = false;
         cell.AddChild(badge);
@@ -53,6 +53,8 @@ public partial class ItemSlot : Button {
 
     // Godot drag data must be a Variant, so the C# payload rides alongside it for the drag's lifetime.
     private static ItemDrag? dragging;
+    /// <summary>The cup's own count pill, which a drag of the whole stack copies.</summary>
+    private Badge? shownCount;
     public Func<ItemDrag?>? Drag { get; set; }
     public Func<ItemDrag, bool>? CanTake { get; set; }
     /// <summary>Drops the drag here and returns the units that did not fit, which stay on the cursor.</summary>
@@ -69,7 +71,7 @@ public partial class ItemSlot : Button {
     public override Variant _GetDragData(Vector2 atPosition) {
         dragging = Drag?.Invoke();
         if (dragging == null) return default;
-        SetDragPreview(Preview());
+        SetDragPreview(Preview(null));
         return dragging.Item;
     }
 
@@ -82,14 +84,21 @@ public partial class ItemSlot : Button {
         else if (click.ButtonIndex == MouseButton.Right && Drag?.Invoke() is { Count: > 0 } whole) {
             var half = whole with { Count = (whole.Count + 1) / 2 };
             dragging = half;
-            ForceDrag(half.Item, Preview());
+            ForceDrag(half.Item, Preview(half.Count == whole.Count ? null : half.Count));
             AcceptEvent();
         } else if (click.ButtonIndex == MouseButton.Right && RightClicked != null) { RightClicked(); AcceptEvent(); }
     }
 
-    private Control Preview() {
+    /// <summary>
+    /// The icon under the cursor, in a frame the size of this cup with a count pill on the same corner.
+    /// Carrying the whole stack, <paramref name="part"/> is null and the pill reads as the cup's does, such as a bottle's sips; carrying part of it, the pill counts what is carried.
+    /// </summary>
+    private Control Preview(int? part) {
         var preview = new Control();
-        preview.AddChild(new TextureRect { Texture = Icon, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, Size = new Vector2(40, 40), Position = new Vector2(-20, -20), Modulate = new Color(1, 1, 1, .85f) });
+        var frame = new Control { Size = Size, Position = -Size / 2, MouseFilter = MouseFilterEnum.Ignore }; preview.AddChild(frame);
+        frame.AddChild(new TextureRect { Texture = Icon, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, Size = new Vector2(40, 40), Position = Size / 2 - new Vector2(20, 20), Modulate = new Color(1, 1, 1, .85f) });
+        var pill = CountBadge(); pill.Name = "carried_count"; frame.AddChild(pill);
+        pill.Text = part is int carried ? carried.ToString() : shownCount?.Text ?? "";
         return preview;
     }
 
@@ -108,7 +117,7 @@ public partial class ItemSlot : Button {
         do await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
         while (Input.IsMouseButtonPressed(MouseButton.Left));
         if (!IsInstanceValid(this) || !IsInsideTree()) return;
-        dragging = rest; ForceDrag(rest.Item, Preview());
+        dragging = rest; ForceDrag(rest.Item, Preview(rest.Count));
     }
 
     public override void _Notification(int what) {

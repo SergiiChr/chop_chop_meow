@@ -41,6 +41,9 @@ The interface reads the world through `World`'s read members and changes it thro
 The side panel builds a new `PagePanel` node when a page opens; the page holds its own `LiveUpdates`, which run on each refresh, and its own state.
 A tab or other choice on a page calls `Redraw`, which builds its body again and keeps that state; `PageMemory` keeps only what outlasts the page.
 A `ThingPage` is a page about one thing in the world, with its job buttons and filters.
+The side panel and the backpack drawer are `MovableWindow`s: a drag on an empty spot moves one within the screen, `Redraw` keeps it there, and opening a different page or building puts both back.
+The board beside the panel moves with it, and the panel shifts right when the board would open past the screen's left edge.
+Wells and boxes on the panel pass a press on their own surface on, so they move it too.
 UI checks stay in `partial class Game` and reach the parts through their public members.
 
 ### Source files
@@ -77,7 +80,7 @@ UI and input:
 | --- | --- |
 | `src/Game.cs` | Creates and holds the interface's parts, routes input and runs the main game loop |
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
-| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates` and `LiveText` |
+| `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
 | `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode, full-bottle and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
@@ -543,6 +546,7 @@ Input rule for every item cell, in storage and stations alike:
 - A click moves exactly one item, in either direction.
 - Shift-click moves the stack clicked, and Ctrl-click all of that item.
 - Right-click picks up half where a panel supports dragging.
+- A carried stack shows its count on the cursor: the cell's own pill when it carries the whole stack, otherwise how many it carries.
 - Dragging carries a stack or a split portion to its exact destination, merging compatible stacks or swapping cells.
 - Bulk buttons and recipe batch actions say what they move.
 

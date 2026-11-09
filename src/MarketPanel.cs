@@ -73,7 +73,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
 
     /// <summary>The road to the village with every cart from this post drawn where it is.</summary>
     private void Road() {
-        var strip = new PanelContainer(); strip.AddThemeStyleboxOverride("panel", Style.Round(Style.Line, 22).Item1); AddChild(strip);
+        var strip = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Pass }; strip.AddThemeStyleboxOverride("panel", Style.Round(Style.Line, 22).Item1); AddChild(strip);
         var pad = new MarginContainer(); pad.AddThemeConstantOverride("margin_left", 12); pad.AddThemeConstantOverride("margin_right", 12); pad.AddThemeConstantOverride("margin_top", 6); pad.AddThemeConstantOverride("margin_bottom", 6);
         strip.AddChild(pad);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 10); pad.AddChild(row);

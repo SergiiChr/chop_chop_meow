@@ -23,6 +23,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
             ("key:1–9", "Put a hotbar slot in hand. Drag an item or plan onto a slot to assign it."),
             ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Your crew."), ("key:I", "This guide."),
             ("key:Click / Shift / Ctrl", "Click moves one item, Shift-click the stack clicked and Ctrl-click all of that item. Right-click picks up half."),
+            ("key:Drag", "Drag an empty spot on a panel or the backpack to move it."),
             ("key:F5 · F9", "Quick save and load."),
             ("key:Esc", "Cancel, close a panel, or pause.")
         },
@@ -79,7 +80,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
         }
         var page = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; page.AddThemeConstantOverride("separation", 10); board.AddChild(page);
         foreach (var (key, _, title) in GuideTopics) if (key == memory.GuideTab) page.AddChild(Style.Heading(title, 20));
-        var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Style.Well); page.AddChild(well);
+        var well = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Pass }; well.AddThemeStyleboxOverride("panel", Style.Well); page.AddChild(well);
         var rows = new VBoxContainer(); rows.AddThemeConstantOverride("separation", 8); well.AddChild(rows);
         var tips = GuideTips[memory.GuideTab];
         for (int i = 0; i < tips.Length; i++) {

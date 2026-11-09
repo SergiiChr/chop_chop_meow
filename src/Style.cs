@@ -172,7 +172,8 @@ public static class Style {
 
     /// <summary>A beige well around a control.</summary>
     public static PanelContainer InWell(Control inner) {
-        var well = new PanelContainer(); well.AddThemeStyleboxOverride("panel", Well); well.AddChild(inner);
+        // A press on the well's own surface passes on, so it moves the window the well sits in.
+        var well = new PanelContainer { MouseFilter = Control.MouseFilterEnum.Pass }; well.AddThemeStyleboxOverride("panel", Well); well.AddChild(inner);
         return well;
     }
 
