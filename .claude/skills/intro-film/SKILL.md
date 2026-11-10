@@ -1,11 +1,11 @@
 ---
 name: intro-film
-description: Change the intro film a new game opens with, check it shot by shot and make its movie file again. Use when changing a shot, pose, set, camera or sound of the intro, or after changing a model the film shows.
+description: Change the intro film the game opens with, check it shot by shot and make its movie file again. Use when changing a shot, pose, set, camera or sound of the intro, or after changing a model the film shows.
 ---
 
 # Intro film
 
-A new game plays `assets/intro.ogv` (`src/IntroMovie.cs`).
+The game opens by playing `assets/intro.ogv` over the start menu (`src/IntroMovie.cs`); Esc skips it.
 The game draws the film's frames itself (`src/WorldIntro.cs`, `src/IntroSets.cs`, `src/IntroPoses.cs`), and a movie
 tool outside this project turns them into the movie.
 [docs/DESIGN.md](../../../docs/DESIGN.md#intro-film) describes how the film is built.
@@ -34,8 +34,8 @@ tool outside this project turns them into the movie.
        --gain 6 --ogv assets/intro.ogv --mp4 build/intro/intro.mp4
    ```
 
-5. Play it in the real window with the `playtest` skill: New game, a shot of the film, Esc, a shot of the game.
-6. Run `./build.py check`; `CheckNewGameOpensWithTheIntroUntilEsc` covers the film holding the game and Esc.
+5. Play it in the real window with the `playtest` skill: a shot of the film right after launch, Esc, a shot of the menu.
+6. Run `./build.py check`; `CheckIntroFilmCoversTheStartMenuUntilEsc` covers the film taking input and Esc.
 
 ## Tools
 

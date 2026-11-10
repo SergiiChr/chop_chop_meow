@@ -35,8 +35,6 @@ public partial class Game : Node, IGameFlow {
     private ItemMoves moves = null!;
     private RecoveryPrompt recovery = null!;
     private IntroMovie intro = null!;
-    /// <summary>Whether a new game opens with the intro film; review runs and checks start without it.</summary>
-    private bool introOnNewGame;
     private PlayerControl player = null!;
     private float uiClock;
     private Net net = null!;
@@ -89,13 +87,15 @@ public partial class Game : Node, IGameFlow {
             blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);
             // Play renders at the player's pick; a review run or check at the design size, unless --resolution asks for one such as "2560x1440".
             bool review = Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run" or "--render-intro");
-            fullscreen = !review && Settings.Fullscreen; introOnNewGame = !review;
+            fullscreen = !review && Settings.Fullscreen;
             ApplyResolution(Launch.Size("--resolution") ?? (introFolder != null ? WorldView.IntroSize : review ? Settings.DesignSize : Settings.Resolution));
             if (!review) Engine.MaxFps = Settings.FrameLimit;
             BuildHud();
             Settings.ApplyAntiAliasing(GetViewport(), Settings.AntiAliasing);
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review") && introFolder == null) startMenu.ShowStart();
+            // The game opens on the intro film, over the start menu; review runs and checks open without it.
+            if (!review) intro.Play();
             if (Launch.Has("--performance-run")) StartGame(-1);
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
@@ -139,7 +139,7 @@ public partial class Game : Node, IGameFlow {
         startMenu = new StartMenu(kit, saves, net, panel, () => menu.Visible = false, this);
         menu = new PauseMenu(kit, net, startMenu, this); ui.AddChild(menu); ui.AddChild(startMenu);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
-        intro = new IntroMovie(kit) { Name = "intro" }; ui.AddChild(intro);
+        intro = new IntroMovie(sounds) { Name = "intro" }; ui.AddChild(intro);
         RefreshLive();
     }
     private void Notify(string message) {
@@ -189,8 +189,6 @@ public partial class Game : Node, IGameFlow {
     private void OnJoined(bool back) {
         ending.Joined(back);
         shownHealth = world.Health;
-        // This server has not heard whether this window holds the game, as it does under the intro film: tell it on the next frame.
-        holding = false;
         if (session is Session.Starting starting) Begin(starting.Slot);
         else if (session is Session.Returning returning) Notify($"{returning.Note} You are back in your game.");
         else if (net.Owning) Notify("You are back in your game.");
@@ -245,8 +243,6 @@ public partial class Game : Node, IGameFlow {
     private void StartGame(int slot) {
         LeaveServer();
         startMenu.ShowStarting();
-        // The film plays while the server starts, and holds the game until it ends or is skipped.
-        if (slot < 0 && introOnNewGame) intro.Play();
         // The checks that set the world up directly run the server inside this window, under a branch with its own network.
         if (Launch.Has("--net-check") || Launch.Has("--ui-test")) {
             var branch = new Node { Name = "Hosted" }; GetTree().Root.AddChild(branch);

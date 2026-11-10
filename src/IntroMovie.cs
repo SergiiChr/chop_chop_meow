@@ -3,11 +3,11 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The intro film, shown over everything when a new game starts.
-/// While it plays it holds the game, quiets the game's music and takes every key and click; Esc skips it.
+/// The intro film, shown over the start menu when the game opens.
+/// While it plays it quiets the game's music and takes every key and click; Esc skips it.
 /// The film is a small movie the window blows up, made from frames the game itself draws with <c>--render-intro</c>.
 /// </summary>
-public partial class IntroMovie(UiKit kit) : Control {
+public partial class IntroMovie(Sounds sounds) : Control {
     private const string Movie = "res://assets/intro.ogv";
     /// <summary>Seconds the skip hint stays before it fades.</summary>
     private const float HintSeconds = 4;
@@ -24,21 +24,20 @@ public partial class IntroMovie(UiKit kit) : Control {
         frame.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); AddChild(frame);
         frame.AddChild(player);
         hint.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomRight, LayoutPresetMode.Minsize, 24); AddChild(hint);
-        kit.HoldWhile(() => Visible);
         Visible = false; SetProcess(false);
     }
 
     public void Play() {
         Visible = true; SetProcess(true);
         shown = 0; hint.Modulate = Colors.White;
-        kit.Sounds.MusicVolume = 0;
+        sounds.MusicVolume = 0;
         player.Play();
     }
 
     private void End() {
         player.Stop();
         Visible = false; SetProcess(false);
-        kit.Sounds.MusicVolume = Settings.MusicVolume;
+        sounds.MusicVolume = Settings.MusicVolume;
     }
 
     public override void _Process(double delta) {

@@ -154,7 +154,7 @@ Checks and review tools:
 | `src/AnimationCapture.cs` | Captures the animation review |
 | `src/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
 | `src/IntroSets.cs`, `src/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
-| `src/IntroMovie.cs` | Plays the film over a new game, holding the game until it ends or Esc skips it |
+| `src/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
 | `tools/intro_film.py` | Draws the film's frames and writes its sound cue sheet |
 
 ### Simulation, view and UI
@@ -732,10 +732,9 @@ The yield goes into the plot's `Thing.Output`; nothing moves seed back into the 
 
 ## Intro film
 
-A new game opens with the film (`IntroMovie`): it plays `assets/intro.ogv` over everything while the server starts,
-holds the game, quiets the game's music and takes every key and click until it ends or Esc skips it.
-A window tells its server that it holds the game again once it has joined, since the film is up before there is a server.
-Loading a save, joining a game, review runs and checks start without it.
+The game opens with the film (`IntroMovie`): it plays `assets/intro.ogv` over the start menu, quiets the game's music
+and takes every key and click until it ends or Esc skips it.
+Review runs and checks open without it.
 
 The movie is made in two steps: `./tools/intro_film.py` has the game draw the frames and write the cue sheet, and a movie
 tool outside this project turns them into `assets/intro.ogv` (see the `intro-film` skill).

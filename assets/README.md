@@ -192,7 +192,7 @@ Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound 
 
 ### Intro film
 
-`intro.ogv` is the intro film a new game opens with: 480×270, 15 frames a second, Ogg Theora with Vorbis sound.
+`intro.ogv` is the intro film the game opens with: 480×270, 15 frames a second, Ogg Theora with Vorbis sound.
 It is made from frames the game draws ([README](../README.md#intro-film)); make it again after changing a model it shows.
 
 `intro/` holds the sounds only the film uses, mixed into it with the game's own sounds and music; a `.gdignore` keeps

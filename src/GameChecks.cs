@@ -64,23 +64,19 @@ public partial class Game {
         RemoveThings(Hosted, t => placed.Contains(t) || t.Kind == ThingKind.Grave);
         await Frames();
     }
-    /// <summary>A new game opens with the intro film, which holds the game still until Esc skips it and nothing else.</summary>
-    private async Task CheckNewGameOpensWithTheIntroUntilEsc() {
+    /// <summary>The intro film covers the start menu and takes every click and key until Esc skips it and nothing else.</summary>
+    private async Task CheckIntroFilmCoversTheStartMenuUntilEsc() {
         ShowStart(); await Frames();
-        // Checks start their games without the film; this one starts as a player's game does.
-        introOnNewGame = true;
-        await Click(FindButton(startMenu.Screen, "New game")!);
-        introOnNewGame = false;
-        Require(intro.Visible, "A new game must open with the intro film.");
-        await Until(() => session is Session.Playing, "the new game starting under the intro film", 20);
-        await Frames(10);
-        float held = world.DayPhase;
-        await Frames(30);
-        Require(intro.Visible && world.DayPhase == held, "The intro film must hold the game while it plays.");
+        // The film plays when the game opens, which a check run does without: no input starts it.
+        intro.Play(); await Frames();
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        Require(intro.Visible && FindButton(startMenu.Screen, "New game") != null, "A click must not reach the start menu under the intro film.");
         await KeyStroke(Key.Escape);
         Require(!intro.Visible, "Esc must skip the intro film.");
-        Require(!menu.Visible, "The Esc that skips the intro film must not open the pause menu too.");
-        await Until(() => world.DayPhase != held, "the game running once the intro film is skipped", 10);
+        Require(startMenu.Visible && FindButton(startMenu.Screen, "New game") != null, "Skipping the intro film must leave the start menu as it was.");
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        Require(FindButton(startMenu.Screen, "New game") == null, "The start menu must take clicks again once the intro film is gone.");
+        await KeyStroke(Key.Escape);
     }
     /// <summary>
     /// A new game reuses the ids of the last one, so the models the view keeps for them must be built anew:
@@ -1403,7 +1399,7 @@ public partial class Game {
             await Test(CheckCrateDraggedIntoCrateStopsAtWarning);
             RemoveCheckFiles();
             await Test(CheckRestartBuildsFreshModelsForReusedIds);
-            await Test(CheckNewGameOpensWithTheIntroUntilEsc);
+            await Test(CheckIntroFilmCoversTheStartMenuUntilEsc);
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }

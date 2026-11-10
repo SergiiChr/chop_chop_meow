@@ -31,6 +31,8 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
 
 ## Drive
 
+The game opens with the intro film over the start menu: send `key Escape` and take a `shot` before anything else.
+
 Write commands, one per line, to `<dir>/cmd.txt`.
 The driver runs them, renames the file to `cmd-N.done`, appends `ok …` or `failed …` per line to `log.txt`, and sets `status.txt` to `ready` when idle.
 Wait for `ready` before writing the next `cmd.txt`.

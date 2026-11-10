@@ -92,7 +92,7 @@ These options are developer review tools; they do not represent a normal fresh-s
 
 ### Intro film
 
-A new game opens with a 42-second film, `assets/intro.ogv` ([Start menu and options](#start-menu-and-options)).
+The game opens with a 42-second film, `assets/intro.ogv`, played over the start menu; Esc skips it.
 It shows the hero bored at his office desk, his boss yelling at him, the bat he takes to his computer, packing at home,
 the train, the walk through the forest, the shore where he squats to touch the sea, and a cold first night by a fire
 with wolves howling.
@@ -113,11 +113,9 @@ Sources and licenses of the environment assets are in [assets/README.md](assets/
 
 ## Start menu and options
 
-The game opens on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit.
+The game opens with the intro film, which Esc skips, and then on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit.
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
-
-A new game opens with the intro film, which holds the game until it ends; Esc skips it.
 
 Options holds a render resolution picker, a frame rate limit (off, 60 or 90 fps), an anti-aliasing picker, a fullscreen
 switch (off by default), a frame rate counter switch (on by default, shown under the clock) and a music volume slider.
