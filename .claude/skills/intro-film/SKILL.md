@@ -20,7 +20,8 @@ tool outside this project turns them into the movie.
    ```
 
    Put them on one sheet and look at the sheet, not at each still (see [Tools](#tools)).
-3. When the stills are right, draw the whole film (about 4.5 minutes) and look at each changed shot as a strip of frames:
+3. When the stills are right, draw the whole film (about 4.5 minutes) and look at each changed shot as a strip of
+   frames:
 
    ```sh
    ./tools/intro_film.py                               # build/intro/frames/00000.png ... and cues.tsv
@@ -73,6 +74,8 @@ Times are from the film's start; a change to a shot's length moves every later s
   looked fine in the head. Check the first and last frame of every shot whose camera or set changed.
 - **A hand misses what it reaches for.** `Reaching` bends an arm to a point but an arm is only so long: lower the squat,
   lean the body further or move the thing closer.
+- **An arm will not cross the body.** A pose's elbow folds only forward; `Folding` with `ActorRig.RollArm` turns the
+  upper arm too, as the crossed arms by the fire do.
 - **Only the cue sheet changed.** A stills run writes the whole `cues.tsv` too: copy `build/intro/stills/cues.tsv` over
   `build/intro/frames/cues.tsv` and make the movie again, without drawing the frames again.
 - **Sound cannot be heard from here.** Place sounds by measuring them (`loudness.py`) and check the mix by its loudness

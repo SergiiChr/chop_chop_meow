@@ -5,17 +5,15 @@ namespace ChopChopMeow;
 
 /// <summary>The intro film's own poses, for what nobody does in the game: sitting at a desk, yelling, swinging a bat, riding a train and shivering.</summary>
 internal static class IntroPoses {
-    /// <summary>Eases through keys sorted by time and holds the first and last outside them.</summary>
-    public static Pose Keyed(float time, params (float At, Pose Pose)[] keys) {
-        if (time <= keys[0].At) return keys[0].Pose;
-        for (int i = 0; i + 1 < keys.Length; i++) {
-            var (from, to) = (keys[i], keys[i + 1]);
-            if (time >= to.At) continue;
-            float t = (time - from.At) / (to.At - from.At);
-            return Pose.Lerp(from.Pose, to.Pose, t * t * (3 - 2 * t));
-        }
-        return keys[^1].Pose;
+    /// <summary>A value eased through keys sorted by time, held before the first and after the last; <paramref name="blend"/> mixes two of them.</summary>
+    public static T Keyed<T>(float time, Func<T, T, float, T> blend, ReadOnlySpan<(float At, T Value)> keys) {
+        for (int i = 0; i + 1 < keys.Length; i++)
+            if (time < keys[i + 1].At) return blend(keys[i].Value, keys[i + 1].Value, Mathf.SmoothStep(keys[i].At, keys[i + 1].At, time));
+        return keys[^1].Value;
     }
+
+    /// <summary>A pose eased through keys sorted by time.</summary>
+    public static Pose Keyed(float time, params (float At, Pose Pose)[] keys) => Keyed<Pose>(time, Pose.Lerp, keys);
 
     /// <summary>Sitting upright on a seat of <see cref="IntroSets.SeatTop"/> with the feet flat and the hands in the lap.</summary>
     public static readonly Pose Seated = new(Lean: 4, Head: 4, RaiseL: 30, OutL: 2, ElbowL: 58, RaiseR: 30, OutR: 2, ElbowR: 58,
@@ -81,9 +79,6 @@ internal static class IntroPoses {
             (SecondBlow, BatDown with { Lean = 34 }), (1.62f, BatDown), (1.95f, spent));
     }
 
-    /// <summary>The game's gathering squat with both hands pressing something shut on the floor ahead.</summary>
-    public static readonly Pose Pressing = new(Lean: 44, Head: 20, RaiseL: 58, OutL: -12, ElbowL: 14, RaiseR: 58, OutR: -12, ElbowR: 14, SwingL: 72, KneeL: 118, SwingR: 50, KneeR: 112);
-
     /// <summary>Riding by the window on the left: the left elbow on the sill, the chin in that hand.</summary>
     public static Pose Riding(float time) {
         float breath = MathF.Sin(time * 1.2f);
@@ -97,11 +92,11 @@ internal static class IntroPoses {
             (.8f, stand with { Lean = 7, Head = 16, RaiseL = 8, OutL = 5, ElbowL = 6, RaiseR = 8, OutR = 5, ElbowR = 6 }), (1, stand with { Lean = 4, Head = 8 }));
     }
 
-    /// <summary>Cross-legged by a fire, hunched and hugging the arms to the chest, shivering; <paramref name="scared"/> pulls everything in tighter.</summary>
+    /// <summary>Cross-legged by a fire, hunched and shivering; the film crosses the arms over the chest. <paramref name="scared"/> pulls him in tighter.</summary>
     public static Pose Shivering(float time, float scared) {
-        float shiver = MathF.Sin(time * 41) * (.5f + .5f * MathF.Sin(time * 2.3f)), rub = MathF.Sin(time * 5.2f) * (1 - scared);
+        float shiver = MathF.Sin(time * 41) * (.5f + .5f * MathF.Sin(time * 2.3f));
         return new Pose(Lean: 16 + scared * 6 + shiver * .7f, Head: 12 - scared * 8, Twist: shiver * 1.2f,
-            RaiseL: 46 + rub * 5, OutL: -38, ElbowL: 118 + scared * 10 - rub * 4, RaiseR: 42 - rub * 5, OutR: -36, ElbowR: 122 + scared * 10 + rub * 4,
             SwingL: 86, KneeL: 150, TurnL: 40, RollL: 90, SwingR: 82, KneeR: 150, TurnR: 40, RollR: 90, Hips: .15f);
     }
+
 }

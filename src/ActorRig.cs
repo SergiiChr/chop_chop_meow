@@ -185,6 +185,12 @@ public sealed class ActorRig {
         }
     }
 
+    /// <summary>
+    /// Turns an upper arm about its own length, on top of the pose just shown.
+    /// A <see cref="Pose"/> has no such turn, so an elbow folds only forward; with it a forearm can lie across the chest.
+    /// </summary>
+    public void RollArm(bool left, float degrees) => (left ? shoulderL : shoulderR).RotateObjectLocal(Vector3.Up, Mathf.DegToRad(degrees));
+
     /// <summary>Puts something gripped at its origin into the right fist, or the left one.</summary>
     public void Hold(Node3D item, bool right = true) {
         item.Position = new Vector3(0, -Forearm, .01f);

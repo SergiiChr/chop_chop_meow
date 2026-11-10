@@ -3,7 +3,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The intro film, shown over the start menu when the game opens.
+/// The intro film, which plays over the start menu from the moment it is added, then removes itself.
 /// While it plays it quiets the game's music and takes every key and click; Esc skips it.
 /// The film is a small movie the window blows up, made from frames the game itself draws with <c>--render-intro</c>.
 /// </summary>
@@ -24,20 +24,15 @@ public partial class IntroMovie(Sounds sounds) : Control {
         frame.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); AddChild(frame);
         frame.AddChild(player);
         hint.SetAnchorsAndOffsetsPreset(LayoutPreset.BottomRight, LayoutPresetMode.Minsize, 24); AddChild(hint);
-        Visible = false; SetProcess(false);
-    }
-
-    public void Play() {
-        Visible = true; SetProcess(true);
-        shown = 0; hint.Modulate = Colors.White;
         sounds.MusicVolume = 0;
         player.Play();
     }
 
+    /// <summary>Gives the music back and takes the film off the screen for good.</summary>
     private void End() {
         player.Stop();
-        Visible = false; SetProcess(false);
         sounds.MusicVolume = Settings.MusicVolume;
+        Visible = false; QueueFree();
     }
 
     public override void _Process(double delta) {

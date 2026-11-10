@@ -68,11 +68,11 @@ public partial class Game {
     private async Task CheckIntroFilmCoversTheStartMenuUntilEsc() {
         ShowStart(); await Frames();
         // The film plays when the game opens, which a check run does without: no input starts it.
-        intro.Play(); await Frames();
+        PlayIntro(); await Frames();
         await Click(FindButton(startMenu.Screen, "Options")!);
-        Require(intro.Visible && FindButton(startMenu.Screen, "New game") != null, "A click must not reach the start menu under the intro film.");
+        Require(intro!.Visible && FindButton(startMenu.Screen, "New game") != null, "A click must not reach the start menu under the intro film.");
         await KeyStroke(Key.Escape);
-        Require(!intro.Visible, "Esc must skip the intro film.");
+        Require(!IsInstanceValid(intro), "Esc must skip the intro film and take it off the screen.");
         Require(startMenu.Visible && FindButton(startMenu.Screen, "New game") != null, "Skipping the intro film must leave the start menu as it was.");
         await Click(FindButton(startMenu.Screen, "Options")!);
         Require(FindButton(startMenu.Screen, "New game") == null, "The start menu must take clicks again once the intro film is gone.");

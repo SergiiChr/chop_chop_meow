@@ -113,7 +113,8 @@ Sources and licenses of the environment assets are in [assets/README.md](assets/
 
 ## Start menu and options
 
-The game opens with the intro film, which Esc skips, and then on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit.
+The game opens with the intro film, which Esc skips, and then on a start menu with Continue (the most recent save), New
+game, Load game, Join game, Options and Quit.
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
 
@@ -765,6 +766,8 @@ Sound credits:
 
 - Kenney ([www.kenney.nl](https://www.kenney.nl))
 - Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com))
+- kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the intro
+  film's train and office recordings ([assets/README.md](assets/README.md#intro-film))
 
 Music credits:
 

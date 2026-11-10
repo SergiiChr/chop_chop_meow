@@ -34,7 +34,8 @@ public partial class Game : Node, IGameFlow {
     private BlackHole blackHole = null!;
     private ItemMoves moves = null!;
     private RecoveryPrompt recovery = null!;
-    private IntroMovie intro = null!;
+    /// <summary>The intro film while it plays; it frees itself when it ends.</summary>
+    private IntroMovie? intro;
     private PlayerControl player = null!;
     private float uiClock;
     private Net net = null!;
@@ -86,7 +87,7 @@ public partial class Game : Node, IGameFlow {
             ui.Theme = Style.Interface();
             blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);
             // Play renders at the player's pick; a review run or check at the design size, unless --resolution asks for one such as "2560x1440".
-            bool review = Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run" or "--render-intro");
+            bool review = introFolder != null || Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run");
             fullscreen = !review && Settings.Fullscreen;
             ApplyResolution(Launch.Size("--resolution") ?? (introFolder != null ? WorldView.IntroSize : review ? Settings.DesignSize : Settings.Resolution));
             if (!review) Engine.MaxFps = Settings.FrameLimit;
@@ -94,8 +95,8 @@ public partial class Game : Node, IGameFlow {
             Settings.ApplyAntiAliasing(GetViewport(), Settings.AntiAliasing);
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review") && introFolder == null) startMenu.ShowStart();
-            // The game opens on the intro film, over the start menu; review runs and checks open without it.
-            if (!review) intro.Play();
+            // The game opens on the intro film, over the start menu; review runs, checks and a screenshot of the menu open without it.
+            if (!review && screenshotPath == null) PlayIntro();
             if (Launch.Has("--performance-run")) StartGame(-1);
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
@@ -139,9 +140,9 @@ public partial class Game : Node, IGameFlow {
         startMenu = new StartMenu(kit, saves, net, panel, () => menu.Visible = false, this);
         menu = new PauseMenu(kit, net, startMenu, this); ui.AddChild(menu); ui.AddChild(startMenu);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
-        intro = new IntroMovie(sounds) { Name = "intro" }; ui.AddChild(intro);
         RefreshLive();
     }
+    private void PlayIntro() { intro = new IntroMovie(sounds) { Name = "intro" }; ui.AddChild(intro); }
     private void Notify(string message) {
         if (message == Water.FullBottleWarning && waterWarning != null) waterWarning.Warn(message); else messages?.Post(message);
         GD.Print(message);

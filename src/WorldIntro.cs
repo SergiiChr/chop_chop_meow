@@ -35,7 +35,7 @@ public partial class WorldView {
     private IntroSets.Train train = null!;
     private Node3D skyline = null!;
     private MeshInstance3D skyDome = null!, moon = null!;
-    private readonly ShaderMaterial skyColors = new() { Shader = new Shader { Code = SkyShader } };
+    private ShaderMaterial skyColors = null!;
     private ColorRect black = null!;
     private Thing campfire = null!;
     private readonly List<ShaderMaterial> waters = new();
@@ -130,6 +130,7 @@ public partial class WorldView {
         sun.DirectionalShadowMode = DirectionalLight3D.ShadowMode.Parallel4Splits; sun.DirectionalShadowBlendSplits = true;
         environment.FogLightEnergy = 1; environment.FogSkyAffect = 0;
         film = new Node3D(); AddChild(film);
+        skyColors = new ShaderMaterial { Shader = new Shader { Code = SkyShader } };
         skyDome = Sphere(film, 600, Vector3.Zero, skyColors, null, 24);
         skyDome.CastShadow = GeometryInstance3D.ShadowCastingSetting.Off;
         moon = Sphere(film, 1, Vector3.Zero, new StandardMaterial3D { AlbedoColor = new Color("e9edf2"), ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, DisableFog = true }, Vector3.One * 16, 16);
@@ -180,7 +181,6 @@ public partial class WorldView {
         boss.Root.Visible = set == office.Root;
         heroLids.Visible = heroTie.Visible = set == office.Root;
         heldBat.Visible = false; moon.Visible = false;
-        hero.Root.Scale = Vector3.One;
     }
 
     /// <summary>Lights a built set: one key light travelling along <paramref name="rays"/>, over a flat fill.</summary>
@@ -230,17 +230,14 @@ public partial class WorldView {
     /// <summary>Turns a posed rig's head further: a nod down, a turn toward its left and a tilt toward its right shoulder, in degrees.</summary>
     private static void TurnHead(ActorRig rig, float nod, float turn, float tilt) => rig.Head.RotationDegrees += new Vector3(nod, turn, tilt);
 
-    /// <summary>A value eased through keys sorted by time, held before the first and after the last.</summary>
-    private static float Track(float time, params (float At, float Value)[] keys) {
-        for (int i = 0; i + 1 < keys.Length; i++) if (time < keys[i + 1].At) return Mathf.Lerp(keys[i].Value, keys[i + 1].Value, Eased(keys[i].At, keys[i + 1].At, time));
-        return keys[^1].Value;
-    }
+    /// <summary>A number eased through keys sorted by time, held before the first and after the last.</summary>
+    private static float Track(float time, params (float At, float Value)[] keys) => IntroPoses.Keyed<float>(time, Mathf.Lerp, keys);
 
     /// <summary>A point eased through keys sorted by time, held before the first and after the last.</summary>
-    private static Vector3 Path(float time, params (float At, Vector3 Point)[] keys) {
-        for (int i = 0; i + 1 < keys.Length; i++) if (time < keys[i + 1].At) return keys[i].Point.Lerp(keys[i + 1].Point, Eased(keys[i].At, keys[i + 1].At, time));
-        return keys[^1].Point;
-    }
+    private static Vector3 Path(float time, params (float At, Vector3 Point)[] keys) => IntroPoses.Keyed<Vector3>(time, static (from, to, weight) => from.Lerp(to, weight), keys);
+
+    /// <summary>Whether a shot's clock passed a moment on this frame, for what happens once.</summary>
+    private static bool Reached(float moment, float t, float dt) => t >= moment && t - dt < moment;
 
     /// <summary>
     /// Bends one arm of a pose so its fist goes to a point in the rig's own space, or as near as the arm is long.
@@ -265,8 +262,30 @@ public partial class WorldView {
             : pose with { RaiseR = raise, OutR = -Mathf.RadToDeg(outward), ElbowR = Mathf.RadToDeg(elbow) };
     }
 
+    /// <summary>
+    /// Bends one arm of a pose so its fist lies on a point of his own torso, given in the torso's space, with the elbow
+    /// swung toward <paramref name="elbowToward"/>.
+    /// That takes a turn of the upper arm about its own length, which a pose cannot hold: <paramref name="roll"/> is that
+    /// turn in degrees, for <see cref="ActorRig.RollArm"/> once the pose is shown.
+    /// </summary>
+    private static RigPose Folding(RigPose pose, bool left, Vector3 target, Vector3 elbowToward, out float roll) {
+        const float upper = ActorRig.UpperArm, fore = ActorRig.Forearm;
+        var to = target - new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
+        float reach = Math.Clamp(to.Length(), .1f, upper + fore - .005f);
+        var line = to.Normalized();
+        // The elbow can sit anywhere on a circle around the line from shoulder to fist; it takes the point nearest the hint.
+        float along = (upper * upper - fore * fore + reach * reach) / (2 * reach), off = MathF.Sqrt(Math.Max(0, upper * upper - along * along));
+        var elbow = line * along + (elbowToward - line * elbowToward.Dot(line)).Normalized() * off;
+        Vector3 arm = elbow / upper, forearm = (line * reach - elbow) / fore;
+        float bend = MathF.Acos(Math.Clamp(arm.Dot(forearm), -1, 1)), outward = MathF.Asin(Math.Clamp(arm.X, -1, 1)), raise = MathF.Atan2(arm.Z, -arm.Y);
+        // The way the bent forearm points, seen from the shoulder as the pose alone turns it, gives the turn still missing.
+        var folds = Basis.FromEuler(new Vector3(-raise, 0, outward)).Inverse() * ((forearm - arm * MathF.Cos(bend)) / MathF.Sin(bend));
+        roll = Mathf.RadToDeg(MathF.Atan2(folds.X, folds.Z));
+        return left ? pose with { RaiseL = Mathf.RadToDeg(raise), OutL = Mathf.RadToDeg(outward), ElbowL = Mathf.RadToDeg(bend) }
+            : pose with { RaiseR = Mathf.RadToDeg(raise), OutR = -Mathf.RadToDeg(outward), ElbowR = Mathf.RadToDeg(bend) };
+    }
+
     private static float Span(float from, float to, float time) => Math.Clamp((time - from) / (to - from), 0, 1);
-    private static float Eased(float from, float to, float time) => Ease(Span(from, to, time));
 
     // ---------- Flying wreckage ----------
 
@@ -346,7 +365,7 @@ public partial class WorldView {
         Place(hero, Vector3.Zero, 0, IntroPoses.Bored(t));
         TurnHead(hero, 4, -6, 22);
         // A slow blink, lids already half shut; the boss's voice takes a while to reach him, then the eyes open and the head comes up.
-        float roused = Eased(4.25f, 4.6f, t);
+        float roused = Mathf.SmoothStep(4.25f, 4.6f, t);
         TurnHead(hero, -8 * roused, 0, -12 * roused);
         float blink = MathF.Pow(Math.Max(0, MathF.Sin(t * 1.9f + .6f)), 14) * (1 - roused);
         heroLids.Scale = new Vector3(1, Math.Max(.01f, 1 + blink - roused), 1); heroLids.Position = new Vector3(0, -.007f * blink + .007f * roused, 0);
@@ -355,8 +374,8 @@ public partial class WorldView {
         bossMouth.Scale = new Vector3(1, .01f, 1);
         // Two recordings of an office hum under all three shots here, and the yelling starts before the boss is seen.
         if (cut) { Cue("intro/office", 2, "length=12\tfadein=0.4\tfadeout=0.8"); Cue("intro/office_room", -6, "length=12\tfadein=0.4\tfadeout=0.8"); }
-        if (t >= BossHeard && t - dt < BossHeard) Cue("intro/boss", -3, string.Create(CultureInfo.InvariantCulture, $"from={BossVoiceStarts:0.00}\tlength=5.8\tfadeout=0.1"));
-        float push = Eased(0, 5, t);
+        if (Reached(BossHeard, t, dt)) Cue("intro/boss", -3, string.Create(CultureInfo.InvariantCulture, $"from={BossVoiceStarts:0.00}\tlength=5.8\tfadeout=0.1"));
+        float push = Mathf.SmoothStep(0, 5, t);
         Frame(new Vector3(.2f, 1.08f, 1.05f).Lerp(new Vector3(.12f, 1.05f, .82f), push), new Vector3(-.05f, .97f, .2f), 44);
     }
 
@@ -374,7 +393,7 @@ public partial class WorldView {
         bossMouth.Scale = new Vector3(1 + shout * .2f, .25f + shout, 1);
         // From the desk top, looking up past his face at the boss, with a tremor on every shout.
         var tremor = new Vector3(MathF.Sin(t * 47), MathF.Sin(t * 61 + 1), 0) * .006f * shout;
-        Frame(new Vector3(-.6f, .84f, .34f).Lerp(new Vector3(-.52f, .86f, .3f), Eased(0, 4, t)) + tremor, new Vector3(.5f, 1.26f, .05f), 54);
+        Frame(new Vector3(-.6f, .84f, .34f).Lerp(new Vector3(-.52f, .86f, .3f), Mathf.SmoothStep(0, 4, t)) + tremor, new Vector3(.5f, 1.26f, .05f), 54);
     }
 
     private readonly Random smashRandom = new(7);
@@ -384,13 +403,12 @@ public partial class WorldView {
         const float drop = 1.9f, bolt = 2.02f;
         if (cut) {
             OfficeLight(); office.LeaningBat.Visible = false;
-            office.Chair.Position += new Vector3(-.35f, 0, -1.25f); office.Chair.RotationDegrees = new Vector3(0, 40, 84);
-            office.Chair.Position += Vector3.Up * .2f;
+            office.Chair.Position += new Vector3(-.35f, .2f, -1.25f); office.Chair.RotationDegrees = new Vector3(0, 40, 84);
         }
         Colleagues(filmTime);
         heroLids.Visible = false;
         heldBat.Visible = t < drop;
-        bool first = t >= IntroPoses.FirstBlow && t - dt < IntroPoses.FirstBlow, second = t >= IntroPoses.SecondBlow && t - dt < IntroPoses.SecondBlow;
+        bool first = Reached(IntroPoses.FirstBlow, t, dt), second = Reached(IntroPoses.SecondBlow, t, dt);
         if (dt > 0 && (Mathf.RoundToInt((t - .45f) * IntroFps) == 0 || Mathf.RoundToInt((t - 1.26f) * IntroFps) == 0)) Cue("tool_air_swing", 1);
         if (first) {
             // The tube bursts: the screen dies, the case caves in and glass flies.
@@ -405,10 +423,11 @@ public partial class WorldView {
             Throw(office.Monitor, new Vector3(.2f, 3.8f, 1.8f), new Vector3(-420, 60, 90), .16f);
             Throw(office.Keyboard, new Vector3(-.5f, 2.9f, -.7f), new Vector3(540, 200, -300), .02f);
             Shatter(office.Monitor.Position + new Vector3(0, .25f, -.1f), new Vector3(0, .5f, .4f), 12, 14, smashRandom);
-            // The recording's next hit, a little lower, with the crash that follows it.
-            Cue("intro/hit", -2, "from=0.74\trate=0.9");
+            // The recording's next hit, a little lower; its last one falls as the monitor lands on the floor.
+            Cue("intro/hit", -2, "from=0.74\tlength=0.48\trate=0.9");
+            Cue("intro/hit", -4, "from=1.24\trate=0.9", .85f);
         }
-        if (t >= drop && t - dt < drop) {
+        if (Reached(drop, t, dt)) {
             var dropped = IntroSets.Bat(); office.Root.AddChild(dropped);
             dropped.GlobalTransform = heldBat.GlobalTransform;
             Throw(dropped, new Vector3(-.4f, .6f, .2f), new Vector3(200, 0, 260), .04f);
@@ -427,11 +446,11 @@ public partial class WorldView {
             Stride(hero, heroStep, at, ActorAction.Run, at + Vector2.Up, dt, "footsteps_default", 1);
         }
         // The boss is thrown back by the first blow and watches him go.
-        float aghast = Eased(IntroPoses.FirstBlow, IntroPoses.FirstBlow + .25f, t);
-        Place(boss, new Vector3(1.45f, 0, -1) + new Vector3(.65f, 0, -.2f) * aghast, -55 - 100 * Eased(bolt + .1f, bolt + .7f, t), RigPose.Lerp(IntroPoses.Yelling(0), IntroPoses.Aghast(t), aghast));
+        float aghast = Mathf.SmoothStep(IntroPoses.FirstBlow, IntroPoses.FirstBlow + .25f, t);
+        Place(boss, new Vector3(1.45f, 0, -1) + new Vector3(.65f, 0, -.2f) * aghast, -55 - 100 * Mathf.SmoothStep(bolt + .1f, bolt + .7f, t), RigPose.Lerp(IntroPoses.Yelling(0), IntroPoses.Aghast(t), aghast));
         bossMouth.Scale = new Vector3(1, .3f + aghast * .9f, 1);
         // From the aisle, side on to the blows, then swinging round to watch him go.
-        float swing = Eased(bolt - .1f, 2.9f, t);
+        float swing = Mathf.SmoothStep(bolt - .1f, 2.9f, t);
         float jolt = (first || second ? 1 : 0) * .02f;
         Frame(new Vector3(2.05f, 1.4f + jolt, .95f), new Vector3(0, .95f, .4f).Lerp(new Vector3(1.2f, .95f, -5), swing), 50);
     }
@@ -466,25 +485,26 @@ public partial class WorldView {
             float u = t - (.1f + i * each);
             // Out to the thing, closing on it, over the pack's mouth, down into it and back.
             var mouth = IntroSets.PackMouth;
-            var hand = Path(u, (0, rightHand ? RightRest : LeftRest), (.32f, lies + grip), (.42f, lies + grip), (.68f, mouth + Vector3.Up * .2f), (.8f, mouth), (1, rightHand ? RightRest : LeftRest));
+            var rest = rightHand ? RightRest : LeftRest;
+            var hand = Path(u, (0, rest), (.32f, lies + grip), (.42f, lies + grip), (.68f, mouth + Vector3.Up * .2f), (.8f, mouth), (1, rest));
             if (u > 0 && u < 1) { if (rightHand) right = hand; else left = hand; }
-            float reaching = Eased(0, .3f, u) * (1 - Eased(.42f, .68f, u));
+            float reaching = Mathf.SmoothStep(0, .3f, u) * (1 - Mathf.SmoothStep(.42f, .68f, u));
             lean += 11 * reaching; twist += (rightHand ? -15 : 15) * reaching;
             if (u >= .37f && u < .8f) { if (rightHand) rightHolds = i; else leftHolds = i; }
             item.Visible = u < .8f;
-            if (u >= .8f && u - dt < .8f) Cue(i % 2 == 0 ? "putting_items_on_hotbar" : "moving_leather_in_inventory", -4);
+            if (u >= .8f && u - dt < .8f) Cue(rightHand ? "putting_items_on_hotbar" : "moving_leather_in_inventory", -4);
         }
         // The right hand swings the flap shut and pulls the zip across while the left steadies the pack.
         right = Path(t, (shut - .25f, right), (shut - .05f, new Vector3(0, .44f, .5f)), (shut + .13f, new Vector3(0, .3f, .62f)), (zip, new Vector3(-.15f, .27f, .66f)), (zipped, new Vector3(.13f, .27f, .6f)), (rise, new Vector3(-.15f, .22f, .6f)));
         left = Path(t, (shut - .05f, left), (shut + .2f, new Vector3(.17f, .22f, .6f)));
-        room.Flap.RotationDegrees = new Vector3(-80 * (1 - Eased(shut - .1f, shut + .13f, t)), 0, 0);
+        room.Flap.RotationDegrees = new Vector3(-80 * (1 - Mathf.SmoothStep(shut - .1f, shut + .13f, t)), 0, 0);
         var squat = ActorAnimation.PoseAt(ActorAction.Craft, 0, false) with { Lean = lean, Twist = twist, Head = 20 };
         squat = Reaching(Reaching(squat, false, right, out var rightFist), true, left, out var leftFist);
         if (rightHolds >= 0) room.Items[rightHolds].Item.Position = rightFist - room.Items[rightHolds].Grip;
         if (leftHolds >= 0) room.Items[leftHolds].Item.Position = leftFist - room.Items[leftHolds].Grip;
         // Up with the pack: it goes from the rug onto his back as he rises.
         room.Pack.Visible = t < shoulder; hero.Pack!.Visible = t >= shoulder;
-        if (t >= shoulder && t - dt < shoulder) Cue("moving_leather_in_inventory", -3);
+        if (Reached(shoulder, t, dt)) Cue("moving_leather_in_inventory", -3);
         var lifting = new RigPose(Lean: 30, Head: 10, RaiseL: 70, OutL: -6, ElbowL: 70, RaiseR: 70, OutR: -6, ElbowR: 70, SwingL: 62, KneeL: 104, SwingR: 50, KneeR: 96);
         // All done: on his feet with his chest out, fists on his hips, and a nod at the room.
         var standing = new RigPose(Lean: -3, Head: -4, SwingL: 4, SwingR: -3);
@@ -493,8 +513,8 @@ public partial class WorldView {
         TurnHead(hero, 9 * MathF.Sin(Span(done + .05f, done + .35f, t) * MathF.PI), 0, 0);
         room.Lamp.LightEnergy = 1.1f + .04f * MathF.Sin(t * 23);
         // Knee high beside the rug, looking down over the pack, rising with him as he stands.
-        float up = Eased(rise, done, t);
-        Frame(new Vector3(1.4f, .74f, 1.5f).Lerp(new Vector3(1.25f, .78f, 1.62f), Eased(0, 5, t)) + Vector3.Up * .3f * up, new Vector3(-.05f, .28f + .76f * up, .42f - .36f * up), 44);
+        float up = Mathf.SmoothStep(rise, done, t);
+        Frame(new Vector3(1.4f, .74f, 1.5f).Lerp(new Vector3(1.25f, .78f, 1.62f), Mathf.SmoothStep(0, 5, t)) + Vector3.Up * .3f * up, new Vector3(-.05f, .28f + .76f * up, .42f - .36f * up), 44);
     }
 
     // ---------- The train ----------
@@ -521,7 +541,7 @@ public partial class WorldView {
         Place(hero, TrainSeat + new Vector3(0, joint * .006f, 0), 0, IntroPoses.Riding(t));
         TurnHead(hero, 4, 46, -12);
         var sway = new Vector3(rock * .006f, joint * .008f, 0);
-        Frame(new Vector3(.4f, 1.04f, 1.3f).Lerp(new Vector3(.38f, 1.03f, 1.12f), Eased(0, 3, t)) + sway, new Vector3(.2f, 1, 0) + sway * .5f, 46);
+        Frame(new Vector3(.4f, 1.04f, 1.3f).Lerp(new Vector3(.38f, 1.03f, 1.12f), Mathf.SmoothStep(0, 3, t)) + sway, new Vector3(.2f, 1, 0) + sway * .5f, 46);
     }
 
     // ---------- The valley ----------
@@ -552,17 +572,17 @@ public partial class WorldView {
         bool walking = t < ArrivalStop;
         Stride(hero, heroStep, at, walking ? ActorAction.Walk : ActorAction.Idle, sea, dt);
         if (!walking) {
-            float settled = Eased(ArrivalStop, ArrivalStop + .3f, t);
-            if (t > 3.05f) hero.Show(RigPose.Lerp(heroStep.Pose, IntroPoses.Sigh(Span(3.05f, 4.4f, t)), Eased(3.05f, 3.2f, t)), null, false);
+            float settled = Mathf.SmoothStep(ArrivalStop, ArrivalStop + .3f, t);
+            if (t > 3.05f) hero.Show(RigPose.Lerp(heroStep.Pose, IntroPoses.Sigh(Span(3.05f, 4.4f, t)), Mathf.SmoothStep(3.05f, 3.2f, t)), null, false);
             // A look up the beach to his left, then down it to his right.
             float look = Track(t, (ArrivalStop, 0), (2.05f, 38), (2.35f, 38), (2.9f, -30), (3.1f, -30), (3.5f, 0));
             TurnHead(hero, 0, look * settled, 0);
-            if (t >= 3.3f && t - dt < 3.3f) Cue("bellows_pump", -6, "rate=0.7");
+            if (Reached(3.3f, t, dt)) Cue("bellows_pump", -6, "rate=0.7");
         }
         // Side on to him where he stops, the sea behind, drifting closer.
         var forward = (sea - at).Normalized(); var side = new Vector2(-forward.Y, forward.X);
         var stop = Trail(ArrivalAlong(ArrivalStop));
-        Frame(To3(stop - side * (3.6f - Eased(0, 4.4f, t) * .8f) - forward * .3f, 1.3f), To3(stop + forward * .5f, 1.28f), 40);
+        Frame(To3(stop - side * (3.6f - Mathf.SmoothStep(0, 4.4f, t) * .8f) - forward * .3f, 1.3f), To3(stop + forward * .5f, 1.28f), 40);
     }
 
     private static readonly StandardMaterial3D RippleWater = Flat(new Color(.86f, .95f, 1, .4f));
@@ -580,8 +600,8 @@ public partial class WorldView {
             // Down onto his heels, the game's crafting squat, with the right hand going out into the water and stirring it.
             var water = new Vector3(-.1f + .05f * MathF.Sin(t * 5), .04f, .56f + .03f * MathF.Cos(t * 5));
             var squat = ActorAnimation.PoseAt(ActorAction.Craft, 0, false) with { Lean = 55, Head = 24, Twist = -8, RaiseL = 44, OutL = 6, ElbowL = 70 };
-            squat = Reaching(squat, false, RightRest.Lerp(water, Eased(arrive + .3f, touch, t)), out var fist);
-            hero.Show(RigPose.Lerp(heroStep.Pose, squat, Eased(arrive, arrive + .5f, t)), null, false);
+            squat = Reaching(squat, false, RightRest.Lerp(water, Mathf.SmoothStep(arrive + .3f, touch, t)), out var fist);
+            hero.Show(RigPose.Lerp(heroStep.Pose, squat, Mathf.SmoothStep(arrive, arrive + .5f, t)), null, false);
             for (int ring = 0; ring < 3; ring++) {
                 float starts = touch + ring * .3f;
                 if (t < starts || t - dt >= starts) continue;
@@ -600,11 +620,11 @@ public partial class WorldView {
             SetFade(ring, RippleWater, Math.Min(1, age / .9f));
         }
         Fade((t - 3) / .6f);
-        if (t >= 2.4f && t - dt < 2.4f) Cue("music/path_to_lake_land", 0, "stop=2");
+        if (Reached(2.4f, t, dt)) Cue("music/path_to_lake_land", 0, "stop=2");
         // Low over the water just off the shore, looking back at where he comes down to it, drifting in.
         var shore = Trail(edge);
         var forward = (sea - shore).Normalized(); var side = new Vector2(-forward.Y, forward.X);
-        Frame(To3(shore - side * (2.7f - Eased(0, 3.6f, t) * .5f) + forward * 1.5f, .38f), To3(shore + forward * .2f, .55f), 42);
+        Frame(To3(shore - side * (2.7f - Mathf.SmoothStep(0, 3.6f, t) * .5f) + forward * 1.5f, .38f), To3(shore + forward * .2f, .55f), 42);
     }
 
     /// <summary>Night: he sits hunched at a fire, shivering, and wolves howl somewhere out in the dark.</summary>
@@ -625,13 +645,18 @@ public partial class WorldView {
         moon.Visible = true; moon.Position = camera.Position + new Vector3(-.5f, .42f, .75f).Normalized() * 560;
         Fade(Math.Max(1 - t / 1.2f, (t - 6.2f) / 1.6f));
         // The first howl lifts his head toward it; when the pack answers he looks the other way and pulls in tighter.
-        float scared = Eased(howl + .3f, howl + .6f, t);
-        Place(hero, To3(seat), Mathf.RadToDeg(ActorAnimation.Yaw(toward, 0)), IntroPoses.Shivering(t, scared));
+        float scared = Mathf.SmoothStep(howl + .3f, howl + .6f, t);
+        // Arms crossed over the chest, each palm on the other shoulder, the right arm outside, rubbing a little for warmth.
+        float rub = .012f * MathF.Sin(t * 5.2f) * (1 - scared);
+        var huddled = Folding(IntroPoses.Shivering(t, scared), true, new Vector3(-.15f, .44f + rub, .1f), new Vector3(.5f, -1, .3f), out float leftRoll);
+        huddled = Folding(huddled, false, new Vector3(.15f, .44f - rub, .15f), new Vector3(-.5f, -1, .45f), out float rightRoll);
+        Place(hero, To3(seat), Mathf.RadToDeg(ActorAnimation.Yaw(toward, 0)), huddled);
+        hero.RollArm(true, leftRoll); hero.RollArm(false, rightRoll);
         float look = Track(t, (howl + .3f, 0), (howl + .55f, 55), (pack + .2f, 50), (pack + .5f, -62), (pack + 1.9f, -55), (pack + 2.4f, -20));
         TurnHead(hero, -4 * scared, look, 0);
         // Across the fire from him, low, drawing back and up into the dark.
         var side = new Vector2(-toward.Y, toward.X);
-        float back = Eased(2.2f, 8, t);
+        float back = Mathf.SmoothStep(2.2f, 8, t);
         Frame(To3(fire + toward * (2.1f + back * 4.2f) + side * (.9f + back * 1.4f), .5f + back * 2.6f), To3(seat, .62f), 40);
     }
 }

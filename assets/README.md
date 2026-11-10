@@ -193,7 +193,8 @@ Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound 
 ### Intro film
 
 `intro.ogv` is the intro film the game opens with: 480×270, 15 frames a second, Ogg Theora with Vorbis sound.
-It is made from frames the game draws ([README](../README.md#intro-film)); make it again after changing a model it shows.
+It is made from frames the game draws ([README](../README.md#intro-film)); make it again after changing a model it
+shows.
 
 `intro/` holds the sounds only the film uses, mixed into it with the game's own sounds and music; a `.gdignore` keeps
 them out of the game.
@@ -202,7 +203,11 @@ them out of the game.
   supplied for this project.
 - `train.mp3` — six seconds of "Inside old train" by kokoreli777 (Pixabay 169418).
 - `office.mp3` — thirteen seconds of "IT office 3" by thellywellyn (Pixabay 535970).
-- `office_room.mp3` — thirteen seconds of "Office ambience 01 (owi)" by freesound_community (Pixabay 57193), laid over it.
+- `office_room.mp3` — thirteen seconds of "Office ambience 01 (owi)" by freesound_community (Pixabay 57193), laid over
+  it.
+
+The train and office recordings were downloaded from Pixabay; their titles and authors are as the downloads' file names
+give them.
 
 ## Provenance
 
