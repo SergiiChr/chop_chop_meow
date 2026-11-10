@@ -13,6 +13,8 @@ public enum ActorSkin { Player, Worker, Courier, Boss }
 /// </summary>
 public sealed class ActorRig {
     public readonly Node3D Root = new();
+    /// <summary>How far out from the spine and up from the hips a shoulder sits, and the lengths from shoulder to elbow and elbow to fist, in metres.</summary>
+    public const float ShoulderOut = .17f, ShoulderUp = .45f, UpperArm = .28f, Forearm = .27f;
     private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     private readonly Dictionary<string, Node3D> tools = new();
     private readonly Node3D torch;
@@ -46,9 +48,8 @@ public sealed class ActorRig {
         head = Pivot(torso, new Vector3(0, .56f, 0));
         Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(skinTone), new Vector3(.95f, 1.05f, 1), 16);
         Sphere(head, .023f, new Vector3(0, .12f, .115f), Mat(skinTone), new Vector3(.7f, 1, 1), 8);
-        const float shoulder = .17f;
-        shoulderL = Pivot(torso, new Vector3(shoulder, .45f, 0));
-        shoulderR = Pivot(torso, new Vector3(-shoulder, .45f, 0));
+        shoulderL = Pivot(torso, new Vector3(ShoulderOut, ShoulderUp, 0));
+        shoulderR = Pivot(torso, new Vector3(-ShoulderOut, ShoulderUp, 0));
         elbowL = Arm(shoulderL, shirt, skinTone, skin == ActorSkin.Player);
         elbowR = Arm(shoulderR, shirt, skinTone, skin == ActorSkin.Player);
         switch (skin) {
@@ -169,8 +170,8 @@ public sealed class ActorRig {
 
     /// <summary>Every role shares the continuous arm and its skin weights; the palette selects sleeve length.</summary>
     private Node3D Arm(Node3D shoulder, string sleeve, string skinTone, bool shortSleeve) {
-        var elbow = Pivot(shoulder, new Vector3(0, -.28f, 0));
-        limbs.Add((HumanShape.Arm(shoulder, .28f, shoulder.Position.X > 0, sleeve, skinTone, shortSleeve), elbow));
+        var elbow = Pivot(shoulder, new Vector3(0, -UpperArm, 0));
+        limbs.Add((HumanShape.Arm(shoulder, UpperArm, shoulder.Position.X > 0, sleeve, skinTone, shortSleeve), elbow));
         return elbow;
     }
 
@@ -186,7 +187,7 @@ public sealed class ActorRig {
 
     /// <summary>Puts something gripped at its origin into the right fist, or the left one.</summary>
     public void Hold(Node3D item, bool right = true) {
-        item.Position = new Vector3(0, -.27f, .01f);
+        item.Position = new Vector3(0, -Forearm, .01f);
         (right ? elbowR : elbowL).AddChild(item);
     }
 

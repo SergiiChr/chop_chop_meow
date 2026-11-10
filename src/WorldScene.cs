@@ -26,7 +26,7 @@ public partial class WorldView {
             float width = .33f + layer * .12f;
             var strip = new SurfaceTool();
             strip.Begin(Mesh.PrimitiveType.TriangleStrip);
-            for (float along = from - 1; along <= Terrain.Coast(Terrain.Across(Terrain.Spawn)) + 2; along += 1) {
+            for (float along = from - 1; along <= TrailCoast + 2; along += 1) {
                 var mid = Trail(along);
                 float lift = .006f + (3 - layer) * .001f;
                 strip.SetNormal(Vector3.Up); strip.AddVertex(To3(mid - Terrain.Sideways * width, lift));
@@ -41,6 +41,9 @@ public partial class WorldView {
         foreach (var den in World.Dens) BuildDen(parent, den);
         BuildPlacedEnvironment(parent);
     }
+
+    /// <summary>How far along the valley the coast lies where the trail reaches it.</summary>
+    private static float TrailCoast => Terrain.Coast(Terrain.Across(Terrain.Spawn));
 
     /// <summary>The middle of the worn trail from the clearing to the shore, at a distance along the valley.</summary>
     private static Vector2 Trail(float along) =>

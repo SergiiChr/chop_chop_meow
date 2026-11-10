@@ -250,7 +250,9 @@ internal static class IntroSets {
         Cylinder(tins, .045f, .045f, .11f, new Vector3(0, .055f, 0), Metal("b9c2c4", .35f, .7f), sides: 10);
         Cylinder(tins, .046f, .046f, .06f, new Vector3(0, .055f, 0), Mat("b5513f", .6f), sides: 10);
         Lay(tins, new Vector3(.36f, 0, .36f), Vector3.Zero, 1, .1f);
-        Lay(ActorRig.Torch().Torch, new Vector3(-.34f, .035f, .56f), new Vector3(0, -150, 0), 1);
+        var (torch, flame, _) = ActorRig.Torch();
+        flame.Visible = false;
+        Lay(torch, new Vector3(-.34f, .035f, .56f), new Vector3(0, -150, 0), 1);
         Lay(ActorRig.Tool("steel_axe"), new Vector3(.34f, .03f, .54f), new Vector3(90, 0, 70), 1);
         return room;
     }

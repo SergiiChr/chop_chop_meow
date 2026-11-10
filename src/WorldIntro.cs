@@ -11,11 +11,11 @@ namespace ChopChopMeow;
 /// <summary>
 /// The intro film: the hero's last day at the office, the trip out, his arrival at the shore and his first night by a fire.
 /// <c>--render-intro DIR</c> plays it in place of a game, under a film camera at eye level rather than the game's view from above.
-/// Each frame is saved to DIR with a cue sheet of its sounds, which <c>tools/intro_video.py</c> turns into the video.
+/// Each frame is saved to DIR with a cue sheet of its sounds; a movie tool outside this project turns them into <c>assets/intro.ogv</c>.
 /// </summary>
 public partial class WorldView {
     public const int IntroFps = 30;
-    /// <summary>The film's frame size; the video tool shrinks it to the old console's resolution.</summary>
+    /// <summary>The film's frame size; the movie tool shrinks it to the old console's resolution.</summary>
     public static readonly Vector2I IntroSize = new(1280, 720);
     private const float IntroStep = 1f / IntroFps;
     /// <summary>The cue sheet beside the frames: when each sound starts, how loud, and how it is treated.</summary>
@@ -92,7 +92,7 @@ public partial class WorldView {
                 if (stills != null && !still) continue;
                 // After a cut the ground's detail and the lights settle for a few frames before one is kept.
                 for (int settle = cut || still ? 4 : 1; settle > 0; settle--) await ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
-                string name = still ? $"still_{filmTime:00.00}.png" : $"{saved:D5}.png";
+                string name = still ? string.Create(CultureInfo.InvariantCulture, $"still_{filmTime:00.00}.png") : $"{saved:D5}.png";
                 var result = GetViewport().GetTexture().GetImage().SavePng($"{folder}/{name}");
                 if (result != Error.Ok) throw new InvalidOperationException($"Intro frame {name} was not saved: {result}");
                 saved++;
@@ -103,7 +103,7 @@ public partial class WorldView {
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
 
-    /// <summary>Notes a sound for the video tool to lay under the film at this moment.</summary>
+    /// <summary>Notes a sound for the movie tool to lay under the film at this moment.</summary>
     /// <param name="sound">A game sound's name in <c>assets/sounds</c>, or <c>music/NAME</c> or <c>intro/NAME</c> for a file of those folders.</param>
     /// <param name="gain">Decibels over a game sound's level in the game's mix; for a file of another folder, its level outright.</param>
     /// <param name="treatment">Further <c>key=value</c> settings the tool reads, separated by tabs.</param>
@@ -204,6 +204,8 @@ public partial class WorldView {
     private void Valley(float dayPhase, Vector2 around, float dt, string skyTop, string skyHorizon, float haze, bool stars = false) {
         World.S.Time = dayPhase * World.Data.DaySeconds;
         World.Player = around;
+        // The game's flames and shakes go by the view's clock, which stands still while filming.
+        Elapsed = filmTime;
         SyncThings(dt); UpdateEffects(dt); UpdateLighting(); UpdateLook(dt); UpdateFog();
         sun.DirectionalShadowMaxDistance = 70;
         PaintSky(skyTop, skyHorizon, stars);
@@ -245,9 +247,8 @@ public partial class WorldView {
     /// <paramref name="fist"/> is where the fist ends up, for whatever it holds.
     /// </summary>
     private static RigPose Reaching(RigPose pose, bool left, Vector3 target, out Vector3 fist) {
-        // The upper arm and forearm lengths, and where the shoulder sits on the torso, as ActorRig builds them.
-        const float upper = .28f, fore = .27f;
-        var shoulder = new Vector3(left ? .17f : -.17f, .45f, 0);
+        const float upper = ActorRig.UpperArm, fore = ActorRig.Forearm;
+        var shoulder = new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
         var torso = Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway)));
         var hips = new Vector3(0, pose.HipHeight, 0);
         var to = torso.Inverse() * (target - hips) - shoulder;
@@ -362,9 +363,9 @@ public partial class WorldView {
     /// <summary>The boss leans over him, yelling and jabbing a finger; he shrinks into the chair.</summary>
     private void BossShot(float t, float dt) {
         if (cut) { OfficeLight(); office.Monitor.Visible = true; }
-        Colleagues(5 + t);
+        Colleagues(filmTime);
         // His mouth opens as wide as the recording is loud at this moment.
-        float voice = BossVoiceStarts + 5 + t - BossHeard;
+        float voice = BossVoiceStarts + filmTime - BossHeard;
         float shout = Math.Clamp((BossLoudness[Math.Clamp((int)(voice * 10), 0, BossLoudness.Length - 1)] + 40) / 20f, 0, 1);
         Place(hero, Vector3.Zero, 0, IntroPoses.Cowering(t));
         TurnHead(hero, 0, 38, 0);
@@ -386,7 +387,7 @@ public partial class WorldView {
             office.Chair.Position += new Vector3(-.35f, 0, -1.25f); office.Chair.RotationDegrees = new Vector3(0, 40, 84);
             office.Chair.Position += Vector3.Up * .2f;
         }
-        Colleagues(9 + t);
+        Colleagues(filmTime);
         heroLids.Visible = false;
         heldBat.Visible = t < drop;
         bool first = t >= IntroPoses.FirstBlow && t - dt < IntroPoses.FirstBlow, second = t >= IntroPoses.SecondBlow && t - dt < IntroPoses.SecondBlow;
@@ -526,7 +527,7 @@ public partial class WorldView {
     // ---------- The valley ----------
 
     /// <summary>Where the trail meets the water.</summary>
-    private static float TrailShore => Terrain.Coast(Terrain.Across(Terrain.Spawn)) - 1.2f;
+    private static float TrailShore => TrailCoast - 1.2f;
 
     /// <summary>Walking the trail through the forest, the pack on his back.</summary>
     private void ForestShot(float t, float dt) {
