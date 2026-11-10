@@ -64,6 +64,24 @@ public partial class Game {
         RemoveThings(Hosted, t => placed.Contains(t) || t.Kind == ThingKind.Grave);
         await Frames();
     }
+    /// <summary>A new game opens with the intro film, which holds the game still until Esc skips it and nothing else.</summary>
+    private async Task CheckNewGameOpensWithTheIntroUntilEsc() {
+        ShowStart(); await Frames();
+        // Checks start their games without the film; this one starts as a player's game does.
+        introOnNewGame = true;
+        await Click(FindButton(startMenu.Screen, "New game")!);
+        introOnNewGame = false;
+        Require(intro.Visible, "A new game must open with the intro film.");
+        await Until(() => session is Session.Playing, "the new game starting under the intro film", 20);
+        await Frames(10);
+        float held = world.DayPhase;
+        await Frames(30);
+        Require(intro.Visible && world.DayPhase == held, "The intro film must hold the game while it plays.");
+        await KeyStroke(Key.Escape);
+        Require(!intro.Visible, "Esc must skip the intro film.");
+        Require(!menu.Visible, "The Esc that skips the intro film must not open the pause menu too.");
+        await Until(() => world.DayPhase != held, "the game running once the intro film is skipped", 10);
+    }
     /// <summary>
     /// A new game reuses the ids of the last one, so the models the view keeps for them must be built anew:
     /// an old one would carry the last game's state, such as a felled tree faded out.
@@ -1385,6 +1403,7 @@ public partial class Game {
             await Test(CheckCrateDraggedIntoCrateStopsAtWarning);
             RemoveCheckFiles();
             await Test(CheckRestartBuildsFreshModelsForReusedIds);
+            await Test(CheckNewGameOpensWithTheIntroUntilEsc);
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }

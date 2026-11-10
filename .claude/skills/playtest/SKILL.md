@@ -26,7 +26,8 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
    `.tools` symlink, and the prefix makes the game read and write `playtest-*` files there instead. To test with one of
    the player's saves, copy it to a `playtest-` name first. Delete the `playtest-*` files when done.
 3. Start the game in the background with a folder in your scratchpad: `env -u WAYLAND_DISPLAY ./build.py play -- --file-prefix playtest- --drive <dir>`. On native Wayland the window runs at about one frame a second. Add `--showcase` and its flags for a late-game fixture instead of a fresh start.
-4. When done, remove both: `git checkout src/Game.cs && rm -f src/ReviewDrive.cs src/ReviewDrive.cs.uid`. Never commit the driver.
+4. When done, remove both: delete the hook line from `src/Game.cs` by hand and `rm -f src/ReviewDrive.cs src/ReviewDrive.cs.uid`.
+   Never `git checkout src/Game.cs`: it also throws away any change to that file not yet committed. Never commit the driver.
 
 ## Drive
 

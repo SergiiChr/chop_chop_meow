@@ -61,6 +61,8 @@ public partial class Sounds : Node {
     public int Played { get; private set; }
     public string Last { get; private set; } = "";
     public static IEnumerable<string> Names => Levels.Keys;
+    /// <summary>A sound's place in the mix, in decibels.</summary>
+    public static float Level(string name) => Levels.GetValueOrDefault(name);
     public int VariantCount(string name) => Variants(name).Length;
     public int LastVariant(string name) => previous.GetValueOrDefault(name, -1);
 

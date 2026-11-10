@@ -21,13 +21,13 @@ public partial class WorldView {
         for (int ring = 0; ring < 4; ring++)
             Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(Terrain.Spawn.X, .003f + ring * .0005f, Terrain.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
         // A narrow, worn trail from the clearing down the valley to the shore, the way the carts go.
-        float from = Terrain.Along(Terrain.Spawn), across = Terrain.Across(Terrain.Spawn);
+        float from = Terrain.Along(Terrain.Spawn);
         for (int layer = 3; layer > 0; layer--) {
             float width = .33f + layer * .12f;
             var strip = new SurfaceTool();
             strip.Begin(Mesh.PrimitiveType.TriangleStrip);
-            for (float along = from - 1; along <= Terrain.Coast(across) + 2; along += 1) {
-                var mid = Terrain.Point(along, across + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f);
+            for (float along = from - 1; along <= Terrain.Coast(Terrain.Across(Terrain.Spawn)) + 2; along += 1) {
+                var mid = Trail(along);
                 float lift = .006f + (3 - layer) * .001f;
                 strip.SetNormal(Vector3.Up); strip.AddVertex(To3(mid - Terrain.Sideways * width, lift));
                 strip.SetNormal(Vector3.Up); strip.AddVertex(To3(mid + Terrain.Sideways * width, lift));
@@ -41,6 +41,10 @@ public partial class WorldView {
         foreach (var den in World.Dens) BuildDen(parent, den);
         BuildPlacedEnvironment(parent);
     }
+
+    /// <summary>The middle of the worn trail from the clearing to the shore, at a distance along the valley.</summary>
+    private static Vector2 Trail(float along) =>
+        Terrain.Point(along, Terrain.Across(Terrain.Spawn) + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f);
 
     /// <summary>A wolf den: a mine's rock outcrop and dark tunnel at half size, with no timber, rails or cart, so the mouth is about a wolf's height.</summary>
     private static void BuildDen(Node3D parent, Den den) {
