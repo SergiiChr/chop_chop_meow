@@ -15,8 +15,11 @@ public sealed class ActorRig {
     public readonly Node3D Root = new();
     /// <summary>How far out from the spine and up from the hips a shoulder sits, and the lengths from shoulder to elbow and elbow to fist, in metres.</summary>
     public const float ShoulderOut = .17f, ShoulderUp = .45f, UpperArm = .28f, Forearm = .27f;
+    /// <summary>How far ahead of the forearm's line a held thing sits in the fist, in metres.</summary>
+    public const float Palm = .01f;
     private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
-    private readonly Dictionary<string, Node3D> tools = new();
+    /// <summary>What each tool puts in the hands, by its name: one piece, or two for a tool that fills both.</summary>
+    private readonly List<(string Name, Node3D Node)> tools = new();
     private readonly Node3D torch;
     private readonly List<(Skeleton3D Skeleton, Node3D Joint)> limbs = new();
     // The leg skins, whose third bone turns the foot at the ankle.
@@ -79,6 +82,23 @@ public sealed class ActorRig {
         Sphere(rock, .13f, new Vector3(.15f, .05f, .1f), Stone("7a7e79", .85f), new Vector3(1, .7f, 1));
         BuildTools();
         (torch, Flame, TorchLight) = BuildTorch();
+        BuildMortar();
+    }
+
+    /// <summary>
+    /// The mortar's bowl standing on the left fist and its pestle in the right.
+    /// Each is turned against its forearm in the grinding pose, so there the bowl sits level and the pestle leans from the bowl's floor up to the fist.
+    /// </summary>
+    private void BuildMortar() {
+        Node3D bowl = new() { Visible = false }, pestle = new() { Visible = false };
+        Hold(bowl, right: false); Hold(pestle);
+        tools.Add(("mortar", bowl)); tools.Add(("mortar", pestle));
+        // The rig stands in the grinding pose to read how its forearms are turned there, until it is first shown.
+        Show(ActorAnimation.GrindRest, null, false);
+        bowl.Basis = (torso.Basis * shoulderL.Basis * elbowL.Basis).Inverse();
+        pestle.Basis = (torso.Basis * shoulderR.Basis * elbowR.Basis).Inverse() * new Basis(Vector3.Back, Mathf.DegToRad(ActorAnimation.PestleLean));
+        Add(bowl, CookShape.Bowl, CookShape.Ceramic, new Vector3(0, ActorAnimation.BowlOverFist, 0));
+        Add(pestle, CookShape.Pestle, CookShape.Ceramic, new Vector3(0, -ActorAnimation.PestleGrip, 0));
     }
 
     /// <summary>Keep face cues and a simple canvas pack; silhouette and smooth transitions carry the design.</summary>
@@ -181,7 +201,7 @@ public sealed class ActorRig {
             var tool = name == "protest_sign" ? ProtestSign() : Tool(name);
             Hold(tool);
             tool.Visible = false;
-            tools[name] = tool;
+            tools.Add((name, tool));
         }
     }
 
@@ -193,7 +213,7 @@ public sealed class ActorRig {
 
     /// <summary>Puts something gripped at its origin into the right fist, or the left one.</summary>
     public void Hold(Node3D item, bool right = true) {
-        item.Position = new Vector3(0, -Forearm, .01f);
+        item.Position = new Vector3(0, -Forearm, Palm);
         (right ? elbowR : elbowL).AddChild(item);
     }
 

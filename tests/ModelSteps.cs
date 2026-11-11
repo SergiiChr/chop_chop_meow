@@ -42,6 +42,20 @@ internal static class ModelSteps {
         return null;
     }
 
+    /// <summary>Where a part of a rig is from the rig's root.</summary>
+    public static Transform3D InRig(ActorRig rig, Node3D part) {
+        var place = part.Transform;
+        for (var parent = (Node3D)part.GetParent(); parent != rig.Root; parent = (Node3D)parent.GetParent()) place = parent.Transform * place;
+        return place;
+    }
+
+    /// <summary>The mortar's bowl in a rig's left hand, and where the pestle's foot in its right hand is from the bowl's own foot, across the bowl and up it.</summary>
+    public static (Transform3D Bowl, Vector3 PestleFoot) HeldMortar(ActorRig rig) {
+        var meshes = AllMeshes(rig.Root);
+        var bowl = InRig(rig, meshes.Single(mesh => mesh.Mesh == CookShape.Bowl));
+        return (bowl, bowl.AffineInverse() * InRig(rig, meshes.Single(mesh => mesh.Mesh == CookShape.Pestle)).Origin);
+    }
+
     public static List<MeshInstance3D> Core(ActorRig rig) {
         var result = new List<MeshInstance3D>();
         Visit(rig.Root, result);

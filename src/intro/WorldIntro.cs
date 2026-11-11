@@ -244,22 +244,14 @@ public partial class WorldView {
     /// <paramref name="fist"/> is where the fist ends up, for whatever it holds.
     /// </summary>
     private static RigPose Reaching(RigPose pose, bool left, Vector3 target, out Vector3 fist) {
-        const float upper = ActorRig.UpperArm, fore = ActorRig.Forearm;
         var shoulder = new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
         var torso = Basis.FromEuler(new Vector3(Mathf.DegToRad(pose.Lean), Mathf.DegToRad(pose.Twist), Mathf.DegToRad(pose.Sway)));
         var hips = new Vector3(0, pose.HipHeight, 0);
         var to = torso.Inverse() * (target - hips) - shoulder;
-        float reach = Math.Clamp(to.Length(), .1f, upper + fore - .005f);
-        to = to.Normalized() * reach;
+        to = to.Normalized() * Math.Clamp(to.Length(), .1f, ActorRig.UpperArm + ActorRig.Forearm - .005f);
         fist = hips + torso * (shoulder + to);
-        // The elbow folds until the fist is that far from the shoulder, then the shoulder swings the bent arm onto the point.
-        float elbow = MathF.Acos(Math.Clamp((reach * reach - upper * upper - fore * fore) / (2 * upper * fore), -1, 1));
-        float down = -upper - fore * MathF.Cos(elbow), ahead = fore * MathF.Sin(elbow);
-        float outward = MathF.Asin(Math.Clamp(to.X / -down, -1, 1));
-        float raise = Mathf.RadToDeg(MathF.Atan2(ahead, down * MathF.Cos(outward)) - MathF.Atan2(to.Z, to.Y));
-        raise = Mathf.PosMod(raise + 180, 360) - 180;
-        return left ? pose with { RaiseL = raise, OutL = Mathf.RadToDeg(outward), ElbowL = Mathf.RadToDeg(elbow) }
-            : pose with { RaiseR = raise, OutR = -Mathf.RadToDeg(outward), ElbowR = Mathf.RadToDeg(elbow) };
+        var (raise, outward, elbow) = ActorAnimation.ArmTo(shoulder + to, left);
+        return left ? pose with { RaiseL = raise, OutL = outward, ElbowL = elbow } : pose with { RaiseR = raise, OutR = outward, ElbowR = elbow };
     }
 
     /// <summary>

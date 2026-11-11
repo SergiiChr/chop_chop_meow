@@ -904,6 +904,15 @@ public partial class Game {
         await Frames();
         RemoveThings(Hosted, t => t == farm || t == anvil); Warp(Hosted, start);
     }
+    /// <summary>A player standing idle beside a cooking table that is crushing berries grinds with its mortar, which leaves the counter for their hands.</summary>
+    private async Task CheckIdlePlayerBesideACookingTableGrindsWithItsMortar() {
+        // The server's position, since the window's copy may not have caught up with the last check's warp.
+        var table = Hosted.Add(ThingKind.Cooktable, Hosted.Player + new Vector2(1.2f, 0));
+        table.Tools!.Add("mortar", 1); Hosted.SetRecipe(table, "crushed_berries"); table.Inventory.Add("berries", 8);
+        await Until(() => table.Processing && view.PlayerAnimation == ActorAction.Grind, "the idle player grinding at the cooking table beside it", 3);
+        Require(view.PropOf(table.Id) is StoveProp { Mortar.Visible: false }, "The mortar must be off the counter while the player grinds with it.");
+        RemoveThings(Hosted, t => t == table);
+    }
     /// <summary>Holding the right mouse button on a marked mine walks the player to its entrance and digs it with the pickaxe.</summary>
     private async Task CheckRightMouseOnAMarkedMineDigsItWithAPickaxe() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
@@ -1360,6 +1369,7 @@ public partial class Game {
             await Test(CheckPackedCrateOpensFromTheBackpack);
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHarvestingBesideAStationStopsHammering);
+            await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);

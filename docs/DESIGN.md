@@ -291,6 +291,12 @@ The transient state is excluded from saves and recalculated on the next simulati
 At a packing station the packer stands behind the table (`World.PackStand`) and the `Pack` action rummages in the heap of goods, lifts a piece across and settles it into the crate, then turns back.
 The player working a station they stand near packs the same way.
 
+At a cooking table, which is only worked for the mortar's recipes, the `Grind` action holds the mortar in hand (`ActorAnimation.StationAction`).
+The left fist holds the bowl out in front, and the right takes the pestle twice round the bowl's floor, then lifts it and pounds.
+Both arms are solved from where the hands have to be (`ActorAnimation.ArmTo`), so the pestle stays over the bowl.
+`ActorRig` turns the bowl and pestle against their forearms in the resting pose (`ActorAnimation.GrindRest`), which keeps the bowl level and the pestle leaning toward its hand.
+While someone grinds, the table's own mortar is off the counter (`WorldView.grinding`).
+
 Manual bellows pumping and the unarmed punch trigger one loop of their action.
 Each work action has an impact moment that shakes its target and spawns chips, leaves, splashes or sparks.
 Pausing freezes animation and effects.

@@ -22,6 +22,7 @@ public static class HumanModelChecks {
             CheckSleevesShowSkinOrShirtAndFadingKeepsThePalette(core);
             CheckPosingOneRigLeavesAnotherAlone(rigs, core);
             CheckCarriedCrateFollowsCarryingVisibility(rigs);
+            CheckGrindingWorksThePestleInsideALevelBowl(rigs);
         } finally {
             foreach (var rig in rigs) rig.Root.Free();
         }
@@ -109,6 +110,32 @@ public static class HumanModelChecks {
             }
             rig.Show(new Pose(), null, false);
             Require(!((Node3D)cargo.GetParent()).Visible, "the shipping crate should hide when the actor is not carrying");
+        }
+    }
+
+    /// <summary>
+    /// Through a grinding loop the left hand holds the mortar's bowl level and the pestle's foot stays inside it:
+    /// round the floor, then up to pound without leaving the bowl.
+    /// </summary>
+    private static void CheckGrindingWorksThePestleInsideALevelBowl(ActorRig[] rigs) {
+        // The bowl as CookShape builds it: its floor is 3 cm above its foot and 4.5 cm out to the wall, and its rim is 11 cm up.
+        const float floor = .03f, wall = .045f, rim = .11f;
+        foreach (var rig in rigs) {
+            float widest = 0, highest = 0;
+            for (int step = 0; step < 90; step++) {
+                rig.Show(ActorAnimation.PoseAt(ActorAction.Grind, ActorAnimation.Duration(ActorAction.Grind) * step / 90, false), ActorAnimation.Tool(ActorAction.Grind), false);
+                var (bowl, foot) = HeldMortar(rig);
+                float aside = new Vector2(foot.X, foot.Z).Length();
+                Require(bowl.Basis.Y.Normalized().Y > .998f, $"the held bowl should stay level through the grind, step {step}");
+                Require(aside < wall, $"the pestle's foot should stay over the bowl's floor, step {step}: {aside:0.000} m out");
+                Require(foot.Y > floor - .01f && foot.Y < rim, $"the pestle's foot should stay between the bowl's floor and its rim, step {step}: {foot.Y:0.000} m up");
+                widest = Math.Max(widest, aside); highest = Math.Max(highest, foot.Y);
+            }
+            Require(widest > .02f, $"the pestle should go round the bowl's floor, reached {widest:0.000} m out");
+            Require(highest > floor + .04f, $"the pestle should lift to pound, reached {highest:0.000} m up");
+            rig.Show(new Pose(), null, false);
+            Require(AllMeshes(rig.Root).Where(mesh => mesh.Mesh == CookShape.Bowl || mesh.Mesh == CookShape.Pestle).All(mesh => !((Node3D)mesh.GetParent()).Visible),
+                "the mortar should leave the hands when the actor is not grinding");
         }
     }
 }

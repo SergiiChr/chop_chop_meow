@@ -87,7 +87,7 @@ public sealed class FurnaceProp : HearthProp {
 /// <summary>A cooking table or canning station.</summary>
 public sealed class StoveProp : HearthProp {
     public MeshInstance3D Glow = null!;
-    /// <summary>The cooking table's mortar, shown while one is slotted.</summary>
+    /// <summary>The cooking table's mortar, shown while one is slotted and nobody grinds with it.</summary>
     public Node3D? Mortar;
 }
 

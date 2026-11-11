@@ -196,6 +196,8 @@ public static class AnimationChecks {
         worker.WorkState = WorkerWorkState.Hammering;
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Hammer,
             "anvil work should select hammering animation");
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Cooktable }, false) == ActorAction.Grind,
+            "cooking table work should select grinding with the mortar, not hammering");
     }
 
     private static void CheckStrikingWorkerProtestsUntilWalking() {
@@ -271,6 +273,7 @@ public static class AnimationChecks {
             "a cross-legged worker should sit on the ground, and one on a rock should not");
         Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick", "steel mining should show the steel pick");
         Require(ActorAnimation.Tool(ActorAction.Hammer) == "hammer", "hammering should show the hammer");
+        Require(ActorAnimation.Tool(ActorAction.Grind) == "mortar", "grinding should show the mortar in hand");
         Require(ActorAnimation.Tool(ActorAction.Gather) == null, "hand gathering should show no tool");
     }
 }

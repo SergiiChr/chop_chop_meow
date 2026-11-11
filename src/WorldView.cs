@@ -65,6 +65,8 @@ public partial class WorldView : Node3D {
     /// <summary>The village's carts no order holds, built while loading and reused for every trip.</summary>
     private readonly Stack<WorldModels.CartModel> idleCarts = new();
     private readonly Dictionary<int, float> pumping = new();
+    /// <summary>The cooking tables whose mortar is in someone's hands this frame, so it is off the counter.</summary>
+    private readonly HashSet<int> grinding = new();
     /// <summary>Build-mode ghosts by building kind, made hidden while loading; mines have one per cliff ore instead.</summary>
     private readonly Dictionary<ThingKind, Prop> ghosts = new(), mineGhosts = new();
     private Prop? ghost;
@@ -462,7 +464,7 @@ public partial class WorldView : Node3D {
     };
 
     private void UpdateActors(float dt) {
-        pumping.Clear();
+        pumping.Clear(); grinding.Clear();
         if (ShirtOf(World.Me) != playerShirt) {
             playerShirt = ShirtOf(World.Me); playerRig.Root.QueueFree();
             playerRig = new ActorRig(ActorSkin.Player, playerShirt); scene.AddChild(playerRig.Root);
@@ -504,7 +506,7 @@ public partial class WorldView : Node3D {
             bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var assignment = World.Find(worker.Assignment);
             var work = ActorAnimation.WorkerAction(worker, assignment, walking);
-            if (work is ActorAction.Hammer or ActorAction.Pack && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
+            if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
             // At a mine the worker faces the rock past the entrance, not the cart out front.
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
@@ -655,6 +657,7 @@ public partial class WorldView : Node3D {
         // The bellows board follows the lean of the person pressing it.
         if (action == ActorAction.Pump)
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
+        if (action == ActorAction.Grind) grinding.Add(subject.Id);
         float impact = action switch {
             ActorAction.Chop or ActorAction.SteelChop => .52f,
             ActorAction.Mine or ActorAction.SteelMine => .55f,
@@ -830,7 +833,7 @@ public partial class WorldView : Node3D {
                 bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Burns;
                 stove.Glow.Visible = cooking;
                 stove.Light.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
-                if (stove.Mortar != null && World.Sees(t.Pos)) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null;
+                if (stove.Mortar != null && World.Sees(t.Pos)) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null && !grinding.Contains(t.Id);
                 Smoke(stove, t, cooking, dt, FurnaceSmoke);
                 break;
             case ForgeProp forge:
