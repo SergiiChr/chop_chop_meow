@@ -48,16 +48,17 @@ public partial class ReviewDrive : Node {
         try {
             switch (p[0]) {
                 case "key": Key(Parse(p[1]), p.Length < 3 ? "tap" : p[2]); break;
-                case "hold": Key(Parse(p[1]), "down"); queue.Enqueue($"key {p[1]} up"); Requeue(); waitLeft = double.Parse(p[2]); break;
-                case "move": Move(new Vector2(float.Parse(p[1]), float.Parse(p[2]))); break;
+                case "hold": Key(Parse(p[1]), "down"); queue.Enqueue($"key {p[1]} up"); Requeue(); waitLeft = Number(p[2]); break;
+                case "move": Move(new Vector2(Number(p[1]), Number(p[2]))); break;
                 case "click": Click(p, true); Click(p, false); break;
                 case "down": Click(p, true); break;
                 case "up": Click(p, false); break;
                 case "wheel": Wheel(p); break;
-                case "wait": waitLeft = double.Parse(p[1]); break;
-                case "scale": Engine.TimeScale = double.Parse(p[1]); break;
+                case "wait": waitLeft = Number(p[1]); break;
+                case "scale": Engine.TimeScale = Number(p[1]); break;
                 case "shot": Shot(p[1]); break;
-                case "quit": GetTree().Quit(); break;
+                // The close request goes through the game's own quit, which leaves the server and stops the sounds first.
+                case "quit": GetTree().Root.PropagateNotification((int)NotificationWMCloseRequest); break;
                 default: throw new ArgumentException("unknown command");
             }
             Log($"ok {line}");
@@ -70,6 +71,9 @@ public partial class ReviewDrive : Node {
         queue.Enqueue(rest[^1]);
         for (int i = 0; i < rest.Length - 1; i++) queue.Enqueue(rest[i]);
     }
+
+    /// <summary>Numbers are written with a point, whatever the machine's language.</summary>
+    private static float Number(string text) => float.Parse(text, System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>Digits are `Key4`, not `4`, which Godot would read as keycode 4.</summary>
     private static Key Parse(string name) => name.Length == 1 && char.IsDigit(name[0]) ? Enum.Parse<Key>("Key" + name) : Enum.Parse<Key>(name, true);
@@ -96,7 +100,7 @@ public partial class ReviewDrive : Node {
 
     /// <summary>`click|down|up X Y [left|right] [ctrl] [shift] [double]`.</summary>
     private void Click(string[] p, bool pressed) {
-        var at = new Vector2(float.Parse(p[1]), float.Parse(p[2]));
+        var at = new Vector2(Number(p[1]), Number(p[2]));
         var rest = p.AsSpan(3);
         var mask = rest.Contains("right") ? MouseButtonMask.Right : MouseButtonMask.Left;
         Move(at);
@@ -115,7 +119,7 @@ public partial class ReviewDrive : Node {
 
     /// <summary>`wheel X Y up|down [steps]`.</summary>
     private void Wheel(string[] p) {
-        var at = new Vector2(float.Parse(p[1]), float.Parse(p[2]));
+        var at = new Vector2(Number(p[1]), Number(p[2]));
         var button = p[3] == "up" ? MouseButton.WheelUp : MouseButton.WheelDown;
         for (int i = 0; i < (p.Length > 4 ? int.Parse(p[4]) : 1); i++) {
             Input.ParseInputEvent(new InputEventMouseButton { Position = at, GlobalPosition = at, ButtonIndex = button, Pressed = true });

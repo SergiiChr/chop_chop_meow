@@ -6,8 +6,8 @@ description: Play the real rendered game window with keyboard and mouse events a
 # Playtest
 
 There is no xdotool or ydotool on this Wayland machine, so the game drives itself.
-Started with `--drive <dir>`, its `ReviewDrive` node (`src/ReviewDrive.cs`) reads commands from a file in that folder and
-sends them through `Input.ParseInputEvent`, like real input.
+Started with `--drive <dir>`, its `ReviewDrive` node (`src/ReviewDrive.cs`) reads commands from a file in that folder
+and sends them through `Input.ParseInputEvent`, like real input.
 
 ## Set up
 
@@ -56,7 +56,7 @@ Look at every screenshot before deciding the next step.
   step, and prefer clicking the Resume or Back button.
 - `shot` lines in a row without a `wait` between them all capture the same frame: put `wait 0.05` between them for a
   sequence of a motion.
-- Stop the game by PID from `pgrep -a ChopChopMeow`, the exported game's name.
+- If the game no longer answers `quit`, stop it by PID from `pgrep -a ChopChopMeow`, the exported game's name.
   `pkill -f` and `pgrep -f` match the calling shell's own command line: `pkill -f` kills that shell, and a wait loop
   on `pgrep -f` never ends.
 - A showcase switches panels and pages on its own, so a click there can land on a different page than the last

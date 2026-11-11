@@ -876,8 +876,7 @@ public partial class Game {
     /// <summary>The driver behind `--drive` plays its command file as real input and reports each line once: a key it sends opens the backpack, and a command it does not know fails by name.</summary>
     private async Task CheckDriverPlaysItsCommandFileAsRealInput() {
         await CloseWithEsc();
-        string folder = ProjectSettings.GlobalizePath($"user://{Launch.FilePrefix}drive"), log = System.IO.Path.Combine(folder, "log.txt");
-        if (System.IO.Directory.Exists(folder)) System.IO.Directory.Delete(folder, true);
+        string folder = System.IO.Directory.CreateTempSubdirectory("chop-chop-meow-drive-").FullName, log = System.IO.Path.Combine(folder, "log.txt");
         // The driver starts from the `--drive` launch flag, which a check run does without: no input starts it.
         var driver = new ReviewDrive { Folder = folder }; AddChild(driver);
         System.IO.File.WriteAllText(System.IO.Path.Combine(folder, "cmd.txt"), "key Tab\nwiggle\n");
