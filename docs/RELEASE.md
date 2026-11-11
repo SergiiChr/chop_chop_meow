@@ -6,11 +6,11 @@
 
    ```sh
    git fetch origin main:main
-   git worktree add -b <branch> ../chop_chop_meow-<name> main
-   ln -s "$PWD/.tools" ../chop_chop_meow-<name>/.tools
+   git worktree add -b <branch> ../worktrees/chop_chop_meow-<name> main
+   ln -s "$PWD/.tools" ../worktrees/chop_chop_meow-<name>/.tools
    ```
 
-   The symlink reuses the downloaded Godot, .NET and Python tools and is ignored by git. Leave the main checkout on whatever branch it is on: `git fetch origin main:main` fast-forwards `main` without switching to it.
+   Worktrees live together in a `worktrees` folder next to the main checkout. The symlink reuses the downloaded Godot, .NET and Python tools and is ignored by git. Leave the main checkout on whatever branch it is on: `git fetch origin main:main` fast-forwards `main` without switching to it.
 2. Make the change and update the docs it affects in the same commit.
 3. Run `./build.py check`. For a visual change, also inspect a rendered screenshot.
 4. Review the branch against `main` with the `self-review` skill and apply what improves it.
