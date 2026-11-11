@@ -597,10 +597,6 @@ public partial class Game {
     private async Task CheckLaunchOpensTheStartMenuWithNoSaveToContinue() {
         await Frames(4);
         Require(!view.Warming, "The models drawn while loading must be gone by the time the start menu is up.");
-        // A failed earlier run may have left saves behind, which would enable Continue.
-        // Going to the options and back rereads the saves the removal just cleared.
-        RemoveCheckFiles(); await Frames(4);
-        await Click(FindButton(startMenu.Screen, "Options")!); await KeyStroke(Key.Escape);
         Require(startMenu.Visible, "Launch must show the start menu.");
         Require(view.Paused, "Launch must hold the world.");
         Require(FindButton(startMenu.Screen, "New game") != null, "Launch must offer a new game.");

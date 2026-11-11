@@ -72,6 +72,8 @@ public partial class Game : Node, IGameFlow {
             if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             if (Launch.Value("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
             world.Notify = Notify;
+            // A failed UI check run leaves its saves and settings behind: the next one starts without them, as a first launch does.
+            if (Launch.Has("--ui-test")) RemoveCheckFiles();
             sounds = new Sounds { World = world, MusicVolume = Settings.MusicVolume }; AddChild(sounds);
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;
