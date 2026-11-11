@@ -215,6 +215,18 @@ public partial class Game {
         Require(Saves.SlotUsed(0), "The autosave must write its slot.");
     }
 
+    /// <summary>A save that cannot be written says so and leaves the slot's earlier save as it was.</summary>
+    private void CheckFailedSaveKeepsTheSaveBefore() {
+        Require(Saves.Write(Hosted, 0).StartsWith("Settlement saved"), "A save must say it was written.");
+        // A position that is no number cannot be written as save text. No frame runs before it is put back.
+        var stood = Hosted.Player;
+        Hosted.Player = new Vector2(float.NaN, 0);
+        string said = Saves.Write(Hosted, 0);
+        Hosted.Player = stood;
+        Require(said.StartsWith("Save failed"), $"A save that cannot be written must say so, not: {said}");
+        Require(Saves.Read(world.Data, 0).Error == null, "A failed save must leave the slot's earlier save loadable.");
+    }
+
     /// <summary>A window glides what the server moves, and an update that changes one number must not leave the other where the glide had got to.</summary>
     private async Task CheckOthersGlideAndStopWhereTheServerPutThem() {
         var worker = AddWorker(Hosted, world.Player + new Vector2(3, 0));
@@ -929,6 +941,34 @@ public partial class Game {
         Drop(Hosted, "steel_pick", 1);
         RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
+    /// <summary>A mine's page left open follows the mine from stage to stage and on to the open mine.</summary>
+    private async Task CheckMinePageFollowsTheMineThroughItsStages() {
+        var start = Hosted.Player;
+        var cliff = World.CliffOf(ThingKind.Iron);
+        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        var mine = Hosted.Build(ThingKind.Mine, World.MineSpot(cliff))!;
+        await Frames(2);
+        await Click(view.Screen(mine.Pos));
+        await Until(() => HasLabel(panel, "Stage 1 · Dig the entrance"), "the mine's page opening on its first stage", 3);
+        mine.MineStage = MineStage.Dug;
+        await Until(() => HasLabel(panel, "Stage 2 · Shore it up") && ShowsChild(panel, "supply_wood"), "the open mine page moving on to the supplies", 3);
+        mine.MineStage = MineStage.Supplied;
+        await Until(() => HasLabel(panel, "Stage 3 · Fit the frame and rails"), "the open mine page moving on to the fitting", 3);
+        mine.MineStage = MineStage.Open;
+        await Until(() => ShowsChild(panel, "output_stone") && !HasLabel(panel, "Stage 3"), "the open mine page showing the mine's outputs once it opens", 3);
+        RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
+    /// <summary>A page about a thing closes when the thing goes, as a recovery box does once it is emptied.</summary>
+    private async Task CheckPageClosesWhenWhatItShowsIsGone() {
+        await CloseWithEsc();
+        var box = Hosted.Add(ThingKind.Grave, world.Player + new Vector2(2, 0)); box.Inventory.Add("wood", 3);
+        await Frames();
+        await Click(view.Screen(box.Pos));
+        await Until(() => ShownPage() == "Recovery box", "the recovery box's page opening", 3);
+        await Click(FindButton(panel, "Take all")!);
+        await Until(() => !panel.Visible && view.Selection.Thing == 0, "the page closing once its box is emptied and gone", 3);
+        Drop(Hosted, "wood", 3);
+    }
     /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
     private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(2, 0)); anvil.Inventory.Add("steel_bar", 4);
@@ -1366,11 +1406,13 @@ public partial class Game {
             await Test(CheckRightClickGathersTreeAndHarvestsFarm);
             await Test(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
             await Test(CheckRedXTakesABuildingDownOnTheSecondClick);
+            await Test(CheckPageClosesWhenWhatItShowsIsGone);
             await Test(CheckPackedCrateOpensFromTheBackpack);
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
+            await Test(CheckMinePageFollowsTheMineThroughItsStages);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
             await Test(CheckHudAndHotbarEatAndDrinkInHand);
@@ -1402,6 +1444,7 @@ public partial class Game {
             await Test(CheckFilterWindowOpensOnScreenBesideAMovedPanel);
             await Test(CheckSurvivalActionsWorkThroughTheInventoryUI);
             await Test(CheckAutosaveTellsTheOwner);
+            Test(CheckFailedSaveKeepsTheSaveBefore);
             await Test(CheckOthersGlideAndStopWhereTheServerPutThem);
             await Test(CheckTickBoxesFollowTheServer);
             await Test(CheckLoadRemembersWhatIsOutOfSight);

@@ -156,8 +156,11 @@ public partial class SidePanel : MovableWindow {
 
     public void Close() { Visible = false; Bag.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
 
-    /// <summary>Runs the open page's updates.</summary>
-    public void Refresh() => page?.Refresh();
+    /// <summary>Runs the open page's updates, or closes a page whose thing has gone, such as an emptied recovery box or a building someone else took down.</summary>
+    public void Refresh() {
+        if (page is { Current: false }) { Selection = default; Close(); return; }
+        page?.Refresh();
+    }
 
     /// <summary>Selects a building or resource and shows it.</summary>
     public void Select(Thing t) {

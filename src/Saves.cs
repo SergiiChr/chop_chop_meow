@@ -48,8 +48,13 @@ public sealed class Saves(UiKit kit, Net net, IGameFlow flow) {
     /// <summary>Server: writes the world to a slot and returns what to tell the player who asked.</summary>
     public static string Write(World world, int n) {
         try {
-            using var file = Godot.FileAccess.Open(SlotPath(n), Godot.FileAccess.ModeFlags.Write); if (file == null) throw new InvalidOperationException("Cannot open save file");
-            file.StoreString(world.Serialize());
+            // The slot's earlier save stays until the new one is whole: the world is written beside it and then takes its place.
+            string text = world.Serialize(), path = ProjectSettings.GlobalizePath(SlotPath(n)), fresh = path + ".new";
+            using (var file = Godot.FileAccess.Open(fresh, Godot.FileAccess.ModeFlags.Write)) {
+                if (file == null) throw new InvalidOperationException($"Cannot open save file: {Godot.FileAccess.GetOpenError()}");
+                if (!file.StoreString(text)) throw new InvalidOperationException($"Cannot write save file: {file.GetError()}");
+            }
+            if (DirAccess.RenameAbsolute(fresh, path) is var moved && moved != Error.Ok) throw new InvalidOperationException($"Cannot replace the earlier save: {moved}");
             return $"Settlement saved · {SlotName(n)}.";
         } catch (Exception e) { return $"Save failed: {e.Message}"; }
     }

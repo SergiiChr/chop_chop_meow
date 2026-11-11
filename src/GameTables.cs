@@ -19,7 +19,7 @@ public sealed partial class GameData {
             ["steel_pick"] = new() { Daily = 12, Steady = 0, Drop = .5f },
             ["steel_hammer"] = new() { Daily = 12, Steady = 0, Drop = .5f },
         },
-        Buys = new() { ["steel_axe"] = 1, ["steel_pick"] = 1, ["steel_hammer"] = 1, ["canned_food"] = 12, ["water"] = 1, ["wheat_seeds"] = 4, ["fertilizer"] = 4, ["empty_bottle"] = 1 },
+        Buys = new() { ["steel_axe"] = 1, ["steel_pick"] = 1, ["steel_hammer"] = 1, ["canned_meat_stew"] = 12, ["water"] = 1, ["wheat_seeds"] = 4, ["fertilizer"] = 4, ["empty_bottle"] = 1 },
     };
     public MineDef Mine { get; } = new() { Materials = new() { ["wood"] = 50, ["iron_bar"] = 10, ["stone"] = 50 }, StageWorkdays = 1, Seconds = 1.6f, Workers = 3 };
     public FarmDef Farm { get; } = new() { Sow = new() { ["wheat_seeds"] = 1, ["fertilizer"] = 1 }, GrowDays = 3, HarvestWorkdays = 1, Yield = new() { ["wheat"] = 4, ["wheat_seeds"] = 2, ["grass"] = 1 } };
@@ -46,7 +46,6 @@ public sealed partial class GameData {
         ["water_2"] = new() { Name = "Water bottle (2 sips)", Price = 11.8333f, Color = "88cbe0", Thirst = 33.333336f },
         ["water_1"] = new() { Name = "Water bottle (1 sip)", Price = 11.1667f, Color = "88cbe0", Thirst = 33.333336f },
         ["empty_bottle"] = new() { Name = "Empty bottle", Price = 10.5f, Color = "a8bdc3" },
-        ["canned_food"] = new() { Name = "Canned food", Price = 5.65f, Color = "c8574a", Food = true, Hunger = 35, Health = 5 },
         ["raw_meat"] = new() { Name = "Raw meat", Price = 1, Color = "c4524a", Food = true },
         ["burnt_steak"] = new() { Name = "Burnt steak", Price = 2.25f, Color = "5e3b25", Food = true, Hunger = 40, Health = 10 },
         ["tin_ore"] = new() { Name = "Tin ore", Price = 1.5f, Color = "c7c9c2" },
@@ -84,7 +83,7 @@ public sealed partial class GameData {
         [ThingKind.Farm] = new() { Name = "Farm plot", Cost = new() { ["wood"] = 8 }, Description = "A 3\u00d73 field that snaps edge to edge with piles and other plots. Wheat seeds and fertilizer sow it; the wheat grows for 3 days and is harvested by hand, by you or a worker, for wheat, more seeds and grass." },
         [ThingKind.Toolstation] = new() { Name = "Tool station", Cost = new() { ["planks"] = 8, ["stone"] = 4 }, Description = "A rack for tools. Workers take an axe, pickaxe or rake from it when their job needs one and put it back when they finish or go home." },
         [ThingKind.Cooktable] = new() { Name = "Cooking table", Cost = new() { ["steel_bar"] = 2, ["stone"] = 6, ["planks"] = 8 }, Description = "A steel grill over a firebox, with a mortar slot. Crushing berries and grinding wheat need the mortar and someone working it; jam and stew cook on their own over wood, coal or charcoal, and dough needs no fire." },
-        [ThingKind.Cannery] = new() { Name = "Canning station", Cost = new() { ["steel_bar"] = 2, ["planks"] = 8 }, Description = "Seals stew, jam or meat into tin cans over a wood, coal or charcoal fire. Canned goods keep and sell for the most." },
+        [ThingKind.Cannery] = new() { Name = "Canning station", Cost = new() { ["steel_bar"] = 2, ["planks"] = 8 }, Description = "Seals meat stew or jam into tin cans over a wood, coal or charcoal fire. Canned goods keep and sell for the most." },
         [ThingKind.Packer] = new() { Name = "Packing station", Cost = new() { ["planks"] = 8, ["wood"] = 4 }, Description = "Packs one chosen good into crates, one item at a time while someone works it. A full crate waits to be carried out." },
         [ThingKind.Signpost] = new() { Name = "Trading post", Cost = new() { ["wood"] = 10, ["stone"] = 4 }, Description = "Trade by cart. Hire and manage neighboring villagers." },
     };
@@ -117,6 +116,5 @@ public sealed partial class GameData {
         ["dough"] = new() { Name = "Knead dough", Station = ThingKind.Cooktable, Inputs = new() { ["flour"] = 1, ["water"] = 1 }, Output = "dough", Amount = 1, Seconds = 8 },
         ["canned_meat_stew"] = new() { Name = "Can meat stew", Station = ThingKind.Cannery, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["meat_stew"] = 1, ["tin_can"] = 1 }, Output = "canned_meat_stew", Amount = 1, Seconds = 10 },
         ["canned_jam"] = new() { Name = "Can jam", Station = ThingKind.Cannery, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["berry_jam"] = 1, ["tin_can"] = 1 }, Output = "canned_jam", Amount = 1, Seconds = 10 },
-        ["canned_food"] = new() { Name = "Can meat", Station = ThingKind.Cannery, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["raw_meat"] = 1, ["tin_can"] = 1 }, Output = "canned_food", Amount = 1, Seconds = 10 },
     };
 }

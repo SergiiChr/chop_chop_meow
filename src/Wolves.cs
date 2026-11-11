@@ -25,7 +25,7 @@ public readonly record struct Den(Vector2 Mouth, Vector2 Face) {
     public const float Clearance = 4;
 }
 
-/// <summary>Wolves at night: they come out of the dens at dusk and patrol until one smells a player, howls and goes after them, and before dawn they all go home.</summary>
+/// <summary>Wolves at night: they come out of the dens from dusk and patrol until one smells a player, howls and goes after them, and before dawn they all go home.</summary>
 public sealed partial class World {
     /// <summary>The dens along the valley from its inland end, each dug into the range on one side.</summary>
     public static readonly Den[] Dens = { FootDen(17, 1), FootDen(56, -1), FootDen(92, 1), FootDen(166, -1), FootDen(211, 1) };
@@ -38,8 +38,6 @@ public sealed partial class World {
     /// <summary>How far the player a wolf runs at may move before it looks for a new way around what blocks it.</summary>
     private const float RouteSlack = 2;
     private readonly Random wolfRandom = new(1913);
-    /// <summary>Metres a second a wolf patrols, stalks and backs off at; it speeds up a little each day.</summary>
-    private float WolfTrot => Math.Min(3.8f, 3 + Day * .1f);
     /// <summary>A wolf hunting nobody walks its patrol at this share of its trot.</summary>
     private const float PatrolPace = .5f;
     /// <summary>From an hour before dawn every wolf gives up and heads back to the nearest den.</summary>
@@ -52,22 +50,29 @@ public sealed partial class World {
         return false;
     }
 
-    /// <summary>Lets each den's wolves out in turn once nobody can see its door, and moves every wolf that hunts nobody.</summary>
+    /// <summary>
+    /// Lets each den's wolves out in turn at dusk once nobody can see its door, then one more from a den picked at random every hour,
+    /// and moves every wolf that hunts nobody.
+    /// </summary>
     private void TickDens(float dt) {
         float sinceDusk = (DayPhase - Data.DuskStarts) * Data.DaySeconds;
-        if (!WolvesRetreat)
+        if (!WolvesRetreat) {
             for (int i = 0; i < Dens.Length; i++) {
                 if ((S.DensOut & 1 << i) != 0 || sinceDusk < i * DenGapSeconds || !Unseen(Dens[i].Door)) continue;
                 S.DensOut |= 1 << i;
                 // Each wolf of a den sets off its own way.
                 float heading = (float)wolfRandom.NextDouble() * MathF.Tau;
-                for (int n = 0; n < Data.WolvesPerDen; n++) S.Wolves.Add(new Wolf { Pos = Dens[i].Door, Health = 4 + Day * .4f, Heading = heading + n * MathF.Tau / Data.WolvesPerDen });
+                for (int n = 0; n < Data.WolvesPerDen; n++) LetOut(Dens[i], heading + n * MathF.Tau / Data.WolvesPerDen);
             }
+            // An hour whose wolf no den could let out unseen is not made up for later.
+            int hours = (int)(sinceDusk / Data.HourSeconds);
+            if (S.DenHours < hours && RandomUnseenDen() is Den den) { S.DenHours = hours; LetOut(den, (float)wolfRandom.NextDouble() * MathF.Tau); }
+        }
         for (int i = S.Wolves.Count - 1; i >= 0; i--) {
             var wolf = S.Wolves[i];
             if (WolvesRetreat && wolf.Mode != WolfMode.Home) GoHome(wolf);
             if (wolf.Target != 0) continue;
-            float step = dt * WolfTrot;
+            float step = dt * Data.WolfTrot;
             switch (wolf.Mode) {
                 case WolfMode.Patrol:
                     Wander(wolf, step * PatrolPace); Smell(wolf);
@@ -84,6 +89,16 @@ public sealed partial class World {
                     break;
             }
         }
+    }
+    private void LetOut(Den den, float heading) => S.Wolves.Add(new Wolf { Pos = den.Door, Health = Data.WolfHealth, Heading = heading });
+    /// <summary>One of the dens whose door no player sees, picked at random, or null when every door is watched.</summary>
+    private Den? RandomUnseenDen() {
+        int unseen = 0;
+        foreach (var den in Dens) if (Unseen(den.Door)) unseen++;
+        if (unseen == 0) return null;
+        int pick = wolfRandom.Next(unseen);
+        foreach (var den in Dens) if (Unseen(den.Door) && pick-- == 0) return den;
+        return null;
     }
     /// <summary>
     /// Walks a patrolling wolf on its heading; ground ahead nobody can stand on, or firelight, turns it a new random way it can take.

@@ -71,6 +71,8 @@ public static class SimulationChecks {
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
+        Test(CheckARandomDenLetsOneMoreWolfOutEveryHour, data);
+        Test(CheckWolvesAreNoStrongerOnLaterNights, data);
         Test(CheckPatrollingWolfWalksAtHalfItsTrot, data);
         Test(CheckWolvesKeepToGroundAPlayerCanWalk, data);
         Test(CheckSmelledPlayerDrawsAHowlAndThePack, data);
@@ -98,6 +100,7 @@ public static class SimulationChecks {
         Test(CheckFullStationLeavesWorkerHoldingTheWrongToolUntilThereIsRoom, data);
         Test(CheckWorkerPutsToolBackGoingHomeAndLeavesItWhenDismissed, data);
         Test(CheckRakeClearsLeavesWhichFallAgain, data);
+        Test(CheckBerryBushesStartAlikeAndRegrowWhateverIsPicked, data);
         Test(CheckPilesSnapTogetherHoldOneResourceAndMakeCompost, data);
         Test(CheckCookingTableCrushesBerriesAndCooksJam, data);
         Test(CheckCanneryAndFurnaceTakeTheirFoodRecipes, data);
@@ -2110,16 +2113,16 @@ public static class SimulationChecks {
         SafeTick(world, data.TradeSeconds + .1f);
         Require(said.Any(m => m.EndsWith("Donated 1 Steel chisel.")), "the returning cart should say what was donated");
         SetCoins(world, 1000);
-        Require(world.Buy(sign, "canned_food", 2), "boxed goods should be bought from the post");
+        Require(world.Buy(sign, "canned_meat_stew", 2), "boxed goods should be bought from the post");
         Require(world.Orders.Last().Crates == 2, "boxed goods should be bought by the crate");
-        Require(world.Coins == 822, "boxed goods should cost the crate price");
-        Require(world.LotPrice("canned_food") > data.Market.Buys["canned_food"] * world.UnitPrice("canned_food", false), "a bought crate costs more than its contents would sell for");
+        // A crate of 12 at 12.15 each plus its crate at 3.15 is 148.95; a quarter more, rounded up, is 187.
+        Require(world.Coins == 1000 - 2 * 187, "boxed goods should cost the crate price");
+        Require(world.LotPrice("canned_meat_stew") > data.Market.Buys["canned_meat_stew"] * world.UnitPrice("canned_meat_stew", false), "a bought crate costs more than its contents would sell for");
         SafeTick(world, data.TradeSeconds + .1f);
         var bought = sign.Output!.Items.Keys.Where(World.IsCrate).ToList();
-        Require(bought.Count == 2 && bought.All(id => world.Packed(id)?["canned_food"] == data.Market.Buys["canned_food"]), "each bought crate should arrive packed with one purchase");
-        SetNeeds(world, hunger: 40); Give(world, "canned_food", 1); world.Consume("canned_food");
-        Require(world.Hunger > 40 && data.IsFood("canned_food"), "canned food should be edible");
-        Require(world.KnownPrice("raw_meat") > 0 && !world.Priced("canned_food"), "the price sheet only tracks goods the village buys");
+        Require(bought.Count == 2 && bought.All(id => world.Packed(id)?["canned_meat_stew"] == 12), "each bought crate should arrive packed with one purchase");
+        Require(world.KnownPrice("raw_meat") > 0 && !world.Priced("wheat_seeds"), "the price sheet only tracks goods the village buys");
+        Require(!data.Items.ContainsKey("canned_food") && data.Recipes.Values.All(r => !r.Inputs.ContainsKey("raw_meat") || r.Station != ThingKind.Cannery), "raw meat should sell in crates and never go into a can");
     }
 
     private static void CheckLoadedSaveDropsOldStageNumber(GameData data) {
@@ -2279,14 +2282,67 @@ public static class SimulationChecks {
         Require(world.Wolves.All(w => w.Target == 0 && w.Mode == WolfMode.Patrol), "wolves out of their dens should patrol until they smell someone");
     }
 
+    private static void CheckARandomDenLetsOneMoreWolfOutEveryHour(GameData data) {
+        // Inside a cabin the player is never smelled, so every wolf let out stays out until the retreat.
+        var world = EmptyWorld(data);
+        Require(world.Enter(world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0))), "the player should step into the cabin");
+        RunUntil(world, data.DuskStarts * data.DaySeconds);
+        SafeTick(world, data.HourSeconds - 1);
+        Require(world.Wolves.Count == World.Dens.Length, "only the wolves of dusk should be out through the first hour");
+        SafeTick(world, 2);
+        Require(world.Wolves.Count == World.Dens.Length + 1 && World.Dens.Any(den => world.Wolves[^1].Pos.DistanceTo(den.Door) < 4),
+                "one den should let one more wolf out an hour after dusk");
+        SafeTick(world, data.HourSeconds);
+        Require(world.Wolves.Count == World.Dens.Length + 2, "a den should let one more wolf out after each further hour");
+        // From dusk at 20:24 to the retreat at 05:00 eight whole hours pass.
+        SafeTick(world, data.WolfRetreatStarts * data.DaySeconds - world.Time - 1);
+        Require(world.Wolves.Count == World.Dens.Length + 8, $"a night should let out one wolf an hour until the retreat, not {world.Wolves.Count - World.Dens.Length}");
+    }
+
+    private static void CheckWolvesAreNoStrongerOnLaterNights(GameData data) {
+        (float Health, float Pace, float Bite) Wolf(int night) {
+            var world = EmptyWorld(data);
+            world.Player = Terrain.Point(120, 0);
+            RunUntil(world, (night - 1 + data.DuskStarts) * data.DaySeconds);
+            SafeTick(world, .5f);
+            var wolf = world.Wolves.Single();
+            var from = wolf.Pos;
+            SafeTick(world, 1);
+            float pace = wolf.Pos.DistanceTo(from);
+            SetNeeds(world, health: 100);
+            PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+            SafeTick(world, .2f);
+            return (wolf.Health, pace, 100 - world.Health);
+        }
+        var (first, later) = (Wolf(1), Wolf(30));
+        Require(later.Health == first.Health, $"a wolf should take as many blows a month in as on the first night: {first.Health} and {later.Health}");
+        Require(later.Pace == first.Pace, $"a wolf should walk as fast a month in as on the first night: {first.Pace} and {later.Pace}");
+        foreach (float bite in new[] { first.Bite, later.Bite })
+            Require(bite * 3 < 50 && bite * 4 >= 50, $"the fourth bite, not the third, should take a healthy player to half health on any night; one takes {bite}");
+    }
+
+    private static void CheckBerryBushesStartAlikeAndRegrowWhateverIsPicked(GameData data) {
+        var world = new World(data);
+        var bushes = world.Things.Where(t => t.Kind == ThingKind.Berries).ToList();
+        Require(bushes.All(b => b.Remaining == 24), "every bush should start with 24 berries, as many as it regrows");
+        var bush = bushes[0];
+        world.Player = bush.Pos;
+        world.Gather(bush, data.GatherSeconds);
+        Require(bush.Remaining == 20, "one gather should pick 4 berries");
+        RunUntil(world, world.Time + data.BerryRegrowSeconds - 2);
+        Require(bush.Remaining == 20, "a bush should not fruit again before its hours have passed");
+        RunUntil(world, world.Time + 4);
+        Require(bush.Remaining == 24, "a bush picked only in part should be full again once its hours have passed");
+    }
+
     private static void CheckPatrollingWolfWalksAtHalfItsTrot(GameData data) {
         var world = NightWorld(data);
         world.Player = Terrain.Point(30, 0);
         var start = Terrain.Point(120, 0);
         var wolf = PatrolWolf(world, new Wolf { Pos = start, Heading = Terrain.Sideways.Angle() });
         SafeTick(world, 1);
-        // On the first night a wolf trots at 3.1 m/s, so it patrols at 1.55 m/s.
-        Require(Math.Abs(wolf.Pos.DistanceTo(start) - 1.55f) < .05f, $"a patrolling wolf should walk at half its trot, not {wolf.Pos.DistanceTo(start):0.00} m/s");
+        // A wolf trots at 3 m/s, so it patrols at 1.5 m/s.
+        Require(Math.Abs(wolf.Pos.DistanceTo(start) - 1.5f) < .02f, $"a patrolling wolf should walk at half its trot, not {wolf.Pos.DistanceTo(start):0.00} m/s");
     }
 
     private static void CheckWolvesKeepToGroundAPlayerCanWalk(GameData data) {

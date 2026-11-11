@@ -249,6 +249,8 @@ public sealed class SaveState {
     public List<Wolf> Wolves { get; set; } = new();
     /// <summary>One bit for each of <see cref="World.Dens"/> whose wolves are out tonight.</summary>
     public int DensOut { get; set; }
+    /// <summary>Whole hours since dusk that have had their one more wolf tonight.</summary>
+    public int DenHours { get; set; }
     /// <summary>A wolf has howled tonight.</summary>
     public bool Howled { get; set; }
     [JsonIgnore] public Inventory Backpack { get => Actor.Backpack; set => Actor.Backpack = value; }
@@ -477,7 +479,7 @@ public sealed partial class World {
         }
         // Rocks and berry bushes stand alone on the plains, far from the clearing and each other, so more of them means exploring.
         Scatter(rng, ThingKind.Stone, 30, StonePile, 15, 9, _ => 1, 2000);
-        Scatter(rng, ThingKind.Berries, 24, 34, 14, 10, _ => 1, 2000);
+        Scatter(rng, ThingKind.Berries, 24, BushBerries, 14, 10, _ => 1, 2000);
         var shore = Terrain.Spawn - Terrain.Lake;
         Add(ThingKind.Water, Terrain.Lake + shore.Normalized() * (Terrain.Shore(MathF.Atan2(shore.Y, shore.X)) + .2f), 9999);
         Add(ThingKind.Tree, Terrain.Spawn + new Vector2(5, 0), 42);
@@ -493,6 +495,8 @@ public sealed partial class World {
     public const int LeafPatch = 12;
     /// <summary>Ore in a full coal, iron or tin deposit at a cliff.</summary>
     public const int DepositOre = 600;
+    /// <summary>Berries on a full bush, at the start and each time it fruits again.</summary>
+    public const int BushBerries = 24;
     /// <summary>Stone in a full boulder.</summary>
     public const int StonePile = 64;
     /// <summary>Meat on a fresh wolf carcass.</summary>
@@ -617,7 +621,7 @@ public sealed partial class World {
         if (t.Kind == ThingKind.Mine) return MineBuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (!t.IsResource) return "Select a natural resource.";
-        if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again in ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Tree => "Only a stump is left. Find another tree.", ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
+        if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again within ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Tree => "Only a stump is left. Find another tree.", ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
         // Workers fetch their tools from a tool station instead of needing them carried.
         if (worker || GatherRules.Of(t.Kind)?.Needs is not string kind || BestTool(kind) != null) return null;
         return kind switch {
@@ -2118,8 +2122,9 @@ public sealed partial class World {
         foreach (var t in Ticking(ThingKind.Farm)) FarmTick(t, dt);
         foreach (var t in Ticking(ThingKind.Packer)) PackTick(t, dt);
         foreach (var t in Ticking(ThingKind.Signpost)) AutoSell(t);
+        // A bush fruits again its hours after the first berry was picked, whether or not it was picked clean.
         foreach (var t in S.Things.Of(ThingKind.Berries))
-            if (t.Remaining == 0) { t.Regrow += dt; if (t.Regrow >= Data.BerryRegrowSeconds) { t.Remaining = 24; t.Regrow = 0; } }
+            if (t.Remaining < BushBerries && (t.Regrow += dt) >= Data.BerryRegrowSeconds) { t.Remaining = BushBerries; t.Regrow = 0; }
         foreach (var t in S.Things.Of(ThingKind.Campfire)) {
             t.Burn = Math.Max(0, t.Burn - dt);
             if (t.Burn < 30 && t.Inventory.Remove("wood", 1) > 0) { if (t.Burn <= 0) Play("start_fire", t.Pos); t.Burn += Data.CampfireSeconds; }
@@ -2143,7 +2148,7 @@ public sealed partial class World {
                 if (CanStand(b.Pos - push)) b.Pos -= push;
             }
         }
-        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.Howled = false; } else if (!sleeping) TickDens(dt);
+        if (!Dusk) { S.Wolves.Clear(); S.DensOut = 0; S.DenHours = 0; S.Howled = false; } else if (!sleeping) TickDens(dt);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting)
             using (ActAs(p)) {
@@ -2281,7 +2286,7 @@ public sealed partial class World {
             if (hunter != null) { hunter.Leap = LeapSeconds; Say("A wolf leaps for your throat!"); }
         }
         // A chase always outpaces a walk but not a sprint.
-        float speed = WolfTrot, chase = Data.WalkSpeed * Data.WolfChase;
+        float speed = Data.WolfTrot, chase = Data.WalkSpeed * Data.WolfChase;
         foreach (var wolf in hunters) {
             wolf.Attack -= dt;
             if (wolf.Howl > 0) { wolf.Howl = Math.Max(0, wolf.Howl - dt); continue; }
@@ -2311,7 +2316,7 @@ public sealed partial class World {
                 wolf.Chase = 0;
                 Travel(wolf, Player, dt * speed * .35f, dt * speed * .35f, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
+                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); }
             } else if ((lit || Protected(wolf.Pos)) is var safe && safe && wolf.Chase <= 0) {
                 // Firelight turns a wolf back, unless it is already on the player's heels: then it follows in briefly.
                 wolf.Chase = 0; wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * dt * 3);
@@ -2323,7 +2328,7 @@ public sealed partial class World {
                 wolf.Chase = safe ? wolf.Chase - dt : ChaseSeconds;
                 Travel(wolf, Player, dt * chase, dt * chase, RouteSlack);
                 if (!wolf.Growled && wolf.Pos.DistanceTo(Player) < 6) { wolf.Growled = true; Play("wolf_growl_approaching", wolf.Pos); }
-                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= 12 + Day; Play("wolf_bite", Player); }
+                if (wolf.Pos.DistanceTo(Player) < 1.1f && wolf.Attack <= 0) { wolf.Attack = 1; S.Health -= Data.WolfBite; Play("wolf_bite", Player); }
             }
         }
         // Feeding wolves crowd around the player without stacking on one spot.

@@ -68,8 +68,8 @@ internal static class SetupSteps {
     /// <summary>Puts a wolf out patrolling where the check needs it, hunting nobody until it smells someone.</summary>
     public static Wolf PatrolWolf(World world, Wolf wolf) { world.S.Wolves.Add(wolf); return wolf; }
 
-    /// <summary>Keeps every den shut tonight, so a check meets only the wolves it places.</summary>
-    public static void ShutDens(World world) => world.S.DensOut = (1 << World.Dens.Length) - 1;
+    /// <summary>Keeps every den shut tonight, at dusk and through every hour after, so a check meets only the wolves it places.</summary>
+    public static void ShutDens(World world) { world.S.DensOut = (1 << World.Dens.Length) - 1; world.S.DenHours = 24; }
 
     /// <summary>Takes wolves away, which the game does only at dawn or on a respawn.</summary>
     public static void RemoveWolves(World world, Predicate<Wolf> match) => world.S.Wolves.RemoveAll(match);
