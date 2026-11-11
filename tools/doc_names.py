@@ -25,15 +25,18 @@ OTHER_CODE = [
     ".claude/skills/*/*.txt",
     ".github/workflows/*.yml",
 ]
+# A skill's commands, in its fenced blocks, may add a flag of their own to the game, such as the playtest driver's.
+SKILLS = ".claude/skills/*/SKILL.md"
 
 SPAN = re.compile(r"`([^`\n]+)`")
 TYPE = re.compile(
     r"\b(?:class|struct|record struct|record|enum|interface)\s+([A-Z]\w*)"
 )
+WORD = re.compile(r"\w+")
+FLAG = re.compile(r"--[a-z][a-z0-9-]*")
 NAME = r"[A-Za-z_]\w*"
 DOTTED = re.compile(rf"^{NAME}(?:\.{NAME})+$")
 PASCAL = re.compile(r"^[A-Z][a-z0-9]+(?:[A-Z][a-z0-9]*)+$")
-FLAG = re.compile(r"^--[a-z][a-z0-9-]*$")
 # Folders of the repo a path in the docs starts with; anything else, such as build output, is not checked.
 FOLDERS = (
     "src/",
@@ -47,52 +50,6 @@ FOLDERS = (
     ".github/",
 )
 SOURCE_ENDINGS = (".cs", ".py", ".gd", ".md")
-# Endings of files the game or a tool writes while running, which a dotted name must not be taken for.
-DATA_ENDINGS = (
-    "json",
-    "cfg",
-    "txt",
-    "log",
-    "tsv",
-    "png",
-    "svg",
-    "mp3",
-    "ogv",
-    "mp4",
-    "gif",
-    "zip",
-    "gz",
-    "pck",
-    "tscn",
-    "godot",
-    "toml",
-    "yml",
-    "sh",
-    "import",
-    "uid",
-    "x86_64",
-    "done",
-    "tmp",
-)
-# Commands of other programs, whose flags are theirs and not the game's.
-FOREIGN = (
-    "git",
-    "gh",
-    "dotnet",
-    "mypy",
-    "ruff",
-    "pip",
-    "ln",
-    "cp",
-    "rm",
-    "ffmpeg",
-    "pgrep",
-    "pkill",
-)
-# A skill's commands, in its fenced blocks, may add a flag of their own to the game, such as the playtest driver's.
-SKILLS = ".claude/skills/*/SKILL.md"
-# Names that are right but are not in this repo: tools kept outside it.
-OUTSIDE = {"loudness.py"}
 
 
 def files(patterns: list[str]) -> list[Path]:
@@ -100,69 +57,53 @@ def files(patterns: list[str]) -> list[Path]:
     return sorted({path for pattern in patterns for path in ROOT.glob(pattern)})
 
 
-def spans(path: Path) -> Iterator[tuple[int, str]]:
-    """Each backticked span in a doc with its line number, leaving out fenced code blocks."""
+def lines(path: Path) -> Iterator[tuple[int, str, bool]]:
+    """Each line of a doc with its number and whether a fenced code block holds it; the fences themselves are left out."""
     fenced = False
     for number, line in enumerate(path.read_text().splitlines(), 1):
         if line.lstrip().startswith("```"):
             fenced = not fenced
-            continue
-        if not fenced:
-            for match in SPAN.finditer(line):
-                yield number, match.group(1)
-
-
-def fenced(path: Path) -> Iterator[str]:
-    """The lines of a doc's fenced code blocks."""
-    inside = False
-    for line in path.read_text().splitlines():
-        if line.lstrip().startswith("```"):
-            inside = not inside
-        elif inside:
-            yield line
+        else:
+            yield number, line, fenced
 
 
 class Code:
     """The repo's code, as the docs' names are looked up in it."""
 
     def __init__(self) -> None:
-        self.csharp = {path: path.read_text() for path in files(CSHARP)}
-        self.other = "\n".join(
-            [path.read_text() for path in files(OTHER_CODE)]
-            + [block for path in files([SKILLS]) for block in fenced(path)]
+        csharp = {path: path.read_text() for path in files(CSHARP)}
+        other = files(OTHER_CODE)
+        skills = [
+            line for doc in files([SKILLS]) for _, line, fenced in lines(doc) if fenced
+        ]
+        self.text = "\n".join(
+            [*csharp.values(), *(path.read_text() for path in other), *skills]
         )
-        self.stems = {path.stem for path in self.csharp}
-        self.all = "\n".join(self.csharp.values()) + "\n" + self.other
+        self.words = set(WORD.findall(self.text))
+        self.flags = set(FLAG.findall(self.text))
+        self.file_names = {path.name for path in [*csharp, *other, *files(DOCS)]}
+        self.stems = {path.stem for path in [*csharp, *other]}
         # A partial class is declared in several files, and its members are in any of them.
-        self.types: dict[str, str] = {}
-        for text in self.csharp.values():
+        self.types: dict[str, set[str]] = {}
+        for text in csharp.values():
+            words = set(WORD.findall(text))
             for name in set(TYPE.findall(text)):
-                self.types[name] = self.types.get(name, "") + "\n" + text
-
-    def has_word(self, word: str, text: str | None = None) -> bool:
-        """Whether a name appears as a whole word."""
-        return (
-            re.search(rf"(?<![\w]){re.escape(word)}(?![\w])", text or self.all)
-            is not None
-        )
+                self.types.setdefault(name, set()).update(words)
 
     def has_dotted(self, name: str) -> bool:
         """Whether `Type.Member` names a member of a type declared here, or is written out somewhere as it stands."""
-        parts = name.split(".")
-        owner = self.types.get(parts[0])
+        first, *rest = name.split(".")
+        owner = self.types.get(first)
         if owner is None:
-            return name in self.all
-        for part in parts[1:]:
-            if not self.has_word(part, owner):
+            return name in self.text
+        for part in rest:
+            if part not in owner:
                 return False
             owner = self.types.get(part, owner)
         return True
 
-    def has_flag(self, flag: str) -> bool:
-        return re.search(rf"(?<![\w-]){re.escape(flag)}(?![\w-])", self.all) is not None
 
-
-def path_exists(text: str) -> bool | None:
+def path_exists(text: str, code: Code) -> bool | None:
     """Whether a path the docs name exists, or None when the text is not a path into the repo."""
     text = text.split("#")[0].removeprefix("./").removeprefix("res://")
     text = re.sub(r":\d+(-\d+)?$", "", text)
@@ -172,52 +113,58 @@ def path_exists(text: str) -> bool | None:
         return any(ROOT.glob(text.rstrip("/")))
     # A lone file name is checked when it is source or a doc, which live in known places.
     if "/" not in text and text.endswith(SOURCE_ENDINGS) and "*" not in text:
-        return any(ROOT.glob(text)) or any(
-            path.name == text for path in files([*CSHARP, *OTHER_CODE, *DOCS])
-        )
+        return text in code.file_names
     return None
 
 
 def missing(span: str, code: Code) -> Iterator[str]:
     """The names in one backticked span that are meant to be in the repo and are not."""
-    words = span.split()
-    foreign = bool(words) and words[0] in FOREIGN
+    words = [word.strip(",;:()[]\"'") for word in span.split()]
+    if not words:
+        return
+    # A flag is the game's or a tool's own when the span starts with a flag or runs one of the repo's scripts.
+    # Any other program's flags are its own.
+    ours = FLAG.fullmatch(words[0]) is not None or any(
+        path_exists(word, code) for word in words
+    )
     for word in words:
-        word = word.strip(",;:()[]\"'")
-        if word in OUTSIDE:
-            continue
-        exists = path_exists(word)
+        exists = path_exists(word, code)
         if exists is not None:
             if not exists:
                 yield word
-            continue
-        if FLAG.match(word):
-            if not foreign and not code.has_flag(word):
+        elif FLAG.fullmatch(word):
+            if ours and word not in code.flags:
                 yield word
-            continue
-        if len(words) > 1:
-            continue
-        # `World.As(...)`, `Checks.Test<T>` and `GameData.LowNeed` are looked up as `World.As`, `Checks.Test` and so on.
-        name = re.sub(r"<[^<>]*>|\(.*\)$", "", word)
-        if DOTTED.match(name) and name.rsplit(".", 1)[1] not in DATA_ENDINGS:
-            if not code.has_dotted(name):
+        elif len(words) == 1:
+            # `World.As(...)` and `Checks.Test<T>` are looked up as `World.As` and `Checks.Test`.
+            name = re.sub(r"<[^<>]*>|\(.*\)$", "", word)
+            first = name.split(".")[0]
+            # A dotted name is the code's when it starts with a type or a module of the repo.
+            # `settings.cfg` and the like are files the game writes.
+            if DOTTED.match(name) and (first[0].isupper() or first in code.stems):
+                if not code.has_dotted(name):
+                    yield word
+            elif (
+                PASCAL.match(name) and name not in code.stems and name not in code.words
+            ):
                 yield word
-        elif PASCAL.match(name) and name not in code.stems and not code.has_word(name):
-            yield word
 
 
 def main() -> int:
     code = Code()
+    docs = files(DOCS)
     found = [
         f"{doc.relative_to(ROOT)}:{number}: `{name}`"
-        for doc in files(DOCS)
-        for number, span in spans(doc)
+        for doc in docs
+        for number, line, fenced in lines(doc)
+        if not fenced
+        for span in SPAN.findall(line)
         for name in missing(span, code)
     ]
     if found:
         print("Names in the docs that are not in the code:\n" + "\n".join(found))
         return 1
-    print(f"Docs name nothing missing ({len(files(DOCS))} docs).")
+    print(f"Docs name nothing missing ({len(docs)} docs).")
     return 0
 
 

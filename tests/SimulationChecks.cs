@@ -118,7 +118,6 @@ public static class SimulationChecks {
         Test(CheckFoodsFeedWaterAndHealByTheirData, data);
         Test(CheckMarketTakesCratesAndDonations, data);
         Test(CheckDonationIsNoSale, data);
-        Test(CheckEditedSaveLoadsWithItsStationMarkAndGoalPutRight, data);
         Test(CheckStationQueueAndMarkSurviveALoad, data);
         Test(CheckEverythingIsReachableFromFreshStart, data);
         Test(CheckTorchLightsAndBurnsOut, data);
@@ -462,7 +461,7 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
         world.Player = sign.Pos;
-        // The post refuses loose goods by hand, so this is what an old save might hold.
+        // The post refuses loose goods by hand, so they are put in directly.
         sign.Inventory.Add("wood", 3);
         Require(!world.Sell(sign), "loose goods must not be sold");
         Require(world.Orders.Count == 0, "loose goods must not send a cart");
@@ -2110,19 +2109,6 @@ public static class SimulationChecks {
         Require(!data.Items.ContainsKey("canned_food") && data.Recipes.Values.All(r => !r.Inputs.ContainsKey("raw_meat") || r.Station != ThingKind.Cannery), "raw meat should sell in crates and never go into a can");
     }
 
-    /// <summary>A save edited by hand loads with what it holds out of place put right rather than failing mid-game.</summary>
-    private static void CheckEditedSaveLoadsWithItsStationMarkAndGoalPutRight(GameData data) {
-        var saved = EmptyWorld(data);
-        var anvil = saved.Add(ThingKind.Anvil, new Vector2(10, 10));
-        // An anvil makes steel parts only; pickaxes are made at the bench.
-        anvil.Keep = "steel_pick"; anvil.Inventory.Add("iron_bar", 3);
-        Achieve(saved, "gather", "furnace", "iron_bar", "anvil", "pick");
-        SetGoal(saved, 5);
-        var loaded = EmptyWorld(data);
-        loaded.Deserialize(saved.Serialize());
-        Require(loaded.Find(anvil.Id)!.Recipe == "steel_parts" && loaded.Find(anvil.Id)!.Inventory["iron_bar"] == 3, "a station marked with a recipe it does not make should go back to its starting recipe and keep what it holds");
-        Require(loaded.Goal == 0, "the goal should be worked out from the milestones: with no water carried yet it is the first");
-    }
 
     private static void CheckStationQueueAndMarkSurviveALoad(GameData data) {
         var old = EmptyWorld(data);
@@ -2241,7 +2227,7 @@ public static class SimulationChecks {
         // Inside a cabin the player is never smelled, so every wolf let out stays out until the retreat.
         var world = EmptyWorld(data);
         Require(world.Enter(world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0))), "the player should step into the cabin");
-        RunUntil(world, data.DuskStarts * data.DaySeconds);
+        RunUntilDusk(world);
         SafeTick(world, data.HourSeconds - 1);
         Require(world.Wolves.Count == World.Dens.Length, "only the wolves of dusk should be out through the first hour");
         SafeTick(world, 2);
@@ -2258,7 +2244,8 @@ public static class SimulationChecks {
         (float Health, float Pace, float Bite) Wolf(int night) {
             var world = EmptyWorld(data);
             world.Player = Terrain.Point(120, 0);
-            RunUntil(world, (night - 1 + data.DuskStarts) * data.DaySeconds);
+            RunUntil(world, (night - 1) * data.DaySeconds);
+            RunUntilDusk(world);
             SafeTick(world, .5f);
             var wolf = world.Wolves.Single();
             var from = wolf.Pos;
@@ -2519,9 +2506,11 @@ public static class SimulationChecks {
         Give(world, "tin_can", 2);
         var worker = AddWorker(world, new Vector2(12, 12));
         worker.Tool = "steel_hammer"; worker.Bag.Add("wood", 2);
+        // An anvil makes steel parts only; pickaxes are made at the bench.
+        world.Add(ThingKind.Anvil, new Vector2(10, 10));
         string json = world.Serialize();
         EmptyWorld(data).Deserialize(json);
-        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"Tool\": \"steel_hammer\"", "\"Tool\": \"unobtainium\""), ("\"wood\": 2", "\"unobtainium\": 2") }) {
+        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"Tool\": \"steel_hammer\"", "\"Tool\": \"unobtainium\""), ("\"wood\": 2", "\"unobtainium\": 2"), ("\"Keep\": \"steel_parts\"", "\"Keep\": \"steel_pick\"") }) {
             bool refused = false;
             try { EmptyWorld(data).Deserialize(Patch(json, edit)); } catch (InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
             Require(refused, $"a save with {edit.Item2} in place of {edit.Item1} should be refused with a clear reason");

@@ -11,6 +11,8 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
         headingIcon.Texture = Icons.Of(World.MineOre(thing)); headingIcon.Visible = true;
         var data = world.Data.Mine;
         int stage = (int)thing.MineStage; bool open = thing.MineStage == MineStage.Open;
+        // Everything below is laid out for this stage.
+        RedrawOnChange(() => thing.MineStage);
         var tag = Style.Pill(open ? "open" : $"{stage + 1} / 3", open ? Style.TagPill : Style.Tag(Style.Mustard), open ? Style.Rim : Style.Line, 13);
         panel.AddToHeader(tag);
         if (!open) {

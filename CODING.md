@@ -25,7 +25,7 @@ Project rules on top of the global coding and testing guides.
 - **Layer-first folders:** the project keeps the flat `src/` and `tests/` layout; group related code by file name prefix instead of adding folders.
 - **Illegal states:** use enums such as `ActorAction` rather than combinations of flags or strings.
 - **Validation at the boundary:** `GameData` checks its tables fit together when the game starts, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
-- **Saves:** a change that would make a save written before it load wrong raises `SaveState.Version`, and `World.Deserialize` refuses every other version. Write no code that converts an old save, and no check for one; the developer's own save is fixed by hand when they ask.
+- **Saves:** a change that would make a save written before it load wrong raises `SaveState.Version`, and `World.Deserialize` refuses every other version. Write no code that converts an old save or repairs a broken one, and no check for either: a save the game cannot take as it is, is refused with the reason. The user's own save is fixed by hand when they ask.
 
 ## Architecture
 

@@ -139,11 +139,6 @@ How they are framed:
 - Tools are seen from the side, head up and to the right. Everything else is seen from the game camera's angle under the game's sunlight.
 - Chisels and hammers have a model per grade. The bench shows the slotted grade lying on its top, and a held hammer shows its own grade.
 
-### Item atlas
-
-`item-atlas.png` is a 4×3 sheet of inventory icons.
-`src/Icons.cs` falls back on it only for the water icon (cell 10), which `icons/water.png` now covers, so every icon comes from `icons/` or `ui/`.
-
 ### SVG glyphs
 
 `ui/` holds hand-written SVG icons:
@@ -210,8 +205,6 @@ give them.
 
 ## Provenance
 
-The item atlas was generated with the built-in image generation tool for this project.
-Its prompt is preserved in [PROMPTS.md](PROMPTS.md).
 The ground textures in `environment/terrain3d/textures/` are packed from three [ambientCG](https://ambientcg.com)
 photoscans, Grass004, Ground037 and Rock030, released under CC0 1.0; `tools/ground_textures.py` downloads the pinned
 1K PNG archives, checks their SHA-256 and packs them at 512 px with `tools/pack_textures.gd`.

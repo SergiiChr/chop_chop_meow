@@ -155,6 +155,9 @@ internal static class WorldSteps {
         RunUntil(world, time > world.Time ? time : time + world.Data.DaySeconds);
     }
 
+    /// <summary>Ticks to the moment the light starts to fade, when the dens open and workers head home.</summary>
+    public static void RunUntilDusk(World world) => RunUntilPhase(world, world.Data.DuskStarts);
+
     /// <summary>Ticks to the next daytime, with no wolves about.</summary>
     public static void RunUntilMorning(World world) => RunUntilPhase(world, .3f);
 

@@ -64,7 +64,6 @@ public sealed partial class World {
                 float heading = (float)wolfRandom.NextDouble() * MathF.Tau;
                 for (int n = 0; n < Data.WolvesPerDen; n++) LetOut(Dens[i], heading + n * MathF.Tau / Data.WolvesPerDen);
             }
-            // An hour whose wolf no den could let out unseen is not made up for later.
             int hours = (int)(sinceDusk / Data.HourSeconds);
             if (S.DenHours < hours && RandomUnseenDen() is Den den) { S.DenHours = hours; LetOut(den, (float)wolfRandom.NextDouble() * MathF.Tau); }
         }
@@ -91,14 +90,11 @@ public sealed partial class World {
         }
     }
     private void LetOut(Den den, float heading) => S.Wolves.Add(new Wolf { Pos = den.Door, Health = Data.WolfHealth, Heading = heading });
-    /// <summary>One of the dens whose door no player sees, picked at random, or null when every door is watched.</summary>
+    /// <summary>One of the dens whose door no player sees, each as likely as the next, or null when every door is watched.</summary>
     private Den? RandomUnseenDen() {
-        int unseen = 0;
-        foreach (var den in Dens) if (Unseen(den.Door)) unseen++;
-        if (unseen == 0) return null;
-        int pick = wolfRandom.Next(unseen);
-        foreach (var den in Dens) if (Unseen(den.Door) && pick-- == 0) return den;
-        return null;
+        Den? pick = null; int unseen = 0;
+        foreach (var den in Dens) if (Unseen(den.Door) && wolfRandom.Next(++unseen) == 0) pick = den;
+        return pick;
     }
     /// <summary>
     /// Walks a patrolling wolf on its heading; ground ahead nobody can stand on, or firelight, turns it a new random way it can take.

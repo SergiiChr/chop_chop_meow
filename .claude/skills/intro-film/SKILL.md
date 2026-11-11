@@ -79,7 +79,7 @@ Times are from the film's start; a change to a shot's length moves every later s
   upper arm too, as the crossed arms by the fire do.
 - **Only the cue sheet changed.** A stills run writes the whole `cues.tsv` too: copy `build/intro/stills/cues.tsv` over
   `build/intro/frames/cues.tsv` and make the movie again, without drawing the frames again.
-- **Sound cannot be heard from here.** Place sounds by measuring them (`loudness.py`) and check the mix by its loudness
+- **Sound cannot be heard from here.** Place sounds by measuring them (`$T/loudness.py`) and check the mix by its loudness
   per shot; say that it was measured, not heard, and what to check by ear.
 - **The film is drawn by its own clock.** Anything that moves by real time, such as a shader's `TIME`, runs at the wrong
   speed in the frames; give it the film's time, as the sea's waves get.

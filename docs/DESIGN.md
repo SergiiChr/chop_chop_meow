@@ -21,7 +21,7 @@ These came from the user; change them only after asking.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
 - **Wolves:** the same every night, never stronger or faster with the days; three or four bites bring a healthy player to half health. After the five let out at dusk, one den picked at random lets one more out every hour.
 - **Canning:** meat stew and jam are canned; raw meat is not, and sells in crates as it is.
-- **Saves:** a save from another version is refused, and no code converts old saves; the developer's own save is fixed by hand when asked.
+- **Saves:** a save from another version is refused, and no code converts old saves; the user's own save is fixed by hand when asked.
 - **Market:** reached at a trading post; selling lowers a price, which recovers over time; deeper goods are worth more; orders settle after a visible 30-second cart trip.
 - **Workers:** hired individually, paid daily, assigned, reassigned and dismissed; they carry station inputs and outputs, preferring matching filtered storage.
 - **Pacing:** 10–15 minutes to the first goal is a target, not a measured playthrough.
@@ -45,7 +45,7 @@ The side panel builds a new `PagePanel` node when a page opens; the page holds i
 A page whose subject has gone (`PagePanel.Current`), such as an emptied recovery box or a building another player took down, closes on the next refresh.
 A page that names another (`PagePanel.GivesWayTo`) opens that one instead: an emptied or placed carried crate's page gives way to the backpack's.
 A tab or other choice on a page calls `Redraw`, which builds its body again and keeps that state; `PageMemory` keeps only what outlasts the page.
-A `ThingPage` is a page about one thing in the world, with its job buttons and filters; it draws itself again when what sets its layout changes, such as a mine's stage.
+A `ThingPage` is a page about one thing in the world, with its job buttons and filters; a page calls `RedrawOnChange` beside what its layout reads, such as a mine's stage, so it draws itself again when that changes.
 The side panel and the backpack drawer are `MovableWindow`s: a drag on an empty spot moves one within the screen, `Redraw` keeps it there, and opening a different page or building puts both back.
 The board beside the panel moves with it, and the panel shifts right when the board would open past the screen's left edge.
 Wells and boxes on the panel pass a press on their own surface on, so they move it too.
@@ -419,7 +419,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 - **Dens.** `World.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
   The outcrop is solid like a mine's (`World.InSpur`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
   From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
-  After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`); an hour with every door watched is not made up for.
+  After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`).
 - **Strength.** A wolf's health, bite and pace are `GameData.WolfHealth`, `WolfBite` and `WolfTrot`, the same every night: the fourth bite brings a healthy player to half health.
 - **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at `PatrolPace` (half) of the trot it stalks at, a walk, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
 - **Smell and howl.** A patrolling or called wolf within `SmellRadius` of a player out in the open takes them as its target and howls, standing still, for as long as the howl recording plays (`LoneHowlSeconds` or `PackHowlSeconds`, `Wolf.Howl` counting down `Wolf.HowlLength`).
@@ -808,7 +808,7 @@ Music in `assets/music` crossfades over four seconds between the day music and t
 The day plays its tracks one after another and the night loops one.
 
 Each keeps its place for the running session, so music longer than its part of the day carries on next time.
-A track that plays to its end hands over to the next, and the last wraps back to the first; the playlist's own update does this, since the player's finished signal arrives after that update has already started the track again.
+A track that plays to its end hands over to the next, and the last wraps back to the first.
 The options screen sets the music volume, stored in the settings file.
 
 ## World map
@@ -820,14 +820,13 @@ The world is a fixed 216-tile valley defined in `src/Terrain.cs`:
 - a lake whose shore function bounds both walking and the drawn water.
 
 `World.Scatter` places resources with a seeded generator, trees more densely toward the mountains.
-`World.Deserialize` refuses a save from another version, and one that is incomplete, names unknown items or holds player needs out of range.
+`World.Deserialize` also refuses, rather than repairs, a save that is incomplete, names unknown items, marks or queues a recipe at a station that does not make it, or holds player needs out of range.
 Workers use grid detours around water and buildings.
 
 ## Development and verification
 
 [AGENTS.md](../AGENTS.md#checks) lists the checks and [RELEASE.md](RELEASE.md) the development flow.
 The network check's guest joins through a relay in `build.py` that adds about 80 ms of delay and 5% packet loss each way.
-`tools/doc_names.py` looks up the files, types, members, checks and flags the docs put in backticks, so a rename that leaves a doc behind fails the check.
 
 ### Platform
 

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Godot;
 using static Checks;
 using static ModelSteps;
+using static PlayerSteps;
 using static SetupSteps;
 using static WorldSteps;
 using static WorkerSteps;
@@ -620,8 +621,7 @@ public partial class Game {
         var tree = Hosted.Add(ThingKind.Tree, home + new Vector2(3, 3), 42);
         var chest = Hosted.Add(ThingKind.Chest, home + new Vector2(-3, 3)); chest.Inventory.Add("wood", 3);
         await Frames(4);
-        var cliff = World.CliffOf(ThingKind.Iron);
-        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        var cliff = await StandAtIronCliff();
         Require(!world.Sees(tree.Pos) && world.Remembered(tree.Id)?.Remaining == 42, "The player must remember the tree standing once they have walked away.");
         tree.Remaining = 0; chest.Inventory.Add("wood", 5);
         await Frames(4);
@@ -916,9 +916,7 @@ public partial class Game {
     }
     /// <summary>A packed crate's page gives way to the backpack's once the last item is taken out of the crate.</summary>
     private async Task CheckEmptiedCrateGivesWayToTheBackpack() {
-        Give(Hosted, "crate", 1); Give(Hosted, "berries", 1);
-        var placed = Hosted.PlaceCrate("crate", Hosted.Player + new Vector2(0, 2))!;
-        Hosted.Transfer(Hosted.Backpack, placed.Inventory, "berries", 1); Hosted.PickUpCrate(placed);
+        PackCrate(Hosted, ("berries", 1));
         await KeyStroke(Key.Tab);
         await Click(await Showing(0, c => c.TooltipText.StartsWith("Wood crate of")));
         await Click(await Showing(0, c => c.TooltipText.StartsWith("Berries")));
@@ -966,8 +964,7 @@ public partial class Game {
     private async Task CheckRightMouseOnAMarkedMineDigsItWithAPickaxe() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
         var start = Hosted.Player;
-        var cliff = World.CliffOf(ThingKind.Iron);
-        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        var cliff = await StandAtIronCliff();
         var mine = Hosted.Build(ThingKind.Mine, World.MineSpot(cliff))!;
         Give(Hosted, "steel_pick", 1);
         await Frames(2);
@@ -981,11 +978,9 @@ public partial class Game {
     /// <summary>A mine's page left open follows the mine from stage to stage and on to the open mine.</summary>
     private async Task CheckMinePageFollowsTheMineThroughItsStages() {
         var start = Hosted.Player;
-        var cliff = World.CliffOf(ThingKind.Iron);
-        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        var cliff = await StandAtIronCliff();
         var mine = Hosted.Build(ThingKind.Mine, World.MineSpot(cliff))!;
-        await Frames(2);
-        await Click(view.Screen(mine.Pos));
+        await ClickOn(mine);
         await Until(() => HasLabel(panel, "Stage 1 · Dig the entrance"), "the mine's page opening on its first stage", 3);
         mine.MineStage = MineStage.Dug;
         await Until(() => HasLabel(panel, "Stage 2 · Shore it up") && ShowsChild(panel, "supply_wood"), "the open mine page moving on to the supplies", 3);
@@ -999,8 +994,7 @@ public partial class Game {
     private async Task CheckPageClosesWhenWhatItShowsIsGone() {
         await CloseWithEsc();
         var box = Hosted.Add(ThingKind.Grave, world.Player + new Vector2(2, 0)); box.Inventory.Add("wood", 3);
-        await Frames();
-        await Click(view.Screen(box.Pos));
+        await ClickOn(box);
         await Until(() => ShownPage() == "Recovery box", "the recovery box's page opening", 3);
         await Click(FindButton(panel, "Take all")!);
         await Until(() => !panel.Visible && view.Selection.Thing == 0, "the page closing once its box is emptied and gone", 3);

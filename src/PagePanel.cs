@@ -36,9 +36,9 @@ public abstract partial class PagePanel : VBoxContainer {
     /// <summary>Brings what the page shows up to date.</summary>
     public void Refresh() => live.Run();
 
-    /// <summary>Builds the page's body again, keeping its state; a page whose subject has gone gives way to a new one.</summary>
+    /// <summary>Builds the page's body again, keeping its state; a page whose subject has gone closes or gives way, as on any refresh.</summary>
     public void Redraw() {
-        if (!Current) { panel.Open(panel.Page); return; }
+        if (!Current) { panel.Refresh(); return; }
         live.Clear();
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
         panel.ClearFrame();

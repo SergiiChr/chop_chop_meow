@@ -22,7 +22,6 @@ For goods the village trades, it is the trade price; for the rest it is a refere
 | 4 | 20% | steel axe, steel pickaxe, steel hammer, steel chisel, rake |
 
 The village also sells canned meat stew, a crate of 12 at the buying price.
-Raw meat is not canned: it sells in crates as it is.
 
 A new recipe gets its price from this rule.
 The check fails if any recipe loses value or a deeper recipe marks up more than a shallower one.

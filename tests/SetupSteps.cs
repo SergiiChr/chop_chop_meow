@@ -119,7 +119,4 @@ internal static class SetupSteps {
         world.S.Workers.Add(worker);
         return worker;
     }
-
-    /// <summary>Sets a goal number the milestones do not give, as a save edited by hand can hold: play only moves the goal with its milestones.</summary>
-    public static void SetGoal(World world, int goal) => world.S.Goal = goal;
 }

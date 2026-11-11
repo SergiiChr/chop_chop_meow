@@ -27,7 +27,6 @@ public sealed class Thing {
     private List<Queued>? queue;
     private string? making, keep;
     // Saves and updates carry these only when set, so a tree or a rock carries none of them.
-    // The batch in progress is saved under the name "Recipe".
     [JsonInclude, JsonPropertyName("Recipe"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] internal string? SavedMaking { get => making; set => Making = value ?? ""; }
     [JsonInclude, JsonPropertyName("Keep"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] internal string? SavedKeep { get => keep; set => Keep = value ?? ""; }
     [JsonInclude, JsonPropertyName("Queue"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), JsonConverter(typeof(QueueJson))]
@@ -36,6 +35,7 @@ public sealed class Thing {
     public bool Processing { get; set; }
     public float Heat { get; set; }
     public float Burn { get; set; }
+    /// <summary>When a picked berry bush fruits again, on the world's clock, or zero while it is full.</summary>
     public float Regrow { get; set; }
     /// <summary>A signpost's market output: bought goods arrive here with the returning cart, and sale coins once <see cref="Wages"/> is full.</summary>
     public Inventory? Output { get; set; }
@@ -2121,8 +2121,12 @@ public sealed partial class World {
         foreach (var t in Ticking(ThingKind.Packer)) PackTick(t, dt);
         foreach (var t in Ticking(ThingKind.Signpost)) AutoSell(t);
         // A bush fruits again its hours after the first berry was picked, whether or not it was picked clean.
-        foreach (var t in S.Things.Of(ThingKind.Berries))
-            if (t.Remaining < BushBerries && (t.Regrow += dt) >= Data.BerryRegrowSeconds) { t.Remaining = BushBerries; t.Regrow = 0; }
+        // The moment is set once, so a bush waiting to fruit changes nothing from tick to tick and sends no updates.
+        foreach (var t in S.Things.Of(ThingKind.Berries)) {
+            if (t.Remaining >= BushBerries) continue;
+            if (t.Regrow == 0) t.Regrow = S.Time + Data.BerryRegrowSeconds;
+            else if (S.Time >= t.Regrow) { t.Remaining = BushBerries; t.Regrow = 0; }
+        }
         foreach (var t in S.Things.Of(ThingKind.Campfire)) {
             t.Burn = Math.Max(0, t.Burn - dt);
             if (t.Burn < 30 && t.Inventory.Remove("wood", 1) > 0) { if (t.Burn <= 0) Play("start_fire", t.Pos); t.Burn += Data.CampfireSeconds; }
@@ -2440,29 +2444,29 @@ public sealed partial class World {
         return (p.Health is > 0 and <= 100 || p.Health <= 0 && p.RespawnIn > 0) && p.Hunger is >= 0 and <= 100 && p.Thirst is >= 0 and <= 100
             && p.Torch >= 0 && p.Torch <= Data.CampfireSeconds && p.RespawnIn >= 0 && p.RespawnIn <= Data.RespawnSeconds;
     }
-    /// <summary>Whether every building, worker and cart in a save holds only known items, and every worker's tool is a known item.</summary>
+    /// <summary>
+    /// Whether every building, worker and cart in a save holds only known items, every worker's tool is a known item,
+    /// and every station is marked with, makes and has queued only recipes it makes.
+    /// </summary>
     private bool ValidSettlement(SaveState save) {
         foreach (var t in save.Things) {
             if (t?.Inventory == null) return false;
             foreach (var box in Boxes(t)) if (box != null && !ValidInventory(box, save.Crates)) return false;
+            if (t.Keep != "" && !Makes(t, t.Keep) || t.Making != "" && !Makes(t, t.Making)) return false;
+            foreach (var q in t.Queue) if (q == null || !Makes(t, q.Recipe) || q.Count is <= 0 or > MaxQueued) return false;
         }
         foreach (var w in save.Workers)
             if (w?.Duties == null || w.Tool == null || w.Tool != "" && !Data.Items.ContainsKey(w.Tool) || !ValidInventory(w.Bag, save.Crates)) return false;
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }
-    /// <summary>Clears what a save edited by hand may hold out of place in a player: hotbar entries for nothing known or carried, a cabin that is gone, recipes not made by hand.</summary>
-    private void FixPlayer(PlayerState p, SaveState save) {
-        var slots = p.HotbarSlots ?? new();
-        p.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack?[id] > 0) ? id : "").ToList();
+    /// <summary>Empties the hotbar slots that name nothing the game knows or the player carries, such as a packed crate since sold.</summary>
+    private void TidyHotbar(PlayerState p) {
+        p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
-        if (!save.Things.Any(t => t.Id == p.Sheltered && t.Kind == ThingKind.Hut)) p.Sheltered = 0;
-        p.Crafting ??= new();
-        p.Crafting.RemoveAll(q => !Hand(q.Recipe));
-        if (!Hand(p.Making ?? "")) p.Making = "";
     }
     private bool Hand(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand;
-    /// <summary>Brings every inventory of a freshly parsed save in line with its totals, which a save edited by hand can leave disagreeing with its stacks.</summary>
+    /// <summary>Brings the stacks of every inventory of a freshly parsed save in line with its totals.</summary>
     private static void RebuildAllStacks(SaveState save) {
         foreach (var player in save.Players.Concat(save.Absent.Values)) player?.Backpack?.RebuildStacks();
         RebuildAll(save.Crates?.Values);
@@ -2475,7 +2479,7 @@ public sealed partial class World {
 
     /// <summary>
     /// Takes over a save written by this version of the game.
-    /// One from any other version is refused rather than converted, and so is one that is incomplete, names unknown items or holds values out of range.
+    /// One from any other version is refused rather than converted, and one that is incomplete, names unknown items or recipes or holds values out of range is refused rather than repaired.
     /// </summary>
     public void Deserialize(string json) {
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
@@ -2488,17 +2492,8 @@ public sealed partial class World {
         loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.First();
         RebuildAllStacks(loaded);
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
-        foreach (var t in loaded.Things) {
-            // A save edited by hand can mark, run or queue a recipe its station does not make:
-            // the mark goes back to the station's starting recipe, and such a batch or queued batches are dropped.
-            if (t.Keep != "" && !Makes(t, t.Keep)) t.Keep = StartingRecipe(t.Kind);
-            if (t.Making != "" && !(t.Processing && Makes(t, t.Making))) { t.Making = ""; t.Processing = false; t.Progress = 0; }
-            t.SavedQueue?.RemoveAll(q => q == null || !Makes(t, q.Recipe) || q.Count is <= 0 or > MaxQueued);
-        }
-        foreach (var p in loaded.Absent.Values) if (p != null) FixPlayer(p, loaded);
         if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
-        // The current goal is worked out from the milestones rather than taken from the save.
-        loaded.Goal = 0;
+        foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;
         loaded.Absent.Remove(local.Key);
@@ -2506,7 +2501,7 @@ public sealed partial class World {
         S = loaded;
         toolsChanged = true;
         foreach (var t in S.Things.Of(ThingKind.Toolstation)) WatchTools(t);
-        UpdateGoal(); gatherClock = 0; ExploredRevision++; Look();
+        gatherClock = 0; ExploredRevision++; Look();
         Replaced?.Invoke();
     }
 }
