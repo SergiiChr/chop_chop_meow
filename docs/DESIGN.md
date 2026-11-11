@@ -298,7 +298,7 @@ Both arms are solved from where the hands have to be (`ActorAnimation.ArmTo`), s
 While someone grinds, the table's own mortar is off the counter (`WorldView.grinding`).
 
 Manual bellows pumping and the unarmed punch trigger one loop of their action.
-Each work action has an impact moment that shakes its target and spawns chips, leaves, splashes or sparks.
+Each striking work action has an impact moment that shakes its target and spawns chips, leaves, splashes or sparks; packing and grinding strike nothing.
 Pausing freezes animation and effects.
 
 ### Wolf animation

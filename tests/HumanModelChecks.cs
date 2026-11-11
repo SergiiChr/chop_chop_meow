@@ -133,9 +133,10 @@ public static class HumanModelChecks {
             }
             Require(widest > .02f, $"the pestle should go round the bowl's floor, reached {widest:0.000} m out");
             Require(highest > floor + .04f, $"the pestle should lift to pound, reached {highest:0.000} m up");
+            var held = AllMeshes(rig.Root).Where(mesh => mesh.Mesh == CookShape.Bowl || mesh.Mesh == CookShape.Pestle).Select(mesh => (Node3D)mesh.GetParent()).ToArray();
+            Require(held.Length == 2 && held.All(part => part.Visible), "the mortar's bowl and pestle should show in the hands while grinding");
             rig.Show(new Pose(), null, false);
-            Require(AllMeshes(rig.Root).Where(mesh => mesh.Mesh == CookShape.Bowl || mesh.Mesh == CookShape.Pestle).All(mesh => !((Node3D)mesh.GetParent()).Visible),
-                "the mortar should leave the hands when the actor is not grinding");
+            Require(held.All(part => !part.Visible), "the mortar should leave the hands when the actor is not grinding");
         }
     }
 }

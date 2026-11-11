@@ -168,7 +168,11 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             var at = Terrain.Spawn + new Vector2(-3, 8);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 4 && !t.IsResource);
             var table = world.Add(ThingKind.Cooktable, at); table.Tools!.Add("mortar", 1); world.SetRecipe(table, grind ? "flour" : "meat_stew");
-            if (grind) { table.Inventory.Add("wheat", 20); world.S.Making = ""; world.S.Crafting.Clear(); } else { table.Inventory.Add("water", 2); table.Inventory.Add("raw_meat", 2); table.Burner!.Add("wood", 2); }
+            if (grind) {
+                table.Inventory.Add("wheat", 20); world.S.Making = ""; world.S.Crafting.Clear();
+            } else {
+                table.Inventory.Add("water", 2); table.Inventory.Add("raw_meat", 2); table.Burner!.Add("wood", 2);
+            }
             var cannery = world.Add(ThingKind.Cannery, at + new Vector2(2.2f, 0)); world.SetRecipe(cannery, "canned_meat_stew");
             cannery.Inventory.Add("meat_stew", 2); cannery.Inventory.Add("tin_can", 2); cannery.Burner!.Add("wood", 2);
             world.Player = at + (grind ? new Vector2(.4f, -1.1f) : new Vector2(1, 2.5f)); world.Tick(.5f); view.Zoom = grind ? 3.4f : 1.7f;
