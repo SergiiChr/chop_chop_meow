@@ -15,8 +15,8 @@ description: Make a character or creature animation look physically right, check
 4. Change the poses, capture again and compare from the side in slow motion, frame by frame, then from the front and the
    game camera.
 5. Add or extend a check in `tests/AnimationChecks.cs` for what can be measured: feet on the ground, no sliding, nothing
-   below it, time in the air. `CheckWolfGaitsPlantEachPaw` and `CheckRunPlantsEachFootAndLeavesTheGroundAfterPushOff`
-   show how.
+   below it, time in the air. `CheckWolfGaitsPlantEachPaw` and
+   `CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning` show how.
 6. Play it in the real window with the `playtest` skill: speeds, blends into and out of the motion, and turns.
 7. Share a before/after video made with the `frame-compare` skill.
 
