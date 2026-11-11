@@ -103,6 +103,9 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 - People: `Pose` in `src/ActorAnimation.cs` lists joint angles, and `src/ActorRig.cs` applies them to hips, torso, head,
   shoulders, elbows, thighs, knees and ankles. [docs/DESIGN.md](../../../docs/DESIGN.md) describes the walk, jog and
   sprint.
+- To put a hand on a point, use `ActorAnimation.ArmTo`: it gives the shoulder and elbow angles for a fist, or for what
+  the fist holds, at a point in the trunk's frame. Grinding places both arms with it. The intro film's `Reaching` in
+  `src/intro/WorldIntro.cs` wraps it for a point in the rig's own space. Do not write another arm solver.
 - Wolves: `src/WolfShape.cs` builds one skinned mesh on a skeleton, and `WolfModel` in `src/WolfModel.cs` poses it from
   a `WolfPose` of spine, neck, head, jaw, ears, tail and leg angles. Gait legs are solved by IK from where each paw stands
   (`Reach`), and `WolfModel.Paw` and `WolfModel.Bite` give where a paw and the jaws are under the pose shown.
