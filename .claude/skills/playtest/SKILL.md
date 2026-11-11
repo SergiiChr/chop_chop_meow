@@ -11,14 +11,13 @@ and sends them through `Input.ParseInputEvent`, like real input.
 
 ## Set up
 
-1. Keep the player's files out of it with `--file-prefix playtest-`. The saves and settings live in
+1. A driven game keeps the player's files out of it: it reads and writes `playtest-*` saves and settings. They live in
    `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/` in the main checkout, which every worktree reaches through its
-   `.tools` symlink, and the prefix makes the game read and write `playtest-*` files there instead. To test with one of
-   the player's saves, copy it to a `playtest-` name first.
+   `.tools` symlink. To test with one of the player's saves, copy it to a `playtest-` name first.
 2. Start the game in the background with a folder in your scratchpad:
 
    ```sh
-   env -u WAYLAND_DISPLAY ./build.py play -- --file-prefix playtest- --drive <dir>
+   env -u WAYLAND_DISPLAY ./build.py play -- --drive <dir>
    ```
 
    On native Wayland the window runs at about one frame a second. Add `--showcase` and its flags for a late-game fixture
