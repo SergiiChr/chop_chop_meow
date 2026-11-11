@@ -387,6 +387,7 @@ Each dough bakes into 4 bread at the stone furnace.
 
 The cooking table (2 steel bars, 6 stone, 8 planks) is a steel grill over a stone firebox with a plank counter and a mortar slot.
 With a mortar and pestle slotted and someone working it, it crushes 4 berries into 4 crushed berries and grinds wheat into flour.
+Whoever works it takes the mortar off the counter, holds the bowl in one hand and grinds with the pestle in the other.
 You can do both by hand from the crafting menu with a carried mortar.
 
 Its other recipes cook on their own:
@@ -720,7 +721,7 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, hammering, packing crates, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 
 The world reacts too:

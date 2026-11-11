@@ -26,7 +26,8 @@ public enum ActorAction {
     Protest,
     PickUp,
     Pack,
-    Craft
+    Craft,
+    Grind
 }
 
 /// <summary>
@@ -86,6 +87,7 @@ public static class ActorAnimation {
         ActorAction.PickUp => .9f,
         ActorAction.Pack => 2.4f,
         ActorAction.Craft => 2.4f,
+        ActorAction.Grind => 1.8f,
         _ => 1
     };
 
@@ -115,17 +117,60 @@ public static class ActorAnimation {
     public static float Yaw(Vector2 movement, float previous) =>
         movement.LengthSquared() < 0.0001f ? previous : MathF.Atan2(movement.X, movement.Y);
 
-    /// <summary>The tool mesh an action shows in the right hand, or null for empty hands.</summary>
+    /// <summary>The tool an action shows in hand, or null for empty hands; the mortar is its pestle in the right hand and its bowl in the left.</summary>
     public static string? Tool(ActorAction action) => action switch {
         ActorAction.Chop or ActorAction.SteelChop => "steel_axe",
         ActorAction.Mine or ActorAction.SteelMine => "steel_pick",
         ActorAction.Hammer => "hammer",
         ActorAction.Protest => "protest_sign",
+        ActorAction.Grind => "mortar",
         _ => null
     };
 
     private static readonly Pose Stance = new(SwingL: 16, KneeL: 16, SwingR: -10, KneeR: 10);
     private static readonly Pose Crouch = new(Lean: 38, Head: 18, SwingL: 72, KneeL: 118, SwingR: 50, KneeR: 112);
+
+    // The trunk leans this many degrees over the mortar's bowl, which the left fist holds this far from the hips in the trunk's own frame.
+    private const float GrindLean = 8;
+    private static readonly Vector3 BowlHand = new(0, .2f, .4f);
+    /// <summary>
+    /// How far above the left fist the mortar's bowl stands, how far up from its foot the right fist grips the pestle, and the degrees the pestle leans toward that hand.
+    /// </summary>
+    public const float BowlOverFist = .04f, PestleGrip = .16f, PestleLean = 25;
+    // The pestle hand circles this far out, which swings the pestle's foot about half as far again round the bowl's floor, and lifts this high to pound.
+    private const float GrindCircle = .02f, PoundLift = .06f;
+    /// <summary>Grinding with the pestle's foot resting in the middle of the bowl's floor; the rig turns the bowl level and the pestle onto its lean in this pose.</summary>
+    public static readonly Pose GrindRest = Grinding(Vector2.Zero, 0);
+
+    /// <summary>
+    /// Standing with the mortar in hand: the left fist holds the bowl out in front and the right holds the pestle in it.
+    /// The pestle hand is <paramref name="aside"/>, in metres to the left and ahead, and <paramref name="lift"/> above where it rests the pestle's foot in the middle of the bowl's floor.
+    /// </summary>
+    private static Pose Grinding(Vector2 aside, float lift) {
+        float tilt = Mathf.DegToRad(PestleLean);
+        // Measured upright, then turned into the leaning trunk's frame.
+        var toFist = new Vector3(aside.X - PestleGrip * MathF.Sin(tilt), BowlOverFist + CookShape.BowlFloor + lift + PestleGrip * MathF.Cos(tilt), aside.Y);
+        var bowl = ArmTo(BowlHand, left: true, ActorRig.Palm);
+        var pestle = ArmTo(BowlHand + toFist.Rotated(Vector3.Right, -Mathf.DegToRad(GrindLean)), left: false, ActorRig.Palm);
+        return Stance with { Lean = GrindLean, RaiseL = bowl.Raise, OutL = bowl.Out, ElbowL = bowl.Elbow, RaiseR = pestle.Raise, OutR = pestle.Out, ElbowR = pestle.Elbow };
+    }
+
+    /// <summary>
+    /// The arm raise, outward swing and elbow bend, in degrees, that put a fist at <paramref name="grip"/>, measured from the hips in the trunk's own frame.
+    /// With <paramref name="palm"/> it is what the fist holds that goes there, that far ahead of the forearm's line.
+    /// </summary>
+    public static (float Raise, float Out, float Elbow) ArmTo(Vector3 grip, bool left, float palm = 0) {
+        var reach = grip - new Vector3(left ? ActorRig.ShoulderOut : -ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0);
+        // A held thing ahead of the forearm's line is reached by a slightly longer forearm bent a little further.
+        const float upper = ActorRig.UpperArm;
+        float fore = MathF.Sqrt(ActorRig.Forearm * ActorRig.Forearm + palm * palm);
+        // The elbow folds until the fist is that far from the shoulder, then the shoulder swings the bent arm onto the point.
+        float bend = MathF.Acos(Math.Clamp((reach.LengthSquared() - upper * upper - fore * fore) / (2 * upper * fore), -1, 1));
+        float along = upper + fore * MathF.Cos(bend), ahead = fore * MathF.Sin(bend);
+        float outward = MathF.Asin(Math.Clamp((left ? reach.X : -reach.X) / along, -1, 1));
+        float raise = Mathf.RadToDeg(MathF.Atan2(reach.Z, -reach.Y) - MathF.Atan2(ahead, along * MathF.Cos(outward)));
+        return (Mathf.PosMod(raise + 180, 360) - 180, Mathf.RadToDeg(outward), Mathf.RadToDeg(bend - MathF.Atan2(palm, ActorRig.Forearm)));
+    }
 
     /// <summary>Swings that play out in full on the move: the arms and body keep swinging while the legs keep walking.</summary>
     public static bool SwingsOnTheMove(ActorAction action) => action is ActorAction.TorchSwing or ActorAction.Attack or ActorAction.Chop or ActorAction.SteelChop;
@@ -204,6 +249,14 @@ public static class ActorAnimation {
                     (.74f, crate with { Lean = 14, RaiseL = 56, ElbowL = 44, RaiseR = 42, ElbowR = 36 }),
                     (.86f, crate),
                     (.94f, table with { Lean = 6, RaiseL = 62, ElbowL = 70, RaiseR = 62, ElbowR = 70 }));
+            case ActorAction.Grind: {
+                    // The pestle goes twice round the bowl's floor, the shoulders turning with it, then lifts and comes down in the middle.
+                    const float rounds = .7f, top = .9f;
+                    float angle = Mathf.Tau * 2 * p / rounds, across = MathF.Sin(angle);
+                    float open = Mathf.SmoothStep(0, .1f, Math.Min(p, rounds - p));
+                    float lift = Mathf.SmoothStep(rounds, top, p) - Mathf.SmoothStep(top, 1, p);
+                    return Grinding(new Vector2(MathF.Cos(angle), across) * (GrindCircle * open), lift * PoundLift) with { Twist = across * open * 5, Head = 22 - lift * 5 };
+                }
             case ActorAction.Attack:
                 var fists = Stance with { Twist = 10, RaiseL = 48, OutL = -14, ElbowL = 112, RaiseR = 44, OutR = -14, ElbowR = 115 };
                 return Keys(p, (0, fists),
@@ -544,7 +597,12 @@ public static class ActorAnimation {
     }
 
     /// <summary>What someone working at a station does there.</summary>
-    public static ActorAction StationAction(ThingKind station) => station == ThingKind.Packer ? ActorAction.Pack : ActorAction.Hammer;
+    public static ActorAction StationAction(ThingKind station) => station switch {
+        ThingKind.Packer => ActorAction.Pack,
+        // A cooking table is only worked for the mortar's recipes.
+        ThingKind.Cooktable => ActorAction.Grind,
+        _ => ActorAction.Hammer
+    };
 
     public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving) {
         // The sign hides any load in the worker's bag, which stays there until the strike ends.

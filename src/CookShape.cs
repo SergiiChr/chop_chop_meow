@@ -5,11 +5,21 @@ namespace ChopChopMeow;
 
 /// <summary>Cached outdoor cook station: open masonry hearth, fitted counter and hollow cookware.</summary>
 internal static class CookShape {
-    private static ArrayMesh? masonry, timber, metal, mortar, fire;
+    private static ArrayMesh? masonry, timber, metal, mortar, bowl, pestle, fire;
     public static Mesh Masonry => masonry ??= BuildMasonry();
     public static Mesh Timber => timber ??= BuildTimber();
     public static Mesh Metal => metal ??= BuildMetal();
+    /// <summary>The mortar as it stands on the counter: the bowl with the pestle leaning in it.</summary>
     public static Mesh Mortar => mortar ??= BuildMortar();
+    /// <summary>The mortar's bowl alone, standing on its foot at the origin, for a hand to hold.</summary>
+    public static Mesh Bowl => bowl ??= Turned(BowlProfile, BowlTint, 12);
+    /// <summary>The pestle alone, upright on its foot at the origin, for a hand to hold.</summary>
+    public static Mesh Pestle => pestle ??= Turned(PestleProfile, PestleTint, 8);
+    /// <summary>How far the bowl's floor is above its foot, in metres.</summary>
+    public const float BowlFloor = .03f;
+    private const string BowlTint = "9aa29f", PestleTint = "c4c8c3";
+    private static readonly Vector2[] BowlProfile = { new(0, 0), new(.062f, 0), new(.078f, .013f), new(.1f, .08f), new(.1f, .105f), new(.085f, .111f), new(.077f, .092f), new(.045f, .035f), new(0, BowlFloor) };
+    private static readonly Vector2[] PestleProfile = { new(0, 0), new(.027f, .008f), new(.029f, .03f), new(.022f, .06f), new(.019f, .19f), new(.015f, .2f), new(0, .203f) };
     public static Mesh Fire => fire ??= BuildFire();
     public static readonly StandardMaterial3D Stone = ModelKit.Vertex(Surface.Stone, .95f);
     public static readonly StandardMaterial3D Wood = ModelKit.Vertex(Surface.Wood, .85f);
@@ -68,9 +78,16 @@ internal static class CookShape {
 
     private static ArrayMesh BuildMortar() {
         var s = Begin();
-        Lathe(s, Vector3.Zero, new[] { new Vector2(0, 0), new(.062f, 0), new(.078f, .013f), new(.1f, .08f), new(.1f, .105f), new(.085f, .111f), new(.077f, .092f), new(.045f, .035f), new(0, .03f) }, "9aa29f", 12);
+        Lathe(s, Vector3.Zero, BowlProfile, BowlTint, 12);
         // Rounded pestle leans into the bowl, with its foot below the rim.
-        Lathe(s, new(.025f, .025f, 0), new[] { new Vector2(0, 0), new(.027f, .008f), new(.029f, .03f), new(.022f, .06f), new(.019f, .19f), new(.015f, .2f), new(0, .203f) }, "c4c8c3", 8, -.38f);
+        Lathe(s, new(.025f, .025f, 0), PestleProfile, PestleTint, 8, -.38f);
+        return s.Commit();
+    }
+
+    /// <summary>A profile turned round the upright axis through the origin.</summary>
+    private static ArrayMesh Turned(Vector2[] profile, string tint, int sides) {
+        var s = Begin();
+        Lathe(s, Vector3.Zero, profile, tint, sides);
         return s.Commit();
     }
 
