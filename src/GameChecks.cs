@@ -798,10 +798,10 @@ public partial class Game {
         Require(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds);
         Require(sounds.DayMusicPlaying && !sounds.NightMusicPlaying, "Daytime must play the day music only.");
-        sounds.FinishDayTrack();
-        Require(sounds.DayMusicPlaying && sounds.DayMusicIndex == 1, "A finished day track must hand over to the next one.");
-        sounds.FinishDayTrack();
-        Require(sounds.DayMusicIndex == 0, "The last day track must wrap to the first.");
+        sounds.SkipToDayTrackEnd();
+        await Until(() => sounds.DayMusicPlaying && sounds.DayMusicIndex == 1, "a day track that plays to its end handing over to the next one", 5);
+        sounds.SkipToDayTrackEnd();
+        await Until(() => sounds.DayMusicPlaying && sounds.DayMusicIndex == 0, "the last day track wrapping to the first", 5);
         RunUntilNight(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds / 2);
         Require(sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Nightfall must crossfade the day music into the night music.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds); await Seconds(.5f);

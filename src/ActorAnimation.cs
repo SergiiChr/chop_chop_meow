@@ -130,6 +130,85 @@ public static class ActorAnimation {
     private static readonly Pose Stance = new(SwingL: 16, KneeL: 16, SwingR: -10, KneeR: 10);
     private static readonly Pose Crouch = new(Lean: 38, Head: 18, SwingL: 72, KneeL: 118, SwingR: 50, KneeR: 112);
 
+    // Each action's key poses are made once: every worker and player is posed every frame, and a list made per call is garbage.
+    private static readonly Pose ChopReady = Stance with { Lean = 6, RaiseL = 50, OutL = -24, ElbowL = 35, RaiseR = 55, OutR = -16, ElbowR = 25 };
+    private static readonly (float At, Pose Pose)[] ChopKeys = {
+        (0, ChopReady),
+        (.38f, ChopReady with { Lean = -8, Twist = 24, RaiseL = 150, OutL = -26, ElbowL = 60, RaiseR = 168, OutR = -10, ElbowR = 45 }),
+        (.52f, ChopReady with { Lean = 18, Twist = -12, RaiseL = 80, OutL = -26, ElbowL = 14, RaiseR = 86, OutR = -12, ElbowR = 4 }),
+        (.66f, ChopReady with { Lean = 20, Twist = -14, RaiseL = 76, OutL = -26, ElbowL = 14, RaiseR = 80, OutR = -12, ElbowR = 6 }),
+    };
+    private static readonly Pose MineGuard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
+    private static readonly (float At, Pose Pose)[] MineKeys = {
+        (0, MineGuard),
+        (.4f, MineGuard with { Lean = -6, RaiseL = 160, OutL = -24, ElbowL = 50, RaiseR = 175, OutR = -10, ElbowR = 35 }),
+        (.55f, MineGuard with { Lean = 32, Head = 10, RaiseL = 34, OutL = -26, ElbowL = 10, RaiseR = 36, OutR = -12, ElbowR = 0, KneeL = 28, KneeR = 22 }),
+        (.68f, MineGuard with { Lean = 30, Head = 10, RaiseL = 32, OutL = -26, ElbowL = 12, RaiseR = 34, OutR = -12, ElbowR = 2, KneeL = 26, KneeR = 20 }),
+    };
+    // Reach with one hand, close it on the find and pull it in while the other hand reaches.
+    private static readonly (float At, Pose Pose)[] GatherKeys = {
+        (0, Crouch with { RaiseR = 66, ElbowR = 6, OutR = -6, RaiseL = 24, ElbowL = 70 }),
+        (.22f, Crouch with { Lean = 44, RaiseR = 50, ElbowR = 34, OutR = -10, RaiseL = 30, ElbowL = 60 }),
+        (.5f, Crouch with { RaiseL = 66, ElbowL = 6, OutL = -6, RaiseR = 24, ElbowR = 70 }),
+        (.72f, Crouch with { Lean = 44, RaiseL = 50, ElbowL = 34, OutL = -10, RaiseR = 30, ElbowR = 60 }),
+    };
+    // The gathering crouch once: drop down, reach, close the hand on the piece and stand with it held up to stow.
+    private static readonly (float At, Pose Pose)[] PickUpKeys = {
+        (0, new Pose()),
+        (.32f, Crouch with { Lean = 44, RaiseR = 64, ElbowR = 8, OutR = -6, RaiseL = 26, ElbowL = 60 }),
+        (.48f, Crouch with { Lean = 42, RaiseR = 52, ElbowR = 40, OutR = -10, RaiseL = 26, ElbowL = 60 }),
+        (.78f, new Pose(Lean: 4, Head: 8, RaiseR: 36, OutR: -14, ElbowR: 105)),
+    };
+    // A quick shove down on the lever, a short hold, then a slower lift as the bellows refill.
+    private static readonly Pose PumpLever = Stance with { Lean = 16, RaiseL = 78, OutL = -12, ElbowL = 42, RaiseR = 78, OutR = -12, ElbowR = 42 };
+    private static readonly Pose PumpPressed = PumpLever with { Lean = 32, RaiseL = 44, ElbowL = 6, RaiseR = 44, ElbowR = 6, KneeL = 30, KneeR = 24 };
+    private static readonly (float At, Pose Pose)[] PumpKeys = { (0, PumpLever), (.35f, PumpPressed), (.5f, PumpPressed with { Lean = 30, KneeL = 27, KneeR = 21 }) };
+    private static readonly Pose HammerHold = Stance with { Lean = 15, RaiseL = 48, OutL = -16, ElbowL = 52, RaiseR = 70, OutR = -8, ElbowR = 50 };
+    private static readonly (float At, Pose Pose)[] HammerKeys = {
+        (0, HammerHold),
+        (.35f, HammerHold with { Lean = 8, RaiseR = 150, ElbowR = 96 }),
+        (.5f, HammerHold with { Lean = 18, RaiseR = 58, ElbowR = 22 }),
+        (.7f, HammerHold with { Lean = 18, RaiseR = 60, ElbowR = 24 }),
+    };
+    // Both hands rummage in the heap of goods, lift a piece across, and settle it into the crate on the other side.
+    private static readonly Pose PackTable = Stance with { Lean = 8, Head = 20, RaiseL = 50, OutL = -14, ElbowL = 46, RaiseR = 50, OutR = -14, ElbowR = 46 };
+    private static readonly Pose PackHeap = PackTable with { Twist = -20, Sway = -3, RaiseL = 46, OutL = -22, ElbowL = 40, RaiseR = 56, OutR = -2, ElbowR = 50 };
+    private static readonly Pose PackCrate = PackTable with { Twist = 20, Sway = 3, RaiseL = 56, OutL = -2, ElbowL = 50, RaiseR = 46, OutR = -22, ElbowR = 40 };
+    private static readonly (float At, Pose Pose)[] PackKeys = {
+        (0, PackHeap),
+        (.12f, PackHeap with { RaiseL = 40, ElbowL = 52, RaiseR = 62, ElbowR = 38 }),
+        (.24f, PackHeap with { RaiseL = 50, ElbowL = 34, RaiseR = 52, ElbowR = 58 }),
+        (.36f, PackHeap),
+        (.5f, PackTable with { Lean = 4, RaiseL = 70, ElbowL = 84, RaiseR = 70, ElbowR = 84 }),
+        (.62f, PackCrate with { Lean = 14, RaiseL = 50, ElbowL = 30, RaiseR = 46, ElbowR = 28 }),
+        (.74f, PackCrate with { Lean = 14, RaiseL = 56, ElbowL = 44, RaiseR = 42, ElbowR = 36 }),
+        (.86f, PackCrate),
+        (.94f, PackTable with { Lean = 6, RaiseL = 62, ElbowL = 70, RaiseR = 62, ElbowR = 70 }),
+    };
+    private static readonly Pose Fists = Stance with { Twist = 10, RaiseL = 48, OutL = -14, ElbowL = 112, RaiseR = 44, OutR = -14, ElbowR = 115 };
+    private static readonly (float At, Pose Pose)[] AttackKeys = {
+        (0, Fists),
+        (.32f, Fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
+        (.5f, Fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }),
+    };
+    // A wide forehand sweep of the torch arm across the body.
+    private static readonly Pose TorchUp = Stance with { RaiseL = 30, OutL = 4, ElbowL = 60, RaiseR = 20, OutR = 10, ElbowR = 30 };
+    private static readonly (float At, Pose Pose)[] TorchSwingKeys = {
+        (0, TorchUp),
+        (.2f, TorchUp with { Twist = 22, Lean = -4, RaiseL = 70, OutL = 50, ElbowL = 30 }),
+        (.45f, TorchUp with { Twist = -24, Lean = 10, RaiseL = 95, OutL = -40, ElbowL = 8 }),
+        (.65f, TorchUp with { Twist = -16, Lean = 6, RaiseL = 80, OutL = -30, ElbowL = 20 }),
+    };
+    // Cross-legged on the ground with hands on the knees, or on a rock with knees up and forearms on them.
+    // Now and then a bite goes up to the mouth.
+    private static readonly (float At, Pose Pose)[] SitKeys = Eating(new Pose(Lean: 6, Head: 2, RaiseL: 30, OutL: 22, ElbowL: 34, RaiseR: 30, OutR: 22, ElbowR: 34,
+        SwingL: 86, KneeL: 150, TurnL: 40, RollL: 90, SwingR: 82, KneeR: 150, TurnR: 40, RollR: 90, Hips: .15f));
+    private static readonly (float At, Pose Pose)[] PerchKeys = Eating(new Pose(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, SwingL: 112, KneeL: 100, SwingR: 108, KneeR: 96));
+    private static (float At, Pose Pose)[] Eating(Pose seated) {
+        var bite = seated with { Head = seated.Head + 6, Lean = seated.Lean + 6, RaiseR = 40, OutR = -24, ElbowR = 140 };
+        return new[] { (0, seated), (.55f, seated), (.68f, bite), (.8f, bite), (.92f, seated) };
+    }
+
     // The trunk leans this many degrees over the mortar's bowl, which the left fist holds this far from the hips in the trunk's own frame.
     private const float GrindLean = 8;
     private static readonly Vector3 BowlHand = new(0, .2f, .4f);
@@ -201,54 +280,19 @@ public static class ActorAnimation {
                 var carry = new Pose(Lean: -4, RaiseL: 8, OutL: 0, ElbowL: 82, RaiseR: 8, OutR: 0, ElbowR: 82);
                 return moving ? Walk(p) with { Lean = carry.Lean, Head = -carry.Lean / 2, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
             case ActorAction.Chop or ActorAction.SteelChop:
-                var ready = Stance with { Lean = 6, RaiseL = 50, OutL = -24, ElbowL = 35, RaiseR = 55, OutR = -16, ElbowR = 25 };
-                return Keys(p, (0, ready),
-                    (.38f, ready with { Lean = -8, Twist = 24, RaiseL = 150, OutL = -26, ElbowL = 60, RaiseR = 168, OutR = -10, ElbowR = 45 }),
-                    (.52f, ready with { Lean = 18, Twist = -12, RaiseL = 80, OutL = -26, ElbowL = 14, RaiseR = 86, OutR = -12, ElbowR = 4 }),
-                    (.66f, ready with { Lean = 20, Twist = -14, RaiseL = 76, OutL = -26, ElbowL = 14, RaiseR = 80, OutR = -12, ElbowR = 6 }));
+                return Keys(p, ChopKeys);
             case ActorAction.Mine or ActorAction.SteelMine:
-                var guard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
-                return Keys(p, (0, guard),
-                    (.4f, guard with { Lean = -6, RaiseL = 160, OutL = -24, ElbowL = 50, RaiseR = 175, OutR = -10, ElbowR = 35 }),
-                    (.55f, guard with { Lean = 32, Head = 10, RaiseL = 34, OutL = -26, ElbowL = 10, RaiseR = 36, OutR = -12, ElbowR = 0, KneeL = 28, KneeR = 22 }),
-                    (.68f, guard with { Lean = 30, Head = 10, RaiseL = 32, OutL = -26, ElbowL = 12, RaiseR = 34, OutR = -12, ElbowR = 2, KneeL = 26, KneeR = 20 }));
+                return Keys(p, MineKeys);
             case ActorAction.Gather:
-                // Reach with one hand, close it on the find and pull it in while the other hand reaches.
-                return Keys(p, (0, Crouch with { RaiseR = 66, ElbowR = 6, OutR = -6, RaiseL = 24, ElbowL = 70 }),
-                    (.22f, Crouch with { Lean = 44, RaiseR = 50, ElbowR = 34, OutR = -10, RaiseL = 30, ElbowL = 60 }),
-                    (.5f, Crouch with { RaiseL = 66, ElbowL = 6, OutL = -6, RaiseR = 24, ElbowR = 70 }),
-                    (.72f, Crouch with { Lean = 44, RaiseL = 50, ElbowL = 34, OutL = -10, RaiseR = 30, ElbowR = 60 }));
+                return Keys(p, GatherKeys);
             case ActorAction.PickUp:
-                // The gathering crouch once: drop down, reach, close the hand on the piece and stand with it held up to stow.
-                return Keys(p, (0, new Pose()),
-                    (.32f, Crouch with { Lean = 44, RaiseR = 64, ElbowR = 8, OutR = -6, RaiseL = 26, ElbowL = 60 }),
-                    (.48f, Crouch with { Lean = 42, RaiseR = 52, ElbowR = 40, OutR = -10, RaiseL = 26, ElbowL = 60 }),
-                    (.78f, new Pose(Lean: 4, Head: 8, RaiseR: 36, OutR: -14, ElbowR: 105)));
+                return Keys(p, PickUpKeys);
             case ActorAction.Pump:
-                var lever = Stance with { Lean = 16, RaiseL = 78, OutL = -12, ElbowL = 42, RaiseR = 78, OutR = -12, ElbowR = 42 };
-                // A quick shove down on the lever, a short hold, then a slower lift as the bellows refill.
-                var pressed = lever with { Lean = 32, RaiseL = 44, ElbowL = 6, RaiseR = 44, ElbowR = 6, KneeL = 30, KneeR = 24 };
-                return Keys(p, (0, lever), (.35f, pressed), (.5f, pressed with { Lean = 30, KneeL = 27, KneeR = 21 }));
+                return Keys(p, PumpKeys);
             case ActorAction.Hammer:
-                var hold = Stance with { Lean = 15, RaiseL = 48, OutL = -16, ElbowL = 52, RaiseR = 70, OutR = -8, ElbowR = 50 };
-                return Keys(p, (0, hold),
-                    (.35f, hold with { Lean = 8, RaiseR = 150, ElbowR = 96 }),
-                    (.5f, hold with { Lean = 18, RaiseR = 58, ElbowR = 22 }),
-                    (.7f, hold with { Lean = 18, RaiseR = 60, ElbowR = 24 }));
+                return Keys(p, HammerKeys);
             case ActorAction.Pack:
-                // Both hands rummage in the heap of goods, lift a piece across, and settle it into the crate on the other side.
-                var table = Stance with { Lean = 8, Head = 20, RaiseL = 50, OutL = -14, ElbowL = 46, RaiseR = 50, OutR = -14, ElbowR = 46 };
-                var heap = table with { Twist = -20, Sway = -3, RaiseL = 46, OutL = -22, ElbowL = 40, RaiseR = 56, OutR = -2, ElbowR = 50 };
-                var crate = table with { Twist = 20, Sway = 3, RaiseL = 56, OutL = -2, ElbowL = 50, RaiseR = 46, OutR = -22, ElbowR = 40 };
-                return Keys(p, (0, heap),
-                    (.12f, heap with { RaiseL = 40, ElbowL = 52, RaiseR = 62, ElbowR = 38 }),
-                    (.24f, heap with { RaiseL = 50, ElbowL = 34, RaiseR = 52, ElbowR = 58 }),
-                    (.36f, heap),
-                    (.5f, table with { Lean = 4, RaiseL = 70, ElbowL = 84, RaiseR = 70, ElbowR = 84 }),
-                    (.62f, crate with { Lean = 14, RaiseL = 50, ElbowL = 30, RaiseR = 46, ElbowR = 28 }),
-                    (.74f, crate with { Lean = 14, RaiseL = 56, ElbowL = 44, RaiseR = 42, ElbowR = 36 }),
-                    (.86f, crate),
-                    (.94f, table with { Lean = 6, RaiseL = 62, ElbowL = 70, RaiseR = 62, ElbowR = 70 }));
+                return Keys(p, PackKeys);
             case ActorAction.Grind: {
                     // The pestle goes twice round the bowl's floor, the shoulders turning with it, then lifts and comes down in the middle.
                     const float rounds = .7f, top = .9f;
@@ -258,31 +302,16 @@ public static class ActorAnimation {
                     return Grinding(new Vector2(MathF.Cos(angle), across) * (GrindCircle * open), lift * PoundLift) with { Twist = across * open * 5, Head = 22 - lift * 5 };
                 }
             case ActorAction.Attack:
-                var fists = Stance with { Twist = 10, RaiseL = 48, OutL = -14, ElbowL = 112, RaiseR = 44, OutR = -14, ElbowR = 115 };
-                return Keys(p, (0, fists),
-                    (.32f, fists with { Lean = 10, Twist = -26, RaiseR = 90, OutR = -8, ElbowR = 0 }),
-                    (.5f, fists with { Lean = 8, Twist = -20, RaiseR = 86, OutR = -8, ElbowR = 6 }));
+                return Keys(p, AttackKeys);
             case ActorAction.Kindle:
                 // The left hand holds the torch head forward while the right strikes steel down across flint four times.
                 var kneel = Stance with { Lean = 14, Head = 14, RaiseL = 40, OutL = -10, ElbowL = 70, RaiseR = 52, OutR = -20, ElbowR = 80 };
                 float strike = MathF.Sin(p * Mathf.Tau * 4);
                 return kneel with { RaiseR = 52 + strike * 18, ElbowR = 80 - strike * 34, Twist = strike * 4, RaiseL = 40 + MathF.Sin(p * Mathf.Tau) * 4 };
             case ActorAction.TorchSwing:
-                // A wide forehand sweep of the torch arm across the body.
-                var torchUp = Stance with { RaiseL = 30, OutL = 4, ElbowL = 60, RaiseR = 20, OutR = 10, ElbowR = 30 };
-                return Keys(p, (0, torchUp),
-                    (.2f, torchUp with { Twist = 22, Lean = -4, RaiseL = 70, OutL = 50, ElbowL = 30 }),
-                    (.45f, torchUp with { Twist = -24, Lean = 10, RaiseL = 95, OutL = -40, ElbowL = 8 }),
-                    (.65f, torchUp with { Twist = -16, Lean = 6, RaiseL = 80, OutL = -30, ElbowL = 20 }));
+                return Keys(p, TorchSwingKeys);
             case ActorAction.Sit or ActorAction.Perch:
-                // Cross-legged on the ground with hands on the knees, or on a rock with knees up and forearms on them.
-                // Now and then a bite goes up to the mouth.
-                var seated = action == ActorAction.Sit
-                    ? new Pose(Lean: 6, Head: 2, RaiseL: 30, OutL: 22, ElbowL: 34, RaiseR: 30, OutR: 22, ElbowR: 34,
-                        SwingL: 86, KneeL: 150, TurnL: 40, RollL: 90, SwingR: 82, KneeR: 150, TurnR: 40, RollR: 90, Hips: .15f)
-                    : new Pose(Lean: -6, Head: 4, RaiseL: 52, OutL: -10, ElbowL: 48, RaiseR: 52, OutR: -10, ElbowR: 48, SwingL: 112, KneeL: 100, SwingR: 108, KneeR: 96);
-                var bite = seated with { Head = seated.Head + 6, Lean = seated.Lean + 6, RaiseR = 40, OutR = -24, ElbowR = 140 };
-                var eating = Keys(p, (0, seated), (.55f, seated), (.68f, bite), (.8f, bite), (.92f, seated));
+                var eating = Keys(p, action == ActorAction.Sit ? SitKeys : PerchKeys);
                 return eating with { Lean = eating.Lean + wave * 1.2f, Head = eating.Head + wave * 1.5f };
             // Both downed poses are drawn with the rig tipped onto its back, so Raise points the arms at the sky.
             case ActorAction.Mauled:
@@ -563,7 +592,7 @@ public static class ActorAnimation {
     }
 
     /// <summary>Loops smoothly through keys sorted by phase; the last key eases back into the first.</summary>
-    private static Pose Keys(float phase, params (float At, Pose Pose)[] keys) {
+    private static Pose Keys(float phase, (float At, Pose Pose)[] keys) {
         for (int i = 0; i < keys.Length; i++) {
             var from = keys[i];
             var (toAt, toPose) = i + 1 < keys.Length ? keys[i + 1] : (1f, keys[0].Pose);

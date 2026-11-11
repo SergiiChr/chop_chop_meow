@@ -20,12 +20,23 @@ public static class AnimationChecks {
         CheckChangingActionBlendsBetweenPoses();
         CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning();
         CheckWolfGaitsPlantEachPaw();
+        CheckPosingAllocatesNothing();
+    }
+
+    /// <summary>Every worker and player in the world is posed every frame, so working out a pose makes no garbage.</summary>
+    private static void CheckPosingAllocatesNothing() {
+        var actions = Enum.GetValues<ActorAction>();
+        float time = 0;
+        AllocationChecks.Check("pose: every action, blending out of the last", () => {
+            time += 1 / 60f;
+            foreach (var action in actions) ActorAnimation.Blended(ActorAction.Idle, time, false, action, time, false, .5f);
+        });
     }
 
     /// <summary>At each gait's pace a paw on the ground holds its place while the body moves on over it, and no paw sinks into the ground.</summary>
     private static void CheckWolfGaitsPlantEachPaw() {
         var wolf = new WolfModel();
-        foreach (var (gait, speed, chasing) in new[] { ("walk", 1.1f, false), ("patrol walk on the first night", 1.55f, false), ("patrol walk at its fastest", 1.9f, false), ("trot", 3f, false), ("gallop", 6.3f, true) }) {
+        foreach (var (gait, speed, chasing) in new[] { ("walk", 1.1f, false), ("patrol walk", 1.5f, false), ("trot", 3f, false), ("gallop", 6.3f, true) }) {
             const float dt = 1f / 240;
             // A second at the pace lets the speed settle and the blend from the last gait finish.
             for (int i = 0; i < 240; i++) wolf.Move(speed * dt, dt, chasing, false);

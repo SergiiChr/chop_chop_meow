@@ -150,6 +150,8 @@ public partial class Game {
 
     /// <summary>Esc until no placement, side panel or backpack drawer is left; with nothing open it does nothing, so it never opens the pause menu.</summary>
     private async Task CloseWithEsc() {
+        // A page about something a check has just removed closes by itself once the window hears of it, and Esc pressed after that would open the pause menu.
+        await Frames(1);
         for (int i = 0; i < 3 && (player.Mode.Placing != null || panel.Visible || bag.Visible); i++) await KeyStroke(Key.Escape);
     }
 
