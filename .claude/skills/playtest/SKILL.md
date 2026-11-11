@@ -10,7 +10,7 @@ There is no xdotool or ydotool on this Wayland machine, so the game drives itsel
 ## Set up
 
 1. Copy the driver in and hook it into `Game._Ready`, on the line after
-   `else if (!Launch.Has("--animation-review")) startMenu.ShowStart();`, which every launch reaches.
+   `else if (!Launch.Has("--animation-review") && introFolder == null) startMenu.ShowStart();`, which every launch reaches.
    Between that `else if` and the showcase `if` above it, the hook would take the `else` and hide the start menu:
 
    ```sh

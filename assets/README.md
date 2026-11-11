@@ -128,7 +128,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 The hotbar prefers them over everything else.
 Rerun the command after changing a model.
 
-They cover the steel axe and pickaxe, stone and steel chisels, mallet and steel hammer, torch, rake, mortar, crate, wood, planks, wood parts, stone, iron ore, coal, charcoal, tin ore, iron, steel and tin bars, berries, leaves and every building.
+They cover the steel axe and pickaxe, stone and steel chisels, mallet and steel hammer, torch, rake, mortar, crate, the bottle empty and at each fill, wood, planks, wood parts, stone, iron ore, coal, charcoal, tin ore, iron, steel and tin bars, berries, leaves and every building.
 
 How they are framed:
 
@@ -142,8 +142,7 @@ How they are framed:
 ### Item atlas
 
 `item-atlas.png` is a 4×3 sheet of inventory icons.
-`src/Hotbar.cs` loads it, and only the water icon (cell 10) is taken from it.
-Every other icon comes from `icons/` or `ui/`.
+`src/Icons.cs` falls back on it only for the water icon (cell 10), which `icons/water.png` now covers, so every icon comes from `icons/` or `ui/`.
 
 ### SVG glyphs
 
@@ -151,7 +150,7 @@ Every other icon comes from `icons/` or `ui/`.
 
 - Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, guide, close, filter, stash, trash and so on), tinted in code.
 - A hard hat for workers.
-- Icons named by item id for items without a model of their own: steel parts, tin cans, grass, fertilizer, wheat seeds, wheat, flour, dough, and the foods: raw meat, burnt steak, bread, crushed berries, berry jam, meat stew and the canned goods.
+- Icons named by item id for items without a model of their own: steel parts, tin cans, grass, fertilizer, wheat seeds, wheat, flour, dough, and the foods: raw meat, burnt steak, bread, crushed berries, berry jam, meat stew, canned jam and canned meat stew.
 
 ## Fonts
 
