@@ -18,7 +18,7 @@ public partial class Game {
     private async void RunServerCheck() {
         try {
             Engine.MaxFps = CheckFrameRate;
-            RemoveCheckFiles(); await Frames(4);
+            await Frames(4);
             await Test(CheckNewGameRunsOnAServerOfItsOwn);
             await Test(CheckPlayerComesBackThroughEveryLoad);
             await Test(CheckSecondGameTakesAnotherPort);
