@@ -47,7 +47,7 @@ Models are assembled from code-built Godot meshes.
 
 - `src/WorldModels.cs` — world objects, wolf carcass and trade cart.
 - `src/ActorRig.cs` — player, worker, courier and the intro film's boss.
-- `src/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
+- `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
 - `src/ModelKit.cs` — shared primitive, material and fade helpers.
   A material is flat colour or one of the surfaces wood, metal, stone, cloth and earth: the colour stays the model's
   own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail

@@ -5,14 +5,15 @@ description: Change the intro film the game opens with, check it shot by shot an
 
 # Intro film
 
-The game opens by playing `assets/intro.ogv` over the start menu (`src/IntroMovie.cs`); Esc skips it.
-The game draws the film's frames itself (`src/WorldIntro.cs`, `src/IntroSets.cs`, `src/IntroPoses.cs`), and a movie
-tool outside this project turns them into the movie.
+The film's code lives in `src/intro/`.
+The game opens by playing `assets/intro.ogv` over the start menu (`IntroMovie.cs`); Esc skips it.
+The game draws the film's frames itself (`WorldIntro.cs`, `IntroSets.cs`, `IntroPoses.cs`), and a movie tool outside
+this project turns them into the movie.
 [docs/DESIGN.md](../../../docs/DESIGN.md#intro-film) describes how the film is built.
 
 ## Workflow
 
-1. Change the shot in `src/WorldIntro.cs`: each shot is one method given the seconds since its cut.
+1. Change the shot in `src/intro/WorldIntro.cs`: each shot is one method given the seconds since its cut.
 2. Look at single moments first; a stills run takes about 15 seconds:
 
    ```sh

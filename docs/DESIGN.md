@@ -152,9 +152,9 @@ Checks and review tools:
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
 | `src/AnimationCapture.cs` | Captures the animation review |
-| `src/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
-| `src/IntroSets.cs`, `src/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
-| `src/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
+| `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
+| `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
+| `src/intro/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
 | `tools/intro_film.py` | Draws the film's frames and writes its sound cue sheet |
 
 ### Simulation, view and UI
