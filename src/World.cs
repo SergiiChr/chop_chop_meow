@@ -2446,12 +2446,15 @@ public sealed partial class World {
     }
     /// <summary>
     /// Whether every building, worker and cart in a save holds only known items, every worker's tool is a known item,
-    /// and every station is marked with, makes and has queued only recipes it makes.
+    /// every building has its boxes, and every station is marked with, makes and has queued only recipes it makes.
     /// </summary>
     private bool ValidSettlement(SaveState save) {
         foreach (var t in save.Things) {
             if (t?.Inventory == null) return false;
             foreach (var box in Boxes(t)) if (box != null && !ValidInventory(box, save.Crates)) return false;
+            // A building has the boxes its kind is made with.
+            if (SlotKinds(t.Kind).Length > 0 && t.Tools == null || Burns(t.Kind) && t.Burner == null || t.Kind == ThingKind.Signpost && t.Wages == null
+                || t.Kind is ThingKind.Signpost or ThingKind.Farm or ThingKind.Packer or ThingKind.Mine && t.Output == null) return false;
             if (t.Keep != "" && !Makes(t, t.Keep) || t.Making != "" && !Makes(t, t.Making)) return false;
             foreach (var q in t.Queue) if (q == null || !Makes(t, q.Recipe) || q.Count is <= 0 or > MaxQueued) return false;
         }
@@ -2492,7 +2495,7 @@ public sealed partial class World {
         loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.First();
         RebuildAllStacks(loaded);
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
-        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
+        if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded) || loaded.Goal < 0) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
         foreach (var p in loaded.Absent.Values) TidyHotbar(p);
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;

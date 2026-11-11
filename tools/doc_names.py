@@ -8,6 +8,7 @@ Words in backticks that are none of these, such as item ids, keys and shell comm
 from __future__ import annotations
 
 import re
+import subprocess
 import sys
 from collections.abc import Iterator
 from pathlib import Path
@@ -83,6 +84,11 @@ class Code:
         self.flags = set(FLAG.findall(self.text))
         self.file_names = {path.name for path in [*csharp, *other, *files(DOCS)]}
         self.stems = {path.stem for path in [*csharp, *other]}
+        # The endings of the files the repo holds, which tell a file the game writes, such as `settings.cfg`, from a code name.
+        tracked = subprocess.run(
+            ["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True
+        ).stdout.split()
+        self.endings = {Path(name).suffix[1:] for name in tracked}
         # A partial class is declared in several files, and its members are in any of them.
         self.types: dict[str, set[str]] = {}
         for text in csharp.values():
@@ -91,11 +97,16 @@ class Code:
                 self.types.setdefault(name, set()).update(words)
 
     def has_dotted(self, name: str) -> bool:
-        """Whether `Type.Member` names a member of a type declared here, or is written out somewhere as it stands."""
+        """Whether a dotted name is in the code: a member of a type declared here, or written out somewhere as it stands.
+
+        A name that ends like a file, and starts with no type, is a file the game or a tool writes.
+        """
         first, *rest = name.split(".")
         owner = self.types.get(first)
         if owner is None:
-            return name in self.text
+            return name in self.text or (
+                not first[0].isupper() and rest[-1] in self.endings
+            )
         for part in rest:
             if part not in owner:
                 return False
@@ -138,10 +149,7 @@ def missing(span: str, code: Code) -> Iterator[str]:
         elif len(words) == 1:
             # `World.As(...)` and `Checks.Test<T>` are looked up as `World.As` and `Checks.Test`.
             name = re.sub(r"<[^<>]*>|\(.*\)$", "", word)
-            first = name.split(".")[0]
-            # A dotted name is the code's when it starts with a type or a module of the repo.
-            # `settings.cfg` and the like are files the game writes.
-            if DOTTED.match(name) and (first[0].isupper() or first in code.stems):
+            if DOTTED.match(name):
                 if not code.has_dotted(name):
                     yield word
             elif (

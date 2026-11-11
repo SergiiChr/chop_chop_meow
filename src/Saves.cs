@@ -53,6 +53,9 @@ public sealed class Saves(UiKit kit, Net net, IGameFlow flow) {
             using (var file = Godot.FileAccess.Open(fresh, Godot.FileAccess.ModeFlags.Write)) {
                 if (file == null) throw new InvalidOperationException($"Cannot open save file: {Godot.FileAccess.GetOpenError()}");
                 if (!file.StoreString(text)) throw new InvalidOperationException($"Cannot write save file: {file.GetError()}");
+                // What a full disk refuses may only show once the file is written out.
+                file.Flush();
+                if (file.GetError() != Error.Ok) throw new InvalidOperationException($"Cannot write save file: {file.GetError()}");
             }
             if (DirAccess.RenameAbsolute(fresh, path) is var moved && moved != Error.Ok) throw new InvalidOperationException($"Cannot replace the earlier save: {moved}");
             return $"Settlement saved · {SlotName(n)}.";

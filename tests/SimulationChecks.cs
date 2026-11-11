@@ -2105,6 +2105,9 @@ public static class SimulationChecks {
         SafeTick(world, data.TradeSeconds + .1f);
         var bought = sign.Output!.Items.Keys.Where(World.IsCrate).ToList();
         Require(bought.Count == 2 && bought.All(id => world.Packed(id)?["canned_meat_stew"] == 12), "each bought crate should arrive packed with one purchase");
+        SetNeeds(world, hunger: 30); Give(world, "canned_meat_stew", 1); world.Consume("canned_meat_stew");
+        // A can of meat stew feeds 60.
+        Require(world.Hunger == 90, "canned meat stew should be eaten from the can");
         Require(world.KnownPrice("raw_meat") > 0 && !world.Priced("wheat_seeds"), "the price sheet only tracks goods the village buys");
         Require(!data.Items.ContainsKey("canned_food") && data.Recipes.Values.All(r => !r.Inputs.ContainsKey("raw_meat") || r.Station != ThingKind.Cannery), "raw meat should sell in crates and never go into a can");
     }
@@ -2510,7 +2513,7 @@ public static class SimulationChecks {
         world.Add(ThingKind.Anvil, new Vector2(10, 10));
         string json = world.Serialize();
         EmptyWorld(data).Deserialize(json);
-        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"Tool\": \"steel_hammer\"", "\"Tool\": \"unobtainium\""), ("\"wood\": 2", "\"unobtainium\": 2"), ("\"Keep\": \"steel_parts\"", "\"Keep\": \"steel_pick\"") }) {
+        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"Tool\": \"steel_hammer\"", "\"Tool\": \"unobtainium\""), ("\"wood\": 2", "\"unobtainium\": 2"), ("\"Keep\": \"steel_parts\"", "\"Keep\": \"steel_pick\""), ("\"Goal\": 0", "\"Goal\": -1") }) {
             bool refused = false;
             try { EmptyWorld(data).Deserialize(Patch(json, edit)); } catch (InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
             Require(refused, $"a save with {edit.Item2} in place of {edit.Item1} should be refused with a clear reason");

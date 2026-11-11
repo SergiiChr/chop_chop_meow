@@ -620,15 +620,18 @@ public partial class Game {
         Warp(Hosted, home); await Frames(4);
         var tree = Hosted.Add(ThingKind.Tree, home + new Vector2(3, 3), 42);
         var chest = Hosted.Add(ThingKind.Chest, home + new Vector2(-3, 3)); chest.Inventory.Add("wood", 3);
+        var rock = Hosted.Add(ThingKind.Stone, home + new Vector2(0, 6), World.StonePile);
         await Frames(4);
-        var cliff = await StandAtIronCliff();
+        await StandAtIronCliff();
         Require(!world.Sees(tree.Pos) && world.Remembered(tree.Id)?.Remaining == 42, "The player must remember the tree standing once they have walked away.");
         tree.Remaining = 0; chest.Inventory.Add("wood", 5);
+        var chip = Hosted.Add(ThingKind.LooseStone, rock.Pos + new Vector2(1.2f, 0), 1);
         await Frames(4);
         Warp(Hosted, home); await Frames(3);
         Require(view.PropOf(tree.Id) is TreeProp { Stump.Visible: true, Sway.Visible: false }, "A tree felled out of sight must stand as a stump when seen again, not topple then.");
         Require(view.PropOf(chest.Id) is BoxProp { Puff: 0, Open: 0 }, "A chest filled out of sight must keep its lid shut when seen again.");
-        RemoveThings(Hosted, t => t == tree || t == chest); Warp(Hosted, start); await Frames(4);
+        Require(view.PropOf(chip.Id) is LooseProp { Flight: >= WorldModels.ChipFlight }, "A chip knocked off a rock out of sight must lie where it fell when seen, not fly from the rock then.");
+        RemoveThings(Hosted, t => t == tree || t == chest || t == rock || t == chip); Warp(Hosted, start); await Frames(4);
     }
     /// <summary>Launch opens the start menu with no save to continue, and Esc does not leave it.</summary>
     private async Task CheckLaunchOpensTheStartMenuWithNoSaveToContinue() {
