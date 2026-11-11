@@ -150,6 +150,7 @@ Checks and review tools:
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
+| `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
 | `src/AnimationCapture.cs` | Captures the animation review |
 | `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |

@@ -877,6 +877,21 @@ public partial class Game {
         await CloseWithEsc();
         Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
     }
+    /// <summary>The driver behind `--drive` plays its command file as real input and reports each line once: a key it sends opens the backpack, and a command it does not know fails by name.</summary>
+    private async Task CheckDriverPlaysItsCommandFileAsRealInput() {
+        await CloseWithEsc();
+        string folder = ProjectSettings.GlobalizePath($"user://{Launch.FilePrefix}drive"), log = System.IO.Path.Combine(folder, "log.txt");
+        if (System.IO.Directory.Exists(folder)) System.IO.Directory.Delete(folder, true);
+        // The driver starts from the `--drive` launch flag, which a check run does without: no input starts it.
+        var driver = new ReviewDrive { Folder = folder }; AddChild(driver);
+        System.IO.File.WriteAllText(System.IO.Path.Combine(folder, "cmd.txt"), "key Tab\nwiggle\n");
+        await Until(() => System.IO.File.Exists(log) && System.IO.File.ReadAllText(log).Contains("wiggle"), "the driver running its command file", 5);
+        await Frames();
+        Require(bag.Visible, "A key the driver sends must open the backpack as a pressed key does.");
+        Require(System.IO.File.ReadAllLines(log) is ["ok key Tab", var failed] && failed.StartsWith("failed wiggle"), "The driver must report each command once, as ok or as failed.");
+        driver.QueueFree(); System.IO.Directory.Delete(folder, true);
+        await CloseWithEsc();
+    }
     /// <summary>With a building's page open, clicking an item on the hotbar moves it in as a click on it in the backpack does.</summary>
     private async Task CheckHotbarClickMovesItemsIntoAnOpenBuilding() {
         var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2));
@@ -1367,6 +1382,7 @@ public partial class Game {
             await Test(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
             await Test(CheckRedXTakesABuildingDownOnTheSecondClick);
             await Test(CheckPackedCrateOpensFromTheBackpack);
+            await Test(CheckDriverPlaysItsCommandFileAsRealInput);
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);

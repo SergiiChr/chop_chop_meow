@@ -2,8 +2,11 @@ using System;
 using System.Collections.Generic;
 using Godot;
 
+namespace ChopChopMeow;
+
 /// <summary>Plays the real game window from a command file, so an agent can play without OS input tools.</summary>
 /// <remarks>
+/// `--drive` starts it with its folder.
 /// It reads `cmd.txt` in its folder, runs each line through `Input.ParseInputEvent`, renames the file to `cmd-N.done` and writes `ready` to `status.txt`.
 /// Waits count real seconds, whatever `Engine.TimeScale` is.
 /// </remarks>
@@ -55,7 +58,7 @@ public partial class ReviewDrive : Node {
                 case "scale": Engine.TimeScale = double.Parse(p[1]); break;
                 case "shot": Shot(p[1]); break;
                 case "quit": GetTree().Quit(); break;
-                default: Log($"unknown command: {line}"); break;
+                default: throw new ArgumentException("unknown command");
             }
             Log($"ok {line}");
         } catch (Exception e) { Log($"failed {line}: {e.Message}"); }

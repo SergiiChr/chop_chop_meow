@@ -95,6 +95,7 @@ public partial class Game : Node, IGameFlow {
             Settings.ApplyAntiAliasing(GetViewport(), Settings.AntiAliasing);
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review") && introFolder == null) startMenu.ShowStart();
+            if (Launch.Value("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
             // The game opens on the intro film, over the start menu; review runs, checks and a screenshot of the menu open without it.
             if (!review && screenshotPath == null) PlayIntro();
             if (Launch.Has("--performance-run")) StartGame(-1);
