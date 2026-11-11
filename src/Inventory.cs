@@ -107,7 +107,7 @@ public sealed class Inventory {
     }
 
     /// <summary>
-    /// Brings the stacks in line with the item totals, for totals that arrived without matching stacks such as an old save's.
+    /// Brings the stacks in line with the item totals, for totals that arrived without matching stacks, as in a save edited by hand.
     /// Surviving stacks keep their cells, new units fill empty cells, and stacks beyond the slot count move into free cells.
     /// </summary>
     public void RebuildStacks() {

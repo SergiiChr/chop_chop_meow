@@ -27,7 +27,7 @@ public sealed class Thing {
     private List<Queued>? queue;
     private string? making, keep;
     // Saves and updates carry these only when set, so a tree or a rock carries none of them.
-    // The batch in progress is saved under the name of the current recipe, which older saves held it in while a batch ran.
+    // The batch in progress is saved under the name "Recipe".
     [JsonInclude, JsonPropertyName("Recipe"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] internal string? SavedMaking { get => making; set => Making = value ?? ""; }
     [JsonInclude, JsonPropertyName("Keep"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] internal string? SavedKeep { get => keep; set => Keep = value ?? ""; }
     [JsonInclude, JsonPropertyName("Queue"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), JsonConverter(typeof(QueueJson))]
@@ -164,9 +164,6 @@ public sealed class Worker : IWalker {
 }
 public sealed class TradeOrder {
     public Dictionary<string, int> Goods { get; set; } = new();
-    /// <summary>Single-item orders from older saves; moved into <see cref="Goods"/> on load.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public string? Item { get; set; }
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Quantity { get; set; }
     public bool Buying { get; set; }
     public float Value { get; set; }
     public float Elapsed { get; set; }
@@ -241,7 +238,7 @@ public sealed class SaveState {
     }
     /// <summary>The key of the machine that last started this world, whose player follows the save to another computer.</summary>
     public string Owner { get; set; } = "";
-    /// <summary>Saves from any other version are refused.</summary>
+    /// <summary>Raised whenever what a save holds changes shape. Saves from any other version are refused, never converted.</summary>
     public int Version { get; set; } = 7;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
@@ -257,8 +254,6 @@ public sealed class SaveState {
     public Dictionary<string, float> Demand { get; set; } = new();
     /// <summary>Sale prices as last reported by someone arriving from the village, and when that was.</summary>
     public Dictionary<string, float> Prices { get; set; } = new();
-    /// <summary>Coins from older saves, which kept them outside the backpack; moved into it on load.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] public float? Coins { get; set; }
     public float PricesTime { get; set; }
     public HashSet<string> Milestones { get; set; } = new();
     [JsonIgnore] public float PlayerX { get => Actor.PlayerX; set => Actor.PlayerX = value; }
@@ -2453,7 +2448,7 @@ public sealed partial class World {
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }
-    /// <summary>Clears what an edited or older save may hold out of place in a player: hotbar entries for nothing known or carried, a cabin that is gone, recipes not made by hand.</summary>
+    /// <summary>Clears what a save edited by hand may hold out of place in a player: hotbar entries for nothing known or carried, a cabin that is gone, recipes not made by hand.</summary>
     private void FixPlayer(PlayerState p, SaveState save) {
         var slots = p.HotbarSlots ?? new();
         p.HotbarSlots = Enumerable.Range(0, 9).Select(i => slots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack?[id] > 0) ? id : "").ToList();
@@ -2464,29 +2459,7 @@ public sealed partial class World {
         if (!Hand(p.Making ?? "")) p.Making = "";
     }
     private bool Hand(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand;
-    /// <summary>
-    /// Brings older saves' things up to date before they are read: loose iron left the game and no kind names it any more,
-    /// and a mine's or farm plot's stage was one number for both.
-    /// </summary>
-    private static string UpgradeThings(string json) {
-        static bool Loose(JsonNode? thing) => thing?["Kind"]?.GetValue<string>() == "loose_iron";
-        static void Stage(JsonNode? thing) {
-            if (thing is not JsonObject fields || !fields.Remove("Stage", out var stage)) return;
-            string? kind = fields["Kind"]?.GetValue<string>();
-            if (kind == ThingKind.Mine.Id()) fields["MineStage"] = stage; else if (kind == ThingKind.Farm.Id()) fields["FarmStage"] = stage;
-        }
-        var save = JsonNode.Parse(json)!.AsObject();
-        if (save["Things"] is JsonArray things) {
-            foreach (var thing in things.Where(Loose).ToList()) things.Remove(thing);
-            foreach (var thing in things) Stage(thing);
-        }
-        if (save["Remembered"] is JsonObject remembered) {
-            foreach (var (id, _) in remembered.Where(pair => Loose(pair.Value)).ToList()) remembered.Remove(id);
-            foreach (var (_, thing) in remembered) Stage(thing);
-        }
-        return save.ToJsonString();
-    }
-    /// <summary>Brings every inventory of a freshly parsed save in line with its totals, since an old save holds totals without stacks.</summary>
+    /// <summary>Brings every inventory of a freshly parsed save in line with its totals, which a save edited by hand can leave disagreeing with its stacks.</summary>
     private static void RebuildAllStacks(SaveState save) {
         foreach (var player in save.Players.Concat(save.Absent.Values)) player?.Backpack?.RebuildStacks();
         RebuildAll(save.Crates?.Values);
@@ -2497,59 +2470,31 @@ public sealed partial class World {
         static void RebuildThing(Thing? thing) { if (thing != null) foreach (var box in Boxes(thing)) box?.RebuildStacks(); }
     }
 
+    /// <summary>
+    /// Takes over a save written by this version of the game.
+    /// One from any other version is refused rather than converted, and so is one that is incomplete, names unknown items or holds values out of range.
+    /// </summary>
     public void Deserialize(string json) {
-        // Older saves hold steel tools as one item: they load as steel parts, and a missing axe or pickaxe is made from one so the save stays playable.
-        bool legacyTools = json.Contains("\"steel_tools\"");
-        json = json.Replace("\"steel_tools\"", "\"steel_parts\"").Replace("\"cooked_meat\"", "\"burnt_steak\"");
-        // Iron tools and parts left the game: older saves get the steel ones instead.
-        json = json.Replace("\"iron_axe\"", "\"steel_axe\"").Replace("\"iron_pick\"", "\"steel_pick\"").Replace("\"iron_hammer\"", "\"steel_hammer\"").Replace("\"iron_parts\"", "\"steel_parts\"");
-        if (json.Contains("\"loose_iron\"") || json.Contains("\"Stage\"")) json = UpgradeThings(json);
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
-        if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Absent.Count == 0) throw new InvalidOperationException("Unsupported or incomplete save.");
+        if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Prices == null
+            || loaded.Remembered == null || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
+            throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Players = new();
-        // Item fixes below that belong to one player go to the unclaimed one, else the first.
+        // Until its machines join, the save's world runs as the player no machine has claimed, else the first.
         loaded.Actor = loaded.Absent.GetValueOrDefault("") ?? loaded.Absent.Values.First();
         RebuildAllStacks(loaded);
-        loaded.Prices ??= new();
-        if (loaded.Coins is float coins) { loaded.Backpack.Add(Inventory.Coins, (int)coins); loaded.Coins = null; }
-        foreach (var order in loaded.Orders.Where(o => o.Item != null && o.Goods.Count == 0)) { order.Goods[order.Item!] = order.Quantity; order.Item = null; order.Quantity = 0; }
-        // Signposts from older saves had no market, so they get its boxes on load.
-        foreach (var sign in loaded.Things.Of(ThingKind.Signpost).Where(t => t.Output == null)) { sign.Inventory.Slots = MarketSlots; sign.Output = new() { Slots = MarketSlots }; }
-        foreach (var sign in loaded.Things.Of(ThingKind.Signpost).Where(t => t.Wages == null)) sign.Wages = NewWageSlot();
-        // Saves from before the fog start unexplored.
-        if (loaded.Explored?.Length != Terrain.Size * Terrain.Size) loaded.Explored = new byte[Terrain.Size * Terrain.Size];
-        loaded.Remembered ??= new();
         if (loaded.Things.Concat(loaded.Remembered.Values).Any(t => !Enum.IsDefined(t.Kind) || !Enum.IsDefined(t.MineStage) || !Enum.IsDefined(t.FarmStage))) throw new InvalidOperationException("Unsupported or incomplete save.");
-        loaded.Crates ??= new(); loaded.Profits ??= new();
         foreach (var t in loaded.Things) {
-            // A station marked with or working on a recipe it doesn't make, as on older saves' anvils, goes back to its starting recipe; queued batches of one are dropped.
+            // A save edited by hand can mark, run or queue a recipe its station does not make:
+            // the mark goes back to the station's starting recipe, and such a batch or queued batches are dropped.
             if (t.Keep != "" && !Makes(t, t.Keep)) t.Keep = StartingRecipe(t.Kind);
-            // Older saves held the current recipe where the batch in progress is now saved, so between batches it is let go.
             if (t.Making != "" && !(t.Processing && Makes(t, t.Making))) { t.Making = ""; t.Processing = false; t.Progress = 0; }
             t.SavedQueue?.RemoveAll(q => q == null || !Makes(t, q.Recipe) || q.Count is <= 0 or > MaxQueued);
-            if (SlotKinds(t.Kind).Length > 0) t.Tools ??= NewToolSlots(t.Kind);
-            // A plot from an older save keeps its harvest with the seed; the harvest moves to its own slots.
-            if (t.Kind == ThingKind.Farm && t.Output == null) {
-                t.Output = new() { Slots = Data.Farm.Yield.Count };
-                foreach (var item in t.Inventory.Items.Keys.Where(i => !Data.Farm.Sow.ContainsKey(i)).ToList()) t.Inventory.TransferTo(t.Output, item, t.Inventory[item]);
-                t.Inventory.Slots = Data.Farm.Sow.Count;
-            }
-            // A station from an older save keeps its fuel with the ingredients; fuel nothing smelts moves to the fuel slot.
-            if (Burns(t.Kind) && t.Burner == null) {
-                t.Burner = NewBurner();
-                string fuel = ShownFuel(t, Data);
-                if (!BatchCost(t).ContainsKey(fuel)) t.Inventory.TransferTo(t.Burner, fuel, t.Inventory[fuel]);
-            }
-        }
-        if (legacyTools) {
-            foreach (var (tool, made) in new[] { ("axe", "steel_axe"), ("pickaxe", "steel_pick") })
-                if (BestTool(tool, loaded.Backpack) == null && loaded.Backpack.Remove("steel_parts", 1) == 1) loaded.Backpack.Add(made, 1);
-            if (loaded.Milestones.Contains("steel_parts")) loaded.Milestones.Add("steel_tool");
         }
         foreach (var p in loaded.Absent.Values) if (p != null) FixPlayer(p, loaded);
         if (loaded.Absent.Values.Any(p => p == null || !ValidPlayer(p, loaded.Crates)) || !ValidCrates(loaded.Crates) || !ValidSettlement(loaded)) throw new InvalidOperationException("This save holds unknown items or values out of range and cannot be loaded.");
-        // The current goal is worked out again from the milestones, so a save made with a shorter goal chain lands on the right step.
+        // The current goal is worked out from the milestones rather than taken from the save.
         loaded.Goal = 0;
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;
@@ -2558,15 +2503,6 @@ public sealed partial class World {
         S = loaded;
         toolsChanged = true;
         foreach (var t in S.Things.Of(ThingKind.Toolstation)) WatchTools(t);
-        // Older saves set only a worker's place; it carries every job there.
-        foreach (var w in S.Workers)
-            if (w.Duties.Count == 0 && w.Assignment > 0 && Find(w.Assignment) is Thing place) foreach (string job in Jobs(place)) w.Duties.Add(NewDuty(place, job));
-        // Gather jobs from older saves learn the kind of resource they gather.
-        foreach (var w in S.Workers)
-            foreach (var d in w.Duties) if (d.Job == "gather" && d.Kind == null && Find(d.Thing) is Thing spot) d.Kind = spot.Kind;
-        NormalizeBottleStorage();
-        // Saves from before raking have no leaf litter.
-        if (S.Things.Of(ThingKind.Leaves).Count == 0) DropLeaves();
         UpdateGoal(); gatherClock = 0; ExploredRevision++; Look();
         Replaced?.Invoke();
     }

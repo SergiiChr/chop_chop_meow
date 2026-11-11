@@ -11,7 +11,7 @@ public sealed class Saves(UiKit kit, Net net, IGameFlow flow) {
     /// <summary>Numbered slot that F5 and F9 use; 0 until the player saves to or loads one.</summary>
     public int Slot { get; set; }
 
-    // Slot 1 keeps the original single-save file name, so older saves load as slot 1.
+    // Slot 1's file carries no number.
     public static string SlotPath(int n) => $"user://{Launch.FilePrefix}{(n == 0 ? "autosave" : n == 1 ? "settlement" : $"settlement-{n}")}.json";
     public static string SlotName(int n) => n == 0 ? "Autosave" : $"Slot {n}";
     public static bool SlotUsed(int n) => Godot.FileAccess.FileExists(SlotPath(n));

@@ -120,9 +120,6 @@ internal static class SetupSteps {
         return worker;
     }
 
-    /// <summary>Sets a goal number from an older save: old-save fixtures only.</summary>
+    /// <summary>Sets a goal number the milestones do not give, as a save edited by hand can hold: play only moves the goal with its milestones.</summary>
     public static void SetGoal(World world, int goal) => world.S.Goal = goal;
-
-    /// <summary>The loose coins field an older save held, which has no read in the game.</summary>
-    public static float? OldCoins(World world) => world.S.Coins;
 }
