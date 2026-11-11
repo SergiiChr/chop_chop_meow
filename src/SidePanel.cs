@@ -156,9 +156,15 @@ public partial class SidePanel : MovableWindow {
 
     public void Close() { Visible = false; Bag.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
 
-    /// <summary>Runs the open page's updates, or closes a page whose thing has gone, such as an emptied recovery box or a building someone else took down.</summary>
+    /// <summary>
+    /// Runs the open page's updates.
+    /// A page whose thing has gone, such as an emptied recovery box or a building someone else took down, closes or gives way to the page it names.
+    /// </summary>
     public void Refresh() {
-        if (page is { Current: false }) { Selection = default; Close(); return; }
+        if (page is { Current: false }) {
+            if (page.GivesWayTo == Page.None) { Selection = default; Close(); } else Open(page.GivesWayTo);
+            return;
+        }
         page?.Refresh();
     }
 

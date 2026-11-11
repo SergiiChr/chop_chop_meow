@@ -181,7 +181,7 @@ def path_exists(text: str) -> bool | None:
 def missing(span: str, code: Code) -> Iterator[str]:
     """The names in one backticked span that are meant to be in the repo and are not."""
     words = span.split()
-    foreign = words[0] in FOREIGN
+    foreign = bool(words) and words[0] in FOREIGN
     for word in words:
         word = word.strip(",;:()[]\"'")
         if word in OUTSIDE:

@@ -65,7 +65,6 @@ public static class Water {
 public enum WaterCollectResult { NoChange, RefilledBottle, SourceSip }
 
 public sealed partial class World {
-
     /// <summary>A water collector refills existing empty bottles; gathering never creates packaging.</summary>
     private bool WaterWork(Worker worker, Thing pond, float dt) {
         string? carried = Water.FindBottle(worker.Bag);

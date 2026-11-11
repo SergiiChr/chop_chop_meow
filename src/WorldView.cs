@@ -710,7 +710,6 @@ public partial class WorldView : Node3D {
     private readonly List<Thing> known = new();
     private readonly List<int> gone = new();
     private SaveState? builtFor;
-    private bool loadingProps;
     private int thingsCounted = -1;
     private static readonly Vector2 Nowhere = new(-1e6f, -1e6f);
     // Where the player stood when things were last drawn.
@@ -722,28 +721,30 @@ public partial class WorldView : Node3D {
     /// What changed out of sight, or is first seen as the player walks up, shows as it now is without playing the change.
     /// </summary>
     private bool Watched(Vector2 at) => at.DistanceTo(sawFrom) <= World.Data.SightRadius;
+    /// <summary>Dark enough for cabin windows to be lit, which is all that night changes in a thing drawn as last seen.</summary>
+    private bool Dark => night > .45f;
     private void SyncThings(float dt) {
         // Every model is built while a world loads, hidden until the player first sees it, so exploring builds nothing mid-game.
         // Another world, loaded or started, starts from fresh models: the old ones carry the state of things with the same ids.
         if (builtFor != World.S) {
             builtFor = World.S;
             thingsCounted = -1;
+            // Nothing in a world just loaded appeared in front of the player.
             sawFrom = Nowhere;
             foreach (var (_, old) in props) old.Root.QueueFree();
             props.Clear();
-            loadingProps = true;
             foreach (var t in World.Things) Show(PropFor(t), false);
-            loadingProps = false;
         }
         seen.Clear();
         bool everything = filming || EnvironmentReview && EnvironmentCenter.HasValue;
         if (everything) { known.Clear(); known.AddRange(World.Things); } else World.CollectKnown(known);
-        bool dark = night > .45f;
+        bool dark = Dark;
         foreach (var t in known) {
             seen.Add(t.Id);
             var prop = PropFor(t);
-            // Most of an explored valley is out of sight, drawn as it was last seen. That only changes when it is seen again, by this player or another,
-            // or when night falls or lifts, so such a thing is settled once and then left alone: only what is in sight is drawn every frame.
+            // Most of an explored valley is out of sight, drawn as it was last seen.
+            // That only changes when it is seen again, by this player or another, or when night falls or lifts,
+            // so such a thing is settled once and then left alone: only what is in sight is drawn every frame.
             bool live = everything || World.Sees(t.Pos);
             var look = (t.Remaining, t.Progress, t.MineStage, t.FarmStage, dark);
             if (!live && prop.Settled && prop.Look == look && prop.At == t.Pos) continue;
@@ -774,7 +775,7 @@ public partial class WorldView : Node3D {
     private Prop PropFor(Thing t) {
         if (props.TryGetValue(t.Id, out var prop) && prop.Kind == t.Kind) return prop;
         // A building or crate put down in front of the player lands with a puff of dust; a kind changing in place, such as a dug mine, does not.
-        bool appeared = !loadingProps && Watched(t.Pos);
+        bool appeared = Watched(t.Pos);
         if (prop == null && appeared && (t.Kind == ThingKind.Crate || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
         if (prop != null) prop.Root.QueueFree();
         prop = WorldModels.Build(t);
@@ -954,7 +955,7 @@ public partial class WorldView : Node3D {
                 if (dt > 0 && near && hut.Open == 0) Sounds?.Play(World.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
                 hut.Open = Mathf.MoveToward(hut.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
                 hut.Door.RotationDegrees = new Vector3(0, -100 * Ease(hut.Open), 0);
-                bool lit = night > .45f;
+                bool lit = Dark;
                 if (lit != hut.Lit) {
                     hut.Lit = lit;
                     hut.Window.MaterialOverride = lit ? NightGlass : DayGlass;
@@ -1059,10 +1060,12 @@ public partial class WorldView : Node3D {
         if (filming) return;
         var bounds = GetViewport().GetVisibleRect().Grow(300);
         float ppu = PixelsPerUnit;
-        // The view never draws ground larger than it is, so nothing further from the player than the far corner of those bounds can lie inside them:
+        // Nothing further from the player than the far corner of those bounds can lie inside them:
         // that rules out most of an explored valley before the camera is asked where each thing is on screen.
-        var size = bounds.Size;
-        float reach = EnvironmentReview ? float.MaxValue : Math.Max(Center.X + 300, size.X - Center.X - 300) / ppu + Math.Max(Center.Y + 300, size.Y - Center.Y - 300) / ppu;
+        // The tilted camera draws ground running away from it shorter than ground running across, so up the screen a pixel covers more ground.
+        var (size, center) = (bounds.Size, Center);
+        float across = Math.Max(center.X + 300, size.X - center.X - 300), away = Math.Max(center.Y + 300, size.Y - center.Y - 300) / MathF.Sin(Mathf.DegToRad(Pitch));
+        float reach = EnvironmentReview ? float.MaxValue : MathF.Sqrt(across * across + away * away) / ppu;
         float reach2 = reach * reach;
         var focus = World.Player;
         structures.Clear();

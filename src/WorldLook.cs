@@ -29,9 +29,15 @@ public partial class WorldView {
     /// <summary>Another world starts on unworn ground.</summary>
     private void ClearPaths() {
         Array.Clear(traffic);
+        ShowPaths();
+        trafficClock = 0;
+    }
+
+    /// <summary>Hands the wear map to the ground's materials.</summary>
+    private void ShowPaths() {
+        trafficChanged = false;
         trafficImage.SetData(TrafficSize, TrafficSize, false, Image.Format.R8, traffic);
         trafficTexture.Update(trafficImage);
-        trafficChanged = false; trafficClock = 0;
     }
 
     /// <summary>How many spots of ground footfall has worn, two to a tile each way.</summary>
@@ -69,10 +75,7 @@ public partial class WorldView {
             for (int i = 0; i < traffic.Length; i++) if (traffic[i] > 0) traffic[i]--;
             trafficChanged = true;
         }
-        if (!trafficChanged) return;
-        trafficChanged = false;
-        trafficImage.SetData(TrafficSize, TrafficSize, false, Image.Format.R8, traffic);
-        trafficTexture.Update(trafficImage);
+        if (trafficChanged) ShowPaths();
     }
 
     /// <summary>One step's wear: strongest under the foot, fading over about a tile.</summary>

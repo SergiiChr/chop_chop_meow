@@ -238,7 +238,10 @@ public sealed class SaveState {
     }
     /// <summary>The key of the machine that last started this world, whose player follows the save to another computer.</summary>
     public string Owner { get; set; } = "";
-    /// <summary>Raised whenever a change would make saves written before it load wrong. Saves from any other version are refused, never converted.</summary>
+    /// <summary>
+    /// Raised whenever a change would make saves written before it load wrong.
+    /// Saves from any other version are refused, never converted.
+    /// </summary>
     public int Version { get; set; } = 7;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();

@@ -30,6 +30,9 @@ public abstract partial class PagePanel : VBoxContainer {
     /// <summary>Whether what this page shows still exists, so that drawing it again makes sense.</summary>
     public virtual bool Current => true;
 
+    /// <summary>The page that takes this one's place once what it shows has gone; with none the panel closes.</summary>
+    public virtual Page GivesWayTo => Page.None;
+
     /// <summary>Brings what the page shows up to date.</summary>
     public void Refresh() => live.Run();
 

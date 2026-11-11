@@ -218,7 +218,8 @@ public partial class Game {
     /// <summary>A save that cannot be written says so and leaves the slot's earlier save as it was.</summary>
     private void CheckFailedSaveKeepsTheSaveBefore() {
         Require(Saves.Write(Hosted, 0).StartsWith("Settlement saved"), "A save must say it was written.");
-        // A position that is no number cannot be written as save text. No frame runs before it is put back.
+        // A position that is no number cannot be written as save text.
+        // No frame runs before it is put back.
         var stood = Hosted.Player;
         Hosted.Player = new Vector2(float.NaN, 0);
         string said = Saves.Write(Hosted, 0);
@@ -913,6 +914,18 @@ public partial class Game {
         await CloseWithEsc();
         Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
     }
+    /// <summary>A packed crate's page gives way to the backpack's once the last item is taken out of the crate.</summary>
+    private async Task CheckEmptiedCrateGivesWayToTheBackpack() {
+        Give(Hosted, "crate", 1); Give(Hosted, "berries", 1);
+        var placed = Hosted.PlaceCrate("crate", Hosted.Player + new Vector2(0, 2))!;
+        Hosted.Transfer(Hosted.Backpack, placed.Inventory, "berries", 1); Hosted.PickUpCrate(placed);
+        await KeyStroke(Key.Tab);
+        await Click(await Showing(0, c => c.TooltipText.StartsWith("Wood crate of")));
+        await Click(await Showing(0, c => c.TooltipText.StartsWith("Berries")));
+        await Until(() => panel.Page == Page.Backpack && bag.Visible, "the emptied crate's page giving way to the backpack's", 3);
+        await CloseWithEsc();
+        Drop(Hosted, "crate", 1); Drop(Hosted, "berries", 1); await Frames();
+    }
     /// <summary>With a building's page open, clicking an item on the hotbar moves it in as a click on it in the backpack does.</summary>
     private async Task CheckHotbarClickMovesItemsIntoAnOpenBuilding() {
         var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2));
@@ -1435,6 +1448,7 @@ public partial class Game {
             await Test(CheckRedXTakesABuildingDownOnTheSecondClick);
             await Test(CheckPageClosesWhenWhatItShowsIsGone);
             await Test(CheckPackedCrateOpensFromTheBackpack);
+            await Test(CheckEmptiedCrateGivesWayToTheBackpack);
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
