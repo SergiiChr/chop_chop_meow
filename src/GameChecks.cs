@@ -583,6 +583,7 @@ public partial class Game {
         await Until(() => world.Sheltered == hut.Id && Shows(hut), "a cabin clicked while walking taking the player inside and opening", 4);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
+        await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind the player once they are inside", 3);
         RunUntilNight(Hosted); SetNeeds(Hosted, hunger: 5);
         await Until(() => Named("sleep")?.TooltipText.Contains("too hungry") == true, "the sleep button explaining that the player is too hungry to sleep", 2);
         RunUntilMorning(Hosted);
@@ -593,6 +594,11 @@ public partial class Game {
         Require(world.Sheltered == hut.Id, "Moving must not step the player out of the cabin.");
         await Click(FindButton(panel, "Step outside")!);
         Require(world.Sheltered == 0, "Step outside must leave the cabin.");
+        // With no key held the player stops where they stepped in, right by the door.
+        await Click(view.Screen(hut.Pos, 1.5f));
+        await Until(() => world.Sheltered == hut.Id, "a click on the cabin taking a standing player inside", 4);
+        await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind a player who stepped in from beside it", 3);
+        await Click(FindButton(panel, "Step outside")!);
         RemoveThings(Hosted, t => t == hut); await CloseWithEsc();
 
         // A loose piece far enough behind a tree sits under its crown on screen; it must still be the one picked.
@@ -604,6 +610,24 @@ public partial class Game {
         RemoveThings(Hosted, t => t == hidden); await Frames();
         Require(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
         Require(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
+    }
+    /// <summary>What changed while the player was away shows as it now is when they come back, without playing the change in front of them.</summary>
+    private async Task CheckChangesOutOfSightDoNotReplayWhenSeenAgain() {
+        await CloseWithEsc();
+        var (start, home) = (Hosted.Player, Terrain.Spawn);
+        Warp(Hosted, home); await Frames(4);
+        var tree = Hosted.Add(ThingKind.Tree, home + new Vector2(3, 3), 42);
+        var chest = Hosted.Add(ThingKind.Chest, home + new Vector2(-3, 3)); chest.Inventory.Add("wood", 3);
+        await Frames(4);
+        var cliff = World.CliffOf(ThingKind.Iron);
+        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        Require(!world.Sees(tree.Pos) && world.Remembered(tree.Id)?.Remaining == 42, "The player must remember the tree standing once they have walked away.");
+        tree.Remaining = 0; chest.Inventory.Add("wood", 5);
+        await Frames(4);
+        Warp(Hosted, home); await Frames(3);
+        Require(view.PropOf(tree.Id) is TreeProp { Stump.Visible: true, Sway.Visible: false }, "A tree felled out of sight must stand as a stump when seen again, not topple then.");
+        Require(view.PropOf(chest.Id) is BoxProp { Puff: 0, Open: 0 }, "A chest filled out of sight must keep its lid shut when seen again.");
+        RemoveThings(Hosted, t => t == tree || t == chest); Warp(Hosted, start); await Frames(4);
     }
     /// <summary>Launch opens the start menu with no save to continue, and Esc does not leave it.</summary>
     private async Task CheckLaunchOpensTheStartMenuWithNoSaveToContinue() {
@@ -1120,7 +1144,10 @@ public partial class Game {
         await Seconds(.25);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames(); Require(world.Player.DistanceTo(savedPosition) > .1f, "The player should move after saving.");
+        Require(view.WornGround > 0, "Walking about must have worn the ground.");
         await KeyStroke(Key.F9);
+        // Half a second of play passes before the first footfall wears the loaded world's ground.
+        Require(view.WornGround == 0, "A loaded game must start on unworn ground, not on the footpaths of the game before.");
         Require(world.Player.DistanceTo(savedPosition) < .01f && world.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] == savedWood), "F9 must restore position and stored items from disk.");
         Require(world.HotbarSlots.SequenceEqual(savedSlots) && world.ActiveHotbar == savedActiveSlot, "F5 and F9 must preserve hotbar references and selection.");
         Warp(Hosted, world.Player + Vector2.One); await CloseWithEsc();
@@ -1425,6 +1452,7 @@ public partial class Game {
             await Test(CheckPinnedPlayerStaysDownAndDeathCountsDown);
             await Test(CheckMouseWheelOverPanelDoesNotZoom);
             await Test(CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable);
+            await Test(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
             await Test(CheckTradingPostSendsOnlyCratesOffOnACart);
             await Test(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await Test(CheckPackingStationListsGoodsAndTakesBackpackClicks);

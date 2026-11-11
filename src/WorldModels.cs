@@ -19,6 +19,11 @@ public class Prop {
     /// <summary>Whether a build-mode ghost is tinted as placeable, or null before its first tint.</summary>
     public bool? Tint;
     public bool Seen;
+    /// <summary>Drawn as last seen and left alone since, with what it looked like then; a thing in sight is drawn every frame.</summary>
+    public bool Settled;
+    public (int Remaining, float Progress, MineStage Mine, FarmStage Farm, bool Night) Look;
+    /// <summary>Where the model stands.</summary>
+    public Vector2 At;
     /// <summary>Whether the model is drawn, kept here so it is set in Godot only when it changes.</summary>
     public bool Shown = true;
     public Prop() { Body = Pivot(Root, Vector3.Zero); }
@@ -31,6 +36,8 @@ public sealed class TreeProp : Prop {
     public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
     /// <summary>Seconds since the tree was felled, or below zero while it stands.</summary>
     public float Fall = -1;
+    /// <summary>Whether the trunk was left leaning by a shake, and has to be set upright once the shake is over.</summary>
+    public bool Swayed;
     /// <summary>How see-through the crown is while it hides something behind it.</summary>
     public float Fade;
 }

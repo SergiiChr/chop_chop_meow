@@ -26,6 +26,23 @@ public partial class WorldView {
         listener.MakeCurrent();
     }
 
+    /// <summary>Another world starts on unworn ground.</summary>
+    private void ClearPaths() {
+        Array.Clear(traffic);
+        trafficImage.SetData(TrafficSize, TrafficSize, false, Image.Format.R8, traffic);
+        trafficTexture.Update(trafficImage);
+        trafficChanged = false; trafficClock = 0;
+    }
+
+    /// <summary>How many spots of ground footfall has worn, two to a tile each way.</summary>
+    public int WornGround {
+        get {
+            int worn = 0;
+            foreach (byte wear in traffic) if (wear > 0) worn++;
+            return worn;
+        }
+    }
+
     /// <summary>Per-frame look updates; none of them allocates.</summary>
     private void UpdateLook(float dt) {
         Wind.Update(dt, World.Player);
