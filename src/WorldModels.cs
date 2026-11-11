@@ -537,19 +537,24 @@ public static class WorldModels {
         var prop = new BoxProp();
         var dropped = Pivot(prop.Body, Vector3.Zero, new Vector3(0, -18, 0));
         dropped.Scale = Vector3.One * 1.4f;
-        var pack = Pivot(dropped, new Vector3(0, .145f, 0), new Vector3(90, 0, 0));
-        pack.Scale = Vector3.One * 1.5f;
-        ActorShape.Backpack(pack);
-        Add(dropped, BackpackShape.Details, BackpackShape.Canvas, Vector3.Zero);
-        var flap = Pivot(dropped, new Vector3(0, .235f, -.15f));
-        Add(flap, BackpackShape.Flap, BackpackShape.Canvas, Vector3.Zero);
-        prop.Lid = flap;
+        prop.Lid = LaidBackpack(dropped);
         var marker = Pivot(prop.Root, new Vector3(0, 1.2f, 0));
         var gold = Mat("f2b33d", .4f, 0, 1.4f);
         Cylinder(marker, .13f, 0, .09f, new Vector3(0, .045f, 0), gold, sides: 4);
         Cylinder(marker, 0, .13f, .24f, new Vector3(0, -.12f, 0), gold, sides: 4);
         prop.Marker = marker;
         return prop;
+    }
+
+    /// <summary>The canvas pack laid on its straps under <paramref name="parent"/>, half as large again as worn; returns its access flap, hinged at the back.</summary>
+    public static Node3D LaidBackpack(Node3D parent) {
+        var pack = Pivot(parent, new Vector3(0, .145f, 0), new Vector3(90, 0, 0));
+        pack.Scale = Vector3.One * 1.5f;
+        ActorShape.Backpack(pack);
+        Add(parent, BackpackShape.Details, BackpackShape.Canvas, Vector3.Zero);
+        var flap = Pivot(parent, new Vector3(0, .235f, -.15f));
+        Add(flap, BackpackShape.Flap, BackpackShape.Canvas, Vector3.Zero);
+        return flap;
     }
 
     /// <summary>A hollow slatted crate with a separately hinged lid and shared wood geometry.</summary>

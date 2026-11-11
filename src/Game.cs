@@ -12,6 +12,8 @@ public partial class Game : Node, IGameFlow {
     private static readonly bool smokeTest = Launch.Has("--smoke-test");
     private static readonly string? screenshotPath = Launch.Value("--screenshot");
     private static readonly float shotDelay = Launch.Number("--shot-delay", 2);
+    /// <summary>Where <c>--render-intro</c> saves the intro film's frames; the film is drawn in place of a game.</summary>
+    private static readonly string? introFolder = Launch.Value("--render-intro");
     private World world = null!;
     private WorldView view = null!;
     private Sounds sounds = null!;
@@ -32,6 +34,8 @@ public partial class Game : Node, IGameFlow {
     private BlackHole blackHole = null!;
     private ItemMoves moves = null!;
     private RecoveryPrompt recovery = null!;
+    /// <summary>The intro film while it plays; it frees itself when it ends.</summary>
+    private IntroMovie? intro;
     private PlayerControl player = null!;
     private float uiClock;
     private Net net = null!;
@@ -83,18 +87,26 @@ public partial class Game : Node, IGameFlow {
             ui.Theme = Style.Interface();
             blackHole = new BlackHole(kit, view, ui.Theme, this, saves, () => panel.Close()); AddChild(blackHole);
             // Play renders at the player's pick; a review run or check at the design size, unless --resolution asks for one such as "2560x1440".
-            bool review = Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run");
+            bool review = introFolder != null || Launch.Args.Any(a => a is "--showcase" or "--ui-test" or "--net-check" or "--server-check" or "--animation-review" or "--performance-run");
             fullscreen = !review && Settings.Fullscreen;
-            ApplyResolution(Launch.Size("--resolution") ?? (review ? Settings.DesignSize : Settings.Resolution));
+            ApplyResolution(Launch.Size("--resolution") ?? (introFolder != null ? WorldView.IntroSize : review ? Settings.DesignSize : Settings.Resolution));
             if (!review) Engine.MaxFps = Settings.FrameLimit;
             BuildHud();
             Settings.ApplyAntiAliasing(GetViewport(), Settings.AntiAliasing);
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
-            else if (!Launch.Has("--animation-review")) startMenu.ShowStart();
+            else if (!Launch.Has("--animation-review") && introFolder == null) startMenu.ShowStart();
+            // The game opens on the intro film, over the start menu; review runs, checks and a screenshot of the menu open without it.
+            if (!review && screenshotPath == null) PlayIntro();
             if (Launch.Has("--performance-run")) StartGame(-1);
             if (Launch.Has("--ui-test")) RunUIChecks();
             if (Launch.Has("--net-check")) RunNetCheck(Launch.Value("--net-check") == "host");
             if (Launch.Has("--server-check")) RunServerCheck();
+            if (introFolder != null) {
+                // --intro-stills saves only the frames at those seconds, such as 1.5,9.2, for a look at single moments.
+                var stills = Launch.Value("--intro-stills")?.Split(',').Select(at => float.Parse(at, System.Globalization.CultureInfo.InvariantCulture)).ToArray();
+                panel.Close(); ui.Visible = false; AudioServer.SetBusMute(0, true);
+                view.RenderIntro(introFolder, stills);
+            }
             if (Launch.Has("--animation-review")) {
                 panel.Close(); ui.Visible = false; view.AnimationReview = true;
                 if (Launch.Value("--animation-capture") is string captures) {
@@ -130,6 +142,7 @@ public partial class Game : Node, IGameFlow {
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
         RefreshLive();
     }
+    private void PlayIntro() { intro = new IntroMovie(sounds) { Name = "intro" }; ui.AddChild(intro); }
     private void Notify(string message) {
         if (message == Water.FullBottleWarning && waterWarning != null) waterWarning.Warn(message); else messages?.Post(message);
         GD.Print(message);
@@ -322,7 +335,8 @@ public partial class Game : Node, IGameFlow {
         if (ev is InputEventMouseButton mouse) player.Click(mouse, GetViewport().GuiGetHoveredControl() != null);
     }
     public override void _Process(double delta) {
-        if (world == null || view == null) return;
+        // Drawing the intro film takes no input and runs no game under it.
+        if (world == null || view == null || introFolder != null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;
         player.Update(dt); panel.ShowAwaited();
         if (session is Session.Launching launching) AwaitServer(launching);

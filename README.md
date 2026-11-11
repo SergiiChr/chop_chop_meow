@@ -73,6 +73,8 @@ Play accepts Godot arguments after `--`:
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
 | `--animation-slow 4` | Slow a capture down this many times |
+| `--render-intro /absolute/directory` | Play the intro film in place of a game and save its frames there, 30 a second, with the cue sheet of its sounds |
+| `--render-intro /absolute/directory --intro-stills 1.5,9.2` | Save only the film's frames at those seconds |
 | `--performance-run /absolute/directory` | Record a walking, day/night and staffed-settlement benchmark; summarise it with `python3 tools/performance_report.py /absolute/directory` |
 
 Other showcase flags are parsed in `src/Showcase.cs`.
@@ -84,7 +86,25 @@ These options are developer review tools; they do not represent a normal fresh-s
 ./tools/environment_review.py             # landscape views, saved in build/environment-review/
 ./tools/environment_review.py --shoreline # coast, lake edge and mine views
 ./tools/animation_review.py "player run"   # one clip from the side, front and game camera, in build/animation-review/
+./tools/intro_film.py                     # the intro film's frames and sound cue sheet, in build/intro/frames/
+./tools/intro_film.py --stills 1.5,9.2    # single frames of the film, in build/intro/stills/
 ```
+
+### Intro film
+
+The game opens with a 42-second film, `assets/intro.ogv`, played over the start menu; Esc skips it.
+It shows the hero bored at his office desk, his boss yelling at him, the bat he takes to his computer, packing at home,
+the train, the walk through the forest, the shore where he squats to touch the sea, and a cold first night by a fire
+with wolves howling.
+It is made to look like a movie on a 1990s console: small frames, 15 a second, lightly blocky from compression.
+
+The game draws the film itself, so a change to a model or a shot means making the movie again:
+
+1. `./tools/intro_film.py` draws the frames, 30 a second, and writes the cue sheet of the film's sounds beside them.
+2. A movie tool turns the frames and cue sheet into `assets/intro.ogv`: keep every second frame, shrink it to 480×270,
+   pack each as a JPEG so its blocks just show, mix the cue sheet's sounds from `assets/sounds` and `assets`, and write
+   Ogg Theora, which the game plays and blows up to the window.
+   The movie tool is not part of this project; the `intro-film` skill (`.claude/skills/intro-film`) has the commands.
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
@@ -93,7 +113,8 @@ Sources and licenses of the environment assets are in [assets/README.md](assets/
 
 ## Start menu and options
 
-The game opens on a start menu with Continue (the most recent save), New game, Load game, Join game, Options and Quit.
+The game opens with the intro film, which Esc skips, and then on a start menu with Continue (the most recent save), New
+game, Load game, Join game, Options and Quit.
 
 The pause menu also has New game and Quit; both ask first, since anything done since the last save is lost.
 
@@ -745,6 +766,8 @@ Sound credits:
 
 - Kenney ([www.kenney.nl](https://www.kenney.nl))
 - Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com))
+- kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the intro
+  film's train and office recordings ([assets/README.md](assets/README.md#intro-film))
 
 Music credits:
 

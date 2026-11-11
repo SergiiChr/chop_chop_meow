@@ -24,6 +24,8 @@ Icons and models are committed; playing does not call an image-generation servic
 - `src/SidePanel.cs` and `src/*Panel.cs`: the side panel and its pages, one node per feature.
 - `src/GameData.cs` and `src/GameTables.cs`: items, buildings, recipes, trade and time values, checked to fit together.
 - `src/Inventory.cs`: inventory rules, used by every worker job.
+- `src/intro/`: the intro film. `IntroMovie.cs` plays it when the game opens; `WorldIntro.cs`, `IntroSets.cs` and
+  `IntroPoses.cs` draw its frames (`intro-film` skill).
 - `src/Server.cs`: the headless server every game runs on.
 - `src/Net.cs`: the connection between a server and its players.
 - `tests/`: simulation checks; `src/GameChecks.cs`, `src/NetChecks.cs` and `src/ServerChecks.cs`: UI, network and real server checks.

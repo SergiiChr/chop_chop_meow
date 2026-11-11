@@ -208,7 +208,7 @@ public partial class WorldView : Node3D {
     private static readonly StringName FogPlayer = "player", FogRadius = "radius", FogMemory = "memory";
 
     private void UpdateFog() {
-        bool clearReview = AnimationReview || EnvironmentReview && !EnvironmentReviewFog;
+        bool clearReview = AnimationReview || filming || EnvironmentReview && !EnvironmentReviewFog;
         fog.SetShaderParameter(FogPlayer, World.Player);
         fog.SetShaderParameter(FogRadius, clearReview ? 1e6f : World.Data.SightRadius);
         fog.SetShaderParameter(FogMemory, new Color(.38f, .4f, .42f).Lerp(new Color(.07f, .08f, .11f), night));
@@ -427,7 +427,8 @@ public partial class WorldView : Node3D {
     // ---------- Frame update ----------
 
     public override void _Process(double delta) {
-        if (World == null) return;
+        // The film moves everything by its own clock.
+        if (World == null || filming) return;
         float dt = Paused ? 0 : CaptureStep ?? Math.Min((float)delta, .1f);
         Elapsed += dt;
         SyncCamera();
@@ -714,7 +715,7 @@ public partial class WorldView : Node3D {
             loadingProps = false;
         }
         seen.Clear();
-        if (EnvironmentReview && EnvironmentCenter.HasValue) { known.Clear(); known.AddRange(World.Things); } else World.CollectKnown(known);
+        if (filming || EnvironmentReview && EnvironmentCenter.HasValue) { known.Clear(); known.AddRange(World.Things); } else World.CollectKnown(known);
         foreach (var t in known) {
             seen.Add(t.Id);
             var prop = PropFor(t);
@@ -1002,7 +1003,8 @@ public partial class WorldView : Node3D {
     private static readonly SmokeStyle ForgeSmoke = new(.16f, new Color(.36f, .36f, .36f, .55f), .2f, 2.8f);
 
     private void Smoke(HearthProp prop, Thing t, bool active, float dt, SmokeStyle smoke) {
-        if (!active || dt <= 0) return;
+        // Seen from the ground by the film's camera, the puffs are flat discs.
+        if (!active || dt <= 0 || filming) return;
         prop.Smoke -= dt;
         if (prop.Smoke > 0) return;
         prop.Smoke = smoke.Every;
@@ -1012,6 +1014,8 @@ public partial class WorldView : Node3D {
     private readonly List<Thing> structures = new();
     /// <summary>Trees in front of the player, a worker or a structure turn see-through instead of hiding them.</summary>
     private void FadeCanopies(float dt) {
+        // The film's camera stands among the trees, where nothing needs seeing through.
+        if (filming) return;
         var bounds = GetViewport().GetVisibleRect().Grow(300);
         float ppu = PixelsPerUnit;
         structures.Clear();

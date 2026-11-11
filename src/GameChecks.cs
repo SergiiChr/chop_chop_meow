@@ -64,6 +64,20 @@ public partial class Game {
         RemoveThings(Hosted, t => placed.Contains(t) || t.Kind == ThingKind.Grave);
         await Frames();
     }
+    /// <summary>The intro film covers the start menu and takes every click and key until Esc skips it and nothing else.</summary>
+    private async Task CheckIntroFilmCoversTheStartMenuUntilEsc() {
+        ShowStart(); await Frames();
+        // The film plays when the game opens, which a check run does without: no input starts it.
+        PlayIntro(); await Frames();
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        Require(intro!.Visible && FindButton(startMenu.Screen, "New game") != null, "A click must not reach the start menu under the intro film.");
+        await KeyStroke(Key.Escape);
+        Require(!IsInstanceValid(intro), "Esc must skip the intro film and take it off the screen.");
+        Require(startMenu.Visible && FindButton(startMenu.Screen, "New game") != null, "Skipping the intro film must leave the start menu as it was.");
+        await Click(FindButton(startMenu.Screen, "Options")!);
+        Require(FindButton(startMenu.Screen, "New game") == null, "The start menu must take clicks again once the intro film is gone.");
+        await KeyStroke(Key.Escape);
+    }
     /// <summary>
     /// A new game reuses the ids of the last one, so the models the view keeps for them must be built anew:
     /// an old one would carry the last game's state, such as a felled tree faded out.
@@ -1385,6 +1399,7 @@ public partial class Game {
             await Test(CheckCrateDraggedIntoCrateStopsAtWarning);
             RemoveCheckFiles();
             await Test(CheckRestartBuildsFreshModelsForReusedIds);
+            await Test(CheckIntroFilmCoversTheStartMenuUntilEsc);
             GD.Print("UI-TEST PASS"); Quit();
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }

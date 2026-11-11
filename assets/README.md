@@ -46,7 +46,8 @@ Detail past these does not show at the game's camera distance and costs frame ti
 Models are assembled from code-built Godot meshes.
 
 - `src/WorldModels.cs` — world objects, wolf carcass and trade cart.
-- `src/ActorRig.cs` — player, worker and courier.
+- `src/ActorRig.cs` — player, worker, courier and the intro film's boss.
+- `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
 - `src/ModelKit.cs` — shared primitive, material and fade helpers.
   A material is flat colour or one of the surfaces wood, metal, stone, cloth and earth: the colour stays the model's
   own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
@@ -188,6 +189,25 @@ Variants of one sound are matched in loudness, and a numbered suffix marks them.
 `wolf_howl` (a lone wolf, the night's first howl) and `wolf_howl_group` (the pack answering) were supplied for this project.
 
 Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com)).
+
+### Intro film
+
+`intro.ogv` is the intro film the game opens with: 480×270, 15 frames a second, Ogg Theora with Vorbis sound.
+It is made from frames the game draws ([README](../README.md#intro-film)); make it again after changing a model it
+shows.
+
+`intro/` holds the sounds only the film uses, mixed into it with the game's own sounds and music; a `.gdignore` keeps
+them out of the game.
+
+- `hit.mp3`, `boss.mp3` and `bag.mp3` — the bat on the computer, the boss yelling and a bag being packed and zipped,
+  supplied for this project.
+- `train.mp3` — six seconds of "Inside old train" by kokoreli777 (Pixabay 169418).
+- `office.mp3` — thirteen seconds of "IT office 3" by thellywellyn (Pixabay 535970).
+- `office_room.mp3` — thirteen seconds of "Office ambience 01 (owi)" by freesound_community (Pixabay 57193), laid over
+  it.
+
+The train and office recordings were downloaded from Pixabay; their titles and authors are as the downloads' file names
+give them.
 
 ## Provenance
 

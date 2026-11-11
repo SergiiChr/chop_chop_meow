@@ -5,7 +5,7 @@ using static ChopChopMeow.ModelKit;
 
 namespace ChopChopMeow;
 
-public enum ActorSkin { Player, Worker, Courier }
+public enum ActorSkin { Player, Worker, Courier, Boss }
 
 /// <summary>
 /// A jointed low-poly person about 1.65 units tall, posed every frame from <see cref="ActorAnimation.PoseAt"/>.
@@ -13,6 +13,8 @@ public enum ActorSkin { Player, Worker, Courier }
 /// </summary>
 public sealed class ActorRig {
     public readonly Node3D Root = new();
+    /// <summary>How far out from the spine and up from the hips a shoulder sits, and the lengths from shoulder to elbow and elbow to fist, in metres.</summary>
+    public const float ShoulderOut = .17f, ShoulderUp = .45f, UpperArm = .28f, Forearm = .27f;
     private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
     private readonly Dictionary<string, Node3D> tools = new();
     private readonly Node3D torch;
@@ -22,12 +24,18 @@ public sealed class ActorRig {
     /// <summary>The torch flame and its light, animated by the view while the torch burns.</summary>
     public readonly Node3D Flame;
     public readonly OmniLight3D TorchLight;
+    /// <summary>The torso and head, for a film to dress and turn beyond what a <see cref="Pose"/> holds.</summary>
+    public Node3D Torso => torso;
+    public Node3D Head => head;
+    /// <summary>The player's backpack and its straps, which a film hides before the journey starts; null on other skins.</summary>
+    public Node3D? Pack { get; private set; }
 
     /// <param name="shirtColor">Tells players apart; each skin has its own otherwise.</param>
     public ActorRig(ActorSkin skin, string? shirtColor = null) {
         var (skinTone, hair, shirt, legs, boots) = skin switch {
             ActorSkin.Worker => ("c48d66", "2e2420", "e9dfc6", "3c5e94", "5c3a22"),
             ActorSkin.Courier => ("b98060", "3a2c22", "6d7378", "3b3f45", "2d2a28"),
+            ActorSkin.Boss => ("dba083", "8c8a86", "ece8dc", "2c2f36", "1d1c1c"),
             _ => ("d9a27c", "5a3b25", "2f7f86", "34465e", "6b4428"),
         };
         shirt = shirtColor ?? shirt;
@@ -40,14 +48,13 @@ public sealed class ActorRig {
         head = Pivot(torso, new Vector3(0, .56f, 0));
         Sphere(head, .12f, new Vector3(0, .13f, 0), Mat(skinTone), new Vector3(.95f, 1.05f, 1), 16);
         Sphere(head, .023f, new Vector3(0, .12f, .115f), Mat(skinTone), new Vector3(.7f, 1, 1), 8);
-        const float shoulder = .17f;
-        shoulderL = Pivot(torso, new Vector3(shoulder, .45f, 0));
-        shoulderR = Pivot(torso, new Vector3(-shoulder, .45f, 0));
+        shoulderL = Pivot(torso, new Vector3(ShoulderOut, ShoulderUp, 0));
+        shoulderR = Pivot(torso, new Vector3(-ShoulderOut, ShoulderUp, 0));
         elbowL = Arm(shoulderL, shirt, skinTone, skin == ActorSkin.Player);
         elbowR = Arm(shoulderR, shirt, skinTone, skin == ActorSkin.Player);
         switch (skin) {
             case ActorSkin.Player:
-                BuildPlayerDetails(skinTone, hair);
+                Pack = BuildPlayerDetails(skinTone, hair);
                 break;
             case ActorSkin.Worker:
                 BuildWorkerDetails(skinTone, hair, legs);
@@ -58,6 +65,9 @@ public sealed class ActorRig {
                 BuildFace(skinTone, hair);
                 Add(torso, CourierShape.Vest, CourierShape.VestMaterial, Vector3.Zero);
                 Add(head, CourierShape.Cap, CourierShape.CapMaterial, Vector3.Zero);
+                break;
+            case ActorSkin.Boss:
+                BuildBossDetails(skinTone, hair, shirt);
                 break;
         }
         crate = Pivot(torso, new Vector3(0, .37f, .33f));
@@ -72,20 +82,39 @@ public sealed class ActorRig {
     }
 
     /// <summary>Keep face cues and a simple canvas pack; silhouette and smooth transitions carry the design.</summary>
-    private void BuildPlayerDetails(string skinTone, string hair) {
+    private Node3D BuildPlayerDetails(string skinTone, string hair) {
         Sphere(head, .126f, new Vector3(0, .19f, -.025f), Mat(hair), new Vector3(1, .68f, 1.02f), 16);
         BuildFace(skinTone, hair);
+        var worn = Pivot(torso, Vector3.Zero);
         foreach (float side in new[] { -1f, 1f }) {
             // Each continuous loop is buried in the pack at both ends and wraps the shoulder and ribs.
-            ActorShape.Strap(torso, new[] {
+            ActorShape.Strap(worn, new[] {
                 new Vector3(side * .09f, .46f, -.16f), new Vector3(side * .1f, .497f, -.065f),
                 new Vector3(side * .105f, .517f, -.015f), new Vector3(side * .105f, .49f, .055f),
                 new Vector3(side * .092f, .39f, .098f), new Vector3(side * .09f, .26f, .091f),
                 new Vector3(side * .14f, .205f, .04f), new Vector3(side * .15f, .21f, -.04f),
                 new Vector3(side * .115f, .22f, -.15f) });
         }
-        var pack = Pivot(torso, new Vector3(0, .32f, -.17f));
+        var pack = Pivot(worn, new Vector3(0, .32f, -.17f));
         ActorShape.Backpack(pack);
+        return worn;
+    }
+
+    /// <summary>An office boss: a grey fringe around a bald crown, a moustache, a paunch under the shirt and a tie.</summary>
+    private void BuildBossDetails(string skinTone, string hair, string shirt) {
+        BuildFace(skinTone, hair);
+        Sphere(head, .122f, new Vector3(0, .15f, -.04f), Mat(hair), new Vector3(1.02f, .62f, .88f), 16);
+        Box(head, new Vector3(.075f, .016f, .014f), new Vector3(0, .088f, .112f), Mat(hair));
+        Sphere(torso, .15f, new Vector3(0, .23f, .045f), Cloth(shirt), new Vector3(1.05f, 1, .85f), 12);
+        Tie(torso, "8e2a2a").Position += new Vector3(0, 0, .045f);
+    }
+
+    /// <summary>A knotted tie down the front of a shirt; returned so it can be loosened or taken off.</summary>
+    public static Node3D Tie(Node3D torso, string color) {
+        var tie = Pivot(torso, Vector3.Zero);
+        Box(tie, new Vector3(.045f, .035f, .02f), new Vector3(0, .5f, .078f), Cloth(color));
+        Box(tie, new Vector3(.05f, .25f, .012f), new Vector3(0, .365f, .1f), Cloth(color), new Vector3(-5, 0, 0));
+        return tie;
     }
 
     private void BuildFace(string skinTone, string hair) {
@@ -112,8 +141,7 @@ public sealed class ActorRig {
     /// </summary>
     private (Node3D Torch, Node3D Flame, OmniLight3D Light) BuildTorch() {
         var (holder, flame, light) = Torch();
-        holder.Position = new Vector3(0, -.27f, .01f);
-        elbowL.AddChild(holder);
+        Hold(holder, right: false);
         holder.Visible = false;
         return (holder, flame, light);
     }
@@ -142,8 +170,8 @@ public sealed class ActorRig {
 
     /// <summary>Every role shares the continuous arm and its skin weights; the palette selects sleeve length.</summary>
     private Node3D Arm(Node3D shoulder, string sleeve, string skinTone, bool shortSleeve) {
-        var elbow = Pivot(shoulder, new Vector3(0, -.28f, 0));
-        limbs.Add((HumanShape.Arm(shoulder, .28f, shoulder.Position.X > 0, sleeve, skinTone, shortSleeve), elbow));
+        var elbow = Pivot(shoulder, new Vector3(0, -UpperArm, 0));
+        limbs.Add((HumanShape.Arm(shoulder, UpperArm, shoulder.Position.X > 0, sleeve, skinTone, shortSleeve), elbow));
         return elbow;
     }
 
@@ -151,11 +179,22 @@ public sealed class ActorRig {
     private void BuildTools() {
         foreach (var name in new[] { "steel_axe", "steel_pick", "wood_hammer", "steel_hammer", "protest_sign" }) {
             var tool = name == "protest_sign" ? ProtestSign() : Tool(name);
-            tool.Position = new Vector3(0, -.27f, .01f);
-            elbowR.AddChild(tool);
+            Hold(tool);
             tool.Visible = false;
             tools[name] = tool;
         }
+    }
+
+    /// <summary>
+    /// Turns an upper arm about its own length, on top of the pose just shown.
+    /// A <see cref="Pose"/> has no such turn, so an elbow folds only forward; with it a forearm can lie across the chest.
+    /// </summary>
+    public void RollArm(bool left, float degrees) => (left ? shoulderL : shoulderR).RotateObjectLocal(Vector3.Up, Mathf.DegToRad(degrees));
+
+    /// <summary>Puts something gripped at its origin into the right fist, or the left one.</summary>
+    public void Hold(Node3D item, bool right = true) {
+        item.Position = new Vector3(0, -Forearm, .01f);
+        (right ? elbowR : elbowL).AddChild(item);
     }
 
     /// <summary>A held tool gripped at the origin, handle down along -Y and blade toward -Z; the icon renderer shows it on its own.</summary>

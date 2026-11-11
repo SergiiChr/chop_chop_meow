@@ -152,6 +152,10 @@ Checks and review tools:
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
 | `src/AnimationCapture.cs` | Captures the animation review |
+| `src/intro/WorldIntro.cs` | The intro film behind `--render-intro`: its shots, film camera, lighting, fades and sound cues |
+| `src/intro/IntroSets.cs`, `src/intro/IntroPoses.cs` | The film's office, rented room and train car, and the poses nobody strikes in the game |
+| `src/intro/IntroMovie.cs` | Plays the film over the start menu when the game opens, until it ends or Esc skips it |
+| `tools/intro_film.py` | Draws the film's frames and writes its sound cue sheet |
 
 ### Simulation, view and UI
 
@@ -725,6 +729,40 @@ The yield goes into the plot's `Thing.Output`; nothing moves seed back into the 
 
 - A worker on Farm harvests.
 - A worker on Haul first moves seed from the output into the sowing inventory, then carries out the rest and fetches what the next sowing lacks.
+
+## Intro film
+
+The game opens with the film (`IntroMovie`): it plays `assets/intro.ogv` over the start menu, quiets the game's music
+and takes every key and click until it ends or Esc skips it.
+Review runs and checks open without it.
+
+The movie is made in two steps: `./tools/intro_film.py` has the game draw the frames and write the cue sheet, and a
+movie
+tool outside this project turns them into `assets/intro.ogv` (see the `intro-film` skill).
+
+- The film is a list of shots in `WorldView.IntroShots`, each a method that poses everything for a moment of its own
+  clock.
+  The clock moves one frame at a time, so frames are evenly spaced however long each takes to draw and save.
+- It reuses the game's own models: the player's rig, the pack, flask, axe and torch, the trees, the valley with its
+  trail,
+  shore and sea, and the fire pit. Walking and running go through the game's gaits.
+- New for the film: the office, the rented room and the train car (`IntroSets`), a baseball bat, the boss
+  (`ActorSkin.Boss`), and the poses in `IntroPoses`.
+- The camera is the game's own, switched to perspective and placed per shot at eye level. A dome around it draws the
+  sky,
+  since the game's sky is one flat colour that only a view from above hides.
+- Indoor shots hide the valley and light their set with the sun as a key light. Valley shots run the game's own
+  lighting,
+  wind and waves at a set time of day, with fog of war lifted, every tree shown and none faded.
+- Sounds are not played while drawing: each is written to a cue sheet (`cues.tsv`) as its moment, its name and its
+  level,
+  then settings. A game sound goes by its name in `assets/sounds`, and music or one of the film's own recordings by its
+  folder and name under `assets`, such as `intro/boss`. A cue's `from` and `length` take a part of a file, `far=1` makes
+  it distant, `rate` plays it faster or slower, and a `stop` cue fades out the music track that is playing.
+- A hand goes to a thing through `Reaching`, which bends an arm of a pose so its fist lands on a point: packing at home
+  and touching the sea use it over the game's crafting squat.
+- A pose's elbow folds only forward. `Folding` also turns the upper arm about its own length (`ActorRig.RollArm`), so a
+  forearm can lie across the chest: by the fire his arms are crossed, each palm on the other shoulder.
 
 ## Sound and music
 

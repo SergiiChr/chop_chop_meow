@@ -46,7 +46,7 @@ def main() -> None:
     parser.add_argument("base", help="commit to compare against")
     base = at_commit(parser.parse_args().base)
     now: Counter[str] = Counter()
-    for path in (ROOT / "src").glob("*.cs"):
+    for path in (ROOT / "src").rglob("*.cs"):
         now += literals(path.read_text())
     for literal in sorted(base.keys() - now.keys()):
         print(f"- {literal}")
