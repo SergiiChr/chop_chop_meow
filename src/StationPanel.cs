@@ -16,7 +16,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         // A station's own tool cups sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
         var slotted = World.SlotKinds(thing.Kind);
         if (slotted.Length > 0) ToolWindow(slotted);
-        if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
+        if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool, or of the one you carry while you work it. Someone has to work it.";
         string? openOn = opened ? null : thing.Keep != "" ? thing.Keep : thing.Recipe != "" ? thing.Recipe : null;
         opened = true;
         AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn));

@@ -235,7 +235,7 @@ Hovering a card shows what the recipe requires, how long it takes, what its prod
 | --- | --- |
 | available (green) | Slotted at the station, or carried when crafting by hand |
 | in your backpack (yellow) | The station's slot is empty and you carry the tool: you can work the recipe, a worker cannot |
-| not available (red) | Neither slotted nor carried |
+| not available (red) | Neither slotted nor carried; a tool made by hand with no tool, such as the stone chisel, says what it takes |
 
 A station's tool slots sit in a small window of their own left of its page, "Available tools", each with the tool it holds.
 
@@ -446,7 +446,7 @@ You can do both by hand from the crafting menu with a carried mortar.
 Its other recipes cook on their own:
 
 - 2 crushed berries → jam, over one wood, coal or charcoal
-- 1 water + 1 raw meat → meat stew, over one wood, coal or charcoal
+- 1 raw meat + 1 water → meat stew, over one wood, coal or charcoal
 - 1 flour + 1 water → dough, kneaded with no fire
 
 The canning station (2 steel bars, 8 planks) seals meat stew or jam into a tin can over one wood, coal or charcoal.

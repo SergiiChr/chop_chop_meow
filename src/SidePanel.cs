@@ -147,6 +147,7 @@ public partial class SidePanel : MovableWindow {
         ClearFrame();
         page = Pages[(int)name].Make(tools, Selection);
         content.AddChild(page);
+        if (!asideShown) Aside.Visible = false;
         page.Refresh(); Bag.Refresh();
     }
 
@@ -157,8 +158,9 @@ public partial class SidePanel : MovableWindow {
         HeadingTitle.Text = Pages[(int)Page].Title;
         foreach (var child in sheet.GetChildren()) { sheet.RemoveChild(child); child.QueueFree(); }
         board.Visible = false; sheet.Visible = false; sheetScroll = null; pageScroll = null;
+        // The window beside the panel stays up while a page that fills it draws again; Fit hides it once no page does.
         foreach (var child in asideContent.GetChildren()) { asideContent.RemoveChild(child); child.QueueFree(); }
-        asideShown = false; Aside.Visible = false;
+        asideShown = false;
         OffsetLeft = LeftEdge; scroll.ScrollVertical = 0;
         Bag.Clear();
     }

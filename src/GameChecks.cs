@@ -393,6 +393,7 @@ public partial class Game {
         // The page rebuilds when the queue moves on, so the card's line is looked up afresh.
         Label Lacks() => (Label)Named("craft_torch")!.FindChild("lacks", true, false);
         Require(Lacks().Visible && Lacks().Text == "No chisel" && !ShowsChild(Named("craft_torch")!, "inputs"), "A torch must name the chisel it lacks in place of its inputs.");
+        Require(PopupLabel("torch", "tool_hint") == "Make one by hand: 2 Stone", "The torch's popup must say how to come by the chisel it lacks.");
         await Click(Named("craft_stone_chisel")!);
         Require(World.Waiting(world.Crafting, "stone_chisel") + (world.Making == "stone_chisel" ? 1 : 0) == 1 && world.Backpack["stone"] == 0, "Clicking a recipe must queue it and take its materials.");
         // Hand crafting only goes on once the player has stood still a moment.
@@ -1294,8 +1295,7 @@ public partial class Game {
         var slot = panel.Aside.FindChild("tool_chisel", true, false) as ItemSlot;
         Require(panel.Aside.Visible && slot != null && HasLabel(panel.Aside, "Available tools") && HasLabel(panel.Aside, "Empty"), "A bench must show its empty tool slots in a window beside its page.");
         Require(panel.Aside.GetGlobalRect().End.X <= panel.GetGlobalRect().Position.X, "The tool window must stand left of the page.");
-        // The popup is built as Godot builds it for a hover, which shows it only after a real delay in a window of its own.
-        string ToolState() { var popup = ((ItemSlot)Named("craft_planks")!).Popup!(); AddChild(popup); string state = ((Label)popup.FindChild("tool_state", true, false)).Text; popup.QueueFree(); return state; }
+        string ToolState() => PopupLabel("planks", "tool_state");
         Label Lacks() => (Label)Named("craft_planks")!.FindChild("lacks", true, false);
         Require(ToolState() == "not available" && Lacks().Visible && Lacks().Text == "No chisel", "With no chisel anywhere a bench recipe must say so on its card and in its popup.");
         Give(Hosted, "stone_chisel", 1);
@@ -1320,10 +1320,10 @@ public partial class Game {
         Require(scrolled > 0, "The wheel must scroll the recipe list.");
         var card = panel.FindChildren("craft_*", "Button", true, false).OfType<Control>().First(c => c.Name != "craft_planks" && List().GetGlobalRect().Encloses(c.GetGlobalRect()));
         string recipe = card.Name.ToString()["craft_".Length..];
+        var before = List();
         await Click(card);
-        await Until(() => workbench.Keep == recipe, "the click marking the recipe for workers", 2);
-        await Frames(4);
-        Require(List().ScrollVertical == scrolled, "The list must stay where it was scrolled to after the page draws again.");
+        await Until(() => workbench.Keep == recipe && List() != before, "the click marking the recipe for workers and the page drawing its list again", 2);
+        await Until(() => List().ScrollVertical == scrolled, "the new list going back to where the old one was scrolled to", 2);
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
     }
     /// <summary>The crafting menu's map button opens the recipe map with every item on it once, those the settlement has had drawn as known; Escape closes it.</summary>
@@ -1353,6 +1353,9 @@ public partial class Game {
         Require(recipeMap.Chosen == "crate" && ((Label)recipeMap.FindChild("detail_name", true, false)).Text == "Wood crate" && HasLabel((Node)recipeMap.FindChild("map_details", true, false), "6 Wood planks"), "A click on the crate must show its name and the six planks it requires.");
         await Click((Control)recipeMap.NodeOf("planks")!.FindChild("cup", true, false));
         Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "10 s by hand, 5 s at the crafting bench"), "Planks must show their time by hand and at the bench.");
+        await Click((Control)recipeMap.NodeOf("tin_can")!.FindChild("cup", true, false));
+        // Ten seconds, halved by the bench and divided by the steel hammer's 1.8.
+        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "steel hammer · 2.8 s"), "Tin cans must show their time with the steel hammer they require.");
         await Click((Control)recipeMap.NodeOf("crate")!.FindChild("cup", true, false));
         await Click((Control)recipeMap.FindChild("map_show", true, false));
         await Until(() => !recipeMap.Visible && Shows(workbench) && Named("craft_crate") != null, "Show leaving the map for the bench's page with the crate on it", 2);

@@ -185,7 +185,8 @@ public partial class RecipeMap : Control {
         var data = world.Data;
         if (data.RecipeOf(item) is not RecipeDef r) return data.Sources[item].How;
         string where = MapNode.Where(data, r), tool = r.Tool == "" ? "" : $", {data.ToolName(r.Tool, r.Tier)}";
-        float byHand = r.Seconds / world.WorkRate(null, null), there = r.Seconds / world.WorkRate(r.Station, null);
+        string? plainest = r.Tool == "" ? null : data.PlainestTool(r.Tool, r.Tier);
+        float byHand = r.Seconds / world.WorkRate(null, plainest), there = r.Seconds / world.WorkRate(r.Station, plainest);
         string time = r.Hand && r.Station is ThingKind station && byHand != there ? $"{byHand:0.#} s by hand, {there:0.#} s at the {data.Name(station).ToLowerInvariant()}" : $"{there:0.#} s";
         return $"{where}{tool} · {time}";
     }
@@ -257,10 +258,12 @@ public partial class MapCup : Control {
 }
 
 /// <summary>
-/// An item on the map: its cup, its name and where it is made, with a chip on the cup's corners for the tool its recipe requires
+/// An item on the map: its cup, its name and where it is made, with a chip beside the cup for the tool its recipe requires
 /// and for each additional resource it takes.
 /// </summary>
-public partial class MapNode : Control {
+/// <param name="choose">Shows an item's details.</param>
+/// <param name="jump">Goes to another item and lights it up.</param>
+public partial class MapNode(World world, string item, Action<string> choose, Action<string> jump) : Control {
     public const float Width = 200, Height = 48;
     private const float Cup = 40, Chip = 22;
     /// <summary>Left edge of the chips, which lap over the cup's right edge.</summary>
@@ -270,25 +273,23 @@ public partial class MapNode : Control {
     public static readonly StyleBoxFlat StationBuilt = Style.Flat(Style.Beige, 12, 6, horizontal: 8), StationPlanned = Style.Flat(Colors.Transparent, 12, 6, new Color(Style.Beige, .7f), 2, 8);
     private static readonly StyleBoxFlat ChosenRing = Style.Flat(Colors.Transparent, 14, 0, Style.Mustard, 3), LitRing = Style.Flat(new Color(Style.Rim, .25f), 16, 0, Style.Rim, 4);
 
-    private readonly Label nameLabel, sourceLabel;
+    private Label nameLabel = null!, sourceLabel = null!;
     /// <summary>Where the item's words start: after the cup, or after the chips beside it.</summary>
-    private readonly float wordsStart;
+    private float wordsStart;
     private bool chosen;
     private int lit;
 
     /// <summary>Whether the settlement has had this item before.</summary>
-    public bool Known { get; }
+    public bool Known { get; } = world.Had(item);
     /// <summary>Whether the item is lit up after a jump to it.</summary>
     public bool Lit => lit > 0;
     public bool Chosen { set { chosen = value; QueueRedraw(); } }
     /// <summary>Where the item's words end, which the line to what is made out of it starts after.</summary>
     public float WordsEnd => wordsStart + Math.Max(nameLabel.GetMinimumSize().X, sourceLabel.GetMinimumSize().X);
 
-    /// <param name="choose">Shows an item's details.</param>
-    /// <param name="jump">Goes to another item and lights it up.</param>
-    public MapNode(World world, string item, Action<string> choose, Action<string> jump) {
+    public override void _Ready() {
         var data = world.Data;
-        Known = world.Had(item); Name = $"map_{item}";
+        Name = $"map_{item}";
         CustomMinimumSize = Size = new Vector2(Width, Height); MouseFilter = MouseFilterEnum.Ignore;
         var cup = new Button { Name = "cup", Position = new Vector2(0, (Height - Cup) / 2), Size = new Vector2(Cup, Cup), Icon = Icons.Of(item), ExpandIcon = true, IconAlignment = HorizontalAlignment.Center, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, TooltipText = data.Name(item) };
         Style.Skin(cup, Style.None, Style.None); cup.AddThemeConstantOverride("icon_max_width", 30);

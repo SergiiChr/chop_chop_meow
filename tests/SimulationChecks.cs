@@ -105,6 +105,7 @@ public static class SimulationChecks {
         Test(CheckBerryBushesStartAlikeAndRegrowWhateverIsPicked, data);
         Test(CheckPilesSnapTogetherHoldOneResourceAndMakeCompost, data);
         Test(CheckCookingTableCrushesBerriesAndCooksJam, data);
+        Test(CheckCookingTableGrindsWithACarriedMortar, data);
         Test(CheckCanneryAndFurnaceTakeTheirFoodRecipes, data);
         Test(CheckCrushingBerriesByHandNeedsACarriedMortar, data);
         Test(CheckWorkerWithTwoJobsTakesTurns, data);
@@ -1715,6 +1716,11 @@ public static class SimulationChecks {
         Require(world.Had("stone_chisel"), "crafting should mark the product as had");
         Achieve(world, "iron_bar");
         Require(world.Had("iron_bar"), "what the settlement's milestones say it made should count as had");
+        string save = world.Serialize();
+        var loose = world.Add(ThingKind.LooseStone, Site(2, 0), 1);
+        world.Player = loose.Pos; world.Gather(loose, Step);
+        var loaded = new World(data, false); loaded.Deserialize(save);
+        Require(world.Had("stone") && loaded.Had("tin_ore") && !loaded.Had("stone"), "a save should keep what the settlement had when it was written");
     }
 
     private static void CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf(GameData data) {
@@ -1996,6 +2002,17 @@ public static class SimulationChecks {
     }
 
     /// <summary>By hand, the mortar is carried like any other tool.</summary>
+    private static void CheckCookingTableGrindsWithACarriedMortar(GameData data) {
+        var world = EmptyWorld(data);
+        var table = world.Add(ThingKind.Cooktable, new Vector2(20, 20));
+        world.Player = table.Pos + new Vector2(1, 0);
+        Give(world, "mortar", 1); Give(world, "berries", 4);
+        world.SetRecipe(table, "crushed_berries");
+        world.LoadBatch(table);
+        SafeTick(world, data.Recipes["crushed_berries"].Seconds + 1);
+        Require(table.Inventory["crushed_berries"] == 4 && world.Backpack["mortar"] == 1, "the player should crush berries at the table with the mortar they carry");
+    }
+
     private static void CheckCrushingBerriesByHandNeedsACarriedMortar(GameData data) {
         var world = EmptyWorld(data);
         Give(world, "mortar", 1); Give(world, "berries", 4);
@@ -2139,6 +2156,7 @@ public static class SimulationChecks {
         SetNeeds(world, hunger: 30); Give(world, "canned_meat_stew", 1); world.Consume("canned_meat_stew");
         // A can of meat stew feeds 60.
         Require(world.Hunger == 90, "canned meat stew should be eaten from the can");
+        Require(world.Had("canned_meat_stew"), "what the cart brings back should count as had");
         Require(world.KnownPrice("raw_meat") > 0 && !world.Priced("wheat_seeds"), "the price sheet only tracks goods the village buys");
         Require(!data.Items.ContainsKey("canned_food") && data.Recipes.Values.All(r => !r.Inputs.ContainsKey("raw_meat") || r.Station != ThingKind.Cannery), "raw meat should sell in crates and never go into a can");
     }

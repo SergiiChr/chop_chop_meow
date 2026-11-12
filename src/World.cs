@@ -1613,7 +1613,6 @@ public sealed partial class World {
         }
     }
     /// <summary>The nearest thing of a kind, or null.</summary>
-    /// <summary>The nearest thing of a kind, or null.</summary>
     public Thing? Nearest(ThingKind kind, Vector2 origin) => Nearest(new ReadOnlySpan<ThingKind>(in kind), origin);
     /// <summary>The nearest thing of any of these kinds, or null.</summary>
     private Thing? Nearest(ReadOnlySpan<ThingKind> kinds, Vector2 origin) {

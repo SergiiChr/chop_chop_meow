@@ -205,7 +205,10 @@ public partial class RecipePopup(World world, Thing? station, RecipeDef r, float
         line.AddChild(Style.Text(world.Data.Name(shown), 14, Style.Rim));
         var state = ready != null ? Style.Text("available", 14, Style.Ready) : carried != null ? Style.Text("in your backpack", 14, Style.Held) : Style.Text("not available", 14, Style.Warn);
         state.Name = "tool_state"; line.AddChild(state);
-        if (ready == null && carried != null) { var note = Style.Text("Workers can't use it until it is slotted.", 12, Style.Beige); note.CustomMinimumSize = new Vector2(250, 0); line.AddChild(note); }
+        // A note under the line takes its whole width: who cannot use a carried tool, or how to come by a missing one that needs no tool itself.
+        string hint = ready != null ? "" : carried != null ? "Workers can't use it until it is slotted."
+            : world.Data.RecipeOf(shown) is { Hand: true, Tool: "" } making ? $"Make one by hand: {PageText.Cost(world, making.Inputs)}" : "";
+        if (hint != "") { var note = Style.Text(hint, 12, Style.Beige); note.Name = "tool_hint"; note.CustomMinimumSize = new Vector2(250, 0); line.AddChild(note); }
     }
 }
 
