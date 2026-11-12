@@ -661,6 +661,15 @@ public partial class WorldView : Node3D {
         slot.GetChild<Node3D>(1).Visible = steel;
     }
 
+    /// <summary>The sound of hands closing on a gathered thing: plants rustle and a carcass tears, while stone and water make none.</summary>
+    private static string? GrabSound(ThingKind kind) => kind switch {
+        ThingKind.Tree or ThingKind.Berries or ThingKind.Leaves or ThingKind.Farm => "rustle",
+        ThingKind.WolfCorpse => "butcher_carcass",
+        _ => null
+    };
+    // Blows hammered into mines' frames, counted so a rail clinks on every other one.
+    private int railBlows;
+
     /// <summary>Whether working on a thing hammers in a mine's frame and rails rather than digging.</summary>
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
 
@@ -672,6 +681,10 @@ public partial class WorldView : Node3D {
         if (action == ActorAction.Pump)
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
+        // Hands close on what they gather twice a loop; packing digs into the crate as each loop starts, and grinding plays one clip a loop.
+        if (action == ActorAction.Gather && GrabSound(subject.Kind) is string grab && (actor.Struck(.22f) || actor.Struck(.72f))) Sounds?.Play(grab, subject.Pos);
+        if (action == ActorAction.Pack && actor.Struck(.04f)) Sounds?.Play("rustle", subject.Pos);
+        if (action == ActorAction.Grind && actor.Struck(.03f)) Sounds?.Play("grind_mortar", subject.Pos);
         float impact = action switch {
             ActorAction.Chop or ActorAction.SteelChop => .52f,
             ActorAction.Mine or ActorAction.SteelMine => .55f,
@@ -684,13 +697,15 @@ public partial class WorldView : Node3D {
         // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips; the blow is still heard.
         bool inSight = World.Sees(subject.Pos);
         if (inSight) prop.Shake = 1;
-        // A bench knocks wood on wood, so it borrows the axe's knock.
+        // Fitting a mine's frame knocks wood like a bench, and every other blow also clinks on a rail.
         string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
             : action == ActorAction.Pump ? "bellows_pump"
             : subject.Kind == ThingKind.Anvil ? "anvil_work"
-            : subject.Kind is ThingKind.Tree or ThingKind.Bench ? "chop_tree"
+            : subject.Kind is ThingKind.Bench or ThingKind.Mine ? "bench_work"
+            : subject.Kind == ThingKind.Tree && action != ActorAction.Gather ? "chop_tree"
             : null;
         if (sound != null) Sounds?.Play(sound, subject.Pos);
+        if (subject.Kind == ThingKind.Mine && action == ActorAction.Hammer && ++railBlows % 2 == 0) Sounds?.Play("rail_clink", subject.Pos);
         if (!inSight) return;
         var impactAt = World.GatherAt(subject, actor.Position);
         var toward = (actor.Position - impactAt).Normalized();

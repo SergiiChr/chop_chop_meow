@@ -725,7 +725,8 @@ public sealed partial class World {
         if (blocked != null) { Say(blocked); return null; }
         if (Forwarded(Verb.Build, item: kind.Id(), at: p)) return null;
         S.Backpack.Spend(Data.Buildings[kind].Cost);
-        var t = Add(kind, p); if (kind == ThingKind.Campfire) { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
+        var t = Add(kind, p); Play("place_building", p);
+        if (kind == ThingKind.Campfire) { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
         S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); Made?.Invoke(S.Actor.Id, t.Id); }
         return t;
     }
@@ -747,7 +748,7 @@ public sealed partial class World {
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
         foreach (var box in Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
-        S.Things.Remove(t);
+        S.Things.Remove(t); Play("take_down_building", t.Pos);
         if (t.Kind == ThingKind.Toolstation) toolsChanged = true;
         Inventory? rest = null;
         foreach (var (item, amount) in back) {
@@ -1039,7 +1040,7 @@ public sealed partial class World {
         bool pack = PackAround >= PackSize;
         var wolf = S.Wolves.Where(w => w.Leap <= 0 && !w.Feeding).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
-            wolf.Health -= 1; wolf.Flee = FleeSeconds; KnockBack(wolf);
+            wolf.Health -= 1; wolf.Flee = FleeSeconds; KnockBack(wolf); Play("wolf_hit", wolf.Pos);
             if (wolf.Health <= 0) KillWolf(wolf);
         }
         // A wave of fire toward a wolf on its own makes it keep its distance; a pack closing in no longer cares.
@@ -1056,6 +1057,7 @@ public sealed partial class World {
         Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
     }
     private void PutOutTorch() {
+        if (S.TorchLit) Play("torch_out", Player);
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
         foreach (var w in Hunters) w.Scared = false;
     }
@@ -1069,7 +1071,7 @@ public sealed partial class World {
         PlayerActed?.Invoke(action, target); Play("tool_air_swing", Player);
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
             wolf.Health -= axe == null ? .5f : 1.5f * Speed(axe);
-            KnockBack(wolf);
+            KnockBack(wolf); Play("wolf_hit", wolf.Pos);
             if (wolf.Health <= 0) KillWolf(wolf);
         }
     }
@@ -1231,6 +1233,7 @@ public sealed partial class World {
         if (Forwarded(Verb.Buy, sign.Id, item: item, count: lots)) return false;
         int price = LotPrice(item) * lots, units = Lot(item) * lots;
         if (!Pay(price)) { Say("Not enough coins in your backpack."); return false; }
+        Play("buy_coins", sign.Pos);
         S.Orders.Add(new TradeOrder { Goods = new() { [item] = units }, Buying = true, Value = price, Signpost = sign.Id, Crates = Lot(item) > 1 ? lots : 0 });
         Say($"Ordered {(Lot(item) > 1 ? $"{lots} {(lots == 1 ? "crate" : "crates")} of " : "")}{units} {Data.Name(item)} for {price} coins. Back in {Data.TradeSeconds:0} seconds."); return true;
     }
@@ -1422,7 +1425,7 @@ public sealed partial class World {
         if (!PayWage(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from the bank or your backpack."); return null; }
         string name = WorkerNames.FirstOrDefault(n => S.Workers.All(w => w.Name != n)) ?? "Neighbor";
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
-        S.Workers.Add(w); S.Milestones.Add("hired"); Say($"New worker {name} is ready for a task."); Made?.Invoke(S.Actor.Id, w.Id); return w;
+        S.Workers.Add(w); S.Milestones.Add("hired"); Play("hire_sign", sign.Pos); Say($"New worker {name} is ready for a task."); Made?.Invoke(S.Actor.Id, w.Id); return w;
     }
     /// <summary>The jobs a place offers workers, in the order the panel shows them.</summary>
     public string[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {

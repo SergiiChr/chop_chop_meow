@@ -175,12 +175,20 @@ Credits: Alexandr Zhelanov ([soundcloud.com/alexandr-zhelanov](https://soundclou
 `sounds/` holds the sound effects as 320 kbps MP3, converted from the supplied files and peak-normalised.
 Variants of one sound are matched in loudness, and a numbered suffix marks them.
 
-`mine_ore` and `bellows_pump` were made with ffmpeg:
+These were made with ffmpeg from Kenney's sounds:
 
-- A pickaxe strike is an anvil clink pitched down over the rock footstep and a low axe knock.
-- A bellows pump is shaped brown noise over a soft, muffled fire catch.
+- `mine_ore`: a pickaxe strike is an anvil clink pitched down over the rock footstep and a low axe knock.
+- `bellows_pump`: shaped brown noise over a soft, muffled fire catch.
+- `start_fire`: a thruster burst pitched down and muffled into a soft whoomp.
+- `torch_out`: the same burst, lower and darker, fading out over most of a second.
+- `bench_work`: the axe knock, and two lower thumps made from it, one over a heavy wooden knock.
+- `take_down_building`: four plank drops a fraction of a second apart, each quieter than the last.
+- `grind_mortar`: snow footstep grains for the pestle's two rounds and a light tap as it comes down, one 1.8 second loop.
+- `rustle`: cloth handling, for packing crates and for picking plants by hand.
 
-`wolf_howl` (a lone wolf, the night's first howl) and `wolf_howl_group` (the pack answering) were supplied for this project.
+`wolf_hit`, `place_building`, `butcher_carcass`, `rail_clink` and `buy_coins` are Kenney's punch and wood impacts, knife cuts, metal clinks and coins as they are.
+
+`wolf_howl` (a lone wolf, the night's first howl), `wolf_howl_group` (the pack answering) and `hire_sign` (a pen signing paper, cleaned of rumble and room noise) were supplied for this project.
 
 Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com)).
 
