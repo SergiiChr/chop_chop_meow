@@ -354,7 +354,7 @@ public partial class Game {
         await Click(Slots().First(c => c.TooltipText.StartsWith("Berries ·")));
         Require(packer.Inventory["berries"] == 1, "Clicking berries in the backpack must load one into the packing station.");
         packer.Inventory.Add("crate", 1);
-        await Until(() => view.PlayerAnimation == ActorAction.Pack, "the idle player packing at the station beside it", 3);
+        await Until(() => view.PlayerAnimation == ActorAction.Pack && sounds.Last == "rustle", "the idle player packing at the station beside it, rustling through the goods", 4);
         RemoveThings(Hosted, t => t == packer); Drop(Hosted, "berries"); await CloseWithEsc();
     }
     /// <summary>Marks a mine on every ore through the build plan and a ground click, then checks its stages and the end goals in the pause menu.</summary>
@@ -963,12 +963,20 @@ public partial class Game {
         await Frames();
         RemoveThings(Hosted, t => t == farm || t == anvil); Warp(Hosted, start);
     }
+    /// <summary>A player standing idle beside a bench that is making a crate hammers it with the bench's own knock.</summary>
+    private async Task CheckIdlePlayerBesideABenchKnocksWithItsHammer() {
+        // The server's position, since the window's copy may not have caught up with the last check's warp.
+        var bench = Hosted.Add(ThingKind.Bench, Hosted.Player + new Vector2(1.2f, 0));
+        bench.Tools!.Add("wood_hammer", 1); Hosted.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 6);
+        await Until(() => bench.Processing && view.PlayerAnimation == ActorAction.Hammer && sounds.Last == "bench_work", "the idle player hammering at the bench beside it with its knock", 4);
+        RemoveThings(Hosted, t => t == bench);
+    }
     /// <summary>A player standing idle beside a cooking table that is crushing berries grinds with its mortar, which leaves the counter for their hands.</summary>
     private async Task CheckIdlePlayerBesideACookingTableGrindsWithItsMortar() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
         var table = Hosted.Add(ThingKind.Cooktable, Hosted.Player + new Vector2(1.2f, 0));
         table.Tools!.Add("mortar", 1); Hosted.SetRecipe(table, "crushed_berries"); table.Inventory.Add("berries", 8);
-        await Until(() => table.Processing && view.PlayerAnimation == ActorAction.Grind, "the idle player grinding at the cooking table beside it", 3);
+        await Until(() => table.Processing && view.PlayerAnimation == ActorAction.Grind && sounds.Last == "grind_mortar", "the idle player grinding at the cooking table beside it, with the pestle heard", 4);
         Require(view.PropOf(table.Id) is StoveProp { Mortar.Visible: false }, "The mortar must be off the counter while the player grinds with it.");
         RemoveThings(Hosted, t => t == table);
     }
@@ -1504,8 +1512,14 @@ public partial class Game {
         // Space would pump the furnace clicked last.
         RemoveThings(Hosted, t => t.Kind == ThingKind.Reinforced);
         Drop(Hosted, "steel_axe");
+        // By day wolves are calmed and sent home at once, which would clear the blow before the window shows it.
+        float health = world.Health; RunUntilNight(Hosted);
+        var wolf = PlaceWolf(Hosted, new Wolf { Pos = Hosted.Player + Vector2.Right * 1.2f, Health = 5 });
         await KeyStroke(Key.Space);
         Require(view.PlayerAnimation == ActorAction.Attack, "Space without an axe must trigger the dedicated unarmed attack.");
+        Require(sounds.Last == "tool_air_swing", "A punch must whoosh before it lands.");
+        await Until(() => sounds.Last == "wolf_hit", "the punch thudding as it lands on the wolf", 2);
+        RemoveWolves(Hosted, w => w == wolf); RunUntilMorning(Hosted); SetNeeds(Hosted, health: health);
         await Until(() => view.PlayerAnimation != ActorAction.Attack, "the unarmed attack finishing", 3);
         var gatheringPosition = Terrain.Spawn - new Vector2(30, 30);
         // Full-size tree crowns reach several tiles up the screen, so clear enough room for a clean click.
@@ -1538,6 +1552,7 @@ public partial class Game {
         Require(view.Pick(point)?.Id == berryBush.Id, "The bush foliage must select its berry resource.");
         var windowPoint = GetViewport().GetFinalTransform() * point;
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = true });
+        await Until(() => sounds.Last == "rustle", "picking a berry bush by hand rustling its leaves", 3);
         await Until(() => berryBush.Remaining == 0, "holding RMB on a berry bush picking it clean", world.Data.GatherSeconds + 3);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = windowPoint, GlobalPosition = windowPoint, Pressed = false });
         await Frames(2);
@@ -1572,6 +1587,7 @@ public partial class Game {
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
+            await Test(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckMinePageFollowsTheMineThroughItsStages);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);

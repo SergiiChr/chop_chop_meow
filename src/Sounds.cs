@@ -23,9 +23,16 @@ public partial class Sounds : Node {
         ["footsteps_rocks"] = -17,
         ["footsteps_water"] = -15,
         ["chop_tree"] = -7.5f,
+        ["bench_work"] = -3.5f,
+        ["rail_clink"] = -13,
         ["anvil_work"] = -2,
         ["mine_ore"] = -8,
         ["bellows_pump"] = -14,
+        ["grind_mortar"] = -10,
+        ["rustle"] = -7,
+        ["butcher_carcass"] = -6.5f,
+        ["place_building"] = -6.5f,
+        ["take_down_building"] = -4.5f,
         ["tool_air_swing"] = -11,
         ["open_chest"] = -11,
         ["close_chest"] = -13,
@@ -40,13 +47,17 @@ public partial class Sounds : Node {
         ["putting_items_on_hotbar"] = -3,
         ["eat_berry"] = -7.5f,
         ["gather_water"] = -10,
-        ["start_fire"] = -9,
+        ["start_fire"] = -8,
+        ["torch_out"] = -16,
+        ["buy_coins"] = -2,
+        ["hire_sign"] = -7,
         ["payment_from_village_arrives"] = -6,
         ["wolf_growl_distance"] = -11,
         ["wolf_howl"] = -11,
         ["wolf_howl_group"] = -11,
         ["wolf_growl_approaching"] = -3,
         ["wolf_bite"] = -3,
+        ["wolf_hit"] = -5.5f,
     };
     private const float MusicDb = -14;
     public const float MusicFadeSeconds = 4;
@@ -116,6 +127,8 @@ public partial class Sounds : Node {
 
     // A howl carries across the valley: it fades with distance from the player, on screen too, and falls silent where wolves stop hearing it.
     private static bool Carries(string name) => name is "wolf_howl" or "wolf_howl_group";
+    // A howl keeps its pitch, so it lasts exactly as long as the wolf holds its howl, and the mortar's, so its tap lands as the pestle comes down.
+    private static bool KeepsPitch(string name) => Carries(name) || name == "grind_mortar";
     /// <summary>The volume scale of the last sound started, from one at full volume.</summary>
     public float LastFade { get; private set; }
     /// <summary>Seconds the longest variant of a sound plays.</summary>
@@ -135,8 +148,7 @@ public partial class Sounds : Node {
         int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
         if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
         previous[name] = pick;
-        // A howl keeps its pitch, so it lasts exactly as long as the wolf holds its howl.
-        float pitch = Carries(name) ? 1 : 1 + (float)(random.NextDouble() * .12 - .06);
+        float pitch = KeepsPitch(name) ? 1 : 1 + (float)(random.NextDouble() * .12 - .06);
         float volume = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
         if (at is Vector2 place) {
             var placed = FreeVoice(placedVoices, ref nextPlacedVoice, static voice => voice.Playing);

@@ -113,7 +113,7 @@ public static class MineChecks {
         Give(world, "steel_pick", 1);
         for (float held = 0; held <= world.MineStageSeconds && mine.MineStage == MineStage.Marked; held++) world.Gather(mine, 1);
         Require(mine.MineStage == MineStage.Dug, "a player holding right mouse on a marked mine with a pickaxe should dig its entrance in a working day");
-        foreach (var (item, amount) in data.Mine.Materials) Give(world, item, amount);
+        Give(world, data.Mine.Materials);
         world.SupplyMine(mine); world.Tick(.1f);
         Require(mine.MineStage == MineStage.Supplied, "the delivered materials should shore the mine up");
         world.Gather(mine, 1);

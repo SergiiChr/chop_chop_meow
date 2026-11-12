@@ -743,7 +743,8 @@ public sealed partial class World {
         if (blocked != null) { Say(blocked); return null; }
         if (Forwarded(Verb.Build, item: kind.Id(), at: p)) return null;
         S.Backpack.Spend(Data.Buildings[kind].Cost);
-        var t = Add(kind, p); if (kind == ThingKind.Campfire) { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
+        var t = Add(kind, p); Play("place_building", p);
+        if (kind == ThingKind.Campfire) { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
         S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); Made?.Invoke(S.Actor.Id, t.Id); }
         return t;
     }
@@ -765,7 +766,7 @@ public sealed partial class World {
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
         foreach (var box in Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
-        S.Things.Remove(t);
+        S.Things.Remove(t); Play("take_down_building", t.Pos);
         if (t.Kind == ThingKind.Toolstation) toolsChanged = true;
         Inventory? rest = null;
         foreach (var (item, amount) in back) {
@@ -1071,8 +1072,7 @@ public sealed partial class World {
         bool pack = PackAround >= PackSize;
         var wolf = S.Wolves.Where(w => w.Leap <= 0 && !w.Feeding).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
-            wolf.Health -= 1; wolf.Flee = FleeSeconds; KnockBack(wolf);
-            if (wolf.Health <= 0) KillWolf(wolf);
+            wolf.Flee = FleeSeconds; Strike(wolf, 1);
         }
         // A wave of fire toward a wolf on its own makes it keep its distance; a pack closing in no longer cares.
         if (!pack)
@@ -1081,6 +1081,11 @@ public sealed partial class World {
     public const float StaggerSeconds = .45f;
     /// <summary>How far a blow throws a wolf back: a short hop, which the view plays as the wolf jumping clear.</summary>
     public const float KnockBackDistance = .5f;
+    /// <summary>A blow landing on a wolf: it takes the damage and is thrown back, and falls once its health is gone.</summary>
+    private void Strike(Wolf wolf, float damage) {
+        wolf.Health -= damage; KnockBack(wolf);
+        if (wolf.Health <= 0) KillWolf(wolf);
+    }
     private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; }
     /// <summary>Leaves a carcass where a struck wolf fell.</summary>
     private void KillWolf(Wolf wolf) {
@@ -1088,6 +1093,7 @@ public sealed partial class World {
         Say("The wolf falls. Butcher the carcass for meat and cook it in a furnace.");
     }
     private void PutOutTorch() {
+        if (S.TorchLit) Play("torch_out", Player);
         S.TorchLit = false; S.TorchKindling = 0; torchSwings.Clear();
         foreach (var w in Hunters) w.Scared = false;
     }
@@ -1100,9 +1106,7 @@ public sealed partial class World {
         Vector2 target = wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f ? wolf.Pos : Player;
         PlayerActed?.Invoke(action, target); Play("tool_air_swing", Player);
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
-            wolf.Health -= axe == null ? .5f : 1.5f * Speed(axe);
-            KnockBack(wolf);
-            if (wolf.Health <= 0) KillWolf(wolf);
+            Strike(wolf, axe == null ? .5f : 1.5f * Speed(axe));
         }
     }
     public void Die() {
@@ -1263,6 +1267,7 @@ public sealed partial class World {
         if (Forwarded(Verb.Buy, sign.Id, item: item, count: lots)) return false;
         int price = LotPrice(item) * lots, units = Lot(item) * lots;
         if (!Pay(price)) { Say("Not enough coins in your backpack."); return false; }
+        Play("buy_coins", sign.Pos);
         S.Orders.Add(new TradeOrder { Goods = new() { [item] = units }, Buying = true, Value = price, Signpost = sign.Id, Crates = Lot(item) > 1 ? lots : 0 });
         Say($"Ordered {(Lot(item) > 1 ? $"{lots} {(lots == 1 ? "crate" : "crates")} of " : "")}{units} {Data.Name(item)} for {price} coins. Back in {Data.TradeSeconds:0} seconds."); return true;
     }
@@ -1454,7 +1459,7 @@ public sealed partial class World {
         if (!PayWage(offer.Upfront)) { Say($"This offer needs {offer.Upfront:0} coins up front from the bank or your backpack."); return null; }
         string name = WorkerNames.FirstOrDefault(n => S.Workers.All(w => w.Name != n)) ?? "Neighbor";
         var w = new Worker { Id = S.NextId++, Name = name, Pos = sign.Pos + new Vector2(1, 0), Wage = offer.Wage };
-        S.Workers.Add(w); S.Milestones.Add("hired"); Say($"New worker {name} is ready for a task."); Made?.Invoke(S.Actor.Id, w.Id); return w;
+        S.Workers.Add(w); S.Milestones.Add("hired"); Play("hire_sign", sign.Pos); Say($"New worker {name} is ready for a task."); Made?.Invoke(S.Actor.Id, w.Id); return w;
     }
     /// <summary>The jobs a place offers workers, in the order the panel shows them.</summary>
     public string[] Jobs(Thing t) => t.IsResource ? GatherJobs : t.Kind switch {

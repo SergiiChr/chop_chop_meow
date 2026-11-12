@@ -661,6 +661,13 @@ public partial class WorldView : Node3D {
         slot.GetChild<Node3D>(1).Visible = steel;
     }
 
+    /// <summary>The sound of hands closing on a gathered thing: plants rustle and a carcass tears, while stone and water make none.</summary>
+    private static string? GrabSound(ThingKind kind) => kind switch {
+        ThingKind.Tree or ThingKind.Berries or ThingKind.Leaves or ThingKind.Farm => "rustle",
+        ThingKind.WolfCorpse => "butcher_carcass",
+        _ => null
+    };
+
     /// <summary>Whether working on a thing hammers in a mine's frame and rails rather than digging.</summary>
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
 
@@ -672,6 +679,14 @@ public partial class WorldView : Node3D {
         if (action == ActorAction.Pump)
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
+        // Hands close on what they gather twice a loop; packing digs into the heap of goods as each loop starts, and grinding plays one clip a loop.
+        string? handSound = action switch {
+            ActorAction.Gather when actor.Struck(.22f) || actor.Struck(.72f) => GrabSound(subject.Kind),
+            ActorAction.Pack when actor.Struck(.04f) => "rustle",
+            ActorAction.Grind when actor.Struck(.03f) => "grind_mortar",
+            _ => null
+        };
+        if (handSound != null) Sounds?.Play(handSound, subject.Pos);
         float impact = action switch {
             ActorAction.Chop or ActorAction.SteelChop => .52f,
             ActorAction.Mine or ActorAction.SteelMine => .55f,
@@ -684,13 +699,15 @@ public partial class WorldView : Node3D {
         // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips; the blow is still heard.
         bool inSight = World.Sees(subject.Pos);
         if (inSight) prop.Shake = 1;
-        // A bench knocks wood on wood, so it borrows the axe's knock.
+        // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.
         string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
             : action == ActorAction.Pump ? "bellows_pump"
             : subject.Kind == ThingKind.Anvil ? "anvil_work"
-            : subject.Kind is ThingKind.Tree or ThingKind.Bench ? "chop_tree"
+            : subject.Kind is ThingKind.Bench or ThingKind.Mine ? "bench_work"
+            : subject.Kind == ThingKind.Tree && action != ActorAction.Gather ? "chop_tree"
             : null;
         if (sound != null) Sounds?.Play(sound, subject.Pos);
+        if (action == ActorAction.Hammer && Fitting(subject) && (int)(actor.Time / ActorAnimation.Duration(action)) % 2 == 1) Sounds?.Play("rail_clink", subject.Pos);
         if (!inSight) return;
         var impactAt = World.GatherAt(subject, actor.Position);
         var toward = (actor.Position - impactAt).Normalized();
@@ -865,6 +882,8 @@ public partial class WorldView : Node3D {
             case CarcassProp carcass:
                 // Thrown, the carcass covers the knockback while it is in the air and stays where it lands.
                 float since = t.Progress - carcass.HitIn, dying = Math.Clamp(since / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
+                // The killing blow thuds as it lands, heard only where the player saw the wolf fall.
+                if (!carcass.Landed && since >= 0) { carcass.Landed = true; if (watched) Sounds?.Play("wolf_hit", t.Pos); }
                 carcass.Body.Position = carcass.From * (1 - thrown * (2 - thrown));
                 carcass.Wolf.Fall(dying);
                 // Butchering flattens the carcass while the blood pool spreads out from under it.
@@ -1124,7 +1143,7 @@ public partial class WorldView : Node3D {
                 var at = model.HitFrom.Lerp(strike, Ease(1 - model.HitIn / Math.Max(model.HitSeconds, .001f)));
                 back = -(at - wolf.Pos - model.Knock).Length();
                 model.Knock = at - wolf.Pos;
-                if (model.HitIn == 0) { model.Recoiling = WolfModel.RecoilSeconds; model.KnockFrom = model.Knock; FurAndEmbers(To3(at, .6f)); }
+                if (model.HitIn == 0) { model.Recoiling = WolfModel.RecoilSeconds; model.KnockFrom = model.Knock; FurAndEmbers(To3(at, .6f)); Sounds?.Play("wolf_hit", at); }
             } else if (model.Recoiling > 0) {
                 // The wolf goes back only while it is in the air, so its paws never slide.
                 model.Recoiling = Math.Max(0, model.Recoiling - dt);

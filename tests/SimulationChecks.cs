@@ -26,6 +26,8 @@ public static class SimulationChecks {
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
         Test(CheckDismantlingABuildingReturnsItsCostAndContents, data);
+        Test(CheckBuildingsKnockIntoPlaceAndClatterDown, data);
+        Test(CheckBuyingJinglesCoinsAndHiringSigns, data);
         Test(CheckDismantlingWhatDoesNotFitLeavesItInABox, data);
         Test(CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest, data);
         Test(CheckWorkerGathersWoodAndRetargetsWhenFilterChanges, data);
@@ -254,6 +256,32 @@ public static class SimulationChecks {
         world.Player = cabin.Pos + new Vector2(2, 0);
         Require(world.Enter(cabin), "the player should step into the cabin");
         Require(!world.Dismantle(cabin) && world.Find(cabin.Id) != null, "a cabin someone shelters in should not come down");
+    }
+
+    private static void CheckBuildingsKnockIntoPlaceAndClatterDown(GameData data) {
+        var world = EmptyWorld(data);
+        var heard = Listen(world);
+        Give(world, data.Buildings[ThingKind.Chest].Cost);
+        var chest = BuildAt(world, ThingKind.Chest, new Vector2(22, 20));
+        Require(heard.SequenceEqual(new[] { "place_building" }), "a building should knock into place as it goes up");
+        Give(world, data.Buildings[ThingKind.Campfire].Cost);
+        heard.Clear(); BuildAt(world, ThingKind.Campfire, new Vector2(17, 23));
+        Require(heard.SequenceEqual(new[] { "place_building", "start_fire" }), "a campfire should knock into place and catch fire");
+        world.Player = new Vector2(20, 20);
+        heard.Clear(); world.Dismantle(chest);
+        Require(heard.SequenceEqual(new[] { "take_down_building" }), "a building taken down should clatter apart");
+    }
+
+    private static void CheckBuyingJinglesCoinsAndHiringSigns(GameData data) {
+        var world = EmptyWorld(data);
+        var heard = Listen(world);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(20, 16));
+        world.Player = sign.Pos;
+        SetCoins(world, 100);
+        heard.Clear(); world.Buy(sign, "water", 1);
+        Require(heard.SequenceEqual(new[] { "buy_coins" }), "a buy order should jingle the coins paid");
+        heard.Clear(); world.Hire(sign, data.HireOffers[0]);
+        Require(heard.SequenceEqual(new[] { "hire_sign" }), "hiring a worker should sign them on");
     }
 
     private static void CheckDismantlingWhatDoesNotFitLeavesItInABox(GameData data) {
@@ -1590,9 +1618,11 @@ public static class SimulationChecks {
         SafeTick(world, World.WildWindow);
         string said = "";
         world.Notify += message => said = message;
+        var heard = Listen(world);
         for (int i = 0; i < World.WildSwings; i++) { world.UseTorch(Vector2.Right); SafeTick(world, .65f); }
         float left = world.Torch;
         Require(!world.TorchLit && said == "Torch went off due to wild swinging.", "wild swinging should put the torch out with a message");
+        Require(heard.Count(name => name == "torch_out") == 1, "a torch going out should fizzle once");
         SafeTick(world, 5);
         Require(world.Torch == left, "an unlit torch should keep its burn time");
         world.UseTorch(Vector2.Zero); SafeTick(world, World.KindleSeconds + .1f);
@@ -1603,11 +1633,18 @@ public static class SimulationChecks {
         SafeTick(world, world.Torch + .25f);
         Require(world.Torch == 0, "a torch should burn out completely");
         Require(!world.TorchLit, "a burnt out torch should not stay lit");
+        Require(heard.Count(name => name == "torch_out") == 2, "a torch burning out should fizzle");
         Require(world.Backpack["torch"] == 1, "a burnt out torch should leave the spare torch in the backpack");
-        world.UseTorch(Vector2.Zero); world.Die();
+        Give(world, "torch", 1); world.UseTorch(Vector2.Zero); SafeTick(world, World.KindleSeconds + .1f);
+        Require(world.TorchLit, "a fresh torch should light");
+        world.Die();
+        Require(heard.Count(name => name == "torch_out") == 3, "a lit torch should fizzle out when the player falls");
+        SafeTick(world, data.RespawnSeconds + .1f);
+        Give(world, "torch", 1); world.UseTorch(Vector2.Zero); world.Die();
         Require(world.Torch == 0, "a torch should burn out when the player falls");
         Require(!world.TorchLit, "a torch should not stay lit when the player falls");
         Require(world.TorchKindling == 0, "a torch should stop kindling when the player falls");
+        Require(heard.Count(name => name == "torch_out") == 3, "a torch still being lit when the player falls should not fizzle");
     }
 
     private static void CheckTorchSwingScaresOnlyWolvesItIsAimedAt(GameData data) {
@@ -2433,7 +2470,7 @@ public static class SimulationChecks {
         var smeller = new Wolf { Pos = world.Player + Terrain.Seaward * (data.SmellRadius - 5) };
         var called = new Wolf { Pos = smeller.Pos + Terrain.Seaward * (data.HowlRadius - 10) };
         var deaf = new Wolf { Pos = smeller.Pos - Terrain.Seaward * (data.HowlRadius + 10) };
-        var heard = new List<string>(); world.Sound = (name, _) => heard.Add(name);
+        var heard = Listen(world);
         foreach (var wolf in new[] { smeller, called, deaf }) PatrolWolf(world, wolf);
         SafeTick(world, .1f);
         Require(smeller.Target == world.Me.Id && smeller.Howl > 0, "a wolf within smell of the player should howl and take them as its prey");

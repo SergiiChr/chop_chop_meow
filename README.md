@@ -800,10 +800,13 @@ Animations pause with gameplay.
 Sound effects follow the same actions:
 
 - footsteps change on grass, rock and the lake shore;
-- axes, pickaxes, anvils and swings have impacts;
+- axes, pickaxes, anvils, benches and swings have impacts, and fitting a mine's frame clinks on its rails;
+- picking plants by hand and packing crates rustle, butchering tears, and a mortar grinds;
 - bellows puff;
-- fires crackle as they catch, including a furnace lighting a new batch;
-- wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, and bite.
+- fires catch with a whoomp, including a lit torch and a furnace lighting a new batch, and a torch fizzles out;
+- a building knocks into place, and one taken down clatters apart;
+- buying jingles coins, and hiring signs the worker on;
+- wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, bite, and thud when struck.
 
 Repeated sounds rotate between variants.
 Sounds on screen play at full volume and fade out just past its edge, so zooming out lets you hear further.
