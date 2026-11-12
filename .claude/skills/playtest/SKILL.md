@@ -55,9 +55,8 @@ Look at every screenshot before deciding the next step.
   step, and prefer clicking the Resume or Back button.
 - `shot` lines in a row without a `wait` between them all capture the same frame: put `wait 0.05` between them for a
   sequence of a motion.
-- If the game no longer answers `quit`, stop it by PID from `pgrep -a ChopChopMeow`, the exported game's name.
-  `pkill -f` and `pgrep -f` match the calling shell's own command line: `pkill -f` kills that shell, and a wait loop
-  on `pgrep -f` never ends.
+- If the game no longer answers `quit`, stop it by PID from `pgrep -a ChopChopMeow`, never with `pkill -f`
+  (AGENTS.md, Checks).
 - A showcase switches panels and pages on its own, so a click there can land on a different page than the last
   screenshot showed. Take a `shot` right before clicking, or play a normal game for input checks.
 - A playtest game left running holds the game's network port, and `./build.py check` or `test net` then fails or
