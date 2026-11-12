@@ -331,7 +331,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
 
     /// <summary>A round chip beside the cup that goes to the item it pictures.</summary>
     private Button ChipFor(GameData data, string other, string kind, StyleBoxFlat look, float top, int across, string role, Action<string> jump) {
-        var chip = new Button { Name = $"{kind}_{other}", Position = new Vector2(ChipsLeft + across * (Chip + 2), top), Size = new Vector2(Chip, Chip), Icon = Icons.Of(other), ExpandIcon = true, IconAlignment = HorizontalAlignment.Center, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, TooltipText = $"{role}: {data.Name(other)}\nClick to go to it" };
+        var chip = new Button { Name = $"{kind}_{other}", Position = new Vector2(ChipsLeft + across * (Chip + 2), top), Size = new Vector2(Chip, Chip), Icon = Icons.Of(other), ExpandIcon = true, IconAlignment = HorizontalAlignment.Center, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, TooltipText = $"{role}: {data.Name(other)}\nClick to view" };
         Style.Skin(chip, look, look); chip.AddThemeConstantOverride("icon_max_width", 14);
         chip.Pressed += () => jump(other);
         return chip;
