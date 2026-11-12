@@ -13,6 +13,8 @@ public partial class IconRender : Node {
     public GameData Data = null!;
     public string Folder = "";
     private const float GamePitch = 30;
+    /// <summary>How much of a tool's length its icon shows, measured from the head.</summary>
+    private const float HeadShare = .58f;
     private readonly SubViewport viewport = new() { Size = new Vector2I(Size, Size), TransparentBg = true, OwnWorld3D = true, Msaa3D = Viewport.Msaa.Msaa8X, RenderTargetUpdateMode = SubViewport.UpdateMode.Always };
     // Icons show the models alone, without ground marks.
     private readonly Camera3D camera = new() { Projection = Camera3D.ProjectionType.Orthogonal, Near = .1f, Far = 100, Current = true, CullMask = 0xFFFFF & ~WorldModels.MarkLayer };
@@ -65,7 +67,7 @@ public partial class IconRender : Node {
         _ => Basis.Identity,
     };
 
-    /// <summary>Looks at tools from the side and at everything else from the game camera's angle, lit the way the game lights it, and fits the model.</summary>
+    /// <summary>Looks at tools from the side and at everything else from the game camera's angle, lit the way the game lights it, and fits the model, or for a tool its head end.</summary>
     private void Frame(Node3D holder, string id) {
         bool tool = id is "steel_axe" or "steel_pick" or "rake" or "torch" or "wood_hammer" or "steel_hammer" or "stone_chisel" or "steel_chisel";
         // Fallen leaves lie flat, so they are seen from higher up.
@@ -77,6 +79,8 @@ public partial class IconRender : Node {
         sun.Basis = Basis.LookingAt(camera.Basis * light, Vector3.Up);
         var (min, max) = (new Vector3(float.MaxValue, float.MaxValue, float.MaxValue), new Vector3(float.MinValue, float.MinValue, float.MinValue));
         Bounds(holder, Transform3D.Identity, camera.Basis.Inverse(), ref min, ref max);
+        // The head tells one tool from another, and at icon size a whole handle leaves it a few pixels: the icon shows the head end, up and to the right.
+        if (tool) { float shown = Math.Max(max.X - min.X, max.Y - min.Y) * HeadShare; min = new Vector3(max.X - shown, max.Y - shown, min.Z); }
         var center = camera.Basis * ((min + max) / 2);
         camera.Size = Math.Max(max.X - min.X, max.Y - min.Y) * 1.08f;
         camera.Position = center + back * 40;

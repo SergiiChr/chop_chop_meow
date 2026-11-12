@@ -15,13 +15,16 @@ internal static class PileShape {
 
     private static readonly Dictionary<string, Mesh> contents = new();
 
-    private static readonly string[] families = { "logs", "stone", "ore", "coal", "planks", "parts", "bars", "fallback" };
+    private static readonly string[] families = { "logs", "stone", "ore", "coal", "charcoal", "planks", "parts", "bars", "fallback" };
+    /// <summary>The box every stock shape is fitted to in a pile slot.</summary>
+    private static readonly Vector3 SlotSize = new(.72f, .4f, .72f);
 
     private static string Family(string item) => item switch {
         "wood" => "logs",
         "stone" => "stone",
         "iron_ore" or "tin_ore" => "ore",
-        "coal" or "charcoal" => "coal",
+        "coal" => "coal",
+        "charcoal" => "charcoal",
         "planks" => "planks",
         "wood_parts" => "parts",
         "iron_bar" or "steel_bar" or "tin_bar" => "bars",
@@ -31,6 +34,7 @@ internal static class PileShape {
     private static StandardMaterial3D Material(string family, string color) => family switch {
         "bars" => ModelKit.Metal(color, .45f, .5f),
         "coal" => ModelKit.Stone("292c30"),
+        "charcoal" => CharcoalShape.Material,
         "stone" or "ore" => ModelKit.Stone(color),
         "logs" or "planks" or "parts" => ModelKit.Wood(color, .95f),
         _ => ModelKit.Mat(color, .95f),
@@ -61,6 +65,8 @@ internal static class PileShape {
 
     private static Mesh BuildStock(string family, bool fit) {
         if (family == "fallback") return Stack;
+        // Charcoal's briquettes carry their own colours, so they come whole from their own builder.
+        if (family == "charcoal") return fit ? CharcoalShape.Fitted(SlotSize) : CharcoalShape.Heap;
         var faces = new List<Vector3>();
         void Copy(Mesh mesh, Transform3D transform) {
             foreach (var point in mesh.GetFaces()) faces.Add(transform * point);
@@ -146,7 +152,7 @@ internal static class PileShape {
         // Fit the stock to its existing slot. All families sit on the same support plane in the 9–4–1 stack.
         var min = faces[0]; var max = min;
         foreach (var point in faces) { min = min.Min(point); max = max.Max(point); }
-        var center = (min + max) / 2; var scale = fit ? new Vector3(.72f, .4f, .72f) / (max - min) : Vector3.One;
+        var center = (min + max) / 2; var scale = fit ? SlotSize / (max - min) : Vector3.One;
         var s = Begin();
         for (int i = 0; i < faces.Count; i += 3) {
             var a = (faces[i] - center) * scale; var b = (faces[i + 1] - center) * scale; var c = (faces[i + 2] - center) * scale;
@@ -253,8 +259,8 @@ public sealed class StockPile {
         mesh.Visible = item != "";
         if (item == "") return;
         PileShape.SetStock(mesh, item, data.Items.TryGetValue(item, out var def) ? def.Color : PileShape.Fallback);
-        // Turn the shared broken coal chunk to avoid a row of identical fracture faces.
-        mesh.Rotation = new Vector3(0, item == "coal" ? slot * 2.399963f : 0, 0);
+        // Turn the shared coal chunk and charcoal heap to avoid a row of identical faces.
+        mesh.Rotation = new Vector3(0, item is "coal" or "charcoal" ? slot * 2.399963f : 0, 0);
     }
 
     /// <summary>Shows one item in a slot for every <paramref name="perSlot"/> of <paramref name="count"/>, rounding up, and hides the rest.</summary>

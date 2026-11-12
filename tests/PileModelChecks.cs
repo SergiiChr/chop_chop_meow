@@ -25,6 +25,15 @@ public static class PileModelChecks {
             Require(first.Stock.Slots[0].Mesh!.GetInstanceId() != logs.GetInstanceId(), "replacing wood with stone must change the model");
             Require(second.Stock.Slots.All(s => s.Visible) && second.Stock.Slots[0].Mesh!.GetInstanceId() == logs.GetInstanceId(), "a refresh must leave another pile's remembered appearance alone");
 
+            thing.Inventory.Clear(); thing.Inventory.Add("coal", 64);
+            WorldModels.SyncPile(first, thing, data);
+            var coal = first.Stock.Slots[0].Mesh!;
+            thing.Inventory.Clear(); thing.Inventory.Add("charcoal", 64);
+            WorldModels.SyncPile(first, thing, data);
+            var charcoal = first.Stock.Slots[0].Mesh!;
+            // Three six-sided briquettes with a hole through each: six sides, six hole walls and two ringed ends of six, two triangles apiece.
+            Require(charcoal.GetInstanceId() != coal.GetInstanceId() && charcoal.GetFaces().Length / 3 == 144, "charcoal must pile as three holed briquettes rather than as coal's lumps");
+
             thing.Inventory.Clear(); thing.Inventory.Add("fertilizer", 64);
             WorldModels.SyncPile(first, thing, data);
             var fallback = first.Stock.Slots[0].Mesh!;

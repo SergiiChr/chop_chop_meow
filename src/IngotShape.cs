@@ -4,18 +4,16 @@ namespace ChopChopMeow;
 
 /// <summary>Small cast-metal ingots used by item icons.</summary>
 internal static class IngotShape {
-    private static readonly string[] metals = { "c2c9c9", "b5d8e4", "dfe2dc" };
     private static ArrayMesh? casting;
     public static Godot.Mesh Mesh => casting ??= Build();
 
-    /// <summary>Builds a low, heavy ingot with a tapered top and a restrained casting mark.</summary>
-    public static Node3D Create(string item) {
-        int kind = item switch { "steel_bar" => 1, "tin_bar" => 2, _ => 0 };
+    /// <summary>Builds a low, heavy ingot in the bar's own colour, with a tapered top and a restrained casting mark.</summary>
+    public static Node3D Create(string item, string color) {
         var root = new Node3D();
-        ModelKit.Add(root, Mesh, ModelKit.Metal(metals[kind], .38f, .72f), Vector3.Zero);
+        ModelKit.Add(root, Mesh, ModelKit.Metal(color, .45f, .35f), Vector3.Zero);
         // A shallow dark runner mark reads as a casting detail without adding letter-like text.
         ModelKit.Box(root, new Vector3(.17f, .008f, .025f), new Vector3(-.08f, .102f, 0),
-            ModelKit.Metal(kind == 2 ? "59452f" : "566061", .52f, .55f));
+            ModelKit.Metal(item == "tin_bar" ? "59452f" : "566061", .52f, .55f));
         return root;
     }
 
