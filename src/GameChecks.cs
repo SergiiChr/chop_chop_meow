@@ -390,17 +390,15 @@ public partial class Game {
         await CloseWithEsc(); Drop(Hosted, "stone_chisel"); Give(Hosted, "stone", 2); Give(Hosted, "wood", 3);
         await KeyStroke(Key.C);
         Require(ShownPage() == "Crafting", "C must open the crafting menu.");
-        // The page rebuilds when the queue moves on, so the badge is looked up afresh.
-        TextureRect ChiselBadge() => (TextureRect)panel.FindChild("section_chisel", true, false).FindChild("badge", true, false);
-        var badge = ChiselBadge();
-        Require(badge.Modulate != Colors.White && badge.TooltipText.Contains("Needs a chisel"), "A missing chisel must show a red badge with a hint.");
+        // The page rebuilds when the queue moves on, so the card's line is looked up afresh.
+        Label Lacks() => (Label)Named("craft_torch")!.FindChild("lacks", true, false);
+        Require(Lacks().Visible && Lacks().Text == "No chisel" && !ShowsChild(Named("craft_torch")!, "inputs"), "A torch must name the chisel it lacks in place of its inputs.");
         await Click(Named("craft_stone_chisel")!);
         Require(World.Waiting(world.Crafting, "stone_chisel") + (world.Making == "stone_chisel" ? 1 : 0) == 1 && world.Backpack["stone"] == 0, "Clicking a recipe must queue it and take its materials.");
         // Hand crafting only goes on once the player has stood still a moment.
         Hosted.Tick(World.CraftSettle); Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
-        await Until(() => world.Backpack["stone_chisel"] == 1 && ChiselBadge().Modulate == Colors.White, "the chisel arriving and turning its badge back to normal", 2);
+        await Until(() => world.Backpack["stone_chisel"] == 1 && !Lacks().Visible && ShowsChild(Named("craft_torch")!, "inputs"), "the chisel arriving and the torch showing its inputs again", 2);
         int wood = world.Backpack["wood"];
-        await Click(Named("section_chisel")!);
         await Click(Named("craft_torch")!);
         Hosted.Tick(World.CraftSettle); Hosted.Tick(world.Data.Recipes["torch"].Seconds); await Frames(10);
         Require(world.Backpack["torch"] == 1 && world.Backpack["wood"] == wood - 3, "A torch must be made by hand from 3 wood.");
@@ -1268,17 +1266,58 @@ public partial class Game {
         await Frames(3);
         Require(!ending.Visible, "The ending must not reappear after the player chose to keep playing.");
     }
+    /// <summary>A recipe group closes on a click on its heading and opens on the next, on the crafting menu and on a station alike.</summary>
+    private async Task CheckRecipeGroupsCloseAndOpenOnAClick() {
+        await CloseWithEsc();
+        await KeyStroke(Key.C);
+        Require(Named("craft_planks") != null && Named("craft_stone_chisel") != null, "The crafting menu must open with its groups showing their recipes.");
+        await Click(Named("group_Materials")!);
+        await Until(() => Named("craft_planks") == null && Named("craft_stone_chisel") != null, "a click on the Materials heading hiding its recipes only", 2);
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
+        await ClickOn(furnace);
+        // A new stone furnace keeps making iron, whose group opens with the page.
+        Require(Named("craft_iron_bar") != null, "A station's page must open the group of what it is making, closed or not.");
+        await Click(Named("group_Materials")!);
+        await Until(() => Named("craft_iron_bar") == null && ShowsChild(Named("group_Materials")!, "kept"), "the closed group wearing the hard hat of the recipe it hides", 2);
+        await Click(Named("group_Materials")!);
+        await Until(() => Named("craft_iron_bar") != null, "a second click opening the group again", 2);
+        RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
+    }
+    /// <summary>
+    /// A bench's tool slots sit in a window of their own beside its page. A recipe's popup says where its tool is:
+    /// not available, in the backpack, which works for the player alone, or available once slotted.
+    /// </summary>
+    private async Task CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs() {
+        await CloseWithEsc(); Drop(Hosted, "stone_chisel", world.Backpack["stone_chisel"]);
+        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
+        await ClickOn(workbench);
+        var slot = panel.Aside.FindChild("tool_chisel", true, false) as ItemSlot;
+        Require(panel.Aside.Visible && slot != null && HasLabel(panel.Aside, "Available tools") && HasLabel(panel.Aside, "Empty"), "A bench must show its empty tool slots in a window beside its page.");
+        Require(panel.Aside.GetGlobalRect().End.X <= panel.GetGlobalRect().Position.X, "The tool window must stand left of the page.");
+        // The popup is built as Godot builds it for a hover, which shows it only after a real delay in a window of its own.
+        string ToolState() { var popup = ((ItemSlot)Named("craft_planks")!).Popup!(); AddChild(popup); string state = ((Label)popup.FindChild("tool_state", true, false)).Text; popup.QueueFree(); return state; }
+        Label Lacks() => (Label)Named("craft_planks")!.FindChild("lacks", true, false);
+        Require(ToolState() == "not available" && Lacks().Visible && Lacks().Text == "No chisel", "With no chisel anywhere a bench recipe must say so on its card and in its popup.");
+        Give(Hosted, "stone_chisel", 1);
+        await Until(() => !Lacks().Visible, "the card showing its inputs once a chisel is carried", 2);
+        Require(ToolState() == "in your backpack", "A carried chisel at a bench with an empty slot must show as in the backpack.");
+        await Click(BagCell(c => c.TooltipText.StartsWith("Stone chisel")));
+        await Until(() => world.BenchTool(workbench, "chisel") == "stone_chisel" && HasLabel(panel.Aside, "Stone chisel"), "a click on the carried chisel slotting it, named in the tool window", 2);
+        Require(ToolState() == "available", "A slotted chisel must show as available.");
+        RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
+        Require(!panel.Aside.Visible, "The tool window must close with the page.");
+    }
     /// <summary>At a bench, a click loads one item, a double click loads a batch and a right click takes half back.</summary>
     private async Task CheckBenchLoadsInputsByClickDoubleClickAndSplit() {
         await CloseWithEsc();
         var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(workbench, "crate"); Give(Hosted, "planks", 6);
         await ClickOn(workbench);
-        await Click(bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(c => c.TooltipText.StartsWith("Wood planks")));
+        await Click(BagCell(c => c.TooltipText.StartsWith("Wood planks")));
         Require(workbench.Inventory["planks"] == 1 && world.Backpack["planks"] == 5, "Clicking a backpack item at the bench must load just one.");
         await DoubleClick(Named("craft_crate")!);
         Require(workbench.Inventory["planks"] == 6 && world.Backpack["planks"] == 0, "Double-clicking a bench recipe must load one batch of its inputs.");
         Require(workbench.Keep == "crate", "Double-clicking the marked recipe of an idle bench must keep it marked.");
-        await SplitTo(Named("input_planks")!, bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(c => c.TooltipText == ""));
+        await SplitTo(Named("input_planks")!, BagCell(c => c.TooltipText == ""));
         Require(workbench.Inventory["planks"] == 3 && world.Backpack["planks"] == 3, "Right-clicking a bench input must pick up half of it.");
         RemoveThings(Hosted, t => t == workbench); Drop(Hosted, "planks", 3); await CloseWithEsc();
     }
@@ -1325,7 +1364,7 @@ public partial class Game {
         await ClickOn(anvil);
         Require(Named("input_steel_bar") != null, "A new anvil must show a slot for steel bars.");
         Require(Named("output_steel_parts") != null, "A new anvil must show a slot for steel parts.");
-        await Click(Cell(1, c => c.TooltipText.StartsWith("Steel bar")));
+        await Click(BagCell(c => c.TooltipText.StartsWith("Steel bar")));
         Require(world.Backpack["steel_bar"] == 1, "Clicking a steel bar in the backpack must load it into the anvil.");
         RemoveThings(Hosted, t => t == anvil); Drop(Hosted, "steel_bar"); await CloseWithEsc();
     }
@@ -1337,11 +1376,11 @@ public partial class Game {
         Require(Named("input_iron_bar") != null, "The steel furnace must show a slot for iron bars.");
         Require(Named("input_coal") != null, "The steel furnace must show a slot for coal.");
         Require(Named("output_steel_bar") != null, "The steel furnace must show a slot for steel bars.");
-        await DragTo(Cell(1, c => c.TooltipText.StartsWith("Iron bar")), Named("input_iron_bar")!);
+        await DragTo(BagCell(c => c.TooltipText.StartsWith("Iron bar")), Named("input_iron_bar")!);
         Require(furnace.Inventory["iron_bar"] == 5 && world.Backpack["iron_bar"] == 0, "Dragging bars onto the matching input slot must load them.");
-        await DragTo(Cell(1, c => c.TooltipText.StartsWith("Coal")), Named("input_iron_bar")!);
+        await DragTo(BagCell(c => c.TooltipText.StartsWith("Coal")), Named("input_iron_bar")!);
         Require(furnace.Inventory["coal"] == 0, "An input slot must reject a different item.");
-        await Click(Cell(1, c => c.TooltipText.StartsWith("Coal")));
+        await Click(BagCell(c => c.TooltipText.StartsWith("Coal")));
         Require(furnace.Inventory["coal"] == 1, "Clicking a backpack item must add one to its input slot.");
         await Click(Named("input_iron_bar")!);
         Require(furnace.Inventory["iron_bar"] == 4 && world.Backpack["iron_bar"] == 1, "Clicking an input slot must return exactly one item.");
@@ -1481,6 +1520,8 @@ public partial class Game {
             await Test(CheckEndGoalsShowEndingOnceAndKeepPlaying);
             await Test(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
             await Test(CheckRecipeBoardsMarkAndQueueWithModifiers);
+            await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
+            await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
             await Test(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
             var furnace = await Test(CheckSteelFurnaceSlotsLoadByDragAndClickThenPump);
             await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));

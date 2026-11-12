@@ -23,6 +23,8 @@ public static class Style {
     public static readonly Color Ember = new("d98a4e");
     /// <summary>Text on enamel that warns: a cost the bank cannot cover, a count the backpack is short of.</summary>
     public static readonly Color Warn = new("f2937c");
+    /// <summary>On a dark popup: something there and ready, and something the player has that is not where it works for everyone.</summary>
+    public static readonly Color Ready = new("8fcf9a"), Held = new("e8c468");
     public static readonly Color Rise = new("4f7a55");
     /// <summary>Modulates: a faint picture of what an empty cup wants, something not ready yet, and what the open page does not take.</summary>
     public static readonly Color Ghost = new(1, 1, 1, .28f), Unready = new(1, 1, 1, .5f), Faded = new(1, 1, 1, .4f);

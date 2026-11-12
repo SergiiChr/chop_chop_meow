@@ -134,7 +134,7 @@ public partial class Game : Node, IGameFlow {
         ui.AddChild(hotbar);
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
-        ui.AddChild(panel); ui.AddChild(bag);
+        ui.AddChild(panel.Aside); ui.AddChild(panel); ui.AddChild(bag);
         waterWarning = new WaterWarning(bag, ui); ui.AddChild(waterWarning);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);

@@ -222,11 +222,24 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 
 ### Station panels
 
-Every station and the crafting menu share one layout: round tabs on the left for the tool each group of recipes needs, and square recipe plates beside them.
-A plate shows how many batches wait in the queue at its top right corner.
+Every station and the crafting menu share one layout: recipe cards under a heading for each group of what they make (tools, materials, containers, food).
+A click on a heading closes its group and another opens it; the list scrolls once it outgrows the page.
+A card shows the product, its name and what a batch takes, each count in brick while your backpack is short.
+A recipe whose tool is nowhere to hand names it instead, such as "No steel chisel".
+A card shows how many batches wait in the queue at its top right corner.
 The queue sits under the work in progress, one cup per recipe in the order first queued, however many batches of it wait.
 
-| Input on a plate | At a station | In the crafting menu |
+Hovering a card shows what the recipe requires, how long it takes, what its product is used for and where its tool is:
+
+| Tool line | Means |
+| --- | --- |
+| available (green) | Slotted at the station, or carried when crafting by hand |
+| in your backpack (yellow) | The station's slot is empty and you carry the tool: you can work the recipe, a worker cannot |
+| not available (red) | Neither slotted nor carried |
+
+A station's tool slots sit in a small window of their own left of its page, "Available tools", each with the tool it holds.
+
+| Input on a card | At a station | In the crafting menu |
 | --- | --- | --- |
 | Click | Mark it for workers to keep making once the queue is done (a thick outline with a hard hat); click again to unmark | Queue one |
 | Double-click | Queue one and load one batch of its inputs and a fuel from the backpack | Queue one |
@@ -235,7 +248,7 @@ The queue sits under the work in progress, one cup per recipe in the order first
 
 A right-click on a cup in the queue takes batches off the same way.
 A batch leaves the queue when it starts, and one in progress cannot be taken off.
-A station page opens on the tab of what the station is making.
+A station page opens with the group of what the station is making open.
 A station with nothing queued and nothing marked stands idle.
 
 Stations show one cup per recipe input, the batch time above a progress bar and the output cup, with what one batch takes or makes under each cup.
@@ -368,7 +381,7 @@ Reaching both shows an ending screen with Restart and Keep playing.
 The crafting menu (C) crafts at base speed, about 10 seconds a recipe, and queues up to 99 of each recipe.
 Queueing takes the materials from the backpack at once.
 Crafting goes on only while you stand still, squatting over the work: walking stands you up and pauses it until you stop.
-Recipes are grouped into tabs by the tool they need, red while you carry none.
+Recipes are grouped by what they make; one that needs a tool you do not carry names it on its card.
 
 A stone chisel takes 2 stone and no tool.
 With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wooden mallet and torches (3 wood).

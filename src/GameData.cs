@@ -235,6 +235,12 @@ public sealed partial class GameData {
     public List<string> MadeOutOf(string item) => madeOutOf.GetValueOrDefault(item, Nothing);
     /// <summary>How many steps the longest chain out of an item runs.</summary>
     public int ChainLength(string item) => MadeOutOf(item).Count == 0 ? 0 : 1 + MadeOutOf(item).Max(ChainLength);
+    /// <summary>What an item goes into: the products that take it as an input, then for a tool those made with it.</summary>
+    public IEnumerable<string> UsedFor(string item) {
+        var uses = Recipes.Values.Where(r => r.Inputs.ContainsKey(item)).Select(r => r.Output).Concat(Sources.Where(p => p.Value.From.Contains(item) || p.Value.Also.Contains(item)).Select(p => p.Key));
+        if (Items[item].Tool is { Length: > 0 } kind) uses = uses.Concat(Recipes.Values.Where(r => r.Tool == kind && r.Tier <= Items[item].Tier).Select(r => r.Output));
+        return uses.Distinct();
+    }
     /// <summary>Works out the recipe map's chains and checks that every item is on the map once.</summary>
     private void ValidateMap() {
         foreach (var recipe in Recipes.Values)

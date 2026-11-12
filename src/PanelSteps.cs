@@ -32,6 +32,9 @@ public partial class Game {
 
     private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => Cells(grid).First(match);
 
+    /// <summary>A cell of the backpack drawer, whatever grids the open page has.</summary>
+    private ItemSlot BagCell(Func<ItemSlot, bool> match) => bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(match);
+
     /// <summary>Waits until a grid shows a matching cell, for what changes on the game's own refresh, and returns the cell.</summary>
     private async Task<ItemSlot> Showing(int grid, Func<ItemSlot, bool> match) {
         await Until(() => Cells(grid).Any(match), "a matching cell showing", 2);

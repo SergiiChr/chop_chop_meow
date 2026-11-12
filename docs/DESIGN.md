@@ -103,10 +103,10 @@ UI and input:
 | `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
-| `src/StationPanel.cs` | A station's page: tool slots, recipe board, process row, queue, bellows and jobs |
+| `src/StationPanel.cs` | A station's page: recipe board, process row, queue, bellows and jobs, with its tool slots in a window beside it |
 | `src/Cups.cs` | `Cups`: a building's item cups and a station's process row |
 | `src/CraftPanel.cs` | The crafting menu |
-| `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, and the queue strip under it |
+| `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the queue strip under the work |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
@@ -517,6 +517,10 @@ A station takes inputs for any recipe it has queued or kept, and haulers carry o
 What no storage takes stays in the station, which goes on working until its output stack is full.
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
+The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.ClosedGroups` keeps the groups the player closed, for every board.
+Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
+A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
+A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
 `SaveState.Obtained` holds every item the settlement has made, gathered, bought or started with (`World.Had`), which the recipe map shows as known.
