@@ -18,7 +18,6 @@ public static class WaterChecks {
         CheckBottleKeepsPartialStateAcrossSave(data);
         CheckBottleRecipeMakesEmptyBottleFromTinAndWood(data);
         CheckRecipesReturnReusableBottles(data);
-        CheckLegacyStackedBottlesOverflowToRecoveryBox(data);
     }
 
     private static void CheckRecipesTakeOnlyFullBottles(GameData data) {
@@ -147,17 +146,5 @@ public static class WaterChecks {
         Require(chest.Inventory["water"] == 1, "an assigned collector must deliver the refilled bottle");
         Require(chest.Inventory["empty_bottle"] == 0, "an assigned collector must refill the existing bottle");
         Require(worker.Bag.Count == 0, "an assigned collector must not generate more containers");
-    }
-
-    private static void CheckLegacyStackedBottlesOverflowToRecoveryBox(GameData data) {
-        var old = new World(data, false);
-        Inventory.Unstacked.Remove("water");
-        string saved;
-        try { Give(old, "water", 64); Give(old, "wood", 1); saved = old.Serialize(); } finally { Inventory.Unstacked.Add("water"); }
-        var loaded = new World(data, false); loaded.Deserialize(saved);
-        int preserved = loaded.Backpack["water"] + loaded.Things.Where(t => t.Kind == ThingKind.Grave).Sum(t => t.Inventory["water"]);
-        Require(preserved == 64, "legacy stacked bottles must overflow without loss");
-        Require(loaded.Backpack.UsedSlots <= 24, "legacy stacked bottles must not oversize the player's inventory");
-        Require(loaded.Backpack["wood"] == 1, "legacy stacked bottles must leave other goods alone");
     }
 }

@@ -11,7 +11,7 @@ These came from the user; change them only after asking.
 - **Platform and launch:** Linux first, one-command launch from a fresh checkout through the Python launcher.
 - **Look:** smooth isometric 3D, natural and lighthearted, with some of Terraria's approachable feel; no fantasy or industrial styling. Buildings are modern DIY, there are several tree species, and workers wear blue overalls over a cream shirt.
 - **Animation:** every core interaction has an animation, with a dedicated one for every tool.
-- **Progression:** the player starts with a steel axe and no pickaxe; no loose iron lies about and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
+- **Progression:** the player starts with a steel axe, an empty bottle, 10 berries and 6 wood, and no pickaxe; no loose iron lies about and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
@@ -19,6 +19,9 @@ These came from the user; change them only after asking.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. Piles set their own filters from what they hold. Manual transfers bypass automation filters.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
+- **Wolves:** the same every night, never stronger or faster with the days; three or four bites bring a healthy player to half health. After the five let out at dusk, one den picked at random lets one more out every hour.
+- **Canning:** meat stew and jam are canned; raw meat is not, and sells in crates as it is.
+- **Saves:** a save from another version is refused, and no code converts old saves; the user's own save is fixed by hand when asked.
 - **Market:** reached at a trading post; selling lowers a price, which recovers over time; deeper goods are worth more; orders settle after a visible 30-second cart trip.
 - **Workers:** hired individually, paid daily, assigned, reassigned and dismissed; they carry station inputs and outputs, preferring matching filtered storage.
 - **Pacing:** 10–15 minutes to the first goal is a target, not a measured playthrough.
@@ -39,8 +42,10 @@ The interface reads the world through `World`'s read members and changes it thro
 `UiKit.Paused` follows which overlays are open: each one registers with `HoldWhile`, so none saves or restores another's pause.
 `World.Replaced` fires whenever the whole state is replaced (a new game, a load, a player taking the server's world); each part resets itself on it, and what differs, such as which page opens next, stays where that path starts.
 The side panel builds a new `PagePanel` node when a page opens; the page holds its own `LiveUpdates`, which run on each refresh, and its own state.
+A page whose subject has gone (`PagePanel.Current`), such as an emptied recovery box or a building another player took down, closes on the next refresh.
+A page that names another (`PagePanel.GivesWayTo`) opens that one instead: an emptied or placed carried crate's page gives way to the backpack's.
 A tab or other choice on a page calls `Redraw`, which builds its body again and keeps that state; `PageMemory` keeps only what outlasts the page.
-A `ThingPage` is a page about one thing in the world, with its job buttons and filters.
+A `ThingPage` is a page about one thing in the world, with its job buttons and filters; a page calls `RedrawOnChange` beside what its layout reads, such as a mine's stage, so it draws itself again when that changes.
 The side panel and the backpack drawer are `MovableWindow`s: a drag on an empty spot moves one within the screen, `Redraw` keeps it there, and opening a different page or building puts both back.
 The board beside the panel moves with it, and the panel shifts right when the board would open past the screen's left edge.
 Wells and boxes on the panel pass a press on their own surface on, so they move it too.
@@ -60,7 +65,7 @@ Simulation and data:
 | `src/GameTables.cs` | Items, buildings, recipes, hiring deals, the market, the mine, the farm and the goals |
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
-| `src/Wolves.cs` | Wolf dens, patrols, smell, howls and the way home |
+| `src/Wolves.cs` | Wolf dens, the wolves they let out, patrols, smell, howls and the way home |
 | `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor and its chip |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
 | `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces |
@@ -73,6 +78,7 @@ Simulation and data:
 | `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
 | `src/Session.cs` | Where a window stands with the game it started |
 | `src/WorldUpdates.cs` | World updates as entries, their differences and compression |
+| `src/UpdateJson.cs` | How an update's entries are written: fields at their default left out |
 
 UI and input:
 
@@ -133,9 +139,11 @@ Rendering and sound:
 | `src/WorldScene.cs` | Ground dressing, particles and the animation review |
 | `src/Terrain3DView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, flowers and shrubs from the baked placement, cleared around buildings and paths |
+| `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
 | `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake surface and wet banks |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
+| `src/WolfModel.cs` | Poses the wolf: its gaits, leap, howl, recoil and fall |
 | `src/IconRender.cs` | Renders item and building icons from the models (`./build.py icons`) |
 | `src/Sounds.cs` | Plays sound effects |
 
@@ -198,7 +206,8 @@ A save writes them all in `SaveState.Party` and leaves out the top-level player 
 `SaveState.Owner` names the machine that last started the world.
 The server sends everyone away on start (`World.Vacate`), then the starting machine takes the world over with the owner's player (`World.Claim`), so a save keeps its player on another computer.
 `World.Arrive` brings back a machine's player, else the unclaimed one, else a newcomer, and `World.Depart` keeps a player who leaves.
-Saves from any other version are refused.
+A save holds `SaveState.Version`, raised whenever a change would make saves written before it load wrong, and `World.Deserialize` refuses any other version: nothing converts an old save.
+`Saves.Write` writes the world beside the slot's file and renames it over, so a write that fails leaves the earlier save.
 
 Player actions run in the acting player's context (`World.As`).
 In a guest's copy, `World.Forwarded` sends each action to the host as a `Command`, named by its `Verb`, instead of changing the copy.
@@ -300,6 +309,7 @@ While someone grinds, the table's own mortar is off the counter (`WorldView.grin
 
 Manual bellows pumping and the unarmed punch trigger one loop of their action.
 Each striking work action has an impact moment that shakes its target and spawns chips, leaves, splashes or sparks; packing and grinding strike nothing.
+An action's key poses are made once (`ActorAnimation.ChopKeys` and the like): every worker and player is posed every frame, so a pose is worked out without allocating.
 Pausing freezes animation and effects.
 
 ### Wolf animation
@@ -353,7 +363,7 @@ In multiplayer it is available only when everyone is downed; a living player pre
 The end goals:
 
 - a working mine on every ore in `World.Cliffs`;
-- `goals.profitDays` consecutive days of at least `goals.dailyProfit` profit.
+- `Goals.ProfitDays` consecutive days of at least `Goals.DailyProfit` profit.
 
 `SaveState.DayRevenue` collects returned sale coins.
 At dawn the wages charged are taken off and the result joins `SaveState.Profits`.
@@ -364,7 +374,7 @@ The starter goal chain stays as the tutorial, and the pause menu lists both.
 
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
 
-- Items carry what eating or drinking one restores (`hunger`, `thirst`, `health`) and a `food` flag.
+- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`, `Health`) and a `Food` flag.
 - Food is what wolves eat and compost will take, cooked or not.
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.
@@ -389,9 +399,14 @@ Recovery boxes are never automation storage and disappear once empty.
 Fog of war is simulation state.
 `World.Look` runs every tick: it marks tiles within `SightRadius` of the player in `SaveState.Explored` and replaces `SaveState.Remembered` entries in sight with snapshots of the live things there.
 
-`World.Known` is what the view draws and picks: live things in sight, snapshots elsewhere, nothing never seen.
+`World.CollectKnown` gives what the view draws and picks: live things in sight, snapshots elsewhere, nothing never seen.
 Snapshots are updated in place and keep only the look: no inventory, fire, heat or work in progress.
 The view picks against what it draws but only returns things that still exist.
+
+Only what is in sight is drawn every frame (`WorldView.SyncThings`).
+A thing out of sight is drawn once as its snapshot, moved on far enough to finish whatever it was doing, and left alone until its snapshot changes, night falls or lifts, or it is seen again.
+A change that did not happen in front of the player is not played when they see it (`WorldView.Watched`): a tree felled out of sight is a stump, a chest filled out of sight keeps its lid shut, and a chip or a building that appeared out of sight neither flies nor lands in dust.
+Work out of sight is heard but shakes nothing and throws no chips.
 
 `WorldView` hides wolves, workers and carts outside sight.
 It draws one screen-wide quad after everything else, placing each pixel in the world from the depth buffer: black on unexplored tiles, a grey wash on explored ones, clear inside the sight circle.
@@ -405,6 +420,8 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 - **Dens.** `World.Dens` are five small caves at the foot of the ranges, drawn as a mine's outcrop and tunnel at half size.
   The outcrop is solid like a mine's (`World.InSpur`), and nothing may be built within `Den.Clearance` of a door, so the wolves always have a way out.
   From `GameData.DuskStarts` (20:24), over an hour before `World.SleepHour`, each den lets out `WolvesPerDen` wolves at its `Den.Door` once no player sees it (`SaveState.DensOut`), one den every `DenGapSeconds` so their wolves never all appear on one frame.
+  After each further hour one den, picked at random among those whose door no player sees, lets one more out until the wolves head home (`SaveState.DenHours`).
+- **Strength.** A wolf's health, bite and pace are `GameData.WolfHealth`, `WolfBite` and `WolfTrot`, the same every night: the fourth bite brings a healthy player to half health.
 - **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at `PatrolPace` (half) of the trot it stalks at, a walk, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
 - **Smell and howl.** A patrolling or called wolf within `SmellRadius` of a player out in the open takes them as its target and howls, standing still, for as long as the howl recording plays (`LoneHowlSeconds` or `PackHowlSeconds`, `Wolf.Howl` counting down `Wolf.HowlLength`).
   The night's first howl plays `wolf_howl`, a lone wolf, and later ones `wolf_howl_group` (`SaveState.Howled`).
@@ -448,7 +465,7 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
 - `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `GatherRules.ChipReach` of a boulder or deposit on `GatherRules.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
-- A picked-clean berry bush fruits again after `BerryRegrowHours`.
+- A berry bush holds `World.BushBerries` at the start and each time it fruits again, which is `BerryRegrowHours` after the first berry was picked from it, picked clean or not.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
 - Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
 - The stone furnace burns 2 wood into 1 charcoal.
@@ -517,7 +534,7 @@ A recipe's `Fuels` list what it can burn, one unit per batch from the station's 
 - `World.BatchCost` lists materials only.
 - Haulers keep the burner topped up with what it holds, fill an empty one with the first listed fuel storage gives out, and carry a fuel the recipe cannot burn back to storage (`Worker.Fueling`).
 
-The canning station (`cannery`) seals a filling and a `tin_can` into a canned good over fuel.
+The canning station (`cannery`) seals meat stew or jam and a `tin_can` into a canned good over fuel.
 
 #### Anvil
 
@@ -547,7 +564,7 @@ Tools, packed crates and bottles take a slot each everywhere.
 The layout is saved and synchronized: removing one stack never shifts unrelated cells.
 Sort is the only action that packs and regroups stacks.
 Item totals change only through `Inventory` methods, which keep them in line with the stacks.
-Stacks are rebuilt from totals once, where the two can disagree: when a save loads (old saves hold totals only).
+Stacks are rebuilt from totals once, where the two can disagree: when a save loads, since one edited by hand can hold both.
 A window's copy takes totals and stacks together from the server, so it does not rebuild.
 
 The player moves items in and out of storage and stations within `World.ItemReach` (15 m, `World.Reaches`); gathering, working a station and pumping need `World.Near`'s 3.2 m.
@@ -672,7 +689,7 @@ Goods outside `Market.Sells` are donated: they pay nothing and leave demand alon
 The returning cart names them.
 A sale pays for the contents unit by unit plus the crate.
 
-`market.buys` lists what the village sells and in what lot, as the [README price sheet](../README.md#price-sheet) shows.
+`Market.Buys` lists what the village sells and in what lot, as the [README price sheet](../README.md#price-sheet) shows.
 
 #### Demand and prices
 
@@ -699,25 +716,24 @@ Trades always use the live price, so the sheet can be out of date.
 
 ### Mines
 
-A mine (`src/Mine.cs`, `Mine` in `GameTables`) is marked free and snaps to `World.MineSpot`, directly in front of an ore cliff, one per cliff.
+A mine (`src/Mine.cs`, `Mine` in `GameTables`) is marked free and snaps to `World.MineSpot`, in front of the middle of an ore cliff's face between its two deposits, one per cliff.
 Each portal follows its own cliff face, its tunnel runs into the rock, and its rails point outward toward the valley.
 A continuous outcrop extends from the mountain foot, blocks walking with a matching footprint (`World.InSpur`), and holds the tunnel, which `WorldModels.Mine` darkens step by step to black.
-Loading a save made on an older valley moves only the mine cart anchor to this site and keeps stock, stages and worker assignments.
 
 `Thing.MineStage` counts finished stages from `MineStage.Marked`:
 
 | Stage | Done by | Check |
 | --- | --- | --- |
 | Dug | a worker with a pickaxe | `MineStage.Dug` |
-| Supplied | `mine.materials` delivered | `MineStage.Supplied` |
+| Supplied | `Mine.Materials` delivered | `MineStage.Supplied` |
 | Fitted | a worker with a hammer | `MineStage.Open` |
 
 The two worker stages take `StageWorkdays` of `GameData.WorkdaySeconds`.
 The player holding a gather on the mine (`World.Gather`, standing at `World.MineDoor`) adds to the same progress with a pickaxe or hammer carried (`World.BuildMine`), swinging the pickaxe or hammering (`ActorAnimation.PlayerAction`).
 Workers fetch the pickaxe or hammer a stage needs from a tool station, like any other job.
 
-Up to `mine.workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).
-Each adds one ore and one stone to the mine's two-slot `Thing.Output` every `mine.seconds`.
+Up to `Mine.Workers` miners work underground (`WorkerWorkState.Underground`, hidden by the view).
+Each adds one ore and one stone to the mine's two-slot `Thing.Output` every `Mine.Seconds`.
 Mining stops while either slot holds a full stack.
 The first free miner then carries the whole stack to storage (`Worker.Bag` grows to the stack size until emptied), and with no storage the mine reports once that it is full.
 
@@ -793,7 +809,7 @@ Music in `assets/music` crossfades over four seconds between the day music and t
 The day plays its tracks one after another and the night loops one.
 
 Each keeps its place for the running session, so music longer than its part of the day carries on next time.
-It wraps back to the first track at the end.
+A track that plays to its end hands over to the next, and the last wraps back to the first.
 The options screen sets the music volume, stored in the settings file.
 
 ## World map
@@ -805,8 +821,7 @@ The world is a fixed 216-tile valley defined in `src/Terrain.cs`:
 - a lake whose shore function bounds both walking and the drawn water.
 
 `World.Scatter` places resources with a seeded generator, trees more densely toward the mountains.
-Saves from earlier maps are refused.
-`World.Deserialize` upgrades older saves, then refuses one that names unknown items or holds player needs out of range.
+`World.Deserialize` also refuses, rather than repairs, a save that is incomplete, names unknown items, marks or queues a recipe at a station that does not make it, or holds player needs out of range.
 Workers use grid detours around water and buildings.
 
 ## Development and verification

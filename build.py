@@ -576,7 +576,8 @@ def check_raw_save() -> None:
 
 
 def run_check(env: dict[str, str]) -> None:
-    """Verify C# format and raw save use, then run every test."""
+    """Verify the docs' code names, C# format and raw save use, then run every test."""
+    command([sys.executable, ROOT / "tools" / "doc_names.py"])
     check_raw_save()
     command(
         ["dotnet", "format", ROOT / "ChopChopMeow.csproj", "--verify-no-changes"],

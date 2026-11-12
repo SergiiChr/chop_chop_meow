@@ -34,7 +34,7 @@ The project uses Godot's Forward+ renderer, which picks a discrete GPU over an i
 ./build.py play     # export the optimized release build and run it
 ./build.py setup    # prepare local tools, compile C#, and import assets
 ./build.py editor   # open the Godot editor
-./build.py check    # run every check: C# and Python types and format, then all tests
+./build.py check    # run every check: C# and Python types and format, the docs' code names, then all tests
 ./build.py test     # run only the tests
 ./build.py build    # check, export, and smoke-test build/ChopChopMeow.x86_64
 ./build.py icons    # re-render item and building icons from their models (opens a window)
@@ -59,7 +59,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
 | `--showcase --trees`, `--bushes` | Show the three tree species or the berry bushes |
-| `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
+| `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
 | `--showcase --hide-ui` | Hide the interface, leaving only the world in a screenshot |
@@ -133,7 +133,7 @@ The interface is drawn at 0.8 of the size it is laid out for (`Game.InterfaceSca
 It keeps that share of the screen at every resolution, with its text drawn at the size it shows.
 
 Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
-Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved.
+Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
 meet (SSAO), and world sounds pan with their place on screen.
 Ambient light comes from a sky that is never drawn: light from above and grass-coloured bounce from below, so roofs and walls differ in shade.
@@ -254,14 +254,18 @@ Every building's panel ends in a row of job buttons, one per kind of work there 
 
 | Place | Jobs |
 | --- | --- |
-| Crafting bench | Craft, Haul |
+| Crafting bench, anvil, cooking table, packing station | Craft, Haul |
+| Stone furnace, canning station | Haul |
 | Reinforced furnace | Bellows, Haul |
 | Mine | Build, Haul, Mine |
 | Farm plot | Farm, Haul |
 | Trading post | Manage deliveries |
+| Campfire | Tend fire |
 | Tool station | Stock |
 | Compost pile | Tend |
 | Resource | Gather |
+
+A worker on Tend fire keeps a campfire fed with wood from storage.
 
 Clicking a job lists the crew with a tick box each.
 A circled number beside a worker counts their other jobs, and hovering it lists them.
@@ -306,7 +310,8 @@ Ground you have never seen is black.
 You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 tiles), which fills the screen at full zoom-out.
 
 Ground you have seen before is greyed out and shows things as you last saw them: a tree felled out of sight still stands there until you look again.
-Remembered fires and furnaces show unlit, and wolves, workers and carts are not shown.
+What changed while you were away shows as it now is when you come back, without playing the change: such a tree is already a stump, and a chest that was filled keeps its lid shut.
+Remembered fires and furnaces show unlit, wolves, workers and carts are not shown, and work out of sight neither shakes what it is done on nor throws chips, though it is still heard.
 Explored ground and remembered things are kept in saves.
 
 ### The valley
@@ -316,6 +321,7 @@ It opens onto the sea at the bottom of the screen, which cannot be drunk and is 
 Impassable mountain ranges close in from the left and right toward the valley's inland end, and a lake lies in the middle.
 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
+A berry bush holds 24 berries and is full again a day after the first one is picked from it, whether or not it was picked clean.
 Iron and coal deposits sit at the foot of rock faces at the base of both ranges and need a pickaxe.
 Loose coal is scattered below the nearer coal face and is picked up whole with one right-click, with no tool.
 Loose stones and sticks lie about the plains: each picks up the same way as 1 stone or 1 wood, and is gone once picked.
@@ -325,6 +331,25 @@ A pale grey cliff further inland holds tin: mine it with a pickaxe.
 ## Progression
 
 The opening progression prioritizes water, shelter and fire, then hand gathering with the starting steel axe: chisel, planks, mallet, bench and crates; sell berries at a trading post for the first pickaxe; then work toward steel.
+
+### Buildings
+
+| Building | Cost |
+| --- | --- |
+| Storage chest | 8 wood |
+| Campfire | 6 wood, 4 stone |
+| Cabin | 20 wood, 8 stone |
+| Pile, farm plot | 8 wood |
+| Trading post | 10 wood, 4 stone |
+| Crafting bench | 10 planks |
+| Tool station | 8 planks, 4 stone |
+| Packing station | 8 planks, 4 wood |
+| Stone furnace | 16 stone, 6 wood |
+| Anvil | 4 iron bars, 6 stone |
+| Reinforced furnace | 20 stone, 5 iron bars, 8 wood |
+| Cooking table | 2 steel bars, 6 stone, 8 planks |
+| Canning station | 2 steel bars, 8 planks |
+| Mine | free to mark; its second stage takes 50 wood, 10 iron bars and 50 stone |
 
 ### Goals
 
@@ -353,7 +378,7 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 The crafting bench costs 10 planks, works twice as fast and must be worked like the anvil, by you or an assigned worker.
 It has a chisel slot and a hammer slot, and a slotted tool's speed multiplies its rate.
 
-It makes everything the menu makes, plus these, all with any hammer:
+It makes what the menu's chisel makes (planks, wood parts, the mallet, torches and the mortar), plus these, all with any hammer:
 
 | Recipe | Takes |
 | --- | --- |
@@ -366,8 +391,10 @@ Some recipes need a better tool:
 
 - Tin cans (1 tin bar → 4) need a steel hammer.
 - A mortar and pestle (3 stone, by hand or at the bench) needs a steel chisel.
+- A tin water bottle (1 tin bar + 1 wood part) needs a steel hammer.
 
 A better tool always does a plainer tool's work; the steel chisel works twice as fast as the stone one.
+The stone chisel itself is only knapped by hand.
 
 ### Steel tools
 
@@ -379,7 +406,7 @@ A small steel tool such as a hammer takes 1 steel part and a big one such as an 
 
 - The stone furnace smelts 2 iron ore into an iron bar and 2 tin ore into a tin bar over coal or charcoal.
 - It also burns 2 wood into 1 charcoal, sears meat and bakes bread (see Cooking) over wood, coal or charcoal.
-- The reinforced furnace takes iron and coal as materials, burns only coal from its fuel slot, and needs heat from manual or worker-operated bellows. Steel forms from 1450 °C; below that it keeps burning coal without making steel.
+- The reinforced furnace smelts 2 iron bars and 2 coal into 2 steel bars, burns only coal from its fuel slot, and needs heat from manual or worker-operated bellows. Steel forms from 1450 °C; below that it keeps burning coal without making steel.
 
 ## Cooking and canning
 
@@ -397,7 +424,8 @@ Its other recipes cook on their own:
 - 1 water + 1 raw meat → meat stew, over one wood, coal or charcoal
 - 1 flour + 1 water → dough, kneaded with no fire
 
-The canning station (2 steel bars, 8 planks) seals meat stew, jam or raw meat into a tin can over one wood, coal or charcoal.
+The canning station (2 steel bars, 8 planks) seals meat stew or jam into a tin can over one wood, coal or charcoal.
+Raw meat is not canned: it sells as it is, in crates.
 Canned meat stew is the best food to sell.
 
 Both stations, like the stone furnace's food recipes, take wood, coal or charcoal in their fuel slot.
@@ -536,7 +564,7 @@ The price sheet opens to the left of the panel and lists sell and buy prices wit
 | Goods | Sold by |
 | --- | --- |
 | Single steel tools | One |
-| Canned food | Crate of 12 |
+| Canned meat stew | Crate of 12 |
 | Filled bottle, empty bottle | One bottle |
 | Wheat seeds, fertilizer | Crate of 4 |
 
@@ -575,7 +603,7 @@ An unpaid worker strikes, standing with a "No pay - no work" sign, and owed wage
 ## Mines
 
 A mine is marked for free from the building plans, which list what each of its stages takes and what the finished mine brings out.
-The plan snaps to a rock spur past the seaward end of the nearest ore cliff and shows a see-through green outline.
+The plan snaps to the nearest ore cliff, in front of the middle of its face between its two deposits, and shows a see-through green outline.
 Each cliff takes one mine.
 
 Clicking the mine shows its three stages:
@@ -600,7 +628,9 @@ With none, a message says the mine is full with no output available.
 ## Wolves and night
 
 Five wolf dens, small caves at the foot of the mountains, each let one wolf out at dusk (20:24), so the hour or two before bed is risky too.
+After that one den, picked at random, lets one more wolf out every hour until the wolves head home, so a night sees about thirteen.
 They patrol the valley at a walk, each its own way, turning wherever the ground ahead is blocked; wolves walk only where you can.
+Wolves are the same every night: two blows of a steel axe fell one, and its fourth bite brings a healthy player down to half health.
 
 A wolf that smells you within 30 metres while you are out in the open howls, and every patrolling wolf within 80 metres runs to the howl, ready to smell you on the way.
 After its howl it closes in, and once it is near enough to see you outside firelight it breaks into a sprint.
@@ -629,7 +659,7 @@ A direct hit with the torch hurts a wolf and sends it running for a moment.
 
 ### Cabins
 
-Click a cabin to step inside, even while walking.
+Click a cabin to step inside, even while walking; the door shuts behind you.
 Wolves cannot smell you there: they give up at once and patrol on, and you stay in until you press Step outside in its panel.
 
 ### Wolf kills
@@ -664,7 +694,7 @@ The world's save keeps every player who has played in it (position, health, need
 Only the player who started the game saves and loads it, and the autosave runs every 5 minutes on the server.
 A guest that comes back to the same world, even after the host loaded a save, finds its player as the save had it.
 
-A player a world has never seen starts with an axe and a bottle at the clearing.
+A new game's first player starts at the clearing with a steel axe, an empty bottle, 10 berries and 6 wood; a player who joins a world that has never seen them starts with the axe and the bottle.
 A save follows its owner: whoever starts it on another computer plays the player who saved it.
 Leaving returns a guest to the start menu.
 A guest that loses the connection tries to get back in on its own for up to 120 seconds, with a countdown on screen.
@@ -673,7 +703,7 @@ A guest that loses the connection tries to get back in on its own for up to 120 
 ### Shared world
 
 Everyone shares the world, the market and the workers.
-Sleep needs every player inside a cabin with enough food and water.
+Sleep needs every other player inside a cabin, and everyone with enough food and water.
 Night wolves hunt each player separately.
 
 Thirty times a second the server sends each player only what changed since the last update that player confirmed, usually a few hundred bytes, so it plays over the internet as well as at home.
@@ -688,7 +718,8 @@ Thirty times a second the server sends each player only what changed since the l
 ## Saves
 
 There are three save slots and a separate autosave the server writes every 5 minutes.
-A save from another version of the game is refused rather than converted.
+A save is written beside the one it replaces and takes its place only once it is whole, so a save that fails leaves the earlier one.
+A save from another version of the game is refused, never converted.
 F5 and F9 quick save and load to the current slot.
 
 The launcher keeps its Godot user-data directory under `.tools/xdg-data`.
@@ -702,8 +733,7 @@ Launcher-managed saves are in `.tools/xdg-data/godot/app_userdata/Chop Chop Meow
 | `autosave.json` | Autosave |
 
 A manually exported or otherwise normally launched Godot build uses Godot's standard per-user application-data location instead.
-Saves from the earlier, smaller maps cannot be loaded.
-Nor can a save that names items the game does not know, or holds needs out of range; the game says why when loading fails.
+A save that is incomplete, names items the game does not know or holds needs out of range is refused too; the game says why when loading fails.
 
 ## Look and sound
 
@@ -732,7 +762,7 @@ The world reacts too:
 - the bellows board travels with each press, and the heat gauge tracks the forge;
 - a bar under the reinforced furnace and its panel dial mark the heat steel needs;
 - furnaces smoke (the reinforced furnace darker and thicker), and anvils spark;
-- storage lids open on transfers, and the cabin door opens as you approach;
+- storage lids open on transfers, and the cabin door opens as you approach and shuts once you are inside;
 - the market mailbox flag rises while a cart is out;
 - wolves trot, leap, feed and fall dead, and a pinned player struggles on their back;
 - couriers pull the trade cart.
@@ -756,7 +786,7 @@ Day and night have their own music, which crossfades as the time changes and pic
 
 ## Limitations
 
-- Worker automation is limited to gathering and station/furnace tasks.
+- Worker automation is limited to the jobs in the [job table](#job-buttons); workers do not hunt, cook by hand, place buildings or trade.
 - Workers use simple grid detours around water and buildings; this is not a full navigation system.
 - There is no pollution, vampire threat, or technology beyond steel in this POC.
 

@@ -116,7 +116,7 @@ internal static class WorldSteps {
         return mine!;
     }
 
-    /// <summary>Rewrites a save into an older form, failing when a text it rewrites is missing so the fixture cannot silently stop testing anything.</summary>
+    /// <summary>Rewrites a save as an edit by hand would, failing when a text it rewrites is missing so the fixture cannot silently stop testing anything.</summary>
     public static string Patch(string json, params (string Old, string New)[] edits) {
         foreach (var (old, replacement) in edits) {
             Require(json.Contains(old), $"save fixture text {old} is missing");
@@ -154,6 +154,9 @@ internal static class WorldSteps {
         float time = (world.Day - 1 + phase) * world.Data.DaySeconds;
         RunUntil(world, time > world.Time ? time : time + world.Data.DaySeconds);
     }
+
+    /// <summary>Ticks to the moment the light starts to fade, when the dens open and workers head home.</summary>
+    public static void RunUntilDusk(World world) => RunUntilPhase(world, world.Data.DuskStarts);
 
     /// <summary>Ticks to the next daytime, with no wolves about.</summary>
     public static void RunUntilMorning(World world) => RunUntilPhase(world, .3f);

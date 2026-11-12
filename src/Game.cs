@@ -68,12 +68,12 @@ public partial class Game : Node, IGameFlow {
             GD.Print(OS.IsDebugBuild() ? "Build: debug, from the project folder" : "Build: optimized release export");
             data = GameData.Create();
             if (Launch.Has("--server")) { Server.Run(this, data); return; }
+            // A check run that stopped half way leaves its settings and saves behind; they go before anything here reads them.
+            if (Launch.Args.Any(a => a is "--ui-test" or "--net-check" or "--server-check")) RemoveCheckFiles();
             world = new World(data);
             if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             if (Launch.Value("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
             world.Notify = Notify;
-            // A failed check run leaves its saves and settings behind: the next one starts without them, as a first launch does.
-            if (Launch.Args.Any(a => a is "--ui-test" or "--net-check" or "--server-check")) RemoveCheckFiles();
             sounds = new Sounds { World = world, MusicVolume = Settings.MusicVolume }; AddChild(sounds);
             // Closing the window goes through Quit, which lets playing sounds stop first.
             GetTree().AutoAcceptQuit = false;

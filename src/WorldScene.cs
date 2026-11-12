@@ -348,7 +348,7 @@ public partial class WorldView {
                     break;
                 }
             default: {
-                    float speed = clip switch { "wolf walk" => 1.55f, "wolf trot" => 3, "wolf gallop" => 6.3f, _ => ReviewSpeeds(Elapsed % 11) };
+                    float speed = clip switch { "wolf walk" => 1.5f, "wolf trot" => 3, "wolf gallop" => 6.3f, _ => ReviewSpeeds(Elapsed % 11) };
                     // The wolf crosses 40 tiles of track, then starts over.
                     reviewGround = Mathf.PosMod(reviewGround + speed * dt + 20, 40) - 20;
                     if (speed < .05f) wolf.Stand(Elapsed, dt, false); else wolf.Move(speed * dt, dt, speed > 4.5f, false);

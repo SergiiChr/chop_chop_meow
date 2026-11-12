@@ -37,6 +37,8 @@ public partial class CratePanel(PageTools tools, Thing subject) : ThingPage(tool
 /// <summary>A packed crate opened from the backpack: its contents move to and from the backpack by click, and it can be put down from here.</summary>
 public partial class CarriedCratePanel(PageTools tools, int crate) : PagePanel(tools) {
     public override bool Current => world.CarriedCrate(crate) != null;
+    // An emptied, placed or dropped crate leaves the backpack, and its page gives way to the backpack's.
+    public override Page GivesWayTo => Page.Backpack;
     protected override bool StoresFromHotbar => true;
 
     /// <summary>What the crate holds now, or an empty crate once it has gone.</summary>
@@ -53,7 +55,5 @@ public partial class CarriedCratePanel(PageTools tools, int crate) : PagePanel(t
         AddButton("Put it down", () => { if (world.CarriedCrate(crate) is string item) panel.Player.PlaceCrate(item); });
         BagGrid(id => world.MoveInCrate(crate, id, ItemMoves.Amount(world.S.Backpack, id), true), "Click: pack one · Shift: a stack · Ctrl: pack all",
             accepts: drag => drag.From != null && drag.From != Contents);
-        // An emptied, placed or dropped crate leaves the backpack, and its page gives way to the backpack's.
-        live.Add(() => { if (!Current) Callable.From(() => { if (panel.Shows(this)) panel.Open(Page.Backpack); }).CallDeferred(); });
     }
 }

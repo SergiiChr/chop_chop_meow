@@ -110,8 +110,14 @@ public sealed partial class GameData {
     public float WalkSpeed { get; } = 4.2f;
     /// <summary>How many times faster than walking a wolf chases: above 1 so walking never outpaces it, below <see cref="SprintSpeed"/> so sprinting does.</summary>
     public float WolfChase { get; } = 1.5f;
-    /// <summary>Wolves that come out of each den at dusk.</summary>
+    /// <summary>Wolves that come out of each den at dusk; after them one den lets one more out every hour until the wolves head home.</summary>
     public int WolvesPerDen { get; } = 1;
+    /// <summary>A wolf's health: an axe blow takes more than half of it.</summary>
+    public float WolfHealth { get; } = 4;
+    /// <summary>Health one bite takes: the fourth bite, not the third, brings a healthy player to half.</summary>
+    public float WolfBite { get; } = 15;
+    /// <summary>Metres a second a wolf stalks and backs off at; it patrols at half of it.</summary>
+    public float WolfTrot { get; } = 3;
     /// <summary>Metres within which a wolf smells a player out in the open; it howls and goes after them.</summary>
     public float SmellRadius { get; } = 30;
     /// <summary>Metres within which a wolf closing in on a player outside firelight sees them and breaks into a sprint.</summary>
@@ -170,7 +176,7 @@ public sealed partial class GameData {
         return data;
     }
     private void Validate() {
-        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || WolvesPerDen < 1 || WolfSightRange <= 0 || WolfSightRange >= SmellRadius || HowlRadius <= 0 || LoneHowlSeconds <= 0 || PackHowlSeconds <= 0 || WolfRetreatStarts <= NightStarts || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
+        if (DaySeconds <= 0 || TradeSeconds <= 0 || GatherSeconds <= 0 || DuskStarts <= 0 || NightStarts >= 1 || LunchHour < 6 || LunchHour + 1 > 6 + DuskStarts * 24 || RespawnSeconds < 0 || HungerHours <= 0 || ThirstHours <= 0 || CampfireHours <= 0 || MoonCycleDays <= 0 || BerryRegrowHours <= 0 || HireOffers.Count == 0 || HireOffers.Exists(o => o.Upfront < 0 || o.Wage < 0) || SightRadius <= 0 || CrateCapacity <= 0 || PackSeconds <= 0 || BenchSpeed <= 0 || SprintSpeed < 1 || SprintDrain < 1 || WalkSpeed <= 0 || WolfChase <= 1 || WolfChase >= SprintSpeed || WolvesPerDen < 1 || WolfHealth <= 0 || WolfBite <= 0 || WolfTrot <= 0 || WolfSightRange <= 0 || WolfSightRange >= SmellRadius || HowlRadius <= 0 || LoneHowlSeconds <= 0 || PackHowlSeconds <= 0 || WolfRetreatStarts <= NightStarts || !Items.ContainsKey("crate") || Water.BottleItems.Any(id => !Items.ContainsKey(id)))
             throw new InvalidOperationException("Invalid time or economy balance in GameData.");
         foreach (var building in Buildings) {
             foreach (var cost in building.Value.Cost)

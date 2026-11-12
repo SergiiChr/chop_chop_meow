@@ -71,6 +71,8 @@ public static class SimulationChecks {
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
         Test(CheckSprintOutrunsWolf, data);
         Test(CheckDensLetWolvesOutAtDusk, data);
+        Test(CheckARandomDenLetsOneMoreWolfOutEveryHour, data);
+        Test(CheckWolvesAreNoStrongerOnLaterNights, data);
         Test(CheckPatrollingWolfWalksAtHalfItsTrot, data);
         Test(CheckWolvesKeepToGroundAPlayerCanWalk, data);
         Test(CheckSmelledPlayerDrawsAHowlAndThePack, data);
@@ -78,7 +80,7 @@ public static class SimulationChecks {
         Test(CheckDensStayOpen, data);
         Test(CheckWolvesLetGoCleanly, data);
         Test(CheckOnlyCoinsUseTheLargerStack, data);
-        Test(CheckOlderSaveMigratesCoinsMarketBoxesAndOrders, data);
+        Test(CheckSaveFromAnotherVersionIsRefused, data);
         Test(CheckSaveWithUnknownItemRefused, data);
         Test(CheckCrewKeepsForgeHot, data);
         Test(CheckCrewLunchesAtTheNearestFireAndGoesBackToWork, data);
@@ -98,6 +100,7 @@ public static class SimulationChecks {
         Test(CheckFullStationLeavesWorkerHoldingTheWrongToolUntilThereIsRoom, data);
         Test(CheckWorkerPutsToolBackGoingHomeAndLeavesItWhenDismissed, data);
         Test(CheckRakeClearsLeavesWhichFallAgain, data);
+        Test(CheckBerryBushesStartAlikeAndRegrowWhateverIsPicked, data);
         Test(CheckPilesSnapTogetherHoldOneResourceAndMakeCompost, data);
         Test(CheckCookingTableCrushesBerriesAndCooksJam, data);
         Test(CheckCanneryAndFurnaceTakeTheirFoodRecipes, data);
@@ -115,9 +118,7 @@ public static class SimulationChecks {
         Test(CheckFoodsFeedWaterAndHealByTheirData, data);
         Test(CheckMarketTakesCratesAndDonations, data);
         Test(CheckDonationIsNoSale, data);
-        Test(CheckOlderSavesResetMadeToolAnvilsAndStartWaterGoal, data);
         Test(CheckStationQueueAndMarkSurviveALoad, data);
-        Test(CheckLoadedSaveDropsOldStageNumber, data);
         Test(CheckEverythingIsReachableFromFreshStart, data);
         Test(CheckTorchLightsAndBurnsOut, data);
         Test(CheckTorchSwingScaresOnlyWolvesItIsAimedAt, data);
@@ -460,7 +461,7 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
         world.Player = sign.Pos;
-        // The post refuses loose goods by hand, so this is what an old save might hold.
+        // The post refuses loose goods by hand, so they are put in directly.
         sign.Inventory.Add("wood", 3);
         Require(!world.Sell(sign), "loose goods must not be sold");
         Require(world.Orders.Count == 0, "loose goods must not send a cart");
@@ -2039,7 +2040,7 @@ public static class SimulationChecks {
         Require(chest.Inventory["fertilizer"] == 0, "the worker should bring the fertilizer");
     }
 
-    /// <summary>Foods restore what their data says, raw ones only say they need cooking, and saves from before the rename keep their cooked meat.</summary>
+    /// <summary>Foods restore what their data says, and raw ones only say they need cooking.</summary>
     private static void CheckFoodsFeedWaterAndHealByTheirData(GameData data) {
         var world = EmptyWorld(data);
         SetNeeds(world, 20, 20, 50);
@@ -2057,20 +2058,6 @@ public static class SimulationChecks {
         Require(!data.IsFood("water"), "water should not be food");
         Require(data.IsConsumable("water"), "water should be drinkable");
         Require(!data.IsFood("tin_can"), "cans should not be food");
-
-        var old = EmptyWorld(data);
-        var furnace = old.Add(ThingKind.Furnace, new Vector2(10, 10));
-        old.SetRecipe(furnace, "burnt_steak"); furnace.Inventory.Add("burnt_steak", 2);
-        Give(old, "burnt_steak", 3);
-        var json = Patch(old.Serialize(), ("\"burnt_steak\"", "\"cooked_meat\""));
-        var loaded = EmptyWorld(data);
-        loaded.Deserialize(json);
-        Require(loaded.Backpack["burnt_steak"] == 3,
-            "cooked meat from older saves should become burnt steak in the backpack");
-        var f = loaded.Find(furnace.Id);
-        Require(f?.Recipe == "burnt_steak",
-            "the furnace's cooked meat recipe from older saves should become burnt steak");
-        Require(f.Inventory["burnt_steak"] == 2, "cooked meat in an older save's furnace should become burnt steak");
     }
 
     private static void CheckDonationIsNoSale(GameData data) {
@@ -2110,61 +2097,21 @@ public static class SimulationChecks {
         SafeTick(world, data.TradeSeconds + .1f);
         Require(said.Any(m => m.EndsWith("Donated 1 Steel chisel.")), "the returning cart should say what was donated");
         SetCoins(world, 1000);
-        Require(world.Buy(sign, "canned_food", 2), "boxed goods should be bought from the post");
+        Require(world.Buy(sign, "canned_meat_stew", 2), "boxed goods should be bought from the post");
         Require(world.Orders.Last().Crates == 2, "boxed goods should be bought by the crate");
-        Require(world.Coins == 822, "boxed goods should cost the crate price");
-        Require(world.LotPrice("canned_food") > data.Market.Buys["canned_food"] * world.UnitPrice("canned_food", false), "a bought crate costs more than its contents would sell for");
+        // A crate of 12 at 12.15 each plus its crate at 3.15 is 148.95; a quarter more, rounded up, is 187.
+        Require(world.Coins == 1000 - 2 * 187, "boxed goods should cost the crate price");
+        Require(world.LotPrice("canned_meat_stew") > data.Market.Buys["canned_meat_stew"] * world.UnitPrice("canned_meat_stew", false), "a bought crate costs more than its contents would sell for");
         SafeTick(world, data.TradeSeconds + .1f);
         var bought = sign.Output!.Items.Keys.Where(World.IsCrate).ToList();
-        Require(bought.Count == 2 && bought.All(id => world.Packed(id)?["canned_food"] == data.Market.Buys["canned_food"]), "each bought crate should arrive packed with one purchase");
-        SetNeeds(world, hunger: 40); Give(world, "canned_food", 1); world.Consume("canned_food");
-        Require(world.Hunger > 40 && data.IsFood("canned_food"), "canned food should be edible");
-        Require(world.KnownPrice("raw_meat") > 0 && !world.Priced("canned_food"), "the price sheet only tracks goods the village buys");
+        Require(bought.Count == 2 && bought.All(id => world.Packed(id)?["canned_meat_stew"] == 12), "each bought crate should arrive packed with one purchase");
+        SetNeeds(world, hunger: 30); Give(world, "canned_meat_stew", 1); world.Consume("canned_meat_stew");
+        // A can of meat stew feeds 60.
+        Require(world.Hunger == 90, "canned meat stew should be eaten from the can");
+        Require(world.KnownPrice("raw_meat") > 0 && !world.Priced("wheat_seeds"), "the price sheet only tracks goods the village buys");
+        Require(!data.Items.ContainsKey("canned_food") && data.Recipes.Values.All(r => !r.Inputs.ContainsKey("raw_meat") || r.Station != ThingKind.Cannery), "raw meat should sell in crates and never go into a can");
     }
 
-    private static void CheckLoadedSaveDropsOldStageNumber(GameData data) {
-        var old = EmptyWorld(data);
-        var mine = old.Add(ThingKind.Mine, World.MineSpot(World.CliffOf(ThingKind.Iron))); mine.MineStage = MineStage.Supplied;
-        var farm = old.Add(ThingKind.Farm, new Vector2(20, 20)); farm.FarmStage = FarmStage.Ripe;
-        old.Look();
-        // Older saves kept both stages in one number.
-        var save = JsonNode.Parse(old.Serialize())!.AsObject();
-        foreach (var thing in save["Things"]!.AsArray().Concat(save["Remembered"]!.AsObject().Select(pair => pair.Value))) {
-            var fields = thing!.AsObject();
-            int stage = (int)fields["MineStage"]! + (int)fields["FarmStage"]!;
-            fields.Remove("MineStage"); fields.Remove("FarmStage"); fields["Stage"] = stage;
-        }
-        var loaded = EmptyWorld(data);
-        loaded.Deserialize(save.ToJsonString());
-        Require(loaded.Find(mine.Id)?.MineStage == MineStage.Supplied,
-            "an older save's stage number should load as the mine's stage");
-        Require(loaded.Find(farm.Id)?.FarmStage == FarmStage.Ripe,
-            "an older save's stage number should load as the farm plot's stage");
-        Require(loaded.Find(farm.Id)?.MineStage == MineStage.Marked,
-            "an older save's stage number should leave the farm plot's mine stage at its default");
-        Require(!loaded.Serialize().Contains("\"Stage\""), "a loaded save should no longer write the old stage number");
-    }
-
-    private static void CheckOlderSavesResetMadeToolAnvilsAndStartWaterGoal(GameData data) {
-        var old = EmptyWorld(data);
-        var anvil = old.Add(ThingKind.Anvil, new Vector2(10, 10));
-        anvil.Keep = "steel_pick"; anvil.Inventory.Add("iron_bar", 3);
-        Give(old, "steel_pick", 1); Give(old, "steel_hammer", 1); Give(old, "iron_bar", 2);
-        old.Add(ThingKind.Stone, new Vector2(20, 20), 2);
-        Achieve(old, "gather", "furnace", "iron_bar", "anvil", "pick");
-        SetGoal(old, 5);
-        // Older saves had steel tools as one item, and iron tools and loose iron that have since left the game.
-        var json = Patch(old.Serialize(), ("\"iron_bar\": 2", "\"steel_tools\": 3"), ("\"steel_pick\"", "\"iron_pick\""), ("\"steel_hammer\"", "\"iron_hammer\""), ("\"stone\"", "\"loose_iron\""));
-        var loaded = EmptyWorld(data);
-        loaded.Deserialize(json);
-        Require(loaded.Backpack["steel_axe"] == 1 && loaded.Backpack["steel_parts"] == 2,
-                "old steel tools become steel parts, except one that becomes the missing axe");
-        Require(loaded.Backpack["steel_pick"] == 1, "old iron pickaxes should become steel ones");
-        Require(loaded.Backpack["steel_hammer"] == 1, "old iron hammers should become steel ones");
-        Require(loaded.Things.Count == old.Things.Count(t => t.Kind != ThingKind.Stone), "loose iron should be gone");
-        Require(loaded.Find(anvil.Id)!.Recipe == "steel_parts" && loaded.Find(anvil.Id)!.Inventory["iron_bar"] == 3, "an anvil set to a tool now made at the bench goes back to steel parts and keeps its inputs");
-        Require(loaded.Goal == 0, "an older save should begin with the new collect-water survival goal");
-    }
 
     private static void CheckStationQueueAndMarkSurviveALoad(GameData data) {
         var old = EmptyWorld(data);
@@ -2279,14 +2226,68 @@ public static class SimulationChecks {
         Require(world.Wolves.All(w => w.Target == 0 && w.Mode == WolfMode.Patrol), "wolves out of their dens should patrol until they smell someone");
     }
 
+    private static void CheckARandomDenLetsOneMoreWolfOutEveryHour(GameData data) {
+        // Inside a cabin the player is never smelled, so every wolf let out stays out until the retreat.
+        var world = EmptyWorld(data);
+        Require(world.Enter(world.Add(ThingKind.Hut, world.Player + new Vector2(2, 0))), "the player should step into the cabin");
+        RunUntilDusk(world);
+        SafeTick(world, data.HourSeconds - 1);
+        Require(world.Wolves.Count == World.Dens.Length, "only the wolves of dusk should be out through the first hour");
+        SafeTick(world, 2);
+        Require(world.Wolves.Count == World.Dens.Length + 1 && World.Dens.Any(den => world.Wolves[^1].Pos.DistanceTo(den.Door) < 4),
+                "one den should let one more wolf out an hour after dusk");
+        SafeTick(world, data.HourSeconds);
+        Require(world.Wolves.Count == World.Dens.Length + 2, "a den should let one more wolf out after each further hour");
+        // From dusk at 20:24 to the retreat at 05:00 eight whole hours pass.
+        SafeTick(world, data.WolfRetreatStarts * data.DaySeconds - world.Time - 1);
+        Require(world.Wolves.Count == World.Dens.Length + 8, $"a night should let out one wolf an hour until the retreat, not {world.Wolves.Count - World.Dens.Length}");
+    }
+
+    private static void CheckWolvesAreNoStrongerOnLaterNights(GameData data) {
+        (float Health, float Pace, float Bite) Wolf(int night) {
+            var world = EmptyWorld(data);
+            world.Player = Terrain.Point(120, 0);
+            RunUntil(world, (night - 1) * data.DaySeconds);
+            RunUntilDusk(world);
+            SafeTick(world, .5f);
+            var wolf = world.Wolves.Single();
+            var from = wolf.Pos;
+            SafeTick(world, 1);
+            float pace = wolf.Pos.DistanceTo(from);
+            SetNeeds(world, health: 100);
+            PlaceWolf(world, new Wolf { Pos = world.Player + new Vector2(.8f, 0) });
+            SafeTick(world, .2f);
+            return (wolf.Health, pace, 100 - world.Health);
+        }
+        var (first, later) = (Wolf(1), Wolf(30));
+        Require(later.Health == first.Health, $"a wolf should take as many blows a month in as on the first night: {first.Health} and {later.Health}");
+        Require(later.Pace == first.Pace, $"a wolf should walk as fast a month in as on the first night: {first.Pace} and {later.Pace}");
+        foreach (float bite in new[] { first.Bite, later.Bite })
+            Require(bite * 3 < 50 && bite * 4 >= 50, $"the fourth bite, not the third, should take a healthy player to half health on any night; one takes {bite}");
+    }
+
+    private static void CheckBerryBushesStartAlikeAndRegrowWhateverIsPicked(GameData data) {
+        var world = new World(data);
+        var bushes = world.Things.Where(t => t.Kind == ThingKind.Berries).ToList();
+        Require(bushes.All(b => b.Remaining == 24), "every bush should start with 24 berries, as many as it regrows");
+        var bush = bushes[0];
+        world.Player = bush.Pos;
+        world.Gather(bush, data.GatherSeconds);
+        Require(bush.Remaining == 20, "one gather should pick 4 berries");
+        RunUntil(world, world.Time + data.BerryRegrowSeconds - 2);
+        Require(bush.Remaining == 20, "a bush should not fruit again before its hours have passed");
+        RunUntil(world, world.Time + 4);
+        Require(bush.Remaining == 24, "a bush picked only in part should be full again once its hours have passed");
+    }
+
     private static void CheckPatrollingWolfWalksAtHalfItsTrot(GameData data) {
         var world = NightWorld(data);
         world.Player = Terrain.Point(30, 0);
         var start = Terrain.Point(120, 0);
         var wolf = PatrolWolf(world, new Wolf { Pos = start, Heading = Terrain.Sideways.Angle() });
         SafeTick(world, 1);
-        // On the first night a wolf trots at 3.1 m/s, so it patrols at 1.55 m/s.
-        Require(Math.Abs(wolf.Pos.DistanceTo(start) - 1.55f) < .05f, $"a patrolling wolf should walk at half its trot, not {wolf.Pos.DistanceTo(start):0.00} m/s");
+        // A wolf trots at 3 m/s, so it patrols at 1.5 m/s.
+        Require(Math.Abs(wolf.Pos.DistanceTo(start) - 1.5f) < .02f, $"a patrolling wolf should walk at half its trot, not {wolf.Pos.DistanceTo(start):0.00} m/s");
     }
 
     private static void CheckWolvesKeepToGroundAPlayerCanWalk(GameData data) {
@@ -2508,37 +2509,21 @@ public static class SimulationChecks {
         Give(world, "tin_can", 2);
         var worker = AddWorker(world, new Vector2(12, 12));
         worker.Tool = "steel_hammer"; worker.Bag.Add("wood", 2);
+        // An anvil makes steel parts only; pickaxes are made at the bench.
+        world.Add(ThingKind.Anvil, new Vector2(10, 10));
         string json = world.Serialize();
         EmptyWorld(data).Deserialize(json);
-        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"Tool\": \"steel_hammer\"", "\"Tool\": \"unobtainium\""), ("\"wood\": 2", "\"unobtainium\": 2") }) {
+        foreach (var edit in new[] { ("\"tin_can\"", "\"unobtainium\""), ("\"Tool\": \"steel_hammer\"", "\"Tool\": \"unobtainium\""), ("\"wood\": 2", "\"unobtainium\": 2"), ("\"Keep\": \"steel_parts\"", "\"Keep\": \"steel_pick\""), ("\"Goal\": 0", "\"Goal\": -1") }) {
             bool refused = false;
             try { EmptyWorld(data).Deserialize(Patch(json, edit)); } catch (InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
             Require(refused, $"a save with {edit.Item2} in place of {edit.Item1} should be refused with a clear reason");
         }
     }
 
-    private static void CheckOlderSaveMigratesCoinsMarketBoxesAndOrders(GameData data) {
+    /// <summary>A save from another version of the game is refused with a clear reason, never converted.</summary>
+    private static void CheckSaveFromAnotherVersionIsRefused(GameData data) {
         var old = EmptyWorld(data);
-        var sign = old.Add(ThingKind.Signpost, new Vector2(10, 10));
-        PlaceOrder(old, new TradeOrder { Buying = true, Value = 8, Signpost = sign.Id });
-        // Older saves kept coins outside the backpack and one item per order.
-        var json = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;
-        json["Coins"] = 30;
-        var post = json["Things"]!.AsArray().First(t => t!["Id"]!.GetValue<int>() == sign.Id)!;
-        post["Output"] = null; post["Wages"] = null; post["Inventory"]!["Slots"] = 18;
-        var order = json["Orders"]![0]!;
-        order["Goods"] = new System.Text.Json.Nodes.JsonObject(); order["Item"] = "wood"; order["Quantity"] = 4;
-        var loaded = EmptyWorld(data);
-        loaded.Deserialize(json.ToJsonString());
-        Require(loaded.Coins == 30, "coins from an older save should move into the backpack");
-        Require(OldCoins(loaded) == null, "an older save's loose coins should not stay behind after moving");
-        Require(loaded.Find(sign.Id) is { Output.Slots: World.MarketSlots, Inventory.Slots: World.MarketSlots, Wages.Slots: 1 }, "an older signpost should get its market boxes");
-        Require(loaded.Orders.Single().Goods.GetValueOrDefault("wood") == 4 && loaded.Orders.Single().Item == null, "an older single-item order should keep its goods");
-        var migrated = System.Text.Json.Nodes.JsonNode.Parse(loaded.Serialize())!;
-        Require(migrated["Coins"] == null && migrated["Orders"]!.AsArray().All(order => order!["Item"] == null), "migrated fields should not be written back");
-
-        // A save from another version keeps its players in another place, so it is refused rather than loaded without them.
-        var older = System.Text.Json.Nodes.JsonNode.Parse(old.Serialize())!;
+        var older = JsonNode.Parse(old.Serialize())!;
         older["Version"] = 5;
         bool refused = false;
         try { EmptyWorld(data).Deserialize(older.ToJsonString()); } catch (InvalidOperationException error) { refused = error.Message.Contains("another version"); }

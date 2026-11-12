@@ -30,6 +30,13 @@ public partial class Game {
         } while ((net.Connecting || net.ShownUpdate != server.Net.LastUpdate) && Time.GetTicksMsec() < until);
     }
 
+    /// <summary>Puts the player in front of the first iron cliff, where a mine is marked, and gives the cliff.</summary>
+    private async Task<Cliff> StandAtIronCliff() {
+        var cliff = World.CliffOf(ThingKind.Iron);
+        SetupSteps.Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        return cliff;
+    }
+
     /// <summary>This window's copy of something a check placed on the server.</summary>
     private Thing Shown(Thing thing) => world.Find(thing.Id) ?? throw new InvalidOperationException($"This window does not show the {thing.Kind}.");
 

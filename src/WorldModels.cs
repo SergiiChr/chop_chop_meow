@@ -19,6 +19,8 @@ public class Prop {
     /// <summary>Whether a build-mode ghost is tinted as placeable, or null before its first tint.</summary>
     public bool? Tint;
     public bool Seen;
+    /// <summary>What the model was last drawn from: where its thing stood, what of it shows, and whether it was in sight.</summary>
+    public (Vector2 Pos, int Remaining, float Progress, MineStage Mine, FarmStage Farm, bool Night, bool Live) Look;
     /// <summary>Whether the model is drawn, kept here so it is set in Godot only when it changes.</summary>
     public bool Shown = true;
     public Prop() { Body = Pivot(Root, Vector3.Zero); }

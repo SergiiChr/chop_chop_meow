@@ -107,6 +107,8 @@ public partial class Game {
         await Click(Named($"hire_{world.Data.HireOffers[0].Upfront:0}")!);
         await Until(() => panel.Selection.Worker != 0, "the panel opening on the worker the server hired");
         Hosted.Fire(Hosted.Workers[^1]);
+        // The page closes by itself once this window hears of it; an Esc pressed just before that would land after it and open the pause menu.
+        await Until(() => !panel.Visible, "the fired worker's page closing once this window hears they left", 5);
         await CloseWithEsc();
     }
 

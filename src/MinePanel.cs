@@ -11,6 +11,8 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
         headingIcon.Texture = Icons.Of(World.MineOre(thing)); headingIcon.Visible = true;
         var data = world.Data.Mine;
         int stage = (int)thing.MineStage; bool open = thing.MineStage == MineStage.Open;
+        // Everything below is laid out for this stage.
+        RedrawOnChange(() => thing.MineStage);
         var tag = Style.Pill(open ? "open" : $"{stage + 1} / 3", open ? Style.TagPill : Style.Tag(Style.Mustard), open ? Style.Rim : Style.Line, 13);
         panel.AddToHeader(tag);
         if (!open) {
@@ -42,7 +44,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                         cell.TooltipText = $"{world.Data.Name(item)} · {drawn} of {amount}\nClick to deliver from your backpack";
                     });
                 }
-            } else Dynamic(text => text.Append(stages[(int)thing.MineStage].Needs).Append(" · ").Append((int)(thing.Progress / world.MineStageSeconds * 100)).Append("% done"), 14, Style.Beige);
+            } else Dynamic(text => text.Append(stages[stage].Needs).Append(" · ").Append((int)(thing.Progress / world.MineStageSeconds * 100)).Append("% done"), 14, Style.Beige);
             BagGrid(id => world.SupplyMine(thing), "Click: deliver what the mine needs", wanted: id => world.MineNeed(thing, id) > 0);
         } else {
             // Miners as hardhats, lit while underground, and the two outputs with how fast they fill.

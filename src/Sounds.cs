@@ -70,8 +70,8 @@ public partial class Sounds : Node {
     public float MusicVolume = 1;
     public bool DayMusicPlaying => day.Player.Playing;
     public int DayMusicIndex => day.Index;
-    /// <summary>Ends the current day track early, as if it had played to its end.</summary>
-    public void FinishDayTrack() => day.Player.EmitSignal(AudioStreamPlayer.SignalName.Finished);
+    /// <summary>Jumps the current day track to its last moment, so it plays to its end without the wait.</summary>
+    public void SkipToDayTrackEnd() => day.Player.Seek((float)day.Player.Stream.GetLength() - .1f);
     public bool NightMusicPlaying => night.Player.Playing;
     public float NightMusicPosition => night.Position;
 
@@ -186,6 +186,7 @@ public partial class Sounds : Node {
         public readonly AudioStreamPlayer Player;
         private readonly AudioStreamMP3[] streams;
         private float level, at;
+        private bool started;
         public int Index { get; private set; }
         public float Position => Player.Playing ? Player.GetPlaybackPosition() : at;
 
@@ -193,7 +194,6 @@ public partial class Sounds : Node {
             streams = names.Select(name => GD.Load<AudioStreamMP3>($"res://assets/music/{name}.mp3")).ToArray();
             streams[0].Loop = streams.Length == 1;
             Player = new AudioStreamPlayer { Stream = streams[0] };
-            Player.Finished += () => { Index = (Index + 1) % streams.Length; Player.Stream = streams[Index]; Player.Play(); };
             parent.AddChild(Player);
         }
 
@@ -201,7 +201,12 @@ public partial class Sounds : Node {
             level = Mathf.MoveToward(level, wanted ? 1 : 0, dt / MusicFadeSeconds);
             if (level > 0) {
                 if (Player.StreamPaused) Player.StreamPaused = false;
-                else if (!Player.Playing) Player.Play();
+                else if (!Player.Playing) {
+                    // A player that has started and is neither playing nor paused has reached the end of its track, so the next one follows.
+                    // The player's own finished signal comes too late for this: it fires after this update has already started the track again.
+                    if (started) { Index = (Index + 1) % streams.Length; Player.Stream = streams[Index]; }
+                    Player.Play(); started = true;
+                }
             } else if (Player.Playing) {
                 at = Player.GetPlaybackPosition();
                 Player.StreamPaused = true;
