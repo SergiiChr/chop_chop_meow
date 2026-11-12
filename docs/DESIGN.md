@@ -800,7 +800,7 @@ A sound on screen plays at full volume, one just past the screen edge is faint, 
 Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
-- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, bellows pumps, storage lids and the cabin door.
+- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids and the cabin door.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
 ### Music

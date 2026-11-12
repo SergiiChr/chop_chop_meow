@@ -185,8 +185,9 @@ These were made with ffmpeg from Kenney's sounds:
 - `take_down_building`: four plank drops a fraction of a second apart, each quieter than the last.
 - `grind_mortar`: snow footstep grains for the pestle's two rounds and a light tap as it comes down, one 1.8 second loop.
 - `rustle`: cloth handling, for packing crates and for picking plants by hand.
+- `butcher_carcass`: knife slices pitched lower and muffled, so they read as tearing meat.
 
-`wolf_hit`, `place_building`, `butcher_carcass`, `rail_clink` and `buy_coins` are Kenney's punch and wood impacts, knife cuts, metal clinks and coins as they are.
+`wolf_hit`, `place_building`, `rail_clink` and `buy_coins` are Kenney's punch and wood impacts, metal clinks and coins as they are.
 
 `wolf_howl` (a lone wolf, the night's first howl), `wolf_howl_group` (the pack answering) and `hire_sign` (a pen signing paper, cleaned of rumble and room noise) were supplied for this project.
 

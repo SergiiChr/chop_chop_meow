@@ -679,7 +679,7 @@ public partial class WorldView : Node3D {
         if (action == ActorAction.Pump)
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
-        // Hands close on what they gather twice a loop; packing digs into the crate as each loop starts, and grinding plays one clip a loop.
+        // Hands close on what they gather twice a loop; packing digs into the heap of goods as each loop starts, and grinding plays one clip a loop.
         string? handSound = action switch {
             ActorAction.Gather when actor.Struck(.22f) || actor.Struck(.72f) => GrabSound(subject.Kind),
             ActorAction.Pack when actor.Struck(.04f) => "rustle",
@@ -882,6 +882,8 @@ public partial class WorldView : Node3D {
             case CarcassProp carcass:
                 // Thrown, the carcass covers the knockback while it is in the air and stays where it lands.
                 float since = t.Progress - carcass.HitIn, dying = Math.Clamp(since / WolfModel.FallSeconds, 0, 1), thrown = Math.Min(1, dying / WolfModel.ThrowShare);
+                // The killing blow thuds as it lands, heard only where the player saw the wolf fall.
+                if (!carcass.Landed && since >= 0) { carcass.Landed = true; if (watched) Sounds?.Play("wolf_hit", t.Pos); }
                 carcass.Body.Position = carcass.From * (1 - thrown * (2 - thrown));
                 carcass.Wolf.Fall(dying);
                 // Butchering flattens the carcass while the blood pool spreads out from under it.
@@ -1141,7 +1143,7 @@ public partial class WorldView : Node3D {
                 var at = model.HitFrom.Lerp(strike, Ease(1 - model.HitIn / Math.Max(model.HitSeconds, .001f)));
                 back = -(at - wolf.Pos - model.Knock).Length();
                 model.Knock = at - wolf.Pos;
-                if (model.HitIn == 0) { model.Recoiling = WolfModel.RecoilSeconds; model.KnockFrom = model.Knock; FurAndEmbers(To3(at, .6f)); }
+                if (model.HitIn == 0) { model.Recoiling = WolfModel.RecoilSeconds; model.KnockFrom = model.Knock; FurAndEmbers(To3(at, .6f)); Sounds?.Play("wolf_hit", at); }
             } else if (model.Recoiling > 0) {
                 // The wolf goes back only while it is in the air, so its paws never slide.
                 model.Recoiling = Math.Max(0, model.Recoiling - dt);

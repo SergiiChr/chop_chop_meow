@@ -1049,9 +1049,9 @@ public sealed partial class World {
     public const float StaggerSeconds = .45f;
     /// <summary>How far a blow throws a wolf back: a short hop, which the view plays as the wolf jumping clear.</summary>
     public const float KnockBackDistance = .5f;
-    /// <summary>A blow landing on a wolf: it thuds, takes the damage and is thrown back, and falls once its health is gone.</summary>
+    /// <summary>A blow landing on a wolf: it takes the damage and is thrown back, and falls once its health is gone.</summary>
     private void Strike(Wolf wolf, float damage) {
-        Play("wolf_hit", wolf.Pos); wolf.Health -= damage; KnockBack(wolf);
+        wolf.Health -= damage; KnockBack(wolf);
         if (wolf.Health <= 0) KillWolf(wolf);
     }
     private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; }

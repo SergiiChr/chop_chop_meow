@@ -55,6 +55,8 @@ public sealed class CarcassProp : Prop {
     /// <summary>Where the wolf stood when it was killed, from the carcass, and how long after the carcass appeared the killing blow landed.</summary>
     public Vector3 From;
     public float HitIn;
+    /// <summary>Whether the killing blow has landed, so its thud plays once.</summary>
+    public bool Landed;
 }
 
 /// <summary>A chest, crate or dropped backpack, whose lid opens while it is used.</summary>

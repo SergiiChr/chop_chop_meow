@@ -26,7 +26,8 @@ public static class SimulationChecks {
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
         Test(CheckPlayerMovesItemsWithinFifteenMetres, data);
         Test(CheckDismantlingABuildingReturnsItsCostAndContents, data);
-        Test(CheckBuildingTradingAndBlowsOnWolvesMakeTheirSounds, data);
+        Test(CheckBuildingsKnockIntoPlaceAndClatterDown, data);
+        Test(CheckBuyingJinglesCoinsAndHiringSigns, data);
         Test(CheckDismantlingWhatDoesNotFitLeavesItInABox, data);
         Test(CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest, data);
         Test(CheckWorkerGathersWoodAndRetargetsWhenFilterChanges, data);
@@ -253,7 +254,7 @@ public static class SimulationChecks {
         Require(!world.Dismantle(cabin) && world.Find(cabin.Id) != null, "a cabin someone shelters in should not come down");
     }
 
-    private static void CheckBuildingTradingAndBlowsOnWolvesMakeTheirSounds(GameData data) {
+    private static void CheckBuildingsKnockIntoPlaceAndClatterDown(GameData data) {
         var world = EmptyWorld(data);
         var heard = Listen(world);
         Give(world, data.Buildings[ThingKind.Chest].Cost);
@@ -265,22 +266,18 @@ public static class SimulationChecks {
         world.Player = new Vector2(20, 20);
         heard.Clear(); world.Dismantle(chest);
         Require(heard.SequenceEqual(new[] { "take_down_building" }), "a building taken down should clatter apart");
-        var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(0, -4));
+    }
+
+    private static void CheckBuyingJinglesCoinsAndHiringSigns(GameData data) {
+        var world = EmptyWorld(data);
+        var heard = Listen(world);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(20, 16));
         world.Player = sign.Pos;
         SetCoins(world, 100);
         heard.Clear(); world.Buy(sign, "water", 1);
         Require(heard.SequenceEqual(new[] { "buy_coins" }), "a buy order should jingle the coins paid");
         heard.Clear(); world.Hire(sign, data.HireOffers[0]);
         Require(heard.SequenceEqual(new[] { "hire_sign" }), "hiring a worker should sign them on");
-
-        var night = NightWorld(data);
-        var struck = Listen(night);
-        night.Attack();
-        Require(!struck.Contains("wolf_hit"), "a blow at the air should not sound like it hit a wolf");
-        SafeTick(night, 1);
-        PlaceWolf(night, new Wolf { Pos = night.Player + new Vector2(1.5f, 0), Health = 5 });
-        struck.Clear(); night.Attack();
-        Require(struck.Contains("wolf_hit"), "a blow that lands on a wolf should thud");
     }
 
     private static void CheckDismantlingWhatDoesNotFitLeavesItInABox(GameData data) {
@@ -1634,11 +1631,16 @@ public static class SimulationChecks {
         Require(!world.TorchLit, "a burnt out torch should not stay lit");
         Require(heard.Count(name => name == "torch_out") == 2, "a torch burning out should fizzle");
         Require(world.Backpack["torch"] == 1, "a burnt out torch should leave the spare torch in the backpack");
-        world.UseTorch(Vector2.Zero); world.Die();
+        Give(world, "torch", 1); world.UseTorch(Vector2.Zero); SafeTick(world, World.KindleSeconds + .1f);
+        Require(world.TorchLit, "a fresh torch should light");
+        world.Die();
+        Require(heard.Count(name => name == "torch_out") == 3, "a lit torch should fizzle out when the player falls");
+        SafeTick(world, data.RespawnSeconds + .1f);
+        Give(world, "torch", 1); world.UseTorch(Vector2.Zero); world.Die();
         Require(world.Torch == 0, "a torch should burn out when the player falls");
         Require(!world.TorchLit, "a torch should not stay lit when the player falls");
         Require(world.TorchKindling == 0, "a torch should stop kindling when the player falls");
-        Require(heard.Count(name => name == "torch_out") == 2, "a torch put away before it caught should not fizzle");
+        Require(heard.Count(name => name == "torch_out") == 3, "a torch still being lit when the player falls should not fizzle");
     }
 
     private static void CheckTorchSwingScaresOnlyWolvesItIsAimedAt(GameData data) {
