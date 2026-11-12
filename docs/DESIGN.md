@@ -532,15 +532,16 @@ A click on a chip scrolls to that item and lights it (`MapNode.Light`); a click 
 
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
 `SaveState.Obtained` holds every item the settlement has gathered, grown, bought or started with; with what it made, which is among `SaveState.Milestones`, those are the items the recipe map shows as known (`World.Had`).
-A save written before `Obtained` existed loads with it empty, so its raw resources show as not made until they are gathered again.
+Everything such an item is made of is known with it (`GameData.EndsUpIn`), so no ingredient looks unmade beside its product: a new settlement's steel axe and bottle make their whole chains known.
+A save written before `Obtained` existed loads with it empty, so a raw resource it made nothing of shows as not made until it is gathered again.
 `GameData.MadeFrom` gives the item another is made out of: its recipe's first input, or the first `From` of its entry in `GameData.Sources` when no recipe makes it.
 `GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item is on the map once.
 
 #### Tool slots
 
 `World.SlotKinds` names the tool slots a station has (`Thing.Tools`): a chisel and a hammer at the bench, a mortar at the cooking table (`cooktable`).
-A recipe that needs a tool at such a station runs at the speed of the slotted tool, or with the slot empty at that of the fastest one carried by a player working there (`World.StationTool`).
-Worked only by its crew, it waits for a slotted tool.
+A recipe that needs a tool at such a station runs at the speed of the fastest of the slotted tool and those carried by players working there (`World.StationTool`).
+Worked only by its crew, it runs with the slotted tool and waits when there is none.
 At the cooking table it runs only while someone works it (`World.Worked(Thing)`).
 The mortar's recipes are worked, while jam, stew and dough cook unattended and their worker only hauls.
 

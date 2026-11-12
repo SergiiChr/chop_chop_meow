@@ -394,7 +394,7 @@ The game goes on under it, with your character standing where they were, and an 
 
 - The map has a row for each category: wood, stone and coal, iron and steel, tin, food and farm. In a row each item hangs off the one it is made out of, raw material first.
 - Every item is on the map, with where it is made or come by under its name.
-- An item the settlement has made, gathered, bought or started with has a filled cup, any other a dashed outline. The stations along the top, with their costs, are outlined until first built.
+- An item the settlement has made, gathered, bought or started with has a filled cup, and so has everything that item is made of; any other has a dashed outline. The stations along the top, with their costs, are outlined until first built.
 - Chips beside an item's cup show the tool its recipe requires (yellow rim) and each additional resource it takes (dark rim). A click on a chip scrolls to that item and lights it up for a moment.
 - A click on an item shows how it is made, what it requires and what it is used for, with a button that opens the nearest station that makes it, or the crafting menu for a recipe made by hand.
 
@@ -402,7 +402,7 @@ The game goes on under it, with your character standing where they were, and an 
 
 The crafting bench costs 10 planks, works twice as fast and must be worked like the anvil, by you or an assigned worker.
 It has a chisel slot and a hammer slot, and a slotted tool's speed multiplies its rate.
-With a slot empty you can still work the bench with a tool from your backpack; a worker needs the tool slotted.
+You can also work the bench with a tool from your backpack, and the faster of that and the slotted one counts; a worker needs the tool slotted.
 
 It makes what the menu's chisel makes (planks, wood parts, the mallet, torches and the mortar), plus these, all with any hammer:
 

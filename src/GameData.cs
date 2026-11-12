@@ -224,6 +224,7 @@ public sealed partial class GameData {
     // Filled by Validate: the id of the recipe that makes each item, and what the recipe map hangs under each item.
     private readonly Dictionary<string, string> recipeIdOf = new();
     private readonly Dictionary<string, List<string>> madeOutOf = new();
+    private readonly Dictionary<string, string[]> endsUpIn = new();
     private static readonly List<string> Nothing = new();
     /// <summary>Items the recipe map leaves out: coins, and the part-drunk bottles that stand with the full one.</summary>
     public static bool OffTheMap(string item) => item == Inventory.Coins || item is "water_1" or "water_2";
@@ -239,10 +240,14 @@ public sealed partial class GameData {
     public int ChainLength(string item) => MadeOutOf(item).Count == 0 ? 0 : 1 + MadeOutOf(item).Max(ChainLength);
     /// <summary>What an item goes into: the products that take it as an input, then for a tool those made with it.</summary>
     public IEnumerable<string> UsedFor(string item) {
-        var uses = Recipes.Values.Where(r => r.Inputs.ContainsKey(item)).Select(r => r.Output).Concat(Sources.Where(p => p.Value.From.Contains(item) || p.Value.Also.Contains(item)).Select(p => p.Key));
+        var uses = ProductsOf(item);
         if (Items[item].Tool is { Length: > 0 } kind) uses = uses.Concat(Recipes.Values.Where(r => r.Tool == kind && r.Tier <= Items[item].Tier).Select(r => r.Output));
         return uses.Distinct();
     }
+    /// <summary>The products that take an item as an input or come out of it.</summary>
+    private IEnumerable<string> ProductsOf(string item) => Recipes.Values.Where(r => r.Inputs.ContainsKey(item)).Select(r => r.Output).Concat(Sources.Where(p => p.Value.From.Contains(item) || p.Value.Also.Contains(item)).Select(p => p.Key));
+    /// <summary>Everything an item ends up in: its products, their products and so on down every chain.</summary>
+    public string[] EndsUpIn(string item) => endsUpIn[item];
     /// <summary>Works out the recipe map's chains and checks that every item is on the map once.</summary>
     private void ValidateMap() {
         foreach (var (id, recipe) in Recipes)
@@ -278,6 +283,11 @@ public sealed partial class GameData {
             foreach (string other in source.From.Skip(1))
                 if (!placed.TryGetValue(other, out var row) || row != placed.GetValueOrDefault(item)) throw new InvalidOperationException($"{other} and {item} must share a recipe map row.");
         if (Items.Keys.FirstOrDefault(item => !OffTheMap(item) && !placed.ContainsKey(item)) is string missing) throw new InvalidOperationException($"{missing} is not on the recipe map.");
+        foreach (string item in Items.Keys) {
+            var reached = new HashSet<string>(); var open = new Stack<string>(); open.Push(item);
+            while (open.TryPop(out var at)) foreach (string product in ProductsOf(at)) if (reached.Add(product)) open.Push(product);
+            endsUpIn[item] = reached.ToArray();
+        }
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
     public bool IsConsumable(string item) => Water.BottleSips(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);

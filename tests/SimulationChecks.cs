@@ -92,6 +92,7 @@ public static class SimulationChecks {
         Test(CheckPlayerMovesItemsInAndOutOfACarriedCrate, data);
         Test(CheckHandCraftingNeedsChiselAndTakesTime, data);
         Test(CheckBenchWorksWithACarriedOrSlottedTool, data);
+        Test(CheckBenchWorksWithTheFasterOfItsSlottedAndACarriedTool, data);
         Test(CheckSettlementRemembersWhatItHasHad, data);
         Test(CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf, data);
         Test(CheckTinNeedsPickaxeAndSmeltsIntoBars, data);
@@ -1701,9 +1702,24 @@ public static class SimulationChecks {
         Require(chest.Inventory["planks"] >= 16 && chest.Inventory["wood"] == 0, "a bench worker should fetch wood, work the bench and store the planks");
     }
 
+    private static void CheckBenchWorksWithTheFasterOfItsSlottedAndACarriedTool(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(10, 10));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        Give(world, "planks", 12); Give(world, "wood_hammer", 1); Give(world, "steel_hammer", 1);
+        Require(world.SlotTool(bench, "wood_hammer"), "the mallet should go into the hammer slot");
+        world.SetRecipe(bench, "crate");
+        world.LoadBatch(bench, 2);
+        Require(world.ToolInUse(bench, "hammer", 0) == "steel_hammer", "the player should work with the carried steel hammer over the slotted mallet");
+        // A crate takes 10 s by hand: 5 s at the bench with the mallet, 2.8 s with the steel hammer.
+        SafeTick(world, 3.5f);
+        Require(bench.Inventory["crate"] == 1, "a bench should work at the speed of a carried steel hammer when only a mallet is slotted");
+    }
+
     private static void CheckSettlementRemembersWhatItHasHad(GameData data) {
         var fresh = new World(data);
-        Require(fresh.Had("steel_axe") && fresh.Had("berries") && !fresh.Had("tin_ore") && !fresh.Had("stone_chisel"), "a new settlement should know only what it starts with");
+        Require(fresh.Had("steel_axe") && fresh.Had("berries") && !fresh.Had("stone") && !fresh.Had("stone_chisel") && !fresh.Had("planks"), "a new settlement should know only what it starts with");
+        Require(fresh.Had("steel_parts") && fresh.Had("iron_ore") && fresh.Had("coal") && fresh.Had("tin_bar") && fresh.Had("tin_ore"), "what the starting axe and bottle are made of should count as had along with them");
         var world = EmptyWorld(data);
         var tin = world.Add(ThingKind.Tin, Site(0, 0), 400);
         world.Player = tin.Pos;
@@ -1713,14 +1729,15 @@ public static class SimulationChecks {
         Give(world, "stone", 2);
         Require(world.Craft("stone_chisel"), "two stone should queue a stone chisel");
         SafeTick(world, data.Recipes["stone_chisel"].Seconds + 1);
-        Require(world.Had("stone_chisel"), "crafting should mark the product as had");
+        Require(world.Had("stone_chisel") && world.Had("stone"), "crafting should mark the product as had, and the stone it is made of with it");
+        Require(!world.Had("iron_ore"), "ore nobody dug and nothing was made of should not count as had");
         Achieve(world, "iron_bar");
-        Require(world.Had("iron_bar"), "what the settlement's milestones say it made should count as had");
+        Require(world.Had("iron_bar") && world.Had("iron_ore") && !world.Had("steel_bar"), "what the settlement's milestones say it made should count as had with its ingredients, and what is made of it should not");
         string save = world.Serialize();
-        var loose = world.Add(ThingKind.LooseStone, Site(2, 0), 1);
+        var loose = world.Add(ThingKind.LooseCoal, Site(2, 0), 1);
         world.Player = loose.Pos; world.Gather(loose, Step);
         var loaded = new World(data, false); loaded.Deserialize(save);
-        Require(world.Had("stone") && loaded.Had("tin_ore") && !loaded.Had("stone"), "a save should keep what the settlement had when it was written");
+        Require(world.Had("coal") && loaded.Had("tin_ore") && !loaded.Had("coal"), "a save should keep what the settlement had when it was written");
     }
 
     private static void CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf(GameData data) {

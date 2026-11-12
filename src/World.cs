@@ -426,8 +426,17 @@ public sealed partial class World {
     public ListView<PlayerState> Players => new(S.Players);
     public int Goal => S.Goal;
     public bool Reached(string milestone) => S.Milestones.Contains(milestone);
-    /// <summary>Whether the settlement has ever made, gathered, bought or started with an item; what it made is among its milestones.</summary>
-    public bool Had(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item);
+    /// <summary>
+    /// Whether the settlement has ever made, gathered, bought or started with an item, or with anything the item ends up in:
+    /// whoever has had an iron bar counts as having had the ore.
+    /// </summary>
+    public bool Had(string item) {
+        if (HadItself(item)) return true;
+        foreach (string product in Data.EndsUpIn(item)) if (HadItself(product)) return true;
+        return false;
+    }
+    /// <summary>What the settlement gathered, bought or started with is in its record of items, and what it made is among its milestones.</summary>
+    private bool HadItself(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item);
     private void Got(string item) => S.Obtained.Add(item);
     public int DayRevenue => S.DayRevenue;
     public ListView<int> Profits => new(S.Profits);
@@ -832,21 +841,22 @@ public sealed partial class World {
     public int Waiting(Thing? station, string recipe) => Waiting(QueueOf(station), recipe);
     /// <summary>The recipes a station makes, or with none those made by hand.</summary>
     public IEnumerable<string> RecipesAt(Thing? station) => station == null ? HandRecipes : Data.Recipes.Where(p => p.Value.Station == station.Kind).Select(p => p.Key);
-    /// <summary>The tool the acting player works a recipe with: the one slotted at a station, else the best one carried; null when there is none or none is needed.</summary>
-    public string? ToolInUse(Thing? station, string tool, int tier) => tool == "" ? null : station != null && BenchTool(station, tool, tier) is string slotted ? slotted : BestTool(tool, null, tier);
+    /// <summary>The tool the acting player works a recipe with: the faster of the one slotted at a station and the best one carried; null when there is none or none is needed.</summary>
+    public string? ToolInUse(Thing? station, string tool, int tier) => tool == "" ? null : Faster(station == null ? null : BenchTool(station, tool, tier), BestTool(tool, null, tier));
     /// <summary>
-    /// The tool a station's recipe is worked with: the one slotted, else the fastest one carried by a player working at the station.
-    /// A worker brings none, so a station worked only by its crew waits for a slotted tool.
+    /// The tool a station's recipe is worked with: the fastest of the one slotted and those carried by players working at the station.
+    /// A worker brings none, so a station worked only by its crew works with the slotted tool and waits when there is none.
     /// </summary>
     private string? StationTool(Thing t, RecipeDef r) {
         if (r.Tool == "") return null;
-        if (BenchTool(t, r.Tool, r.Tier) is string slotted) return slotted;
-        string? best = null;
+        string? best = BenchTool(t, r.Tool, r.Tier);
         foreach (var p in S.Players)
             using (ActAs(p))
-                if (PlayerHammers(t) && BestTool(r.Tool, null, r.Tier) is string carried && (best == null || Speed(carried) > Speed(best))) best = carried;
+                if (PlayerHammers(t)) best = Faster(best, BestTool(r.Tool, null, r.Tier));
         return best;
     }
+    /// <summary>The faster of two tools, the first when they are as fast; null when there is neither.</summary>
+    private string? Faster(string? first, string? second) => first == null || second != null && Speed(second) > Speed(first) ? second : first;
     /// <summary>Batches of a recipe waiting in a queue.</summary>
     public static int Waiting(ListView<Queued> queue, string recipe) {
         for (int i = 0; i < queue.Count; i++) if (queue[i].Recipe == recipe) return queue[i].Count;
