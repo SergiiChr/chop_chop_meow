@@ -295,7 +295,6 @@ public sealed partial class World {
         p.Mauled = false; p.GatherTarget = 0; p.Held = ""; p.Sprinting = false; p.TorchKindling = 0;
         S.Players.Add(p);
         if (S.Players.Count == 1) S.Actor = p;
-        NormalizeBottleStorage();
         if (S.Players.Count > 1) SayToAll("A neighbor joined the settlement.");
         return p;
     }

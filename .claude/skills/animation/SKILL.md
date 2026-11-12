@@ -15,7 +15,7 @@ description: Make a character or creature animation look physically right, check
 4. Change the poses, capture again and compare from the side in slow motion, frame by frame, then from the front and the
    game camera.
 5. Add or extend a check in `tests/AnimationChecks.cs` for what can be measured: feet on the ground, no sliding, nothing
-   below it, time in the air. `CheckWolfGaitsPlantEachPaw` and `CheckRunPlantsEachFootAndLeavesTheGroundAfterPushOff`
+   below it, time in the air. `CheckWolfGaitsPlantEachPaw` and `CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning`
    show how.
 6. Play it in the real window with the `playtest` skill: speeds, blends into and out of the motion, and turns.
 7. Share a before/after video made with the `frame-compare` skill.
@@ -135,8 +135,8 @@ git fetch origin
   A ref without the close-up review (`--animation-clip`) cannot be captured.
 - `--base-clip` names the clip in `--base` when it was renamed since, such as `--base-clip "player walk"` for
   `"player jog"`; both land in the current clip's folder.
-- Wolves have close-ups too: `wolf idle`, `wolf walk`, `wolf trot`, `wolf gallop`, `wolf speeds` (stand to gallop and
-  back, for blends), `wolf leap`, `wolf hit`, `wolf feed` and `wolf fall`. The last four play against a player, as
-  `SyncWolves` sets them up. `./build.py play -- --animation-review` shows every clip on one screen.
+- Wolves have close-ups too: `wolf idle`, `wolf howl`, `wolf walk`, `wolf trot`, `wolf gallop`, `wolf speeds` (stand to
+  gallop and back, for blends), `wolf leap`, `wolf hit`, `wolf feed` and `wolf fall`. The leap, hit and feed play against
+  a player, as `SyncWolves` sets them up. `./build.py play -- --animation-review` shows every clip on one screen.
 - A machine without a display, such as a cloud container, captures under `xvfb-run -a ./tools/animation_review.py ...`.
 - Turn the frames into a video or a numbered contact sheet with the `frame-compare` skill.

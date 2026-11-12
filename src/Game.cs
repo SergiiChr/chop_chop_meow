@@ -68,6 +68,8 @@ public partial class Game : Node, IGameFlow {
             GD.Print(OS.IsDebugBuild() ? "Build: debug, from the project folder" : "Build: optimized release export");
             data = GameData.Create();
             if (Launch.Has("--server")) { Server.Run(this, data); return; }
+            // An interface check run that stopped half way leaves its settings and saves behind; they go before anything here reads them.
+            if (Launch.Has("--ui-test")) RemoveCheckFiles();
             world = new World(data);
             if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             if (Launch.Value("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }

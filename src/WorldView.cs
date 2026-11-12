@@ -133,7 +133,7 @@ public partial class WorldView : Node3D {
     private static Vector3 To3(Vector2 p, float y = 0) => new(p.X, y, p.Y);
 
     public override void _Ready() {
-        World.Replaced += () => worldReplaced = true;
+        World.Replaced += () => { worldReplaced = true; ClearPaths(); };
         camera = new Camera3D { Projection = Camera3D.ProjectionType.Orthogonal, Size = BaseSize, Near = 1, Far = 200, Current = true };
         AddChild(camera);
         // Half energy puts the sky's light at DayAmbientEnergy.
@@ -350,8 +350,7 @@ public partial class WorldView : Node3D {
         return distance < float.MaxValue;
     }
 
-    private bool RayHits(Vector2 screen, Vector2 at, ReadOnlySpan<Hit> hits, out float distance) {
-        var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
+    private static bool RayHits(Vector3 origin, Vector3 direction, Vector2 at, ReadOnlySpan<Hit> hits, out float distance) {
         distance = float.MaxValue;
         foreach (var hit in hits)
             if (RayCylinder(origin, direction, at, hit, out float d)) distance = Math.Min(distance, d);
@@ -363,6 +362,8 @@ public partial class WorldView : Node3D {
     /// <summary>The visible object nearest the camera under the cursor, tested against the models' hit cylinders.</summary>
     public Thing? Pick(Vector2 screen) {
         SyncCamera();
+        // One ray for the whole pick: asking the camera again for every thing is most of what a pick costs.
+        var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
         Thing? best = null; float nearest = float.MaxValue;
         // Hits follow what is drawn, including memories, but only things that still exist can be picked.
         World.CollectKnown(picking);
@@ -371,10 +372,10 @@ public partial class WorldView : Node3D {
             var hits = HitsOf(drawn);
             // Only the foot of a tree's trunk, its first hit, picks the tree, so a click among the crowns of a forest reaches the ground and swings.
             if (t.Kind == ThingKind.Tree) {
-                if (hits.Length > 0 && RayHits(screen, t.Pos, [hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) }], out float s) && s < nearest) { nearest = s; best = t; }
+                if (hits.Length > 0 && RayHits(origin, direction, t.Pos, [hits[0] with { Top = Math.Min(hits[0].Top, StumpHeight) }], out float s) && s < nearest) { nearest = s; best = t; }
                 continue;
             }
-            if (RayHits(screen, t.Pos, hits, out float d) && d < nearest) { nearest = d; best = t; }
+            if (RayHits(origin, direction, t.Pos, hits, out float d) && d < nearest) { nearest = d; best = t; }
         }
         if (best != null) return best;
         var point = ToWorld(screen);
@@ -386,15 +387,28 @@ public partial class WorldView : Node3D {
     private static readonly Hit[] PersonHit = { new(.38f, 0, 1.75f) };
     public Worker? PickWorker(Vector2 screen) {
         SyncCamera();
+        var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
         Worker? best = null; float nearest = float.MaxValue;
         foreach (var w in World.Workers)
-            if (World.Sees(w) && RayHits(screen, w.Pos, PersonHit, out float d) && d < nearest) { nearest = d; best = w; }
+            if (World.Sees(w) && RayHits(origin, direction, w.Pos, PersonHit, out float d) && d < nearest) { nearest = d; best = w; }
         return best;
     }
 
+    // The camera is orthogonal, so where a point shows on screen is a straight-line function of where it is in the world.
+    // Read once a frame, it places every tree, building and head on screen without asking the camera for each.
+    private Vector2 screenOrigin, screenX, screenZ, screenUp;
+    private void ReadScreenAxes() {
+        screenOrigin = camera.UnprojectPosition(Vector3.Zero);
+        screenX = camera.UnprojectPosition(Vector3.Right) - screenOrigin;
+        screenZ = camera.UnprojectPosition(Vector3.Back) - screenOrigin;
+        screenUp = camera.UnprojectPosition(Vector3.Up) - screenOrigin;
+    }
+    /// <summary>Where a world position shows on screen, by the axes last read.</summary>
+    private Vector2 OnScreen(Vector2 at, float height = 0) => screenOrigin + screenX * at.X + screenZ * at.Y + screenUp * height;
+
     /// <summary>The screen rectangle of one hit cylinder, used to decide when a canopy hides something.</summary>
     private Rect2 ScreenRect(Vector2 at, Hit hit, float ppu) {
-        var bottom = camera.UnprojectPosition(To3(at, hit.Bottom)); var top = camera.UnprojectPosition(To3(at, hit.Top));
+        var bottom = OnScreen(at, hit.Bottom); var top = OnScreen(at, hit.Top);
         float half = hit.Radius * ppu;
         return new Rect2(bottom.X - half, top.Y - half * .5f, half * 2, bottom.Y - top.Y + half);
     }
@@ -402,7 +416,7 @@ public partial class WorldView : Node3D {
     internal Prop? PropOf(int id) => props.GetValueOrDefault(id);
 
     internal bool TreeCanopyCoversThing(Thing tree, Thing thing) {
-        SyncCamera();
+        SyncCamera(); ReadScreenAxes();
         return Covers(tree, thing, PixelsPerUnit);
     }
 
@@ -421,7 +435,7 @@ public partial class WorldView : Node3D {
 
     private bool TreeCoversPerson(Thing tree, Vector2 person, float ppu) {
         if (tree.X + tree.Y <= person.X + person.Y) return false;
-        var head = camera.UnprojectPosition(To3(person, 1.2f));
+        var head = OnScreen(person, 1.2f);
         foreach (var hit in HitsOf(tree)) if (ScreenRect(tree.Pos, hit, ppu).HasPoint(head)) return true;
         return false;
     }
@@ -667,7 +681,9 @@ public partial class WorldView : Node3D {
             _ => -1
         };
         if (impact < 0 || !actor.Struck(impact) || !props.TryGetValue(subject.Id, out var prop)) return;
-        prop.Shake = 1;
+        // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips; the blow is still heard.
+        bool inSight = World.Sees(subject.Pos);
+        if (inSight) prop.Shake = 1;
         // A bench knocks wood on wood, so it borrows the axe's knock.
         string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
             : action == ActorAction.Pump ? "bellows_pump"
@@ -675,6 +691,7 @@ public partial class WorldView : Node3D {
             : subject.Kind is ThingKind.Tree or ThingKind.Bench ? "chop_tree"
             : null;
         if (sound != null) Sounds?.Play(sound, subject.Pos);
+        if (!inSight) return;
         var impactAt = World.GatherAt(subject, actor.Position);
         var toward = (actor.Position - impactAt).Normalized();
         var side = To3(impactAt + toward * .35f);
@@ -699,33 +716,59 @@ public partial class WorldView : Node3D {
         }
     }
 
+    /// <summary>Seconds after it is felled when a tree's trunk and crown have faded away, leaving the stump.</summary>
+    private const float TreeGone = 1.7f;
     private readonly HashSet<int> seen = new();
     private readonly List<Thing> known = new();
     private readonly List<int> gone = new();
     private SaveState? builtFor;
-    private bool loadingProps;
     private int thingsCounted = -1;
+    private static readonly Vector2 Nowhere = new(-1e6f, -1e6f);
+    // Where the player stood when things were last drawn.
+    private Vector2 sawFrom = Nowhere;
+    /// <summary>Seconds a thing going out of sight is moved on by, enough to finish whatever it was doing: a tree falling, a chip flying, a door swinging.</summary>
+    private const float SettleSeconds = 10;
+    /// <summary>
+    /// Whether a spot was in the player's sight when things were last drawn, so that a thing which has no model yet appeared there in front of them.
+    /// One that appeared out of sight, or is first seen as the player walks up, shows as it now is without flying in or landing in dust.
+    /// </summary>
+    private bool Watched(Vector2 at) => at.DistanceTo(sawFrom) <= World.Data.SightRadius;
+    /// <summary>Dark enough for cabin windows to be lit, which is all that night changes in a thing drawn as last seen.</summary>
+    private bool Dark => night > .45f;
     private void SyncThings(float dt) {
         // Every model is built while a world loads, hidden until the player first sees it, so exploring builds nothing mid-game.
         // Another world, loaded or started, starts from fresh models: the old ones carry the state of things with the same ids.
         if (builtFor != World.S) {
             builtFor = World.S;
             thingsCounted = -1;
+            // Nothing in a world just loaded appeared in front of the player.
+            sawFrom = Nowhere;
             foreach (var (_, old) in props) old.Root.QueueFree();
             props.Clear();
-            loadingProps = true;
             foreach (var t in World.Things) Show(PropFor(t), false);
-            loadingProps = false;
         }
         seen.Clear();
-        if (filming || EnvironmentReview && EnvironmentCenter.HasValue) { known.Clear(); known.AddRange(World.Things); } else World.CollectKnown(known);
+        bool everything = filming || EnvironmentReview && EnvironmentCenter.HasValue;
+        if (everything) { known.Clear(); known.AddRange(World.Things); } else World.CollectKnown(known);
+        bool dark = Dark;
         foreach (var t in known) {
             seen.Add(t.Id);
             var prop = PropFor(t);
+            // Most of an explored valley is out of sight, drawn as it was last seen.
+            // That only changes when it is seen again, by this player or another, or when night falls or lifts,
+            // so such a thing is settled once and then left alone: only what is in sight is drawn every frame.
+            bool live = everything || World.Sees(t.Pos);
+            // What a thing drawn as last seen can show: what a memory keeps of it (World.LookAround) that its kind draws, and night in a cabin's windows.
+            var look = (t.Pos, t.Remaining, t.Kind is ThingKind.Mine or ThingKind.WolfCorpse ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
+            if (!live && prop.Seen && prop.Look == look) continue;
             Show(prop, true);
-            prop.Root.Position = To3(t.Pos);
-            Animate(prop, t, dt);
+            if (prop.Look.Pos != t.Pos) prop.Root.Position = To3(t.Pos);
+            // A change plays out only where the player was already watching, not on a thing first seen or seen again this frame.
+            bool watched = live && prop.Seen && prop.Look.Live;
+            Animate(prop, t, live ? dt : SettleSeconds, live, watched);
+            prop.Look = look;
         }
+        sawFrom = World.Player;
         foreach (var (id, prop) in props) if (!seen.Contains(id)) Show(prop, false);
         // Things leave the world rarely, so their models are looked for only when the count changes.
         if (thingsCounted != World.Things.Count) {
@@ -746,8 +789,9 @@ public partial class WorldView : Node3D {
     /// <summary>The model drawn for a thing, built when it has none or its kind changed.</summary>
     private Prop PropFor(Thing t) {
         if (props.TryGetValue(t.Id, out var prop) && prop.Kind == t.Kind) return prop;
-        // A building or crate put down in play lands with a puff of dust; a kind changing in place, such as a dug mine, does not.
-        if (prop == null && !loadingProps && (t.Kind == ThingKind.Crate || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
+        // A building or crate put down in front of the player lands with a puff of dust; a kind changing in place, such as a dug mine, does not.
+        bool appeared = Watched(t.Pos);
+        if (prop == null && appeared && (t.Kind == ThingKind.Crate || World.Data.Buildings.ContainsKey(t.Kind))) Plop(t.Pos, World.Footprint(t.Kind));
         if (prop != null) prop.Root.QueueFree();
         prop = WorldModels.Build(t);
         scene.AddChild(prop.Root);
@@ -759,8 +803,8 @@ public partial class WorldView : Node3D {
             prop.Body.Rotation = new Vector3(0, dying.Yaw, 0);
             carcass.From = dying.Root.Position - To3(t.Pos); carcass.HitIn = SwingLands(dying.Last + dying.Knock).In;
         }
-        // A chip that appears in play was knocked off the rock beside it, and flies from there.
-        if (prop is LooseProp chip && !loadingProps && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
+        // A chip that appears in front of the player was knocked off the rock beside it, and flies from there.
+        if (prop is LooseProp chip && appeared && ChippedFrom(t) is Thing rock) { chip.From = To3(rock.Pos) - To3(t.Pos) + Vector3.Up * .7f; chip.Flight = 0; }
         return prop;
     }
 
@@ -772,8 +816,15 @@ public partial class WorldView : Node3D {
         return rock;
     }
 
-    private void Animate(Prop prop, Thing t, float dt) {
-        bool first = !prop.Seen;
+    /// <summary>
+    /// Moves a thing's model on by <paramref name="dt"/> and shows the state of <paramref name="t"/>.
+    /// A thing that is not <paramref name="live"/> is out of sight: it is drawn as remembered, with nothing that only shows while someone watches.
+    /// A change plays out only when the player <paramref name="watched"/> the thing before it; otherwise the thing shows as it now is.
+    /// </summary>
+    private void Animate(Prop prop, Thing t, float dt, bool live, bool watched) {
+        bool first = !prop.Seen, shaking = prop.Shake > 0;
+        // Most things in sight stand still: one that is neither shaking nor holding more or less than when last drawn needs no writing to.
+        bool still = !first && !shaking && prop.Look.Remaining == t.Remaining;
         prop.Seen = true;
         prop.Shake = Math.Max(0, prop.Shake - dt * 2.5f);
         float wobble = prop.Shake * MathF.Sin(Elapsed * 34);
@@ -782,18 +833,20 @@ public partial class WorldView : Node3D {
             case TreeProp tree:
                 var sway = tree.Sway;
                 if (t.Remaining > 0) {
-                    tree.Fall = -1; sway.Visible = true; tree.Stump.Visible = false;
-                    sway.RotationDegrees = new Vector3(wobble * 3, 0, prop.Shake * 2 * MathF.Cos(Elapsed * 29));
+                    bool raised = first || tree.Fall >= 0;
+                    if (raised) { tree.Fall = -1; sway.Visible = true; tree.Stump.Visible = false; }
+                    if (raised || shaking) sway.RotationDegrees = new Vector3(wobble * 3, 0, prop.Shake * 2 * MathF.Cos(Elapsed * 29));
                     break;
                 }
-                // A felled tree topples, fades away and leaves its stump.
-                if (tree.Fall < 0) tree.Fall = first ? 9 : 0;
+                // A tree felled in front of the player topples, fades away and leaves its stump; one felled out of sight is a stump when seen again.
+                if (tree.Fall < 0) tree.Fall = watched ? 0 : 9;
+                else if (tree.Fall >= TreeGone) break;
                 float before = tree.Fall; tree.Fall += dt;
                 float drop = Math.Min(1, tree.Fall / 1.1f);
                 sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
-                if (before < 1.1f && tree.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
+                if (live && before < 1.1f && tree.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
                 SetFade(tree.SwayParts, Math.Clamp((tree.Fall - 1.2f) / .5f, 0, 1));
-                sway.Visible = tree.Fall < 1.7f;
+                sway.Visible = tree.Fall < TreeGone;
                 tree.Stump.Visible = true;
                 break;
             case LooseProp chip when chip.Flight < WorldModels.ChipFlight:
@@ -804,6 +857,7 @@ public partial class WorldView : Node3D {
                 prop.Body.Rotation = new Vector3(flown * 9, flown * 4, 0) * (1 - flown);
                 break;
             case Prop when t.IsLoose || t.Kind is ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Leaves:
+                if (still) break;
                 prop.Body.Visible = t.Remaining > 0;
                 prop.Body.Scale = Vector3.One * (.55f + .45f * Math.Clamp(WorldModels.Fullness(t), 0, 1));
                 prop.Body.Position = new Vector3(wobble * .03f, 0, 0);
@@ -819,11 +873,12 @@ public partial class WorldView : Node3D {
                 carcass.Pool.Scale = Vector3.One * (.2f + .8f * Ease(dying)) * (1.25f - .25f * WorldModels.Fullness(t));
                 break;
             case BushProp bush:
+                if (still) break;
                 bush.Fruit.Visible = t.Remaining > 0;
                 prop.Body.Scale = new Vector3(1 + wobble * .04f, 1 - wobble * .03f, 1 + wobble * .04f);
                 break;
             case FurnaceProp furnace:
-                if (World.Sees(t.Pos)) WorldModels.SyncFuel(furnace, t, World.Data);
+                if (live) WorldModels.SyncFuel(furnace, t, World.Data);
                 furnace.Glow.Visible = t.Processing;
                 furnace.Light.LightEnergy = t.Processing ? (1.1f + flicker * .25f) * (.5f + night) : 0;
                 Smoke(furnace, t, t.Processing, dt, FurnaceSmoke);
@@ -833,7 +888,7 @@ public partial class WorldView : Node3D {
                 bool cooking = t.Processing && World.Data.Recipes.TryGetValue(t.Recipe, out var cooked) && cooked.Burns;
                 stove.Glow.Visible = cooking;
                 stove.Light.LightEnergy = cooking ? (.9f + flicker * .25f) * (.5f + night) : 0;
-                if (stove.Mortar != null && World.Sees(t.Pos)) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null && !grinding.Contains(t.Id);
+                if (stove.Mortar != null && live) stove.Mortar.Visible = t.Tools != null && World.BenchTool(t, "mortar") != null && !grinding.Contains(t.Id);
                 Smoke(stove, t, cooking, dt, FurnaceSmoke);
                 break;
             case ForgeProp forge:
@@ -857,32 +912,32 @@ public partial class WorldView : Node3D {
                 break;
             case BenchProp bench:
                 // Slotted tools lie on the bench top.
-                if (!World.Sees(t.Pos)) break;
+                if (!live) break;
                 ShowSlotted(bench.Chisel, World.BenchTool(t, "chisel"));
                 ShowSlotted(bench.Hammer, World.BenchTool(t, "hammer"));
                 prop.Body.Position = new Vector3(wobble * .02f, 0, 0);
                 break;
             case PileProp pile:
                 // Remembered piles carry no inventory, so they keep the stacks they had when last seen.
-                if (!World.Sees(t.Pos)) break;
+                if (!live) break;
                 WorldModels.SyncPile(pile, t, World.Data);
                 break;
             case FarmProp farm:
-                if (!World.Sees(t.Pos)) break;
+                if (!live) break;
                 int look = World.CropLook(t, World.GrowSeconds);
                 farm.Crops[0].Visible = look > 0;
                 for (int i = 1; i < farm.Crops.Length; i++) farm.Crops[i].Visible = look == i + 1;
                 break;
             case PackerProp packer:
                 // Remembered stations carry no inventory, so they keep the crates they had when last seen.
-                if (!World.Sees(t.Pos)) break;
+                if (!live) break;
                 for (int i = 0; i < packer.Crates.Length; i++) packer.Crates[i].Visible = i < t.Inventory["crate"];
                 packer.Packing.Visible = t.Processing;
                 // The heap grows a pile for each third of a crate's worth.
                 packer.Stock.Fill(t.Packs, t.Packs == "" ? 0 : t.Inventory[t.Packs], World.Data.CrateCapacity / 3, World.Data);
                 break;
             case RackProp rack:
-                if (!World.Sees(t.Pos)) break;
+                if (!live) break;
                 // Each peg shows the tool in its slot.
                 var layout = t.Inventory.Layout;
                 for (int slot = 0; slot < rack.Pegs.Length; slot++) {
@@ -893,9 +948,9 @@ public partial class WorldView : Node3D {
                 break;
             case BoxProp box:
                 // Remembered boxes carry no inventory, so the lid stays as it was last seen.
-                if (!World.Sees(t.Pos)) break;
+                if (!live) break;
                 int count = t.Inventory.Count;
-                if (!first && count != box.LastCount) box.Puff = .9f;
+                if (watched && count != box.LastCount) box.Puff = .9f;
                 box.LastCount = count;
                 box.Puff = Math.Max(0, box.Puff - dt);
                 bool open = box.Puff > 0 || t.Id == Selection.Thing && PanelOpen && World.Reaches(t);
@@ -911,12 +966,13 @@ public partial class WorldView : Node3D {
                 if (t.Kind == ThingKind.Crate) { prop.Body.Position = new Vector3(0, lifted * .35f, 0); prop.Body.RotationDegrees = new Vector3(lifted * 9 * MathF.Sin(Elapsed * 18), 0, lifted * 6 * MathF.Cos(Elapsed * 15)); }
                 break;
             case HutProp hut:
-                bool near = AnyPlayerNear(t.Pos, 2.6f);
+                // The door stands open for someone at it and shuts behind them once they are inside.
+                bool near = live && AnyPlayerOutsideNear(t.Pos, 2.6f);
                 // Running inside from a hunting pack slams the door instead of swinging it open.
                 if (dt > 0 && near && hut.Open == 0) Sounds?.Play(World.Wolves.Count > 0 ? "hut_door_escaping" : "hut_door_normal", t.Pos);
                 hut.Open = Mathf.MoveToward(hut.Open, near ? 1 : 0, Math.Max(dt, .016f) * 2.5f);
                 hut.Door.RotationDegrees = new Vector3(0, -100 * Ease(hut.Open), 0);
-                bool lit = night > .45f;
+                bool lit = Dark;
                 if (lit != hut.Lit) {
                     hut.Lit = lit;
                     hut.Window.MaterialOverride = lit ? NightGlass : DayGlass;
@@ -933,7 +989,7 @@ public partial class WorldView : Node3D {
                 mine.Supplies.Visible = t.MineStage == MineStage.Supplied;
                 mine.Frame.Visible = finished || t.MineStage == MineStage.Supplied && stageShare > 0;
                 mine.Frame.Scale = new Vector3(1, finished ? 1 : Math.Max(.05f, stageShare), 1);
-                bool mining = finished && World.Sees(t.Pos) && Underground(t.Id);
+                bool mining = finished && live && Underground(t.Id);
                 mine.Rails.Visible = finished;
                 mine.Cart.Visible = finished && !mining;
                 mine.Load.Visible = (t.Output?.Count ?? 0) > 0;
@@ -943,7 +999,7 @@ public partial class WorldView : Node3D {
                 mine.Light.LightEnergy = mining ? (1 + flicker * .25f) * (.3f + night * 1.3f) : 0;
                 break;
             case SignpostProp sign:
-                bool waiting = OrderAt(t.Id);
+                bool waiting = live && OrderAt(t.Id);
                 sign.Open = Mathf.MoveToward(sign.Open, waiting ? 1 : 0, Math.Max(dt, .016f) * 3);
                 sign.Flag.RotationDegrees = new Vector3(-90 * (1 - Ease(sign.Open)), 0, 0);
                 break;
@@ -986,8 +1042,8 @@ public partial class WorldView : Node3D {
             }
         return (lands, best == float.MaxValue ? World.Player : from);
     }
-    private bool AnyPlayerNear(Vector2 at, float radius) {
-        foreach (var p in World.Players) if (p.RespawnIn <= 0 && p.Pos.DistanceTo(at) < radius) return true;
+    private bool AnyPlayerOutsideNear(Vector2 at, float radius) {
+        foreach (var p in World.Players) if (p.RespawnIn <= 0 && p.Sheltered == 0 && p.Pos.DistanceTo(at) < radius) return true;
         return false;
     }
     private bool Underground(int mine) {
@@ -1019,15 +1075,16 @@ public partial class WorldView : Node3D {
     private void FadeCanopies(float dt) {
         // The film's camera stands among the trees, where nothing needs seeing through.
         if (filming) return;
-        var bounds = GetViewport().GetVisibleRect().Grow(300);
-        float ppu = PixelsPerUnit;
+        var screen = GetViewport().GetVisibleRect();
+        var bounds = screen.Grow(300);
+        float ppu = screen.Size.Y / camera.Size;
+        ReadScreenAxes();
         structures.Clear();
         foreach (var kind in World.Structures)
             foreach (var o in World.ThingsOf(kind))
-                if (seen.Contains(o.Id) && bounds.HasPoint(camera.UnprojectPosition(To3(o.Pos)))) structures.Add(o);
+                if (bounds.HasPoint(OnScreen(o.Pos)) && seen.Contains(o.Id)) structures.Add(o);
         foreach (var t in World.ThingsOf(ThingKind.Tree)) {
-            if (t.Remaining <= 0 || !seen.Contains(t.Id) || props.GetValueOrDefault(t.Id) is not TreeProp tree) continue;
-            if (!bounds.HasPoint(camera.UnprojectPosition(To3(t.Pos)))) continue;
+            if (t.Remaining <= 0 || !bounds.HasPoint(OnScreen(t.Pos)) || !seen.Contains(t.Id) || props.GetValueOrDefault(t.Id) is not TreeProp tree) continue;
             float fade = Mathf.MoveToward(tree.Fade, CoversSomething(t, ppu) ? .68f : 0, Math.Max(dt, .016f) * 3);
             if (Math.Abs(fade - tree.Fade) < .001f) continue;
             tree.Fade = fade; SetFade(tree.SwayParts, fade);

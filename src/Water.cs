@@ -65,24 +65,6 @@ public static class Water {
 public enum WaterCollectResult { NoChange, RefilledBottle, SourceSip }
 
 public sealed partial class World {
-    /// <summary>Old saves may have a stack of bottles. Preserve excess containers in a recovery box.</summary>
-    private void NormalizeBottleStorage() {
-        foreach (var player in S.Players) Spill(player.Backpack, player.Pos);
-        foreach (var thing in S.Things.ToArray()) foreach (var inventory in Boxes(thing)) if (inventory != null) Spill(inventory, thing.Pos);
-        foreach (var worker in S.Workers) Spill(worker.Bag, worker.Pos);
-        foreach (var inventory in S.Crates.Values) Spill(inventory, Player);
-        void Spill(Inventory inventory, Godot.Vector2 position) {
-            Thing? overflow = null;
-            while (inventory.AggregateSlotsNeeded > inventory.Slots) {
-                string? bottle = Water.FindBottle(inventory);
-                if (bottle == null) break;
-                overflow ??= Add(ThingKind.Grave, position);
-                overflow.Inventory.Slots = System.Math.Max(overflow.Inventory.Slots, overflow.Inventory.Count + 1);
-                inventory.Remove(bottle, 1); overflow.Inventory.Add(bottle, 1);
-            }
-        }
-    }
-
     /// <summary>A water collector refills existing empty bottles; gathering never creates packaging.</summary>
     private bool WaterWork(Worker worker, Thing pond, float dt) {
         string? carried = Water.FindBottle(worker.Bag);

@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Godot;
 using static Checks;
 using static ModelSteps;
+using static PlayerSteps;
 using static SetupSteps;
 using static WorldSteps;
 using static WorkerSteps;
@@ -213,6 +214,19 @@ public partial class Game {
         hosted!.Autosave();
         await Until(() => messages.Shown.Contains("Settlement saved · Autosave."), "the owner hearing about the autosave", 5);
         Require(Saves.SlotUsed(0), "The autosave must write its slot.");
+    }
+
+    /// <summary>A save that cannot be written says so and leaves the slot's earlier save as it was.</summary>
+    private void CheckFailedSaveKeepsTheSaveBefore() {
+        Require(Saves.Write(Hosted, 0).StartsWith("Settlement saved"), "A save must say it was written.");
+        // A position that is no number cannot be written as save text.
+        // No frame runs before it is put back.
+        var stood = Hosted.Player;
+        Hosted.Player = new Vector2(float.NaN, 0);
+        string said = Saves.Write(Hosted, 0);
+        Hosted.Player = stood;
+        Require(said.StartsWith("Save failed"), $"A save that cannot be written must say so, not: {said}");
+        Require(Saves.Read(world.Data, 0).Error == null, "A failed save must leave the slot's earlier save loadable.");
     }
 
     /// <summary>A window glides what the server moves, and an update that changes one number must not leave the other where the glide had got to.</summary>
@@ -571,6 +585,7 @@ public partial class Game {
         await Until(() => world.Sheltered == hut.Id && Shows(hut), "a cabin clicked while walking taking the player inside and opening", 4);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames();
+        await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind the player once they are inside", 3);
         RunUntilNight(Hosted); SetNeeds(Hosted, hunger: 5);
         await Until(() => Named("sleep")?.TooltipText.Contains("too hungry") == true, "the sleep button explaining that the player is too hungry to sleep", 2);
         RunUntilMorning(Hosted);
@@ -581,6 +596,11 @@ public partial class Game {
         Require(world.Sheltered == hut.Id, "Moving must not step the player out of the cabin.");
         await Click(FindButton(panel, "Step outside")!);
         Require(world.Sheltered == 0, "Step outside must leave the cabin.");
+        // With no key held the player stops where they stepped in, right by the door.
+        await Click(view.Screen(hut.Pos, 1.5f));
+        await Until(() => world.Sheltered == hut.Id, "a click on the cabin taking a standing player inside", 4);
+        await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind a player who stepped in from beside it", 3);
+        await Click(FindButton(panel, "Step outside")!);
         RemoveThings(Hosted, t => t == hut); await CloseWithEsc();
 
         // A loose piece far enough behind a tree sits under its crown on screen; it must still be the one picked.
@@ -592,6 +612,26 @@ public partial class Game {
         RemoveThings(Hosted, t => t == hidden); await Frames();
         Require(view.Pick(point) == null, "A crown alone must not select its tree, so a click in a forest swings instead.");
         Require(view.Pick(view.Screen(tree.Pos, .5f))?.Id == tree.Id, "Clicking the foot of a trunk must select its tree.");
+    }
+    /// <summary>What changed while the player was away shows as it now is when they come back, without playing the change in front of them.</summary>
+    private async Task CheckChangesOutOfSightDoNotReplayWhenSeenAgain() {
+        await CloseWithEsc();
+        var (start, home) = (Hosted.Player, Terrain.Spawn);
+        Warp(Hosted, home); await Frames(4);
+        var tree = Hosted.Add(ThingKind.Tree, home + new Vector2(3, 3), 42);
+        var chest = Hosted.Add(ThingKind.Chest, home + new Vector2(-3, 3)); chest.Inventory.Add("wood", 3);
+        var rock = Hosted.Add(ThingKind.Stone, home + new Vector2(0, 6), World.StonePile);
+        await Frames(4);
+        await StandAtIronCliff();
+        Require(!world.Sees(tree.Pos) && world.Remembered(tree.Id)?.Remaining == 42, "The player must remember the tree standing once they have walked away.");
+        tree.Remaining = 0; chest.Inventory.Add("wood", 5);
+        var chip = Hosted.Add(ThingKind.LooseStone, rock.Pos + new Vector2(1.2f, 0), 1);
+        await Frames(4);
+        Warp(Hosted, home); await Frames(3);
+        Require(view.PropOf(tree.Id) is TreeProp { Stump.Visible: true, Sway.Visible: false }, "A tree felled out of sight must stand as a stump when seen again, not topple then.");
+        Require(view.PropOf(chest.Id) is BoxProp { Puff: 0, Open: 0 }, "A chest filled out of sight must keep its lid shut when seen again.");
+        Require(view.PropOf(chip.Id) is LooseProp { Flight: >= WorldModels.ChipFlight }, "A chip knocked off a rock out of sight must lie where it fell when seen, not fly from the rock then.");
+        RemoveThings(Hosted, t => t == tree || t == chest || t == rock || t == chip); Warp(Hosted, start); await Frames(4);
     }
     /// <summary>Launch opens the start menu with no save to continue, and Esc does not leave it.</summary>
     private async Task CheckLaunchOpensTheStartMenuWithNoSaveToContinue() {
@@ -786,10 +826,10 @@ public partial class Game {
         Require(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds);
         Require(sounds.DayMusicPlaying && !sounds.NightMusicPlaying, "Daytime must play the day music only.");
-        sounds.FinishDayTrack();
-        Require(sounds.DayMusicPlaying && sounds.DayMusicIndex == 1, "A finished day track must hand over to the next one.");
-        sounds.FinishDayTrack();
-        Require(sounds.DayMusicIndex == 0, "The last day track must wrap to the first.");
+        sounds.SkipToDayTrackEnd();
+        await Until(() => sounds.DayMusicPlaying && sounds.DayMusicIndex == 1, "a day track that plays to its end handing over to the next one", 5);
+        sounds.SkipToDayTrackEnd();
+        await Until(() => sounds.DayMusicPlaying && sounds.DayMusicIndex == 0, "the last day track wrapping to the first", 5);
         RunUntilNight(Hosted); await Frames(1); sounds.UpdateMusic(Sounds.MusicFadeSeconds / 2);
         Require(sounds.DayMusicPlaying && sounds.NightMusicPlaying, "Nightfall must crossfade the day music into the night music.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds); await Seconds(.5f);
@@ -877,6 +917,16 @@ public partial class Game {
         await CloseWithEsc();
         Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
     }
+    /// <summary>A packed crate's page gives way to the backpack's once the last item is taken out of the crate.</summary>
+    private async Task CheckEmptiedCrateGivesWayToTheBackpack() {
+        PackCrate(Hosted, ("berries", 1));
+        await KeyStroke(Key.Tab);
+        await Click(await Showing(0, c => c.TooltipText.StartsWith("Wood crate of")));
+        await Click(await Showing(0, c => c.TooltipText.StartsWith("Berries")));
+        await Until(() => panel.Page == Page.Backpack && bag.Visible, "the emptied crate's page giving way to the backpack's", 3);
+        await CloseWithEsc();
+        Drop(Hosted, "crate", 1); Drop(Hosted, "berries", 1); await Frames();
+    }
     /// <summary>With a building's page open, clicking an item on the hotbar moves it in as a click on it in the backpack does.</summary>
     private async Task CheckHotbarClickMovesItemsIntoAnOpenBuilding() {
         var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2));
@@ -917,8 +967,7 @@ public partial class Game {
     private async Task CheckRightMouseOnAMarkedMineDigsItWithAPickaxe() {
         // The server's position, since the window's copy may not have caught up with the last check's warp.
         var start = Hosted.Player;
-        var cliff = World.CliffOf(ThingKind.Iron);
-        Warp(Hosted, World.MineSpot(cliff) + cliff.Face * 3); await Frames(4);
+        var cliff = await StandAtIronCliff();
         var mine = Hosted.Build(ThingKind.Mine, World.MineSpot(cliff))!;
         Give(Hosted, "steel_pick", 1);
         await Frames(2);
@@ -928,6 +977,31 @@ public partial class Game {
         await Frames();
         Drop(Hosted, "steel_pick", 1);
         RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
+    /// <summary>A mine's page left open follows the mine from stage to stage and on to the open mine.</summary>
+    private async Task CheckMinePageFollowsTheMineThroughItsStages() {
+        var start = Hosted.Player;
+        var cliff = await StandAtIronCliff();
+        var mine = Hosted.Build(ThingKind.Mine, World.MineSpot(cliff))!;
+        await ClickOn(mine);
+        await Until(() => HasLabel(panel, "Stage 1 · Dig the entrance"), "the mine's page opening on its first stage", 3);
+        mine.MineStage = MineStage.Dug;
+        await Until(() => HasLabel(panel, "Stage 2 · Shore it up") && ShowsChild(panel, "supply_wood"), "the open mine page moving on to the supplies", 3);
+        mine.MineStage = MineStage.Supplied;
+        await Until(() => HasLabel(panel, "Stage 3 · Fit the frame and rails"), "the open mine page moving on to the fitting", 3);
+        mine.MineStage = MineStage.Open;
+        await Until(() => ShowsChild(panel, "output_stone") && !HasLabel(panel, "Stage 3"), "the open mine page showing the mine's outputs once it opens", 3);
+        RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
+    /// <summary>A page about a thing closes when the thing goes, as a recovery box does once it is emptied.</summary>
+    private async Task CheckPageClosesWhenWhatItShowsIsGone() {
+        await CloseWithEsc();
+        var box = Hosted.Add(ThingKind.Grave, world.Player + new Vector2(2, 0)); box.Inventory.Add("wood", 3);
+        await ClickOn(box);
+        await Until(() => ShownPage() == "Recovery box", "the recovery box's page opening", 3);
+        await Click(FindButton(panel, "Take all")!);
+        await Until(() => !panel.Visible && view.Selection.Thing == 0, "the page closing once its box is emptied and gone", 3);
+        Drop(Hosted, "wood", 3);
     }
     /// <summary>A smith who walks out mid-batch is no longer working the station, so the player standing there takes over the hammering.</summary>
     private async Task CheckStrikerBesideAStationLeavesThePlayerHammering() {
@@ -1080,7 +1154,10 @@ public partial class Game {
         await Seconds(.25);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.D, Keycode = Key.D, Pressed = false });
         await Frames(); Require(world.Player.DistanceTo(savedPosition) > .1f, "The player should move after saving.");
+        Require(view.WornGround > 0, "Walking about must have worn the ground.");
         await KeyStroke(Key.F9);
+        // Half a second of play passes before the first footfall wears the loaded world's ground.
+        Require(view.WornGround == 0, "A loaded game must start on unworn ground, not on the footpaths of the game before.");
         Require(world.Player.DistanceTo(savedPosition) < .01f && world.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] == savedWood), "F9 must restore position and stored items from disk.");
         Require(world.HotbarSlots.SequenceEqual(savedSlots) && world.ActiveHotbar == savedActiveSlot, "F5 and F9 must preserve hotbar references and selection.");
         Warp(Hosted, world.Player + Vector2.One); await CloseWithEsc();
@@ -1366,11 +1443,14 @@ public partial class Game {
             await Test(CheckRightClickGathersTreeAndHarvestsFarm);
             await Test(CheckFarmPageSaysWhenTheWheatRipensAndOnlyThenHarvest);
             await Test(CheckRedXTakesABuildingDownOnTheSecondClick);
+            await Test(CheckPageClosesWhenWhatItShowsIsGone);
             await Test(CheckPackedCrateOpensFromTheBackpack);
+            await Test(CheckEmptiedCrateGivesWayToTheBackpack);
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
+            await Test(CheckMinePageFollowsTheMineThroughItsStages);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
             await Test(CheckHudAndHotbarEatAndDrinkInHand);
@@ -1383,6 +1463,7 @@ public partial class Game {
             await Test(CheckPinnedPlayerStaysDownAndDeathCountsDown);
             await Test(CheckMouseWheelOverPanelDoesNotZoom);
             await Test(CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable);
+            await Test(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
             await Test(CheckTradingPostSendsOnlyCratesOffOnACart);
             await Test(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await Test(CheckPackingStationListsGoodsAndTakesBackpackClicks);
@@ -1402,6 +1483,7 @@ public partial class Game {
             await Test(CheckFilterWindowOpensOnScreenBesideAMovedPanel);
             await Test(CheckSurvivalActionsWorkThroughTheInventoryUI);
             await Test(CheckAutosaveTellsTheOwner);
+            Test(CheckFailedSaveKeepsTheSaveBefore);
             await Test(CheckOthersGlideAndStopWhereTheServerPutThem);
             await Test(CheckTickBoxesFollowTheServer);
             await Test(CheckLoadRemembersWhatIsOutOfSight);

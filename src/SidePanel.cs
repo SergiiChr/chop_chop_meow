@@ -156,8 +156,20 @@ public partial class SidePanel : MovableWindow {
 
     public void Close() { Visible = false; Bag.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
 
-    /// <summary>Runs the open page's updates.</summary>
-    public void Refresh() => page?.Refresh();
+    /// <summary>Whether the open page shows something that has gone, and so closes or gives way on the next refresh.</summary>
+    public bool SubjectGone => page is { Current: false };
+
+    /// <summary>
+    /// Runs the open page's updates.
+    /// A page whose thing has gone, such as an emptied recovery box or a building someone else took down, closes or gives way to the page it names.
+    /// </summary>
+    public void Refresh() {
+        if (SubjectGone) {
+            if (page!.GivesWayTo == Page.None) { Selection = default; Close(); } else Open(page.GivesWayTo);
+            return;
+        }
+        page?.Refresh();
+    }
 
     /// <summary>Selects a building or resource and shows it.</summary>
     public void Select(Thing t) {

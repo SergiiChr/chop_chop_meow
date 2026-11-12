@@ -128,7 +128,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 The hotbar prefers them over everything else.
 Rerun the command after changing a model.
 
-They cover the steel axe and pickaxe, stone and steel chisels, mallet and steel hammer, torch, rake, mortar, crate, wood, planks, wood parts, stone, iron ore, coal, charcoal, tin ore, iron, steel and tin bars, berries, leaves and every building.
+They cover the steel axe and pickaxe, stone and steel chisels, mallet and steel hammer, torch, rake, mortar, crate, the bottle empty and at each fill, wood, planks, wood parts, stone, iron ore, coal, charcoal, tin ore, iron, steel and tin bars, berries, leaves and every building.
 
 How they are framed:
 
@@ -139,19 +139,13 @@ How they are framed:
 - Tools are seen from the side, head up and to the right. Everything else is seen from the game camera's angle under the game's sunlight.
 - Chisels and hammers have a model per grade. The bench shows the slotted grade lying on its top, and a held hammer shows its own grade.
 
-### Item atlas
-
-`item-atlas.png` is a 4×3 sheet of inventory icons.
-`src/Hotbar.cs` loads it, and only the water icon (cell 10) is taken from it.
-Every other icon comes from `icons/` or `ui/`.
-
 ### SVG glyphs
 
 `ui/` holds hand-written SVG icons:
 
 - Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, guide, close, filter, stash, trash and so on), tinted in code.
 - A hard hat for workers.
-- Icons named by item id for items without a model of their own: steel parts, tin cans, grass, fertilizer, wheat seeds, wheat, flour, dough, and the foods: raw meat, burnt steak, bread, crushed berries, berry jam, meat stew and the canned goods.
+- Icons named by item id for items without a model of their own: steel parts, tin cans, grass, fertilizer, wheat seeds, wheat, flour, dough, and the foods: raw meat, burnt steak, bread, crushed berries, berry jam, meat stew, canned jam and canned meat stew.
 
 ## Fonts
 
@@ -211,8 +205,6 @@ give them.
 
 ## Provenance
 
-The item atlas was generated with the built-in image generation tool for this project.
-Its prompt is preserved in [PROMPTS.md](PROMPTS.md).
 The ground textures in `environment/terrain3d/textures/` are packed from three [ambientCG](https://ambientcg.com)
 photoscans, Grass004, Ground037 and Rock030, released under CC0 1.0; `tools/ground_textures.py` downloads the pinned
 1K PNG archives, checks their SHA-256 and packs them at 512 px with `tools/pack_textures.gd`.

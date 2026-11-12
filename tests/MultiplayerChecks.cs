@@ -103,10 +103,10 @@ public static class MultiplayerChecks {
     }
 
     private static void CheckStateReadKeepsNothingFromTheOneBefore() {
-        var before = WorldUpdates.ReadState("""{"Coins":12,"Time":9}"""u8.ToArray());
+        var before = WorldUpdates.ReadState("""{"DayRevenue":12,"Time":9}"""u8.ToArray());
         var after = WorldUpdates.ReadState("""{"Time":10}"""u8.ToArray());
-        Require(after.Coins == null && after.Time == 10, "a field a state entry leaves out should not keep the last entry's value");
-        Require(before.Coins == 12 && before.Time == 9, "reading a state entry should leave the one read before alone");
+        Require(after.DayRevenue == 0 && after.Time == 10, "a field a state entry leaves out should not keep the last entry's value");
+        Require(before.DayRevenue == 12 && before.Time == 9, "reading a state entry should leave the one read before alone");
     }
 
     private static void CheckUpdatesSetNumbersInPlaceAndReadAnythingElseWhole() {

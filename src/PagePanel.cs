@@ -30,12 +30,15 @@ public abstract partial class PagePanel : VBoxContainer {
     /// <summary>Whether what this page shows still exists, so that drawing it again makes sense.</summary>
     public virtual bool Current => true;
 
+    /// <summary>The page that takes this one's place once what it shows has gone; with none the panel closes.</summary>
+    public virtual Page GivesWayTo => Page.None;
+
     /// <summary>Brings what the page shows up to date.</summary>
     public void Refresh() => live.Run();
 
-    /// <summary>Builds the page's body again, keeping its state; a page whose subject has gone gives way to a new one.</summary>
+    /// <summary>Builds the page's body again, keeping its state; a page whose subject has gone closes or gives way, as on any refresh.</summary>
     public void Redraw() {
-        if (!Current) { panel.Open(panel.Page); return; }
+        if (!Current) { panel.Refresh(); return; }
         live.Clear();
         foreach (var child in GetChildren()) { RemoveChild(child); child.QueueFree(); }
         panel.ClearFrame();

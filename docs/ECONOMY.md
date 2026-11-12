@@ -17,11 +17,11 @@ For goods the village trades, it is the trade price; for the rest it is a refere
 | Step | Markup | Recipes |
 |---|---|---|
 | 1 | 50% | charcoal, iron bar, tin bar, burnt steak, planks, wood parts, stone chisel, torch, mortar and pestle, crushed berries, flour, meat stew |
-| 2 | 40% | steel bar, crate, wooden mallet, tin cans, berry jam, dough |
-| 3 | 30% | steel parts, bread, canned meat stew, canned jam, canned food |
+| 2 | 40% | steel bar, crate, wooden mallet, tin cans, tin water bottle, berry jam, dough |
+| 3 | 30% | steel parts, bread, canned meat stew, canned jam |
 | 4 | 20% | steel axe, steel pickaxe, steel hammer, steel chisel, rake |
 
-Canned food, which the village also sells, is canned raw meat at 5.65.
+The village also sells canned meat stew, a crate of 12 at the buying price.
 
 A new recipe gets its price from this rule.
 The check fails if any recipe loses value or a deeper recipe marks up more than a shallower one.

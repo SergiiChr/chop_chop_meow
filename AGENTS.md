@@ -51,11 +51,12 @@ Icons and models are committed; playing does not call an image-generation servic
 - For a visual change, look at a rendered screenshot (`./build.py play -- --showcase --screenshot /absolute/path.png`); headless checks cannot verify presentation.
 - To play the real window with keyboard and mouse, use the `playtest` skill (`.claude/skills/playtest`).
 - After a scripted rename, run `python3 tools/compare_strings.py <base>`: checks do not read most text, and a rename can reach into it.
+- `python3 tools/doc_names.py` lists the files, types, members, checks and flags the docs name in backticks that the code no longer has.
 - Report limitations candidly; do not claim a full playthrough from a fixture that injects finished goods.
 
 ## Checks
 
-`./build.py check` runs every offline check: C# compile with warnings as errors, C# format, Python `mypy --strict` and `ruff`, then the simulation, UI, network and server tests, printing each stage's time and the total against its limit.
+`./build.py check` runs every offline check: C# compile with warnings as errors, C# format, Python `mypy --strict` and `ruff`, the code names in the docs, then the simulation, UI, network and server tests, printing each stage's time and the total against its limit.
 `./build.py test sim`, `ui`, `net` or `server` runs one stage.
 CI runs the same command.
 Treat Godot error output as a failure even when the process exits zero; `build.py` does.

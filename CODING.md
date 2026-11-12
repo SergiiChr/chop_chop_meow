@@ -25,7 +25,7 @@ Project rules on top of the global coding and testing guides.
 - **Layer-first folders:** the project keeps the flat `src/` and `tests/` layout; group related code by file name prefix instead of adding folders.
 - **Illegal states:** use enums such as `ActorAction` rather than combinations of flags or strings.
 - **Validation at the boundary:** `GameData` checks its tables fit together when the game starts, `World.Deserialize` checks saves, and `Net` parses messages when they arrive. Code inside trusts what they produced.
-- **Old saves:** upgrades to an older save's data run once when it loads, never in the tick.
+- **Saves:** a change that would make a save written before it load wrong raises `SaveState.Version`, and `World.Deserialize` refuses every other version. Write no code that converts an old save or repairs a broken one, and no check for either: a save the game cannot take as it is, is refused with the reason. The user's own save is fixed by hand when they ask.
 
 ## Architecture
 
@@ -50,12 +50,12 @@ Project rules on top of the global coding and testing guides.
   - They read results through `World`'s public members; a missing read becomes a small read-only member like `Coins`.
   - `World.Backpack` is a read-only `InventoryView`, which `World.Transfer` takes as an end of a move, so a check moves items the way a player does.
   - They set up through real play: `Build`, `Buy`, `Consume`, `Tick` and the like, with `Add` for placing things. A time of day comes from a named step that ticks there, such as `RunUntilDawn`.
-  - A state real play cannot reach, or cannot reach within a check's time limit, goes behind a named step in `tests/SetupSteps.cs` whose comment says why. Old-save fixtures use steps there too.
+  - A state real play cannot reach, or cannot reach within a check's time limit, goes behind a named step in `tests/SetupSteps.cs` whose comment says why.
   - `./build.py check` fails on the raw save anywhere else in `tests/`, `src/*Checks.cs` or `src/*Steps.cs`.
   - A check may set fields directly on things and workers it placed, such as a farm's stage or a worker's tool, and on a `PlayerState` it builds as save text.
   - A check may place the player, with `world.Player = position`, and hold a player's input, with `Sprinting` or `GatherTarget`.
 - Simulation setup may construct fixtures, but tests claiming resource-to-steel progression must gather raw materials and use the actual recipes and trade delays.
-- A fixture built by editing text, such as an old save, fails when the text it edits is missing.
+- A fixture built by editing text, such as a save edited by hand, fails when the text it edits is missing.
 - UI checks wait for a condition with a time limit, not for a fixed time; a fixed wait is only for holding input, letting something play for a set time or pausing between retries.
 - A check that a load restores something changes that thing between saving and loading.
 - Check files hold only checks and their runners. Steps live in feature files: `tests/WorldSteps.cs`, `PlayerSteps.cs`, `WorkerSteps.cs`, `EconomySteps.cs`, `ModelSteps.cs`, `ChainSteps.cs` and `SetupSteps.cs` for simulation checks, and `src/InputSteps.cs`, `PanelSteps.cs` and `SessionSteps.cs` for UI and network checks.
