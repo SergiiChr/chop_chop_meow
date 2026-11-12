@@ -95,6 +95,8 @@ public partial class SidePanel : MovableWindow {
     private const float AsideGap = 12;
     /// <summary>The player's control of the world, which also needs this panel, so the game sets it once both exist.</summary>
     public PlayerControl Player { get; set; } = null!;
+    /// <summary>The recipe map, which also needs this panel, so the game sets it once both exist.</summary>
+    public RecipeMap Map { get; set; } = null!;
     /// <summary>The open page, or nothing while the panel is closed.</summary>
     public Page Page { get; private set; }
     public Selection Selection { get; private set; }
@@ -201,6 +203,12 @@ public partial class SidePanel : MovableWindow {
         if (tools.Memory.CarriedCrate != crate) Page = Page.None;
         tools.Memory.CarriedCrate = crate;
         Open(Page.Crate);
+    }
+
+    /// <summary>Opens the page where a recipe is made, a station's or with none the crafting menu, with the recipe's group open.</summary>
+    public void ShowRecipe(Thing? station, string recipe) {
+        tools.Memory.ClosedGroups.Remove(world.Data.Recipes[recipe].Group);
+        if (station != null) Select(station); else Open(Page.Craft);
     }
 
     /// <summary>Selects a worker and shows them.</summary>

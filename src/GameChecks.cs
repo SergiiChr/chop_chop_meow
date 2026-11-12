@@ -1307,6 +1307,35 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
         Require(!panel.Aside.Visible, "The tool window must close with the page.");
     }
+    /// <summary>The crafting menu's map button opens the recipe map with every item on it once, those the settlement has had drawn as known; Escape closes it.</summary>
+    private async Task CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce() {
+        await CloseWithEsc();
+        await KeyStroke(Key.C);
+        await Click(Named("open_map")!);
+        Require(recipeMap.Visible, "The crafting menu's map button must open the recipe map.");
+        Require(world.Data.Items.Keys.Where(id => !GameData.OffTheMap(id)).All(id => recipeMap.FindChildren($"map_{id}", "", true, false).Count == 1), "Every item must be on the map once.");
+        Require(recipeMap.NodeOf("steel_axe")!.Known && !recipeMap.NodeOf("canned_jam")!.Known, "The axe the settlement started with must be drawn as known, and jam nobody has canned as not made yet.");
+        Require(HasLabel(recipeMap, "Required tool") && HasLabel(recipeMap, "Additional resources") && HasLabel(recipeMap, "Hunt animals"), "The map must name its marks and where raw meat comes from.");
+        await KeyStroke(Key.Escape);
+        Require(!recipeMap.Visible && ShownPage() == "Crafting", "Escape must close the map and leave the crafting menu open.");
+        await CloseWithEsc();
+    }
+    /// <summary>On the recipe map a click on a chip goes to its item and lights it up for a moment, a click on an item shows its details, and Show leaves the map for where it is made.</summary>
+    private async Task CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation() {
+        await CloseWithEsc();
+        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0));
+        await KeyStroke(Key.C);
+        await Click(Named("open_map")!);
+        var coal = recipeMap.NodeOf("coal")!;
+        await Click((Control)recipeMap.NodeOf("steel_bar")!.FindChild("also_coal", true, false));
+        Require(coal.Lit, "A click on the steel bar's coal chip must light coal up.");
+        await Until(() => !coal.Lit, "the light on coal going out again", RecipeMap.LitSeconds + 2);
+        await Click((Control)recipeMap.NodeOf("crate")!.FindChild("cup", true, false));
+        Require(recipeMap.Chosen == "crate" && ((Label)recipeMap.FindChild("detail_name", true, false)).Text == "Wood crate" && HasLabel((Node)recipeMap.FindChild("map_details", true, false), "6 Wood planks"), "A click on the crate must show its name and the six planks it requires.");
+        await Click((Control)recipeMap.FindChild("map_show", true, false));
+        await Until(() => !recipeMap.Visible && Shows(workbench) && Named("craft_crate") != null, "Show leaving the map for the bench's page with the crate on it", 2);
+        RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
+    }
     /// <summary>At a bench, a click loads one item, a double click loads a batch and a right click takes half back.</summary>
     private async Task CheckBenchLoadsInputsByClickDoubleClickAndSplit() {
         await CloseWithEsc();
@@ -1522,6 +1551,8 @@ public partial class Game {
             await Test(CheckRecipeBoardsMarkAndQueueWithModifiers);
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
             await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
+            await Test(CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce);
+            await Test(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
             await Test(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
             var furnace = await Test(CheckSteelFurnaceSlotsLoadByDragAndClickThenPump);
             await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));

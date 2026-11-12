@@ -107,6 +107,7 @@ UI and input:
 | `src/Cups.cs` | `Cups`: a building's item cups and a station's process row |
 | `src/CraftPanel.cs` | The crafting menu |
 | `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the queue strip under the work |
+| `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
@@ -521,6 +522,11 @@ The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.Clos
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
+
+`RecipeMap` covers the screen and holds the game while it shows (`UiKit.HoldWhile`); it is drawn afresh on each `RecipeMap.Open`.
+`RecipeMap.Place` puts an item on a grid of steps across and lines down: what is made out of it goes one step on, the first on the same line and the rest on lines below, and `MapTree` draws the lines between them.
+A `MapNode` draws a filled cup for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.
+A click on a chip scrolls to that item and lights it (`MapNode.Light`); a click on a cup shows its details, whose button leaves the map through `SidePanel.ShowRecipe`.
 
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
 `SaveState.Obtained` holds every item the settlement has made, gathered, bought or started with (`World.Had`), which the recipe map shows as known.
