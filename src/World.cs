@@ -662,10 +662,11 @@ public sealed partial class World {
         }
         bool small = t.Kind == ThingKind.WolfCorpse || t.Kind == ThingKind.Stone && tool == null;
         int amount = Math.Min(t.Remaining, small ? 2 : 4);
-        amount = S.Backpack.Add(ResourceItem(t), amount); t.Remaining -= amount;
+        string item = ResourceItem(t);
+        amount = S.Backpack.Add(item, amount); t.Remaining -= amount;
         if (amount > 0) Chip(t, tool);
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
-        if (amount > 0) { S.Milestones.Add("gather"); Got(ResourceItem(t)); }
+        if (amount > 0) { S.Milestones.Add("gather"); Got(item); }
     }
     private void PickUp(Thing t) {
         string item = ResourceItem(t);
@@ -1612,7 +1613,8 @@ public sealed partial class World {
         }
     }
     /// <summary>The nearest thing of a kind, or null.</summary>
-    private Thing? Nearest(ThingKind kind, Vector2 origin) => Nearest(new ReadOnlySpan<ThingKind>(in kind), origin);
+    /// <summary>The nearest thing of a kind, or null.</summary>
+    public Thing? Nearest(ThingKind kind, Vector2 origin) => Nearest(new ReadOnlySpan<ThingKind>(in kind), origin);
     /// <summary>The nearest thing of any of these kinds, or null.</summary>
     private Thing? Nearest(ReadOnlySpan<ThingKind> kinds, Vector2 origin) {
         Thing? best = null; float bestDistance = 0;

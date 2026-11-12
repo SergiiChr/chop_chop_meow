@@ -6,13 +6,11 @@ namespace ChopChopMeow;
 
 /// <summary>The personal crafting menu: the recipe board, then what is being made by hand and what waits after it.</summary>
 public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
-    private readonly ListPlace place = new();
-
     protected override void Build() {
         headingIcon.Texture = GD.Load<Texture2D>("res://assets/ui/line_craft.svg"); headingIcon.SelfModulate = Style.Rim; headingIcon.Visible = true;
         headingIcon.TooltipText = "Crafting by hand. A crafting bench works twice as fast.";
         HeaderAction("map", "Recipe map: everything there is to make", panel.Map.Open, Style.FilterRound, "open_map");
-        AddChild(new RecipeBoard(kit, live, memory, panel, place, Redraw, null, null));
+        AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, null, null));
         CraftQueue();
         BagGrid(UseFromBag, UseHint, wanted: id => world.HandRecipes.Any(r => world.Data.Recipes[r].Inputs.ContainsKey(id)));
     }

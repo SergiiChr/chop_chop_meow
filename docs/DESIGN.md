@@ -520,7 +520,7 @@ What no storage takes stays in the station, which goes on working until its outp
 Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
 The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.ClosedGroups` keeps the groups the player closed, for every board.
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
-The page keeps a `ListPlace`, so the list stays where it was scrolled to when the page draws again.
+The panel keeps the list's place while the page draws again, so a click on a recipe leaves the list where it was scrolled to.
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 

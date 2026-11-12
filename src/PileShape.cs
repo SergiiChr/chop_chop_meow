@@ -66,7 +66,7 @@ internal static class PileShape {
     private static Mesh BuildStock(string family, bool fit) {
         if (family == "fallback") return Stack;
         // Charcoal's briquettes carry their own colours, so they come whole from their own builder.
-        if (family == "charcoal") return fit ? CharcoalShape.Fitted(SlotSize) : CharcoalShape.Heap;
+        if (family == "charcoal") return fit ? CharcoalShape.Build(SlotSize) : CharcoalShape.Heap;
         var faces = new List<Vector3>();
         void Copy(Mesh mesh, Transform3D transform) {
             foreach (var point in mesh.GetFaces()) faces.Add(transform * point);

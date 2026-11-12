@@ -12,10 +12,9 @@ namespace ChopChopMeow;
 /// By hand a click queues a batch. At a station a click marks the recipe workers keep making, and a double-click queues a batch and loads it from the backpack.
 /// Shift queues 5 and Ctrl 10, at a station loading them too; a right-click takes as many waiting batches off.
 /// </summary>
-/// <param name="place">Where the page's list was scrolled to, so it stays there when the page draws again.</param>
 /// <param name="station">Null when crafting by hand.</param>
 /// <param name="openOn">A recipe whose group the board opens, for a page opening rather than drawing again.</param>
-public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, SidePanel panel, ListPlace place, Action redraw, Thing? station, string? openOn) : VBoxContainer {
+public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, SidePanel panel, Action redraw, Thing? station, string? openOn) : VBoxContainer {
     private readonly World world = kit.World;
 
     /// <summary>How far the worker mark's hard hat stands out over the top of a card.</summary>
@@ -41,7 +40,6 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         var groups = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; groups.AddThemeConstantOverride("separation", 6);
         AddChild(list); list.AddChild(room); room.AddChild(groups);
         panel.ShowPageRows(list, room);
-        KeepPlace(list);
         foreach (var group in Enum.GetValues<RecipeGroup>()) {
             var ids = recipes.Where(id => world.Data.Recipes[id].Group == group).ToList();
             if (ids.Count == 0) continue;
@@ -57,19 +55,6 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
                 row.AddChild(i + 1 < ids.Count ? Card(ids[i + 1]) : new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
             }
         }
-    }
-
-    /// <summary>
-    /// Puts a list drawn again where the one before it was scrolled to: it takes that one's height at once, and its place a frame later, once its rows have their size.
-    /// </summary>
-    private async void KeepPlace(ScrollContainer list) {
-        int offset = place.Offset;
-        list.CustomMinimumSize = new Vector2(0, place.Height);
-        list.GetVScrollBar().ValueChanged += at => place.Offset = (int)at;
-        list.Resized += () => place.Height = list.Size.Y;
-        if (offset == 0) return;
-        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        if (IsInstanceValid(list)) list.ScrollVertical = offset;
     }
 
     /// <summary>A group's heading: an arrow, its name and how many recipes it holds; a closed one that hides the recipe workers keep making wears their hard hat.</summary>
@@ -109,10 +94,13 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             // Counts turn brick while the backpack is short.
             live.Watch(() => world.Backpack[item] < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
-        // A recipe whose tool is neither slotted nor carried names the tool in place of its inputs.
         var lacks = Style.Text(r.Tool == "" ? "" : $"No {world.Data.ToolName(r.Tool, r.Tier)}", 12, Style.Brick); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
         bool NoTool() => r.Tool != "" && world.ToolInUse(station, r.Tool, r.Tier) == null;
-        live.Watch(NoTool, missing => { lacks.Visible = missing; inputs.Visible = !missing; });
+        // One look for the tool a refresh: the card names a missing tool in place of its inputs, and its picture fades while the recipe cannot be made from the backpack now.
+        live.Watch(() => { bool missing = NoTool(); return (Missing: missing, Ready: !missing && (station != null ? world.Backpack.Has(r.Inputs) : world.CanCraft(id))); }, state => {
+            lacks.Visible = state.Missing; inputs.Visible = !state.Missing;
+            product.Modulate = state.Ready ? Colors.White : Style.Faded;
+        });
         var queued = ItemSlot.CountBadge(1, 0); queued.Name = "queued"; cell.AddChild(queued);
         live.Watch(() => world.Waiting(station, id), waiting => queued.Text = waiting > 0 ? waiting.ToString() : "");
         if (station != null) {
@@ -148,16 +136,8 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         }
         cell.Popup = () => new RecipePopup(world, station, r, Seconds(r), Hint);
         live.Bind(shown => cell.TooltipText = shown, Describe);
-        // The picture fades while the recipe cannot be made from the backpack now.
-        live.Watch(() => !NoTool() && (station != null ? world.Backpack.Has(r.Inputs) : world.CanCraft(id)), yes => product.Modulate = yes ? Colors.White : Style.Faded);
         return cell;
     }
-}
-
-/// <summary>Where a recipe board's list is scrolled to and how tall it is; its page keeps one, which outlasts the board when the page draws again.</summary>
-public sealed class ListPlace {
-    public int Offset;
-    public float Height;
 }
 
 /// <summary>A small arrow that points down beside an open group and right beside a closed one.</summary>

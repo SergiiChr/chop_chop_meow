@@ -25,18 +25,15 @@ internal static class CharcoalShape {
     public static readonly StandardMaterial3D Material = ModelKit.Vertex(Surface.Stone, .95f);
 
     /// <summary>The three briquettes in their own proportions, for the icon.</summary>
-    public static Mesh Heap => heap ??= Build(Vector3.One);
+    public static Mesh Heap => heap ??= Build();
 
-    /// <summary>The three briquettes stretched to fill a box of the given size, as a pile slot shows them; the caller keeps the mesh.</summary>
-    public static Mesh Fitted(Vector3 size) => Build(size);
-
-    /// <summary>Builds the heap centred on the origin; a size other than one stretches it to fill a box of that size.</summary>
-    private static ArrayMesh Build(Vector3 size) {
+    /// <summary>Builds the heap centred on the origin, in its own proportions or stretched to fill a box of the given size, as a pile slot shows it.</summary>
+    public static ArrayMesh Build(Vector3? fit = null) {
         var points = new List<(Vector3 A, Vector3 B, Vector3 C, Vector3 Outward, string Tint)>();
         foreach (var (start, end) in Logs) Log(points, start, end);
         var min = points[0].A; var max = min;
         foreach (var (a, b, c, _, _) in points) { min = min.Min(a).Min(b).Min(c); max = max.Max(a).Max(b).Max(c); }
-        var centre = (min + max) / 2; var scale = size == Vector3.One ? Vector3.One : size / (max - min);
+        var centre = (min + max) / 2; var scale = fit is Vector3 size ? size / (max - min) : Vector3.One;
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         foreach (var (a, b, c, outward, tint) in points) {
             Vector3 p = (a - centre) * scale, q = (b - centre) * scale, r = (c - centre) * scale;

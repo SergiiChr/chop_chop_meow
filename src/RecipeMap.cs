@@ -19,7 +19,6 @@ public partial class RecipeMap : Control {
     private readonly Dictionary<string, MapNode> nodes = new();
     private ScrollContainer rows = null!;
     private PanelContainer details = null!;
-    private string chosen = "";
     /// <summary>How long a jumped-to item stays lit, in seconds.</summary>
     public const float LitSeconds = 1.5f;
 
@@ -36,7 +35,7 @@ public partial class RecipeMap : Control {
     }
 
     /// <summary>The item whose details show, or empty.</summary>
-    public string Chosen => chosen;
+    public string Chosen { get; private set; } = "";
 
     /// <summary>An item's place on the map, or null while the map is closed.</summary>
     public MapNode? NodeOf(string item) => nodes.GetValueOrDefault(item);
@@ -59,7 +58,7 @@ public partial class RecipeMap : Control {
 
     private void Clear() {
         foreach (var child in board.GetChildren()) { board.RemoveChild(child); child.QueueFree(); }
-        nodes.Clear(); chosen = "";
+        nodes.Clear(); Chosen = "";
     }
 
     /// <summary>The title, what the marks on the map mean, and the close button.</summary>
@@ -142,8 +141,8 @@ public partial class RecipeMap : Control {
 
     /// <summary>Shows an item's details in the strip under the map and rings it; an empty item shows what a click does.</summary>
     private void Choose(string item) {
-        if (nodes.TryGetValue(chosen, out var before)) before.Chosen = false;
-        chosen = item;
+        if (nodes.TryGetValue(Chosen, out var before)) before.Chosen = false;
+        Chosen = item;
         foreach (var child in details.GetChildren()) { details.RemoveChild(child); child.QueueFree(); }
         if (!nodes.TryGetValue(item, out var node)) { details.AddChild(Style.Text("Click an item to see how it is made and what it is used for. Click a chip on it to go to that tool or resource.", 14, Style.Ink)); return; }
         node.Chosen = true;
@@ -157,16 +156,20 @@ public partial class RecipeMap : Control {
         var madeAt = new HBoxContainer(); madeAt.AddThemeConstantOverride("separation", 6); Column(strip, "Made at").AddChild(madeAt);
         if (recipe?.Station is ThingKind station) madeAt.AddChild(Style.Icon(Icons.Of(station.Id()), 28));
         madeAt.AddChild(Style.Text(MadeAt(item), 14, Style.Ink));
-        var requires = new HBoxContainer(); requires.AddThemeConstantOverride("separation", 6);
-        foreach (var (input, amount) in recipe?.Inputs ?? new()) { requires.AddChild(Style.Icon(Icons.Of(input), 28)); requires.AddChild(Style.Text($"{amount} {data.Name(input)}", 14, Style.Ink)); }
-        if (recipe == null) foreach (string input in data.Sources[item].From.Concat(data.Sources[item].Also)) { requires.AddChild(Style.Icon(Icons.Of(input), 28)); requires.AddChild(Style.Text(data.Name(input), 14, Style.Ink)); }
-        if (requires.GetChildCount() > 0) Column(strip, "Requires").AddChild(requires); else requires.QueueFree();
+        // A recipe's inputs with their amounts, or what an item no recipe makes comes out of and takes.
+        var needs = (recipe != null ? recipe.Inputs.Select(p => (p.Key, $"{p.Value} {data.Name(p.Key)}")) : data.Sources[item].From.Concat(data.Sources[item].Also).Select(input => (input, data.Name(input)))).ToList();
+        if (needs.Count > 0) {
+            var requires = new HBoxContainer(); requires.AddThemeConstantOverride("separation", 6); Column(strip, "Requires").AddChild(requires);
+            foreach (var (input, words) in needs) { requires.AddChild(Style.Icon(Icons.Of(input), 28)); requires.AddChild(Style.Text(words, 14, Style.Ink)); }
+        }
         var uses = data.UsedFor(item).ToList();
-        var used = new HBoxContainer { Name = "detail_uses" }; used.AddThemeConstantOverride("separation", 4);
-        foreach (string use in uses) { var icon = Style.Icon(Icons.Of(use), 28); icon.Name = $"use_{use}"; icon.TooltipText = data.Name(use); icon.MouseFilter = MouseFilterEnum.Stop; used.AddChild(icon); }
-        if (uses.Count == 1) used.AddChild(Style.Text(data.Name(uses[0]), 14, Style.Ink));
-        var usedColumn = Column(strip, uses.Count > 0 ? "Used for" : null); usedColumn.SizeFlagsHorizontal = SizeFlags.ExpandFill;
-        if (uses.Count > 0) usedColumn.AddChild(used); else used.QueueFree();
+        // The last column takes the room that is left, which keeps the button at the strip's right end.
+        var usedFor = Column(strip, uses.Count > 0 ? "Used for" : null); usedFor.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        if (uses.Count > 0) {
+            var used = new HBoxContainer { Name = "detail_uses" }; used.AddThemeConstantOverride("separation", 4); usedFor.AddChild(used);
+            foreach (string use in uses) { var icon = Style.Icon(Icons.Of(use), 28); icon.Name = $"use_{use}"; icon.TooltipText = data.Name(use); icon.MouseFilter = MouseFilterEnum.Stop; used.AddChild(icon); }
+            if (uses.Count == 1) used.AddChild(Style.Text(data.Name(uses[0]), 14, Style.Ink));
+        }
         if (recipe != null) strip.AddChild(ShowButton(item, recipe));
     }
 
@@ -189,10 +192,8 @@ public partial class RecipeMap : Control {
 
     /// <summary>The button that leaves the map for the place a recipe is made: the nearest station of its kind, else the crafting menu for one made by hand.</summary>
     private Button ShowButton(string item, RecipeDef recipe) {
-        Thing? station = null;
-        if (recipe.Station is ThingKind kind)
-            foreach (var t in world.ThingsOf(kind)) if (station == null || t.Pos.DistanceTo(world.Player) < station.Pos.DistanceTo(world.Player)) station = t;
-        string id = world.Data.Recipes.First(p => p.Value == recipe).Key;
+        var station = recipe.Station is ThingKind kind ? world.Nearest(kind, world.Player) : null;
+        string id = world.Data.RecipeIdOf(item)!;
         bool byHand = station == null && recipe.Hand;
         string place = byHand ? "in the crafting menu" : $"at the {world.Data.Name(recipe.Station!.Value).ToLowerInvariant()}";
         var show = kit.Button($"Show {place}", () => { Close(); panel.ShowRecipe(station, id); }, disabled: station == null && !byHand);
@@ -238,7 +239,7 @@ public partial class MapTree : Control {
 /// <summary>A cup as the map draws it: filled for an item made before, a dashed outline for one not made yet.</summary>
 public partial class MapCup : Control {
     public bool Known { get; set; }
-    private static readonly StyleBoxFlat Unknown = new() { BgColor = new Color(Style.CupFill, .14f), CornerRadiusTopLeft = 12, CornerRadiusTopRight = 12, CornerRadiusBottomLeft = 12, CornerRadiusBottomRight = 12 };
+    private static readonly StyleBoxFlat Unknown = Style.Flat(new Color(Style.CupFill, .14f), 12, 0);
 
     public override void _Draw() => Paint(this, new Rect2(Vector2.Zero, Size), Known);
 
@@ -264,10 +265,10 @@ public partial class MapNode : Control {
     private const float Cup = 40, Chip = 22;
     /// <summary>Left edge of the chips, which lap over the cup's right edge.</summary>
     private const float ChipsLeft = Cup - 4;
-    public static readonly StyleBoxFlat ToolChip = Round(Style.CupFill, Style.Mustard, Chip / 2, 2), ResourceChip = Round(Style.CupFill, Style.Line, Chip / 2, 2);
-    public static readonly StyleBoxFlat ChosenCup = Round(Style.CupFill, Style.Mustard, 14, 3), LaneBack = Round(new Color(Style.Line, .5f), Colors.Transparent, 14, 0, 12, 10);
-    public static readonly StyleBoxFlat StationBuilt = Round(Style.Beige, Colors.Transparent, 12, 0, 8, 6), StationPlanned = Round(Colors.Transparent, new Color(Style.Beige, .7f), 12, 2, 8, 6);
-    private static readonly StyleBoxFlat ChosenRing = Round(Colors.Transparent, Style.Mustard, 14, 3), LitRing = Round(new Color(Style.Rim, .25f), Style.Rim, 16, 4);
+    public static readonly StyleBoxFlat ToolChip = Style.Flat(Style.CupFill, (int)Chip / 2, 0, Style.Mustard, 2), ResourceChip = Style.Flat(Style.CupFill, (int)Chip / 2, 0, Style.Line, 2);
+    public static readonly StyleBoxFlat ChosenCup = Style.Flat(Style.CupFill, 14, 0, Style.Mustard, 3), LaneBack = Style.Flat(new Color(Style.Line, .5f), 14, 10, horizontal: 12);
+    public static readonly StyleBoxFlat StationBuilt = Style.Flat(Style.Beige, 12, 6, horizontal: 8), StationPlanned = Style.Flat(Colors.Transparent, 12, 6, new Color(Style.Beige, .7f), 2, 8);
+    private static readonly StyleBoxFlat ChosenRing = Style.Flat(Colors.Transparent, 14, 0, Style.Mustard, 3), LitRing = Style.Flat(new Color(Style.Rim, .25f), 16, 0, Style.Rim, 4);
 
     private readonly Label nameLabel, sourceLabel;
     /// <summary>Where the item's words start: after the cup, or after the chips beside it.</summary>
@@ -275,7 +276,6 @@ public partial class MapNode : Control {
     private bool chosen;
     private int lit;
 
-    public string Item { get; }
     /// <summary>Whether the settlement has had this item before.</summary>
     public bool Known { get; }
     /// <summary>Whether the item is lit up after a jump to it.</summary>
@@ -288,7 +288,7 @@ public partial class MapNode : Control {
     /// <param name="jump">Goes to another item and lights it up.</param>
     public MapNode(World world, string item, Action<string> choose, Action<string> jump) {
         var data = world.Data;
-        Item = item; Known = world.Had(item); Name = $"map_{item}";
+        Known = world.Had(item); Name = $"map_{item}";
         CustomMinimumSize = Size = new Vector2(Width, Height); MouseFilter = MouseFilterEnum.Ignore;
         var cup = new Button { Name = "cup", Position = new Vector2(0, (Height - Cup) / 2), Size = new Vector2(Cup, Cup), Icon = Icons.Of(item), ExpandIcon = true, IconAlignment = HorizontalAlignment.Center, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, TooltipText = data.Name(item) };
         Style.Skin(cup, Style.None, Style.None); cup.AddThemeConstantOverride("icon_max_width", 30);
@@ -333,11 +333,5 @@ public partial class MapNode : Control {
         if (Lit) DrawStyleBox(LitRing, cup.Grow(5));
         MapCup.Paint(this, cup, Known);
         if (chosen) DrawStyleBox(ChosenRing, cup.Grow(2));
-    }
-
-    private static StyleBoxFlat Round(Color fill, Color edge, float radius, int border, int horizontal = 0, int vertical = 0) {
-        var box = new StyleBoxFlat { BgColor = fill, BorderColor = edge, AntiAliasing = true, ContentMarginLeft = horizontal, ContentMarginRight = horizontal, ContentMarginTop = vertical, ContentMarginBottom = vertical };
-        box.SetCornerRadiusAll((int)radius); box.SetBorderWidthAll(border);
-        return box;
     }
 }

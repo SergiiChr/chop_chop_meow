@@ -101,7 +101,8 @@ public static class Style {
     /// <summary>A stage on a track: done, the current one, and still to come.</summary>
     public static readonly StyleBoxFlat StageDone = Round(Sage, 24).Item1, StageNow = Round(Mustard, 24).Item1, StageTodo = Round(Line, 24).Item1;
 
-    private static StyleBoxFlat Flat(Color bg, int radius, int margin, Color? edge = null, int border = 0, int horizontal = -1) {
+    /// <summary>A flat rounded box: its fill, corner radius, the room inside it top and bottom, then its edge, the edge's width and other room left and right.</summary>
+    public static StyleBoxFlat Flat(Color bg, int radius, int margin, Color? edge = null, int border = 0, int horizontal = -1) {
         var box = new StyleBoxFlat { BgColor = bg, BorderColor = edge ?? Colors.Transparent, AntiAliasing = true };
         box.SetCornerRadiusAll(radius);
         if (border > 0) box.SetBorderWidthAll(border);

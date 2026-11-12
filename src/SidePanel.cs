@@ -81,6 +81,9 @@ public partial class SidePanel : MovableWindow {
     private Control? pageRows;
     /// <summary>The least a page's own list keeps, about two rows of recipe cards.</summary>
     private const float MinPageRows = 150;
+    // Where the open page's own list is scrolled to and how tall it is: kept while the page draws again, forgotten when another page opens.
+    private int pageOffset;
+    private float pageHeight;
     private Selection shownInspect;
     private int awaited;
     /// <summary>The open page, or null while the panel is closed.</summary>
@@ -139,7 +142,7 @@ public partial class SidePanel : MovableWindow {
         if (same && page is { Current: true }) { page.Redraw(); return; }
         // A different page or building leaves the backpack drawer's close button behind, and opens both windows where they open first.
         if (!same) { Bag.Dismissed = false; ResetPlace(); Bag.ResetPlace(); }
-        Page = name;
+        Page = name; pageOffset = 0; pageHeight = 0;
         foreach (var child in content.GetChildren()) { content.RemoveChild(child); child.QueueFree(); }
         ClearFrame();
         page = Pages[(int)name].Make(tools, Selection);
@@ -253,24 +256,36 @@ public partial class SidePanel : MovableWindow {
         return asideContent;
     }
 
-    /// <summary>Hands over the page's own long list, such as a recipe board's, so <see cref="Fit"/> lets it scroll in the room the rest of the page leaves rather than push that out of view.</summary>
-    public void ShowPageRows(ScrollContainer scrollArea, Control rows) { pageScroll = scrollArea; pageRows = rows; }
+    /// <summary>
+    /// Hands over the page's own long list, such as a recipe board's, so <see cref="Fit"/> lets it scroll in the room the rest of the page leaves rather than push that out of view.
+    /// A list handed over when the page draws again takes the height of the one before it at once and its place a frame later, once its rows have their size.
+    /// </summary>
+    public async void ShowPageRows(ScrollContainer scrollArea, Control rows) {
+        pageScroll = scrollArea; pageRows = rows;
+        int offset = pageOffset;
+        scrollArea.CustomMinimumSize = new Vector2(0, pageHeight);
+        scrollArea.GetVScrollBar().ValueChanged += at => pageOffset = (int)at;
+        if (offset == 0) return;
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (IsInstanceValid(scrollArea)) scrollArea.ScrollVertical = offset;
+    }
 
     /// <summary>Sizes the panel's scroll area to what it shows, up to the room between the clock and the hotbar.</summary>
     public void Fit() {
         if (!Visible) return;
         Aside.Visible = asideShown;
         if (asideShown) {
+            if (Aside.Size != Aside.GetCombinedMinimumSize()) Aside.ResetSize();
             // Left of the panel, or right of it where the panel stands too near the screen's left edge.
-            Aside.ResetSize();
             float left = Position.X - Aside.Size.X - AsideGap;
-            Aside.Position = new Vector2(left >= 0 ? left : Position.X + Size.X + AsideGap, Position.Y);
+            var at = new Vector2(left >= 0 ? left : Position.X + Size.X + AsideGap, Position.Y);
+            if (Aside.Position != at) Aside.Position = at;
         }
         float room = Math.Max(160, ui.Size.Y - Position.Y - 120);
         if (pageScroll != null) {
-            float rest = inset.GetCombinedMinimumSize().Y - pageScroll.CustomMinimumSize.Y;
-            float rows = Math.Max(Math.Min(MinPageRows, pageRows!.GetCombinedMinimumSize().Y), Math.Min(pageRows.GetCombinedMinimumSize().Y, room - rest));
-            if (Math.Abs(pageScroll.CustomMinimumSize.Y - rows) > .5f) pageScroll.CustomMinimumSize = new Vector2(0, rows);
+            float rest = inset.GetCombinedMinimumSize().Y - pageScroll.CustomMinimumSize.Y, all = pageRows!.GetCombinedMinimumSize().Y;
+            pageHeight = Math.Max(Math.Min(MinPageRows, all), Math.Min(all, room - rest));
+            if (Math.Abs(pageScroll.CustomMinimumSize.Y - pageHeight) > .5f) pageScroll.CustomMinimumSize = new Vector2(0, pageHeight);
         }
         float want = Math.Min(inset.GetCombinedMinimumSize().Y, room);
         if (sheet.Visible && sheetScroll != null) {

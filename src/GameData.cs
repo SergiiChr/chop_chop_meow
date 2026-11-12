@@ -221,14 +221,16 @@ public sealed partial class GameData {
             throw new InvalidOperationException("Invalid farm in GameData.");
         ValidateMap();
     }
-    // Filled by Validate: the recipe that makes each item, and what the recipe map hangs under each item.
-    private readonly Dictionary<string, RecipeDef> recipeOf = new();
+    // Filled by Validate: the id of the recipe that makes each item, and what the recipe map hangs under each item.
+    private readonly Dictionary<string, string> recipeIdOf = new();
     private readonly Dictionary<string, List<string>> madeOutOf = new();
     private static readonly List<string> Nothing = new();
     /// <summary>Items the recipe map leaves out: coins, and the part-drunk bottles that stand with the full one.</summary>
     public static bool OffTheMap(string item) => item == Inventory.Coins || item is "water_1" or "water_2";
+    /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
+    public string? RecipeIdOf(string item) => recipeIdOf.GetValueOrDefault(item);
     /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
-    public RecipeDef? RecipeOf(string item) => recipeOf.GetValueOrDefault(item);
+    public RecipeDef? RecipeOf(string item) => recipeIdOf.TryGetValue(item, out var id) ? Recipes[id] : null;
     /// <summary>The item another is made out of, which the recipe map hangs it under; null for one a chain starts from.</summary>
     public string? MadeFrom(string item) => RecipeOf(item) is RecipeDef r ? r.Inputs.Keys.First() : Sources.TryGetValue(item, out var source) && source.From.Count > 0 ? source.From[0] : null;
     /// <summary>The items made out of another, longest chain first.</summary>
@@ -243,14 +245,14 @@ public sealed partial class GameData {
     }
     /// <summary>Works out the recipe map's chains and checks that every item is on the map once.</summary>
     private void ValidateMap() {
-        foreach (var recipe in Recipes.Values)
-            if (!recipeOf.TryAdd(recipe.Output, recipe) || recipe.Inputs.Count == 0) throw new InvalidOperationException($"{recipe.Output} needs one recipe with an input for the recipe map.");
+        foreach (var (id, recipe) in Recipes)
+            if (!recipeIdOf.TryAdd(recipe.Output, id) || recipe.Inputs.Count == 0) throw new InvalidOperationException($"{recipe.Output} needs one recipe with an input for the recipe map.");
         foreach (var (item, source) in Sources)
-            if (!Items.ContainsKey(item) || recipeOf.ContainsKey(item) || source.How == "" || source.From.Concat(source.Also).Any(other => !Items.ContainsKey(other)))
+            if (!Items.ContainsKey(item) || recipeIdOf.ContainsKey(item) || source.How == "" || source.From.Concat(source.Also).Any(other => !Items.ContainsKey(other)))
                 throw new InvalidOperationException($"Invalid source for {item}.");
         foreach (string item in Items.Keys) {
             if (OffTheMap(item)) continue;
-            if (!recipeOf.ContainsKey(item) && !Sources.ContainsKey(item)) throw new InvalidOperationException($"{item} has neither a recipe nor a source for the recipe map.");
+            if (!recipeIdOf.ContainsKey(item) && !Sources.ContainsKey(item)) throw new InvalidOperationException($"{item} has neither a recipe nor a source for the recipe map.");
             if (MadeFrom(item) is string parent) { if (!madeOutOf.TryGetValue(parent, out var children)) madeOutOf[parent] = children = new(); children.Add(item); }
         }
         foreach (string item in Items.Keys) {

@@ -111,7 +111,8 @@ public sealed partial class World {
         foreach (var w in S.Workers) if (w.Assignment == mine.Id && w.WorkState == WorkerWorkState.Underground) miners++;
         mine.Progress += dt * miners;
         while (mine.Progress >= Data.Mine.Seconds && !MineFull(mine)) {
-            mine.Progress -= Data.Mine.Seconds; mine.Output!.Add(MineOre(mine), 1); mine.Output.Add("stone", 1); Got(MineOre(mine)); Got("stone");
+            string ore = MineOre(mine);
+            mine.Progress -= Data.Mine.Seconds; mine.Output!.Add(ore, 1); mine.Output.Add("stone", 1); Got(ore); Got("stone");
         }
     }
 

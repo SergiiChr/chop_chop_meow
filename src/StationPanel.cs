@@ -11,7 +11,6 @@ namespace ChopChopMeow;
 public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     // The board opens the group of what the station makes when the page opens, and keeps the groups as the player leaves them after that.
     private bool opened;
-    private readonly ListPlace place = new();
 
     protected override void Body() {
         // A station's own tool cups sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
@@ -20,7 +19,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
         string? openOn = opened ? null : thing.Keep != "" ? thing.Keep : thing.Recipe != "" ? thing.Recipe : null;
         opened = true;
-        AddChild(new RecipeBoard(kit, live, memory, panel, place, Redraw, thing, openOn));
+        AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn));
         RedrawOnChange(() => World.QueueCode(world.QueueOf(thing)));
         if (thing.Recipe != "") AddChild(cups.Machine());
         else AddLabel("Click a recipe for workers to keep making it, or Shift-click to queue and load some.", 14, Style.Beige);
