@@ -259,7 +259,7 @@ public sealed class SaveState {
     public Dictionary<string, float> Prices { get; set; } = new();
     public float PricesTime { get; set; }
     public HashSet<string> Milestones { get; set; } = new();
-    /// <summary>Every item the settlement has made, gathered, bought or started with, which the recipe map shows as known.</summary>
+    /// <summary>Every item the settlement has gathered, grown, bought or started with; with what it made, in <see cref="Milestones"/>, the recipe map shows these as known.</summary>
     public HashSet<string> Obtained { get; set; } = new();
     [JsonIgnore] public float PlayerX { get => Actor.PlayerX; set => Actor.PlayerX = value; }
     [JsonIgnore] public float PlayerY { get => Actor.PlayerY; set => Actor.PlayerY = value; }
@@ -426,8 +426,8 @@ public sealed partial class World {
     public ListView<PlayerState> Players => new(S.Players);
     public int Goal => S.Goal;
     public bool Reached(string milestone) => S.Milestones.Contains(milestone);
-    /// <summary>Whether the settlement has ever made, gathered, bought or started with an item.</summary>
-    public bool Had(string item) => S.Obtained.Contains(item);
+    /// <summary>Whether the settlement has ever made, gathered, bought or started with an item; what it made is among its milestones.</summary>
+    public bool Had(string item) => S.Obtained.Contains(item) || S.Milestones.Contains(item);
     private void Got(string item) => S.Obtained.Add(item);
     public int DayRevenue => S.DayRevenue;
     public ListView<int> Profits => new(S.Profits);
@@ -613,6 +613,8 @@ public sealed partial class World {
         return best;
     }
     public float Speed(string? tool) => tool == null ? 1 : Data.Items[tool].Speed;
+    /// <summary>How many times faster than a recipe's own seconds work goes: a bench's speed, or 1 elsewhere and by hand, times the tool's.</summary>
+    public float WorkRate(ThingKind? station, string? tool) => (station == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
     public void MovePlayer(Vector2 delta) {
         // Inside a cabin the player stays put until they step outside on purpose.
         if (Downed || S.Sheltered != 0) return;
@@ -1389,7 +1391,7 @@ public sealed partial class World {
         Crafted(r.Output); Play(Sounds.ForItem(r.Output), Player);
     }
     private void Crafted(string output) {
-        S.Milestones.Add(output); Got(output);
+        S.Milestones.Add(output);
         if (Data.Items[output].Tool == "pickaxe") S.Milestones.Add("pick");
         if (output.StartsWith("steel_") && Data.Items[output].Tool != "") S.Milestones.Add("steel_tool");
     }
@@ -1798,7 +1800,8 @@ public sealed partial class World {
             w.WorkState = WorkerWorkState.Gathering; w.Exhausted = null;
             w.Timer += dt;
             if (target.IsLoose || w.Timer >= GatherTime(target.Kind, w.Tool == "" ? null : w.Tool) * 1.6f) {
-                w.Timer = 0; target.Remaining -= w.Bag.Add(item, target.Remaining); Got(item);
+                w.Timer = 0; int took = w.Bag.Add(item, target.Remaining); target.Remaining -= took;
+                if (took > 0) Got(item);
                 Chip(target, w.Tool == "" ? null : w.Tool);
                 if (target.Remaining > 0) return true;
                 NextSpot(w, target.Id, target.Kind, target.Pos, dt);
@@ -2198,7 +2201,7 @@ public sealed partial class World {
         // A recipe at a station with tool slots needs its tool slotted or carried by a player working there, and the tool's speed sets the pace.
         string? tool = StationTool(t, recipe);
         if (t.Tools != null && recipe.Tool != "" && tool == null) atAnvil = false;
-        float rate = (t.Kind == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
+        float rate = WorkRate(t.Kind, tool);
         if (!t.Processing && hot && atAnvil && Stocked(t)) {
             t.Inventory.Spend(BatchCost(t)); t.Making = StartNext(t.Queue, t.Keep); t.Processing = true; t.Progress = 0;
             if (recipe.Inputs.TryGetValue("water", out int usedWater)) t.Inventory.Add("empty_bottle", usedWater);

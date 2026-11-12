@@ -116,7 +116,7 @@ public partial class RecipeMap : Control {
         // An item that comes out of several others hangs under the first; the others reach it with a joining line.
         foreach (var (item, node) in nodes)
             if (node.GetParent() == tree && world.Data.Sources.TryGetValue(item, out var source))
-                foreach (string other in source.From.Skip(1)) if (nodes.TryGetValue(other, out var joining)) tree.Join(joining, node);
+                foreach (string other in source.From.Skip(1)) tree.Join(nodes[other], node);
         tree.CustomMinimumSize = new Vector2(tree.Columns * MapTree.Pitch - MapTree.Gap, line * MapNode.Height);
         return lane;
     }
@@ -177,13 +177,14 @@ public partial class RecipeMap : Control {
         return column;
     }
 
-    /// <summary>Where an item is made or come by, with the tool and the time a batch takes with the plainest one.</summary>
+    /// <summary>Where an item is made or come by, with the tool and the time a batch takes with the plainest one, by hand and at its station where the two differ.</summary>
     private string MadeAt(string item) {
         var data = world.Data;
         if (data.RecipeOf(item) is not RecipeDef r) return data.Sources[item].How;
         string where = MapNode.Where(data, r), tool = r.Tool == "" ? "" : $", {data.ToolName(r.Tool, r.Tier)}";
-        float seconds = r.Seconds / (r.Station == ThingKind.Bench ? data.BenchSpeed : 1);
-        return $"{where}{tool} · {seconds:0.#} s";
+        float byHand = r.Seconds / world.WorkRate(null, null), there = r.Seconds / world.WorkRate(r.Station, null);
+        string time = r.Hand && r.Station is ThingKind station && byHand != there ? $"{byHand:0.#} s by hand, {there:0.#} s at the {data.Name(station).ToLowerInvariant()}" : $"{there:0.#} s";
+        return $"{where}{tool} · {time}";
     }
 
     /// <summary>The button that leaves the map for the place a recipe is made: the nearest station of its kind, else the crafting menu for one made by hand.</summary>

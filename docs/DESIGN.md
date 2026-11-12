@@ -520,6 +520,7 @@ What no storage takes stays in the station, which goes on working until its outp
 Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
 The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.ClosedGroups` keeps the groups the player closed, for every board.
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
+The page keeps a `ListPlace`, so the list stays where it was scrolled to when the page draws again.
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 
@@ -529,7 +530,8 @@ A `MapNode` draws a filled cup for an item `World.Had` knows and a dashed one ot
 A click on a chip scrolls to that item and lights it (`MapNode.Light`); a click on a cup shows its details, whose button leaves the map through `SidePanel.ShowRecipe`.
 
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
-`SaveState.Obtained` holds every item the settlement has made, gathered, bought or started with (`World.Had`), which the recipe map shows as known.
+`SaveState.Obtained` holds every item the settlement has gathered, grown, bought or started with; with what it made, which is among `SaveState.Milestones`, those are the items the recipe map shows as known (`World.Had`).
+A save written before `Obtained` existed loads with it empty, so its raw resources show as not made until they are gathered again.
 `GameData.MadeFrom` gives the item another is made out of: its recipe's first input, or the first `From` of its entry in `GameData.Sources` when no recipe makes it.
 `GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item is on the map once.
 

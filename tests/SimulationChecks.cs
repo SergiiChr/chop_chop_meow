@@ -1713,6 +1713,8 @@ public static class SimulationChecks {
         Require(world.Craft("stone_chisel"), "two stone should queue a stone chisel");
         SafeTick(world, data.Recipes["stone_chisel"].Seconds + 1);
         Require(world.Had("stone_chisel"), "crafting should mark the product as had");
+        Achieve(world, "iron_bar");
+        Require(world.Had("iron_bar"), "what the settlement's milestones say it made should count as had");
     }
 
     private static void CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf(GameData data) {

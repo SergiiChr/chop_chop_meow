@@ -87,7 +87,7 @@ public partial class SidePanel : MovableWindow {
     private PagePanel? page;
 
     public BackpackDrawer Bag { get; }
-    /// <summary>A small window of its own left of the panel and level with its top, which a page fills through <see cref="ShowAside"/>; it follows the panel.</summary>
+    /// <summary>A small window of its own beside the panel and level with its top, which a page fills through <see cref="ShowAside"/>; it follows the panel.</summary>
     public PanelContainer Aside { get; }
     private readonly VBoxContainer asideContent;
     private bool asideShown;
@@ -260,7 +260,12 @@ public partial class SidePanel : MovableWindow {
     public void Fit() {
         if (!Visible) return;
         Aside.Visible = asideShown;
-        if (asideShown) { Aside.ResetSize(); Aside.Position = new Vector2(Math.Max(0, Position.X - Aside.Size.X - AsideGap), Position.Y); }
+        if (asideShown) {
+            // Left of the panel, or right of it where the panel stands too near the screen's left edge.
+            Aside.ResetSize();
+            float left = Position.X - Aside.Size.X - AsideGap;
+            Aside.Position = new Vector2(left >= 0 ? left : Position.X + Size.X + AsideGap, Position.Y);
+        }
         float room = Math.Max(160, ui.Size.Y - Position.Y - 120);
         if (pageScroll != null) {
             float rest = inset.GetCombinedMinimumSize().Y - pageScroll.CustomMinimumSize.Y;

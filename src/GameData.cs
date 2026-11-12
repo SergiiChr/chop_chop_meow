@@ -253,21 +253,29 @@ public sealed partial class GameData {
             if (!recipeOf.ContainsKey(item) && !Sources.ContainsKey(item)) throw new InvalidOperationException($"{item} has neither a recipe nor a source for the recipe map.");
             if (MadeFrom(item) is string parent) { if (!madeOutOf.TryGetValue(parent, out var children)) madeOutOf[parent] = children = new(); children.Add(item); }
         }
+        foreach (string item in Items.Keys) {
+            int steps = 0;
+            for (string? at = item; at != null; at = MadeFrom(at)) if (++steps > Items.Count) throw new InvalidOperationException($"{item} is made out of itself on the recipe map.");
+        }
         // A stable sort, so chains of one length keep the tables' order.
         foreach (var (parent, children) in madeOutOf.ToList()) madeOutOf[parent] = children.OrderByDescending(ChainLength).ToList();
-        var placed = new HashSet<string>();
-        void Place(string item) {
-            if (!placed.Add(item)) throw new InvalidOperationException($"{item} is on the recipe map twice.");
-            foreach (string child in MadeOutOf(item)) Place(child);
+        var placed = new Dictionary<string, MapRowDef>();
+        void Place(string item, MapRowDef row) {
+            if (!placed.TryAdd(item, row)) throw new InvalidOperationException($"{item} is on the recipe map twice.");
+            foreach (string child in MadeOutOf(item)) Place(child, row);
         }
         foreach (var row in MapRows) {
             if (row.Title == "" || row.Roots.Count == 0) throw new InvalidOperationException("A recipe map row needs a title and an item.");
             foreach (string root in row.Roots) {
                 if (!Items.ContainsKey(root) || MadeFrom(root) != null) throw new InvalidOperationException($"{root} cannot start a recipe map row.");
-                Place(root);
+                Place(root, row);
             }
         }
-        if (Items.Keys.FirstOrDefault(item => !OffTheMap(item) && !placed.Contains(item)) is string missing) throw new InvalidOperationException($"{missing} is not on the recipe map.");
+        // The map joins the other items something comes out of to it with a line, which it draws inside one row.
+        foreach (var (item, source) in Sources)
+            foreach (string other in source.From.Skip(1))
+                if (!placed.TryGetValue(other, out var row) || row != placed.GetValueOrDefault(item)) throw new InvalidOperationException($"{other} and {item} must share a recipe map row.");
+        if (Items.Keys.FirstOrDefault(item => !OffTheMap(item) && !placed.ContainsKey(item)) is string missing) throw new InvalidOperationException($"{missing} is not on the recipe map.");
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
     public bool IsConsumable(string item) => Water.BottleSips(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);

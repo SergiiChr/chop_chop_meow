@@ -1307,6 +1307,25 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
         Require(!panel.Aside.Visible, "The tool window must close with the page.");
     }
+    /// <summary>A recipe list that has scrolled keeps its place when a click on a recipe makes the page draw again.</summary>
+    private async Task CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain() {
+        await CloseWithEsc();
+        // A bench that is making something shows its work under the list, which leaves the list too little room for thirteen recipes.
+        var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(workbench, "planks");
+        await ClickOn(workbench);
+        ScrollContainer List() => (ScrollContainer)panel.FindChild("recipe_list", true, false);
+        await Until(() => List().GetVScrollBar().MaxValue > List().Size.Y, "the bench's recipes outgrowing the room the page leaves them", 2);
+        await Wheel((layer.Transform * List().GetGlobalRect()).GetCenter());
+        int scrolled = List().ScrollVertical;
+        Require(scrolled > 0, "The wheel must scroll the recipe list.");
+        var card = panel.FindChildren("craft_*", "Button", true, false).OfType<Control>().First(c => c.Name != "craft_planks" && List().GetGlobalRect().Encloses(c.GetGlobalRect()));
+        string recipe = card.Name.ToString()["craft_".Length..];
+        await Click(card);
+        await Until(() => workbench.Keep == recipe, "the click marking the recipe for workers", 2);
+        await Frames(4);
+        Require(List().ScrollVertical == scrolled, "The list must stay where it was scrolled to after the page draws again.");
+        RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
+    }
     /// <summary>The crafting menu's map button opens the recipe map with every item on it once, those the settlement has had drawn as known; Escape closes it.</summary>
     private async Task CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce() {
         await CloseWithEsc();
@@ -1332,6 +1351,9 @@ public partial class Game {
         await Until(() => !coal.Lit, "the light on coal going out again", RecipeMap.LitSeconds + 2);
         await Click((Control)recipeMap.NodeOf("crate")!.FindChild("cup", true, false));
         Require(recipeMap.Chosen == "crate" && ((Label)recipeMap.FindChild("detail_name", true, false)).Text == "Wood crate" && HasLabel((Node)recipeMap.FindChild("map_details", true, false), "6 Wood planks"), "A click on the crate must show its name and the six planks it requires.");
+        await Click((Control)recipeMap.NodeOf("planks")!.FindChild("cup", true, false));
+        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "10 s by hand, 5 s at the crafting bench"), "Planks must show their time by hand and at the bench.");
+        await Click((Control)recipeMap.NodeOf("crate")!.FindChild("cup", true, false));
         await Click((Control)recipeMap.FindChild("map_show", true, false));
         await Until(() => !recipeMap.Visible && Shows(workbench) && Named("craft_crate") != null, "Show leaving the map for the bench's page with the crate on it", 2);
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
@@ -1551,6 +1573,7 @@ public partial class Game {
             await Test(CheckRecipeBoardsMarkAndQueueWithModifiers);
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
             await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
+            await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
             await Test(CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce);
             await Test(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
             await Test(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
