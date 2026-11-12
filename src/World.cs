@@ -259,6 +259,8 @@ public sealed class SaveState {
     public Dictionary<string, float> Prices { get; set; } = new();
     public float PricesTime { get; set; }
     public HashSet<string> Milestones { get; set; } = new();
+    /// <summary>Every item the settlement has made, gathered, bought or started with, which the recipe map shows as known.</summary>
+    public HashSet<string> Obtained { get; set; } = new();
     [JsonIgnore] public float PlayerX { get => Actor.PlayerX; set => Actor.PlayerX = value; }
     [JsonIgnore] public float PlayerY { get => Actor.PlayerY; set => Actor.PlayerY = value; }
     public float Time { get; set; } = 55;
@@ -424,6 +426,9 @@ public sealed partial class World {
     public ListView<PlayerState> Players => new(S.Players);
     public int Goal => S.Goal;
     public bool Reached(string milestone) => S.Milestones.Contains(milestone);
+    /// <summary>Whether the settlement has ever made, gathered, bought or started with an item.</summary>
+    public bool Had(string item) => S.Obtained.Contains(item);
+    private void Got(string item) => S.Obtained.Add(item);
     public int DayRevenue => S.DayRevenue;
     public ListView<int> Profits => new(S.Profits);
     public bool EndingShown => S.EndingShown;
@@ -462,6 +467,7 @@ public sealed partial class World {
         S = new SaveState(); toolsChanged = true;
         S.Backpack.Add("steel_axe", 1); S.Backpack.Add("berries", 10); S.Backpack.Add("wood", 6);
         S.Backpack.Add("empty_bottle", 1);
+        foreach (var pair in S.Backpack.Items) Got(pair.Key);
         var rng = new Random(4271);
         foreach (var cliff in Cliffs) {
             // Two deposits flank the mine's mouth in the middle of the cliff, holding what three did before.
@@ -649,7 +655,7 @@ public sealed partial class World {
         gatherClock = 0;
         if (t.Kind == ThingKind.Water) {
             var result = Water.CollectWater(this, t);
-            if (result != WaterCollectResult.NoChange) { S.Milestones.Add("water"); Play("gather_water", Player); }
+            if (result != WaterCollectResult.NoChange) { S.Milestones.Add("water"); Got("water"); Play("gather_water", Player); }
             return;
         }
         bool small = t.Kind == ThingKind.WolfCorpse || t.Kind == ThingKind.Stone && tool == null;
@@ -657,14 +663,14 @@ public sealed partial class World {
         amount = S.Backpack.Add(ResourceItem(t), amount); t.Remaining -= amount;
         if (amount > 0) Chip(t, tool);
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
-        if (amount > 0) S.Milestones.Add("gather");
+        if (amount > 0) { S.Milestones.Add("gather"); Got(ResourceItem(t)); }
     }
     private void PickUp(Thing t) {
         string item = ResourceItem(t);
         int amount = S.Backpack.Add(item, t.Remaining); t.Remaining -= amount;
         if (amount == 0) { Say("Backpack full. Store or sell some supplies."); return; }
         if (t.Remaining <= 0) S.Things.Remove(t);
-        S.Milestones.Add("gather"); Play("wood_rocks_inventory", t.Pos); PlayerActed?.Invoke(ActorAction.PickUp, t.Pos);
+        S.Milestones.Add("gather"); Got(item); Play("wood_rocks_inventory", t.Pos); PlayerActed?.Invoke(ActorAction.PickUp, t.Pos);
     }
     public void ResetGather() { gatherClock = 0; S.Actor.GatherTarget = 0; }
     /// <summary>The player hammers an anvil while standing by it with nothing else to do.</summary>
@@ -823,8 +829,21 @@ public sealed partial class World {
     public int Waiting(Thing? station, string recipe) => Waiting(QueueOf(station), recipe);
     /// <summary>The recipes a station makes, or with none those made by hand.</summary>
     public IEnumerable<string> RecipesAt(Thing? station) => station == null ? HandRecipes : Data.Recipes.Where(p => p.Value.Station == station.Kind).Select(p => p.Key);
-    /// <summary>The tool a recipe's work uses: slotted at a station, carried by hand; null when it is missing or none is needed.</summary>
-    public string? ToolInUse(Thing? station, string tool, int tier) => tool == "" ? null : station == null ? BestTool(tool, null, tier) : BenchTool(station, tool, tier);
+    /// <summary>The tool the acting player works a recipe with: the one slotted at a station, else the best one carried; null when there is none or none is needed.</summary>
+    public string? ToolInUse(Thing? station, string tool, int tier) => tool == "" ? null : station != null && BenchTool(station, tool, tier) is string slotted ? slotted : BestTool(tool, null, tier);
+    /// <summary>
+    /// The tool a station's recipe is worked with: the one slotted, else the fastest one carried by a player working at the station.
+    /// A worker brings none, so a station worked only by its crew waits for a slotted tool.
+    /// </summary>
+    private string? StationTool(Thing t, RecipeDef r) {
+        if (r.Tool == "") return null;
+        if (BenchTool(t, r.Tool, r.Tier) is string slotted) return slotted;
+        string? best = null;
+        foreach (var p in S.Players)
+            using (ActAs(p))
+                if (PlayerHammers(t) && BestTool(r.Tool, null, r.Tier) is string carried && (best == null || Speed(carried) > Speed(best))) best = carried;
+        return best;
+    }
     /// <summary>Batches of a recipe waiting in a queue.</summary>
     public static int Waiting(ListView<Queued> queue, string recipe) {
         for (int i = 0; i < queue.Count; i++) if (queue[i].Recipe == recipe) return queue[i].Count;
@@ -1370,7 +1389,7 @@ public sealed partial class World {
         Crafted(r.Output); Play(Sounds.ForItem(r.Output), Player);
     }
     private void Crafted(string output) {
-        S.Milestones.Add(output);
+        S.Milestones.Add(output); Got(output);
         if (Data.Items[output].Tool == "pickaxe") S.Milestones.Add("pick");
         if (output.StartsWith("steel_") && Data.Items[output].Tool != "") S.Milestones.Add("steel_tool");
     }
@@ -1550,7 +1569,7 @@ public sealed partial class World {
         if (pile.Progress < Data.HourSeconds) return;
         pile.Progress = 0;
         for (int left = CompostBatch; left > 0;) left -= pile.Inventory.Remove(pile.Inventory.Items.Keys.First(Compostable), left);
-        pile.Inventory.Add("fertilizer", 1);
+        pile.Inventory.Add("fertilizer", 1); Got("fertilizer");
     }
     // Only chests and piles take part in automation; recovery boxes hold the player's or a dismissed worker's belongings.
     private static readonly ThingKind[] Stores = { ThingKind.Chest, ThingKind.Pile };
@@ -1779,7 +1798,7 @@ public sealed partial class World {
             w.WorkState = WorkerWorkState.Gathering; w.Exhausted = null;
             w.Timer += dt;
             if (target.IsLoose || w.Timer >= GatherTime(target.Kind, w.Tool == "" ? null : w.Tool) * 1.6f) {
-                w.Timer = 0; target.Remaining -= w.Bag.Add(item, target.Remaining);
+                w.Timer = 0; target.Remaining -= w.Bag.Add(item, target.Remaining); Got(item);
                 Chip(target, w.Tool == "" ? null : w.Tool);
                 if (target.Remaining > 0) return true;
                 NextSpot(w, target.Id, target.Kind, target.Pos, dt);
@@ -2057,6 +2076,7 @@ public sealed partial class World {
         // Boxed goods come back as packed crates of one purchase each.
         if (order.Buying && order.Crates > 0)
             goods = order.Goods.SelectMany(p => Enumerable.Range(0, order.Crates).Select(_ => { var box = NewCrate(); box.Add(p.Key, p.Value / order.Crates); return Pack(box); })).ToDictionary(id => id, _ => 1);
+        if (order.Buying) foreach (string item in order.Goods.Keys) Got(item);
         foreach (var (item, quantity) in goods) {
             int overflow = quantity - output.Add(item, quantity);
             if (overflow <= 0) continue;
@@ -2175,8 +2195,8 @@ public sealed partial class World {
         bool wasBurning = stillBurning.Remove(t.Id);
         bool hot = t.Kind != ThingKind.Reinforced || t.Heat >= SteelHeat;
         bool atAnvil = !Worked(t) || Hammered(t);
-        // A recipe at a station with tool slots needs its tool slotted, and the tool's speed sets the pace.
-        string? tool = ToolInUse(t, recipe.Tool, recipe.Tier);
+        // A recipe at a station with tool slots needs its tool slotted or carried by a player working there, and the tool's speed sets the pace.
+        string? tool = StationTool(t, recipe);
         if (t.Tools != null && recipe.Tool != "" && tool == null) atAnvil = false;
         float rate = (t.Kind == ThingKind.Bench ? Data.BenchSpeed : 1) * Speed(tool);
         if (!t.Processing && hot && atAnvil && Stocked(t)) {
@@ -2487,7 +2507,7 @@ public sealed partial class World {
     public void Deserialize(string json) {
         var loaded = JsonSerializer.Deserialize<SaveState>(json, GameData.Json) ?? throw new InvalidOperationException("Invalid save.");
         if (loaded.Version != new SaveState().Version) throw new InvalidOperationException("This save is from another version of the game and cannot be loaded. Start a new game.");
-        if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Prices == null
+        if (loaded.Things == null || loaded.Workers == null || loaded.Orders == null || loaded.Wolves == null || loaded.Demand == null || loaded.Milestones == null || loaded.Obtained == null || loaded.Prices == null
             || loaded.Remembered == null || loaded.Crates == null || loaded.Profits == null || loaded.Explored?.Length != Terrain.Size * Terrain.Size || loaded.Absent.Count == 0)
             throw new InvalidOperationException("Unsupported or incomplete save.");
         loaded.Players = new();

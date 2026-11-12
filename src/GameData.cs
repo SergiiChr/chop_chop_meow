@@ -29,15 +29,19 @@ public sealed class BuildingDef {
     /// <summary>The recipe a station starts on, or empty for one that waits for the player's choice.</summary>
     public string Recipe { get; set; } = "";
 }
+/// <summary>What a recipe's product is for; the recipe boards list recipes under these, in this order.</summary>
+public enum RecipeGroup { Tools, Materials, Containers, Food }
 public sealed class RecipeDef {
     public string Name { get; set; } = "";
+    public required RecipeGroup Group { get; set; }
     /// <summary>The station that makes it, or null for a recipe made only by hand.</summary>
     public ThingKind? Station { get; set; }
+    /// <summary>What a batch takes. The first is the one the product is made out of, which the recipe map hangs it under.</summary>
     public Dictionary<string, int> Inputs { get; set; } = new();
     public string Output { get; set; } = "";
     public int Amount { get; set; } = 1;
     public float Seconds { get; set; }
-    /// <summary>The tool kind the recipe needs: carried for crafting by hand, slotted at a bench.</summary>
+    /// <summary>The tool kind the recipe needs: carried for crafting by hand; at a station slotted, or carried by a player working there.</summary>
     public string Tool { get; set; } = "";
     /// <summary>The lowest <see cref="ItemDef.Tier"/> of that tool that will do; a better one always does.</summary>
     public int Tier { get; set; }
@@ -46,6 +50,20 @@ public sealed class RecipeDef {
     /// <summary>The fuels a batch can burn, one unit per batch from the station's fuel slot, in the order workers look for them; empty for a recipe that burns none.</summary>
     public List<string> Fuels { get; set; } = new();
     public bool Burns => Fuels.Count > 0;
+}
+/// <summary>How an item that no recipe makes is come by, for the recipe map.</summary>
+public sealed class SourceDef {
+    /// <summary>Where it comes from, in a few words.</summary>
+    public string How { get; set; } = "";
+    /// <summary>The items it comes out of, if any; the map hangs it under the first.</summary>
+    public List<string> From { get; set; } = new();
+    /// <summary>Other items that getting it takes.</summary>
+    public List<string> Also { get; set; } = new();
+}
+/// <summary>One row of the recipe map: a category and the items its chains start from, top to bottom.</summary>
+public sealed class MapRowDef {
+    public string Title { get; set; } = "";
+    public List<string> Roots { get; set; } = new();
 }
 /// <summary>How the village's appetite for a good it takes moves with sales.</summary>
 public sealed class DemandDef {
@@ -201,6 +219,49 @@ public sealed partial class GameData {
             throw new InvalidOperationException("Invalid mine or goals in GameData.");
         if (Farm.Sow.Count == 0 || Farm.Yield.Count == 0 || Farm.Sow.Concat(Farm.Yield).Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Farm.GrowDays <= 0 || Farm.HarvestWorkdays <= 0)
             throw new InvalidOperationException("Invalid farm in GameData.");
+        ValidateMap();
+    }
+    // Filled by Validate: the recipe that makes each item, and what the recipe map hangs under each item.
+    private readonly Dictionary<string, RecipeDef> recipeOf = new();
+    private readonly Dictionary<string, List<string>> madeOutOf = new();
+    private static readonly List<string> Nothing = new();
+    /// <summary>Items the recipe map leaves out: coins, and the part-drunk bottles that stand with the full one.</summary>
+    public static bool OffTheMap(string item) => item == Inventory.Coins || item is "water_1" or "water_2";
+    /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
+    public RecipeDef? RecipeOf(string item) => recipeOf.GetValueOrDefault(item);
+    /// <summary>The item another is made out of, which the recipe map hangs it under; null for one a chain starts from.</summary>
+    public string? MadeFrom(string item) => RecipeOf(item) is RecipeDef r ? r.Inputs.Keys.First() : Sources.TryGetValue(item, out var source) && source.From.Count > 0 ? source.From[0] : null;
+    /// <summary>The items made out of another, longest chain first.</summary>
+    public List<string> MadeOutOf(string item) => madeOutOf.GetValueOrDefault(item, Nothing);
+    /// <summary>How many steps the longest chain out of an item runs.</summary>
+    public int ChainLength(string item) => MadeOutOf(item).Count == 0 ? 0 : 1 + MadeOutOf(item).Max(ChainLength);
+    /// <summary>Works out the recipe map's chains and checks that every item is on the map once.</summary>
+    private void ValidateMap() {
+        foreach (var recipe in Recipes.Values)
+            if (!recipeOf.TryAdd(recipe.Output, recipe) || recipe.Inputs.Count == 0) throw new InvalidOperationException($"{recipe.Output} needs one recipe with an input for the recipe map.");
+        foreach (var (item, source) in Sources)
+            if (!Items.ContainsKey(item) || recipeOf.ContainsKey(item) || source.How == "" || source.From.Concat(source.Also).Any(other => !Items.ContainsKey(other)))
+                throw new InvalidOperationException($"Invalid source for {item}.");
+        foreach (string item in Items.Keys) {
+            if (OffTheMap(item)) continue;
+            if (!recipeOf.ContainsKey(item) && !Sources.ContainsKey(item)) throw new InvalidOperationException($"{item} has neither a recipe nor a source for the recipe map.");
+            if (MadeFrom(item) is string parent) { if (!madeOutOf.TryGetValue(parent, out var children)) madeOutOf[parent] = children = new(); children.Add(item); }
+        }
+        // A stable sort, so chains of one length keep the tables' order.
+        foreach (var (parent, children) in madeOutOf.ToList()) madeOutOf[parent] = children.OrderByDescending(ChainLength).ToList();
+        var placed = new HashSet<string>();
+        void Place(string item) {
+            if (!placed.Add(item)) throw new InvalidOperationException($"{item} is on the recipe map twice.");
+            foreach (string child in MadeOutOf(item)) Place(child);
+        }
+        foreach (var row in MapRows) {
+            if (row.Title == "" || row.Roots.Count == 0) throw new InvalidOperationException("A recipe map row needs a title and an item.");
+            foreach (string root in row.Roots) {
+                if (!Items.ContainsKey(root) || MadeFrom(root) != null) throw new InvalidOperationException($"{root} cannot start a recipe map row.");
+                Place(root);
+            }
+        }
+        if (Items.Keys.FirstOrDefault(item => !OffTheMap(item) && !placed.Contains(item)) is string missing) throw new InvalidOperationException($"{missing} is not on the recipe map.");
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
     public bool IsConsumable(string item) => Water.BottleSips(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);

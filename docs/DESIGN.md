@@ -518,10 +518,16 @@ What no storage takes stays in the station, which goes on working until its outp
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
 
+Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
+`SaveState.Obtained` holds every item the settlement has made, gathered, bought or started with (`World.Had`), which the recipe map shows as known.
+`GameData.MadeFrom` gives the item another is made out of: its recipe's first input, or the first `From` of its entry in `GameData.Sources` when no recipe makes it.
+`GameData.MapRows` names the map's rows and the items their chains start from, and `GameData.ValidateMap` checks that every item is on the map once.
+
 #### Tool slots
 
 `World.SlotKinds` names the tool slots a station has (`Thing.Tools`): a chisel and a hammer at the bench, a mortar at the cooking table (`cooktable`).
-A recipe that needs a tool at such a station waits for it to be slotted and runs at that tool's speed.
+A recipe that needs a tool at such a station runs at the speed of the slotted tool, or with the slot empty at that of the fastest one carried by a player working there (`World.StationTool`).
+Worked only by its crew, it waits for a slotted tool.
 At the cooking table it runs only while someone works it (`World.Worked(Thing)`).
 The mortar's recipes are worked, while jam, stew and dough cook unattended and their worker only hauls.
 

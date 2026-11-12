@@ -35,7 +35,7 @@ public sealed partial class World {
         if (farm.Progress < HarvestSeconds) return;
         var yield = farm.Output ?? farm.Inventory;
         foreach (var pair in Data.Farm.Yield) if (yield.Room(pair.Key) < pair.Value) return;
-        foreach (var (item, amount) in Data.Farm.Yield) yield.Add(item, amount);
+        foreach (var (item, amount) in Data.Farm.Yield) { yield.Add(item, amount); Got(item); }
         farm.FarmStage = FarmStage.Fallow; farm.Progress = 0;
     }
 

@@ -377,6 +377,7 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 
 The crafting bench costs 10 planks, works twice as fast and must be worked like the anvil, by you or an assigned worker.
 It has a chisel slot and a hammer slot, and a slotted tool's speed multiplies its rate.
+With a slot empty you can still work the bench with a tool from your backpack; a worker needs the tool slotted.
 
 It makes what the menu's chisel makes (planks, wood parts, the mallet, torches and the mortar), plus these, all with any hammer:
 
@@ -414,7 +415,7 @@ Sear 2 raw meat into 2 burnt steaks at the stone furnace (Sear meat recipe, one 
 Each dough bakes into 4 bread at the stone furnace.
 
 The cooking table (2 steel bars, 6 stone, 8 planks) is a steel grill over a stone firebox with a plank counter and a mortar slot.
-With a mortar and pestle slotted and someone working it, it crushes 4 berries into 4 crushed berries and grinds wheat into flour.
+With a mortar and pestle slotted and someone working it, or carried by you while you work it, it crushes 4 berries into 4 crushed berries and grinds wheat into flour.
 Whoever works it takes the mortar off the counter, holds the bowl in one hand and grinds with the pestle in the other.
 You can do both by hand from the crafting menu with a carried mortar.
 
