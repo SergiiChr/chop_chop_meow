@@ -255,14 +255,14 @@ public static class SimulationChecks {
 
     private static void CheckBuildingTradingAndBlowsOnWolvesMakeTheirSounds(GameData data) {
         var world = EmptyWorld(data);
-        world.Player = new Vector2(20, 20);
-        var heard = new List<string>(); world.Sound = (name, _) => heard.Add(name);
-        Give(world, "wood", 8);
-        var chest = world.Build(ThingKind.Chest, world.Player + new Vector2(2, 0))!;
+        var heard = Listen(world);
+        Give(world, data.Buildings[ThingKind.Chest].Cost);
+        var chest = BuildAt(world, ThingKind.Chest, new Vector2(22, 20));
         Require(heard.SequenceEqual(new[] { "place_building" }), "a building should knock into place as it goes up");
-        foreach (var (item, amount) in data.Buildings[ThingKind.Campfire].Cost) Give(world, item, amount);
-        heard.Clear(); world.Build(ThingKind.Campfire, world.Player + new Vector2(-3, 3));
+        Give(world, data.Buildings[ThingKind.Campfire].Cost);
+        heard.Clear(); BuildAt(world, ThingKind.Campfire, new Vector2(17, 23));
         Require(heard.SequenceEqual(new[] { "place_building", "start_fire" }), "a campfire should knock into place and catch fire");
+        world.Player = new Vector2(20, 20);
         heard.Clear(); world.Dismantle(chest);
         Require(heard.SequenceEqual(new[] { "take_down_building" }), "a building taken down should clatter apart");
         var sign = world.Add(ThingKind.Signpost, world.Player + new Vector2(0, -4));
@@ -274,7 +274,7 @@ public static class SimulationChecks {
         Require(heard.SequenceEqual(new[] { "hire_sign" }), "hiring a worker should sign them on");
 
         var night = NightWorld(data);
-        var struck = new List<string>(); night.Sound = (name, _) => struck.Add(name);
+        var struck = Listen(night);
         night.Attack();
         Require(!struck.Contains("wolf_hit"), "a blow at the air should not sound like it hit a wolf");
         SafeTick(night, 1);
@@ -1617,7 +1617,7 @@ public static class SimulationChecks {
         SafeTick(world, World.WildWindow);
         string said = "";
         world.Notify += message => said = message;
-        var heard = new List<string>(); world.Sound = (name, _) => heard.Add(name);
+        var heard = Listen(world);
         for (int i = 0; i < World.WildSwings; i++) { world.UseTorch(Vector2.Right); SafeTick(world, .65f); }
         float left = world.Torch;
         Require(!world.TorchLit && said == "Torch went off due to wild swinging.", "wild swinging should put the torch out with a message");
@@ -2402,7 +2402,7 @@ public static class SimulationChecks {
         var smeller = new Wolf { Pos = world.Player + Terrain.Seaward * (data.SmellRadius - 5) };
         var called = new Wolf { Pos = smeller.Pos + Terrain.Seaward * (data.HowlRadius - 10) };
         var deaf = new Wolf { Pos = smeller.Pos - Terrain.Seaward * (data.HowlRadius + 10) };
-        var heard = new List<string>(); world.Sound = (name, _) => heard.Add(name);
+        var heard = Listen(world);
         foreach (var wolf in new[] { smeller, called, deaf }) PatrolWolf(world, wolf);
         SafeTick(world, .1f);
         Require(smeller.Target == world.Me.Id && smeller.Howl > 0, "a wolf within smell of the player should howl and take them as its prey");

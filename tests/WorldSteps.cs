@@ -48,6 +48,13 @@ internal static class WorldSteps {
         return world;
     }
 
+    /// <summary>The names of the sounds a world plays from now on, in order.</summary>
+    public static List<string> Listen(World world) {
+        var heard = new List<string>();
+        world.Sound = (name, _) => heard.Add(name);
+        return heard;
+    }
+
     /// <summary>An empty world hosting one guest, and the messages that guest has heard.</summary>
     public static (World World, PlayerState Guest, List<string> Heard) Hosted(GameData data) {
         var world = EmptyWorld(data);

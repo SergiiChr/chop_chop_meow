@@ -680,9 +680,13 @@ public partial class WorldView : Node3D {
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
         // Hands close on what they gather twice a loop; packing digs into the crate as each loop starts, and grinding plays one clip a loop.
-        if (action == ActorAction.Gather && GrabSound(subject.Kind) is string grab && (actor.Struck(.22f) || actor.Struck(.72f))) Sounds?.Play(grab, subject.Pos);
-        if (action == ActorAction.Pack && actor.Struck(.04f)) Sounds?.Play("rustle", subject.Pos);
-        if (action == ActorAction.Grind && actor.Struck(.03f)) Sounds?.Play("grind_mortar", subject.Pos);
+        string? handSound = action switch {
+            ActorAction.Gather when actor.Struck(.22f) || actor.Struck(.72f) => GrabSound(subject.Kind),
+            ActorAction.Pack when actor.Struck(.04f) => "rustle",
+            ActorAction.Grind when actor.Struck(.03f) => "grind_mortar",
+            _ => null
+        };
+        if (handSound != null) Sounds?.Play(handSound, subject.Pos);
         float impact = action switch {
             ActorAction.Chop or ActorAction.SteelChop => .52f,
             ActorAction.Mine or ActorAction.SteelMine => .55f,
@@ -703,7 +707,7 @@ public partial class WorldView : Node3D {
             : subject.Kind == ThingKind.Tree && action != ActorAction.Gather ? "chop_tree"
             : null;
         if (sound != null) Sounds?.Play(sound, subject.Pos);
-        if (subject.Kind == ThingKind.Mine && action == ActorAction.Hammer && (int)(actor.Time / ActorAnimation.Duration(action)) % 2 == 1) Sounds?.Play("rail_clink", subject.Pos);
+        if (action == ActorAction.Hammer && Fitting(subject) && (int)(actor.Time / ActorAnimation.Duration(action)) % 2 == 1) Sounds?.Play("rail_clink", subject.Pos);
         if (!inSight) return;
         var impactAt = World.GatherAt(subject, actor.Position);
         var toward = (actor.Position - impactAt).Normalized();

@@ -1040,8 +1040,7 @@ public sealed partial class World {
         bool pack = PackAround >= PackSize;
         var wolf = S.Wolves.Where(w => w.Leap <= 0 && !w.Feeding).OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
-            wolf.Health -= 1; wolf.Flee = FleeSeconds; KnockBack(wolf); Play("wolf_hit", wolf.Pos);
-            if (wolf.Health <= 0) KillWolf(wolf);
+            wolf.Flee = FleeSeconds; Strike(wolf, 1);
         }
         // A wave of fire toward a wolf on its own makes it keep its distance; a pack closing in no longer cares.
         if (!pack)
@@ -1050,6 +1049,11 @@ public sealed partial class World {
     public const float StaggerSeconds = .45f;
     /// <summary>How far a blow throws a wolf back: a short hop, which the view plays as the wolf jumping clear.</summary>
     public const float KnockBackDistance = .5f;
+    /// <summary>A blow landing on a wolf: it thuds, takes the damage and is thrown back, and falls once its health is gone.</summary>
+    private void Strike(Wolf wolf, float damage) {
+        Play("wolf_hit", wolf.Pos); wolf.Health -= damage; KnockBack(wolf);
+        if (wolf.Health <= 0) KillWolf(wolf);
+    }
     private void KnockBack(Wolf wolf) { wolf.Pos = Slide(wolf.Pos, AwayFromPlayer(wolf) * KnockBackDistance); wolf.Stagger = StaggerSeconds; }
     /// <summary>Leaves a carcass where a struck wolf fell.</summary>
     private void KillWolf(Wolf wolf) {
@@ -1070,9 +1074,7 @@ public sealed partial class World {
         Vector2 target = wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f ? wolf.Pos : Player;
         PlayerActed?.Invoke(action, target); Play("tool_air_swing", Player);
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
-            wolf.Health -= axe == null ? .5f : 1.5f * Speed(axe);
-            KnockBack(wolf); Play("wolf_hit", wolf.Pos);
-            if (wolf.Health <= 0) KillWolf(wolf);
+            Strike(wolf, axe == null ? .5f : 1.5f * Speed(axe));
         }
     }
     public void Die() {
