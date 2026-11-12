@@ -524,7 +524,8 @@ The panel keeps the list's place while the page draws again, so a click on a rec
 A card names the tool its recipe lacks when `World.ToolInUse` finds none slotted or carried, and `RecipePopup` says where the tool is.
 A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that follows the panel (`StationPanel.ToolWindow`).
 
-`RecipeMap` covers the screen and holds the game while it shows (`UiKit.HoldWhile`); it is drawn afresh on each `RecipeMap.Open`.
+`RecipeMap` covers the screen while the game goes on under it; it is drawn afresh on each `RecipeMap.Open`.
+`PlayerControl.Update` moves nobody while it shows, and a `MapNode` turns to made before as soon as `World.Had` knows its item.
 `RecipeMap.Place` puts an item on a grid of steps across and lines down: what is made out of it goes one step on, the first on the same line and the rest on lines below, and `MapTree` draws the lines between them.
 A `MapNode` draws a filled cup for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.
 A click on a chip scrolls to that item and lights it (`MapNode.Light`); a click on a cup shows its details, whose button leaves the map through `SidePanel.ShowRecipe`.

@@ -389,7 +389,8 @@ With a chisel you carve planks (1 wood → 4), wood parts (1 wood → 2), a wood
 ### Recipe map
 
 The map button in the crafting menu's header opens the recipe map over the whole screen.
-Esc or its close button closes it, and the game holds while it shows.
+Esc or its close button closes it.
+The game goes on under it, with your character standing where they were, and an item first made meanwhile turns to made before.
 
 - The map has a row for each category: wood, stone and coal, iron and steel, tin, food and farm. In a row each item hangs off the one it is made out of, raw material first.
 - Every item is on the map, with where it is made or come by under its name.

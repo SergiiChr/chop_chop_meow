@@ -1339,6 +1339,25 @@ public partial class Game {
         Require(!recipeMap.Visible && ShownPage() == "Crafting", "Escape must close the map and leave the crafting menu open.");
         await CloseWithEsc();
     }
+    /// <summary>The game goes on under the open recipe map: time passes and an item first made meanwhile turns to made before, while a held walking key leaves the player in place.</summary>
+    private async Task CheckGameGoesOnUnderTheOpenRecipeMap() {
+        await CloseWithEsc();
+        await KeyStroke(Key.C);
+        await Click(Named("open_map")!);
+        var stew = recipeMap.NodeOf("canned_meat_stew")!;
+        Require(!stew.Known, "Canned stew nobody has made must be drawn as not made yet.");
+        float opened = world.Time;
+        await Until(() => !view.Paused && world.Time > opened + .2f, "time passing under the open map", 2);
+        Achieve(Hosted, "canned_meat_stew");
+        await Until(() => stew.Known, "the stew turning to made before on the open map", 2);
+        await Click((Control)stew.FindChild("cup", true, false));
+        Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "Made before"), "The stew's details must say it was made before.");
+        var stood = world.Player;
+        await Holding(Key.D, () => Seconds(.3));
+        Require(world.Player.DistanceTo(stood) < .01f, "A walking key held under the map must not move the player.");
+        await KeyStroke(Key.Escape);
+        await CloseWithEsc();
+    }
     /// <summary>On the recipe map a click on a chip goes to its item and lights it up for a moment, a click on an item shows its details, and Show leaves the map for where it is made.</summary>
     private async Task CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation() {
         await CloseWithEsc();
@@ -1579,6 +1598,7 @@ public partial class Game {
             await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);
             await Test(CheckRecipeMapOpensFromTheCraftingMenuAndShowsEveryItemOnce);
             await Test(CheckRecipeMapChipsLightTheirItemAndShowLeadsToTheStation);
+            await Test(CheckGameGoesOnUnderTheOpenRecipeMap);
             await Test(CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack);
             var furnace = await Test(CheckSteelFurnaceSlotsLoadByDragAndClickThenPump);
             await Test(() => CheckPauseFreezesPumpingAttackAndAnimations(furnace));

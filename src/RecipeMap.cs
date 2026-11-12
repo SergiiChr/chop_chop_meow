@@ -9,7 +9,7 @@ namespace ChopChopMeow;
 /// The recipe map: every item of the game on one screen, a row for each category, each item hanging off the one it is made out of.
 /// Stations stand in a strip on top with what they cost. A click on an item shows how it is made and what it is used for;
 /// a click on a chip for a required tool or an additional resource goes to that item and lights it up for a moment.
-/// The map is drawn afresh each time it opens and holds the game while it shows.
+/// The map is drawn afresh each time it opens, and the game goes on under it.
 /// </summary>
 public partial class RecipeMap : Control {
     private readonly UiKit kit;
@@ -31,7 +31,6 @@ public partial class RecipeMap : Control {
         board = new PanelContainer(); board.AddThemeStyleboxOverride("panel", Style.Board);
         board.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 20); AddChild(board);
         world.Replaced += Close;
-        kit.HoldWhile(() => Visible);
     }
 
     /// <summary>The item whose details show, or empty.</summary>
@@ -273,6 +272,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
     public static readonly StyleBoxFlat StationBuilt = Style.Flat(Style.Beige, 12, 6, horizontal: 8), StationPlanned = Style.Flat(Colors.Transparent, 12, 6, new Color(Style.Beige, .7f), 2, 8);
     private static readonly StyleBoxFlat ChosenRing = Style.Flat(Colors.Transparent, 14, 0, Style.Mustard, 3), LitRing = Style.Flat(new Color(Style.Rim, .25f), 16, 0, Style.Rim, 4);
 
+    private Button cupButton = null!;
     private Label nameLabel = null!, sourceLabel = null!;
     /// <summary>Where the item's words start: after the cup, or after the chips beside it.</summary>
     private float wordsStart;
@@ -280,7 +280,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
     private int lit;
 
     /// <summary>Whether the settlement has had this item before.</summary>
-    public bool Known { get; } = world.Had(item);
+    public bool Known { get; private set; } = world.Had(item);
     /// <summary>Whether the item is lit up after a jump to it.</summary>
     public bool Lit => lit > 0;
     public bool Chosen { set { chosen = value; QueueRedraw(); } }
@@ -291,9 +291,8 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         var data = world.Data;
         Name = $"map_{item}";
         CustomMinimumSize = Size = new Vector2(Width, Height); MouseFilter = MouseFilterEnum.Ignore;
-        var cup = new Button { Name = "cup", Position = new Vector2(0, (Height - Cup) / 2), Size = new Vector2(Cup, Cup), Icon = Icons.Of(item), ExpandIcon = true, IconAlignment = HorizontalAlignment.Center, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, TooltipText = data.Name(item) };
+        var cup = cupButton = new Button { Name = "cup", Position = new Vector2(0, (Height - Cup) / 2), Size = new Vector2(Cup, Cup), Icon = Icons.Of(item), ExpandIcon = true, IconAlignment = HorizontalAlignment.Center, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, TooltipText = data.Name(item) };
         Style.Skin(cup, Style.None, Style.None); cup.AddThemeConstantOverride("icon_max_width", 30);
-        if (!Known) { var faded = new Color(1, 1, 1, .55f); cup.AddThemeColorOverride("icon_normal_color", faded); cup.AddThemeColorOverride("icon_hover_color", faded); cup.AddThemeColorOverride("icon_pressed_color", faded); }
         cup.Pressed += () => choose(item);
         AddChild(cup);
         var recipe = data.RecipeOf(item);
@@ -306,9 +305,26 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         wordsStart = tooled || across > 0 ? ChipsLeft + Math.Max(1, across) * (Chip + 2) + 4 : Cup + 8;
         var words = new VBoxContainer { Position = new Vector2(wordsStart, 0), Size = new Vector2(Width - wordsStart, Height), Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = MouseFilterEnum.Ignore };
         words.AddThemeConstantOverride("separation", -2); AddChild(words);
-        nameLabel = Style.Text(data.Name(item), 13, Known ? Style.Rim : Style.Beige); words.AddChild(nameLabel);
+        nameLabel = Style.Text(data.Name(item), 13, Style.Beige); words.AddChild(nameLabel);
         sourceLabel = Style.Text(recipe != null ? Where(data, recipe) : data.Sources[item].How, 11, Style.Beige); sourceLabel.Name = "source"; words.AddChild(sourceLabel);
+        ShowKnown();
     }
+
+    /// <summary>Turns the item to made before as soon as the settlement has had it, in its details too when they show.</summary>
+    public override void _Process(double delta) {
+        if (Known || !world.Had(item)) return;
+        Known = true; ShowKnown();
+        if (chosen) choose(item);
+    }
+
+    /// <summary>Draws the icon and name full for an item had before, and faded for one not made yet.</summary>
+    private void ShowKnown() {
+        var tint = new Color(1, 1, 1, Known ? 1 : .55f);
+        foreach (string state in IconStates) cupButton.AddThemeColorOverride(state, tint);
+        nameLabel.AddThemeColorOverride("font_color", Known ? Style.Rim : Style.Beige);
+        QueueRedraw();
+    }
+    private static readonly string[] IconStates = { "icon_normal_color", "icon_hover_color", "icon_pressed_color" };
 
     /// <summary>Where a recipe is made, in a few words.</summary>
     public static string Where(GameData data, RecipeDef r) => r.Station is not ThingKind station ? "By hand" : r.Hand ? $"Hand or {data.Name(station).ToLowerInvariant()}" : data.Name(station);
