@@ -135,6 +135,8 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         if (Launch.Has("--bench")) { world.Player = bench.Pos + Vector2.One; panel.Select(bench); }
         if (Launch.Has("--neighbor")) { world.As(world.Arrive("neighbor", 2), () => world.Player = bench.Pos + Vector2.One); world.Player = bench.Pos + new Vector2(-2, 4); panel.Close(); view.Zoom = 1.6f; }
         if (Launch.Has("--craft")) panel.Open(Page.Craft);
+        // --map-item also clicks an item's cup, to show its details.
+        if (Launch.Has("--map")) { panel.Map.Open(); if (Launch.Value("--map-item") is string item) panel.Map.NodeOf(item)?.GetNode<Button>("cup").EmitSignal(BaseButton.SignalName.Pressed); }
         if (Launch.Has("--crew")) panel.Open(Page.Crew);
         if (Launch.Has("--worker")) panel.Select(world.Workers[0]);
         if (Launch.Has("--guide")) panel.Open(Page.Guide);

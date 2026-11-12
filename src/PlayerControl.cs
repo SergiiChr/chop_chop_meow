@@ -56,7 +56,8 @@ public sealed class PlayerControl {
 
     /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started.</summary>
     public void Update(float dt) {
-        if (kit.Paused) { world.Me.Sprinting = false; return; }
+        // The recipe map covers the world, so nothing held over it walks or gathers.
+        if (kit.Paused || panel.Map.Visible) { world.Me.Sprinting = false; return; }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
         var direction = TowardCabin(HeldDirection());
         direction = Gather(direction, right, dt);

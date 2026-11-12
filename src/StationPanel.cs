@@ -5,21 +5,21 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// A station's page: its tool cups in the header, the recipe board, the work of its current recipe, what waits in its queue,
-/// the bellows of a reinforced furnace, and the jobs it offers.
+/// A station's page: the recipe board, the work of its current recipe, what waits in its queue, the bellows of a reinforced furnace
+/// and the jobs it offers, with its tool cups in a window of their own to the left.
 /// </summary>
 public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
-    // The board opens on the tab of what the station makes when the page opens, and keeps the tab the player picks after that.
+    // The board opens the group of what the station makes when the page opens, and keeps the groups as the player leaves them after that.
     private bool opened;
 
     protected override void Body() {
-        // A station's own tool cups sit in the header: what is slotted sets which recipes can run and how fast.
+        // A station's own tool cups sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
         var slotted = World.SlotKinds(thing.Kind);
-        foreach (string tool in slotted) panel.AddToHeader(ToolSlot(tool));
-        if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool. Someone has to work it.";
+        if (slotted.Length > 0) ToolWindow(slotted);
+        if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool, or of the one you carry while you work it. Someone has to work it.";
         string? openOn = opened ? null : thing.Keep != "" ? thing.Keep : thing.Recipe != "" ? thing.Recipe : null;
         opened = true;
-        AddChild(new RecipeBoard(kit, live, memory, Redraw, thing, openOn));
+        AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn));
         RedrawOnChange(() => World.QueueCode(world.QueueOf(thing)));
         if (thing.Recipe != "") AddChild(cups.Machine());
         else AddLabel("Click a recipe for workers to keep making it, or Shift-click to queue and load some.", 14, Style.Beige);
@@ -33,6 +33,21 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         }, slotted.Length > 0 ? "Click: slot a tool, or add one · Shift: a stack · Ctrl: all of it · Drag onto a slot" : "Click: add one · Shift: a stack · Ctrl: all of it · Drag onto a slot",
             wanted: id => world.Takes(thing, id) || FreeToolCup(id));
         JobButtons();
+    }
+
+    /// <summary>The window left of the page with the station's tool slots, each named with the tool it holds.</summary>
+    private void ToolWindow(string[] kinds) {
+        var window = panel.ShowAside(190);
+        window.AddChild(Style.Heading("Available tools", 19));
+        var slots = new VBoxContainer(); slots.AddThemeConstantOverride("separation", 10); window.AddChild(Style.InWell(slots));
+        foreach (string tool in kinds) {
+            var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 8); slots.AddChild(row);
+            row.AddChild(ToolSlot(tool));
+            var words = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center }; words.AddThemeConstantOverride("separation", 0); row.AddChild(words);
+            words.AddChild(Style.Text($"{char.ToUpperInvariant(tool[0])}{tool[1..]} slot", 12, Style.Tan));
+            var held = Style.Text("", 13, Style.Ink, wrap: true); held.Name = $"tool_name_{tool}"; words.AddChild(held);
+            live.Watch(() => world.BenchTool(thing, tool), now => held.Text = now != null ? world.Data.Name(now) : "Empty");
+        }
     }
 
     /// <summary>A station's cup for one tool kind; while empty it shows a faint picture of the tool it wants.</summary>

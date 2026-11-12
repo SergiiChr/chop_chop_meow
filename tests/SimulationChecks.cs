@@ -91,7 +91,10 @@ public static class SimulationChecks {
         Test(CheckCratesShowOneSlotPerItemTheyCanHold, data);
         Test(CheckPlayerMovesItemsInAndOutOfACarriedCrate, data);
         Test(CheckHandCraftingNeedsChiselAndTakesTime, data);
-        Test(CheckBenchRecipesWaitForSlottedTools, data);
+        Test(CheckBenchWorksWithACarriedOrSlottedTool, data);
+        Test(CheckBenchWorksWithTheFasterOfItsSlottedAndACarriedTool, data);
+        Test(CheckSettlementRemembersWhatItHasHad, data);
+        Test(CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf, data);
         Test(CheckTinNeedsPickaxeAndSmeltsIntoBars, data);
         Test(CheckTinCansNeedASteelHammer, data);
         Test(CheckSteelChiselCarvesAMortarAndWorksTwiceAsFast, data);
@@ -103,6 +106,7 @@ public static class SimulationChecks {
         Test(CheckBerryBushesStartAlikeAndRegrowWhateverIsPicked, data);
         Test(CheckPilesSnapTogetherHoldOneResourceAndMakeCompost, data);
         Test(CheckCookingTableCrushesBerriesAndCooksJam, data);
+        Test(CheckCookingTableGrindsWithACarriedMortar, data);
         Test(CheckCanneryAndFurnaceTakeTheirFoodRecipes, data);
         Test(CheckCrushingBerriesByHandNeedsACarriedMortar, data);
         Test(CheckWorkerWithTwoJobsTakesTurns, data);
@@ -1666,22 +1670,25 @@ public static class SimulationChecks {
         Require(mixed.Add("coal", 1) == 0, "a worker should carry no more than five things in all");
     }
 
-    private static void CheckBenchRecipesWaitForSlottedTools(GameData data) {
+    private static void CheckBenchWorksWithACarriedOrSlottedTool(GameData data) {
         var world = EmptyWorld(data);
         var bench = world.Add(ThingKind.Bench, new Vector2(10, 10));
         world.Player = bench.Pos + new Vector2(1.2f, 0);
-        Give(world, "wood", 4); Give(world, "stone_chisel", 1); Give(world, "wood_hammer", 1);
+        Give(world, "wood", 4); Give(world, "wood_hammer", 1);
         world.SetRecipe(bench, "planks");
         world.LoadBatch(bench, 2);
         SafeTick(world, 6);
-        Require(!bench.Processing && bench.Inventory["planks"] == 0, "a bench recipe should wait for its tool in the slot");
+        Require(!bench.Processing && bench.Inventory["planks"] == 0, "a bench recipe should wait while its tool is neither slotted nor carried");
+        Give(world, "stone_chisel", 1);
+        SafeTick(world, Step);
+        SafeTick(world, data.Recipes["planks"].Seconds / data.BenchSpeed);
+        Require(bench.Inventory["planks"] == 4 && world.Backpack["stone_chisel"] == 1, "the player should work a bench with a carried chisel, twice as fast as crafting by hand");
         Require(!world.SlotTool(bench, "wood_hammer") || world.BenchTool(bench, "chisel") == null, "a hammer must not fill the chisel slot");
         Require(world.SlotTool(bench, "stone_chisel"), "the chisel should go into its slot");
         Require(world.Backpack["stone_chisel"] == 0, "the chisel should leave the backpack");
         Require(!world.SlotTool(bench, "stone_chisel"), "a second chisel should not fit the one slot");
-        SafeTick(world, Step);
-        SafeTick(world, data.Recipes["planks"].Seconds / data.BenchSpeed);
-        Require(bench.Inventory["planks"] == 4, "a bench should work twice as fast as crafting by hand");
+        SafeTick(world, data.Recipes["planks"].Seconds / data.BenchSpeed + Step);
+        Require(bench.Inventory["planks"] == 8, "a bench should work with its slotted chisel");
         var worker = AddWorker(world, bench.Pos + Vector2.One);
         var chest = world.Add(ThingKind.Chest, new Vector2(14, 10));
         chest.Inventory.Add("wood", 2);
@@ -1689,10 +1696,57 @@ public static class SimulationChecks {
         world.Assign(worker, bench);
         world.Player = new Vector2(30, 30);
         SafeTick(world, 12);
-        Require(worker.Status.Contains("chisel") && world.Backpack["stone_chisel"] == 1, "a bench worker should say which tool the bench is missing");
+        Require(worker.Status.Contains("chisel") && world.Backpack["stone_chisel"] == 1 && bench.Inventory["planks"] + chest.Inventory["planks"] == 8, "a bench worker should wait for a slotted tool and say which one the bench is missing");
         bench.Tools!.Add("stone_chisel", 1);
         SafeTick(world, 40);
-        Require(chest.Inventory["planks"] >= 8 && chest.Inventory["wood"] == 0, "a bench worker should fetch wood, work the bench and store the planks");
+        Require(chest.Inventory["planks"] >= 16 && chest.Inventory["wood"] == 0, "a bench worker should fetch wood, work the bench and store the planks");
+    }
+
+    private static void CheckBenchWorksWithTheFasterOfItsSlottedAndACarriedTool(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = world.Add(ThingKind.Bench, new Vector2(10, 10));
+        world.Player = bench.Pos + new Vector2(1.2f, 0);
+        Give(world, "planks", 12); Give(world, "wood_hammer", 1); Give(world, "steel_hammer", 1);
+        Require(world.SlotTool(bench, "wood_hammer"), "the mallet should go into the hammer slot");
+        world.SetRecipe(bench, "crate");
+        world.LoadBatch(bench, 2);
+        Require(world.ToolInUse(bench, "hammer", 0) == "steel_hammer", "the player should work with the carried steel hammer over the slotted mallet");
+        // A crate takes 10 s by hand: 5 s at the bench with the mallet, 2.8 s with the steel hammer.
+        SafeTick(world, 3.5f);
+        Require(bench.Inventory["crate"] == 1, "a bench should work at the speed of a carried steel hammer when only a mallet is slotted");
+    }
+
+    private static void CheckSettlementRemembersWhatItHasHad(GameData data) {
+        var fresh = new World(data);
+        Require(fresh.Had("steel_axe") && fresh.Had("berries") && !fresh.Had("stone") && !fresh.Had("stone_chisel") && !fresh.Had("planks"), "a new settlement should know only what it starts with");
+        Require(fresh.Had("steel_parts") && fresh.Had("iron_ore") && fresh.Had("coal") && fresh.Had("tin_bar") && fresh.Had("tin_ore"), "what the starting axe and bottle are made of should count as had along with them");
+        var world = EmptyWorld(data);
+        var tin = world.Add(ThingKind.Tin, Site(0, 0), 400);
+        world.Player = tin.Pos;
+        Give(world, "steel_pick", 1);
+        GatherUntil(world, tin, "tin_ore", 4);
+        Require(world.Had("tin_ore") && !world.Had("steel_pick"), "gathering should mark the ore as had, and a tool only handed over should not be");
+        Give(world, "stone", 2);
+        Require(world.Craft("stone_chisel"), "two stone should queue a stone chisel");
+        SafeTick(world, data.Recipes["stone_chisel"].Seconds + 1);
+        Require(world.Had("stone_chisel") && world.Had("stone"), "crafting should mark the product as had, and the stone it is made of with it");
+        Require(!world.Had("iron_ore"), "ore nobody dug and nothing was made of should not count as had");
+        Achieve(world, "iron_bar");
+        Require(world.Had("iron_bar") && world.Had("iron_ore") && !world.Had("steel_bar"), "what the settlement's milestones say it made should count as had with its ingredients, and what is made of it should not");
+        string save = world.Serialize();
+        var loose = world.Add(ThingKind.LooseCoal, Site(2, 0), 1);
+        world.Player = loose.Pos; world.Gather(loose, Step);
+        var loaded = new World(data, false); loaded.Deserialize(save);
+        Require(world.Had("coal") && loaded.Had("tin_ore") && !loaded.Had("coal"), "a save should keep what the settlement had when it was written");
+    }
+
+    private static void CheckRecipeMapHangsItemsUnderWhatTheyAreMadeOutOf(GameData data) {
+        Require(data.MadeFrom("wood") == null && data.MadeFrom("coal") == null, "gathered resources should start a chain");
+        Require(data.MadeFrom("rake") == "steel_parts" && data.MadeFrom("meat_stew") == "raw_meat" && data.MadeFrom("steel_bar") == "iron_bar", "a product should hang under its first input");
+        Require(data.MadeFrom("water") == "empty_bottle" && data.MadeFrom("wheat") == "wheat_seeds" && data.MadeFrom("fertilizer") == "leaves", "what no recipe makes should hang under what it comes out of");
+        Require(data.MadeOutOf("steel_parts").Order().SequenceEqual(new[] { "rake", "steel_axe", "steel_chisel", "steel_hammer", "steel_pick" }), "steel parts should lead to the five steel tools");
+        Require(data.MadeOutOf("wood").SequenceEqual(new[] { "planks", "wood_parts", "torch", "charcoal" }), "the longest chains out of an item should come first");
+        Require(data.RecipeOf("crate")?.Group == RecipeGroup.Containers && data.RecipeOf("stone_chisel")?.Group == RecipeGroup.Tools && data.RecipeOf("planks")?.Group == RecipeGroup.Materials && data.RecipeOf("bread")?.Group == RecipeGroup.Food, "recipes should be grouped by what they make");
     }
 
     /// <summary>Tin is mined with a pickaxe and smelted like iron; cans and the mortar need steel tools, and anything better than the tier asked for will do.</summary>
@@ -1965,6 +2019,17 @@ public static class SimulationChecks {
     }
 
     /// <summary>By hand, the mortar is carried like any other tool.</summary>
+    private static void CheckCookingTableGrindsWithACarriedMortar(GameData data) {
+        var world = EmptyWorld(data);
+        var table = world.Add(ThingKind.Cooktable, new Vector2(20, 20));
+        world.Player = table.Pos + new Vector2(1, 0);
+        Give(world, "mortar", 1); Give(world, "berries", 4);
+        world.SetRecipe(table, "crushed_berries");
+        world.LoadBatch(table);
+        SafeTick(world, data.Recipes["crushed_berries"].Seconds + 1);
+        Require(table.Inventory["crushed_berries"] == 4 && world.Backpack["mortar"] == 1, "the player should crush berries at the table with the mortar they carry");
+    }
+
     private static void CheckCrushingBerriesByHandNeedsACarriedMortar(GameData data) {
         var world = EmptyWorld(data);
         Give(world, "mortar", 1); Give(world, "berries", 4);
@@ -2108,6 +2173,7 @@ public static class SimulationChecks {
         SetNeeds(world, hunger: 30); Give(world, "canned_meat_stew", 1); world.Consume("canned_meat_stew");
         // A can of meat stew feeds 60.
         Require(world.Hunger == 90, "canned meat stew should be eaten from the can");
+        Require(world.Had("canned_meat_stew"), "what the cart brings back should count as had");
         Require(world.KnownPrice("raw_meat") > 0 && !world.Priced("wheat_seeds"), "the price sheet only tracks goods the village buys");
         Require(!data.Items.ContainsKey("canned_food") && data.Recipes.Values.All(r => !r.Inputs.ContainsKey("raw_meat") || r.Station != ThingKind.Cannery), "raw meat should sell in crates and never go into a can");
     }

@@ -39,7 +39,8 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
             ("stone_chisel", "Press C to craft on the go. Knap a stone chisel from 2 stone first."),
             ("planks", "With a chisel, carve planks, wood parts, a mallet and torches."),
             ("bench", "A crafting bench works twice as fast and makes tools and crates. Slot a chisel and a hammer."),
-            ("steel_axe", "A small steel tool takes 1 steel part, a big one 2, plus a wood part for the handle.")
+            ("steel_axe", "A small steel tool takes 1 steel part, a big one 2, plus a wood part for the handle."),
+            ("line_map", "The map button on the crafting menu shows everything there is to make and what it is made out of.")
         },
         ["crew"] = new[] {
             ("line_crew", "Hire at a trading post: more coins up front means a lower daily wage."),

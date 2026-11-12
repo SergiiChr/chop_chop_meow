@@ -31,6 +31,7 @@ public partial class Game : Node, IGameFlow {
     private BackpackDrawer bag = null!;
     private Hotbar hotbar = null!;
     private EndingScreen ending = null!;
+    private RecipeMap recipeMap = null!;
     private BlackHole blackHole = null!;
     private ItemMoves moves = null!;
     private RecoveryPrompt recovery = null!;
@@ -134,11 +135,12 @@ public partial class Game : Node, IGameFlow {
         ui.AddChild(hotbar);
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
-        ui.AddChild(panel); ui.AddChild(bag);
+        ui.AddChild(panel.Aside); ui.AddChild(panel); ui.AddChild(bag);
         waterWarning = new WaterWarning(bag, ui); ui.AddChild(waterWarning);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         needsPlate = new NeedsPlate(kit, moves, damageEdges); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
+        recipeMap = new RecipeMap(kit, panel); panel.Map = recipeMap; ui.AddChild(recipeMap);
         ending = new EndingScreen(kit, panel.Close, this); ui.AddChild(ending);
         startMenu = new StartMenu(kit, saves, net, panel, () => menu.Visible = false, this);
         menu = new PauseMenu(kit, net, startMenu, this); ui.AddChild(menu); ui.AddChild(startMenu);
@@ -318,6 +320,7 @@ public partial class Game : Node, IGameFlow {
         if (blackHole.Showing) { if (blackHole.Asking && ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) blackHole.Cancel(); return; }
         if (startMenu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) startMenu.Back(); return; }
         if (menu.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) menu.Close(); return; }
+        if (recipeMap.Visible) { if (ev is InputEventKey { Pressed: true, Echo: false, PhysicalKeycode: Key.Escape }) recipeMap.Close(); return; }
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
                 case Key.Escape:

@@ -74,7 +74,7 @@ public sealed partial class World {
             worker.WorkState = WorkerWorkState.Gathering;
             worker.Timer += dt;
             if (worker.Timer < Data.GatherSeconds) return true;
-            worker.Timer = 0; worker.Bag.Replace(carried, "water");
+            worker.Timer = 0; worker.Bag.Replace(carried, "water"); Got("water");
             worker.Destination = DepositFor("water", worker.Pos)?.Id ?? 0;
             return true;
         }

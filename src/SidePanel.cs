@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace ChopChopMeow;
@@ -9,8 +10,8 @@ public sealed class PageMemory {
     public bool PackPicking;
     /// <summary>The field guide topic shown.</summary>
     public string GuideTab = "controls";
-    /// <summary>The tool group whose recipes are shown.</summary>
-    public string CraftTab = "";
+    /// <summary>The recipe groups the player has closed, on every recipe board.</summary>
+    public readonly HashSet<RecipeGroup> ClosedGroups = new();
     /// <summary>Whether the trading post shows hiring rather than shipping, and whether its price sheet is open.</summary>
     public bool Hiring, SheetOpen = true;
     /// <summary>A station's worker mark before the last press on its recipe board; the page may redraw between the two presses of a double-click.</summary>
@@ -75,14 +76,30 @@ public partial class SidePanel : MovableWindow {
     private float? sheetRest;
     // Whether the board's list hides the backpack drawer and reaches down where it was.
     private bool sheetHidesDrawer;
+    /// <summary>The open page's own long list and what it holds, which <see cref="Fit"/> sizes to the room the rest of the page leaves.</summary>
+    private ScrollContainer? pageScroll;
+    private Control? pageRows;
+    /// <summary>The least a page's own list keeps, about two rows of recipe cards.</summary>
+    private const float MinPageRows = 150;
+    // Where the open page's own list is scrolled to and how tall it is: kept while the page draws again, forgotten when another page opens.
+    private int pageOffset;
+    private float pageHeight;
     private Selection shownInspect;
     private int awaited;
     /// <summary>The open page, or null while the panel is closed.</summary>
     private PagePanel? page;
 
     public BackpackDrawer Bag { get; }
+    /// <summary>A small window of its own beside the panel and level with its top, which a page fills through <see cref="ShowAside"/>; it follows the panel.</summary>
+    public PanelContainer Aside { get; }
+    private readonly VBoxContainer asideContent;
+    private bool asideShown;
+    /// <summary>The gap between the panel and the window beside it.</summary>
+    private const float AsideGap = 12;
     /// <summary>The player's control of the world, which also needs this panel, so the game sets it once both exist.</summary>
     public PlayerControl Player { get; set; } = null!;
+    /// <summary>The recipe map, which also needs this panel, so the game sets it once both exist.</summary>
+    public RecipeMap Map { get; set; } = null!;
     /// <summary>The open page, or nothing while the panel is closed.</summary>
     public Page Page { get; private set; }
     public Selection Selection { get; private set; }
@@ -98,6 +115,8 @@ public partial class SidePanel : MovableWindow {
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top; Visible = false;
         Bag = new BackpackDrawer(kit, this);
+        Aside = new PanelContainer { Name = "aside", Visible = false }; Aside.AddThemeStyleboxOverride("panel", Style.Board);
+        asideContent = new VBoxContainer(); asideContent.AddThemeConstantOverride("separation", 12); Aside.AddChild(asideContent);
         var frame = new HBoxContainer(); frame.AddThemeConstantOverride("separation", 20); AddChild(frame);
         // Boxes on the panel pass a press on their own surface on, so it moves the panel.
         board = new PanelContainer { Visible = false, SizeFlagsVertical = SizeFlags.ShrinkBegin, MouseFilter = MouseFilterEnum.Pass }; frame.AddChild(board);
@@ -123,11 +142,12 @@ public partial class SidePanel : MovableWindow {
         if (same && page is { Current: true }) { page.Redraw(); return; }
         // A different page or building leaves the backpack drawer's close button behind, and opens both windows where they open first.
         if (!same) { Bag.Dismissed = false; ResetPlace(); Bag.ResetPlace(); }
-        Page = name;
+        Page = name; pageOffset = 0; pageHeight = 0;
         foreach (var child in content.GetChildren()) { content.RemoveChild(child); child.QueueFree(); }
         ClearFrame();
         page = Pages[(int)name].Make(tools, Selection);
         content.AddChild(page);
+        if (!asideShown) Aside.Visible = false;
         page.Refresh(); Bag.Refresh();
     }
 
@@ -137,7 +157,10 @@ public partial class SidePanel : MovableWindow {
         HeadingIcon.Texture = null; HeadingIcon.Visible = false; HeadingIcon.TooltipText = ""; HeadingIcon.SelfModulate = Colors.White;
         HeadingTitle.Text = Pages[(int)Page].Title;
         foreach (var child in sheet.GetChildren()) { sheet.RemoveChild(child); child.QueueFree(); }
-        board.Visible = false; sheet.Visible = false; sheetScroll = null;
+        board.Visible = false; sheet.Visible = false; sheetScroll = null; pageScroll = null;
+        // The window beside the panel stays up while a page that fills it draws again; Fit hides it once no page does.
+        foreach (var child in asideContent.GetChildren()) { asideContent.RemoveChild(child); child.QueueFree(); }
+        asideShown = false;
         OffsetLeft = LeftEdge; scroll.ScrollVertical = 0;
         Bag.Clear();
     }
@@ -149,12 +172,12 @@ public partial class SidePanel : MovableWindow {
     public bool Shows(PagePanel shown) => page == shown;
 
     /// <summary>Leaves only the backpack drawer on screen, so the camera keeps the player centred.</summary>
-    public void DrawerOnly() { Visible = false; view.PanelOpen = false; }
+    public void DrawerOnly() { Visible = false; Aside.Visible = false; view.PanelOpen = false; }
 
     /// <summary>Opens a page, or closes it if it is the one showing.</summary>
     public void Toggle(Page name) { if (Page == name) Close(); else Open(name); }
 
-    public void Close() { Visible = false; Bag.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
+    public void Close() { Visible = false; Bag.Visible = false; Aside.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
 
     /// <summary>Whether the open page shows something that has gone, and so closes or gives way on the next refresh.</summary>
     public bool SubjectGone => page is { Current: false };
@@ -185,6 +208,12 @@ public partial class SidePanel : MovableWindow {
         if (tools.Memory.CarriedCrate != crate) Page = Page.None;
         tools.Memory.CarriedCrate = crate;
         Open(Page.Crate);
+    }
+
+    /// <summary>Opens the page where a recipe is made, a station's or with none the crafting menu, with the recipe's group open.</summary>
+    public void ShowRecipe(Thing? station, string recipe) {
+        tools.Memory.ClosedGroups.Remove(world.Data.Recipes[recipe].Group);
+        if (station != null) Select(station); else Open(Page.Craft);
     }
 
     /// <summary>Selects a worker and shows them.</summary>
@@ -223,10 +252,43 @@ public partial class SidePanel : MovableWindow {
     /// <param name="hidesDrawer">Hides the backpack drawer while the list shows, so the board reaches down to the hotbar, for a list picked from by click.</param>
     public void ShowSheetRows(ScrollContainer scrollArea, Control rows, float? rest = null, bool hidesDrawer = false) { sheetScroll = scrollArea; sheetRows = rows; sheetRest = rest; sheetHidesDrawer = hidesDrawer; }
 
+    /// <summary>Shows the window beside the panel and gives the column a page fills it with.</summary>
+    public VBoxContainer ShowAside(float width) {
+        asideShown = true; asideContent.CustomMinimumSize = new Vector2(width, 0);
+        return asideContent;
+    }
+
+    /// <summary>
+    /// Hands over the page's own long list, such as a recipe board's, so <see cref="Fit"/> lets it scroll in the room the rest of the page leaves rather than push that out of view.
+    /// A list handed over when the page draws again takes the height of the one before it at once and its place a frame later, once its rows have their size.
+    /// </summary>
+    public async void ShowPageRows(ScrollContainer scrollArea, Control rows) {
+        pageScroll = scrollArea; pageRows = rows;
+        int offset = pageOffset;
+        scrollArea.CustomMinimumSize = new Vector2(0, pageHeight);
+        scrollArea.GetVScrollBar().ValueChanged += at => pageOffset = (int)at;
+        if (offset == 0) return;
+        await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
+        if (IsInstanceValid(scrollArea)) scrollArea.ScrollVertical = offset;
+    }
+
     /// <summary>Sizes the panel's scroll area to what it shows, up to the room between the clock and the hotbar.</summary>
     public void Fit() {
         if (!Visible) return;
+        Aside.Visible = asideShown;
+        if (asideShown) {
+            if (Aside.Size != Aside.GetCombinedMinimumSize()) Aside.ResetSize();
+            // Left of the panel, or right of it where the panel stands too near the screen's left edge.
+            float left = Position.X - Aside.Size.X - AsideGap;
+            var at = new Vector2(left >= 0 ? left : Position.X + Size.X + AsideGap, Position.Y);
+            if (Aside.Position != at) Aside.Position = at;
+        }
         float room = Math.Max(160, ui.Size.Y - Position.Y - 120);
+        if (pageScroll != null) {
+            float rest = inset.GetCombinedMinimumSize().Y - pageScroll.CustomMinimumSize.Y, all = pageRows!.GetCombinedMinimumSize().Y;
+            pageHeight = Math.Max(Math.Min(MinPageRows, all), Math.Min(all, room - rest));
+            if (Math.Abs(pageScroll.CustomMinimumSize.Y - pageHeight) > .5f) pageScroll.CustomMinimumSize = new Vector2(0, pageHeight);
+        }
         float want = Math.Min(inset.GetCombinedMinimumSize().Y, room);
         if (sheet.Visible && sheetScroll != null) {
             // The board reaches further left than the panel, over the backpack drawer, so it stops above the drawer.

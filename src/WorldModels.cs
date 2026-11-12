@@ -289,7 +289,7 @@ public static class WorldModels {
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
             case "water" or "water_2" or "water_1" or "empty_bottle": return BottleShape.Create(Water.BottleSips(id));
-            case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id);
+            case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "wood" or "planks" or "wood_parts": {
                     var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
                     return stock;
@@ -299,7 +299,7 @@ public static class WorldModels {
             case "crate": return Build(new Thing { Kind = ThingKind.Crate }).Root;
             // Loose iron left the world, but its lump still makes the iron ore icon.
             case "iron_ore": { var lump = new Node3D(); LooseOre(lump, "loose_iron", 0, "a35a2e", "8b4f2b"); return lump; }
-            case "charcoal": { var lump = new Node3D(); LooseOre(lump, "charcoal", 0, "3b302a", "231c18"); return lump; }
+            case "charcoal": { var heap = new Node3D(); Add(heap, CharcoalShape.Heap, CharcoalShape.Material, Vector3.Zero); return heap; }
             case "coal" or "tin_ore": return Build(new Thing { Kind = id == "coal" ? ThingKind.LooseCoal : ThingKind.Tin }).Root;
             case "mine": {
                     var prop = Mine(ThingKind.Iron);

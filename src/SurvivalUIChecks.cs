@@ -122,13 +122,13 @@ public partial class Game {
         var table = Hosted.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
         Hosted.SetRecipe(table, "dough");
         await ClickOn(table); await Frames(3);
-        await Click(Cell(1, c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal)));
+        await Click(BagCell(c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal)));
         Require(waterWarning.Text == Water.FullBottleWarning, "Trying a partial bottle must show the full-bottle warning text.");
         Require(waterWarning.GetGlobalRect().Position.X < 50, "The full-bottle warning must sit at the left of the screen.");
         Require(waterWarning.Size.X > 300, "The full-bottle warning must be wide enough to read.");
         Require(waterWarning.Size.Y < 50, "The full-bottle warning must be a single short line.");
         Require(waterWarning.GetGlobalRect().End.Y < bag.GetGlobalRect().Position.Y, "The full-bottle warning must sit above the backpack.");
-        var partial = Cell(1, c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal));
+        var partial = BagCell(c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal));
         await DragTo(partial, (Control)ui.FindChild("input_water", true, false));
         Require(table.Inventory["water_2"] == 0, "A partial bottle dragged onto a water slot must not go in.");
         Require(world.Backpack["water_2"] == 1, "A partial bottle dragged onto a water slot must stay in the backpack.");

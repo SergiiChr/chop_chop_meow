@@ -35,7 +35,7 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
     /// <summary>A station's work: what one batch takes, how long it runs, what it burns and what it makes.</summary>
     public ProcessRow Machine() {
         var recipe = world.Data.Recipes[t.Recipe];
-        float rate = (t.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * world.Speed(world.ToolInUse(t, recipe.Tool, recipe.Tier));
+        float rate = world.WorkRate(t.Kind, world.ToolInUse(t, recipe.Tool, recipe.Tier));
         float seconds = recipe.Seconds / Math.Max(.01f, rate);
         var cost = world.BatchCost(t);
         var inputs = cost.Select(p => (Control)StationCup(p.Key, true, $"×{p.Value}"));

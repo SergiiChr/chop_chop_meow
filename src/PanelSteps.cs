@@ -32,6 +32,20 @@ public partial class Game {
 
     private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => Cells(grid).First(match);
 
+    /// <summary>
+    /// The text of a named label in a recipe card's hover popup, or "" when the popup has none.
+    /// The popup is built as Godot builds it for a hover, which shows it only after a real delay in a window of its own.
+    /// </summary>
+    private string PopupLabel(string recipe, string name) {
+        var popup = ((ItemSlot)Named($"craft_{recipe}")!).Popup!(); AddChild(popup);
+        string text = popup.FindChild(name, true, false) is Label label ? label.Text : "";
+        popup.QueueFree();
+        return text;
+    }
+
+    /// <summary>A cell of the backpack drawer, whatever grids the open page has.</summary>
+    private ItemSlot BagCell(Func<ItemSlot, bool> match) => bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(match);
+
     /// <summary>Waits until a grid shows a matching cell, for what changes on the game's own refresh, and returns the cell.</summary>
     private async Task<ItemSlot> Showing(int grid, Func<ItemSlot, bool> match) {
         await Until(() => Cells(grid).Any(match), "a matching cell showing", 2);

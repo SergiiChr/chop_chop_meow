@@ -23,6 +23,8 @@ public static class Style {
     public static readonly Color Ember = new("d98a4e");
     /// <summary>Text on enamel that warns: a cost the bank cannot cover, a count the backpack is short of.</summary>
     public static readonly Color Warn = new("f2937c");
+    /// <summary>On a dark popup: something there and ready, and something the player has that is not where it works for everyone.</summary>
+    public static readonly Color Ready = new("8fcf9a"), Held = new("e8c468");
     public static readonly Color Rise = new("4f7a55");
     /// <summary>Modulates: a faint picture of what an empty cup wants, something not ready yet, and what the open page does not take.</summary>
     public static readonly Color Ghost = new(1, 1, 1, .28f), Unready = new(1, 1, 1, .5f), Faded = new(1, 1, 1, .4f);
@@ -99,7 +101,8 @@ public static class Style {
     /// <summary>A stage on a track: done, the current one, and still to come.</summary>
     public static readonly StyleBoxFlat StageDone = Round(Sage, 24).Item1, StageNow = Round(Mustard, 24).Item1, StageTodo = Round(Line, 24).Item1;
 
-    private static StyleBoxFlat Flat(Color bg, int radius, int margin, Color? edge = null, int border = 0, int horizontal = -1) {
+    /// <summary>A flat rounded box: its fill, corner radius, the room inside it top and bottom, then its edge, the edge's width and other room left and right.</summary>
+    public static StyleBoxFlat Flat(Color bg, int radius, int margin, Color? edge = null, int border = 0, int horizontal = -1) {
         var box = new StyleBoxFlat { BgColor = bg, BorderColor = edge ?? Colors.Transparent, AntiAliasing = true };
         box.SetCornerRadiusAll(radius);
         if (border > 0) box.SetBorderWidthAll(border);

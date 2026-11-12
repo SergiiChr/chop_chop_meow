@@ -294,6 +294,8 @@ public sealed partial class World {
         if (p.Sheltered == 0 && !CanStand(p.Pos)) p.Pos = Terrain.Spawn;
         p.Mauled = false; p.GatherTarget = 0; p.Held = ""; p.Sprinting = false; p.TorchKindling = 0;
         S.Players.Add(p);
+        // A packed crate's own name is no item, so it leaves no mark.
+        foreach (var pair in p.Backpack.Items) if (Data.Items.ContainsKey(pair.Key)) Got(pair.Key);
         if (S.Players.Count == 1) S.Actor = p;
         if (S.Players.Count > 1) SayToAll("A neighbor joined the settlement.");
         return p;

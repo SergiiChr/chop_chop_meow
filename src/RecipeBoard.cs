@@ -7,103 +7,100 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// Round tabs for the tools recipes need, beside a grid of square recipe plates.
-/// Each plate shows the product big and its inputs small, each count in brick while the backpack is short, and how many are queued at its top right corner.
+/// A list of recipe cards under a heading for each group of what they make, which closes and opens on a click.
+/// Each card shows the product, its name and its inputs, each count in brick while the backpack is short, or the tool it lacks.
 /// By hand a click queues a batch. At a station a click marks the recipe workers keep making, and a double-click queues a batch and loads it from the backpack.
 /// Shift queues 5 and Ctrl 10, at a station loading them too; a right-click takes as many waiting batches off.
 /// </summary>
 /// <param name="station">Null when crafting by hand.</param>
-/// <param name="openOn">A recipe whose tab the board opens on, for a page opening rather than drawing again.</param>
-public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, Action redraw, Thing? station, string? openOn) : HBoxContainer {
+/// <param name="openOn">A recipe whose group the board opens, for a page opening rather than drawing again.</param>
+public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, SidePanel panel, Action redraw, Thing? station, string? openOn) : VBoxContainer {
     private readonly World world = kit.World;
-    private readonly List<IGrouping<(string Tool, int Tier), string>> groups =
-        kit.World.RecipesAt(station).GroupBy(id => (kit.World.Data.Recipes[id].Tool, kit.World.Data.Recipes[id].Tier)).OrderBy(g => g.Key).ToList();
 
-    /// <summary>The tool in use for a group: carried by hand, slotted at a station; null when it is missing or none is needed.</summary>
-    private string? Held((string Tool, int Tier) group) => world.ToolInUse(station, group.Tool, group.Tier);
-
-    /// <summary>How far the worker mark's hard hat stands out over the top of a plate.</summary>
+    /// <summary>How far the worker mark's hard hat stands out over the top of a card.</summary>
     private const int HatRise = 18;
 
     /// <summary>How many batches a click queues or takes off: 10 with Ctrl, 5 with Shift, else 1.</summary>
     public static int Step => Input.IsKeyPressed(Key.Ctrl) ? 10 : Input.IsKeyPressed(Key.Shift) ? 5 : 1;
 
-    /// <summary>A recipe's hover popup: its name, each input as an icon with the amount (brick while the backpack is short), the time where it is crafted and what clicks do.</summary>
-    private Control RecipePopup(RecipeDef r, float seconds) {
-        var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 6);
-        column.AddChild(Style.Text($"{r.Name}{(r.Amount > 1 ? $" ×{r.Amount}" : "")}", 15, Style.Rim, Style.Head));
-        var inputs = new HBoxContainer(); inputs.AddThemeConstantOverride("separation", 10); column.AddChild(inputs);
-        foreach (var (item, amount) in r.Inputs) {
-            var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 2); inputs.AddChild(pair);
-            pair.AddChild(Style.Icon(Icons.Of(item), 30));
-            pair.AddChild(Style.Text(amount.ToString(), 14, world.Backpack[item] >= amount ? Style.Rim : Style.Warn));
-        }
-        column.AddChild(Style.Text($"{seconds:0.#} s", 14, Style.Beige));
-        column.AddChild(Style.Text(Hint, 13, Style.Beige));
-        return column;
-    }
-
     private string Hint => station != null
-        ? "Click: workers keep making it · Double-click: queue one and load it\nShift/Ctrl-click: queue and load 5/10 · Right-click: take 1, 5 or 10 off"
-        : "Click: queue one · Shift/Ctrl-click: queue 5/10\nRight-click: take 1, 5 or 10 off";
+        ? "Click: marks as a recurring recipe for the worker.\nDouble-click: queue 1.\nShift/Ctrl-click: queue 5/10.\nRight-click: undo 1/5/10 respectively."
+        : "Click: queue 1.\nShift/Ctrl-click: queue 5/10.\nRight-click: undo 1/5/10 respectively.";
 
-    private static string GroupKey((string Tool, int Tier) group) => $"{(group.Tool == "" ? "hand" : group.Tool)}{(group.Tier > 0 ? $"_{group.Tier}" : "")}";
+    /// <summary>Seconds a batch takes here with the tool at hand.</summary>
+    private float Seconds(RecipeDef r) => r.Seconds / world.WorkRate(station?.Kind, world.ToolInUse(station, r.Tool, r.Tier));
 
-    /// <summary>A column of round tabs, one per tool the recipes need (red while that tool is missing), beside the chosen tab's plates.</summary>
+    /// <summary>The groups' headings and cards in a list that scrolls once it outgrows the room the page leaves it.</summary>
     public override void _Ready() {
-        // A page opens on the tab of the recipe its station makes; a board drawn again keeps its tab, unless that tab is not on this board.
-        if (openOn != null && groups.FirstOrDefault(g => g.Contains(openOn)) is { } opening) memory.CraftTab = GroupKey(opening.Key);
-        else if (groups.All(g => GroupKey(g.Key) != memory.CraftTab)) memory.CraftTab = groups.Count > 0 ? GroupKey(groups[0].Key) : "";
-        AddThemeConstantOverride("separation", 14);
-        var tabs = new VBoxContainer { SizeFlagsVertical = Control.SizeFlags.ShrinkBegin }; tabs.AddThemeConstantOverride("separation", 10); AddChild(tabs);
-        var plates = new GridContainer { Columns = 4, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkBegin };
-        plates.AddThemeConstantOverride("h_separation", 10); plates.AddThemeConstantOverride("v_separation", 14);
-        // Room above the first row for the hard hat that marks what workers keep making, which stands out over a plate's top edge.
-        var platesRoom = new MarginContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkBegin };
-        platesRoom.AddThemeConstantOverride("margin_top", station != null ? HatRise : 0); platesRoom.AddChild(plates); AddChild(platesRoom);
-        foreach (var group in groups) {
-            var (kind, tier) = group.Key;
-            string key = GroupKey(group.Key);
-            bool open = key == memory.CraftTab;
-            var tab = kit.Button("", () => { memory.CraftTab = key; redraw(); }); tab.Name = $"section_{key}"; tab.CustomMinimumSize = new Vector2(48, 48);
-            var look = open ? Style.TabActive : Style.TabRound; Style.Skin(tab, look.Normal, look.Hover);
-            tabs.AddChild(tab);
-            var badge = Style.Icon(null, 28); badge.Name = "badge"; badge.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.Center); badge.GrowHorizontal = badge.GrowVertical = Control.GrowDirection.Both; badge.MouseFilter = Control.MouseFilterEnum.Pass;
-            tab.AddChild(badge);
-            if (kind == "") { badge.Texture = Icons.Of(station?.Burner != null ? "coal" : "stone"); badge.TooltipText = "No tool needed"; } else {
-                string plainest = world.Data.PlainestTool(kind, tier);
-                string name = world.Data.ToolName(kind, tier);
-                badge.Texture = Icons.Of(plainest);
-                live.Watch(() => Held(group.Key), inUse => {
-                    if (inUse != null) badge.Texture = Icons.Of(inUse);
-                    badge.Modulate = inUse != null ? Colors.White : new Color(1, .35f, .3f);
-                    badge.TooltipText = inUse != null
-                        ? $"Needs a {name} · using {world.Data.Name(inUse)}"
-                        : station != null ? $"Needs a {name} in the {world.Data.Name(station.Kind).ToLowerInvariant()}'s {kind} slot" : $"Needs a {name} in your backpack{(kind == "chisel" && tier == 0 ? " · knap a stone chisel from 2 stone" : "")}";
-                });
-            }
+        var recipes = world.RecipesAt(station).ToList();
+        if (openOn != null) memory.ClosedGroups.Remove(world.Data.Recipes[openOn].Group);
+        var list = new ScrollContainer { Name = "recipe_list", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled, SizeFlagsHorizontal = SizeFlags.ExpandFill };
+        // Room at the right for the scroll bar and the pills on the cards' corners.
+        var room = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; room.AddThemeConstantOverride("margin_right", 12);
+        var groups = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; groups.AddThemeConstantOverride("separation", 6);
+        AddChild(list); list.AddChild(room); room.AddChild(groups);
+        panel.ShowPageRows(list, room);
+        foreach (var group in Enum.GetValues<RecipeGroup>()) {
+            var ids = recipes.Where(id => world.Data.Recipes[id].Group == group).ToList();
+            if (ids.Count == 0) continue;
+            bool open = !memory.ClosedGroups.Contains(group);
+            groups.AddChild(Heading(group, ids, open));
             if (!open) continue;
-            foreach (string id in group) plates.AddChild(Plate(id, () => Held(group.Key)));
+            // Two cards a row; an odd last card keeps its half beside an empty one.
+            var cards = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; cards.AddThemeConstantOverride("separation", station != null ? 12 : 8);
+            groups.AddChild(cards);
+            for (int i = 0; i < ids.Count; i += 2) {
+                var row = new HBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; row.AddThemeConstantOverride("separation", 8); cards.AddChild(row);
+                row.AddChild(Card(ids[i]));
+                row.AddChild(i + 1 < ids.Count ? Card(ids[i + 1]) : new Control { SizeFlagsHorizontal = SizeFlags.ExpandFill, MouseFilter = MouseFilterEnum.Ignore });
+            }
         }
     }
 
-    /// <summary>A square recipe plate: the product big, with what it makes in a pill, its inputs small underneath, and the queued count at the top right.</summary>
-    private ItemSlot Plate(string id, Func<string?> tool) {
+    /// <summary>A group's heading: an arrow, its name and how many recipes it holds; a closed one that hides the recipe workers keep making wears their hard hat.</summary>
+    private Button Heading(RecipeGroup group, List<string> ids, bool open) {
+        var heading = kit.Button("", () => { if (!memory.ClosedGroups.Remove(group)) memory.ClosedGroups.Add(group); redraw(); });
+        heading.Name = $"group_{group}"; heading.TooltipText = open ? "Click to close this group" : "Click to open this group";
+        Style.Skin(heading, Style.None, Style.None);
+        var row = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore }; row.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect); row.AddThemeConstantOverride("separation", 8);
+        heading.AddChild(row);
+        row.AddChild(new Chevron { Open = open, CustomMinimumSize = new Vector2(14, 14), SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore });
+        row.AddChild(Style.Text(group.ToString(), 15, Style.Beige, Style.Head));
+        var count = Style.Pill(ids.Count.ToString(), Style.CountPill, Style.Beige, 11); count.SizeFlagsVertical = SizeFlags.ShrinkCenter; row.AddChild(count);
+        if (!open && station != null && ids.Contains(station.Keep)) {
+            var hat = Style.Glyph("hardhat", 22, Colors.White); hat.Name = "kept"; hat.SizeFlagsVertical = SizeFlags.ShrinkCenter; row.AddChild(hat);
+        }
+        row.AddChild(new ColorRect { Color = new Color(Style.Beige, .3f), CustomMinimumSize = new Vector2(0, 2), SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore });
+        return heading;
+    }
+
+    /// <summary>A recipe card: the product with what a batch makes on a pill, its name, and under it its inputs or the tool it lacks; the queued count sits at the top right.</summary>
+    private ItemSlot Card(string id) {
         var r = world.Data.Recipes[id];
-        var (cell, count) = ItemSlot.Cup($"craft_{id}");
-        cell.CustomMinimumSize = new Vector2(84, 84);
-        var face = new VBoxContainer { MouseFilter = Control.MouseFilterEnum.Ignore, Alignment = BoxContainer.AlignmentMode.Center };
-        face.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect); face.AddThemeConstantOverride("separation", 4); cell.AddChild(face);
-        var product = Style.Icon(Icons.Of(r.Output), 42); product.SizeFlagsHorizontal = Control.SizeFlags.ShrinkCenter; face.AddChild(product);
-        var inputs = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = Control.MouseFilterEnum.Ignore }; inputs.AddThemeConstantOverride("separation", 4); face.AddChild(inputs);
+        var (cell, _) = ItemSlot.Cup($"craft_{id}");
+        cell.CustomMinimumSize = new Vector2(0, 64); cell.SizeFlagsHorizontal = SizeFlags.ExpandFill;
+        var face = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
+        face.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 8); face.AddThemeConstantOverride("separation", 8); cell.AddChild(face);
+        var product = Style.Icon(Icons.Of(r.Output), 42); product.Name = "product"; product.SizeFlagsVertical = SizeFlags.ShrinkCenter; face.AddChild(product);
+        if (r.Amount > 1) product.AddChild(Style.Corner(Style.Pill($"×{r.Amount}", Style.BeigePill, Style.Ink, 11), 1, 1, 5));
+        var text = new VBoxContainer { MouseFilter = MouseFilterEnum.Ignore, SizeFlagsHorizontal = SizeFlags.ExpandFill, Alignment = BoxContainer.AlignmentMode.Center };
+        text.AddThemeConstantOverride("separation", 1); face.AddChild(text);
+        var name = Style.Text(world.Data.Name(r.Output), 13, Style.Ink, wrap: true); name.MaxLinesVisible = 2; text.AddChild(name);
+        var inputs = new HBoxContainer { Name = "inputs", MouseFilter = MouseFilterEnum.Ignore }; inputs.AddThemeConstantOverride("separation", 3); text.AddChild(inputs);
         foreach (var (item, amount) in r.Inputs) {
             inputs.AddChild(Style.Icon(Icons.Of(item), 18));
-            var need = Style.Text(amount.ToString(), 13, Style.Ink);
+            var need = Style.Text(amount.ToString(), 13, Style.Ink); need.CustomMinimumSize = new Vector2(14, 0);
             inputs.AddChild(need);
             // Counts turn brick while the backpack is short.
             live.Watch(() => world.Backpack[item] < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
-        count.Text = r.Amount > 1 ? $"×{r.Amount}" : ""; count.MoveToFront();
+        var lacks = Style.Text(r.Tool == "" ? "" : $"No {world.Data.ToolName(r.Tool, r.Tier)}", 12, Style.Brick); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
+        bool NoTool() => r.Tool != "" && world.ToolInUse(station, r.Tool, r.Tier) == null;
+        // One look for the tool a refresh: the card names a missing tool in place of its inputs, and its picture fades while the recipe cannot be made from the backpack now.
+        live.Watch(() => { bool missing = NoTool(); return (Missing: missing, Ready: !missing && (station != null ? world.Backpack.Has(r.Inputs) : world.CanCraft(id))); }, state => {
+            lacks.Visible = state.Missing; inputs.Visible = !state.Missing;
+            product.Modulate = state.Ready ? Colors.White : Style.Faded;
+        });
         var queued = ItemSlot.CountBadge(1, 0); queued.Name = "queued"; cell.AddChild(queued);
         live.Watch(() => world.Waiting(station, id), waiting => queued.Text = waiting > 0 ? waiting.ToString() : "");
         if (station != null) {
@@ -131,17 +128,87 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             kit.Run(() => { world.SetRecipe(station, kept); world.QueueBatch(station, id); });
         };
         cell.RightClicked = () => kit.Run(() => world.Enqueue(station, id, -Step));
-        float Time() => r.Seconds / ((station?.Kind == ThingKind.Bench ? world.Data.BenchSpeed : 1) * (tool() is string inUse ? world.Data.Items[inUse].Speed : 1));
         void Describe(StringBuilder text) {
             text.Append(r.Name);
             if (r.Amount > 1) text.Append($" ×{r.Amount}");
-            text.Append("\nNeeds: "); PageText.AppendNeeds(world, text, r.Inputs);
-            text.Append($"\n{Time():0.#} s\n").Append(Hint);
+            text.Append("\nRequires: "); PageText.AppendNeeds(world, text, r.Inputs);
+            text.Append($"\n{Seconds(r):0.#} s\n").Append(Hint);
         }
-        cell.Popup = () => RecipePopup(r, Time());
+        cell.Popup = () => new RecipePopup(world, station, r, Seconds(r), Hint);
         live.Bind(shown => cell.TooltipText = shown, Describe);
-        live.Watch(() => station != null ? world.Backpack.Has(r.Inputs) : world.CanCraft(id), yes => cell.Modulate = yes ? Colors.White : Style.Unready);
         return cell;
+    }
+}
+
+/// <summary>A small arrow that points down beside an open group and right beside a closed one.</summary>
+public partial class Chevron : Control {
+    public bool Open { get; set; }
+
+    public override void _Draw() {
+        var mid = Size / 2;
+        float reach = Math.Min(Size.X, Size.Y) * .32f;
+        var points = Open
+            ? new[] { mid + new Vector2(-reach, -reach / 2), mid + new Vector2(0, reach / 2), mid + new Vector2(reach, -reach / 2) }
+            : new[] { mid + new Vector2(-reach / 2, -reach), mid + new Vector2(reach / 2, 0), mid + new Vector2(-reach / 2, reach) };
+        DrawPolyline(points, Style.Beige, 2.5f, true);
+    }
+}
+
+/// <summary>
+/// A recipe's hover popup: its name, what it requires with the amount the backpack is short of, where its tool is, how long it takes,
+/// what its product is used for and what clicks do.
+/// </summary>
+public partial class RecipePopup(World world, Thing? station, RecipeDef r, float seconds, string hint) : VBoxContainer {
+    /// <summary>Most uses the popup pictures before it counts the rest.</summary>
+    private const int MaxUses = 5;
+
+    public override void _Ready() {
+        AddThemeConstantOverride("separation", 6);
+        AddChild(Style.Text($"{r.Name}{(r.Amount > 1 ? $" ×{r.Amount}" : "")}", 17, Style.Rim, Style.Head));
+        var requires = Line("Requires");
+        foreach (var (item, amount) in r.Inputs) {
+            requires.AddChild(Style.Icon(Icons.Of(item), 26));
+            requires.AddChild(Style.Text($"{amount} {world.Data.Name(item)}", 14, Style.Rim));
+            if (world.Backpack[item] < amount) requires.AddChild(Style.Text($"you have {world.Backpack[item]}", 14, Style.Warn));
+        }
+        if (r.Tool != "") ToolLine();
+        Line("Time").AddChild(Style.Text($"{seconds:0.#} s", 14, Style.Rim));
+        var uses = world.Data.UsedFor(r.Output).ToList();
+        if (uses.Count > 0) {
+            var used = Line("Used for"); used.Name = "used_for";
+            foreach (string use in uses.Take(MaxUses)) { var icon = Style.Icon(Icons.Of(use), 26); icon.Name = $"use_{use}"; used.AddChild(icon); }
+            used.AddChild(Style.Text(uses.Count == 1 ? world.Data.Name(uses[0]) : uses.Count > MaxUses ? $"and {uses.Count - MaxUses} more" : "", 14, Style.Rim));
+        }
+        AddChild(new HSeparator());
+        AddChild(Style.Text(hint, 12, Style.Beige));
+    }
+
+    /// <summary>A row with its name on the left and what it holds flowing beside it.</summary>
+    private HFlowContainer Line(string name) {
+        var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 8); AddChild(row);
+        var key = Style.Text(name, 12, Style.Beige); key.CustomMinimumSize = new Vector2(62, 30); row.AddChild(key);
+        var value = new HFlowContainer { CustomMinimumSize = new Vector2(250, 0), SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter };
+        value.AddThemeConstantOverride("h_separation", 6); value.AddThemeConstantOverride("v_separation", 2); row.AddChild(value);
+        return value;
+    }
+
+    /// <summary>
+    /// Where the recipe's tool is: green when it is ready to work with, slotted at a station or carried by hand;
+    /// yellow when a station's slot is empty and the player carries it, which works for them but not for a worker; red when there is none.
+    /// </summary>
+    private void ToolLine() {
+        string? slotted = station != null ? world.BenchTool(station, r.Tool, r.Tier) : null, carried = world.BestTool(r.Tool, null, r.Tier);
+        string? ready = station != null ? slotted : carried;
+        string shown = ready ?? carried ?? world.Data.PlainestTool(r.Tool, r.Tier);
+        var line = Line("Tool"); line.Name = "tool_line";
+        line.AddChild(Style.Icon(Icons.Of(shown), 26));
+        line.AddChild(Style.Text(world.Data.Name(shown), 14, Style.Rim));
+        var state = ready != null ? Style.Text("available", 14, Style.Ready) : carried != null ? Style.Text("in your backpack", 14, Style.Held) : Style.Text("not available", 14, Style.Warn);
+        state.Name = "tool_state"; line.AddChild(state);
+        // A note under the line takes its whole width: who cannot use a carried tool, or how to come by a missing one that needs no tool itself.
+        string hint = ready != null ? "" : carried != null ? "Workers can't use it until it is slotted."
+            : world.Data.RecipeOf(shown) is { Hand: true, Tool: "" } making ? $"Make one by hand: {PageText.Cost(world, making.Inputs)}" : "";
+        if (hint != "") { var note = Style.Text(hint, 12, Style.Beige); note.Name = "tool_hint"; note.CustomMinimumSize = new Vector2(250, 0); line.AddChild(note); }
     }
 }
 
