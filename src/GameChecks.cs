@@ -637,10 +637,6 @@ public partial class Game {
     private async Task CheckLaunchOpensTheStartMenuWithNoSaveToContinue() {
         await Frames(4);
         Require(!view.Warming, "The models drawn while loading must be gone by the time the start menu is up.");
-        // A failed earlier run may have left saves behind, which would enable Continue.
-        // Going to the options and back rereads the saves the removal just cleared.
-        RemoveCheckFiles(); await Frames(4);
-        await Click(FindButton(startMenu.Screen, "Options")!); await KeyStroke(Key.Escape);
         Require(startMenu.Visible, "Launch must show the start menu.");
         Require(view.Paused, "Launch must hold the world.");
         Require(FindButton(startMenu.Screen, "New game") != null, "Launch must offer a new game.");
@@ -916,6 +912,20 @@ public partial class Game {
         Require(world.Backpack["berries"] == berries, "Clicking berries in the backpack must pack one back into the open crate.");
         await CloseWithEsc();
         Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
+    }
+    /// <summary>The driver behind `--drive` plays its command file as real input and reports each line once: a key it sends opens the backpack, and a command it does not know fails by name.</summary>
+    private async Task CheckDriverPlaysItsCommandFileAsRealInput() {
+        await CloseWithEsc();
+        string folder = System.IO.Directory.CreateTempSubdirectory("chop-chop-meow-drive-").FullName, log = System.IO.Path.Combine(folder, "log.txt");
+        // The driver starts from the `--drive` launch flag, which a check run does without: no input starts it.
+        var driver = new ReviewDrive { Folder = folder }; AddChild(driver);
+        System.IO.File.WriteAllText(System.IO.Path.Combine(folder, "cmd.txt"), "key Tab\nwiggle\n");
+        await Until(() => System.IO.File.Exists(log) && System.IO.File.ReadAllText(log).Contains("wiggle"), "the driver running its command file", 5);
+        await Frames();
+        Require(bag.Visible, "A key the driver sends must open the backpack as a pressed key does.");
+        Require(System.IO.File.ReadAllLines(log) is ["ok key Tab", var failed] && failed.StartsWith("failed wiggle"), "The driver must report each command once, as ok or as failed.");
+        driver.QueueFree(); System.IO.Directory.Delete(folder, true);
+        await CloseWithEsc();
     }
     /// <summary>A packed crate's page gives way to the backpack's once the last item is taken out of the crate.</summary>
     private async Task CheckEmptiedCrateGivesWayToTheBackpack() {
@@ -1445,6 +1455,7 @@ public partial class Game {
             await Test(CheckRedXTakesABuildingDownOnTheSecondClick);
             await Test(CheckPageClosesWhenWhatItShowsIsGone);
             await Test(CheckPackedCrateOpensFromTheBackpack);
+            await Test(CheckDriverPlaysItsCommandFileAsRealInput);
             await Test(CheckEmptiedCrateGivesWayToTheBackpack);
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHarvestingBesideAStationStopsHammering);

@@ -68,8 +68,8 @@ public partial class Game : Node, IGameFlow {
             GD.Print(OS.IsDebugBuild() ? "Build: debug, from the project folder" : "Build: optimized release export");
             data = GameData.Create();
             if (Launch.Has("--server")) { Server.Run(this, data); return; }
-            // An interface check run that stopped half way leaves its settings and saves behind; they go before anything here reads them.
-            if (Launch.Has("--ui-test")) RemoveCheckFiles();
+            // A check run that stopped half way leaves its settings and saves behind; they go before anything here reads them.
+            if (Launch.Args.Any(a => a is "--ui-test" or "--net-check" or "--server-check")) RemoveCheckFiles();
             world = new World(data);
             if (Launch.Has("--self-test")) { SimulationChecks.Run(data); GetTree().Quit(); return; }
             if (Launch.Value("--render-icons") is string icons) { AddChild(new IconRender { Data = data, Folder = icons }); return; }
@@ -97,6 +97,7 @@ public partial class Game : Node, IGameFlow {
             Settings.ApplyAntiAliasing(GetViewport(), Settings.AntiAliasing);
             if (Launch.Has("--showcase")) new Showcase(world, view, panel, ui, blackHole, menu, kit).Run();
             else if (!Launch.Has("--animation-review") && introFolder == null) startMenu.ShowStart();
+            if (Launch.Value("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
             // The game opens on the intro film, over the start menu; review runs, checks and a screenshot of the menu open without it.
             if (!review && screenshotPath == null) PlayIntro();
             if (Launch.Has("--performance-run")) StartGame(-1);

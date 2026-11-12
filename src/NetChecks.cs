@@ -22,7 +22,7 @@ public partial class Game {
     }
 
     private async Task HostNetCheck() {
-        RemoveCheckFiles(); await Frames(4);
+        await Frames(4);
         await Click(FindButton(startMenu.Screen, "New game")!);
         await Until(() => world.Remote && !startMenu.Visible, "the new game's server taking this window's player");
         await CloseWithEsc();
@@ -126,7 +126,7 @@ public partial class Game {
     }
 
     private async Task CheckFirstTimeGuestActsThroughTheHost() {
-        RemoveCheckFiles(); await Frames(4);
+        await Frames(4);
         await JoinUntilRefused("The host has not opened the game to other players.");
         Signal("refused");
         await Signaled("hosting");

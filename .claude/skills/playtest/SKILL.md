@@ -5,31 +5,24 @@ description: Play the real rendered game window with keyboard and mouse events a
 
 # Playtest
 
-There is no xdotool or ydotool on this Wayland machine, so the game drives itself: a temporary `ReviewDrive` node reads commands from a file and sends them through `Input.ParseInputEvent`, like real input.
+There is no xdotool or ydotool on this Wayland machine, so the game drives itself.
+Started with `--drive <dir>`, its `ReviewDrive` node (`src/ReviewDrive.cs`) reads commands from a file in that folder
+and sends them through `Input.ParseInputEvent`, like real input.
 
 ## Set up
 
-1. Copy the driver in and hook it into `Game._Ready`, on the line after
-   `else if (!Launch.Has("--animation-review") && introFolder == null) startMenu.ShowStart();`, which every launch reaches.
-   Between that `else if` and the showcase `if` above it, the hook would take the `else` and hide the start menu:
+1. A driven game keeps the player's files out of it: it reads and writes `playtest-*` saves and settings. They live in
+   `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/` in the main checkout, which every worktree reaches through its
+   `.tools` symlink. To test with one of the player's saves, copy it to a `playtest-` name first.
+2. Start the game in the background with a folder in your scratchpad:
 
    ```sh
-   cp .claude/skills/playtest/ReviewDrive.cs.txt src/ReviewDrive.cs
+   env -u WAYLAND_DISPLAY ./build.py play -- --drive <dir>
    ```
 
-   ```csharp
-   if (Launch.Value("--drive") is string drive) AddChild(new ReviewDrive { Folder = drive });
-   ```
-
-2. Keep the player's files out of it with `--file-prefix playtest-`. The saves and settings live in
-   `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/` in the main checkout, which every worktree reaches through its
-   `.tools` symlink, and the prefix makes the game read and write `playtest-*` files there instead. To test with one of
-   the player's saves, copy it to a `playtest-` name first. Delete the `playtest-*` files when done.
-3. Start the game in the background with a folder in your scratchpad: `env -u WAYLAND_DISPLAY ./build.py play -- --file-prefix playtest- --drive <dir>`. On native Wayland the window runs at about one frame a second. Add `--showcase` and its flags for a late-game fixture instead of a fresh start.
-4. When done, remove both: delete the hook line from `src/Game.cs` by hand and `rm -f src/ReviewDrive.cs
-   src/ReviewDrive.cs.uid`.
-   Never `git checkout src/Game.cs`: it also throws away any change to that file not yet committed. Never commit the
-   driver.
+   On native Wayland the window runs at about one frame a second. Add `--showcase` and its flags for a late-game fixture
+   instead of a fresh start.
+3. When done, send `quit` and delete the `playtest-*` files.
 
 ## Drive
 
@@ -62,9 +55,8 @@ Look at every screenshot before deciding the next step.
   step, and prefer clicking the Resume or Back button.
 - `shot` lines in a row without a `wait` between them all capture the same frame: put `wait 0.05` between them for a
   sequence of a motion.
-- Stop the game by PID from `pgrep -a ChopChopMeow`, the exported game's name.
-  `pkill -f` and `pgrep -f` match the calling shell's own command line: `pkill -f` kills that shell, and a wait loop
-  on `pgrep -f` never ends.
+- If the game no longer answers `quit`, stop it by PID from `pgrep -a ChopChopMeow`, never with `pkill -f`
+  (AGENTS.md, Checks).
 - A showcase switches panels and pages on its own, so a click there can land on a different page than the last
   screenshot showed. Take a `shot` right before clicking, or play a normal game for input checks.
 - A playtest game left running holds the game's network port, and `./build.py check` or `test net` then fails or

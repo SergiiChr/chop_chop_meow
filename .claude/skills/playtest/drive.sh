@@ -3,7 +3,8 @@
 dir=$1; shift
 ready() { [ "$(cat "$dir/status.txt" 2>/dev/null)" = ready ] && [ ! -f "$dir/cmd.txt" ]; }
 for _ in $(seq 120); do ready && break; sleep .5; done
+logged=$(cat "$dir/log.txt" 2>/dev/null | wc -l)
 printf '%s\n' "$@" > "$dir/cmd.tmp" && mv "$dir/cmd.tmp" "$dir/cmd.txt"
 sleep 1
 for _ in $(seq 240); do ready && break; sleep .5; done
-tail -n $# "$dir/log.txt"
+tail -n +$((logged + 1)) "$dir/log.txt"
