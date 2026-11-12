@@ -667,8 +667,6 @@ public partial class WorldView : Node3D {
         ThingKind.WolfCorpse => "butcher_carcass",
         _ => null
     };
-    // Blows hammered into mines' frames, counted so a rail clinks on every other one.
-    private int railBlows;
 
     /// <summary>Whether working on a thing hammers in a mine's frame and rails rather than digging.</summary>
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
@@ -697,7 +695,7 @@ public partial class WorldView : Node3D {
         // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips; the blow is still heard.
         bool inSight = World.Sees(subject.Pos);
         if (inSight) prop.Shake = 1;
-        // Fitting a mine's frame knocks wood like a bench, and every other blow also clinks on a rail.
+        // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.
         string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
             : action == ActorAction.Pump ? "bellows_pump"
             : subject.Kind == ThingKind.Anvil ? "anvil_work"
@@ -705,7 +703,7 @@ public partial class WorldView : Node3D {
             : subject.Kind == ThingKind.Tree && action != ActorAction.Gather ? "chop_tree"
             : null;
         if (sound != null) Sounds?.Play(sound, subject.Pos);
-        if (subject.Kind == ThingKind.Mine && action == ActorAction.Hammer && ++railBlows % 2 == 0) Sounds?.Play("rail_clink", subject.Pos);
+        if (subject.Kind == ThingKind.Mine && action == ActorAction.Hammer && (int)(actor.Time / ActorAnimation.Duration(action)) % 2 == 1) Sounds?.Play("rail_clink", subject.Pos);
         if (!inSight) return;
         var impactAt = World.GatherAt(subject, actor.Position);
         var toward = (actor.Position - impactAt).Normalized();
