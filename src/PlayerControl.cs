@@ -96,7 +96,7 @@ public sealed class PlayerControl {
         }
         // Emptying it shows on the stump or bare bush; a target that was already empty or out of reach still says why.
         bool had = gathering.Remaining > 0; world.Gather(gathering, dt);
-        if (world.GatherBlock(gathering) is string blocked) { if (!had || gathering.Remaining > 0) kit.Notify(blocked); gathering = null; }
+        if (world.GatherBlock(gathering) is string blocked) { if (blocked != "" && (!had || gathering.Remaining > 0)) kit.Notify(blocked); gathering = null; }
         return direction;
     }
 

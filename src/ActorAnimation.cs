@@ -27,7 +27,9 @@ public enum ActorAction {
     PickUp,
     Pack,
     Craft,
-    Grind
+    Grind,
+    AxeSwing,
+    SteelAxeSwing
 }
 
 /// <summary>
@@ -39,13 +41,14 @@ public enum ActorAction {
 /// Sway tips the torso sideways over the hips; positive tips it toward the right side.
 /// Foot tips the toes down from square to the shin, and negative pulls them up.
 /// Splay tips both thighs sideways away from the body, and negative draws the feet in under it.
+/// Grip turns what the right fist holds about its own length: at 90 a blade that cuts downward at the end of a level arm cuts toward the right.
 /// </summary>
 public readonly record struct Pose(
     float Lean = 0, float Twist = 0, float Head = 0,
     float RaiseL = 6, float OutL = 7, float ElbowL = 12,
     float RaiseR = 6, float OutR = 7, float ElbowR = 12,
     float SwingL = 0, float KneeL = 0, float SwingR = 0, float KneeR = 0,
-    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Hips = 0, float Sway = 0, float FootL = 0, float FootR = 0, float Splay = 0) {
+    float TurnL = 0, float RollL = 0, float TurnR = 0, float RollR = 0, float Hips = 0, float Sway = 0, float FootL = 0, float FootR = 0, float Splay = 0, float Grip = 0) {
     /// <summary>Blends two poses; set hips blend by how far they sit above or below a standing foot, so a foot on or above the ground in both poses stays there.</summary>
     public static Pose Lerp(Pose a, Pose b, float t) {
         if (t <= 0) return a;
@@ -55,7 +58,7 @@ public readonly record struct Pose(
             Mathf.Lerp(a.RaiseR, b.RaiseR, t), Mathf.Lerp(a.OutR, b.OutR, t), Mathf.Lerp(a.ElbowR, b.ElbowR, t),
             Mathf.Lerp(a.SwingL, b.SwingL, t), Mathf.Lerp(a.KneeL, b.KneeL, t), Mathf.Lerp(a.SwingR, b.SwingR, t), Mathf.Lerp(a.KneeR, b.KneeR, t),
             Mathf.Lerp(a.TurnL, b.TurnL, t), Mathf.Lerp(a.RollL, b.RollL, t), Mathf.Lerp(a.TurnR, b.TurnR, t), Mathf.Lerp(a.RollR, b.RollR, t), 0, Mathf.Lerp(a.Sway, b.Sway, t),
-            Mathf.Lerp(a.FootL, b.FootL, t), Mathf.Lerp(a.FootR, b.FootR, t), Mathf.Lerp(a.Splay, b.Splay, t));
+            Mathf.Lerp(a.FootL, b.FootL, t), Mathf.Lerp(a.FootR, b.FootR, t), Mathf.Lerp(a.Splay, b.Splay, t), Mathf.Lerp(a.Grip, b.Grip, t));
         return a.Hips == 0 && b.Hips == 0 ? blend : blend with { Hips = blend.Standing + Mathf.Lerp(a.Hips > 0 ? a.Hips - a.Standing : 0, b.Hips > 0 ? b.Hips - b.Standing : 0, t) };
     }
 
@@ -74,7 +77,7 @@ public static class ActorAnimation {
         ActorAction.Walk or ActorAction.Carry => WalkCycle,
         ActorAction.Jog => Jogging.Cycle,
         ActorAction.Run => Sprinting.Cycle,
-        ActorAction.SteelChop or ActorAction.SteelMine => .8f,
+        ActorAction.SteelChop or ActorAction.SteelMine or ActorAction.SteelAxeSwing => .8f,
         ActorAction.Gather => 1.2f,
         ActorAction.Hammer => .6f,
         ActorAction.Attack => .875f,
@@ -95,11 +98,11 @@ public static class ActorAnimation {
     public static float Advance(ActorAction action, float seconds, float metres) =>
         Stride(action) > 0 ? metres / Stride(action) * Duration(action) : seconds;
 
-    /// <summary>Seconds into a swing at which it lands: the punch at full stretch, the torch crossing in front, or the axe at the bottom of its stroke; zero for anything else.</summary>
+    /// <summary>Seconds into a swing at which it lands: the punch at full stretch, the torch crossing in front, or the axe at the bottom of its overhead stroke; zero for anything else.</summary>
     public static float Contact(ActorAction action) => action switch {
         ActorAction.Attack => .32f * Duration(action),
         ActorAction.TorchSwing => .3f * Duration(action),
-        ActorAction.Chop or ActorAction.SteelChop => .5f * Duration(action),
+        ActorAction.AxeSwing or ActorAction.SteelAxeSwing => .5f * Duration(action),
         _ => 0
     };
 
@@ -119,7 +122,7 @@ public static class ActorAnimation {
 
     /// <summary>The tool an action shows in hand, or null for empty hands; the mortar is its pestle in the right hand and its bowl in the left.</summary>
     public static string? Tool(ActorAction action) => action switch {
-        ActorAction.Chop or ActorAction.SteelChop => "steel_axe",
+        ActorAction.Chop or ActorAction.SteelChop or ActorAction.AxeSwing or ActorAction.SteelAxeSwing => "steel_axe",
         ActorAction.Mine or ActorAction.SteelMine => "steel_pick",
         ActorAction.Hammer => "hammer",
         ActorAction.Protest => "protest_sign",
@@ -131,12 +134,22 @@ public static class ActorAnimation {
     private static readonly Pose Crouch = new(Lean: 38, Head: 18, SwingL: 72, KneeL: 118, SwingR: 50, KneeR: 112);
 
     // Each action's key poses are made once: every worker and player is posed every frame, and a list made per call is garbage.
-    private static readonly Pose ChopReady = Stance with { Lean = 6, RaiseL = 50, OutL = -24, ElbowL = 35, RaiseR = 55, OutR = -16, ElbowR = 25 };
+    // An axe swung in the air goes up overhead and comes straight down in front.
+    private static readonly Pose AxeSwingReady = Stance with { Lean = 6, RaiseL = 50, OutL = -24, ElbowL = 35, RaiseR = 55, OutR = -16, ElbowR = 25 };
+    private static readonly (float At, Pose Pose)[] AxeSwingKeys = {
+        (0, AxeSwingReady),
+        (.38f, AxeSwingReady with { Lean = -8, Twist = 24, RaiseL = 150, OutL = -26, ElbowL = 60, RaiseR = 168, OutR = -10, ElbowR = 45 }),
+        (.52f, AxeSwingReady with { Lean = 18, Twist = -12, RaiseL = 80, OutL = -26, ElbowL = 14, RaiseR = 86, OutR = -12, ElbowR = 4 }),
+        (.66f, AxeSwingReady with { Lean = 20, Twist = -14, RaiseL = 76, OutL = -26, ElbowL = 14, RaiseR = 80, OutR = -12, ElbowR = 6 }),
+    };
+    // Felling: the axe is wound round to the left at shoulder height, then swung across, almost level, into the trunk's flank.
+    // The shoulders turn through the stroke and the grip turns the blade to cut sideways.
+    private static readonly Pose ChopReady = TwoHanded(Stance with { Lean = 6, Twist = 14, RaiseR = 42, OutR = -30, ElbowR = 40, Grip = 35 });
     private static readonly (float At, Pose Pose)[] ChopKeys = {
         (0, ChopReady),
-        (.38f, ChopReady with { Lean = -8, Twist = 24, RaiseL = 150, OutL = -26, ElbowL = 60, RaiseR = 168, OutR = -10, ElbowR = 45 }),
-        (.52f, ChopReady with { Lean = 18, Twist = -12, RaiseL = 80, OutL = -26, ElbowL = 14, RaiseR = 86, OutR = -12, ElbowR = 4 }),
-        (.66f, ChopReady with { Lean = 20, Twist = -14, RaiseL = 76, OutL = -26, ElbowL = 14, RaiseR = 80, OutR = -12, ElbowR = 6 }),
+        (.38f, TwoHanded(Stance with { Twist = 48, Sway = -4, RaiseR = 66, OutR = -62, ElbowR = 30, Grip = 75 })),
+        (.52f, TwoHanded(Stance with { Lean = 19, Twist = -14, Sway = 2, RaiseR = 77, OutR = -39, ElbowR = 28, Grip = 90, KneeL = 24, KneeR = 16 })),
+        (.66f, TwoHanded(Stance with { Lean = 20, Twist = -16, Sway = 2, RaiseR = 74, OutR = -40, ElbowR = 30, Grip = 90, KneeL = 24, KneeR = 16 })),
     };
     private static readonly Pose MineGuard = Stance with { Lean = 8, RaiseL = 45, OutL = -24, ElbowL = 40, RaiseR = 50, OutR = -14, ElbowR = 30 };
     private static readonly (float At, Pose Pose)[] MineKeys = {
@@ -251,8 +264,22 @@ public static class ActorAnimation {
         return (Mathf.PosMod(raise + 180, 360) - 180, Mathf.RadToDeg(outward), Mathf.RadToDeg(bend - MathF.Atan2(palm, ActorRig.Forearm)));
     }
 
+    /// <summary>How far past the right fist, along the handle it holds, the left fist grips in a two-handed swing, in metres.</summary>
+    private const float SecondGrip = .06f;
+    /// <summary>
+    /// A pose with the left fist on the handle of what the right fist holds, just past the right fist.
+    /// A handle out of the left arm's reach gets the arm stretched toward it.
+    /// </summary>
+    private static Pose TwoHanded(Pose pose) {
+        var shoulder = Basis.FromEuler(new Vector3(Mathf.DegToRad(-pose.RaiseR), 0, Mathf.DegToRad(-pose.OutR)));
+        var arm = shoulder * new Basis(Vector3.Right, Mathf.DegToRad(-pose.ElbowR));
+        var fist = new Vector3(-ActorRig.ShoulderOut, ActorRig.ShoulderUp, 0) + shoulder * new Vector3(0, -ActorRig.UpperArm, 0) + arm * new Vector3(0, -ActorRig.Forearm, ActorRig.Palm);
+        var (raise, outward, elbow) = ArmTo(fist + arm * Vector3.Down * SecondGrip, left: true);
+        return pose with { RaiseL = raise, OutL = outward, ElbowL = elbow };
+    }
+
     /// <summary>Swings that play out in full on the move: the arms and body keep swinging while the legs keep walking.</summary>
-    public static bool SwingsOnTheMove(ActorAction action) => action is ActorAction.TorchSwing or ActorAction.Attack or ActorAction.Chop or ActorAction.SteelChop;
+    public static bool SwingsOnTheMove(ActorAction action) => action is ActorAction.TorchSwing or ActorAction.Attack or ActorAction.AxeSwing or ActorAction.SteelAxeSwing;
 
     public static Pose PoseAt(ActorAction action, float elapsed, bool moving) {
         if (moving && SwingsOnTheMove(action)) {
@@ -281,6 +308,8 @@ public static class ActorAnimation {
                 return moving ? Walk(p) with { Lean = carry.Lean, Head = -carry.Lean / 2, RaiseL = carry.RaiseL, OutL = carry.OutL, ElbowL = carry.ElbowL, RaiseR = carry.RaiseR, OutR = carry.OutR, ElbowR = carry.ElbowR } : carry;
             case ActorAction.Chop or ActorAction.SteelChop:
                 return Keys(p, ChopKeys);
+            case ActorAction.AxeSwing or ActorAction.SteelAxeSwing:
+                return Keys(p, AxeSwingKeys);
             case ActorAction.Mine or ActorAction.SteelMine:
                 return Keys(p, MineKeys);
             case ActorAction.Gather:

@@ -15,6 +15,9 @@ internal static class ModelSteps {
         return meshes;
     }
 
+    /// <summary>How far above the ground the lowest bark of a tree's model is, before the tree's own size is applied; bark is whatever is not drawn with the foliage shader.</summary>
+    public static float TrunkBottom(TreeProp prop) => AllMeshes(prop.Sway).Where(mesh => mesh.MaterialOverride is StandardMaterial3D).Min(mesh => (mesh.Transform * mesh.Mesh.GetAabb()).Position.Y);
+
     /// <summary>The solid core that fills a canopy's shadow, separate from the per-mesh proxies.</summary>
     public static bool CanopyCore(MeshInstance3D mesh) => mesh.MaterialOverride is ShaderMaterial { Shader: var shader } && shader == Tree3DShape.SolidFoliage;
 

@@ -715,7 +715,7 @@ public partial class WorldView : Node3D {
         switch (subject.Kind) {
             case ThingKind.Tree:
                 Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
-                Burst(To3(subject.Pos, 3.6f), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
+                Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id)), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
             case ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Mine:
                 var color = subject.Kind is ThingKind.Stone or ThingKind.Mine ? "9a9d99" : subject.Kind == ThingKind.Iron ? "a35a2e" : subject.Kind == ThingKind.Tin ? "b9bbb4" : "26282b";
@@ -733,8 +733,14 @@ public partial class WorldView : Node3D {
         }
     }
 
-    /// <summary>Seconds after it is felled when a tree's trunk and crown have faded away, leaving the stump.</summary>
-    private const float TreeGone = 1.7f;
+    /// <summary>Seconds a felled tree takes to reach the ground: a second for the shortest, just over two for the tallest.</summary>
+    private static float FallSeconds(float tall) => 1 + 1.1f * tall;
+    /// <summary>Seconds after it lands when a felled tree's trunk and crown have faded away, leaving the stump.</summary>
+    private const float TreeFadeSeconds = .6f;
+    /// <summary>How tall a tree stands (<see cref="WorldModels.TreeTall"/>) before it tears at length as it goes over rather than cracks.</summary>
+    private const float TearsFrom = .7f;
+    /// <summary>How much lower and slower a tree's sounds play the taller it stands.</summary>
+    private static float TreePitch(float tall) => 1.1f - .2f * tall;
     private readonly HashSet<int> seen = new();
     private readonly List<Thing> known = new();
     private readonly List<int> gone = new();
@@ -856,14 +862,21 @@ public partial class WorldView : Node3D {
                     break;
                 }
                 // A tree felled in front of the player topples, fades away and leaves its stump; one felled out of sight is a stump when seen again.
-                if (tree.Fall < 0) tree.Fall = watched ? 0 : 9;
-                else if (tree.Fall >= TreeGone) break;
+                float lands = FallSeconds(tree.Tall), faded = lands + TreeFadeSeconds;
+                if (tree.Fall < 0) {
+                    tree.Fall = watched ? 0 : faded;
+                    // The wood gives as the tree starts to go: the tearing of a tall tree lasts about as long as its fall.
+                    if (watched) Sounds?.Play(tree.Tall >= TearsFrom ? "tree_bend" : "tree_crack", t.Pos, pitch: TreePitch(tree.Tall));
+                } else if (tree.Fall >= faded) break;
                 float before = tree.Fall; tree.Fall += dt;
-                float drop = Math.Min(1, tree.Fall / 1.1f);
+                float drop = Math.Min(1, tree.Fall / lands);
                 sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
-                if (live && before < 1.1f && tree.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
-                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - 1.2f) / .5f, 0, 1));
-                sway.Visible = tree.Fall < TreeGone;
+                if (live && before < lands && tree.Fall >= lands) {
+                    Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
+                    Sounds?.Play("tree_crash", t.Pos, pitch: TreePitch(tree.Tall));
+                }
+                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - lands - .1f) / .5f, 0, 1));
+                sway.Visible = tree.Fall < faded;
                 tree.Stump.Visible = true;
                 break;
             case LooseProp chip when chip.Flight < WorldModels.ChipFlight:

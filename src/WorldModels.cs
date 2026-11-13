@@ -33,6 +33,8 @@ public sealed class TreeProp : Prop {
     public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
     /// <summary>Seconds since the tree was felled, or below zero while it stands.</summary>
     public float Fall = -1;
+    /// <summary>How tall the tree stands among trees, from 0 to 1 (<see cref="WorldModels.TreeTall"/>).</summary>
+    public float Tall;
     /// <summary>How see-through the crown is while it hides something behind it.</summary>
     public float Fade;
 }
@@ -192,12 +194,24 @@ public static class WorldModels {
         return (h & 0xffff) / 65536f;
     }
 
+    /// <summary>How tall a tree stands among trees by its id, from 0 for the shortest to 1 for the tallest.</summary>
+    public static float TreeTall(int id) => Jitter(id, 2);
+    /// <summary>A tree's size against its baked model: the tallest stand two thirds taller than the shortest.</summary>
+    public static float TreeScale(int id) => .9f + TreeTall(id) * .6f;
+
+    /// <summary>A tree's trunk and crown, sized with the tree.</summary>
+    private static Hit[] TreeHits(int id) {
+        var (trunk, crown, fork, top) = (id % TreeVariants) switch {
+            1 => (.3f, 1.25f, 1.2f, 5.6f),
+            2 => (.25f, 1.05f, 2.6f, 5.4f),
+            _ => (.35f, 1.8f, 2.5f, 5.3f),
+        };
+        float scale = TreeScale(id);
+        return new[] { new Hit(trunk * scale, 0, fork * scale), new Hit(crown * scale, fork * scale, top * scale) };
+    }
+
     public static Hit[] Hits(Thing t) => t.Kind switch {
-        ThingKind.Tree => (t.Id % TreeVariants) switch {
-            1 => new[] { new Hit(.3f, 0, 1.2f), new Hit(1.25f, 1.2f, 5.6f) },
-            2 => new[] { new Hit(.25f, 0, 2.6f), new Hit(1.05f, 2.6f, 5.4f) },
-            _ => new[] { new Hit(.35f, 0, 2.5f), new Hit(1.8f, 2.5f, 5.3f) },
-        },
+        ThingKind.Tree => TreeHits(t.Id),
         ThingKind.Stone => new[] { new Hit(.75f, 0, .9f) },
         ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => new[] { new Hit(.8f, 0, 1) },
         ThingKind.LooseCoal or ThingKind.LooseStone or ThingKind.IronChip or ThingKind.TinChip => new[] { new Hit(.45f, 0, .35f) },
@@ -333,13 +347,18 @@ public static class WorldModels {
         var prop = new TreeProp();
         var sway = Pivot(prop.Body, Vector3.Zero);
         prop.Sway = sway; // the whole tree shakes and falls about its base
-        float scale = .9f + Jitter(id, 2) * .22f;
+        prop.Tall = TreeTall(id);
+        float scale = TreeScale(id);
         sway.Scale = Vector3.One * scale;
         int variant = (id / TreeVariants) % NatureShape.Variants;
         var leaves = Tree3DShape.Add(sway, id % TreeVariants, variant);
         PreserveShadows(sway);
         Tree3DShape.AddShadowCore(sway, id % TreeVariants, leaves);
-        var stump = Add(prop.Root, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
+        // The stump stands where the trunk did and is as thick as it was at the ground.
+        var (foot, radius) = Tree3DShape.Foot(id % TreeVariants, variant);
+        var stump = Add(prop.Body, NatureShape.Stump, NatureShape.Timber, new Vector3(foot.X, 0, foot.Y) * scale);
+        float width = radius * scale / NatureShape.StumpRadius;
+        stump.Scale = new Vector3(width, scale, width);
         stump.Visible = false;
         prop.Stump = stump;
         prop.SwayParts = FadeParts(sway);

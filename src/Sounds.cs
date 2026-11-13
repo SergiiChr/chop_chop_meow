@@ -23,6 +23,9 @@ public partial class Sounds : Node {
         ["footsteps_rocks"] = -17,
         ["footsteps_water"] = -15,
         ["chop_tree"] = -7.5f,
+        ["tree_crack"] = -5,
+        ["tree_bend"] = -6,
+        ["tree_crash"] = -5,
         ["bench_work"] = -3.5f,
         ["rail_clink"] = -13,
         ["anvil_work"] = -2,
@@ -137,8 +140,9 @@ public partial class Sounds : Node {
     /// <summary>
     /// Plays a sound; one with a world position pans with its place on screen.
     /// A howl fades with distance from the player; any other placed sound is faint off screen and silent beyond <paramref name="reach"/> tiles past the screen edge.
+    /// A <paramref name="pitch"/> below one plays it lower and slower, as from something bigger.
     /// </summary>
-    public void Play(string name, Vector2? at = null, float reach = Reach) {
+    public void Play(string name, Vector2? at = null, float reach = Reach, float pitch = 1) {
         var streams = Variants(name);
         if (streams.Length == 0 || silenced) return;
         float fade = at is not Vector2 p ? 1
@@ -148,7 +152,7 @@ public partial class Sounds : Node {
         int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
         if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
         previous[name] = pick;
-        float pitch = KeepsPitch(name) ? 1 : 1 + (float)(random.NextDouble() * .12 - .06);
+        if (!KeepsPitch(name)) pitch *= 1 + (float)(random.NextDouble() * .12 - .06);
         float volume = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
         if (at is Vector2 place) {
             var placed = FreeVoice(placedVoices, ref nextPlacedVoice, static voice => voice.Playing);

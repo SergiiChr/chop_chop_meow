@@ -80,6 +80,19 @@ internal static class SetupSteps {
     /// <summary>Removes things from the map: the game has no way to clear a building or a tree off the ground.</summary>
     public static void RemoveThings(World world, Predicate<Thing> match) => world.S.Things.RemoveAll(match);
 
+    /// <summary>
+    /// Plants a tree among the tallest or among the shortest.
+    /// A tree's height comes from its id, which a check cannot choose, so trees are planted and pulled up until one fits.
+    /// </summary>
+    public static Thing PlantTree(World world, Vector2 at, bool tall) {
+        while (true) {
+            var tree = world.Add(ThingKind.Tree, at, 42);
+            float height = WorldModels.TreeTall(tree.Id);
+            if (tall ? height > .85f : height < .15f) return tree;
+            RemoveThings(world, t => t == tree);
+        }
+    }
+
     /// <summary>Sets a cart on the road with an exact value and trip time, which a real sale's changing price would not give.</summary>
     public static TradeOrder PlaceOrder(World world, TradeOrder order) { world.S.Orders.Add(order); return order; }
 

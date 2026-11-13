@@ -937,6 +937,8 @@ public static class SimulationChecks {
         Give(world, "steel_axe", 1);
         Require(world.GatherBlock(iron)?.Contains("pickaxe") == true && world.GatherBlock(world.Add(ThingKind.Tree, new Vector2(12, 12), 5)) == null,
                 "an axe should fell trees but not mine ore");
+        Require(world.GatherBlock(world.Add(ThingKind.Tree, new Vector2(14, 12))) == "",
+                "a stump should refuse the axe without a message, since it shows for itself that nothing is left");
 
         Give(world, "wood", 8);
         Require(world.Build(ThingKind.Chest, Terrain.Spawn) == null,
@@ -1034,7 +1036,10 @@ public static class SimulationChecks {
         Give(hunt, "wood", 1);
         var prey = new Wolf { Pos = hunt.Player + new Vector2(1.5f, 0), Health = 1 };
         PlaceWolf(hunt, prey);
+        ActorAction swung = ActorAction.Idle;
+        hunt.PlayerActed += (action, _) => swung = action;
         hunt.Attack();
+        Require(swung == ActorAction.SteelAxeSwing, "a swing with a steel axe carried should be the overhead axe swing, not the felling stroke");
         var carcass = hunt.Things.SingleOrDefault(t => t.Kind == ThingKind.WolfCorpse);
         Require(!hunt.Wolves.Contains(prey), "a killed wolf should not stay among the wolves");
         Require(carcass != null, "a killed wolf should leave a carcass");

@@ -259,6 +259,9 @@ The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
 Picking, the hover ring and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`), so selection matches what is drawn.
 A tree crown only wins a click when nothing else is under the cursor, so objects behind a canopy stay selectable.
 Trees use three variants chosen by object id, so saves need no new fields.
+A tree's height comes from its id too (`WorldModels.TreeTall`): its model, stump and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
+The bake stands each tree's lowest point on the ground, which on a spruce and one oak is a hanging branch, so their baked trunks start up to 1.8 m higher; `Tree3DShape.Add` carries such a trunk down to the ground with a stem that widens toward its foot.
+A stump stands where its tree's trunk did and is as thick as the trunk at the ground (`Tree3DShape.Foot`), so a birch leaves a thin stump and an oak a stout one.
 Fading swaps in cached alpha-blended copies of a model's materials, so faded trees still share a handful of materials.
 
 ### Actor animation
@@ -308,7 +311,11 @@ Both arms are solved from where the hands have to be (`ActorAnimation.ArmTo`), s
 `ActorRig` turns the bowl and pestle against their forearms in the resting pose (`ActorAnimation.GrindRest`), which keeps the bowl level and the pestle leaning toward its hand.
 While someone grinds, the table's own mortar is off the counter (`WorldView.grinding`).
 
-Manual bellows pumping and the unarmed punch trigger one loop of their action.
+Felling a tree (`Chop`, `SteelChop`) is a stroke from the side: the axe is wound round to the left at shoulder height and swung across, almost level, into the trunk's flank.
+The shoulders turn through the stroke, the grip turns the blade to cut sideways (`Pose.Grip`, which `ActorRig` applies at the right fist), and the left fist is put on the handle just past the right (`ActorAnimation.TwoHanded`).
+An axe swung in the air with Space or a click (`AxeSwing`, `SteelAxeSwing`) goes up overhead and comes straight down, which is the blow that lands on a wolf.
+
+Manual bellows pumping, the unarmed punch and the axe swing trigger one loop of their action.
 Each striking work action has an impact moment that shakes its target and spawns chips, leaves, splashes or sparks; packing and grinding strike nothing.
 An action's key poses are made once (`ActorAnimation.ChopKeys` and the like): every worker and player is posed every frame, so a pose is worked out without allocating.
 Pausing freezes animation and effects.
@@ -820,8 +827,16 @@ A sound on screen plays at full volume, one just past the screen edge is faint, 
 Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
-- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids and the cabin door.
+- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
+
+A tree felled in sight takes 1 second to reach the ground when it is among the shortest and 2.1 when among the tallest (`WorldView.FallSeconds`).
+It is heard twice, each sound started by the animation so both land on their moment whatever the tree's height:
+
+- As it starts to go: `tree_crack`, under a second of cracking, or for the tallest three in ten `tree_bend`, 1.8 seconds of wood tearing that lasts about as long as their fall.
+- As the trunk reaches the ground: `tree_crash`, the boom and the crown settling.
+
+Both play lower and slower the taller the tree, from a tenth above their recorded pitch to a tenth below (`Sounds.Play`'s `pitch`).
 
 ### Music
 
