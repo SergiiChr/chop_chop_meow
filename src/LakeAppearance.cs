@@ -16,6 +16,7 @@ public static class LakeAppearance {
         if (shader == null) throw new InvalidOperationException($"Could not load lake shader at {ShaderPath}");
 
         var material = CreateMaterial(still);
+        ShorelineAppearance.UseShore(material, ShorelineAppearance.Rocks);
 
         var surface = new MeshInstance3D {
             Name = "lake_water_surface",

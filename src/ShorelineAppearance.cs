@@ -7,11 +7,35 @@ namespace ChopChopMeow;
 internal static class ShorelineAppearance {
     private static Shader? bankShader;
 
-    private static ShaderMaterial BankMaterial(bool coast) {
+    /// <summary>A shore photoscan and how it is laid along the water.</summary>
+    /// <param name="Name">The file prefix of its colour and bumps maps in the lake folder.</param>
+    /// <param name="Tile">World units one tile of the photoscan spans.</param>
+    /// <param name="Wet">Brightness at the waterline, where it is wet, as a share of the dry shore's.</param>
+    /// <param name="GrassFade">Units over which the shore thins out into the grass.</param>
+    /// <param name="Depth">Units of water over which the shore sinks out of sight.</param>
+    internal sealed record ShoreLook(string Name, float Tile, float Wet, float GrassFade, float Depth);
+
+    /// <summary>Rippled beach sand along the sea coast.</summary>
+    internal static readonly ShoreLook Sand = new("sand", 15, .6f, 2.2f, 3.5f);
+    /// <summary>Pebbles, earth and moss around the pond.</summary>
+    internal static readonly ShoreLook Rocks = new("rocks", 10, .6f, 1.5f, 2.5f);
+
+    private static Texture2D Map(ShoreLook look, string map) => GD.Load<Texture2D>($"res://assets/environment/lake/{look.Name}_{map}.jpg");
+
+    /// <summary>Gives a bank or water material the shore photoscan, at the same scale and wet shade in both.</summary>
+    internal static void UseShore(ShaderMaterial material, ShoreLook look) {
+        material.SetShaderParameter("shore_albedo", Map(look, "albedo"));
+        material.SetShaderParameter("shore_tile", look.Tile);
+        material.SetShaderParameter("shore_wet", look.Wet);
+        material.SetShaderParameter("shore_depth", look.Depth);
+    }
+
+    private static ShaderMaterial BankMaterial(ShoreLook look) {
         bankShader ??= GD.Load<Shader>("res://assets/environment/lake/bank.gdshader");
         var material = new ShaderMaterial { Shader = bankShader };
-        material.SetShaderParameter("dry_color", new Color(coast ? "b5a47b" : "827956"));
-        material.SetShaderParameter("wet_color", new Color(coast ? "6d7155" : "50553d"));
+        UseShore(material, look);
+        material.SetShaderParameter("shore_normal", Map(look, "normal"));
+        material.SetShaderParameter("grass_fade", look.GrassFade);
         return material;
     }
 
@@ -25,7 +49,7 @@ internal static class ShorelineAppearance {
         var tool = new SurfaceTool(); tool.Begin(Mesh.PrimitiveType.Triangles);
         const int segments = 192, rings = 5;
         void At(float angle, float t) {
-            float width = 1.25f + .3f * MathF.Sin(angle * 5 + .8f) + .2f * MathF.Sin(angle * 11);
+            float width = 2.75f + .3f * MathF.Sin(angle * 5 + .8f) + .2f * MathF.Sin(angle * 11);
             float distance = Mathf.Lerp(-.35f, width, t);
             var p = Terrain.Lake + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (Terrain.Shore(angle) + distance);
             Vertex(tool, p, distance, width);
@@ -37,14 +61,14 @@ internal static class ShorelineAppearance {
                 At(a, inner); At(a, outer); At(b, outer);
                 At(a, inner); At(b, outer); At(b, inner);
             }
-        parent.AddChild(new MeshInstance3D { Name = "SoftLakeBank", Mesh = tool.Commit(), MaterialOverride = BankMaterial(false), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        parent.AddChild(new MeshInstance3D { Name = "SoftLakeBank", Mesh = tool.Commit(), MaterialOverride = BankMaterial(Rocks), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 
     public static void BuildCoast(Node3D parent, bool still) {
         var bank = new SurfaceTool(); bank.Begin(Mesh.PrimitiveType.Triangles);
         const float step = .75f;
         void At(float across, float t) {
-            float width = 3.65f + .35f * MathF.Sin(across * .31f) + .2f * MathF.Sin(across * .83f);
+            float width = 5.15f + .35f * MathF.Sin(across * .31f) + .2f * MathF.Sin(across * .83f);
             float distance = Mathf.Lerp(-.35f, width, t);
             Vertex(bank, Terrain.Point(Terrain.Coast(across) - 1.2f - distance, across), distance, width);
         }
@@ -54,7 +78,7 @@ internal static class ShorelineAppearance {
                 At(across, a); At(across, b); At(across + step, b);
                 At(across, a); At(across + step, b); At(across + step, a);
             }
-        parent.AddChild(new MeshInstance3D { Name = "SoftCoastalBank", Mesh = bank.Commit(), MaterialOverride = BankMaterial(true), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
+        parent.AddChild(new MeshInstance3D { Name = "SoftCoastalBank", Mesh = bank.Commit(), MaterialOverride = BankMaterial(Sand), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 
         var water = new SurfaceTool(); water.Begin(Mesh.PrimitiveType.Triangles);
         float[] bands = { 0, .3f, 1, 2.5f, 6, 14, 40, 400 };
@@ -71,6 +95,7 @@ internal static class ShorelineAppearance {
             }
         var material = LakeAppearance.CreateMaterial(still);
         material.SetShaderParameter("coastal", true);
+        UseShore(material, Sand);
         parent.AddChild(new MeshInstance3D { Name = "CoastalWater", Mesh = water.Commit(), MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 }

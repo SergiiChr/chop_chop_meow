@@ -143,7 +143,7 @@ Rendering and sound:
 | `src/Terrain3DView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
-| `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake surface and wet banks |
+| `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake and sea surfaces and their sand and pebble shores |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
 | `src/WolfModel.cs` | Poses the wolf: its gaits, leap, howl, recoil and fall |

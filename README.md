@@ -802,7 +802,7 @@ A save that is incomplete, names items the game does not know or holds needs out
 
 ### Environment
 
-The environment uses a shared human scale, Terrain3D mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones.
+The environment uses a shared human scale, Terrain3D mountain ranges, a rippled sand beach along the sea, and an irregular lake with a pebbled shore, reeds, lily pads and clustered shore stones.
 Meadow grass and wildflowers grow in patches, ferns add woodland ground cover, and plain bushes stand among them.
 Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas.
 A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).

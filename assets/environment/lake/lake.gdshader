@@ -7,6 +7,12 @@ uniform float review_time = -1.0;
 uniform bool coastal = false;
 uniform float roughness : hint_range(0.0, 1.0) = 0.22;
 uniform float specular : hint_range(0.0, 1.0) = 0.7;
+// The shore photoscan, seen through the shallows; the bank shader lays it out the same way.
+uniform sampler2D shore_albedo : source_color, filter_linear_mipmap, repeat_enable;
+uniform float shore_tile = 15.0;
+uniform float shore_wet = 0.6;
+// Units of water over which the shore sinks out of sight.
+uniform float shore_depth = 3.5;
 varying vec3 world_position;
 
 // Adapted from Chrisknyfe/boujie_water_shader commit 25f3c2d.
@@ -34,8 +40,10 @@ void fragment() {
 	vec3 deep_water = vec3(0.025, 0.095, 0.14);
 	vec3 shallow_water = vec3(0.08, 0.28, 0.26);
 	vec3 water_color = mix(deep_water, shallow_water, edge);
-	// A narrow wet transition connects water to the bank without widening the gameplay boundary.
-	water_color = mix(vec3(0.075, 0.14, 0.105), water_color, smoothstep(0.0, 0.65, shore_distance));
+	// The wet shore at the waterline runs on under the shallows, sinking into the water's colour.
+	vec3 shore = texture(shore_albedo, world_position.xz / shore_tile).rgb * shore_wet;
+	vec3 sunk = mix(shore, shore * vec3(0.55, 0.85, 0.85), smoothstep(0.0, shore_depth * 0.43, shore_distance));
+	water_color = mix(sunk, water_color, smoothstep(0.0, shore_depth, shore_distance));
 
 	// Two low-energy Gerstner normals animate small highlights without moving the shore.
 	vec3 wave_a = N_DEG(world_position.x, world_position.z, t, 0.30, 0.24, 28.0, 0.32, 0.72, 0.0);
