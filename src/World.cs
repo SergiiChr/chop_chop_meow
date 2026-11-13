@@ -862,7 +862,7 @@ public sealed partial class World {
     /// <summary>
     /// Asks a station for batches of a recipe and loads their inputs and one fuel each from the backpack, on top of what the station holds.
     /// A station counts batches of one recipe at a time.
-    /// Turning from the recipe it is on to another drops the batches still waiting and takes what the station's boxes hold into the backpack; <see cref="SwitchBlock"/> says when it cannot.
+    /// Turning from the recipe it is on to another drops the batches still waiting and takes what the station's boxes and fuel slot hold into the backpack; <see cref="SwitchBlock"/> says when it cannot.
     /// </summary>
     public void QueueBatch(Thing t, string recipe, int batches = 1) {
         if (batches <= 0 || !Makes(t, recipe)) return;
@@ -871,7 +871,7 @@ public sealed partial class World {
         if (SwitchBlock(t, recipe) is string blocked) { Say(blocked); return; }
         int waiting = Waiting(t, recipe);
         if (waiting >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
-        if (recipe != t.Shown) foreach (string item in t.Inventory.Items.Keys.ToArray()) t.Inventory.TransferTo(S.Backpack, item, t.Inventory[item]);
+        if (recipe != t.Shown) { Unload(t.Inventory); if (t.Burner != null) Unload(t.Burner); }
         Ask(t, recipe, waiting + batches);
         batches = t.Batches - waiting;
         var r = Data.Recipes[recipe];
@@ -879,13 +879,15 @@ public sealed partial class World {
         if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost) is string fuel) LoadFuel(t, fuel, batches);
     }
     /// <summary>
-    /// Why a station cannot turn from the recipe it is on to another now, or null: a batch is being worked, or the backpack has no room for what the station's boxes hold.
+    /// Why a station cannot turn from the recipe it is on to another now, or null: a batch is being worked, or the backpack has no room for what the station's boxes and fuel slot hold.
     /// More batches of the recipe it is on are never blocked.
     /// </summary>
     public string? SwitchBlock(Thing t, string recipe) =>
         recipe == t.Shown ? null
         : t.Processing ? $"The {Lower(Data.Name(t.Kind))} has to finish its batch first."
-        : !S.Backpack.Fits(t.Inventory) ? $"No room in your backpack for what the {Lower(Data.Name(t.Kind))} holds." : null;
+        : !S.Backpack.Fits(t.Inventory, t.Burner) ? $"No room in your backpack for what the {Lower(Data.Name(t.Kind))} holds." : null;
+    /// <summary>Moves everything a box holds into the backpack, as far as it fits.</summary>
+    private void Unload(Inventory box) { foreach (string item in box.Items.Keys.ToArray()) box.TransferTo(S.Backpack, item, box[item]); }
     private static readonly Dictionary<string, int> NoCost = new();
     /// <summary>
     /// The fuel loading a recipe burns: what the fuel slot holds, or for an empty slot the first fuel the recipe burns

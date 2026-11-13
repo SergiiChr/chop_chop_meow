@@ -49,6 +49,7 @@ public static class SimulationChecks {
         Test(CheckStationMakesAskedBatchesThenWhatItKeeps, data);
         Test(CheckStationTurnsToAnotherRecipeOnlyWhenFree, data);
         Test(CheckIdleStationStaysOnTheRecipeAskedLast, data);
+        Test(CheckTurningToAnotherRecipeTakesTheFuelOut, data);
         Test(CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere, data);
         Test(CheckQueuingSeveralBatchesLoadsEachOfThem, data);
         Test(CheckStationLoadsMidBatchAndFinishesIt, data);
@@ -792,16 +793,33 @@ public static class SimulationChecks {
         Require(furnace.Recipe == "charcoal" && world.Waiting(furnace, "charcoal") == 1 && world.Waiting(furnace, "tin_bar") == 0,
             "asking for another recipe between batches should turn the station to it and drop the batches that waited");
         Require(world.Backpack["tin_bar"] == 1 && furnace.Inventory["tin_bar"] == 0 && furnace.Inventory["wood"] == 2 && furnace.Burner!["coal"] == 1,
-            "turning to another recipe should take the boxes' contents into the backpack, load the new batch and leave the fuel");
-        // Stone in every free slot leaves no room for the furnace's wood.
+            "turning to another recipe should take the boxes' contents into the backpack and load the new batch with a fuel");
+        // Stone in every free slot leaves no room for the furnace's wood and coal.
         Give(world, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
         world.QueueBatch(furnace, "iron_bar");
         Require(world.SwitchBlock(furnace, "iron_bar") != null && furnace.Recipe == "charcoal" && world.Waiting(furnace, "charcoal") == 1 && furnace.Inventory["wood"] == 2,
             "with no room in the backpack for what its boxes hold the station should stay on its recipe");
-        // One log in place of a stack of stone: the furnace's wood tops that stack up, with no slot free.
-        Drop(world, "stone", world.Backpack.StackOf("stone")); Give(world, "wood", 1);
+        // One log and one coal in place of two stacks of stone: the furnace's wood and coal top those stacks up, with no slot free.
+        Drop(world, "stone", world.Backpack.StackOf("stone") * 2); Give(world, "wood", 1); Give(world, "coal", 1);
         world.QueueBatch(furnace, "iron_bar");
-        Require(furnace.Recipe == "iron_bar" && world.Backpack["wood"] == 3, "wood that tops up a stack in a full backpack should let the station turn");
+        // The furnace's coal joins the one in the backpack, and one of the two goes back in as the iron's fuel.
+        Require(furnace.Recipe == "iron_bar" && world.Backpack["wood"] == 3 && world.Backpack["coal"] == 1 && furnace.Burner!["coal"] == 1,
+            "wood and coal that top up stacks in a full backpack should let the station turn");
+    }
+
+    /// <summary>A turn to another recipe takes the fuel out of the fuel slot too, into the backpack; what a batch burned is gone.</summary>
+    private static void CheckTurningToAnotherRecipeTakesTheFuelOut(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
+        world.SetRecipe(furnace, "");
+        world.Player = furnace.Pos + Vector2.One;
+        // Of 5 logs, 2 go in as the batch, 1 as its fuel and 2 more as fuel by hand.
+        Give(world, "wood", 5);
+        world.QueueBatch(furnace, "charcoal"); world.LoadFuel(furnace, "wood", 2);
+        SafeTick(world, data.Recipes["charcoal"].Seconds + 1);
+        Require(furnace.Inventory["charcoal"] == 1 && furnace.Burner!["wood"] == 2, "the batch should burn one log and leave two in the fuel slot");
+        world.QueueBatch(furnace, "iron_bar");
+        Require(furnace.Recipe == "iron_bar" && furnace.Burner!["wood"] == 0 && world.Backpack["wood"] == 2, "turning to iron should take the two logs out of the fuel slot into the backpack");
     }
 
     /// <summary>A station with no mark that has run out of batches stays on the recipe asked for last: more of it counts up and leaves its cups alone, even with a full backpack.</summary>

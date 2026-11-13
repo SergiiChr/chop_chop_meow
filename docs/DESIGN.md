@@ -516,7 +516,7 @@ A station counts batches of one recipe at a time: `Thing.Asked` is the recipe a 
 So a station with no mark that has run out of batches keeps showing what it made, and more batches of that recipe are not a turn to another.
 Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
 `World.QueueBatch` adds to the count, and for a recipe other than `Shown` it first turns the station to it:
-it drops the batches that waited and moves everything in `Thing.Inventory` to the acting player's backpack, leaving the fuel slot alone.
+it drops the batches that waited and moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack.
 `World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for all of it (`Inventory.Fits`).
 So batches only wait for the recipe in progress when there is one, and `World.Deserialize` refuses a save where they wait for another.
 `World.Unqueue` takes waiting batches off the count.

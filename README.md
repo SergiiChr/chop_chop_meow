@@ -256,11 +256,11 @@ Queueing another recipe depends on what the station is doing:
 | The station | Queueing another recipe |
 | --- | --- |
 | Is working a batch | Nothing changes, and its input and output cups shake |
-| Is between batches, with something in its cups | Its cups empty into your backpack, the batches that still waited are dropped, and it turns to the new recipe |
-| Is between batches, with no room in your backpack for what its cups hold | Nothing changes, and its cups shake |
+| Is between batches, with something in its cups | Its cups and its fuel cup empty into your backpack, the batches that still waited are dropped, and it turns to the new recipe |
+| Is between batches, with no room in your backpack for what its cups and fuel cup hold | Nothing changes, and its cups shake |
 | Has empty cups | It turns to the new recipe |
 
-Fuel stays in its cup when a station turns to another recipe.
+Fuel a batch has already burned is gone; queueing a recipe loads its fuel again from your backpack.
 Once the batches you queued are done, the station goes back to the recipe marked for workers, and haulers carry what is left in its cups to storage.
 A station page opens with the group of what the station is making open.
 A station with nothing queued and nothing marked stands idle.
