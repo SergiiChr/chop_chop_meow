@@ -9,6 +9,8 @@ internal static class Tree3DShape {
     private static readonly StandardMaterial3D?[] bark = new StandardMaterial3D?[4];
     private static readonly ShaderMaterial?[] foliage = new ShaderMaterial?[4], cores = new ShaderMaterial?[4];
     private static readonly string[] species = { "oak", "spruce", "birch", "bush" };
+    /// <summary>The berry bush among the species: its twigs start above the ground behind its leaves and get no stem.</summary>
+    public const int Bush = 3;
     private const string Folder = "res://assets/models/tree3d/";
     public static readonly StringName Opacity = "opacity";
 
@@ -77,7 +79,6 @@ internal static class Tree3DShape {
     private const float StemOverlap = .05f;
 
     public static Mesh Add(Node3D parent, int kind, int variant) {
-        Trunk(kind, variant);
         leaves[kind, variant] ??= GD.Load<Mesh>($"{Folder}{species[kind]}{variant}_leaves.res");
         bark[kind] ??= new StandardMaterial3D {
             AlbedoTexture = GD.Load<Texture2D>(Folder + (kind == 2 ? "birch_bark.svg" : "bark.svg")),
@@ -90,16 +91,15 @@ internal static class Tree3DShape {
             material.SetShaderParameter("albedo", kind == 2 ? new Color("c5d690") : Colors.White);
             foliage[kind] = material;
         }
-        // A trunk whose model starts above the ground is carried down to it by a stem that widens toward its foot.
-        var (center, radius, height) = Start(kind, variant);
-        if (height > .03f) {
+        // A tree's trunk whose model starts above the ground is carried down to it by a stem that widens toward its foot.
+        if (kind != Bush && Start(kind, variant) is var (center, radius, height) && height > .03f) {
             float tall = height + StemOverlap;
             stems[kind, variant] ??= new CylinderMesh { TopRadius = radius, BottomRadius = Foot(kind, variant).Radius, Height = tall, RadialSegments = 6, Rings = 1, CapTop = false, CapBottom = false };
             // The baked trunks are wound inside out and drawn by their back faces; a built cylinder is not.
             stemBark[kind] ??= new StandardMaterial3D { AlbedoTexture = bark[kind]!.AlbedoTexture, Roughness = .95f };
             ModelKit.Add(parent, stems[kind, variant]!, stemBark[kind]!, new Vector3(center.X, tall / 2, center.Y));
         }
-        ModelKit.Add(parent, trunks[kind, variant]!, bark[kind]!, Vector3.Zero);
+        ModelKit.Add(parent, Trunk(kind, variant), bark[kind]!, Vector3.Zero);
         ModelKit.Add(parent, leaves[kind, variant]!, foliage[kind]!, Vector3.Zero);
         return leaves[kind, variant]!;
     }

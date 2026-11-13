@@ -883,11 +883,12 @@ public partial class Game {
             var stump = Fell(Hosted, tree);
             string breaking = tall ? "tree_bend" : "tree_crack";
             await Until(() => sounds.Last == breaking, tall ? "a tall tree tearing at length as it breaks" : "a short tree cracking as it breaks", 2);
-            ulong brokeAt = Time.GetTicksMsec();
+            // The fall is timed on the view's own clock, which a slow frame does not stretch the way it stretches real time.
+            float brokeAt = view.Elapsed;
             Require(falling.Sway.RotationDegrees.X < 10, "A tree must be heard breaking as it starts to go over.");
             await Until(() => sounds.Last == "tree_crash", "a felled tree crashing", 4);
             Require(falling.Sway.RotationDegrees.X > 89, "A felled tree must crash as its trunk reaches the ground, not before.");
-            took[tall ? 1 : 0] = (Time.GetTicksMsec() - brokeAt) / 1000f;
+            took[tall ? 1 : 0] = view.Elapsed - brokeAt;
             RemoveThings(Hosted, t => t == stump); await Frames(2);
         }
         Require(took[1] > took[0] + .4f, "A tall tree must take longer to come down than a short one.");

@@ -441,7 +441,7 @@ public static class WorldModels {
     private static BushProp Bush(int id) {
         var prop = new BushProp();
         int variant = id % NatureShape.Variants;
-        var leaves = Tree3DShape.Add(prop.Body, 3, variant);
+        var leaves = Tree3DShape.Add(prop.Body, Tree3DShape.Bush, variant);
         var fruit = Pivot(prop.Body, Vector3.Zero);
         Add(fruit, NatureShape.CardBerries(leaves, variant), NatureShape.Glossy, Vector3.Zero);
         prop.Fruit = fruit;

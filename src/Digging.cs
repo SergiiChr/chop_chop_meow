@@ -21,7 +21,7 @@ public partial class World {
     }
 
     /// <summary>Takes a tree whose last wood is gone out of the world and returns the stump it leaves in its place.</summary>
-    private Thing Fell(Thing tree) {
+    internal Thing Fell(Thing tree) {
         S.Things.Remove(tree);
         var stump = Add(ThingKind.Stump, tree.Pos, StumpWood);
         stump.OfTree = tree.Id;

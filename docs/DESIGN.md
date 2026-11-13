@@ -263,7 +263,8 @@ A tree crown only wins a click when nothing else is under the cursor, so objects
 Trees use three variants chosen by object id, so saves need no new fields.
 A tree's height comes from its id too (`WorldModels.TreeTall`): its model and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
 The bake stands each tree's lowest point on the ground, which on a spruce and one oak is a hanging branch, so their baked trunks start up to 1.8 m higher; `Tree3DShape.Add` carries such a trunk down to the ground with a stem that widens toward its foot.
-A stump keeps the id of the tree that left it (`Thing.OfTree`), so its model stands where that tree's trunk did (`DugProp.Seat`) and is as thick as the trunk was at the ground (`Tree3DShape.Foot`): a birch leaves a thin stump and an oak a stout one. A stump with no tree on record, such as a showcase's, keeps the stump model's own size.
+A stump keeps the id of the tree that left it (`Thing.OfTree`), so its model stands where that tree's trunk did (`DugProp.Seat`) and is as thick as the trunk was at the ground (`Tree3DShape.Foot`): a birch leaves a thin stump and an oak a stout one.
+A stump with no tree on record, such as a showcase's, keeps the stump model's own size.
 Fading swaps in cached alpha-blended copies of a model's materials, so faded trees still share a handful of materials.
 
 ### Actor animation
@@ -866,7 +867,7 @@ Sounds come from three places:
 A tree felled in sight takes 1 second to reach the ground when it is among the shortest and 2.1 when among the tallest (`WorldView.FallSeconds`).
 It is heard twice, each sound started by the animation so both land on their moment whatever the tree's height:
 
-- As it starts to go: `tree_crack`, under a second of cracking, or for the tallest three in ten `tree_bend`, 1.8 seconds of wood tearing that lasts about as long as their fall.
+- As it starts to go: `tree_crack`, about a second of cracking or less, or for the tallest three in ten `tree_bend`, 1.8 seconds of wood tearing that lasts about as long as their fall.
 - As the trunk reaches the ground: `tree_crash`, the boom and the crown settling.
 
 Both play lower and slower the taller the tree, from a tenth above their recorded pitch to a tenth below (`Sounds.Play`'s `pitch`).
