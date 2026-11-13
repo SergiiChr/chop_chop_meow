@@ -70,7 +70,7 @@ public static class MultiplayerChecks {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 40);
         string entry = System.Text.Encoding.UTF8.GetString(JsonSerializer.SerializeToUtf8Bytes(tree, UpdateJson.Default.Thing));
-        Require(!entry.Contains("\"Recipe\"") && !entry.Contains("\"Keep\"") && !entry.Contains("\"Queue\""), $"a tree's update should carry no station fields: {entry}");
+        Require(!entry.Contains("\"Recipe\"") && !entry.Contains("\"Keep\"") && !entry.Contains("\"Asked\"") && !entry.Contains("\"Batches\""), $"a tree's update should carry no station fields: {entry}");
     }
 
     private static void CheckUpdateEntriesReadBackAsTheyWere(GameData data) {
