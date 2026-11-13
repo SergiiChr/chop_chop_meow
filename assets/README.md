@@ -58,10 +58,11 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   The surfaces' grain and bump textures are in `models/surfaces/`, packed by `tools/surface_textures.py`.
 - `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons and pile stock. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
-- `src/ItemShape.cs` — goods that no world model shows, one small model an item, each a mesh that carries its own colours.
+- `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
   The icon shows the model as built, and a pile slot shows it scaled down to fit the slot.
-  - Built in code: steel parts (an axe head, a sledge head and a six-sided collar, none with a handle), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a ribbon, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
+  - Built in code: wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a six-sided collar, none with a handle), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a ribbon, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
   - Baked from Kenney's Food Kit and recoloured to the game's palette: bread (the round loaf), raw meat (the ham on the bone), burnt steak (the cooked steak, charred) and the bowls of meat stew and crushed berries (the bowl of soup). `tools/food_models.py` bakes them into `models/food/`; see [food/README.md](models/food/README.md).
+  - Light copies of models the world already shows, for piles alone, since their icons come from those models: the hand tools and the torch with their cylinders redrawn on six sides, the rake, the mortar turned on fewer sides, the cargo crate, the bottle lying on its back, seven berries, and a mound of leaves with five of the leaf patch's leaves on it.
   - A slot's stock keeps its shape: it is scaled to nine tenths of the slot's width, which leaves room between neighbours, and only stock too tall for the slot is pressed down to it. A slot holds one of most goods. Cans stand as a six-pack, jars three together, steaks lie two deep and steel parts lie in two layers.
   - Cans and jars in a pile are plainer than in their icons: no rim, rib, lid, bare tin, mark or ribbon, which do not show at the game's distance.
   - A slot's stock stays within 145 triangles, which keeps a full pile and a fully stocked packing station under their ceilings.
@@ -73,11 +74,11 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
 Show resources piled on or beside a model with a `StockPile`, never with meshes of the model's own, so a good looks the same in every pile.
 
 - Build it with the slot positions, from the ground up a level at a time, and a scale: a slot is 0.72 wide and 0.4 tall at scale 1.
-- Stock shorter than a slot stands on its level's floor, and each level rests on the tallest stock of the level below.
+- Stock shorter than a slot stands on its level's floor. Stock that fills its slot carries the next level on its top; `ItemShape` goods leave gaps, and the next level settles into them, three tenths of the way up (`ItemShape.Nest`), so from the game camera it shows between the four goods under it.
 - Sync it from the view with `Show(slot, item, data)` for one item per slot, or `Fill(item, count, perSlot, data)` for a heap of one item that grows a slot at a time.
 - Both swap only cached meshes and materials, so they allocate nothing once warmed.
-- An item without stock of its own shows the tinted fallback block; give its family stock in `PileShape`, or the item a model in `ItemShape`, rather than drawing it elsewhere.
-- Preview a stack of every `ItemShape` good in two piles, beside a pile full of one good, with `./build.py play -- --showcase --goods --goods-full raw_meat`.
+- Every item has stock of its own; an item the data does not know shows the tinted fallback block; give its family stock in `PileShape`, or the item a model in `ItemShape`, rather than drawing it elsewhere.
+- Preview one of every `ItemShape` good in a row of piles, nine to a pile, with a pile full of one good at the end: `./build.py play -- --showcase --goods --goods-full raw_meat`. `--goods-pile N` looks at the Nth pile.
 - Storage piles, the furnace's fuel and the packing station's goods use it.
 
 ### People and animals
@@ -138,13 +139,14 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 The hotbar prefers them over everything else.
 Rerun the command after changing a model.
 
-They cover every item and every building.
+They cover every item, every building and the workers' hard hat.
 
 How they are framed:
 
 - Items show the part of a model that shows them in the world, such as a storage pile's logs.
 - Planks, parts and bars show as the stock a storage pile holds (wood parts as a handle, a grip and two pegs).
 - Goods that no world model shows have a model of their own in `ItemShape`, and show one of it.
+- The hard hat is the one workers wear, seen from nearly level so its brim and crown show apart.
 - Berries show as a small heap of the bush's berries.
 - Buildings show as placed, with a finished mine, a ripe farm and a pile full of logs.
 - Tools are seen from the side, head up and to the right, and show only the head end (`IconRender.HeadShare` of their length): the head tells one tool from another, and a whole handle leaves it a few pixels at icon size. Everything else is seen from the game camera's angle under the game's sunlight.
@@ -156,7 +158,6 @@ How they are framed:
 `ui/` holds hand-written SVG icons:
 
 - Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, guide, close, filter, stash, trash and so on), tinted in code.
-- A hard hat for workers.
 
 ## Fonts
 

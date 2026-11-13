@@ -273,7 +273,8 @@ public static class WorldModels {
     /// <summary>
     /// The model an icon shows for an item or building plan, or null when the game has no model of its own for it.
     /// Items borrow the part of a model that shows them in the world; buildings show as placed, with a finished mine, a ripe farm and a pile full of logs.
-    /// Berries show as a small heap of the bush's berries; planks, parts, bars and goods with a model in <see cref="ItemShape"/> as the stock a storage pile shows.
+    /// Berries show as a small heap of the bush's berries; planks, parts, bars and goods the world does not show as the stock a storage pile shows.
+    /// The hard hat is the one a worker wears.
     /// </summary>
     public static Node3D? IconModel(string id, bool building, GameData data) {
         Node3D Part(ThingKind kind, Func<Prop, Node3D> part) {
@@ -284,11 +285,8 @@ public static class WorldModels {
             prop.Root.Free();
             return node;
         }
-        if (id is "wood" or "planks" or "wood_parts" || ItemShape.Has(id)) {
-            var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
-            return stock;
-        }
         switch (id) {
+            case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
             case "steel_axe" or "steel_pick" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
@@ -308,6 +306,11 @@ public static class WorldModels {
                     prop.Outline.Visible = prop.Supplies.Visible = prop.Glow.Visible = prop.Fire.Visible = false;
                     return prop.Root;
                 }
+        }
+        // Everything else an item shows as is the stock a storage pile holds of it.
+        if (id is "wood" or "planks" or "wood_parts" || !building && ItemShape.Has(id)) {
+            var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
+            return stock;
         }
         if (!building || Kinds.Parse(id) is not ThingKind kind) return null;
         var built = Build(new Thing { Kind = kind });

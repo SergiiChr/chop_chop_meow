@@ -152,19 +152,22 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Pile)); else panel.Close();
         }
         if (Launch.Has("--goods")) {
-            // Piles with a stack of every good that has a model of its own, a pile's nine ground slots at a time so none
-            // hides another, and a pile full of --goods-full.
+            // A pile full of --goods-full, then a row of piles with one of every good that has a model of its own, a pile's
+            // nine ground slots at a time so none hides another; --goods-pile N looks at the Nth pile, the full one being 0.
             const int perPile = 9;
             var at = Terrain.Spawn + new Vector2(-3, 9);
-            world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at + new Vector2(3, 0)) < 7);
             var goods = ItemShape.Items.ToArray();
             int piles = (goods.Length + perPile - 1) / perPile;
+            world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + piles * 3 + 4 && MathF.Abs(t.Pos.Y - at.Y) < 8);
+            world.S.Workers.Clear(); world.S.Orders.Clear();
+            var full = world.Add(ThingKind.Pile, at);
+            full.Inventory.Add(Launch.Value("--goods-full") ?? "bread", 14 * full.Inventory.StackSize);
             for (int i = 0; i < piles; i++) {
-                var pile = world.Add(ThingKind.Pile, at + new Vector2(i * 3, 0));
-                foreach (string item in goods.Skip(i * perPile).Take(perPile)) pile.Inventory.Add(item, pile.Inventory.StackSize);
+                var pile = world.Add(ThingKind.Pile, at + new Vector2((i + 1) * 3, 0));
+                foreach (string item in goods.Skip(i * perPile).Take(perPile)) pile.Inventory.Add(item, 1);
             }
-            var full = world.Add(ThingKind.Pile, at + new Vector2(piles * 3, 0)); full.Inventory.Add(Launch.Value("--goods-full") ?? "bread", 14 * full.Inventory.StackSize);
-            world.Player = at + new Vector2(3, -2.5f); world.Tick(0); view.Zoom = 2.2f; panel.Close();
+            // The player crouches in front of the pile looked at, clear of it.
+            world.Player = at + new Vector2(Launch.Number("--goods-pile", 1) * 3 + 1.9f, 1.9f); world.Tick(0); view.Zoom = 2.2f; panel.Close();
         }
         if (Launch.Has("--farm")) {
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.

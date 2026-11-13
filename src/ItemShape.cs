@@ -6,11 +6,10 @@ using Ring = (float Radius, float Y, string Tint);
 namespace ChopChopMeow;
 
 /// <summary>
-/// Goods that no world model shows: one small model an item, carrying its own colours.
-/// An item's icon shows the model as built and a pile slot shows it fitted to the slot, so a good looks the same in
-/// both.
-/// Bread, meat and the bowls are baked Kenney Food Kit meshes from <c>assets/models/food</c> in the game's colours;
-/// the rest is built here.
+/// One small model an item, carrying its own colours, for icons and for piles.
+/// A good that no world model shows is built here, or baked from Kenney's Food Kit in <c>assets/models/food</c> and
+/// given the game's colours: its icon shows the model as built and a pile slot shows it scaled to the slot.
+/// A good the world does show keeps the icon of that model, and has a lighter copy of it here for piles.
 /// </summary>
 internal static class ItemShape {
     /// <summary>One flat triangle, wound so that it faces outward, in one colour.</summary>
@@ -23,14 +22,22 @@ internal static class ItemShape {
 
     /// <summary>How much of a pile slot's width and depth its stock takes, which leaves room between neighbours.</summary>
     private const float Room = .9f;
+    /// <summary>
+    /// How far up a piled good the level above it rests: the goods leave gaps between them, and a good above settles
+    /// most of the way down into the gap between the four under it.
+    /// Seen from the game camera it then shows between those four, rather than over the one behind them.
+    /// </summary>
+    public const float Nest = .3f;
 
     private static readonly StandardMaterial3D Plain = ModelKit.Vertex(Surface.Flat, .8f);
     private static readonly StandardMaterial3D Glossy = ModelKit.Vertex(Surface.Flat, .35f);
+    private static readonly StandardMaterial3D Wooden = ModelKit.Vertex(Surface.Wood, .95f);
     private static readonly StandardMaterial3D Sacking = ModelKit.Vertex(Surface.Cloth, .9f);
     private static readonly StandardMaterial3D Steel = ModelKit.Vertex(Surface.Metal, .45f, .35f);
     private static readonly StandardMaterial3D Tin = ModelKit.Vertex(Surface.Metal, .4f, .15f);
 
     private static readonly Dictionary<string, Look> looks = new() {
+        ["wood_parts"] = new(f => WoodParts(f, 8), Wooden, f => WoodParts(f, 5)),
         ["steel_parts"] = new(SteelParts, Steel, f => Cross(f, SteelParts)),
         ["tin_can"] = new(f => OpenCan(f, true), Tin, f => SixPack(f, one => OpenCan(one, false))),
         ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, f => SixPack(f, one => Can(one, "b83a5c", null, false))),
@@ -49,7 +56,29 @@ internal static class ItemShape {
         ["meat_stew"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "e9e6dc"), ("e68d64", "8f5a33"), ("ff8e44", "e0873a"), ("61cb8b", "7fa650"), ("f2bf99", "d9b98a"))), Plain),
         ["crushed_berries"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "b08050"), ("e68d64", "b8434f"), ("ff8e44", "7d1f2e"), ("61cb8b", "d86a70"), ("f2bf99", "8f2436"))), Plain),
         ["coins"] = new(Coins, Glossy),
+        // What follows has a model in the world, which its icon shows; a pile shows a lighter copy of it, laid down.
+        ["steel_axe"] = Held("steel_axe"),
+        ["steel_pick"] = Held("steel_pick"),
+        ["wood_hammer"] = Held("wood_hammer"),
+        ["steel_hammer"] = Held("steel_hammer"),
+        ["stone_chisel"] = Held("stone_chisel"),
+        ["steel_chisel"] = Held("steel_chisel"),
+        ["torch"] = new(f => Lighter(f, ActorRig.Torch().Torch, Basis.Identity), Plain),
+        ["rake"] = new(f => Copy(f, RackShape.Rake, new Transform3D(new Basis(Vector3.Right, MathF.PI / 2), Vector3.Zero), Colors.White), Plain),
+        ["mortar"] = new(f => Copy(f, CookShape.BuildMortar(6, 5), Transform3D.Identity, Colors.White), Plain),
+        ["crate"] = new(f => Copy(f, CrateShape.Cargo, Transform3D.Identity, Colors.White), Plain),
+        ["water"] = Bottle("water"),
+        ["water_2"] = Bottle("water_2"),
+        ["water_1"] = Bottle("water_1"),
+        ["empty_bottle"] = Bottle("empty_bottle"),
+        ["berries"] = new(Berries, Glossy),
+        ["leaves"] = new(Leaves, Plain),
     };
+
+    /// <summary>A hand tool lying on its side, so its head lies flat.</summary>
+    private static Look Held(string tool) => new(f => Lighter(f, ActorRig.Tool(tool), new Basis(Vector3.Back, MathF.PI / 2)), Plain);
+    /// <summary>A bottle lying on its back, its gauge up.</summary>
+    private static Look Bottle(string item) => new(f => Lighter(f, BottleShape.Create(Water.BottleSips(item)), new Basis(Vector3.Right, -MathF.PI / 2)), Plain);
 
     public static IEnumerable<string> Items => looks.Keys;
     public static bool Has(string item) => looks.ContainsKey(item);
@@ -64,6 +93,8 @@ internal static class ItemShape {
         var look = looks[item];
         var faces = new List<Face>();
         if (fit != null && look.Pile != null) look.Pile(faces); else look.Build(faces);
+        // The game's camera looks down on a pile, so it never sees an underside.
+        if (fit != null) faces.RemoveAll(face => (face.C - face.A).Cross(face.B - face.A).Normalized().Y < -.9f);
         var (min, max) = Bounds(faces);
         var centre = (min + max) / 2; var scale = Vector3.One;
         if (fit is Vector3 slot) {
@@ -145,10 +176,57 @@ internal static class ItemShape {
     /// by <paramref name="stretch"/> where one is given.
     /// </summary>
     private static void Baked(List<Face> faces, string name, Func<Color, Color> recolour, Vector3? stretch = null) {
-        var by = stretch ?? Vector3.One;
-        var arrays = GD.Load<Mesh>($"res://assets/models/food/{name}.res").SurfaceGetArrays(0);
-        var points = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array(); var colours = arrays[(int)Mesh.ArrayType.Color].AsColorArray();
-        for (int i = 0; i < points.Length; i += 3) faces.Add(new(points[i] * by, points[i + 1] * by, points[i + 2] * by, recolour(colours[i])));
+        int first = faces.Count;
+        Copy(faces, GD.Load<Mesh>($"res://assets/models/food/{name}.res"), new Transform3D(Basis.FromScale(stretch ?? Vector3.One), Vector3.Zero), Colors.White);
+        for (int i = first; i < faces.Count; i++) faces[i] = faces[i] with { Tint = recolour(faces[i].Tint) };
+    }
+
+    /// <summary>A mesh's triangles placed by <paramref name="at"/>, each in its first corner's colour, or in <paramref name="plain"/> where the mesh carries none.</summary>
+    private static void Copy(List<Face> faces, Mesh mesh, Transform3D at, Color plain) {
+        for (int surface = 0; surface < mesh.GetSurfaceCount(); surface++) {
+            var arrays = mesh.SurfaceGetArrays(surface);
+            var points = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
+            var colours = arrays[(int)Mesh.ArrayType.Color].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.Color].AsColorArray();
+            var index = arrays[(int)Mesh.ArrayType.Index].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.Index].AsInt32Array();
+            for (int i = 0; i < (index?.Length ?? points.Length); i += 3) {
+                int a = index?[i] ?? i, b = index?[i + 1] ?? i + 1, c = index?[i + 2] ?? i + 2;
+                faces.Add(new(at * points[a], at * points[b], at * points[c], colours?[a] ?? plain));
+            }
+        }
+    }
+
+    /// <summary>
+    /// A model built from the kit's primitives, turned by <paramref name="pose"/>, as triangles in its materials'
+    /// colours and light enough to pile: each cylinder is redrawn on at most six sides, and flames are left out.
+    /// The model is freed.
+    /// </summary>
+    private static void Lighter(List<Face> faces, Node3D model, Basis pose) {
+        void Add(Node node, Transform3D parent) {
+            var at = node is Node3D placed ? parent * placed.Transform : parent;
+            if (node is MeshInstance3D { Mesh: Mesh mesh } part && (part.MaterialOverride ?? mesh.SurfaceGetMaterial(0)) is StandardMaterial3D material
+                && material.ShadingMode != BaseMaterial3D.ShadingModeEnum.Unshaded) {
+                if (mesh is CylinderMesh round) Cylinder(faces, at, round.BottomRadius, round.TopRadius, round.Height, Math.Min(round.RadialSegments, 6), material.AlbedoColor);
+                else Copy(faces, mesh, at, material.AlbedoColor);
+            }
+            foreach (var child in node.GetChildren()) Add(child, at);
+        }
+        Add(model, new Transform3D(pose, Vector3.Zero) * model.Transform.AffineInverse());
+        model.Free();
+    }
+
+    /// <summary>An upright cylinder or cone placed by <paramref name="at"/>, its middle at the origin, with its ends closed.</summary>
+    private static void Cylinder(List<Face> faces, Transform3D at, float bottom, float top, float height, int sides, Color tint) {
+        Vector3 Point(float radius, float y, int side) { float angle = side * Mathf.Tau / sides; return at * new Vector3(MathF.Cos(angle) * radius, y, MathF.Sin(angle) * radius); }
+        for (int side = 0; side < sides; side++) {
+            float middle = (side + .5f) * Mathf.Tau / sides;
+            var outward = at.Basis * new Vector3(MathF.Cos(middle) * height, bottom - top, MathF.Sin(middle) * height);
+            if (bottom > 0) Tri(faces, Point(bottom, -height / 2, side), Point(bottom, -height / 2, side + 1), Point(top, height / 2, side + 1), outward, tint);
+            if (top > 0) Tri(faces, Point(bottom, -height / 2, side), Point(top, height / 2, side + 1), Point(top, height / 2, side), outward, tint);
+        }
+        for (int side = 1; side < sides - 1; side++) {
+            if (bottom > 0) Tri(faces, Point(bottom, -height / 2, 0), Point(bottom, -height / 2, side), Point(bottom, -height / 2, side + 1), at.Basis * Vector3.Down, tint);
+            if (top > 0) Tri(faces, Point(top, height / 2, 0), Point(top, height / 2, side), Point(top, height / 2, side + 1), at.Basis * Vector3.Up, tint);
+        }
     }
 
     /// <summary>
@@ -166,6 +244,23 @@ internal static class ItemShape {
     }
 
     private static float Distance(Color a, Color b) => new Vector3(a.R - b.R, a.G - b.G, a.B - b.B).LengthSquared();
+
+    /// <summary>
+    /// Turned wooden parts lying side by side: a long tool handle with a knob, a thick grip with a collar at each end
+    /// and two pointed pegs, each turned on the given number of sides.
+    /// </summary>
+    private static void WoodParts(List<Face> faces, int sides) {
+        var wood = new Color("b98552");
+        // A part lies along X, its thicker end toward -X.
+        void Turned(float thick, float thin, float length, float x, float z) =>
+            Cylinder(faces, new Transform3D(new Basis(Vector3.Back, MathF.PI / 2), new Vector3(x, MathF.Max(thick, thin), z)), thick, thin, length, sides, wood);
+        Turned(.03f, .038f, .6f, 0, -.2f); Turned(.05f, .05f, .05f, -.32f, -.2f);
+        Turned(.055f, .055f, .22f, -.1f, .02f); Turned(.045f, .045f, .03f, .025f, .02f); Turned(.045f, .045f, .03f, -.225f, .02f);
+        foreach (float z in new[] { .19f, .29f }) {
+            Turned(.028f, .028f, .2f, .05f, z);
+            Cylinder(faces, new Transform3D(new Basis(Vector3.Back, -MathF.PI / 2), new Vector3(.18f, .028f, z)), .028f, 0, .06f, sides, wood);
+        }
+    }
 
     /// <summary>
     /// Tool heads as they leave the anvil, none with a handle yet: an axe head lying on its cheek, a sledge head behind
@@ -359,6 +454,34 @@ internal static class ItemShape {
             Vector3 a = points[triangles[i]], b = points[triangles[i + 1]], c = points[triangles[i + 2]];
             var outward = (a + b + c) / 3 - middle;
             Tri(faces, a, b, c, outward, new Color("efdcb0").Lerp(new Color("fbf3dc"), Math.Clamp(outward.Normalized().Y, 0, 1) * .8f));
+        }
+    }
+
+    /// <summary>A small heap of berries, five round one with two more on top, each a bare twenty-sided lump.</summary>
+    private static void Berries(List<Face> faces) {
+        Color[] reds = { new("c0283a"), new("a3202f"), new("d23a45") };
+        for (int i = 0; i < 7; i++) {
+            float angle = i * Mathf.Tau / 5, reach = i < 5 ? .075f : .03f;
+            var middle = new Vector3(MathF.Cos(angle) * reach, i < 5 ? .05f : .12f, MathF.Sin(angle) * reach);
+            var (points, triangles) = NatureShape.Shape(middle, Vector3.One * .055f, 0, i, 0, 0, 0, -1, 0);
+            for (int t = 0; t < triangles.Count; t += 3)
+                Tri(faces, points[triangles[t]], points[triangles[t + 1]], points[triangles[t + 2]], (points[triangles[t]] + points[triangles[t + 1]] + points[triangles[t + 2]]) / 3 - middle, reds[i % reds.Length]);
+        }
+    }
+
+    /// <summary>A raked-up mound of fallen leaves in the leaf patch's colours, with five of the patch's own leaves lying on it.</summary>
+    private static void Leaves(List<Face> faces) {
+        Color[] palette = { new("c08a3a"), new("a8652c"), new("d0a347"), new("8e5a2a"), new("b8753a") };
+        var middle = new Vector3(0, .03f, 0);
+        var (points, triangles) = NatureShape.Shape(middle, new(.3f, .17f, .3f), 1, 11, 3, .15f, .05f, 0, 0);
+        for (int t = 0; t < triangles.Count; t += 3)
+            Tri(faces, points[triangles[t]], points[triangles[t + 1]], points[triangles[t + 2]], (points[triangles[t]] + points[triangles[t + 1]] + points[triangles[t + 2]]) / 3 - middle, palette[t / 3 * 7 % palette.Length]);
+        // A leaf of the patch is eleven triangles that start at the middle of its ridge.
+        var patch = new List<Face>(); Copy(patch, LeafShape.For(0), Transform3D.Identity, Colors.White);
+        for (int leaf = 0; leaf < 5; leaf++) {
+            float angle = leaf * Mathf.Tau / 4, reach = leaf < 4 ? .16f : 0;
+            var to = new Vector3(MathF.Cos(angle) * reach, leaf < 4 ? .17f : .215f, MathF.Sin(angle) * reach) - patch[leaf * 11].A;
+            for (int t = leaf * 11; t < leaf * 11 + 11; t++) faces.Add(new(patch[t].A + to, patch[t].B + to, patch[t].C + to, patch[t].Tint));
         }
     }
 

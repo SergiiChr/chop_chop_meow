@@ -30,8 +30,8 @@ public static class PileModelChecks {
             // Three six-sided briquettes with a hole through each: six sides, six hole walls and two ringed ends of six, two triangles apiece.
             Require(charcoal.GetInstanceId() != coal.GetInstanceId() && charcoal.GetFaces().Length / 3 == 144, "charcoal must pile as three holed briquettes rather than as coal's lumps");
 
-            var fallback = ModelSteps.Piled(first, thing, "torch", data);
-            Require(ModelSteps.Piled(first, thing, "unmodelled_item", data).GetInstanceId() == fallback.GetInstanceId(), "unmodelled items must use the shared fallback");
+            var fallback = ModelSteps.Piled(first, thing, "unmodelled_item", data);
+            Require(ModelSteps.Piled(first, thing, "another_unmodelled_item", data).GetInstanceId() == fallback.GetInstanceId(), "unmodelled items must use the shared fallback");
             Require(first.Stock.Slots[0].MaterialOverride is StandardMaterial3D material && material.AlbedoColor.IsEqualApprox(new Color("b0a58a")), "unknown items must have a visible fallback color");
 
             thing.Inventory.Clear();
@@ -56,23 +56,21 @@ public static class PileModelChecks {
     }
 
     /// <summary>
-    /// Every item's icon is rendered from a model, and the goods that are only ever carried or stored pile as that same
-    /// model, light enough for a full pile and a full packing station.
+    /// Every item's icon and the workers' hard hat are rendered from models, and every item piles as its model rather
+    /// than as a plain block, light enough for a full pile and a full packing station.
     /// </summary>
     public static void Goods(GameData data) {
-        foreach (string item in data.Items.Keys)
+        foreach (string item in data.Items.Keys.Append("hardhat"))
             Require(ResourceLoader.Exists($"res://assets/icons/{item}.png"), $"{item} must have an icon rendered from its model");
         PileShape.Warm(data);
         var thing = new Thing { Kind = ThingKind.Pile, Inventory = new Inventory { Slots = 14 } };
         var pile = (PileProp)WorldModels.Build(thing);
         try {
             var block = ModelSteps.Piled(pile, thing, "unmodelled_item", data);
-            string[] goods = { "steel_parts", "tin_can", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "raw_meat", "burnt_steak", "bread",
-                "crushed_berries", "berry_jam", "meat_stew", "canned_jam", "canned_meat_stew", "coins" };
             // A pile and a packing station are buildings, each held to 2,500 triangles with every slot of stock showing.
             var packer = (PackerProp)WorldModels.Build(new Thing { Kind = ThingKind.Packer });
             try {
-                foreach (string good in goods) {
+                foreach (string good in data.Items.Keys) {
                     Require(ModelSteps.Piled(pile, thing, good, data).GetInstanceId() != block.GetInstanceId(), $"{good} must pile as its own model rather than as the plain block");
                     pile.Stock.Fill(good, int.MaxValue, 1, data); packer.Stock.Fill(good, int.MaxValue, 1, data);
                     Require(ModelSteps.Triangles(pile.Root) <= 2500, $"a pile full of {good} must stay a light building: {ModelSteps.Triangles(pile.Root)} triangles");
@@ -81,7 +79,7 @@ public static class PileModelChecks {
             } finally { packer.Root.Free(); }
             // Six open cans stand in two rows of three, each eight-sided: a wall of sixteen triangles and a hollow of eight.
             Require(ModelSteps.Piled(pile, thing, "tin_can", data).GetFaces().Length / 3 == 144, "tin cans must pile as a six-pack");
-            // A loaf is scaled down to fit a slot rather than stretched to fill it, and a second layer rests on the first.
+            // A loaf is scaled down to fit a slot rather than stretched to fill it, and a second layer settles into the gaps of the first, three tenths of the way up its loaves.
             var one = PileShape.Stock("bread", data.Items["bread"].Color);
             Vector3 loaf = one.Mesh.GetAabb().Size, piled = ModelSteps.Piled(pile, thing, "bread", data).GetAabb().Size;
             one.Free();
@@ -89,7 +87,8 @@ public static class PileModelChecks {
             Require(piled.X < .72f && piled.Z < .72f, "a piled loaf must leave room around it in its slot");
             pile.Stock.Fill("bread", 10, 1, data);
             MeshInstance3D below = pile.Stock.Slots[0], above = pile.Stock.Slots[9];
-            Require(MathF.Abs(above.Position.Y + above.Mesh.GetAabb().Position.Y - (below.Position.Y + below.Mesh.GetAabb().End.Y)) < .001f, "a second layer of loaves must rest on the first");
+            float ground = below.Position.Y + below.Mesh.GetAabb().Position.Y;
+            Require(MathF.Abs(above.Position.Y + above.Mesh.GetAabb().Position.Y - (ground + .3f * below.Mesh.GetAabb().Size.Y)) < .001f, "a second layer of loaves must settle into the gaps of the first");
         } finally { pile.Root.Free(); }
     }
 }

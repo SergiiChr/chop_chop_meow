@@ -15,21 +15,20 @@ internal static class PileShape {
 
     private static readonly Dictionary<string, Mesh> contents = new();
 
-    private static readonly string[] families = { "logs", "stone", "ore", "coal", "charcoal", "planks", "parts", "bars", "fallback" };
+    private static readonly string[] families = { "logs", "stone", "ore", "coal", "charcoal", "planks", "bars", "fallback" };
     /// <summary>The box every stock shape is fitted to in a pile slot.</summary>
     public static readonly Vector3 SlotSize = new(.72f, .4f, .72f);
 
-    private static string Family(string item) => item switch {
+    private static string Family(string item) => (World.IsCrate(item) ? "crate" : item) switch {
         "wood" => "logs",
         "stone" => "stone",
         "iron_ore" or "tin_ore" => "ore",
         "coal" => "coal",
         "charcoal" => "charcoal",
         "planks" => "planks",
-        "wood_parts" => "parts",
         "iron_bar" or "steel_bar" or "tin_bar" => "bars",
         // A good with a model of its own is a family of one.
-        _ => ItemShape.Has(item) ? item : "fallback"
+        var good => ItemShape.Has(good) ? good : "fallback"
     };
 
     private static StandardMaterial3D Material(string family, string color) => family switch {
@@ -37,7 +36,7 @@ internal static class PileShape {
         "coal" => ModelKit.Stone("292c30"),
         "charcoal" => CharcoalShape.Material,
         "stone" or "ore" => ModelKit.Stone(color),
-        "logs" or "planks" or "parts" => ModelKit.Wood(color, .95f),
+        "logs" or "planks" => ModelKit.Wood(color, .95f),
         _ when ItemShape.Has(family) => ItemShape.Material(family),
         _ => ModelKit.Mat(color, .95f),
     };
@@ -66,6 +65,12 @@ internal static class PileShape {
 
     /// <summary>How tall an item's stock stands in a slot, as a share of the slot's height.</summary>
     public static float Rise(string item) => contents[Family(item)].GetAabb().Size.Y / SlotSize.Y;
+
+    /// <summary>
+    /// How high up an item's stock the level above it rests, as a share of the slot's height.
+    /// Stock that fills its slot carries the next level on its top; the smaller goods leave gaps, which the next level settles into.
+    /// </summary>
+    public static float Carry(string item) => Rise(item) * (ItemShape.Has(Family(item)) ? ItemShape.Nest : 1);
 
     /// <summary>The stock an item's pile slot shows, in its own proportions rather than fitted to the slot; icons show it this way.</summary>
     public static MeshInstance3D Stock(string item, string color) {
@@ -131,23 +136,6 @@ internal static class PileShape {
                 foreach (float x in new[] { -.075f, .075f }) {
                     var log = ModelKit.Cylinder(source, .11f, .11f, .9f, new(x * 1.5f, 0, 0), ModelKit.Mat("8a5f3c"), new Vector3(90, 0, 0), 7);
                     CopyLog(log.Mesh, log.Transform);
-                }
-            } else if (family == "parts") {
-                // A long tool handle with a knob, a thick grip and two pointed pegs, lying side by side.
-                var wood = ModelKit.Mat("b98552");
-                var turned = new Vector3(0, 0, 90);
-                var shapes = new[] {
-                    ModelKit.Cylinder(source, .03f, .038f, .6f, new(0, .038f, -.2f), wood, turned, 8),
-                    ModelKit.Cylinder(source, .05f, .05f, .05f, new(-.32f, .05f, -.2f), wood, turned, 8),
-                    ModelKit.Cylinder(source, .055f, .055f, .22f, new(-.1f, .055f, .02f), wood, turned, 8),
-                    ModelKit.Cylinder(source, .045f, .045f, .03f, new(.025f, .045f, .02f), wood, turned, 8),
-                    ModelKit.Cylinder(source, .045f, .045f, .03f, new(-.225f, .045f, .02f), wood, turned, 8),
-                };
-                foreach (var shape in shapes) Copy(shape.Mesh, shape.Transform);
-                foreach (float z in new[] { .19f, .29f }) {
-                    var peg = ModelKit.Cylinder(source, .028f, .028f, .2f, new(.05f, .028f, z), wood, turned, 8);
-                    var point = ModelKit.Cylinder(source, .028f, .004f, .06f, new(.18f, .028f, z), wood, new Vector3(0, 0, -90), 8);
-                    Copy(peg.Mesh, peg.Transform); Copy(point.Mesh, point.Transform);
                 }
             } else if (family == "bars") {
                 Copy(IngotShape.Mesh, Transform3D.Identity);
@@ -248,8 +236,8 @@ internal static class PileShape {
 public sealed class StockPile {
     private readonly MeshInstance3D[] slots;
     private readonly string[] shown;
-    /// <summary>Where each slot's stock sits when the stock is as tall as a slot, and how tall the stock shown in it is.</summary>
-    private readonly float[] rests, heights;
+    /// <summary>Where each slot's stock sits when the stock is as tall as a slot, how tall the stock shown in it is, and how high up it carries the level above.</summary>
+    private readonly float[] rests, heights, carries;
     private readonly float full;
 
     /// <summary>
@@ -258,7 +246,7 @@ public sealed class StockPile {
     /// </summary>
     public StockPile(Node3D parent, ReadOnlySpan<Vector3> positions, float scale = 1) {
         slots = new MeshInstance3D[positions.Length]; shown = new string[positions.Length];
-        rests = new float[positions.Length]; heights = new float[positions.Length];
+        rests = new float[positions.Length]; heights = new float[positions.Length]; carries = new float[positions.Length];
         full = PileShape.SlotSize.Y * scale;
         for (int i = 0; i < slots.Length; i++) {
             slots[i] = new MeshInstance3D { Position = positions[i], Scale = Vector3.One * scale, Visible = false };
@@ -277,6 +265,7 @@ public sealed class StockPile {
         var mesh = slots[slot];
         mesh.Visible = item != "";
         heights[slot] = item == "" ? 0 : PileShape.Rise(item) * full;
+        carries[slot] = item == "" ? 0 : PileShape.Carry(item) * full;
         Settle();
         if (item == "") return;
         PileShape.SetStock(mesh, item, data.Items.TryGetValue(item, out var def) ? def.Color : PileShape.Fallback);
@@ -284,14 +273,14 @@ public sealed class StockPile {
         mesh.Rotation = new Vector3(0, item is "coal" or "charcoal" ? slot * 2.399963f : 0, 0);
     }
 
-    /// <summary>Stands each slot's stock on its level's floor, which is the top of the tallest stock on the level below.</summary>
+    /// <summary>Stands each slot's stock on its level's floor, which is as high as the stock on the level below carries it.</summary>
     private void Settle() {
-        float floor = rests[0] - full / 2, tallest = 0;
+        float floor = rests[0] - full / 2, carried = 0;
         for (int i = 0; i < slots.Length; i++) {
             // A level with nothing on it keeps a slot's height, so what stands above it stays where it would.
-            if (i > 0 && rests[i] > rests[i - 1] + .001f) { floor += tallest > 0 ? tallest : full; tallest = 0; }
+            if (i > 0 && rests[i] > rests[i - 1] + .001f) { floor += carried > 0 ? carried : full; carried = 0; }
             slots[i].Position = slots[i].Position with { Y = floor + heights[i] / 2 };
-            tallest = MathF.Max(tallest, heights[i]);
+            carried = MathF.Max(carried, carries[i]);
         }
     }
 
