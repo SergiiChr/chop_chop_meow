@@ -15,6 +15,16 @@ internal static class ModelSteps {
         return meshes;
     }
 
+    /// <summary>The triangles of every mesh under a node, shown or hidden.</summary>
+    public static int Triangles(Node at) => AllMeshes(at).Sum(mesh => mesh.Mesh.GetFaces().Length / 3);
+
+    /// <summary>The stock a pile's first slot shows once the pile holds nothing but a stack of the item.</summary>
+    public static Mesh Piled(PileProp pile, Thing thing, string item, GameData data) {
+        thing.Inventory.Clear(); thing.Inventory.Add(item, 64);
+        WorldModels.SyncPile(pile, thing, data);
+        return pile.Stock.Slots[0].Mesh!;
+    }
+
     /// <summary>The solid core that fills a canopy's shadow, separate from the per-mesh proxies.</summary>
     public static bool CanopyCore(MeshInstance3D mesh) => mesh.MaterialOverride is ShaderMaterial { Shader: var shader } && shader == Tree3DShape.SolidFoliage;
 

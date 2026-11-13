@@ -273,7 +273,7 @@ public static class WorldModels {
     /// <summary>
     /// The model an icon shows for an item or building plan, or null when the game has no model of its own for it.
     /// Items borrow the part of a model that shows them in the world; buildings show as placed, with a finished mine, a ripe farm and a pile full of logs.
-    /// Berries show as a small heap of the bush's berries; planks, parts and bars as the stock a storage pile shows.
+    /// Berries show as a small heap of the bush's berries; planks, parts, bars and goods with a model in <see cref="ItemShape"/> as the stock a storage pile shows.
     /// </summary>
     public static Node3D? IconModel(string id, bool building, GameData data) {
         Node3D Part(ThingKind kind, Func<Prop, Node3D> part) {
@@ -284,6 +284,10 @@ public static class WorldModels {
             prop.Root.Free();
             return node;
         }
+        if (id is "wood" or "planks" or "wood_parts" || ItemShape.Has(id)) {
+            var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
+            return stock;
+        }
         switch (id) {
             case "steel_axe" or "steel_pick" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
@@ -292,10 +296,6 @@ public static class WorldModels {
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
             case "water" or "water_2" or "water_1" or "empty_bottle": return BottleShape.Create(Water.BottleSips(id));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
-            case "wood" or "planks" or "wood_parts": {
-                    var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
-                    return stock;
-                }
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
             case "leaves": return Build(new Thing { Kind = ThingKind.Leaves }).Root;
             case "crate": return Build(new Thing { Kind = ThingKind.Crate }).Root;

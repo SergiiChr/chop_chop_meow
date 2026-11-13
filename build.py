@@ -71,10 +71,14 @@ def command(args: list[str | Path], *, env: dict[str, str] | None = None) -> Non
 
 def download(url: str, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
+    # Some hosts refuse Python's default client name.
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "chop-chop-meow-build"}
+    )
     for attempt in range(5):
         try:
             with (
-                urllib.request.urlopen(url, timeout=60) as response,
+                urllib.request.urlopen(request, timeout=60) as response,
                 target.open("wb") as output,
             ):
                 shutil.copyfileobj(response, output)

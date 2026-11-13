@@ -10,7 +10,7 @@ public static class Icons {
     public static Texture2D? Of(string id) {
         if (World.IsCrate(id)) id = "crate";
         if (cache.TryGetValue(id, out var cached)) return cached;
-        // Icons rendered from the game's own models come first; items without a model have drawn icons named by their id.
+        // Items and buildings have icons rendered from their models; the hard hat is a drawn icon.
         foreach (var path in new[] { $"res://assets/icons/{id}.png", $"res://assets/ui/{id}.svg" })
             if (ResourceLoader.Exists(path)) return cache[id] = GD.Load<Texture2D>(path);
         return null;

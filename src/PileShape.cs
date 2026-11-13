@@ -28,7 +28,8 @@ internal static class PileShape {
         "planks" => "planks",
         "wood_parts" => "parts",
         "iron_bar" or "steel_bar" or "tin_bar" => "bars",
-        _ => "fallback"
+        // A good with a model of its own is a family of one.
+        _ => ItemShape.Has(item) ? item : "fallback"
     };
 
     private static StandardMaterial3D Material(string family, string color) => family switch {
@@ -37,13 +38,18 @@ internal static class PileShape {
         "charcoal" => CharcoalShape.Material,
         "stone" or "ore" => ModelKit.Stone(color),
         "logs" or "planks" or "parts" => ModelKit.Wood(color, .95f),
-        _ => ModelKit.Mat(color, .95f),
+        "fallback" => ModelKit.Mat(color, .95f),
+        _ => ItemShape.Material(family),
     };
 
     /// <summary>Builds every stock mesh and item material while loading, so a pile showing a new item mid-game swaps cached resources only.</summary>
     public static void Warm(GameData data) {
         foreach (var family in families) if (!contents.ContainsKey(family)) contents[family] = BuildStock(family, true);
-        foreach (var (id, item) in data.Items) Material(Family(id), item.Color);
+        foreach (var (id, item) in data.Items) {
+            string family = Family(id);
+            if (!contents.ContainsKey(family)) contents[family] = BuildStock(family, true);
+            Material(family, item.Color);
+        }
         Material("fallback", Fallback);
     }
 
@@ -67,6 +73,7 @@ internal static class PileShape {
         if (family == "fallback") return Stack;
         // Charcoal's briquettes carry their own colours, so they come whole from their own builder.
         if (family == "charcoal") return fit ? CharcoalShape.Build(SlotSize) : CharcoalShape.Heap;
+        if (ItemShape.Has(family)) return ItemShape.Build(family, fit ? SlotSize : null);
         var faces = new List<Vector3>();
         void Copy(Mesh mesh, Transform3D transform) {
             foreach (var point in mesh.GetFaces()) faces.Add(transform * point);
