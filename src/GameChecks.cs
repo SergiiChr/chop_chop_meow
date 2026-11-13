@@ -111,12 +111,12 @@ public partial class Game {
             Require(bottom < .03f, $"Tree look {id} must have a trunk down to the ground, not one that starts {bottom:0.00} m above it.");
         }
     }
-    /// <summary>A stump is shaped by the tree that left it: a birch's is thinner than an oak's, and one with no tree on record keeps the stump model's own size.</summary>
+    /// <summary>A stump is shaped by the tree that left it: a birch's is thinner than an oak's, and one with no tree on record is no thicker than a trunk either.</summary>
     private void CheckStumpIsAsThickAsItsTreesTrunk() {
         // A tree's species goes by its id: 3 is an oak and 2 a birch.
         var (oak, birch, bare) = (StumpWidth(3), StumpWidth(2), StumpWidth(0));
         Require(oak > birch, $"An oak's stump must be thicker than a birch's: {oak:0.00} against {birch:0.00}.");
-        Require(bare == 1, "A stump with no tree on record must keep the stump model's own size.");
+        Require(bare < 1, $"A stump with no tree on record must be as thin as a trunk, not the stump model's own size: {bare:0.00}.");
     }
     /// <summary>Canopy fades use separate shadow-only meshes so the original cutout shadows survive alpha blending.</summary>
     private void CheckTreeCanopyCastsShadowsOnlyThroughItsProxies(TreeProp prop) {

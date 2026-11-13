@@ -37,7 +37,7 @@ public sealed class Thing {
     public float Burn { get; set; }
     /// <summary>When a picked berry bush fruits again, on the world's clock, or zero while it is full.</summary>
     public float Regrow { get; set; }
-    /// <summary>The id of the tree that left a stump, whose species and size shape the stump; zero for a stump with no tree on record.</summary>
+    /// <summary>The id of the tree that left a stump, whose species and size shape the stump; zero for a stump with no tree on record, which is shaped by its own id.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OfTree { get; set; }
     /// <summary>A signpost's market output: bought goods arrive here with the returning cart, and sale coins once <see cref="Wages"/> is full.</summary>
     public Inventory? Output { get; set; }

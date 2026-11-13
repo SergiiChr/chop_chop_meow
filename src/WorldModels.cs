@@ -262,7 +262,7 @@ public static class WorldModels {
         Prop prop;
         switch (t.Kind) {
             case ThingKind.Tree: prop = Tree(t.Id); break;
-            case ThingKind.Stump: prop = Stump(t.OfTree); break;
+            case ThingKind.Stump: prop = Stump(t.OfTree != 0 ? t.OfTree : t.Id); break;
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
             case ThingKind.Stone: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "8d918e"); break;
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
@@ -384,12 +384,11 @@ public static class WorldModels {
 
     /// <summary>
     /// The stump a felled tree leaves: as thick as that tree's trunk was at the ground, and standing where the trunk stood.
-    /// A stump with no tree on record is a middling one on its own spot.
+    /// A stump with no tree on record is shaped as if a tree with the stump's own id had left it.
     /// </summary>
     private static DugProp Stump(int tree) {
         var prop = new DugProp();
         var stump = Add(prop.Body, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
-        if (tree == 0) return prop;
         float scale = TreeScale(tree);
         var (species, variant) = TreeLook(tree);
         var (foot, radius) = Tree3DShape.Foot(species, variant);

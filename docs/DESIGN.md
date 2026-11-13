@@ -264,7 +264,7 @@ Trees use three variants chosen by object id, so saves need no new fields.
 A tree's height comes from its id too (`WorldModels.TreeTall`): its model and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
 The bake stands each tree's lowest point on the ground, which on a spruce and one oak is a hanging branch, so their baked trunks start up to 1.8 m higher; `Tree3DShape.Add` carries such a trunk down to the ground with a stem that widens toward its foot.
 A stump keeps the id of the tree that left it (`Thing.OfTree`), so its model stands where that tree's trunk did (`DugProp.Seat`) and is as thick as the trunk was at the ground (`Tree3DShape.Foot`): a birch leaves a thin stump and an oak a stout one.
-A stump with no tree on record, such as a showcase's, keeps the stump model's own size.
+A stump with no tree on record, such as a showcase's or one in an older save, is shaped as if a tree with the stump's own id had left it.
 Fading swaps in cached alpha-blended copies of a model's materials, so faded trees still share a handful of materials.
 
 ### Actor animation
