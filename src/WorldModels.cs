@@ -361,9 +361,8 @@ public static class WorldModels {
         float size = .85f + Jitter(id, 3) * .4f;
         for (int lobe = 0; lobe < 3; lobe++) {
             float angle = lobe * Mathf.Tau / 3, radius = (.35f + (id + lobe * 3) % 7 * .05f) * size;
-            var mesh = Add(body, NatureShape.Scrub, NatureShape.ScrubMaterial, new Vector3(MathF.Cos(angle) * .23f, radius * .35f, MathF.Sin(angle) * .23f),
+            Add(body, NatureShape.Scrub, NatureShape.ScrubMaterials[(id + lobe) % NatureShape.ScrubHues], new Vector3(MathF.Cos(angle) * .23f, radius * .35f, MathF.Sin(angle) * .23f),
                 new Vector3(0, Mathf.RadToDeg(angle), 0), new Vector3(radius, radius * .75f, radius));
-            mesh.SetInstanceShaderParameter(NatureShape.ScrubHue, new Color("527238").Lerp(new Color("6a8a45"), (id + lobe) % 5 / 4f));
         }
     }
 

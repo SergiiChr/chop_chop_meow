@@ -55,7 +55,7 @@ Models are assembled from code-built Godot meshes.
   layer, so the marks stay put as it moves and a model's own albedo texture stays free.
   `Mat` makes a flat material and `Wood`, `Metal`, `Stone` and `Cloth` a surfaced one for primitives; `Vertex` dresses
   a mesh that carries its own colours and `Dress` any standard material. The foliage surface is laid on the plain
-  bushes by their own shader (`NatureShape.ScrubMaterial`). Skin, hair, fur, glass, leaf cards and flames stay flat.
+  bushes by their own shader (`NatureShape.ScrubMaterials`). Skin, hair, fur, glass, leaf cards and flames stay flat.
   The surfaces' grain and bump textures are in `models/surfaces/`, packed by `tools/surface_textures.py`.
 - `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons and pile stock. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
@@ -119,7 +119,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 - Regenerate Tree3D output with `./tools/tree3d.py`. Native authoring binaries stay in ignored `.tools/tree3d` and are not needed to play. See [tree3d/README.md](models/tree3d/README.md).
 - `src/NatureShape.cs` supplies shared vertex-coloured meshes for stumps, plain bushes, fruit, rocks, ore deposits and loose ore.
 - `NatureShape.Ore` and `NatureShape.OreChips` — color-neutral host/seam and fractured chip geometry shared by coal, iron and tin deposits for each of three seeded variants. Cached material palettes distinguish black coal, rusty iron and pale tin; coal chips use near-black `0c0e10` without lightened grey tops. Seams are clipped flush into the four-boulder profiles along continuous bedding planes. The tin-ore icon is rendered from the deposit; coal and iron inventory icons use their separate loose-ore models.
-- `NatureShape.Scrub` — a plain bush's lobe, a lightweight shape that reuses the resource bush's folded-leaf builder. A bush is a world thing of three lobes (`WorldModels.Shrub`), each a little different in size and green by the bush's id. `NatureShape.ScrubMaterial` tints a lobe by an instance value, so every bush shares one material, sways it in the wind, parts it around a walker and lays the foliage grain over it in its own space. Bushes cast shadows and stand on the baked scenery spots `Scenery.Bush` picks.
+- `NatureShape.Scrub` — a plain bush's lobe, a lightweight shape that reuses the resource bush's folded-leaf builder. A bush is a world thing of three lobes (`WorldModels.Shrub`), each a little different in size and green by the bush's id. `NatureShape.ScrubMaterials` holds one material for each of a lobe's five greens, all of one shader, which sways a lobe in the wind, parts it around a walker and lays the foliage grain over it in its own space. Bushes cast shadows and stand on the baked scenery spots `Scenery.Bush` picks.
 - `LeafShape` — one shared mesh of twenty-four pointed, folded autumn leaves with tapered stems for the leaf patch. Three fixed seeded layouts add variation alongside the ID-based yaw. Fully raked patches stay hidden until the daily refill. All vertices fit inside the picking radius and height.
 
 ## Icons
