@@ -66,7 +66,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             return;
         }
         if (Launch.Has("--bushes")) {
-            // A clean three-bush comparison row, with one picked-clean bush to show its persistent model.
+            // A clean three-bush comparison row of berry bushes, with one picked-clean bush to show its persistent model.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Bush variants are selected from the id; start the row at variant zero and include all three.
@@ -75,6 +75,12 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Add(ThingKind.Berries, at + new Vector2(-.75f, .75f), 24);
             world.Add(ThingKind.Berries, at + new Vector2(.75f, -.75f), 24);
             world.Add(ThingKind.Berries, at + new Vector2(2.25f, -2.25f), 0);
+            // In front of them, three plain bushes, the last half dug out, and a stump beside one half dug out.
+            for (int i = 0; i < 3; i++) world.Add(ThingKind.Bush, at + new Vector2(-.5f + i * 1.6f, 3.4f - i * 1.6f), World.BushLeaves).Progress = i == 2 ? GatherRules.DigSeconds * .7f : 0;
+            for (int i = 0; i < 2; i++) world.Add(ThingKind.Stump, at + new Vector2(3.4f + i * 1.2f, -.4f - i * 1.2f), World.StumpWood).Progress = i * GatherRules.DigSeconds * .7f;
+            // A tree two strokes from falling and a shovel to dig with, to see a tree leave its stump and a stump or bush come out.
+            world.Add(ThingKind.Tree, at + new Vector2(-4, -1), 8);
+            world.S.Backpack.Add("steel_shovel", 1);
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
             world.Player = at + new Vector2(-1, -.5f);
@@ -105,7 +111,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(4, 4)); var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(-1, 4));
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("water", 4); world.S.Backpack.Add("steel_pick", 1);
         var bench = world.Add(ThingKind.Bench, Terrain.Spawn + new Vector2(-4, 1.5f)); world.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
-        var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1);
+        var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1); rack.Inventory.Add("steel_shovel", 1);
         world.Add(ThingKind.Leaves, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
         var crate = world.Add(ThingKind.Crate, Terrain.Spawn + new Vector2(1.5f, 1.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
         foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1), ("torch", 2) }) world.S.Backpack.Add(item, count);

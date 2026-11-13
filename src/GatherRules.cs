@@ -2,8 +2,11 @@ using System.Collections.Generic;
 
 namespace ChopChopMeow;
 
-/// <summary>What a resource is to a gatherer: worked down over many gathers, an ore deposit at a cliff, or a loose piece picked up whole in one go.</summary>
-public enum GatherShape { Patch, Deposit, Loose }
+/// <summary>
+/// What a resource is to a gatherer: worked down over many gathers, an ore deposit at a cliff, a loose piece picked up whole in one go,
+/// or something rooted that is dug out of the ground whole.
+/// </summary>
+public enum GatherShape { Patch, Deposit, Loose, Dug }
 
 /// <summary>How one kind of resource is gathered.</summary>
 /// <param name="Item">What gathering it yields.</param>
@@ -11,8 +14,12 @@ public enum GatherShape { Patch, Deposit, Loose }
 /// <param name="Helps">A tool kind that only speeds gathering it up, or null.</param>
 /// <param name="ByHand">How many times longer a gather takes without the helping tool.</param>
 /// <param name="Chip">The loose piece a pickaxe hit now and then knocks off it, or null.</param>
-/// <param name="Shape">Whether it is worked down, an ore deposit or a loose piece.</param>
-public readonly record struct GatherRule(string Item, string? Needs = null, string? Helps = null, float ByHand = 1, ThingKind? Chip = null, GatherShape Shape = GatherShape.Patch);
+/// <param name="Shape">Whether it is worked down, an ore deposit, a loose piece or dug up whole.</param>
+/// <param name="Job">The gathering job it belongs to when that is not every spot yielding its item, or null.</param>
+public readonly record struct GatherRule(string Item, string? Needs = null, string? Helps = null, float ByHand = 1, ThingKind? Chip = null, GatherShape Shape = GatherShape.Patch, string? Job = null) {
+    /// <summary>The job a gatherer of this resource does: they move on only to spots of the same job.</summary>
+    public string JobName => Job ?? Item;
+}
 
 /// <summary>Every gathering rule in one table, so a new resource is one line here.</summary>
 public static class GatherRules {
@@ -20,6 +27,8 @@ public static class GatherRules {
     public const float ChipChance = .05f;
     /// <summary>Farthest a chip lands from the middle of what it came off.</summary>
     public const float ChipReach = 2;
+    /// <summary>Seconds of digging at a speed of 1 that bring a stump or a bush out of the ground.</summary>
+    public const float DigSeconds = 6;
 
     private static readonly Dictionary<ThingKind, GatherRule> All = new() {
         [ThingKind.Tree] = new("wood", Needs: "axe"),
@@ -36,6 +45,9 @@ public static class GatherRules {
         [ThingKind.LooseCoal] = new("coal", Shape: GatherShape.Loose),
         [ThingKind.IronChip] = new("iron_ore", Shape: GatherShape.Loose),
         [ThingKind.TinChip] = new("tin_ore", Shape: GatherShape.Loose),
+        // A woodcutter with a shovel to hand digs up stumps too, while bushes are a job apart from raking leaves.
+        [ThingKind.Stump] = new("wood", Needs: "shovel", Shape: GatherShape.Dug),
+        [ThingKind.Bush] = new("leaves", Needs: "shovel", Shape: GatherShape.Dug, Job: "bushes"),
     };
 
     // The same rules by kind, since every resource check in the tick and the view asks for one.
@@ -49,10 +61,4 @@ public static class GatherRules {
 
     /// <summary>The rule for gathering a kind, or null for anything that is not gathered.</summary>
     public static GatherRule? Of(ThingKind kind) => ByKind[(int)kind];
-
-    /// <summary>The tool kind that spots yielding an item take, such as an axe for wood, or null when every one is gathered by hand.</summary>
-    public static string? ToolFor(string item) {
-        foreach (var rule in All.Values) if (rule.Item == item && rule.Needs != null) return rule.Needs;
-        return null;
-    }
 }

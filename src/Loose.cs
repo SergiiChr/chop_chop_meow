@@ -14,10 +14,12 @@ public partial class World {
         for (int i = 0; i < points.Count; i++) {
             if (Scenery.Loose(i) is not ThingKind kind) continue;
             var p = points[i].At;
-            if (!Scenery.Dressable(p) || S.Things.Any(t => t.Pos.DistanceTo(p) < (t.Kind == ThingKind.Tree ? .95f : t.IsResource ? 1.3f : 2.7f))) continue;
-            Add(kind, p, 1);
+            if (FreeSpot(p)) Add(kind, p, 1);
         }
     }
+
+    /// <summary>Whether a scenery spot is free for a thing to lie or grow on: ground that scenery may stand on, clear of what is already there.</summary>
+    private bool FreeSpot(Vector2 p) => Scenery.Dressable(p) && !S.Things.Any(t => t.Pos.DistanceTo(p) < (t.Kind == ThingKind.Tree ? .95f : t.IsResource ? 1.3f : 2.7f));
 
     /// <summary>After a hit with a pickaxe on rock or ore, now and then drops a loose piece of it on open ground nearby.</summary>
     private void Chip(Thing rock, string? tool) {
@@ -34,10 +36,13 @@ public partial class World {
     /// <summary>Whether a worker has a tool of a kind in hand or can take one from a tool station.</summary>
     private bool HasTool(Worker w, string kind) => w.Tool != "" && Data.Items[w.Tool].Tool == kind || StationsHold(kind);
 
-    /// <summary>Sends a gatherer who cannot work a spot to the nearest known loose piece of the same resource, and tells whether there was one.</summary>
-    private bool LooseSpot(Worker w, Thing spot) {
-        if (NearestSpot(w, ResourceItem(spot), w.Pos, false) is not Thing loose) return false;
-        MoveTo(w, spot.Id, loose); w.Missing = "";
+    /// <summary>
+    /// Sends a gatherer who cannot work a spot to the nearest known spot of the same job that they can, and tells whether there was one:
+    /// a woodcutter with no axe to be had digs up stumps or picks up sticks.
+    /// </summary>
+    private bool OtherSpot(Worker w, Thing spot) {
+        if (NearestSpot(w, spot.Kind, w.Pos) is not Thing other) return false;
+        MoveTo(w, spot.Id, other); w.Missing = "";
         return true;
     }
 }

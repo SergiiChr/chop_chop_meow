@@ -10,7 +10,7 @@ To tune: change the data, run the tests, and read those lines before and after.
 Every item has a `Price`.
 For goods the village trades, it is the trade price; for the rest it is a reference value used only to keep recipes in line.
 
-- Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1. Iron ore, coal and tin ore are worth 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful and four make one fertilizer. Wheat is 1.5.
+- Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1. Iron ore, coal and tin ore are worth 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful, or 36 at once from a dug up bush, and four make one fertilizer. Wheat is 1.5.
 - A recipe's output is worth its inputs plus the cheapest fuel its station burns, plus a markup that shrinks with each step from raw goods: 50% for the first step, then 40%, 30% and 20%.
 - So lower tiers keep a bigger share of their price as profit, and deeper goods are worth more coins in total. A steel axe earns 6 coins over its parts and an iron bar 2, though the bar's margin is far higher.
 
@@ -19,7 +19,7 @@ For goods the village trades, it is the trade price; for the rest it is a refere
 | 1 | 50% | charcoal, iron bar, tin bar, burnt steak, planks, wood parts, stone chisel, torch, mortar and pestle, crushed berries, flour, meat stew |
 | 2 | 40% | steel bar, crate, wooden mallet, tin cans, tin water bottle, berry jam, dough |
 | 3 | 30% | steel parts, bread, canned meat stew, canned jam |
-| 4 | 20% | steel axe, steel pickaxe, steel hammer, steel chisel, rake |
+| 4 | 20% | steel axe, steel pickaxe, steel shovel, steel hammer, steel chisel, rake |
 
 The village also sells canned meat stew, a crate of 12 at the buying price.
 
@@ -66,7 +66,7 @@ Each good the village takes has `Daily`, `Steady` and `Drop` in `Market.Sells`:
 | Berries | 36 (3 crates) | 36 | 5% |
 | Raw meat and burnt steak | 24 (2 crates) | 24 | 5% |
 | Bread, berry jam, meat stew, canned jam and canned meat stew | 24 (2 crates) | 24 | 5% |
-| Steel axe, pickaxe and hammer | 12 (1 crate) | 0 | 50% |
+| Steel axe, pickaxe, shovel and hammer | 12 (1 crate) | 0 | 50% |
 
 - Food is a steady staple: its daily amount sells at the full price, and past it the price slips slowly.
 - Tools react sharply: a crate of one tool takes half off the price of the last one in it and averages 77%, and a second crate the same day sells for little.

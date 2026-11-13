@@ -61,9 +61,9 @@ public partial class IconRender : Node {
 
     /// <summary>Hand tools stand on their sides, head to the upper right with the blade toward the upper left; everything else sits as placed.</summary>
     private static Basis Pose(string id) => id switch {
-        // Tools are built along -Y toward the head with the blade facing -Z; the rake's head spans X, so it turns to face the camera first.
+        // Tools are built along -Y toward the head with the blade facing -Z; the rake's head and the shovel's blade span X, so they turn to face the camera first.
         "steel_axe" or "steel_pick" or "wood_hammer" or "steel_hammer" or "stone_chisel" or "steel_chisel" => new Basis(Vector3.Right, Mathf.DegToRad(135)),
-        "rake" => new Basis(Vector3.Right, Mathf.DegToRad(135)) * new Basis(Vector3.Up, Mathf.DegToRad(90)),
+        "rake" or "steel_shovel" => new Basis(Vector3.Right, Mathf.DegToRad(135)) * new Basis(Vector3.Up, Mathf.DegToRad(90)),
         // The torch is built along +Z toward its flame.
         "torch" => new Basis(Vector3.Right, Mathf.DegToRad(-135)),
         _ => Basis.Identity,
@@ -71,7 +71,7 @@ public partial class IconRender : Node {
 
     /// <summary>Looks at tools from the side and at everything else from the game camera's angle, lit the way the game lights it, and fits the model, or for a tool its head end.</summary>
     private void Frame(Node3D holder, string id) {
-        bool tool = id is "steel_axe" or "steel_pick" or "rake" or "torch" or "wood_hammer" or "steel_hammer" or "stone_chisel" or "steel_chisel";
+        bool tool = id is "steel_axe" or "steel_pick" or "steel_shovel" or "rake" or "torch" or "wood_hammer" or "steel_hammer" or "stone_chisel" or "steel_chisel";
         // Fallen leaves lie flat, so they are seen from higher up.
         // The hard hat is seen from nearly level, where its brim and crown show apart.
         var back = tool ? Direction(15, 70) : id == "hardhat" ? Direction(12, 30) : Direction(id == "leaves" ? 60 : GamePitch, 45);

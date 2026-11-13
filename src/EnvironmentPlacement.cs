@@ -5,16 +5,17 @@ using Godot;
 namespace ChopChopMeow;
 
 public partial class WorldView {
-    /// <summary>ProtonScatter generates the candidates offline; gameplay geometry masks them once during loading. The loose stones and sticks among them are world things.</summary>
+    /// <summary>ProtonScatter generates the candidates offline; gameplay geometry masks them once during loading. The loose stones, sticks and bushes among them are world things.</summary>
     private void BuildPlacedEnvironment(Node3D parent) {
         var grass = new List<(Transform3D At, Color Color)>();
         var flowers = new List<(Transform3D At, Color Color)>();
         var ferns = new List<(Transform3D At, Color Color)>();
-        var bushes = new List<(Transform3D At, Color Color)>();
         var blocked = new bool[Terrain.Size, Terrain.Size];
         // Decorative plants have no collision or inventory. Keep actual resources and initial buildings readable.
         foreach (var thing in World.Things) {
-            float radius = thing.Kind == ThingKind.Tree ? .45f : thing.IsResource ? .8f : 2.2f;
+            // Grass grows right up to a bush, as it does to the stump a tree leaves.
+            if (thing.Kind == ThingKind.Bush) continue;
+            float radius = thing.Kind is ThingKind.Tree or ThingKind.Stump ? .45f : thing.IsResource ? .8f : 2.2f;
             for (int y = Math.Max(0, (int)(thing.Pos.Y - radius)); y <= Math.Min(Terrain.Size - 1, (int)(thing.Pos.Y + radius)); y++)
                 for (int x = Math.Max(0, (int)(thing.Pos.X - radius)); x <= Math.Min(Terrain.Size - 1, (int)(thing.Pos.X + radius)); x++)
                     if (thing.Pos.DistanceTo(new Vector2(x + .5f, y + .5f)) < radius + .5f) blocked[x, y] = true;
@@ -26,18 +27,6 @@ public partial class WorldView {
             float density = Scenery.Density(p);
             var basis = new Basis(Vector3.Up, yaw).Scaled(Vector3.One * size);
             var at = new Transform3D(basis, To3(p));
-            // Restore the ordinary shrubs alongside the new ground cover. Use the same
-            // dry-ground and access masks, and keep their sampling independent of other plants.
-            if (id % 31 == 0 && Terrain.FromMountains(p) >= 3 && p.DistanceTo(Terrain.Spawn) >= 6) {
-                for (int lobe = 0; lobe < 3; lobe++) {
-                    float angle = yaw + lobe * Mathf.Tau / 3;
-                    float radius = (.35f + ((id + lobe * 3) % 7) * .05f) * size;
-                    var offset = new Vector3(MathF.Cos(angle) * .23f, radius * .35f, MathF.Sin(angle) * .23f);
-                    var shrubBasis = new Basis(Vector3.Up, angle).Scaled(new Vector3(radius, radius * .75f, radius));
-                    bushes.Add((new Transform3D(shrubBasis, To3(p) + offset), new Color("527238").Lerp(new Color("6a8a45"), ((id + lobe) % 5) / 4f)));
-                    ShadeScenery(p + new Vector2(offset.X, offset.Z), radius * 1.1f, .45f);
-                }
-            }
             if (id % 13 == 0 && density > .02f) {
                 ferns.Add((at, new Color("56783e").Lerp(new Color("829552"), (id % 7) / 7f)));
                 ShadeScenery(p, .45f * size, .35f);
@@ -50,10 +39,8 @@ public partial class WorldView {
         }
         Scatter(parent, MeadowMesh(), grass, dressingMaterial);
         Scatter(parent, FernMesh(), ferns, dressingMaterial);
-        // All scenery darkens the baked ground shade; shrubs are also few and large enough to cast real shadows.
-        Scatter(parent, NatureShape.Scrub, bushes, solidDressingMaterial, true);
         Scatter(parent, new SphereMesh { Radius = .055f, Height = .06f, RadialSegments = 5, Rings = 3 }, flowers, dressingMaterial);
-        GD.Print($"PROTON-SCATTER: {grass.Count} meadow patches, {ferns.Count} ferns, {bushes.Count / 3} bushes, {flowers.Count} flowers (baked candidates: {points.Count})");
+        GD.Print($"PROTON-SCATTER: {grass.Count} meadow patches, {ferns.Count} ferns, {flowers.Count} flowers (baked candidates: {points.Count})");
     }
 
     private static ArrayMesh MeadowMesh() {

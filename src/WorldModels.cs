@@ -28,10 +28,10 @@ public class Prop {
 
 public sealed class TreeProp : Prop {
     /// <summary>The trunk and crown, which shake and fall about the base.</summary>
-    public Node3D Sway = null!, Stump = null!;
+    public Node3D Sway = null!;
     /// <summary>The crown's meshes and their own materials, for fading it without walking its nodes.</summary>
     public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
-    /// <summary>Seconds since the tree was felled, or below zero while it stands.</summary>
+    /// <summary>Seconds since the tree was felled, or below zero while it stands; its stump is a thing of its own.</summary>
     public float Fall = -1;
     /// <summary>How see-through the crown is while it hides something behind it.</summary>
     public float Fade;
@@ -43,6 +43,14 @@ public sealed class LooseProp : Prop {
     public Vector3 From;
     /// <summary>Seconds into the chip's flight, or past <see cref="WorldModels.ChipFlight"/> once it lies still.</summary>
     public float Flight = float.MaxValue;
+}
+
+/// <summary>A stump or a bush, which leans further out of the ground the more it is dug at, then comes out and is gone.</summary>
+public sealed class DugProp : Prop {
+    /// <summary>The turn about the vertical it was built with, in degrees.</summary>
+    public float Yaw;
+    /// <summary>Seconds since it came out of the ground, or below zero while it is rooted.</summary>
+    public float Out = -1;
 }
 
 public sealed class BushProp : Prop {
@@ -204,6 +212,8 @@ public static class WorldModels {
         ThingKind.Stick => new[] { new Hit(.5f, 0, .3f) },
         ThingKind.WolfCorpse => new[] { new Hit(.65f, 0, .5f) },
         ThingKind.Berries => new[] { new Hit(.65f, 0, 1) },
+        ThingKind.Stump => new[] { new Hit(.4f, 0, .4f) },
+        ThingKind.Bush => new[] { new Hit(.6f, 0, .6f) },
         ThingKind.Water => new[] { new Hit(1.2f, 0, .5f) },
         ThingKind.Furnace => new[] { new Hit(.72f, 0, 1.15f) },
         ThingKind.Reinforced => new[] { new Hit(.95f, 0, 1.45f) },
@@ -230,6 +240,8 @@ public static class WorldModels {
         Prop prop;
         switch (t.Kind) {
             case ThingKind.Tree: prop = Tree(t.Id); break;
+            case ThingKind.Stump: prop = new DugProp(); Add(prop.Body, NatureShape.Stump, NatureShape.Timber, Vector3.Zero); break;
+            case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
             case ThingKind.Stone: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "8d918e"); break;
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case ThingKind.Coal: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
@@ -267,6 +279,7 @@ public static class WorldModels {
         var body = prop.Body;
         if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Jitter(t.Id, 1) * 360 : 0, 0);
         if (t.Kind == ThingKind.Mine) body.Rotation = MineYaw(t.Pos);
+        if (prop is DugProp dug) dug.Yaw = body.RotationDegrees.Y;
         return prop;
     }
 
@@ -287,7 +300,7 @@ public static class WorldModels {
         }
         switch (id) {
             case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
-            case "steel_axe" or "steel_pick" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
+            case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
@@ -342,11 +355,18 @@ public static class WorldModels {
         var leaves = Tree3DShape.Add(sway, id % TreeVariants, variant);
         PreserveShadows(sway);
         Tree3DShape.AddShadowCore(sway, id % TreeVariants, leaves);
-        var stump = Add(prop.Root, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
-        stump.Visible = false;
-        prop.Stump = stump;
         prop.SwayParts = FadeParts(sway);
         return prop;
+    }
+
+    /// <summary>A plain bush of three lobes around its middle, each a little different in size and green by its id; it casts a shadow.</summary>
+    private static void Shrub(Node3D body, int id) {
+        float size = .85f + Jitter(id, 3) * .4f;
+        for (int lobe = 0; lobe < 3; lobe++) {
+            float angle = lobe * Mathf.Tau / 3, radius = (.35f + (id + lobe * 3) % 7 * .05f) * size;
+            Add(body, NatureShape.Scrub, NatureShape.ScrubMaterials[(id + lobe) % NatureShape.ScrubHues], new Vector3(MathF.Cos(angle) * .23f, radius * .35f, MathF.Sin(angle) * .23f),
+                new Vector3(0, Mathf.RadToDeg(angle), 0), new Vector3(radius, radius * .75f, radius));
+        }
     }
 
     /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows veins across the rock faces and ore chunks set into it.</summary>

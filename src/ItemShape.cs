@@ -59,6 +59,8 @@ internal static class ItemShape {
         // What follows has a model in the world, which its icon shows; a pile shows a lighter copy of it, laid down.
         ["steel_axe"] = Held("steel_axe"),
         ["steel_pick"] = Held("steel_pick"),
+        // The shovel's blade spans the other way from an axe's, so it lies on its back.
+        ["steel_shovel"] = Held("steel_shovel", new Basis(Vector3.Right, MathF.PI / 2)),
         ["wood_hammer"] = Held("wood_hammer"),
         ["steel_hammer"] = Held("steel_hammer"),
         ["stone_chisel"] = Held("stone_chisel"),
@@ -75,8 +77,8 @@ internal static class ItemShape {
         ["leaves"] = new(Leaves, Plain),
     };
 
-    /// <summary>A hand tool lying on its side, so its head lies flat.</summary>
-    private static Look Held(string tool) => new(f => Lighter(f, ActorRig.Tool(tool), new Basis(Vector3.Back, MathF.PI / 2)), Plain);
+    /// <summary>A hand tool lying on its side, or as <paramref name="pose"/> turns it, so its head lies flat.</summary>
+    private static Look Held(string tool, Basis? pose = null) => new(f => Lighter(f, ActorRig.Tool(tool), pose ?? new Basis(Vector3.Back, MathF.PI / 2)), Plain);
     /// <summary>A bottle lying on its back, its gauge up.</summary>
     private static Look Bottle(string item) => new(f => Lighter(f, BottleShape.Create(Water.BottleSips(item)), new Basis(Vector3.Right, -MathF.PI / 2)), Plain);
 

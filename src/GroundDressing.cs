@@ -8,7 +8,7 @@ public partial class WorldView {
     private readonly byte[] disturbed = new byte[Terrain.Size * Terrain.Size];
     private Image disturbanceImage = null!;
     private ImageTexture disturbanceTexture = null!;
-    private ShaderMaterial dressingMaterial = null!, solidDressingMaterial = null!;
+    private ShaderMaterial dressingMaterial = null!;
 
     // Baked ground shade: four texels a tile under scenery, two under world objects so restamping them stays cheap.
     // Scenery shade is baked once while loading and fades where worn ground shrinks the plants.
@@ -23,20 +23,18 @@ public partial class WorldView {
     /// Plants shrink away on worn ground; wear is read at each plant's origin so the whole plant scales evenly.
     /// Plants sway in the wind and part around the player.
     /// </summary>
-    private static string DressingCode(bool shrubs) => $$"""
+    private static readonly string DressingCode = $$"""
         shader_type spatial;
-        render_mode {{(shrubs ? "cull_back" : "cull_disabled")}};
+        render_mode cull_disabled;
         uniform sampler2D disturbance : filter_linear, repeat_disable;
         // Footpaths worn by walking.
         uniform sampler2D traffic : filter_linear, repeat_disable;
         varying vec3 tint;
-        {{(shrubs ? GrainUniforms : "")}}
         {{Wind.ShaderCode}}
         void vertex() {
             vec2 uv = MODEL_MATRIX[3].xz / {{Terrain.Size}}.0;
             float wear = max(texture(disturbance, uv).r, texture(traffic, uv).r);
             VERTEX *= 1.0 - smoothstep(0.12, 0.65, wear);
-            {{(shrubs ? GrainVertex : "")}}
             vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
             float bend = clamp(VERTEX.y / 0.3, 0.0, 1.0);
             VERTEX += to_local(MODEL_MATRIX, wind_offset(world, bend, 0.12) + push_offset(world, bend));
@@ -48,38 +46,15 @@ public partial class WorldView {
         }
         void fragment() {
             ALBEDO = tint;
-            {{(shrubs ? GrainFragment : "")}}
             ROUGHNESS = 1.0;
         }
-        """;
-
-    // The foliage surface's grain on the shrubs, laid over each in its own space before the wind moves it, with the
-    // three projections weighted per vertex: the lobes are smooth.
-    private const string GrainUniforms = """
-        uniform sampler2D grain : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
-        uniform float tile = 1.0;
-        varying vec3 local;
-        varying vec3 weight;
-        """;
-    private const string GrainVertex = """
-            local = mat3(MODEL_MATRIX) * VERTEX;
-            vec3 facing = abs(mat3(MODEL_MATRIX) * NORMAL);
-            weight = facing / (facing.x + facing.y + facing.z);
-        """;
-    private const string GrainFragment = """
-            ALBEDO *= texture(grain, local.yz / tile).rgb * weight.x + texture(grain, local.xz / tile).rgb * weight.y + texture(grain, local.xy / tile).rgb * weight.z;
         """;
 
     private void InitializeDressing() {
         disturbanceImage = Image.CreateFromData(Terrain.Size, Terrain.Size, false, Image.Format.R8, disturbed);
         disturbanceTexture = ImageTexture.CreateFromImage(disturbanceImage);
-        dressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingCode(false) } };
+        dressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingCode } };
         dressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
-        // Closed shapes such as shrubs keep back faces culled, or their unlit insides show where they meet a slope.
-        solidDressingMaterial = new ShaderMaterial { Shader = new Shader { Code = DressingCode(true) } };
-        solidDressingMaterial.SetShaderParameter("disturbance", disturbanceTexture);
-        solidDressingMaterial.SetShaderParameter("grain", ModelKit.Grain(Surface.Foliage));
-        solidDressingMaterial.SetShaderParameter("tile", ModelKit.Tile(Surface.Foliage));
         sceneryShadeImage = Image.CreateFromData(ShadeSize, ShadeSize, false, Image.Format.R8, sceneryShade);
         sceneryShadeTexture = ImageTexture.CreateFromImage(sceneryShadeImage);
         objectShadeImage = Image.CreateFromData(ContactSize, ContactSize, false, Image.Format.Rg8, objectShade);
@@ -109,13 +84,13 @@ public partial class WorldView {
     private void ShadeObject(Vector2 at, float radius, float strength) => Stamp(objectShade, at, radius, strength, ContactScale, 2, 0);
     private void BareSoil(Vector2 at, float radius) => Stamp(objectShade, at, radius, 1, ContactScale, 2, 1);
 
-    /// <summary>Contact shade and bare soil under one world object; trees keep a dark ring at the trunk even as stumps.</summary>
+    /// <summary>Contact shade and bare soil under one world object; a stump keeps the dark ring its tree had at the trunk.</summary>
     private void ShadeThing(Thing t) {
         if (t.IsDeposit) { ShadeObject(t.Pos, .9f, .7f); BareSoil(t.Pos, 1.6f); return; }
         switch (t.Kind) {
             case ThingKind.Stone: ShadeObject(t.Pos, .7f, .7f); BareSoil(t.Pos, 1.3f); break;
-            case ThingKind.Tree: ShadeObject(t.Pos, .55f, .7f); break;
-            case ThingKind.Berries: ShadeObject(t.Pos, .6f, .6f); break;
+            case ThingKind.Tree or ThingKind.Stump: ShadeObject(t.Pos, .55f, .7f); break;
+            case ThingKind.Berries or ThingKind.Bush: ShadeObject(t.Pos, .6f, .6f); break;
             case ThingKind.Water or ThingKind.Leaves or ThingKind.WolfCorpse or ThingKind.Campfire or ThingKind.Grave or ThingKind.Signpost or ThingKind.Mine: break;
             default:
                 if (t.IsLoose) ShadeObject(t.Pos, .3f, .6f);

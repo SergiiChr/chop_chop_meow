@@ -19,7 +19,7 @@ public partial class WorldView {
     private void BuildLook() {
         trafficImage = Image.CreateFromData(TrafficSize, TrafficSize, false, Image.Format.R8, traffic);
         trafficTexture = ImageTexture.CreateFromImage(trafficImage);
-        foreach (var material in new[] { dressingMaterial, solidDressingMaterial }) material.SetShaderParameter("traffic", trafficTexture);
+        dressingMaterial.SetShaderParameter("traffic", trafficTexture);
         // Terrain3D's material is reached only by its RID; the terrain keeps a reference to the texture through the field.
         RenderingServer.MaterialSetParam(terrainMaterialRid, TerrainTraffic, trafficTexture.GetRid());
         AddChild(listener);

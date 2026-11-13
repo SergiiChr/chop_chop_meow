@@ -5,7 +5,7 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// Shared nature meshes: stumps, decorative shrubs, fruit, faceted boulders and resource lumps.
+/// Shared nature meshes: stumps, bushes, fruit, faceted boulders and resource lumps.
 /// Each variant is built once from a fixed seed and colored by vertex. Standing trees and berry bushes use baked Tree3D meshes.
 /// </summary>
 internal static class NatureShape {
@@ -237,7 +237,58 @@ internal static class NatureShape {
         }
     }
 
-    /// <summary>A lightweight neutral shrub lobe tinted by the scenery MultiMesh's existing per-instance colors.</summary>
+    /// <summary>How many greens a bush's lobes come in.</summary>
+    public const int ScrubHues = 5;
+    /// <summary>
+    /// A bush's lobes, one material for each green: a lobe sways in the wind and parts around whoever walks through it.
+    /// The foliage grain is laid over a lobe in its own space, so it stays put as the bush leans and comes out of the ground.
+    /// The greens are materials of one shader rather than a value of each lobe, which a renderer holds only so many of.
+    /// </summary>
+    public static readonly ShaderMaterial[] ScrubMaterials = NewScrubMaterials();
+
+    private static ShaderMaterial[] NewScrubMaterials() {
+        var shader = new Shader {
+            Code = $$"""
+                    shader_type spatial;
+                    render_mode cull_back;
+                    uniform vec3 hue : source_color = vec3(1.0);
+                    uniform sampler2D grain : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+                    uniform float tile = 1.0;
+                    varying vec3 tint;
+                    varying vec3 local;
+                    varying vec3 weight;
+                    {{Wind.ShaderCode}}
+                    void vertex() {
+                        local = VERTEX * vec3(length(MODEL_MATRIX[0].xyz), length(MODEL_MATRIX[1].xyz), length(MODEL_MATRIX[2].xyz));
+                        vec3 facing = abs(NORMAL);
+                        weight = facing / (facing.x + facing.y + facing.z);
+                        vec3 world = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+                        float bend = clamp(VERTEX.y / 0.3, 0.0, 1.0);
+                        VERTEX += to_local(MODEL_MATRIX, wind_offset(world, bend, 0.12) + push_offset(world, bend));
+                        // The same sRGB to linear conversion StandardMaterial3D applies to sRGB vertex colors.
+                        tint = COLOR.rgb;
+                        if (!OUTPUT_IS_SRGB) {
+                            tint = mix(pow((tint + vec3(0.055)) * (1.0 / 1.055), vec3(2.4)), tint * (1.0 / 12.92), lessThan(tint, vec3(0.04045)));
+                        }
+                        tint *= hue;
+                    }
+                    void fragment() {
+                        ALBEDO = tint * (texture(grain, local.yz / tile).rgb * weight.x + texture(grain, local.xz / tile).rgb * weight.y + texture(grain, local.xy / tile).rgb * weight.z);
+                        ROUGHNESS = 1.0;
+                    }
+                    """
+        };
+        var materials = new ShaderMaterial[ScrubHues];
+        for (int i = 0; i < ScrubHues; i++) {
+            materials[i] = new ShaderMaterial { Shader = shader };
+            materials[i].SetShaderParameter("hue", new Color("527238").Lerp(new Color("6a8a45"), i / (ScrubHues - 1f)));
+            materials[i].SetShaderParameter("grain", ModelKit.Grain(Surface.Foliage));
+            materials[i].SetShaderParameter("tile", ModelKit.Tile(Surface.Foliage));
+        }
+        return materials;
+    }
+
+    /// <summary>A lightweight neutral shrub lobe, tinted by the green of its material in <see cref="ScrubMaterials"/>.</summary>
     public static Mesh Scrub => Cached("scrub", s => {
         // A wide range from a dark underside to a pale top, so the shrub reads as round from above.
         var tint = Leafy(new Color("5e5e5e"), new Color("c2c2c2"), Colors.White, 391);

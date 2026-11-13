@@ -63,6 +63,8 @@ public sealed class Thing {
     [JsonIgnore] public bool IsDeposit => GatherRules.Of(Kind)?.Shape == GatherShape.Deposit;
     /// <summary>Loose pieces are picked up whole in one go and vanish, instead of being worked down like a deposit.</summary>
     [JsonIgnore] public bool IsLoose => GatherRules.Of(Kind)?.Shape == GatherShape.Loose;
+    /// <summary>A stump or a bush: digging adds up in <see cref="Progress"/> until it comes out of the ground whole.</summary>
+    [JsonIgnore] public bool IsDug => GatherRules.Of(Kind)?.Shape == GatherShape.Dug;
     [JsonIgnore] public bool IsStorage => Kind is ThingKind.Chest or ThingKind.Grave or ThingKind.Crate or ThingKind.Toolstation or ThingKind.Pile;
 }
 /// <summary>Batches of one recipe waiting in a queue.</summary>
@@ -242,7 +244,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 7;
+    public int Version { get; set; } = 8;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -501,6 +503,7 @@ public sealed partial class World {
         Scatter(rng, ThingKind.Tree, int.MaxValue, 42, 3.4f, 9, p => Math.Clamp(1.15f - Terrain.FromMountains(p) / 16, .015f, 1), 60000);
         DropLeaves();
         ScatterLoose();
+        GrowBushes();
         Look();
         Replaced?.Invoke();
     }
@@ -592,6 +595,8 @@ public sealed partial class World {
     private string Task(Thing t) => t.Kind switch {
         ThingKind.Tree => "chop wood",
         ThingKind.Leaves => "rake leaves",
+        ThingKind.Stump => "dig up the stump",
+        ThingKind.Bush => "dig up the bush",
         _ when t.IsLoose => Phrase("pick up ", Lower(Data.Name(t.Kind))),
         ThingKind.Mine => t.MineStage == MineStage.Marked ? "dig the mine" : t.MineStage == MineStage.Supplied ? "fit the mine frame" : Phrase("mine ", CliffAt(t.Pos).Ore.Id()),
         _ => Phrase("mine ", t.Kind.Id())
@@ -636,13 +641,17 @@ public sealed partial class World {
         if (t.Kind == ThingKind.Mine) return MineBuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (!t.IsResource) return "Select a natural resource.";
-        if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again within ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Tree => "Only a stump is left. Find another tree.", ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
-        // Workers fetch their tools from a tool station instead of needing them carried.
-        if (worker || GatherRules.Of(t.Kind)?.Needs is not string kind || BestTool(kind) != null) return null;
-        return kind switch {
+        if (t.Remaining <= 0) return t.Kind switch { ThingKind.Berries => Phrase("Picked clean. The bush fruits again within ", Number(Data.BerryRegrowHours), " hours."), ThingKind.Leaves => "Raked clean. More leaves fall by tomorrow.", _ => "Depleted. Look for another deposit." };
+        // Workers fetch their tools from a tool station instead of needing them carried, and carry off whatever they dig up.
+        if (worker) return null;
+        if (GatherRules.Of(t.Kind)?.Needs is string kind && BestTool(kind) == null) return kind switch {
             "axe" => "An axe is required to chop a tree.",
+            "shovel" => Phrase("A shovel is required to dig up the ", Lower(Data.Name(t.Kind)), "."),
             _ => "A pickaxe is required to mine."
         };
+        // A stump or a bush comes out whole, so all of it has to fit.
+        if (t.IsDug && S.Backpack.Room(ResourceItem(t)) < t.Remaining) return Phrase(Phrase("No room in your backpack for ", Number(t.Remaining), " "), Lower(Data.Name(ResourceItem(t))), ".");
+        return null;
     }
     public static string ResourceItem(Thing t) => ResourceItem(t.Kind);
     public static string ResourceItem(ThingKind kind) => GatherRules.Of(kind)?.Item ?? kind.Id();
@@ -651,6 +660,8 @@ public sealed partial class World {
     public void Gather(Thing t, float dt) {
         // A loose piece is a single pick-up; anything else the host works on for as long as the player holds on to it.
         if (t.IsLoose ? Forwarded(Verb.PickUp, t.Id) : Remote) { S.Actor.GatherTarget = t.IsLoose ? 0 : t.Id; return; }
+        // A felled tree or a dug up bush is no longer there to work on.
+        if (Find(t.Id) != t) { ResetGather(); return; }
         S.Actor.GatherTarget = t.Id;
         playerBusy = true;
         if (!Near(t)) { gatherClock = 0; return; }
@@ -662,6 +673,11 @@ public sealed partial class World {
         gatherClock += dt;
         var rule = GatherRules.Of(t.Kind);
         string? tool = (rule?.Needs ?? rule?.Helps) is string kind ? BestTool(kind) : null;
+        if (t.IsDug) {
+            t.Progress += dt * Speed(tool);
+            if (DugOut(t) && Unearth(t, S.Backpack)) S.Milestones.Add("gather");
+            return;
+        }
         if (gatherClock < GatherTime(t.Kind, tool)) return;
         gatherClock = 0;
         if (t.Kind == ThingKind.Water) {
@@ -673,6 +689,7 @@ public sealed partial class World {
         int amount = Math.Min(t.Remaining, small ? 2 : 4);
         string item = ResourceItem(t);
         amount = S.Backpack.Add(item, amount); t.Remaining -= amount;
+        if (t.Kind == ThingKind.Tree && t.Remaining <= 0) Fell(t);
         if (amount > 0) Chip(t, tool);
         if (amount == 0) Say("Backpack full. Store or sell some supplies.");
         if (amount > 0) { S.Milestones.Add("gather"); Got(item); }
@@ -703,6 +720,8 @@ public sealed partial class World {
         foreach (var w in S.Workers) if (w.Assignment == anvil.Id && w.WageDebt <= 0 && w.WorkState == WorkerWorkState.Hammering && HasDuty(w, anvil.Id, "craft")) return true;
         return false;
     }
+    /// <summary>The room a building keeps from a resource's middle beyond its own footprint, and a yard beyond its own edge.</summary>
+    private const float ResourceRoom = .65f, YardResourceRoom = .3f;
     /// <summary>Why a building, or a crate from the backpack when <paramref name="item"/> names one, cannot go here.</summary>
     public string? PlacementBlock(ThingKind kind, Vector2 p, string? item = null) {
         bool crate = kind == ThingKind.Crate;
@@ -716,7 +735,7 @@ public sealed partial class World {
         if (Player.DistanceTo(p) < 1.2f || Terrain.Spawn.DistanceTo(p) < 1.2f) return "Leave your feet and the arrival point clear.";
         if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         foreach (var t in S.Things)
-            if (t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + .65f : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
+            if (!BuiltOver(t.Kind) && t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + ResourceRoom : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
         if (crate ? item != null && S.Backpack[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
         return null;
     }
@@ -731,8 +750,8 @@ public sealed partial class World {
         float half = ZoneSize / 2;
         // Yards may touch edge to edge; anything else keeps its usual room from the square.
         foreach (var t in S.Things) {
-            if (!IsZone(t.Kind) && t.IsResource && t.Remaining <= 0) continue;
-            float margin = IsZone(t.Kind) ? half - .05f : t.IsResource ? .3f : Footprint(t.Kind) + .2f;
+            if (!IsZone(t.Kind) && t.IsResource && t.Remaining <= 0 || BuiltOver(t.Kind)) continue;
+            float margin = IsZone(t.Kind) ? half - .05f : t.IsResource ? YardResourceRoom : Footprint(t.Kind) + .2f;
             if (Math.Abs(t.Pos.X - p.X) < half + margin && Math.Abs(t.Pos.Y - p.Y) < half + margin) return "Leave room around resources and buildings.";
         }
         return S.Backpack.Has(Data.Buildings[kind].Cost) ? null : "Missing materials in your backpack.";
@@ -743,7 +762,7 @@ public sealed partial class World {
         if (blocked != null) { Say(blocked); return null; }
         if (Forwarded(Verb.Build, item: kind.Id(), at: p)) return null;
         S.Backpack.Spend(Data.Buildings[kind].Cost);
-        var t = Add(kind, p); Play("place_building", p);
+        var t = Add(kind, p); ClearGround(t); Play("place_building", p);
         if (kind == ThingKind.Campfire) { t.Burn = Data.CampfireSeconds; Play("start_fire", p); }
         S.Milestones.Add(kind.Id()); if (kind == ThingKind.Mine) { Say($"Marked the {MineName(t)} site. Dig the entrance with a pickaxe, or assign a worker to."); Made?.Invoke(S.Actor.Id, t.Id); }
         return t;
@@ -1327,7 +1346,7 @@ public sealed partial class World {
         if (PlacementBlock(ThingKind.Crate, p, item) is string blocked) { Say(blocked); return null; }
         if (Forwarded(Verb.PlaceCrate, item: item, at: p)) return null;
         S.Backpack.Remove(item, 1);
-        var crate = Add(ThingKind.Crate, p);
+        var crate = Add(ThingKind.Crate, p); ClearGround(crate);
         if (Packed(item) is Inventory contents) { crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
         Play("close_chest", p); return crate;
     }
@@ -1808,18 +1827,30 @@ public sealed partial class World {
             if (DepositFor(item, target.Pos) == null) { w.Status = "Needs an accepting storage chest"; return false; }
             if (need != null && w.Tool == "") {
                 FetchTool(w, need, target, dt);
-                // With no tool to be had, loose pieces of the same resource are picked up instead.
-                return w.Missing == "" || LooseSpot(w, target);
+                // With no tool to be had, the nearest spot of the job that needs none, or one that is to be had, is worked instead.
+                return w.Missing == "" || OtherSpot(w, target);
             }
             w.Status = Phrase("Gathering ", Data.Name(item));
             if (!Walk(w, target.Pos, dt)) return true;
             w.WorkState = WorkerWorkState.Gathering; w.Exhausted = null;
+            string? tool = w.Tool == "" ? null : w.Tool;
+            if (target.IsDug) {
+                // What is dug up is carried off whole, however much it holds.
+                target.Progress += dt * Speed(tool) / WorkerGatherTime;
+                if (DugOut(target)) { w.Hands(Math.Max(Worker.BagStack, target.Remaining)); Unearth(target, w.Bag); }
+                return true;
+            }
             w.Timer += dt;
-            if (target.IsLoose || w.Timer >= GatherTime(target.Kind, w.Tool == "" ? null : w.Tool) * 1.6f) {
+            if (target.IsLoose || w.Timer >= GatherTime(target.Kind, tool) * WorkerGatherTime) {
                 w.Timer = 0; int took = w.Bag.Add(item, target.Remaining); target.Remaining -= took;
                 if (took > 0) Got(item);
-                Chip(target, w.Tool == "" ? null : w.Tool);
+                Chip(target, tool);
                 if (target.Remaining > 0) return true;
+                // Whoever fells a tree digs its stump up next while a shovel is to be had, and otherwise goes on to the next tree.
+                if (target.Kind == ThingKind.Tree) {
+                    var stump = Fell(target);
+                    if (CanWork(w, stump.Kind)) { MoveTo(w, target.Id, stump); return true; }
+                }
                 NextSpot(w, target.Id, target.Kind, target.Pos, dt);
                 if (target.IsLoose) S.Things.Remove(target);
             }
@@ -1960,27 +1991,33 @@ public sealed partial class World {
     /// With none known, they go on to their other jobs, or wait at the trading post; either way they say so once.
     /// </summary>
     private bool NextSpot(Worker w, int spent, ThingKind kind, Vector2 from, float dt) {
-        // Spots that need a tool count only while the worker has one or a tool station does; loose pieces come after every other spot.
-        string item = ResourceItem(kind);
-        if (NearestSpot(w, item, from, GatherRules.ToolFor(item) is not string tool || HasTool(w, tool)) is Thing next) { MoveTo(w, spent, next); return true; }
+        if (NearestSpot(w, kind, from) is Thing next) { MoveTo(w, spent, next); return true; }
         if (w.Exhausted != kind) { w.Exhausted = kind; Say($"{w.Name} knows no other {Lower(Data.Name(kind))} to gather."); }
         if (w.Duties.Count > 1) return false;
         w.Status = Phrase("No other known ", Lower(Data.Name(kind)), " · waiting at the trading post");
         WaitAtPost(w, dt); return true;
     }
-    /// <summary>The nearest known spot with stock left that yields an item and the worker has no duty on: one needing a tool when <paramref name="tooled"/>, else a loose piece.</summary>
-    private Thing? NearestSpot(Worker w, string item, Vector2 from, bool tooled) {
+    /// <summary>
+    /// The nearest known spot with stock left, of the job that gathering <paramref name="of"/> is, which the worker has no duty on.
+    /// Spots that need a tool count only while the worker has one or a tool station does, and loose pieces come after every other spot.
+    /// </summary>
+    private Thing? NearestSpot(Worker w, ThingKind of, Vector2 from) {
+        if (GatherRules.Of(of)?.JobName is not string job) return null;
         Thing? next = null, loose = null; float nearest = 0, nearestLoose = 0;
         foreach (var kind in Kinds.All) {
-            if (GatherRules.Of(kind) == null || ResourceItem(kind) != item) continue;
+            if (GatherRules.Of(kind)?.JobName != job || !CanWork(w, kind)) continue;
             foreach (var t in S.Things.Of(kind)) {
                 if (t.Remaining <= 0 || !S.Remembered.ContainsKey(t.Id) || HasDuty(w, t.Id)) continue;
                 float distance = t.Pos.DistanceSquaredTo(from);
-                if (t.IsLoose) { if (loose == null || distance < nearestLoose) { loose = t; nearestLoose = distance; } } else if (tooled && (next == null || distance < nearest)) { next = t; nearest = distance; }
+                if (t.IsLoose) { if (loose == null || distance < nearestLoose) { loose = t; nearestLoose = distance; } } else if (next == null || distance < nearest) { next = t; nearest = distance; }
             }
         }
         return next ?? loose;
     }
+    /// <summary>Whether a worker can gather a kind of resource: it needs no tool, or one they have in hand or can take from a tool station.</summary>
+    private bool CanWork(Worker w, ThingKind kind) => GatherRules.Of(kind)?.Needs is not string tool || HasTool(w, tool);
+    /// <summary>How many times longer than the player a worker takes over a gather.</summary>
+    private const float WorkerGatherTime = 1.6f;
     /// <summary>Moves a worker's duties on a spent spot to the next one.</summary>
     private static void MoveTo(Worker w, int spent, Thing next) {
         foreach (var duty in w.Duties) if (duty.Thing == spent) duty.Thing = next.Id;
