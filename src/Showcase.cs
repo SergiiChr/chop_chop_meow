@@ -158,22 +158,23 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Pile)); else panel.Close();
         }
         if (Launch.Has("--goods")) {
-            // A pile full of --goods-full, then a row of piles with one of every good that has a model of its own, a pile's
-            // nine ground slots at a time so none hides another; --goods-pile N looks at the Nth pile, the full one being 0.
-            const int perPile = 9;
+            // A pile of every good, eight to a row and --goods-share full (six tenths unless given), then a compost pile.
+            // --goods-pile N looks at the Nth pile, counting from 0.
+            const int perRow = 8;
             var at = Terrain.Spawn + new Vector2(-3, 9);
-            var goods = ItemShape.Items.ToArray();
-            int piles = (goods.Length + perPile - 1) / perPile;
-            world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + piles * 3 + 4 && MathF.Abs(t.Pos.Y - at.Y) < 8);
+            string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins).ToArray();
+            float share = Launch.Number("--goods-share", .6f); int look = (int)Launch.Number("--goods-pile", 0);
+            Vector2 Spot(int pile) => at + new Vector2(pile % perRow * 3.2f, pile / perRow * 3.2f);
+            world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + perRow * 3.2f + 4 && t.Pos.Y > at.Y - 4 && t.Pos.Y < at.Y + (goods.Length / perRow + 1) * 3.2f + 4);
             world.S.Workers.Clear(); world.S.Orders.Clear();
-            var full = world.Add(ThingKind.Pile, at);
-            full.Inventory.Add(Launch.Value("--goods-full") ?? "bread", 14 * full.Inventory.StackSize);
-            for (int i = 0; i < piles; i++) {
-                var pile = world.Add(ThingKind.Pile, at + new Vector2((i + 1) * 3, 0));
-                foreach (string item in goods.Skip(i * perPile).Take(perPile)) pile.Inventory.Add(item, 1);
+            for (int i = 0; i < goods.Length; i++) {
+                var pile = world.Add(ThingKind.Pile, Spot(i));
+                pile.Inventory.Add(goods[i], Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share)));
             }
+            var compost = world.Add(ThingKind.Pile, Spot(goods.Length)); compost.Compost = true;
+            compost.Inventory.Add("leaves", (int)(300 * share)); compost.Inventory.Add("grass", (int)(300 * share)); compost.Inventory.Add("fertilizer", (int)(200 * share));
             // The player crouches in front of the pile looked at, clear of it.
-            world.Player = at + new Vector2(Launch.Number("--goods-pile", 1) * 3 + 1.9f, 1.9f); world.Tick(0); view.Zoom = 2.2f; panel.Close();
+            world.Player = Spot(look) + new Vector2(1.9f, 1.9f); world.Tick(0); view.Zoom = 2.2f; panel.Close();
         }
         if (Launch.Has("--farm")) {
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.

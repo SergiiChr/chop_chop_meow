@@ -15,19 +15,16 @@ internal static class ItemShape {
     /// <summary>One flat triangle, wound so that it faces outward, in one colour.</summary>
     private readonly record struct Face(Vector3 A, Vector3 B, Vector3 C, Color Tint);
     /// <summary>
-    /// How an item is built and what it is made of, and how a pile slot's worth of it is built where one alone would
-    /// not fill the slot.
+    /// How an item is built and what it is made of, and how a pile heaps it.
+    /// A heap's piece is the item as built, or what <paramref name="Piece"/> builds where the item as built is too
+    /// detailed or too small to heap; it is scaled so its longer side on the ground is <paramref name="Size"/>, or
+    /// left as built at zero, and each level of the heap adds <paramref name="Rise"/> of its height.
     /// </summary>
-    private sealed record Look(Action<List<Face>> Build, StandardMaterial3D Material, Action<List<Face>>? Pile = null);
+    private sealed record Look(Action<List<Face>> Build, StandardMaterial3D Material, float Size = 0, Lay Lay = Lay.Neat, float Rise = 1,
+        Action<List<Face>>? Piece = null);
 
-    /// <summary>How much of a pile slot's width and depth its stock takes, which leaves room between neighbours.</summary>
-    private const float Room = .9f;
-    /// <summary>
-    /// How far up a piled good the level above it rests: the goods leave gaps between them, and a good above settles
-    /// most of the way down into the gap between the four under it.
-    /// Seen from the game camera it then shows between those four, rather than over the one behind them.
-    /// </summary>
-    public const float Nest = .3f;
+    /// <summary>A compost pile's heap: not an item, but heaped like one.</summary>
+    public const string Compost = "compost";
 
     private static readonly StandardMaterial3D Plain = ModelKit.Vertex(Surface.Flat, .8f);
     private static readonly StandardMaterial3D Glossy = ModelKit.Vertex(Surface.Flat, .35f);
@@ -35,28 +32,43 @@ internal static class ItemShape {
     private static readonly StandardMaterial3D Sacking = ModelKit.Vertex(Surface.Cloth, .9f);
     private static readonly StandardMaterial3D Steel = ModelKit.Vertex(Surface.Metal, .45f, .35f);
     private static readonly StandardMaterial3D Tin = ModelKit.Vertex(Surface.Metal, .4f, .15f);
+    private static readonly StandardMaterial3D Soil = ModelKit.Vertex(Surface.Earth, 1);
 
     private static readonly Dictionary<string, Look> looks = new() {
-        ["wood_parts"] = new(f => WoodParts(f, 8), Wooden, f => WoodParts(f, 5)),
-        ["steel_parts"] = new(SteelParts, Steel, f => Cross(f, SteelParts)),
-        ["tin_can"] = new(f => OpenCan(f, true), Tin, f => SixPack(f, one => OpenCan(one, false))),
-        ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, f => SixPack(f, one => Can(one, "b83a5c", null, false))),
-        ["canned_meat_stew"] = new(f => Can(f, "c07a48", "7a4a26"), Tin, f => SixPack(f, one => Can(one, "c07a48", null, false))),
-        ["berry_jam"] = new(f => Jar(f, true), Glossy, f => Huddle(f, one => Jar(one, false))),
-        ["grass"] = new(f => Sheaf(f, 20, .5f, .24f, false, "8fae55", "7c9c46", "a3bf63"), Plain),
-        ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain),
-        ["wheat_seeds"] = new(Seeds, Sacking),
-        ["fertilizer"] = new(f => Sack(f, "b89b66", "9a8052", null, ("4a3524", "6b5233")), Sacking),
-        ["flour"] = new(f => Sack(f, "f2ece0", "d6cdbb", "8fa3b8", null), Sacking),
-        ["dough"] = new(Dough, Plain),
+        ["wood_parts"] = new(f => WoodParts(f, 8), Wooden, .55f, Lay.Loose, Piece: f => WoodParts(f, 5)),
+        ["steel_parts"] = new(SteelParts, Steel, .5f, Lay.Loose),
+        // Cans heap as six-packs of plain cans.
+        ["tin_can"] = new(f => OpenCan(f, true), Tin, .42f, Piece: f => SixPack(f, one => OpenCan(one, false))),
+        ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "b83a5c", null, false))),
+        ["canned_meat_stew"] = new(f => Can(f, "c07a48", "7a4a26"), Tin, .42f, Piece: f => SixPack(f, one => Can(one, "c07a48", null, false))),
+        ["berry_jam"] = new(f => Jar(f, true), Glossy, .2f, Piece: f => Jar(f, false)),
+        ["grass"] = new(f => Sheaf(f, 20, .5f, .24f, false, "8fae55", "7c9c46", "a3bf63"), Plain, .32f, Rise: .7f),
+        ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain, .6f, Lay.Rows, .7f),
+        ["wheat_seeds"] = new(Seeds, Sacking, .36f, Rise: .8f),
+        ["fertilizer"] = new(f => Sack(f, "b89b66", "9a8052", null, ("4a3524", "6b5233")), Sacking, .36f, Rise: .8f),
+        ["flour"] = new(f => Sack(f, "f2ece0", "d6cdbb", "8fa3b8", null), Sacking, .36f, Rise: .8f),
+        ["dough"] = new(Dough, Plain, .36f, Lay.Loose, .8f),
         // Kenney's loaf is a long oval; widened and raised it is a round one.
-        ["bread"] = new(f => Baked(f, "loaf_round", Swap(("995941", "c98a45"), ("e68d64", "ecc892")), new(1, 1.3f, 1.45f)), Plain),
-        ["raw_meat"] = new(f => Baked(f, "wholer_ham", Swap(("995941", "c4524a"), ("dc9e76", "efe3d0"))), Plain),
-        ["burnt_steak"] = new(Steak, Plain, f => Stack(f, Steak)),
-        ["meat_stew"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "e9e6dc"), ("e68d64", "8f5a33"), ("ff8e44", "e0873a"), ("61cb8b", "7fa650"), ("f2bf99", "d9b98a"))), Plain),
-        ["crushed_berries"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "b08050"), ("e68d64", "b8434f"), ("ff8e44", "7d1f2e"), ("61cb8b", "d86a70"), ("f2bf99", "8f2436"))), Plain),
-        ["coins"] = new(Coins, Glossy),
-        // What follows has a model in the world, which its icon shows; a pile shows a lighter copy of it, laid down.
+        ["bread"] = new(f => Baked(f, "loaf_round", Swap(("995941", "c98a45"), ("e68d64", "ecc892")), new(1, 1.3f, 1.45f)), Plain, .36f, Lay.Loose, .7f),
+        ["raw_meat"] = new(f => Baked(f, "wholer_ham", Swap(("995941", "c4524a"), ("dc9e76", "efe3d0"))), Plain, .42f, Lay.Loose, .7f),
+        ["burnt_steak"] = new(f => Baked(f, "meat_cooked", Swap(("e2a781", "7a5536"), ("c9835b", "5e3b25"), ("e08860", "5e3b25"), ("ab5e41", "2b1c14"), ("61cb8b", "2b1c14"))), Plain,
+            .32f, Lay.Loose),
+        ["meat_stew"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "e9e6dc"), ("e68d64", "8f5a33"), ("ff8e44", "e0873a"), ("61cb8b", "7fa650"), ("f2bf99", "d9b98a"))), Plain, .3f, Rise: .7f),
+        ["crushed_berries"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "b08050"), ("e68d64", "b8434f"), ("ff8e44", "7d1f2e"), ("61cb8b", "d86a70"), ("f2bf99", "8f2436"))), Plain, .3f,
+            Rise: .7f),
+        ["coins"] = new(Coins, Glossy, .26f),
+        // What follows has a model in the world, which its icon shows; a pile heaps lighter copies of it or of a piece of it.
+        ["wood"] = new(Log, Wooden, Lay: Lay.Rows, Rise: .85f),
+        ["planks"] = new(Plank, Wooden, Lay: Lay.Rows),
+        ["stone"] = new(f => First(f, NatureShape.Rocks("pile_stone", new Color("8d918e"), 0), 80), NatureShape.Rock, .42f, Lay.Loose, .7f),
+        ["iron_ore"] = Nugget("pile_iron", "a35a2e"),
+        ["tin_ore"] = Nugget("pile_tin", "b9bcb4"),
+        ["coal"] = Nugget("pile_coal", "2d2f33"),
+        ["charcoal"] = new(f => Copy(f, CharcoalShape.Briquette, Transform3D.Identity, Colors.White), CharcoalShape.Material, .32f, Lay.Loose, .8f),
+        // Bars heap as six-packs: three lying side by side and three across them.
+        ["iron_bar"] = new(Ingots, Plain, .5f),
+        ["steel_bar"] = new(Ingots, Plain, .5f),
+        ["tin_bar"] = new(Ingots, Plain, .5f),
         ["steel_axe"] = Held("steel_axe"),
         ["steel_pick"] = Held("steel_pick"),
         // The shovel's blade spans the other way from an axe's, so it lies on its back.
@@ -65,48 +77,61 @@ internal static class ItemShape {
         ["steel_hammer"] = Held("steel_hammer"),
         ["stone_chisel"] = Held("stone_chisel"),
         ["steel_chisel"] = Held("steel_chisel"),
-        ["torch"] = new(f => Lighter(f, ActorRig.Torch().Torch, Basis.Identity), Plain),
-        ["rake"] = new(f => Copy(f, RackShape.Rake, new Transform3D(new Basis(Vector3.Right, MathF.PI / 2), Vector3.Zero), Colors.White), Plain),
-        ["mortar"] = new(f => Copy(f, CookShape.BuildMortar(6, 5), Transform3D.Identity, Colors.White), Plain),
-        ["crate"] = new(f => Copy(f, CrateShape.Cargo, Transform3D.Identity, Colors.White), Plain),
+        ["torch"] = new(f => Lighter(f, ActorRig.Torch().Torch, Basis.Identity), Plain, Lay: Lay.Rows),
+        ["rake"] = new(f => Copy(f, RackShape.Rake, new Transform3D(new Basis(Vector3.Right, MathF.PI / 2), Vector3.Zero), Colors.White), Plain, Lay: Lay.Rows),
+        ["mortar"] = new(f => Copy(f, CookShape.BuildMortar(6, 5), Transform3D.Identity, Colors.White), Plain, .3f),
+        ["crate"] = new(f => Copy(f, CrateShape.Cargo, Transform3D.Identity, Colors.White), Plain, .5f),
         ["water"] = Bottle("water"),
         ["water_2"] = Bottle("water_2"),
         ["water_1"] = Bottle("water_1"),
         ["empty_bottle"] = Bottle("empty_bottle"),
-        ["berries"] = new(Berries, Glossy),
-        ["leaves"] = new(Leaves, Plain),
+        // Berries heap one by one.
+        ["berries"] = new(Berry, Glossy, .16f, Lay.Loose, .7f),
+        // Leaves and compost are each one mound, which swells with what is in it.
+        ["leaves"] = new(Leaves, Plain, Lay: Lay.Mound),
+        [Compost] = new(Mulch, Soil, Lay: Lay.Mound),
     };
 
     /// <summary>A hand tool lying on its side, or as <paramref name="pose"/> turns it, so its head lies flat.</summary>
-    private static Look Held(string tool, Basis? pose = null) => new(f => Lighter(f, ActorRig.Tool(tool), pose ?? new Basis(Vector3.Back, MathF.PI / 2)), Plain);
+    private static Look Held(string tool, Basis? pose = null) =>
+        new(f => Lighter(f, ActorRig.Tool(tool), pose ?? new Basis(Vector3.Back, MathF.PI / 2)), Plain, Lay: Lay.Rows);
     /// <summary>A bottle lying on its back, its gauge up.</summary>
-    private static Look Bottle(string item) => new(f => Lighter(f, BottleShape.Create(Water.BottleSips(item)), new Basis(Vector3.Right, -MathF.PI / 2)), Plain);
+    private static Look Bottle(string item) =>
+        new(f => Lighter(f, BottleShape.Create(Water.BottleSips(item)), new Basis(Vector3.Right, -MathF.PI / 2)), Plain, .45f, Lay.Rows, .85f);
+    /// <summary>One loose lump of ore or coal, the first of those the world scatters, in the given colour.</summary>
+    private static Look Nugget(string kind, string colour) =>
+        new(f => First(f, NatureShape.Loose(kind, new Color(colour), new Color(colour), 0), 20), NatureShape.Rock, .24f, Lay.Loose, .7f);
 
     public static IEnumerable<string> Items => looks.Keys;
     public static bool Has(string item) => looks.ContainsKey(item);
-    public static StandardMaterial3D Material(string item) => looks[item].Material;
+    public static Lay LayOf(string item) => looks[item].Lay;
+    public static float RiseOf(string item) => looks[item].Rise;
+    /// <summary>What an item's model is made of; a bar is plain metal in its item's colour.</summary>
+    public static StandardMaterial3D Material(string item, string color) =>
+        item is "iron_bar" or "steel_bar" or "tin_bar" ? ModelKit.Metal(color, .45f, .5f) : looks[item].Material;
 
-    /// <summary>
-    /// Builds the item centred on the origin: one in its own proportions, or a pile slot's worth scaled down to fit a
-    /// slot of the given size.
-    /// A slot's worth keeps its shape and leaves room round it; only one too tall for the slot is pressed down to it.
-    /// </summary>
-    public static ArrayMesh Build(string item, Vector3? fit = null) {
-        var look = looks[item];
-        var faces = new List<Face>();
-        if (fit != null && look.Pile != null) look.Pile(faces); else look.Build(faces);
-        // The game's camera looks down on a pile, so it never sees an underside.
-        if (fit != null) faces.RemoveAll(face => (face.C - face.A).Cross(face.B - face.A).Normalized().Y < -.9f);
+    /// <summary>Builds one of the item as its icon shows it, centred on the origin.</summary>
+    public static ArrayMesh Build(string item) {
+        var faces = new List<Face>(); looks[item].Build(faces);
         var (min, max) = Bounds(faces);
-        var centre = (min + max) / 2; var scale = Vector3.One;
-        if (fit is Vector3 slot) {
-            var size = max - min;
-            float across = Room * MathF.Min(slot.X / size.X, slot.Z / size.Z);
-            scale = new Vector3(across, MathF.Min(across, slot.Y / size.Y), across);
-        }
+        return Commit(faces, new Transform3D(Basis.Identity, -(min + max) / 2));
+    }
+
+    /// <summary>Builds the piece a heap of the item is made of, standing on the origin at the size a heap shows it.</summary>
+    public static ArrayMesh Piece(string item) {
+        var look = looks[item];
+        var faces = new List<Face>(); (look.Piece ?? look.Build)(faces);
+        // The game's camera looks down on a heap, so it never sees an underside.
+        faces.RemoveAll(face => (face.C - face.A).Cross(face.B - face.A).Normalized().Y < -.9f);
+        var (min, max) = Bounds(faces);
+        float scale = look.Size > 0 ? look.Size / MathF.Max(max.X - min.X, max.Z - min.Z) : 1;
+        return Commit(faces, new Transform3D(Basis.FromScale(Vector3.One * scale), -new Vector3((min.X + max.X) / 2, min.Y, (min.Z + max.Z) / 2) * scale));
+    }
+
+    private static ArrayMesh Commit(List<Face> faces, Transform3D at) {
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         foreach (var (a, b, c, tint) in faces) {
-            Vector3 p = (a - centre) * scale, q = (b - centre) * scale, r = (c - centre) * scale;
+            Vector3 p = at * a, q = at * b, r = at * c;
             s.SetColor(tint); s.SetNormal((r - p).Cross(q - p).Normalized());
             s.AddVertex(p); s.AddVertex(q); s.AddVertex(r);
         }
@@ -132,46 +157,39 @@ internal static class ItemShape {
         foreach (var (a, b, c, tint) in one) faces.Add(new(at * a, at * b, at * c, tint));
     }
 
-    /// <summary>Three of one standing in a ring, each touching the other two and turned its own way.</summary>
-    private static void Huddle(List<Face> faces, Action<List<Face>> build) {
-        var (one, size) = One(build);
-        float reach = MathF.Max(size.X, size.Z) / 2 / MathF.Sin(MathF.PI / 3);
-        for (int i = 0; i < 3; i++) {
-            float angle = i * Mathf.Tau / 3;
-            Place(faces, one, new Transform3D(new Basis(Vector3.Up, i * 2.4f), new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle)) * reach));
-        }
-    }
-
     /// <summary>Six of one standing side by side in two rows of three.</summary>
     private static void SixPack(List<Face> faces, Action<List<Face>> build) {
         var (one, size) = One(build);
         for (int i = 0; i < 6; i++) Place(faces, one, new Transform3D(Basis.Identity, new Vector3((i % 3 - 1) * size.X, 0, (i / 3 - .5f) * size.Z)));
     }
 
-    /// <summary>Two layers of parts spread on the ground, the upper laid across the lower a quarter turn round.</summary>
-    private static void Cross(List<Face> faces, Action<List<Face>> build) {
-        var (one, size) = One(build);
-        Place(faces, one, Transform3D.Identity);
-        Place(faces, one, new Transform3D(new Basis(Vector3.Up, MathF.PI / 2), Vector3.Up * size.Y));
-    }
-
     /// <summary>
-    /// Two of a flat one lying on each other, the upper sunk into the lower as far as its bevelled edge.
-    /// The upper keeps all but its underside, and the lower keeps only its upright sides, which are all that show of it.
+    /// Six cast bars as they are stacked: three lying side by side and three across them.
+    /// The lower three lose their tops, which the upper three cover.
     /// </summary>
-    private static void Stack(List<Face> faces, Action<List<Face>> build) {
-        var (one, size) = One(build);
-        var lift = Vector3.Up * size.Y * .8f;
-        foreach (var (a, b, c, tint) in one) {
-            float up = (c - a).Cross(b - a).Normalized().Y;
-            if (MathF.Abs(up) < .3f) faces.Add(new(a, b, c, tint));
-            if (up > -.5f) faces.Add(new(a + lift, b + lift, c + lift, tint));
+    private static void Ingots(List<Face> faces) {
+        var one = new List<Face>(); Copy(one, IngotShape.Mesh, Transform3D.Identity, Colors.White);
+        for (int i = -1; i <= 1; i++) {
+            foreach (var (a, b, c, tint) in one) {
+                var lower = new Vector3(0, .1f, i * .22f);
+                if ((c - a).Cross(b - a).Normalized().Y < .9f) faces.Add(new(a + lower, b + lower, c + lower, tint));
+            }
+            Place(faces, one, new Transform3D(new Basis(Vector3.Up, MathF.PI / 2), new Vector3(i * .22f, .3f, 0)));
         }
     }
 
-    /// <summary>Kenney's cooked steak, charred.</summary>
-    private static void Steak(List<Face> faces) =>
-        Baked(faces, "meat_cooked", Swap(("e2a781", "7a5536"), ("c9835b", "5e3b25"), ("e08860", "5e3b25"), ("ab5e41", "2b1c14"), ("61cb8b", "2b1c14")));
+    /// <summary>A log lying on the ground, as long as a pile's logs have always been.</summary>
+    private static void Log(List<Face> faces) =>
+        Cylinder(faces, new Transform3D(new Basis(Vector3.Right, MathF.PI / 2), new Vector3(0, .11f, 0)), .11f, .11f, .9f, 7, new Color("af8053"));
+
+    /// <summary>A sawn board lying flat.</summary>
+    private static void Plank(List<Face> faces) => Box(faces, new Transform3D(Basis.Identity, new Vector3(0, .03f, 0)), new(.15f, .06f, 1), new Color("d2a26a"));
+
+    /// <summary>The first triangles of a mesh that scatters several lumps: its first lump alone.</summary>
+    private static void First(List<Face> faces, Mesh mesh, int triangles) {
+        var all = new List<Face>(); Copy(all, mesh, Transform3D.Identity, Colors.White);
+        faces.AddRange(all.GetRange(0, triangles));
+    }
 
     /// <summary>
     /// A baked mesh's triangles, each in the colour <paramref name="recolour"/> gives for its own, the mesh stretched
@@ -459,31 +477,59 @@ internal static class ItemShape {
         }
     }
 
-    /// <summary>A small heap of berries, five round one with two more on top, each a bare twenty-sided lump.</summary>
-    private static void Berries(List<Face> faces) {
-        Color[] reds = { new("c0283a"), new("a3202f"), new("d23a45") };
-        for (int i = 0; i < 7; i++) {
-            float angle = i * Mathf.Tau / 5, reach = i < 5 ? .075f : .03f;
-            var middle = new Vector3(MathF.Cos(angle) * reach, i < 5 ? .05f : .12f, MathF.Sin(angle) * reach);
-            var (points, triangles) = NatureShape.Shape(middle, Vector3.One * .055f, 0, i, 0, 0, 0, -1, 0);
-            for (int t = 0; t < triangles.Count; t += 3)
-                Tri(faces, points[triangles[t]], points[triangles[t + 1]], points[triangles[t + 2]], (points[triangles[t]] + points[triangles[t + 1]] + points[triangles[t + 2]]) / 3 - middle, reds[i % reds.Length]);
+    /// <summary>One berry, a bare twenty-sided lump.</summary>
+    private static void Berry(List<Face> faces) {
+        var middle = new Vector3(0, .055f, 0);
+        var (points, triangles) = NatureShape.Shape(middle, Vector3.One * .055f, 0, 3, 0, 0, 0, -1, 0);
+        for (int t = 0; t < triangles.Count; t += 3) {
+            Vector3 a = points[triangles[t]], b = points[triangles[t + 1]], c = points[triangles[t + 2]];
+            Tri(faces, a, b, c, (a + b + c) / 3 - middle, new Color("c0283a"));
         }
     }
 
-    /// <summary>A raked-up mound of fallen leaves in the leaf patch's colours, with five of the patch's own leaves lying on it.</summary>
-    private static void Leaves(List<Face> faces) {
-        Color[] palette = { new("c08a3a"), new("a8652c"), new("d0a347"), new("8e5a2a"), new("b8753a") };
-        var middle = new Vector3(0, .03f, 0);
-        var (points, triangles) = NatureShape.Shape(middle, new(.3f, .17f, .3f), 1, 11, 3, .15f, .05f, 0, 0);
-        for (int t = 0; t < triangles.Count; t += 3)
-            Tri(faces, points[triangles[t]], points[triangles[t + 1]], points[triangles[t + 2]], (points[triangles[t]] + points[triangles[t + 1]] + points[triangles[t + 2]]) / 3 - middle, palette[t / 3 * 7 % palette.Length]);
+    /// <summary>
+    /// A broad low mound with flat faces, each in one of the given colours, and where the top of it is at a distance
+    /// from its middle.
+    /// </summary>
+    private static Func<float, float> Mound(List<Face> faces, float radius, float height, int seed, Color[] palette) {
+        var middle = new Vector3(0, height * .1f, 0);
+        var (points, triangles) = NatureShape.Shape(middle, new(radius, height, radius), 2, seed, 5, .12f, .04f, 0, 0);
+        for (int t = 0; t < triangles.Count; t += 3) {
+            Vector3 a = points[triangles[t]], b = points[triangles[t + 1]], c = points[triangles[t + 2]];
+            Tri(faces, a, b, c, (a + b + c) / 3 - middle, palette[t / 3 * 7 % palette.Length]);
+        }
+        return reach => middle.Y + height * MathF.Sqrt(MathF.Max(0, 1 - reach * reach / (radius * radius)));
+    }
+
+    /// <summary>The leaf patch's own leaves laid flat on a mound, spread from its middle out.</summary>
+    private static void Litter(List<Face> faces, Func<float, float> top, float radius, int leaves) {
         // A leaf of the patch is eleven triangles that start at the middle of its ridge.
         var patch = new List<Face>(); Copy(patch, LeafShape.For(0), Transform3D.Identity, Colors.White);
-        for (int leaf = 0; leaf < 5; leaf++) {
-            float angle = leaf * Mathf.Tau / 4, reach = leaf < 4 ? .16f : 0;
-            var to = new Vector3(MathF.Cos(angle) * reach, leaf < 4 ? .17f : .215f, MathF.Sin(angle) * reach) - patch[leaf * 11].A;
-            for (int t = leaf * 11; t < leaf * 11 + 11; t++) faces.Add(new(patch[t].A + to, patch[t].B + to, patch[t].C + to, patch[t].Tint));
+        for (int leaf = 0; leaf < leaves; leaf++) {
+            float angle = leaf * 2.399963f, reach = radius * .85f * MathF.Sqrt((leaf + .5f) / leaves);
+            var grown = Basis.FromScale(Vector3.One * 1.5f);
+            var to = new Vector3(MathF.Cos(angle) * reach, top(reach) + .012f, MathF.Sin(angle) * reach) - grown * patch[leaf * 11].A;
+            for (int t = leaf * 11; t < leaf * 11 + 11; t++) faces.Add(new(grown * patch[t].A + to, grown * patch[t].B + to, grown * patch[t].C + to, patch[t].Tint));
+        }
+    }
+
+    /// <summary>A raked-up mound of fallen leaves in the leaf patch's colours, with some of the patch's own leaves lying on it.</summary>
+    private static void Leaves(List<Face> faces) {
+        var top = Mound(faces, .95f, .42f, 11, new Color[] { new("c08a3a"), new("a8652c"), new("d0a347"), new("8e5a2a"), new("b8753a") });
+        Litter(faces, top, .95f, 16);
+    }
+
+    /// <summary>A compost heap: a mound of dark soil with leaves on it and stalks and scraps poking out of it.</summary>
+    private static void Mulch(List<Face> faces) {
+        const float radius = 1.1f;
+        var top = Mound(faces, radius, .5f, 23, new Color[] { new("4a3524"), new("5a4129"), new("3f2d1f"), new("523a26") });
+        Litter(faces, top, radius, 7);
+        Color[] scraps = { new("8fae55"), new("c08a3a"), new("d9c27a"), new("7c9c46"), new("a8652c") };
+        for (int i = 0; i < 20; i++) {
+            float angle = i * 2.399963f + 1, reach = radius * .9f * MathF.Sqrt((i + .5f) / 20);
+            var foot = new Vector3(MathF.Cos(angle) * reach, top(reach) - .03f, MathF.Sin(angle) * reach);
+            var lean = new Vector3(MathF.Cos(angle * 3) * .07f, .16f + .06f * MathF.Sin(i * 1.7f), MathF.Sin(angle * 3) * .07f);
+            Bar(faces, foot, foot + lean, .035f, 0, 3, scraps[i % scraps.Length]);
         }
     }
 

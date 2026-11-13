@@ -490,7 +490,7 @@ A pile of crates takes more crates of the same good.
 
 ### Piles
 
-A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that build up as a 9-4-1 pyramid in the colour of what it holds.
+A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that show as a heap of the resource itself, bigger the more it holds.
 The first resource put in sets it: from then on workers store and take only that, and anything else is refused.
 Emptying it frees it again.
 

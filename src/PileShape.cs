@@ -4,7 +4,13 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Shared pile ground, its log frame and cached stock shapes derived from existing resource meshes, with a block fallback.</summary>
+/// <summary>How a heap lays its pieces: side by side in a grid, in rows of long pieces lying the same way, loose and turned any way, or as one mound that swells.</summary>
+public enum Lay { Neat, Rows, Loose, Mound }
+
+/// <summary>
+/// The pile's ground and log frame, and how every good heaps up: the piece a heap is made of, taken from
+/// <see cref="ItemShape"/>, and where the pieces go on a pad of a given size.
+/// </summary>
 internal static class PileShape {
     private static ArrayMesh? yard, frame, stack;
     public static Mesh Yard => yard ??= BuildYard();
@@ -13,93 +19,98 @@ internal static class PileShape {
     public static readonly StandardMaterial3D Ground = ModelKit.Vertex(Surface.Earth, 1);
     public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .9f);
 
-    private static readonly Dictionary<string, Mesh> contents = new();
-
-    private static readonly string[] families = { "logs", "stone", "ore", "coal", "charcoal", "planks", "bars", "fallback" };
-    /// <summary>The box every stock shape is fitted to in a pile slot.</summary>
-    public static readonly Vector3 SlotSize = new(.72f, .4f, .72f);
-
-    private static string Family(string item) => (World.IsCrate(item) ? "crate" : item) switch {
-        "wood" => "logs",
-        "stone" => "stone",
-        "iron_ore" or "tin_ore" => "ore",
-        "coal" => "coal",
-        "charcoal" => "charcoal",
-        "planks" => "planks",
-        "iron_bar" or "steel_bar" or "tin_bar" => "bars",
-        // A good with a model of its own is a family of one.
-        var good => ItemShape.Has(good) ? good : "fallback"
-    };
-
-    private static StandardMaterial3D Material(string family, string color) => family switch {
-        "bars" => ModelKit.Metal(color, .45f, .5f),
-        "coal" => ModelKit.Stone("292c30"),
-        "charcoal" => CharcoalShape.Material,
-        "stone" or "ore" => ModelKit.Stone(color),
-        "logs" or "planks" => ModelKit.Wood(color, .95f),
-        _ when ItemShape.Has(family) => ItemShape.Material(family),
-        _ => ModelKit.Mat(color, .95f),
-    };
-
-    /// <summary>Builds every stock mesh and item material while loading, so a pile showing a new item mid-game swaps cached resources only.</summary>
-    public static void Warm(GameData data) {
-        void Stock(string family) { if (!contents.ContainsKey(family)) contents[family] = BuildStock(family, true); }
-        foreach (var family in families) Stock(family);
-        foreach (var (id, item) in data.Items) {
-            Stock(Family(id));
-            // Asking for the material's RID builds its shader now rather than on the first pile that shows it.
-            _ = Material(Family(id), item.Color).GetRid();
-        }
-        Material("fallback", Fallback);
-    }
-
     /// <summary>The color of an item the data does not know.</summary>
     public const string Fallback = "b0a58a";
+    /// <summary>The most pieces a heap shows, whatever its pad and pieces would take.</summary>
+    private const int MostPieces = 120;
 
-    /// <summary>Reuse small stock/resource meshes without duplicating nodes or changing inventory slot order.</summary>
-    public static void SetStock(MeshInstance3D slot, string item, string color) {
-        string family = Family(item);
-        slot.Mesh = contents[family];
-        slot.MaterialOverride = Material(family, color);
+    /// <summary>A good as a heap shows it: one piece, what it is made of, how pieces are laid and how much of a piece's height each level adds.</summary>
+    public sealed record Heap(Mesh Mesh, StandardMaterial3D Material, Lay Lay, float Rise) {
+        public readonly int Triangles = Mesh.GetFaces().Length / 3;
+        public readonly Vector3 Size = Mesh.GetAabb().Size;
     }
 
-    /// <summary>How tall an item's stock stands in a slot, as a share of the slot's height.</summary>
-    public static float Rise(string item) => contents[Family(item)].GetAabb().Size.Y / SlotSize.Y;
+    /// <summary>Where a heap's pieces go, in the order they are added, and how much darker each loose one is drawn.</summary>
+    public sealed record Places(Transform3D[] At, float[] Shade);
+
+    private static readonly Dictionary<string, Heap> heaps = new();
+    private static readonly Dictionary<(Heap, Vector2, int), Places> layouts = new();
+
+    /// <summary>The heap an item makes; an item without a model heaps as plain blocks of its colour.</summary>
+    public static Heap HeapOf(string item, string color) {
+        if (World.IsCrate(item)) item = "crate";
+        if (heaps.TryGetValue(item, out var heap)) return heap;
+        return heaps[item] = ItemShape.Has(item)
+            ? new Heap(ItemShape.Piece(item), ItemShape.Material(item, color), ItemShape.LayOf(item), ItemShape.RiseOf(item))
+            : new Heap(Stack, ModelKit.Mat(color, .95f), Lay.Neat, 1);
+    }
+
+    /// <summary>Builds every heap's piece and material while loading, so a pile showing a new good mid-game swaps cached resources only.</summary>
+    public static void Warm(GameData data) {
+        // Asking for a material's RID builds its shader now rather than on the first pile that shows it.
+        foreach (var (id, item) in data.Items) _ = HeapOf(id, item.Color).Material.GetRid();
+        _ = HeapOf(ItemShape.Compost, Fallback).Material.GetRid();
+    }
+
+    /// <summary>Adds one piece of every heap to the stage that loading draws, so the first pile to show a good builds nothing mid-game.</summary>
+    public static void Stage(Node3D stage, GameData data) {
+        foreach (string item in data.Items.Keys) new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(item, 1, data);
+        new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(ItemShape.Compost, 1, data);
+    }
 
     /// <summary>
-    /// How high up an item's stock the level above it rests, as a share of the slot's height.
-    /// Stock that fills its slot carries the next level on its top; the smaller goods leave gaps, which the next level settles into.
+    /// Where a heap's pieces go on a pad of the given size, as many as the pad holds and <paramref name="triangles"/> allow.
+    /// The ground level fills from the middle out, and each level above is one piece smaller each way and set over
+    /// the gaps of the one below; a piece is added only after those it rests on, so any number of pieces makes a heap.
     /// </summary>
-    public static float Carry(string item) => Rise(item) * (ItemShape.Has(Family(item)) ? ItemShape.Nest : 1);
-
-    /// <summary>The stock an item's pile slot shows, in its own proportions rather than fitted to the slot; icons show it this way.</summary>
-    public static MeshInstance3D Stock(string item, string color) {
-        string family = Family(item);
-        return new MeshInstance3D { Mesh = BuildStock(family, false), MaterialOverride = Material(family, color) };
+    public static Places PlacesOf(Heap heap, Vector2 pad, int triangles) {
+        if (layouts.TryGetValue((heap, pad, triangles), out var places)) return places;
+        var found = new List<(float Order, Transform3D At, float Shade)>();
+        if (heap.Lay == Lay.Mound) found.Add((0, Transform3D.Identity, 1));
+        else {
+            bool loose = heap.Lay == Lay.Loose;
+            // Loose pieces crowd a little; laid ones keep a sliver between them.
+            float fit = loose ? .9f : 1.04f; Vector2 step = new(heap.Size.X * fit, heap.Size.Z * fit);
+            int across = Math.Max(1, (int)(pad.X / step.X)), deep = Math.Max(1, (int)(pad.Y / step.Y));
+            // Rows of long pieces narrow across the pieces only, like stacked logs.
+            bool rows = heap.Lay == Lay.Rows; bool alongX = heap.Size.X > heap.Size.Z;
+            bool narrowX = across > 1 && !(rows && alongX), narrowZ = deep > 1 && !(rows && !alongX);
+            float reach = MathF.Max(step.X, step.Y) * 1.2f;
+            var random = new Random(41);
+            for (int level = 0; level < 24; level++) {
+                int nx = narrowX ? across - level : across, nz = narrowZ ? deep - level : deep;
+                if (nx < 1 || nz < 1 || level > 0 && !narrowX && !narrowZ) break;
+                for (int ix = 0; ix < nx; ix++)
+                    for (int iz = 0; iz < nz; iz++) {
+                        var at = new Vector3((ix - (nx - 1) / 2f) * step.X, level * heap.Size.Y * heap.Rise, (iz - (nz - 1) / 2f) * step.Y);
+                        // A row fills along its pieces before it widens.
+                        float far = rows ? (alongX ? MathF.Abs(at.Z) + MathF.Abs(at.X) * .01f : MathF.Abs(at.X) + MathF.Abs(at.Z) * .01f) : new Vector2(at.X, at.Z).Length();
+                        var basis = Basis.Identity; float shade = 1;
+                        if (loose) {
+                            at += new Vector3((float)random.NextDouble() - .5f, 0, (float)random.NextDouble() - .5f) * step.X * .2f;
+                            basis = new Basis(Vector3.Up, (float)random.NextDouble() * Mathf.Tau).Scaled(Vector3.One * (.85f + (float)random.NextDouble() * .25f));
+                            shade = .8f + (float)random.NextDouble() * .2f;
+                        }
+                        found.Add((level * reach + far, new Transform3D(basis, at), shade));
+                    }
+            }
+            found.Sort((a, b) => a.Order.CompareTo(b.Order));
+            int most = Math.Min(MostPieces, Math.Max(1, triangles / heap.Triangles));
+            if (found.Count > most) found.RemoveRange(most, found.Count - most);
+        }
+        places = new Places(found.ConvertAll(f => f.At).ToArray(), found.ConvertAll(f => f.Shade).ToArray());
+        return layouts[(heap, pad, triangles)] = places;
     }
 
-    private static Mesh BuildStock(string family, bool fit) {
-        if (family == "fallback") return Stack;
-        // Charcoal's briquettes carry their own colours, so they come whole from their own builder.
-        if (family == "charcoal") return fit ? CharcoalShape.Build(SlotSize) : CharcoalShape.Heap;
-        if (ItemShape.Has(family)) return ItemShape.Build(family, fit ? SlotSize : null);
+    /// <summary>What an item's icon shows where no other model does: a pair of logs for wood, three boards for planks, and otherwise one of the good as <see cref="ItemShape"/> builds it.</summary>
+    public static MeshInstance3D Stock(string item, string color) => item is "wood" or "planks"
+        ? new MeshInstance3D { Mesh = BuildIcon(item == "wood"), MaterialOverride = ModelKit.Wood(color, .95f) }
+        : new MeshInstance3D { Mesh = ItemShape.Build(item), MaterialOverride = ItemShape.Material(item, color) };
+
+    private static Mesh BuildIcon(bool logs) {
         var faces = new List<Vector3>();
         void Copy(Mesh mesh, Transform3D transform) {
             foreach (var point in mesh.GetFaces()) faces.Add(transform * point);
-        }
-        void CopyFirstPart(Mesh mesh) {
-            // Keep a complete connected lump, so changing the source's triangle count cannot cut it open.
-            var vertices = mesh.GetFaces(); var touching = new Dictionary<Vector3, List<int>>();
-            for (int i = 0; i < vertices.Length; i++) {
-                if (!touching.TryGetValue(vertices[i], out var triangles)) touching[vertices[i]] = triangles = new();
-                triangles.Add(i / 3);
-            }
-            var seen = new HashSet<int> { 0 }; var pending = new Queue<int>(); pending.Enqueue(0);
-            while (pending.TryDequeue(out int triangle))
-                for (int k = 0; k < 3; k++) {
-                    var point = vertices[triangle * 3 + k]; faces.Add(point);
-                    foreach (int neighbor in touching[point]) if (seen.Add(neighbor)) pending.Enqueue(neighbor);
-                }
         }
         void CopyLog(Mesh mesh, Transform3D transform) {
             // Preserve the mine supply log's seven-sided outline, skipping its redundant middle ring.
@@ -124,39 +135,26 @@ internal static class PileShape {
                 Face(Bottom(0), Bottom(i), Bottom(i + 1), transform.Basis * Vector3.Down);
             }
         }
-        if (family == "stone") CopyFirstPart(NatureShape.Rocks("stone", new Color("8d918e"), 0));
-        else if (family == "ore") {
-            // A complete 20-face nugget from the existing loose-iron mesh, rather than a whole deposit per slot.
-            CopyFirstPart(NatureShape.Loose("loose_iron", new Color("a35a2e"), new Color("8b4f2b"), 0));
-        } else if (family == "coal") CopyFirstPart(FurnaceShape.CoalPile);
-        else {
-            // ModelKit's parameter cache supplies the same primitive resources used by the furnace, bench and mine supplies.
-            var source = new Node3D();
-            if (family == "logs") {
-                foreach (float x in new[] { -.075f, .075f }) {
-                    var log = ModelKit.Cylinder(source, .11f, .11f, .9f, new(x * 1.5f, 0, 0), ModelKit.Mat("8a5f3c"), new Vector3(90, 0, 0), 7);
-                    CopyLog(log.Mesh, log.Transform);
-                }
-            } else if (family == "bars") {
-                Copy(IngotShape.Mesh, Transform3D.Identity);
-            } else
-                for (int i = 0; i < 3; i++) {
-                    var part = family == "bars"
-                        ? ModelKit.Box(source, new(.12f, .06f, .5f), new((i % 2) * .04f, i * .075f, 0), ModelKit.Mat("c2c9c9"))
-                        : ModelKit.Box(source, new(1, .15f, .06f), new((i % 2) * .04f, i * .075f, 0), ModelKit.Mat("d2a26a"), new Vector3(90, 0, 0));
-                    Copy(part.Mesh, part.Transform);
-                }
-            source.Free();
-        }
-        // Fit the stock to its existing slot. All families sit on the same support plane in the 9–4–1 stack.
+        // ModelKit's parameter cache supplies the same primitive resources used by the furnace, bench and mine supplies.
+        var source = new Node3D();
+        if (logs)
+            foreach (float x in new[] { -.075f, .075f }) {
+                var log = ModelKit.Cylinder(source, .11f, .11f, .9f, new(x * 1.5f, 0, 0), ModelKit.Mat("8a5f3c"), new Vector3(90, 0, 0), 7);
+                CopyLog(log.Mesh, log.Transform);
+            }
+        else
+            for (int i = 0; i < 3; i++) {
+                var part = ModelKit.Box(source, new(1, .15f, .06f), new((i % 2) * .04f, i * .075f, 0), ModelKit.Mat("d2a26a"), new Vector3(90, 0, 0));
+                Copy(part.Mesh, part.Transform);
+            }
+        source.Free();
         var min = faces[0]; var max = min;
         foreach (var point in faces) { min = min.Min(point); max = max.Max(point); }
-        var center = (min + max) / 2; var scale = fit ? SlotSize / (max - min) : Vector3.One;
+        var center = (min + max) / 2;
         var s = Begin();
         for (int i = 0; i < faces.Count; i += 3) {
-            var a = (faces[i] - center) * scale; var b = (faces[i + 1] - center) * scale; var c = (faces[i + 2] - center) * scale;
-            var normal = (c - a).Cross(b - a).Normalized();
-            s.SetNormal(normal);
+            var a = faces[i] - center; var b = faces[i + 1] - center; var c = faces[i + 2] - center;
+            s.SetNormal((c - a).Cross(b - a).Normalized());
             s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);
         }
         return s.Commit();
@@ -230,63 +228,75 @@ internal static class PileShape {
 }
 
 /// <summary>
-/// Piled resources on a model, shown the way storage piles show them: fixed slots that each hold one item's cached pile stock.
-/// Every model that shows piled resources uses one, so a good looks the same in every pile.
+/// A good heaped on or beside a model, as storage piles show it: pieces of the good on a pad, more of them the more there is.
+/// Every model that shows piled goods uses one, so a good looks the same in every pile.
+/// The pieces are drawn in one batch, and a change in how many shows costs nothing but a count.
 /// </summary>
 public sealed class StockPile {
-    private readonly MeshInstance3D[] slots;
-    private readonly string[] shown;
-    /// <summary>Where each slot's stock sits when the stock is as tall as a slot, how tall the stock shown in it is, and how high up it carries the level above.</summary>
-    private readonly float[] rests, heights, carries;
-    private readonly float full;
+    private readonly MultiMeshInstance3D node;
+    private readonly MultiMesh pieces = new() { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true };
+    private readonly Vector2 pad;
+    private readonly int triangles;
+    private string shown = "";
+    private PileShape.Places places = null!;
+    /// <summary>The share or count last shown, so a refresh that changes nothing costs nothing.</summary>
+    private float last = -1;
+    private Transform3D mound = Transform3D.Identity;
 
     /// <summary>
-    /// Adds a hidden slot under <paramref name="parent"/> at each position, its stock scaled by <paramref name="scale"/>.
-    /// The positions run from the ground up, a level at a time.
+    /// Adds an empty heap under <paramref name="parent"/> with its middle on the ground at <paramref name="at"/>.
+    /// Its pieces are drawn <paramref name="scale"/> times their size over a pad of the given width and depth, and
+    /// a full heap stays within the given number of triangles.
     /// </summary>
-    public StockPile(Node3D parent, ReadOnlySpan<Vector3> positions, float scale = 1) {
-        slots = new MeshInstance3D[positions.Length]; shown = new string[positions.Length];
-        rests = new float[positions.Length]; heights = new float[positions.Length]; carries = new float[positions.Length];
-        full = PileShape.SlotSize.Y * scale;
-        for (int i = 0; i < slots.Length; i++) {
-            slots[i] = new MeshInstance3D { Position = positions[i], Scale = Vector3.One * scale, Visible = false };
-            parent.AddChild(slots[i]); shown[i] = ""; rests[i] = positions[i].Y;
+    public StockPile(Node3D parent, Vector3 at, Vector2 pad, int triangles, float scale = 1) {
+        this.pad = pad / scale; this.triangles = triangles;
+        node = new MultiMeshInstance3D { Multimesh = pieces, Position = at, Scale = Vector3.One * scale, Visible = false };
+        parent.AddChild(node);
+    }
+
+    /// <summary>How many pieces show.</summary>
+    public int Count => node.Visible ? pieces.VisibleInstanceCount : 0;
+    /// <summary>The piece the heap is made of, and what it is made of, for checks that compare what piles show.</summary>
+    public Mesh? Piece => pieces.Mesh;
+    public Material? Material => node.MaterialOverride;
+    /// <summary>Where a piece stands on the pad; a mound's one piece is as large as its share made it.</summary>
+    public Transform3D Place(int piece) => places.At.Length == 1 ? mound : places.At[piece];
+
+    /// <summary>Shows a share of a full heap of an item, from nothing at 0 to every piece at 1; any at all shows at least one piece.</summary>
+    public void Fill(string item, float share, GameData data) {
+        if (item == "" || share <= 0) { node.Visible = false; last = -1; return; }
+        if (shown == item && last == share) return;
+        Change(item, data); last = share;
+        share = MathF.Min(share, 1);
+        if (places.At.Length == 1) {
+            // A mound is one piece that swells with what is in it.
+            mound = new Transform3D(Basis.FromScale(Vector3.One * (.45f + .55f * MathF.Cbrt(share))), Vector3.Zero);
+            pieces.SetInstanceTransform(0, mound);
+            pieces.VisibleInstanceCount = 1;
+        } else pieces.VisibleInstanceCount = Math.Clamp((int)MathF.Ceiling(share * places.At.Length), 1, places.At.Length);
+        node.Visible = true;
+    }
+
+    /// <summary>Shows a number of pieces of an item, as many as the heap holds at most.</summary>
+    public void Show(string item, int count, GameData data) {
+        if (item == "" || count <= 0) { node.Visible = false; last = -1; return; }
+        if (shown == item && last == count) return;
+        Change(item, data); last = count;
+        pieces.VisibleInstanceCount = Math.Min(count, places.At.Length);
+        node.Visible = true;
+    }
+
+    /// <summary>Lays out the heap for another item. Swaps only cached meshes, materials and places.</summary>
+    private void Change(string item, GameData data) {
+        if (shown == item) return;
+        shown = item;
+        var heap = PileShape.HeapOf(item, data.Items.TryGetValue(item, out var def) ? def.Color : PileShape.Fallback);
+        places = PileShape.PlacesOf(heap, pad, triangles);
+        pieces.Mesh = heap.Mesh; node.MaterialOverride = heap.Material;
+        pieces.InstanceCount = places.At.Length;
+        for (int i = 0; i < places.At.Length; i++) {
+            pieces.SetInstanceTransform(i, places.At[i]);
+            pieces.SetInstanceColor(i, new Color(places.Shade[i], places.Shade[i], places.Shade[i]));
         }
-    }
-
-    public int Count => slots.Length;
-    /// <summary>The slot meshes, for checks that compare what piles show.</summary>
-    public IReadOnlyList<MeshInstance3D> Slots => slots;
-
-    /// <summary>Shows an item's stock in a slot, or hides the slot for "". Swaps only cached meshes and materials.</summary>
-    public void Show(int slot, string item, GameData data) {
-        if (shown[slot] == item) return;
-        shown[slot] = item;
-        var mesh = slots[slot];
-        mesh.Visible = item != "";
-        heights[slot] = item == "" ? 0 : PileShape.Rise(item) * full;
-        carries[slot] = item == "" ? 0 : PileShape.Carry(item) * full;
-        Settle();
-        if (item == "") return;
-        PileShape.SetStock(mesh, item, data.Items.TryGetValue(item, out var def) ? def.Color : PileShape.Fallback);
-        // Turn the shared coal chunk and charcoal heap to avoid a row of identical faces.
-        mesh.Rotation = new Vector3(0, item is "coal" or "charcoal" ? slot * 2.399963f : 0, 0);
-    }
-
-    /// <summary>Stands each slot's stock on its level's floor, which is as high as the stock on the level below carries it.</summary>
-    private void Settle() {
-        float floor = rests[0] - full / 2, carried = 0;
-        for (int i = 0; i < slots.Length; i++) {
-            // A level with nothing on it keeps a slot's height, so what stands above it stays where it would.
-            if (i > 0 && rests[i] > rests[i - 1] + .001f) { floor += carried > 0 ? carried : full; carried = 0; }
-            slots[i].Position = slots[i].Position with { Y = floor + heights[i] / 2 };
-            carried = MathF.Max(carried, carries[i]);
-        }
-    }
-
-    /// <summary>Shows one item in a slot for every <paramref name="perSlot"/> of <paramref name="count"/>, rounding up, and hides the rest.</summary>
-    public void Fill(string item, int count, int perSlot, GameData data) {
-        int filled = count <= 0 ? 0 : (count + perSlot - 1) / perSlot;
-        for (int i = 0; i < slots.Length; i++) Show(i, i < filled ? item : "", data);
     }
 }

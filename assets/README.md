@@ -58,28 +58,29 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   bushes by their own shader (`NatureShape.ScrubMaterials`). Skin, hair, fur, glass, leaf cards and flames stay flat.
   The surfaces' grain and bump textures are in `models/surfaces/`, packed by `tools/surface_textures.py`.
 - `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
-- `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons and pile stock. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
+- `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons, and by heaps as six-packs. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
 - `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
-  The icon shows the model as built, and a pile slot shows it scaled down to fit the slot.
+  The icon shows the model as built, and a heap is made of pieces of it.
   - Built in code: wood parts (a handle with a knob, a grip and two pegs), steel parts (an axe head, a sledge head and a six-sided collar, none with a handle), the open tin can with its ribs and bent-up lid, the two sealed cans with their paper labels, the jar of jam under a cloth cover tied with a ribbon, the tied sheaves of grass and wheat, the flour sack tied with a ribbon, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
   - Baked from Kenney's Food Kit and recoloured to the game's palette: bread (the round loaf), raw meat (the ham on the bone), burnt steak (the cooked steak, charred) and the bowls of meat stew and crushed berries (the bowl of soup). `tools/food_models.py` bakes them into `models/food/`; see [food/README.md](models/food/README.md).
-  - Light copies of models the world already shows, for piles alone, since their icons come from those models: the hand tools and the torch with their cylinders redrawn on six sides, the rake, the mortar turned on fewer sides, the cargo crate, the bottle lying on its back, seven berries, and a mound of leaves with five of the leaf patch's leaves on it.
-  - A slot's stock keeps its shape: it is scaled to nine tenths of the slot's width, which leaves room between neighbours, and only stock too tall for the slot is pressed down to it. A slot holds one of most goods. Cans stand as a six-pack, jars three together, steaks lie two deep and steel parts lie in two layers.
-  - Cans and jars in a pile are plainer than in their icons: no rim, rib, lid, bare tin, mark or ribbon, which do not show at the game's distance.
-  - A slot's stock stays within 145 triangles, which keeps a full pile and a fully stocked packing station under their ceilings.
-- `src/CharcoalShape.cs` — charcoal as three pressed briquettes: six-sided logs with a hole through the middle, two lying and one leaning on them, in one mesh that carries its own colours. The icon shows it as built, and a pile slot shows it fitted to the slot.
-- `StockPile` in `src/PileShape.cs` — piled resources on any model: fixed slots that each show one item's cached pile stock.
+  - Light copies of models the world already shows, for heaps alone, since their icons come from those models: the hand tools and the torch with their cylinders redrawn on six sides, the rake, the mortar turned on fewer sides, the cargo crate, the bottle lying on its back, a single berry, a log, a board, one boulder of the world's stones, one lump of its loose ore and coal, one charcoal briquette, and six cast bars stacked three across three.
+  - Each good says how its heap is laid (`Lay`): neat grids for boxes, sacks, jars and six-packs; rows for logs, boards, tools and bottles, which lie the same way; loose and turned any way for stone, ore, coal, charcoal, berries, bread, meat and parts; and one mound that swells for leaves and compost.
+  - Cans heap as six-packs and bars as six-packs stacked three across three; a compost pile is a mound of soil with leaves on it and scraps poking out, whatever it holds.
+  - Cans and jars in a heap are plainer than in their icons: no rim, rib, lid, bare tin, mark or ribbon, which do not show at the game's distance.
+  - A heap shows as many pieces as its triangles allow, so a full pile and a fully stocked packing station stay under their ceilings whatever the good.
+- `src/CharcoalShape.cs` — charcoal as three pressed briquettes: six-sided logs with a hole through the middle, two lying and one leaning on them, in one mesh that carries its own colours. The icon shows the three as built, and a heap is made of single briquettes.
+- `StockPile` in `src/PileShape.cs` — a good heaped on any model: pieces of the good on a pad, more of them the more there is, drawn in one batch.
 
 ### Showing piled resources
 
 Show resources piled on or beside a model with a `StockPile`, never with meshes of the model's own, so a good looks the same in every pile.
 
-- Build it with the slot positions, from the ground up a level at a time, and a scale: a slot is 0.72 wide and 0.4 tall at scale 1.
-- Stock shorter than a slot stands on its level's floor. Stock that fills its slot carries the next level on its top; `ItemShape` goods leave gaps, and the next level settles into them, three tenths of the way up (`ItemShape.Nest`), so from the game camera it shows between the four goods under it.
-- Sync it from the view with `Show(slot, item, data)` for one item per slot, or `Fill(item, count, perSlot, data)` for a heap of one item that grows a slot at a time.
-- Both swap only cached meshes and materials, so they allocate nothing once warmed.
-- Every item has stock of its own; an item the data does not know shows the tinted fallback block; give its family stock in `PileShape`, or the item a model in `ItemShape`, rather than drawing it elsewhere.
-- Preview one of every `ItemShape` good in a row of piles, nine to a pile, with a pile full of one good at the end: `./build.py play -- --showcase --goods --goods-full raw_meat`. `--goods-pile N` looks at the Nth pile.
+- Build it with where its middle stands, the pad's width and depth, the triangles a full heap may take and a scale.
+- Sync it from the view with `Fill(item, share, data)` for a share of a full heap, or `Show(item, count, data)` for a number of pieces.
+- `PileShape.PlacesOf` lays any good out: the ground level fills from the middle out, each level above is one piece smaller each way and stands over the gaps of the one below, and a piece is added only after those it rests on. Any number of pieces therefore makes a heap, and it need not be a full pyramid.
+- A change in how much shows sets one count; another good swaps cached meshes, materials and places. Nothing is built once warmed.
+- Every item has a piece of its own in `ItemShape`; an item the data does not know heaps as tinted blocks.
+- Preview a pile of every good, eight to a row, and a compost pile: `./build.py play -- --showcase --goods --goods-share 0.6 --goods-pile 3`. `--goods-share` sets how full they are and `--goods-pile N` looks at the Nth, from 0.
 - Storage piles, the furnace's fuel and the packing station's goods use it.
 
 ### People and animals
@@ -93,7 +94,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 ### Buildings and stations
 
 - `src/CabinShape.cs` — the cabin's shared sloped wall shell with door and window openings, its continuous corrugated roof, and a simple interior. The interior has contrasting wall lining, a wooden floor and a sleeping platform, visible through the open doorway.
-- `src/FurnaceShape.cs` — shared bevelled block faces, a recessed firebox, a shaped steel coping plate and a coal pile of irregular broken slabs with broad fracture faces, the source of coal pile stock. The furnace's outdoor `StockPile` shows its selected stocked fuel, a pile for every two, and disappears when that slot is empty.
+- `src/FurnaceShape.cs` — shared bevelled block faces, a recessed firebox, a shaped steel coping plate and a coal pile of irregular broken slabs with broad fracture faces. The furnace's outdoor `StockPile` shows its selected stocked fuel, a piece for each one up to a small heap, and disappears when that slot is empty.
 - `src/ForgeShape.cs` — the reinforced forge's continuous rounded tank shell, fitted steel bands, recessed refractory chamber and continuous teardrop bellows boards. Its shared meshes keep separate animated bellows pivots and heat glow.
 - `src/AnvilShape.cs` — the anvil's shared cast body with a curved waist, bevelled working face and swept horn.
 - `src/ChestShape.cs` — the hollow wooden chest: bevelled shell and lid, fitted corner guards, loop handles and rear hinge hardware.
@@ -102,11 +103,11 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 - `CanneryShape` — caches the cannery's bevelled steel stove with an open firebox and flue, fitted timber counter, shaped stockpot and lid with open handles, and hand press with cans. Bevels are limited to broad edges. Simplified can profiles and omitted covered caps keep the model light. The fire, light and smoke controls are on `WorldModels.Cannery`.
 - `WorldModels.PackingStation` — a long waist-high table with a sage-painted top, sled-footed legs, straw on the shelf, kraft paper and a twine spool, built in `BenchShape.Packing`.
   - The crate being packed sits open on the table only while packing goes on.
-  - Beside it a heap of the good grows a mound at the first item, a third and two thirds of a crate: the same stock a storage pile shows for that good, scaled down.
+  - Beside it a heap of the good grows toward a full one at a crate's worth: the same pieces a storage pile shows for that good, at half their size.
   - Up to three lidded crates stack beside the table, one for each empty crate the station holds.
   - Fully stocked it stays under its ceiling of 2,500 triangles, whichever good it heaps.
 - `RackShape` — caches the tool station's fitted concrete feet, bevelled planks and cap, and shaped axe, pickaxe, shovel, rake, hammer and chisel. Each of the four pegs has a pivot per tool shape in `RackProp.Pegs`, and shows the one its slot holds.
-- `PileShape` — caches a pile-only dirt pad with fitted log edging, and stock shapes reused from other models. Sources are the mine supply log outline, nature boulders and loose-ore nuggets, furnace coal lumps, charcoal's briquettes (`CharcoalShape`), and the bench/mine stock-board and bar primitives. Connected lumps are extracted whole and logs omit redundant cylinder rings. Coal slots reuse the furnace's closed chunk, and coal and charcoal slots turn by varied amounts. Families share one baked mesh across piles, fitted to the fourteen 9–4–1 slot positions. A good with a model in `ItemShape` is a family of its own. Items without a suitable source use a color-tinted block. `WorldModels.SyncPile` fills the pile's `StockPile` from its inventory, while `WorldView` keeps its sight guard, so remembered stock shows in fog. The farm yard uses `PileShape.Yard`.
+- `PileShape` — the pile's dirt pad with fitted log edging, and how every good heaps: the piece from `ItemShape` and its places on a pad. `WorldModels.SyncPile` fills the pile's `StockPile` from its inventory, the fuller the pile the more pieces, while `WorldView` keeps its sight guard, so a remembered heap shows in fog. A compost pile shows one mound for all it holds. The farm yard uses `PileShape.Yard`.
 - `FarmShape` — caches the farm's shaped soil rows and three seeded variants of sprouts, green plants and ripe wheat. Leaves are tapered and two-sided, stems are triangular and grain heads are shaped. One crop mesh is shown per growth stage under the `Crops` handles.
 - `MineShape` — caches the mine's plan outline, inward-facing tunnel shell, spoil pad, fitted portal and sloped board hood, inner supports and rail runs. The cart has a continuous flared tub, inner lining and rim, and axles and wheels seated on the rail tops. Its load reuses loose-ore geometry. Construction pivots, cart/load visibility, lantern fire/light and tunnel glow are independent. Each cave site rotates with its own cliff face, projecting from the mountain foot with a matching blocked rock footprint. Grass is cleared only inside the cave/rail approaches.
 - `MineRockShape` — a continuous single-mesh outcrop at the cave mouth. Its rear is embedded beneath the mountain triangles sampled by `MountainShape`. The middle cliff columns are removed, and the mountain triangles are clipped around the tunnel to leave its interior clear.
@@ -145,7 +146,7 @@ They cover every item, every building and the workers' hard hat.
 How they are framed:
 
 - Items show the part of a model that shows them in the world, such as a storage pile's logs.
-- Planks, parts and bars show as the stock a storage pile holds (wood parts as a handle, a grip and two pegs).
+- Wood shows as a pair of logs and planks as three boards; wood parts as a handle, a grip and two pegs.
 - Goods that no world model shows have a model of their own in `ItemShape`, and show one of it.
 - The hard hat is the one workers wear, seen from nearly level so its brim and crown show apart.
 - Berries show as a small heap of the bush's berries.

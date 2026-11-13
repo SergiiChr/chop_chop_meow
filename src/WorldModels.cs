@@ -128,7 +128,7 @@ public sealed class BenchProp : Prop {
 }
 
 public sealed class PileProp : Prop {
-    /// <summary>The stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
+    /// <summary>The heap of the good the pile holds.</summary>
     public StockPile Stock = null!;
 }
 
@@ -329,20 +329,20 @@ public static class WorldModels {
         var built = Build(new Thing { Kind = kind });
         // A pile and a furnace show logs, a packing station a heap of bread, and a farm ripe wheat over sown soil.
         switch (built) {
-            case FurnaceProp furnace: furnace.Glow.Visible = false; furnace.Stock.Fill("wood", int.MaxValue, 1, data); break;
+            case FurnaceProp furnace: furnace.Glow.Visible = false; furnace.Stock.Fill("wood", 1, data); break;
             case StoveProp stove: stove.Glow.Visible = false; break;
             case ForgeProp forge: forge.Glow.Visible = false; break;
             case FarmProp farm: farm.Crops[0].Visible = farm.Crops[^1].Visible = true; break;
-            case PileProp pile: pile.Stock.Fill("wood", int.MaxValue, 1, data); break;
-            case PackerProp packer: packer.Stock.Fill("bread", int.MaxValue, 1, data); break;
+            case PileProp pile: pile.Stock.Fill("wood", 1, data); break;
+            case PackerProp packer: packer.Stock.Fill("bread", 1, data); break;
         }
         return built.Root;
     }
 
-    /// <summary>The outdoor pile shows stocked fuel, excluding fuel already burning in a batch: a pile of it for every two.</summary>
+    /// <summary>The outdoor heap shows stocked fuel, excluding fuel already burning in a batch: a piece for each one, as many as the heap holds.</summary>
     public static void SyncFuel(FurnaceProp prop, Thing t, GameData data) {
         string fuel = World.ShownFuel(t, data);
-        prop.Stock.Fill(fuel, t.Burner?[fuel] ?? 0, 2, data);
+        prop.Stock.Show(fuel, t.Burner?[fuel] ?? 0, data);
     }
 
     private static TreeProp Tree(int id) {
@@ -429,7 +429,7 @@ public static class WorldModels {
             new ActorShape.Ring(.85f, .12f, .12f, metal) }, material: FurnaceShape.Steel);
         prop.Vent = new Vector3(-.3f, 2.05f, -.25f);
         // Stocked fuel piles beside the firebox: pile stock is centred and .16 tall at this scale.
-        prop.Stock = new StockPile(body, new[] { new Vector3(.82f, .08f, -.13f), new Vector3(.82f, .08f, .15f), new Vector3(.82f, .24f, .01f) }, .4f);
+        prop.Stock = new StockPile(body, new Vector3(.82f, 0, .01f), new Vector2(.46f, .62f), 300, .7f);
         prop.Light = Light(body, new Vector3(0, .35f, .7f), 2);
         Scorch(body, 1.9f);
         return prop;
@@ -628,8 +628,8 @@ public static class WorldModels {
         Add(body, BenchShape.Packing, BenchShape.Timber, new Vector3(-.25f, 0, 0));
         prop.Packing = Pivot(body, new Vector3(-.6f, .835f, 0));
         Add(prop.Packing, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
-        // Pile stock is centred and .12 tall at this scale, so two slots sit on the table top and the third on them.
-        prop.Stock = new StockPile(body, new[] { new Vector3(-.03f, .96f, -.04f), new Vector3(.21f, .96f, .04f), new Vector3(.09f, 1.08f, 0) }, .3f);
+        // The goods waiting to be packed heap on the table top at half the size a storage pile shows them.
+        prop.Stock = new StockPile(body, new Vector3(.09f, .9f, 0), new Vector2(.46f, .32f), 430, .5f);
         prop.Crates = new Node3D[3];
         for (int i = 0; i < prop.Crates.Length; i++) {
             var crate = prop.Crates[i] = Pivot(body, new Vector3(.85f, i * .44f, .05f));
@@ -691,33 +691,28 @@ public static class WorldModels {
         return prop;
     }
 
-    /// <summary>A 3×3 yard of packed earth edged with logs, with fourteen stack blocks in a 9-4-1 pyramid that the view shows as the pile fills.</summary>
+    /// <summary>A 3×3 yard of packed earth edged with logs, with a heap of the good the pile holds, which the view fills from its inventory.</summary>
     private static PileProp Pile() {
         var prop = new PileProp();
         var body = prop.Body;
         Yard(body);
-        var slots = new List<Vector3>();
-        foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
-            for (int x = 0; x < count; x++)
-                for (int z = 0; z < count; z++) {
-                    float step = .82f, offset = (count - 1) * step / 2;
-                    slots.Add(new Vector3(x * step - offset, y, z * step - offset));
-                }
-        prop.Stock = new StockPile(body, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(slots));
+        // The pad lies inside the log frame; with it the pile's ground and frame take 108 of a building's 2,500 triangles.
+        prop.Stock = new StockPile(body, new Vector3(0, .02f, 0), new Vector2(2.4f, 2.4f), 2390);
         return prop;
     }
 
-    private static readonly List<(string Item, int Count)> pileSlots = new();
-
-    /// <summary>Refresh only visible inventory memory; the view guards this call with the existing sight check.</summary>
+    /// <summary>
+    /// Refresh only visible inventory memory; the view guards this call with the existing sight check.
+    /// A pile heaps up the good it holds, more of it the fuller the pile is; a compost pile shows one mound of soil that swells with all it holds.
+    /// </summary>
     public static void SyncPile(PileProp prop, Thing t, GameData data) {
-        t.Inventory.FillStacks(pileSlots);
-        // Each drawn stack shows the next filled slot, or nothing once the slots run out.
-        for (int i = 0, next = 0; i < prop.Stock.Count; i++) {
-            string item = "";
-            while (item == "" && next < pileSlots.Count) item = pileSlots[next++].Item;
-            prop.Stock.Show(i, item, data);
+        string item = t.Compost ? ItemShape.Compost : ""; int count = 0, room = 0;
+        foreach (var (id, held) in t.Inventory.Items) {
+            if (t.Compost) { count += held; room = t.Inventory.Slots * t.Inventory.StackSize; }
+            // A pile holds one good; should it ever hold more, the most plentiful shows.
+            else if (held > count) { item = id; count = held; room = t.Inventory.Slots * t.Inventory.StackOf(id); }
         }
+        prop.Stock.Fill(item, room > 0 ? count / (float)room : 0, data);
     }
 
     /// <summary>The packed-earth yard with its log frame that a pile or a farm plot stands on.</summary>

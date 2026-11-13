@@ -183,7 +183,7 @@ public partial class WorldView : Node3D {
         BuildLook();
         BuildEffects(scene);
         PileShape.Warm(World.Data);
-        warmStage = new Node3D(); WorldModels.Warm(warmStage); scene.AddChild(warmStage);
+        warmStage = new Node3D(); WorldModels.Warm(warmStage); PileShape.Stage(warmStage, World.Data); scene.AddChild(warmStage);
         BuildGhosts();
         for (int i = 0; i < World.Carts; i++) idleCarts.Push(NewCart());
         playerRig = new ActorRig(ActorSkin.Player); scene.AddChild(playerRig.Root); playerShirt = Shirts[0];
@@ -1019,8 +1019,8 @@ public partial class WorldView : Node3D {
                 if (!live) break;
                 for (int i = 0; i < packer.Crates.Length; i++) packer.Crates[i].Visible = i < t.Inventory["crate"];
                 packer.Packing.Visible = t.Processing;
-                // The heap grows a pile for each third of a crate's worth.
-                packer.Stock.Fill(t.Packs, t.Packs == "" ? 0 : t.Inventory[t.Packs], World.Data.CrateCapacity / 3, World.Data);
+                // The heap grows toward a full one at a crate's worth.
+                packer.Stock.Fill(t.Packs, t.Packs == "" ? 0 : t.Inventory[t.Packs] / (float)World.Data.CrateCapacity, World.Data);
                 break;
             case RackProp rack:
                 if (!live) break;

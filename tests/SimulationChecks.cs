@@ -22,6 +22,7 @@ public static class SimulationChecks {
         Test(NatureModelChecks.Run);
         Test(PileModelChecks.Run, data);
         Test(PileModelChecks.Goods, data);
+        Test(PileModelChecks.Heaps, data);
         Test(MineRockChecks.Run);
         Test(WorkerStateChecks.Run, data);
         Test(CheckOutputFilterBlocksAutomatedWithdrawal, data);
