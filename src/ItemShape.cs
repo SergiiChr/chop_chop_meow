@@ -28,7 +28,7 @@ internal static class ItemShape {
     private static readonly StandardMaterial3D Tin = ModelKit.Vertex(Surface.Metal, .4f, .15f);
 
     private static readonly Dictionary<string, Look> looks = new() {
-        ["steel_parts"] = new(SteelParts, Steel),
+        ["steel_parts"] = new(SteelParts, Steel, Cross),
         ["tin_can"] = new(f => Can(f, null), Tin, Huddle),
         ["canned_jam"] = new(f => Can(f, "b83a5c"), Tin, Huddle),
         ["canned_meat_stew"] = new(f => Can(f, "c07a48"), Tin, Huddle),
@@ -92,6 +92,19 @@ internal static class ItemShape {
         return all;
     }
 
+    /// <summary>Two layers of parts spread on the ground, the upper laid across the lower a quarter turn round.</summary>
+    private static List<Face> Cross(List<Face> one) {
+        var (min, max) = Bounds(one);
+        var middle = ((min + max) / 2) with { Y = 0 };
+        var across = new Transform3D(new Basis(Vector3.Up, MathF.PI / 2), Vector3.Up * (max.Y - min.Y));
+        var all = new List<Face>();
+        foreach (var (a, b, c, tint) in one) {
+            all.Add(new(a - middle, b - middle, c - middle, tint));
+            all.Add(new(across * (a - middle), across * (b - middle), across * (c - middle), tint));
+        }
+        return all;
+    }
+
     /// <summary>
     /// Two of a flat one lying on each other, the upper sunk into the lower as far as its bevelled edge.
     /// The upper keeps all but its underside, and the lower keeps only its upright sides, which are all that show of it.
@@ -147,14 +160,16 @@ internal static class ItemShape {
             int next = (i + 1) % outline.Length;
             Quad(faces, Bottom(i), Bottom(next), Top(next), Top(i), new Vector3(outline[i].Z - outline[next].Z, 0, outline[next].X - outline[i].X), steel);
         }
-        // The eye for the handle runs through the poll, and shows as a slot in its near edge.
-        Box(faces, new Transform3D(new Basis(Vector3.Up, .062f), new Vector3(-.14f, .05f, .057f)), new(.09f, .05f, .008f), dark);
+        // The eye for the handle runs through the poll, and shows as a dark slot on its near edge.
+        Quad(faces, new(-.185f, .025f, .06f), new(-.095f, .025f, .054f), new(-.095f, .07f, .054f), new(-.185f, .07f, .06f), Vector3.Back, dark);
         // The sledge head has its own eye on top.
         var sledge = new Transform3D(new Basis(Vector3.Up, .1f), new Vector3(-.1f, .055f, -.2f));
         Box(faces, sledge, new(.3f, .11f, .11f), steel);
-        Box(faces, sledge.TranslatedLocal(Vector3.Up * .056f), new(.08f, .004f, .05f), dark);
+        Quad(faces, sledge * new Vector3(-.04f, .057f, -.022f), sledge * new Vector3(.04f, .057f, -.022f), sledge * new Vector3(.04f, .057f, .022f),
+            sledge * new Vector3(-.04f, .057f, .022f), Vector3.Up, dark);
+        // The collar is six-sided, like a nut.
         Lathe(faces, new Transform3D(Basis.Identity, new Vector3(-.15f, 0, .24f)),
-            new Ring[] { (.08f, 0, "7fb4d6"), (.08f, .07f, "7fb4d6"), (.056f, .07f, "a8d2ec"), (.056f, .004f, "2c3e4c") }, 8);
+            new Ring[] { (.085f, 0, "7fb4d6"), (.085f, .07f, "7fb4d6"), (.054f, .07f, "a8d2ec"), (.054f, .004f, "2c3e4c") }, 6);
     }
 
     /// <summary>

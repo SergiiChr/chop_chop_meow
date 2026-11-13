@@ -1,6 +1,6 @@
 # Assets
 
-The world is rendered with code-built low-poly 3D models.
+The world is rendered with low-poly 3D models, code-built apart from the baked trees and a few baked foods.
 There are no world or character sprite sheets.
 The only 2D images are interface icons.
 
@@ -43,7 +43,7 @@ Detail past these does not show at the game's camera distance and costs frame ti
 
 ### Assembly and shared helpers
 
-Models are assembled from code-built Godot meshes.
+Models are assembled from code-built Godot meshes, with baked meshes for trees, berry bushes and four foods.
 
 - `src/WorldModels.cs` — world objects, wolf carcass and trade cart.
 - `src/ActorRig.cs` — player, worker, courier and the intro film's boss.
@@ -60,9 +60,9 @@ Models are assembled from code-built Godot meshes.
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons and pile stock. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
 - `src/ItemShape.cs` — goods that no world model shows, one small model an item, each a mesh that carries its own colours.
   The icon shows the model as built, and a pile slot shows it fitted to the slot.
-  - Built in code: steel parts (an axe head, a sledge head and a collar ring, none with a handle), the tin can and the two sealed cans with their labels, the jar of jam under a cloth cover, the tied sheaves of grass and wheat, the flour sack, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
+  - Built in code: steel parts (an axe head, a sledge head and a six-sided collar, none with a handle), the tin can and the two sealed cans with their labels, the jar of jam under a cloth cover, the tied sheaves of grass and wheat, the flour sack, the open sacks of fertilizer and wheat seeds, dough on a floured board, and coins.
   - Baked from Kenney's Food Kit and recoloured to the game's palette: bread (the round loaf), raw meat (the ham on the bone), burnt steak (the cooked steak, charred) and the bowls of meat stew and crushed berries (the bowl of soup). `tools/food_models.py` bakes them into `models/food/`; see [food/README.md](models/food/README.md).
-  - A slot holds one of most goods, stretched to fill it. Cans and jars stand three together and steaks lie two deep, since one alone would be stretched out of shape.
+  - A slot holds one of most goods, stretched to fill it. Cans and jars stand three together, steaks lie two deep and steel parts lie in two layers, since one alone would be stretched out of shape.
   - A slot's stock stays within 145 triangles, which keeps a full pile and a fully stocked packing station under their ceilings.
 - `src/CharcoalShape.cs` — charcoal as three pressed briquettes: six-sided logs with a hole through the middle, two lying and one leaning on them, in one mesh that carries its own colours. The icon shows it as built, and a pile slot shows it fitted to the slot.
 - `StockPile` in `src/PileShape.cs` — piled resources on any model: fixed slots that each show one item's cached pile stock.
