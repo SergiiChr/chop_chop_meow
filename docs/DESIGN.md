@@ -517,13 +517,14 @@ A station is always on one: taking the mark off with no batches waiting leaves t
 So a station with nothing to make keeps showing its cups, and more batches of that recipe are not a turn to another.
 Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
 `World.QueueBatch` adds to the count, and for a recipe other than the selected one it first turns the station to it:
-it drops the batches that waited and moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack.
+it drops the batches that waited, moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack, and moves the mark, when the station has one, to the new recipe.
 `World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for all of it (`Inventory.Fits`).
 So batches only wait for the recipe in progress when there is one, and `World.Deserialize` refuses a save where they wait for another.
 `World.Unqueue` takes waiting batches off the count.
-`World.SetRecipe` moves the mark; `World.MarkBlock` refuses a move to a recipe other than the selected one while a batch is in progress or `Thing.Inventory` holds anything.
+`World.SetRecipe` moves the mark, and a move to a recipe other than the selected one turns the station to it and drops the batches that waited; `World.MarkBlock` refuses that move while a batch is in progress or `Thing.Inventory` holds anything.
+So a station with a mark is on its marked recipe, and `World.Deserialize` refuses a save where batches wait for another.
 A station takes inputs for the selected recipe and the kept one, and haulers carry out only what neither takes.
-A station starts no batch while its cups hold something that is neither such an input nor what its recipe makes (`World.Blocked`), as after asked batches end and it goes back to the kept recipe.
+A station starts no batch while its cups hold something that is neither such an input nor what its recipe makes (`World.Blocked`), as when a hauler delivers after the station has turned.
 What no storage takes stays in the station, which goes on working until its output stack is full.
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu; only the crafting menu has a `QueueStrip` under the work.

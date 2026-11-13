@@ -1406,8 +1406,8 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); Drop(Hosted, "planks", 3); await CloseWithEsc();
     }
     /// <summary>
-    /// At a station a click marks or unmarks what workers keep making, Shift and Ctrl queue and load 5 and 10 with the count on the plate,
-    /// a right-click takes batches off, and no queue is drawn below.
+    /// At a station Shift and Ctrl queue and load 5 and 10 with the count on the plate and move the worker mark to the recipe queued,
+    /// a click unmarks what workers keep making, a right-click takes batches off, and no queue is drawn below.
     /// By hand a double-click queues just one, and a right-click on a cup in the queue takes a waiting batch off.
     /// </summary>
     private async Task CheckRecipeBoardsMarkAndQueueWithModifiers() {
@@ -1415,12 +1415,14 @@ public partial class Game {
         await ClickOn(furnace);
         string Queued(string plate) => ((Label)Named(plate)!.FindChild("queued", true, false)).Text;
         Require(((Control)Named("craft_iron_bar")!.FindChild("kept", true, false)).Visible, "A new stone furnace must show iron marked for workers.");
-        await Click(Named("craft_iron_bar")!);
-        await Until(() => furnace.Keep == "" && !((Control)Named("craft_iron_bar")!.FindChild("kept", true, false)).Visible, "a click on the marked recipe taking the mark off", 2);
+        bool Kept(string plate) => ((Control)Named(plate)!.FindChild("kept", true, false)).Visible;
         await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
+        await Until(() => furnace.Keep == "charcoal" && Named("craft_charcoal") != null && Kept("craft_charcoal") && Queued("craft_charcoal") == "5", "a Shift-click queueing 5 charcoal and moving the worker mark to it", 2);
+        await Click(Named("craft_charcoal")!);
+        await Until(() => furnace.Keep == "" && !Kept("craft_charcoal"), "a click on the marked recipe taking the mark off", 2);
         await Holding(Key.Ctrl, () => Click(Named("craft_charcoal")!));
-        await Until(() => Named("craft_charcoal") != null && Queued("craft_charcoal") == "15", "Shift and Ctrl clicks queueing 15 charcoal, shown on the plate", 2);
-        Require(furnace.Keep == "", "Queueing with a modifier must not mark the recipe.");
+        await Until(() => Queued("craft_charcoal") == "15", "a Ctrl-click queueing 10 more charcoal, shown on the plate", 2);
+        Require(furnace.Keep == "", "Queueing at a station with no mark must not mark the recipe.");
         await Holding(Key.Shift, () => RightClick(Named("craft_charcoal")!));
         await Until(() => Queued("craft_charcoal") == "10", "a Shift right-click taking 5 batches off", 2);
         Require(panel.FindChildren("queued_*", "", true, false).Count == 0, "A station must show what waits only as the count on its card.");
