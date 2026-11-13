@@ -19,6 +19,7 @@ public static class AnimationChecks {
         CheckCraftingSquatsOnlyWhileStandingStill();
         CheckChangingActionBlendsBetweenPoses();
         CheckEveryGaitPlantsItsFeetAndLeavesTheGroundOnlyWhenRunning();
+        CheckDiggingKeepsBothFeetWhereTheyStand();
         CheckWolfGaitsPlantEachPaw();
         CheckPosingAllocatesNothing();
     }
@@ -31,6 +32,24 @@ public static class AnimationChecks {
             time += 1 / 60f;
             foreach (var action in actions) ActorAnimation.Blended(ActorAction.Idle, time, false, action, time, false, .5f);
         });
+    }
+
+    /// <summary>Through a dig the front boot stays flat on the ground and the back one on its toe, neither sliding nor sinking, while the hips go down and up.</summary>
+    private static void CheckDiggingKeepsBothFeetWhereTheyStand() {
+        const int samples = 200;
+        float lowest = float.MaxValue, highest = 0;
+        Vector2? frontToe = null, backToe = null;
+        for (int i = 0; i < samples; i++) {
+            var pose = ActorAnimation.PoseAt(ActorAction.Dig, ActorAnimation.Duration(ActorAction.Dig) * i / samples, false);
+            var front = ActorAnimation.SoleOf(pose.SwingL, pose.KneeL, pose.FootL);
+            var back = ActorAnimation.SoleOf(pose.SwingR, pose.KneeR, pose.FootR);
+            frontToe ??= front.Toe; backToe ??= back.Toe;
+            Require(Math.Abs(pose.Hips - front.Toe.Y) < .003f && Math.Abs(pose.Hips - front.Heel.Y) < .003f, $"the front boot should stay flat on the ground, sample {i}: toe {pose.Hips - front.Toe.Y:0.000} m, heel {pose.Hips - front.Heel.Y:0.000} m up");
+            Require(Math.Abs(pose.Hips - back.Toe.Y) < .003f && pose.Hips - back.Heel.Y > -.003f, $"the back boot should stay on its toe with the heel off the ground, sample {i}: toe {pose.Hips - back.Toe.Y:0.000} m, heel {pose.Hips - back.Heel.Y:0.000} m up");
+            Require(Math.Abs(front.Toe.X - frontToe.Value.X) < .005f && Math.Abs(back.Toe.X - backToe.Value.X) < .005f, $"neither boot should slide, sample {i}");
+            lowest = Math.Min(lowest, pose.Hips); highest = Math.Max(highest, pose.Hips);
+        }
+        Require(highest - lowest > .1f, $"the digger should bend down onto the shovel and straighten to throw: the hips moved {highest - lowest:0.00} m");
     }
 
     /// <summary>At each gait's pace a paw on the ground holds its place while the body moves on over it, and no paw sinks into the ground.</summary>
@@ -181,6 +200,11 @@ public static class AnimationChecks {
             "butchering a carcass should use the crouched gather action");
         Require(ActorAnimation.PlayerAction(ThingKind.Tree, false, false, bag) == ActorAction.Idle,
             "inactive gathering should leave the player idle");
+        Require(ActorAnimation.PlayerAction(ThingKind.Stump, true, false, bag) == ActorAction.Idle && ActorAnimation.PlayerAction(ThingKind.Bush, true, false, bag) == ActorAction.Idle,
+            "a stump or a bush should not be worked at without a shovel");
+        bag.Add("steel_shovel", 1);
+        Require(ActorAnimation.PlayerAction(ThingKind.Stump, true, false, bag) == ActorAction.Dig && ActorAnimation.PlayerAction(ThingKind.Bush, true, false, bag) == ActorAction.Dig,
+            "a carried shovel should dig at a stump and at a bush");
     }
 
     private static void CheckWorkerHoldingALoadCarriesIt() {
@@ -237,6 +261,8 @@ public static class AnimationChecks {
         worker.Status = "Arbitrary status";
         Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Iron }, false) == ActorAction.Mine,
             "workers gathering iron should mine");
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Stump }, false) == ActorAction.Dig && ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Bush }, false) == ActorAction.Dig,
+            "workers at a stump or a bush should dig");
         worker.Status = "Available";
         worker.WorkState = WorkerWorkState.Idle;
         Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Idle,
@@ -289,6 +315,7 @@ public static class AnimationChecks {
         Require(ActorAnimation.Tool(ActorAction.SteelMine) == "steel_pick", "steel mining should show the steel pick");
         Require(ActorAnimation.Tool(ActorAction.Hammer) == "hammer", "hammering should show the hammer");
         Require(ActorAnimation.Tool(ActorAction.Grind) == "mortar", "grinding should show the mortar in hand");
+        Require(ActorAnimation.Tool(ActorAction.Dig) == "steel_shovel", "digging should show the shovel");
         Require(ActorAnimation.Tool(ActorAction.Gather) == null, "hand gathering should show no tool");
     }
 }

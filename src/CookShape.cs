@@ -76,11 +76,12 @@ internal static class CookShape {
         return s.Commit();
     }
 
-    private static ArrayMesh BuildMortar() {
+    /// <summary>The mortar with its pestle in it, turned on the given numbers of sides; fewer make it light enough to pile.</summary>
+    public static ArrayMesh BuildMortar(int bowlSides = 12, int pestleSides = 8) {
         var s = Begin();
-        Lathe(s, Vector3.Zero, BowlProfile, BowlTint, 12);
+        Lathe(s, Vector3.Zero, BowlProfile, BowlTint, bowlSides);
         // Rounded pestle leans into the bowl, with its foot below the rim.
-        Lathe(s, new(.025f, .025f, 0), PestleProfile, PestleTint, 8, -.38f);
+        Lathe(s, new(.025f, .025f, 0), PestleProfile, PestleTint, pestleSides, -.38f);
         return s.Commit();
     }
 

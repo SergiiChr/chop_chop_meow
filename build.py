@@ -71,10 +71,14 @@ def command(args: list[str | Path], *, env: dict[str, str] | None = None) -> Non
 
 def download(url: str, target: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
+    # Some hosts refuse Python's default client name.
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "chop-chop-meow-build"}
+    )
     for attempt in range(5):
         try:
             with (
-                urllib.request.urlopen(url, timeout=60) as response,
+                urllib.request.urlopen(request, timeout=60) as response,
                 target.open("wb") as output,
             ):
                 shutil.copyfileobj(response, output)
@@ -105,17 +109,48 @@ def fetch_pinned(url: str, archive: Path, sha256: str) -> None:
 
 
 AMBIENTCG = TOOLS / "ambientcg"
-# The Godot script that packs photoscans into the game's textures; it runs from a temporary project.
+# The Godot script that packs photoscans into the game's textures.
 PACK_SCRIPT = ROOT / "tools" / "pack_textures.gd"
-PACKER_PROJECT = """; Isolated project for packing textures.
+SCRIPT_PROJECT = """; Isolated project for running one tool script.
 config_version=5
 
 [application]
-config/name="Texture packer"
+config/name="Tool script"
 
 [rendering]
 renderer/rendering_method="gl_compatibility"
 """
+
+
+def run_tool_script(
+    script: Path, args: list[str | Path], success_marker: str, timeout: float
+) -> None:
+    """Runs a Godot tool script headless from a throwaway project of its own, and stops unless it prints the marker.
+
+    Godot ignores projects nested under the repository's .tools/.gdignore, so the project is a temporary folder.
+
+    """
+    with tempfile.TemporaryDirectory(prefix="chop-chop-tool-") as temporary:
+        project = Path(temporary) / "project"
+        project.mkdir()
+        (project / "project.godot").write_text(SCRIPT_PROJECT, encoding="utf-8")
+        shutil.copy(script, project / script.name)
+        run_godot(
+            script.stem,
+            [
+                GODOT,
+                "--headless",
+                "--path",
+                project,
+                "--script",
+                f"res://{script.name}",
+                "--",
+                *args,
+            ],
+            isolated_env(Path(temporary)),
+            timeout=timeout,
+            success_marker=success_marker,
+        )
 
 
 def pack_photoscans(
@@ -137,11 +172,8 @@ def pack_photoscans(
     BUILD.mkdir(exist_ok=True)
     AMBIENTCG.mkdir(parents=True, exist_ok=True)
     output.mkdir(parents=True, exist_ok=True)
-    # Godot ignores projects nested under the repository's .tools/.gdignore, so the packer runs from a temporary
-    # project.
     with tempfile.TemporaryDirectory(prefix="chop-chop-textures-") as temporary:
-        source = Path(temporary) / "source"
-        source.mkdir()
+        source = Path(temporary)
         for asset, sha256 in sets.values():
             archive = AMBIENTCG / f"{asset}_1K-PNG.zip"
             fetch_pinned(
@@ -150,20 +182,9 @@ def pack_photoscans(
             with zipfile.ZipFile(archive) as bundle:
                 for name in maps:
                     bundle.extract(f"{asset}_1K-PNG_{name}.png", source)
-        project = Path(temporary) / "project"
-        project.mkdir()
-        (project / "project.godot").write_text(PACKER_PROJECT, encoding="utf-8")
-        shutil.copy(PACK_SCRIPT, project / PACK_SCRIPT.name)
-        run_godot(
-            PACK_SCRIPT.stem,
+        run_tool_script(
+            PACK_SCRIPT,
             [
-                GODOT,
-                "--headless",
-                "--path",
-                project,
-                "--script",
-                f"res://{PACK_SCRIPT.name}",
-                "--",
                 kind,
                 source,
                 output,
@@ -174,9 +195,8 @@ def pack_photoscans(
                     for name, (asset, _) in sets.items()
                 ),
             ],
-            isolated_env(Path(temporary)),
+            "TEXTURE-PACK PASS",
             timeout=600,
-            success_marker="TEXTURE-PACK PASS",
         )
     print(f"Packed {len(sets)} texture sets into {output.relative_to(ROOT)}")
 

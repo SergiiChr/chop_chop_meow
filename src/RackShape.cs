@@ -12,7 +12,7 @@ internal static class RackShape {
     public static Mesh Pick => pick ??= BuildTool("pickaxe");
     public static Mesh Rake => rake ??= BuildTool("rake");
     /// <summary>The hanging shape of every tool kind a peg can show; a kind without one, such as the mortar, hangs nothing.</summary>
-    public static readonly (string Kind, Mesh Mesh)[] Tools = [("axe", Axe), ("pickaxe", Pick), ("rake", Rake), ("hammer", BuildTool("hammer")), ("chisel", BuildTool("chisel"))];
+    public static readonly (string Kind, Mesh Mesh)[] Tools = [("axe", Axe), ("pickaxe", Pick), ("rake", Rake), ("shovel", BuildTool("shovel")), ("hammer", BuildTool("hammer")), ("chisel", BuildTool("chisel"))];
     /// <summary>Where a slot's peg sits across the board.</summary>
     public static float PegX(int slot) => -.36f + slot * .24f;
     public static readonly StandardMaterial3D Concrete = ModelKit.Vertex(Surface.Stone, .95f);
@@ -58,6 +58,11 @@ internal static class RackShape {
             case "chisel":
                 // A short flat blade in place of a long handle's head.
                 Prism(s, new[] { new Vector2(-.012f, .0f), new(.012f, .0f), new(.018f, .1f), new(-.018f, .1f) }, .012f, "aebabc");
+                break;
+            case "shovel":
+                // A pointed blade hangs face out below the handle, on a short socket.
+                Prism(s, new[] { new Vector2(-.085f, -.7f), new(.085f, -.7f), new(.085f, -.86f), new(0, -.95f), new(-.085f, -.86f) }, .012f, "aebabc", new Vector3(0, 0, .012f));
+                Box(s, new(.04f, .08f, .03f), new(0, -.72f, .004f), "aebabc");
                 break;
             case "rake":
                 Box(s, new(.3f, .04f, .04f), new(0, -.74f, 0), "aebabc");

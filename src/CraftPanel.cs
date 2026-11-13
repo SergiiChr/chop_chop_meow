@@ -30,7 +30,7 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
         var product = RecipeCup("making", making.Output, $"×{making.Amount}", 64);
         AddChild(new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))),
             () => world.Making == shown && making.Seconds > 0 ? world.CraftTime / making.Seconds : 0, null, product, Array.Empty<Control>()));
-        AddChild(new QueueStrip(kit, live, null));
+        AddChild(new QueueStrip(kit, live));
         var status = Style.Text("", 14, Style.Warn); AddChild(status);
         live.Watch(() => world.CraftRate <= 0, stalled => {
             bool noTool = stalled && making.Tool != "";

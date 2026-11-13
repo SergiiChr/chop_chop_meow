@@ -12,10 +12,11 @@ These came from the user; change them only after asking.
 - **Look:** smooth isometric 3D, natural and lighthearted, with some of Terraria's approachable feel; no fantasy or industrial styling. Buildings are modern DIY, there are several tree species, and workers wear blue overalls over a cream shirt.
 - **Animation:** every core interaction has an animation, with a dedicated one for every tool.
 - **Progression:** the player starts with a steel axe, an empty bottle, 10 berries and 6 wood, and no pickaxe; no loose iron lies about and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
+- **Shovel:** a steel shovel is made, bought and sold like the pickaxe. It digs up the stump a felled tree leaves for 3 wood and a plain bush for 36 leaves, three oak patches' worth; both are gone for good. Stumps are part of a worker's wood gathering while a shovel is to be had, and bushes are a job of their own.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
-- **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they pick up loose pieces of the same resource, or wait and say so once.
+- **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, shovel for stumps and bushes, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they go to another spot of the job that they can work, loose pieces last, or wait and say so once.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. Piles set their own filters from what they hold. Manual transfers bypass automation filters.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
@@ -66,9 +67,10 @@ Simulation and data:
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
 | `src/Wolves.cs` | Wolf dens, the wolves they let out, patrols, smell, howls and the way home |
-| `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor and its chip |
+| `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
-| `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces |
+| `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
+| `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
@@ -103,10 +105,10 @@ UI and input:
 | `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
-| `src/StationPanel.cs` | A station's page: recipe board, process row, queue, bellows and jobs, with its tool slots in a window beside it |
+| `src/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
 | `src/Cups.cs` | `Cups`: a building's item cups and a station's process row |
 | `src/CraftPanel.cs` | The crafting menu |
-| `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the queue strip under the work |
+| `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
@@ -139,7 +141,7 @@ Rendering and sound:
 | `src/WorldView.cs` | The 3D scene, orthographic camera, picking, lighting and world animation |
 | `src/WorldScene.cs` | Ground dressing, particles and the animation review |
 | `src/Terrain3DView.cs` | Mountain and valley terrain through the Terrain3D plugin |
-| `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, flowers and shrubs from the baked placement, cleared around buildings and paths |
+| `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
 | `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake surface and wet banks |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
@@ -259,9 +261,9 @@ The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
 Picking, the hover ring and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`), so selection matches what is drawn.
 A tree crown only wins a click when nothing else is under the cursor, so objects behind a canopy stay selectable.
 Trees use three variants chosen by object id, so saves need no new fields.
-A tree's height comes from its id too (`WorldModels.TreeTall`): its model, stump and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
+A tree's height comes from its id too (`WorldModels.TreeTall`): its model and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
 The bake stands each tree's lowest point on the ground, which on a spruce and one oak is a hanging branch, so their baked trunks start up to 1.8 m higher; `Tree3DShape.Add` carries such a trunk down to the ground with a stem that widens toward its foot.
-A stump stands where its tree's trunk did and is as thick as the trunk at the ground (`Tree3DShape.Foot`), so a birch leaves a thin stump and an oak a stout one.
+A stump keeps the id of the tree that left it (`Thing.OfTree`), so its model stands where that tree's trunk did (`DugProp.Seat`) and is as thick as the trunk was at the ground (`Tree3DShape.Foot`): a birch leaves a thin stump and an oak a stout one. A stump with no tree on record, such as a showcase's, keeps the stump model's own size.
 Fading swaps in cached alpha-blended copies of a model's materials, so faded trees still share a handful of materials.
 
 ### Actor animation
@@ -296,6 +298,12 @@ A sprint and a jog share their mechanics and differ in timing and form:
 - The feet land close to one line, and the trunk leans into the run, more in a sprint.
 - The elbows stay bent, most in front, bringing the hand up toward the chin.
 
+Digging (`ActorAction.Dig`) holds the shovel in both hands: the right on top of the handle and the left `ActorAnimation.ShovelGrip` down the shaft.
+`ActorAnimation.DigKeys` give where the blade's tip is and how the shaft leans at each moment: driven into the ground ahead, leant on, levered up and thrown aside to the left.
+Both arms are solved from there with `ActorAnimation.ArmTo`, and `ActorRig.Show` lays the shaft from the right fist through the left, so the blade goes where the keys take it.
+The front boot stays flat and the back one on its toe at fixed spots, so neither slides as the hips go down and up.
+The handle is kept ahead of the right side of the chest and below the shoulders: at the middle of the chest the folded right arm would lie inside the torso, and higher it would be in front of the face.
+
 A player with something to make by hand squats over it, turning it in both hands (`ActorAction.Craft`), only while standing still.
 
 The player's carried tool selects its matching action and the tool shown in hand.
@@ -316,7 +324,8 @@ The shoulders turn through the stroke, the grip turns the blade to cut sideways 
 An axe swung in the air with Space or a click (`AxeSwing`, `SteelAxeSwing`) goes up overhead and comes straight down, which is the blow that lands on a wolf.
 
 Manual bellows pumping, the unarmed punch and the axe swing trigger one loop of their action.
-Each striking work action has an impact moment that shakes its target and spawns chips, leaves, splashes or sparks; packing and grinding strike nothing.
+Each striking work action has an impact moment that shakes its target and spawns chips, leaves, soil, splashes or sparks; packing and grinding strike nothing.
+A dig strikes at `ActorAnimation.DigStrike` and throws its soil off the blade (`ActorRig.ShovelTip`) at `DigToss`.
 An action's key poses are made once (`ActorAnimation.ChopKeys` and the like): every worker and player is posed every frame, so a pose is worked out without allocating.
 Pausing freezes animation and effects.
 
@@ -414,6 +423,9 @@ The view picks against what it draws but only returns things that still exist.
 Only what is in sight is drawn every frame (`WorldView.SyncThings`).
 A thing out of sight is drawn once as its snapshot, moved on far enough to finish whatever it was doing, and left alone until its snapshot changes, night falls or lifts, or it is seen again.
 A change that did not happen in front of the player is not played when they see it (`WorldView.Watched`): a tree felled out of sight is a stump, a chest filled out of sight keeps its lid shut, and a chip or a building that appeared out of sight neither flies nor lands in dust.
+A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
+A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one a building now stands over (`World.Clears`) just goes.
+While it is dug at, a stump or bush leans further over with `Thing.Progress` (`DugProp`).
 Work out of sight is heard but shakes nothing and throws no chips.
 
 `WorldView` hides wolves, workers and carts outside sight.
@@ -473,6 +485,10 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
 - `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `GatherRules.ChipReach` of a boulder or deposit on `GatherRules.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
+- A felled tree is taken out of the world and its stump (`stump`, `World.StumpWood`) put in its place by `World.Fell`, as a thing of its own with a new id that keeps the tree's id in `Thing.OfTree`.
+- Plain bushes (`bush`, `World.BushLeaves`) grow on the scenery spots `Scenery.Bush` picks (`World.GrowBushes`), away from the clearing and the mountain feet.
+- A stump or a bush is dug up whole (`GatherShape.Dug`, `Thing.IsDug`): digging adds to `Thing.Progress` at the shovel's speed until `GatherRules.DigSeconds`, then `World.Unearth` moves all it holds to the digger and removes it with a `dig_up` sound. The player's backpack must have room for all of it (`World.GatherBlock`), and a worker's hands are sized for it.
+- Stumps and bushes never block building (`World.BuiltOver`): a new building, yard or crate clears away those on the ground it keeps clear of other resources (`World.ClearGround`).
 - A berry bush holds `World.BushBerries` at the start and each time it fruits again, which is `BerryRegrowHours` after the first berry was picked from it, picked clean or not.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
 - Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
@@ -480,7 +496,7 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 
 ### Tools
 
-Tools carry a `Tool` kind (axe, pickaxe, hammer, chisel, rake, mortar), a `Speed` and a `Tier` in `GameTables`:
+Tools carry a `Tool` kind (axe, pickaxe, shovel, hammer, chisel, rake, mortar), a `Speed` and a `Tier` in `GameTables`:
 
 | `Tier` | Material |
 | --- | --- |
@@ -493,7 +509,8 @@ Tier 1 is unused, since there are no iron tools.
 Recipes name the tool they need, the lowest `Tier` that will do, and whether they can be made by hand (`Hand`).
 So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
 
-`GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for deposits), one that only speeds gathering up (a pickaxe for rock, a rake for leaves, which take three times as long by hand), and the loose piece a pickaxe chips off it.
+`GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for deposits, a shovel for stumps and bushes), one that only speeds gathering up (a pickaxe for rock, a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
+A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf patches.
 Stone, leaves, berries and loose pieces need no tool.
 The world's things are also kept by kind (`ThingList.Of`), so a search for one kind, such as tool stations, stores or campfires, and the tick, which runs only kinds that change by themselves, pass over trees and rocks.
 Searches by place, such as what a player sees and room to build, still look at every thing.
@@ -511,20 +528,34 @@ Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFr
 Hand recipes queue in `PlayerState.Crafting`, one `Queued` entry per recipe with its count, and take their inputs at once.
 The first one waiting moves to `PlayerState.Making` when work on it starts and can no longer be cancelled; the rest give their materials back when taken off.
 They run at base speed times the tool's speed while the player carries it, and only while the player has stood still for `World.CraftSettle` (`PlayerState.Still`).
-Queues are written by `QueueJson`, since the generic list writer allocates on every world update.
+The queue is written by `QueueJson`, since the generic list writer allocates on every world update.
 
 The bench runs at `BenchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
 
-A station's `Thing.Queue` holds its queued batches, one entry per recipe in the order first queued; a batch leaves it as it starts.
-`Thing.Keep` is the recipe workers keep it making once the queue is done, and a building's `Recipe` in `GameTables` names the one it starts with.
-`Thing.Making` is the batch in progress, as `PlayerState.Making` is by hand, and both start the next batch through `World.StartNext`.
-`Thing.Recipe` is worked out, not stored: the batch in progress, else the first queued, else `Keep`; with none the station stands idle.
-Saves and world updates leave out an empty mark, queue and batch, so a tree or a rock carries none of them.
-`World.QueueOf` and `World.Enqueue` read and change either queue, a station's or the hand's, for the board and the strip.
-A station takes inputs for any recipe it has queued or kept, and haulers carry out only what none of them takes.
+A station counts batches of one recipe at a time: `Thing.Asked` is the recipe a player queued last and `Thing.Batches` how many of it still wait; a batch leaves the count as it starts.
+`Thing.Keep` is the recipe workers keep it making once those batches are done, and a building's `Recipe` in `GameTables` names the one it starts with.
+`Thing.Making` is the batch in progress, as `PlayerState.Making` is by hand.
+`Thing.Recipe` is worked out, not stored: the batch in progress, else `Asked` while batches of it wait, else `Keep`; with none the station stands idle.
+`World.Selected` is the recipe the station is on, whose cups its page draws and whose card is outlined: `Recipe`, else `Asked`, else the first recipe on its board.
+A station is always on one: taking the mark off with no batches waiting leaves the marked recipe in `Asked`.
+So a station with nothing to make keeps showing its cups, and more batches of that recipe are not a turn to another.
+Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
+`World.QueueBatch` adds to the count, and for a recipe other than the selected one it first turns the station to it:
+it drops the batches that waited and moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack.
+It always puts the mark on the recipe queued.
+`World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for all of it (`Inventory.Fits`).
+So batches only wait for the recipe in progress when there is one, and `World.Deserialize` refuses a save where they wait for another.
+`World.Unqueue` takes waiting batches off the count.
+`World.SetRecipe` moves the mark, and a move to a recipe other than the selected one turns the station to it and drops the batches that waited; `World.MarkBlock` refuses that move while a batch is in progress or `Thing.Inventory` holds anything.
+So a station with a mark is on its marked recipe, and `World.Deserialize` refuses a save where batches wait for another.
+A station takes inputs for the selected recipe and the kept one, and haulers carry out only what neither takes.
+A station starts no batch while its cups hold something that is neither such an input nor what its recipe makes (`World.Blocked`), as when a hauler delivers after the station has turned.
 What no storage takes stays in the station, which goes on working until its output stack is full.
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
-Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
+Every station page shows the same `RecipeBoard` as the crafting menu; only the crafting menu has a `QueueStrip` under the work.
+The board asks `World.SwitchBlock` before it queues at a station and `World.MarkBlock` before it marks, and when the answer is a refusal it shakes the cups of the station's `ProcessRow` (`ProcessRow.Shake`).
+A click on a station's card marks at once, also as the first press of a double-click: queueing puts the mark on the recipe whatever that press did.
+A mark the station refuses is sent and shown only after `RecipeBoard.DoubleClickSeconds`, the time Godot on Linux allows a double-click's second press, since a double-click empties the cups in the way.
 The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.ClosedGroups` keeps the groups the player closed, for every board.
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
 The panel keeps the list's place while the page draws again, so a click on a recipe leaves the list where it was scrolled to.
@@ -673,8 +704,10 @@ Workers hold duties (`Worker.Duties`): a place and one of the jobs `World.Jobs` 
 - Tend fetches what a compost pile's filters take from storage and carries its fertilizer out.
 - Deliveries runs price errands and carries the trading post's mail, other than coins, to storage.
 
-A gatherer whose spot is spent moves the duty to the nearest spot yielding the same item in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
-Spots that need a tool count only while the worker can get one, and loose pieces come only after every other spot; a gatherer with no tool to be had goes to known loose pieces at once (`World.LooseSpot`).
+A gatherer whose spot is spent moves the duty to the nearest spot of the same job in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
+Spots that need a tool count only while the worker can get one (`World.CanWork`), and loose pieces come only after every other spot; a gatherer with no tool to be had for their spot goes to the nearest spot they can work at once (`World.OtherSpot`).
+A woodcutter who fells a tree takes its stump as their spot while a shovel is to be had, without waiting for a player to see it; other stumps count once a player has seen them.
+A worker carries one tool, so going between a tree and a stump takes a walk to a tool station to swap.
 With none known they say so once and go on to their other places, or wait at the nearest trading post until one is seen or the spot comes back.
 A worker with no duties waits at the nearest trading post.
 
@@ -827,7 +860,7 @@ A sound on screen plays at full volume, one just past the screen edge is faint, 
 Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
-- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
+- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
 A tree felled in sight takes 1 second to reach the ground when it is among the shortest and 2.1 when among the tallest (`WorldView.FallSeconds`).
@@ -856,7 +889,7 @@ The world is a fixed 216-tile valley defined in `src/Terrain.cs`:
 - a lake whose shore function bounds both walking and the drawn water.
 
 `World.Scatter` places resources with a seeded generator, trees more densely toward the mountains.
-`World.Deserialize` also refuses, rather than repairs, a save that is incomplete, names unknown items, marks or queues a recipe at a station that does not make it, or holds player needs out of range.
+`World.Deserialize` also refuses, rather than repairs, a save that is incomplete, names unknown items, marks or counts batches of a recipe at a station that does not make it, or holds player needs out of range.
 Workers use grid detours around water and buildings.
 
 ## Development and verification

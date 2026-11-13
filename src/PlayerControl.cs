@@ -81,6 +81,8 @@ public sealed class PlayerControl {
 
     /// <summary>Carries on a gather; a loose piece needs only one click: the player keeps walking to it after the button is released.</summary>
     private Vector2 Gather(Vector2 direction, bool right, float dt) {
+        // What was being worked on can go: a tree falls and leaves its stump, and a stump or a bush comes out of the ground.
+        if (gathering != null && world.Find(gathering.Id) == null) { panel.Deselect(gathering.Id); gathering = null; }
         if (gathering == null || !right && !gathering.IsLoose || direction != Vector2.Zero || entering != null) {
             world.ResetGather();
             if (!right || gathering?.IsLoose == true) gathering = null;
@@ -94,9 +96,9 @@ public sealed class PlayerControl {
             gathering = null;
             return direction;
         }
-        // Emptying it shows on the stump or bare bush; a target that was already empty or out of reach still says why.
+        // Emptying it shows on the bare bush or raked patch; a target that was already empty or out of reach still says why.
         bool had = gathering.Remaining > 0; world.Gather(gathering, dt);
-        if (world.GatherBlock(gathering) is string blocked) { if (blocked != "" && (!had || gathering.Remaining > 0)) kit.Notify(blocked); gathering = null; }
+        if (world.GatherBlock(gathering) is string blocked) { if (!had || gathering.Remaining > 0) kit.Notify(blocked); gathering = null; }
         return direction;
     }
 
@@ -161,7 +163,7 @@ public sealed class PlayerControl {
 
     private void AssignGather(ClickMode.Assign assign, Thing? t) {
         var worker = world.Workers.FirstOrDefault(w => w.Id == assign.Worker);
-        if (worker == null || t?.IsResource != true) { kit.Notify("Choose a tree, leaves, stone, ore, coal, berry bush or water source."); return; }
+        if (worker == null || t?.IsResource != true) { kit.Notify("Choose a tree, stump, bush, leaves, stone, ore, coal, berry bush or water source."); return; }
         if (world.GatherBlock(t, true) is string blocked) { kit.Notify(blocked); return; }
         world.SetDuty(worker, t, "gather", true); Mode = new ClickMode.Normal(); panel.Select(worker);
     }

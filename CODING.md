@@ -58,6 +58,8 @@ Project rules on top of the global coding and testing guides.
 - A fixture built by editing text, such as a save edited by hand, fails when the text it edits is missing.
 - A UI check picks a backpack cell with the `BagCell` step, by what the cell holds, never by its place among a page's grids: a page that gains or loses a grid shifts those numbers.
 - UI checks wait for a condition with a time limit, not for a fixed time; a fixed wait is only for holding input, letting something play for a set time or pausing between retries.
+- An open page refreshes at once after the player's own action, but only every 0.2 seconds otherwise, and a page that has to draw itself again does so a frame later.
+  A check that reads the page after `Hosted.Tick` or other setup waits on something that refresh draws, such as a cup's count; after `Frames` alone it reads the page as it was.
 - A check that a load restores something changes that thing between saving and loading.
 - Check files hold only checks and their runners. Steps live in feature files: `tests/WorldSteps.cs`, `PlayerSteps.cs`, `WorkerSteps.cs`, `EconomySteps.cs`, `ModelSteps.cs`, `ChainSteps.cs` and `SetupSteps.cs` for simulation checks, and `src/InputSteps.cs`, `PanelSteps.cs` and `SessionSteps.cs` for UI and network checks.
 - Checks fail through the shared `Checks.Require` in `tests/Checks.cs`.

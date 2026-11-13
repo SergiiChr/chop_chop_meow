@@ -43,6 +43,9 @@ public partial class Game {
         return text;
     }
 
+    /// <summary>The open station page's work: its input cups, progress bar and output cups.</summary>
+    private ProcessRow WorkRow() => panel.FindChildren("*", "", true, false).OfType<ProcessRow>().Single();
+
     /// <summary>A cell of the backpack drawer, whatever grids the open page has.</summary>
     private ItemSlot BagCell(Func<ItemSlot, bool> match) => bag.FindChildren("*", "GridContainer", true, false)[0].GetChildren().OfType<ItemSlot>().First(match);
 

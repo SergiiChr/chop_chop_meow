@@ -5,7 +5,7 @@ Gather nearby materials, build a small settlement, craft parts and tools, pack s
 Play alone or with up to three friends at home or over the internet.
 
 The world is rendered in 3D with low-poly models under an orthographic isometric camera: natural woodland, modern DIY buildings and readable silhouettes.
-Item and building icons are rendered from the same models, and the rest are drawn icons.
+Item and building icons are rendered from the same models, and the menu and panel glyphs are drawn icons.
 
 ## Run on Linux
 
@@ -58,7 +58,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
-| `--showcase --trees`, `--bushes` | Show the three tree species or the berry bushes |
+| `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
@@ -109,7 +109,7 @@ The game draws the film itself, so a change to a model or a shot means making th
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
-from their pinned CC0 sources.
+from their pinned CC0 sources, and `./tools/food_models.py` bakes the committed food models from theirs.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
@@ -132,7 +132,7 @@ The display choices are stored in `settings.cfg` and applied at launch.
 The interface is drawn at 0.8 of the size it is laid out for (`Game.InterfaceScale`).
 It keeps that share of the screen at every resolution, with its text drawn at the size it shows.
 
-Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
+Wind sways grass, bushes and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
 Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
 meet (SSAO), and world sounds pan with their place on screen.
@@ -226,8 +226,8 @@ Every station and the crafting menu share one layout: recipe cards under a headi
 A click on a heading closes its group and another opens it; the list scrolls once it outgrows the page.
 A card shows the product, its name and what a batch takes, each count in brick while your backpack is short.
 A recipe whose tool is nowhere to hand names it instead, such as "No steel chisel".
-A card shows how many batches wait in the queue at its top right corner.
-The queue sits under the work in progress, one cup per recipe in the order first queued, however many batches of it wait.
+A card shows how many batches of it wait at its top right corner.
+The crafting menu also shows its queue under the work in progress, one cup per recipe in the order first queued, however many batches of it wait.
 
 Hovering a card shows what the recipe requires, how long it takes, what its product is used for and where its tool is:
 
@@ -241,15 +241,39 @@ A station's tool slots sit in a small window of their own left of its page, "Ava
 
 | Input on a card | At a station | In the crafting menu |
 | --- | --- | --- |
-| Click | Mark it for workers to keep making once the queue is done (a thick outline with a hard hat); click again to unmark | Queue one |
-| Double-click | Queue one and load one batch of its inputs and a fuel from the backpack | Queue one |
-| Shift-click, Ctrl-click | Queue 5 or 10 and load their inputs and a fuel each from the backpack | Queue 5 or 10 |
+| Click | Mark it for workers to keep making once the batches you queued are done (a thick outline with a hard hat); click again to unmark | Queue one |
+| Double-click | Queue one and load one batch of its inputs and a fuel from the backpack; the hard hat goes on the recipe | Queue one |
+| Shift-click, Ctrl-click | Queue 5 or 10 and load their inputs and a fuel each from the backpack; the hard hat goes on the recipe | Queue 5 or 10 |
 | Right-click, with Shift or Ctrl | Take 1, 5 or 10 waiting batches off | Take 1, 5 or 10 off and get their materials back |
 
-A right-click on a cup in the queue takes batches off the same way.
-A batch leaves the queue when it starts, and one in progress cannot be taken off.
-A station page opens with the group of what the station is making open.
-A station with nothing queued and nothing marked stands idle.
+A right-click on a cup in the crafting menu's queue takes batches off the same way.
+A batch leaves the count when it starts, and one in progress cannot be taken off.
+
+A station is on one recipe at a time, and its page shows that recipe's cups; the crafting menu queues as many recipes as you like.
+The card of the recipe a station is on has an outline, thicker and with the hard hat when it is also the marked one.
+A station nobody has marked or queued anything at is on the first recipe of its list.
+Queueing more of the recipe a station is on adds to its count.
+Queueing another recipe depends on what the station is doing:
+
+| The station | Queueing another recipe |
+| --- | --- |
+| Is working a batch | Nothing changes, and its input and output cups shake |
+| Is between batches, with something in its cups | Its cups and its fuel cup empty into your backpack, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
+| Is between batches, with no room in your backpack for what its cups and fuel cup hold | Nothing changes, and its cups shake |
+| Has empty cups | It turns to the new recipe, its hard hat with it |
+
+Fuel a batch has already burned is gone; queueing a recipe loads its fuel again from your backpack.
+
+A click that would move the hard hat to another recipe than the one the station is on is refused while a batch is being worked or the cups hold anything.
+The cups shake a moment after such a click, once it is clear no second press makes it a double-click.
+Taking the hard hat off, and putting it on the recipe the station is on, always work.
+A hard hat moved to another recipe drops the batches that still waited.
+
+So a station with a hard hat is always on the hard-hat recipe: once the batches you queued are done, workers go on making it.
+Click the hard hat off for a station to stop after your batches.
+It starts no batch while its cups hold something another recipe left there, such as a hauler's late delivery: haulers carry that to storage, or you take it out.
+A station page opens with the group of the recipe the station is on open.
+A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
 Stations show one cup per recipe input, the batch time above a progress bar and the output cup, with what one batch takes or makes under each cup.
 A station that burns fuel has its own fuel cup under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
@@ -335,6 +359,9 @@ Impassable mountain ranges close in from the left and right toward the valley's 
 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
 A berry bush holds 24 berries and is full again a day after the first one is picked from it, whether or not it was picked clean.
+A felled tree leaves a stump, and a couple of hundred plain bushes grow about the plains.
+Hold right mouse on a stump or a plain bush with a shovel in your backpack to dig it up: a stump gives 3 wood and a bush 36 leaves, three times what lies under an oak.
+It comes out whole after a few seconds of digging and is gone for good, so the backpack needs room for all of it.
 Iron and coal deposits sit at the foot of rock faces at the base of both ranges and need a pickaxe.
 Loose coal is scattered below the nearer coal face and is picked up whole with one right-click, with no tool.
 Loose stones and sticks lie about the plains: each picks up the same way as 1 stone or 1 wood, and is gone once picked.
@@ -346,6 +373,8 @@ A pale grey cliff further inland holds tin: mine it with a pickaxe.
 The opening progression prioritizes water, shelter and fire, then hand gathering with the starting steel axe: chisel, planks, mallet, bench and crates; sell berries at a trading post for the first pickaxe; then work toward steel.
 
 ### Buildings
+
+A building, yard or crate goes up over stumps and plain bushes and clears them away, giving nothing for them.
 
 | Building | Cost |
 | --- | --- |
@@ -409,7 +438,7 @@ It makes what the menu's chisel makes (planks, wood parts, the mallet, torches a
 | Recipe | Takes |
 | --- | --- |
 | Crate | 6 planks |
-| Steel axe, pickaxe, hammer | see Steel tools below |
+| Steel axe, pickaxe, shovel, hammer | see Steel tools below |
 | Steel chisel | 1 steel part + 1 wood part |
 | Rake | 1 steel part + 2 wood parts |
 
@@ -426,7 +455,7 @@ The stone chisel itself is only knapped by hand.
 
 The anvil turns one steel bar into one steel part.
 Anvils only work while someone stands at them hammering.
-A small steel tool such as a hammer takes 1 steel part and a big one such as an axe or pickaxe 2, plus 1 wood part for the handle.
+A small steel tool such as a hammer takes 1 steel part and a big one such as an axe, pickaxe or shovel 2, plus 1 wood part for the handle.
 
 ## Furnaces and steel
 
@@ -485,7 +514,7 @@ A pile of crates takes more crates of the same good.
 
 ### Piles
 
-A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that build up as a 9-4-1 pyramid in the colour of what it holds.
+A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that show as a heap of the resource itself, bigger the more it holds.
 The first resource put in sets it: from then on workers store and take only that, and anything else is refused.
 Emptying it frees it again.
 
@@ -518,13 +547,21 @@ Workers need tools for some jobs:
 
 - an axe to chop wood;
 - a pickaxe to mine ore and coal;
+- a shovel to dig up stumps and bushes;
 - a hammer to fit a mine.
 
 Stone, leaves, berries and loose pieces need no tool, though a pickaxe breaks rock faster and a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
 They put it back when reassigned or when heading home at dusk.
-If there is none, the worker picks up known loose pieces of the same resource; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
+If there is none, the worker goes to the nearest known spot of the same job that they can work, one that needs no tool or one whose tool is to be had, and to loose pieces only after those; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
 A gatherer whose spot runs out goes on to the next known spot of the same resource, and to loose pieces of it only once no other spot is left.
+
+Stumps are part of gathering wood.
+A woodcutter who fells a tree digs up its stump next while a tool station has a shovel, and counts any other known stump as a spot like a tree, going to whichever is nearer.
+With no shovel to be had they leave stumps and go on chopping.
+A worker carries one tool at a time, so they swap the axe for the shovel at a tool station and back.
+Digging up bushes is a job of its own: a worker given a bush goes on to the next known bush and never rakes leaves, and a worker raking leaves never digs up a bush.
+A worker carries off all of a bush's 36 leaves in one load.
 
 A worker on the station's Stock job brings tools from other storage to the rack.
 
@@ -561,7 +598,7 @@ It only takes packed crates.
 The village pays for:
 
 - raw meat, burnt steak, berries, bread, berry jam, meat stew, canned jam, canned meat stew;
-- steel axes, pickaxes and hammers.
+- steel axes, pickaxes, shovels and hammers.
 
 Anything else in a crate goes as a donation: the cart takes it and pays nothing for it.
 The returning cart says what was donated.
@@ -766,7 +803,7 @@ A save that is incomplete, names items the game does not know or holds needs out
 ### Environment
 
 The environment uses a shared human scale, Terrain3D mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones.
-Meadow grass and wildflowers grow in patches; ferns and ordinary shrubs add woodland ground cover.
+Meadow grass and wildflowers grow in patches, ferns add woodland ground cover, and plain bushes stand among them.
 Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas.
 A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch), from short trees to ones two thirds taller.
 
@@ -778,13 +815,14 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 A tree is felled with strokes from the side into its trunk, while an axe swung in the air comes down from overhead.
 
 The world reacts too:
 
-- trees shake and topple into stumps, a tall one slower than a short one;
+- trees shake and topple over the stumps they leave, a tall one slower than a short one;
+- a stump or a bush leans further out of the ground as it is dug at, then is thrown up out of a spray of soil and is gone;
 - deposits shrink and throw chips;
 - the bellows board travels with each press, and the heat gauge tracks the forge;
 - a bar under the reinforced furnace and its panel dial mark the heat steel needs;
@@ -803,6 +841,7 @@ Sound effects follow the same actions:
 - footsteps change on grass, rock and the lake shore;
 - axes, pickaxes, anvils, benches and swings have impacts, and fitting a mine's frame clinks on its rails;
 - a felled tree cracks as it breaks, a tall one tearing at length, and crashes as it reaches the ground;
+- a shovel crunches into the soil and throws it aside, and a stump or bush comes out with a heave of earth;
 - picking plants by hand and packing crates rustle, butchering tears, and a mortar grinds;
 - bellows puff;
 - fires catch with a whoomp, including a lit torch and a furnace lighting a new batch, and a torch fizzles out;

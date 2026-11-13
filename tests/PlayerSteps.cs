@@ -42,6 +42,15 @@ internal static class PlayerSteps {
         Require(world.Backpack[item] >= quantity, $"gathered enough {item} for the progression");
     }
 
+    /// <summary>Holds a gather on a thing from beside it, for a time or until it is gone.</summary>
+    public static void HoldGather(World world, Thing thing, float seconds) {
+        world.Player = thing.Pos + new Vector2(1, 0);
+        for (; seconds > 0 && world.Find(thing.Id) != null; seconds -= Step) {
+            world.Gather(thing, Step);
+            SafeTick(world, Step);
+        }
+    }
+
     public static void PickUp(World world, Thing loose) {
         world.Player = loose.Pos;
         world.Gather(loose, 0);

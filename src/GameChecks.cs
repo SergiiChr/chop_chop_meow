@@ -91,6 +91,7 @@ public partial class Game {
         CheckTreeCanopyCastsShadowsOnlyThroughItsProxies(old!);
         CheckFadingCanopyKeepsItsCutoutShadows(old!);
         CheckEveryTreeTrunkReachesTheGround();
+        CheckStumpIsAsThickAsItsTreesTrunk();
         old!.Fade = .68f; old.Fall = 9;
         await Click(FindButton(startMenu.Screen, "New game")!);
         var fresh = view.PropOf(tree.Id) as TreeProp;
@@ -109,6 +110,13 @@ public partial class Game {
             prop.Root.Free();
             Require(bottom < .03f, $"Tree look {id} must have a trunk down to the ground, not one that starts {bottom:0.00} m above it.");
         }
+    }
+    /// <summary>A stump is shaped by the tree that left it: a birch's is thinner than an oak's, and one with no tree on record keeps the stump model's own size.</summary>
+    private void CheckStumpIsAsThickAsItsTreesTrunk() {
+        // A tree's species goes by its id: 3 is an oak and 2 a birch.
+        var (oak, birch, bare) = (StumpWidth(3), StumpWidth(2), StumpWidth(0));
+        Require(oak > birch, $"An oak's stump must be thicker than a birch's: {oak:0.00} against {birch:0.00}.");
+        Require(bare == 1, "A stump with no tree on record must keep the stump model's own size.");
     }
     /// <summary>Canopy fades use separate shadow-only meshes so the original cutout shadows survive alpha blending.</summary>
     private void CheckTreeCanopyCastsShadowsOnlyThroughItsProxies(TreeProp prop) {
@@ -633,14 +641,14 @@ public partial class Game {
         await Frames(4);
         await StandAtIronCliff();
         Require(!world.Sees(tree.Pos) && world.Remembered(tree.Id)?.Remaining == 42, "The player must remember the tree standing once they have walked away.");
-        tree.Remaining = 0; chest.Inventory.Add("wood", 5);
+        var stump = Fell(Hosted, tree); chest.Inventory.Add("wood", 5);
         var chip = Hosted.Add(ThingKind.LooseStone, rock.Pos + new Vector2(1.2f, 0), 1);
         await Frames(4);
         Warp(Hosted, home); await Frames(3);
-        Require(view.PropOf(tree.Id) is TreeProp { Stump.Visible: true, Sway.Visible: false }, "A tree felled out of sight must stand as a stump when seen again, not topple then.");
+        Require(view.PropOf(stump.Id) is DugProp { Shown: true } && view.PropOf(tree.Id) is not { Shown: true } && view.Departing == 0, "A tree felled out of sight must be a stump when seen again, not topple then.");
         Require(view.PropOf(chest.Id) is BoxProp { Puff: 0, Open: 0 }, "A chest filled out of sight must keep its lid shut when seen again.");
         Require(view.PropOf(chip.Id) is LooseProp { Flight: >= WorldModels.ChipFlight }, "A chip knocked off a rock out of sight must lie where it fell when seen, not fly from the rock then.");
-        RemoveThings(Hosted, t => t == tree || t == chest || t == rock || t == chip); Warp(Hosted, start); await Frames(4);
+        RemoveThings(Hosted, t => t == stump || t == chest || t == rock || t == chip); Warp(Hosted, start); await Frames(4);
     }
     /// <summary>Launch opens the start menu with no save to continue, and Esc does not leave it.</summary>
     private async Task CheckLaunchOpensTheStartMenuWithNoSaveToContinue() {
@@ -827,6 +835,8 @@ public partial class Game {
         Require(Sounds.Names.All(name => sounds.VariantCount(name) > 0), "Every sound must load.");
         Require(sounds.VariantCount("footsteps_default") == 3, "Numbered footstep files must group as three variants.");
         Require(sounds.VariantCount("chop_tree") == 1, "A single chop file must count as one variant.");
+        // Random picks can keep to two of the three variants, about once in a thousand runs: a seed makes them the same every run.
+        sounds.Reseed(1);
         var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
         Require(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds);
@@ -868,15 +878,17 @@ public partial class Game {
         foreach (bool tall in new[] { false, true }) {
             var tree = PlantTree(Hosted, home + new Vector2(3, 3), tall);
             await Frames(4);
-            tree.Remaining = 0;
+            // The model outlives its tree while it falls, so it is taken before the tree leaves the world.
+            var falling = (TreeProp)view.PropOf(tree.Id)!;
+            var stump = Fell(Hosted, tree);
             string breaking = tall ? "tree_bend" : "tree_crack";
             await Until(() => sounds.Last == breaking, tall ? "a tall tree tearing at length as it breaks" : "a short tree cracking as it breaks", 2);
             ulong brokeAt = Time.GetTicksMsec();
-            Require(view.PropOf(tree.Id) is TreeProp { Sway.RotationDegrees.X: < 10 }, "A tree must be heard breaking as it starts to go over.");
+            Require(falling.Sway.RotationDegrees.X < 10, "A tree must be heard breaking as it starts to go over.");
             await Until(() => sounds.Last == "tree_crash", "a felled tree crashing", 4);
-            Require(view.PropOf(tree.Id) is TreeProp { Sway.RotationDegrees.X: > 89 }, "A felled tree must crash as its trunk reaches the ground, not before.");
+            Require(falling.Sway.RotationDegrees.X > 89, "A felled tree must crash as its trunk reaches the ground, not before.");
             took[tall ? 1 : 0] = (Time.GetTicksMsec() - brokeAt) / 1000f;
-            RemoveThings(Hosted, t => t == tree); await Frames(2);
+            RemoveThings(Hosted, t => t == stump); await Frames(2);
         }
         Require(took[1] > took[0] + .4f, "A tall tree must take longer to come down than a short one.");
         Warp(Hosted, start); await Frames(4);
@@ -1026,6 +1038,42 @@ public partial class Game {
         await Frames();
         Drop(Hosted, "steel_pick", 1);
         RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
+    /// <summary>A tree felled in front of the player topples over the stump it leaves, and holding the right mouse button on the stump digs it up with the shovel.</summary>
+    private async Task CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp() {
+        // The server's position, since the window's copy may not have caught up with the last check's warp.
+        var start = Hosted.Player;
+        var tree = Hosted.Add(ThingKind.Tree, start + new Vector2(2, 2), 4);
+        Give(Hosted, "steel_shovel", 1);
+        await Frames(2);
+        int wood = world.Backpack["wood"];
+        var point = RightPress(tree.Pos);
+        await Until(() => world.Find(tree.Id) == null && view.Departing == 1, "holding RMB on a tree felling it, its model toppling once the tree is gone", 8);
+        RightRelease(point);
+        var stump = world.Things.Single(t => t.Kind == ThingKind.Stump && t.Pos == tree.Pos);
+        Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "The stump must stand under the toppling tree.");
+        await Until(() => view.Departing == 0, "the felled tree fading away over its stump", 4);
+        point = RightPress(stump.Pos);
+        await Until(() => stump.Progress > 0 && view.PlayerAnimation == ActorAction.Dig && sounds.Last is "dig_earth" or "dig_toss", "holding RMB on a stump digging at it with the shovel, heard in the soil", 6);
+        await Until(() => world.Find(stump.Id) == null && view.Departing == 1, "the stump coming out of the ground, thrown up as it goes", 8);
+        // The tree held 4 wood and its stump 3.
+        await Until(() => world.Backpack["wood"] == wood + 7 && view.Departing == 0 && view.PlayerAnimation != ActorAction.Dig, "the stump's wood in the backpack, its model gone and the digging done", 3);
+        RightRelease(point); await Frames();
+        Drop(Hosted, "steel_shovel", 1); Drop(Hosted, "wood", 7);
+        Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
+    /// <summary>A stump a building goes up over just goes, however far it was dug: only one dug out is thrown up out of the ground.</summary>
+    private async Task CheckStumpBuiltOverGoesWithoutBeingThrownUp() {
+        var at = Hosted.Player + new Vector2(2, 2);
+        var stump = Hosted.Add(ThingKind.Stump, at, World.StumpWood); stump.Progress = GatherRules.DigSeconds * .8f;
+        await Frames(2);
+        Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "A stump in sight must be drawn.");
+        Give(Hosted, world.Data.Buildings[ThingKind.Chest].Cost);
+        var chest = Hosted.Build(ThingKind.Chest, at);
+        await Frames(2);
+        Require(chest != null && world.Find(stump.Id) == null, "A chest must go up over a stump and clear it away.");
+        Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump built over must just go, not be thrown up through the building.");
+        RemoveThings(Hosted, t => t == chest); await Frames(2);
     }
     /// <summary>A mine's page left open follows the mine from stage to stage and on to the open mine.</summary>
     private async Task CheckMinePageFollowsTheMineThroughItsStages() {
@@ -1350,9 +1398,10 @@ public partial class Game {
     /// <summary>A recipe list that has scrolled keeps its place when a click on a recipe makes the page draw again.</summary>
     private async Task CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain() {
         await CloseWithEsc();
-        // A bench that is making something shows its work under the list, which leaves the list too little room for thirteen recipes.
+        // A bench that is making something shows its work under the list; moved down the screen, the page leaves the list too little room for all its recipes.
         var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(workbench, "planks");
         await ClickOn(workbench);
+        await MoveWindow(panel, new Vector2(0, 150));
         ScrollContainer List() => (ScrollContainer)panel.FindChild("recipe_list", true, false);
         await Until(() => List().GetVScrollBar().MaxValue > List().Size.Y, "the bench's recipes outgrowing the room the page leaves them", 2);
         await Wheel((layer.Transform * List().GetGlobalRect()).GetCenter());
@@ -1435,27 +1484,26 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); Drop(Hosted, "planks", 3); await CloseWithEsc();
     }
     /// <summary>
-    /// At a station a click marks or unmarks what workers keep making, Shift and Ctrl queue and load 5 and 10 with the count on the plate,
-    /// a right-click takes batches off, and the queue below shows one cup per recipe. By hand a double-click queues just one.
+    /// At a station Shift and Ctrl queue and load 5 and 10 with the count on the plate and put the worker mark on the recipe queued,
+    /// a click unmarks what workers keep making, a right-click takes batches off, and no queue is drawn below.
+    /// By hand a double-click queues just one, and a right-click on a cup in the queue takes a waiting batch off.
     /// </summary>
     private async Task CheckRecipeBoardsMarkAndQueueWithModifiers() {
         var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
         await ClickOn(furnace);
         string Queued(string plate) => ((Label)Named(plate)!.FindChild("queued", true, false)).Text;
         Require(((Control)Named("craft_iron_bar")!.FindChild("kept", true, false)).Visible, "A new stone furnace must show iron marked for workers.");
-        await Click(Named("craft_iron_bar")!);
-        await Until(() => furnace.Keep == "" && !((Control)Named("craft_iron_bar")!.FindChild("kept", true, false)).Visible, "a click on the marked recipe taking the mark off", 2);
+        bool Kept(string plate) => ((Control)Named(plate)!.FindChild("kept", true, false)).Visible;
         await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
+        await Until(() => furnace.Keep == "charcoal" && Named("craft_charcoal") != null && Kept("craft_charcoal") && Queued("craft_charcoal") == "5", "a Shift-click queueing 5 charcoal and moving the worker mark to it", 2);
+        await Click(Named("craft_charcoal")!);
+        await Until(() => furnace.Keep == "" && !Kept("craft_charcoal"), "a click on the marked recipe taking the mark off", 2);
         await Holding(Key.Ctrl, () => Click(Named("craft_charcoal")!));
-        await Until(() => Named("craft_charcoal") != null && Queued("craft_charcoal") == "15", "Shift and Ctrl clicks queueing 15 charcoal, shown on the plate", 2);
-        Require(furnace.Keep == "", "Queueing with a modifier must not mark the recipe.");
+        await Until(() => Queued("craft_charcoal") == "15", "a Ctrl-click queueing 10 more charcoal, shown on the plate", 2);
+        Require(furnace.Keep == "charcoal" && Kept("craft_charcoal"), "Queueing at a station with no mark must put the mark on the recipe queued.");
         await Holding(Key.Shift, () => RightClick(Named("craft_charcoal")!));
         await Until(() => Queued("craft_charcoal") == "10", "a Shift right-click taking 5 batches off", 2);
-        await Holding(Key.Shift, () => Click(Named("craft_tin_bar")!));
-        await Until(() => Named("queued_tin_bar") != null, "the second recipe joining the queue", 2);
-        Require(panel.FindChildren("queued_*", "", true, false).Count == 2, "The queue must show one cup per recipe.");
-        await RightClick(Named("queued_charcoal")!);
-        await Until(() => world.Waiting(furnace, "charcoal") == 9, "a right-click on the queue taking one batch off", 2);
+        Require(panel.FindChildren("queued_*", "", true, false).Count == 0, "A station must show what waits only as the count on its card.");
         RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
 
         Give(Hosted, "stone", 4);
@@ -1467,7 +1515,94 @@ public partial class Game {
         await Until(() => world.Backpack["stone"] == 4 || world.Making == "stone_chisel", "a right-click taking the queued chisel off unless it is already being made", 2);
         if (world.Making != "") Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
         await Until(() => world.Making == "" && world.Crafting.Count == 0, "the hand queue emptying", 2);
+        // Of three chisels one is being made, so the other two wait in one cup under the work.
+        Give(Hosted, "stone", 6);
+        await Frames();
+        int stone = world.Backpack["stone"];
+        await Click(Named("craft_stone_chisel")!);
+        await Until(() => world.Making == "stone_chisel" && Named("making") != null && Named("queued_stone_chisel") == null, "the page showing the first chisel being made with nothing waiting", 2);
+        await Click(Named("craft_stone_chisel")!);
+        await Until(() => Named("queued_stone_chisel") != null, "the second chisel waiting in the queue's cup", 2);
+        await Click(Named("craft_stone_chisel")!);
+        await Until(() => Named("queued_stone_chisel")!.GetChildren().OfType<Badge>().First().Text == "2", "a third chisel counted on the queue's cup", 2);
+        await RightClick(Named("queued_stone_chisel")!);
+        await Until(() => World.Waiting(world.Crafting, "stone_chisel") == 1 && world.Backpack["stone"] == stone - 4, "a right-click on the queue's cup taking one waiting chisel off and giving its stone back", 2);
+        await RightClick(Named("queued_stone_chisel")!);
+        await Until(() => world.Crafting.Count == 0 && world.Backpack["stone"] == stone - 2, "a second right-click emptying the queue", 2);
+        Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
+        await Until(() => world.Making == "", "the chisel in progress being finished", 2);
         await CloseWithEsc(); Drop(Hosted, "stone", world.Backpack["stone"]); Drop(Hosted, "stone_chisel", world.Backpack["stone_chisel"]);
+    }
+
+    /// <summary>
+    /// At a station, queueing another recipe while a batch is worked shakes the boxes and changes nothing.
+    /// Once the batch is done, it takes what the boxes hold into the backpack and turns the station to the new recipe.
+    /// </summary>
+    private async Task CheckStationShakesWhileBusyThenTurnsToAnotherRecipe() {
+        await CloseWithEsc();
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0)); Hosted.SetRecipe(furnace, "");
+        Give(Hosted, "tin_ore", 2); Give(Hosted, "coal", 1); Give(Hosted, "wood", 2);
+        await ClickOn(furnace);
+        await DoubleClick(Named("craft_tin_bar")!);
+        await Until(() => furnace.Processing && Named("input_tin_ore") != null, "the furnace starting the tin a double-click asked for", 2);
+        await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
+        Require(WorkRow().Shaking, "Queueing another recipe while a batch is worked must shake the boxes.");
+        await Until(() => !WorkRow().Shaking, "the boxes coming to rest", 2);
+        Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
+        Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
+        await Until(() => !furnace.Processing && furnace.Inventory["tin_bar"] == 1, "the tin bar coming out", 2);
+        // An idle page refreshes a few times a second; one that drew itself again without its cups would never show the bar's count.
+        await Until(() => Named("output_tin_bar")?.GetChildren().OfType<Badge>().First().Text == "1", "the furnace that has run out of batches still showing the bar in its cup", 2);
+        await DoubleClick(Named("craft_charcoal")!);
+        await Until(() => furnace.Recipe == "charcoal" && world.Backpack["tin_bar"] == 1 && furnace.Inventory["wood"] == 2 && Named("input_wood") != null,
+            "a double-click on charcoal taking the bar into the backpack and turning the furnace to charcoal, loaded with its wood", 2);
+        RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "tin_bar", 1); await CloseWithEsc();
+    }
+
+    /// <summary>
+    /// With no room in the backpack for what a station's cups hold, a double-click on another recipe leaves the station as it is, its cups shaking.
+    /// So does a click that would move the worker mark to another recipe while the cups hold something.
+    /// </summary>
+    private async Task CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem() {
+        await CloseWithEsc();
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0)); Hosted.SetRecipe(furnace, "charcoal");
+        Give(Hosted, "wood", 2); Hosted.LoadInput(furnace, "wood", 2);
+        // Stone in every free slot leaves no room for the furnace's wood.
+        int stone = Give(Hosted, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
+        await ClickOn(furnace);
+        await DoubleClick(Named("craft_iron_bar")!);
+        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the cups.");
+        Require(furnace.Recipe == "charcoal" && furnace.Keep == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0,
+            "A furnace whose cups the backpack has no room for must stay on its recipe with its wood and its mark.");
+        await Until(() => !WorkRow().Shaking, "the cups coming to rest", 2);
+        await Click(Named("craft_iron_bar")!);
+        await Until(() => WorkRow().Shaking, "a click on another recipe shaking the cups of a furnace that holds wood", 2);
+        Require(furnace.Keep == "charcoal", "A furnace that holds something must keep its mark where it is.");
+        RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "stone", stone); await CloseWithEsc();
+    }
+
+    /// <summary>A station whose mark is taken off stays on its recipe: the card keeps an outline and the page its cups.</summary>
+    private async Task CheckUnmarkedStationStaysOnItsRecipe() {
+        await CloseWithEsc();
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
+        await ClickOn(anvil);
+        await Click(Named("craft_steel_parts")!);
+        await Until(() => anvil.Keep == "" && !((Control)Named("craft_steel_parts")!.FindChild("kept", true, false)).Visible, "a click taking the mark off steel parts", 2);
+        Require(Named("input_steel_bar") != null && Named("craft_steel_parts")!.GetThemeStylebox("normal") == Style.PlateSelected,
+            "An anvil with no mark must stay on steel parts, its card outlined and its cups on the page.");
+        RemoveThings(Hosted, t => t == anvil); await CloseWithEsc();
+    }
+
+    /// <summary>A double-click whose batch is refused leaves the worker mark on: at its 99 batches the marked recipe gets back the mark the first press took off.</summary>
+    private async Task CheckRefusedDoubleClickKeepsTheWorkerMark() {
+        await CloseWithEsc();
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
+        Hosted.QueueBatch(furnace, "iron_bar", World.MaxQueued);
+        await ClickOn(furnace);
+        await DoubleClick(Named("craft_iron_bar")!);
+        await Frames(4);
+        Require(furnace.Keep == "iron_bar" && world.Waiting(furnace, "iron_bar") == World.MaxQueued, "A double-click refused at 99 batches must leave the marked recipe marked.");
+        RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
     }
 
     /// <summary>A new anvil's page shows steel bars in, steel parts out, and a backpack click loads a bar.</summary>
@@ -1621,6 +1756,8 @@ public partial class Game {
             await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await Test(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
+            await Test(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
+            await Test(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
             await Test(CheckMinePageFollowsTheMineThroughItsStages);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
@@ -1642,6 +1779,10 @@ public partial class Game {
             await Test(CheckEndGoalsShowEndingOnceAndKeepPlaying);
             await Test(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
             await Test(CheckRecipeBoardsMarkAndQueueWithModifiers);
+            await Test(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);
+            await Test(CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem);
+            await Test(CheckUnmarkedStationStaysOnItsRecipe);
+            await Test(CheckRefusedDoubleClickKeepsTheWorkerMark);
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
             await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
             await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);

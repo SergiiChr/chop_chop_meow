@@ -28,10 +28,10 @@ public class Prop {
 
 public sealed class TreeProp : Prop {
     /// <summary>The trunk and crown, which shake and fall about the base.</summary>
-    public Node3D Sway = null!, Stump = null!;
+    public Node3D Sway = null!;
     /// <summary>The crown's meshes and their own materials, for fading it without walking its nodes.</summary>
     public (MeshInstance3D Mesh, Material Material)[] SwayParts = Array.Empty<(MeshInstance3D, Material)>();
-    /// <summary>Seconds since the tree was felled, or below zero while it stands.</summary>
+    /// <summary>Seconds since the tree was felled, or below zero while it stands; its stump is a thing of its own.</summary>
     public float Fall = -1;
     /// <summary>How tall the tree stands among trees, from 0 to 1 (<see cref="WorldModels.TreeTall"/>).</summary>
     public float Tall;
@@ -45,6 +45,16 @@ public sealed class LooseProp : Prop {
     public Vector3 From;
     /// <summary>Seconds into the chip's flight, or past <see cref="WorldModels.ChipFlight"/> once it lies still.</summary>
     public float Flight = float.MaxValue;
+}
+
+/// <summary>A stump or a bush, which leans further out of the ground the more it is dug at, then comes out and is gone.</summary>
+public sealed class DugProp : Prop {
+    /// <summary>The turn about the vertical it was built with, in degrees.</summary>
+    public float Yaw;
+    /// <summary>Seconds since it came out of the ground, or below zero while it is rooted.</summary>
+    public float Out = -1;
+    /// <summary>Where it stands from its thing's spot: a stump stands where its tree's trunk did, which is off the middle of the tree.</summary>
+    public Vector3 Seat;
 }
 
 public sealed class BushProp : Prop {
@@ -122,7 +132,7 @@ public sealed class BenchProp : Prop {
 }
 
 public sealed class PileProp : Prop {
-    /// <summary>The stacks, 9, 4 and 1 from the ground up, shown one per used slot in the colour of what it holds.</summary>
+    /// <summary>The heap of the good the pile holds.</summary>
     public StockPile Stock = null!;
 }
 
@@ -218,6 +228,8 @@ public static class WorldModels {
         ThingKind.Stick => new[] { new Hit(.5f, 0, .3f) },
         ThingKind.WolfCorpse => new[] { new Hit(.65f, 0, .5f) },
         ThingKind.Berries => new[] { new Hit(.65f, 0, 1) },
+        ThingKind.Stump => new[] { new Hit(.4f, 0, .4f) },
+        ThingKind.Bush => new[] { new Hit(.6f, 0, .6f) },
         ThingKind.Water => new[] { new Hit(1.2f, 0, .5f) },
         ThingKind.Furnace => new[] { new Hit(.72f, 0, 1.15f) },
         ThingKind.Reinforced => new[] { new Hit(.95f, 0, 1.45f) },
@@ -244,6 +256,8 @@ public static class WorldModels {
         Prop prop;
         switch (t.Kind) {
             case ThingKind.Tree: prop = Tree(t.Id); break;
+            case ThingKind.Stump: prop = Stump(t.OfTree); break;
+            case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
             case ThingKind.Stone: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "8d918e"); break;
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case ThingKind.Coal: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
@@ -281,13 +295,15 @@ public static class WorldModels {
         var body = prop.Body;
         if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Jitter(t.Id, 1) * 360 : 0, 0);
         if (t.Kind == ThingKind.Mine) body.Rotation = MineYaw(t.Pos);
+        if (prop is DugProp dug) dug.Yaw = body.RotationDegrees.Y;
         return prop;
     }
 
     /// <summary>
     /// The model an icon shows for an item or building plan, or null when the game has no model of its own for it.
     /// Items borrow the part of a model that shows them in the world; buildings show as placed, with a finished mine, a ripe farm and a pile full of logs.
-    /// Berries show as a small heap of the bush's berries; planks, parts and bars as the stock a storage pile shows.
+    /// Berries show as a small heap of the bush's berries; planks, parts, bars and goods the world does not show as the stock a storage pile shows.
+    /// The hard hat is the one a worker wears.
     /// </summary>
     public static Node3D? IconModel(string id, bool building, GameData data) {
         Node3D Part(ThingKind kind, Func<Prop, Node3D> part) {
@@ -299,17 +315,14 @@ public static class WorldModels {
             return node;
         }
         switch (id) {
-            case "steel_axe" or "steel_pick" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
+            case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
+            case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
             case "torch": var (torch, _, _) = ActorRig.Torch(); return torch;
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
             case "water" or "water_2" or "water_1" or "empty_bottle": return BottleShape.Create(Water.BottleSips(id));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
-            case "wood" or "planks" or "wood_parts": {
-                    var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
-                    return stock;
-                }
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
             case "leaves": return Build(new Thing { Kind = ThingKind.Leaves }).Root;
             case "crate": return Build(new Thing { Kind = ThingKind.Crate }).Root;
@@ -323,24 +336,29 @@ public static class WorldModels {
                     return prop.Root;
                 }
         }
+        // Everything else an item shows as is the stock a storage pile holds of it.
+        if (id is "wood" or "planks" or "wood_parts" || !building && ItemShape.Has(id)) {
+            var stock = new Node3D(); stock.AddChild(PileShape.Stock(id, data.Items[id].Color));
+            return stock;
+        }
         if (!building || Kinds.Parse(id) is not ThingKind kind) return null;
         var built = Build(new Thing { Kind = kind });
         // A pile and a furnace show logs, a packing station a heap of bread, and a farm ripe wheat over sown soil.
         switch (built) {
-            case FurnaceProp furnace: furnace.Glow.Visible = false; furnace.Stock.Fill("wood", int.MaxValue, 1, data); break;
+            case FurnaceProp furnace: furnace.Glow.Visible = false; furnace.Stock.Fill("wood", 1, data); break;
             case StoveProp stove: stove.Glow.Visible = false; break;
             case ForgeProp forge: forge.Glow.Visible = false; break;
             case FarmProp farm: farm.Crops[0].Visible = farm.Crops[^1].Visible = true; break;
-            case PileProp pile: pile.Stock.Fill("wood", int.MaxValue, 1, data); break;
-            case PackerProp packer: packer.Stock.Fill("bread", int.MaxValue, 1, data); break;
+            case PileProp pile: pile.Stock.Fill("wood", 1, data); break;
+            case PackerProp packer: packer.Stock.Fill("bread", 1, data); break;
         }
         return built.Root;
     }
 
-    /// <summary>The outdoor pile shows stocked fuel, excluding fuel already burning in a batch: a pile of it for every two.</summary>
+    /// <summary>The outdoor heap shows stocked fuel, excluding fuel already burning in a batch: a piece for each one, as many as the heap holds.</summary>
     public static void SyncFuel(FurnaceProp prop, Thing t, GameData data) {
         string fuel = World.ShownFuel(t, data);
-        prop.Stock.Fill(fuel, t.Burner?[fuel] ?? 0, 2, data);
+        prop.Stock.Show(fuel, t.Burner?[fuel] ?? 0, data);
     }
 
     private static TreeProp Tree(int id) {
@@ -354,15 +372,36 @@ public static class WorldModels {
         var leaves = Tree3DShape.Add(sway, id % TreeVariants, variant);
         PreserveShadows(sway);
         Tree3DShape.AddShadowCore(sway, id % TreeVariants, leaves);
-        // The stump stands where the trunk did and is as thick as it was at the ground.
-        var (foot, radius) = Tree3DShape.Foot(id % TreeVariants, variant);
-        var stump = Add(prop.Body, NatureShape.Stump, NatureShape.Timber, new Vector3(foot.X, 0, foot.Y) * scale);
-        float width = radius * scale / NatureShape.StumpRadius;
-        stump.Scale = new Vector3(width, scale, width);
-        stump.Visible = false;
-        prop.Stump = stump;
         prop.SwayParts = FadeParts(sway);
         return prop;
+    }
+
+    /// <summary>
+    /// The stump a felled tree leaves: as thick as that tree's trunk was at the ground, and standing where the trunk stood.
+    /// A stump with no tree on record is a middling one on its own spot.
+    /// </summary>
+    private static DugProp Stump(int tree) {
+        var prop = new DugProp();
+        var stump = Add(prop.Body, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
+        if (tree == 0) return prop;
+        float scale = TreeScale(tree);
+        var (foot, radius) = Tree3DShape.Foot(tree % TreeVariants, (tree / TreeVariants) % NatureShape.Variants);
+        float width = radius * scale / NatureShape.StumpRadius;
+        stump.Scale = new Vector3(width, scale, width);
+        // The tree's model was turned by its id, and its trunk with it.
+        prop.Seat = new Vector3(foot.X, 0, foot.Y).Rotated(Vector3.Up, Mathf.DegToRad(Jitter(tree, 1) * 360)) * scale;
+        prop.Body.Position = prop.Seat;
+        return prop;
+    }
+
+    /// <summary>A plain bush of three lobes around its middle, each a little different in size and green by its id; it casts a shadow.</summary>
+    private static void Shrub(Node3D body, int id) {
+        float size = .85f + Jitter(id, 3) * .4f;
+        for (int lobe = 0; lobe < 3; lobe++) {
+            float angle = lobe * Mathf.Tau / 3, radius = (.35f + (id + lobe * 3) % 7 * .05f) * size;
+            Add(body, NatureShape.Scrub, NatureShape.ScrubMaterials[(id + lobe) % NatureShape.ScrubHues], new Vector3(MathF.Cos(angle) * .23f, radius * .35f, MathF.Sin(angle) * .23f),
+                new Vector3(0, Mathf.RadToDeg(angle), 0), new Vector3(radius, radius * .75f, radius));
+        }
     }
 
     /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows veins across the rock faces and ore chunks set into it.</summary>
@@ -425,7 +464,7 @@ public static class WorldModels {
             new ActorShape.Ring(.85f, .12f, .12f, metal) }, material: FurnaceShape.Steel);
         prop.Vent = new Vector3(-.3f, 2.05f, -.25f);
         // Stocked fuel piles beside the firebox: pile stock is centred and .16 tall at this scale.
-        prop.Stock = new StockPile(body, new[] { new Vector3(.82f, .08f, -.13f), new Vector3(.82f, .08f, .15f), new Vector3(.82f, .24f, .01f) }, .4f);
+        prop.Stock = new StockPile(body, new Vector3(.82f, 0, .01f), new Vector2(.46f, .62f), 300, .7f);
         prop.Light = Light(body, new Vector3(0, .35f, .7f), 2);
         Scorch(body, 1.9f);
         return prop;
@@ -624,8 +663,8 @@ public static class WorldModels {
         Add(body, BenchShape.Packing, BenchShape.Timber, new Vector3(-.25f, 0, 0));
         prop.Packing = Pivot(body, new Vector3(-.6f, .835f, 0));
         Add(prop.Packing, CrateShape.Body, CrateShape.Timber, Vector3.Zero);
-        // Pile stock is centred and .12 tall at this scale, so two slots sit on the table top and the third on them.
-        prop.Stock = new StockPile(body, new[] { new Vector3(-.03f, .96f, -.04f), new Vector3(.21f, .96f, .04f), new Vector3(.09f, 1.08f, 0) }, .3f);
+        // The goods waiting to be packed heap on the table top at half the size a storage pile shows them.
+        prop.Stock = new StockPile(body, new Vector3(.09f, .9f, 0), new Vector2(.46f, .32f), 430, .5f);
         prop.Crates = new Node3D[3];
         for (int i = 0; i < prop.Crates.Length; i++) {
             var crate = prop.Crates[i] = Pivot(body, new Vector3(.85f, i * .44f, .05f));
@@ -687,33 +726,28 @@ public static class WorldModels {
         return prop;
     }
 
-    /// <summary>A 3×3 yard of packed earth edged with logs, with fourteen stack blocks in a 9-4-1 pyramid that the view shows as the pile fills.</summary>
+    /// <summary>A 3×3 yard of packed earth edged with logs, with a heap of the good the pile holds, which the view fills from its inventory.</summary>
     private static PileProp Pile() {
         var prop = new PileProp();
         var body = prop.Body;
         Yard(body);
-        var slots = new List<Vector3>();
-        foreach (var (count, y) in new[] { (3, .22f), (2, .62f), (1, 1.02f) })
-            for (int x = 0; x < count; x++)
-                for (int z = 0; z < count; z++) {
-                    float step = .82f, offset = (count - 1) * step / 2;
-                    slots.Add(new Vector3(x * step - offset, y, z * step - offset));
-                }
-        prop.Stock = new StockPile(body, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(slots));
+        // The pad lies inside the log frame; with it the pile's ground and frame take 108 of a building's 2,500 triangles.
+        prop.Stock = new StockPile(body, new Vector3(0, .02f, 0), new Vector2(2.4f, 2.4f), 2390);
         return prop;
     }
 
-    private static readonly List<(string Item, int Count)> pileSlots = new();
-
-    /// <summary>Refresh only visible inventory memory; the view guards this call with the existing sight check.</summary>
+    /// <summary>
+    /// Refresh only visible inventory memory; the view guards this call with the existing sight check.
+    /// A pile heaps up the good it holds, more of it the fuller the pile is; a compost pile shows one mound of soil that swells with all it holds.
+    /// </summary>
     public static void SyncPile(PileProp prop, Thing t, GameData data) {
-        t.Inventory.FillStacks(pileSlots);
-        // Each drawn stack shows the next filled slot, or nothing once the slots run out.
-        for (int i = 0, next = 0; i < prop.Stock.Count; i++) {
-            string item = "";
-            while (item == "" && next < pileSlots.Count) item = pileSlots[next++].Item;
-            prop.Stock.Show(i, item, data);
+        string item = t.Compost ? ItemShape.Compost : ""; int count = 0, room = 0;
+        foreach (var (id, held) in t.Inventory.Items) {
+            if (t.Compost) { count += held; room = t.Inventory.Slots * t.Inventory.StackSize; }
+            // A pile holds one good; should it ever hold more, the most plentiful shows.
+            else if (held > count) { item = id; count = held; room = t.Inventory.Slots * t.Inventory.StackOf(id); }
         }
+        prop.Stock.Fill(item, room > 0 ? count / (float)room : 0, data);
     }
 
     /// <summary>The packed-earth yard with its log frame that a pile or a farm plot stands on.</summary>

@@ -66,7 +66,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             return;
         }
         if (Launch.Has("--bushes")) {
-            // A clean three-bush comparison row, with one picked-clean bush to show its persistent model.
+            // A clean three-bush comparison row of berry bushes, with one picked-clean bush to show its persistent model.
             var at = Terrain.Spawn + new Vector2(9, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at) < 15);
             // Bush variants are selected from the id; start the row at variant zero and include all three.
@@ -75,6 +75,12 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Add(ThingKind.Berries, at + new Vector2(-.75f, .75f), 24);
             world.Add(ThingKind.Berries, at + new Vector2(.75f, -.75f), 24);
             world.Add(ThingKind.Berries, at + new Vector2(2.25f, -2.25f), 0);
+            // In front of them, three plain bushes, the last half dug out, and a stump beside one half dug out.
+            for (int i = 0; i < 3; i++) world.Add(ThingKind.Bush, at + new Vector2(-.5f + i * 1.6f, 3.4f - i * 1.6f), World.BushLeaves).Progress = i == 2 ? GatherRules.DigSeconds * .7f : 0;
+            for (int i = 0; i < 2; i++) world.Add(ThingKind.Stump, at + new Vector2(3.4f + i * 1.2f, -.4f - i * 1.2f), World.StumpWood).Progress = i * GatherRules.DigSeconds * .7f;
+            // A tree two strokes from falling and a shovel to dig with, to see a tree leave its stump and a stump or bush come out.
+            world.Add(ThingKind.Tree, at + new Vector2(-4, -1), 8);
+            world.S.Backpack.Add("steel_shovel", 1);
             world.S.Time = world.Data.DaySeconds * .2f;
             world.S.Workers.Clear(); world.S.Orders.Clear(); world.S.Remembered.Clear();
             world.Player = at + new Vector2(-1, -.5f);
@@ -105,7 +111,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(4, 4)); var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(-1, 4));
         world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("water", 4); world.S.Backpack.Add("steel_pick", 1);
         var bench = world.Add(ThingKind.Bench, Terrain.Spawn + new Vector2(-4, 1.5f)); world.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
-        var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1);
+        var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1); rack.Inventory.Add("steel_shovel", 1);
         world.Add(ThingKind.Leaves, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
         var crate = world.Add(ThingKind.Crate, Terrain.Spawn + new Vector2(1.5f, 1.5f)); crate.Inventory.Add("berries", 6); crate.Inventory.Add("steel_axe", 1); crate.Inventory.Add("steel_pick", 1);
         foreach (var (item, count) in new[] { ("steel_axe", 1), ("steel_pick", 1), ("stone_chisel", 1), ("wood", 9), ("planks", 8), ("wood_parts", 3), ("crate", 1), ("torch", 2) }) world.S.Backpack.Add(item, count);
@@ -150,6 +156,25 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             }
             world.Player = at + new Vector2(3, -2.5f); world.Tick(0); view.Zoom = 1.4f;
             if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Pile)); else panel.Close();
+        }
+        if (Launch.Has("--goods")) {
+            // A pile of every good, eight to a row and --goods-share full (six tenths unless given), then a compost pile.
+            // --goods-pile N looks at the Nth pile, counting from 0.
+            const int perRow = 8;
+            var at = Terrain.Spawn + new Vector2(-3, 9);
+            string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins).ToArray();
+            float share = Launch.Number("--goods-share", .6f); int look = (int)Launch.Number("--goods-pile", 0);
+            Vector2 Spot(int pile) => at + new Vector2(pile % perRow * 3.2f, pile / perRow * 3.2f);
+            world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + perRow * 3.2f + 4 && t.Pos.Y > at.Y - 4 && t.Pos.Y < at.Y + (goods.Length / perRow + 1) * 3.2f + 4);
+            world.S.Workers.Clear(); world.S.Orders.Clear();
+            for (int i = 0; i < goods.Length; i++) {
+                var pile = world.Add(ThingKind.Pile, Spot(i));
+                pile.Inventory.Add(goods[i], Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share)));
+            }
+            var compost = world.Add(ThingKind.Pile, Spot(goods.Length)); compost.Compost = true;
+            compost.Inventory.Add("leaves", (int)(300 * share)); compost.Inventory.Add("grass", (int)(300 * share)); compost.Inventory.Add("fertilizer", (int)(200 * share));
+            // The player crouches in front of the pile looked at, clear of it.
+            world.Player = Spot(look) + new Vector2(1.9f, 1.9f); world.Tick(0); view.Zoom = 2.2f; panel.Close();
         }
         if (Launch.Has("--farm")) {
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
