@@ -652,7 +652,7 @@ public partial class WorldView : Node3D {
         var pose = state.Pose;
         // Between actions the torch arm stays raised with the forearm level, which is the angle the flame is built for.
         if (torch && state.Action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run) pose = pose with { RaiseL = 30, OutL = 4, ElbowL = 60 };
-        rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch, ActorAnimation.TwoHanded(state.Action));
+        rig.Show(pose, tool, state.Action == ActorAction.Carry, state.Action == ActorAction.Perch, torch);
     }
 
     /// <summary>Shows a bench slot's model of the slotted tool's grade: the first child for the lower grade, the second for steel.</summary>
@@ -758,7 +758,8 @@ public partial class WorldView : Node3D {
     /// <summary>Seconds a dug out stump or bush takes to come out of the ground and be gone.</summary>
     private const float DugOutSeconds = .6f;
     private SaveState? builtFor;
-    private int thingsCounted = -1;
+    // How many things the world held, and the newest of them, when models were last cleared away: a tree swapped for its stump changes only the second.
+    private int thingsCounted = -1, newestThing;
     private static readonly Vector2 Nowhere = new(-1e6f, -1e6f);
     // Where the player stood when things were last drawn.
     private Vector2 sawFrom = Nowhere;
@@ -812,16 +813,17 @@ public partial class WorldView : Node3D {
             if (seen.Contains(id) || !prop.Shown) continue;
             if (World.Find(id) != null) { Show(prop, false); continue; }
             // What was in sight a moment ago and has left the world may show how it went; anything else is cleared away below.
-            if (prop.Look.Live && Departs(prop)) departed.Add(id); else { Show(prop, false); thingsCounted = -1; }
+            if (prop.Look.Live && Departs(prop)) departed.Add(id); else Show(prop, false);
         }
         foreach (int id in departed) { leaving.Add(props[id]); props.Remove(id); }
         for (int i = leaving.Count - 1; i >= 0; i--) {
             if (Depart(leaving[i], dt)) continue;
             leaving[i].Root.QueueFree(); leaving.RemoveAt(i);
         }
-        // Things leave the world rarely, so the models of the rest that left are looked for only when the count changes or one that was shown has gone.
-        if (thingsCounted != World.Things.Count) {
-            thingsCounted = World.Things.Count;
+        // Things come and go rarely, so the models of those that left are looked for only when the count or the newest thing changes.
+        int newest = World.Things.Count > 0 ? World.Things[World.Things.Count - 1].Id : 0;
+        if (thingsCounted != World.Things.Count || newestThing != newest) {
+            (thingsCounted, newestThing) = (World.Things.Count, newest);
             RefreshDressing();
             gone.Clear();
             foreach (var (id, _) in props) if (!seen.Contains(id) && World.Find(id) == null) gone.Add(id);
@@ -858,7 +860,14 @@ public partial class WorldView : Node3D {
     }
 
     /// <summary>Whether a model whose thing has left the world plays its way out: a felled tree, and a stump or bush that was dug out rather than built over.</summary>
-    private static bool Departs(Prop prop) => prop is TreeProp || prop is DugProp && prop.Look.Progress >= GatherRules.DigSeconds / 2;
+    private bool Departs(Prop prop) => prop is TreeProp || prop is DugProp && !BuiltOver(prop.Look.Pos);
+
+    /// <summary>Whether a building, yard or crate now stands over a spot, having cleared away the stump or bush that was there.</summary>
+    private bool BuiltOver(Vector2 at) {
+        foreach (var kind in World.Structures)
+            foreach (var t in World.ThingsOf(kind)) if (World.Clears(t, at)) return true;
+        return false;
+    }
 
     /// <summary>
     /// Moves on a model whose thing has left the world, and tells whether it still has more to show.

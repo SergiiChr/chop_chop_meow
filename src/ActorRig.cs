@@ -352,8 +352,7 @@ public sealed class ActorRig {
         return sign;
     }
 
-    /// <param name="bothHands">The tool is a shovel dug with, its shaft held in both fists rather than hanging from the right.</param>
-    public void Show(Pose pose, string? tool, bool carrying, bool onRock = false, bool lit = false, bool bothHands = false) {
+    public void Show(Pose pose, string? tool, bool carrying, bool onRock = false, bool lit = false) {
         torso.RotationDegrees = new Vector3(pose.Lean, pose.Twist, pose.Sway);
         // The head stays nearer upright than the body under it.
         head.RotationDegrees = new Vector3(pose.Head - pose.Lean * .4f, -pose.Twist * .5f, -pose.Sway * .6f);
@@ -372,7 +371,8 @@ public sealed class ActorRig {
         hips.Position = new Vector3(0, pose.HipHeight, 0);
         rock.Visible = onRock;
         foreach (var (name, node) in tools) node.Visible = name == tool;
-        if (shovel.Visible) { if (bothHands) LayShovel(); else shovel.Basis = Basis.Identity; }
+        // A shovel is only ever dug with, held in both fists.
+        if (shovel.Visible) LayShovel();
         crate.Visible = carrying;
         torch.Visible = lit;
     }

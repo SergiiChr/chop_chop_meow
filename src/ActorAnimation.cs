@@ -308,9 +308,6 @@ public static class ActorAnimation {
             SwingL: front.Swing, KneeL: front.Knee, FootL: front.Foot, SwingR: back.Swing, KneeR: back.Knee, FootR: back.Foot);
     }
 
-    /// <summary>Whether an action holds its tool in both fists, so the rig lays the shaft through them.</summary>
-    public static bool TwoHanded(ActorAction action) => action == ActorAction.Dig;
-
     /// <summary>Swings that play out in full on the move: the arms and body keep swinging while the legs keep walking.</summary>
     public static bool SwingsOnTheMove(ActorAction action) => action is ActorAction.TorchSwing or ActorAction.Attack or ActorAction.Chop or ActorAction.SteelChop;
 

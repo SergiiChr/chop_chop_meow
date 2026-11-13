@@ -42,13 +42,16 @@ public partial class World {
     /// <summary>Whether a kind grows low enough to build on: a building or yard goes up over it and clears it away.</summary>
     public static bool BuiltOver(ThingKind kind) => kind is ThingKind.Stump or ThingKind.Bush;
 
-    /// <summary>Clears away the stumps and bushes on the ground a new building, yard or crate keeps clear of other resources.</summary>
+    /// <summary>Whether a spot is on the ground a building, yard or crate keeps clear of other resources, where it leaves no stump or bush.</summary>
+    public static bool Clears(Thing built, Vector2 p) {
+        if (!IsZone(built.Kind)) return p.DistanceTo(built.Pos) < Footprint(built.Kind) + ResourceRoom;
+        float room = ZoneSize / 2 + YardResourceRoom;
+        return Math.Abs(p.X - built.Pos.X) < room && Math.Abs(p.Y - built.Pos.Y) < room;
+    }
+
+    /// <summary>Clears away the stumps and bushes under a new building, yard or crate.</summary>
     private void ClearGround(Thing built) {
-        float room = IsZone(built.Kind) ? ZoneSize / 2 + YardResourceRoom : Footprint(built.Kind) + ResourceRoom;
-        foreach (var kind in ClearedKinds)
-            S.Things.RemoveAll(kind, t => IsZone(built.Kind)
-                ? Math.Abs(t.Pos.X - built.Pos.X) < room && Math.Abs(t.Pos.Y - built.Pos.Y) < room
-                : t.Pos.DistanceTo(built.Pos) < room);
+        foreach (var kind in ClearedKinds) S.Things.RemoveAll(kind, t => Clears(built, t.Pos));
     }
     private static readonly ThingKind[] ClearedKinds = Array.FindAll(Kinds.All, BuiltOver);
 }

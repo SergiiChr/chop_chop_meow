@@ -297,7 +297,7 @@ A sprint and a jog share their mechanics and differ in timing and form:
 
 Digging (`ActorAction.Dig`) holds the shovel in both hands: the right on top of the handle and the left `ActorAnimation.ShovelGrip` down the shaft.
 `ActorAnimation.DigKeys` give where the blade's tip is and how the shaft leans at each moment: driven into the ground ahead, leant on, levered up and thrown aside to the left.
-Both arms are solved from there with `ActorAnimation.ArmTo`, and `ActorRig.Show` lays the shaft from the right fist through the left (`bothHands`), so the blade goes where the keys take it.
+Both arms are solved from there with `ActorAnimation.ArmTo`, and `ActorRig.Show` lays the shaft from the right fist through the left, so the blade goes where the keys take it.
 The front boot stays flat and the back one on its toe at fixed spots, so neither slides as the hips go down and up.
 The handle is kept in front of the right shoulder, since `ArmTo` cannot take a folded arm far to the side.
 
@@ -417,7 +417,7 @@ Only what is in sight is drawn every frame (`WorldView.SyncThings`).
 A thing out of sight is drawn once as its snapshot, moved on far enough to finish whatever it was doing, and left alone until its snapshot changes, night falls or lifts, or it is seen again.
 A change that did not happen in front of the player is not played when they see it (`WorldView.Watched`): a tree felled out of sight is a stump, a chest filled out of sight keeps its lid shut, and a chip or a building that appeared out of sight neither flies nor lands in dust.
 A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
-A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one built over just goes.
+A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one a building now stands over (`World.Clears`) just goes.
 While it is dug at, a stump or bush leans further over with `Thing.Progress` (`DugProp`).
 Work out of sight is heard but shakes nothing and throws no chips.
 

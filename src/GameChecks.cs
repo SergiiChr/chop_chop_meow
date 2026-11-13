@@ -1018,6 +1018,19 @@ public partial class Game {
         Drop(Hosted, "steel_shovel", 1); Drop(Hosted, "wood", 7);
         Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
+    /// <summary>A stump a building goes up over just goes, however far it was dug: only one dug out is thrown up out of the ground.</summary>
+    private async Task CheckStumpBuiltOverGoesWithoutBeingThrownUp() {
+        var at = Hosted.Player + new Vector2(2, 2);
+        var stump = Hosted.Add(ThingKind.Stump, at, World.StumpWood); stump.Progress = GatherRules.DigSeconds * .8f;
+        await Frames(2);
+        Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "A stump in sight must be drawn.");
+        Give(Hosted, world.Data.Buildings[ThingKind.Chest].Cost);
+        var chest = Hosted.Build(ThingKind.Chest, at);
+        await Frames(2);
+        Require(chest != null && world.Find(stump.Id) == null, "A chest must go up over a stump and clear it away.");
+        Require(view.Departing == 0 && view.PropOf(stump.Id) is not { Shown: true }, "A stump built over must just go, not be thrown up through the building.");
+        RemoveThings(Hosted, t => t == chest); await Frames(2);
+    }
     /// <summary>A mine's page left open follows the mine from stage to stage and on to the open mine.</summary>
     private async Task CheckMinePageFollowsTheMineThroughItsStages() {
         var start = Hosted.Player;
@@ -1613,6 +1626,7 @@ public partial class Game {
             await Test(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
             await Test(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
+            await Test(CheckStumpBuiltOverGoesWithoutBeingThrownUp);
             await Test(CheckMinePageFollowsTheMineThroughItsStages);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);

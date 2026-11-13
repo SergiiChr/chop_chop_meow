@@ -121,7 +121,7 @@ public static class HumanModelChecks {
     private static void CheckDiggingDrivesTheBladeIntoTheGroundWithBothHandsOnTheShaft(ActorRig[] rigs) {
         float loop = ActorAnimation.Duration(ActorAction.Dig);
         Vector3 TipAt(ActorRig rig, float phase) {
-            rig.Show(ActorAnimation.PoseAt(ActorAction.Dig, loop * phase, false), ActorAnimation.Tool(ActorAction.Dig), false, bothHands: true);
+            rig.Show(ActorAnimation.PoseAt(ActorAction.Dig, loop * phase, false), ActorAnimation.Tool(ActorAction.Dig), false);
             return rig.ShovelTip;
         }
         foreach (var rig in rigs) {
