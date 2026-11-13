@@ -11,14 +11,22 @@ namespace ChopChopMeow;
 /// Each card shows the product, its name and its inputs, each count in brick while the backpack is short, or the tool it lacks.
 /// By hand a click queues a batch. At a station a click marks the recipe workers keep making, and a double-click queues a batch and loads it from the backpack.
 /// Shift queues 5 and Ctrl 10, at a station loading them too; a right-click takes as many waiting batches off.
+/// A station is on one recipe at a time, whose card is outlined: queueing or marking another one turns the station to it when it can.
 /// </summary>
 /// <param name="station">Null when crafting by hand.</param>
 /// <param name="openOn">A recipe whose group the board opens, for a page opening rather than drawing again.</param>
-public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, SidePanel panel, Action redraw, Thing? station, string? openOn) : VBoxContainer {
+/// <param name="occupied">Shows that a station's cups are taken, when it cannot turn to the recipe queued or marked; null by hand.</param>
+public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, SidePanel panel, Action redraw, Thing? station, string? openOn, Action? occupied = null) : VBoxContainer {
     private readonly World world = kit.World;
 
     /// <summary>How far the worker mark's hard hat stands out over the top of a card.</summary>
     private const int HatRise = 18;
+
+    /// <summary>Seconds a refused mark waits for a second press before it shows: Godot on Linux calls a second press within this time a double-click.</summary>
+    private const float DoubleClickSeconds = .4f;
+
+    // The wait of the refused mark shown next; a newer click or a double-click takes its place.
+    private SceneTreeTimer? refusing;
 
     /// <summary>How many batches a click queues or takes off: 10 with Ctrl, 5 with Shift, else 1.</summary>
     public static int Step => Input.IsKeyPressed(Key.Ctrl) ? 10 : Input.IsKeyPressed(Key.Shift) ? 5 : 1;
@@ -104,30 +112,56 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         var queued = ItemSlot.CountBadge(1, 0); queued.Name = "queued"; cell.AddChild(queued);
         live.Watch(() => world.Waiting(station, id), waiting => queued.Text = waiting > 0 ? waiting.ToString() : "");
         if (station != null) {
-            // The worker mark: a thick outline with a hard hat on top.
+            // The worker mark is a thick outline with a hard hat on top; the recipe the station is on has a thinner outline of its own.
             var hat = Style.Corner(Style.Glyph("hardhat", 34, Colors.White), .5f, 0, HatRise); hat.Name = "kept"; cell.AddChild(hat);
-            live.Watch(() => station.Keep == id, kept => {
-                Style.Skin(cell, kept ? Style.PlateKept : Style.PlateNormal, kept ? Style.PlateKept : Style.PlateHover);
-                hat.Visible = kept;
+            live.Watch(() => (Kept: station.Keep == id, On: world.Selected(station) == id), state => {
+                var plate = state.Kept ? Style.PlateKept : state.On ? Style.PlateSelected : Style.PlateNormal;
+                Style.Skin(cell, plate, state.Kept || state.On ? plate : Style.PlateHover);
+                hat.Visible = state.Kept;
             });
         } else Style.Skin(cell, Style.PlateNormal, Style.PlateHover);
-        // The second press of a double-click undoes what its first press did, then queues one batch with its inputs.
-        bool doubled = false;
+        // A double-click is a press, a release and a second press: its second release presses the card again, which does nothing more.
+        // At a station its first press marks or unmarks like any click, and queueing then puts the mark on the recipe whatever that press did.
+        // A mark that press took off goes back on even when the batch is refused, as at 99 batches or out of reach.
+        bool doubled = false, unmarked = false;
         cell.Pressed += () => {
             if (doubled) { doubled = false; return; }
-            string kept = memory.KeptBefore = station?.Keep ?? "";
             int step = Step;
-            if (station == null) kit.Run(() => world.Enqueue(null, id, step));
-            else if (step > 1) kit.Run(() => world.QueueBatch(station, id, step));
-            else kit.Run(() => world.SetRecipe(station, kept == id ? "" : id));
+            unmarked = false;
+            if (station == null) kit.Run(() => world.Craft(id, step));
+            else if (step > 1) Queue(step);
+            else Mark();
         };
         cell.DoubleClicked = () => {
             doubled = true;
             if (station == null) return;
-            string kept = memory.KeptBefore;
-            kit.Run(() => { world.SetRecipe(station, kept); world.QueueBatch(station, id); });
+            Queue(1);
+            if (unmarked) kit.Run(() => world.SetRecipe(station, id));
         };
-        cell.RightClicked = () => kit.Run(() => world.Enqueue(station, id, -Step));
+        // The server answers a refusal with its reason; the cups in the way shake at once.
+        void Queue(int batches) {
+            refusing = null;
+            bool refused = world.SwitchBlock(station!, id) != null;
+            kit.Run(() => world.QueueBatch(station!, id, batches));
+            if (refused) occupied?.Invoke();
+        }
+        // A mark the station takes is set at once.
+        // One it refuses is shown only once the time for a second press is over: a double-click empties the cups in the way and queues instead.
+        void Mark() {
+            string mark = station!.Keep == id ? "" : id;
+            refusing = null;
+            if (world.MarkBlock(station, mark) == null) { unmarked = mark == ""; kit.Run(() => world.SetRecipe(station, mark)); return; }
+            var wait = refusing = GetTree().CreateTimer(DoubleClickSeconds);
+            wait.Timeout += () => {
+                if (refusing != wait) return;
+                refusing = null;
+                // The cups may have emptied meanwhile: then the mark moves after all.
+                bool refused = world.MarkBlock(station, mark) != null;
+                kit.Run(() => world.SetRecipe(station, mark));
+                if (refused) occupied?.Invoke();
+            };
+        }
+        cell.RightClicked = () => kit.Run(() => { if (station != null) world.Unqueue(station, id, Step); else world.CancelCraft(id, Step); });
         void Describe(StringBuilder text) {
             text.Append(r.Name);
             if (r.Amount > 1) text.Append($" ×{r.Amount}");
@@ -212,12 +246,14 @@ public partial class RecipePopup(World world, Thing? station, RecipeDef r, float
     }
 }
 
-/// <summary>What waits in a queue, one cup per recipe in the order first queued; a right-click takes 1, 5 or 10 batches off.</summary>
-/// <param name="station">The station whose queue it shows, or null for the hand's; the page draws it again when the queue's recipes change.</param>
-public partial class QueueStrip(UiKit kit, LiveUpdates live, Thing? station) : HBoxContainer {
+/// <summary>
+/// What waits in the hand's queue, one cup per recipe in the order first queued; a right-click takes 1, 5 or 10 batches off.
+/// The page draws it again when the queue's recipes change.
+/// </summary>
+public partial class QueueStrip(UiKit kit, LiveUpdates live) : HBoxContainer {
     public override void _Ready() {
         var world = kit.World;
-        var queue = world.QueueOf(station);
+        var queue = world.Crafting;
         Name = "queue";
         AddThemeConstantOverride("separation", 10);
         if (queue.Count == 0) return;
@@ -227,8 +263,9 @@ public partial class QueueStrip(UiKit kit, LiveUpdates live, Thing? station) : H
             var (cell, count) = ItemSlot.Cup($"queued_{q.Recipe}", 44); cell.Icon = Icons.Of(r.Output);
             cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
             string id = q.Recipe;
-            live.Watch(() => world.Waiting(station, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
-            cell.RightClicked = () => kit.Run(() => world.Enqueue(station, id, -RecipeBoard.Step));
+            // The server's answer brings a new list, so the count is read from the world each time.
+            live.Watch(() => world.Waiting(null, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
+            cell.RightClicked = () => kit.Run(() => world.CancelCraft(id, RecipeBoard.Step));
             AddChild(cell);
         }
     }

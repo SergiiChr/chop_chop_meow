@@ -226,8 +226,8 @@ Every station and the crafting menu share one layout: recipe cards under a headi
 A click on a heading closes its group and another opens it; the list scrolls once it outgrows the page.
 A card shows the product, its name and what a batch takes, each count in brick while your backpack is short.
 A recipe whose tool is nowhere to hand names it instead, such as "No steel chisel".
-A card shows how many batches wait in the queue at its top right corner.
-The queue sits under the work in progress, one cup per recipe in the order first queued, however many batches of it wait.
+A card shows how many batches of it wait at its top right corner.
+The crafting menu also shows its queue under the work in progress, one cup per recipe in the order first queued, however many batches of it wait.
 
 Hovering a card shows what the recipe requires, how long it takes, what its product is used for and where its tool is:
 
@@ -241,15 +241,39 @@ A station's tool slots sit in a small window of their own left of its page, "Ava
 
 | Input on a card | At a station | In the crafting menu |
 | --- | --- | --- |
-| Click | Mark it for workers to keep making once the queue is done (a thick outline with a hard hat); click again to unmark | Queue one |
-| Double-click | Queue one and load one batch of its inputs and a fuel from the backpack | Queue one |
-| Shift-click, Ctrl-click | Queue 5 or 10 and load their inputs and a fuel each from the backpack | Queue 5 or 10 |
+| Click | Mark it for workers to keep making once the batches you queued are done (a thick outline with a hard hat); click again to unmark | Queue one |
+| Double-click | Queue one and load one batch of its inputs and a fuel from the backpack; the hard hat goes on the recipe | Queue one |
+| Shift-click, Ctrl-click | Queue 5 or 10 and load their inputs and a fuel each from the backpack; the hard hat goes on the recipe | Queue 5 or 10 |
 | Right-click, with Shift or Ctrl | Take 1, 5 or 10 waiting batches off | Take 1, 5 or 10 off and get their materials back |
 
-A right-click on a cup in the queue takes batches off the same way.
-A batch leaves the queue when it starts, and one in progress cannot be taken off.
-A station page opens with the group of what the station is making open.
-A station with nothing queued and nothing marked stands idle.
+A right-click on a cup in the crafting menu's queue takes batches off the same way.
+A batch leaves the count when it starts, and one in progress cannot be taken off.
+
+A station is on one recipe at a time, and its page shows that recipe's cups; the crafting menu queues as many recipes as you like.
+The card of the recipe a station is on has an outline, thicker and with the hard hat when it is also the marked one.
+A station nobody has marked or queued anything at is on the first recipe of its list.
+Queueing more of the recipe a station is on adds to its count.
+Queueing another recipe depends on what the station is doing:
+
+| The station | Queueing another recipe |
+| --- | --- |
+| Is working a batch | Nothing changes, and its input and output cups shake |
+| Is between batches, with something in its cups | Its cups and its fuel cup empty into your backpack, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
+| Is between batches, with no room in your backpack for what its cups and fuel cup hold | Nothing changes, and its cups shake |
+| Has empty cups | It turns to the new recipe, its hard hat with it |
+
+Fuel a batch has already burned is gone; queueing a recipe loads its fuel again from your backpack.
+
+A click that would move the hard hat to another recipe than the one the station is on is refused while a batch is being worked or the cups hold anything.
+The cups shake a moment after such a click, once it is clear no second press makes it a double-click.
+Taking the hard hat off, and putting it on the recipe the station is on, always work.
+A hard hat moved to another recipe drops the batches that still waited.
+
+So a station with a hard hat is always on the hard-hat recipe: once the batches you queued are done, workers go on making it.
+Click the hard hat off for a station to stop after your batches.
+It starts no batch while its cups hold something another recipe left there, such as a hauler's late delivery: haulers carry that to storage, or you take it out.
+A station page opens with the group of the recipe the station is on open.
+A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
 Stations show one cup per recipe input, the batch time above a progress bar and the output cup, with what one batch takes or makes under each cup.
 A station that burns fuel has its own fuel cup under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.

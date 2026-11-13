@@ -105,10 +105,10 @@ UI and input:
 | `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
 | `src/Grid.cs` | Draws the icon-cell grids |
 | `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
-| `src/StationPanel.cs` | A station's page: recipe board, process row, queue, bellows and jobs, with its tool slots in a window beside it |
+| `src/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
 | `src/Cups.cs` | `Cups`: a building's item cups and a station's process row |
 | `src/CraftPanel.cs` | The crafting menu |
-| `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the queue strip under the work |
+| `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
@@ -521,20 +521,34 @@ Every tool and its parts stay reachable, which `CheckEverythingIsReachableFromFr
 Hand recipes queue in `PlayerState.Crafting`, one `Queued` entry per recipe with its count, and take their inputs at once.
 The first one waiting moves to `PlayerState.Making` when work on it starts and can no longer be cancelled; the rest give their materials back when taken off.
 They run at base speed times the tool's speed while the player carries it, and only while the player has stood still for `World.CraftSettle` (`PlayerState.Still`).
-Queues are written by `QueueJson`, since the generic list writer allocates on every world update.
+The queue is written by `QueueJson`, since the generic list writer allocates on every world update.
 
 The bench runs at `BenchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
 
-A station's `Thing.Queue` holds its queued batches, one entry per recipe in the order first queued; a batch leaves it as it starts.
-`Thing.Keep` is the recipe workers keep it making once the queue is done, and a building's `Recipe` in `GameTables` names the one it starts with.
-`Thing.Making` is the batch in progress, as `PlayerState.Making` is by hand, and both start the next batch through `World.StartNext`.
-`Thing.Recipe` is worked out, not stored: the batch in progress, else the first queued, else `Keep`; with none the station stands idle.
-Saves and world updates leave out an empty mark, queue and batch, so a tree or a rock carries none of them.
-`World.QueueOf` and `World.Enqueue` read and change either queue, a station's or the hand's, for the board and the strip.
-A station takes inputs for any recipe it has queued or kept, and haulers carry out only what none of them takes.
+A station counts batches of one recipe at a time: `Thing.Asked` is the recipe a player queued last and `Thing.Batches` how many of it still wait; a batch leaves the count as it starts.
+`Thing.Keep` is the recipe workers keep it making once those batches are done, and a building's `Recipe` in `GameTables` names the one it starts with.
+`Thing.Making` is the batch in progress, as `PlayerState.Making` is by hand.
+`Thing.Recipe` is worked out, not stored: the batch in progress, else `Asked` while batches of it wait, else `Keep`; with none the station stands idle.
+`World.Selected` is the recipe the station is on, whose cups its page draws and whose card is outlined: `Recipe`, else `Asked`, else the first recipe on its board.
+A station is always on one: taking the mark off with no batches waiting leaves the marked recipe in `Asked`.
+So a station with nothing to make keeps showing its cups, and more batches of that recipe are not a turn to another.
+Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
+`World.QueueBatch` adds to the count, and for a recipe other than the selected one it first turns the station to it:
+it drops the batches that waited and moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack.
+It always puts the mark on the recipe queued.
+`World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for all of it (`Inventory.Fits`).
+So batches only wait for the recipe in progress when there is one, and `World.Deserialize` refuses a save where they wait for another.
+`World.Unqueue` takes waiting batches off the count.
+`World.SetRecipe` moves the mark, and a move to a recipe other than the selected one turns the station to it and drops the batches that waited; `World.MarkBlock` refuses that move while a batch is in progress or `Thing.Inventory` holds anything.
+So a station with a mark is on its marked recipe, and `World.Deserialize` refuses a save where batches wait for another.
+A station takes inputs for the selected recipe and the kept one, and haulers carry out only what neither takes.
+A station starts no batch while its cups hold something that is neither such an input nor what its recipe makes (`World.Blocked`), as when a hauler delivers after the station has turned.
 What no storage takes stays in the station, which goes on working until its output stack is full.
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
-Every station page shows the same `RecipeBoard` as the crafting menu, with a `QueueStrip` under the work.
+Every station page shows the same `RecipeBoard` as the crafting menu; only the crafting menu has a `QueueStrip` under the work.
+The board asks `World.SwitchBlock` before it queues at a station and `World.MarkBlock` before it marks, and when the answer is a refusal it shakes the cups of the station's `ProcessRow` (`ProcessRow.Shake`).
+A click on a station's card marks at once, also as the first press of a double-click: queueing puts the mark on the recipe whatever that press did.
+A mark the station refuses is sent and shown only after `RecipeBoard.DoubleClickSeconds`, the time Godot on Linux allows a double-click's second press, since a double-click empties the cups in the way.
 The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.ClosedGroups` keeps the groups the player closed, for every board.
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
 The panel keeps the list's place while the page draws again, so a click on a recipe leaves the list where it was scrolled to.
@@ -860,7 +874,7 @@ The world is a fixed 216-tile valley defined in `src/Terrain.cs`:
 - a lake whose shore function bounds both walking and the drawn water.
 
 `World.Scatter` places resources with a seeded generator, trees more densely toward the mountains.
-`World.Deserialize` also refuses, rather than repairs, a save that is incomplete, names unknown items, marks or queues a recipe at a station that does not make it, or holds player needs out of range.
+`World.Deserialize` also refuses, rather than repairs, a save that is incomplete, names unknown items, marks or counts batches of a recipe at a station that does not make it, or holds player needs out of range.
 Workers use grid detours around water and buildings.
 
 ## Development and verification

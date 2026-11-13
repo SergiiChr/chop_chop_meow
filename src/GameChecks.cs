@@ -817,6 +817,8 @@ public partial class Game {
         Require(Sounds.Names.All(name => sounds.VariantCount(name) > 0), "Every sound must load.");
         Require(sounds.VariantCount("footsteps_default") == 3, "Numbered footstep files must group as three variants.");
         Require(sounds.VariantCount("chop_tree") == 1, "A single chop file must count as one variant.");
+        // Random picks can keep to two of the three variants, about once in a thousand runs: a seed makes them the same every run.
+        sounds.Reseed(1);
         var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
         Require(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds);
@@ -1354,9 +1356,10 @@ public partial class Game {
     /// <summary>A recipe list that has scrolled keeps its place when a click on a recipe makes the page draw again.</summary>
     private async Task CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain() {
         await CloseWithEsc();
-        // A bench that is making something shows its work under the list, which leaves the list too little room for thirteen recipes.
+        // A bench that is making something shows its work under the list; moved down the screen, the page leaves the list too little room for all its recipes.
         var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(workbench, "planks");
         await ClickOn(workbench);
+        await MoveWindow(panel, new Vector2(0, 150));
         ScrollContainer List() => (ScrollContainer)panel.FindChild("recipe_list", true, false);
         await Until(() => List().GetVScrollBar().MaxValue > List().Size.Y, "the bench's recipes outgrowing the room the page leaves them", 2);
         await Wheel((layer.Transform * List().GetGlobalRect()).GetCenter());
@@ -1439,27 +1442,26 @@ public partial class Game {
         RemoveThings(Hosted, t => t == workbench); Drop(Hosted, "planks", 3); await CloseWithEsc();
     }
     /// <summary>
-    /// At a station a click marks or unmarks what workers keep making, Shift and Ctrl queue and load 5 and 10 with the count on the plate,
-    /// a right-click takes batches off, and the queue below shows one cup per recipe. By hand a double-click queues just one.
+    /// At a station Shift and Ctrl queue and load 5 and 10 with the count on the plate and put the worker mark on the recipe queued,
+    /// a click unmarks what workers keep making, a right-click takes batches off, and no queue is drawn below.
+    /// By hand a double-click queues just one, and a right-click on a cup in the queue takes a waiting batch off.
     /// </summary>
     private async Task CheckRecipeBoardsMarkAndQueueWithModifiers() {
         var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
         await ClickOn(furnace);
         string Queued(string plate) => ((Label)Named(plate)!.FindChild("queued", true, false)).Text;
         Require(((Control)Named("craft_iron_bar")!.FindChild("kept", true, false)).Visible, "A new stone furnace must show iron marked for workers.");
-        await Click(Named("craft_iron_bar")!);
-        await Until(() => furnace.Keep == "" && !((Control)Named("craft_iron_bar")!.FindChild("kept", true, false)).Visible, "a click on the marked recipe taking the mark off", 2);
+        bool Kept(string plate) => ((Control)Named(plate)!.FindChild("kept", true, false)).Visible;
         await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
+        await Until(() => furnace.Keep == "charcoal" && Named("craft_charcoal") != null && Kept("craft_charcoal") && Queued("craft_charcoal") == "5", "a Shift-click queueing 5 charcoal and moving the worker mark to it", 2);
+        await Click(Named("craft_charcoal")!);
+        await Until(() => furnace.Keep == "" && !Kept("craft_charcoal"), "a click on the marked recipe taking the mark off", 2);
         await Holding(Key.Ctrl, () => Click(Named("craft_charcoal")!));
-        await Until(() => Named("craft_charcoal") != null && Queued("craft_charcoal") == "15", "Shift and Ctrl clicks queueing 15 charcoal, shown on the plate", 2);
-        Require(furnace.Keep == "", "Queueing with a modifier must not mark the recipe.");
+        await Until(() => Queued("craft_charcoal") == "15", "a Ctrl-click queueing 10 more charcoal, shown on the plate", 2);
+        Require(furnace.Keep == "charcoal" && Kept("craft_charcoal"), "Queueing at a station with no mark must put the mark on the recipe queued.");
         await Holding(Key.Shift, () => RightClick(Named("craft_charcoal")!));
         await Until(() => Queued("craft_charcoal") == "10", "a Shift right-click taking 5 batches off", 2);
-        await Holding(Key.Shift, () => Click(Named("craft_tin_bar")!));
-        await Until(() => Named("queued_tin_bar") != null, "the second recipe joining the queue", 2);
-        Require(panel.FindChildren("queued_*", "", true, false).Count == 2, "The queue must show one cup per recipe.");
-        await RightClick(Named("queued_charcoal")!);
-        await Until(() => world.Waiting(furnace, "charcoal") == 9, "a right-click on the queue taking one batch off", 2);
+        Require(panel.FindChildren("queued_*", "", true, false).Count == 0, "A station must show what waits only as the count on its card.");
         RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
 
         Give(Hosted, "stone", 4);
@@ -1471,7 +1473,94 @@ public partial class Game {
         await Until(() => world.Backpack["stone"] == 4 || world.Making == "stone_chisel", "a right-click taking the queued chisel off unless it is already being made", 2);
         if (world.Making != "") Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
         await Until(() => world.Making == "" && world.Crafting.Count == 0, "the hand queue emptying", 2);
+        // Of three chisels one is being made, so the other two wait in one cup under the work.
+        Give(Hosted, "stone", 6);
+        await Frames();
+        int stone = world.Backpack["stone"];
+        await Click(Named("craft_stone_chisel")!);
+        await Until(() => world.Making == "stone_chisel" && Named("making") != null && Named("queued_stone_chisel") == null, "the page showing the first chisel being made with nothing waiting", 2);
+        await Click(Named("craft_stone_chisel")!);
+        await Until(() => Named("queued_stone_chisel") != null, "the second chisel waiting in the queue's cup", 2);
+        await Click(Named("craft_stone_chisel")!);
+        await Until(() => Named("queued_stone_chisel")!.GetChildren().OfType<Badge>().First().Text == "2", "a third chisel counted on the queue's cup", 2);
+        await RightClick(Named("queued_stone_chisel")!);
+        await Until(() => World.Waiting(world.Crafting, "stone_chisel") == 1 && world.Backpack["stone"] == stone - 4, "a right-click on the queue's cup taking one waiting chisel off and giving its stone back", 2);
+        await RightClick(Named("queued_stone_chisel")!);
+        await Until(() => world.Crafting.Count == 0 && world.Backpack["stone"] == stone - 2, "a second right-click emptying the queue", 2);
+        Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
+        await Until(() => world.Making == "", "the chisel in progress being finished", 2);
         await CloseWithEsc(); Drop(Hosted, "stone", world.Backpack["stone"]); Drop(Hosted, "stone_chisel", world.Backpack["stone_chisel"]);
+    }
+
+    /// <summary>
+    /// At a station, queueing another recipe while a batch is worked shakes the boxes and changes nothing.
+    /// Once the batch is done, it takes what the boxes hold into the backpack and turns the station to the new recipe.
+    /// </summary>
+    private async Task CheckStationShakesWhileBusyThenTurnsToAnotherRecipe() {
+        await CloseWithEsc();
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0)); Hosted.SetRecipe(furnace, "");
+        Give(Hosted, "tin_ore", 2); Give(Hosted, "coal", 1); Give(Hosted, "wood", 2);
+        await ClickOn(furnace);
+        await DoubleClick(Named("craft_tin_bar")!);
+        await Until(() => furnace.Processing && Named("input_tin_ore") != null, "the furnace starting the tin a double-click asked for", 2);
+        await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
+        Require(WorkRow().Shaking, "Queueing another recipe while a batch is worked must shake the boxes.");
+        await Until(() => !WorkRow().Shaking, "the boxes coming to rest", 2);
+        Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
+        Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
+        await Until(() => !furnace.Processing && furnace.Inventory["tin_bar"] == 1, "the tin bar coming out", 2);
+        // An idle page refreshes a few times a second; one that drew itself again without its cups would never show the bar's count.
+        await Until(() => Named("output_tin_bar")?.GetChildren().OfType<Badge>().First().Text == "1", "the furnace that has run out of batches still showing the bar in its cup", 2);
+        await DoubleClick(Named("craft_charcoal")!);
+        await Until(() => furnace.Recipe == "charcoal" && world.Backpack["tin_bar"] == 1 && furnace.Inventory["wood"] == 2 && Named("input_wood") != null,
+            "a double-click on charcoal taking the bar into the backpack and turning the furnace to charcoal, loaded with its wood", 2);
+        RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "tin_bar", 1); await CloseWithEsc();
+    }
+
+    /// <summary>
+    /// With no room in the backpack for what a station's cups hold, a double-click on another recipe leaves the station as it is, its cups shaking.
+    /// So does a click that would move the worker mark to another recipe while the cups hold something.
+    /// </summary>
+    private async Task CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem() {
+        await CloseWithEsc();
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0)); Hosted.SetRecipe(furnace, "charcoal");
+        Give(Hosted, "wood", 2); Hosted.LoadInput(furnace, "wood", 2);
+        // Stone in every free slot leaves no room for the furnace's wood.
+        int stone = Give(Hosted, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
+        await ClickOn(furnace);
+        await DoubleClick(Named("craft_iron_bar")!);
+        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the cups.");
+        Require(furnace.Recipe == "charcoal" && furnace.Keep == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0,
+            "A furnace whose cups the backpack has no room for must stay on its recipe with its wood and its mark.");
+        await Until(() => !WorkRow().Shaking, "the cups coming to rest", 2);
+        await Click(Named("craft_iron_bar")!);
+        await Until(() => WorkRow().Shaking, "a click on another recipe shaking the cups of a furnace that holds wood", 2);
+        Require(furnace.Keep == "charcoal", "A furnace that holds something must keep its mark where it is.");
+        RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "stone", stone); await CloseWithEsc();
+    }
+
+    /// <summary>A station whose mark is taken off stays on its recipe: the card keeps an outline and the page its cups.</summary>
+    private async Task CheckUnmarkedStationStaysOnItsRecipe() {
+        await CloseWithEsc();
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
+        await ClickOn(anvil);
+        await Click(Named("craft_steel_parts")!);
+        await Until(() => anvil.Keep == "" && !((Control)Named("craft_steel_parts")!.FindChild("kept", true, false)).Visible, "a click taking the mark off steel parts", 2);
+        Require(Named("input_steel_bar") != null && Named("craft_steel_parts")!.GetThemeStylebox("normal") == Style.PlateSelected,
+            "An anvil with no mark must stay on steel parts, its card outlined and its cups on the page.");
+        RemoveThings(Hosted, t => t == anvil); await CloseWithEsc();
+    }
+
+    /// <summary>A double-click whose batch is refused leaves the worker mark on: at its 99 batches the marked recipe gets back the mark the first press took off.</summary>
+    private async Task CheckRefusedDoubleClickKeepsTheWorkerMark() {
+        await CloseWithEsc();
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
+        Hosted.QueueBatch(furnace, "iron_bar", World.MaxQueued);
+        await ClickOn(furnace);
+        await DoubleClick(Named("craft_iron_bar")!);
+        await Frames(4);
+        Require(furnace.Keep == "iron_bar" && world.Waiting(furnace, "iron_bar") == World.MaxQueued, "A double-click refused at 99 batches must leave the marked recipe marked.");
+        RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
     }
 
     /// <summary>A new anvil's page shows steel bars in, steel parts out, and a backpack click loads a bar.</summary>
@@ -1647,6 +1736,10 @@ public partial class Game {
             await Test(CheckEndGoalsShowEndingOnceAndKeepPlaying);
             await Test(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
             await Test(CheckRecipeBoardsMarkAndQueueWithModifiers);
+            await Test(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);
+            await Test(CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem);
+            await Test(CheckUnmarkedStationStaysOnItsRecipe);
+            await Test(CheckRefusedDoubleClickKeepsTheWorkerMark);
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
             await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
             await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);

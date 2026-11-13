@@ -67,7 +67,7 @@ public partial class Sounds : Node {
     private Track day = null!, night = null!;
     private readonly Dictionary<string, AudioStream[]> variants = new();
     private readonly Dictionary<string, int> previous = new();
-    private readonly Random random = new();
+    private Random random = new();
     public World World = null!;
     /// <summary>How many tiles a world position lies outside the visible screen; zero when on screen.</summary>
     public Func<Vector2, float> OffScreen = _ => 0;
@@ -79,6 +79,8 @@ public partial class Sounds : Node {
     public static float Level(string name) => Levels.GetValueOrDefault(name);
     public int VariantCount(string name) => Variants(name).Length;
     public int LastVariant(string name) => previous.GetValueOrDefault(name, -1);
+    /// <summary>Starts the picks of variant, pitch and volume over from a seed with no sound played before, so a check hears the same ones on every run.</summary>
+    public void Reseed(int seed) { random = new Random(seed); previous.Clear(); }
 
     /// <summary>Music loudness from the options, 0 to 1.</summary>
     public float MusicVolume = 1;
