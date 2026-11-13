@@ -1459,10 +1459,10 @@ public partial class Game {
         await ClickOn(furnace);
         await DoubleClick(Named("craft_tin_bar")!);
         await Until(() => furnace.Processing && Named("input_tin_ore") != null, "the furnace starting the tin a double-click asked for", 2);
-        ProcessRow Work() => panel.FindChildren("*", "", true, false).OfType<ProcessRow>().Single();
         await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
-        Require(Work().Shaking, "Queueing another recipe while a batch is worked must shake the boxes.");
-        await Until(() => !Work().Shaking, "the boxes coming to rest", 2);
+        Require(WorkRow().Shaking, "Queueing another recipe while a batch is worked must shake the boxes.");
+        await Until(() => !WorkRow().Shaking, "the boxes coming to rest", 2);
+        Require(!HasLabel(panel, "Click a recipe for workers to keep making it, or Shift-click to queue and load some."), "A station with work on its page must not show the hint of an idle one.");
         Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
         Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
         await Until(() => !furnace.Processing && furnace.Inventory["tin_bar"] == 1, "the tin bar coming out", 2);
@@ -1483,7 +1483,7 @@ public partial class Game {
         await DoubleClick(Named("craft_iron_bar")!);
         // The first press marks iron and the second takes the mark back, and the page is drawn again each time.
         await Until(() => furnace.Keep == "charcoal" && Named("input_wood") != null, "the page going back to charcoal after the refused double-click", 2);
-        Require(panel.FindChildren("*", "", true, false).OfType<ProcessRow>().Single().Shaking, "A double-click refused for a full backpack must leave the cups shaking on the page drawn again.");
+        Require(WorkRow().Shaking, "A double-click refused for a full backpack must leave the cups shaking on the page drawn again.");
         Require(furnace.Recipe == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0, "A furnace whose cups the backpack has no room for must stay on its recipe with its wood.");
         RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "stone", stone); await CloseWithEsc();
     }

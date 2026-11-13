@@ -27,8 +27,8 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn, () => { shakeEnds = Time.GetTicksMsec() + (ulong)(ProcessRow.ShakeSeconds * 1000); work?.Shake(); }));
         work = thing.Recipe != "" ? cups.Machine() : null;
         if (work != null) AddChild(work);
-        if (Time.GetTicksMsec() < shakeEnds) work?.Shake();
         else AddLabel("Click a recipe for workers to keep making it, or Shift-click to queue and load some.", 14, Style.Beige);
+        if (Time.GetTicksMsec() < shakeEnds) work?.Shake();
         // The side cups are the leftovers the station held when the page was drawn.
         RedrawOnChange(cups.SideCode);
         if (thing.Kind == ThingKind.Reinforced) Bellows();
