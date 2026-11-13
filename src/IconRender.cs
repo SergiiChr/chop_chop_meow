@@ -40,6 +40,8 @@ public partial class IconRender : Node {
         var ids = new List<(string Id, bool Building)>();
         foreach (var id in Data.Items.Keys) ids.Add((id, false));
         foreach (var kind in Data.Buildings.Keys) ids.Add((kind.Id(), true));
+        // The workers' hard hat marks them in the panels.
+        ids.Add(("hardhat", false));
         int count = 0;
         foreach (var (id, building) in ids) {
             if (WorldModels.IconModel(id, building, Data) is not Node3D model) continue;
@@ -71,7 +73,8 @@ public partial class IconRender : Node {
     private void Frame(Node3D holder, string id) {
         bool tool = id is "steel_axe" or "steel_pick" or "steel_shovel" or "rake" or "torch" or "wood_hammer" or "steel_hammer" or "stone_chisel" or "steel_chisel";
         // Fallen leaves lie flat, so they are seen from higher up.
-        var back = tool ? Direction(15, 70) : Direction(id == "leaves" ? 60 : GamePitch, 45);
+        // The hard hat is seen from nearly level, where its brim and crown show apart.
+        var back = tool ? Direction(15, 70) : id == "hardhat" ? Direction(12, 30) : Direction(id == "leaves" ? 60 : GamePitch, 45);
         camera.Basis = Basis.LookingAt(-back, Vector3.Up);
         // The sun keeps the place it has relative to the game camera: high on the left.
         var gameCamera = Basis.LookingAt(-Direction(GamePitch, 45), Vector3.Up);

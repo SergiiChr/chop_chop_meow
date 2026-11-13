@@ -74,7 +74,7 @@ internal static class NatureShape {
     /// A closed lumpy ellipsoid: broad bulges from <paramref name="lumps"/> random directions plus fine jitter.
     /// Points below <paramref name="floor"/> are pressed flat so the blob rests on, or hangs from, a level base.
     /// </summary>
-    private static (Vector3[] Points, List<int> Triangles) Shape(Vector3 center, Vector3 radii, int detail, int seed, int lumps, float bulge, float jitter,
+    public static (Vector3[] Points, List<int> Triangles) Shape(Vector3 center, Vector3 radii, int detail, int seed, int lumps, float bulge, float jitter,
         float floor, int cuts) {
         var (points, triangles) = Icosphere(detail);
         // Bulges spread evenly over the upper sphere, then jittered, so a crown is clustered all round instead of lopsided.

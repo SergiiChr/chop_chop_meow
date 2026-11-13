@@ -15,6 +15,24 @@ internal static class ModelSteps {
         return meshes;
     }
 
+    /// <summary>The triangles of every mesh under a node, shown or hidden, and of every piece a heap under it shows.</summary>
+    public static int Triangles(Node at) {
+        int count = at switch {
+            MeshInstance3D { Mesh: Mesh mesh } => mesh.GetFaces().Length / 3,
+            MultiMeshInstance3D { Visible: true, Multimesh: { Mesh: Mesh piece } heap } => heap.VisibleInstanceCount * (piece.GetFaces().Length / 3),
+            _ => 0,
+        };
+        foreach (var child in at.GetChildren()) count += Triangles(child);
+        return count;
+    }
+
+    /// <summary>The piece a pile heaps up once it holds nothing but the given number of the item, a stack unless told.</summary>
+    public static Mesh Piled(PileProp pile, Thing thing, string item, GameData data, int count = 64) {
+        thing.Inventory.Clear(); thing.Inventory.Add(item, count);
+        WorldModels.SyncPile(pile, thing, data);
+        return pile.Stock.Piece!;
+    }
+
     /// <summary>The solid core that fills a canopy's shadow, separate from the per-mesh proxies.</summary>
     public static bool CanopyCore(MeshInstance3D mesh) => mesh.MaterialOverride is ShaderMaterial { Shader: var shader } && shader == Tree3DShape.SolidFoliage;
 

@@ -5,7 +5,7 @@ Gather nearby materials, build a small settlement, craft parts and tools, pack s
 Play alone or with up to three friends at home or over the internet.
 
 The world is rendered in 3D with low-poly models under an orthographic isometric camera: natural woodland, modern DIY buildings and readable silhouettes.
-Item and building icons are rendered from the same models, and the rest are drawn icons.
+Item and building icons are rendered from the same models, and the menu and panel glyphs are drawn icons.
 
 ## Run on Linux
 
@@ -109,7 +109,7 @@ The game draws the film itself, so a change to a model or a shot means making th
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
-from their pinned CC0 sources.
+from their pinned CC0 sources, and `./tools/food_models.py` bakes the committed food models from theirs.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
@@ -514,7 +514,7 @@ A pile of crates takes more crates of the same good.
 
 ### Piles
 
-A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that build up as a 9-4-1 pyramid in the colour of what it holds.
+A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that show as a heap of the resource itself, bigger the more it holds.
 The first resource put in sets it: from then on workers store and take only that, and anything else is refused.
 Emptying it frees it again.
 

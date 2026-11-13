@@ -76,7 +76,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         row.AddChild(Style.Text(group.ToString(), 15, Style.Beige, Style.Head));
         var count = Style.Pill(ids.Count.ToString(), Style.CountPill, Style.Beige, 11); count.SizeFlagsVertical = SizeFlags.ShrinkCenter; row.AddChild(count);
         if (!open && station != null && ids.Contains(station.Keep)) {
-            var hat = Style.Glyph("hardhat", 22, Colors.White); hat.Name = "kept"; hat.SizeFlagsVertical = SizeFlags.ShrinkCenter; row.AddChild(hat);
+            var hat = Style.Icon(Icons.Of("hardhat"), 22); hat.Name = "kept"; hat.SizeFlagsVertical = SizeFlags.ShrinkCenter; row.AddChild(hat);
         }
         row.AddChild(new ColorRect { Color = new Color(Style.Beige, .3f), CustomMinimumSize = new Vector2(0, 2), SizeFlagsHorizontal = SizeFlags.ExpandFill, SizeFlagsVertical = SizeFlags.ShrinkCenter, MouseFilter = MouseFilterEnum.Ignore });
         return heading;
@@ -113,7 +113,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         live.Watch(() => world.Waiting(station, id), waiting => queued.Text = waiting > 0 ? waiting.ToString() : "");
         if (station != null) {
             // The worker mark is a thick outline with a hard hat on top; the recipe the station is on has a thinner outline of its own.
-            var hat = Style.Corner(Style.Glyph("hardhat", 34, Colors.White), .5f, 0, HatRise); hat.Name = "kept"; cell.AddChild(hat);
+            var hat = Style.Corner(Style.Icon(Icons.Of("hardhat"), 34), .5f, 0, HatRise); hat.Name = "kept"; cell.AddChild(hat);
             live.Watch(() => (Kept: station.Keep == id, On: world.Selected(station) == id), state => {
                 var plate = state.Kept ? Style.PlateKept : state.On ? Style.PlateSelected : Style.PlateNormal;
                 Style.Skin(cell, plate, state.Kept || state.On ? plate : Style.PlateHover);

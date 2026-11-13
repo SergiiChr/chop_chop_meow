@@ -157,6 +157,25 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Player = at + new Vector2(3, -2.5f); world.Tick(0); view.Zoom = 1.4f;
             if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Pile)); else panel.Close();
         }
+        if (Launch.Has("--goods")) {
+            // A pile of every good, eight to a row and --goods-share full (six tenths unless given), then a compost pile.
+            // --goods-pile N looks at the Nth pile, counting from 0.
+            const int perRow = 8;
+            var at = Terrain.Spawn + new Vector2(-3, 9);
+            string[] goods = world.Data.Items.Keys.Where(item => item != Inventory.Coins).ToArray();
+            float share = Launch.Number("--goods-share", .6f); int look = (int)Launch.Number("--goods-pile", 0);
+            Vector2 Spot(int pile) => at + new Vector2(pile % perRow * 3.2f, pile / perRow * 3.2f);
+            world.S.Things.RemoveAll(t => t.Pos.X > at.X - 4 && t.Pos.X < at.X + perRow * 3.2f + 4 && t.Pos.Y > at.Y - 4 && t.Pos.Y < at.Y + (goods.Length / perRow + 1) * 3.2f + 4);
+            world.S.Workers.Clear(); world.S.Orders.Clear();
+            for (int i = 0; i < goods.Length; i++) {
+                var pile = world.Add(ThingKind.Pile, Spot(i));
+                pile.Inventory.Add(goods[i], Math.Max(1, (int)(pile.Inventory.Slots * pile.Inventory.StackOf(goods[i]) * share)));
+            }
+            var compost = world.Add(ThingKind.Pile, Spot(goods.Length)); compost.Compost = true;
+            compost.Inventory.Add("leaves", (int)(300 * share)); compost.Inventory.Add("grass", (int)(300 * share)); compost.Inventory.Add("fertilizer", (int)(200 * share));
+            // The player crouches in front of the pile looked at, clear of it.
+            world.Player = Spot(look) + new Vector2(1.9f, 1.9f); world.Tick(0); view.Zoom = 2.2f; panel.Close();
+        }
         if (Launch.Has("--farm")) {
             // A row of plots, one per look: bare, sown soil, straws, green plants and ripe wheat half harvested, beside a pile of wheat.
             var at = Terrain.Spawn + new Vector2(-6, 9);

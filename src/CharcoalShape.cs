@@ -19,24 +19,26 @@ internal static class CharcoalShape {
         (new(.22f, Rest, -.20f), new(.44f, Rest, .06f)),
         (new(.18f, .11f, .18f), new(0, .56f, .12f)),
     };
-    private static ArrayMesh? heap;
+    private static ArrayMesh? heap, briquette;
 
     /// <summary>The colours the mesh carries: lighter and darker sides, the pressed ends and the dark of the hole.</summary>
     public static readonly StandardMaterial3D Material = ModelKit.Vertex(Surface.Stone, .95f);
 
     /// <summary>The three briquettes in their own proportions, for the icon.</summary>
-    public static Mesh Heap => heap ??= Build();
+    public static Mesh Heap => heap ??= Build(Logs);
+    /// <summary>One briquette lying on its side, the piece a pile heaps up.</summary>
+    public static Mesh Briquette => briquette ??= Build((new(-.26f, Rest, 0), new(.26f, Rest, 0)));
 
-    /// <summary>Builds the heap centred on the origin, in its own proportions or stretched to fill a box of the given size, as a pile slot shows it.</summary>
-    public static ArrayMesh Build(Vector3? fit = null) {
+    /// <summary>Builds briquettes, each from one end's middle to the other's, centred on the origin.</summary>
+    private static ArrayMesh Build(params (Vector3 Start, Vector3 End)[] logs) {
         var points = new List<(Vector3 A, Vector3 B, Vector3 C, Vector3 Outward, string Tint)>();
-        foreach (var (start, end) in Logs) Log(points, start, end);
+        foreach (var (start, end) in logs) Log(points, start, end);
         var min = points[0].A; var max = min;
         foreach (var (a, b, c, _, _) in points) { min = min.Min(a).Min(b).Min(c); max = max.Max(a).Max(b).Max(c); }
-        var centre = (min + max) / 2; var scale = fit is Vector3 size ? size / (max - min) : Vector3.One;
+        var centre = (min + max) / 2;
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         foreach (var (a, b, c, outward, tint) in points) {
-            Vector3 p = (a - centre) * scale, q = (b - centre) * scale, r = (c - centre) * scale;
+            Vector3 p = a - centre, q = b - centre, r = c - centre;
             var normal = (r - p).Cross(q - p).Normalized();
             if (normal.Dot(outward) < 0) { (q, r) = (r, q); normal = -normal; }
             s.SetColor(new Color(tint)); s.SetNormal(normal); s.AddVertex(p); s.AddVertex(q); s.AddVertex(r);

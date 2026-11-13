@@ -62,8 +62,7 @@ public sealed class ActorRig {
                 break;
             case ActorSkin.Worker:
                 BuildWorkerDetails(skinTone, hair, legs);
-                Sphere(head, .14f, new Vector3(0, .2f, 0), Mat("e8b323", .5f), new Vector3(1, .62f, 1.08f), 16);
-                Cylinder(head, .17f, .17f, .02f, new Vector3(0, .17f, .02f), Mat("e8b323", .5f), null, 20);
+                HardHat(head);
                 break;
             case ActorSkin.Courier:
                 BuildFace(skinTone, hair);
@@ -240,6 +239,13 @@ public sealed class ActorRig {
     public void Hold(Node3D item, bool right = true) {
         item.Position = new Vector3(0, -Forearm, Palm);
         (right ? elbowR : elbowL).AddChild(item);
+    }
+
+    /// <summary>A worker's hard hat on a head: a shell with a ridge from front to back, over a round brim. The icon renderer shows it on its own.</summary>
+    public static void HardHat(Node3D head) {
+        Sphere(head, .14f, new Vector3(0, .2f, 0), Mat("e8b323", .5f), new Vector3(1, .62f, 1.08f), 16);
+        Sphere(head, .14f, new Vector3(0, .204f, 0), Mat("c9981a", .5f), new Vector3(.2f, .66f, 1.1f), 16);
+        Cylinder(head, .17f, .17f, .02f, new Vector3(0, .17f, .02f), Mat("e8b323", .5f), null, 20);
     }
 
     /// <summary>A held tool gripped at the origin, handle down along -Y and blade toward -Z; the icon renderer shows it on its own.</summary>
