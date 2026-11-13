@@ -5,12 +5,14 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// A station's page: the recipe board, the work of its current recipe, what waits in its queue, the bellows of a reinforced furnace
+/// A station's page: the recipe board, the work of its current recipe, the bellows of a reinforced furnace
 /// and the jobs it offers, with its tool cups in a window of their own to the left.
 /// </summary>
 public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     // The board opens the group of what the station makes when the page opens, and keeps the groups as the player leaves them after that.
     private bool opened;
+    // The work as drawn now, or null while the station has no recipe.
+    private ProcessRow? work;
 
     protected override void Body() {
         // A station's own tool cups sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
@@ -19,11 +21,12 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool, or of the one you carry while you work it. Someone has to work it.";
         string? openOn = opened ? null : thing.Keep != "" ? thing.Keep : thing.Recipe != "" ? thing.Recipe : null;
         opened = true;
-        AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn));
-        RedrawOnChange(() => World.QueueCode(world.QueueOf(thing)));
-        if (thing.Recipe != "") AddChild(cups.Machine());
+        AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn, () => work?.Shake()));
+        work = thing.Recipe != "" ? cups.Machine() : null;
+        if (work != null) AddChild(work);
         else AddLabel("Click a recipe for workers to keep making it, or Shift-click to queue and load some.", 14, Style.Beige);
-        AddChild(new QueueStrip(kit, live, thing));
+        // The side cups are the leftovers the station held when the page was drawn.
+        RedrawOnChange(cups.SideCode);
         if (thing.Kind == ThingKind.Reinforced) Bellows();
         // A tool whose cup is empty goes into it.
         bool FreeToolCup(string id) => slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(thing, world.Data.Items[id].Tool) == null;

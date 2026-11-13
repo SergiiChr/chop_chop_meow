@@ -16,6 +16,8 @@ public sealed class PageMemory {
     public bool Hiring, SheetOpen = true;
     /// <summary>A station's worker mark before the last press on its recipe board; the page may redraw between the two presses of a double-click.</summary>
     public string KeptBefore = "";
+    /// <summary>Whether the station could not turn to the recipe pressed last, as it stood before that press changed its mark.</summary>
+    public bool BlockedBefore;
     /// <summary>The number of the packed crate opened from the backpack.</summary>
     public int CarriedCrate;
 }

@@ -82,6 +82,18 @@ public sealed class Inventory {
         return used > Slots ? 0 : room;
     }
 
+    /// <summary>Whether everything another inventory holds fits in this one at once: each item tops up its own stacks, and the rest takes empty slots.</summary>
+    public bool Fits(Inventory other) {
+        int limit = Math.Min(Slots, Layout.Count), empty = 0;
+        for (int i = 0; i < limit; i++) if (Layout[i].Item == "") empty++;
+        foreach (var (item, count) in other.items) {
+            int stack = StackOf(item), spare = 0;
+            for (int i = 0; i < limit; i++) if (Layout[i].Item == item) spare += stack - Layout[i].Count;
+            empty -= (Math.Max(0, count - spare) + stack - 1) / stack;
+        }
+        return empty >= 0 && (Capacity == 0 || Count + other.Count <= Capacity);
+    }
+
     /// <summary>Slots to show: every stack, plus one single-item slot per unit of capacity left.</summary>
     public int ShownSlots {
         get {

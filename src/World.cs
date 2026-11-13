@@ -16,21 +16,21 @@ public sealed class Thing {
     public float Y { get; set; }
     public int Remaining { get; set; }
     public Inventory Inventory { get; set; } = new();
-    /// <summary>A station's recipe now: the batch in progress, else the first queued, else <see cref="Keep"/>; empty when it has nothing to make.</summary>
-    [JsonIgnore] public string Recipe => Making != "" ? Making : queue is { Count: > 0 } ? queue[0].Recipe : Keep;
+    /// <summary>A station's recipe now: the batch in progress, else the one a player asked for batches of, else <see cref="Keep"/>; empty when it has nothing to make.</summary>
+    [JsonIgnore] public string Recipe => Making != "" ? Making : Asked != "" ? Asked : Keep;
     /// <summary>The recipe of a station's batch in progress, or empty between batches.</summary>
     [JsonIgnore] public string Making { get => making ?? ""; set => making = value == "" ? null : value; }
-    /// <summary>The recipe workers keep a station making once its queue is done, or empty.</summary>
+    /// <summary>The recipe workers keep a station making once the batches asked of it are done, or empty.</summary>
     [JsonIgnore] public string Keep { get => keep ?? ""; set => keep = value == "" ? null : value; }
-    /// <summary>Batches queued at a station, one entry per recipe in the order first queued; a batch leaves the queue when it starts.</summary>
-    [JsonIgnore] public List<Queued> Queue => queue ??= new();
-    private List<Queued>? queue;
-    private string? making, keep;
+    /// <summary>The one recipe a player asked a station for batches of, or empty when none wait.</summary>
+    [JsonIgnore] public string Asked { get => asked ?? ""; set => asked = value == "" ? null : value; }
+    /// <summary>How many batches of <see cref="Asked"/> wait; a batch leaves the count as it starts.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Batches { get; set; }
+    private string? making, keep, asked;
     // Saves and updates carry these only when set, so a tree or a rock carries none of them.
     [JsonInclude, JsonPropertyName("Recipe"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] internal string? SavedMaking { get => making; set => Making = value ?? ""; }
     [JsonInclude, JsonPropertyName("Keep"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] internal string? SavedKeep { get => keep; set => Keep = value ?? ""; }
-    [JsonInclude, JsonPropertyName("Queue"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull), JsonConverter(typeof(QueueJson))]
-    internal List<Queued>? SavedQueue { get => queue is { Count: > 0 } ? queue : null; set => queue = value; }
+    [JsonInclude, JsonPropertyName("Asked"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] internal string? SavedAsked { get => asked; set => Asked = value ?? ""; }
     public float Progress { get; set; }
     public bool Processing { get; set; }
     public float Heat { get; set; }
@@ -65,14 +65,14 @@ public sealed class Thing {
     [JsonIgnore] public bool IsLoose => GatherRules.Of(Kind)?.Shape == GatherShape.Loose;
     [JsonIgnore] public bool IsStorage => Kind is ThingKind.Chest or ThingKind.Grave or ThingKind.Crate or ThingKind.Toolstation or ThingKind.Pile;
 }
-/// <summary>Batches of one recipe waiting in a queue.</summary>
+/// <summary>Batches of one recipe waiting in the hand's queue.</summary>
 public sealed class Queued {
     public string Recipe { get; set; } = "";
     public int Count { get; set; }
 }
 /// <summary>
-/// Reads and writes a queue as an array of its entries with a plain loop.
-/// Every station's entry in a world update carries a queue, and the generic list writer allocates on each call.
+/// Reads and writes the hand's queue as an array of its entries with a plain loop.
+/// Every player's entry in a world update carries a queue, and the generic list writer allocates on each call.
 /// </summary>
 public sealed class QueueJson : JsonConverter<List<Queued>> {
     private static readonly JsonEncodedText RecipeName = JsonEncodedText.Encode(nameof(Queued.Recipe)), CountName = JsonEncodedText.Encode(nameof(Queued.Count));
@@ -242,7 +242,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 7;
+    public int Version { get; set; } = 8;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -801,21 +801,26 @@ public sealed partial class World {
         if (t.Burn <= 0) Play("start_fire", t.Pos);
         t.Burn += Data.CampfireSeconds; Say($"Campfire fed: +{Data.CampfireHours:0} hours of light.");
     }
-    /// <summary>Marks the recipe workers keep a station making once its queue is done; an empty one clears the mark.</summary>
+    /// <summary>Marks the recipe workers keep a station making once the batches asked of it are done; an empty one clears the mark.</summary>
     public void SetRecipe(Thing t, string recipe) {
         if (recipe != "" && !Makes(t, recipe)) return;
         if (Forwarded(Verb.SetRecipe, t.Id, item: recipe)) return;
         t.Keep = recipe;
     }
-    /// <summary>Most batches of one recipe a queue holds.</summary>
+    /// <summary>Most batches of one recipe that wait at a station or in the hand's queue.</summary>
     public const int MaxQueued = 99;
     private bool Makes(Thing t, string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Station == t.Kind;
-    /// <summary>Queues batches of a recipe at a station, or with a negative count takes waiting ones off; a batch in progress stays.</summary>
-    public void QueueRecipe(Thing t, string recipe, int count) {
-        if (count == 0 || !Makes(t, recipe) || Forwarded(Verb.QueueRecipe, t.Id, item: recipe, count: count)) return;
-        Requeue(t.Queue, recipe, count);
+    /// <summary>Takes waiting batches of a recipe off a station's count; a batch in progress stays.</summary>
+    public void Unqueue(Thing t, string recipe, int count) {
+        if (count <= 0 || t.Asked != recipe || Forwarded(Verb.Unqueue, t.Id, item: recipe, count: count)) return;
+        Ask(t, recipe, t.Batches - count);
     }
-    /// <summary>Adds to or takes from a queue's entry for a recipe, between none and <see cref="MaxQueued"/>, and returns how many it moved.</summary>
+    /// <summary>Sets how many batches of a recipe wait at a station, between none and <see cref="MaxQueued"/>; with none the station has nothing asked of it.</summary>
+    private static void Ask(Thing t, string recipe, int batches) {
+        t.Batches = Math.Clamp(batches, 0, MaxQueued);
+        t.Asked = t.Batches > 0 ? recipe : "";
+    }
+    /// <summary>Adds to or takes from the entry for a recipe in a hand's queue, between none and <see cref="MaxQueued"/>, and returns how many it moved.</summary>
     private static int Requeue(List<Queued> queue, string recipe, int count) {
         int at = queue.Count - 1;
         while (at >= 0 && queue[at].Recipe != recipe) at--;
@@ -824,22 +829,14 @@ public sealed partial class World {
         if (after == 0) queue.RemoveAt(at); else queue[at].Count = after;
         return Math.Abs(after - before);
     }
-    /// <summary>The batches waiting at a station, or with none in the acting player's hand crafting.</summary>
-    public ListView<Queued> QueueOf(Thing? station) => station == null ? Crafting : new(station.Queue);
-    /// <summary>Queues batches of a recipe at a station or by hand, or with a negative count takes waiting ones off.</summary>
-    public void Enqueue(Thing? station, string recipe, int count) {
-        if (station != null) QueueRecipe(station, recipe, count);
-        else if (count > 0) Craft(recipe, count);
-        else CancelCraft(recipe, -count);
-    }
-    /// <summary>A number that changes with the recipes in a queue and their order, built without allocating.</summary>
+    /// <summary>A number that changes with the recipes in a hand's queue and their order, built without allocating.</summary>
     public static int QueueCode(ListView<Queued> queue) {
         int code = queue.Count;
         for (int i = 0; i < queue.Count; i++) code = code * 31 + queue[i].Recipe.GetHashCode();
         return code;
     }
     /// <summary>Batches of a recipe waiting at a station, or with none in the acting player's hand crafting.</summary>
-    public int Waiting(Thing? station, string recipe) => Waiting(QueueOf(station), recipe);
+    public int Waiting(Thing? station, string recipe) => station == null ? Waiting(Crafting, recipe) : station.Asked == recipe ? station.Batches : 0;
     /// <summary>The recipes a station makes, or with none those made by hand.</summary>
     public IEnumerable<string> RecipesAt(Thing? station) => station == null ? HandRecipes : Data.Recipes.Where(p => p.Value.Station == station.Kind).Select(p => p.Key);
     /// <summary>The tool the acting player works a recipe with: the faster of the one slotted at a station and the best one carried; null when there is none or none is needed.</summary>
@@ -858,29 +855,38 @@ public sealed partial class World {
     }
     /// <summary>The faster of two tools, the first when they are as fast; null when there is neither.</summary>
     private string? Faster(string? first, string? second) => first == null || second != null && Speed(second) > Speed(first) ? second : first;
-    /// <summary>Batches of a recipe waiting in a queue.</summary>
+    /// <summary>Batches of a recipe waiting in a hand's queue.</summary>
     public static int Waiting(ListView<Queued> queue, string recipe) {
         for (int i = 0; i < queue.Count; i++) if (queue[i].Recipe == recipe) return queue[i].Count;
         return 0;
     }
-    /// <summary>The recipe to start next: the first queued, which leaves the queue as it starts so it can no longer be taken off, else the kept one.</summary>
-    private static string StartNext(List<Queued> queue, string keep) {
-        if (queue.Count == 0) return keep;
-        string next = queue[0].Recipe;
-        Requeue(queue, next, -1);
-        return next;
-    }
-    /// <summary>Queues batches of a recipe and loads their inputs and one fuel each from the backpack, on top of what the station holds.</summary>
+    /// <summary>
+    /// Asks a station for batches of a recipe and loads their inputs and one fuel each from the backpack, on top of what the station holds.
+    /// A station counts batches of one recipe at a time.
+    /// Turning to another recipe drops the batches still waiting and takes what the station's boxes hold into the backpack; <see cref="SwitchBlock"/> says when it cannot.
+    /// </summary>
     public void QueueBatch(Thing t, string recipe, int batches = 1) {
         if (batches <= 0 || !Makes(t, recipe)) return;
         if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
         if (Forwarded(Verb.QueueBatch, t.Id, item: recipe, count: batches)) return;
-        if (Waiting(t, recipe) >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
-        batches = Requeue(t.Queue, recipe, batches);
+        if (SwitchBlock(t, recipe) is string blocked) { Say(blocked); return; }
+        int waiting = Waiting(t, recipe);
+        if (waiting >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
+        if (recipe != t.Recipe) foreach (string item in t.Inventory.Items.Keys.ToArray()) t.Inventory.TransferTo(S.Backpack, item, t.Inventory[item]);
+        Ask(t, recipe, waiting + batches);
+        batches = t.Batches - waiting;
         var r = Data.Recipes[recipe];
         foreach (var (item, amount) in r.Inputs) LoadInput(t, item, amount * batches);
         if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost) is string fuel) LoadFuel(t, fuel, batches);
     }
+    /// <summary>
+    /// Why a station cannot turn from its recipe to another now, or null: a batch is being worked, or the backpack has no room for what the station's boxes hold.
+    /// More batches of the recipe it is on are never blocked.
+    /// </summary>
+    public string? SwitchBlock(Thing t, string recipe) =>
+        recipe == t.Recipe ? null
+        : t.Processing ? $"The {Lower(Data.Name(t.Kind))} is in the middle of a batch. Wait for it to finish."
+        : !S.Backpack.Fits(t.Inventory) ? $"No room in your backpack for what the {Lower(Data.Name(t.Kind))} holds." : null;
     private static readonly Dictionary<string, int> NoCost = new();
     /// <summary>
     /// The fuel loading a recipe burns: what the fuel slot holds, or for an empty slot the first fuel the recipe burns
@@ -920,13 +926,9 @@ public sealed partial class World {
         if (!batchCosts.TryGetValue(recipe, out var cost)) batchCosts[recipe] = cost = Data.Recipes.TryGetValue(recipe, out var r) ? new(r.Inputs) : new();
         return cost;
     }
-    /// <summary>Whether a station's current, queued or kept recipe takes an item as an input.</summary>
-    private bool Pending(Thing t, string item) {
-        if (BatchCost(t.Recipe).ContainsKey(item) || BatchCost(t.Keep).ContainsKey(item)) return true;
-        foreach (var q in t.Queue) if (BatchCost(q.Recipe).ContainsKey(item)) return true;
-        return false;
-    }
-    /// <summary>Whether a station takes an item from the player: an input of its current, queued or kept recipe, or a fuel it burns.</summary>
+    /// <summary>Whether a station's current or kept recipe takes an item as an input.</summary>
+    private bool Pending(Thing t, string item) => BatchCost(t.Recipe).ContainsKey(item) || BatchCost(t.Keep).ContainsKey(item);
+    /// <summary>Whether a station takes an item from the player: an input of its current or kept recipe, or a fuel it burns.</summary>
     public bool Takes(Thing t, string item) => Pending(t, item) || t.Burner != null && FuelFits(t, item);
     /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it.</summary>
     private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null);
@@ -976,7 +978,7 @@ public sealed partial class World {
         if (Forwarded(Verb.Collect, t.Id)) return;
         foreach (var item in Leftovers(t).ToArray()) t.Inventory.TransferTo(S.Backpack, item, 999);
     }
-    /// <summary>Finished goods plus anything no current, queued or kept recipe takes.</summary>
+    /// <summary>Finished goods plus anything neither the current nor the kept recipe takes.</summary>
     public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));
     /// <summary>The first of a station's leftovers that some storage takes, and that storage.</summary>
     private (string Item, Thing Store)? LeftoverToStore(Thing t) {
@@ -1397,7 +1399,7 @@ public sealed partial class World {
         float rate = CraftRate;
         if (rate <= 0 || playerBusy || S.Actor.Still < CraftSettle) return;
         // Work starts on the first waiting recipe, which then leaves the queue and can no longer be taken off.
-        if (S.Making == "") { S.Making = StartNext(S.Crafting, ""); S.CraftTime = 0; }
+        if (S.Making == "") { S.Making = S.Crafting[0].Recipe; Requeue(S.Crafting, S.Making, -1); S.CraftTime = 0; }
         var r = Data.Recipes[S.Making];
         S.CraftTime = Math.Min(r.Seconds, S.CraftTime + dt * rate);
         // A full backpack holds the finished item back rather than losing it.
@@ -2219,7 +2221,8 @@ public sealed partial class World {
         if (t.Tools != null && recipe.Tool != "" && tool == null) atAnvil = false;
         float rate = WorkRate(t.Kind, tool);
         if (!t.Processing && hot && atAnvil && Stocked(t)) {
-            t.Inventory.Spend(BatchCost(t)); t.Making = StartNext(t.Queue, t.Keep); t.Processing = true; t.Progress = 0;
+            t.Inventory.Spend(BatchCost(t)); t.Making = t.Recipe; t.Processing = true; t.Progress = 0;
+            if (t.Batches > 0) Ask(t, t.Asked, t.Batches - 1);
             if (recipe.Inputs.TryGetValue("water", out int usedWater)) t.Inventory.Add("empty_bottle", usedWater);
             if (FuelOf(t) is string fuel) t.Burner!.Remove(fuel, 1);
             if (recipe.Burns && !wasBurning) Play("start_fire", t.Pos);
@@ -2485,7 +2488,7 @@ public sealed partial class World {
     }
     /// <summary>
     /// Whether every building, worker and cart in a save holds only known items, every worker's tool is a known item,
-    /// every building has its boxes, and every station is marked with, makes and has queued only recipes it makes.
+    /// every building has its boxes, and every station is marked with, makes and counts batches of only recipes it makes.
     /// </summary>
     private bool ValidSettlement(SaveState save) {
         foreach (var t in save.Things) {
@@ -2495,7 +2498,8 @@ public sealed partial class World {
             if (SlotKinds(t.Kind).Length > 0 && t.Tools == null || Burns(t.Kind) && t.Burner == null || t.Kind == ThingKind.Signpost && t.Wages == null
                 || t.Kind is ThingKind.Signpost or ThingKind.Farm or ThingKind.Packer or ThingKind.Mine && t.Output == null) return false;
             if (t.Keep != "" && !Makes(t, t.Keep) || t.Making != "" && !Makes(t, t.Making)) return false;
-            foreach (var q in t.Queue) if (q == null || !Makes(t, q.Recipe) || q.Count is <= 0 or > MaxQueued) return false;
+            // A station counts batches of one recipe, the one in progress when there is one.
+            if (t.Batches is < 0 or > MaxQueued || t.Batches > 0 != (t.Asked != "") || t.Asked != "" && (!Makes(t, t.Asked) || t.Making != "" && t.Making != t.Asked)) return false;
         }
         foreach (var w in save.Workers)
             if (w?.Duties == null || w.Tool == null || w.Tool != "" && !Data.Items.ContainsKey(w.Tool) || !ValidInventory(w.Bag, save.Crates)) return false;

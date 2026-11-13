@@ -9,10 +9,33 @@ namespace ChopChopMeow;
 /// the fuel under it with how long it lasts, and the main output with its side outputs in a second row.
 /// </summary>
 public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) : PanelContainer {
+    /// <summary>How long a shake lasts, in seconds, how far it swings to each side, in pixels, and how many times it swings.</summary>
+    private const float ShakeSeconds = .4f, ShakeReach = 8, ShakeSwings = 4;
+
+    // The input cups and the output cups, each group in a box of its own.
+    private HBoxContainer left = null!;
+    private VBoxContainer right = null!;
+    private Tween? shake;
+    private Vector2 leftHome, rightHome;
+
+    /// <summary>Whether the cups are shaking now.</summary>
+    public bool Shaking => shake != null && shake.IsValid();
+
+    /// <summary>Shakes the input and output cups from side to side and back to rest, to show they are taken.</summary>
+    public void Shake() {
+        if (Shaking) { shake!.Kill(); left.Position = leftHome; right.Position = rightHome; }
+        leftHome = left.Position; rightHome = right.Position;
+        shake = CreateTween();
+        shake.TweenMethod(Callable.From<float>(done => {
+            var swing = new Vector2(MathF.Sin(done * MathF.Tau * ShakeSwings) * (1 - done) * ShakeReach, 0);
+            left.Position = leftHome + swing; right.Position = rightHome + swing;
+        }), 0f, 1f, ShakeSeconds);
+    }
+
     public override void _Ready() {
         AddThemeStyleboxOverride("panel", Style.Well); MouseFilter = MouseFilterEnum.Pass;
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); AddChild(row);
-        var left = new HBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkBegin }; left.AddThemeConstantOverride("separation", 12); row.AddChild(left);
+        left = new HBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkBegin }; left.AddThemeConstantOverride("separation", 12); row.AddChild(left);
         foreach (var input in inputs) left.AddChild(input);
         var middle = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; middle.AddThemeConstantOverride("separation", 8); row.AddChild(middle);
         var clock = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; clock.AddThemeConstantOverride("separation", 4); middle.AddChild(clock);
@@ -22,7 +45,7 @@ public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, s
         // Redrawn only when the bar moves a pixel's worth.
         live.Watch(() => (int)(progress() * 200), at => bar.Value = at / 200f);
         if (fuel != null) { fuel.SizeFlagsHorizontal = SizeFlags.ShrinkCenter; middle.AddChild(fuel); }
-        var right = new VBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkBegin }; right.AddThemeConstantOverride("separation", 10); row.AddChild(right);
+        right = new VBoxContainer { SizeFlagsVertical = SizeFlags.ShrinkBegin }; right.AddThemeConstantOverride("separation", 10); row.AddChild(right);
         if (main != null) right.AddChild(main);
         var extras = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; extras.AddThemeConstantOverride("separation", 10); right.AddChild(extras);
         foreach (var output in side) extras.AddChild(output);

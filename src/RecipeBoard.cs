@@ -11,10 +11,12 @@ namespace ChopChopMeow;
 /// Each card shows the product, its name and its inputs, each count in brick while the backpack is short, or the tool it lacks.
 /// By hand a click queues a batch. At a station a click marks the recipe workers keep making, and a double-click queues a batch and loads it from the backpack.
 /// Shift queues 5 and Ctrl 10, at a station loading them too; a right-click takes as many waiting batches off.
+/// A station counts batches of one recipe at a time, so queueing another one turns the station to it when it can.
 /// </summary>
 /// <param name="station">Null when crafting by hand.</param>
 /// <param name="openOn">A recipe whose group the board opens, for a page opening rather than drawing again.</param>
-public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, SidePanel panel, Action redraw, Thing? station, string? openOn) : VBoxContainer {
+/// <param name="occupied">Shows that a station's boxes are taken, when it cannot turn to the recipe queued; null by hand.</param>
+public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, SidePanel panel, Action redraw, Thing? station, string? openOn, Action? occupied = null) : VBoxContainer {
     private readonly World world = kit.World;
 
     /// <summary>How far the worker mark's hard hat stands out over the top of a card.</summary>
@@ -115,19 +117,23 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         bool doubled = false;
         cell.Pressed += () => {
             if (doubled) { doubled = false; return; }
-            string kept = memory.KeptBefore = station?.Keep ?? "";
             int step = Step;
-            if (station == null) kit.Run(() => world.Enqueue(null, id, step));
-            else if (step > 1) kit.Run(() => world.QueueBatch(station, id, step));
+            if (station == null) { kit.Run(() => world.Craft(id, step)); return; }
+            string kept = memory.KeptBefore = station.Keep;
+            memory.BlockedBefore = world.SwitchBlock(station, id) != null;
+            if (step > 1) kit.Run(() => Queue(step));
             else kit.Run(() => world.SetRecipe(station, kept == id ? "" : id));
         };
         cell.DoubleClicked = () => {
             doubled = true;
-            if (station == null) return;
-            string kept = memory.KeptBefore;
-            kit.Run(() => { world.SetRecipe(station, kept); world.QueueBatch(station, id); });
+            if (station != null) kit.Run(() => { world.SetRecipe(station, memory.KeptBefore); Queue(1); });
         };
-        cell.RightClicked = () => kit.Run(() => world.Enqueue(station, id, -Step));
+        // The server answers a refusal with its reason; the boxes in the way shake at once.
+        void Queue(int batches) {
+            world.QueueBatch(station!, id, batches);
+            if (memory.BlockedBefore) occupied?.Invoke();
+        }
+        cell.RightClicked = () => kit.Run(() => { if (station != null) world.Unqueue(station, id, Step); else world.CancelCraft(id, Step); });
         void Describe(StringBuilder text) {
             text.Append(r.Name);
             if (r.Amount > 1) text.Append($" ×{r.Amount}");
@@ -212,12 +218,14 @@ public partial class RecipePopup(World world, Thing? station, RecipeDef r, float
     }
 }
 
-/// <summary>What waits in a queue, one cup per recipe in the order first queued; a right-click takes 1, 5 or 10 batches off.</summary>
-/// <param name="station">The station whose queue it shows, or null for the hand's; the page draws it again when the queue's recipes change.</param>
-public partial class QueueStrip(UiKit kit, LiveUpdates live, Thing? station) : HBoxContainer {
+/// <summary>
+/// What waits in the hand's queue, one cup per recipe in the order first queued; a right-click takes 1, 5 or 10 batches off.
+/// The page draws it again when the queue's recipes change.
+/// </summary>
+public partial class QueueStrip(UiKit kit, LiveUpdates live) : HBoxContainer {
     public override void _Ready() {
         var world = kit.World;
-        var queue = world.QueueOf(station);
+        var queue = world.Crafting;
         Name = "queue";
         AddThemeConstantOverride("separation", 10);
         if (queue.Count == 0) return;
@@ -227,8 +235,8 @@ public partial class QueueStrip(UiKit kit, LiveUpdates live, Thing? station) : H
             var (cell, count) = ItemSlot.Cup($"queued_{q.Recipe}", 44); cell.Icon = Icons.Of(r.Output);
             cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
             string id = q.Recipe;
-            live.Watch(() => world.Waiting(station, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
-            cell.RightClicked = () => kit.Run(() => world.Enqueue(station, id, -RecipeBoard.Step));
+            live.Watch(() => World.Waiting(queue, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
+            cell.RightClicked = () => kit.Run(() => world.CancelCraft(id, RecipeBoard.Step));
             AddChild(cell);
         }
     }

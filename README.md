@@ -226,8 +226,8 @@ Every station and the crafting menu share one layout: recipe cards under a headi
 A click on a heading closes its group and another opens it; the list scrolls once it outgrows the page.
 A card shows the product, its name and what a batch takes, each count in brick while your backpack is short.
 A recipe whose tool is nowhere to hand names it instead, such as "No steel chisel".
-A card shows how many batches wait in the queue at its top right corner.
-The queue sits under the work in progress, one cup per recipe in the order first queued, however many batches of it wait.
+A card shows how many batches of it wait at its top right corner.
+The crafting menu also shows its queue under the work in progress, one cup per recipe in the order first queued, however many batches of it wait.
 
 Hovering a card shows what the recipe requires, how long it takes, what its product is used for and where its tool is:
 
@@ -241,13 +241,27 @@ A station's tool slots sit in a small window of their own left of its page, "Ava
 
 | Input on a card | At a station | In the crafting menu |
 | --- | --- | --- |
-| Click | Mark it for workers to keep making once the queue is done (a thick outline with a hard hat); click again to unmark | Queue one |
+| Click | Mark it for workers to keep making once the batches you queued are done (a thick outline with a hard hat); click again to unmark | Queue one |
 | Double-click | Queue one and load one batch of its inputs and a fuel from the backpack | Queue one |
 | Shift-click, Ctrl-click | Queue 5 or 10 and load their inputs and a fuel each from the backpack | Queue 5 or 10 |
 | Right-click, with Shift or Ctrl | Take 1, 5 or 10 waiting batches off | Take 1, 5 or 10 off and get their materials back |
 
-A right-click on a cup in the queue takes batches off the same way.
-A batch leaves the queue when it starts, and one in progress cannot be taken off.
+A right-click on a cup in the crafting menu's queue takes batches off the same way.
+A batch leaves the count when it starts, and one in progress cannot be taken off.
+
+A station counts batches of one recipe at a time; the crafting menu queues as many recipes as you like.
+Queueing more of the recipe a station is on adds to its count.
+Queueing another recipe depends on what the station is doing:
+
+| The station | Queueing another recipe |
+| --- | --- |
+| Is working a batch | Nothing changes, and its input and output cups shake |
+| Is between batches, with something in its cups | Its cups empty into your backpack, the batches that still waited are dropped, and it turns to the new recipe |
+| Is between batches, with no room in your backpack for what its cups hold | Nothing changes, and its cups shake |
+| Has empty cups | It turns to the new recipe |
+
+Fuel stays in its cup when a station turns to another recipe.
+Once the batches you queued are done, the station goes back to the recipe marked for workers, and haulers carry what is left in its cups to storage.
 A station page opens with the group of what the station is making open.
 A station with nothing queued and nothing marked stands idle.
 
