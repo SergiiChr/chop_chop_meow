@@ -1468,7 +1468,6 @@ public partial class Game {
         await Holding(Key.Shift, () => Click(Named("craft_charcoal")!));
         Require(WorkRow().Shaking, "Queueing another recipe while a batch is worked must shake the boxes.");
         await Until(() => !WorkRow().Shaking, "the boxes coming to rest", 2);
-        Require(!HasLabel(panel, "Click a recipe for workers to keep making it, or Shift-click to queue and load some."), "A station with work on its page must not show the hint of an idle one.");
         Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
         Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
         await Until(() => !furnace.Processing && furnace.Inventory["tin_bar"] == 1, "the tin bar coming out", 2);
@@ -1480,7 +1479,10 @@ public partial class Game {
         RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "tin_bar", 1); await CloseWithEsc();
     }
 
-    /// <summary>With no room in the backpack for what a station's cups hold, a double-click on another recipe leaves the station as it is, its cups shaking.</summary>
+    /// <summary>
+    /// With no room in the backpack for what a station's cups hold, a double-click on another recipe leaves the station as it is, its cups shaking.
+    /// So does a click that would move the worker mark to another recipe while the cups hold something.
+    /// </summary>
     private async Task CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem() {
         await CloseWithEsc();
         var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0)); Hosted.SetRecipe(furnace, "charcoal");
@@ -1489,11 +1491,26 @@ public partial class Game {
         int stone = Give(Hosted, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
         await ClickOn(furnace);
         await DoubleClick(Named("craft_iron_bar")!);
-        // The first press marks iron and the second takes the mark back, and the page is drawn again each time.
-        await Until(() => furnace.Keep == "charcoal" && Named("input_wood") != null, "the page going back to charcoal after the refused double-click", 2);
-        Require(WorkRow().Shaking, "A double-click refused for a full backpack must leave the cups shaking on the page drawn again.");
-        Require(furnace.Recipe == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0, "A furnace whose cups the backpack has no room for must stay on its recipe with its wood.");
+        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the cups.");
+        Require(furnace.Recipe == "charcoal" && furnace.Keep == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0,
+            "A furnace whose cups the backpack has no room for must stay on its recipe with its wood and its mark.");
+        await Until(() => !WorkRow().Shaking, "the cups coming to rest", 2);
+        await Click(Named("craft_iron_bar")!);
+        await Until(() => WorkRow().Shaking, "a click on another recipe shaking the cups of a furnace that holds wood", 2);
+        Require(furnace.Keep == "charcoal", "A furnace that holds something must keep its mark where it is.");
         RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "stone", stone); await CloseWithEsc();
+    }
+
+    /// <summary>A station whose mark is taken off stays on its recipe: the card keeps an outline and the page its cups.</summary>
+    private async Task CheckUnmarkedStationStaysOnItsRecipe() {
+        await CloseWithEsc();
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
+        await ClickOn(anvil);
+        await Click(Named("craft_steel_parts")!);
+        await Until(() => anvil.Keep == "" && !((Control)Named("craft_steel_parts")!.FindChild("kept", true, false)).Visible, "a click taking the mark off steel parts", 2);
+        Require(Named("input_steel_bar") != null && Named("craft_steel_parts")!.GetThemeStylebox("normal") == Style.PlateSelected,
+            "An anvil with no mark must stay on steel parts, its card outlined and its cups on the page.");
+        RemoveThings(Hosted, t => t == anvil); await CloseWithEsc();
     }
 
     /// <summary>A new anvil's page shows steel bars in, steel parts out, and a backpack click loads a bar.</summary>
@@ -1669,6 +1686,7 @@ public partial class Game {
             await Test(CheckRecipeBoardsMarkAndQueueWithModifiers);
             await Test(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);
             await Test(CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem);
+            await Test(CheckUnmarkedStationStaysOnItsRecipe);
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
             await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
             await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);

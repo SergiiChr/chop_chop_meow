@@ -9,10 +9,8 @@ namespace ChopChopMeow;
 /// the fuel under it with how long it lasts, and the main output with its side outputs in a second row.
 /// </summary>
 public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) : PanelContainer {
-    /// <summary>How long a shake lasts, in seconds.</summary>
-    public const float ShakeSeconds = .4f;
-    /// <summary>How far a shake swings to each side, in pixels, and how many times it swings.</summary>
-    private const float ShakeReach = 8, ShakeSwings = 4;
+    /// <summary>How long a shake lasts, in seconds, how far it swings to each side, in pixels, and how many times it swings.</summary>
+    private const float ShakeSeconds = .4f, ShakeReach = 8, ShakeSwings = 4;
 
     // The input cups and the output cups, each group in a box of its own.
     private HBoxContainer left = null!;

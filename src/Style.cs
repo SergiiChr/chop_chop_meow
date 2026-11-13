@@ -75,7 +75,7 @@ public static class Style {
     public static readonly StyleBoxFlat CupFuel = Flat(CupFill, 14, 3, Ember, 3);
     public static readonly StyleBoxFlat CupBank = Flat(CupFill, 28, 3, Line, 2);
     /// <summary>A recipe plate: a larger cup; the recipe a station makes is ringed in mustard.</summary>
-    public static readonly StyleBoxFlat PlateNormal = Flat(CupFill, 16, 6, Line, 2), PlateHover = Flat(CupFill, 16, 6, Mustard, 3), PlateKept = Flat(CupFill, 16, 6, Brick, 6);
+    public static readonly StyleBoxFlat PlateNormal = Flat(CupFill, 16, 6, Line, 2), PlateHover = Flat(CupFill, 16, 6, Mustard, 3), PlateKept = Flat(CupFill, 16, 6, Brick, 6), PlateSelected = Flat(CupFill, 16, 6, Brick, 3);
     /// <summary>The pill on a cup's corner that counts what it holds.</summary>
     public static readonly StyleBoxFlat CountPill = Flat(Line, 9, 0, Rim, 2, horizontal: 5);
     /// <summary>The count beside a job's name, and a menu badge's key.</summary>

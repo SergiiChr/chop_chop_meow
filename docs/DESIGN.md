@@ -512,21 +512,23 @@ A station counts batches of one recipe at a time: `Thing.Asked` is the recipe a 
 `Thing.Keep` is the recipe workers keep it making once those batches are done, and a building's `Recipe` in `GameTables` names the one it starts with.
 `Thing.Making` is the batch in progress, as `PlayerState.Making` is by hand.
 `Thing.Recipe` is worked out, not stored: the batch in progress, else `Asked` while batches of it wait, else `Keep`; with none the station stands idle.
-`Thing.Shown` is the recipe the station is on, whose cups its page draws: `Recipe`, else `Asked`.
-So a station with no mark that has run out of batches keeps showing what it made, and more batches of that recipe are not a turn to another.
+`World.Selected` is the recipe the station is on, whose cups its page draws and whose card is outlined: `Recipe`, else `Asked`, else the first recipe on its board.
+A station is always on one: taking the mark off with no batches waiting leaves the marked recipe in `Asked`.
+So a station with nothing to make keeps showing its cups, and more batches of that recipe are not a turn to another.
 Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
-`World.QueueBatch` adds to the count, and for a recipe other than `Shown` it first turns the station to it:
+`World.QueueBatch` adds to the count, and for a recipe other than the selected one it first turns the station to it:
 it drops the batches that waited and moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack.
 `World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for all of it (`Inventory.Fits`).
 So batches only wait for the recipe in progress when there is one, and `World.Deserialize` refuses a save where they wait for another.
 `World.Unqueue` takes waiting batches off the count.
-A station takes inputs for its current recipe and the kept one, and haulers carry out only what neither takes.
+`World.SetRecipe` moves the mark; `World.MarkBlock` refuses a move to a recipe other than the selected one while a batch is in progress or `Thing.Inventory` holds anything.
+A station takes inputs for the selected recipe and the kept one, and haulers carry out only what neither takes.
+A station starts no batch while its cups hold something that is neither such an input nor what its recipe makes (`World.Blocked`), as after asked batches end and it goes back to the kept recipe.
 What no storage takes stays in the station, which goes on working until its output stack is full.
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu; only the crafting menu has a `QueueStrip` under the work.
-The board asks `World.SwitchBlock` before it queues at a station and, when the turn is refused, shakes the cups of the station's `ProcessRow` (`ProcessRow.Shake`).
-It asks on the first press of a double-click, before that press changes the worker mark, and keeps the answer in `PageMemory.BlockedBefore`.
-A double-click changes the worker mark and puts it back, which draws the page again: `StationPanel` starts the shake again on each row it draws until the shake's time is up.
+The board asks `World.SwitchBlock` before it queues at a station and `World.MarkBlock` before it marks, and when the answer is a refusal it shakes the cups of the station's `ProcessRow` (`ProcessRow.Shake`).
+A click on a station's card marks only after `RecipeBoard.DoubleClickSeconds`, the time Godot on Linux allows a double-click's second press: a double-click queues a batch and leaves the mark alone.
 The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.ClosedGroups` keeps the groups the player closed, for every board.
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
 The panel keeps the list's place while the page draws again, so a click on a recipe leaves the list where it was scrolled to.
