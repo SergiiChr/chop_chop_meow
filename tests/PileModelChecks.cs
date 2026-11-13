@@ -79,8 +79,17 @@ public static class PileModelChecks {
                     Require(ModelSteps.Triangles(packer.Root) <= 2500, $"a packing station full of {good} must stay a light building: {ModelSteps.Triangles(packer.Root)} triangles");
                 }
             } finally { packer.Root.Free(); }
-            // Three open cans stand together, each eight-sided: a wall and a rim of sixteen triangles and a hollow of eight.
-            Require(ModelSteps.Piled(pile, thing, "tin_can", data).GetFaces().Length / 3 == 120, "tin cans must pile three to a slot");
+            // Six open cans stand in two rows of three, each eight-sided: a wall of sixteen triangles and a hollow of eight.
+            Require(ModelSteps.Piled(pile, thing, "tin_can", data).GetFaces().Length / 3 == 144, "tin cans must pile as a six-pack");
+            // A loaf is scaled down to fit a slot rather than stretched to fill it, and a second layer rests on the first.
+            var one = PileShape.Stock("bread", data.Items["bread"].Color);
+            Vector3 loaf = one.Mesh.GetAabb().Size, piled = ModelSteps.Piled(pile, thing, "bread", data).GetAabb().Size;
+            one.Free();
+            Require(MathF.Abs(piled.X / piled.Z - loaf.X / loaf.Z) < .01f && MathF.Abs(piled.X / piled.Y - loaf.X / loaf.Y) < .01f, "a piled loaf must keep its shape");
+            Require(piled.X < .72f && piled.Z < .72f, "a piled loaf must leave room around it in its slot");
+            pile.Stock.Fill("bread", 10, 1, data);
+            MeshInstance3D below = pile.Stock.Slots[0], above = pile.Stock.Slots[9];
+            Require(MathF.Abs(above.Position.Y + above.Mesh.GetAabb().Position.Y - (below.Position.Y + below.Mesh.GetAabb().End.Y)) < .001f, "a second layer of loaves must rest on the first");
         } finally { pile.Root.Free(); }
     }
 }

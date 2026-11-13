@@ -16,10 +16,13 @@ internal static class ItemShape {
     /// <summary>One flat triangle, wound so that it faces outward, in one colour.</summary>
     private readonly record struct Face(Vector3 A, Vector3 B, Vector3 C, Color Tint);
     /// <summary>
-    /// How an item is built, what it is made of and, where one alone would not fill a pile slot, how several are put
-    /// together to fill it.
+    /// How an item is built and what it is made of, and how a pile slot's worth of it is built where one alone would
+    /// not fill the slot.
     /// </summary>
-    private sealed record Look(Action<List<Face>> Build, StandardMaterial3D Material, Func<List<Face>, List<Face>>? Pile = null);
+    private sealed record Look(Action<List<Face>> Build, StandardMaterial3D Material, Action<List<Face>>? Pile = null);
+
+    /// <summary>How much of a pile slot's width and depth its stock takes, which leaves room between neighbours.</summary>
+    private const float Room = .9f;
 
     private static readonly StandardMaterial3D Plain = ModelKit.Vertex(Surface.Flat, .8f);
     private static readonly StandardMaterial3D Glossy = ModelKit.Vertex(Surface.Flat, .35f);
@@ -28,21 +31,21 @@ internal static class ItemShape {
     private static readonly StandardMaterial3D Tin = ModelKit.Vertex(Surface.Metal, .4f, .15f);
 
     private static readonly Dictionary<string, Look> looks = new() {
-        ["steel_parts"] = new(SteelParts, Steel, Cross),
-        ["tin_can"] = new(f => Can(f, null), Tin, Huddle),
-        ["canned_jam"] = new(f => Can(f, "b83a5c"), Tin, Huddle),
-        ["canned_meat_stew"] = new(f => Can(f, "c07a48"), Tin, Huddle),
-        ["berry_jam"] = new(Jar, Glossy, Huddle),
+        ["steel_parts"] = new(SteelParts, Steel, f => Cross(f, SteelParts)),
+        ["tin_can"] = new(f => Can(f, null, null), Tin, f => SixPack(f, one => Can(one, null, null, false))),
+        ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, f => SixPack(f, one => Can(one, "b83a5c", null, false))),
+        ["canned_meat_stew"] = new(f => Can(f, "c07a48", "7a4a26"), Tin, f => SixPack(f, one => Can(one, "c07a48", null, false))),
+        ["berry_jam"] = new(f => Jar(f, true), Glossy, f => Huddle(f, one => Jar(one, false))),
         ["grass"] = new(f => Sheaf(f, 20, .5f, .24f, false, "8fae55", "7c9c46", "a3bf63"), Plain),
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain),
         ["wheat_seeds"] = new(Seeds, Sacking),
         ["fertilizer"] = new(f => Sack(f, "b89b66", "9a8052", null, ("4a3524", "6b5233")), Sacking),
         ["flour"] = new(f => Sack(f, "f2ece0", "d6cdbb", "8fa3b8", null), Sacking),
         ["dough"] = new(Dough, Plain),
-        ["bread"] = new(f => Baked(f, "loaf_round", Swap(("995941", "c98a45"), ("e68d64", "ecc892"))), Plain),
+        // Kenney's loaf is a long oval; widened and raised it is a round one.
+        ["bread"] = new(f => Baked(f, "loaf_round", Swap(("995941", "c98a45"), ("e68d64", "ecc892")), new(1, 1.3f, 1.45f)), Plain),
         ["raw_meat"] = new(f => Baked(f, "wholer_ham", Swap(("995941", "c4524a"), ("dc9e76", "efe3d0"))), Plain),
-        ["burnt_steak"] = new(f => Baked(f, "meat_cooked", Swap(("e2a781", "7a5536"), ("c9835b", "5e3b25"), ("e08860", "5e3b25"), ("ab5e41", "2b1c14"), ("61cb8b", "2b1c14"))), Plain,
-            Stack),
+        ["burnt_steak"] = new(Steak, Plain, f => Stack(f, Steak)),
         ["meat_stew"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "e9e6dc"), ("e68d64", "8f5a33"), ("ff8e44", "e0873a"), ("61cb8b", "7fa650"), ("f2bf99", "d9b98a"))), Plain),
         ["crushed_berries"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "b08050"), ("e68d64", "b8434f"), ("ff8e44", "7d1f2e"), ("61cb8b", "d86a70"), ("f2bf99", "8f2436"))), Plain),
         ["coins"] = new(Coins, Glossy),
@@ -53,15 +56,21 @@ internal static class ItemShape {
     public static StandardMaterial3D Material(string item) => looks[item].Material;
 
     /// <summary>
-    /// Builds the item centred on the origin: one in its own proportions, or a slot's worth stretched to fill a box of
-    /// the given size, as a pile slot shows it.
+    /// Builds the item centred on the origin: one in its own proportions, or a pile slot's worth scaled down to fit a
+    /// slot of the given size.
+    /// A slot's worth keeps its shape and leaves room round it; only one too tall for the slot is pressed down to it.
     /// </summary>
     public static ArrayMesh Build(string item, Vector3? fit = null) {
         var look = looks[item];
-        var faces = new List<Face>(); look.Build(faces);
-        if (fit != null && look.Pile != null) faces = look.Pile(faces);
+        var faces = new List<Face>();
+        if (fit != null && look.Pile != null) look.Pile(faces); else look.Build(faces);
         var (min, max) = Bounds(faces);
-        var centre = (min + max) / 2; var scale = fit is Vector3 size ? size / (max - min) : Vector3.One;
+        var centre = (min + max) / 2; var scale = Vector3.One;
+        if (fit is Vector3 slot) {
+            var size = max - min;
+            float across = Room * MathF.Min(slot.X / size.X, slot.Z / size.Z);
+            scale = new Vector3(across, MathF.Min(across, slot.Y / size.Y), across);
+        }
         var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
         foreach (var (a, b, c, tint) in faces) {
             Vector3 p = (a - centre) * scale, q = (b - centre) * scale, r = (c - centre) * scale;
@@ -77,55 +86,69 @@ internal static class ItemShape {
         return (min, max);
     }
 
-    /// <summary>Three of one standing in a ring, each touching the other two and turned its own way.</summary>
-    private static List<Face> Huddle(List<Face> one) {
-        const int count = 3;
+    /// <summary>What <paramref name="build"/> makes, with its middle on the ground at the origin, and its size.</summary>
+    private static (List<Face> Faces, Vector3 Size) One(Action<List<Face>> build) {
+        var one = new List<Face>(); build(one);
         var (min, max) = Bounds(one);
-        var middle = ((min + max) / 2) with { Y = 0 };
-        float reach = MathF.Max(max.X - min.X, max.Z - min.Z) / 2 / MathF.Sin(MathF.PI / count);
-        var all = new List<Face>();
-        for (int i = 0; i < count; i++) {
-            float angle = i * Mathf.Tau / count;
-            var at = new Transform3D(new Basis(Vector3.Up, i * 2.4f), new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle)) * reach);
-            foreach (var (a, b, c, tint) in one) all.Add(new(at * (a - middle), at * (b - middle), at * (c - middle), tint));
+        var middle = ((min + max) / 2) with { Y = min.Y };
+        for (int i = 0; i < one.Count; i++) one[i] = new(one[i].A - middle, one[i].B - middle, one[i].C - middle, one[i].Tint);
+        return (one, max - min);
+    }
+
+    private static void Place(List<Face> faces, List<Face> one, Transform3D at) {
+        foreach (var (a, b, c, tint) in one) faces.Add(new(at * a, at * b, at * c, tint));
+    }
+
+    /// <summary>Three of one standing in a ring, each touching the other two and turned its own way.</summary>
+    private static void Huddle(List<Face> faces, Action<List<Face>> build) {
+        var (one, size) = One(build);
+        float reach = MathF.Max(size.X, size.Z) / 2 / MathF.Sin(MathF.PI / 3);
+        for (int i = 0; i < 3; i++) {
+            float angle = i * Mathf.Tau / 3;
+            Place(faces, one, new Transform3D(new Basis(Vector3.Up, i * 2.4f), new Vector3(MathF.Cos(angle), 0, MathF.Sin(angle)) * reach));
         }
-        return all;
+    }
+
+    /// <summary>Six of one standing side by side in two rows of three.</summary>
+    private static void SixPack(List<Face> faces, Action<List<Face>> build) {
+        var (one, size) = One(build);
+        for (int i = 0; i < 6; i++) Place(faces, one, new Transform3D(Basis.Identity, new Vector3((i % 3 - 1) * size.X, 0, (i / 3 - .5f) * size.Z)));
     }
 
     /// <summary>Two layers of parts spread on the ground, the upper laid across the lower a quarter turn round.</summary>
-    private static List<Face> Cross(List<Face> one) {
-        var (min, max) = Bounds(one);
-        var middle = ((min + max) / 2) with { Y = 0 };
-        var across = new Transform3D(new Basis(Vector3.Up, MathF.PI / 2), Vector3.Up * (max.Y - min.Y));
-        var all = new List<Face>();
-        foreach (var (a, b, c, tint) in one) {
-            all.Add(new(a - middle, b - middle, c - middle, tint));
-            all.Add(new(across * (a - middle), across * (b - middle), across * (c - middle), tint));
-        }
-        return all;
+    private static void Cross(List<Face> faces, Action<List<Face>> build) {
+        var (one, size) = One(build);
+        Place(faces, one, Transform3D.Identity);
+        Place(faces, one, new Transform3D(new Basis(Vector3.Up, MathF.PI / 2), Vector3.Up * size.Y));
     }
 
     /// <summary>
     /// Two of a flat one lying on each other, the upper sunk into the lower as far as its bevelled edge.
     /// The upper keeps all but its underside, and the lower keeps only its upright sides, which are all that show of it.
     /// </summary>
-    private static List<Face> Stack(List<Face> one) {
-        var (min, max) = Bounds(one);
-        var lift = Vector3.Up * (max.Y - min.Y) * .8f;
-        var all = new List<Face>();
+    private static void Stack(List<Face> faces, Action<List<Face>> build) {
+        var (one, size) = One(build);
+        var lift = Vector3.Up * size.Y * .8f;
         foreach (var (a, b, c, tint) in one) {
             float up = (c - a).Cross(b - a).Normalized().Y;
-            if (MathF.Abs(up) < .3f) all.Add(new(a, b, c, tint));
-            if (up > -.5f) all.Add(new(a + lift, b + lift, c + lift, tint));
+            if (MathF.Abs(up) < .3f) faces.Add(new(a, b, c, tint));
+            if (up > -.5f) faces.Add(new(a + lift, b + lift, c + lift, tint));
         }
-        return all;
     }
 
-    /// <summary>A baked mesh's triangles, each in the colour <paramref name="recolour"/> gives for its own.</summary>
-    private static void Baked(List<Face> faces, string name, Func<Color, Color> recolour) {
+    /// <summary>Kenney's cooked steak, charred.</summary>
+    private static void Steak(List<Face> faces) =>
+        Baked(faces, "meat_cooked", Swap(("e2a781", "7a5536"), ("c9835b", "5e3b25"), ("e08860", "5e3b25"), ("ab5e41", "2b1c14"), ("61cb8b", "2b1c14")));
+
+    /// <summary>
+    /// A baked mesh's triangles, each in the colour <paramref name="recolour"/> gives for its own, the mesh stretched
+    /// by <paramref name="stretch"/> where one is given.
+    /// </summary>
+    private static void Baked(List<Face> faces, string name, Func<Color, Color> recolour, Vector3? stretch = null) {
+        var by = stretch ?? Vector3.One;
         var arrays = GD.Load<Mesh>($"res://assets/models/food/{name}.res").SurfaceGetArrays(0);
         var points = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array(); var colours = arrays[(int)Mesh.ArrayType.Color].AsColorArray();
-        for (int i = 0; i < points.Length; i += 3) faces.Add(new(points[i], points[i + 1], points[i + 2], recolour(colours[i])));
+        for (int i = 0; i < points.Length; i += 3) faces.Add(new(points[i] * by, points[i + 1] * by, points[i + 2] * by, recolour(colours[i])));
     }
 
     /// <summary>
@@ -173,25 +196,59 @@ internal static class ItemShape {
     }
 
     /// <summary>
-    /// A tin can: open and empty, its inside drawn as a dark hollow, or sealed under a lid and wrapped in a label of
-    /// the given colour with a pale patch on one side.
+    /// A tin can: open and empty, its inside drawn as a dark hollow, or sealed under a lid and wrapped in a paper label
+    /// of the given colour.
+    /// The label has a pale panel on the side the game camera sees lit, with a mark of what is inside where
+    /// <paramref name="mark"/> gives its colour.
+    /// A plain can is the same with the least that still shows it, for cans standing six to a pile slot: no rim, no
+    /// bare tin above and below the label and no mark.
     /// </summary>
-    private static void Can(List<Face> faces, string? label) {
+    private static void Can(List<Face> faces, string? label, string? mark, bool detail = true) {
         const float radius = .06f, height = .13f;
-        if (label == null) {
-            Lathe(faces, Transform3D.Identity,
-                new Ring[] { (radius, 0, "dfe4e1"), (radius, height, "dfe4e1"), (radius * .88f, height, "f4f6f5"), (0, .03f, "8a9594") }, 8);
-            return;
-        }
-        // The patch is on the side the game camera sees lit.
-        Lathe(faces, Transform3D.Identity,
-            new Ring[] { (radius, 0, label), (radius, height, label), (radius * .82f, height, "f4f6f5"), (0, height * .95f, "cdd4d1") }, 8,
-            (row, side) => row == 0 && side == 2 ? "f6eeda" : null);
+        const string tin = "dfe4e1", bright = "f4f6f5", panel = "f6eeda";
+        var rings = new List<Ring> { (radius, 0, tin) };
+        if (label == null) rings.Add((radius, height, tin));
+        else if (!detail) rings.Add((radius, height, label));
+        else rings.AddRange(new Ring[] { (radius, height * .14f, tin), (radius, height * .84f, label), (radius, height, tin) });
+        // The label is the band above the bare tin at the foot, or the whole wall of a plain can.
+        int band = detail ? 1 : 0;
+        if (detail) rings.Add((radius * (label == null ? .88f : .82f), height, bright));
+        rings.Add(label == null ? (0, .03f, "8a9594") : (0, detail ? height * .95f : height, "cdd4d1"));
+        Lathe(faces, Transform3D.Identity, rings.ToArray(), 8, (row, side) => label != null && row == band && side == 2 ? panel : null);
+        if (mark == null) return;
+        // The mark is a diamond in the middle of the panel, standing a hair proud of it.
+        float turn = 2.5f * Mathf.Tau / 8, reach = radius * MathF.Cos(MathF.PI / 8) + .001f;
+        Vector3 middle = new(MathF.Cos(turn) * reach, height * .49f, MathF.Sin(turn) * reach), facing = new(MathF.Cos(turn), 0, MathF.Sin(turn));
+        var along = Vector3.Up.Cross(facing) * .014f; var up = Vector3.Up * .024f;
+        Quad(faces, middle - along, middle - up, middle + along, middle + up, facing, new Color(mark));
     }
 
-    /// <summary>A glass jar of berry jam under a cloth cover.</summary>
-    private static void Jar(List<Face> faces) => Lathe(faces, Transform3D.Identity,
-        new Ring[] { (.055f, 0, "b3263c"), (.055f, .096f, "b3263c"), (.046f, .132f, "e9dcc0"), (0, .138f, "f6eeda") }, 8);
+    /// <summary>
+    /// A glass jar of berry jam under a cloth cover tied round the neck with a ribbon, its bow toward the game
+    /// camera.
+    /// A plain jar, for jars standing three to a pile slot, has the cover alone.
+    /// </summary>
+    private static void Jar(List<Face> faces, bool detail) {
+        const string jam = "b3263c", cloth = "e9dcc0", ribbon = "4f7fa8";
+        if (!detail) {
+            Lathe(faces, Transform3D.Identity, new Ring[] { (.055f, 0, jam), (.055f, .096f, jam), (.046f, .132f, cloth), (0, .138f, "f6eeda") }, 8);
+            return;
+        }
+        // Below the ribbon the cover flares into a frill, and above it the cover swells over the lid.
+        Lathe(faces, Transform3D.Identity, new Ring[] {
+            (.055f, 0, jam), (.055f, .09f, jam), (.07f, .084f, "c9bb9c"), (.055f, .099f, cloth), (.055f, .109f, ribbon), (.06f, .116f, cloth), (.048f, .138f, cloth),
+            (0, .144f, "f6eeda") }, 8);
+        // The bow: two loops and two hanging ends from a knot on the ribbon, each drawn from both sides.
+        float turn = Mathf.DegToRad(96);
+        Vector3 away = new(MathF.Cos(turn), 0, MathF.Sin(turn)), along = Vector3.Up.Cross(away), knot = away * .058f + Vector3.Up * .104f;
+        foreach (int side in new[] { -1, 1 }) {
+            var loop = knot + along * side * .04f + away * .012f; var end = knot + along * side * .022f + away * .014f - Vector3.Up * .046f;
+            foreach (var facing in new[] { away, -away }) {
+                Tri(faces, knot, loop + Vector3.Up * .02f, loop - Vector3.Up * .014f, facing, new Color(ribbon));
+                Tri(faces, knot, end - along * side * .011f, end + along * side * .011f, facing, new Color(ribbon).Darkened(.15f));
+            }
+        }
+    }
 
     /// <summary>
     /// A cloth sack standing on the ground, squarish and slumped: tied shut at the neck, with a printed band if one is given,
@@ -244,12 +301,12 @@ internal static class ItemShape {
         for (int i = first; i < faces.Count; i++) faces[i] = new(lying * faces[i].A, lying * faces[i].B, lying * faces[i].C, faces[i].Tint);
     }
 
-    /// <summary>A round of dough resting on a floured board.</summary>
+    /// <summary>A lump of dough pressed down on a floured board: low, longer one way and uneven.</summary>
     private static void Dough(List<Face> faces) {
         Lathe(faces, Transform3D.Identity, new Ring[] { (.27f, 0, "a47548"), (.27f, .03f, "a47548"), (0, .03f, "c79a66") }, 8);
-        // A lump pressed flat where it meets the board, paler where the flour lies on top.
-        var middle = new Vector3(0, .13f, 0);
-        var (points, triangles) = NatureShape.Shape(middle, new(.2f, .13f, .2f), 1, 7, 2, .08f, .02f, .03f, 0);
+        // Flat where it meets the board, paler where the flour lies on top.
+        var middle = new Vector3(.01f, .1f, 0);
+        var (points, triangles) = NatureShape.Shape(middle, new(.23f, .1f, .18f), 1, 7, 4, .22f, .04f, .03f, 0);
         for (int i = 0; i < triangles.Count; i += 3) {
             Vector3 a = points[triangles[i]], b = points[triangles[i + 1]], c = points[triangles[i + 2]];
             var outward = (a + b + c) / 3 - middle;

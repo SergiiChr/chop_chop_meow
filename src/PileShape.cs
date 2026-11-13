@@ -17,7 +17,7 @@ internal static class PileShape {
 
     private static readonly string[] families = { "logs", "stone", "ore", "coal", "charcoal", "planks", "parts", "bars", "fallback" };
     /// <summary>The box every stock shape is fitted to in a pile slot.</summary>
-    private static readonly Vector3 SlotSize = new(.72f, .4f, .72f);
+    public static readonly Vector3 SlotSize = new(.72f, .4f, .72f);
 
     private static string Family(string item) => item switch {
         "wood" => "logs",
@@ -63,6 +63,9 @@ internal static class PileShape {
         slot.Mesh = contents[family];
         slot.MaterialOverride = Material(family, color);
     }
+
+    /// <summary>How tall an item's stock stands in a slot, as a share of the slot's height.</summary>
+    public static float Rise(string item) => contents[Family(item)].GetAabb().Size.Y / SlotSize.Y;
 
     /// <summary>The stock an item's pile slot shows, in its own proportions rather than fitted to the slot; icons show it this way.</summary>
     public static MeshInstance3D Stock(string item, string color) {
@@ -245,13 +248,21 @@ internal static class PileShape {
 public sealed class StockPile {
     private readonly MeshInstance3D[] slots;
     private readonly string[] shown;
+    /// <summary>Where each slot's stock sits when the stock is as tall as a slot, and how tall the stock shown in it is.</summary>
+    private readonly float[] rests, heights;
+    private readonly float full;
 
-    /// <summary>Adds a hidden slot under <paramref name="parent"/> at each position, its stock scaled by <paramref name="scale"/>.</summary>
+    /// <summary>
+    /// Adds a hidden slot under <paramref name="parent"/> at each position, its stock scaled by <paramref name="scale"/>.
+    /// The positions run from the ground up, a level at a time.
+    /// </summary>
     public StockPile(Node3D parent, ReadOnlySpan<Vector3> positions, float scale = 1) {
         slots = new MeshInstance3D[positions.Length]; shown = new string[positions.Length];
+        rests = new float[positions.Length]; heights = new float[positions.Length];
+        full = PileShape.SlotSize.Y * scale;
         for (int i = 0; i < slots.Length; i++) {
             slots[i] = new MeshInstance3D { Position = positions[i], Scale = Vector3.One * scale, Visible = false };
-            parent.AddChild(slots[i]); shown[i] = "";
+            parent.AddChild(slots[i]); shown[i] = ""; rests[i] = positions[i].Y;
         }
     }
 
@@ -265,10 +276,23 @@ public sealed class StockPile {
         shown[slot] = item;
         var mesh = slots[slot];
         mesh.Visible = item != "";
+        heights[slot] = item == "" ? 0 : PileShape.Rise(item) * full;
+        Settle();
         if (item == "") return;
         PileShape.SetStock(mesh, item, data.Items.TryGetValue(item, out var def) ? def.Color : PileShape.Fallback);
         // Turn the shared coal chunk and charcoal heap to avoid a row of identical faces.
         mesh.Rotation = new Vector3(0, item is "coal" or "charcoal" ? slot * 2.399963f : 0, 0);
+    }
+
+    /// <summary>Stands each slot's stock on its level's floor, which is the top of the tallest stock on the level below.</summary>
+    private void Settle() {
+        float floor = rests[0] - full / 2, tallest = 0;
+        for (int i = 0; i < slots.Length; i++) {
+            // A level with nothing on it keeps a slot's height, so what stands above it stays where it would.
+            if (i > 0 && rests[i] > rests[i - 1] + .001f) { floor += tallest > 0 ? tallest : full; tallest = 0; }
+            slots[i].Position = slots[i].Position with { Y = floor + heights[i] / 2 };
+            tallest = MathF.Max(tallest, heights[i]);
+        }
     }
 
     /// <summary>Shows one item in a slot for every <paramref name="perSlot"/> of <paramref name="count"/>, rounding up, and hides the rest.</summary>
