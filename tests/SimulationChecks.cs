@@ -48,6 +48,7 @@ public static class SimulationChecks {
         Test(CheckHaulerFuelsSmeltingWithCoalAndReturnsWood, data);
         Test(CheckStationMakesAskedBatchesThenWhatItKeeps, data);
         Test(CheckStationTurnsToAnotherRecipeOnlyWhenFree, data);
+        Test(CheckIdleStationStaysOnTheRecipeAskedLast, data);
         Test(CheckDoubleClickLoadsAWholeBatchOnTopOfWhatIsThere, data);
         Test(CheckQueuingSeveralBatchesLoadsEachOfThem, data);
         Test(CheckStationLoadsMidBatchAndFinishesIt, data);
@@ -797,6 +798,28 @@ public static class SimulationChecks {
         world.QueueBatch(furnace, "iron_bar");
         Require(world.SwitchBlock(furnace, "iron_bar") != null && furnace.Recipe == "charcoal" && world.Waiting(furnace, "charcoal") == 1 && furnace.Inventory["wood"] == 2,
             "with no room in the backpack for what its boxes hold the station should stay on its recipe");
+        // One log in place of a stack of stone: the furnace's wood tops that stack up, with no slot free.
+        Drop(world, "stone", world.Backpack.StackOf("stone")); Give(world, "wood", 1);
+        world.QueueBatch(furnace, "iron_bar");
+        Require(furnace.Recipe == "iron_bar" && world.Backpack["wood"] == 3, "wood that tops up a stack in a full backpack should let the station turn");
+    }
+
+    /// <summary>A station with no mark that has run out of batches stays on the recipe asked for last: more of it counts up and leaves its cups alone, even with a full backpack.</summary>
+    private static void CheckIdleStationStaysOnTheRecipeAskedLast(GameData data) {
+        var world = EmptyWorld(data);
+        var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
+        world.SetRecipe(furnace, "");
+        world.Player = furnace.Pos + Vector2.One;
+        Give(world, "tin_ore", 2); Give(world, "coal", 1);
+        world.QueueBatch(furnace, "tin_bar");
+        SafeTick(world, data.Recipes["tin_bar"].Seconds + 1);
+        Require(furnace.Recipe == "" && furnace.Inventory["tin_bar"] == 1, "the furnace should stand idle with its bar once the batch asked for is done");
+        Give(world, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
+        world.QueueBatch(furnace, "tin_bar");
+        Require(world.Waiting(furnace, "tin_bar") == 1 && furnace.Inventory["tin_bar"] == 1 && world.Backpack["tin_bar"] == 0,
+            "asking again for the recipe made last should count up and leave the bar in its cup, with no room asked of the backpack");
+        world.QueueBatch(furnace, "charcoal");
+        Require(world.SwitchBlock(furnace, "charcoal") != null && world.Waiting(furnace, "tin_bar") == 1, "another recipe should still be refused while the backpack has no room for the bar");
     }
 
     /// <summary>A double-click loads a whole batch and one fuel from the backpack, whatever the station already holds.</summary>

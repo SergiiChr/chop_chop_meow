@@ -264,6 +264,7 @@ Fuel stays in its cup when a station turns to another recipe.
 Once the batches you queued are done, the station goes back to the recipe marked for workers, and haulers carry what is left in its cups to storage.
 A station page opens with the group of what the station is making open.
 A station with nothing queued and nothing marked stands idle.
+Its page keeps the cups of the recipe queued last, so what it made stays in reach, and queueing that recipe again adds to its count.
 
 Stations show one cup per recipe input, the batch time above a progress bar and the output cup, with what one batch takes or makes under each cup.
 A station that burns fuel has its own fuel cup under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.

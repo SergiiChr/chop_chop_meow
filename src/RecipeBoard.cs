@@ -235,7 +235,8 @@ public partial class QueueStrip(UiKit kit, LiveUpdates live) : HBoxContainer {
             var (cell, count) = ItemSlot.Cup($"queued_{q.Recipe}", 44); cell.Icon = Icons.Of(r.Output);
             cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
             string id = q.Recipe;
-            live.Watch(() => World.Waiting(queue, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
+            // The server's answer brings a new list, so the count is read from the world each time.
+            live.Watch(() => world.Waiting(null, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });
             cell.RightClicked = () => kit.Run(() => world.CancelCraft(id, RecipeBoard.Step));
             AddChild(cell);
         }

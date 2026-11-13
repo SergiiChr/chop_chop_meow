@@ -34,11 +34,10 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
 
     /// <summary>A station's work: what one batch takes, how long it runs, what it burns and what it makes.</summary>
     public ProcessRow Machine() {
-        var recipe = world.Data.Recipes[t.Recipe];
+        var recipe = world.Data.Recipes[t.Shown];
         float rate = world.WorkRate(t.Kind, world.ToolInUse(t, recipe.Tool, recipe.Tier));
         float seconds = recipe.Seconds / Math.Max(.01f, rate);
-        var cost = world.BatchCost(t);
-        var inputs = cost.Select(p => (Control)StationCup(p.Key, true, $"×{p.Value}"));
+        var inputs = recipe.Inputs.Select(p => (Control)StationCup(p.Key, true, $"×{p.Value}"));
         // Leftovers and inputs loaded for the kept recipe stay reachable as side outputs.
         var side = t.Inventory.Items.Keys.Where(item => Leftover(recipe, item)).Select(item => (Control)StationCup(item, false, "", 44));
         return new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, seconds)), () => t.Processing ? t.Progress / recipe.Seconds : 0,
@@ -51,7 +50,7 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
 
     /// <summary>A number that changes with which leftovers the station holds beside its recipe's inputs and product, built without allocating.</summary>
     public int SideCode() {
-        if (!world.Data.Recipes.TryGetValue(t.Recipe, out var recipe)) return 0;
+        if (!world.Data.Recipes.TryGetValue(t.Shown, out var recipe)) return 0;
         int code = 0;
         foreach (var pair in t.Inventory.Items) if (Leftover(recipe, pair.Key)) code += pair.Key.GetHashCode();
         return code;

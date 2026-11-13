@@ -11,7 +11,7 @@ namespace ChopChopMeow;
 public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     // The board opens the group of what the station makes when the page opens, and keeps the groups as the player leaves them after that.
     private bool opened;
-    // The work as drawn now, or null while the station has no recipe.
+    // The work as drawn now, or null while the station is on no recipe.
     private ProcessRow? work;
     // When the shake asked for last ends, on the engine's clock in milliseconds.
     // A double-click changes the worker mark and puts it back, which draws the page again under the shake.
@@ -22,10 +22,10 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         var slotted = World.SlotKinds(thing.Kind);
         if (slotted.Length > 0) ToolWindow(slotted);
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool, or of the one you carry while you work it. Someone has to work it.";
-        string? openOn = opened ? null : thing.Keep != "" ? thing.Keep : thing.Recipe != "" ? thing.Recipe : null;
+        string? openOn = opened ? null : thing.Keep != "" ? thing.Keep : thing.Shown != "" ? thing.Shown : null;
         opened = true;
         AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn, () => { shakeEnds = Time.GetTicksMsec() + (ulong)(ProcessRow.ShakeSeconds * 1000); work?.Shake(); }));
-        work = thing.Recipe != "" ? cups.Machine() : null;
+        work = thing.Shown != "" ? cups.Machine() : null;
         if (work != null) AddChild(work);
         else AddLabel("Click a recipe for workers to keep making it, or Shift-click to queue and load some.", 14, Style.Beige);
         if (Time.GetTicksMsec() < shakeEnds) work?.Shake();

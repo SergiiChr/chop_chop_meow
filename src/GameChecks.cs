@@ -1433,16 +1433,20 @@ public partial class Game {
         await Until(() => world.Backpack["stone"] == 4 || world.Making == "stone_chisel", "a right-click taking the queued chisel off unless it is already being made", 2);
         if (world.Making != "") Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
         await Until(() => world.Making == "" && world.Crafting.Count == 0, "the hand queue emptying", 2);
-        // Of two chisels one is being made, so the other waits in a cup under the work.
-        Give(Hosted, "stone", 4);
+        // Of three chisels one is being made, so the other two wait in one cup under the work.
+        Give(Hosted, "stone", 6);
         await Frames();
         int stone = world.Backpack["stone"];
         await Click(Named("craft_stone_chisel")!);
         await Until(() => world.Making == "stone_chisel" && Named("making") != null && Named("queued_stone_chisel") == null, "the page showing the first chisel being made with nothing waiting", 2);
         await Click(Named("craft_stone_chisel")!);
         await Until(() => Named("queued_stone_chisel") != null, "the second chisel waiting in the queue's cup", 2);
+        await Click(Named("craft_stone_chisel")!);
+        await Until(() => Named("queued_stone_chisel")!.GetChildren().OfType<Badge>().First().Text == "2", "a third chisel counted on the queue's cup", 2);
         await RightClick(Named("queued_stone_chisel")!);
-        await Until(() => world.Crafting.Count == 0 && world.Backpack["stone"] == stone - 2, "a right-click on the queue's cup taking the waiting chisel off and giving its stone back", 2);
+        await Until(() => World.Waiting(world.Crafting, "stone_chisel") == 1 && world.Backpack["stone"] == stone - 4, "a right-click on the queue's cup taking one waiting chisel off and giving its stone back", 2);
+        await RightClick(Named("queued_stone_chisel")!);
+        await Until(() => world.Crafting.Count == 0 && world.Backpack["stone"] == stone - 2, "a second right-click emptying the queue", 2);
         Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
         await Until(() => world.Making == "", "the chisel in progress being finished", 2);
         await CloseWithEsc(); Drop(Hosted, "stone", world.Backpack["stone"]); Drop(Hosted, "stone_chisel", world.Backpack["stone_chisel"]);
@@ -1466,6 +1470,8 @@ public partial class Game {
         Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
         Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
         await Until(() => !furnace.Processing && furnace.Inventory["tin_bar"] == 1, "the tin bar coming out", 2);
+        // An idle page refreshes a few times a second; one that drew itself again without its cups would never show the bar's count.
+        await Until(() => Named("output_tin_bar")?.GetChildren().OfType<Badge>().First().Text == "1", "the furnace that has run out of batches still showing the bar in its cup", 2);
         await DoubleClick(Named("craft_charcoal")!);
         await Until(() => furnace.Recipe == "charcoal" && world.Backpack["tin_bar"] == 1 && furnace.Inventory["wood"] == 2 && Named("input_wood") != null,
             "a double-click on charcoal taking the bar into the backpack and turning the furnace to charcoal, loaded with its wood", 2);

@@ -54,7 +54,7 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         if (world.Data.Buildings.ContainsKey(thing.Kind)) DismantleButton();
         Reach();
         Body();
-        RedrawOnChange(() => (thing.Packs, thing.Recipe, thing.Compost, FilterCode()));
+        RedrawOnChange(() => (thing.Packs, thing.Shown, thing.Compost, FilterCode()));
     }
 
     /// <summary>A number that changes with the filters' contents.</summary>

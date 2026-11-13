@@ -508,15 +508,17 @@ The queue is written by `QueueJson`, since the generic list writer allocates on 
 
 The bench runs at `BenchSpeed` times the speed of the tool in its own chisel or hammer slot (`Thing.Tools`), and like the anvil only while someone works it.
 
-A station counts batches of one recipe at a time: `Thing.Asked` is the recipe a player queued and `Thing.Batches` how many of it wait; a batch leaves the count as it starts.
+A station counts batches of one recipe at a time: `Thing.Asked` is the recipe a player queued last and `Thing.Batches` how many of it still wait; a batch leaves the count as it starts.
 `Thing.Keep` is the recipe workers keep it making once those batches are done, and a building's `Recipe` in `GameTables` names the one it starts with.
 `Thing.Making` is the batch in progress, as `PlayerState.Making` is by hand.
-`Thing.Recipe` is worked out, not stored: the batch in progress, else `Asked`, else `Keep`; with none the station stands idle.
+`Thing.Recipe` is worked out, not stored: the batch in progress, else `Asked` while batches of it wait, else `Keep`; with none the station stands idle.
+`Thing.Shown` is the recipe the station is on, whose cups its page draws: `Recipe`, else `Asked`.
+So a station with no mark that has run out of batches keeps showing what it made, and more batches of that recipe are not a turn to another.
 Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
-`World.QueueBatch` adds to the count, and for a recipe the station is not on it first turns the station to it:
+`World.QueueBatch` adds to the count, and for a recipe other than `Shown` it first turns the station to it:
 it drops the batches that waited and moves everything in `Thing.Inventory` to the acting player's backpack, leaving the fuel slot alone.
 `World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for all of it (`Inventory.Fits`).
-So while a batch is in progress, `Asked` is empty or the recipe being made, and `World.Deserialize` refuses a save where it is neither.
+So batches only wait for the recipe in progress when there is one, and `World.Deserialize` refuses a save where they wait for another.
 `World.Unqueue` takes waiting batches off the count.
 A station takes inputs for its current recipe and the kept one, and haulers carry out only what neither takes.
 What no storage takes stays in the station, which goes on working until its output stack is full.
