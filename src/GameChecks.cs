@@ -1515,6 +1515,18 @@ public partial class Game {
         RemoveThings(Hosted, t => t == anvil); await CloseWithEsc();
     }
 
+    /// <summary>A double-click whose batch is refused leaves the worker mark on: at its 99 batches the marked recipe gets back the mark the first press took off.</summary>
+    private async Task CheckRefusedDoubleClickKeepsTheWorkerMark() {
+        await CloseWithEsc();
+        var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
+        Hosted.QueueBatch(furnace, "iron_bar", World.MaxQueued);
+        await ClickOn(furnace);
+        await DoubleClick(Named("craft_iron_bar")!);
+        await Frames(4);
+        Require(furnace.Keep == "iron_bar" && world.Waiting(furnace, "iron_bar") == World.MaxQueued, "A double-click refused at 99 batches must leave the marked recipe marked.");
+        RemoveThings(Hosted, t => t == furnace); await CloseWithEsc();
+    }
+
     /// <summary>A new anvil's page shows steel bars in, steel parts out, and a backpack click loads a bar.</summary>
     private async Task CheckNewAnvilMakesSteelPartsAndLoadsFromTheBackpack() {
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
@@ -1689,6 +1701,7 @@ public partial class Game {
             await Test(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);
             await Test(CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem);
             await Test(CheckUnmarkedStationStaysOnItsRecipe);
+            await Test(CheckRefusedDoubleClickKeepsTheWorkerMark);
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
             await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
             await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);

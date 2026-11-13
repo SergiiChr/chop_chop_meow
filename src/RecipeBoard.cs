@@ -122,17 +122,21 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         } else Style.Skin(cell, Style.PlateNormal, Style.PlateHover);
         // A double-click is a press, a release and a second press: its second release presses the card again, which does nothing more.
         // At a station its first press marks or unmarks like any click, and queueing then puts the mark on the recipe whatever that press did.
-        bool doubled = false;
+        // A mark that press took off goes back on even when the batch is refused, as at 99 batches or out of reach.
+        bool doubled = false, unmarked = false;
         cell.Pressed += () => {
             if (doubled) { doubled = false; return; }
             int step = Step;
+            unmarked = false;
             if (station == null) kit.Run(() => world.Craft(id, step));
             else if (step > 1) Queue(step);
             else Mark();
         };
         cell.DoubleClicked = () => {
             doubled = true;
-            if (station != null) Queue(1);
+            if (station == null) return;
+            Queue(1);
+            if (unmarked) kit.Run(() => world.SetRecipe(station, id));
         };
         // The server answers a refusal with its reason; the cups in the way shake at once.
         void Queue(int batches) {
@@ -146,13 +150,15 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
         void Mark() {
             string mark = station!.Keep == id ? "" : id;
             refusing = null;
-            if (world.MarkBlock(station, mark) == null) { kit.Run(() => world.SetRecipe(station, mark)); return; }
+            if (world.MarkBlock(station, mark) == null) { unmarked = mark == ""; kit.Run(() => world.SetRecipe(station, mark)); return; }
             var wait = refusing = GetTree().CreateTimer(DoubleClickSeconds);
             wait.Timeout += () => {
                 if (refusing != wait) return;
                 refusing = null;
+                // The cups may have emptied meanwhile: then the mark moves after all.
+                bool refused = world.MarkBlock(station, mark) != null;
                 kit.Run(() => world.SetRecipe(station, mark));
-                occupied?.Invoke();
+                if (refused) occupied?.Invoke();
             };
         }
         cell.RightClicked = () => kit.Run(() => { if (station != null) world.Unqueue(station, id, Step); else world.CancelCraft(id, Step); });

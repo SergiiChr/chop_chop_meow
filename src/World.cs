@@ -806,8 +806,10 @@ public sealed partial class World {
     /// A mark on another recipe than the one the station is on turns the station to it and drops the batches that waited; <see cref="MarkBlock"/> says when it cannot.
     /// </summary>
     public void SetRecipe(Thing t, string recipe) {
-        if (recipe == t.Keep || recipe != "" && !Makes(t, recipe)) return;
+        if (recipe != "" && !Makes(t, recipe)) return;
         if (Forwarded(Verb.SetRecipe, t.Id, item: recipe)) return;
+        // Only the server knows the mark as it is now: a window's copy can still show the one from before its last click.
+        if (recipe == t.Keep) return;
         if (MarkBlock(t, recipe) is string blocked) { Say(blocked); return; }
         // A station that loses its mark with no batches waiting stays on the recipe it was marked with.
         if (recipe == "" && t.Batches == 0) t.Asked = t.Keep;
