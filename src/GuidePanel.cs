@@ -40,6 +40,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
             ("planks", "With a chisel, carve planks, wood parts, a mallet and torches."),
             ("bench", "A crafting bench works twice as fast and makes tools and crates. Slot a chisel and a hammer."),
             ("steel_axe", "A small steel tool takes 1 steel part, a big one 2, plus a wood part for the handle."),
+            ("steel_shovel", $"A shovel digs up a stump for {World.StumpWood} wood and a plain bush for {World.BushLeaves} leaves. Both are gone for good."),
             ("line_map", "The map button on the crafting menu shows everything there is to make and what it is made out of.")
         },
         ["crew"] = new[] {

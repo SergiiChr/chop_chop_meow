@@ -25,8 +25,9 @@ public static class AllocationChecks {
 
         var settlement = Settlement(data);
         // Twenty seconds first, so every worker has been through its trips once and the status and cost caches hold what they will show.
-        // A store taking an item it has not held before grows its table once; that rare event is the one byte per tick allowed here (measured 0.2 to 0.5).
-        Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 1, warmup: 1200);
+        // A store taking an item it has not held before grows its table once (measured 0.2 to 0.5 bytes a tick).
+        // A woodcutter's first tree falls during the measured runs and leaves a stump, a new thing: those rare events are what this budget allows (measured 6.2).
+        Check("tick: working settlement", () => { settlement.Tick(1 / 60f); Fed(settlement); }, maxBytesPerRun: 7, warmup: 1200);
 
         // The host sends an update thirty times a second, against one the guest confirmed a few updates back, as over a long connection, and the guest merges it.
         // Only entries that changed are new arrays, on the host and again in the guest's merge: about seven worker and station entries an update in a working settlement (measured 10.6 KB an update).

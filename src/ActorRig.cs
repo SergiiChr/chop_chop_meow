@@ -21,6 +21,7 @@ public sealed class ActorRig {
     /// <summary>What each tool puts in the hands, by its name: one piece, or two for a tool that fills both.</summary>
     private readonly List<(string Name, Node3D Node)> tools = new();
     private readonly Node3D torch;
+    private Node3D shovel = null!;
     private readonly List<(Skeleton3D Skeleton, Node3D Joint)> limbs = new();
     // The leg skins, whose third bone turns the foot at the ankle.
     private readonly Skeleton3D footL, footR;
@@ -197,12 +198,36 @@ public sealed class ActorRig {
 
     /// <summary>Tools hang from the right fist along the forearm; blades face local -Z, the direction of a downward stroke.</summary>
     private void BuildTools() {
-        foreach (var name in new[] { "steel_axe", "steel_pick", "wood_hammer", "steel_hammer", "protest_sign" }) {
+        foreach (var name in new[] { "steel_axe", "steel_pick", "steel_shovel", "wood_hammer", "steel_hammer", "protest_sign" }) {
             var tool = name == "protest_sign" ? ProtestSign() : Tool(name);
             Hold(tool);
             tool.Visible = false;
             tools.Add((name, tool));
+            if (name == "steel_shovel") shovel = tool;
         }
+    }
+
+    /// <summary>Where a point on a forearm is from the rig's root, under the pose just shown.</summary>
+    private Vector3 FromForearm(bool left, Vector3 point) => hips.Transform * (torso.Transform * ((left ? shoulderL : shoulderR).Transform * ((left ? elbowL : elbowR).Transform * point)));
+
+    /// <summary>Where a fist is from the rig's root, under the pose just shown.</summary>
+    public Vector3 Fist(bool left) => FromForearm(left, new Vector3(0, -Forearm, Palm));
+
+    /// <summary>Where an elbow is from the rig's root, under the pose just shown.</summary>
+    public Vector3 Elbow(bool left) => FromForearm(left, Vector3.Zero);
+
+    /// <summary>Where the tip of the shovel's blade is from the rig's root, under the pose just shown.</summary>
+    public Vector3 ShovelTip => FromForearm(false, shovel.Transform * new Vector3(0, -ActorAnimation.ShovelLength, 0));
+
+    /// <summary>
+    /// Lays the shovel's shaft from the right fist through the left, as both hands hold it, and turns the blade's face up and away from the digger.
+    /// </summary>
+    private void LayShovel() {
+        var along = (Fist(true) - Fist(false)).Normalized();
+        // The face looks ahead with the shaft upright and at the sky with it level.
+        var face = along.Cross(Vector3.Right).Normalized();
+        var held = new Basis(along.Cross(face), -along, -face);
+        shovel.Basis = (torso.Basis * shoulderR.Basis * elbowR.Basis).Inverse() * held;
     }
 
     /// <summary>
@@ -219,6 +244,7 @@ public sealed class ActorRig {
 
     /// <summary>A held tool gripped at the origin, handle down along -Y and blade toward -Z; the icon renderer shows it on its own.</summary>
     public static Node3D Tool(string name) {
+        if (name == "steel_shovel") return Shovel();
         if (name is "steel_hammer" or "wood_hammer") return Hammer(name == "steel_hammer");
         if (name is "stone_chisel" or "steel_chisel") return Chisel(name == "steel_chisel");
         bool steelTool = name.StartsWith("steel");
@@ -237,6 +263,27 @@ public sealed class ActorRig {
             Cylinder(tool, .035f, 0, .3f, new Vector3(0, end, -.15f), steel, new Vector3(-90, 0, 0), 6);
             Cylinder(tool, .035f, 0, .22f, new Vector3(0, end, .11f), steel, new Vector3(90, 0, 0), 6);
         }
+        return tool;
+    }
+
+    /// <summary>
+    /// A steel spade gripped at the origin by the bar across the top of its handle, shaft down along -Y to a pointed blade whose face looks toward -Z.
+    /// </summary>
+    private static Node3D Shovel() {
+        var tool = new Node3D();
+        const float length = ActorAnimation.ShovelLength, blade = .27f, shaft = length - blade;
+        var wood = Wood("e87d1e", .7f);
+        var steel = Metal("c9d3d8", .35f, .85f);
+        // A bar to hold, on a fork that meets the shaft.
+        Cylinder(tool, .017f, .017f, .11f, Vector3.Zero, wood, new Vector3(0, 0, 90), 6);
+        foreach (float side in new[] { -1f, 1f }) Cylinder(tool, .012f, .012f, .085f, new Vector3(side * .03f, -.035f, 0), wood, new Vector3(0, 0, side * 35), 5);
+        Cylinder(tool, .02f, .02f, shaft - .06f, new Vector3(0, -.06f - (shaft - .06f) / 2, 0), wood, sides: 6);
+        Cylinder(tool, .027f, .027f, .1f, new Vector3(0, -.22f, 0), Mat("222222"), sides: 6);
+        // The socket runs down the back of the blade, which narrows to a point.
+        Cylinder(tool, .016f, .024f, .14f, new Vector3(0, -shaft - .03f, .008f), steel, sides: 6);
+        Box(tool, new Vector3(.2f, .012f, .012f), new Vector3(0, -shaft + .006f, 0), steel);
+        Box(tool, new Vector3(.19f, .17f, .008f), new Vector3(0, -shaft - .085f, 0), steel);
+        Cylinder(tool, 0, .095f, blade - .17f, new Vector3(0, -shaft - .17f - (blade - .17f) / 2, 0), Metal("e9eef0", .3f, .85f), null, 4).Scale = new Vector3(1, 1, .06f);
         return tool;
     }
 
@@ -327,6 +374,8 @@ public sealed class ActorRig {
         hips.Position = new Vector3(0, pose.HipHeight, 0);
         rock.Visible = onRock;
         foreach (var (name, node) in tools) node.Visible = name == tool;
+        // A shovel is only ever dug with, held in both fists.
+        if (shovel.Visible) LayShovel();
         crate.Visible = carrying;
         torch.Visible = lit;
     }

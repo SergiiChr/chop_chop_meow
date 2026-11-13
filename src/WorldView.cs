@@ -83,6 +83,7 @@ public partial class WorldView : Node3D {
     private static readonly StandardMaterial3D NightGlass = Mat("ffd58a", .3f, 0, 1.6f);
     private static readonly StandardMaterial3D Sparks = Flat(new Color("ffd27a"));
     private static readonly StandardMaterial3D GatherDust = Flat(new Color(.8f, .78f, .7f, .45f));
+    private static readonly StandardMaterial3D Soil = Mat("5a4330", .95f);
     private static readonly StandardMaterial3D Splash = Flat(new Color(.7f, .88f, .95f, .8f));
     private static readonly StandardMaterial3D Embers = Flat(new Color("ffb347"));
     private static readonly StandardMaterial3D FallDust = Flat(new Color(.7f, .66f, .52f, .45f));
@@ -414,6 +415,8 @@ public partial class WorldView : Node3D {
     }
 
     internal Prop? PropOf(int id) => props.GetValueOrDefault(id);
+    /// <summary>How many models of things that left the world are still playing their way out.</summary>
+    internal int Departing => leaving.Count;
 
     internal bool TreeCanopyCoversThing(Thing tree, Thing thing) {
         SyncCamera(); ReadScreenAxes();
@@ -507,7 +510,7 @@ public partial class WorldView : Node3D {
         Torch(playerRig, player, World.TorchLit, World.TorchFlare, null);
         if (downedFor > 0) KnockDown(playerRig, player, downedFor);
         playerRig.Root.Visible = (!World.Dead || World.Mauled) && World.Sheltered == 0;
-        Work(player, subject);
+        Work(player, subject, playerRig);
         UpdateOthers(dt);
         foreach (var worker in World.Workers) {
             if (!crew.TryGetValue(worker.Id, out var entry)) {
@@ -530,7 +533,7 @@ public partial class WorldView : Node3D {
             Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
             entry.Rig.Root.Visible = World.Sees(worker);
             Fade(entry.Parts, entry.Rig.Root, TripFade(World.TripLeg(worker)));
-            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest ? null : assignment);
+            Work(state, work is ActorAction.Idle or ActorAction.Walk or ActorAction.Carry or ActorAction.Sit or ActorAction.Perch or ActorAction.Protest ? null : assignment, entry.Rig);
         }
         // Removing while walking a dictionary is allowed, so no copy of its keys is needed.
         foreach (var (id, entry) in crew) {
@@ -604,7 +607,7 @@ public partial class WorldView : Node3D {
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             if (other.DownedFor > 0) KnockDown(other.Rig, state, other.DownedFor);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);
-            Work(state, subject);
+            Work(state, subject, other.Rig);
         }
         foreach (var (id, other) in others)
             if (!HasPlayer(id)) { other.Rig.Root.QueueFree(); others.Remove(id); }
@@ -672,24 +675,28 @@ public partial class WorldView : Node3D {
     private static bool Fitting(Thing? target) => target is { Kind: ThingKind.Mine, MineStage: MineStage.Supplied };
 
     /// <summary>Feeds an actor's work into the object it works on: bellows travel, impact shakes, chips and sparks.</summary>
-    private void Work(ActorState actor, Thing? subject) {
+    private void Work(ActorState actor, Thing? subject, ActorRig rig) {
         if (subject == null) return;
         var action = actor.Action;
         // The bellows board follows the lean of the person pressing it.
         if (action == ActorAction.Pump)
             pumping[subject.Id] = Math.Max(pumping.GetValueOrDefault(subject.Id), Math.Clamp((ActorAnimation.PoseAt(action, actor.Time, false).Lean - 16) / 16, 0, 1));
         if (action == ActorAction.Grind) grinding.Add(subject.Id);
-        // Hands close on what they gather twice a loop; packing digs into the heap of goods as each loop starts, and grinding plays one clip a loop.
+        // Hands close on what they gather twice a loop; packing digs into the heap of goods as each loop starts, grinding plays one clip a loop, and a dig throws its soil aside once.
         string? handSound = action switch {
             ActorAction.Gather when actor.Struck(.22f) || actor.Struck(.72f) => GrabSound(subject.Kind),
             ActorAction.Pack when actor.Struck(.04f) => "rustle",
             ActorAction.Grind when actor.Struck(.03f) => "grind_mortar",
+            ActorAction.Dig when actor.Struck(ActorAnimation.DigToss) => "dig_toss",
             _ => null
         };
         if (handSound != null) Sounds?.Play(handSound, subject.Pos);
+        // The soil a dig throws aside flies off the blade.
+        if (handSound == "dig_toss" && World.Sees(actor.Position)) Burst(rig.Root.Transform * rig.ShovelTip, Soil, 5, 1.6f, .5f, 9, .06f);
         float impact = action switch {
             ActorAction.Chop or ActorAction.SteelChop => .52f,
             ActorAction.Mine or ActorAction.SteelMine => .55f,
+            ActorAction.Dig => ActorAnimation.DigStrike,
             ActorAction.Hammer => .5f,
             ActorAction.Pump => .35f,
             ActorAction.Gather => .1f,
@@ -701,6 +708,7 @@ public partial class WorldView : Node3D {
         if (inSight) prop.Shake = 1;
         // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.
         string? sound = action is ActorAction.Mine or ActorAction.SteelMine ? "mine_ore"
+            : action == ActorAction.Dig ? "dig_earth"
             : action == ActorAction.Pump ? "bellows_pump"
             : subject.Kind == ThingKind.Anvil ? "anvil_work"
             : subject.Kind is ThingKind.Bench or ThingKind.Mine ? "bench_work"
@@ -723,6 +731,12 @@ public partial class WorldView : Node3D {
                 Burst(side + Vector3.Up * .4f, GatherDust, 3, .5f, .9f, -.3f, .16f, 1.5f);
                 if (action == ActorAction.SteelMine) Burst(side + Vector3.Up * .5f, Sparks, 5, 3.2f, .3f, 4, .025f);
                 break;
+            case ThingKind.Stump or ThingKind.Bush:
+                // The blade goes in at the foot of it and throws up soil, and a bush sheds leaves as it is rocked.
+                Burst(side + Vector3.Up * .08f, Soil, 6, 2, .5f, 9, .06f);
+                Burst(side + Vector3.Up * .1f, GatherDust, 2, .4f, .8f, -.3f, .14f, 1.5f);
+                if (subject.Kind == ThingKind.Bush) Burst(To3(subject.Pos, .5f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f);
+                break;
             case ThingKind.WolfCorpse: Burst(side + Vector3.Up * .3f, Mat("7a1414", .6f), 5, 1.4f, .45f, 8, .04f); break;
             case ThingKind.Berries: Burst(To3(subject.Pos, .7f), Mat("5d8a3c"), 3, 1.2f, .7f, 5, .06f); break;
             case ThingKind.Water: Burst(side + Vector3.Up * .05f, Splash, 6, 1.6f, .45f, 7, .045f); break;
@@ -733,13 +747,19 @@ public partial class WorldView : Node3D {
         }
     }
 
-    /// <summary>Seconds after it is felled when a tree's trunk and crown have faded away, leaving the stump.</summary>
+    /// <summary>Seconds after it is felled when a tree's trunk and crown have faded away over the stump.</summary>
     private const float TreeGone = 1.7f;
     private readonly HashSet<int> seen = new();
     private readonly List<Thing> known = new();
     private readonly List<int> gone = new();
+    // Models of things that left the world in front of the player, shown until they have played their way out.
+    private readonly List<int> departed = new();
+    private readonly List<Prop> leaving = new();
+    /// <summary>Seconds a dug out stump or bush takes to come out of the ground and be gone.</summary>
+    private const float DugOutSeconds = .6f;
     private SaveState? builtFor;
-    private int thingsCounted = -1;
+    // How many things the world held, and the newest of them, when models were last cleared away: a tree swapped for its stump changes only the second.
+    private int thingsCounted = -1, newestThing;
     private static readonly Vector2 Nowhere = new(-1e6f, -1e6f);
     // Where the player stood when things were last drawn.
     private Vector2 sawFrom = Nowhere;
@@ -762,6 +782,8 @@ public partial class WorldView : Node3D {
             sawFrom = Nowhere;
             foreach (var (_, old) in props) old.Root.QueueFree();
             props.Clear();
+            foreach (var old in leaving) old.Root.QueueFree();
+            leaving.Clear();
             foreach (var t in World.Things) Show(PropFor(t), false);
         }
         seen.Clear();
@@ -776,7 +798,7 @@ public partial class WorldView : Node3D {
             // so such a thing is settled once and then left alone: only what is in sight is drawn every frame.
             bool live = everything || World.Sees(t.Pos);
             // What a thing drawn as last seen can show: what a memory keeps of it (World.LookAround) that its kind draws, and night in a cabin's windows.
-            var look = (t.Pos, t.Remaining, t.Kind is ThingKind.Mine or ThingKind.WolfCorpse ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
+            var look = (t.Pos, t.Remaining, t.Kind is ThingKind.Mine or ThingKind.WolfCorpse || t.IsDug ? t.Progress : 0, t.MineStage, t.FarmStage, t.Kind == ThingKind.Hut && dark, live);
             if (!live && prop.Seen && prop.Look == look) continue;
             Show(prop, true);
             if (prop.Look.Pos != t.Pos) prop.Root.Position = To3(t.Pos);
@@ -786,10 +808,22 @@ public partial class WorldView : Node3D {
             prop.Look = look;
         }
         sawFrom = World.Player;
-        foreach (var (id, prop) in props) if (!seen.Contains(id)) Show(prop, false);
-        // Things leave the world rarely, so their models are looked for only when the count changes.
-        if (thingsCounted != World.Things.Count) {
-            thingsCounted = World.Things.Count;
+        departed.Clear();
+        foreach (var (id, prop) in props) {
+            if (seen.Contains(id) || !prop.Shown) continue;
+            if (World.Find(id) != null) { Show(prop, false); continue; }
+            // What was in sight a moment ago and has left the world may show how it went; anything else is cleared away below.
+            if (prop.Look.Live && Departs(prop)) departed.Add(id); else Show(prop, false);
+        }
+        foreach (int id in departed) { leaving.Add(props[id]); props.Remove(id); }
+        for (int i = leaving.Count - 1; i >= 0; i--) {
+            if (Depart(leaving[i], dt)) continue;
+            leaving[i].Root.QueueFree(); leaving.RemoveAt(i);
+        }
+        // Things come and go rarely, so the models of those that left are looked for only when the count or the newest thing changes.
+        int newest = World.Things.Count > 0 ? World.Things[World.Things.Count - 1].Id : 0;
+        if (thingsCounted != World.Things.Count || newestThing != newest) {
+            (thingsCounted, newestThing) = (World.Things.Count, newest);
             RefreshDressing();
             gone.Clear();
             foreach (var (id, _) in props) if (!seen.Contains(id) && World.Find(id) == null) gone.Add(id);
@@ -825,6 +859,48 @@ public partial class WorldView : Node3D {
         return prop;
     }
 
+    /// <summary>Whether a model whose thing has left the world plays its way out: a felled tree, and a stump or bush that was dug out rather than built over.</summary>
+    private bool Departs(Prop prop) => prop is TreeProp || prop is DugProp && !BuiltOver(prop.Look.Pos);
+
+    /// <summary>Whether a building, yard or crate now stands over a spot, having cleared away the stump or bush that was there.</summary>
+    private bool BuiltOver(Vector2 at) {
+        foreach (var kind in World.Structures)
+            foreach (var t in World.ThingsOf(kind)) if (World.Clears(t, at)) return true;
+        return false;
+    }
+
+    /// <summary>
+    /// Moves on a model whose thing has left the world, and tells whether it still has more to show.
+    /// A felled tree topples, raises dust where its crown lands and fades away over the stump it left.
+    /// A dug out stump or bush is thrown up out of a spray of soil, tumbling over, and shrinks away as it comes down.
+    /// </summary>
+    private bool Depart(Prop prop, float dt) {
+        switch (prop) {
+            case TreeProp tree:
+                float before = Math.Max(0, tree.Fall); tree.Fall = before + dt;
+                float drop = Math.Min(1, tree.Fall / 1.1f);
+                tree.Sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
+                if (before < 1.1f && tree.Fall >= 1.1f) Burst(prop.Root.Position + tree.Sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
+                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - 1.2f) / .5f, 0, 1));
+                return tree.Fall < TreeGone;
+            case DugProp dug:
+                if (dug.Out < 0) {
+                    dug.Out = 0;
+                    Burst(prop.Root.Position + Vector3.Up * .1f, Soil, 10, 2.4f, .6f, 9, .07f);
+                    Burst(prop.Root.Position + Vector3.Up * .15f, GatherDust, 4, .6f, .9f, -.3f, .2f, 1.5f);
+                    if (prop.Kind == ThingKind.Bush) Burst(prop.Root.Position + Vector3.Up * .5f, Mat("5d8a3c"), 6, 1.6f, .8f, 5, .06f);
+                }
+                dug.Out += dt;
+                float u = Math.Min(1, dug.Out / DugOutSeconds);
+                // It carries on from the lean digging left it at.
+                prop.Body.Position = new Vector3(0, .07f + MathF.Sin(u * MathF.PI) * .45f, 0);
+                prop.Body.RotationDegrees = new Vector3(16 + 150 * Ease(u), dug.Yaw, 0);
+                prop.Body.Scale = Vector3.One * (1 - Mathf.SmoothStep(.45f, 1, u));
+                return u < 1;
+            default: return false;
+        }
+    }
+
     /// <summary>The rock or ore deposit a newly appeared chip came off, or null when none is close enough.</summary>
     private Thing? ChippedFrom(Thing chip) {
         Thing? rock = null; float nearest = (GatherRules.ChipReach + .5f) * (GatherRules.ChipReach + .5f);
@@ -848,23 +924,14 @@ public partial class WorldView : Node3D {
         float flicker = MathF.Sin(Elapsed * 13 + t.Id) * .5f + MathF.Sin(Elapsed * 7.3f + t.Id * 3) * .5f;
         switch (prop) {
             case TreeProp tree:
-                var sway = tree.Sway;
-                if (t.Remaining > 0) {
-                    bool raised = first || tree.Fall >= 0;
-                    if (raised) { tree.Fall = -1; sway.Visible = true; tree.Stump.Visible = false; }
-                    if (raised || shaking) sway.RotationDegrees = new Vector3(wobble * 3, 0, prop.Shake * 2 * MathF.Cos(Elapsed * 29));
-                    break;
-                }
-                // A tree felled in front of the player topples, fades away and leaves its stump; one felled out of sight is a stump when seen again.
-                if (tree.Fall < 0) tree.Fall = watched ? 0 : 9;
-                else if (tree.Fall >= TreeGone) break;
-                float before = tree.Fall; tree.Fall += dt;
-                float drop = Math.Min(1, tree.Fall / 1.1f);
-                sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
-                if (live && before < 1.1f && tree.Fall >= 1.1f) Burst(prop.Root.Position + sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
-                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - 1.2f) / .5f, 0, 1));
-                sway.Visible = tree.Fall < TreeGone;
-                tree.Stump.Visible = true;
+                if (first || shaking) tree.Sway.RotationDegrees = new Vector3(wobble * 3, 0, prop.Shake * 2 * MathF.Cos(Elapsed * 29));
+                break;
+            case DugProp dug:
+                if (still && prop.Look.Progress == t.Progress) break;
+                // Digging works it loose: it leans further over with the work done, and rocks as each push of the shovel lands.
+                float loose = Ease(Math.Clamp(t.Progress / GatherRules.DigSeconds, 0, 1));
+                prop.Body.RotationDegrees = new Vector3(loose * 16 + wobble * 5, dug.Yaw, wobble * 3);
+                prop.Body.Position = new Vector3(wobble * .02f, loose * .07f, 0);
                 break;
             case LooseProp chip when chip.Flight < WorldModels.ChipFlight:
                 // An arc from the rock with a hop at the end, spinning as it goes.
