@@ -817,6 +817,8 @@ public partial class Game {
         Require(Sounds.Names.All(name => sounds.VariantCount(name) > 0), "Every sound must load.");
         Require(sounds.VariantCount("footsteps_default") == 3, "Numbered footstep files must group as three variants.");
         Require(sounds.VariantCount("chop_tree") == 1, "A single chop file must count as one variant.");
+        // Random picks can keep to two of the three variants, about once in a thousand runs: a seed makes them the same every run.
+        sounds.Reseed(1);
         var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
         Require(picks.Zip(picks.Skip(1)).All(p => p.First != p.Second) && picks.Distinct().Count() == 3, "Repeated sounds must rotate through their variants without repeating the previous one.");
         sounds.UpdateMusic(Sounds.MusicFadeSeconds);
