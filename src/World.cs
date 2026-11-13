@@ -885,7 +885,7 @@ public sealed partial class World {
     /// </summary>
     public string? SwitchBlock(Thing t, string recipe) =>
         recipe == t.Recipe ? null
-        : t.Processing ? $"The {Lower(Data.Name(t.Kind))} is in the middle of a batch. Wait for it to finish."
+        : t.Processing ? $"The {Lower(Data.Name(t.Kind))} has to finish its batch first."
         : !S.Backpack.Fits(t.Inventory) ? $"No room in your backpack for what the {Lower(Data.Name(t.Kind))} holds." : null;
     private static readonly Dictionary<string, int> NoCost = new();
     /// <summary>

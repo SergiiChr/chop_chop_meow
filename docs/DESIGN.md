@@ -524,6 +524,7 @@ What no storage takes stays in the station, which goes on working until its outp
 Every station page shows the same `RecipeBoard` as the crafting menu; only the crafting menu has a `QueueStrip` under the work.
 The board asks `World.SwitchBlock` before it queues at a station and, when the turn is refused, shakes the cups of the station's `ProcessRow` (`ProcessRow.Shake`).
 It asks on the first press of a double-click, before that press changes the worker mark, and keeps the answer in `PageMemory.BlockedBefore`.
+A double-click changes the worker mark and puts it back, which draws the page again: `StationPanel` starts the shake again on each row it draws until the shake's time is up.
 The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.ClosedGroups` keeps the groups the player closed, for every board.
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
 The panel keeps the list's place while the page draws again, so a click on a recipe leaves the list where it was scrolled to.

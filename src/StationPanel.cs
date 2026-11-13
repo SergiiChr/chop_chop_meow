@@ -13,6 +13,9 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
     private bool opened;
     // The work as drawn now, or null while the station has no recipe.
     private ProcessRow? work;
+    // When the shake asked for last ends, on the engine's clock in milliseconds.
+    // A double-click changes the worker mark and puts it back, which draws the page again under the shake.
+    private ulong shakeEnds;
 
     protected override void Body() {
         // A station's own tool cups sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
@@ -21,9 +24,10 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool, or of the one you carry while you work it. Someone has to work it.";
         string? openOn = opened ? null : thing.Keep != "" ? thing.Keep : thing.Recipe != "" ? thing.Recipe : null;
         opened = true;
-        AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn, () => work?.Shake()));
+        AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn, () => { shakeEnds = Time.GetTicksMsec() + (ulong)(ProcessRow.ShakeSeconds * 1000); work?.Shake(); }));
         work = thing.Recipe != "" ? cups.Machine() : null;
         if (work != null) AddChild(work);
+        if (Time.GetTicksMsec() < shakeEnds) work?.Shake();
         else AddLabel("Click a recipe for workers to keep making it, or Shift-click to queue and load some.", 14, Style.Beige);
         // The side cups are the leftovers the station held when the page was drawn.
         RedrawOnChange(cups.SideCode);

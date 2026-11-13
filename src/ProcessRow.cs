@@ -9,24 +9,28 @@ namespace ChopChopMeow;
 /// the fuel under it with how long it lasts, and the main output with its side outputs in a second row.
 /// </summary>
 public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) : PanelContainer {
-    /// <summary>How long a shake lasts, in seconds, how far it swings to each side, in pixels, and how many times it swings.</summary>
-    private const float ShakeSeconds = .4f, ShakeReach = 8, ShakeSwings = 4;
+    /// <summary>How long a shake lasts, in seconds.</summary>
+    public const float ShakeSeconds = .4f;
+    /// <summary>How far a shake swings to each side, in pixels, and how many times it swings.</summary>
+    private const float ShakeReach = 8, ShakeSwings = 4;
 
     // The input cups and the output cups, each group in a box of its own.
     private HBoxContainer left = null!;
     private VBoxContainer right = null!;
     private Tween? shake;
-    private Vector2 leftHome, rightHome;
 
     /// <summary>Whether the cups are shaking now.</summary>
     public bool Shaking => shake != null && shake.IsValid();
 
-    /// <summary>Shakes the input and output cups from side to side and back to rest, to show they are taken.</summary>
+    /// <summary>Shakes the input and output cups from side to side and back to rest, to show they are taken; a shake under way goes on as it is.</summary>
     public void Shake() {
-        if (Shaking) { shake!.Kill(); left.Position = leftHome; right.Position = rightHome; }
-        leftHome = left.Position; rightHome = right.Position;
+        if (Shaking) return;
+        bool placed = false;
+        Vector2 leftHome = default, rightHome = default;
         shake = CreateTween();
         shake.TweenMethod(Callable.From<float>(done => {
+            // The cups' places are read on the first step: a row drawn this frame is laid out only by then.
+            if (!placed) { placed = true; leftHome = left.Position; rightHome = right.Position; }
             var swing = new Vector2(MathF.Sin(done * MathF.Tau * ShakeSwings) * (1 - done) * ShakeReach, 0);
             left.Position = leftHome + swing; right.Position = rightHome + swing;
         }), 0f, 1f, ShakeSeconds);
