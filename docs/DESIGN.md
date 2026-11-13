@@ -299,7 +299,7 @@ Digging (`ActorAction.Dig`) holds the shovel in both hands: the right on top of 
 `ActorAnimation.DigKeys` give where the blade's tip is and how the shaft leans at each moment: driven into the ground ahead, leant on, levered up and thrown aside to the left.
 Both arms are solved from there with `ActorAnimation.ArmTo`, and `ActorRig.Show` lays the shaft from the right fist through the left, so the blade goes where the keys take it.
 The front boot stays flat and the back one on its toe at fixed spots, so neither slides as the hips go down and up.
-The handle is kept in front of the right shoulder, since `ArmTo` cannot take a folded arm far to the side.
+The handle is kept ahead of the right side of the chest and below the shoulders: at the middle of the chest the folded right arm would lie inside the torso, and higher it would be in front of the face.
 
 A player with something to make by hand squats over it, turning it in both hands (`ActorAction.Craft`), only while standing still.
 

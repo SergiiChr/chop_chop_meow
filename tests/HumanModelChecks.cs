@@ -24,6 +24,7 @@ public static class HumanModelChecks {
             CheckCarriedCrateFollowsCarryingVisibility(rigs);
             CheckGrindingWorksThePestleInsideALevelBowl(rigs);
             CheckDiggingDrivesTheBladeIntoTheGroundWithBothHandsOnTheShaft(rigs);
+            CheckDiggingKeepsBothArmsOutOfTheTorso(rigs);
         } finally {
             foreach (var rig in rigs) rig.Root.Free();
         }
@@ -139,6 +140,31 @@ public static class HumanModelChecks {
             Require(thrown.Y > .35f && thrown.X > .4f, $"the blade should be up and out to the left as the soil leaves it: {thrown}");
             rig.Show(new Pose(), null, false);
         }
+    }
+
+    /// <summary>
+    /// Through a dig both arms stay outside the torso, with the handle below the shoulders:
+    /// no elbow, forearm or fist is inside the chest or belly, and the handle is never in front of the face.
+    /// </summary>
+    private static void CheckDiggingKeepsBothArmsOutOfTheTorso(ActorRig[] rigs) {
+        // The torso as HumanShape builds it is widest at the chest, 0.177 m to each side and 0.105 m front and back, and a forearm is about 0.045 m thick.
+        const float halfWidth = .177f + .045f, halfDepth = .105f + .045f, shoulders = .45f;
+        float loop = ActorAnimation.Duration(ActorAction.Dig);
+        foreach (var rig in rigs)
+            for (int step = 0; step < 90; step++) {
+                rig.Show(ActorAnimation.PoseAt(ActorAction.Dig, loop * step / 90, false), ActorAnimation.Tool(ActorAction.Dig), false);
+                var toTrunk = InRig(rig, rig.Torso).AffineInverse();
+                foreach (bool left in new[] { false, true }) {
+                    Vector3 elbow = toTrunk * rig.Elbow(left), fist = toTrunk * rig.Fist(left);
+                    foreach (var (part, at) in new[] { ("elbow", elbow), ("forearm", (elbow + fist) / 2), ("fist", fist) }) {
+                        bool beside = at.Y < 0 || at.Y > shoulders + .1f || at.X * at.X / (halfWidth * halfWidth) + at.Z * at.Z / (halfDepth * halfDepth) >= 1;
+                        Require(beside, $"the {(left ? "left" : "right")} {part} should stay out of the torso, step {step}: {at} from the hips in the trunk's frame");
+                    }
+                }
+                float handle = (toTrunk * rig.Fist(left: false)).Y;
+                Require(handle < shoulders + .02f, $"the handle should stay below the shoulders, out of the digger's face, step {step}: {handle:0.00} m up the trunk");
+            }
+        foreach (var rig in rigs) rig.Show(new Pose(), null, false);
     }
 
     /// <summary>

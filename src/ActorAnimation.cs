@@ -269,17 +269,19 @@ public static class ActorAnimation {
     /// </summary>
     private readonly record struct DigKey(float At, float Lean, float Twist, float Hips, Vector3 Tip, float Pitch, float Yaw);
 
-    // The blade is driven into the ground ahead, the weight goes onto it, the handle is pushed down to lever the load out, and the load is thrown aside to the left.
-    // The handle stays in front of the right shoulder and the shaft crosses the body toward the left hand: a folded arm reaches little to the side.
-    // The blade goes in well short of where a digger stands from a stump or a bush, so it enters the ground at its foot.
+    // The blade is driven into the ground ahead, the weight goes onto it, the handle is pushed down to lever the load out, and the load is heaved up and thrown aside to the left.
+    // The handle stays ahead of the right side of the chest and below the shoulders, with the shaft crossing toward the left hand out in front:
+    // held at the middle of the chest the right arm folds into the torso, and held higher the handle is in front of the face.
+    // The blade goes in short of where a digger stands from a stump or a bush, so it enters the ground at its foot.
     private static readonly DigKey[] DigKeys = {
-        new(0, 10, 0, .78f, new(.08f, .3f, .66f), 28, 24),
-        new(DigStrike, 46, 0, .665f, new(.08f, -.08f, .78f), 22, 26),
-        new(.32f, 49, 0, .645f, new(.08f, -.13f, .79f), 19, 26),
-        new(.55f, 48, 0, .665f, new(.08f, .06f, .9f), 48, 14),
-        new(.72f, 26, 24, .74f, new(.5f, .42f, .8f), 66, 38),
-        new(.82f, 20, 32, .76f, new(.7f, .58f, .62f), 68, 55),
-        new(.92f, 12, 12, .775f, new(.36f, .36f, .76f), 50, 36),
+        new(0, 10, 0, .74f, new(.15f, .3f, .73f), 30, 41),
+        new(DigStrike, 54, 0, .7f, new(.1f, -.08f, .78f), 26, 43),
+        new(.32f, 58, 0, .65f, new(.1f, -.13f, .8f), 28, 43),
+        new(.55f, 45, 0, .684f, new(.12f, .09f, .94f), 40, 33),
+        new(.64f, 34, 9, .627f, new(.4f, .26f, 1.01f), 52, 44),
+        new(.72f, 33, 24, .671f, new(.52f, .33f, .98f), 52, 45),
+        new(.82f, 26, 22, .769f, new(.79f, .65f, .79f), 72, 70),
+        new(.92f, 7, 10, .71f, new(.34f, .46f, .87f), 48, 42),
     };
 
     /// <summary>

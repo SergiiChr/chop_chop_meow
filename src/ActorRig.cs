@@ -213,6 +213,9 @@ public sealed class ActorRig {
     /// <summary>Where a fist is from the rig's root, under the pose just shown.</summary>
     public Vector3 Fist(bool left) => FromForearm(left, new Vector3(0, -Forearm, Palm));
 
+    /// <summary>Where an elbow is from the rig's root, under the pose just shown.</summary>
+    public Vector3 Elbow(bool left) => FromForearm(left, Vector3.Zero);
+
     /// <summary>Where the tip of the shovel's blade is from the rig's root, under the pose just shown.</summary>
     public Vector3 ShovelTip => FromForearm(false, shovel.Transform * new Vector3(0, -ActorAnimation.ShovelLength, 0));
 

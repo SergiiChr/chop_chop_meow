@@ -70,6 +70,9 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 - Time the arms from the legs' phase, not their own clock, so the two never drift apart.
 - Work actions such as chopping move the whole body: the weight shifts from the back foot to the front as the tool comes
   down.
+- A hand held close to its own shoulder or at the middle of the chest folds the arm into the torso, since an elbow folds
+  only forward. Keep work hands out in front or to their own side, and look at the `facing` view: a buried arm does not
+  show from the side.
 
 ## Trunk and head
 
@@ -120,11 +123,11 @@ Start from these, and search freely for more: photos and slow-motion footage of 
 
 ## Review
 
-`tools/animation_review.py` captures one clip close up, moving over marked ground, from the side, front and
-game camera:
+`tools/animation_review.py` captures one clip close up, moving over marked ground, from the side, the front, the game
+camera and the game camera with the actor facing it (`facing`):
 
 ```sh
-./tools/animation_review.py "player run"                       # side, front and game views at 4x slow motion
+./tools/animation_review.py "player run"                       # all four views at 4x slow motion
 git fetch origin
 ./tools/animation_review.py "player run" --base origin/main --views side --slow 1  # add the same views from main
 ```

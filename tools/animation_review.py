@@ -20,8 +20,8 @@ import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 OUTPUT = build.BUILD / "animation-review"
 MARKER = "ANIMATION-CAPTURE PASS"
 
-# Camera pitch and rig turn in degrees: low from the side, low facing the camera, and the game's own angle.
-VIEWS = {"side": (4, 0), "front": (4, -90), "game": (30, 0)}
+# Camera pitch and rig turn in degrees: low from the side, low facing the camera, and the game's own angle from the side and facing the camera.
+VIEWS = {"side": (4, 0), "front": (4, -90), "game": (30, 0), "facing": (30, -90)}
 
 
 def review_source(ref: str | None) -> str:
