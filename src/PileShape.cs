@@ -38,17 +38,18 @@ internal static class PileShape {
         "charcoal" => CharcoalShape.Material,
         "stone" or "ore" => ModelKit.Stone(color),
         "logs" or "planks" or "parts" => ModelKit.Wood(color, .95f),
-        "fallback" => ModelKit.Mat(color, .95f),
-        _ => ItemShape.Material(family),
+        _ when ItemShape.Has(family) => ItemShape.Material(family),
+        _ => ModelKit.Mat(color, .95f),
     };
 
     /// <summary>Builds every stock mesh and item material while loading, so a pile showing a new item mid-game swaps cached resources only.</summary>
     public static void Warm(GameData data) {
-        foreach (var family in families) if (!contents.ContainsKey(family)) contents[family] = BuildStock(family, true);
+        void Stock(string family) { if (!contents.ContainsKey(family)) contents[family] = BuildStock(family, true); }
+        foreach (var family in families) Stock(family);
         foreach (var (id, item) in data.Items) {
-            string family = Family(id);
-            if (!contents.ContainsKey(family)) contents[family] = BuildStock(family, true);
-            Material(family, item.Color);
+            Stock(Family(id));
+            // Asking for the material's RID builds its shader now rather than on the first pile that shows it.
+            _ = Material(Family(id), item.Color).GetRid();
         }
         Material("fallback", Fallback);
     }

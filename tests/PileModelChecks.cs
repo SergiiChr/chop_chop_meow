@@ -25,21 +25,13 @@ public static class PileModelChecks {
             Require(first.Stock.Slots[0].Mesh!.GetInstanceId() != logs.GetInstanceId(), "replacing wood with stone must change the model");
             Require(second.Stock.Slots.All(s => s.Visible) && second.Stock.Slots[0].Mesh!.GetInstanceId() == logs.GetInstanceId(), "a refresh must leave another pile's remembered appearance alone");
 
-            thing.Inventory.Clear(); thing.Inventory.Add("coal", 64);
-            WorldModels.SyncPile(first, thing, data);
-            var coal = first.Stock.Slots[0].Mesh!;
-            thing.Inventory.Clear(); thing.Inventory.Add("charcoal", 64);
-            WorldModels.SyncPile(first, thing, data);
-            var charcoal = first.Stock.Slots[0].Mesh!;
+            var coal = ModelSteps.Piled(first, thing, "coal", data);
+            var charcoal = ModelSteps.Piled(first, thing, "charcoal", data);
             // Three six-sided briquettes with a hole through each: six sides, six hole walls and two ringed ends of six, two triangles apiece.
             Require(charcoal.GetInstanceId() != coal.GetInstanceId() && charcoal.GetFaces().Length / 3 == 144, "charcoal must pile as three holed briquettes rather than as coal's lumps");
 
-            thing.Inventory.Clear(); thing.Inventory.Add("torch", 64);
-            WorldModels.SyncPile(first, thing, data);
-            var fallback = first.Stock.Slots[0].Mesh!;
-            thing.Inventory.Clear(); thing.Inventory.Add("unmodelled_item", 64);
-            WorldModels.SyncPile(first, thing, data);
-            Require(first.Stock.Slots[0].Mesh!.GetInstanceId() == fallback.GetInstanceId(), "unmodelled items must use the shared fallback");
+            var fallback = ModelSteps.Piled(first, thing, "torch", data);
+            Require(ModelSteps.Piled(first, thing, "unmodelled_item", data).GetInstanceId() == fallback.GetInstanceId(), "unmodelled items must use the shared fallback");
             Require(first.Stock.Slots[0].MaterialOverride is StandardMaterial3D material && material.AlbedoColor.IsEqualApprox(new Color("b0a58a")), "unknown items must have a visible fallback color");
 
             thing.Inventory.Clear();
@@ -63,7 +55,10 @@ public static class PileModelChecks {
         } finally { first.Root.Free(); second.Root.Free(); }
     }
 
-    /// <summary>Every item's icon is rendered from a model, and the goods that are only ever carried or stored pile as that same model, light enough for a full pile.</summary>
+    /// <summary>
+    /// Every item's icon is rendered from a model, and the goods that are only ever carried or stored pile as that same
+    /// model, light enough for a full pile and a full packing station.
+    /// </summary>
     public static void Goods(GameData data) {
         foreach (string item in data.Items.Keys)
             Require(ResourceLoader.Exists($"res://assets/icons/{item}.png"), $"{item} must have an icon rendered from its model");
@@ -73,7 +68,7 @@ public static class PileModelChecks {
         try {
             var block = ModelSteps.Piled(pile, thing, "unmodelled_item", data);
             string[] goods = { "steel_parts", "tin_can", "grass", "fertilizer", "wheat_seeds", "wheat", "flour", "dough", "raw_meat", "burnt_steak", "bread",
-                "crushed_berries", "berry_jam", "meat_stew", "canned_jam", "canned_meat_stew" };
+                "crushed_berries", "berry_jam", "meat_stew", "canned_jam", "canned_meat_stew", "coins" };
             // A pile and a packing station are buildings, each held to 2,500 triangles with every slot of stock showing.
             var packer = (PackerProp)WorldModels.Build(new Thing { Kind = ThingKind.Packer });
             try {

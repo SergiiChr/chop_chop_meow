@@ -152,14 +152,16 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Pile)); else panel.Close();
         }
         if (Launch.Has("--goods")) {
-            // Piles with a stack of every good that has a model of its own, nine to a pile so none hides another, and a pile full of --goods-full.
+            // Piles with a stack of every good that has a model of its own, a pile's nine ground slots at a time so none
+            // hides another, and a pile full of --goods-full.
+            const int perPile = 9;
             var at = Terrain.Spawn + new Vector2(-3, 9);
             world.S.Things.RemoveAll(t => t.Pos.DistanceTo(at + new Vector2(3, 0)) < 7);
             var goods = ItemShape.Items.ToArray();
-            int piles = (goods.Length + 8) / 9;
+            int piles = (goods.Length + perPile - 1) / perPile;
             for (int i = 0; i < piles; i++) {
                 var pile = world.Add(ThingKind.Pile, at + new Vector2(i * 3, 0));
-                foreach (string item in goods.Skip(i * 9).Take(9)) pile.Inventory.Add(item, pile.Inventory.StackSize);
+                foreach (string item in goods.Skip(i * perPile).Take(perPile)) pile.Inventory.Add(item, pile.Inventory.StackSize);
             }
             var full = world.Add(ThingKind.Pile, at + new Vector2(piles * 3, 0)); full.Inventory.Add(Launch.Value("--goods-full") ?? "bread", 14 * full.Inventory.StackSize);
             world.Player = at + new Vector2(3, -2.5f); world.Tick(0); view.Zoom = 2.2f; panel.Close();

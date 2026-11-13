@@ -7,13 +7,18 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// Goods that no world model shows: one small model an item, carrying its own colours.
-/// An item's icon shows the model as built and a pile slot shows it fitted to the slot, so a good looks the same in both.
-/// Bread, meat and the bowls are baked Kenney Food Kit meshes from <c>assets/models/food</c> in the game's colours; the rest is built here.
+/// An item's icon shows the model as built and a pile slot shows it fitted to the slot, so a good looks the same in
+/// both.
+/// Bread, meat and the bowls are baked Kenney Food Kit meshes from <c>assets/models/food</c> in the game's colours;
+/// the rest is built here.
 /// </summary>
 internal static class ItemShape {
     /// <summary>One flat triangle, wound so that it faces outward, in one colour.</summary>
     private readonly record struct Face(Vector3 A, Vector3 B, Vector3 C, Color Tint);
-    /// <summary>How an item is built, what it is made of and, where one alone would not fill a pile slot, how several are put together to fill it.</summary>
+    /// <summary>
+    /// How an item is built, what it is made of and, where one alone would not fill a pile slot, how several are put
+    /// together to fill it.
+    /// </summary>
     private sealed record Look(Action<List<Face>> Build, StandardMaterial3D Material, Func<List<Face>, List<Face>>? Pile = null);
 
     private static readonly StandardMaterial3D Plain = ModelKit.Vertex(Surface.Flat, .8f);
@@ -24,10 +29,10 @@ internal static class ItemShape {
 
     private static readonly Dictionary<string, Look> looks = new() {
         ["steel_parts"] = new(SteelParts, Steel),
-        ["tin_can"] = new(f => Can(f, null), Tin, f => Huddle(f, 3)),
-        ["canned_jam"] = new(f => Can(f, "b83a5c"), Tin, f => Huddle(f, 3)),
-        ["canned_meat_stew"] = new(f => Can(f, "c07a48"), Tin, f => Huddle(f, 3)),
-        ["berry_jam"] = new(Jar, Glossy, f => Huddle(f, 3)),
+        ["tin_can"] = new(f => Can(f, null), Tin, Huddle),
+        ["canned_jam"] = new(f => Can(f, "b83a5c"), Tin, Huddle),
+        ["canned_meat_stew"] = new(f => Can(f, "c07a48"), Tin, Huddle),
+        ["berry_jam"] = new(Jar, Glossy, Huddle),
         ["grass"] = new(f => Sheaf(f, 20, .5f, .24f, false, "8fae55", "7c9c46", "a3bf63"), Plain),
         ["wheat"] = new(f => Sheaf(f, 7, .62f, .19f, true, "f0d060", "e2c25b", "f5dc7a"), Plain),
         ["wheat_seeds"] = new(Seeds, Sacking),
@@ -37,7 +42,7 @@ internal static class ItemShape {
         ["bread"] = new(f => Baked(f, "loaf_round", Swap(("995941", "c98a45"), ("e68d64", "ecc892"))), Plain),
         ["raw_meat"] = new(f => Baked(f, "wholer_ham", Swap(("995941", "c4524a"), ("dc9e76", "efe3d0"))), Plain),
         ["burnt_steak"] = new(f => Baked(f, "meat_cooked", Swap(("e2a781", "7a5536"), ("c9835b", "5e3b25"), ("e08860", "5e3b25"), ("ab5e41", "2b1c14"), ("61cb8b", "2b1c14"))), Plain,
-            f => Stack(f, 2)),
+            Stack),
         ["meat_stew"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "e9e6dc"), ("e68d64", "8f5a33"), ("ff8e44", "e0873a"), ("61cb8b", "7fa650"), ("f2bf99", "d9b98a"))), Plain),
         ["crushed_berries"] = new(f => Baked(f, "bowl_soup", Swap(("f1f1f6", "b08050"), ("e68d64", "b8434f"), ("ff8e44", "7d1f2e"), ("61cb8b", "d86a70"), ("f2bf99", "8f2436"))), Plain),
         ["coins"] = new(Coins, Glossy),
@@ -48,7 +53,8 @@ internal static class ItemShape {
     public static StandardMaterial3D Material(string item) => looks[item].Material;
 
     /// <summary>
-    /// Builds the item centred on the origin: one in its own proportions, or a slot's worth stretched to fill a box of the given size, as a pile slot shows it.
+    /// Builds the item centred on the origin: one in its own proportions, or a slot's worth stretched to fill a box of
+    /// the given size, as a pile slot shows it.
     /// </summary>
     public static ArrayMesh Build(string item, Vector3? fit = null) {
         var look = looks[item];
@@ -71,8 +77,9 @@ internal static class ItemShape {
         return (min, max);
     }
 
-    /// <summary>Copies of one standing in a ring, each touching its neighbours and turned its own way.</summary>
-    private static List<Face> Huddle(List<Face> one, int count) {
+    /// <summary>Three of one standing in a ring, each touching the other two and turned its own way.</summary>
+    private static List<Face> Huddle(List<Face> one) {
+        const int count = 3;
         var (min, max) = Bounds(one);
         var middle = ((min + max) / 2) with { Y = 0 };
         float reach = MathF.Max(max.X - min.X, max.Z - min.Z) / 2 / MathF.Sin(MathF.PI / count);
@@ -86,18 +93,17 @@ internal static class ItemShape {
     }
 
     /// <summary>
-    /// Copies of a flat one lying on each other, each sunk into the one below as far as its bevelled edge.
-    /// The top one keeps all but its underside, and the rest keep only their upright sides, which are all that show of them.
+    /// Two of a flat one lying on each other, the upper sunk into the lower as far as its bevelled edge.
+    /// The upper keeps all but its underside, and the lower keeps only its upright sides, which are all that show of it.
     /// </summary>
-    private static List<Face> Stack(List<Face> one, int count) {
+    private static List<Face> Stack(List<Face> one) {
         var (min, max) = Bounds(one);
+        var lift = Vector3.Up * (max.Y - min.Y) * .8f;
         var all = new List<Face>();
-        for (int i = 0; i < count; i++) {
-            var lift = Vector3.Up * (max.Y - min.Y) * .8f * i;
-            foreach (var (a, b, c, tint) in one) {
-                float up = (c - a).Cross(b - a).Normalized().Y;
-                if (i == count - 1 ? up > -.5f : MathF.Abs(up) < .3f) all.Add(new(a + lift, b + lift, c + lift, tint));
-            }
+        foreach (var (a, b, c, tint) in one) {
+            float up = (c - a).Cross(b - a).Normalized().Y;
+            if (MathF.Abs(up) < .3f) all.Add(new(a, b, c, tint));
+            if (up > -.5f) all.Add(new(a + lift, b + lift, c + lift, tint));
         }
         return all;
     }
@@ -110,7 +116,8 @@ internal static class ItemShape {
     }
 
     /// <summary>
-    /// Turns each of a baked model's colours into the game colour paired with the nearest listed one, as much lighter or darker as it was than that one.
+    /// Turns each of a baked model's colours into the game colour paired with the nearest listed one, as much lighter
+    /// or darker as it was than that one.
     /// </summary>
     private static Func<Color, Color> Swap(params (string From, string To)[] pairs) {
         var listed = Array.ConvertAll(pairs, pair => (From: new Color(pair.From), To: new Color(pair.To)));
@@ -124,7 +131,10 @@ internal static class ItemShape {
 
     private static float Distance(Color a, Color b) => new Vector3(a.R - b.R, a.G - b.G, a.B - b.B).LengthSquared();
 
-    /// <summary>Tool heads as they leave the anvil, none with a handle yet: an axe head lying on its cheek, a sledge head behind it and a collar ring before it.</summary>
+    /// <summary>
+    /// Tool heads as they leave the anvil, none with a handle yet: an axe head lying on its cheek, a sledge head behind
+    /// it and a collar ring before it.
+    /// </summary>
     private static void SteelParts(List<Face> faces) {
         var (bright, steel, dark) = (new Color("a8d2ec"), new Color("7fb4d6"), new Color("2c3e4c"));
         // The axe head from above: the poll, a waist, then the bit flaring to a long beard on the near side; it thins from poll to edge.
@@ -148,7 +158,8 @@ internal static class ItemShape {
     }
 
     /// <summary>
-    /// A tin can: open and empty, its inside drawn as a dark hollow, or sealed under a lid and wrapped in a label of the given colour with a pale patch on one side.
+    /// A tin can: open and empty, its inside drawn as a dark hollow, or sealed under a lid and wrapped in a label of
+    /// the given colour with a pale patch on one side.
     /// </summary>
     private static void Can(List<Face> faces, string? label) {
         const float radius = .06f, height = .13f;
@@ -193,7 +204,8 @@ internal static class ItemShape {
 
     /// <summary>
     /// A sheaf tied at the waist: straight straws cross at the tie, so they spread out below it and above it.
-    /// Grass stands on its cut ends and each blade ends in a point; wheat lies on its side, an ear on each straw, pointing up and to the right in the icon as tools do.
+    /// Grass stands on its cut ends and each blade ends in a point.
+    /// Wheat lies on its side, an ear on each straw, pointing up and to the right in the icon as tools do.
     /// </summary>
     private static void Sheaf(List<Face> faces, int straws, float height, float spread, bool ears, params string[] tints) {
         int first = faces.Count;
@@ -226,9 +238,7 @@ internal static class ItemShape {
         for (int i = 0; i < triangles.Count; i += 3) {
             Vector3 a = points[triangles[i]], b = points[triangles[i + 1]], c = points[triangles[i + 2]];
             var outward = (a + b + c) / 3 - middle;
-            var normal = (c - a).Cross(b - a).Normalized();
-            if (normal.Dot(outward) < 0) normal = -normal;
-            Tri(faces, a, b, c, outward, new Color("efdcb0").Lerp(new Color("fbf3dc"), Math.Clamp(normal.Y, 0, 1) * .8f));
+            Tri(faces, a, b, c, outward, new Color("efdcb0").Lerp(new Color("fbf3dc"), Math.Clamp(outward.Normalized().Y, 0, 1) * .8f));
         }
     }
 
@@ -236,11 +246,12 @@ internal static class ItemShape {
     private static void Coins(List<Face> faces) {
         const float radius = .1f, thick = .028f;
         var stack = new List<Ring> { (radius, 0, "e0ae3a") };
-        for (int i = 1; i <= 5; i++) stack.Add((radius, i * thick, i % 2 == 0 ? "e0ae3a" : "f7cf55"));
-        stack.Add((0, 5 * thick, "fde488"));
+        const int coins = 4;
+        for (int i = 1; i <= coins; i++) stack.Add((radius, i * thick, i % 2 == 0 ? "e0ae3a" : "f7cf55"));
+        stack.Add((0, coins * thick, "fde488"));
         Lathe(faces, Transform3D.Identity, stack.ToArray(), 10);
         // It leans on the near side with its face up toward the sun.
-        var leaning = new Transform3D(new Basis(Vector3.Right, Mathf.DegToRad(60)), new Vector3(0, .087f, .127f));
+        var leaning = new Transform3D(new Basis(Vector3.Right, Mathf.DegToRad(60)), new Vector3(0, .087f, .115f));
         Lathe(faces, leaning, new Ring[] { (0, 0, "e0ae3a"), (radius, 0, "e0ae3a"), (radius, thick, "f7cf55"), (0, thick, "fde488") }, 10);
     }
 
@@ -264,8 +275,10 @@ internal static class ItemShape {
     }
 
     /// <summary>
-    /// A shape turned about the upright axis of <paramref name="at"/> through rings of a radius and a height, each band in its upper ring's colour.
-    /// A ring of no radius closes the shape, <paramref name="mark"/> gives a band's side another colour, and <paramref name="square"/> pushes every other corner out to square the shape off.
+    /// A shape turned about the upright axis of <paramref name="at"/> through rings of a radius and a height, each
+    /// band in its upper ring's colour.
+    /// A ring of no radius closes the shape, <paramref name="mark"/> gives a band's side another colour, and
+    /// <paramref name="square"/> pushes every other corner out to square the shape off.
     /// </summary>
     private static void Lathe(List<Face> faces, Transform3D at, Ring[] rings, int sides, Func<int, int, string?>? mark = null, float square = 0) {
         Vector3 Point(Ring ring, int side) {
@@ -284,7 +297,10 @@ internal static class ItemShape {
         }
     }
 
-    /// <summary>A straight bar with flat sides from one point to another, going from one radius to the other; a radius of zero ends it in a point.</summary>
+    /// <summary>
+    /// A straight bar with flat sides from one point to another, going from one radius to the other; a radius of zero
+    /// ends it in a point.
+    /// </summary>
     private static void Bar(List<Face> faces, Vector3 from, Vector3 to, float fromRadius, float toRadius, int sides, Color tint) {
         var axis = (to - from).Normalized();
         var across = (MathF.Abs(axis.Y) > .9f ? Vector3.Right : Vector3.Up).Cross(axis).Normalized();

@@ -3,9 +3,7 @@
 
 from __future__ import annotations
 
-import shutil
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,30 +34,12 @@ def main() -> None:
         build.fetch_pinned(
             f"{SOURCE}/{sha256}/{name}.glb", CACHE / f"{name}.glb", sha256
         )
-    # Godot ignores projects nested under the repository's .tools/.gdignore, so the baker runs from a temporary
-    # project.
-    with tempfile.TemporaryDirectory(prefix="chop-chop-models-") as temporary:
-        project = Path(temporary) / "project"
-        project.mkdir()
-        (project / "project.godot").write_text(build.PACKER_PROJECT, encoding="utf-8")
-        shutil.copy(BAKE_SCRIPT, project / BAKE_SCRIPT.name)
-        build.run_godot(
-            BAKE_SCRIPT.stem,
-            [
-                build.GODOT,
-                "--headless",
-                "--path",
-                project,
-                "--script",
-                f"res://{BAKE_SCRIPT.name}",
-                "--",
-                OUTPUT,
-                *(CACHE / f"{name}.glb" for name in MODELS),
-            ],
-            build.isolated_env(Path(temporary)),
-            timeout=300,
-            success_marker="MODEL-BAKE PASS",
-        )
+    build.run_tool_script(
+        BAKE_SCRIPT,
+        [OUTPUT, *(CACHE / f"{name}.glb" for name in MODELS)],
+        "MODEL-BAKE PASS",
+        timeout=300,
+    )
     print(f"Baked {len(MODELS)} models into {OUTPUT.relative_to(ROOT)}")
 
 
