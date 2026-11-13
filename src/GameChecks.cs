@@ -104,7 +104,7 @@ public partial class Game {
     }
     /// <summary>Every tree species and variant has a trunk that stands on the ground, also where its lowest branches hang below the start of its baked trunk.</summary>
     private void CheckEveryTreeTrunkReachesTheGround() {
-        for (int id = 0; id < WorldModels.TreeVariants * NatureShape.Variants; id++) {
+        for (int id = 0; id < WorldModels.TreeLooks; id++) {
             var prop = (TreeProp)WorldModels.Build(new Thing { Id = id, Kind = ThingKind.Tree });
             float bottom = TrunkBottom(prop);
             prop.Root.Free();
@@ -874,24 +874,13 @@ public partial class Game {
         await CloseWithEsc();
         var (start, home) = (Hosted.Player, Terrain.Spawn);
         Warp(Hosted, home); await Frames(4);
-        var took = new float[2];
-        foreach (bool tall in new[] { false, true }) {
-            var tree = PlantTree(Hosted, home + new Vector2(3, 3), tall);
-            await Frames(4);
-            // The model outlives its tree while it falls, so it is taken before the tree leaves the world.
-            var falling = (TreeProp)view.PropOf(tree.Id)!;
-            var stump = Fell(Hosted, tree);
-            string breaking = tall ? "tree_bend" : "tree_crack";
-            await Until(() => sounds.Last == breaking, tall ? "a tall tree tearing at length as it breaks" : "a short tree cracking as it breaks", 2);
-            // The fall is timed on the view's own clock, which a slow frame does not stretch the way it stretches real time.
-            float brokeAt = view.Elapsed;
-            Require(falling.Sway.RotationDegrees.X < 10, "A tree must be heard breaking as it starts to go over.");
-            await Until(() => sounds.Last == "tree_crash", "a felled tree crashing", 4);
-            Require(falling.Sway.RotationDegrees.X > 89, "A felled tree must crash as its trunk reaches the ground, not before.");
-            took[tall ? 1 : 0] = view.Elapsed - brokeAt;
-            RemoveThings(Hosted, t => t == stump); await Frames(2);
+        var quick = await FellInSight(home + new Vector2(3, 3), tall: false);
+        var slow = await FellInSight(home + new Vector2(3, 3), tall: true);
+        foreach (var fall in new[] { quick, slow }) {
+            Require(fall.LeanAtBreak < 10, "A tree must be heard breaking as it starts to go over.");
+            Require(fall.LeanAtCrash > 89, "A felled tree must crash as its trunk reaches the ground, not before.");
         }
-        Require(took[1] > took[0] + .4f, "A tall tree must take longer to come down than a short one.");
+        Require(slow.Seconds > quick.Seconds + .4f, "A tall tree must take longer to come down than a short one.");
         Warp(Hosted, start); await Frames(4);
     }
     /// <summary>Holding the right mouse button on a tree or a ripe farm plot walks over and works it.</summary>

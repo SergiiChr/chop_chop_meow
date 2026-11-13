@@ -42,7 +42,7 @@ public enum ActorAction {
 /// Sway tips the torso sideways over the hips; positive tips it toward the right side.
 /// Foot tips the toes down from square to the shin, and negative pulls them up.
 /// Splay tips both thighs sideways away from the body, and negative draws the feet in under it.
-/// Grip turns what the right fist holds about its own length: at 90 a blade that cuts downward at the end of a level arm cuts toward the right.
+/// Grip turns an axe, pick, hammer or sign in the right fist about its own length: at 90 a blade that cuts downward at the end of a level arm cuts toward the right.
 /// </summary>
 public readonly record struct Pose(
     float Lean = 0, float Twist = 0, float Head = 0,

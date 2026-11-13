@@ -178,7 +178,7 @@ public static class WorldModels {
         foreach (var kind in Kinds.All) {
             if (kind == ThingKind.Mine) continue;
             // Natural things and farm plots look different by id; buildings, crates and backpacks look the same.
-            int looks = kind == ThingKind.Tree ? TreeVariants * NatureShape.Variants : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
+            int looks = kind == ThingKind.Tree ? TreeLooks : new Thing { Kind = kind }.IsResource || kind == ThingKind.Farm ? NatureShape.Variants : 1;
             for (int id = 0; id < looks; id++) Stage(Build(new Thing { Id = id, Kind = kind }).Root);
         }
         foreach (var ore in World.MineOres) Stage(Build(new Thing { Kind = ThingKind.Mine, Pos = World.MineSpot(World.CliffOf(ore)) }).Root);
@@ -204,6 +204,12 @@ public static class WorldModels {
         return (h & 0xffff) / 65536f;
     }
 
+    /// <summary>How many looks a tree has: every species in every variant.</summary>
+    public const int TreeLooks = TreeVariants * NatureShape.Variants;
+    /// <summary>A tree's species and its variant of that species, by its id.</summary>
+    public static (int Species, int Variant) TreeLook(int id) => (id % TreeVariants, id / TreeVariants % NatureShape.Variants);
+    /// <summary>The turn about the vertical, in degrees, a tree or another resource is drawn with, by its id.</summary>
+    private static float Turn(int id) => Jitter(id, 1) * 360;
     /// <summary>How tall a tree stands among trees by its id, from 0 for the shortest to 1 for the tallest.</summary>
     public static float TreeTall(int id) => Jitter(id, 2);
     /// <summary>A tree's size against its baked model: the tallest stand two thirds taller than the shortest.</summary>
@@ -211,7 +217,7 @@ public static class WorldModels {
 
     /// <summary>A tree's trunk and crown, sized with the tree.</summary>
     private static Hit[] TreeHits(int id) {
-        var (trunk, crown, fork, top) = (id % TreeVariants) switch {
+        var (trunk, crown, fork, top) = TreeLook(id).Species switch {
             1 => (.3f, 1.25f, 1.2f, 5.6f),
             2 => (.25f, 1.05f, 2.6f, 5.4f),
             _ => (.35f, 1.8f, 2.5f, 5.3f),
@@ -293,7 +299,7 @@ public static class WorldModels {
         }
         prop.Kind = t.Kind; prop.Hits = Hits(t);
         var body = prop.Body;
-        if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Jitter(t.Id, 1) * 360 : 0, 0);
+        if (t.Kind != ThingKind.Water) body.RotationDegrees = new Vector3(0, t.Kind == ThingKind.Tree || t.IsResource ? Turn(t.Id) : 0, 0);
         if (t.Kind == ThingKind.Mine) body.Rotation = MineYaw(t.Pos);
         if (prop is DugProp dug) dug.Yaw = body.RotationDegrees.Y;
         return prop;
@@ -368,10 +374,10 @@ public static class WorldModels {
         prop.Tall = TreeTall(id);
         float scale = TreeScale(id);
         sway.Scale = Vector3.One * scale;
-        int variant = (id / TreeVariants) % NatureShape.Variants;
-        var leaves = Tree3DShape.Add(sway, id % TreeVariants, variant);
+        var (species, variant) = TreeLook(id);
+        var leaves = Tree3DShape.Add(sway, species, variant);
         PreserveShadows(sway);
-        Tree3DShape.AddShadowCore(sway, id % TreeVariants, leaves);
+        Tree3DShape.AddShadowCore(sway, species, leaves);
         prop.SwayParts = FadeParts(sway);
         return prop;
     }
@@ -385,12 +391,12 @@ public static class WorldModels {
         var stump = Add(prop.Body, NatureShape.Stump, NatureShape.Timber, Vector3.Zero);
         if (tree == 0) return prop;
         float scale = TreeScale(tree);
-        var (foot, radius) = Tree3DShape.Foot(tree % TreeVariants, (tree / TreeVariants) % NatureShape.Variants);
+        var (species, variant) = TreeLook(tree);
+        var (foot, radius) = Tree3DShape.Foot(species, variant);
         float width = radius * scale / NatureShape.StumpRadius;
         stump.Scale = new Vector3(width, scale, width);
         // The tree's model was turned by its id, and its trunk with it.
-        prop.Seat = new Vector3(foot.X, 0, foot.Y).Rotated(Vector3.Up, Mathf.DegToRad(Jitter(tree, 1) * 360)) * scale;
-        prop.Body.Position = prop.Seat;
+        prop.Seat = new Vector3(foot.X, 0, foot.Y).Rotated(Vector3.Up, Mathf.DegToRad(Turn(tree))) * scale;
         return prop;
     }
 

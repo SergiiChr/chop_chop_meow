@@ -749,8 +749,8 @@ public partial class WorldView : Node3D {
 
     /// <summary>Seconds a felled tree takes to reach the ground: a second for the shortest, just over two for the tallest.</summary>
     private static float FallSeconds(float tall) => 1 + 1.1f * tall;
-    /// <summary>Seconds a felled tree lies where it landed before it starts to fade, and seconds after it lands when its trunk and crown have faded away over the stump.</summary>
-    private const float TreeLiesSeconds = .1f, TreeFadeSeconds = .6f;
+    /// <summary>Seconds a felled tree lies where it landed before it starts to fade, and seconds its trunk and crown then take to fade away over the stump.</summary>
+    private const float TreeLiesSeconds = .1f, TreeFadeSeconds = .5f;
     /// <summary>How tall a tree stands (<see cref="WorldModels.TreeTall"/>) before it tears at length as it goes over rather than cracks.</summary>
     private const float TearsFrom = .7f;
     /// <summary>How much lower and slower a tree's sounds play the taller it stands.</summary>
@@ -893,8 +893,8 @@ public partial class WorldView : Node3D {
                     Burst(prop.Root.Position + tree.Sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
                     Sounds?.Play("tree_crash", prop.Look.Pos, pitch: TreePitch(tree.Tall));
                 }
-                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - lands - TreeLiesSeconds) / (TreeFadeSeconds - TreeLiesSeconds), 0, 1));
-                return tree.Fall < lands + TreeFadeSeconds;
+                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - lands - TreeLiesSeconds) / TreeFadeSeconds, 0, 1));
+                return tree.Fall < lands + TreeLiesSeconds + TreeFadeSeconds;
             case DugProp dug:
                 if (dug.Out < 0) {
                     dug.Out = 0;

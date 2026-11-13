@@ -46,13 +46,15 @@ internal static class Tree3DShape {
 
     private static Mesh Trunk(int kind, int variant) => trunks[kind, variant] ??= GD.Load<Mesh>($"{Folder}{species[kind]}{variant}_trunk.res");
 
-    private static readonly (Vector2 Center, float Radius, float Height)?[,] starts = new (Vector2, float, float)?[4, 3];
+    private static readonly (Vector2 Center, float Radius, float Height, float Foot)?[,] starts = new (Vector2, float, float, float)?[4, 3];
+    /// <summary>How much thicker a trunk is at the ground for every metre its model starts above it.</summary>
+    private const float Flare = .25f;
     /// <summary>
-    /// Where a trunk's model starts: the middle and radius of the ring of points at its lower end, and how far above the ground that ring is.
+    /// Where a trunk's model starts: the middle and radius of the ring of points at its lower end, how far above the ground that ring is, and the trunk's radius at the ground.
     /// A trunk's mesh starts with that ring.
     /// The bake stands a tree's lowest point on the ground, which on some trees is a hanging branch, so their trunks start higher.
     /// </summary>
-    private static (Vector2 Center, float Radius, float Height) Start(int kind, int variant) {
+    private static (Vector2 Center, float Radius, float Height, float Foot) Start(int kind, int variant) {
         if (starts[kind, variant] is { } known) return known;
         var points = Trunk(kind, variant).SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array();
         Vector2 low = Vector2.Inf, high = -Vector2.Inf;
@@ -60,20 +62,18 @@ internal static class Tree3DShape {
             var flat = new Vector2(points[i].X, points[i].Z);
             low = low.Min(flat); high = high.Max(flat);
         }
-        var start = ((low + high) / 2, Math.Max(high.X - low.X, high.Y - low.Y) / 2, points[0].Y);
+        float radius = Math.Max(high.X - low.X, high.Y - low.Y) / 2, height = points[0].Y;
+        var start = ((low + high) / 2, radius, height, radius * (1 + height * Flare));
         starts[kind, variant] = start;
         return start;
     }
 
-    /// <summary>How much thicker a trunk is at the ground for every metre its model starts above it.</summary>
-    private const float Flare = .25f;
     /// <summary>Where a trunk stands in its model and how thick it is at the ground.</summary>
     public static (Vector2 Center, float Radius) Foot(int kind, int variant) {
-        var (center, radius, height) = Start(kind, variant);
-        return (center, radius * (1 + height * Flare));
+        var start = Start(kind, variant);
+        return (start.Center, start.Foot);
     }
 
-    private static readonly Mesh?[,] stems = new Mesh?[4, 3];
     private static readonly StandardMaterial3D?[] stemBark = new StandardMaterial3D?[4];
     /// <summary>How far a stem reaches up into the trunk it carries down, so no gap shows between them.</summary>
     private const float StemOverlap = .05f;
@@ -92,12 +92,11 @@ internal static class Tree3DShape {
             foliage[kind] = material;
         }
         // A tree's trunk whose model starts above the ground is carried down to it by a stem that widens toward its foot.
-        if (kind != Bush && Start(kind, variant) is var (center, radius, height) && height > .03f) {
-            float tall = height + StemOverlap;
-            stems[kind, variant] ??= new CylinderMesh { TopRadius = radius, BottomRadius = Foot(kind, variant).Radius, Height = tall, RadialSegments = 6, Rings = 1, CapTop = false, CapBottom = false };
+        var (center, radius, height, foot) = Start(kind, variant);
+        if (kind != Bush && height > .03f) {
             // The baked trunks are wound inside out and drawn by their back faces; a built cylinder is not.
             stemBark[kind] ??= new StandardMaterial3D { AlbedoTexture = bark[kind]!.AlbedoTexture, Roughness = .95f };
-            ModelKit.Add(parent, stems[kind, variant]!, stemBark[kind]!, new Vector3(center.X, tall / 2, center.Y));
+            ModelKit.Post(parent, foot, radius, height + StemOverlap, new Vector3(center.X, 0, center.Y), stemBark[kind]!, 6);
         }
         ModelKit.Add(parent, Trunk(kind, variant), bark[kind]!, Vector3.Zero);
         ModelKit.Add(parent, leaves[kind, variant]!, foliage[kind]!, Vector3.Zero);

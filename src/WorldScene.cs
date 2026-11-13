@@ -270,7 +270,7 @@ public partial class WorldView {
             var rig = new ActorRig(skin);
             review.AddChild(rig.Root); reviewRigs.Add(rig);
             // A felling stroke plays against a trunk standing where a tree does when the player stops to chop it.
-            if (action is ActorAction.Chop or ActorAction.SteelChop) Cylinder(review, ReviewTrunkRadius, ReviewTrunkRadius, 3, ScreenRight * ReviewTrunkAhead + Vector3.Up * 1.5f, Mat("6b4a32", 1), null, 12);
+            if (action is ActorAction.Chop or ActorAction.SteelChop) Post(review, ReviewTrunkRadius, ReviewTrunkRadius, 3, ScreenRight * ReviewTrunkAhead, Mat("6b4a32", 1), 12);
         }
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);
