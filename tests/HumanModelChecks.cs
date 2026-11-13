@@ -23,6 +23,7 @@ public static class HumanModelChecks {
             CheckPosingOneRigLeavesAnotherAlone(rigs, core);
             CheckCarriedCrateFollowsCarryingVisibility(rigs);
             CheckGrindingWorksThePestleInsideALevelBowl(rigs);
+            CheckDiggingDrivesTheBladeIntoTheGroundWithBothHandsOnTheShaft(rigs);
         } finally {
             foreach (var rig in rigs) rig.Root.Free();
         }
@@ -110,6 +111,33 @@ public static class HumanModelChecks {
             }
             rig.Show(new Pose(), null, false);
             Require(!((Node3D)cargo.GetParent()).Visible, "the shipping crate should hide when the actor is not carrying");
+        }
+    }
+
+    /// <summary>
+    /// Through a dig the shovel's shaft runs from the right fist through the left, which keeps its grip on it,
+    /// and the blade goes into the ground ahead at the strike, then lifts and swings out to the left to throw the soil.
+    /// </summary>
+    private static void CheckDiggingDrivesTheBladeIntoTheGroundWithBothHandsOnTheShaft(ActorRig[] rigs) {
+        float loop = ActorAnimation.Duration(ActorAction.Dig);
+        Vector3 TipAt(ActorRig rig, float phase) {
+            rig.Show(ActorAnimation.PoseAt(ActorAction.Dig, loop * phase, false), ActorAnimation.Tool(ActorAction.Dig), false, bothHands: true);
+            return rig.ShovelTip;
+        }
+        foreach (var rig in rigs) {
+            for (int step = 0; step < 90; step++) {
+                var tip = TipAt(rig, step / 90f);
+                Vector3 top = rig.Fist(left: false), grip = rig.Fist(left: true), along = (tip - top).Normalized();
+                float down = (grip - top).Dot(along), off = (grip - top - along * down).Length();
+                Require(off < .005f, $"the left fist should be on the shaft, step {step}: {off:0.000} m off it");
+                // The shaft is 0.95 m from the handle to the tip, gripped 0.25 m down.
+                Require(Math.Abs((tip - top).Length() - .95f) < .005f && Math.Abs(down - .25f) < .02f, $"the left fist should keep its grip 0.25 m down the shaft, step {step}: {down:0.00} m");
+            }
+            var struck = TipAt(rig, ActorAnimation.DigStrike);
+            Require(struck.Y is < -.03f and > -.2f && struck.Z is > .7f and < .85f && Math.Abs(struck.X) < .15f, $"the blade should be in the ground ahead of the digger at the strike: {struck}");
+            var thrown = TipAt(rig, ActorAnimation.DigToss);
+            Require(thrown.Y > .35f && thrown.X > .4f, $"the blade should be up and out to the left as the soil leaves it: {thrown}");
+            rig.Show(new Pose(), null, false);
         }
     }
 

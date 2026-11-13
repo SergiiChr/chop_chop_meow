@@ -623,14 +623,14 @@ public partial class Game {
         await Frames(4);
         await StandAtIronCliff();
         Require(!world.Sees(tree.Pos) && world.Remembered(tree.Id)?.Remaining == 42, "The player must remember the tree standing once they have walked away.");
-        tree.Remaining = 0; chest.Inventory.Add("wood", 5);
+        var stump = Fell(Hosted, tree); chest.Inventory.Add("wood", 5);
         var chip = Hosted.Add(ThingKind.LooseStone, rock.Pos + new Vector2(1.2f, 0), 1);
         await Frames(4);
         Warp(Hosted, home); await Frames(3);
-        Require(view.PropOf(tree.Id) is TreeProp { Stump.Visible: true, Sway.Visible: false }, "A tree felled out of sight must stand as a stump when seen again, not topple then.");
+        Require(view.PropOf(stump.Id) is DugProp { Shown: true } && view.PropOf(tree.Id) is not { Shown: true } && view.Departing == 0, "A tree felled out of sight must be a stump when seen again, not topple then.");
         Require(view.PropOf(chest.Id) is BoxProp { Puff: 0, Open: 0 }, "A chest filled out of sight must keep its lid shut when seen again.");
         Require(view.PropOf(chip.Id) is LooseProp { Flight: >= WorldModels.ChipFlight }, "A chip knocked off a rock out of sight must lie where it fell when seen, not fly from the rock then.");
-        RemoveThings(Hosted, t => t == tree || t == chest || t == rock || t == chip); Warp(Hosted, start); await Frames(4);
+        RemoveThings(Hosted, t => t == stump || t == chest || t == rock || t == chip); Warp(Hosted, start); await Frames(4);
     }
     /// <summary>Launch opens the start menu with no save to continue, and Esc does not leave it.</summary>
     private async Task CheckLaunchOpensTheStartMenuWithNoSaveToContinue() {
@@ -994,6 +994,29 @@ public partial class Game {
         await Frames();
         Drop(Hosted, "steel_pick", 1);
         RemoveThings(Hosted, t => t == mine); Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
+    }
+    /// <summary>A tree felled in front of the player topples over the stump it leaves, and holding the right mouse button on the stump digs it up with the shovel.</summary>
+    private async Task CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp() {
+        // The server's position, since the window's copy may not have caught up with the last check's warp.
+        var start = Hosted.Player;
+        var tree = Hosted.Add(ThingKind.Tree, start + new Vector2(2, 2), 4);
+        Give(Hosted, "steel_shovel", 1);
+        await Frames(2);
+        int wood = world.Backpack["wood"];
+        var point = RightPress(tree.Pos);
+        await Until(() => world.Find(tree.Id) == null && view.Departing == 1, "holding RMB on a tree felling it, its model toppling once the tree is gone", 8);
+        RightRelease(point);
+        var stump = world.Things.Single(t => t.Kind == ThingKind.Stump && t.Pos == tree.Pos);
+        Require(view.PropOf(stump.Id) is DugProp { Shown: true }, "The stump must stand under the toppling tree.");
+        await Until(() => view.Departing == 0, "the felled tree fading away over its stump", 4);
+        point = RightPress(stump.Pos);
+        await Until(() => stump.Progress > 0 && view.PlayerAnimation == ActorAction.Dig && sounds.Last is "dig_earth" or "dig_toss", "holding RMB on a stump digging at it with the shovel, heard in the soil", 6);
+        await Until(() => world.Find(stump.Id) == null && view.Departing == 1, "the stump coming out of the ground, thrown up as it goes", 8);
+        // The tree held 4 wood and its stump 3.
+        await Until(() => world.Backpack["wood"] == wood + 7 && view.Departing == 0 && view.PlayerAnimation != ActorAction.Dig, "the stump's wood in the backpack, its model gone and the digging done", 3);
+        RightRelease(point); await Frames();
+        Drop(Hosted, "steel_shovel", 1); Drop(Hosted, "wood", 7);
+        Warp(Hosted, start); await CloseWithEsc(); await Frames(4);
     }
     /// <summary>A mine's page left open follows the mine from stage to stage and on to the open mine.</summary>
     private async Task CheckMinePageFollowsTheMineThroughItsStages() {
@@ -1589,6 +1612,7 @@ public partial class Game {
             await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await Test(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
             await Test(CheckRightMouseOnAMarkedMineDigsItWithAPickaxe);
+            await Test(CheckFelledTreeTopplesOverItsStumpWhichAShovelDigsUp);
             await Test(CheckMinePageFollowsTheMineThroughItsStages);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);

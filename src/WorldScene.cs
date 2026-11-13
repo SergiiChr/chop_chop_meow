@@ -118,11 +118,10 @@ public partial class WorldView {
         }
     }
 
-    private static void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items, ShaderMaterial material, bool castShadow = false) {
+    private static void Scatter(Node3D parent, Mesh mesh, List<(Transform3D At, Color Color)> items, ShaderMaterial material) {
         var multi = new MultiMesh { TransformFormat = MultiMesh.TransformFormatEnum.Transform3D, UseColors = true, Mesh = mesh, InstanceCount = items.Count };
         for (int i = 0; i < items.Count; i++) { multi.SetInstanceTransform(i, items[i].At); multi.SetInstanceColor(i, items[i].Color); }
-        var shadow = castShadow ? GeometryInstance3D.ShadowCastingSetting.On : GeometryInstance3D.ShadowCastingSetting.Off;
-        var instance = new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material, CastShadow = shadow };
+        var instance = new MultiMeshInstance3D { Multimesh = multi, MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
         parent.AddChild(instance);
     }
 
@@ -217,6 +216,7 @@ public partial class WorldView {
         ("worker hammer", ActorSkin.Worker, ActorAction.Hammer), ("worker pump", ActorSkin.Worker, ActorAction.Pump), ("worker idle", ActorSkin.Worker, ActorAction.Idle),
         ("worker sit", ActorSkin.Worker, ActorAction.Sit), ("worker sit on rock", ActorSkin.Worker, ActorAction.Perch), ("player pick up", ActorSkin.Player, ActorAction.PickUp), ("player craft", ActorSkin.Player, ActorAction.Craft),
         ("player grind", ActorSkin.Player, ActorAction.Grind), ("worker grind", ActorSkin.Worker, ActorAction.Grind),
+        ("player shovel", ActorSkin.Player, ActorAction.Dig), ("worker shovel", ActorSkin.Worker, ActorAction.Dig),
     };
     private static readonly string[] ReviewWolves = { "wolf idle", "wolf trot", "wolf gallop", "wolf leap", "wolf feed", "wolf fall", "wolf hit" };
     private readonly List<ActorRig> reviewRigs = new();
@@ -391,7 +391,7 @@ public partial class WorldView {
         for (int i = 0; i < ReviewClips.Length; i++) {
             var action = ReviewClips[i].Action;
             reviewRigs[i].Root.Rotation = new Vector3(0, Elapsed * .7f + Mathf.Pi / 4, 0);
-            reviewRigs[i].Show(ActorAnimation.PoseAt(action, Elapsed, action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Carry), ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch);
+            reviewRigs[i].Show(ActorAnimation.PoseAt(action, Elapsed, action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run or ActorAction.Carry), ActorAnimation.Tool(action), action == ActorAction.Carry, action == ActorAction.Perch, bothHands: ActorAnimation.TwoHanded(action));
         }
     }
 

@@ -58,7 +58,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --wolves` | Add a night ambush to that fixture |
 | `--showcase --lunch` | Show the crew at lunch with the worker overview open |
 | `--showcase --strike` | Show the unpaid crew holding protest signs |
-| `--showcase --trees`, `--bushes` | Show the three tree species or the berry bushes |
+| `--showcase --trees`, `--bushes` | Show the three tree species, or the berry bushes with plain bushes, stumps, a tree about to fall and a shovel to dig with |
 | `--showcase --environment-review coast` | Fixed daylight view of `coast`, `lake`, `forest`, `terrain`, `den` or `mine` (with `--mine-ore iron`); add `--review-fog` for fog |
 | `--screenshot /absolute/path.png` | Capture the running view after startup and exit |
 | `--showcase --neighbor` | Show a second player working at the bench |
@@ -132,7 +132,7 @@ The display choices are stored in `settings.cfg` and applied at launch.
 The interface is drawn at 0.8 of the size it is laid out for (`Game.InterfaceScale`).
 It keeps that share of the screen at every resolution, with its text drawn at the size it shows.
 
-Wind sways grass, shrubs and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
+Wind sways grass, bushes and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
 Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
 meet (SSAO), and world sounds pan with their place on screen.
@@ -335,6 +335,9 @@ Impassable mountain ranges close in from the left and right toward the valley's 
 
 The plains have occasional rocks, bushes and berry bushes, and the trees thicken into woods toward the mountains, so finding more means going out to look.
 A berry bush holds 24 berries and is full again a day after the first one is picked from it, whether or not it was picked clean.
+A felled tree leaves a stump, and a couple of hundred plain bushes grow about the plains.
+Hold right mouse on a stump or a plain bush with a shovel in your backpack to dig it up: a stump gives 3 wood and a bush 36 leaves, three times what lies under an oak.
+It comes out whole after a few seconds of digging and is gone for good, so the backpack needs room for all of it.
 Iron and coal deposits sit at the foot of rock faces at the base of both ranges and need a pickaxe.
 Loose coal is scattered below the nearer coal face and is picked up whole with one right-click, with no tool.
 Loose stones and sticks lie about the plains: each picks up the same way as 1 stone or 1 wood, and is gone once picked.
@@ -346,6 +349,8 @@ A pale grey cliff further inland holds tin: mine it with a pickaxe.
 The opening progression prioritizes water, shelter and fire, then hand gathering with the starting steel axe: chisel, planks, mallet, bench and crates; sell berries at a trading post for the first pickaxe; then work toward steel.
 
 ### Buildings
+
+A building, yard or crate goes up over stumps and plain bushes and clears them away, giving nothing for them.
 
 | Building | Cost |
 | --- | --- |
@@ -409,7 +414,7 @@ It makes what the menu's chisel makes (planks, wood parts, the mallet, torches a
 | Recipe | Takes |
 | --- | --- |
 | Crate | 6 planks |
-| Steel axe, pickaxe, hammer | see Steel tools below |
+| Steel axe, pickaxe, shovel, hammer | see Steel tools below |
 | Steel chisel | 1 steel part + 1 wood part |
 | Rake | 1 steel part + 2 wood parts |
 
@@ -426,7 +431,7 @@ The stone chisel itself is only knapped by hand.
 
 The anvil turns one steel bar into one steel part.
 Anvils only work while someone stands at them hammering.
-A small steel tool such as a hammer takes 1 steel part and a big one such as an axe or pickaxe 2, plus 1 wood part for the handle.
+A small steel tool such as a hammer takes 1 steel part and a big one such as an axe, pickaxe or shovel 2, plus 1 wood part for the handle.
 
 ## Furnaces and steel
 
@@ -518,13 +523,21 @@ Workers need tools for some jobs:
 
 - an axe to chop wood;
 - a pickaxe to mine ore and coal;
+- a shovel to dig up stumps and bushes;
 - a hammer to fit a mine.
 
 Stone, leaves, berries and loose pieces need no tool, though a pickaxe breaks rock faster and a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
 They put it back when reassigned or when heading home at dusk.
-If there is none, the worker picks up known loose pieces of the same resource; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
+If there is none, the worker goes to the nearest known spot of the same job that they can work, one that needs no tool or one whose tool is to be had, and to loose pieces only after those; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
 A gatherer whose spot runs out goes on to the next known spot of the same resource, and to loose pieces of it only once no other spot is left.
+
+Stumps are part of gathering wood.
+A woodcutter who fells a tree digs up its stump next while a tool station has a shovel, and counts any other known stump as a spot like a tree, going to whichever is nearer.
+With no shovel to be had they leave stumps and go on chopping.
+A worker carries one tool at a time, so they swap the axe for the shovel at a tool station and back.
+Digging up bushes is a job of its own: a worker given a bush goes on to the next known bush and never rakes leaves, and a worker raking leaves never digs up a bush.
+A worker carries off all of a bush's 36 leaves in one load.
 
 A worker on the station's Stock job brings tools from other storage to the rack.
 
@@ -561,7 +574,7 @@ It only takes packed crates.
 The village pays for:
 
 - raw meat, burnt steak, berries, bread, berry jam, meat stew, canned jam, canned meat stew;
-- steel axes, pickaxes and hammers.
+- steel axes, pickaxes, shovels and hammers.
 
 Anything else in a crate goes as a donation: the cart takes it and pays nothing for it.
 The returning cart says what was donated.
@@ -766,7 +779,7 @@ A save that is incomplete, names items the game does not know or holds needs out
 ### Environment
 
 The environment uses a shared human scale, Terrain3D mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones.
-Meadow grass and wildflowers grow in patches; ferns and ordinary shrubs add woodland ground cover.
+Meadow grass and wildflowers grow in patches, ferns add woodland ground cover, and plain bushes stand among them.
 Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas.
 A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
 
@@ -778,12 +791,13 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 ### Animation
 
-Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
+Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
 
 The world reacts too:
 
-- trees shake and topple into stumps;
+- trees shake and topple over the stumps they leave;
+- a stump or a bush leans further out of the ground as it is dug at, then is thrown up out of a spray of soil and is gone;
 - deposits shrink and throw chips;
 - the bellows board travels with each press, and the heat gauge tracks the forge;
 - a bar under the reinforced furnace and its panel dial mark the heat steel needs;
@@ -801,6 +815,7 @@ Sound effects follow the same actions:
 
 - footsteps change on grass, rock and the lake shore;
 - axes, pickaxes, anvils, benches and swings have impacts, and fitting a mine's frame clinks on its rails;
+- a shovel crunches into the soil and throws it aside, and a stump or bush comes out with a heave of earth;
 - picking plants by hand and packing crates rustle, butchering tears, and a mortar grinds;
 - bellows puff;
 - fires catch with a whoomp, including a lit torch and a furnace lighting a new batch, and a torch fizzles out;

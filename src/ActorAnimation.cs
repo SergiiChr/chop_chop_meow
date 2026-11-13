@@ -27,7 +27,8 @@ public enum ActorAction {
     PickUp,
     Pack,
     Craft,
-    Grind
+    Grind,
+    Dig
 }
 
 /// <summary>
@@ -88,6 +89,7 @@ public static class ActorAnimation {
         ActorAction.Pack => 2.4f,
         ActorAction.Craft => 2.4f,
         ActorAction.Grind => 1.8f,
+        ActorAction.Dig => 1.1f,
         _ => 1
     };
 
@@ -124,6 +126,7 @@ public static class ActorAnimation {
         ActorAction.Hammer => "hammer",
         ActorAction.Protest => "protest_sign",
         ActorAction.Grind => "mortar",
+        ActorAction.Dig => "steel_shovel",
         _ => null
     };
 
@@ -251,6 +254,63 @@ public static class ActorAnimation {
         return (Mathf.PosMod(raise + 180, 360) - 180, Mathf.RadToDeg(outward), Mathf.RadToDeg(bend - MathF.Atan2(palm, ActorRig.Forearm)));
     }
 
+    // ---------- Digging ----------
+
+    /// <summary>From the top of a shovel's handle, which the right fist holds: how far down the shaft the left fist grips it, and how far it is to the blade's tip, in metres.</summary>
+    public const float ShovelGrip = .25f, ShovelLength = .95f;
+    /// <summary>The shares of a dig's loop at which the blade goes into the ground and at which the soil leaves it.</summary>
+    public const float DigStrike = .22f, DigToss = .76f;
+    // The front boot's heel and the back boot's toe stay this far ahead of the hips for the whole dig, so neither foot slides.
+    private const float DigFrontHeel = .12f, DigBackToe = -.15f;
+
+    /// <summary>
+    /// A moment of a dig: the trunk's lean and turn in degrees and the height of the hips, where the blade's tip is from the spot under the hips, in metres to the left, up and ahead,
+    /// and how far the shaft leans from straight down toward ahead, <paramref name="Pitch"/>, turned to the left by <paramref name="Yaw"/>, in degrees.
+    /// </summary>
+    private readonly record struct DigKey(float At, float Lean, float Twist, float Hips, Vector3 Tip, float Pitch, float Yaw);
+
+    // The blade is driven into the ground ahead, the weight goes onto it, the handle is pushed down to lever the load out, and the load is thrown aside to the left.
+    // The handle stays in front of the right shoulder and the shaft crosses the body toward the left hand: a folded arm reaches little to the side.
+    // The blade goes in well short of where a digger stands from a stump or a bush, so it enters the ground at its foot.
+    private static readonly DigKey[] DigKeys = {
+        new(0, 10, 0, .78f, new(.08f, .3f, .66f), 28, 24),
+        new(DigStrike, 46, 0, .665f, new(.08f, -.08f, .78f), 22, 26),
+        new(.32f, 49, 0, .645f, new(.08f, -.13f, .79f), 19, 26),
+        new(.55f, 48, 0, .665f, new(.08f, .06f, .9f), 48, 14),
+        new(.72f, 26, 24, .74f, new(.5f, .42f, .8f), 66, 38),
+        new(.82f, 20, 32, .76f, new(.7f, .58f, .62f), 68, 55),
+        new(.92f, 12, 12, .775f, new(.36f, .36f, .76f), 50, 36),
+    };
+
+    /// <summary>
+    /// Digging with a shovel in both hands, the right on top of the handle and the left down the shaft.
+    /// Both arms are solved from where the handle has to be for the blade's tip to be where the dig takes it, and the rig lays the shaft through both fists.
+    /// The front foot stays flat and the back one on its toe, the heel lifting as the hips come down.
+    /// </summary>
+    private static Pose Dig(float p) {
+        int from = DigKeys.Length - 1;
+        while (from > 0 && p < DigKeys[from].At) from--;
+        var (a, b) = (DigKeys[from], DigKeys[(from + 1) % DigKeys.Length]);
+        float t = Mathf.SmoothStep(0, 1, (p - a.At) / ((from + 1 < DigKeys.Length ? b.At : 1) - a.At));
+        float lean = Mathf.Lerp(a.Lean, b.Lean, t), twist = Mathf.Lerp(a.Twist, b.Twist, t), height = Mathf.Lerp(a.Hips, b.Hips, t);
+        float pitch = Mathf.DegToRad(Mathf.Lerp(a.Pitch, b.Pitch, t)), yaw = Mathf.DegToRad(Mathf.Lerp(a.Yaw, b.Yaw, t));
+        var along = new Vector3(MathF.Sin(pitch) * MathF.Sin(yaw), -MathF.Cos(pitch), MathF.Sin(pitch) * MathF.Cos(yaw));
+        var top = a.Tip.Lerp(b.Tip, t) - along * ShovelLength;
+        var front = OnHeel(DigFrontHeel, height, 0);
+        var back = OnToe(DigBackToe, height, Mathf.DegToRad(8 + (.78f - height) * 200));
+        var hips = new Vector3(0, height, 0);
+        // Measured from the ground under the hips, then turned into the leaning, twisted trunk's frame.
+        Vector3 InTrunk(Vector3 point) => (point - hips).Rotated(Vector3.Up, -Mathf.DegToRad(twist)).Rotated(Vector3.Right, -Mathf.DegToRad(lean));
+        var right = ArmTo(InTrunk(top), left: false, ActorRig.Palm);
+        var left = ArmTo(InTrunk(top + along * ShovelGrip), left: true, ActorRig.Palm);
+        return new Pose(Lean: lean, Twist: twist, Head: 14 + lean * .3f, Hips: height,
+            RaiseL: left.Raise, OutL: left.Out, ElbowL: left.Elbow, RaiseR: right.Raise, OutR: right.Out, ElbowR: right.Elbow,
+            SwingL: front.Swing, KneeL: front.Knee, FootL: front.Foot, SwingR: back.Swing, KneeR: back.Knee, FootR: back.Foot);
+    }
+
+    /// <summary>Whether an action holds its tool in both fists, so the rig lays the shaft through them.</summary>
+    public static bool TwoHanded(ActorAction action) => action == ActorAction.Dig;
+
     /// <summary>Swings that play out in full on the move: the arms and body keep swinging while the legs keep walking.</summary>
     public static bool SwingsOnTheMove(ActorAction action) => action is ActorAction.TorchSwing or ActorAction.Attack or ActorAction.Chop or ActorAction.SteelChop;
 
@@ -301,6 +361,8 @@ public static class ActorAnimation {
                     float lift = Mathf.SmoothStep(rounds, top, p) - Mathf.SmoothStep(top, 1, p);
                     return Grinding(new Vector2(MathF.Cos(angle), across) * (GrindCircle * open), lift * PoundLift) with { Twist = across * open * 5, Head = 22 - lift * 5 };
                 }
+            case ActorAction.Dig:
+                return Dig(p);
             case ActorAction.Attack:
                 return Keys(p, AttackKeys);
             case ActorAction.Kindle:
@@ -619,6 +681,7 @@ public static class ActorAnimation {
             ThingKind.Tree => backpack["steel_axe"] > 0 ? ActorAction.SteelChop : ActorAction.Gather,
             ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => backpack["steel_pick"] > 0 ? ActorAction.SteelMine : ActorAction.Gather,
             ThingKind.Berries or ThingKind.Water or ThingKind.WolfCorpse or ThingKind.Leaves => ActorAction.Gather,
+            ThingKind.Stump or ThingKind.Bush => backpack["steel_shovel"] > 0 ? ActorAction.Dig : ActorAction.Idle,
             // A mine is dug with a pickaxe, then its frame and rails are hammered in.
             ThingKind.Mine => fitting ? ActorAction.Hammer : ActorAction.SteelMine,
             _ => ActorAction.Idle
@@ -644,6 +707,7 @@ public static class ActorAnimation {
             return assignment.Kind switch {
                 ThingKind.Tree => ActorAction.Chop,
                 ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => ActorAction.Mine,
+                ThingKind.Stump or ThingKind.Bush => ActorAction.Dig,
                 _ => ActorAction.Gather
             };
         }

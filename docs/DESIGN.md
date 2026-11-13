@@ -12,10 +12,11 @@ These came from the user; change them only after asking.
 - **Look:** smooth isometric 3D, natural and lighthearted, with some of Terraria's approachable feel; no fantasy or industrial styling. Buildings are modern DIY, there are several tree species, and workers wear blue overalls over a cream shirt.
 - **Animation:** every core interaction has an animation, with a dedicated one for every tool.
 - **Progression:** the player starts with a steel axe, an empty bottle, 10 berries and 6 wood, and no pickaxe; no loose iron lies about and there are no iron tools. The first pickaxe is bought at a trading post with crates of berries.
+- **Shovel:** a steel shovel is made, bought and sold like the pickaxe. It digs up the stump a felled tree leaves for 3 wood and a plain bush for 36 leaves, three oak patches' worth; both are gone for good. Stumps are part of a worker's wood gathering while a shovel is to be had, and bushes are a job of their own.
 - **Mining:** coal, iron and tin deposits need a carried pickaxe; loose pieces need no tool. A pickaxe hit on rock or ore chips a loose piece off one time in twenty, so loose iron exists only from mining.
 - **Fuel:** iron and tin smelt over coal or charcoal; wood only cooks food and makes charcoal. Charcoal cannot substitute for coal in steel.
 - **Steel:** needs iron, coal, a reinforced furnace and active bellows heat. Two assigned workers divide bellows and hauling.
-- **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they pick up loose pieces of the same resource, or wait and say so once.
+- **Worker tools:** workers take the tools their jobs need (axe for trees, pickaxe for deposits and mines, shovel for stumps and bushes, hammer for fitting a mine) from a tool station and put them back when reassigned or going home; a rake for leaves and a pickaxe for rock only speed them up. Without a needed tool they go to another spot of the job that they can work, loose pieces last, or wait and say so once.
 - **Transfers:** automated transfers respect input and output allowlists, where empty means unrestricted, and prefer storage whose input filter explicitly matches. Piles set their own filters from what they hold. Manual transfers bypass automation filters.
 - **Carried items:** never deleted when a worker is reassigned, fired, blocked or rerouted.
 - **Survival:** food, water, day and night, wolves that fear light, sleeping in a cabin, wages, saves and recovery after death.
@@ -66,9 +67,10 @@ Simulation and data:
 | `src/Farm.cs` | Farm plots |
 | `src/Mine.cs` | Mines |
 | `src/Wolves.cs` | Wolf dens, the wolves they let out, patrols, smell, howls and the way home |
-| `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor and its chip |
+| `src/GatherRules.cs` | One table of how each resource is gathered: its item, the tool it needs or that helps, the by-hand factor, its chip, whether it is dug up whole and its job |
 | `src/Loose.cs` | Loose stones, sticks and the chips a pickaxe knocks off rock |
-| `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces |
+| `src/Digging.cs` | Stumps and bushes: what a felled tree leaves, the valley's bushes, digging either up and building over them |
+| `src/Scenery.cs` | The baked scenery spots, the ground they may stand on, and which are loose pieces or bushes |
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
@@ -139,7 +141,7 @@ Rendering and sound:
 | `src/WorldView.cs` | The 3D scene, orthographic camera, picking, lighting and world animation |
 | `src/WorldScene.cs` | Ground dressing, particles and the animation review |
 | `src/Terrain3DView.cs` | Mountain and valley terrain through the Terrain3D plugin |
-| `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, flowers and shrubs from the baked placement, cleared around buildings and paths |
+| `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
 | `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake surface and wet banks |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
@@ -293,6 +295,12 @@ A sprint and a jog share their mechanics and differ in timing and form:
 - The feet land close to one line, and the trunk leans into the run, more in a sprint.
 - The elbows stay bent, most in front, bringing the hand up toward the chin.
 
+Digging (`ActorAction.Dig`) holds the shovel in both hands: the right on top of the handle and the left `ActorAnimation.ShovelGrip` down the shaft.
+`ActorAnimation.DigKeys` give where the blade's tip is and how the shaft leans at each moment: driven into the ground ahead, leant on, levered up and thrown aside to the left.
+Both arms are solved from there with `ActorAnimation.ArmTo`, and `ActorRig.Show` lays the shaft from the right fist through the left (`bothHands`), so the blade goes where the keys take it.
+The front boot stays flat and the back one on its toe at fixed spots, so neither slides as the hips go down and up.
+The handle is kept in front of the right shoulder, since `ArmTo` cannot take a folded arm far to the side.
+
 A player with something to make by hand squats over it, turning it in both hands (`ActorAction.Craft`), only while standing still.
 
 The player's carried tool selects its matching action and the tool shown in hand.
@@ -309,7 +317,8 @@ Both arms are solved from where the hands have to be (`ActorAnimation.ArmTo`), s
 While someone grinds, the table's own mortar is off the counter (`WorldView.grinding`).
 
 Manual bellows pumping and the unarmed punch trigger one loop of their action.
-Each striking work action has an impact moment that shakes its target and spawns chips, leaves, splashes or sparks; packing and grinding strike nothing.
+Each striking work action has an impact moment that shakes its target and spawns chips, leaves, soil, splashes or sparks; packing and grinding strike nothing.
+A dig strikes at `ActorAnimation.DigStrike` and throws its soil off the blade (`ActorRig.ShovelTip`) at `DigToss`.
 An action's key poses are made once (`ActorAnimation.ChopKeys` and the like): every worker and player is posed every frame, so a pose is worked out without allocating.
 Pausing freezes animation and effects.
 
@@ -407,6 +416,9 @@ The view picks against what it draws but only returns things that still exist.
 Only what is in sight is drawn every frame (`WorldView.SyncThings`).
 A thing out of sight is drawn once as its snapshot, moved on far enough to finish whatever it was doing, and left alone until its snapshot changes, night falls or lifts, or it is seen again.
 A change that did not happen in front of the player is not played when they see it (`WorldView.Watched`): a tree felled out of sight is a stump, a chest filled out of sight keeps its lid shut, and a chip or a building that appeared out of sight neither flies nor lands in dust.
+A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
+A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one built over just goes.
+While it is dug at, a stump or bush leans further over with `Thing.Progress` (`DugProp`).
 Work out of sight is heard but shakes nothing and throws no chips.
 
 `WorldView` hides wolves, workers and carts outside sight.
@@ -466,6 +478,10 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
 - `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `GatherRules.ChipReach` of a boulder or deposit on `GatherRules.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
+- A felled tree is taken out of the world and its stump (`stump`, `World.StumpWood`) put in its place by `World.Fell`, as a thing of its own with a new id.
+- Plain bushes (`bush`, `World.BushLeaves`) grow on the scenery spots `Scenery.Bush` picks (`World.GrowBushes`), away from the clearing and the mountain feet.
+- A stump or a bush is dug up whole (`GatherShape.Dug`, `Thing.IsDug`): digging adds to `Thing.Progress` at the shovel's speed until `GatherRules.DigSeconds`, then `World.Unearth` moves all it holds to the digger and removes it with a `dig_up` sound. The player's backpack must have room for all of it (`World.GatherBlock`), and a worker's hands are sized for it.
+- Stumps and bushes never block building (`World.BuiltOver`): a new building, yard or crate clears away those on the ground it keeps clear of other resources (`World.ClearGround`).
 - A berry bush holds `World.BushBerries` at the start and each time it fruits again, which is `BerryRegrowHours` after the first berry was picked from it, picked clean or not.
 - Tin sits at the foot of a third cliff further inland. Like iron, it needs a pickaxe.
 - Tin ore smelts into tin bars at the stone furnace, and a tin bar makes 4 cans at the bench.
@@ -473,7 +489,7 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 
 ### Tools
 
-Tools carry a `Tool` kind (axe, pickaxe, hammer, chisel, rake, mortar), a `Speed` and a `Tier` in `GameTables`:
+Tools carry a `Tool` kind (axe, pickaxe, shovel, hammer, chisel, rake, mortar), a `Speed` and a `Tier` in `GameTables`:
 
 | `Tier` | Material |
 | --- | --- |
@@ -486,7 +502,8 @@ Tier 1 is unused, since there are no iron tools.
 Recipes name the tool they need, the lowest `Tier` that will do, and whether they can be made by hand (`Hand`).
 So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
 
-`GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for deposits), one that only speeds gathering up (a pickaxe for rock, a rake for leaves, which take three times as long by hand), and the loose piece a pickaxe chips off it.
+`GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for deposits, a shovel for stumps and bushes), one that only speeds gathering up (a pickaxe for rock, a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
+A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf patches.
 Stone, leaves, berries and loose pieces need no tool.
 The world's things are also kept by kind (`ThingList.Of`), so a search for one kind, such as tool stations, stores or campfires, and the tick, which runs only kinds that change by themselves, pass over trees and rocks.
 Searches by place, such as what a player sees and room to build, still look at every thing.
@@ -666,8 +683,10 @@ Workers hold duties (`Worker.Duties`): a place and one of the jobs `World.Jobs` 
 - Tend fetches what a compost pile's filters take from storage and carries its fertilizer out.
 - Deliveries runs price errands and carries the trading post's mail, other than coins, to storage.
 
-A gatherer whose spot is spent moves the duty to the nearest spot yielding the same item in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
-Spots that need a tool count only while the worker can get one, and loose pieces come only after every other spot; a gatherer with no tool to be had goes to known loose pieces at once (`World.LooseSpot`).
+A gatherer whose spot is spent moves the duty to the nearest spot of the same job in `SaveState.Remembered` that still holds something (`World.NextSpot`): seen by any player, even if now under fog, never under black fog.
+Spots that need a tool count only while the worker can get one (`World.CanWork`), and loose pieces come only after every other spot; a gatherer with no tool to be had for their spot goes to the nearest spot they can work at once (`World.OtherSpot`).
+A woodcutter who fells a tree takes its stump as their spot while a shovel is to be had, without waiting for a player to see it; other stumps count once a player has seen them.
+A worker carries one tool, so going between a tree and a stump takes a walk to a tool station to swap.
 With none known they say so once and go on to their other places, or wait at the nearest trading post until one is seen or the spot comes back.
 A worker with no duties waits at the nearest trading post.
 
@@ -820,7 +839,7 @@ A sound on screen plays at full volume, one just past the screen edge is faint, 
 Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
-- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids and the cabin door.
+- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids and the cabin door.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
 
 ### Music

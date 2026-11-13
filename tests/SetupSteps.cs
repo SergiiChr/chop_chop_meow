@@ -80,6 +80,9 @@ internal static class SetupSteps {
     /// <summary>Removes things from the map: the game has no way to clear a building or a tree off the ground.</summary>
     public static void RemoveThings(World world, Predicate<Thing> match) => world.S.Things.RemoveAll(match);
 
+    /// <summary>Fells a tree at once and returns the stump it leaves: a woodcutter out of the player's sight would take minutes over it.</summary>
+    public static Thing Fell(World world, Thing tree) { world.S.Things.Remove(tree); return world.Add(ThingKind.Stump, tree.Pos, World.StumpWood); }
+
     /// <summary>Sets a cart on the road with an exact value and trip time, which a real sale's changing price would not give.</summary>
     public static TradeOrder PlaceOrder(World world, TradeOrder order) { world.S.Orders.Add(order); return order; }
 
