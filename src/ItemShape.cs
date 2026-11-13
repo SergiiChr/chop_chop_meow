@@ -32,7 +32,7 @@ internal static class ItemShape {
 
     private static readonly Dictionary<string, Look> looks = new() {
         ["steel_parts"] = new(SteelParts, Steel, f => Cross(f, SteelParts)),
-        ["tin_can"] = new(f => Can(f, null, null), Tin, f => SixPack(f, one => Can(one, null, null, false))),
+        ["tin_can"] = new(f => OpenCan(f, true), Tin, f => SixPack(f, one => OpenCan(one, false))),
         ["canned_jam"] = new(f => Can(f, "b83a5c", "8f2436"), Tin, f => SixPack(f, one => Can(one, "b83a5c", null, false))),
         ["canned_meat_stew"] = new(f => Can(f, "c07a48", "7a4a26"), Tin, f => SixPack(f, one => Can(one, "c07a48", null, false))),
         ["berry_jam"] = new(f => Jar(f, true), Glossy, f => Huddle(f, one => Jar(one, false))),
@@ -195,26 +195,53 @@ internal static class ItemShape {
             new Ring[] { (.085f, 0, "7fb4d6"), (.085f, .07f, "7fb4d6"), (.054f, .07f, "a8d2ec"), (.054f, .004f, "2c3e4c") }, 6);
     }
 
+    private const float CanRadius = .06f, CanHeight = .13f;
+    private const string TinShade = "dfe4e1", TinBright = "f4f6f5";
+
     /// <summary>
-    /// A tin can: open and empty, its inside drawn as a dark hollow, or sealed under a lid and wrapped in a paper label
-    /// of the given colour.
+    /// An empty tin can, open at the top, its inside drawn as a dark hollow.
+    /// It has a rolled rim at each end, three ribs round its body and its cut lid bent up at the back.
+    /// A plain can, for cans standing six to a pile slot, is the wall and the hollow alone.
+    /// </summary>
+    private static void OpenCan(List<Face> faces, bool detail) {
+        const float radius = CanRadius, height = CanHeight, rim = radius * 1.07f, rib = radius * 1.05f, mouth = radius * .9f;
+        const string dark = "8a9594";
+        if (!detail) {
+            Lathe(faces, Transform3D.Identity, new Ring[] { (radius, 0, TinShade), (radius, height, TinShade), (0, .03f, dark) }, 8);
+            return;
+        }
+        var rings = new List<Ring> { (rim, 0, TinShade), (rim, .01f, TinBright), (radius, .015f, TinShade) };
+        foreach (float y in new[] { .04f, .065f, .09f }) rings.AddRange(new Ring[] { (radius, y - .007f, TinShade), (rib, y, TinBright), (radius, y + .007f, TinShade) });
+        rings.AddRange(new Ring[] { (radius, height - .015f, TinShade), (rim, height - .01f, TinShade), (rim, height, TinBright), (mouth, height, TinBright), (0, .03f, dark) });
+        Lathe(faces, Transform3D.Identity, rings.ToArray(), 8);
+        // The lid stays joined at the back of the mouth and leans away, its inside toward the sun and the game camera.
+        float turn = Mathf.DegToRad(-80), lean = Mathf.DegToRad(25);
+        Vector3 back = new(MathF.Cos(turn), 0, MathF.Sin(turn)), up = Vector3.Up * MathF.Cos(lean) + back * MathF.Sin(lean), across = Vector3.Up.Cross(back);
+        var inside = Vector3.Up * MathF.Sin(lean) - back * MathF.Cos(lean);
+        var middle = back * mouth + Vector3.Up * height + up * mouth;
+        Vector3 Edge(int i) { float angle = i * Mathf.Tau / 8; return middle + (across * MathF.Cos(angle) + up * MathF.Sin(angle)) * mouth; }
+        for (int i = 0; i < 8; i++) {
+            Tri(faces, middle, Edge(i), Edge(i + 1), inside, new Color(TinBright));
+            Tri(faces, middle, Edge(i), Edge(i + 1), -inside, new Color(TinShade));
+        }
+    }
+
+    /// <summary>
+    /// A tin can sealed under a lid and wrapped in a paper label of the given colour.
     /// The label has a pale panel on the side the game camera sees lit, with a mark of what is inside where
     /// <paramref name="mark"/> gives its colour.
-    /// A plain can is the same with the least that still shows it, for cans standing six to a pile slot: no rim, no
-    /// bare tin above and below the label and no mark.
+    /// A plain can, for cans standing six to a pile slot, is the label and the lid alone: no rim, no bare tin above and
+    /// below the label and no mark.
     /// </summary>
-    private static void Can(List<Face> faces, string? label, string? mark, bool detail = true) {
-        const float radius = .06f, height = .13f;
-        const string tin = "dfe4e1", bright = "f4f6f5", panel = "f6eeda";
-        var rings = new List<Ring> { (radius, 0, tin) };
-        if (label == null) rings.Add((radius, height, tin));
-        else if (!detail) rings.Add((radius, height, label));
-        else rings.AddRange(new Ring[] { (radius, height * .14f, tin), (radius, height * .84f, label), (radius, height, tin) });
+    private static void Can(List<Face> faces, string label, string? mark, bool detail = true) {
+        const float radius = CanRadius, height = CanHeight;
+        const string panel = "f6eeda", lid = "cdd4d1";
         // The label is the band above the bare tin at the foot, or the whole wall of a plain can.
-        int band = detail ? 1 : 0;
-        if (detail) rings.Add((radius * (label == null ? .88f : .82f), height, bright));
-        rings.Add(label == null ? (0, .03f, "8a9594") : (0, detail ? height * .95f : height, "cdd4d1"));
-        Lathe(faces, Transform3D.Identity, rings.ToArray(), 8, (row, side) => label != null && row == band && side == 2 ? panel : null);
+        string? Panel(int row, int side) => row == (detail ? 1 : 0) && side == 2 ? panel : null;
+        Lathe(faces, Transform3D.Identity, detail
+            ? new Ring[] { (radius, 0, TinShade), (radius, height * .14f, TinShade), (radius, height * .84f, label), (radius, height, TinShade),
+                (radius * .82f, height, TinBright), (0, height * .95f, lid) }
+            : new Ring[] { (radius, 0, label), (radius, height, label), (0, height, lid) }, 8, Panel);
         if (mark == null) return;
         // The mark is a diamond in the middle of the panel, standing a hair proud of it.
         float turn = 2.5f * Mathf.Tau / 8, reach = radius * MathF.Cos(MathF.PI / 8) + .001f;
@@ -223,45 +250,66 @@ internal static class ItemShape {
         Quad(faces, middle - along, middle - up, middle + along, middle + up, facing, new Color(mark));
     }
 
+    /// <summary>The side of a standing good that faces the game camera and still catches the sun, where its bow goes.</summary>
+    private static readonly Vector3 Front = new(MathF.Cos(Mathf.DegToRad(96)), 0, MathF.Sin(Mathf.DegToRad(96)));
+    private const string Ribbon = "4f7fa8";
+
+    /// <summary>
+    /// A bow tied at a knot that faces <paramref name="away"/>, <paramref name="size"/> times the jam jar's: two loops,
+    /// and two short ends hanging straight down unless the ribbon's ends are draped some other way.
+    /// Each part is drawn from both sides.
+    /// </summary>
+    private static void Bow(List<Face> faces, Vector3 knot, Vector3 away, float size = 1, bool ends = true) {
+        var along = Vector3.Up.Cross(away) * size; var up = Vector3.Up * size; var tint = new Color(Ribbon);
+        foreach (int side in new[] { -1, 1 }) {
+            var loop = knot + along * side * .04f + away * .012f * size; var end = knot + along * side * .022f + away * .014f * size - up * .046f;
+            foreach (var facing in new[] { away, -away }) {
+                Tri(faces, knot, loop + up * .02f, loop - up * .014f, facing, tint);
+                if (ends) Tri(faces, knot, end - along * side * .011f, end + along * side * .011f, facing, tint.Darkened(.15f));
+            }
+        }
+    }
+
     /// <summary>
     /// A glass jar of berry jam under a cloth cover tied round the neck with a ribbon, its bow toward the game
     /// camera.
     /// A plain jar, for jars standing three to a pile slot, has the cover alone.
     /// </summary>
     private static void Jar(List<Face> faces, bool detail) {
-        const string jam = "b3263c", cloth = "e9dcc0", ribbon = "4f7fa8";
+        const string jam = "b3263c", cloth = "e9dcc0";
         if (!detail) {
             Lathe(faces, Transform3D.Identity, new Ring[] { (.055f, 0, jam), (.055f, .096f, jam), (.046f, .132f, cloth), (0, .138f, "f6eeda") }, 8);
             return;
         }
         // Below the ribbon the cover flares into a frill, and above it the cover swells over the lid.
         Lathe(faces, Transform3D.Identity, new Ring[] {
-            (.055f, 0, jam), (.055f, .09f, jam), (.07f, .084f, "c9bb9c"), (.055f, .099f, cloth), (.055f, .109f, ribbon), (.06f, .116f, cloth), (.048f, .138f, cloth),
+            (.055f, 0, jam), (.055f, .09f, jam), (.07f, .084f, "c9bb9c"), (.055f, .099f, cloth), (.055f, .109f, Ribbon), (.06f, .116f, cloth), (.048f, .138f, cloth),
             (0, .144f, "f6eeda") }, 8);
-        // The bow: two loops and two hanging ends from a knot on the ribbon, each drawn from both sides.
-        float turn = Mathf.DegToRad(96);
-        Vector3 away = new(MathF.Cos(turn), 0, MathF.Sin(turn)), along = Vector3.Up.Cross(away), knot = away * .058f + Vector3.Up * .104f;
-        foreach (int side in new[] { -1, 1 }) {
-            var loop = knot + along * side * .04f + away * .012f; var end = knot + along * side * .022f + away * .014f - Vector3.Up * .046f;
-            foreach (var facing in new[] { away, -away }) {
-                Tri(faces, knot, loop + Vector3.Up * .02f, loop - Vector3.Up * .014f, facing, new Color(ribbon));
-                Tri(faces, knot, end - along * side * .011f, end + along * side * .011f, facing, new Color(ribbon).Darkened(.15f));
-            }
-        }
+        Bow(faces, Front * .058f + Vector3.Up * .104f, Front);
     }
 
     /// <summary>
-    /// A cloth sack standing on the ground, squarish and slumped: tied shut at the neck, with a printed band if one is given,
-    /// or open with its top rolled down around what it holds.
+    /// A cloth sack standing on the ground, squarish and slumped: tied shut at the neck with a ribbon whose ends hang
+    /// down its front, with a printed band if one is given, or open with its top rolled down around what it holds.
     /// </summary>
     private static void Sack(List<Face> faces, string cloth, string shade, string? band, (string Dark, string Light)? holds, float size = 1) {
         var rings = new List<Ring> { (.14f, 0, shade), (.172f, .06f, shade), (.178f, .17f, cloth) };
         if (holds is var (dark, light))
             rings.AddRange(new Ring[] { (.168f, .29f, cloth), (.19f, .32f, cloth), (.17f, .355f, cloth), (.145f, .34f, shade), (.09f, .4f, dark), (0, .43f, light) });
         else
-            rings.AddRange(new Ring[] { (.168f, .27f, band ?? cloth), (.125f, .345f, cloth), (.055f, .39f, cloth), (.05f, .41f, "9a7a44"), (.09f, .455f, cloth), (0, .43f, shade) });
+            rings.AddRange(new Ring[] { (.168f, .27f, band ?? cloth), (.125f, .345f, cloth), (.055f, .39f, cloth), (.05f, .41f, Ribbon), (.09f, .455f, cloth), (0, .43f, shade) });
         for (int i = 0; i < rings.Count; i++) rings[i] = (rings[i].Radius * size, rings[i].Y * size, rings[i].Tint);
         Lathe(faces, Transform3D.Identity, rings.ToArray(), 8, square: .1f);
+        if (holds != null) return;
+        // The ribbon's bow sits at the neck, and its two ends lie over the shoulder and hang down the front.
+        var knot = (Front * .06f + Vector3.Up * .4f) * size; var along = Vector3.Up.Cross(Front);
+        Bow(faces, knot, Front, 1.6f * size, false);
+        foreach (int side in new[] { -1, 1 }) {
+            var shoulder = (Front * .155f + along * side * .04f + Vector3.Up * .35f) * size; var end = (Front * .205f + along * side * .07f + Vector3.Up * .24f) * size;
+            Vector3 narrow = along * .007f * size, wide = along * .017f * size;
+            Quad(faces, knot - narrow, knot + narrow, shoulder + wide, shoulder - wide, Front + Vector3.Up, new Color(Ribbon));
+            Quad(faces, shoulder - wide, shoulder + wide, end + wide, end - wide, Front, new Color(Ribbon).Darkened(.15f));
+        }
     }
 
     /// <summary>A small open bag of wheat seeds with a few spilt in front of it.</summary>
