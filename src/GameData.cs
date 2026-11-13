@@ -9,7 +9,7 @@ public sealed class ItemDef {
     public string Name { get; set; } = "";
     public float Price { get; set; }
     public string Color { get; set; } = "ffffff";
-    /// <summary>The kind of tool this item is (axe, pickaxe, hammer, chisel, rake or mortar), or empty for materials.</summary>
+    /// <summary>The kind of tool this item is (axe, pickaxe, shovel, hammer, chisel, rake or mortar), or empty for materials.</summary>
     public string Tool { get; set; } = "";
     /// <summary>How fast the tool works compared with the plainest tool of its kind.</summary>
     public float Speed { get; set; } = 1;
@@ -309,6 +309,8 @@ public sealed partial class GameData {
     public string Name(string id) => World.IsCrate(id) ? Items["crate"].Name : Items.TryGetValue(id, out var i) ? i.Name : Kinds.TryParse(id, out var kind) ? Name(kind) : id.Replace('_', ' ');
     public string Name(ThingKind kind) => Items.TryGetValue(kind.Id(), out var i) ? i.Name : Buildings.TryGetValue(kind, out var b) ? b.Name : kind switch {
         ThingKind.Tree => "Tree",
+        ThingKind.Stump => "Stump",
+        ThingKind.Bush => "Bush",
         ThingKind.Iron => "Iron deposit",
         ThingKind.Tin => "Tin deposit",
         ThingKind.LooseCoal => "Coal",

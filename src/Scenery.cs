@@ -7,7 +7,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The baked scenery candidates ProtonScatter made offline, and the ground they may stand on.
-/// The view dresses the valley with most of them; the world places the loose stones and sticks among them as things to pick up.
+/// The view dresses the valley with most of them; the world places the loose stones, sticks and bushes among them as things to pick up or dig up.
 /// </summary>
 public static class Scenery {
     /// <summary>A candidate's spot, its turn about the vertical and its size.</summary>
@@ -46,4 +46,7 @@ public static class Scenery {
 
     /// <summary>The loose piece a candidate is, a stone or a stick, or null for one the view dresses with plants.</summary>
     public static ThingKind? Loose(int index) => index % 127 == 0 ? ThingKind.LooseStone : index % 293 == 0 ? ThingKind.Stick : null;
+
+    /// <summary>Whether a candidate is a bush, which the world grows as a thing to dig up.</summary>
+    public static bool Bush(int index) => index % 31 == 0 && Loose(index) == null;
 }

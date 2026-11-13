@@ -7,6 +7,9 @@ using Godot;
 /// <summary>A crew at work for a whole day: a cutter on a big tree, and a pumper and a hauler at a forge.</summary>
 internal sealed record DayCrew(World World, Thing Tree, Thing Chest, Thing NearFire, Thing Forge, Worker Cutter, Worker Pumper, Worker Hauler);
 
+/// <summary>A woodcutter on a tree about to fall, with a bigger tree further off, a chest and a tool station holding an axe.</summary>
+internal sealed record Woodlot(World World, Thing Next, Thing Chest, Thing Rack, Worker Cutter);
+
 /// <summary>Adding workers to a world for the simulation checks.</summary>
 internal static class WorkerSteps {
     /// <summary>Starts a crew with wood and room for a whole day's work, and two campfires, one much nearer than the other.</summary>
@@ -71,6 +74,31 @@ internal static class WorkerSteps {
         var station = world.Add(ThingKind.Toolstation, new Vector2(14, 10));
         world.Player = station.Pos + Vector2.One;
         return (world, tree, rock, station);
+    }
+
+    /// <summary>Starts a woodcutter on a tree of 5 wood, all in the player's sight.</summary>
+    public static Woodlot Woodlot(GameData data) {
+        var world = EmptyWorld(data);
+        var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 5);
+        var next = world.Add(ThingKind.Tree, new Vector2(16, 10), 400);
+        var chest = world.Add(ThingKind.Chest, new Vector2(12, 12));
+        var rack = world.Add(ThingKind.Toolstation, new Vector2(12, 8));
+        rack.Inventory.Add("steel_axe", 1);
+        world.Player = new Vector2(13, 14); world.Look();
+        var cutter = AddWorker(world, tree.Pos + new Vector2(1, 1));
+        world.Assign(cutter, tree);
+        return new Woodlot(world, next, chest, rack, cutter);
+    }
+
+    /// <summary>A bush with an oak's leaf patch beside it, a chest and an empty tool station, all in the player's sight.</summary>
+    public static (World World, Thing Bush, Thing Leaves, Thing Chest, Thing Rack) Thicket(GameData data) {
+        var world = EmptyWorld(data);
+        var bush = world.Add(ThingKind.Bush, new Vector2(10, 10), World.BushLeaves);
+        var leaves = world.Add(ThingKind.Leaves, new Vector2(11, 11), World.LeafPatch);
+        var chest = world.Add(ThingKind.Chest, new Vector2(12, 13));
+        var rack = world.Add(ThingKind.Toolstation, new Vector2(12, 8));
+        world.Player = new Vector2(14, 12); world.Look();
+        return (world, bush, leaves, chest, rack);
     }
 
     public static void Hire(World world, Thing target) => world.Assign(AddWorker(world, target.Pos + new Vector2(1, 1)), target);
