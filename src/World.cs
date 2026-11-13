@@ -37,6 +37,8 @@ public sealed class Thing {
     public float Burn { get; set; }
     /// <summary>When a picked berry bush fruits again, on the world's clock, or zero while it is full.</summary>
     public float Regrow { get; set; }
+    /// <summary>The id of the tree that left a stump, whose species and size shape the stump; zero for a stump with no tree on record, which is shaped by its own id.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OfTree { get; set; }
     /// <summary>A signpost's market output: bought goods arrive here with the returning cart, and sale coins once <see cref="Wages"/> is full.</summary>
     public Inventory? Output { get; set; }
     /// <summary>A signpost's one stack of coins for wages: sale coins land here first, and dawn wages come out of it before any backpack.</summary>
@@ -1162,7 +1164,7 @@ public sealed partial class World {
         attackClock = .6f;
         var wolf = S.Wolves.OrderBy(w => w.Pos.DistanceTo(Player)).FirstOrDefault();
         string? axe = BestTool("axe");
-        ActorAction action = axe == "steel_axe" ? ActorAction.SteelChop : axe != null ? ActorAction.Chop : ActorAction.Attack;
+        ActorAction action = axe == "steel_axe" ? ActorAction.SteelAxeSwing : axe != null ? ActorAction.AxeSwing : ActorAction.Attack;
         Vector2 target = wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f ? wolf.Pos : Player;
         PlayerActed?.Invoke(action, target); Play("tool_air_swing", Player);
         if (wolf != null && wolf.Pos.DistanceTo(Player) < 2.6f) {
@@ -2380,7 +2382,7 @@ public sealed partial class World {
         foreach (var t in S.Things) {
             if (!Sees(t.Pos)) continue;
             if (!S.Remembered.TryGetValue(t.Id, out var memory)) S.Remembered[t.Id] = memory = new Thing { Id = t.Id, Kind = t.Kind };
-            memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Keep = t.Keep; memory.Progress = t.Progress; memory.MineStage = t.MineStage; memory.FarmStage = t.FarmStage;
+            memory.Pos = t.Pos; memory.Remaining = t.Remaining; memory.Keep = t.Keep; memory.Progress = t.Progress; memory.MineStage = t.MineStage; memory.FarmStage = t.FarmStage; memory.OfTree = t.OfTree;
         }
     }
     public bool Explored(Vector2 p) => p.X >= 0 && p.Y >= 0 && p.X < Terrain.Size && p.Y < Terrain.Size && S.Explored[(int)p.Y * Terrain.Size + (int)p.X] != 0;

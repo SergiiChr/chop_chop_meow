@@ -90,6 +90,8 @@ public partial class Game {
         Require(old != null, "Every tree must have its model once the world has loaded.");
         CheckTreeCanopyCastsShadowsOnlyThroughItsProxies(old!);
         CheckFadingCanopyKeepsItsCutoutShadows(old!);
+        CheckEveryTreeTrunkReachesTheGround();
+        CheckStumpIsAsThickAsItsTreesTrunk();
         old!.Fade = .68f; old.Fall = 9;
         await Click(FindButton(startMenu.Screen, "New game")!);
         var fresh = view.PropOf(tree.Id) as TreeProp;
@@ -99,6 +101,22 @@ public partial class Game {
         Require(fresh.Fade == 0, "A new game's tree model must not stay faded.");
         Require(fresh.Fall < 0, "A new game's tree model must not stay fallen.");
         await CloseWithEsc();
+    }
+    /// <summary>Every tree species and variant has a trunk that stands on the ground, also where its lowest branches hang below the start of its baked trunk.</summary>
+    private void CheckEveryTreeTrunkReachesTheGround() {
+        for (int id = 0; id < WorldModels.TreeLooks; id++) {
+            var prop = (TreeProp)WorldModels.Build(new Thing { Id = id, Kind = ThingKind.Tree });
+            float bottom = TrunkBottom(prop);
+            prop.Root.Free();
+            Require(bottom < .03f, $"Tree look {id} must have a trunk down to the ground, not one that starts {bottom:0.00} m above it.");
+        }
+    }
+    /// <summary>A stump is shaped by the tree that left it: a birch's is thinner than an oak's, and one with no tree on record is no thicker than a trunk either.</summary>
+    private void CheckStumpIsAsThickAsItsTreesTrunk() {
+        // A tree's species goes by its id: 3 is an oak and 2 a birch.
+        var (oak, birch, bare) = (StumpWidth(3), StumpWidth(2), StumpWidth(0));
+        Require(oak > birch, $"An oak's stump must be thicker than a birch's: {oak:0.00} against {birch:0.00}.");
+        Require(bare < 1, $"A stump with no tree on record must be as thin as a trunk, not the stump model's own size: {bare:0.00}.");
     }
     /// <summary>Canopy fades use separate shadow-only meshes so the original cutout shadows survive alpha blending.</summary>
     private void CheckTreeCanopyCastsShadowsOnlyThroughItsProxies(TreeProp prop) {
@@ -850,6 +868,20 @@ public partial class Game {
         Require(near < 1 && far > 0 && far < near, "A howl must fade with distance from the player, on screen too.");
         heard = sounds.Played; sounds.Play("wolf_howl", world.Player + new Vector2(world.Data.HowlRadius + 1, 0));
         Require(sounds.Played == heard, "A howl beyond the howl radius must stay silent.");
+    }
+    /// <summary>A tree felled in sight is heard breaking as it starts to go and crashing as its trunk reaches the ground, and a tall one comes down slower.</summary>
+    private async Task CheckFelledTreeBreaksThenCrashesAsItLands() {
+        await CloseWithEsc();
+        var (start, home) = (Hosted.Player, Terrain.Spawn);
+        Warp(Hosted, home); await Frames(4);
+        var quick = await FellInSight(home + new Vector2(3, 3), tall: false);
+        var slow = await FellInSight(home + new Vector2(3, 3), tall: true);
+        foreach (var fall in new[] { quick, slow }) {
+            Require(fall.LeanAtBreak < 10, "A tree must be heard breaking as it starts to go over.");
+            Require(fall.LeanAtCrash > 89, "A felled tree must crash as its trunk reaches the ground, not before.");
+        }
+        Require(slow.Seconds > quick.Seconds + .4f, "A tall tree must take longer to come down than a short one.");
+        Warp(Hosted, start); await Frames(4);
     }
     /// <summary>Holding the right mouse button on a tree or a ripe farm plot walks over and works it.</summary>
     private async Task CheckRightClickGathersTreeAndHarvestsFarm() {
@@ -1730,6 +1762,7 @@ public partial class Game {
             await Test(CheckMouseWheelOverPanelDoesNotZoom);
             await Test(CheckCabinShelterAndTreeCrownKeepsLoosePieceClickable);
             await Test(CheckChangesOutOfSightDoNotReplayWhenSeenAgain);
+            await Test(CheckFelledTreeBreaksThenCrashesAsItLands);
             await Test(CheckTradingPostSendsOnlyCratesOffOnACart);
             await Test(CheckPriceSheetBuysGoodsAndFetchNeedsAHiredWorker);
             await Test(CheckPackingStationListsGoodsAndTakesBackpackClicks);

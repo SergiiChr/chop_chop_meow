@@ -15,6 +15,17 @@ internal static class ModelSteps {
         return meshes;
     }
 
+    /// <summary>How many times wider than the stump model the stump left by a tree with this id is drawn.</summary>
+    public static float StumpWidth(int tree) {
+        var prop = WorldModels.Build(new Thing { Id = 1, Kind = ThingKind.Stump, OfTree = tree });
+        float width = AllMeshes(prop.Body)[0].Scale.X;
+        prop.Root.Free();
+        return width;
+    }
+
+    /// <summary>How far above the ground the lowest bark of a tree's model is, before the tree's own size is applied; bark is whatever is not drawn with the foliage shader.</summary>
+    public static float TrunkBottom(TreeProp prop) => AllMeshes(prop.Sway).Where(mesh => mesh.MaterialOverride is StandardMaterial3D).Min(mesh => (mesh.Transform * mesh.Mesh.GetAabb()).Position.Y);
+
     /// <summary>The triangles of every mesh under a node, shown or hidden, and of every piece a heap under it shows.</summary>
     public static int Triangles(Node at) {
         int count = at switch {

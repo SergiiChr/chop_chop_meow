@@ -124,7 +124,7 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 ### Nature
 
 - Tree3D 1.1.0 supplies the baked tree and berry-bush geometry. Preview it with `./build.py play -- --showcase --trees`.
-- `src/Tree3DShape.cs` loads shared tree and berry-bush meshes, and cutout foliage shader materials that sway in the wind (`src/Wind.cs`) and have a blended twin for fading.
+- `src/Tree3DShape.cs` loads shared tree and berry-bush meshes, and cutout foliage shader materials that sway in the wind (`src/Wind.cs`) and have a blended twin for fading. It also adds the stem under a tree's baked trunk that starts above the ground; a berry bush gets none.
 - Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes`. Berries attach to foliage-card twigs and have their own harvest visibility. The same view shows plain bushes and stumps, one of each half dug out.
 - `assets/models/tree3d/` contains the baked meshes, SVG leaf/bark textures, triangle manifest and upstream license notices.
 - Regenerate Tree3D output with `./tools/tree3d.py`. Native authoring binaries stay in ignored `.tools/tree3d` and are not needed to play. See [tree3d/README.md](models/tree3d/README.md).
@@ -207,6 +207,14 @@ These were made with ffmpeg from Kenney's sounds:
 Each cut is faded at both ends, and the cuts of one sound are brought to one mean level.
 
 `wolf_howl` (a lone wolf, the night's first howl), `wolf_howl_group` (the pack answering) and `hire_sign` (a pen signing paper, cleaned of rumble and room noise) were supplied for this project.
+
+The tree sounds are cut and mixed with ffmpeg from three recordings supplied for this project, a tree bending and two trees falling:
+
+- `tree_crack`: the cracks before each fall's landing, the bend's creak and its loose ticks, and one fall's crack laid over the other's cracks.
+- `tree_bend`: the bend's 1.8 seconds of tearing, cleaned of background noise; its creak, ticks and last tearing joined into one; and a fall's crack leading into the tearing slowed down.
+- `tree_crash`: each fall from its landing on, the first fall's second thud over the other's settling crown, and both landings mixed at different pitches.
+
+Each variant's loudest tenth of a second is brought toward one level, with a limiter taking at most 4 dB off the peaks, or 6 dB off a crack's.
 
 Credits: Kenney ([www.kenney.nl](https://www.kenney.nl)) and Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com)).
 

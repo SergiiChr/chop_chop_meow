@@ -18,6 +18,9 @@ public sealed class ActorRig {
     /// <summary>How far ahead of the forearm's line a held thing sits in the fist, in metres.</summary>
     public const float Palm = .01f;
     private readonly Node3D hips, torso, head, shoulderL, shoulderR, elbowL, elbowR, legL, legR, kneeL, kneeR, crate, rock;
+    /// <summary>The right fist's grip, which turns a held tool about its own length (<see cref="Pose.Grip"/>).</summary>
+    private readonly Node3D wrist;
+    private float grip;
     /// <summary>What each tool puts in the hands, by its name: one piece, or two for a tool that fills both.</summary>
     private readonly List<(string Name, Node3D Node)> tools = new();
     private readonly Node3D torch;
@@ -80,6 +83,7 @@ public sealed class ActorRig {
         rock = Pivot(Root, Vector3.Zero);
         Sphere(rock, .24f, new Vector3(0, .1f, -.04f), Stone("8d918c", .85f), new Vector3(1.15f, .85f, 1));
         Sphere(rock, .13f, new Vector3(.15f, .05f, .1f), Stone("7a7e79", .85f), new Vector3(1, .7f, 1));
+        wrist = new Node3D(); Hold(wrist);
         BuildTools();
         (torch, Flame, TorchLight) = BuildTorch();
         BuildMortar();
@@ -195,14 +199,14 @@ public sealed class ActorRig {
         return elbow;
     }
 
-    /// <summary>Tools hang from the right fist along the forearm; blades face local -Z, the direction of a downward stroke.</summary>
+    /// <summary>Tools hang from the right fist along the forearm; blades face local -Z, the direction of a downward stroke, until the grip turns them.</summary>
     private void BuildTools() {
         foreach (var name in new[] { "steel_axe", "steel_pick", "steel_shovel", "wood_hammer", "steel_hammer", "protest_sign" }) {
             var tool = name == "protest_sign" ? ProtestSign() : Tool(name);
-            Hold(tool);
+            // The shovel is laid through both fists (LayShovel), so it hangs from the fist itself and not from the grip that turns.
+            if (name == "steel_shovel") { Hold(tool); shovel = tool; } else wrist.AddChild(tool);
             tool.Visible = false;
             tools.Add((name, tool));
-            if (name == "steel_shovel") shovel = tool;
         }
     }
 
@@ -379,6 +383,7 @@ public sealed class ActorRig {
         footR.SetBonePoseRotation(2, new Quaternion(Vector3.Right, Mathf.DegToRad(pose.FootR)));
         hips.Position = new Vector3(0, pose.HipHeight, 0);
         rock.Visible = onRock;
+        if (pose.Grip != grip) { grip = pose.Grip; wrist.RotationDegrees = new Vector3(0, grip, 0); }
         foreach (var (name, node) in tools) node.Visible = name == tool;
         // A shovel is only ever dug with, held in both fists.
         if (shovel.Visible) LayShovel();

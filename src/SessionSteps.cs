@@ -129,6 +129,25 @@ public partial class Game {
         await Until(() => !OS.IsProcessRunning(server), "the server ending with its owner", 10);
     }
 
+    /// <summary>
+    /// Plants a tree among the tallest or the shortest at a spot in the player's sight and fells it.
+    /// Returns the seconds on the view's clock from the sound of it breaking to its crash, and how far over its trunk was, in degrees, at each.
+    /// </summary>
+    private async Task<(float Seconds, float LeanAtBreak, float LeanAtCrash)> FellInSight(Vector2 at, bool tall) {
+        var tree = SetupSteps.PlantTree(Hosted, at, tall);
+        await Frames(4);
+        // The model outlives its tree while it falls, so it is taken before the tree leaves the world.
+        var falling = (TreeProp)view.PropOf(tree.Id)!;
+        var stump = SetupSteps.Fell(Hosted, tree);
+        await Until(() => sounds.Last == (tall ? "tree_bend" : "tree_crack"), tall ? "a tall tree tearing at length as it breaks" : "a short tree cracking as it breaks", 2);
+        // The fall is timed on the view's own clock, which a slow frame does not stretch the way it stretches real time.
+        float brokeAt = view.Elapsed, leanAtBreak = falling.Sway.RotationDegrees.X;
+        await Until(() => sounds.Last == "tree_crash", "a felled tree crashing", 4);
+        var fall = (view.Elapsed - brokeAt, leanAtBreak, falling.Sway.RotationDegrees.X);
+        SetupSteps.RemoveThings(Hosted, t => t == stump); await Frames(2);
+        return fall;
+    }
+
     /// <summary>The closest place a building can go.</summary>
     private Vector2 FreeSpotNearby(ThingKind kind) {
         var spots = from x in Enumerable.Range(-3, 7) from y in Enumerable.Range(-3, 7) select world.Player.Round() + new Vector2(x, y);

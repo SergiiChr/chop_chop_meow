@@ -1157,7 +1157,10 @@ public static class SimulationChecks {
         Give(hunt, "wood", 1);
         var prey = new Wolf { Pos = hunt.Player + new Vector2(1.5f, 0), Health = 1 };
         PlaceWolf(hunt, prey);
+        ActorAction swung = ActorAction.Idle;
+        hunt.PlayerActed += (action, _) => swung = action;
         hunt.Attack();
+        Require(swung == ActorAction.SteelAxeSwing, "a swing with a steel axe carried should be the overhead axe swing, not the felling stroke");
         var carcass = hunt.Things.SingleOrDefault(t => t.Kind == ThingKind.WolfCorpse);
         Require(!hunt.Wolves.Contains(prey), "a killed wolf should not stay among the wolves");
         Require(carcass != null, "a killed wolf should leave a carcass");
