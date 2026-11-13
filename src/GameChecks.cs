@@ -1356,7 +1356,7 @@ public partial class Game {
     /// <summary>A recipe list that has scrolled keeps its place when a click on a recipe makes the page draw again.</summary>
     private async Task CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain() {
         await CloseWithEsc();
-        // A bench that is making something shows its work under the list; moved down the screen, the page leaves the list too little room for thirteen recipes.
+        // A bench that is making something shows its work under the list; moved down the screen, the page leaves the list too little room for all its recipes.
         var workbench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-1, 0)); Hosted.SetRecipe(workbench, "planks");
         await ClickOn(workbench);
         await MoveWindow(panel, new Vector2(0, 150));
