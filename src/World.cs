@@ -20,7 +20,7 @@ public sealed class Thing {
     [JsonIgnore] public string Recipe => Making != "" ? Making : Batches > 0 ? Asked : Keep;
     /// <summary>The recipe of a station's batch in progress, or empty between batches.</summary>
     [JsonIgnore] public string Making { get => making ?? ""; set => making = value == "" ? null : value; }
-    /// <summary>The recipe workers keep a station making once the batches asked of it are done, or empty. A marked station is on its marked recipe: the mark follows a turn to another.</summary>
+    /// <summary>The recipe workers keep a station making once the batches asked of it are done, or empty. A marked station is on its marked recipe: asking for batches marks their recipe.</summary>
     [JsonIgnore] public string Keep { get => keep ?? ""; set => keep = value == "" ? null : value; }
     /// <summary>The one recipe a player asked a station for batches of last, or the one it lost its mark on since; a station with nothing to make stays on it.</summary>
     [JsonIgnore] public string Asked { get => asked ?? ""; set => asked = value == "" ? null : value; }
@@ -886,8 +886,9 @@ public sealed partial class World {
     /// <summary>
     /// Asks a station for batches of a recipe and loads their inputs and one fuel each from the backpack, on top of what the station holds.
     /// A station counts batches of one recipe at a time.
-    /// Turning from the recipe it is on to another drops the batches still waiting, takes what the station's boxes and fuel slot hold into the backpack
-    /// and moves the station's mark, when it has one, to the new recipe; <see cref="SwitchBlock"/> says when it cannot.
+    /// The recipe asked for gets the station's mark, so workers go on making it once the batches are done.
+    /// Turning from the recipe it is on to another drops the batches still waiting and takes what the station's boxes and fuel slot hold into the backpack;
+    /// <see cref="SwitchBlock"/> says when it cannot.
     /// </summary>
     public void QueueBatch(Thing t, string recipe, int batches = 1) {
         if (batches <= 0 || !Makes(t, recipe)) return;
@@ -896,11 +897,8 @@ public sealed partial class World {
         if (SwitchBlock(t, recipe) is string blocked) { Say(blocked); return; }
         int waiting = Waiting(t, recipe);
         if (waiting >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
-        if (recipe != Selected(t)) {
-            Unload(t.Inventory);
-            if (t.Burner != null) Unload(t.Burner);
-            if (t.Keep != "") t.Keep = recipe;
-        }
+        if (recipe != Selected(t)) { Unload(t.Inventory); if (t.Burner != null) Unload(t.Burner); }
+        t.Keep = recipe;
         Ask(t, recipe, waiting + batches);
         batches = t.Batches - waiting;
         var r = Data.Recipes[recipe];

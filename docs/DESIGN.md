@@ -517,7 +517,8 @@ A station is always on one: taking the mark off with no batches waiting leaves t
 So a station with nothing to make keeps showing its cups, and more batches of that recipe are not a turn to another.
 Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
 `World.QueueBatch` adds to the count, and for a recipe other than the selected one it first turns the station to it:
-it drops the batches that waited, moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack, and moves the mark, when the station has one, to the new recipe.
+it drops the batches that waited and moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack.
+It always puts the mark on the recipe queued.
 `World.SwitchBlock` refuses that turn while a batch is in progress or while the backpack has no room for all of it (`Inventory.Fits`).
 So batches only wait for the recipe in progress when there is one, and `World.Deserialize` refuses a save where they wait for another.
 `World.Unqueue` takes waiting batches off the count.
@@ -529,7 +530,8 @@ What no storage takes stays in the station, which goes on working until its outp
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu; only the crafting menu has a `QueueStrip` under the work.
 The board asks `World.SwitchBlock` before it queues at a station and `World.MarkBlock` before it marks, and when the answer is a refusal it shakes the cups of the station's `ProcessRow` (`ProcessRow.Shake`).
-A click on a station's card marks only after `RecipeBoard.DoubleClickSeconds`, the time Godot on Linux allows a double-click's second press: a double-click queues a batch and leaves the mark alone.
+A click on a station's card marks at once, also as the first press of a double-click: queueing puts the mark on the recipe whatever that press did.
+A mark the station refuses is sent and shown only after `RecipeBoard.DoubleClickSeconds`, the time Godot on Linux allows a double-click's second press, since a double-click empties the cups in the way.
 The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.ClosedGroups` keeps the groups the player closed, for every board.
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
 The panel keeps the list's place while the page draws again, so a click on a recipe leaves the list where it was scrolled to.

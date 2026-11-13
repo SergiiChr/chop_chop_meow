@@ -810,8 +810,8 @@ public static class SimulationChecks {
         SafeTick(world, data.Recipes["tin_bar"].Seconds + 1);
         Require(!furnace.Processing && furnace.Inventory["tin_bar"] == 1 && world.Waiting(furnace, "tin_bar") == 2, "the furnace should stand with its bar and two batches waiting for ore");
         world.QueueBatch(furnace, "charcoal");
-        Require(furnace.Recipe == "charcoal" && world.Waiting(furnace, "charcoal") == 1 && world.Waiting(furnace, "tin_bar") == 0 && furnace.Keep == "",
-            "asking for another recipe between batches should turn the station to it and drop the batches that waited, with no mark put on a station that had none");
+        Require(furnace.Recipe == "charcoal" && world.Waiting(furnace, "charcoal") == 1 && world.Waiting(furnace, "tin_bar") == 0 && furnace.Keep == "charcoal",
+            "asking for another recipe between batches should turn the station and its mark to it and drop the batches that waited");
         Require(world.Backpack["tin_bar"] == 1 && furnace.Inventory["tin_bar"] == 0 && furnace.Inventory["wood"] == 2 && furnace.Burner!["coal"] == 1,
             "turning to another recipe should take the boxes' contents into the backpack and load the new batch with a fuel");
         // Stone in every free slot leaves no room for the furnace's wood and coal.
@@ -878,13 +878,14 @@ public static class SimulationChecks {
         world.SetRecipe(furnace, "");
         world.Player = furnace.Pos + Vector2.One;
         Give(world, "tin_ore", 2); Give(world, "coal", 1);
-        world.QueueBatch(furnace, "tin_bar");
+        // Asking marks the recipe; the mark comes off again, so only the batch asked for is made.
+        world.QueueBatch(furnace, "tin_bar"); world.SetRecipe(furnace, "");
         SafeTick(world, data.Recipes["tin_bar"].Seconds + 1);
         Require(furnace.Recipe == "" && furnace.Inventory["tin_bar"] == 1, "the furnace should stand idle with its bar once the batch asked for is done");
         Give(world, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
         world.QueueBatch(furnace, "tin_bar");
-        Require(world.Waiting(furnace, "tin_bar") == 1 && furnace.Inventory["tin_bar"] == 1 && world.Backpack["tin_bar"] == 0,
-            "asking again for the recipe made last should count up and leave the bar in its cup, with no room asked of the backpack");
+        Require(world.Waiting(furnace, "tin_bar") == 1 && furnace.Keep == "tin_bar" && furnace.Inventory["tin_bar"] == 1 && world.Backpack["tin_bar"] == 0,
+            "asking again for the recipe made last should count up, mark it and leave the bar in its cup, with no room asked of the backpack");
         world.QueueBatch(furnace, "charcoal");
         Require(world.SwitchBlock(furnace, "charcoal") != null && world.Waiting(furnace, "tin_bar") == 1, "another recipe should still be refused while the backpack has no room for the bar");
     }
@@ -2360,14 +2361,14 @@ public static class SimulationChecks {
         old.Player = furnace.Pos + Vector2.One;
         // Two batches take 4 wood, and 2 more burn under them.
         Give(old, "wood", 6);
-        old.SetRecipe(furnace, ""); old.QueueBatch(furnace, "charcoal", 2);
+        old.QueueBatch(furnace, "charcoal", 2);
         old.Tick(.1f);
         var loaded = EmptyWorld(data);
         loaded.Deserialize(old.Serialize());
         var station = loaded.Find(furnace.Id)!;
         Require(station.Processing && station.Recipe == "charcoal" && loaded.Waiting(station, "charcoal") == 1, "a station saved mid-batch should load making that batch with the other one waiting");
         SafeTick(loaded, data.Recipes["charcoal"].Seconds * 2 + 1);
-        Require(station.Inventory["charcoal"] == 2 && station.Recipe == "", "the loaded batch should finish, the waiting one follow and the station then stop");
+        Require(station.Inventory["charcoal"] == 2 && !station.Processing, "the loaded batch should finish and the waiting one follow, with no wood left for a third");
     }
 
     /// <summary>
