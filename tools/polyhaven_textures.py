@@ -28,6 +28,13 @@ SETS = {
         "298493b652ff4305d089262fdaf436ce970bceab9da33874c850a9535717df04",
         "d1452b4245574bae2005b8367458f540d74991d295c832eebc1a1c79d60ed148",
     ),
+    ("environment/terrain3d", "mountain"): (
+        "rocky_terrain_02",
+        "8k",
+        "ca2881ae0ad377d56129820aaf8e748617395baab7c9fae222802560f3e1b0e7",
+        "17fbde9f1a18298a3ce1498dbf18f710889b31d4c05df2ac0cd3bf4b27b0e6ef",
+        "b8ebba9e2761f630c22df1d0b91807e62a339e950bd7df3cff8f0afc984e7b55",
+    ),
 }
 ASSETS = ROOT / "assets"
 SOURCE = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg"

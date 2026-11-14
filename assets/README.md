@@ -250,6 +250,8 @@ Kumar, released under CC0 1.0.
 The shores in `environment/lake/` are two [Poly Haven](https://polyhaven.com) photoscans by Rob Tuytel, released under
 CC0 1.0 and drawn with their own colours and parallax: Aerial Beach 01 at 8K for the sea coast's sand, and Aerial Rocks
 01 at 4K for the pond's pebbles.
+The mountains in `environment/terrain3d/` are the Poly Haven photoscan Rocky Terrain 02 by Amal Kumar, released under
+CC0 1.0, at 8K with its own colours and parallax.
 `tools/polyhaven_textures.py` downloads the pinned JPEG colour, OpenGL normal and height maps and checks their SHA-256.
 The meshes in `models/food/` are baked from four models of [Kenney's Food Kit](https://kenney.nl/assets/food-kit), released under CC0 1.0, as [Patch's asset library](https://patch.gg) serves them: re-packed, with the texture inside the file, and scaled to real size.
 `tools/food_models.py` downloads the pinned files, checks their SHA-256 and bakes them with `tools/bake_models.gd`.

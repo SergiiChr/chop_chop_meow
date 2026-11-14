@@ -30,7 +30,7 @@ Terrain collision does not drive walking, building placement or other simulation
 The simulation owns the level floor and mountain checks.
 There are no walkable hills, sculpting UI or digging.
 
-The ground keeps the project's own meadow, stone and path colours and takes grain and bump from three photoscan sets
+The meadow keeps the project's own meadow and path colours and takes grain and bump from three photoscan sets
 in `textures/`, each an albedo PNG with the height in its alpha and an OpenGL normal PNG with the roughness in its
 alpha, the way Terrain3D reads them: grass (id 0) on flat ground, rock (id 1) on slopes through Terrain3D's auto
 shader, and dirt (id 2) where the ground is worn.
@@ -44,8 +44,16 @@ washed out the meadow. The height-based ambient occlusion comes from Terrain3D's
 `tools/ground_textures.py` packs the sets from the pinned ambientCG archives; the `.import` files keep the alpha
 channels (VRAM compressed, high quality, no normal-map compression, no alpha border fix).
 
+The mountains and a band along their foot are drawn as Poly Haven's `rocky_terrain_02` photoscan in its own colours
+(`mountain_*.jpg`, 8K, one tile 30 world units), pinned by `tools/polyhaven_textures.py`.
+It is laid from above and from either side, blended by where the ground faces, so steep faces show it unstretched, and
+each side steps into its height map along the view the way the shores do.
+`Terrain3DView` bakes how far each point lies from the foot of the nearer range (`Terrain.FromMountains`) into a map of
+one texel a world unit; the band reaches 5 units onto the floor, its edge wandering in broad patches and reaching
+further out at the photoscan's stones.
+
 The shader insertion in `Terrain3DView` keeps the pinned generated Terrain3D shader core.
-It adds the meadow and stone palette with lusher and drier patches, the photoscan grain over it, the dirt blended into
+It adds the meadow palette with lusher and drier patches, the mountain photoscan, the photoscan grain over it, the dirt blended into
 worn ground and footpaths by its height, baked shade, and fragment clipping for the five mine openings so their
 separately modeled rock shells stay open.
 
