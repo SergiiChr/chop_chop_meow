@@ -42,6 +42,13 @@ SETS = {
         "aa23fa930c6303490f842f7c016c19d838263e8e4538d42508a9332e3fd76b69",
         "1d5c63d39e67af44e96cc9d5752273982bc5c82c9855695dada4abc2fc20575d",
     ),
+    ("environment/terrain3d", "moss"): (
+        "aerial_grass_rock",
+        "4k",
+        "84bf24b80d097c1a38d0fbe5c84584b1ede3e2ab06b4af2721fd184a9f94d5a3",
+        "3a9fca5d7886ab56a8d73d4ad10185a28d40b9eea6200e9c122e7af52dc5ba9f",
+        "eebf74c37905a41938a236767d1a3e3f3e0090f6ef7e0c30ed9c8943ceaa46a9",
+    ),
 }
 ASSETS = ROOT / "assets"
 SOURCE = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg"

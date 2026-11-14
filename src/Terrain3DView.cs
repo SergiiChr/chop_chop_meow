@@ -11,6 +11,7 @@ public partial class WorldView {
     // RenderingServer uniforms take RIDs, so retain the texture resource for their lifetime.
     private Texture2D? terrainGrass;
     private readonly Texture2D[] pathMaps = { Scan("path", "albedo"), Scan("path", "normal"), Scan("path", "height") };
+    private readonly Texture2D[] mossMaps = { Scan("moss", "albedo"), Scan("moss", "normal"), Scan("moss", "height") };
     private readonly Texture2D[] forestMaps = { Scan("forest", "albedo"), Scan("forest", "normal"), Scan("forest", "height") };
     private ImageTexture? woodsDistance;
     /// <summary>World units out from the foot of the ranges that the woods map measures; the shader's frayed band ends within it.</summary>
@@ -106,6 +107,9 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "path_albedo", pathMaps[0].GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "path_normal", pathMaps[1].GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "path_height", pathMaps[2].GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "moss_albedo", mossMaps[0].GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "moss_normal", mossMaps[1].GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "moss_height", mossMaps[2].GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "forest_albedo", forestMaps[0].GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "forest_normal", forestMaps[1].GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "forest_height", forestMaps[2].GetRid());

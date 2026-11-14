@@ -27,6 +27,16 @@
     ALBEDO = palette * mix(1.0, detail, DETAIL);
     // The ground photoscans below lie flat in world x and z, with their height along world up.
     vec3 view = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xzy);
+    // Sparse broad patches of the meadow take the moss photoscan as it is: the patch noise read at a larger scale and an
+    // offset, independent of the lusher and drier patches, with edges reaching further out at the photoscan's moss.
+    float mossy = texture(patches, v_vertex.xz / 300.0 + vec2(0.13, 0.21)).r;
+    if (mossy > 0.5) {
+        vec2 moss_uv = scan_parallax(moss_height, v_vertex.xz / moss_tile, view, scan_relief / moss_tile);
+        float edge = mossy + (texture(moss_height, moss_uv).r - 0.5) * 0.08;
+        float moss = smoothstep(0.6, 0.68, edge) * (1.0 - bare);
+        ALBEDO = mix(ALBEDO, texture(moss_albedo, moss_uv).rgb, moss);
+        NORMAL_MAP = mix(NORMAL_MAP, texture(moss_normal, moss_uv).rgb, moss);
+    }
     // The woods along the mountains take the forest floor photoscan as it is, its edge wandering in broad patches and
     // reaching further out at its litter.
     float woods = texture(woods_distance, (v_vertex.xz - woods_corner) / woods_span).r * woods_reach;

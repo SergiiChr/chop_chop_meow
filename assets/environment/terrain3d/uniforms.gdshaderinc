@@ -20,6 +20,12 @@ uniform float path_tile = 2.0;
 // and the model kit's scans.
 uniform float scan_relief = 0.1;
 
+// The photoscan of moss over gravelly earth, drawn in its own colours in sparse broad patches over the meadow, and its
+// height.
+uniform sampler2D moss_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D moss_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform sampler2D moss_height : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
+uniform float moss_tile = 15.0;
 // The forest floor photoscan, drawn in its own colours in the woods along the mountains, and its height.
 uniform sampler2D forest_albedo : source_color, filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D forest_normal : hint_normal, filter_linear_mipmap_anisotropic, repeat_enable;
