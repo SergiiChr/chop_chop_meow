@@ -13,12 +13,14 @@ internal static class ShorelineAppearance {
     /// <param name="Wet">Brightness at the waterline, where it is wet, as a share of the dry shore's.</param>
     /// <param name="GrassFade">Units over which the shore thins out into the grass.</param>
     /// <param name="Depth">Units of water over which the shore sinks out of sight.</param>
-    internal sealed record ShoreLook(string Name, float Tile, float Wet, float GrassFade, float Depth);
+    /// <param name="Wander">Units over which the shore's edges wander in small bites: the waterline half that either side
+    /// of its line, the grass edge that much on top of its broad patches.</param>
+    internal sealed record ShoreLook(string Name, float Tile, float Wet, float GrassFade, float Depth, float Wander);
 
     /// <summary>Rippled beach sand along the sea coast.</summary>
-    internal static readonly ShoreLook Sand = new("sand", 15, .6f, 2.2f, 3.5f);
+    internal static readonly ShoreLook Sand = new("sand", 15, .6f, 2.2f, 3.5f, 1.2f);
     /// <summary>Mossy ground with stones and bare earth around the pond.</summary>
-    internal static readonly ShoreLook Rocks = new("rocks", 15, .6f, 1.5f, 2.5f);
+    internal static readonly ShoreLook Rocks = new("rocks", 15, .6f, 1.5f, 2.5f, 0);
 
     private static Texture2D Map(ShoreLook look, string map) => GD.Load<Texture2D>($"res://assets/environment/lake/{look.Name}_{map}.jpg");
 
@@ -27,7 +29,11 @@ internal static class ShorelineAppearance {
         material.SetShaderParameter("shore_albedo", Map(look, "albedo"));
         material.SetShaderParameter("shore_tile", look.Tile);
         material.SetShaderParameter("shore_wet", look.Wet);
+        material.SetShaderParameter("shore_wander", look.Wander);
     }
+
+    /// <summary>Distance from the drawn waterline, seaward, where a bank strip starts under the water.</summary>
+    private static float BankStart(ShoreLook look) => -.35f - look.Wander / 2;
 
     private static ShaderMaterial BankMaterial(ShoreLook look) {
         bankShader ??= GD.Load<Shader>("res://assets/environment/lake/bank.gdshader");
@@ -51,7 +57,7 @@ internal static class ShorelineAppearance {
         const int segments = 192, rings = 5;
         void At(float angle, float t) {
             float width = 2.75f + .3f * MathF.Sin(angle * 5 + .8f) + .2f * MathF.Sin(angle * 11);
-            float distance = Mathf.Lerp(-.35f, width, t);
+            float distance = Mathf.Lerp(BankStart(Rocks), width, t);
             var p = Terrain.Lake + new Vector2(MathF.Cos(angle), MathF.Sin(angle)) * (Terrain.Shore(angle) + distance);
             Vertex(tool, p, distance, width);
         }
@@ -69,8 +75,8 @@ internal static class ShorelineAppearance {
         var bank = new SurfaceTool(); bank.Begin(Mesh.PrimitiveType.Triangles);
         const float step = .75f;
         void At(float across, float t) {
-            float width = 5.15f + .35f * MathF.Sin(across * .31f) + .2f * MathF.Sin(across * .83f);
-            float distance = Mathf.Lerp(-.35f, width, t);
+            float width = Terrain.SandWidth(across);
+            float distance = Mathf.Lerp(BankStart(Sand), width, t);
             Vertex(bank, Terrain.Point(Terrain.Coast(across) - 1.2f - distance, across), distance, width);
         }
         for (float across = -300; across < 300; across += step)
@@ -82,7 +88,8 @@ internal static class ShorelineAppearance {
         parent.AddChild(new MeshInstance3D { Name = "SoftCoastalBank", Mesh = bank.Commit(), MaterialOverride = BankMaterial(Sand), CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
 
         var water = new SurfaceTool(); water.Begin(Mesh.PrimitiveType.Triangles);
-        float[] bands = { 0, .3f, 1, 2.5f, 6, 14, 40, 400 };
+        // The water starts inland of its line by as far as the waterline wanders, and its shader cuts the wandering edge.
+        float[] bands = { -Sand.Wander / 2, .3f, 1, 2.5f, 6, 14, 40, 400 };
         void WaterAt(float across, float distance) {
             var p = Terrain.Point(Terrain.Coast(across) - 1.2f + distance, across);
             water.SetNormal(Vector3.Up); water.SetUV(new Vector2(across, distance));

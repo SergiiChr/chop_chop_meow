@@ -14,6 +14,8 @@ uniform float shore_tile = 15.0;
 uniform float shore_wet = 0.6;
 // Units over which the shore thins out into the grass at its inland edge.
 uniform float grass_fade = 2.2;
+// Units over which the shore's edges wander in small bites; the strip starts half that further out under the water.
+uniform float shore_wander;
 varying vec2 world_at;
 
 void vertex() {
@@ -35,10 +37,12 @@ void fragment() {
     ALBEDO = color * mix(shore_wet, 1.0, dryness);
     NORMAL_MAP = texture(shore_normal, shore_uv).rgb;
     ROUGHNESS = mix(0.65, 1.0, smoothstep(0.0, 1.0, distance));
-    // Toward the grass the shore thins out along a line that wanders with broad patches and frays at the
-    // photoscan's own bright and dark spots.
+    // Toward the grass the shore thins out along a line that wanders with broad patches, bites in and out and frays
+    // at the photoscan's own bright and dark spots.
     float patches = sin(world_at.x * 0.45 + world_at.y * 0.21) * sin(world_at.y * 0.37 - world_at.x * 0.18);
+    float bites = sin(world_at.x * 1.9 + world_at.y * 1.1) * sin(world_at.y * 2.3 - world_at.x * 1.4);
     float fray = dot(color, vec3(0.3, 0.59, 0.11)) - 0.45;
-    float inland = distance + (patches * 0.6 + fray * 1.2) * grass_fade / 2.2;
-    ALPHA = smoothstep(-0.3, 0.06, distance) * (1.0 - smoothstep(UV.y - grass_fade, UV.y, inland));
+    float inland = distance + (patches * 0.6 + fray * 1.2) * grass_fade / 2.2 + bites * shore_wander;
+    float sea = -0.5 * shore_wander;
+    ALPHA = smoothstep(sea - 0.3, sea + 0.06, distance) * (1.0 - smoothstep(UV.y - grass_fade, UV.y, inland));
 }

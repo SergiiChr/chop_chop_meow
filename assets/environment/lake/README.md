@@ -15,6 +15,10 @@ Coast mesh UVs encode distance from the boundary, which drives shallows and a na
 `bank.gdshader` draws irregular-width bank strips with a shore photoscan: rippled sand on the coast, mossy ground with
 stones around the pond.
 The shore darkens toward the waterline as if wet and thins out into the grass along a ragged line.
+The coast's sand runs from about 2 to 8 units wide by `Terrain.SandWidth`, which also keeps grass and trees off it.
+Its waterline wanders in lobes and small bites, up to 0.6 units either side of where walking stops: the water mesh
+starts that far inland and the water shader cuts it along the wandering line, showing the sand under it.
+The grass edge bites in and out by up to 1.2 units more on the coast.
 One read of the shore's height map shifts it along the view, so its ripples and stones look sunk in, as far as the
 model kit's scans do.
 The water shader draws the same photoscan under the shallows, sinking into the water's colour a few units out.
