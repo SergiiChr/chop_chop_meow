@@ -237,8 +237,8 @@ give them.
 
 ## Provenance
 
-The ground textures in `environment/terrain3d/textures/` are packed from three [ambientCG](https://ambientcg.com)
-photoscans, Grass004, Ground037 and Rock030, released under CC0 1.0; `tools/ground_textures.py` downloads the pinned
+The ground textures in `environment/terrain3d/textures/` are packed from two [ambientCG](https://ambientcg.com)
+photoscans, Grass004 and Rock030, released under CC0 1.0; `tools/ground_textures.py` downloads the pinned
 1K PNG archives, checks their SHA-256 and packs them at 512 px with `tools/pack_textures.gd`.
 The model surfaces in `models/surfaces/` come the same way from Wood049, Metal038, Rock030, Fabric061, Ground037 and
 Moss002, packed at 256 px by `tools/surface_textures.py` with the same script: a grain EXR holding each pixel's
@@ -250,6 +250,8 @@ Kumar, released under CC0 1.0.
 The shores in `environment/lake/` are two [Poly Haven](https://polyhaven.com) photoscans by Rob Tuytel, released under
 CC0 1.0 and drawn with their own colours and parallax: Aerial Beach 01 at 8K for the sea coast's sand, and Aerial Rocks
 01 at 4K for the pond's pebbles.
+Worn ground in `environment/terrain3d/` is the Poly Haven photoscan Brown Mud Leaves 01 by Rob Tuytel, released under
+CC0 1.0, at 2K with its own colours and parallax.
 `tools/polyhaven_textures.py` downloads the pinned JPEG colour, OpenGL normal and height maps and checks their SHA-256.
 The meshes in `models/food/` are baked from four models of [Kenney's Food Kit](https://kenney.nl/assets/food-kit), released under CC0 1.0, as [Patch's asset library](https://patch.gg) serves them: re-packed, with the texture inside the file, and scaled to real size.
 `tools/food_models.py` downloads the pinned files, checks their SHA-256 and bakes them with `tools/bake_models.gd`.

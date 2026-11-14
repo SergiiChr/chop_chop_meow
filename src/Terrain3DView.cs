@@ -10,8 +10,9 @@ public partial class WorldView {
     private Node3D? terrainTarget;
     // RenderingServer uniforms take RIDs, so retain the texture resource for their lifetime.
     private Texture2D? terrainGrass;
-    /// <summary>The ground texture sets, in Terrain3D id order, with the world units one tile spans: the auto shader puts grass on flat ground and rock on slopes, and the include draws dirt on worn ground.</summary>
-    private static readonly (string Name, float Tile)[] GroundTextures = { ("grass", 4), ("rock", 6), ("dirt", 4) };
+    private readonly Texture2D[] pathMaps = { PathMap("albedo"), PathMap("normal"), PathMap("height") };
+    /// <summary>The ground texture sets, in Terrain3D id order, with the world units one tile spans: the auto shader puts grass on flat ground and rock on slopes.</summary>
+    private static readonly (string Name, float Tile)[] GroundTextures = { ("grass", 4), ("rock", 6) };
     /// <summary>Soft noise over the whole map, about fifteen tiles a blob, for lusher and drier patches of meadow.</summary>
     private readonly NoiseTexture2D terrainPatches = new() { Width = 256, Height = 256, Noise = new FastNoiseLite { Seed = 913, Frequency = .05f, FractalOctaves = 3 } };
 
@@ -98,6 +99,9 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "disturbance", disturbanceTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "shade", sceneryShadeTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "contact", objectShadeTexture.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "path_albedo", pathMaps[0].GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "path_normal", pathMaps[1].GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "path_height", pathMaps[2].GetRid());
         // The shader's tunnel cut-outs hold exactly one entry per cliff.
         if (World.Cliffs.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {World.Cliffs.Length}.");
         var mines = new Vector4[World.Cliffs.Length];
@@ -108,6 +112,8 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "mines", mines);
         GD.Print($"TERRAIN3D: v1.1.0-rc1, 9 regions, {regionSize}² samples/region; playable floor {floor:0.000}");
     }
+
+    private static Texture2D PathMap(string map) => GD.Load<Texture2D>($"res://assets/environment/terrain3d/path_{map}.jpg");
 
     /// <summary>Keeps Terrain3D's finest detail under the view.</summary>
     private void UpdateTerrainTarget() {

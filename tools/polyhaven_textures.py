@@ -28,6 +28,13 @@ SETS = {
         "298493b652ff4305d089262fdaf436ce970bceab9da33874c850a9535717df04",
         "d1452b4245574bae2005b8367458f540d74991d295c832eebc1a1c79d60ed148",
     ),
+    ("environment/terrain3d", "path"): (
+        "brown_mud_leaves_01",
+        "2k",
+        "29c997d77f56e4ea16d3e998a306be0c17fddb28ab4822657c7cd8249040ffda",
+        "b6ec386e00d9d2a1c3a1da6a98a67066b0dfaa88ddb779341df29700cf081bdf",
+        "3688c1acc705f604ffdaf956064c898658bcd2d8b0258e437e671390c896abb8",
+    ),
 }
 ASSETS = ROOT / "assets"
 SOURCE = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg"

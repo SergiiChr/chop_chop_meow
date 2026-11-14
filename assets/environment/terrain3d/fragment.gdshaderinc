@@ -25,17 +25,18 @@
     palette = mix(palette, vec3(0.24, 0.25, 0.23), smoothstep(38.0, 53.0, v_vertex.y) * 0.55);
     float detail = dot(ALBEDO, LUMA) / MEAN;
     ALBEDO = palette * mix(1.0, detail, DETAIL);
-    // Worn building footprints and footpaths worn by walking show dirt through the grass.
+    // Worn building footprints and footpaths worn by walking show the footpath photoscan through the grass.
     float wear = texture(disturbance, v_vertex.xz / 216.0).r;
     wear = max(wear, smoothstep(0.05, 0.6, texture(traffic, v_vertex.xz / 216.0).r)) * (1.0 - bare);
-    vec2 dirt_uv = v_vertex.xz * _texture_uv_scale_array[2];
-    vec4 dirt = texture(_texture_array_albedo, vec3(dirt_uv, 2.0));
-    vec4 dirt_bump = texture(_texture_array_normal, vec3(dirt_uv, 2.0));
-    vec3 path = vec3(0.23, 0.205, 0.14) * mix(1.0, dot(dirt.rgb, LUMA) / MEAN, DETAIL);
-    // The dirt shows first where it stands higher than the grass, so the edge follows the texture.
-    float worn = clamp(wear + (dirt.a - mat.albedo_height.a) * wear, 0.0, 1.0);
-    ALBEDO = mix(ALBEDO, path, worn);
-    NORMAL_MAP = mix(NORMAL_MAP, dirt_bump.rgb, worn);
+    if (wear > 0.0) {
+        // The photoscan lies flat in world x and z, with its height along world up.
+        vec3 view = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xzy);
+        vec2 path_uv = path_parallax(v_vertex.xz / path_tile, view);
+        // The path shows first where it stands higher than the grass, so the edge follows the texture.
+        float worn = clamp(wear + (texture(path_height, path_uv).r - mat.albedo_height.a) * wear, 0.0, 1.0);
+        ALBEDO = mix(ALBEDO, texture(path_albedo, path_uv).rgb, worn);
+        NORMAL_MAP = mix(NORMAL_MAP, texture(path_normal, path_uv).rgb, worn);
+    }
     // Scenery shrinks away on worn ground, and its shade with it.
     float scenery = texture(shade, v_vertex.xz / 216.0).r;
     vec2 objectShade = texture(contact, v_vertex.xz / 216.0).rg;
