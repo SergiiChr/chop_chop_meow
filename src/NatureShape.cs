@@ -15,6 +15,8 @@ internal static class NatureShape {
     public static readonly StandardMaterial3D Natural = ModelKit.Vertex(Surface.Flat, .92f);
     public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .92f);
     public static readonly StandardMaterial3D Rock = ModelKit.Vertex(Surface.Stone, .92f);
+    /// <summary>Boulders, pebbles and quarried stone, in <see cref="ModelKit.RockColor"/>.</summary>
+    public static readonly StandardMaterial3D PlainRock = ModelKit.Vertex(Surface.Rock, .92f);
     public static readonly StandardMaterial3D Glossy = ModelKit.Vertex(Surface.Flat, .4f);
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
 

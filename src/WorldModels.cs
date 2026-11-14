@@ -242,12 +242,12 @@ public static class WorldModels {
             case ThingKind.Tree: prop = Tree(t.Id); break;
             case ThingKind.Stump: prop = new DugProp(); Add(prop.Body, NatureShape.Stump, NatureShape.Timber, Vector3.Zero); break;
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
-            case ThingKind.Stone: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "8d918e"); break;
+            case ThingKind.Stone: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, ModelKit.RockColor); break;
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case ThingKind.Coal: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
             case ThingKind.Tin: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
             case ThingKind.LooseCoal: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "2d2f33", "1d1e21"); break;
-            case ThingKind.LooseStone: prop = new LooseProp(); Add(prop.Body, NatureShape.Pebble(new Color("939184"), t.Id % NatureShape.Variants), NatureShape.Rock, Vector3.Zero, new Vector3(0, t.Id * 47 % 360, 0)); break;
+            case ThingKind.LooseStone: prop = new LooseProp(); Add(prop.Body, NatureShape.Pebble(new Color(ModelKit.RockColor), t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero, new Vector3(0, t.Id * 47 % 360, 0)); break;
             case ThingKind.IronChip: prop = new LooseProp(); LooseOre(prop.Body, "loose_iron", t.Id, "a35a2e", "8b4f2b"); break;
             case ThingKind.TinChip: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "b9bcb4", "8f928b"); break;
             case ThingKind.Stick: prop = new LooseProp(); Stick(prop.Body, t.Id); break;
@@ -373,7 +373,7 @@ public static class WorldModels {
     private static void Rocks(Node3D body, ThingKind kind, int id, string stone, string? vein = null, string? chunks = null) {
         int variant = id % NatureShape.Variants;
         if (vein == null || chunks == null) {
-            Add(body, NatureShape.Rocks(kind.Id(), new Color(stone), variant), NatureShape.Rock, Vector3.Zero);
+            Add(body, NatureShape.Rocks(kind.Id(), new Color(stone), variant), NatureShape.PlainRock, Vector3.Zero);
             return;
         }
         Add(body, NatureShape.Ore(variant, false), NatureShape.OreMaterial(stone, .92f, 0), Vector3.Zero);

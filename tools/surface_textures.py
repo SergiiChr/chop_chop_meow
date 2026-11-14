@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack the pinned CC0 photoscans the model kit tints as its wood, metal, stone, cloth, earth, soil and foliage surfaces."""
+"""Pack the pinned CC0 photoscans the model kit tints as its wood, metal, stone, rock, cloth, earth, soil and foliage surfaces."""
 
 from __future__ import annotations
 
@@ -26,6 +26,10 @@ SETS = {
         "Rock030",
         "d3e0dc55fc46b093631f4d0009c934003c601e69df9aa4ba41a43db3807056ee",
     ),
+    "rock": (
+        "Rock010",
+        "542955172a445235c2ea95029338b9fc250d5ecb72202a628aa09a6a3aea1a88",
+    ),
     "cloth": (
         "Fabric061",
         "fdab47618c56a6ecdffc3ed9131ecba8d21e3a35bcd3932f1c5625cc37514be4",
@@ -49,8 +53,12 @@ POLYHAVEN = {
 }
 MAPS = ("Color", "NormalGL")
 # Cloth scans are nearly even at the game's distance, so the weave keeps all of its contrast to show at all.
-# Soil keeps its colours: the field and compost take its mean colour, so they show the photoscan as it is.
-DETAIL: dict[str, float | Literal["colour"]] = {"cloth": 1.0, "soil": "colour"}
+# Soil and rock keep their colours: models take the scan's mean colour, so they show the photoscan as it is.
+DETAIL: dict[str, float | Literal["colour"]] = {
+    "cloth": 1.0,
+    "rock": "colour",
+    "soil": "colour",
+}
 # A quarter of the source size: a tile spans a model or two and a model is well under a hundred screen pixels.
 SIZE = 256
 OUTPUT = ROOT / "assets" / "models" / "surfaces"

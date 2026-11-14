@@ -5,11 +5,12 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The photoscan a material takes its grain and bump from; its colour stays the model's own, except that soil's grain
-/// keeps the scan's colours around their mean, so a model in <see cref="ModelKit.SoilColor"/> shows the scan as it is.
+/// The photoscan a material takes its grain and bump from; its colour stays the model's own, except that rock's and
+/// soil's grain keep the scan's colours around their mean, so a model in <see cref="ModelKit.RockColor"/> or
+/// <see cref="ModelKit.SoilColor"/> shows the scan as it is.
 /// Foliage is drawn by the shrub shader.
 /// </summary>
-public enum Surface { Flat, Wood, Metal, Stone, Cloth, Earth, Soil, Foliage }
+public enum Surface { Flat, Wood, Metal, Stone, Rock, Cloth, Earth, Soil, Foliage }
 
 /// <summary>
 /// Low-poly primitive helpers shared by every code-built model.
@@ -49,10 +50,11 @@ public static class ModelKit {
         return material;
     }
 
-    /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, a cloth weave is drawn coarse so it shows at the game's distance, and soil at its real size.</summary>
-    public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, Surface.Soil => 2, _ => 1 };
+    /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, a cloth weave is drawn coarse so it shows at the game's distance, and rock and soil at their real size.</summary>
+    public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, Surface.Rock or Surface.Soil => 2, _ => 1 };
 
-    /// <summary>The soil photoscan's mean colour, as `tools/surface_textures.py` prints it when packing.</summary>
+    /// <summary>The rock and soil photoscans' mean colours, as `tools/surface_textures.py` prints them when packing.</summary>
+    public const string RockColor = "4f4e4b";
     public const string SoilColor = "653f2e";
 
     /// <summary>A surface's grain, a multiplier around one; the engine hands out one copy per file.</summary>

@@ -60,7 +60,7 @@ internal static class ItemShape {
         // What follows has a model in the world, which its icon shows; a pile heaps lighter copies of it or of a piece of it.
         ["wood"] = new(Log, Wooden, Lay: Lay.Rows, Rise: .85f),
         ["planks"] = new(Plank, Wooden, Lay: Lay.Rows),
-        ["stone"] = new(f => First(f, NatureShape.Rocks("pile_stone", new Color("8d918e"), 0), 80), NatureShape.Rock, .42f, Lay.Loose, .7f),
+        ["stone"] = new(f => First(f, NatureShape.Rocks("pile_stone", new Color(ModelKit.RockColor), 0), 80), NatureShape.PlainRock, .42f, Lay.Loose, .7f),
         ["iron_ore"] = Nugget("pile_iron", "a35a2e"),
         ["tin_ore"] = Nugget("pile_tin", "b9bcb4"),
         ["coal"] = Nugget("pile_coal", "2d2f33"),

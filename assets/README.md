@@ -50,8 +50,8 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   a spade with a bar across the top of its handle and a pointed blade, laid through both fists while digging.
 - `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
 - `src/ModelKit.cs` — shared primitive, material and fade helpers.
-  A material is flat colour or one of the surfaces wood, metal, stone, cloth and earth: the colour stays the model's
-  own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
+  A material is flat colour or one of the surfaces wood, metal, stone, rock, cloth, earth and soil: the colour stays the
+  model's own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
   layer, so the marks stay put as it moves and a model's own albedo texture stays free.
   `Mat` makes a flat material and `Wood`, `Metal`, `Stone` and `Cloth` a surfaced one for primitives; `Vertex` dresses
   a mesh that carries its own colours and `Dress` any standard material. The foliage surface is laid on the plain
@@ -241,6 +241,8 @@ weave keeps all of its contrast and is drawn coarse, since a fabric scan is near
 The soil surface of the farm field and the compost comes from the Poly Haven photoscan Red Laterite Soil Stones by Amal
 Kumar, released under CC0 1.0, through the same script: its grain keeps the scan's colours around their mean, which
 `ModelKit.SoilColor` holds, so the soil shows the scan as it is while the compost's scraps keep their own colours.
+The rock surface of the stone boulders, loose stones and stone heaps comes the same way from ambientCG's Rock010: its
+grain keeps the scan's colours around their mean, which `ModelKit.RockColor` holds.
 The shores in `environment/lake/` are two [Poly Haven](https://polyhaven.com) photoscans by Rob Tuytel, released under
 CC0 1.0 and drawn with their own colours: Aerial Beach 01 at 4K for the sea coast's sand, and Aerial Rocks 01 at 2K for
 the pond's pebbles.
