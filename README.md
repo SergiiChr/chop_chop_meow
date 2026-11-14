@@ -133,14 +133,15 @@ The interface is drawn at 0.8 of the size it is laid out for (`Game.InterfaceSca
 It keeps that share of the screen at every resolution, with its text drawn at the size it shows.
 
 Wind sways grass, bushes and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
-Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
+Footpaths wear in where the player and workers walk, not where they stand, and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
 meet (SSAO), and world sounds pan with their place on screen.
 Ambient light comes from a sky that is never drawn: light from above and grass-coloured bounce from below, so roofs and walls differ in shade.
 The picture is tonemapped with AgX, which keeps colours as light brightens.
 A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
-The ground has grain and bump from grass, rock and dirt photoscans under its own colours: meadow over the valley with
-soft lusher and drier patches, stone on the mountain slopes, and dirt showing through where the ground is worn.
+The ground has grain and bump from grass and rock photoscans under its own colours: meadow over the valley with soft
+lusher and drier patches and stone on the mountain slopes; where the ground is worn, a photoscan of muddy soil with
+leaves shows through in its own colours.
 Shrubs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading.
 
 ## Controls

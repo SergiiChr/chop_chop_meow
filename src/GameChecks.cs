@@ -1213,6 +1213,9 @@ public partial class Game {
         await KeyStroke(Key.F9);
         // Half a second of play passes before the first footfall wears the loaded world's ground.
         Require(view.WornGround == 0, "A loaded game must start on unworn ground, not on the footpaths of the game before.");
+        // Two footfalls' time spent standing still.
+        await Seconds(1.2);
+        Require(view.WornAt(world.Player) == 0, "Standing still must not wear the ground underfoot.");
         Require(world.Player.DistanceTo(savedPosition) < .01f && world.Things.Any(t => t.Id == chest.Id && t.Inventory["wood"] == savedWood), "F9 must restore position and stored items from disk.");
         Require(world.HotbarSlots.SequenceEqual(savedSlots) && world.ActiveHotbar == savedActiveSlot, "F5 and F9 must preserve hotbar references and selection.");
         Warp(Hosted, world.Player + Vector2.One); await CloseWithEsc();

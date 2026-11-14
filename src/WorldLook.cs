@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Godot;
 
 namespace ChopChopMeow;
@@ -15,6 +16,10 @@ public partial class WorldView {
     private ImageTexture trafficTexture = null!;
     private float trafficClock, regrowClock;
     private bool trafficChanged;
+    /// <summary>Where the player, under id -1, and each worker last set foot; they wear the ground only once they move on from there.</summary>
+    private readonly Dictionary<int, Vector2> footfalls = new();
+    /// <summary>How far a walker moves between two footfalls before the second wears the ground.</summary>
+    private const float FootfallSpacing = .25f;
 
     private void BuildLook() {
         trafficImage = Image.CreateFromData(TrafficSize, TrafficSize, false, Image.Format.R8, traffic);
@@ -29,6 +34,7 @@ public partial class WorldView {
     /// <summary>Another world starts on unworn ground.</summary>
     private void ClearPaths() {
         Array.Clear(traffic);
+        footfalls.Clear();
         ShowPaths();
         trafficClock = 0;
     }
@@ -49,6 +55,9 @@ public partial class WorldView {
         }
     }
 
+    /// <summary>How worn the ground is at a point, from none at zero to bare at 255.</summary>
+    public byte WornAt(Vector2 at) => traffic[(int)(at.Y * TrafficScale) * TrafficSize + (int)(at.X * TrafficScale)];
+
     /// <summary>Per-frame look updates; none of them allocates.</summary>
     private void UpdateLook(float dt) {
         Wind.Update(dt, World.Player);
@@ -67,8 +76,8 @@ public partial class WorldView {
         trafficClock += dt; regrowClock += dt;
         if (trafficClock < .5f) return;
         trafficClock = 0;
-        Tread(World.Player);
-        foreach (var worker in World.Workers) Tread(worker.Pos);
+        Tread(-1, World.Player);
+        foreach (var worker in World.Workers) Tread(worker.Id, worker.Pos);
         // Grass takes back even a fully bare path within two game days.
         if (regrowClock > World.Data.DaySeconds * 2 / 255) {
             regrowClock = 0;
@@ -78,8 +87,14 @@ public partial class WorldView {
         if (trafficChanged) ShowPaths();
     }
 
-    /// <summary>One step's wear: strongest under the foot, fading over about a tile.</summary>
-    private void Tread(Vector2 at) {
+    /// <summary>
+    /// One step's wear, strongest under the foot and fading over about a tile, once the walker has moved on from its last
+    /// footfall; standing still, or first seen, it wears nothing.
+    /// </summary>
+    private void Tread(int walker, Vector2 at) {
+        bool moved = footfalls.TryGetValue(walker, out var last) && last.DistanceTo(at) >= FootfallSpacing;
+        if (moved || !footfalls.ContainsKey(walker)) footfalls[walker] = at;
+        if (!moved) return;
         int cx = (int)(at.X * TrafficScale), cy = (int)(at.Y * TrafficScale);
         for (int y = cy - 2; y <= cy + 2; y++)
             for (int x = cx - 2; x <= cx + 2; x++) {
