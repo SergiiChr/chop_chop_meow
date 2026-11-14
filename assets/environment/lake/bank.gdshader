@@ -28,20 +28,9 @@ void fragment() {
     float distance = UV.x + fleck * 0.1;
     float dryness = smoothstep(0.12, 1.3, distance);
     vec2 shore_uv = world_at / shore_tile;
-    // Steps into the photoscan along the view, from its top down, until it reaches the depth the height map gives
-    // there, then settles between the last two steps; a steeper view needs fewer steps.
+    // One read of the height map shifts the photoscan along the view, so its low spots look sunk in.
     vec3 view = normalize(VIEW * mat3(TANGENT, -BINORMAL, NORMAL));
-    float layers = mix(48.0, 12.0, abs(view.z));
-    vec2 step = view.xy * (shore_relief / shore_tile) / layers;
-    float layer = 0.0, depth = 1.0 - texture(shore_height, shore_uv).r, previous = depth;
-    for (int i = 0; i < 48 && layer < depth; i++) {
-        shore_uv -= step;
-        previous = depth;
-        depth = 1.0 - texture(shore_height, shore_uv).r;
-        layer += 1.0 / layers;
-    }
-    float after = depth - layer, before = previous - layer + 1.0 / layers;
-    shore_uv = mix(shore_uv, shore_uv + step, after / (after - before));
+    shore_uv -= view.xy * (shore_relief / shore_tile) * (1.0 - texture(shore_height, shore_uv).r);
     vec3 color = texture(shore_albedo, shore_uv).rgb;
     ALBEDO = color * mix(shore_wet, 1.0, dryness);
     NORMAL_MAP = texture(shore_normal, shore_uv).rgb;

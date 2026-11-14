@@ -59,8 +59,8 @@ Three Poly Haven photoscans are drawn in their own colours, each at about real s
 - Worn ground takes `brown_mud_leaves_01` (`path_*.jpg`, 2K, one tile 2 world units), over all of these.
 
 One read of each photoscan's height map shifts it along the view, 0.1 units at most.
-Stepping down to the height map as the shores do cost 1.1 to 1.4 ms a frame on an RTX 4080 even with no worn ground
-in view, since the larger shader slowed all the ground; the single read costs nothing measurable.
+Stepping down to the height map instead cost 1.1 to 1.4 ms a frame on an RTX 4080 even with no worn ground in view,
+since the larger shader slowed all the ground; the single read costs nothing measurable.
 
 The first Godot 4.7.2 editor import after installing the runtime can exit with signal 11 during editor shutdown.
 Setup keeps that log and retries once, only when editor initialization completed and Godot reported no engine errors.
