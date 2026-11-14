@@ -16,17 +16,17 @@ import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 SETS = {
     ("environment/lake", "sand"): (
         "aerial_beach_01",
-        "8k",
-        "492b89604cd79f733557b590f561ddc9ea51739705d96d9768c4ca1614b44b60",
-        "0a59f38f2dd43985619d3574b9ec67845cce5e86baa9a4767333ab7f539e635f",
-        "1ad0d03acc97a6b93b6582e0c78ab37f090f3e1031770eef0b4d134ab75c98d4",
+        "2k",
+        "1803d7e2861b304bea6d2e124dcd4c657fcb93843b84c17bb2db98ce48a87e4e",
+        "0f35185b7225fe2027897bb7e4586c7deb048817524f1ed104fdae7ce80bdc06",
+        "73c4795adc4232511b1810995eb6740295ff6d713df5b57573f9413565231f20",
     ),
     ("environment/lake", "rocks"): (
         "coast_sand_rocks_02",
-        "8k",
-        "d1973fe3971f3ace9ed514b19077f6fca393446fa5402108346af9b25f5d2b19",
-        "e924fa9f0eaaab4ddc162954fd30164912694146a0af3c7d9f083559b54fa6cd",
-        "de6b3edec35804fab6a80a13676ba464e62987fd35c70b3517b2eda313db2fe5",
+        "2k",
+        "98a8850f24cba18e4c99e46c56f5675f910809ee7f75df3e8587ec9e27088ed6",
+        "e75cd105d218aae5bf669630635e6753a78f6325bc799be3d0ee8b974853a84d",
+        "109dfa81b1085e1b1d32ba740c0efb04b06e0b497925ef8e58e9c3c0e6753617",
     ),
     ("environment/terrain3d", "path"): (
         "brown_mud_leaves_01",
