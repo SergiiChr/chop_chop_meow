@@ -12,10 +12,10 @@ The upstream license is in `LICENSE`.
 
 The shader also shades the coastline.
 Coast mesh UVs encode distance from the boundary, which drives shallows and a narrow animated foam wash.
-`bank.gdshader` draws irregular-width bank strips with a shore photoscan: rippled sand on the coast, pebbles around the
-pond.
+`bank.gdshader` draws irregular-width bank strips with a shore photoscan: rippled sand on the coast, mossy ground with
+stones around the pond.
 The shore darkens toward the waterline as if wet and thins out into the grass along a ragged line.
-Its height map shifts it with the view, so its ripples and pebbles look sunk in, as far as the model kit's scans do.
+Its height map shifts it with the view, so its ripples and stones look sunk in, as far as the model kit's scans do.
 The water shader draws the same photoscan under the shallows, sinking into the water's colour a few units out.
 `ShorelineAppearance.ShoreLook` holds each shore's photoscan, tile size, wet shade and fade widths.
 Lake stones cluster in patches rather than an even ring.

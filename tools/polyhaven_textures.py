@@ -22,11 +22,11 @@ SETS = {
         "1ad0d03acc97a6b93b6582e0c78ab37f090f3e1031770eef0b4d134ab75c98d4",
     ),
     ("environment/lake", "rocks"): (
-        "aerial_rocks_01",
-        "4k",
-        "df324eaacd84a7cd14d20a375d0c5902b2a07a0e3668979d6044d591fb88aa66",
-        "298493b652ff4305d089262fdaf436ce970bceab9da33874c850a9535717df04",
-        "d1452b4245574bae2005b8367458f540d74991d295c832eebc1a1c79d60ed148",
+        "coast_sand_rocks_02",
+        "8k",
+        "d1973fe3971f3ace9ed514b19077f6fca393446fa5402108346af9b25f5d2b19",
+        "e924fa9f0eaaab4ddc162954fd30164912694146a0af3c7d9f083559b54fa6cd",
+        "de6b3edec35804fab6a80a13676ba464e62987fd35c70b3517b2eda313db2fe5",
     ),
     ("environment/terrain3d", "path"): (
         "brown_mud_leaves_01",

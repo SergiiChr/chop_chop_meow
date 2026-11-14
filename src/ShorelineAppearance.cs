@@ -17,8 +17,8 @@ internal static class ShorelineAppearance {
 
     /// <summary>Rippled beach sand along the sea coast.</summary>
     internal static readonly ShoreLook Sand = new("sand", 15, .6f, 2.2f, 3.5f);
-    /// <summary>Pebbles, earth and moss around the pond.</summary>
-    internal static readonly ShoreLook Rocks = new("rocks", 10, .6f, 1.5f, 2.5f);
+    /// <summary>Mossy ground with stones and bare earth around the pond.</summary>
+    internal static readonly ShoreLook Rocks = new("rocks", 15, .6f, 1.5f, 2.5f);
 
     private static Texture2D Map(ShoreLook look, string map) => GD.Load<Texture2D>($"res://assets/environment/lake/{look.Name}_{map}.jpg");
 

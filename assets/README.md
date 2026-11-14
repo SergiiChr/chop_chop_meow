@@ -248,8 +248,8 @@ The scans come through the same script at their full 1K size, so their marks sta
 ambientCG's Rock026 and coal from its Rock035, and soil from the Poly Haven photoscan Red Laterite Soil Stones by Amal
 Kumar, released under CC0 1.0.
 The shores in `environment/lake/` are two [Poly Haven](https://polyhaven.com) photoscans by Rob Tuytel, released under
-CC0 1.0 and drawn with their own colours and parallax: Aerial Beach 01 at 8K for the sea coast's sand, and Aerial Rocks
-01 at 4K for the pond's pebbles.
+CC0 1.0 and drawn with their own colours and parallax, both at 8K and one tile 15 world units: Aerial Beach 01 for the
+sea coast's sand, and Coast Sand Rocks 02 for the mossy, stony ground around the pond.
 Worn ground in `environment/terrain3d/` is the Poly Haven photoscan Brown Mud Leaves 01 by Rob Tuytel, released under
 CC0 1.0, at 2K with its own colours and parallax.
 `tools/polyhaven_textures.py` downloads the pinned JPEG colour, OpenGL normal and height maps and checks their SHA-256.
