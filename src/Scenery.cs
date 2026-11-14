@@ -32,10 +32,9 @@ public static class Scenery {
     public static float Density(Vector2 p) => Patches.GetNoise2D(p.X, p.Y);
     public const float Bare = -.32f;
 
-    /// <summary>Whether scenery may stand at a spot: dry open ground off the beach, the lake shore, the mountain feet, the clearing where players start and the mine approaches.</summary>
+    /// <summary>Whether scenery may stand at a spot: dry open ground off the beach, the lake shore, the mountain feet and the mine approaches.</summary>
     public static bool Dressable(Vector2 p) {
         if (!Terrain.Open(p) || Terrain.Beach(p) || Terrain.InLake(p, 1.1f) || Terrain.FromMountains(p) < 2) return false;
-        if (p.DistanceTo(Terrain.Spawn) < 4.5f) return false;
         foreach (var cliff in World.Cliffs) {
             var offset = p - World.MineSpot(cliff); float depth = offset.Dot(cliff.Face);
             if (Math.Abs(offset.Dot(cliff.Along)) < 3 && depth > -6 && depth < 2) return false;

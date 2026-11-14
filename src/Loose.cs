@@ -18,8 +18,8 @@ public partial class World {
         }
     }
 
-    /// <summary>Whether a scenery spot is free for a thing to lie or grow on: ground that scenery may stand on, clear of what is already there.</summary>
-    private bool FreeSpot(Vector2 p) => Scenery.Dressable(p) && !S.Things.Any(t => t.Pos.DistanceTo(p) < (t.Kind == ThingKind.Tree ? .95f : t.IsResource ? 1.3f : 2.7f));
+    /// <summary>Whether a scenery spot is free for a thing to lie or grow on: ground that scenery may stand on, away from where players start and clear of what is already there.</summary>
+    private bool FreeSpot(Vector2 p) => Scenery.Dressable(p) && p.DistanceTo(Terrain.Spawn) >= 4.5f && !S.Things.Any(t => t.Pos.DistanceTo(p) < (t.Kind == ThingKind.Tree ? .95f : t.IsResource ? 1.3f : 2.7f));
 
     /// <summary>After a hit with a pickaxe on rock or ore, now and then drops a loose piece of it on open ground nearby.</summary>
     private void Chip(Thing rock, string? tool) {
