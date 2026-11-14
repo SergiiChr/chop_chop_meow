@@ -184,7 +184,7 @@ public partial class WorldView {
 
     private static readonly (string Name, ActorSkin Skin, ActorAction Action)[] ReviewClips =
     {
-        ("player jog", ActorSkin.Player, ActorAction.Jog), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop),
+        ("player jog", ActorSkin.Player, ActorAction.Jog), ("player run", ActorSkin.Player, ActorAction.Run), ("player axe", ActorSkin.Player, ActorAction.Chop), ("player steel axe", ActorSkin.Player, ActorAction.SteelChop), ("player axe swing", ActorSkin.Player, ActorAction.SteelAxeSwing),
         ("player pick", ActorSkin.Player, ActorAction.Mine), ("player steel pick", ActorSkin.Player, ActorAction.SteelMine), ("player gather", ActorSkin.Player, ActorAction.Gather),
         ("player hammer", ActorSkin.Player, ActorAction.Hammer), ("player pump", ActorSkin.Player, ActorAction.Pump), ("player punch", ActorSkin.Player, ActorAction.Attack),
         ("player idle", ActorSkin.Player, ActorAction.Idle), ("worker walk", ActorSkin.Worker, ActorAction.Walk), ("worker axe", ActorSkin.Worker, ActorAction.Chop),
@@ -211,6 +211,8 @@ public partial class WorldView {
     private static readonly float ReviewPitch = Launch.Number("--animation-pitch", Pitch);
     /// <summary>Degrees <c>--animation-turn</c> turns the close-up clip's rig from where it moves, to see it from the front or behind.</summary>
     private static readonly float ReviewTurn = Launch.Number("--animation-turn", 0);
+    /// <summary>How far ahead of someone felling a tree the middle of its trunk stands, and the trunk's radius, for the close-up's trunk.</summary>
+    private const float ReviewTrunkAhead = 1.33f, ReviewTrunkRadius = .13f;
     /// <summary>The close-up clip's actor, moved and posed the way the game moves and poses everyone.</summary>
     private readonly ActorState reviewActor = new();
 
@@ -243,6 +245,8 @@ public partial class WorldView {
             review = ReviewTrack();
             var rig = new ActorRig(skin);
             review.AddChild(rig.Root); reviewRigs.Add(rig);
+            // A felling stroke plays against a trunk standing where a tree does when the player stops to chop it.
+            if (action is ActorAction.Chop or ActorAction.SteelChop) Post(review, ReviewTrunkRadius, ReviewTrunkRadius, 3, ScreenRight * ReviewTrunkAhead, Mat("6b4a32", 1), 12);
         }
         // The actor crosses 40 metres of track, then starts over; the jump back carries its last place with it, so it stays one step.
         var track = new Vector2(ScreenRight.X, ScreenRight.Z);

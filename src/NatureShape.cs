@@ -242,10 +242,12 @@ internal static class NatureShape {
         return color.Lightened(Noise(p * 3, seed) * .05f);
     };
 
+    /// <summary>The radius of the stump's cut face, which a tree's model scales to its trunk.</summary>
+    public const float StumpRadius = .26f;
     /// <summary>A felled tree's stump: bark sides with root flare and a pale cut face.</summary>
     public static Mesh Stump => Cached("stump", s => {
         Color bark = new("6b4a32"), wood = new("c9a477");
-        Lathe(s, Transform3D.Identity, new Step[] { new(0, .36f, new Color("4f3624")), new(.1f, .28f, bark), new(.32f, .26f, wood) }, 9, 5, .06f);
+        Lathe(s, Transform3D.Identity, new Step[] { new(0, .36f, new Color("4f3624")), new(.1f, .28f, bark), new(.32f, StumpRadius, wood) }, 9, 5, .06f);
     });
 
     /// <summary>The same folded leaf construction is used for resource bushes and lightweight scenery lobes.</summary>

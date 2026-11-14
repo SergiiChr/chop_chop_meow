@@ -261,6 +261,10 @@ The camera is orthographic with a 30° pitch, giving a 2:1 isometric footprint.
 Picking, the hover ring and canopy fading use the same per-kind vertical hit cylinders (`WorldModels.Hits`), so selection matches what is drawn.
 A tree crown only wins a click when nothing else is under the cursor, so objects behind a canopy stay selectable.
 Trees use three variants chosen by object id, so saves need no new fields.
+A tree's height comes from its id too (`WorldModels.TreeTall`): its model and hit boxes are sized by `WorldModels.TreeScale`, 0.9 to 1.5.
+The bake stands each tree's lowest point on the ground, which on a spruce and one oak is a hanging branch, so their baked trunks start up to 1.8 m higher; `Tree3DShape.Add` carries such a trunk down to the ground with a stem that widens toward its foot.
+A stump keeps the id of the tree that left it (`Thing.OfTree`), so its model stands where that tree's trunk did (`DugProp.Seat`) and is as thick as the trunk was at the ground (`Tree3DShape.Foot`): a birch leaves a thin stump and an oak a stout one.
+A stump with no tree on record, such as a showcase's or one in an older save, is shaped as if a tree with the stump's own id had left it.
 Fading swaps in cached alpha-blended copies of a model's materials, so faded trees still share a handful of materials.
 
 ### Actor animation
@@ -316,7 +320,11 @@ Both arms are solved from where the hands have to be (`ActorAnimation.ArmTo`), s
 `ActorRig` turns the bowl and pestle against their forearms in the resting pose (`ActorAnimation.GrindRest`), which keeps the bowl level and the pestle leaning toward its hand.
 While someone grinds, the table's own mortar is off the counter (`WorldView.grinding`).
 
-Manual bellows pumping and the unarmed punch trigger one loop of their action.
+Felling a tree (`Chop`, `SteelChop`) is a stroke from the side: the axe is wound round to the left at shoulder height and swung across, almost level, into the trunk's flank.
+The shoulders turn through the stroke, the grip turns the blade to cut sideways (`Pose.Grip`, which `ActorRig` applies at the right fist), and the left fist is put on the handle just past the right (`ActorAnimation.TwoHanded`).
+An axe swung in the air with Space or a click (`AxeSwing`, `SteelAxeSwing`) goes up overhead and comes straight down, which is the blow that lands on a wolf.
+
+Manual bellows pumping, the unarmed punch and the axe swing trigger one loop of their action.
 Each striking work action has an impact moment that shakes its target and spawns chips, leaves, soil, splashes or sparks; packing and grinding strike nothing.
 A dig strikes at `ActorAnimation.DigStrike` and throws its soil off the blade (`ActorRig.ShovelTip`) at `DigToss`.
 An action's key poses are made once (`ActorAnimation.ChopKeys` and the like): every worker and player is posed every frame, so a pose is worked out without allocating.
@@ -478,7 +486,7 @@ Killed wolves leave a `wolf_corpse` resource that yields raw meat, which the sto
 - Oaks drop a patch of leaves beside the trunk (`World.LeafPatch`), refilled every dawn.
 - Loose stones and sticks (`loose_stone`, `stick`) sit on the baked scenery spots `Scenery.Loose` picks; `World.ScatterLoose` lays them when a world is made, and the view dresses the remaining spots with plants. Each gives 1 stone or 1 wood and does not come back.
 - `World.Chip` drops a loose piece (`loose_stone`, `iron_chip`, `loose_coal`, `tin_chip`) within `GatherRules.ChipReach` of a boulder or deposit on `GatherRules.ChipChance` of pickaxe hits, a player's or a worker's; the view flies it there from the rock.
-- A felled tree is taken out of the world and its stump (`stump`, `World.StumpWood`) put in its place by `World.Fell`, as a thing of its own with a new id.
+- A felled tree is taken out of the world and its stump (`stump`, `World.StumpWood`) put in its place by `World.Fell`, as a thing of its own with a new id that keeps the tree's id in `Thing.OfTree`.
 - Plain bushes (`bush`, `World.BushLeaves`) grow on the scenery spots `Scenery.Bush` picks (`World.GrowBushes`), away from the clearing and the mountain feet.
 - A stump or a bush is dug up whole (`GatherShape.Dug`, `Thing.IsDug`): digging adds to `Thing.Progress` at the shovel's speed until `GatherRules.DigSeconds`, then `World.Unearth` moves all it holds to the digger and removes it with a `dig_up` sound. The player's backpack must have room for all of it (`World.GatherBlock`), and a worker's hands are sized for it.
 - Stumps and bushes never block building (`World.BuiltOver`): a new building, yard or crate clears away those on the ground it keeps clear of other resources (`World.ClearGround`).
@@ -853,8 +861,16 @@ A sound on screen plays at full volume, one just past the screen edge is faint, 
 Sounds come from three places:
 
 - The simulation names discrete events through `World.Sound` (a fire catching, a wolf bite, a cart's payment) and stays silent while sleep fast-forwards.
-- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids and the cabin door.
+- The view plays sounds tied to animation timing: footsteps by ground type, axe, pickaxe, anvil and bench impacts, a shovel going into the soil and throwing it aside, rail clinks while fitting a mine, rustles of hand picking and packing, butchering, the mortar, blows landing on wolves, bellows pumps, storage lids, the cabin door and a felled tree.
 - `Net.Do` gives a player's inventory moves and spending a sound by item kind, sent to that player, when the action made none of its own.
+
+A tree felled in sight takes 1 second to reach the ground when it is among the shortest and 2.1 when among the tallest (`WorldView.FallSeconds`).
+It is heard twice, each sound started by the animation so both land on their moment whatever the tree's height:
+
+- As it starts to go: `tree_crack`, about a second of cracking or less, or for the tallest three in ten `tree_bend`, 1.8 seconds of wood tearing that lasts about as long as their fall.
+- As the trunk reaches the ground: `tree_crash`, the boom and the crown settling.
+
+Both play lower and slower the taller the tree, from a tenth above their recorded pitch to a tenth below (`Sounds.Play`'s `pitch`).
 
 ### Music
 

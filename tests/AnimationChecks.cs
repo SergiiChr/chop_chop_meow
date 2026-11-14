@@ -297,9 +297,13 @@ public static class AnimationChecks {
             Require(Math.Abs(start.SwingL - end.SwingL) < 2,
                 $"{action} should end with its left swing where it started");
         }
-        var windup = ActorAnimation.PoseAt(ActorAction.Chop, .38f, false);
-        var strike = ActorAnimation.PoseAt(ActorAction.Chop, .52f, false);
-        Require(windup.RaiseR > 150 && strike.RaiseR < 100, "the axe stroke should rise overhead and come down to the trunk");
+        var windup = ActorAnimation.PoseAt(ActorAction.AxeSwing, .38f, false);
+        var strike = ActorAnimation.PoseAt(ActorAction.AxeSwing, .52f, false);
+        Require(windup.RaiseR > 150 && strike.RaiseR < 100, "an axe swung in the air should rise overhead and come down");
+        var back = ActorAnimation.PoseAt(ActorAction.Chop, .38f, false);
+        var cut = ActorAnimation.PoseAt(ActorAction.Chop, .52f, false);
+        Require(back.Twist > 30 && cut.Twist < 0 && back.RaiseR < 100, "felling should wind the axe round to the side and swing it across, not overhead");
+        Require(cut.Grip == 90, "felling should turn the blade to cut sideways into the trunk");
         Require(ActorAnimation.PoseAt(ActorAction.Gather, .3f, false).KneeL > 80, "hand gathering should crouch");
         Require(ActorAnimation.PoseAt(ActorAction.PickUp, .32f * ActorAnimation.Duration(ActorAction.PickUp), false).KneeL > 80, "picking up a loose piece should crouch for it");
         var swingWalking = ActorAnimation.PoseAt(ActorAction.TorchSwing, .27f, true);

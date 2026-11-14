@@ -29,6 +29,7 @@ public static class DigChecks {
         HoldGather(world, tree, 10);
         var stump = world.Things.SingleOrDefault(t => t.Kind == ThingKind.Stump);
         Require(world.Find(tree.Id) == null && stump != null && stump.Pos == tree.Pos, "a felled tree should leave a stump where it stood");
+        Require(stump.OfTree == tree.Id, "a stump should keep on record which tree left it, since that tree's size shapes it");
         Require(world.Backpack["wood"] == 4, $"felling the tree should give its 4 wood: {world.Backpack["wood"]}");
         Require(world.GatherBlock(stump)?.Contains("shovel") == true, $"a stump should ask for a shovel: {world.GatherBlock(stump)}");
         HoldGather(world, stump, 10);

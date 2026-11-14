@@ -68,7 +68,7 @@ Play accepts Godot arguments after `--`:
 | `--showcase --resolution 2560x1440` | Render at a given size, such as the player's own |
 | `--animation-review` | Show every actor action on rotating rigs |
 | `--animation-capture /absolute/directory` | Capture the animation review frames for visual inspection, evenly spaced at 30 a second |
-| `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following |
+| `--animation-review --animation-clip "player run"` | Show one clip close up, moving over marked ground at its speed in the world, with the camera following; a felling clip such as `"player steel axe"` plays against a trunk |
 | `--animation-review --animation-clip "wolf leap"` | Show one wolf clip close up; the leap, hit and feed play against a player |
 | `--animation-pitch 4` | Tilt the review camera down by this many degrees, low for a side view; the game's 30 otherwise |
 | `--animation-turn -90` | Turn the close-up rig from where it moves, here to face the camera |
@@ -161,7 +161,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | H | Open the crew overview |
 | I | Open or close the field guide |
 | 1–9 or click a hotbar slot | With a building's page open, a click moves the slot's item there instead; otherwise put that slot in hand, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
-| Space | Swing axe, or pump the selected nearby reinforced furnace |
+| Space | Swing axe overhead, or pump the selected nearby reinforced furnace |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
@@ -807,7 +807,7 @@ A save that is incomplete, names items the game does not know or holds needs out
 The environment uses a shared human scale, Terrain3D mountain ranges, a rippled sand beach along the sea, and an irregular lake with a mossy, stony shore, reeds, lily pads and clustered shore stones.
 Meadow grass and wildflowers grow in patches, ferns add woodland ground cover, and plain bushes stand among them.
 Building footprints and mine approaches keep the ground cover clear, with worn soil around active work areas.
-There are three tree types (oak, spruce, birch).
+There are three tree types (oak, spruce, birch), from short trees to ones two thirds taller.
 
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.
 The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset.
@@ -819,10 +819,11 @@ Trees in front of the player, a worker or a structure turn see-through.
 
 Player and worker actions use a jointed 3D rig with keyframed poses for idling, walking, jogging, sprinting, hand gathering, axe and pick strokes, digging with a shovel in both hands, hammering, packing crates, grinding with a mortar and pestle, bellows pumping, crate carrying, sitting at lunch (cross-legged on the ground or on a rock) and an unarmed punch.
 Player tool actions follow the carried tool, while worker actions follow explicit transient work state rather than display text.
+A tree is felled with strokes from the side into its trunk, while an axe swung in the air comes down from overhead.
 
 The world reacts too:
 
-- trees shake and topple over the stumps they leave;
+- trees shake and topple over the stumps they leave, a tall one slower than a short one;
 - a stump or a bush leans further out of the ground as it is dug at, then is thrown up out of a spray of soil and is gone;
 - deposits shrink and throw chips;
 - the bellows board travels with each press, and the heat gauge tracks the forge;
@@ -841,6 +842,7 @@ Sound effects follow the same actions:
 
 - footsteps change on grass, rock and the lake shore;
 - axes, pickaxes, anvils, benches and swings have impacts, and fitting a mine's frame clinks on its rails;
+- a felled tree cracks as it breaks, a tall one tearing at length, and crashes as it reaches the ground;
 - a shovel crunches into the soil and throws it aside, and a stump or bush comes out with a heave of earth;
 - picking plants by hand and packing crates rustle, butchering tears, and a mortar grinds;
 - bellows puff;

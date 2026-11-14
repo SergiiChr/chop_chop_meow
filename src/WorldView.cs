@@ -723,7 +723,7 @@ public partial class WorldView : Node3D {
         switch (subject.Kind) {
             case ThingKind.Tree:
                 Burst(side + Vector3.Up * 1.1f, Mat("d9b07a"), 7, 2.6f, .55f, 9, .06f);
-                Burst(To3(subject.Pos, 3.6f), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
+                Burst(To3(subject.Pos, 3.6f * WorldModels.TreeScale(subject.Id)), Mat("5d8a3c"), 3, .6f, 1.8f, 1.2f, .09f);
                 break;
             case ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin or ThingKind.Mine:
                 var color = subject.Kind is ThingKind.Stone or ThingKind.Mine ? "9a9d99" : subject.Kind == ThingKind.Iron ? "a35a2e" : subject.Kind == ThingKind.Tin ? "b9bbb4" : "26282b";
@@ -747,8 +747,14 @@ public partial class WorldView : Node3D {
         }
     }
 
-    /// <summary>Seconds after it is felled when a tree's trunk and crown have faded away over the stump.</summary>
-    private const float TreeGone = 1.7f;
+    /// <summary>Seconds a felled tree takes to reach the ground: a second for the shortest, just over two for the tallest.</summary>
+    private static float FallSeconds(float tall) => 1 + 1.1f * tall;
+    /// <summary>Seconds a felled tree lies where it landed before it starts to fade, and seconds its trunk and crown then take to fade away over the stump.</summary>
+    private const float TreeLiesSeconds = .1f, TreeFadeSeconds = .5f;
+    /// <summary>How tall a tree stands (<see cref="WorldModels.TreeTall"/>) before it tears at length as it goes over rather than cracks.</summary>
+    private const float TearsFrom = .7f;
+    /// <summary>How much lower and slower a tree's sounds play the taller it stands.</summary>
+    private static float TreePitch(float tall) => 1.1f - .2f * tall;
     private readonly HashSet<int> seen = new();
     private readonly List<Thing> known = new();
     private readonly List<int> gone = new();
@@ -877,23 +883,30 @@ public partial class WorldView : Node3D {
     private bool Depart(Prop prop, float dt) {
         switch (prop) {
             case TreeProp tree:
+                float lands = FallSeconds(tree.Tall);
+                // The wood gives as the tree starts to go: the tearing of a tall tree lasts about as long as its fall.
+                if (tree.Fall < 0) Sounds?.Play(tree.Tall >= TearsFrom ? "tree_bend" : "tree_crack", prop.Look.Pos, pitch: TreePitch(tree.Tall));
                 float before = Math.Max(0, tree.Fall); tree.Fall = before + dt;
-                float drop = Math.Min(1, tree.Fall / 1.1f);
+                float drop = Math.Min(1, tree.Fall / lands);
                 tree.Sway.RotationDegrees = new Vector3(90 * drop * drop, 0, 0);
-                if (before < 1.1f && tree.Fall >= 1.1f) Burst(prop.Root.Position + tree.Sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
-                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - 1.2f) / .5f, 0, 1));
-                return tree.Fall < TreeGone;
+                if (before < lands && tree.Fall >= lands) {
+                    Burst(prop.Root.Position + tree.Sway.GlobalBasis.Y * 3.5f + Vector3.Up * .3f, FallDust, 8, 1.2f, 1.1f, -.2f, .3f, 1.5f);
+                    Sounds?.Play("tree_crash", prop.Look.Pos, pitch: TreePitch(tree.Tall));
+                }
+                SetFade(tree.SwayParts, Math.Clamp((tree.Fall - lands - TreeLiesSeconds) / TreeFadeSeconds, 0, 1));
+                return tree.Fall < lands + TreeLiesSeconds + TreeFadeSeconds;
             case DugProp dug:
                 if (dug.Out < 0) {
                     dug.Out = 0;
-                    Burst(prop.Root.Position + Vector3.Up * .1f, Soil, 10, 2.4f, .6f, 9, .07f);
-                    Burst(prop.Root.Position + Vector3.Up * .15f, GatherDust, 4, .6f, .9f, -.3f, .2f, 1.5f);
-                    if (prop.Kind == ThingKind.Bush) Burst(prop.Root.Position + Vector3.Up * .5f, Mat("5d8a3c"), 6, 1.6f, .8f, 5, .06f);
+                    var foot = prop.Root.Position + dug.Seat;
+                    Burst(foot + Vector3.Up * .1f, Soil, 10, 2.4f, .6f, 9, .07f);
+                    Burst(foot + Vector3.Up * .15f, GatherDust, 4, .6f, .9f, -.3f, .2f, 1.5f);
+                    if (prop.Kind == ThingKind.Bush) Burst(foot + Vector3.Up * .5f, Mat("5d8a3c"), 6, 1.6f, .8f, 5, .06f);
                 }
                 dug.Out += dt;
                 float u = Math.Min(1, dug.Out / DugOutSeconds);
                 // It carries on from the lean digging left it at.
-                prop.Body.Position = new Vector3(0, .07f + MathF.Sin(u * MathF.PI) * .45f, 0);
+                prop.Body.Position = dug.Seat + new Vector3(0, .07f + MathF.Sin(u * MathF.PI) * .45f, 0);
                 prop.Body.RotationDegrees = new Vector3(16 + 150 * Ease(u), dug.Yaw, 0);
                 prop.Body.Scale = Vector3.One * (1 - Mathf.SmoothStep(.45f, 1, u));
                 return u < 1;
@@ -931,7 +944,7 @@ public partial class WorldView : Node3D {
                 // Digging works it loose: it leans further over with the work done, and rocks as each push of the shovel lands.
                 float loose = Ease(Math.Clamp(t.Progress / GatherRules.DigSeconds, 0, 1));
                 prop.Body.RotationDegrees = new Vector3(loose * 16 + wobble * 5, dug.Yaw, wobble * 3);
-                prop.Body.Position = new Vector3(wobble * .02f, loose * .07f, 0);
+                prop.Body.Position = dug.Seat + new Vector3(wobble * .02f, loose * .07f, 0);
                 break;
             case LooseProp chip when chip.Flight < WorldModels.ChipFlight:
                 // An arc from the rock with a hop at the end, spinning as it goes.
