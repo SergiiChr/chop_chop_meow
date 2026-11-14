@@ -16,9 +16,9 @@ uniform sampler2D path_normal : hint_normal, filter_linear_mipmap_anisotropic, r
 uniform sampler2D path_height : hint_default_white, filter_linear_mipmap_anisotropic, repeat_enable;
 // World units one footpath tile spans.
 uniform float path_tile = 2.0;
-// How far in world units the ground photoscans' lowest points shift from their highest, seen edge on, as on the shores
-// and the model kit's scans.
-uniform float scan_relief = 0.1;
+// How far in world units the ground photoscans' lowest points shift from their highest, seen edge on
+// (ModelKit.ScanRelief).
+uniform float scan_relief;
 
 // The photoscan of moss over gravelly earth, drawn in its own colours in sparse broad patches over the meadow, and its
 // height.

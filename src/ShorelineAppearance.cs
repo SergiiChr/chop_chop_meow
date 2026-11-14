@@ -27,7 +27,6 @@ internal static class ShorelineAppearance {
         material.SetShaderParameter("shore_albedo", Map(look, "albedo"));
         material.SetShaderParameter("shore_tile", look.Tile);
         material.SetShaderParameter("shore_wet", look.Wet);
-        material.SetShaderParameter("shore_depth", look.Depth);
     }
 
     private static ShaderMaterial BankMaterial(ShoreLook look) {
@@ -37,6 +36,7 @@ internal static class ShorelineAppearance {
         material.SetShaderParameter("shore_normal", Map(look, "normal"));
         material.SetShaderParameter("shore_height", Map(look, "height"));
         material.SetShaderParameter("grass_fade", look.GrassFade);
+        material.SetShaderParameter("shore_relief", ModelKit.ScanRelief);
         return material;
     }
 
@@ -97,6 +97,7 @@ internal static class ShorelineAppearance {
         var material = LakeAppearance.CreateMaterial(still);
         material.SetShaderParameter("coastal", true);
         UseShore(material, Sand);
+        material.SetShaderParameter("shore_depth", Sand.Depth);
         parent.AddChild(new MeshInstance3D { Name = "CoastalWater", Mesh = water.Commit(), MaterialOverride = material, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off });
     }
 }

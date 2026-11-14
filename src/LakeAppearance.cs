@@ -17,6 +17,7 @@ public static class LakeAppearance {
 
         var material = CreateMaterial(still);
         ShorelineAppearance.UseShore(material, ShorelineAppearance.Rocks);
+        material.SetShaderParameter("shore_depth", ShorelineAppearance.Rocks.Depth);
 
         var surface = new MeshInstance3D {
             Name = "lake_water_surface",

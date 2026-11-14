@@ -55,9 +55,12 @@ public static class ModelKit {
     public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, _ => 1 };
 
     /// <summary>World units one tile of a scan spans, about its real size.</summary>
-    public const float ScanTile = 2;
-    /// <summary>How deep a scan's parallax reads, in the engine's units.</summary>
-    private const float ScanDepth = 5;
+    private const float ScanTile = 2;
+    /// <summary>
+    /// How far in world units every photoscan's lowest point shifts from its highest, seen edge on: the models' scans here,
+    /// the shores and the ground photoscans alike.
+    /// </summary>
+    public const float ScanRelief = .1f;
     private static readonly Dictionary<(Scan, float), StandardMaterial3D> scans = new();
 
     /// <summary>
@@ -78,7 +81,8 @@ public static class ModelKit {
             HeightmapEnabled = true,
             HeightmapTexture = Map("height"),
             HeightmapDeepParallax = true,
-            HeightmapScale = ScanDepth,
+            // The engine reads its height map scale in hundredths of a tile.
+            HeightmapScale = ScanRelief / ScanTile * 100,
             HeightmapMinLayers = 16,
             HeightmapMaxLayers = 64,
             TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,

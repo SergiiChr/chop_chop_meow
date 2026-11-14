@@ -64,17 +64,8 @@ internal static class NatureShape {
     }
 
     /// <summary>Emits a shape shaded smooth, in white, with the scan draped over it, for a <see cref="ModelKit.Scanned"/> material.</summary>
-    private static void Scanned(SurfaceTool surface, Vector3[] shaped, List<int> triangles, Vector3 center, Vector3 radii) {
-        var normals = SmoothNormals(shaped, triangles, center);
-        for (int i = 0; i < triangles.Count; i += 3) {
-            int a = triangles[i], b = triangles[i + 1], c = triangles[i + 2];
-            if ((shaped[c] - shaped[a]).Cross(shaped[b] - shaped[a]).Dot(shaped[a] - center) < 0) (b, c) = (c, b);
-            foreach (int k in new[] { a, b, c }) {
-                surface.SetNormal(normals[k]); surface.SetColor(Colors.White); surface.SetUV(Draped(shaped[k], center, radii));
-                surface.AddVertex(shaped[k]);
-            }
-        }
-    }
+    private static void Scanned(SurfaceTool surface, Vector3[] shaped, List<int> triangles, Vector3 center, Vector3 radii) =>
+        Blob(surface, center, shaped, triangles, false, (_, _) => Colors.White, p => Draped(p, center, radii));
 
     /// <summary>Unit icosphere positions and triangles; detail 0 is the bare 20-face icosahedron.</summary>
     private static (List<Vector3> Points, List<int> Triangles) Icosphere(int detail) {
@@ -152,15 +143,18 @@ internal static class NatureShape {
         Blob(surface, center, shaped, triangles, faceted, tint);
     }
 
+    /// <summary>A shape's triangles turned to face out, flat-shaded or smooth, coloured by <paramref name="tint"/>; smooth ones take a place on a scan from <paramref name="drape"/> where given.</summary>
     private static void Blob(SurfaceTool surface, Vector3 center, Vector3[] shaped, List<int> triangles,
-        bool faceted, Func<Vector3, Vector3, Color> tint) {
+        bool faceted, Func<Vector3, Vector3, Color> tint, Func<Vector3, Vector2>? drape = null) {
         if (faceted) { Faces(surface, shaped, triangles, center, tint); return; }
         var normals = SmoothNormals(shaped, triangles, center);
         for (int i = 0; i < triangles.Count; i += 3) {
             int a = triangles[i], b = triangles[i + 1], c = triangles[i + 2];
             if ((shaped[c] - shaped[a]).Cross(shaped[b] - shaped[a]).Dot(shaped[a] - center) < 0) (b, c) = (c, b);
             foreach (int k in new[] { a, b, c }) {
-                surface.SetNormal(normals[k]); surface.SetColor(tint(shaped[k], normals[k])); surface.AddVertex(shaped[k]);
+                surface.SetNormal(normals[k]); surface.SetColor(tint(shaped[k], normals[k]));
+                if (drape != null) surface.SetUV(drape(shaped[k]));
+                surface.AddVertex(shaped[k]);
             }
         }
     }

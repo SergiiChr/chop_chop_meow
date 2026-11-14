@@ -41,9 +41,11 @@ void fragment() {
 	vec3 shallow_water = vec3(0.08, 0.28, 0.26);
 	vec3 water_color = mix(deep_water, shallow_water, edge);
 	// The wet shore at the waterline runs on under the shallows, sinking into the water's colour.
-	vec3 shore = texture(shore_albedo, world_position.xz / shore_tile).rgb * shore_wet;
-	vec3 sunk = mix(shore, shore * vec3(0.55, 0.85, 0.85), smoothstep(0.0, shore_depth * 0.43, shore_distance));
-	water_color = mix(sunk, water_color, smoothstep(0.0, shore_depth, shore_distance));
+	if (shore_distance < shore_depth) {
+		vec3 shore = texture(shore_albedo, world_position.xz / shore_tile).rgb * shore_wet;
+		vec3 sunk = mix(shore, shore * vec3(0.55, 0.85, 0.85), smoothstep(0.0, shore_depth * 0.43, shore_distance));
+		water_color = mix(sunk, water_color, smoothstep(0.0, shore_depth, shore_distance));
+	}
 
 	// Two low-energy Gerstner normals animate small highlights without moving the shore.
 	vec3 wave_a = N_DEG(world_position.x, world_position.z, t, 0.30, 0.24, 28.0, 0.32, 0.72, 0.0);

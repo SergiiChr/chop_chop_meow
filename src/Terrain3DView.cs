@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Godot;
@@ -10,9 +11,9 @@ public partial class WorldView {
     private Node3D? terrainTarget;
     // RenderingServer uniforms take RIDs, so retain the texture resource for their lifetime.
     private Texture2D? terrainGrass;
-    private readonly Texture2D[] pathMaps = { Scan("path", "albedo"), Scan("path", "normal"), Scan("path", "height") };
-    private readonly Texture2D[] mossMaps = { Scan("moss", "albedo"), Scan("moss", "normal"), Scan("moss", "height") };
-    private readonly Texture2D[] forestMaps = { Scan("forest", "albedo"), Scan("forest", "normal"), Scan("forest", "height") };
+    private readonly List<Texture2D> groundScanMaps = new();
+    /// <summary>The ground photoscans drawn as they are, each with its colour, OpenGL normal and height maps beside the terrain.</summary>
+    private static readonly string[] GroundScans = { "path", "moss", "forest" };
     private ImageTexture? woodsDistance;
     /// <summary>World units out from the foot of the ranges that the woods map measures; the shader's frayed band ends within it.</summary>
     private const float WoodsReach = 16;
@@ -104,15 +105,13 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "disturbance", disturbanceTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "shade", sceneryShadeTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "contact", objectShadeTexture.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "path_albedo", pathMaps[0].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "path_normal", pathMaps[1].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "path_height", pathMaps[2].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "moss_albedo", mossMaps[0].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "moss_normal", mossMaps[1].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "moss_height", mossMaps[2].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "forest_albedo", forestMaps[0].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "forest_normal", forestMaps[1].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "forest_height", forestMaps[2].GetRid());
+        foreach (var scan in GroundScans)
+            foreach (var map in new[] { "albedo", "normal", "height" }) {
+                var texture = GD.Load<Texture2D>($"res://assets/environment/terrain3d/{scan}_{map}.jpg");
+                groundScanMaps.Add(texture);
+                RenderingServer.MaterialSetParam(terrainMaterialRid, $"{scan}_{map}", texture.GetRid());
+            }
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "scan_relief", ModelKit.ScanRelief);
         // One texel a world unit over all nine regions: how far each texel's middle, where filtering reads it, lies from
         // the foot of the nearer range, which is where trees thicken into woods.
         const int span = 3 * regionSize;
@@ -138,8 +137,6 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "mines", mines);
         GD.Print($"TERRAIN3D: v1.1.0-rc1, 9 regions, {regionSize}² samples/region; playable floor {floor:0.000}");
     }
-
-    private static Texture2D Scan(string name, string map) => GD.Load<Texture2D>($"res://assets/environment/terrain3d/{name}_{map}.jpg");
 
     /// <summary>Keeps Terrain3D's finest detail under the view.</summary>
     private void UpdateTerrainTarget() {

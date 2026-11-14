@@ -30,7 +30,8 @@
     // Sparse broad patches of the meadow take the moss photoscan as it is: the patch noise read at a larger scale and an
     // offset, independent of the lusher and drier patches, with edges reaching further out at the photoscan's moss.
     float mossy = texture(patches, v_vertex.xz / 300.0 + vec2(0.13, 0.21)).r;
-    if (mossy > 0.5) {
+    // The edge below can lower the patch value by at most 0.04, so below 0.56 the moss weighs nothing.
+    if (mossy > 0.56 && bare < 1.0) {
         vec2 moss_uv = scan_parallax(moss_height, v_vertex.xz / moss_tile, view, scan_relief / moss_tile);
         float edge = mossy + (texture(moss_height, moss_uv).r - 0.5) * 0.08;
         float moss = smoothstep(0.6, 0.68, edge) * (1.0 - bare);
@@ -40,7 +41,7 @@
     // The woods along the mountains take the forest floor photoscan as it is, its edge wandering in broad patches and
     // reaching further out at its litter.
     float woods = texture(woods_distance, (v_vertex.xz - woods_corner) / woods_span).r * woods_reach;
-    if (woods < woods_reach) {
+    if (woods < woods_reach && bare < 1.0) {
         vec2 forest_uv = scan_parallax(forest_height, v_vertex.xz / forest_tile, view, scan_relief / forest_tile);
         float wander = sin(v_vertex.x * 0.31 + v_vertex.z * 0.17) * sin(v_vertex.z * 0.27 - v_vertex.x * 0.13);
         float edge = woods + (0.5 - texture(forest_height, forest_uv).r) * 3.0 + wander * 2.0;

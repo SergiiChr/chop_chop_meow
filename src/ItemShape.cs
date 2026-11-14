@@ -239,10 +239,10 @@ internal static class ItemShape {
             var colours = arrays[(int)Mesh.ArrayType.Color].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.Color].AsColorArray();
             var index = arrays[(int)Mesh.ArrayType.Index].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.Index].AsInt32Array();
             var uvs = !draped || arrays[(int)Mesh.ArrayType.TexUV].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
-            var normals = uvs == null ? null : arrays[(int)Mesh.ArrayType.Normal].AsVector3Array();
+            var normals = arrays[(int)Mesh.ArrayType.Normal].AsVector3Array();
             for (int i = 0; i < (index?.Length ?? points.Length); i += 3) {
                 int a = index?[i] ?? i, b = index?[i + 1] ?? i + 1, c = index?[i + 2] ?? i + 2;
-                var drape = uvs == null || normals == null ? (Drape?)null : new Drape(normals[a], normals[b], normals[c], uvs[a], uvs[b], uvs[c]).Turned(at.Basis);
+                var drape = uvs == null ? (Drape?)null : new Drape(normals[a], normals[b], normals[c], uvs[a], uvs[b], uvs[c]).Turned(at.Basis);
                 faces.Add(new(at * points[a], at * points[b], at * points[c], colours?[a] ?? plain, drape));
             }
         }
