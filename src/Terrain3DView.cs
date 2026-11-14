@@ -10,10 +10,6 @@ public partial class WorldView {
     private Node3D? terrainTarget;
     // RenderingServer uniforms take RIDs, so retain the texture resource for their lifetime.
     private Texture2D? terrainGrass;
-    private ImageTexture? mountainFoot;
-    private readonly Texture2D[] mountainMaps = { Mountain("albedo"), Mountain("normal"), Mountain("height") };
-    /// <summary>World units out from the foot of the ranges that the foot map measures; the shader's frayed band ends within it.</summary>
-    private const float MountainReach = 10;
     /// <summary>The ground texture sets, in Terrain3D id order, with the world units one tile spans: the auto shader puts grass on flat ground and rock on slopes, and the include draws dirt on worn ground.</summary>
     private static readonly (string Name, float Tile)[] GroundTextures = { ("grass", 4), ("rock", 6), ("dirt", 4) };
     /// <summary>Soft noise over the whole map, about fifteen tiles a blob, for lusher and drier patches of meadow.</summary>
@@ -102,23 +98,6 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "disturbance", disturbanceTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "shade", sceneryShadeTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "contact", objectShadeTexture.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "mountain_albedo", mountainMaps[0].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "mountain_normal", mountainMaps[1].GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "mountain_height", mountainMaps[2].GetRid());
-        // One texel a world unit over all nine regions: how far each point lies from the foot of the nearer range.
-        const int span = 3 * regionSize;
-        var foot = new byte[span * span];
-        Parallel.For(0, span, z => {
-            for (int x = 0; x < span; x++) {
-                float from = Terrain.FromMountains(new Vector2(x - regionSize, z - regionSize));
-                foot[z * span + x] = (byte)Math.Round(Math.Clamp(from / MountainReach, 0, 1) * 255);
-            }
-        });
-        mountainFoot = ImageTexture.CreateFromImage(Image.CreateFromData(span, span, false, Image.Format.R8, foot));
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "mountain_foot", mountainFoot.GetRid());
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "foot_corner", new Vector2(-regionSize, -regionSize));
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "foot_span", (float)span);
-        RenderingServer.MaterialSetParam(terrainMaterialRid, "mountain_reach", MountainReach);
         // The shader's tunnel cut-outs hold exactly one entry per cliff.
         if (World.Cliffs.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {World.Cliffs.Length}.");
         var mines = new Vector4[World.Cliffs.Length];
@@ -129,8 +108,6 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "mines", mines);
         GD.Print($"TERRAIN3D: v1.1.0-rc1, 9 regions, {regionSize}² samples/region; playable floor {floor:0.000}");
     }
-
-    private static Texture2D Mountain(string map) => GD.Load<Texture2D>($"res://assets/environment/terrain3d/mountain_{map}.jpg");
 
     /// <summary>Keeps Terrain3D's finest detail under the view.</summary>
     private void UpdateTerrainTarget() {
