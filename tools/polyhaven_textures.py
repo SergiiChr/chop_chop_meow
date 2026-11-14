@@ -35,6 +35,13 @@ SETS = {
         "b6ec386e00d9d2a1c3a1da6a98a67066b0dfaa88ddb779341df29700cf081bdf",
         "3688c1acc705f604ffdaf956064c898658bcd2d8b0258e437e671390c896abb8",
     ),
+    ("environment/terrain3d", "forest"): (
+        "forrest_ground_01",
+        "2k",
+        "e4d557ff61a0b42712a58e8a2e91c6010738977d4e172b7af47abd7d406ae735",
+        "aa23fa930c6303490f842f7c016c19d838263e8e4538d42508a9332e3fd76b69",
+        "1d5c63d39e67af44e96cc9d5752273982bc5c82c9855695dada4abc2fc20575d",
+    ),
 }
 ASSETS = ROOT / "assets"
 SOURCE = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg"

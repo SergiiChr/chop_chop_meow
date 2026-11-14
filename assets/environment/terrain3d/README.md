@@ -43,13 +43,19 @@ washed out the meadow. The height-based ambient occlusion comes from Terrain3D's
 channels (VRAM compressed, high quality, no normal-map compression, no alpha border fix).
 
 The shader insertion in `Terrain3DView` keeps the pinned generated Terrain3D shader core.
-It adds the meadow and stone palette with lusher and drier patches, the photoscan grain over it, the footpath
-photoscan blended into worn ground and footpaths by its height, baked shade, and fragment clipping for the five mine openings so their
-separately modeled rock shells stay open.
+It adds the meadow and stone palette with lusher and drier patches, the photoscan grain over it, the woods' floor, the
+footpath photoscan blended into worn ground and footpaths by its height, baked shade, and fragment clipping for the
+five mine openings so their separately modeled rock shells stay open.
 
-Worn ground is drawn as Poly Haven's `brown_mud_leaves_01` photoscan in its own colours (`path_*.jpg`, 2K, one tile
-2 world units, about real size), pinned by `tools/polyhaven_textures.py`.
-Where the ground is worn, one read of its height map shifts it along the view, 0.1 units at most.
+Two Poly Haven photoscans are drawn in their own colours, each at 2K with one tile 2 world units, about real size, and
+pinned by `tools/polyhaven_textures.py`:
+- The woods take `forrest_ground_01` (`forest_*.jpg`) out to 10 units from the foot of the ranges, where trees grow at
+  better than even odds (`World` scatters them by `Terrain.FromMountains`).
+  `Terrain3DView` bakes that distance into a map of one texel a world unit; the band's edge wanders in broad patches
+  and reaches further out at the photoscan's litter, and it stops where the slopes turn to stone.
+- Worn ground takes `brown_mud_leaves_01` (`path_*.jpg`), over the woods and the meadow alike.
+
+One read of each photoscan's height map shifts it along the view, 0.1 units at most.
 Stepping down to the height map as the shores do cost 1.1 to 1.4 ms a frame on an RTX 4080 even with no worn ground
 in view, since the larger shader slowed all the ground; the single read costs nothing measurable.
 

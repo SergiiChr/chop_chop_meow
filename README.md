@@ -140,8 +140,9 @@ Ambient light comes from a sky that is never drawn: light from above and grass-c
 The picture is tonemapped with AgX, which keeps colours as light brightens.
 A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
 The ground has grain and bump from grass and rock photoscans under its own colours: meadow over the valley with soft
-lusher and drier patches and stone on the mountain slopes; where the ground is worn, a photoscan of muddy soil with
-leaves shows through in its own colours.
+lusher and drier patches and stone on the mountain slopes.
+The woods along the mountains have a photoscan of forest floor with twigs and dead leaves, and where the ground is
+worn, a photoscan of muddy soil with leaves shows through, both in their own colours.
 Shrubs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading.
 
 ## Controls

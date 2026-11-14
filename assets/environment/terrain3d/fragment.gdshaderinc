@@ -25,13 +25,24 @@
     palette = mix(palette, vec3(0.24, 0.25, 0.23), smoothstep(38.0, 53.0, v_vertex.y) * 0.55);
     float detail = dot(ALBEDO, LUMA) / MEAN;
     ALBEDO = palette * mix(1.0, detail, DETAIL);
+    // The ground photoscans below lie flat in world x and z, with their height along world up.
+    vec3 view = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xzy);
+    // The woods along the mountains take the forest floor photoscan as it is, its edge wandering in broad patches and
+    // reaching further out at its litter.
+    float woods = texture(woods_distance, (v_vertex.xz - woods_corner) / woods_span).r * woods_reach;
+    if (woods < woods_reach) {
+        vec2 forest_uv = scan_parallax(forest_height, v_vertex.xz / forest_tile, view, scan_relief / forest_tile);
+        float wander = sin(v_vertex.x * 0.31 + v_vertex.z * 0.17) * sin(v_vertex.z * 0.27 - v_vertex.x * 0.13);
+        float edge = woods + (0.5 - texture(forest_height, forest_uv).r) * 3.0 + wander * 2.0;
+        float litter = (1.0 - smoothstep(woods_band - 2.0, woods_band + 2.0, edge)) * (1.0 - bare);
+        ALBEDO = mix(ALBEDO, texture(forest_albedo, forest_uv).rgb, litter);
+        NORMAL_MAP = mix(NORMAL_MAP, texture(forest_normal, forest_uv).rgb, litter);
+    }
     // Worn building footprints and footpaths worn by walking show the footpath photoscan through the grass.
     float wear = texture(disturbance, v_vertex.xz / 216.0).r;
     wear = max(wear, smoothstep(0.05, 0.6, texture(traffic, v_vertex.xz / 216.0).r)) * (1.0 - bare);
     if (wear > 0.0) {
-        // The photoscan lies flat in world x and z, with its height along world up.
-        vec3 view = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xzy);
-        vec2 path_uv = path_parallax(v_vertex.xz / path_tile, view);
+        vec2 path_uv = scan_parallax(path_height, v_vertex.xz / path_tile, view, scan_relief / path_tile);
         // The path shows first where it stands higher than the grass, so the edge follows the texture.
         float worn = clamp(wear + (texture(path_height, path_uv).r - mat.albedo_height.a) * wear, 0.0, 1.0);
         ALBEDO = mix(ALBEDO, texture(path_albedo, path_uv).rgb, worn);
