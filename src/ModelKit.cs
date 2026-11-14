@@ -4,8 +4,12 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The photoscan a material takes its grain and bump from; its colour stays the model's own. Foliage is drawn by the shrub shader.</summary>
-public enum Surface { Flat, Wood, Metal, Stone, Cloth, Earth, Foliage }
+/// <summary>
+/// The photoscan a material takes its grain and bump from; its colour stays the model's own, except that soil's grain
+/// keeps the scan's colours around their mean, so a model in <see cref="ModelKit.SoilColor"/> shows the scan as it is.
+/// Foliage is drawn by the shrub shader.
+/// </summary>
+public enum Surface { Flat, Wood, Metal, Stone, Cloth, Earth, Soil, Foliage }
 
 /// <summary>
 /// Low-poly primitive helpers shared by every code-built model.
@@ -45,8 +49,11 @@ public static class ModelKit {
         return material;
     }
 
-    /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, and a cloth weave is drawn coarse so it shows at the game's distance.</summary>
-    public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, _ => 1 };
+    /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, a cloth weave is drawn coarse so it shows at the game's distance, and soil at its real size.</summary>
+    public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, Surface.Soil => 2, _ => 1 };
+
+    /// <summary>The soil photoscan's mean colour, as `tools/surface_textures.py` prints it when packing.</summary>
+    public const string SoilColor = "653f2e";
 
     /// <summary>A surface's grain, a multiplier around one; the engine hands out one copy per file.</summary>
     public static Texture2D Grain(Surface surface) => GD.Load<Texture2D>($"res://assets/models/surfaces/{surface.ToString().ToLowerInvariant()}_grain.exr");

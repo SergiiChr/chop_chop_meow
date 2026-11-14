@@ -538,7 +538,14 @@ public partial class WorldView {
 
     // ---------- The valley ----------
 
-    /// <summary>Where the trail meets the water.</summary>
+    /// <summary>How far along the valley the coast lies where the hero's route down the valley reaches it.</summary>
+    private static float TrailCoast => Terrain.Coast(Terrain.Across(Terrain.Spawn));
+
+    /// <summary>The middle of the hero's route from the clearing down the valley to the shore, at a distance along the valley.</summary>
+    private static Vector2 Trail(float along) =>
+        Terrain.Point(along, Terrain.Across(Terrain.Spawn) + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f);
+
+    /// <summary>Where the route meets the water.</summary>
     private static float TrailShore => TrailCoast - 1.2f;
 
     /// <summary>Walking the trail through the forest, the pack on his back.</summary>

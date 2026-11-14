@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Pack the pinned CC0 photoscans the model kit tints as its wood, metal, stone, cloth, earth and foliage surfaces."""
+"""Pack the pinned CC0 photoscans the model kit tints as its wood, metal, stone, cloth, earth, soil and foliage surfaces."""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import Literal
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -38,16 +39,25 @@ SETS = {
         "97010f72c7a32fa1e1242cfe872822c7c8b2ac445b47aa2e53cc877ccb2ec87a",
     ),
 }
+# Surface name in the game, the Poly Haven asset it comes from and the SHA-256 of its 1K PNG colour and normal maps.
+POLYHAVEN = {
+    "soil": (
+        "red_laterite_soil_stones",
+        "96f3e55c2cf202e609faea9234847805563375d8edf466fb30f06413dda1f2a1",
+        "7cc7f835a3242574e085bfd948234d025fe81714cfda110d57456a914bae66a9",
+    ),
+}
 MAPS = ("Color", "NormalGL")
 # Cloth scans are nearly even at the game's distance, so the weave keeps all of its contrast to show at all.
-DETAIL = {"cloth": 1.0}
+# Soil keeps its colours: the field and compost take its mean colour, so they show the photoscan as it is.
+DETAIL: dict[str, float | Literal["colour"]] = {"cloth": 1.0, "soil": "colour"}
 # A quarter of the source size: a tile spans a model or two and a model is well under a hundred screen pixels.
 SIZE = 256
 OUTPUT = ROOT / "assets" / "models" / "surfaces"
 
 
 def main() -> None:
-    build.pack_photoscans(SETS, MAPS, SIZE, OUTPUT, "surface", DETAIL)
+    build.pack_photoscans(SETS, MAPS, SIZE, OUTPUT, "surface", DETAIL, POLYHAVEN)
     # The shrub shader lays on the foliage grain alone, so its bump stays out of the game.
     (OUTPUT / "foliage_bump.png").unlink()
 

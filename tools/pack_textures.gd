@@ -5,7 +5,9 @@ extends SceneTree
 # every albedo scaled to the same mean linear brightness, so the terrain shader divides any blend by MEAN.
 # surface: the way the model kit tints them, a grain EXR holding each pixel's brightness around the set's mean as a
 # multiplier, at the set's detail share, and the OpenGL normal PNG.
-# Arguments: <ground|surface> <source dir> <output dir> <size> <name=ambientCG id[:detail]>...
+# A surface set whose detail is "colour" keeps each pixel's colour around the set's mean colour instead, which it
+# prints: a model tinted that colour shows the photoscan as it is.
+# Arguments: <ground|surface> <source dir> <output dir> <size> <name=ambientCG id[:detail|:colour]>...
 
 # The mean the terrain shader's fragment include divides the grain by.
 const MEAN := 0.14
@@ -37,10 +39,11 @@ func _pack() -> void:
 			push_error("Expected <name=ambientCG id[:detail]>, got " + spec)
 			quit(1)
 			return
-		var detail := float(set[1]) if set.size() == 2 else DETAIL
+		var colour := set.size() == 2 and set[1] == "colour"
+		var detail := float(set[1]) if set.size() == 2 and not colour else DETAIL
 		var packed := (
 			_pack_ground(source, output, size, parts[0], set[0]) if ground
-			else _pack_surface(source, output, size, parts[0], set[0], detail)
+			else _pack_surface(source, output, size, parts[0], set[0], 1.0 if colour else detail, colour)
 		)
 		if not packed:
 			quit(1)
@@ -98,19 +101,39 @@ func _pack_ground(source: String, output: String, size: int, name: String, id: S
 	return true
 
 
+# The set's mean linear colour.
+func _mean_colour(albedo: Image, size: int) -> Color:
+	var mean := Color(0, 0, 0)
+	for y in size:
+		for x in size:
+			mean += albedo.get_pixel(x, y).srgb_to_linear()
+	return mean / (size * size)
+
+
 # Packs one surface set and returns whether every map loaded.
-func _pack_surface(source: String, output: String, size: int, name: String, id: String, detail: float) -> bool:
+func _pack_surface(
+	source: String, output: String, size: int, name: String, id: String, detail: float, colour: bool
+) -> bool:
 	var albedo := _load(source, id, "Color", size)
 	var normal := _load(source, id, "NormalGL", size)
 	if albedo == null or normal == null:
 		return false
 	var mean := _mean_luminance(albedo, size)
-	var grain := Image.create(size, size, false, Image.FORMAT_RH)
+	var mean_colour := _mean_colour(albedo, size)
+	var grain := Image.create(size, size, false, Image.FORMAT_RGBH if colour else Image.FORMAT_RH)
 	for y in size:
 		for x in size:
-			var factor := lerpf(1.0, _luminance(albedo.get_pixel(x, y)) / mean, detail)
-			grain.set_pixel(x, y, Color(factor, factor, factor))
-	grain.save_exr("%s/%s_grain.exr" % [output, name], true)
+			var pixel := albedo.get_pixel(x, y)
+			if colour:
+				var linear := pixel.srgb_to_linear()
+				grain.set_pixel(x, y, Color(linear.r / mean_colour.r, linear.g / mean_colour.g, linear.b / mean_colour.b))
+			else:
+				var factor := lerpf(1.0, _luminance(pixel) / mean, detail)
+				grain.set_pixel(x, y, Color(factor, factor, factor))
+	grain.save_exr("%s/%s_grain.exr" % [output, name], not colour)
 	normal.save_png("%s/%s_bump.png" % [output, name])
-	print("Packed %s from %s, mean brightness %.3f" % [name, id, mean])
+	if colour:
+		print("Packed %s from %s, mean colour #%s" % [name, id, mean_colour.linear_to_srgb().to_html(false)])
+	else:
+		print("Packed %s from %s, mean brightness %.3f" % [name, id, mean])
 	return true

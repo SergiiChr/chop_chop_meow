@@ -238,10 +238,13 @@ The model surfaces in `models/surfaces/` come the same way from Wood049, Metal03
 Moss002, packed at 256 px by `tools/surface_textures.py` with the same script: a grain EXR holding each pixel's
 brightness around the photoscan's mean as a multiplier, at the ground's detail strength, and the normal PNG. The cloth
 weave keeps all of its contrast and is drawn coarse, since a fabric scan is nearly even at the game's distance.
+The soil surface of the farm field and the compost comes from the Poly Haven photoscan Red Laterite Soil Stones by Amal
+Kumar, released under CC0 1.0, through the same script: its grain keeps the scan's colours around their mean, which
+`ModelKit.SoilColor` holds, so the soil shows the scan as it is while the compost's scraps keep their own colours.
 The shores in `environment/lake/` are two [Poly Haven](https://polyhaven.com) photoscans by Rob Tuytel, released under
 CC0 1.0 and drawn with their own colours: Aerial Beach 01 at 4K for the sea coast's sand, and Aerial Rocks 01 at 2K for
 the pond's pebbles.
-`tools/shore_textures.py` downloads the pinned JPEG colour and OpenGL normal maps and checks their SHA-256.
+`tools/polyhaven_textures.py` downloads the pinned JPEG colour and OpenGL normal maps and checks their SHA-256.
 The meshes in `models/food/` are baked from four models of [Kenney's Food Kit](https://kenney.nl/assets/food-kit), released under CC0 1.0, as [Patch's asset library](https://patch.gg) serves them: re-packed, with the texture inside the file, and scaled to real size.
 `tools/food_models.py` downloads the pinned files, checks their SHA-256 and bakes them with `tools/bake_models.gd`.
 No other external game art or third-party packs are used.

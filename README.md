@@ -804,8 +804,8 @@ A save that is incomplete, names items the game does not know or holds needs out
 
 The environment uses a shared human scale, Terrain3D mountain ranges, a rippled sand beach along the sea, and an irregular lake with a pebbled shore, reeds, lily pads and clustered shore stones.
 Meadow grass and wildflowers grow in patches, ferns add woodland ground cover, and plain bushes stand among them.
-Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas.
-A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch).
+Building footprints and mine approaches keep the ground cover clear, with worn soil around active work areas.
+There are three tree types (oak, spruce, birch).
 
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.
 The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset.

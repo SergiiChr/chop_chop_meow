@@ -9,17 +9,17 @@ internal static class FarmShape {
     private static readonly ArrayMesh?[,] crops = new ArrayMesh?[3, 3];
     public static Mesh Soil => soil ??= BuildSoil();
     public static Mesh Crop(int stage, int variant) => crops[stage, variant] ??= BuildField(stage, variant);
-    public static readonly StandardMaterial3D Earth = ModelKit.Vertex(Surface.Earth, 1);
+    public static readonly StandardMaterial3D Earth = ModelKit.Vertex(Surface.Soil, 1);
     // Thin plant leaves are deliberately two-sided; solid stems and grain heads share the same cached material.
     public static readonly StandardMaterial3D Foliage = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
     private static ArrayMesh BuildSoil() {
         var s = Begin();
-        Quad(s, new(-1.35f, .03f, -1.35f), new(1.35f, .03f, -1.35f), new(1.35f, .03f, 1.35f), new(-1.35f, .03f, 1.35f), Vector3.Up, "4f3a28");
+        Quad(s, new(-1.35f, .03f, -1.35f), new(1.35f, .03f, -1.35f), new(1.35f, .03f, 1.35f), new(-1.35f, .03f, 1.35f), Vector3.Up, "5c3a2a");
         foreach (float side in new[] { -1.35f, 1.35f }) {
-            Quad(s, new(side, .01f, -1.35f), new(side, .03f, -1.35f), new(side, .03f, 1.35f), new(side, .01f, 1.35f), new(side, 0, 0), "4f3a28");
-            Quad(s, new(-1.35f, .01f, side), new(-1.35f, .03f, side), new(1.35f, .03f, side), new(1.35f, .01f, side), new(0, 0, side), "4f3a28");
+            Quad(s, new(side, .01f, -1.35f), new(side, .03f, -1.35f), new(side, .03f, 1.35f), new(side, .01f, 1.35f), new(side, 0, 0), "5c3a2a");
+            Quad(s, new(-1.35f, .01f, side), new(-1.35f, .03f, side), new(1.35f, .03f, side), new(1.35f, .01f, side), new(0, 0, side), "5c3a2a");
         }
         for (int row = 0; row < 5; row++) {
             float z = -1.08f + row * .54f;
@@ -27,9 +27,9 @@ internal static class FarmShape {
             Vector3 Left(int i) => profile[i] + Vector3.Left * 1.3f;
             Vector3 Right(int i) => profile[i] + Vector3.Right * 1.3f;
             for (int i = 0; i < 3; i++)
-                Quad(s, Left(i), Right(i), Right(i + 1), Left(i + 1), Vector3.Up, i == 1 ? "654b32" : "5e4630");
-            Quad(s, Left(0), Left(1), Left(2), Left(3), Vector3.Left, "5e4630");
-            Quad(s, Right(0), Right(1), Right(2), Right(3), Vector3.Right, "5e4630");
+                Quad(s, Left(i), Right(i), Right(i + 1), Left(i + 1), Vector3.Up, i == 1 ? "6f4533" : ModelKit.SoilColor);
+            Quad(s, Left(0), Left(1), Left(2), Left(3), Vector3.Left, ModelKit.SoilColor);
+            Quad(s, Right(0), Right(1), Right(2), Right(3), Vector3.Right, ModelKit.SoilColor);
         }
         return s.Commit();
     }

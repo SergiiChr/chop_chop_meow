@@ -32,7 +32,7 @@ internal static class ItemShape {
     private static readonly StandardMaterial3D Sacking = ModelKit.Vertex(Surface.Cloth, .9f);
     private static readonly StandardMaterial3D Steel = ModelKit.Vertex(Surface.Metal, .45f, .35f);
     private static readonly StandardMaterial3D Tin = ModelKit.Vertex(Surface.Metal, .4f, .15f);
-    private static readonly StandardMaterial3D Soil = ModelKit.Vertex(Surface.Earth, 1);
+    private static readonly StandardMaterial3D Soil = ModelKit.Vertex(Surface.Soil, 1);
 
     private static readonly Dictionary<string, Look> looks = new() {
         ["wood_parts"] = new(f => WoodParts(f, 8), Wooden, .55f, Lay.Loose, Piece: f => WoodParts(f, 5)),
@@ -522,7 +522,7 @@ internal static class ItemShape {
     /// <summary>A compost heap: a mound of dark soil with leaves on it and stalks and scraps poking out of it.</summary>
     private static void Mulch(List<Face> faces) {
         const float radius = 1.1f;
-        var top = Mound(faces, radius, .5f, 23, new Color[] { new("4a3524"), new("5a4129"), new("3f2d1f"), new("523a26") });
+        var top = Mound(faces, radius, .5f, 23, new Color[] { new("5c3a2a"), new(ModelKit.SoilColor), new("553627"), new("6b4331") });
         Litter(faces, top, radius, 7);
         Color[] scraps = { new("8fae55"), new("c08a3a"), new("d9c27a"), new("7c9c46"), new("a8652c") };
         for (int i = 0; i < 20; i++) {

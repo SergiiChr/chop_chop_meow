@@ -109,6 +109,7 @@ def fetch_pinned(url: str, archive: Path, sha256: str) -> None:
 
 
 AMBIENTCG = TOOLS / "ambientcg"
+POLYHAVEN = TOOLS / "polyhaven"
 # The Godot script that packs photoscans into the game's textures.
 PACK_SCRIPT = ROOT / "tools" / "pack_textures.gd"
 SCRIPT_PROJECT = """; Isolated project for running one tool script.
@@ -159,13 +160,15 @@ def pack_photoscans(
     size: int,
     output: Path,
     kind: Literal["ground", "surface"],
-    detail: Mapping[str, float] | None = None,
+    detail: Mapping[str, float | Literal["colour"]] | None = None,
+    polyhaven: Mapping[str, tuple[str, str, str]] | None = None,
 ) -> None:
-    """Fetches each set's pinned ambientCG archive, extracts its maps and packs them into output as the kind says.
+    """Fetches each set's pinned photoscan, extracts its maps and packs them into output as the kind says.
 
-    A set maps its name in the game to the ambientCG asset and the SHA-256 of that asset's 1K PNG zip; detail gives a
-    surface set the share of the photoscan's brightness variation its grain keeps, where the packer's default is not
-    wanted.
+    A set maps its name in the game to the ambientCG asset and the SHA-256 of that asset's 1K PNG zip; polyhaven maps
+    a name to a Poly Haven asset and the SHA-256 of its 1K PNG colour and OpenGL normal maps.
+    Detail gives a surface set the share of the photoscan's brightness variation its grain keeps, where the packer's
+    default is not wanted, or "colour" for a grain that keeps the photoscan's colours around their mean.
 
     """
     fetch_godot()
@@ -182,6 +185,19 @@ def pack_photoscans(
             with zipfile.ZipFile(archive) as bundle:
                 for name in maps:
                     bundle.extract(f"{asset}_1K-PNG_{name}.png", source)
+        for asset, color, normal in (polyhaven or {}).values():
+            for upstream, name, sha256 in (
+                ("diff", "Color", color),
+                ("nor_gl", "NormalGL", normal),
+            ):
+                image = POLYHAVEN / f"{asset}_{upstream}_1k.png"
+                fetch_pinned(
+                    f"https://dl.polyhaven.org/file/ph-assets/Textures/png/1k/{asset}/{image.name}",
+                    image,
+                    sha256,
+                )
+                # Named as an ambientCG map, the one way the packer reads them.
+                shutil.copy(image, source / f"{asset}_1K-PNG_{name}.png")
         run_tool_script(
             PACK_SCRIPT,
             [
@@ -192,13 +208,21 @@ def pack_photoscans(
                 *(
                     f"{name}={asset}"
                     + (f":{detail[name]}" if detail and name in detail else "")
-                    for name, (asset, _) in sets.items()
+                    for name, asset in [
+                        *((name, asset) for name, (asset, _) in sets.items()),
+                        *(
+                            (name, asset)
+                            for name, (asset, _, _) in (polyhaven or {}).items()
+                        ),
+                    ]
                 ),
             ],
             "TEXTURE-PACK PASS",
             timeout=600,
         )
-    print(f"Packed {len(sets)} texture sets into {output.relative_to(ROOT)}")
+    print(
+        f"Packed {len(sets) + len(polyhaven or {})} texture sets into {output.relative_to(ROOT)}"
+    )
 
 
 def dotnet_env() -> dict[str, str]:
