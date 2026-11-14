@@ -141,8 +141,9 @@ public partial class WorldView {
 
         hero = new ActorRig(ActorSkin.Player); film.AddChild(hero.Root);
         // Half-shut eyelids for the office, a loosened tie, and the bat.
-        heroLids = Pivot(hero.Head, Vector3.Zero);
-        foreach (float side in new[] { -1f, 1f }) Box(heroLids, new Vector3(.027f, .014f, .012f), new Vector3(side * .046f, .152f, .113f), Mat("d9a27c"));
+        // The lids hang from their top edge, so stretching them lowers them over the eyes.
+        heroLids = Pivot(hero.Head, new Vector3(0, .159f, 0));
+        foreach (float side in new[] { -1f, 1f }) Box(heroLids, new Vector3(.027f, .014f, .012f), new Vector3(side * .046f, -.007f, .113f), Mat("d9a27c"));
         heroTie = ActorRig.Tie(hero.Torso, "4a5368"); heroTie.RotationDegrees = new Vector3(0, 0, 5);
         heldBat = IntroSets.Bat(); hero.Hold(heldBat);
         boss = new ActorRig(ActorSkin.Boss); film.AddChild(boss.Root);
@@ -360,13 +361,13 @@ public partial class WorldView {
         float roused = Mathf.SmoothStep(4.25f, 4.6f, t);
         TurnHead(hero, -8 * roused, 0, -12 * roused);
         float blink = MathF.Pow(Math.Max(0, MathF.Sin(t * 1.9f + .6f)), 14) * (1 - roused);
-        heroLids.Scale = new Vector3(1, Math.Max(.01f, 1 + blink - roused), 1); heroLids.Position = new Vector3(0, -.007f * blink + .007f * roused, 0);
+        heroLids.Scale = new Vector3(1, Math.Max(.01f, 1 + blink - roused), 1);
         var aisle = new Vector2(1.75f, -7.6f + t * 1.25f);
         Stride(boss, bossStep, aisle, ActorAction.Walk, aisle + Vector2.Down, dt, "footsteps_default", -12);
         bossMouth.Scale = new Vector3(1, .01f, 1);
         // Two recordings of an office hum under all three shots here, and the yelling starts before the boss is seen.
         if (cut) { Cue("intro/office", 2, "length=12\tfadein=0.4\tfadeout=0.8"); Cue("intro/office_room", -6, "length=12\tfadein=0.4\tfadeout=0.8"); }
-        if (Reached(BossHeard, t, dt)) Cue("intro/boss", -3, string.Create(CultureInfo.InvariantCulture, $"from={BossVoiceStarts:0.00}\tlength=5.8\tfadeout=0.1"));
+        if (Reached(BossHeard, t, dt)) Cue("intro/boss", 0, string.Create(CultureInfo.InvariantCulture, $"from={BossVoiceStarts:0.00}\tlength=5.8\tfadeout=0.1"));
         float push = Mathf.SmoothStep(0, 5, t);
         Frame(new Vector3(.2f, 1.08f, 1.05f).Lerp(new Vector3(.12f, 1.05f, .82f), push), new Vector3(-.05f, .97f, .2f), 44);
     }

@@ -152,17 +152,17 @@ public static class SimulationChecks {
         var world = EmptyWorld(data);
         var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
         chest.Inventory.Add("wood", 20);
-        var rock = world.Add(ThingKind.Stone, new Vector2(24, 20), 30);
+        var bush = world.Add(ThingKind.Berries, new Vector2(24, 20), 30);
         var fire = world.Add(ThingKind.Campfire, new Vector2(20, 24));
         var both = AddWorker(world, new Vector2(22, 22));
-        world.SetDuty(both, rock, "gather", true);
+        world.SetDuty(both, bush, "gather", true);
         world.SetDuty(both, fire, "fuel", true);
-        Require(both.Duties.Count == 2 && both.Assignment == rock.Id, "a worker should keep jobs at two places and start at the first");
+        Require(both.Duties.Count == 2 && both.Assignment == bush.Id, "a worker should keep jobs at two places and start at the first");
         SafeTick(world, 60);
-        Require(rock.Remaining < 30 && fire.Burn + fire.Inventory["wood"] * world.Data.CampfireSeconds > 0,
-                "a worker with jobs at two places should take turns: gathering stone and feeding the fire");
+        Require(bush.Remaining < 30 && fire.Burn + fire.Inventory["wood"] * world.Data.CampfireSeconds > 0,
+                "a worker with jobs at two places should take turns: picking berries and feeding the fire");
         world.SetDuty(both, fire, "fuel", false);
-        Require(both.Duties.Count == 1 && World.HasDuty(both, rock.Id, "gather"), "taking one job away should keep the other");
+        Require(both.Duties.Count == 1 && World.HasDuty(both, bush.Id, "gather"), "taking one job away should keep the other");
     }
 
     /// <summary>A bench hauler only stocks it; the work itself waits for a crafter.</summary>
@@ -1060,6 +1060,13 @@ public static class SimulationChecks {
         Give(world, "steel_axe", 1);
         Require(world.GatherBlock(iron)?.Contains("pickaxe") == true && world.GatherBlock(world.Add(ThingKind.Tree, new Vector2(12, 12), 5)) == null,
                 "an axe should fell trees but not mine ore");
+        var boulder = world.Add(ThingKind.Stone, new Vector2(60, 20), 20);
+        var at = world.Player;
+        world.Player = boulder.Pos + new Vector2(1, 0);
+        world.Gather(boulder, data.GatherSeconds * 3);
+        Require(world.GatherBlock(boulder)?.Contains("pickaxe") == true && world.Backpack["stone"] == 0 && boulder.Remaining == 20,
+                $"a boulder should give no stone by hand and ask for a pickaxe: {world.GatherBlock(boulder)}");
+        world.Player = at;
 
         Give(world, "wood", 8);
         Require(world.Build(ThingKind.Chest, Terrain.Spawn) == null,
@@ -1404,7 +1411,7 @@ public static class SimulationChecks {
             "a loaded save should list its own things by kind and none from before");
     }
 
-    /// <summary>About one pickaxe hit in twenty on ore knocks a loose piece of it off nearby; hits by hand chip nothing.</summary>
+    /// <summary>About one pickaxe hit in twenty on ore knocks a loose piece of it off nearby.</summary>
     private static void CheckPickaxeHitsSometimesChipRock(GameData data) {
         var world = EmptyWorld(data);
         var deposits = new[] { world.Add(ThingKind.Iron, new Vector2(20, 20), World.DepositOre), world.Add(ThingKind.Iron, new Vector2(40, 20), World.DepositOre) };
@@ -1420,12 +1427,6 @@ public static class SimulationChecks {
         Require(chips.All(c => deposits.Any(d => d.Pos.DistanceTo(c.Pos) <= GatherRules.ChipReach) && world.CanStand(c.Pos)), "a chip should land where it can be reached, within 2 tiles of its deposit");
         PickUp(world, chips[0]);
         Require(world.Backpack["iron_ore"] == 1, "a chip should give one ore");
-
-        var boulder = world.Add(ThingKind.Stone, new Vector2(60, 20), World.StonePile);
-        Drop(world, "steel_pick");
-        world.Player = boulder.Pos + new Vector2(1, 0);
-        while (boulder.Remaining > 0) world.Gather(boulder, data.GatherSeconds);
-        Require(!world.Things.Any(t => t.Kind == ThingKind.LooseStone), "a boulder broken by hand should chip nothing");
     }
 
     private static void CheckLoosePiecesNeedNoToolOrGatherTime(GameData data) {
@@ -1462,7 +1463,7 @@ public static class SimulationChecks {
         Require(world.GatherBlock(iron)?.Contains("pickaxe") == true && world.GatherBlock(coal)?.Contains("pickaxe") == true, "deposits should wait for a pickaxe the player does not start with");
         var bench = CheckGatheredMaterialsMakeCrates(world, tree, stone, bush);
         var sign = CheckBerryCratesBuyFirstPickaxe(world, iron);
-        CheckMinedOreBecomesSteelTools(world, iron, coal, bench);
+        CheckMinedOreBecomesSteelTools(world, stone, iron, coal, bench);
         var offer = CheckSoldSteelToolFundsHire(world, sign);
         CheckHiredWorkerSuppliesOpeningCamp(world, sign, offer, tree, stone);
         world.Tick(.01f, true);
@@ -1470,10 +1471,12 @@ public static class SimulationChecks {
         GD.Print($"Progression simulation elapsed: {world.Time - startTime:0} seconds.");
     }
 
-    /// <summary>A stone chisel from bare stone opens wood crafting by hand, which leads to the bench, its mallet and crates.</summary>
+    /// <summary>A stone chisel from loose stones opens wood crafting by hand, which leads to the bench, its mallet and crates.</summary>
     private static Thing CheckGatheredMaterialsMakeCrates(World world, Thing tree, Thing stone, Thing bush) {
         GatherUntil(world, tree, "wood", 64);
-        GatherUntil(world, stone, "stone", 58);
+        Require(world.GatherBlock(stone)?.Contains("pickaxe") == true, "a boulder should wait for a pickaxe the player does not start with");
+        // A chisel and the trading post that sells the first pickaxe take 6 stone, picked up loose.
+        for (int i = 0; i < 6; i++) PickUp(world, world.Add(ThingKind.LooseStone, Site(4 + i, 4), 1));
         GatherUntil(world, bush, "berries", 48);
 
         CraftByHand(world, "stone_chisel", 1);
@@ -1521,7 +1524,8 @@ public static class SimulationChecks {
         return sign;
     }
 
-    private static void CheckMinedOreBecomesSteelTools(World world, Thing iron, Thing coal, Thing bench) {
+    private static void CheckMinedOreBecomesSteelTools(World world, Thing stone, Thing iron, Thing coal, Thing bench) {
+        GatherUntil(world, stone, "stone", 52);
         GatherUntil(world, iron, "iron_ore", 22);
         GatherUntil(world, coal, "coal", 17);
         var furnace = BuildAt(world, ThingKind.Furnace, Site(25, 25));
@@ -1984,7 +1988,7 @@ public static class SimulationChecks {
 
     /// <summary>Workers take the best tool their job needs from a tool station, say once when none is there, and put it back when reassigned or going home.</summary>
     private static void CheckWorkerTakesAxeFromStationAndPutsItBackForAJobWithoutTools(GameData data) {
-        var (world, tree, rock, station) = ToolYard(data);
+        var (world, tree, bush, station) = ToolYard(data);
         var said = new List<string>();
         world.Notify = said.Add;
         Require(!world.Holds(station, "wood") && world.Holds(station, "steel_axe"), "a tool station should hold tools only");
@@ -2001,11 +2005,11 @@ public static class SimulationChecks {
         Require(worker.Tool == "steel_axe", "the worker should take the axe once one is there");
         Require(station.Inventory["steel_axe"] == 0, "the axe should leave the tool station");
         Require(tree.Remaining < 400, "the worker should start chopping");
-        world.Assign(worker, rock);
+        world.Assign(worker, bush);
         for (int i = 0; i < 80 && worker.Tool != ""; i++) SafeTick(world, Step);
-        Require(worker.Tool == "" && station.Inventory["steel_axe"] == 1, "a worker moved to stone, which needs no tool, should put the axe back");
+        Require(worker.Tool == "" && station.Inventory["steel_axe"] == 1, "a worker moved to berries, which need no tool, should put the axe back");
         SafeTick(world, 10);
-        Require(rock.Remaining < 400, "stone needs no tool");
+        Require(bush.Remaining < 400, "berries need no tool");
     }
 
     /// <summary>A full station leaves a worker holding the wrong tool, who must wait rather than mine with an axe.</summary>

@@ -65,15 +65,15 @@ internal static class WorkerSteps {
         return (world, said, post);
     }
 
-    /// <summary>A tree and a stone deposit worked from a chest and a tool station, with the player at the station.</summary>
-    public static (World World, Thing Tree, Thing Rock, Thing Station) ToolYard(GameData data) {
+    /// <summary>A tree and a berry bush worked from a chest and a tool station, with the player at the station.</summary>
+    public static (World World, Thing Tree, Thing Bush, Thing Station) ToolYard(GameData data) {
         var world = EmptyWorld(data);
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 400);
-        var rock = world.Add(ThingKind.Stone, new Vector2(10, 14), 400);
+        var bush = world.Add(ThingKind.Berries, new Vector2(10, 14), 400);
         world.Add(ThingKind.Chest, new Vector2(12, 12));
         var station = world.Add(ThingKind.Toolstation, new Vector2(14, 10));
         world.Player = station.Pos + Vector2.One;
-        return (world, tree, rock, station);
+        return (world, tree, bush, station);
     }
 
     /// <summary>Starts a woodcutter on a tree of 5 wood, all in the player's sight.</summary>

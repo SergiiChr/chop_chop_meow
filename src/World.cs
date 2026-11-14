@@ -687,8 +687,7 @@ public sealed partial class World {
             if (result != WaterCollectResult.NoChange) { S.Milestones.Add("water"); Got("water"); Play("gather_water", Player); }
             return;
         }
-        bool small = t.Kind == ThingKind.WolfCorpse || t.Kind == ThingKind.Stone && tool == null;
-        int amount = Math.Min(t.Remaining, small ? 2 : 4);
+        int amount = Math.Min(t.Remaining, t.Kind == ThingKind.WolfCorpse ? 2 : 4);
         string item = ResourceItem(t);
         amount = S.Backpack.Add(item, amount); t.Remaining -= amount;
         if (t.Kind == ThingKind.Tree && t.Remaining <= 0) Fell(t);
