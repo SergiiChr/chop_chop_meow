@@ -54,8 +54,9 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
   layer, so the marks stay put as it moves and a model's own albedo texture stays free.
   `Scanned` draws one of the scans rock, coal and soil as it is instead, with its bumps and the engine's parallax, on a
-  mesh that carries its place on the scan in world units: the stone and coal rocks, loose stones and coal, their heaps,
-  the farm field and the compost mound.
+  mesh that carries its place on the scan in world units: the stone and coal rocks, loose stones and coal, the farm
+  field and the compost mound. Heap pieces are those meshes shrunk to a heap's size with their place on the scan kept,
+  so a heaped stone or lump shows the scan finer than in the world.
   A rounded shape has the scan draped over it from the top down (`NatureShape.Draped`), so only its hidden underside
   bunches, and is shaded smooth; each replaced rock stays under 500 triangles.
   `Mat` makes a flat material and `Wood`, `Metal`, `Stone` and `Cloth` a surfaced one for primitives; `Vertex` dresses

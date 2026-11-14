@@ -12,9 +12,11 @@ public partial class WorldView {
     // RenderingServer uniforms take RIDs, so retain the texture resource for their lifetime.
     private Texture2D? terrainGrass;
     private readonly List<Texture2D> groundScanMaps = new();
-    /// <summary>The ground photoscans drawn as they are, each with its colour, OpenGL normal and height maps beside the terrain.</summary>
-    private static readonly string[] GroundScans = { "path", "moss", "forest" };
+    /// <summary>The ground photoscans drawn as they are, each with its colour, OpenGL normal and height maps beside the terrain, and the world units one tile spans, about its real size.</summary>
+    private static readonly (string Name, float Tile)[] GroundScans = { ("path", 2), ("moss", 15), ("forest", 2) };
     private ImageTexture? woodsDistance;
+    /// <summary>World units out from the foot of the ranges that the woods' floor reaches, where <see cref="World"/> scatters trees at better than even odds.</summary>
+    private const float WoodsBand = 10;
     /// <summary>World units out from the foot of the ranges that the woods map measures; the shader's frayed band ends within it.</summary>
     private const float WoodsReach = 16;
     /// <summary>The ground texture sets, in Terrain3D id order, with the world units one tile spans: the auto shader puts grass on flat ground and rock on slopes.</summary>
@@ -105,12 +107,14 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "disturbance", disturbanceTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "shade", sceneryShadeTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "contact", objectShadeTexture.GetRid());
-        foreach (var scan in GroundScans)
+        foreach (var (scan, tile) in GroundScans) {
+            RenderingServer.MaterialSetParam(terrainMaterialRid, $"{scan}_tile", tile);
             foreach (var map in new[] { "albedo", "normal", "height" }) {
                 var texture = GD.Load<Texture2D>($"res://assets/environment/terrain3d/{scan}_{map}.jpg");
                 groundScanMaps.Add(texture);
                 RenderingServer.MaterialSetParam(terrainMaterialRid, $"{scan}_{map}", texture.GetRid());
             }
+        }
         RenderingServer.MaterialSetParam(terrainMaterialRid, "scan_relief", ModelKit.ScanRelief);
         // One texel a world unit over all nine regions: how far each texel's middle, where filtering reads it, lies from
         // the foot of the nearer range, which is where trees thicken into woods.
@@ -127,6 +131,7 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_corner", new Vector2(-regionSize, -regionSize));
         RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_span", (float)span);
         RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_reach", WoodsReach);
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_band", WoodsBand);
         // The shader's tunnel cut-outs hold exactly one entry per cliff.
         if (World.Cliffs.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {World.Cliffs.Length}.");
         var mines = new Vector4[World.Cliffs.Length];

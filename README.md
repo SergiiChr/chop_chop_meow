@@ -109,7 +109,8 @@ The game draws the film itself, so a change to a model or a shot means making th
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
-from their pinned CC0 sources, and `./tools/food_models.py` bakes the committed food models from theirs.
+from their pinned CC0 sources, `./tools/polyhaven_textures.py` downloads the shore and ground photoscans drawn as they
+are, and `./tools/food_models.py` bakes the committed food models from theirs.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
@@ -806,7 +807,7 @@ A save that is incomplete, names items the game does not know or holds needs out
 
 The environment uses a shared human scale, Terrain3D mountain ranges, a rippled sand beach along the sea, and an irregular lake with a mossy, stony shore, reeds, lily pads and clustered shore stones.
 Meadow grass and wildflowers grow in patches, ferns add woodland ground cover, and plain bushes stand among them.
-Building footprints and mine approaches keep the ground cover clear, with worn soil around active work areas.
+Building footprints, mine approaches and the spot where players start keep the ground cover clear, with worn soil around active work areas.
 There are three tree types (oak, spruce, birch), from short trees to ones two thirds taller.
 
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.

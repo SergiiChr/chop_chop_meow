@@ -39,7 +39,7 @@ func _pack() -> void:
 		var parts := spec.split("=")
 		var set := parts[1].split(":") if parts.size() == 2 else PackedStringArray()
 		if set.size() == 0 or set.size() > 2:
-			push_error("Expected <name=ambientCG id[:detail]>, got " + spec)
+			push_error("Expected <name=ambientCG id[:detail|:scan]>, got " + spec)
 			quit(1)
 			return
 		var scan := set.size() == 2 and set[1] == "scan"
