@@ -549,11 +549,11 @@ Its page lists which worker has which tool out and who waits for one.
 Workers need tools for some jobs:
 
 - an axe to chop wood;
-- a pickaxe to mine ore and coal;
+- a pickaxe to break boulders and mine ore and coal;
 - a shovel to dig up stumps and bushes;
 - a hammer to fit a mine.
 
-Stone, leaves, berries and loose pieces need no tool, though a pickaxe breaks rock faster and a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
+Leaves, berries and loose pieces need no tool, though a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
 They put it back when reassigned or when heading home at dusk.
 If there is none, the worker goes to the nearest known spot of the same job that they can work, one that needs no tool or one whose tool is to be had, and to loose pieces only after those; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.

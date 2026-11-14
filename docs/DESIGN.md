@@ -354,7 +354,7 @@ Wolf eyes glow faintly, so they show in the dark.
 The intended fresh-start loop starts by securing water, shelter and fire, then uses the steel axe the player carries:
 
 1. Collect water, wood, stone and berries; build a cabin and campfire before dusk.
-2. Fell trees with the starting steel axe; gather stone and berries by hand.
+2. Fell trees with the starting steel axe; pick up loose stones and gather berries by hand.
 3. Knap a stone chisel, then carve planks and a mallet.
 4. Build a crafting bench and make crates there.
 5. Build a trading post and sell crates of berries for a steel pickaxe.
@@ -510,7 +510,7 @@ Tier 1 is unused, since there are no iron tools.
 Recipes name the tool they need, the lowest `Tier` that will do, and whether they can be made by hand (`Hand`).
 So a steel chisel does everything a stone chisel does, faster, while tin cans need a steel hammer and the mortar a steel chisel.
 
-`GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for deposits, a shovel for stumps and bushes), one that only speeds gathering up (a pickaxe for rock, a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
+`GatherRules` holds every resource's rule in one table: the tool it needs (an axe for trees, a pickaxe for boulders and deposits, a shovel for stumps and bushes), one that only speeds gathering up (a rake for leaves, which take three times as long by hand), the loose piece a pickaxe chips off it, and the job it belongs to (`GatherRule.JobName`).
 A job is every spot yielding the same item unless a rule names its own: stumps go with trees and sticks as wood, while bushes are apart from leaf patches.
 Stone, leaves, berries and loose pieces need no tool.
 The world's things are also kept by kind (`ThingList.Of`), so a search for one kind, such as tool stations, stores or campfires, and the tick, which runs only kinds that change by themselves, pass over trees and rocks.
