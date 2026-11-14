@@ -66,7 +66,7 @@ internal static class ItemShape {
         ["stone"] = new(f => First(f, NatureShape.Rocks(0), 80), NatureShape.PlainRock, .42f, Lay.Loose, .7f),
         ["iron_ore"] = Nugget("pile_iron", "a35a2e"),
         ["tin_ore"] = Nugget("pile_tin", "b9bcb4"),
-        ["coal"] = new(f => First(f, NatureShape.Lumps("pile_coal", 0, 0), 20), NatureShape.CoalRock, .24f, Lay.Loose, .7f),
+        ["coal"] = new(f => First(f, NatureShape.Lumps(0, 0), 20), NatureShape.CoalRock, .24f, Lay.Loose, .7f),
         ["charcoal"] = new(f => Copy(f, CharcoalShape.Briquette, Transform3D.Identity, Colors.White), CharcoalShape.Material, .32f, Lay.Loose, .8f),
         // Bars heap as six-packs: three lying side by side and three across them.
         ["iron_bar"] = new(Ingots, Plain, .5f),
@@ -212,9 +212,9 @@ internal static class ItemShape {
     /// <summary>A sawn board lying flat.</summary>
     private static void Plank(List<Face> faces) => Box(faces, new Transform3D(Basis.Identity, new Vector3(0, .03f, 0)), new(.15f, .06f, 1), new Color("d2a26a"));
 
-    /// <summary>The first triangles of a mesh that scatters several lumps: its first lump alone.</summary>
+    /// <summary>The first triangles of a mesh that scatters several lumps: its first lump alone, draped where the mesh carries a scan.</summary>
     private static void First(List<Face> faces, Mesh mesh, int triangles) {
-        var all = new List<Face>(); Copy(all, mesh, Transform3D.Identity, Colors.White);
+        var all = new List<Face>(); Copy(all, mesh, Transform3D.Identity, Colors.White, draped: true);
         faces.AddRange(all.GetRange(0, triangles));
     }
 
@@ -228,19 +228,21 @@ internal static class ItemShape {
         for (int i = first; i < faces.Count; i++) faces[i] = faces[i] with { Tint = recolour(faces[i].Tint) };
     }
 
-    /// <summary>A mesh's triangles placed by <paramref name="at"/>, each in its first corner's colour, or in <paramref name="plain"/> where the mesh carries none.</summary>
-    private static void Copy(List<Face> faces, Mesh mesh, Transform3D at, Color plain) {
+    /// <summary>
+    /// A mesh's triangles placed by <paramref name="at"/>, each in its first corner's colour, or in <paramref name="plain"/> where the mesh carries none.
+    /// With <paramref name="draped"/>, a mesh with a place on a scan for each point keeps it and its smooth normals.
+    /// </summary>
+    private static void Copy(List<Face> faces, Mesh mesh, Transform3D at, Color plain, bool draped = false) {
         for (int surface = 0; surface < mesh.GetSurfaceCount(); surface++) {
             var arrays = mesh.SurfaceGetArrays(surface);
             var points = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
             var colours = arrays[(int)Mesh.ArrayType.Color].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.Color].AsColorArray();
             var index = arrays[(int)Mesh.ArrayType.Index].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.Index].AsInt32Array();
-            // A mesh with a place on a scan for each point is draped, and keeps its smooth normals.
-            var uvs = arrays[(int)Mesh.ArrayType.TexUV].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
-            var normals = arrays[(int)Mesh.ArrayType.Normal].AsVector3Array();
+            var uvs = !draped || arrays[(int)Mesh.ArrayType.TexUV].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
+            var normals = uvs == null ? null : arrays[(int)Mesh.ArrayType.Normal].AsVector3Array();
             for (int i = 0; i < (index?.Length ?? points.Length); i += 3) {
                 int a = index?[i] ?? i, b = index?[i + 1] ?? i + 1, c = index?[i + 2] ?? i + 2;
-                var drape = uvs == null ? (Drape?)null : new Drape(normals[a], normals[b], normals[c], uvs[a], uvs[b], uvs[c]).Turned(at.Basis);
+                var drape = uvs == null || normals == null ? (Drape?)null : new Drape(normals[a], normals[b], normals[c], uvs[a], uvs[b], uvs[c]).Turned(at.Basis);
                 faces.Add(new(at * points[a], at * points[b], at * points[c], colours?[a] ?? plain, drape));
             }
         }

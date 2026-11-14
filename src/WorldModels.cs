@@ -268,7 +268,7 @@ public static class WorldModels {
             case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Id, "7d5b45", "a8592b", "b4622a"); break;
             case ThingKind.Coal: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.CoalRock, Vector3.Zero); break;
             case ThingKind.Tin: prop = new Prop(); Rocks(prop.Body, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
-            case ThingKind.LooseCoal: prop = new LooseProp(); Add(prop.Body, NatureShape.Lumps(t.Kind.Id(), t.Id % NatureShape.Variants, 1), NatureShape.CoalRock, Vector3.Zero); break;
+            case ThingKind.LooseCoal: prop = new LooseProp(); Add(prop.Body, NatureShape.Lumps(t.Id % NatureShape.Variants, 1), NatureShape.CoalRock, Vector3.Zero); break;
             case ThingKind.LooseStone: prop = new LooseProp(); Add(prop.Body, NatureShape.Pebble(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero, new Vector3(0, t.Id * 47 % 360, 0)); break;
             case ThingKind.IronChip: prop = new LooseProp(); LooseOre(prop.Body, "loose_iron", t.Id, "a35a2e", "8b4f2b"); break;
             case ThingKind.TinChip: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "b9bcb4", "8f928b"); break;

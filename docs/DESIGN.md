@@ -828,7 +828,6 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   clock.
   The clock moves one frame at a time, so frames are evenly spaced however long each takes to draw and save.
 - It reuses the game's own models: the player's rig, the pack, flask, axe and torch, the trees, the valley with its
-  trail,
   shore and sea, and the fire pit. Walking and running go through the game's gaits.
 - New for the film: the office, the rented room and the train car (`IntroSets`), a baseball bat, the boss
   (`ActorSkin.Boss`), and the poses in `IntroPoses`.

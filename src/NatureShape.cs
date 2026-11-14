@@ -155,18 +155,12 @@ internal static class NatureShape {
     private static void Blob(SurfaceTool surface, Vector3 center, Vector3[] shaped, List<int> triangles,
         bool faceted, Func<Vector3, Vector3, Color> tint) {
         if (faceted) { Faces(surface, shaped, triangles, center, tint); return; }
-        var normals = new Vector3[shaped.Length];
-        for (int i = 0; i < triangles.Count; i += 3) {
-            var face = (shaped[triangles[i + 2]] - shaped[triangles[i]]).Cross(shaped[triangles[i + 1]] - shaped[triangles[i]]);
-            if (face.Dot(shaped[triangles[i]] - center) < 0) face = -face;
-            for (int k = 0; k < 3; k++) normals[triangles[i + k]] += face;
-        }
+        var normals = SmoothNormals(shaped, triangles, center);
         for (int i = 0; i < triangles.Count; i += 3) {
             int a = triangles[i], b = triangles[i + 1], c = triangles[i + 2];
             if ((shaped[c] - shaped[a]).Cross(shaped[b] - shaped[a]).Dot(shaped[a] - center) < 0) (b, c) = (c, b);
             foreach (int k in new[] { a, b, c }) {
-                var normal = normals[k].Normalized();
-                surface.SetNormal(normal); surface.SetColor(tint(shaped[k], normal)); surface.AddVertex(shaped[k]);
+                surface.SetNormal(normals[k]); surface.SetColor(tint(shaped[k], normals[k])); surface.AddVertex(shaped[k]);
             }
         }
     }
@@ -501,28 +495,29 @@ internal static class NatureShape {
     /// A few loose lumps lying on the ground, each a rounded nugget seated flat with a scan draped over it, of
     /// <paramref name="detail"/> as <see cref="Shape"/> takes it: 400 triangles at one, and a first lump of 20 at none.
     /// </summary>
-    public static Mesh Lumps(string kind, int variant, int detail) => Cached($"lumps{kind}{variant}{detail}", s => {
-        var random = new Random(701 + variant);
-        for (int i = 0; i < 5; i++) {
-            float angle = i * 1.4f + (float)random.NextDouble() * .5f, reach = i == 0 ? 0 : .24f + (float)random.NextDouble() * .06f;
-            float size = i == 0 ? .18f : .13f + (float)random.NextDouble() * .03f;
-            Vector3 center = new(MathF.Cos(angle) * reach, size * .45f, MathF.Sin(angle) * reach), radii = new Vector3(1.15f, .75f, 1) * size;
-            var (shaped, triangles) = Shape(center, radii, detail, 711 + variant * 7 + i, 2, .3f, .1f, 0, 0);
+    public static Mesh Lumps(int variant, int detail) => Cached($"lumps{variant}{detail}", s => {
+        foreach (var (center, radii, seed) in Nuggets(variant)) {
+            var (shaped, triangles) = Shape(center, radii, detail, seed, 2, .3f, .1f, 0, 0);
             Scanned(s, shaped, triangles, center, radii);
         }
     }, true);
 
     /// <summary>A few loose lumps lying on the ground, each a faceted nugget seated flat.</summary>
     public static Mesh Loose(string kind, Color light, Color dark, int variant) => Cached($"loose{kind}{variant}", s => {
+        int i = 0;
+        foreach (var (center, radii, seed) in Nuggets(variant))
+            Blob(s, center, radii, 0, seed, 2, .3f, .1f, 0, true, Stony(i++ % 2 == 0 ? light : dark));
+    });
+
+    /// <summary>Where five loose nuggets of a variant lie, a larger one in the middle, how big each is and its shape's seed.</summary>
+    private static IEnumerable<(Vector3 Center, Vector3 Radii, int Seed)> Nuggets(int variant) {
         var random = new Random(701 + variant);
         for (int i = 0; i < 5; i++) {
             float angle = i * 1.4f + (float)random.NextDouble() * .5f, reach = i == 0 ? 0 : .24f + (float)random.NextDouble() * .06f;
             float size = i == 0 ? .18f : .13f + (float)random.NextDouble() * .03f;
-            var color = i % 2 == 0 ? light : dark;
-            Blob(s, new Vector3(MathF.Cos(angle) * reach, size * .45f, MathF.Sin(angle) * reach), new Vector3(1.15f, .75f, 1) * size,
-                0, 711 + variant * 7 + i, 2, .3f, .1f, 0, true, Stony(color));
+            yield return (new(MathF.Cos(angle) * reach, size * .45f, MathF.Sin(angle) * reach), new Vector3(1.15f, .75f, 1) * size, 711 + variant * 7 + i);
         }
-    });
+    }
 
     /// <summary>Stone shading: lighter on top, darker underneath.</summary>
     private static Func<Vector3, Vector3, Color> Stony(Color color) => (_, normal) => color.Lightened(normal.Y * .1f).Darkened(Math.Max(0, -normal.Y) * .3f);

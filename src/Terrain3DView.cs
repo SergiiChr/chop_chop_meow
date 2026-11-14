@@ -113,13 +113,13 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "forest_albedo", forestMaps[0].GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "forest_normal", forestMaps[1].GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "forest_height", forestMaps[2].GetRid());
-        // One texel a world unit over all nine regions: how far each point lies from the foot of the nearer range, which
-        // is where trees thicken into woods.
+        // One texel a world unit over all nine regions: how far each texel's middle, where filtering reads it, lies from
+        // the foot of the nearer range, which is where trees thicken into woods.
         const int span = 3 * regionSize;
         var woods = new byte[span * span];
         Parallel.For(0, span, z => {
             for (int x = 0; x < span; x++) {
-                float from = Terrain.FromMountains(new Vector2(x - regionSize, z - regionSize));
+                float from = Terrain.FromMountains(new Vector2(x - regionSize + .5f, z - regionSize + .5f));
                 woods[z * span + x] = (byte)Math.Round(Math.Clamp(from / WoodsReach, 0, 1) * 255);
             }
         });

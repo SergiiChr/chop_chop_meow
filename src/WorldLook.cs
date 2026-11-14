@@ -92,9 +92,10 @@ public partial class WorldView {
     /// footfall; standing still, or first seen, it wears nothing.
     /// </summary>
     private void Tread(int walker, Vector2 at) {
-        bool moved = footfalls.TryGetValue(walker, out var last) && last.DistanceTo(at) >= FootfallSpacing;
-        if (moved || !footfalls.ContainsKey(walker)) footfalls[walker] = at;
-        if (!moved) return;
+        bool seen = footfalls.TryGetValue(walker, out var last);
+        if (seen && last.DistanceTo(at) < FootfallSpacing) return;
+        footfalls[walker] = at;
+        if (!seen) return;
         int cx = (int)(at.X * TrafficScale), cy = (int)(at.Y * TrafficScale);
         for (int y = cy - 2; y <= cy + 2; y++)
             for (int x = cx - 2; x <= cx + 2; x++) {
