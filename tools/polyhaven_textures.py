@@ -11,19 +11,22 @@ sys.path.insert(0, str(ROOT))
 
 import build  # noqa: E402  Importing build.py is safe; its CLI is guarded.
 
-# Folder and name in the game, the Poly Haven asset, its JPEG size and the SHA-256 of its colour and OpenGL normal maps.
+# Folder and name in the game, the Poly Haven asset, its JPEG size and the SHA-256 of its colour, OpenGL normal and
+# height maps.
 SETS = {
     ("environment/lake", "sand"): (
         "aerial_beach_01",
-        "4k",
-        "231f7dfdbc79ec5ccb128616ed601aacc2b323204148480114bf662b09f79ea8",
-        "0eeff8b0899968fce619b2d0d39c656df13149e319add95041243652596242fd",
+        "8k",
+        "492b89604cd79f733557b590f561ddc9ea51739705d96d9768c4ca1614b44b60",
+        "0a59f38f2dd43985619d3574b9ec67845cce5e86baa9a4767333ab7f539e635f",
+        "1ad0d03acc97a6b93b6582e0c78ab37f090f3e1031770eef0b4d134ab75c98d4",
     ),
     ("environment/lake", "rocks"): (
         "aerial_rocks_01",
-        "2k",
-        "25edb78d0c3daf52d44bbd076c74ef53865fc4cd386a922736cb167313420a7b",
-        "570650b9c9bc26b541cbd09754ab6a6b3d198bb44ae964e3877f262d3c96567d",
+        "4k",
+        "df324eaacd84a7cd14d20a375d0c5902b2a07a0e3668979d6044d591fb88aa66",
+        "298493b652ff4305d089262fdaf436ce970bceab9da33874c850a9535717df04",
+        "d1452b4245574bae2005b8367458f540d74991d295c832eebc1a1c79d60ed148",
     ),
 }
 ASSETS = ROOT / "assets"
@@ -31,10 +34,11 @@ SOURCE = "https://dl.polyhaven.org/file/ph-assets/Textures/jpg"
 
 
 def main() -> None:
-    for (folder, name), (asset, size, albedo, normal) in SETS.items():
+    for (folder, name), (asset, size, albedo, normal, height) in SETS.items():
         for map_name, upstream, sha256 in (
             ("albedo", "diff", albedo),
             ("normal", "nor_gl", normal),
+            ("height", "disp", height),
         ):
             build.fetch_pinned(
                 f"{SOURCE}/{size}/{asset}/{asset}_{upstream}_{size}.jpg",

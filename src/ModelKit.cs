@@ -5,12 +5,13 @@ using Godot;
 namespace ChopChopMeow;
 
 /// <summary>
-/// The photoscan a material takes its grain and bump from; its colour stays the model's own, except that rock's and
-/// soil's grain keep the scan's colours around their mean, so a model in <see cref="ModelKit.RockColor"/> or
-/// <see cref="ModelKit.SoilColor"/> shows the scan as it is.
+/// The photoscan a material takes its grain and bump from; its colour stays the model's own.
 /// Foliage is drawn by the shrub shader.
 /// </summary>
-public enum Surface { Flat, Wood, Metal, Stone, Rock, Cloth, Earth, Soil, Foliage }
+public enum Surface { Flat, Wood, Metal, Stone, Cloth, Earth, Foliage }
+
+/// <summary>A photoscan drawn as it is, in its own colours, with bumps and parallax.</summary>
+public enum Scan { Rock, Coal, Soil }
 
 /// <summary>
 /// Low-poly primitive helpers shared by every code-built model.
@@ -50,12 +51,39 @@ public static class ModelKit {
         return material;
     }
 
-    /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, a cloth weave is drawn coarse so it shows at the game's distance, and rock and soil at their real size.</summary>
-    public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, Surface.Rock or Surface.Soil => 2, _ => 1 };
+    /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, and a cloth weave is drawn coarse so it shows at the game's distance.</summary>
+    public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, _ => 1 };
 
-    /// <summary>The rock and soil photoscans' mean colours, as `tools/surface_textures.py` prints them when packing.</summary>
-    public const string RockColor = "4f4e4b";
-    public const string SoilColor = "653f2e";
+    /// <summary>World units one tile of a scan spans, about its real size.</summary>
+    public const float ScanTile = 2;
+    /// <summary>How deep a scan's parallax reads, in the engine's units.</summary>
+    private const float ScanDepth = 5;
+    private static readonly Dictionary<(Scan, float), StandardMaterial3D> scans = new();
+
+    /// <summary>
+    /// A material that draws a scan as it is, times the mesh's own colours, with bumps and parallax.
+    /// The mesh carries texture coordinates in world units and tangents.
+    /// </summary>
+    public static StandardMaterial3D Scanned(Scan scan, float roughness) {
+        if (scans.TryGetValue((scan, roughness), out var cached)) return cached;
+        Texture2D Map(string map) => GD.Load<Texture2D>($"res://assets/models/surfaces/{scan.ToString().ToLowerInvariant()}_{map}.png");
+        return scans[(scan, roughness)] = new StandardMaterial3D {
+            AlbedoTexture = Map("albedo"),
+            VertexColorUseAsAlbedo = true,
+            VertexColorIsSrgb = true,
+            Roughness = roughness,
+            NormalEnabled = true,
+            NormalTexture = Map("bump"),
+            Uv1Scale = Vector3.One / ScanTile,
+            HeightmapEnabled = true,
+            HeightmapTexture = Map("height"),
+            HeightmapDeepParallax = true,
+            HeightmapScale = ScanDepth,
+            HeightmapMinLayers = 16,
+            HeightmapMaxLayers = 64,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
+        };
+    }
 
     /// <summary>A surface's grain, a multiplier around one; the engine hands out one copy per file.</summary>
     public static Texture2D Grain(Surface surface) => GD.Load<Texture2D>($"res://assets/models/surfaces/{surface.ToString().ToLowerInvariant()}_grain.exr");

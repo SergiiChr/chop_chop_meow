@@ -50,13 +50,19 @@ Models are assembled from code-built Godot meshes, with baked meshes for trees, 
   a spade with a bar across the top of its handle and a pointed blade, laid through both fists while digging.
 - `src/intro/IntroSets.cs` — the intro film's office floor, rented room and train car, and its baseball bat.
 - `src/ModelKit.cs` — shared primitive, material and fade helpers.
-  A material is flat colour or one of the surfaces wood, metal, stone, rock, cloth, earth and soil: the colour stays the
-  model's own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
+  A material is flat colour or one of the surfaces wood, metal, stone, cloth and earth: the colour stays the model's
+  own tint, and the surface lays a photoscan's grain and bump over it in the model's own space, in the material's detail
   layer, so the marks stay put as it moves and a model's own albedo texture stays free.
+  `Scanned` draws one of the scans rock, coal and soil as it is instead, with its bumps and the engine's parallax, on a
+  mesh that carries its place on the scan in world units: the stone and coal rocks, loose stones and coal, their heaps,
+  the farm field and the compost mound.
+  A rounded shape has the scan draped over it from the top down (`NatureShape.Draped`), so only its hidden underside
+  bunches, and is shaded smooth; each replaced rock stays under 500 triangles.
   `Mat` makes a flat material and `Wood`, `Metal`, `Stone` and `Cloth` a surfaced one for primitives; `Vertex` dresses
   a mesh that carries its own colours and `Dress` any standard material. The foliage surface is laid on the plain
   bushes by their own shader (`NatureShape.ScrubMaterials`). Skin, hair, fur, glass, leaf cards and flames stay flat.
-  The surfaces' grain and bump textures are in `models/surfaces/`, packed by `tools/surface_textures.py`.
+  The surfaces' grain and bump textures and the scans' colour, bump and height maps are in `models/surfaces/`, packed
+  by `tools/surface_textures.py`.
 - `src/BottleShape.cs` — refillable tin flask, wood stopper and three-segment water gauge; all four bottle-state icons use this model.
 - `src/IngotShape.cs` — shared tapered cast ingot with beveled ends, metallic finish and casting mark; used by ingot icons, and by heaps as six-packs. Each bar takes its item's colour, which tells them apart: iron dark grey, tin pale, steel blue.
 - `src/ItemShape.cs` — one small model an item for icons and piles, each a mesh that carries its own colours.
@@ -128,8 +134,8 @@ Show resources piled on or beside a model with a `StockPile`, never with meshes 
 - Preview the three berry bushes and a harvested bush with `./build.py play -- --showcase --bushes`. Berries attach to foliage-card twigs and have their own harvest visibility. The same view shows plain bushes and stumps, one of each half dug out.
 - `assets/models/tree3d/` contains the baked meshes, SVG leaf/bark textures, triangle manifest and upstream license notices.
 - Regenerate Tree3D output with `./tools/tree3d.py`. Native authoring binaries stay in ignored `.tools/tree3d` and are not needed to play. See [tree3d/README.md](models/tree3d/README.md).
-- `src/NatureShape.cs` supplies shared vertex-coloured meshes for stumps, plain bushes, fruit, rocks, ore deposits and loose ore.
-- `NatureShape.Ore` and `NatureShape.OreChips` — color-neutral host/seam and fractured chip geometry shared by coal, iron and tin deposits for each of three seeded variants. Cached material palettes distinguish black coal, rusty iron and pale tin; coal chips use near-black `0c0e10` without lightened grey tops. Seams are clipped flush into the four-boulder profiles along continuous bedding planes. The tin-ore icon is rendered from the deposit; coal and iron inventory icons use their separate loose-ore models.
+- `src/NatureShape.cs` supplies shared meshes for stumps, plain bushes, fruit, rocks, ore deposits and loose ore: vertex-coloured, or for stone and coal smooth with a scan draped over them.
+- `NatureShape.Ore` and `NatureShape.OreChips` — color-neutral host/seam and fractured chip geometry shared by iron and tin deposits for each of three seeded variants. Cached material palettes distinguish rusty iron and pale tin. A coal deposit is the stone deposits' rock group (`NatureShape.Rocks`) drawn as the coal scan. Seams are clipped flush into the four-boulder profiles along continuous bedding planes. The tin-ore icon is rendered from the deposit; coal and iron inventory icons use their separate loose-ore models.
 - `NatureShape.Scrub` — a plain bush's lobe, a lightweight shape that reuses the resource bush's folded-leaf builder. A bush is a world thing of three lobes (`WorldModels.Shrub`), each a little different in size and green by the bush's id. `NatureShape.ScrubMaterials` holds one material for each of a lobe's five greens, all of one shader, which sways a lobe in the wind, parts it around a walker and lays the foliage grain over it in its own space. Bushes cast shadows and stand on the baked scenery spots `Scenery.Bush` picks.
 - `LeafShape` — one shared mesh of twenty-four pointed, folded autumn leaves with tapered stems for the leaf patch. Three fixed seeded layouts add variation alongside the ID-based yaw. Fully raked patches stay hidden until the daily refill. All vertices fit inside the picking radius and height.
 
@@ -238,15 +244,13 @@ The model surfaces in `models/surfaces/` come the same way from Wood049, Metal03
 Moss002, packed at 256 px by `tools/surface_textures.py` with the same script: a grain EXR holding each pixel's
 brightness around the photoscan's mean as a multiplier, at the ground's detail strength, and the normal PNG. The cloth
 weave keeps all of its contrast and is drawn coarse, since a fabric scan is nearly even at the game's distance.
-The soil surface of the farm field and the compost comes from the Poly Haven photoscan Red Laterite Soil Stones by Amal
-Kumar, released under CC0 1.0, through the same script: its grain keeps the scan's colours around their mean, which
-`ModelKit.SoilColor` holds, so the soil shows the scan as it is while the compost's scraps keep their own colours.
-The rock surface of the stone boulders, loose stones and stone heaps comes the same way from ambientCG's Rock010: its
-grain keeps the scan's colours around their mean, which `ModelKit.RockColor` holds.
+The scans come through the same script at their full 1K size, so their marks stay sharp at full zoom: rock from
+ambientCG's Rock026 and coal from its Rock035, and soil from the Poly Haven photoscan Red Laterite Soil Stones by Amal
+Kumar, released under CC0 1.0.
 The shores in `environment/lake/` are two [Poly Haven](https://polyhaven.com) photoscans by Rob Tuytel, released under
-CC0 1.0 and drawn with their own colours: Aerial Beach 01 at 4K for the sea coast's sand, and Aerial Rocks 01 at 2K for
-the pond's pebbles.
-`tools/polyhaven_textures.py` downloads the pinned JPEG colour and OpenGL normal maps and checks their SHA-256.
+CC0 1.0 and drawn with their own colours and parallax: Aerial Beach 01 at 8K for the sea coast's sand, and Aerial Rocks
+01 at 4K for the pond's pebbles.
+`tools/polyhaven_textures.py` downloads the pinned JPEG colour, OpenGL normal and height maps and checks their SHA-256.
 The meshes in `models/food/` are baked from four models of [Kenney's Food Kit](https://kenney.nl/assets/food-kit), released under CC0 1.0, as [Patch's asset library](https://patch.gg) serves them: re-packed, with the texture inside the file, and scaled to real size.
 `tools/food_models.py` downloads the pinned files, checks their SHA-256 and bakes them with `tools/bake_models.gd`.
 No other external game art or third-party packs are used.

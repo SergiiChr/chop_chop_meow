@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pack the pinned CC0 photoscans the model kit tints as its wood, metal, stone, rock, cloth, earth, soil and foliage surfaces."""
+"""Pack the pinned CC0 photoscans of the model kit's surfaces and of the rock, coal and soil it draws as they are."""
 
 from __future__ import annotations
 
@@ -27,8 +27,12 @@ SETS = {
         "d3e0dc55fc46b093631f4d0009c934003c601e69df9aa4ba41a43db3807056ee",
     ),
     "rock": (
-        "Rock010",
-        "542955172a445235c2ea95029338b9fc250d5ecb72202a628aa09a6a3aea1a88",
+        "Rock026",
+        "be5e6dc252ff1c17352db9c19e354b57f0414e79146c8431648cb6e640dc0da5",
+    ),
+    "coal": (
+        "Rock035",
+        "e745b558d754962ac44162ccee8805d7dba84ecdc428a543c3e552bcb28f8b85",
     ),
     "cloth": (
         "Fabric061",
@@ -43,23 +47,27 @@ SETS = {
         "97010f72c7a32fa1e1242cfe872822c7c8b2ac445b47aa2e53cc877ccb2ec87a",
     ),
 }
-# Surface name in the game, the Poly Haven asset it comes from and the SHA-256 of its 1K PNG colour and normal maps.
+# Surface name in the game, the Poly Haven asset it comes from and the SHA-256 of its 1K PNG colour, normal and height
+# maps.
 POLYHAVEN = {
     "soil": (
         "red_laterite_soil_stones",
         "96f3e55c2cf202e609faea9234847805563375d8edf466fb30f06413dda1f2a1",
         "7cc7f835a3242574e085bfd948234d025fe81714cfda110d57456a914bae66a9",
+        "525a0b0d8de227188ff9a83a5581c7744d342373c29d54d5b8e6b30c02c6c738",
     ),
 }
-MAPS = ("Color", "NormalGL")
+MAPS = ("Color", "NormalGL", "Displacement")
 # Cloth scans are nearly even at the game's distance, so the weave keeps all of its contrast to show at all.
-# Soil and rock keep their colours: models take the scan's mean colour, so they show the photoscan as it is.
-DETAIL: dict[str, float | Literal["colour"]] = {
+# Rock, coal and soil are drawn as the photoscans are, with parallax.
+DETAIL: dict[str, float | Literal["scan"]] = {
     "cloth": 1.0,
-    "rock": "colour",
-    "soil": "colour",
+    "rock": "scan",
+    "coal": "scan",
+    "soil": "scan",
 }
 # A quarter of the source size: a tile spans a model or two and a model is well under a hundred screen pixels.
+# Scans drawn as they are ignore it and keep the source size.
 SIZE = 256
 OUTPUT = ROOT / "assets" / "models" / "surfaces"
 

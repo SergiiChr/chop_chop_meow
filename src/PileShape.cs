@@ -25,7 +25,7 @@ internal static class PileShape {
     private const int MostPieces = 120;
 
     /// <summary>A good as a heap shows it: one piece, what it is made of, how pieces are laid and how much of a piece's height each level adds.</summary>
-    public sealed record Heap(Mesh Mesh, StandardMaterial3D Material, Lay Lay, float Rise) {
+    public sealed record Heap(Mesh Mesh, StandardMaterial3D? Material, Lay Lay, float Rise) {
         public readonly int Triangles = Mesh.GetFaces().Length / 3;
         public readonly Vector3 Size = Mesh.GetAabb().Size;
     }
@@ -48,8 +48,13 @@ internal static class PileShape {
     /// <summary>Builds every heap's piece and material while loading, so a pile showing a new good mid-game swaps cached resources only.</summary>
     public static void Warm(GameData data) {
         // Asking for a material's RID builds its shader now rather than on the first pile that shows it.
-        foreach (var (id, item) in data.Items) _ = HeapOf(id, item.Color).Material.GetRid();
-        _ = HeapOf(ItemShape.Compost, Fallback).Material.GetRid();
+        foreach (var (id, item) in data.Items) Warm(HeapOf(id, item.Color));
+        Warm(HeapOf(ItemShape.Compost, Fallback));
+        // A heap without a material of its own carries one in each surface of its mesh.
+        static void Warm(Heap heap) {
+            _ = heap.Material?.GetRid();
+            for (int i = 0; i < heap.Mesh.GetSurfaceCount(); i++) _ = heap.Mesh.SurfaceGetMaterial(i)?.GetRid();
+        }
     }
 
     /// <summary>Adds one piece of every heap to the stage that loading draws, so the first pile to show a good builds nothing mid-game.</summary>

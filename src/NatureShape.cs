@@ -15,8 +15,10 @@ internal static class NatureShape {
     public static readonly StandardMaterial3D Natural = ModelKit.Vertex(Surface.Flat, .92f);
     public static readonly StandardMaterial3D Timber = ModelKit.Vertex(Surface.Wood, .92f);
     public static readonly StandardMaterial3D Rock = ModelKit.Vertex(Surface.Stone, .92f);
-    /// <summary>Boulders, pebbles and quarried stone, in <see cref="ModelKit.RockColor"/>.</summary>
-    public static readonly StandardMaterial3D PlainRock = ModelKit.Vertex(Surface.Rock, .92f);
+    /// <summary>Boulders, pebbles and quarried stone, drawn as the rock scan is.</summary>
+    public static readonly StandardMaterial3D PlainRock = ModelKit.Scanned(Scan.Rock, .92f);
+    /// <summary>Coal-bearing rock and loose coal, drawn as the coal scan is.</summary>
+    public static readonly StandardMaterial3D CoalRock = ModelKit.Scanned(Scan.Coal, .92f);
     public static readonly StandardMaterial3D Glossy = ModelKit.Vertex(Surface.Flat, .4f);
     private static readonly Dictionary<string, ArrayMesh> meshes = new();
 
@@ -30,11 +32,48 @@ internal static class NatureShape {
         return material;
     }
 
-    private static Mesh Cached(string key, Action<SurfaceTool> build) {
+    private static Mesh Cached(string key, Action<SurfaceTool> build, bool scanned = false) {
         if (meshes.TryGetValue(key, out var mesh)) return mesh;
         var surface = new SurfaceTool(); surface.Begin(Mesh.PrimitiveType.Triangles);
         build(surface);
+        if (scanned) surface.GenerateTangents();
         return meshes[key] = surface.Commit();
+    }
+
+    /// <summary>
+    /// Where a point of a rounded shape lies on a scan, in world units: the scan is laid over the shape from the top down,
+    /// like a cloth draped over it, so its marks keep their size around the sides and only the hidden underside bunches.
+    /// </summary>
+    public static Vector2 Draped(Vector3 p, Vector3 center, Vector3 radii) {
+        var unit = (p - center) / radii;
+        var across = new Vector2(unit.X, unit.Z);
+        float down = MathF.Atan2(across.Length(), unit.Y), radius = (radii.X + radii.Y + radii.Z) / 3;
+        return across.LengthSquared() < 1e-12f ? Vector2.Zero : across.Normalized() * down * radius;
+    }
+
+    /// <summary>Each point's normal, the mean of the faces around it turned away from the middle, so a shape is shaded smooth.</summary>
+    public static Vector3[] SmoothNormals(Vector3[] shaped, List<int> triangles, Vector3 center) {
+        var normals = new Vector3[shaped.Length];
+        for (int i = 0; i < triangles.Count; i += 3) {
+            var face = (shaped[triangles[i + 2]] - shaped[triangles[i]]).Cross(shaped[triangles[i + 1]] - shaped[triangles[i]]);
+            if (face.Dot(shaped[triangles[i]] - center) < 0) face = -face;
+            for (int k = 0; k < 3; k++) normals[triangles[i + k]] += face;
+        }
+        for (int i = 0; i < normals.Length; i++) normals[i] = normals[i].Normalized();
+        return normals;
+    }
+
+    /// <summary>Emits a shape shaded smooth, in white, with the scan draped over it, for a <see cref="ModelKit.Scanned"/> material.</summary>
+    private static void Scanned(SurfaceTool surface, Vector3[] shaped, List<int> triangles, Vector3 center, Vector3 radii) {
+        var normals = SmoothNormals(shaped, triangles, center);
+        for (int i = 0; i < triangles.Count; i += 3) {
+            int a = triangles[i], b = triangles[i + 1], c = triangles[i + 2];
+            if ((shaped[c] - shaped[a]).Cross(shaped[b] - shaped[a]).Dot(shaped[a] - center) < 0) (b, c) = (c, b);
+            foreach (int k in new[] { a, b, c }) {
+                surface.SetNormal(normals[k]); surface.SetColor(Colors.White); surface.SetUV(Draped(shaped[k], center, radii));
+                surface.AddVertex(shaped[k]);
+            }
+        }
     }
 
     /// <summary>Unit icosphere positions and triangles; detail 0 is the bare 20-face icosahedron.</summary>
@@ -358,16 +397,13 @@ internal static class NatureShape {
 
     private static (Vector3[] Points, List<int> Triangles) Boulder(Vector3 at, Vector3 radii, int seed) => Shape(at, radii, 1, seed, 3, .2f, .06f, 0, 11);
 
-    /// <summary>A faceted stone group pressed into the ground, with lighter tops and per-face color variation.</summary>
-    public static Mesh Rocks(string kind, Color color, int variant) => Cached($"rocks{kind}{variant}", s => {
+    /// <summary>A stone group pressed into the ground, shaded smooth with the rock scan draped over each stone, in 320 triangles.</summary>
+    public static Mesh Rocks(int variant) => Cached($"rocks{variant}", s => {
         foreach (var (at, radii, seed) in Boulders(variant)) {
             var (points, triangles) = Boulder(at, radii, seed);
-            Faces(s, points, triangles, at, (p, normal) => {
-                var shade = normal.Y > 0 ? color.Lightened(normal.Y * .12f) : color.Darkened(-normal.Y * .3f);
-                return shade.Lightened(Noise(p * 5, seed) * .03f);
-            });
+            Scanned(s, points, triangles, at, radii);
         }
-    });
+    }, true);
 
     /// <summary>Neutral host rock or seam faces shared across all ore palettes for one seeded variant.</summary>
     public static Mesh Ore(int variant, bool seam) => Cached($"ore{variant}{seam}", s => {
@@ -452,10 +488,27 @@ internal static class NatureShape {
         return v < 0 || u + v > 1 || t <= 0 ? null : t;
     }
 
-    /// <summary>A single flat stone lying half sunk in the ground, a faceted pebble turned by its variant.</summary>
-    public static Mesh Pebble(Color color, int variant) => Cached($"pebble{color.ToHtml()}{variant}", s =>
-        Blob(s, new Vector3(0, .05f, 0), new Vector3(.3f, .15f, .24f), 0, 731 + variant * 7, 2, .2f, .08f, 0, true,
-            Stony(color)));
+    /// <summary>A single flat stone lying half sunk in the ground, shaped by its variant, with the rock scan draped over it in 320 triangles.</summary>
+    public static Mesh Pebble(int variant) => Cached($"pebble{variant}", s => {
+        Vector3 center = new(0, .05f, 0), radii = new(.3f, .15f, .24f);
+        var (shaped, triangles) = Shape(center, radii, 2, 731 + variant * 7, 2, .2f, .08f, 0, 0);
+        Scanned(s, shaped, triangles, center, radii);
+    }, true);
+
+    /// <summary>
+    /// A few loose lumps lying on the ground, each a rounded nugget seated flat with a scan draped over it, of
+    /// <paramref name="detail"/> as <see cref="Shape"/> takes it: 400 triangles at one, and a first lump of 20 at none.
+    /// </summary>
+    public static Mesh Lumps(string kind, int variant, int detail) => Cached($"lumps{kind}{variant}{detail}", s => {
+        var random = new Random(701 + variant);
+        for (int i = 0; i < 5; i++) {
+            float angle = i * 1.4f + (float)random.NextDouble() * .5f, reach = i == 0 ? 0 : .24f + (float)random.NextDouble() * .06f;
+            float size = i == 0 ? .18f : .13f + (float)random.NextDouble() * .03f;
+            Vector3 center = new(MathF.Cos(angle) * reach, size * .45f, MathF.Sin(angle) * reach), radii = new Vector3(1.15f, .75f, 1) * size;
+            var (shaped, triangles) = Shape(center, radii, detail, 711 + variant * 7 + i, 2, .3f, .1f, 0, 0);
+            Scanned(s, shaped, triangles, center, radii);
+        }
+    }, true);
 
     /// <summary>A few loose lumps lying on the ground, each a faceted nugget seated flat.</summary>
     public static Mesh Loose(string kind, Color light, Color dark, int variant) => Cached($"loose{kind}{variant}", s => {

@@ -8,7 +8,7 @@ internal static class ShorelineAppearance {
     private static Shader? bankShader;
 
     /// <summary>A shore photoscan and how it is laid along the water.</summary>
-    /// <param name="Name">The file prefix of its colour and bumps maps in the lake folder.</param>
+    /// <param name="Name">The file prefix of its colour, bumps and height maps in the lake folder.</param>
     /// <param name="Tile">World units one tile of the photoscan spans.</param>
     /// <param name="Wet">Brightness at the waterline, where it is wet, as a share of the dry shore's.</param>
     /// <param name="GrassFade">Units over which the shore thins out into the grass.</param>
@@ -35,6 +35,7 @@ internal static class ShorelineAppearance {
         var material = new ShaderMaterial { Shader = bankShader };
         UseShore(material, look);
         material.SetShaderParameter("shore_normal", Map(look, "normal"));
+        material.SetShaderParameter("shore_height", Map(look, "height"));
         material.SetShaderParameter("grass_fade", look.GrassFade);
         return material;
     }
