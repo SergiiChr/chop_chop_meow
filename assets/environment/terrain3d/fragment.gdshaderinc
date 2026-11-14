@@ -25,17 +25,40 @@
     palette = mix(palette, vec3(0.24, 0.25, 0.23), smoothstep(38.0, 53.0, v_vertex.y) * 0.55);
     float detail = dot(ALBEDO, LUMA) / MEAN;
     ALBEDO = palette * mix(1.0, detail, DETAIL);
-    // Worn building footprints and footpaths worn by walking show dirt through the grass.
+    // The ground photoscans below lie flat in world x and z, with their height along world up.
+    vec3 view = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xzy);
+    // Sparse broad patches of the meadow take the moss photoscan as it is: the patch noise read at a larger scale and an
+    // offset, independent of the lusher and drier patches, with edges reaching further out at the photoscan's moss.
+    float mossy = texture(patches, v_vertex.xz / 300.0 + vec2(0.13, 0.21)).r;
+    // The edge below can lower the patch value by at most 0.04, so below 0.56 the moss weighs nothing.
+    if (mossy > 0.56 && bare < 1.0) {
+        vec2 moss_uv = scan_parallax(moss_height, v_vertex.xz / moss_tile, view, scan_relief / moss_tile);
+        float edge = mossy + (texture(moss_height, moss_uv).r - 0.5) * 0.08;
+        float moss = smoothstep(0.6, 0.68, edge) * (1.0 - bare);
+        ALBEDO = mix(ALBEDO, texture(moss_albedo, moss_uv).rgb, moss);
+        NORMAL_MAP = mix(NORMAL_MAP, texture(moss_normal, moss_uv).rgb, moss);
+    }
+    // The woods along the mountains take the forest floor photoscan as it is, its edge wandering in broad patches and
+    // reaching further out at its litter.
+    float woods = texture(woods_distance, (v_vertex.xz - woods_corner) / woods_span).r * woods_reach;
+    if (woods < woods_reach && bare < 1.0) {
+        vec2 forest_uv = scan_parallax(forest_height, v_vertex.xz / forest_tile, view, scan_relief / forest_tile);
+        float wander = sin(v_vertex.x * 0.31 + v_vertex.z * 0.17) * sin(v_vertex.z * 0.27 - v_vertex.x * 0.13);
+        float edge = woods + (0.5 - texture(forest_height, forest_uv).r) * 3.0 + wander * 2.0;
+        float litter = (1.0 - smoothstep(woods_band - 2.0, woods_band + 2.0, edge)) * (1.0 - bare);
+        ALBEDO = mix(ALBEDO, texture(forest_albedo, forest_uv).rgb, litter);
+        NORMAL_MAP = mix(NORMAL_MAP, texture(forest_normal, forest_uv).rgb, litter);
+    }
+    // Worn building footprints and footpaths worn by walking show the footpath photoscan through the grass.
     float wear = texture(disturbance, v_vertex.xz / 216.0).r;
     wear = max(wear, smoothstep(0.05, 0.6, texture(traffic, v_vertex.xz / 216.0).r)) * (1.0 - bare);
-    vec2 dirt_uv = v_vertex.xz * _texture_uv_scale_array[2];
-    vec4 dirt = texture(_texture_array_albedo, vec3(dirt_uv, 2.0));
-    vec4 dirt_bump = texture(_texture_array_normal, vec3(dirt_uv, 2.0));
-    vec3 path = vec3(0.23, 0.205, 0.14) * mix(1.0, dot(dirt.rgb, LUMA) / MEAN, DETAIL);
-    // The dirt shows first where it stands higher than the grass, so the edge follows the texture.
-    float worn = clamp(wear + (dirt.a - mat.albedo_height.a) * wear, 0.0, 1.0);
-    ALBEDO = mix(ALBEDO, path, worn);
-    NORMAL_MAP = mix(NORMAL_MAP, dirt_bump.rgb, worn);
+    if (wear > 0.0) {
+        vec2 path_uv = scan_parallax(path_height, v_vertex.xz / path_tile, view, scan_relief / path_tile);
+        // The path shows first where it stands higher than the grass, so the edge follows the texture.
+        float worn = clamp(wear + (texture(path_height, path_uv).r - mat.albedo_height.a) * wear, 0.0, 1.0);
+        ALBEDO = mix(ALBEDO, texture(path_albedo, path_uv).rgb, worn);
+        NORMAL_MAP = mix(NORMAL_MAP, texture(path_normal, path_uv).rgb, worn);
+    }
     // Scenery shrinks away on worn ground, and its shade with it.
     float scenery = texture(shade, v_vertex.xz / 216.0).r;
     vec2 objectShade = texture(contact, v_vertex.xz / 216.0).rg;

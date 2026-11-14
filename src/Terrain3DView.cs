@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Godot;
@@ -10,8 +11,16 @@ public partial class WorldView {
     private Node3D? terrainTarget;
     // RenderingServer uniforms take RIDs, so retain the texture resource for their lifetime.
     private Texture2D? terrainGrass;
-    /// <summary>The ground texture sets, in Terrain3D id order, with the world units one tile spans: the auto shader puts grass on flat ground and rock on slopes, and the include draws dirt on worn ground.</summary>
-    private static readonly (string Name, float Tile)[] GroundTextures = { ("grass", 4), ("rock", 6), ("dirt", 4) };
+    private readonly List<Texture2D> groundScanMaps = new();
+    /// <summary>The ground photoscans drawn as they are, each with its colour, OpenGL normal and height maps beside the terrain, and the world units one tile spans, about its real size.</summary>
+    private static readonly (string Name, float Tile)[] GroundScans = { ("path", 2), ("moss", 15), ("forest", 2) };
+    private ImageTexture? woodsDistance;
+    /// <summary>World units out from the foot of the ranges that the woods' floor reaches, where <see cref="World"/> scatters trees at better than even odds.</summary>
+    private const float WoodsBand = 10;
+    /// <summary>World units out from the foot of the ranges that the woods map measures; the shader's frayed band ends within it.</summary>
+    private const float WoodsReach = 16;
+    /// <summary>The ground texture sets, in Terrain3D id order, with the world units one tile spans: the auto shader puts grass on flat ground and rock on slopes.</summary>
+    private static readonly (string Name, float Tile)[] GroundTextures = { ("grass", 4), ("rock", 6) };
     /// <summary>Soft noise over the whole map, about fifteen tiles a blob, for lusher and drier patches of meadow.</summary>
     private readonly NoiseTexture2D terrainPatches = new() { Width = 256, Height = 256, Noise = new FastNoiseLite { Seed = 913, Frequency = .05f, FractalOctaves = 3 } };
 
@@ -98,6 +107,31 @@ public partial class WorldView {
         RenderingServer.MaterialSetParam(terrainMaterialRid, "disturbance", disturbanceTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "shade", sceneryShadeTexture.GetRid());
         RenderingServer.MaterialSetParam(terrainMaterialRid, "contact", objectShadeTexture.GetRid());
+        foreach (var (scan, tile) in GroundScans) {
+            RenderingServer.MaterialSetParam(terrainMaterialRid, $"{scan}_tile", tile);
+            foreach (var map in new[] { "albedo", "normal", "height" }) {
+                var texture = GD.Load<Texture2D>($"res://assets/environment/terrain3d/{scan}_{map}.jpg");
+                groundScanMaps.Add(texture);
+                RenderingServer.MaterialSetParam(terrainMaterialRid, $"{scan}_{map}", texture.GetRid());
+            }
+        }
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "scan_relief", ModelKit.ScanRelief);
+        // One texel a world unit over all nine regions: how far each texel's middle, where filtering reads it, lies from
+        // the foot of the nearer range, which is where trees thicken into woods.
+        const int span = 3 * regionSize;
+        var woods = new byte[span * span];
+        Parallel.For(0, span, z => {
+            for (int x = 0; x < span; x++) {
+                float from = Terrain.FromMountains(new Vector2(x - regionSize + .5f, z - regionSize + .5f));
+                woods[z * span + x] = (byte)Math.Round(Math.Clamp(from / WoodsReach, 0, 1) * 255);
+            }
+        });
+        woodsDistance = ImageTexture.CreateFromImage(Image.CreateFromData(span, span, false, Image.Format.R8, woods));
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_distance", woodsDistance.GetRid());
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_corner", new Vector2(-regionSize, -regionSize));
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_span", (float)span);
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_reach", WoodsReach);
+        RenderingServer.MaterialSetParam(terrainMaterialRid, "woods_band", WoodsBand);
         // The shader's tunnel cut-outs hold exactly one entry per cliff.
         if (World.Cliffs.Length != 5) throw new InvalidOperationException($"Terrain3D mine cut-outs expect 5 cliffs, not {World.Cliffs.Length}.");
         var mines = new Vector4[World.Cliffs.Length];

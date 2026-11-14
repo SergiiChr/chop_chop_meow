@@ -17,23 +17,6 @@ public partial class WorldView {
         var noise = new FastNoiseLite { NoiseType = FastNoiseLite.NoiseTypeEnum.Perlin, Frequency = .045f, FractalOctaves = 4, FractalGain = .6f, Seed = 4271 };
         var grass = new NoiseTexture2D { Width = 512, Height = 512, Seamless = true, Noise = noise, ColorRamp = ramp };
         BuildTerrain3D(parent, grass);
-        // The arrival clearing: overlapping translucent discs soften into the grass.
-        for (int ring = 0; ring < 4; ring++)
-            Cylinder(parent, 2.4f + ring * .7f, 2.4f + ring * .7f, .002f, new Vector3(Terrain.Spawn.X, .003f + ring * .0005f, Terrain.Spawn.Y), Flat(new Color(.66f, .6f, .42f, .1f), true), null, 32);
-        // A narrow, worn trail from the clearing down the valley to the shore, the way the carts go.
-        float from = Terrain.Along(Terrain.Spawn);
-        for (int layer = 3; layer > 0; layer--) {
-            float width = .33f + layer * .12f;
-            var strip = new SurfaceTool();
-            strip.Begin(Mesh.PrimitiveType.TriangleStrip);
-            for (float along = from - 1; along <= TrailCoast + 2; along += 1) {
-                var mid = Trail(along);
-                float lift = .006f + (3 - layer) * .001f;
-                strip.SetNormal(Vector3.Up); strip.AddVertex(To3(mid - Terrain.Sideways * width, lift));
-                strip.SetNormal(Vector3.Up); strip.AddVertex(To3(mid + Terrain.Sideways * width, lift));
-            }
-            Add(parent, strip.Commit(), Flat(new Color(.67f, .6f, .43f, layer == 1 ? .3f : .16f), true), Vector3.Zero);
-        }
         // Sea and its feathered bank follow the coastline at the valley's mouth.
         ShorelineAppearance.BuildCoast(parent, EnvironmentReview);
         BuildLake(parent);
@@ -41,13 +24,6 @@ public partial class WorldView {
         foreach (var den in World.Dens) BuildDen(parent, den);
         BuildPlacedEnvironment(parent);
     }
-
-    /// <summary>How far along the valley the coast lies where the trail reaches it.</summary>
-    private static float TrailCoast => Terrain.Coast(Terrain.Across(Terrain.Spawn));
-
-    /// <summary>The middle of the worn trail from the clearing to the shore, at a distance along the valley.</summary>
-    private static Vector2 Trail(float along) =>
-        Terrain.Point(along, Terrain.Across(Terrain.Spawn) + MathF.Sin(along * .6f) * .13f + MathF.Sin(along * .08f) * 2.5f);
 
     /// <summary>A wolf den: a mine's rock outcrop and dark tunnel at half size, with no timber, rails or cart, so the mouth is about a wolf's height.</summary>
     private static void BuildDen(Node3D parent, Den den) {

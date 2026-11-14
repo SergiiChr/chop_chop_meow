@@ -109,7 +109,8 @@ The game draws the film itself, so a change to a model or a shot means making th
 
 `./build.py setup` downloads and installs the pinned Terrain3D Linux x86_64 runtime when needed.
 `./tools/ground_textures.py` and `./tools/surface_textures.py` repack the committed ground and model surface textures
-from their pinned CC0 sources, and `./tools/food_models.py` bakes the committed food models from theirs.
+from their pinned CC0 sources, `./tools/polyhaven_textures.py` downloads the shore and ground photoscans drawn as they
+are, and `./tools/food_models.py` bakes the committed food models from theirs.
 Sources and licenses of the environment assets are in [assets/README.md](assets/README.md).
 
 ## Start menu and options
@@ -133,14 +134,16 @@ The interface is drawn at 0.8 of the size it is laid out for (`Game.InterfaceSca
 It keeps that share of the screen at every resolution, with its text drawn at the size it shows.
 
 Wind sways grass, bushes and tree foliage, drifting between calm spells and gusty ones, and grass parts around the player.
-Footpaths wear in where the player and workers walk and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
+Footpaths wear in where the player and workers walk, not where they stand, and grow back within two game days; they are not saved, so a new or loaded game starts on unworn ground.
 Fires and stoves leave soot stains on the ground, light bounces off what is on screen (SSIL), things shade the ground and each other where they
 meet (SSAO), and world sounds pan with their place on screen.
 Ambient light comes from a sky that is never drawn: light from above and grass-coloured bounce from below, so roofs and walls differ in shade.
 The picture is tonemapped with AgX, which keeps colours as light brightens.
 A burning campfire lights exactly the circle where wolves keep away; other lights are small glows that give no safety.
-The ground has grain and bump from grass, rock and dirt photoscans under its own colours: meadow over the valley with
-soft lusher and drier patches, stone on the mountain slopes, and dirt showing through where the ground is worn.
+The ground has grain and bump from grass and rock photoscans under its own colours: meadow over the valley with soft
+lusher and drier patches, sparse broad patches of moss over gravelly earth, and stone on the mountain slopes.
+The woods along the mountains have a photoscan of forest floor with twigs and dead leaves, and where the ground is
+worn, a photoscan of muddy soil with leaves shows through, both in their own colours.
 Shrubs cast real shadows; grass and small objects darken the ground under them through a shade map baked while loading.
 
 ## Controls
@@ -802,10 +805,10 @@ A save that is incomplete, names items the game does not know or holds needs out
 
 ### Environment
 
-The environment uses a shared human scale, Terrain3D mountain ranges, a sandy shore and sea, and an irregular lake with reeds, lily pads and clustered shore stones.
+The environment uses a shared human scale, Terrain3D mountain ranges, a rippled sand beach along the sea, and an irregular lake with a mossy, stony shore, reeds, lily pads and clustered shore stones.
 Meadow grass and wildflowers grow in patches, ferns add woodland ground cover, and plain bushes stand among them.
-Building footprints, mine approaches and the cart trail keep the ground cover clear, with worn soil around active work areas.
-A worn trail runs down to the shore, and there are three tree types (oak, spruce, birch), from short trees to ones two thirds taller.
+Building footprints and mine approaches keep the ground cover clear, with worn soil around active work areas.
+There are three tree types (oak, spruce, birch), from short trees to ones two thirds taller.
 
 Workers wear blue bib overalls, cream shirts and yellow hard hats; the player wears a teal T-shirt, jeans and a daypack.
 The sun crosses the sky from dawn to nightfall, so shadows swing round through the day and stretch out at either end, and its light warms near sunrise and sunset.

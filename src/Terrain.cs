@@ -38,8 +38,11 @@ public static class Terrain {
     }
     /// <summary>Water, from just past the line where the drawn sea meets the sand.</summary>
     public static bool Sea(Vector2 p) => Along(p) > Coast(Across(p)) - 1;
-    /// <summary>The sandy strip along the shore, where nothing grows.</summary>
-    public static bool Beach(Vector2 p) => Along(p) > Coast(Across(p)) - 5;
+    /// <summary>How far the drawn sand reaches inland from the line where the drawn sea meets it, from about 2 to 8 units.</summary>
+    public static float SandWidth(float across) =>
+        5.15f + 1.6f * MathF.Sin(across * .13f + .4f) + .9f * MathF.Sin(across * .41f) + .4f * MathF.Sin(across * 1.1f);
+    /// <summary>The sandy strip along the shore, where nothing grows; grass may stand where the sand thins out inland.</summary>
+    public static bool Beach(Vector2 p) => Along(p) > Coast(Across(p)) - 1.2f - SandWidth(Across(p)) + 1.35f;
     /// <summary>The lake's irregular shore as a distance from its centre; the water and the walkable edge share it.</summary>
     public static float Shore(float angle) => LakeRadius * (.9f + .05f * MathF.Sin(angle * 3 + 1) + .04f * MathF.Sin(angle * 5 + 2.3f) + .05f * MathF.Sin(angle * 2 + .4f));
     public static bool InLake(Vector2 p, float margin = 0) {

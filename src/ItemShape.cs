@@ -13,7 +13,11 @@ namespace ChopChopMeow;
 /// </summary>
 internal static class ItemShape {
     /// <summary>One flat triangle, wound so that it faces outward, in one colour.</summary>
-    private readonly record struct Face(Vector3 A, Vector3 B, Vector3 C, Color Tint);
+    private readonly record struct Face(Vector3 A, Vector3 B, Vector3 C, Color Tint, Drape? Draped = null);
+    /// <summary>A face shaded smooth with a scan draped over it: each corner's normal and place on the scan, in world units.</summary>
+    private readonly record struct Drape(Vector3 NormalA, Vector3 NormalB, Vector3 NormalC, Vector2 A, Vector2 B, Vector2 C) {
+        public Drape Turned(Basis basis) => this with { NormalA = (basis * NormalA).Normalized(), NormalB = (basis * NormalB).Normalized(), NormalC = (basis * NormalC).Normalized() };
+    }
     /// <summary>
     /// How an item is built and what it is made of, and how a pile heaps it.
     /// A heap's piece is the item as built, or what <paramref name="Piece"/> builds where the item as built is too
@@ -21,7 +25,7 @@ internal static class ItemShape {
     /// left as built at zero, and each level of the heap adds <paramref name="Rise"/> of its height.
     /// </summary>
     private sealed record Look(Action<List<Face>> Build, StandardMaterial3D Material, float Size = 0, Lay Lay = Lay.Neat, float Rise = 1,
-        Action<List<Face>>? Piece = null);
+        Action<List<Face>>? Piece = null, StandardMaterial3D? Scan = null);
 
     /// <summary>A compost pile's heap: not an item, but heaped like one.</summary>
     public const string Compost = "compost";
@@ -32,7 +36,6 @@ internal static class ItemShape {
     private static readonly StandardMaterial3D Sacking = ModelKit.Vertex(Surface.Cloth, .9f);
     private static readonly StandardMaterial3D Steel = ModelKit.Vertex(Surface.Metal, .45f, .35f);
     private static readonly StandardMaterial3D Tin = ModelKit.Vertex(Surface.Metal, .4f, .15f);
-    private static readonly StandardMaterial3D Soil = ModelKit.Vertex(Surface.Earth, 1);
 
     private static readonly Dictionary<string, Look> looks = new() {
         ["wood_parts"] = new(f => WoodParts(f, 8), Wooden, .55f, Lay.Loose, Piece: f => WoodParts(f, 5)),
@@ -60,10 +63,10 @@ internal static class ItemShape {
         // What follows has a model in the world, which its icon shows; a pile heaps lighter copies of it or of a piece of it.
         ["wood"] = new(Log, Wooden, Lay: Lay.Rows, Rise: .85f),
         ["planks"] = new(Plank, Wooden, Lay: Lay.Rows),
-        ["stone"] = new(f => First(f, NatureShape.Rocks("pile_stone", new Color("8d918e"), 0), 80), NatureShape.Rock, .42f, Lay.Loose, .7f),
+        ["stone"] = new(f => First(f, NatureShape.Rocks(0), 80), NatureShape.PlainRock, .42f, Lay.Loose, .7f),
         ["iron_ore"] = Nugget("pile_iron", "a35a2e"),
         ["tin_ore"] = Nugget("pile_tin", "b9bcb4"),
-        ["coal"] = Nugget("pile_coal", "2d2f33"),
+        ["coal"] = new(f => First(f, NatureShape.Lumps(0, 0), 20), NatureShape.CoalRock, .24f, Lay.Loose, .7f),
         ["charcoal"] = new(f => Copy(f, CharcoalShape.Briquette, Transform3D.Identity, Colors.White), CharcoalShape.Material, .32f, Lay.Loose, .8f),
         // Bars heap as six-packs: three lying side by side and three across them.
         ["iron_bar"] = new(Ingots, Plain, .5f),
@@ -89,7 +92,7 @@ internal static class ItemShape {
         ["berries"] = new(Berry, Glossy, .16f, Lay.Loose, .7f),
         // Leaves and compost are each one mound, which swells with what is in it.
         ["leaves"] = new(Leaves, Plain, Lay: Lay.Mound),
-        [Compost] = new(Mulch, Soil, Lay: Lay.Mound),
+        [Compost] = new(Mulch, Plain, Lay: Lay.Mound, Scan: ModelKit.Scanned(Scan.Soil, 1)),
     };
 
     /// <summary>A hand tool lying on its side, or as <paramref name="pose"/> turns it, so its head lies flat.</summary>
@@ -106,15 +109,18 @@ internal static class ItemShape {
     public static bool Has(string item) => looks.ContainsKey(item);
     public static Lay LayOf(string item) => looks[item].Lay;
     public static float RiseOf(string item) => looks[item].Rise;
-    /// <summary>What an item's model is made of; a bar is plain metal in its item's colour.</summary>
-    public static StandardMaterial3D Material(string item, string color) =>
-        item is "iron_bar" or "steel_bar" or "tin_bar" ? ModelKit.Metal(color, .45f, .5f) : looks[item].Material;
+    /// <summary>
+    /// What an item's model is made of; a bar is plain metal in its item's colour.
+    /// None for a model partly drawn as a scan, whose mesh carries a material for each part.
+    /// </summary>
+    public static StandardMaterial3D? Material(string item, string color) =>
+        item is "iron_bar" or "steel_bar" or "tin_bar" ? ModelKit.Metal(color, .45f, .5f) : looks[item].Scan == null ? looks[item].Material : null;
 
     /// <summary>Builds one of the item as its icon shows it, centred on the origin.</summary>
     public static ArrayMesh Build(string item) {
         var faces = new List<Face>(); looks[item].Build(faces);
         var (min, max) = Bounds(faces);
-        return Commit(faces, new Transform3D(Basis.Identity, -(min + max) / 2));
+        return Commit(faces, new Transform3D(Basis.Identity, -(min + max) / 2), looks[item]);
     }
 
     /// <summary>Builds the piece a heap of the item is made of, standing on the origin at the size a heap shows it.</summary>
@@ -125,22 +131,43 @@ internal static class ItemShape {
         faces.RemoveAll(face => (face.C - face.A).Cross(face.B - face.A).Normalized().Y < -.9f);
         var (min, max) = Bounds(faces);
         float scale = look.Size > 0 ? look.Size / MathF.Max(max.X - min.X, max.Z - min.Z) : 1;
-        return Commit(faces, new Transform3D(Basis.FromScale(Vector3.One * scale), -new Vector3((min.X + max.X) / 2, min.Y, (min.Z + max.Z) / 2) * scale));
+        return Commit(faces, new Transform3D(Basis.FromScale(Vector3.One * scale), -new Vector3((min.X + max.X) / 2, min.Y, (min.Z + max.Z) / 2) * scale), look);
     }
 
-    private static ArrayMesh Commit(List<Face> faces, Transform3D at) {
-        var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
-        foreach (var (a, b, c, tint) in faces) {
-            Vector3 p = at * a, q = at * b, r = at * c;
-            s.SetColor(tint); s.SetNormal((r - p).Cross(q - p).Normalized());
-            s.AddVertex(p); s.AddVertex(q); s.AddVertex(r);
+    /// <summary>
+    /// The faces as a mesh: flat-shaded ones in one surface and draped ones, with tangents, in another.
+    /// A mesh with both carries the look's material for each, since one material cannot draw both.
+    /// </summary>
+    private static ArrayMesh Commit(List<Face> faces, Transform3D at, Look look) {
+        var mesh = new ArrayMesh();
+        foreach (bool draped in new[] { false, true }) {
+            var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles);
+            int count = 0;
+            foreach (var face in faces) {
+                if (face.Draped.HasValue != draped) continue;
+                count++;
+                Vector3 p = at * face.A, q = at * face.B, r = at * face.C;
+                s.SetColor(face.Tint);
+                if (face.Draped is Drape drape) {
+                    foreach (var (corner, normal, uv) in new[] { (p, drape.NormalA, drape.A), (q, drape.NormalB, drape.B), (r, drape.NormalC, drape.C) }) {
+                        s.SetNormal(normal); s.SetUV(uv); s.AddVertex(corner);
+                    }
+                    continue;
+                }
+                s.SetNormal((r - p).Cross(q - p).Normalized());
+                s.AddVertex(p); s.AddVertex(q); s.AddVertex(r);
+            }
+            if (count == 0) continue;
+            if (draped) s.GenerateTangents();
+            s.Commit(mesh);
+            if (look.Scan != null) mesh.SurfaceSetMaterial(mesh.GetSurfaceCount() - 1, draped ? look.Scan : look.Material);
         }
-        return s.Commit();
+        return mesh;
     }
 
     private static (Vector3 Min, Vector3 Max) Bounds(List<Face> faces) {
         var min = faces[0].A; var max = min;
-        foreach (var (a, b, c, _) in faces) { min = min.Min(a).Min(b).Min(c); max = max.Max(a).Max(b).Max(c); }
+        foreach (var face in faces) { min = min.Min(face.A).Min(face.B).Min(face.C); max = max.Max(face.A).Max(face.B).Max(face.C); }
         return (min, max);
     }
 
@@ -149,12 +176,12 @@ internal static class ItemShape {
         var one = new List<Face>(); build(one);
         var (min, max) = Bounds(one);
         var middle = ((min + max) / 2) with { Y = min.Y };
-        for (int i = 0; i < one.Count; i++) one[i] = new(one[i].A - middle, one[i].B - middle, one[i].C - middle, one[i].Tint);
+        for (int i = 0; i < one.Count; i++) one[i] = one[i] with { A = one[i].A - middle, B = one[i].B - middle, C = one[i].C - middle };
         return (one, max - min);
     }
 
     private static void Place(List<Face> faces, List<Face> one, Transform3D at) {
-        foreach (var (a, b, c, tint) in one) faces.Add(new(at * a, at * b, at * c, tint));
+        foreach (var face in one) faces.Add(new(at * face.A, at * face.B, at * face.C, face.Tint, face.Draped?.Turned(at.Basis)));
     }
 
     /// <summary>Six of one standing side by side in two rows of three.</summary>
@@ -170,7 +197,7 @@ internal static class ItemShape {
     private static void Ingots(List<Face> faces) {
         var one = new List<Face>(); Copy(one, IngotShape.Mesh, Transform3D.Identity, Colors.White);
         for (int i = -1; i <= 1; i++) {
-            foreach (var (a, b, c, tint) in one) {
+            foreach (var (a, b, c, tint, _) in one) {
                 var lower = new Vector3(0, .1f, i * .22f);
                 if ((c - a).Cross(b - a).Normalized().Y < .9f) faces.Add(new(a + lower, b + lower, c + lower, tint));
             }
@@ -185,9 +212,9 @@ internal static class ItemShape {
     /// <summary>A sawn board lying flat.</summary>
     private static void Plank(List<Face> faces) => Box(faces, new Transform3D(Basis.Identity, new Vector3(0, .03f, 0)), new(.15f, .06f, 1), new Color("d2a26a"));
 
-    /// <summary>The first triangles of a mesh that scatters several lumps: its first lump alone.</summary>
+    /// <summary>The first triangles of a mesh that scatters several lumps: its first lump alone, draped where the mesh carries a scan.</summary>
     private static void First(List<Face> faces, Mesh mesh, int triangles) {
-        var all = new List<Face>(); Copy(all, mesh, Transform3D.Identity, Colors.White);
+        var all = new List<Face>(); Copy(all, mesh, Transform3D.Identity, Colors.White, draped: true);
         faces.AddRange(all.GetRange(0, triangles));
     }
 
@@ -201,16 +228,22 @@ internal static class ItemShape {
         for (int i = first; i < faces.Count; i++) faces[i] = faces[i] with { Tint = recolour(faces[i].Tint) };
     }
 
-    /// <summary>A mesh's triangles placed by <paramref name="at"/>, each in its first corner's colour, or in <paramref name="plain"/> where the mesh carries none.</summary>
-    private static void Copy(List<Face> faces, Mesh mesh, Transform3D at, Color plain) {
+    /// <summary>
+    /// A mesh's triangles placed by <paramref name="at"/>, each in its first corner's colour, or in <paramref name="plain"/> where the mesh carries none.
+    /// With <paramref name="draped"/>, a mesh with a place on a scan for each point keeps it and its smooth normals.
+    /// </summary>
+    private static void Copy(List<Face> faces, Mesh mesh, Transform3D at, Color plain, bool draped = false) {
         for (int surface = 0; surface < mesh.GetSurfaceCount(); surface++) {
             var arrays = mesh.SurfaceGetArrays(surface);
             var points = arrays[(int)Mesh.ArrayType.Vertex].AsVector3Array();
             var colours = arrays[(int)Mesh.ArrayType.Color].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.Color].AsColorArray();
             var index = arrays[(int)Mesh.ArrayType.Index].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.Index].AsInt32Array();
+            var uvs = !draped || arrays[(int)Mesh.ArrayType.TexUV].VariantType == Variant.Type.Nil ? null : arrays[(int)Mesh.ArrayType.TexUV].AsVector2Array();
+            var normals = arrays[(int)Mesh.ArrayType.Normal].AsVector3Array();
             for (int i = 0; i < (index?.Length ?? points.Length); i += 3) {
                 int a = index?[i] ?? i, b = index?[i + 1] ?? i + 1, c = index?[i + 2] ?? i + 2;
-                faces.Add(new(at * points[a], at * points[b], at * points[c], colours?[a] ?? plain));
+                var drape = uvs == null ? (Drape?)null : new Drape(normals[a], normals[b], normals[c], uvs[a], uvs[b], uvs[c]).Turned(at.Basis);
+                faces.Add(new(at * points[a], at * points[b], at * points[c], colours?[a] ?? plain, drape));
             }
         }
     }
@@ -488,15 +521,20 @@ internal static class ItemShape {
     }
 
     /// <summary>
-    /// A broad low mound with flat faces, each in one of the given colours, and where the top of it is at a distance
-    /// from its middle.
+    /// A broad low mound, and where the top of it is at a distance from its middle.
+    /// Its faces are flat, each in one of the given colours, or without them shaded smooth with the scan draped over it.
     /// </summary>
-    private static Func<float, float> Mound(List<Face> faces, float radius, float height, int seed, Color[] palette) {
-        var middle = new Vector3(0, height * .1f, 0);
-        var (points, triangles) = NatureShape.Shape(middle, new(radius, height, radius), 2, seed, 5, .12f, .04f, 0, 0);
+    private static Func<float, float> Mound(List<Face> faces, float radius, float height, int seed, Color[]? palette) {
+        var middle = new Vector3(0, height * .1f, 0); var radii = new Vector3(radius, height, radius);
+        var (points, triangles) = NatureShape.Shape(middle, radii, 2, seed, 5, .12f, .04f, 0, 0);
+        var normals = NatureShape.SmoothNormals(points, triangles, middle);
         for (int t = 0; t < triangles.Count; t += 3) {
-            Vector3 a = points[triangles[t]], b = points[triangles[t + 1]], c = points[triangles[t + 2]];
-            Tri(faces, a, b, c, (a + b + c) / 3 - middle, palette[t / 3 * 7 % palette.Length]);
+            int i = triangles[t], j = triangles[t + 1], k = triangles[t + 2];
+            Vector3 a = points[i], b = points[j], c = points[k];
+            if (palette != null) { Tri(faces, a, b, c, (a + b + c) / 3 - middle, palette[t / 3 * 7 % palette.Length]); continue; }
+            if ((c - a).Cross(b - a).Dot((a + b + c) / 3 - middle) < 0) { (b, c) = (c, b); (j, k) = (k, j); }
+            faces.Add(new(a, b, c, Colors.White, new Drape(normals[i], normals[j], normals[k],
+                NatureShape.Draped(a, middle, radii), NatureShape.Draped(b, middle, radii), NatureShape.Draped(c, middle, radii))));
         }
         return reach => middle.Y + height * MathF.Sqrt(MathF.Max(0, 1 - reach * reach / (radius * radius)));
     }
@@ -522,7 +560,7 @@ internal static class ItemShape {
     /// <summary>A compost heap: a mound of dark soil with leaves on it and stalks and scraps poking out of it.</summary>
     private static void Mulch(List<Face> faces) {
         const float radius = 1.1f;
-        var top = Mound(faces, radius, .5f, 23, new Color[] { new("4a3524"), new("5a4129"), new("3f2d1f"), new("523a26") });
+        var top = Mound(faces, radius, .5f, 23, null);
         Litter(faces, top, radius, 7);
         Color[] scraps = { new("8fae55"), new("c08a3a"), new("d9c27a"), new("7c9c46"), new("a8652c") };
         for (int i = 0; i < 20; i++) {

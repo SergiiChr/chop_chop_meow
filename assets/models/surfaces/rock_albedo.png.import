@@ -2,8 +2,8 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://db7djltv54eat"
-path.bptc="res://.godot/imported/dirt_normal.png-136bf6ad520520033c3518bc64df5afb.bptc.ctex"
+uid="uid://bs0arp0fp2o24"
+path.bptc="res://.godot/imported/rock_albedo.png-12fb061023357fa692eae34e8e0cbc51.bptc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
@@ -11,8 +11,8 @@ metadata={
 
 [deps]
 
-source_file="res://assets/environment/terrain3d/textures/dirt_normal.png"
-dest_files=["res://.godot/imported/dirt_normal.png-136bf6ad520520033c3518bc64df5afb.bptc.ctex"]
+source_file="res://assets/models/surfaces/rock_albedo.png"
+dest_files=["res://.godot/imported/rock_albedo.png-12fb061023357fa692eae34e8e0cbc51.bptc.ctex"]
 
 [params]
 
@@ -22,7 +22,7 @@ compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
-compress/normal_map=2
+compress/normal_map=0
 compress/channel_pack=0
 mipmaps/generate=true
 mipmaps/limit=-1

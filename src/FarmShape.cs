@@ -9,17 +9,19 @@ internal static class FarmShape {
     private static readonly ArrayMesh?[,] crops = new ArrayMesh?[3, 3];
     public static Mesh Soil => soil ??= BuildSoil();
     public static Mesh Crop(int stage, int variant) => crops[stage, variant] ??= BuildField(stage, variant);
-    public static readonly StandardMaterial3D Earth = ModelKit.Vertex(Surface.Earth, 1);
+    public static readonly StandardMaterial3D Earth = ModelKit.Scanned(Scan.Soil, 1);
     // Thin plant leaves are deliberately two-sided; solid stems and grain heads share the same cached material.
     public static readonly StandardMaterial3D Foliage = new() { VertexColorUseAsAlbedo = true, VertexColorIsSrgb = true, Roughness = .9f, CullMode = BaseMaterial3D.CullModeEnum.Disabled };
     private static SurfaceTool Begin() { var s = new SurfaceTool(); s.Begin(Mesh.PrimitiveType.Triangles); return s; }
 
+    /// <summary>Tilled soil drawn as the soil scan is: the ridges are drawn lighter than the furrows and the flat ground around them.</summary>
     private static ArrayMesh BuildSoil() {
+        const string ground = "e6e6e6", ridge = "ffffff";
         var s = Begin();
-        Quad(s, new(-1.35f, .03f, -1.35f), new(1.35f, .03f, -1.35f), new(1.35f, .03f, 1.35f), new(-1.35f, .03f, 1.35f), Vector3.Up, "4f3a28");
+        Quad(s, new(-1.35f, .03f, -1.35f), new(1.35f, .03f, -1.35f), new(1.35f, .03f, 1.35f), new(-1.35f, .03f, 1.35f), Vector3.Up, ground);
         foreach (float side in new[] { -1.35f, 1.35f }) {
-            Quad(s, new(side, .01f, -1.35f), new(side, .03f, -1.35f), new(side, .03f, 1.35f), new(side, .01f, 1.35f), new(side, 0, 0), "4f3a28");
-            Quad(s, new(-1.35f, .01f, side), new(-1.35f, .03f, side), new(1.35f, .03f, side), new(1.35f, .01f, side), new(0, 0, side), "4f3a28");
+            Quad(s, new(side, .01f, -1.35f), new(side, .03f, -1.35f), new(side, .03f, 1.35f), new(side, .01f, 1.35f), new(side, 0, 0), ground);
+            Quad(s, new(-1.35f, .01f, side), new(-1.35f, .03f, side), new(1.35f, .03f, side), new(1.35f, .01f, side), new(0, 0, side), ground);
         }
         for (int row = 0; row < 5; row++) {
             float z = -1.08f + row * .54f;
@@ -27,10 +29,11 @@ internal static class FarmShape {
             Vector3 Left(int i) => profile[i] + Vector3.Left * 1.3f;
             Vector3 Right(int i) => profile[i] + Vector3.Right * 1.3f;
             for (int i = 0; i < 3; i++)
-                Quad(s, Left(i), Right(i), Right(i + 1), Left(i + 1), Vector3.Up, i == 1 ? "654b32" : "5e4630");
-            Quad(s, Left(0), Left(1), Left(2), Left(3), Vector3.Left, "5e4630");
-            Quad(s, Right(0), Right(1), Right(2), Right(3), Vector3.Right, "5e4630");
+                Quad(s, Left(i), Right(i), Right(i + 1), Left(i + 1), Vector3.Up, i == 1 ? ridge : ground);
+            Quad(s, Left(0), Left(1), Left(2), Left(3), Vector3.Left, ground);
+            Quad(s, Right(0), Right(1), Right(2), Right(3), Vector3.Right, ground);
         }
+        s.GenerateTangents();
         return s.Commit();
     }
 
@@ -96,9 +99,12 @@ internal static class FarmShape {
         Triangle(s, a, b, c, outward, tint); Triangle(s, a, c, d, outward, tint);
     }
 
+    /// <summary>One flat triangle facing <paramref name="outward"/>, with a scan laid flat across the side it faces most.</summary>
     private static void Triangle(SurfaceTool s, Vector3 a, Vector3 b, Vector3 c, Vector3 outward, string tint) {
         var normal = (c - a).Cross(b - a).Normalized();
         if (normal.Dot(outward) < 0) { (b, c) = (c, b); normal = -normal; }
-        s.SetColor(new Color(tint)); s.SetNormal(normal); s.AddVertex(a); s.AddVertex(b); s.AddVertex(c);
+        Vector2 Laid(Vector3 p) => MathF.Abs(normal.Y) > .5f ? new(p.X, p.Z) : MathF.Abs(normal.X) > MathF.Abs(normal.Z) ? new(p.Z, -p.Y) : new(p.X, -p.Y);
+        s.SetColor(new Color(tint)); s.SetNormal(normal);
+        foreach (var corner in new[] { a, b, c }) { s.SetUV(Laid(corner)); s.AddVertex(corner); }
     }
 }

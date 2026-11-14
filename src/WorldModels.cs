@@ -264,12 +264,12 @@ public static class WorldModels {
             case ThingKind.Tree: prop = Tree(t.Id); break;
             case ThingKind.Stump: prop = Stump(t.OfTree != 0 ? t.OfTree : t.Id); break;
             case ThingKind.Bush: prop = new DugProp(); Shrub(prop.Body, t.Id); break;
-            case ThingKind.Stone: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "8d918e"); break;
-            case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "7d5b45", "a8592b", "b4622a"); break;
-            case ThingKind.Coal: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "50504b", "191d21", "0c0e10"); break;
-            case ThingKind.Tin: prop = new Prop(); Rocks(prop.Body, t.Kind, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
-            case ThingKind.LooseCoal: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "2d2f33", "1d1e21"); break;
-            case ThingKind.LooseStone: prop = new LooseProp(); Add(prop.Body, NatureShape.Pebble(new Color("939184"), t.Id % NatureShape.Variants), NatureShape.Rock, Vector3.Zero, new Vector3(0, t.Id * 47 % 360, 0)); break;
+            case ThingKind.Stone: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero); break;
+            case ThingKind.Iron: prop = new Prop(); Rocks(prop.Body, t.Id, "7d5b45", "a8592b", "b4622a"); break;
+            case ThingKind.Coal: prop = new Prop(); Add(prop.Body, NatureShape.Rocks(t.Id % NatureShape.Variants), NatureShape.CoalRock, Vector3.Zero); break;
+            case ThingKind.Tin: prop = new Prop(); Rocks(prop.Body, t.Id, "858882", "b9bcb4", "e6e8e2"); break;
+            case ThingKind.LooseCoal: prop = new LooseProp(); Add(prop.Body, NatureShape.Lumps(t.Id % NatureShape.Variants, 1), NatureShape.CoalRock, Vector3.Zero); break;
+            case ThingKind.LooseStone: prop = new LooseProp(); Add(prop.Body, NatureShape.Pebble(t.Id % NatureShape.Variants), NatureShape.PlainRock, Vector3.Zero, new Vector3(0, t.Id * 47 % 360, 0)); break;
             case ThingKind.IronChip: prop = new LooseProp(); LooseOre(prop.Body, "loose_iron", t.Id, "a35a2e", "8b4f2b"); break;
             case ThingKind.TinChip: prop = new LooseProp(); LooseOre(prop.Body, t.Kind.Id(), t.Id, "b9bcb4", "8f928b"); break;
             case ThingKind.Stick: prop = new LooseProp(); Stick(prop.Body, t.Id); break;
@@ -409,17 +409,12 @@ public static class WorldModels {
         }
     }
 
-    /// <summary>A boulder group in the deposit's rock color; an ore deposit also shows veins across the rock faces and ore chunks set into it.</summary>
-    private static void Rocks(Node3D body, ThingKind kind, int id, string stone, string? vein = null, string? chunks = null) {
+    /// <summary>An ore deposit: a boulder group in its rock colour, with veins across the rock faces and ore chunks set into it.</summary>
+    private static void Rocks(Node3D body, int id, string stone, string vein, string chunks) {
         int variant = id % NatureShape.Variants;
-        if (vein == null || chunks == null) {
-            Add(body, NatureShape.Rocks(kind.Id(), new Color(stone), variant), NatureShape.Rock, Vector3.Zero);
-            return;
-        }
         Add(body, NatureShape.Ore(variant, false), NatureShape.OreMaterial(stone, .92f, 0), Vector3.Zero);
-        float roughness = kind == ThingKind.Coal ? .58f : .4f, metallic = kind == ThingKind.Coal ? 0 : .3f;
-        Add(body, NatureShape.Ore(variant, true), NatureShape.OreMaterial(vein, roughness, metallic), Vector3.Zero);
-        Add(body, NatureShape.OreChips(variant), NatureShape.OreMaterial(chunks, roughness, metallic), Vector3.Zero);
+        Add(body, NatureShape.Ore(variant, true), NatureShape.OreMaterial(vein, .4f, .3f), Vector3.Zero);
+        Add(body, NatureShape.OreChips(variant), NatureShape.OreMaterial(chunks, .4f, .3f), Vector3.Zero);
     }
 
     /// <summary>How long a chip takes to fly from the rock it came off to where it lands.</summary>

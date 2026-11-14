@@ -143,7 +143,7 @@ Rendering and sound:
 | `src/Terrain3DView.cs` | Mountain and valley terrain through the Terrain3D plugin |
 | `src/EnvironmentPlacement.cs`, `src/GroundDressing.cs` | Grass, ferns and flowers from the baked placement, cleared around buildings and paths |
 | `src/WorldLook.cs`, `src/Wind.cs` | Worn footpaths, the sound listener and the wind |
-| `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake surface and wet banks |
+| `src/LakeAppearance.cs`, `src/ShorelineAppearance.cs` | The lake and sea surfaces and their sand and stony shores |
 | `src/WorldModels.cs`, `src/ActorRig.cs`, `src/ModelKit.cs`, `src/*Shape.cs` | Build the models (see [assets/README.md](../assets/README.md)) |
 | `src/ActorAnimation.cs` | Picks actor actions and gives their keyframed poses |
 | `src/WolfModel.cs` | Poses the wolf: its gaits, leap, howl, recoil and fall |
@@ -828,7 +828,6 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
   clock.
   The clock moves one frame at a time, so frames are evenly spaced however long each takes to draw and save.
 - It reuses the game's own models: the player's rig, the pack, flask, axe and torch, the trees, the valley with its
-  trail,
   shore and sea, and the fire pit. Walking and running go through the game's gaits.
 - New for the film: the office, the rented room and the train car (`IntroSets`), a baseball bat, the boss
   (`ActorSkin.Boss`), and the poses in `IntroPoses`.

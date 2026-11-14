@@ -17,10 +17,6 @@ SETS = {
         "Grass004",
         "9bdb8a28536f437e910824096dd8a3d8276d5186a27ad067dea4e2e762a6981b",
     ),
-    "dirt": (
-        "Ground037",
-        "cbd75f0660870b3299a68c4fe7fd54efb3951cf992d4295961209619eb284c47",
-    ),
     "rock": (
         "Rock030",
         "d3e0dc55fc46b093631f4d0009c934003c601e69df9aa4ba41a43db3807056ee",

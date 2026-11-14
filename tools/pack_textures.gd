@@ -5,7 +5,12 @@ extends SceneTree
 # every albedo scaled to the same mean linear brightness, so the terrain shader divides any blend by MEAN.
 # surface: the way the model kit tints them, a grain EXR holding each pixel's brightness around the set's mean as a
 # multiplier, at the set's detail share, and the OpenGL normal PNG.
-# Arguments: <ground|surface> <source dir> <output dir> <size> <name=ambientCG id[:detail]>...
+# A surface set whose detail is "scan" is drawn as the photoscan is instead, with parallax: its colour PNG, OpenGL
+# normal PNG and height PNG, at the scan's full size.
+# Arguments: <ground|surface> <source dir> <output dir> <size> <name=ambientCG id[:detail|:scan]>...
+
+# The size of the 1K scans, which a scan set keeps.
+const SOURCE_SIZE := 1024
 
 # The mean the terrain shader's fragment include divides the grain by.
 const MEAN := 0.14
@@ -34,12 +39,14 @@ func _pack() -> void:
 		var parts := spec.split("=")
 		var set := parts[1].split(":") if parts.size() == 2 else PackedStringArray()
 		if set.size() == 0 or set.size() > 2:
-			push_error("Expected <name=ambientCG id[:detail]>, got " + spec)
+			push_error("Expected <name=ambientCG id[:detail|:scan]>, got " + spec)
 			quit(1)
 			return
-		var detail := float(set[1]) if set.size() == 2 else DETAIL
+		var scan := set.size() == 2 and set[1] == "scan"
+		var detail := float(set[1]) if set.size() == 2 and not scan else DETAIL
 		var packed := (
 			_pack_ground(source, output, size, parts[0], set[0]) if ground
+			else _pack_scan(source, output, parts[0], set[0]) if scan
 			else _pack_surface(source, output, size, parts[0], set[0], detail)
 		)
 		if not packed:
@@ -95,6 +102,23 @@ func _pack_ground(source: String, output: String, size: int, name: String, id: S
 	albedo.save_png("%s/%s_albedo.png" % [output, name])
 	normal.save_png("%s/%s_normal.png" % [output, name])
 	print("Packed %s from %s, brightness scaled by %.2f" % [name, id, scale])
+	return true
+
+
+# Packs one scan set as it is and returns whether every map loaded.
+func _pack_scan(source: String, output: String, name: String, id: String) -> bool:
+	var albedo := _load(source, id, "Color", SOURCE_SIZE)
+	var normal := _load(source, id, "NormalGL", SOURCE_SIZE)
+	var height := _load(source, id, "Displacement", SOURCE_SIZE)
+	if albedo == null or normal == null or height == null:
+		return false
+	albedo.convert(Image.FORMAT_RGB8)
+	albedo.save_png("%s/%s_albedo.png" % [output, name])
+	normal.convert(Image.FORMAT_RGB8)
+	normal.save_png("%s/%s_bump.png" % [output, name])
+	height.convert(Image.FORMAT_L8)
+	height.save_png("%s/%s_height.png" % [output, name])
+	print("Packed %s from %s as it is" % [name, id])
 	return true
 
 

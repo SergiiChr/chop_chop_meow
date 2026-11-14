@@ -4,8 +4,14 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The photoscan a material takes its grain and bump from; its colour stays the model's own. Foliage is drawn by the shrub shader.</summary>
+/// <summary>
+/// The photoscan a material takes its grain and bump from; its colour stays the model's own.
+/// Foliage is drawn by the shrub shader.
+/// </summary>
 public enum Surface { Flat, Wood, Metal, Stone, Cloth, Earth, Foliage }
+
+/// <summary>A photoscan drawn as it is, in its own colours, with bumps and parallax.</summary>
+public enum Scan { Rock, Coal, Soil }
 
 /// <summary>
 /// Low-poly primitive helpers shared by every code-built model.
@@ -47,6 +53,41 @@ public static class ModelKit {
 
     /// <summary>World units one tile of the surface spans: wood grain runs the length of a plank, metal marks are finer, and a cloth weave is drawn coarse so it shows at the game's distance.</summary>
     public static float Tile(Surface surface) => surface switch { Surface.Wood or Surface.Cloth => 1.2f, Surface.Metal => .6f, _ => 1 };
+
+    /// <summary>World units one tile of a scan spans, about its real size.</summary>
+    private const float ScanTile = 2;
+    /// <summary>
+    /// How far in world units every photoscan's lowest point shifts from its highest, seen edge on: the models' scans here,
+    /// the shores and the ground photoscans alike.
+    /// </summary>
+    public const float ScanRelief = .1f;
+    private static readonly Dictionary<(Scan, float), StandardMaterial3D> scans = new();
+
+    /// <summary>
+    /// A material that draws a scan as it is, times the mesh's own colours, with bumps and parallax.
+    /// The mesh carries texture coordinates in world units and tangents.
+    /// </summary>
+    public static StandardMaterial3D Scanned(Scan scan, float roughness) {
+        if (scans.TryGetValue((scan, roughness), out var cached)) return cached;
+        Texture2D Map(string map) => GD.Load<Texture2D>($"res://assets/models/surfaces/{scan.ToString().ToLowerInvariant()}_{map}.png");
+        return scans[(scan, roughness)] = new StandardMaterial3D {
+            AlbedoTexture = Map("albedo"),
+            VertexColorUseAsAlbedo = true,
+            VertexColorIsSrgb = true,
+            Roughness = roughness,
+            NormalEnabled = true,
+            NormalTexture = Map("bump"),
+            Uv1Scale = Vector3.One / ScanTile,
+            HeightmapEnabled = true,
+            HeightmapTexture = Map("height"),
+            HeightmapDeepParallax = true,
+            // The engine reads its height map scale in hundredths of a tile.
+            HeightmapScale = ScanRelief / ScanTile * 100,
+            HeightmapMinLayers = 16,
+            HeightmapMaxLayers = 64,
+            TextureFilter = BaseMaterial3D.TextureFilterEnum.LinearWithMipmapsAnisotropic,
+        };
+    }
 
     /// <summary>A surface's grain, a multiplier around one; the engine hands out one copy per file.</summary>
     public static Texture2D Grain(Surface surface) => GD.Load<Texture2D>($"res://assets/models/surfaces/{surface.ToString().ToLowerInvariant()}_grain.exr");
