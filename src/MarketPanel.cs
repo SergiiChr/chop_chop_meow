@@ -62,13 +62,8 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
 
     /// <summary>What the crates waiting at the post would fetch at the last known prices.</summary>
     private int SaleWorth() {
-        float value = 0;
-        foreach (var pair in thing.Inventory.Items) {
-            if (world.Packed(pair.Key) is not Inventory packed) continue;
-            value += world.Data.Items["crate"].Price;
-            foreach (var good in packed.Items) if (world.Data.Market.Sells.ContainsKey(good.Key)) value += world.KnownPrice(good.Key) * good.Value;
-        }
-        return (int)value;
+        var crates = thing.Inventory.Items.Keys.Where(world.CanSell).ToList();
+        return (int)world.SaleValue(world.Contents(crates), crates.Count, world.KnownPrice);
     }
 
     /// <summary>The road to the village with every cart from this post drawn where it is.</summary>

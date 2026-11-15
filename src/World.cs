@@ -1338,22 +1338,24 @@ public sealed partial class World {
         if (sign.Kind != ThingKind.Signpost || Forwarded(Verb.AutoSell, sign.Id, count: on ? 1 : 0)) return;
         sign.AutoSell = on;
     }
+    /// <summary>The goods packed in these crates, added up by kind.</summary>
+    public Dictionary<string, int> Contents(IEnumerable<string> crates) {
+        var goods = new Dictionary<string, int>();
+        foreach (var crate in crates)
+            if (Packed(crate) is Inventory packed) foreach (var (item, quantity) in packed.Items) goods[item] = goods.GetValueOrDefault(item) + quantity;
+        return goods;
+    }
+    /// <summary>What a sale pays at the given unit prices: every unit of a good the village takes, plus the crates, which go with the goods.</summary>
+    public float SaleValue(Dictionary<string, int> goods, int crates, Func<string, float> price) =>
+        crates * Data.Items["crate"].Price + goods.Where(p => VillageBuys(p.Key)).Sum(p => p.Value * price(p.Key));
     private bool Ship(Thing sign) {
         var crates = sign.Inventory.Items.Keys.Where(CanSell).ToList();
         if (crates.Count == 0) return false;
-        var goods = new Dictionary<string, int>();
-        foreach (var crate in crates) {
-            foreach (var (item, quantity) in Packed(crate)!.Items) goods[item] = goods.GetValueOrDefault(item) + quantity;
-            sign.Inventory.Remove(crate, 1); S.Crates.Remove(PackedId(crate));
-        }
-        // The crates go with the goods.
-        float price = crates.Count * Data.Items["crate"].Price;
-        foreach (var (item, quantity) in goods) {
-            if (!VillageBuys(item)) continue;
-            // The whole sale is paid at the pre-sale price, so selling in bulk loses nothing; demand drops after it.
-            price += quantity * UnitPrice(item, false);
-            S.Demand[item] = Math.Max(.25f, Demand(item) - quantity * DemandStep(item));
-        }
+        var goods = Contents(crates);
+        // The whole sale is paid at the pre-sale price, so selling in bulk loses nothing; demand drops after it.
+        float price = SaleValue(goods, crates.Count, item => UnitPrice(item, false));
+        foreach (var (item, quantity) in goods) if (VillageBuys(item)) S.Demand[item] = Math.Max(.25f, Demand(item) - quantity * DemandStep(item));
+        foreach (var crate in crates) { sign.Inventory.Remove(crate, 1); S.Crates.Remove(PackedId(crate)); }
         // Coins are whole: sales round down and purchases round up, so a round trip never profits.
         S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count });
         Say($"Goods sent: {string.Join(", ", goods.Select(p => $"{Data.Name(p.Key)} x {p.Value}"))}."); return true;

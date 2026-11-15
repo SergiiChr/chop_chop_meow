@@ -18,6 +18,9 @@ internal static class EconomySteps {
         return cost;
     }
 
+    /// <summary>What a full crate of a good sells for at the full price, the crate included.</summary>
+    public static float CrateSells(GameData data, string item) => data.CrateCapacity * data.Items[item].Price + data.Items["crate"].Price;
+
     /// <summary>Recipe steps from gathered materials: raw goods are 0, and a recipe is one more than its deepest input.</summary>
     public static int Depth(GameData data, string item) =>
         data.Recipes.Values.FirstOrDefault(r => r.Output == item) is RecipeDef r ? 1 + r.Inputs.Keys.Max(input => Depth(data, input)) : 0;
@@ -136,11 +139,11 @@ internal sealed class ChainCost {
     public IReadOnlyDictionary<string, float> MadePerDay => made;
 
     /// <summary>Crates of a good one worker packs in a day, measured the first time it is asked for.</summary>
-    public float PackedPerDay(string item) => packed.TryGetValue(item, out float perDay) ? perDay : packed[item] = EconomySteps.Pack(data, item);
-    public IReadOnlyDictionary<string, float> Packing => packed;
+    public float Packed(string item) => packed.TryGetValue(item, out float perDay) ? perDay : packed[item] = EconomySteps.Pack(data, item);
+    public IReadOnlyDictionary<string, float> PackedPerDay => packed;
 
     /// <summary>Worker-days a full crate of a good takes: its contents, making the empty crate and packing it.</summary>
-    public float CrateWorkerDays(string item) => data.CrateCapacity * WorkerDays(item) + WorkerDays("crate") + 1 / PackedPerDay(item);
+    public float CrateWorkerDays(string item) => data.CrateCapacity * WorkerDays(item) + WorkerDays("crate") + 1 / Packed(item);
 
     /// <summary>Whether every step of a good's chain is gathered by a hire, made at a station or grown on a farm plot.</summary>
     public bool Measurable(string item) => Gathered.ContainsKey(item) || item == Crop || data.RecipeIdOf(item) is string key && EconomySteps.BatchCost(world, key).Keys.All(Measurable);

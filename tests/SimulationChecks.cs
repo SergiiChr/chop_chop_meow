@@ -7,6 +7,7 @@ using Godot;
 using static Checks;
 using static SetupSteps;
 using static WorldSteps;
+using static EconomySteps;
 using static PlayerSteps;
 using static WorkerSteps;
 
@@ -646,10 +647,10 @@ public static class SimulationChecks {
         world.Player = sign.Pos;
         Require(world.Transfer(world.Backpack, sign.Inventory, crate, 1) == 1 && world.Sell(sign), "market should accept the purchased tools back in a crate");
         SafeTick(world, data.TradeSeconds + .1f);
-        int coins = world.Coins + sign.Wages![Inventory.Coins] + sign.Output[Inventory.Coins];
+        int paid = sign.Wages![Inventory.Coins] + sign.Output[Inventory.Coins];
         float price = data.Items["steel_axe"].Price;
-        Require(coins < 20000, "buying tools and selling them straight back must lose coins");
-        Require(sign.Wages[Inventory.Coins] + sign.Output[Inventory.Coins] == (int)MathF.Floor(lot * price + data.Items["crate"].Price),
+        Require(world.Coins + paid < 20000, "buying tools and selling them straight back must lose coins");
+        Require(paid == (int)MathF.Floor(lot * price + data.Items["crate"].Price),
                 "a sale should pay every unit of a crate at the pre-sale price");
     }
 
@@ -1529,15 +1530,7 @@ public static class SimulationChecks {
     private static Thing CheckBerryCratesBuyFirstPickaxe(World world, Thing iron) {
         var data = world.Data;
         var sign = BuildAt(world, ThingKind.Signpost, Site(34, 25));
-        for (int i = 0; i < 4; i++) {
-            world.Player = sign.Pos;
-            var box = world.PlaceCrate("crate", sign.Pos + new Vector2(0, 2));
-            Require(box != null, "a crate should be in the box");
-            Require(world.Transfer(world.Backpack, box!.Inventory, "berries", 12) == 12,
-                "the berries should move from the backpack into the crate");
-            Require(world.PickUpCrate(box), "the packed crate should be picked up");
-            world.Transfer(world.Backpack, sign.Inventory, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1);
-        }
+        for (int i = 0; i < 4; i++) LoadCrate(world, sign, "berries", data.CrateCapacity);
         Require(world.Sell(sign), "signpost should dispatch crates of berries");
         SafeTick(world, data.TradeSeconds + .2f);
         world.Transfer(sign.Wages!, world.Backpack, Inventory.Coins, sign.Wages![Inventory.Coins]);
@@ -1600,19 +1593,10 @@ public static class SimulationChecks {
 
     private static HireOffer CheckSoldSteelToolFundsHire(World world, Thing sign) {
         var data = world.Data;
-        world.Player = sign.Pos;
         // The fifth crate of berries goes along, so the sale covers the hire and the worker's first wage.
-        var berries = world.PlaceCrate("crate", sign.Pos + new Vector2(0, 2));
-        Require(world.Transfer(world.Backpack, berries!.Inventory, "berries", 12) == 12 && world.PickUpCrate(berries), "a fifth crate of berries should be packed");
-        world.Transfer(world.Backpack, sign.Inventory, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1);
-        var crate = world.PlaceCrate("crate", sign.Pos + new Vector2(0, 2));
-        Require(crate != null && world.Backpack["crate"] == 0, "an empty crate should be placed from the backpack");
-        world.Transfer(world.Backpack, crate!.Inventory, "steel_pick", 1);
-        Require(world.PickUpCrate(crate), "the packed crate should be picked up");
-        string packed = world.Backpack.Items.Keys.Single(World.IsCrate);
-        Require(world.Packed(packed)?["steel_pick"] == 1 && world.CanSell(packed), "the picked-up crate should still hold the steel pickaxe");
-        world.Player = sign.Pos;
-        world.Transfer(world.Backpack, sign.Inventory, packed, 1);
+        LoadCrate(world, sign, "berries", data.CrateCapacity);
+        LoadCrate(world, sign, "steel_pick", 1);
+        Require(world.Backpack["crate"] == 0, "both crates the bench made should be on the cart");
         Require(world.Sell(sign), "signpost should dispatch a crate of steel tools and one of berries");
         float beforeReturn = world.Coins;
         SafeTick(world, data.TradeSeconds - .1f);
@@ -2458,8 +2442,7 @@ public static class SimulationChecks {
         Require(data.Market.Sells.ContainsKey("berries"), "berries must be sellable");
         Require(data.Market.Buys.ContainsKey("steel_axe"), "an axe must be buyable");
         Require(data.Market.Buys.ContainsKey("steel_pick"), "a pickaxe must be buyable");
-        float berryCrate = data.CrateCapacity * data.Items["berries"].Price + data.Items["crate"].Price;
-        Require(fresh.LotPrice("steel_pick") <= 4 * berryCrate, "four crates of berries should pay for the first pickaxe");
+        Require(fresh.LotPrice("steel_pick") <= 4 * CrateSells(data, "berries"), "four crates of berries should pay for the first pickaxe");
     }
 
     /// <summary>Health comes back only in sleep, while hunger and thirst both stay above 45%, and the cabin foretells what a night leaves.</summary>

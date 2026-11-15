@@ -372,7 +372,7 @@ The intended fresh-start loop starts by securing water, shelter and fire, then u
 6. Mine iron and coal, and smelt iron in a stone furnace.
 7. Build and operate a reinforced furnace (`reinforced`) to make steel.
 8. Hammer steel into steel parts at the anvil and make steel tools.
-9. Pack a steel tool into a crate, sell it through the trading post and use the proceeds to hire and assign a worker.
+9. Pack a steel tool into a crate, sell it with another crate of berries through the trading post and use the proceeds to hire and assign a worker, with enough left for their first wage.
 
 There are no iron tools; iron bars only go into buildings and steel.
 
