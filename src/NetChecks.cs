@@ -46,7 +46,7 @@ public partial class Game {
         Require(await PlayerWalks(), "After hosting the player must be able to walk again.");
         await KeyStroke(Key.Escape);
         var netStatus = (Label)menu.FindChild("net_status", true, false);
-        Require(menu.Visible && netStatus.Text == "Hosting on port 24565 · 0 guests", "While hosting, the pause menu must say so.");
+        Require(menu.Visible && netStatus.Text == $"Hosting on port {Net.DefaultPort} · 0 guests", "While hosting, the pause menu must say so.");
         // The guest joins only now, so the count above cannot already include it.
         Signal("hosting");
 

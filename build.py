@@ -28,7 +28,7 @@ import urllib.request
 import zipfile
 from collections.abc import Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
 from pathlib import Path
 from typing import Literal
 
@@ -47,8 +47,14 @@ GODOT = (
     else TOOLS / GODOT_RELATIVE
 )
 DOTNET_LOCAL = TOOLS / "dotnet"
-XDG_DATA = TOOLS / "xdg-data"
-TEMPLATES = XDG_DATA / "godot" / "export_templates" / f"{GODOT_VERSION}.stable.mono"
+# A worktree's .tools links to the main checkout's and shares its downloads.
+# Godot's user data (saves, settings and logs) then stays in the worktree, so two checkouts never write the same files.
+SHARED_DATA = TOOLS / "xdg-data"
+XDG_DATA = BUILD / "xdg-data" if TOOLS.is_symlink() else SHARED_DATA
+USER_DATA = Path("godot") / "app_userdata" / "Chop Chop Meow"
+# What a game keeps for its player: the save slots, the autosave and the settings.
+PLAYER_FILES = ("settlement*.json", "autosave*.json", "settings.cfg")
+TEMPLATES = SHARED_DATA / "godot" / "export_templates" / f"{GODOT_VERSION}.stable.mono"
 BASE_URL = (
     f"https://github.com/godotengine/godot/releases/download/{GODOT_VERSION}-stable"
 )
@@ -394,11 +400,39 @@ def build_project(env: dict[str, str]) -> None:
         run_godot("import", import_args, env)
 
 
+def share_templates() -> None:
+    """Link the export templates .tools holds into a worktree's own data folder, where Godot looks for them."""
+    shared = TEMPLATES.parent
+    link = XDG_DATA / shared.relative_to(SHARED_DATA)
+    shared.mkdir(parents=True, exist_ok=True)
+    link.parent.mkdir(parents=True, exist_ok=True)
+    # Another launcher in this worktree may be making the link too.
+    with suppress(FileExistsError):
+        link.symlink_to(shared)
+
+
+def bring_player_files() -> None:
+    """Replace a worktree's saves and settings with those of the checkout its .tools links to.
+
+    A game played from a worktree opens on the player's own saves that way, and what it saves never reaches them.
+    """
+    ours, theirs = XDG_DATA / USER_DATA, SHARED_DATA / USER_DATA
+    ours.mkdir(parents=True, exist_ok=True)
+    for pattern in PLAYER_FILES:
+        for file in ours.glob(pattern):
+            file.unlink()
+        for file in theirs.glob(pattern):
+            shutil.copy2(file, ours)
+    print(f"Copied the player's saves and settings from {theirs.resolve()}")
+
+
 def setup() -> dict[str, str]:
     TOOLS.mkdir(exist_ok=True)
     (TOOLS / ".gdignore").touch()
     BUILD.mkdir(exist_ok=True)
     (BUILD / ".gdignore").touch()
+    if XDG_DATA != SHARED_DATA:
+        share_templates()
     fetch_godot()
     # Terrain3D is part of the default renderer, so every setup path (play,
     # tests, and builds) must provision its pinned native runtime.
@@ -411,17 +445,43 @@ def setup() -> dict[str, str]:
     return env
 
 
+# The port a played game's server takes first, and how many it tries from there: Net.DefaultPort and Server.GamePorts.
 GAME_PORT = 24565
-LAG_PORT = 24575
+GAME_PORTS = 16
+# The lag relay's port, counted from the game port it relays to.
+LAG_OFFSET = 10
 
 
-def lag_proxy(stop: threading.Event, delay: float = 0.08, loss: float = 0.05) -> None:
-    """Relay UDP between guests on LAG_PORT and the host, delaying and dropping packets both ways as a long connection would."""
+@contextmanager
+def check_ports() -> Iterator[int]:
+    """Claim a block of game ports for one run of the checks and give its first.
+
+    Blocks start past the ports a played game takes and end below the ones the system hands out by itself.
+    A run holds the last port of its block until it ends, so its checks never meet a game being played or another run.
+    """
+    for first in range(GAME_PORT + GAME_PORTS, 2**15 - GAME_PORTS, GAME_PORTS):
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as claim:
+            try:
+                claim.bind(("", first + GAME_PORTS - 1))
+            except OSError:
+                continue
+            yield first
+            return
+    raise SystemExit("Every block of game ports for the checks is taken.")
+
+
+def lag_proxy(
+    stop: threading.Event, game_port: int, delay: float = 0.08, loss: float = 0.05
+) -> None:
+    """Relay UDP between guests and the host on game_port, delaying and dropping packets both ways as a long connection would.
+
+    Guests reach it LAG_OFFSET ports above the host's.
+    """
     queue: list[tuple[float, int, socket.socket, tuple[str, int] | None, bytes]] = []
     order = itertools.count()
     upstreams: dict[tuple[str, int], socket.socket] = {}
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as front:
-        front.bind(("127.0.0.1", LAG_PORT))
+        front.bind(("127.0.0.1", game_port + LAG_OFFSET))
         while not stop.is_set():
             wait = queue[0][0] - time.monotonic() if queue else 0.05
             ready, _, _ = select.select(
@@ -438,7 +498,7 @@ def lag_proxy(stop: threading.Event, delay: float = 0.08, loss: float = 0.05) ->
                         upstreams[sender] = socket.socket(
                             socket.AF_INET, socket.SOCK_DGRAM
                         )
-                        upstreams[sender].connect(("127.0.0.1", GAME_PORT))
+                        upstreams[sender].connect(("127.0.0.1", game_port))
                     target, client = upstreams[sender], None
                 else:
                     target, client = (
@@ -494,7 +554,12 @@ def python_checks() -> None:
     command([python, "-m", "ruff", "format", "--check"])
 
 
-def test_simulation(env: dict[str, str], deadline: float) -> None:
+def default_port(port: int) -> list[str]:
+    """The game flag that makes its servers take their ports from port on."""
+    return ["--default-port", str(port)]
+
+
+def test_simulation(env: dict[str, str], deadline: float, _port: int) -> None:
     run_godot(
         "test",
         [GODOT, "--headless", "--path", ROOT, "--", "--self-test"],
@@ -504,28 +569,37 @@ def test_simulation(env: dict[str, str], deadline: float) -> None:
     )
 
 
-def test_ui(env: dict[str, str], deadline: float) -> None:
+def test_ui(env: dict[str, str], deadline: float, port: int) -> None:
     run_godot(
         "ui-test",
-        [GODOT, "--headless", "--path", ROOT, "--", "--ui-test"],
+        [GODOT, "--headless", "--path", ROOT, "--", "--ui-test", *default_port(port)],
         env,
         timeout=deadline - time.monotonic(),
         success_marker="UI-TEST PASS",
     )
 
 
-def test_network(env: dict[str, str], deadline: float) -> None:
+def test_network(env: dict[str, str], deadline: float, port: int) -> None:
     # The host and guest of the network check talk to each other, so both run at once.
     # The guest joins through a relay that adds lag and packet loss.
     stop = threading.Event()
-    roles = {"host": ["host"], "guest": ["guest", "--port", str(LAG_PORT)]}
+    roles = {"host": ["host"], "guest": ["guest", "--port", str(port + LAG_OFFSET)]}
     with ThreadPoolExecutor() as pool:
-        relay = pool.submit(lag_proxy, stop)
+        relay = pool.submit(lag_proxy, stop, port)
         checks = [
             pool.submit(
                 run_godot,
                 f"net-{role}",
-                [GODOT, "--headless", "--path", ROOT, "--", "--net-check", *args],
+                [
+                    GODOT,
+                    "--headless",
+                    "--path",
+                    ROOT,
+                    "--",
+                    "--net-check",
+                    *args,
+                    *default_port(port),
+                ],
                 env,
                 timeout=deadline - time.monotonic(),
                 success_marker=f"NET-{role.upper()} PASS",
@@ -540,10 +614,18 @@ def test_network(env: dict[str, str], deadline: float) -> None:
             relay.result()
 
 
-def test_server(env: dict[str, str], deadline: float) -> None:
+def test_server(env: dict[str, str], deadline: float, port: int) -> None:
     run_godot(
         "server-test",
-        [GODOT, "--headless", "--path", ROOT, "--", "--server-check"],
+        [
+            GODOT,
+            "--headless",
+            "--path",
+            ROOT,
+            "--",
+            "--server-check",
+            *default_port(port),
+        ],
         env,
         timeout=deadline - time.monotonic(),
         success_marker="SERVER-TEST PASS",
@@ -561,9 +643,10 @@ TEST_STAGES = {
 def test(env: dict[str, str], stage: str | None = None) -> None:
     """Run one test stage, or every stage in order, all within TEST_LIMIT."""
     started = time.monotonic()
-    for name, run in TEST_STAGES.items():
-        if stage in {None, name}:
-            run(env, started + TEST_LIMIT)
+    with check_ports() as port:
+        for name, run in TEST_STAGES.items():
+            if stage in {None, name}:
+                run(env, started + TEST_LIMIT, port)
     print(f"Tests took {time.monotonic() - started:.0f}s of {TEST_LIMIT}s")
 
 
@@ -759,6 +842,8 @@ def main() -> int:
     env = setup()
     match args.action:
         case "play":
+            if XDG_DATA != SHARED_DATA:
+                bring_player_files()
             game = export_play(env)
             print(
                 f"Playing the optimized release export {game.relative_to(ROOT)}",

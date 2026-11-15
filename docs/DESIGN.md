@@ -197,7 +197,8 @@ The side panel only shows the building and sizes itself to what it holds.
 
 Every game runs on a `Server`, alone or together, which owns the only simulation and has no player of its own.
 The window that starts a game runs it as a headless child process of the same executable (`--server`).
-The server takes the first free port from 24565 itself when it starts serving, since a port a window picked could be gone by the time the server came up, and writes it to a file named for the window's process.
+The server takes the first free port from `Net.DefaultPort` (24565) itself when it starts serving, since a port a window picked could be gone by the time the server came up, and writes it to a file named for the window's process.
+A run of the checks starts its windows with `--default-port` and a port block of its own, which a window hands on to its server, so checks never meet a game being played or another run.
 A server process logs to `user://logs/server.log`: sharing the window's log, each start would rotate the window's older logs out of the folder.
 `Net.Log` prints the port the server took, connecting, joining, refusals and leaving on both ends, so a failed join can be traced from either computer's log.
 The window joins it over localhost like any guest, showing a starting screen until it does.
