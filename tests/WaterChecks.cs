@@ -12,9 +12,9 @@ namespace ChopChopMeow.Tests;
 /// <summary>Focused bottle-state checks; called from the deterministic simulation checks.</summary>
 public static class WaterChecks {
     public static void Run(GameData data) {
-        CheckBottlesPourTheUnitsTheyHold(data);
+        CheckBottlesPourTheLitersTheyHold(data);
         CheckBottleStatesAreDefinedInData(data);
-        CheckBottleGivesThreeUnits(data);
+        CheckBottleGivesThreeLiters(data);
         CheckBottlesRefillFromWaterAndCanBeDrunkDirectly(data);
         CheckBottleKeepsPartialStateAcrossSave(data);
         CheckBottleRecipeMakesEmptyBottleFromTinAndWood(data);
@@ -25,14 +25,14 @@ public static class WaterChecks {
         CheckDismantledStationFillsBottles(data);
     }
 
-    private static void CheckBottlesPourTheUnitsTheyHold(GameData data) {
-        foreach (var (item, units) in new[] { (Water.OneUnit, 1), (Water.TwoUnits, 2), (Water.Full, 3) }) {
+    private static void CheckBottlesPourTheLitersTheyHold(GameData data) {
+        foreach (var (item, liters) in new[] { (Water.OneLiter, 1), (Water.TwoLiters, 2), (Water.Full, 3) }) {
             var world = new World(data, false);
             var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
             world.SetRecipe(table, "dough");
             Give(world, item, 1);
-            Require(world.LoadInput(table, item, 1) == 1 && table.Inventory[Water.Liquid] == units && table.Inventory[item] == 0,
-                $"a bottle with {units} units must pour all {units} into the table");
+            Require(world.LoadInput(table, item, 1) == 1 && table.Inventory[Water.Liquid] == liters && table.Inventory[item] == 0,
+                $"a bottle with {liters} liters must pour all {liters} into the table");
             Require(world.Backpack[item] == 0 && world.Backpack[Water.Empty] == 1, "the poured bottle must stay in the backpack, empty");
         }
         var empty = new World(data, false);
@@ -40,11 +40,11 @@ public static class WaterChecks {
         empty.SetRecipe(cold, "dough"); Give(empty, Water.Empty, 1);
         Require(empty.LoadInput(cold, Water.Empty, 1) == 0 && cold.Inventory.Count == 0 && empty.Backpack[Water.Empty] == 1, "an empty bottle must pour nothing and stay in the backpack");
 
-        // Dough takes 3 units: a two-unit and a one-unit bottle together make a batch.
+        // Dough takes 3 liters: a two-liter and a one-liter bottle together make a batch.
         var batch = new World(data, false);
         var table2 = batch.Add(ThingKind.Cooktable, batch.Player + Vector2.Right);
         batch.SetRecipe(table2, "dough");
-        Give(batch, Water.TwoUnits, 1); Give(batch, Water.OneUnit, 1); Give(batch, "flour", 1);
+        Give(batch, Water.TwoLiters, 1); Give(batch, Water.OneLiter, 1); Give(batch, "flour", 1);
         batch.LoadBatch(table2);
         Require(table2.Inventory[Water.Liquid] == 3 && table2.Inventory["flour"] == 1, "two part-drunk bottles must load a batch together");
         Require(batch.Backpack[Water.Empty] == 2, "both bottles must stay in the backpack, empty");
@@ -52,8 +52,8 @@ public static class WaterChecks {
         Require(batch.Transfer(batch.Backpack, table2.Inventory, Water.Full, 1) == 1 && table2.Inventory[Water.Liquid] == 6 && batch.Backpack[Water.Empty] == 3,
             "a bottle moved into the table by hand must pour too");
         var chest = batch.Add(ThingKind.Chest, batch.Player + Vector2.Left);
-        Give(batch, Water.TwoUnits, 1);
-        Require(batch.Transfer(batch.Backpack, chest.Inventory, Water.TwoUnits, 1) == 1 && chest.Inventory[Water.TwoUnits] == 1, "bottles must store in ordinary storage as they are");
+        Give(batch, Water.TwoLiters, 1);
+        Require(batch.Transfer(batch.Backpack, chest.Inventory, Water.TwoLiters, 1) == 1 && chest.Inventory[Water.TwoLiters] == 1, "bottles must store in ordinary storage as they are");
     }
 
     private static void CheckBottleStatesAreDefinedInData(GameData data) {
@@ -64,24 +64,24 @@ public static class WaterChecks {
             Require(!data.IsFood(item), $"bottle state {item} should not count as food");
         }
         Require(data.IsConsumable("water"), "a full bottle should be consumable");
-        Require(data.IsConsumable("water_2"), "a two-unit bottle should be consumable");
-        Require(data.IsConsumable("water_1"), "a one-unit bottle should be consumable");
+        Require(data.IsConsumable("water_2"), "a two-liter bottle should be consumable");
+        Require(data.IsConsumable("water_1"), "a one-liter bottle should be consumable");
         Require(!data.IsConsumable("empty_bottle"), "an empty bottle should not be consumable");
     }
 
-    private static void CheckBottleGivesThreeUnits(GameData data) {
+    private static void CheckBottleGivesThreeLiters(GameData data) {
         var world = new World(data, false);
         SetNeeds(world, thirst: 0);
         Require(Give(world, "water", 1) == 1, "a filled bottle should fit");
-        Require(Water.DrinkUnit(world, "water"), "first unit should be consumed");
-        Require(world.Backpack["water_2"] == 1, "first unit should leave two units");
-        Require(world.Thirst > 33.32f, "first unit should restore at least one third thirst");
-        Require(world.Thirst < 33.34f, "first unit should restore no more than one third thirst");
-        Require(Water.DrinkUnit(world, "water_2") && world.Backpack["water_1"] == 1, "second unit should leave one unit");
-        Require(Water.DrinkUnit(world, "water_1") && world.Backpack["empty_bottle"] == 1, "third unit should leave the same bottle empty");
-        Require(world.Thirst > 99.99f && world.Thirst <= 100, "three units should restore a full thirst gauge");
-        Require(!Water.DrinkUnit(world, "empty_bottle") && world.Backpack["empty_bottle"] == 1, "an empty bottle should not produce a free unit");
-        Require(world.Backpack.UsedSlots == 1, "each unit should preserve one physical bottle slot");
+        Require(Water.DrinkLiter(world, "water"), "first liter should be consumed");
+        Require(world.Backpack["water_2"] == 1, "first liter should leave two liters");
+        Require(world.Thirst > 33.32f, "first liter should restore at least one third thirst");
+        Require(world.Thirst < 33.34f, "first liter should restore no more than one third thirst");
+        Require(Water.DrinkLiter(world, "water_2") && world.Backpack["water_1"] == 1, "second liter should leave one liter");
+        Require(Water.DrinkLiter(world, "water_1") && world.Backpack["empty_bottle"] == 1, "third liter should leave the same bottle empty");
+        Require(world.Thirst > 99.99f && world.Thirst <= 100, "three liters should restore a full thirst gauge");
+        Require(!Water.DrinkLiter(world, "empty_bottle") && world.Backpack["empty_bottle"] == 1, "an empty bottle should not produce a free liter");
+        Require(world.Backpack.UsedSlots == 1, "each liter should preserve one physical bottle slot");
     }
 
     private static void CheckBottlesRefillFromWaterAndCanBeDrunkDirectly(GameData data) {
@@ -105,10 +105,10 @@ public static class WaterChecks {
 
         Drop(world, "water", 1);
         SetNeeds(world, thirst: 25);
-        Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceUnit, "gathering without a bottle should drink directly from the source");
-        Require(world.Thirst > 58.32f, "a direct source unit should restore at least one third thirst");
-        Require(world.Thirst < 58.34f, "a direct source unit should restore no more than one third thirst");
-        Require(world.Backpack.Count == 0, "a direct source unit should not create a bottle");
+        Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceLiter, "gathering without a bottle should drink directly from the source");
+        Require(world.Thirst > 58.32f, "a direct source liter should restore at least one third thirst");
+        Require(world.Thirst < 58.34f, "a direct source liter should restore no more than one third thirst");
+        Require(world.Backpack.Count == 0, "a direct source liter should not create a bottle");
     }
 
     private static void CheckBottleKeepsPartialStateAcrossSave(GameData data) {
@@ -166,12 +166,12 @@ public static class WaterChecks {
         world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 5);
         Give(world, Water.Full, 1);
         string message = ""; world.Notify = text => message = text;
-        Require(world.Transfer(table.Inventory, world.Backpack, Water.Liquid, 1) == 0 && message == "You need a water bottle with room for the water.",
+        Require(world.Transfer(table.Inventory, world.Backpack, Water.Liquid, 1) == 0 && message == "You need an empty water vessel.",
             "taking water out with only full bottles must be refused with the reason");
         Require(table.Inventory[Water.Liquid] == 5, "refused water must stay on the table");
-        Give(world, Water.TwoUnits, 1); Give(world, Water.Empty, 1);
+        Give(world, Water.TwoLiters, 1); Give(world, Water.Empty, 1);
         Require(world.Transfer(table.Inventory, world.Backpack, Water.Liquid, 1) == 1 && world.Backpack[Water.Full] == 2 && world.Backpack[Water.Empty] == 1,
-            "one unit must top up the fullest bottle with room first");
+            "one liter must top up the fullest bottle with room first");
         Require(world.Transfer(table.Inventory, world.Backpack, Water.Liquid, 10) == 3 && world.Backpack[Water.Full] == 3 && table.Inventory[Water.Liquid] == 1,
             "taking more must fill bottles while they have room, and leave the rest on the table");
         Require(world.Backpack[Water.Liquid] == 0, "water must never lie loose in the backpack");
@@ -201,8 +201,8 @@ public static class WaterChecks {
         world.SetDuty(hauler, table, "haul", true);
         SafeTick(world, 40);
         Require(table.Inventory[Water.Liquid] == 0, "a hauler must clear water the table's recipe no longer takes");
-        Require(chest.Inventory[Water.OneUnit] == 1 && chest.Inventory[Water.Empty] == 0 && hauler.Bag.Count == 0,
-            "the leftover unit must go back to storage in the empty bottle the hauler fetched");
+        Require(chest.Inventory[Water.OneLiter] == 1 && chest.Inventory[Water.Empty] == 0 && hauler.Bag.Count == 0,
+            "the leftover liter must go back to storage in the empty bottle the hauler fetched");
     }
 
     private static void CheckDismantledStationFillsBottles(GameData data) {
@@ -211,7 +211,7 @@ public static class WaterChecks {
         world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 2);
         EmptyBackpack(world); Give(world, Water.Empty, 1);
         Require(world.Dismantle(table), "the table should come down");
-        Require(world.Backpack[Water.TwoUnits] == 1 && world.Backpack[Water.Liquid] == 0 && world.Things.All(t => t.Inventory[Water.Liquid] == 0),
+        Require(world.Backpack[Water.TwoLiters] == 1 && world.Backpack[Water.Liquid] == 0 && world.Things.All(t => t.Inventory[Water.Liquid] == 0),
             "a dismantled station's water must fill the bottles carried");
     }
 }

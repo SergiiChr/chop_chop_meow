@@ -329,7 +329,7 @@ public static class WorldModels {
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
-            case Water.Full or Water.TwoUnits or Water.OneUnit or Water.Empty: return BottleShape.Create(Water.BottleUnits(id));
+            case Water.Full or Water.TwoLiters or Water.OneLiter or Water.Empty: return BottleShape.Create(Water.BottleLiters(id));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
             case "leaves": return Build(new Thing { Kind = ThingKind.Leaves }).Root;

@@ -85,8 +85,8 @@ internal static class ItemShape {
         ["mortar"] = new(f => Copy(f, CookShape.BuildMortar(6, 5), Transform3D.Identity, Colors.White), Plain, .3f),
         ["crate"] = new(f => Copy(f, CrateShape.Cargo, Transform3D.Identity, Colors.White), Plain, .5f),
         [Water.Full] = Bottle(Water.Full),
-        [Water.TwoUnits] = Bottle(Water.TwoUnits),
-        [Water.OneUnit] = Bottle(Water.OneUnit),
+        [Water.TwoLiters] = Bottle(Water.TwoLiters),
+        [Water.OneLiter] = Bottle(Water.OneLiter),
         [Water.Empty] = Bottle(Water.Empty),
         // Berries heap one by one.
         ["berries"] = new(Berry, Glossy, .16f, Lay.Loose, .7f),
@@ -100,7 +100,7 @@ internal static class ItemShape {
         new(f => Lighter(f, ActorRig.Tool(tool), pose ?? new Basis(Vector3.Back, MathF.PI / 2)), Plain, Lay: Lay.Rows);
     /// <summary>A bottle lying on its back, its gauge up.</summary>
     private static Look Bottle(string item) =>
-        new(f => Lighter(f, BottleShape.Create(Water.BottleUnits(item)), new Basis(Vector3.Right, -MathF.PI / 2)), Plain, .45f, Lay.Rows, .85f);
+        new(f => Lighter(f, BottleShape.Create(Water.BottleLiters(item)), new Basis(Vector3.Right, -MathF.PI / 2)), Plain, .45f, Lay.Rows, .85f);
     /// <summary>One loose lump of ore or coal, the first of those the world scatters, in the given colour.</summary>
     private static Look Nugget(string kind, string colour) =>
         new(f => First(f, NatureShape.Loose(kind, new Color(colour), new Color(colour), 0), 20), NatureShape.Rock, .24f, Lay.Loose, .7f);

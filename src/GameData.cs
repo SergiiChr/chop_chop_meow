@@ -51,20 +51,20 @@ public sealed class RecipeDef {
     public bool Burns => Fuels.Count > 0;
 }
 /// <summary>
-/// A refillable vessel and the liquid it carries, in units.
-/// A vessel dropped into a station that takes its liquid pours the units it holds there and stays with whoever carried it, emptier;
+/// A refillable vessel and the liquid it carries, in liters.
+/// A vessel dropped into a station that takes its liquid pours the liters it holds there and stays with whoever carried it, emptier;
 /// the liquid leaves a station only into vessels with room for it.
 /// </summary>
 public sealed class VesselDef {
-    /// <summary>Its item at each fill, from empty to full: the index is the units it holds.</summary>
+    /// <summary>Its item at each fill, from empty to full: the index is the liters it holds.</summary>
     public List<string> States { get; set; } = new();
-    /// <summary>What it pours out, a unit at a time, which only stations hold.</summary>
+    /// <summary>What it pours out, a liter at a time, which only stations hold.</summary>
     public string Liquid { get; set; } = "";
     public string Empty => States[0];
     public string Full => States[^1];
     public int Capacity => States.Count - 1;
-    /// <summary>The units an item of this vessel holds, or -1 for another item.</summary>
-    public int UnitsIn(string item) => States.IndexOf(item);
+    /// <summary>The liters an item of this vessel holds, or -1 for another item.</summary>
+    public int LitersIn(string item) => States.IndexOf(item);
 }
 /// <summary>How an item that no recipe makes is come by, for the recipe map.</summary>
 public sealed class SourceDef {
@@ -256,7 +256,7 @@ public sealed partial class GameData {
     private readonly Dictionary<string, string[]> endsUpIn = new();
     private static readonly List<string> Nothing = new();
     /// <summary>Items the recipe map leaves out: coins, and the part-drunk bottles that stand with the full one.</summary>
-    public static bool OffTheMap(string item) => item == Inventory.Coins || item is Water.OneUnit or Water.TwoUnits;
+    public static bool OffTheMap(string item) => item == Inventory.Coins || item is Water.OneLiter or Water.TwoLiters;
     /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
     public string? RecipeIdOf(string item) => recipeIdOf.GetValueOrDefault(item);
     /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
@@ -319,7 +319,7 @@ public sealed partial class GameData {
         }
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
-    public bool IsConsumable(string item) => Water.BottleUnits(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
+    public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
     public string PlainestTool(string kind, int tier = 0) => Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;

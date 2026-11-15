@@ -803,7 +803,7 @@ public sealed partial class World {
     public void Consume(string item) {
         if (Downed || !Data.Items.TryGetValue(item, out var def) || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
         if (Water.IsBottle(item)) {
-            if (!Water.DrinkUnit(this, item)) Say("Your bottle is empty. Collect water at the pond to refill it.");
+            if (!Water.DrinkLiter(this, item)) Say("Your bottle is empty. Collect water at the pond to refill it.");
             return;
         }
         if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
@@ -1007,7 +1007,7 @@ public sealed partial class World {
             if (!CarriesBatch(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
             if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
             foreach (var pair in cost)
-                if (Data.VesselFor(pair.Key) is VesselDef vessel) PourUnits(S.Backpack, t.Inventory, vessel, pair.Value);
+                if (Data.VesselFor(pair.Key) is VesselDef vessel) PourLiters(S.Backpack, t.Inventory, vessel, pair.Value);
                 else S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
             if (fuel != null) S.Backpack.TransferTo(t.Burner!, fuel, 1);
         }
@@ -1850,7 +1850,7 @@ public sealed partial class World {
             w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
             if (Walk(w, dest.Pos, dt)) {
                 // Every vessel carried pours, whatever it holds.
-                if (pours != null && dest == Find(w.Destination) && into == dest.Inventory) PourUnits(w.Bag, into, pours, int.MaxValue);
+                if (pours != null && dest == Find(w.Destination) && into == dest.Inventory) PourLiters(w.Bag, into, pours, int.MaxValue);
                 else w.Bag.TransferTo(into!, item, dest.Kind == ThingKind.Mine ? MineNeed(dest, item) : w.Bag[item], true);
                 w.Destination = 0;
                 if (w.Bag.Count == 0) { w.Fueling = false; w.Hands(Worker.BagStack); NextPlace(w); }
@@ -1962,11 +1962,11 @@ public sealed partial class World {
             if (fetches) foreach (var pair in costs) {
                 int wanting = pair.Value * 2 - target.Inventory[pair.Key];
                 if (wanting <= 0) continue;
-                // A liquid comes in the vessels that pour it, enough of them for the units short.
+                // A liquid comes in the vessels that pour it, enough of them for the liters short.
                 string carried = pair.Key; Thing? source; int count = wanting;
                 if (Data.VesselFor(pair.Key) is VesselDef carrier) {
                     if (LiquidSource(carrier, w.Pos) is not (string filled, Thing holder)) continue;
-                    (carried, source) = (filled, holder); count = (wanting + carrier.UnitsIn(filled) - 1) / carrier.UnitsIn(filled);
+                    (carried, source) = (filled, holder); count = (wanting + carrier.LitersIn(filled) - 1) / carrier.LitersIn(filled);
                 } else if ((source = SourceFor(carried, w.Pos)) == null) continue;
                 w.Status = Phrase("Fetching ", Data.Name(carried));
                 if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, carried, count, true); w.Destination = target.Id; }
@@ -2517,7 +2517,7 @@ public sealed partial class World {
     public static int GoalCount => Milestones.Length;
     public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
     public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch {
-        0 => ("Carry fresh water", "Collect water around the pond shore. It holds three units and stays with you when empty; without a bottle, drink at the source."),
+        0 => ("Carry fresh water", "Collect water around the pond shore. It holds three liters and stays with you when empty; without a bottle, drink at the source."),
         1 => ("A safe place", "Gather wood and stone, then build a cabin before dusk. Step inside to shelter from wolves."),
         2 => ("Keep the fire lit", "Build and light a campfire. Firelight keeps wolves away; feed it wood to keep it burning."),
         3 => ("Gather by hand", "You start with a steel axe. Hold right mouse on trees to fell them; gather stone and berries by hand."),

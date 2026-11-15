@@ -3,28 +3,28 @@ using System.Linq;
 
 namespace ChopChopMeow;
 
-/// <summary>The refillable three-unit bottle, and a unit drunk straight from a water source.</summary>
+/// <summary>The refillable three-liter bottle, and a liter drunk straight from a water source.</summary>
 public static class Water {
     /// <summary>The bottle's item ids, full to empty, and the water a full one pours into a station.</summary>
-    public const string Full = "water", TwoUnits = "water_2", OneUnit = "water_1", Empty = "empty_bottle", Liquid = "fresh_water";
-    public const float UnitThirst = 100f / 3f;
-    public static readonly string[] BottleItems = { Empty, OneUnit, TwoUnits, Full };
+    public const string Full = "water", TwoLiters = "water_2", OneLiter = "water_1", Empty = "empty_bottle", Liquid = "fresh_water";
+    public const float LiterThirst = 100f / 3f;
+    public static readonly string[] BottleItems = { Empty, OneLiter, TwoLiters, Full };
 
-    public static bool IsBottle(string item) => item is Full or TwoUnits or OneUnit or Empty;
+    public static bool IsBottle(string item) => item is Full or TwoLiters or OneLiter or Empty;
 
-    /// <summary>Remaining units, or -1 when the item is not a bottle.</summary>
-    public static int BottleUnits(string item) => item switch {
+    /// <summary>Remaining liters, or -1 when the item is not a bottle.</summary>
+    public static int BottleLiters(string item) => item switch {
         Full => 3,
-        TwoUnits => 2,
-        OneUnit => 1,
+        TwoLiters => 2,
+        OneLiter => 1,
         Empty => 0,
         _ => -1
     };
 
-    public static string WaterItem(int units) => units switch {
+    public static string WaterItem(int liters) => liters switch {
         >= 3 => Full,
-        2 => TwoUnits,
-        1 => OneUnit,
+        2 => TwoLiters,
+        1 => OneLiter,
         _ => Empty
     };
 
@@ -34,7 +34,7 @@ public static class Water {
         return null;
     }
 
-    /// <summary>Refills an empty bottle first, then a partial bottle. With no bottle, gathering at a source drinks one unit straight from it.</summary>
+    /// <summary>Refills an empty bottle first, then a partial bottle. With no bottle, gathering at a source drinks one liter straight from it.</summary>
     public static WaterCollectResult CollectWater(World world, Thing source) {
         if (source.Kind != ThingKind.Water) return WaterCollectResult.NoChange;
         Inventory backpack = world.S.Backpack;
@@ -44,16 +44,16 @@ public static class Water {
             Replace(backpack, bottle, Full);
             return WaterCollectResult.RefilledBottle;
         }
-        world.S.Thirst = System.Math.Min(100, world.Thirst + UnitThirst);
-        return WaterCollectResult.SourceUnit;
+        world.S.Thirst = System.Math.Min(100, world.Thirst + LiterThirst);
+        return WaterCollectResult.SourceLiter;
     }
 
-    /// <summary>Drinks one unit and preserves the same individual bottle in its next state.</summary>
-    public static bool DrinkUnit(World world, string item) {
-        if (BottleUnits(item) <= 0) return false;
+    /// <summary>Drinks one liter and preserves the same individual bottle in its next state.</summary>
+    public static bool DrinkLiter(World world, string item) {
+        if (BottleLiters(item) <= 0) return false;
         Inventory backpack = world.S.Backpack;
-        if (!backpack.Replace(item, WaterItem(BottleUnits(item) - 1))) return false;
-        world.S.Thirst = System.Math.Min(100, world.Thirst + UnitThirst);
+        if (!backpack.Replace(item, WaterItem(BottleLiters(item) - 1))) return false;
+        world.S.Thirst = System.Math.Min(100, world.Thirst + LiterThirst);
         return true;
     }
 
@@ -63,7 +63,7 @@ public static class Water {
     }
 }
 
-public enum WaterCollectResult { NoChange, RefilledBottle, SourceUnit }
+public enum WaterCollectResult { NoChange, RefilledBottle, SourceLiter }
 
 public sealed partial class World {
     /// <summary>A water collector refills existing empty bottles; gathering never creates packaging.</summary>

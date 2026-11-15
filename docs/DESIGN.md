@@ -74,7 +74,7 @@ Simulation and data:
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
-| `src/Water.cs` | The refillable three-unit bottle and drinking at a water source |
+| `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
 | `src/Vessels.cs` | Pouring a full vessel's liquid into a station and filling empty vessels from it |
 | `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
@@ -371,9 +371,9 @@ There are no iron tools; iron bars only go into buildings and steel.
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
 Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the pond shore is a collection target.
-A station takes water as a liquid in units, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many units.
+A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many liters.
 `GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
-a vessel dropped into a station whose recipe takes its liquid pours every unit it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourUnits`);
+a vessel dropped into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
 the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the cup shakes.
 Every move between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
 Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.LiquidToClear`), and a dismantled station fills the backpack's vessels and spills the rest.
