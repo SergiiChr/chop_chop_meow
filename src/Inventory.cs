@@ -10,7 +10,9 @@ public sealed class Inventory {
     /// <summary>A persisted stack in a particular inventory cell.</summary>
     public sealed class Slot { public string Item { get; set; } = ""; public int Count { get; set; } }
     private readonly Dictionary<string, int> items = new();
-    private const int NewSlots = 18, NewStackSize = 64;
+    private const int NewSlots = 18, NewStackSize = 64, NewCoinStack = 1000;
+    /// <summary>A coin stack no game comes near, for a box with no coin limit; small enough that adding stacks up never overflows.</summary>
+    public const int UnlimitedCoins = int.MaxValue / 4;
     private int slots = NewSlots, stackSize = NewStackSize;
     /// <summary>Read-only view of each item's total across all stacks; the inventory's methods are the only way to change it.</summary>
     [JsonIgnore] public ItemTotals Items { get; }
@@ -27,6 +29,8 @@ public sealed class Inventory {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
     /// <summary>Most units of one item per cell. Changing it splits or merges stacks to fit.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int StackSize { get => stackSize; set { if (value == stackSize) return; stackSize = value; RebuildStacks(); } }
+    /// <summary>Most coins per cell: 1000, or <see cref="UnlimitedCoins"/> in a trading post's wage slot.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int CoinStack { get; set; } = NewCoinStack;
     /// <summary>Most units the inventory holds across all its stacks, or 0 for no limit beyond its slots.</summary>
     public int Capacity { get; set; }
     /// <summary>Physical cell a UI action targets when an item id appears in several cells.</summary>
@@ -63,12 +67,12 @@ public sealed class Inventory {
     }
     public int this[string item] => items.GetValueOrDefault(item);
     /// <summary>Empty with the settings of a new inventory, so it saves the same as one.</summary>
-    [JsonIgnore] public bool Fresh => items.Count == 0 && slots == NewSlots && stackSize == NewStackSize && Capacity == 0 && InputFilter.Count == 0 && OutputFilter.Count == 0 && Layout.Count == NewSlots && UsedSlots == 0;
+    [JsonIgnore] public bool Fresh => items.Count == 0 && slots == NewSlots && stackSize == NewStackSize && CoinStack == NewCoinStack && Capacity == 0 && InputFilter.Count == 0 && OutputFilter.Count == 0 && Layout.Count == NewSlots && UsedSlots == 0;
 
     /// <summary>Items that take a slot each in any container: every tool, filled from the data when it loads.</summary>
     public static readonly HashSet<string> Unstacked = new();
-    /// <summary>Coins stack to 1000 in any container, packed crates and tools never stack; every other item uses the container's stack size.</summary>
-    public int StackOf(string item) => item == Coins ? 1000 : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) ? 1 : StackSize;
+    /// <summary>Coins stack to the container's coin stack, packed crates and tools never stack; every other item uses the container's stack size.</summary>
+    public int StackOf(string item) => item == Coins ? CoinStack : item.StartsWith(World.PackedPrefix) || Unstacked.Contains(item) ? 1 : StackSize;
     /// <summary>Units of an item that still fit: empty slots plus the unfilled part of its last stack.</summary>
     public int Room(string item) {
         int stack = StackOf(item), room = 0, used = 0;

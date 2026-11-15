@@ -67,10 +67,20 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
     /// <summary>Makes a cup hand one item of an inventory to the backpack: a click moves it as <see cref="Stack"/> does, a drag carries the stack.</summary>
     public void TakeCell(ItemSlot cell, Inventory box, string item, Thing near) => TakeCell(cell, box, () => item, near);
 
-    /// <summary>The same for a cup whose item changes; <paramref name="item"/> is null while it has nothing to give.</summary>
+    /// <summary>
+    /// The same for a cup whose item changes; <paramref name="item"/> is null while it has nothing to give.
+    /// A liquid goes only into an empty vessel: with none in the backpack, the cup shakes and says so.
+    /// </summary>
     public void TakeCell(ItemSlot cell, Inventory box, Func<string?> item, Thing near) {
-        cell.Pressed += () => { if (item() is string id) kit.Run(() => Stack(box, world.S.Backpack, id, near)); };
-        cell.Drag = () => item() is string id && box[id] > 0 ? new ItemDrag(id, box[id], box, near) : null;
+        Tween? shake = null;
+        bool Refused(string id) {
+            if (world.FillBlock(box, world.S.Backpack, id) is not string refused) return false;
+            kit.Notify(refused);
+            if (shake == null || !shake.IsValid()) shake = Shaker.Shake(cell, cell);
+            return true;
+        }
+        cell.Pressed += () => { if (item() is string id && !Refused(id)) kit.Run(() => Stack(box, world.S.Backpack, id, near)); };
+        cell.Drag = () => item() is string id && box[id] > 0 && !Refused(id) ? new ItemDrag(id, box[id], box, near) : null;
     }
 
     /// <summary>

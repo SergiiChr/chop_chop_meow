@@ -177,7 +177,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 Health, hunger and thirst are three upright vials in the top-left corner with a heart, a stomach and a droplet under them.
 Each empties as its level falls and turns red at 25% or less.
 
-Beside them the bank shows the coins in the trading post's wage slot and the wages due each day, in red when they exceed the bank.
+Beside them the bank shows the coins in the trading post's wage slot, which has no limit, and the wages due each day, in red when they exceed the bank.
 Drop coins on it to pay in, or click it beside a trading post to take them out.
 
 The day dial in the top-right corner shows the sun crossing its arc from sunrise to sunset; then the moon crosses the same arc until dawn.
@@ -331,9 +331,18 @@ Keep the empty bottle after drinking and refill it at the lake; without a bottle
 Filling a bottle takes the same time as one gather action.
 Empty or filled replacements can be bought individually.
 Craft an empty bottle at a bench from one tin bar and one wood part, with the same steel hammer used for tin cans.
-Cooking returns the empty bottle when it uses water.
+A recipe that uses water, such as meat stew or dough, takes it poured out: a full bottle dropped on the station's water cup leaves its water there, and the bottle stays in your backpack, empty.
+The cup shows a water droplet, and only a full bottle pours.
+Clicking the cup takes the water back into an empty bottle in your backpack; without one, the cup shakes and says so.
+Workers do the same: they bring full bottles, pour them and carry the empties back to storage.
+Water left in a station whose recipe no longer uses it is taken out by a hauler, who fetches empty bottles from storage, fills them there and stores them.
+Taking down a station fills the empty bottles you carry with its water, and the rest is spilled.
+These rules cover any refillable vessel the game adds (`GameData.Vessels`).
 
+Food and drink restore hunger and thirst but no health: health comes back only in sleep.
 From 10 pm you can sleep until dawn, but only if your food and water will last until morning; otherwise the sleep button explains why.
+Sleep heals while hunger and thirst both stay above 45%, about a third of your health over a full night.
+The cabin's page shows the health, hunger and thirst you would wake with, each as a capsule over its icon, as in the corner.
 
 ### Death and recovery
 
@@ -479,8 +488,8 @@ You can do both by hand from the crafting menu with a carried mortar.
 Its other recipes cook on their own:
 
 - 2 crushed berries → jam, over one wood, coal or charcoal
-- 1 raw meat + 1 water → meat stew, over one wood, coal or charcoal
-- 1 flour + 1 water → dough, kneaded with no fire
+- 1 raw meat + 1 water, poured from a full bottle → meat stew, over one wood, coal or charcoal
+- 1 flour + 1 water, poured from a full bottle → dough, kneaded with no fire
 
 The canning station (2 steel bars, 8 planks) seals meat stew or jam into a tin can over one wood, coal or charcoal.
 Raw meat is not canned: it sells as it is, in crates.
@@ -619,7 +628,7 @@ Trade carts keep their timing: a cart walks down the valley at a steady pace, fa
 Coins are a backpack item that stacks to 1000.
 Purchases are paid from carried coins; hiring is paid from the bank first, then carried coins.
 
-Sale proceeds fill the wage slot first, a single stack of up to 1000 coins between the input and output boxes, and the rest goes into the output boxes.
+Sale proceeds land in the wage slot between the input and output boxes, which holds any number of coins.
 Daily wages are paid from the wage slot first and then from your backpack.
 The slot only holds coins, and you can move coins in or out by hand.
 

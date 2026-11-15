@@ -84,10 +84,10 @@ internal static class ItemShape {
         ["rake"] = new(f => Copy(f, RackShape.Rake, new Transform3D(new Basis(Vector3.Right, MathF.PI / 2), Vector3.Zero), Colors.White), Plain, Lay: Lay.Rows),
         ["mortar"] = new(f => Copy(f, CookShape.BuildMortar(6, 5), Transform3D.Identity, Colors.White), Plain, .3f),
         ["crate"] = new(f => Copy(f, CrateShape.Cargo, Transform3D.Identity, Colors.White), Plain, .5f),
-        ["water"] = Bottle("water"),
-        ["water_2"] = Bottle("water_2"),
-        ["water_1"] = Bottle("water_1"),
-        ["empty_bottle"] = Bottle("empty_bottle"),
+        [Water.Full] = Bottle(Water.Full),
+        [Water.TwoUnits] = Bottle(Water.TwoUnits),
+        [Water.OneUnit] = Bottle(Water.OneUnit),
+        [Water.Empty] = Bottle(Water.Empty),
         // Berries heap one by one.
         ["berries"] = new(Berry, Glossy, .16f, Lay.Loose, .7f),
         // Leaves and compost are each one mound, which swells with what is in it.

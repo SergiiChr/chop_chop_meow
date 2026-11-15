@@ -75,6 +75,7 @@ Simulation and data:
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
+| `src/Vessels.cs` | Pouring a full vessel's liquid into a station and filling empty vessels from it |
 | `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
 | `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
@@ -116,7 +117,7 @@ UI and input:
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
-| `src/CabinPanel.cs` | A cabin: its door and sleep |
+| `src/CabinPanel.cs` | A cabin: its door, sleep and the needs a night would leave |
 | `src/CampfirePanel.cs` | A campfire |
 | `src/ResourcePanel.cs` | A resource in the world |
 | `src/PilePanel.cs` | A pile or compost heap |
@@ -370,7 +371,13 @@ There are no iron tools; iron bars only go into buildings and steel.
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
 Filling it or sipping straight from the source takes one `GatherSeconds`.
 Every point on the pond shore is a collection target.
-Recipes take only a full bottle, and cooking returns the empty bottle rather than destroying it.
+A station takes water as a liquid, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it.
+`GameData.Vessels` lists each refillable vessel (empty, part-full and full item, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
+a full vessel dropped into a station whose recipe takes its liquid pours one unit there and stays where it was, empty (`World.Pour`);
+the liquid leaves only into empty vessels (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the cup shakes.
+Every move between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
+Haulers fetch a liquid input as full vessels and store the empties; leftover liquid leaves in empty vessels a hauler fetches (`World.LiquidToClear`), and a dismantled station fills the backpack's empty vessels and spills the rest.
+No hand recipe takes a liquid, which `GameData` checks.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
 It advances normal simulation through dawn, including needs, trades, production and wages.
@@ -392,7 +399,8 @@ The starter goal chain stays as the tutorial, and the pause menu lists both.
 
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
 
-- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`, `Health`) and a `Food` flag.
+- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`) and a `Food` flag; nothing eaten heals.
+- Health comes back only in sleep, `World.SleepHeal` a second while hunger and thirst both stay above `World.FedNeed`; `World.HealthAtDawn` foretells it for the cabin's page.
 - Food is what wolves eat and compost will take, cooked or not.
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.
@@ -766,7 +774,7 @@ Purchases settle on return into the trading post's market output (`Thing.Output`
 The trading post's input filter names the crates it asks for.
 `DepositFor` treats a post as storage only for an item its filter names, so workers deliver those crates there when it is the nearest storage asking for them.
 With `Thing.AutoSell` set, the cart leaves on its own once every market slot holds a crate and a cart is free.
-Sale coins fill the trading post's one-stack wage slot (`Thing.Wages`, coins only) first and the output after.
+Sale coins land in the trading post's wage slot (`Thing.Wages`, coins only), whose coin stack (`Inventory.CoinStack`) is `Inventory.UnlimitedCoins`, so the bank has no limit.
 Dawn wages, settled strikes and hiring payments draw on every wage slot before the payer's backpack; purchases come from the backpack only.
 
 #### Price sheet

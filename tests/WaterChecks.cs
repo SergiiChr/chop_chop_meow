@@ -5,6 +5,7 @@ using System.Linq;
 using static Checks;
 using static SetupSteps;
 using static WorkerSteps;
+using static WorldSteps;
 
 namespace ChopChopMeow.Tests;
 
@@ -18,6 +19,10 @@ public static class WaterChecks {
         CheckBottleKeepsPartialStateAcrossSave(data);
         CheckBottleRecipeMakesEmptyBottleFromTinAndWood(data);
         CheckRecipesReturnReusableBottles(data);
+        CheckTakingWaterOutNeedsAnEmptyBottle(data);
+        CheckHaulerPoursWaterAndStoresTheEmptyBottle(data);
+        CheckHaulerTakesLeftoverWaterOutInEmptyBottles(data);
+        CheckDismantledStationFillsEmptyBottles(data);
     }
 
     private static void CheckRecipesTakeOnlyFullBottles(GameData data) {
@@ -27,20 +32,23 @@ public static class WaterChecks {
             world.SetRecipe(table, "dough");
             Give(world, item, 1); Give(world, "flour", 1);
             string message = ""; world.Notify = text => message = text;
-            Require(world.LoadInput(table, item, 1) == 0 && message == Water.FullBottleWarning,
+            Require(world.LoadInput(table, item, 1) == 0 && message == "Requires full water bottle",
                 "partial/empty bottle input clicks must give the full-bottle warning");
             message = "";
-            Require(world.Transfer(world.Backpack, table.Inventory, item, 1) == 0 && message == Water.FullBottleWarning,
+            Require(world.Transfer(world.Backpack, table.Inventory, item, 1) == 0 && message == "Requires full water bottle",
                 "direct recipe transfers must reject non-full bottles with the warning");
             message = ""; world.LoadBatch(table);
-            Require(message == Water.FullBottleWarning, "batch loading must explain the requirement");
+            Require(message == "Requires full water bottle", "batch loading must explain the requirement");
             Require(world.Backpack[item] == 1, "batch loading must retain the non-full bottle");
             Require(table.Inventory.Count == 0, "batch loading must not put the bottle on the table");
             var chest = world.Add(ThingKind.Chest, world.Player + Vector2.Left);
             Require(world.Transfer(world.Backpack, chest.Inventory, item, 1) == 1,
                 "non-full bottles must remain transferable to ordinary storage");
-            Give(world, "water", 1);
-            Require(world.LoadInput(table, "water", 1) == 1, "a full bottle must load normally");
+            Give(world, Water.Full, 1);
+            Require(world.LoadInput(table, Water.Full, 1) == 1 && table.Inventory[Water.Liquid] == 1 && table.Inventory[Water.Full] == 0,
+                "a full bottle must pour its water into the table");
+            Require(world.Backpack[Water.Full] == 0 && world.Backpack[Water.Empty] == 1,
+                "the poured bottle must stay in the backpack, empty");
         }
     }
 
@@ -129,10 +137,10 @@ public static class WaterChecks {
         Require(bench.Inventory["empty_bottle"] == 1 && bench.Inventory["water"] == 0,
             "the actual bench recipe must make exactly one empty bottle without creating water");
         var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Left * 2);
-        world.SetRecipe(table, "dough"); table.Inventory.Add("water", 1); table.Inventory.Add("flour", 1);
+        world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 1); table.Inventory.Add("flour", 1);
         for (int i = 0; i < 100; i++) world.Tick(.25f, true);
-        Require(table.Inventory["empty_bottle"] == 1, "cooking must return the reusable container");
-        Require(table.Inventory["water"] == 0, "cooking must use the water");
+        Require(table.Inventory[Water.Empty] == 0, "cooking must leave no bottle on the table: the bottle stayed with whoever poured it");
+        Require(table.Inventory[Water.Liquid] == 0, "cooking must use the water");
         Require(table.Inventory["dough"] > 0, "cooking must make its dough");
 
         world = new World(data, false);
@@ -146,5 +154,57 @@ public static class WaterChecks {
         Require(chest.Inventory["water"] == 1, "an assigned collector must deliver the refilled bottle");
         Require(chest.Inventory["empty_bottle"] == 0, "an assigned collector must refill the existing bottle");
         Require(worker.Bag.Count == 0, "an assigned collector must not generate more containers");
+    }
+
+    private static void CheckTakingWaterOutNeedsAnEmptyBottle(GameData data) {
+        var world = new World(data, false);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 2);
+        string message = ""; world.Notify = text => message = text;
+        Require(world.Transfer(table.Inventory, world.Backpack, Water.Liquid, 1) == 0 && message == "You need an empty bottle to take the water.",
+            "taking water out without an empty bottle must be refused with the reason");
+        Require(table.Inventory[Water.Liquid] == 2 && world.Backpack.Count == 0, "refused water must stay on the table");
+        Give(world, Water.Empty, 1);
+        Require(world.Transfer(table.Inventory, world.Backpack, Water.Liquid, 2) == 1, "one empty bottle must take out one water");
+        Require(world.Backpack[Water.Full] == 1 && world.Backpack[Water.Empty] == 0 && world.Backpack[Water.Liquid] == 0 && table.Inventory[Water.Liquid] == 1,
+            "taking water out must fill the empty bottle, never put loose water in the backpack");
+    }
+
+    private static void CheckHaulerPoursWaterAndStoresTheEmptyBottle(GameData data) {
+        var world = new World(data, false);
+        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        chest.Inventory.Add(Water.Full, 1); chest.Inventory.Add("flour", 4);
+        var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
+        world.SetRecipe(table, "dough");
+        var hauler = AddWorker(world, new Vector2(24, 21));
+        world.SetDuty(hauler, table, "haul", true);
+        SafeTick(world, 40);
+        Require(chest.Inventory["dough"] == 1 && table.Inventory[Water.Full] + table.Inventory[Water.Empty] == 0,
+            "a hauler must pour a full bottle into the table for its dough, leaving no bottle there");
+        Require(chest.Inventory[Water.Empty] == 1 && hauler.Bag.Count == 0, "a hauler must store the emptied bottle again");
+    }
+
+    private static void CheckHaulerTakesLeftoverWaterOutInEmptyBottles(GameData data) {
+        var world = new World(data, false);
+        var chest = world.Add(ThingKind.Chest, new Vector2(20, 20));
+        chest.Inventory.Add(Water.Empty, 1);
+        var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
+        world.SetRecipe(table, "berry_jam"); table.Inventory.Add(Water.Liquid, 1);
+        var hauler = AddWorker(world, new Vector2(24, 21));
+        world.SetDuty(hauler, table, "haul", true);
+        SafeTick(world, 40);
+        Require(table.Inventory[Water.Liquid] == 0, "a hauler must clear water the table's recipe no longer takes");
+        Require(chest.Inventory[Water.Full] == 1 && chest.Inventory[Water.Empty] == 0 && hauler.Bag.Count == 0,
+            "the leftover water must go back to storage in the empty bottle the hauler fetched");
+    }
+
+    private static void CheckDismantledStationFillsEmptyBottles(GameData data) {
+        var world = new World(data, false);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 2);
+        EmptyBackpack(world); Give(world, Water.Empty, 1);
+        Require(world.Dismantle(table), "the table should come down");
+        Require(world.Backpack[Water.Full] == 1 && world.Backpack[Water.Liquid] == 0 && world.Things.All(t => t.Inventory[Water.Liquid] == 0),
+            "a dismantled station's water must fill the empty bottles carried, and the rest spill");
     }
 }

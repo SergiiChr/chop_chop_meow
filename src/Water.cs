@@ -5,26 +5,27 @@ namespace ChopChopMeow;
 
 /// <summary>The refillable three-sip bottle and the direct sip taken at a water source.</summary>
 public static class Water {
-    public const string FullBottleWarning = "Requires full water bottle";
+    /// <summary>The bottle's item ids, full to empty, and the water a full one pours into a station.</summary>
+    public const string Full = "water", TwoUnits = "water_2", OneUnit = "water_1", Empty = "empty_bottle", Liquid = "fresh_water";
     public const float SipThirst = 100f / 3f;
-    public static readonly string[] BottleItems = { "empty_bottle", "water_1", "water_2", "water" };
+    public static readonly string[] BottleItems = { Empty, OneUnit, TwoUnits, Full };
 
-    public static bool IsBottle(string item) => item is "water" or "water_2" or "water_1" or "empty_bottle";
+    public static bool IsBottle(string item) => item is Full or TwoUnits or OneUnit or Empty;
 
     /// <summary>Remaining sips, or -1 when the item is not a bottle.</summary>
     public static int BottleSips(string item) => item switch {
-        "water" => 3,
-        "water_2" => 2,
-        "water_1" => 1,
-        "empty_bottle" => 0,
+        Full => 3,
+        TwoUnits => 2,
+        OneUnit => 1,
+        Empty => 0,
         _ => -1
     };
 
     public static string WaterItem(int sips) => sips switch {
-        >= 3 => "water",
-        2 => "water_2",
-        1 => "water_1",
-        _ => "empty_bottle"
+        >= 3 => Full,
+        2 => TwoUnits,
+        1 => OneUnit,
+        _ => Empty
     };
 
     /// <summary>Finds an empty bottle first, then the least-full partial bottle, and a full bottle last.</summary>
@@ -38,9 +39,9 @@ public static class Water {
         if (source.Kind != ThingKind.Water) return WaterCollectResult.NoChange;
         Inventory backpack = world.S.Backpack;
         string? bottle = FindBottle(backpack);
-        if (bottle == "water") return WaterCollectResult.NoChange;
+        if (bottle == Full) return WaterCollectResult.NoChange;
         if (bottle != null) {
-            Replace(backpack, bottle, "water");
+            Replace(backpack, bottle, Full);
             return WaterCollectResult.RefilledBottle;
         }
         world.S.Thirst = System.Math.Min(100, world.Thirst + SipThirst);
@@ -68,24 +69,24 @@ public sealed partial class World {
     /// <summary>A water collector refills existing empty bottles; gathering never creates packaging.</summary>
     private bool WaterWork(Worker worker, Thing pond, float dt) {
         string? carried = Water.FindBottle(worker.Bag);
-        if (carried != null && carried != "water") {
+        if (carried != null && carried != Water.Full) {
             worker.Status = "Collecting water";
             if (!Walk(worker, Terrain.WaterPoint(worker.Pos), dt, 2.5f)) return true;
             worker.WorkState = WorkerWorkState.Gathering;
             worker.Timer += dt;
             if (worker.Timer < Data.GatherSeconds) return true;
-            worker.Timer = 0; worker.Bag.Replace(carried, "water"); Got("water");
-            worker.Destination = DepositFor("water", worker.Pos)?.Id ?? 0;
+            worker.Timer = 0; worker.Bag.Replace(carried, Water.Full); Got(Water.Full);
+            worker.Destination = DepositFor(Water.Full, worker.Pos)?.Id ?? 0;
             return true;
         }
-        Thing? source = null; string item = "empty_bottle";
+        Thing? source = null; string item = Water.Empty;
         foreach (var candidate in Water.BottleItems) {
-            if (candidate == "water") break;
+            if (candidate == Water.Full) break;
             source = SourceFor(candidate, worker.Pos);
             if (source != null) { item = candidate; break; }
         }
         if (source == null) { worker.Status = "Needs refillable bottles in output-enabled storage"; return false; }
-        if (DepositFor("water", worker.Pos) == null) { worker.Status = "Needs storage for filled bottles"; return false; }
+        if (DepositFor(Water.Full, worker.Pos) == null) { worker.Status = "Needs storage for filled bottles"; return false; }
         worker.Status = "Fetching an empty bottle";
         if (Walk(worker, source.Pos, dt)) {
             source.Inventory.TransferTo(worker.Bag, item, 1, true);

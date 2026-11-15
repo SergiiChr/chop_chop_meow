@@ -54,10 +54,14 @@ public static class PileModelChecks {
     /// <summary>
     /// Every item's icon and the workers' hard hat are rendered from models, and every item heaps as its model rather
     /// than as plain blocks, light enough for a full pile and a full packing station.
+    /// A liquid, which only stations hold, has a drawn icon and never heaps.
     /// </summary>
     public static void Goods(GameData data) {
-        foreach (string item in data.Items.Keys.Append("hardhat"))
+        var goods = data.Items.Keys.Where(item => data.VesselFor(item) == null).ToList();
+        foreach (string item in goods.Append("hardhat"))
             Require(ResourceLoader.Exists($"res://assets/icons/{item}.png"), $"{item} must have an icon rendered from its model");
+        foreach (var vessel in data.Vessels)
+            Require(ResourceLoader.Exists($"res://assets/ui/{vessel.Liquid}.svg"), $"{vessel.Liquid} must have a drawn icon");
         PileShape.Warm(data);
         var thing = new Thing { Kind = ThingKind.Pile, Inventory = new Inventory { Slots = 14 } };
         var pile = (PileProp)WorldModels.Build(thing);
@@ -65,7 +69,7 @@ public static class PileModelChecks {
         try {
             var block = ModelSteps.Piled(pile, thing, "unmodelled_item", data);
             // A pile and a packing station are buildings, each held to 2,500 triangles with a full heap showing.
-            foreach (string good in data.Items.Keys) {
+            foreach (string good in goods) {
                 Require(ModelSteps.Piled(pile, thing, good, data).GetInstanceId() != block.GetInstanceId(), $"{good} must heap as its own model rather than as plain blocks");
                 pile.Stock.Fill(good, 1, data); packer.Stock.Fill(good, 1, data);
                 Require(ModelSteps.Triangles(pile.Root) <= 2500, $"a pile full of {good} must stay a light building: {ModelSteps.Triangles(pile.Root)} triangles");

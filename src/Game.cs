@@ -149,7 +149,7 @@ public partial class Game : Node, IGameFlow {
     }
     private void PlayIntro() { intro = new IntroMovie(sounds) { Name = "intro" }; ui.AddChild(intro); }
     private void Notify(string message) {
-        if (message == Water.FullBottleWarning && waterWarning != null) waterWarning.Warn(message); else messages?.Post(message);
+        if (message.StartsWith(World.VesselWarningStart, System.StringComparison.Ordinal) && waterWarning != null) waterWarning.Warn(message); else messages?.Post(message);
         GD.Print(message);
     }
     private void RefreshLive() {

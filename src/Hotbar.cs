@@ -106,9 +106,9 @@ public partial class Hotbar : PanelContainer {
         string id = world.HotbarSlots[slot];
         if (!Water.IsBottle(id)) return id;
         foreach (var bottle in DrinkingBottles) if (world.Backpack[bottle] > 0) return bottle;
-        return "empty_bottle";
+        return Water.Empty;
     }
-    private static readonly string[] DrinkingBottles = { "water_1", "water_2", "water", "empty_bottle" };
+    private static readonly string[] DrinkingBottles = { Water.OneUnit, Water.TwoUnits, Water.Full, Water.Empty };
 
     public string? ActiveItem() {
         string id = HotbarId(world.ActiveHotbar);

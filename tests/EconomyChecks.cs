@@ -25,8 +25,8 @@ public static class EconomyChecks {
     private static void CheckEveryRecipeAddsValueAlongTheLadder(GameData data) {
         var world = new World(data, false);
         var markups = data.Recipes.Select(p => {
-            // Water recipes return their reusable bottles; only the water is a consumed material.
-            float input = Value(data, BatchCost(world, p.Key)) - p.Value.Inputs.GetValueOrDefault("water") * data.Items["empty_bottle"].Price;
+            // A recipe that takes water takes it poured out; the bottle stays with whoever poured it.
+            float input = Value(data, BatchCost(world, p.Key));
             float output = data.Items[p.Value.Output].Price * p.Value.Amount;
             return (Recipe: p.Key, Depth: Depth(data, p.Value.Output), Markup: output / input - 1);
         }).ToList();

@@ -24,6 +24,7 @@ public partial class Game {
             await CheckDragPlacesStackInExactSlotAndSortOrdersByName();
             await CheckClickMovesOneUnitAndCtrlClickMovesRemainingStack();
             await CheckPartialBottleIsRefusedByRecipeWithWarning();
+            await CheckWaterCupShakesWithoutAnEmptyBottleAndFillsOne();
             await CheckSkipToMorningOnlyForDownedPlayerWithoutCabin();
         } finally {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = 0, Pressed = false });
@@ -123,17 +124,37 @@ public partial class Game {
         Hosted.SetRecipe(table, "dough");
         await ClickOn(table); await Frames(3);
         await Click(BagCell(c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal)));
-        Require(waterWarning.Text == Water.FullBottleWarning, "Trying a partial bottle must show the full-bottle warning text.");
+        Require(waterWarning.Text == "Requires full water bottle", "Trying a partial bottle must show the full-bottle warning text.");
         Require(waterWarning.GetGlobalRect().Position.X < 50, "The full-bottle warning must sit at the left of the screen.");
         Require(waterWarning.Size.X > 300, "The full-bottle warning must be wide enough to read.");
         Require(waterWarning.Size.Y < 50, "The full-bottle warning must be a single short line.");
         Require(waterWarning.GetGlobalRect().End.Y < bag.GetGlobalRect().Position.Y, "The full-bottle warning must sit above the backpack.");
         var partial = BagCell(c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal));
-        await DragTo(partial, (Control)ui.FindChild("input_water", true, false));
+        await DragTo(partial, (Control)ui.FindChild($"input_{Water.Liquid}", true, false));
         Require(table.Inventory["water_2"] == 0, "A partial bottle dragged onto a water slot must not go in.");
         Require(world.Backpack["water_2"] == 1, "A partial bottle dragged onto a water slot must stay in the backpack.");
-        Require(waterWarning.Text == Water.FullBottleWarning, "A partial bottle dragged onto a water slot must warn.");
+        Require(waterWarning.Text == "Requires full water bottle", "A partial bottle dragged onto a water slot must warn.");
         await SurvivalReviewShot("water-warning");
+    }
+    /// <summary>A click on a station's water with no empty bottle in the backpack is refused, says why and shakes the cup; with one it fills the bottle.</summary>
+    private async Task CheckWaterCupShakesWithoutAnEmptyBottleAndFillsOne() {
+        await CloseWithEsc();
+        EmptyBackpack(Hosted); RemoveThings(Hosted, t => t.Kind == ThingKind.Cooktable);
+        var table = Hosted.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        Hosted.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 1);
+        await ClickOn(table); await Frames(3);
+        var cup = (Control)ui.FindChild($"input_{Water.Liquid}", true, false);
+        float rest = cup.Position.X;
+        await Click(cup); await Frames(3);
+        Require(cup.Position.X != rest, "A refused click on the water cup must shake it.");
+        Require(messages.Shown.ToArray().Contains("You need an empty bottle to take the water."), "A refused click on the water cup must say it needs an empty bottle.");
+        Require(table.Inventory[Water.Liquid] == 1 && world.Backpack.Count == 0, "Refused water must stay on the table.");
+        await Until(() => cup.Position.X == rest, "the water cup coming to rest", 2);
+        Give(Hosted, Water.Empty, 1); await Frames(2);
+        await Click(cup);
+        await Until(() => world.Backpack[Water.Full] == 1, "a click on the water cup filling the empty bottle", 2);
+        Require(table.Inventory[Water.Liquid] == 0 && world.Backpack[Water.Empty] == 0, "The water must leave the table in the bottle.");
+        RemoveThings(Hosted, t => t == table); EmptyBackpack(Hosted); await CloseWithEsc();
     }
     /// <summary>A downed player without a cabin may choose dawn; any cabin restores normal respawning.</summary>
     private async Task CheckSkipToMorningOnlyForDownedPlayerWithoutCabin() {

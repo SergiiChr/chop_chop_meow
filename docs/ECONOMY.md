@@ -35,7 +35,7 @@ All offers cost about the same over that time (24 to 26 coins).
 More up front means a lower wage, so a worker kept longer is cheaper, and the dearest wage needs nothing up front.
 
 Wages are paid at dawn from the trading posts' wage slots first, where sale coins land, and then from the backpack.
-The slot holds one stack (1000 coins); sale coins beyond it go to the market output and are not touched by wages.
+The slot has no limit, so every sale coin lands there.
 
 ### Output
 

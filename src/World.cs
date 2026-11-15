@@ -39,9 +39,9 @@ public sealed class Thing {
     public float Regrow { get; set; }
     /// <summary>The id of the tree that left a stump, whose species and size shape the stump; zero for a stump with no tree on record, which is shaped by its own id.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int OfTree { get; set; }
-    /// <summary>A signpost's market output: bought goods arrive here with the returning cart, and sale coins once <see cref="Wages"/> is full.</summary>
+    /// <summary>A signpost's market output: bought goods arrive here with the returning cart.</summary>
     public Inventory? Output { get; set; }
-    /// <summary>A signpost's one stack of coins for wages: sale coins land here first, and dawn wages come out of it before any backpack.</summary>
+    /// <summary>A signpost's coins for wages, with no limit: sale coins land here, and dawn wages come out of it before any backpack.</summary>
     public Inventory? Wages { get; set; }
     /// <summary>A fuel-burning station's one stack of fuel, apart from what it smelts or cooks; what it holds is what it burns.</summary>
     public Inventory? Burner { get; set; }
@@ -246,7 +246,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 9;
+    public int Version { get; set; } = 10;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -479,7 +479,7 @@ public sealed partial class World {
     public void NewGame() {
         S = new SaveState(); toolsChanged = true;
         S.Backpack.Add("steel_axe", 1); S.Backpack.Add("berries", 10); S.Backpack.Add("wood", 6);
-        S.Backpack.Add("empty_bottle", 1);
+        S.Backpack.Add(Water.Empty, 1);
         foreach (var pair in S.Backpack.Items) Got(pair.Key);
         var rng = new Random(4271);
         foreach (var cliff in Cliffs) {
@@ -639,7 +639,7 @@ public sealed partial class World {
         Player = Slide(Player, delta);
     }
     public string? GatherBlock(Thing t, bool worker = false) {
-        if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == "water") return "Your bottles are filled.";
+        if (t.Kind == ThingKind.Water && !worker && Water.FindBottle(S.Backpack) == Water.Full) return "Your bottles are filled.";
         if (t.Kind == ThingKind.Mine) return MineBuildBlock(t);
         if (t.Kind == ThingKind.Farm) return t.FarmStage switch { FarmStage.Ripe => null, FarmStage.Growing => "The wheat is not ripe yet.", _ => "Nothing grows here yet. Sow the plot with wheat seeds and fertilizer." };
         if (!t.IsResource) return "Select a natural resource.";
@@ -684,7 +684,7 @@ public sealed partial class World {
         gatherClock = 0;
         if (t.Kind == ThingKind.Water) {
             var result = Water.CollectWater(this, t);
-            if (result != WaterCollectResult.NoChange) { S.Milestones.Add("water"); Got("water"); Play("gather_water", Player); }
+            if (result != WaterCollectResult.NoChange) { S.Milestones.Add("water"); Got(Water.Full); Play("gather_water", Player); }
             return;
         }
         int amount = Math.Min(t.Remaining, t.Kind == ThingKind.WolfCorpse ? 2 : 4);
@@ -783,6 +783,8 @@ public sealed partial class World {
         if (!Reaches(t)) { Say("Walk closer first."); return false; }
         if (DismantleBlock(t) is string refused) { Say(refused); return false; }
         if (Forwarded(Verb.Dismantle, t.Id)) return true;
+        // Liquid fills the backpack's empty vessels, and the rest is spilled.
+        foreach (var box in Boxes(t)) if (box != null) PourOut(box);
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
         foreach (var box in Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
@@ -806,7 +808,7 @@ public sealed partial class World {
         }
         if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
         if (S.Backpack.Remove(item, 1) == 0) { Say($"No {def.Name} in your backpack."); return; }
-        S.Hunger = Math.Min(100, S.Hunger + def.Hunger); S.Thirst = Math.Min(100, S.Thirst + def.Thirst); S.Health = Math.Min(100, S.Health + def.Health);
+        S.Hunger = Math.Min(100, S.Hunger + def.Hunger); S.Thirst = Math.Min(100, S.Thirst + def.Thirst);
         if (def.Food) Play("eat_berry", Player);
     }
     public void Pump(Thing t) {
@@ -984,7 +986,7 @@ public sealed partial class World {
     /// </summary>
     private bool Blocked(Thing t, RecipeDef r) {
         foreach (var pair in t.Inventory.Items)
-            if (!Pending(t, pair.Key) && pair.Key != r.Output && !(pair.Key == "empty_bottle" && r.Inputs.ContainsKey("water"))) return true;
+            if (!Pending(t, pair.Key) && pair.Key != r.Output) return true;
         return false;
     }
     /// <summary>Whether a station takes an item from the player: an input of the recipe it is on or keeps to, or a fuel it burns.</summary>
@@ -1001,25 +1003,27 @@ public sealed partial class World {
         var r = Data.Recipes[recipe];
         string? fuel = null;
         if (r.Burns && (fuel = FuelFromBackpack(t, r, cost)) == null) return;
-        if (NeedsFullBottle(cost, S.Backpack)) { Say(Water.FullBottleWarning); return; }
+        if (ShortOfFullVessels(cost) is VesselDef partial) { Say(VesselWarning(partial)); return; }
         for (int i = 0; i < batches; i++) {
-            if (!S.Backpack.Has(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
+            if (!CarriesBatch(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
             if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
-            foreach (var pair in cost) S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
+            foreach (var pair in cost) Carry(S.Backpack, t.Inventory, t, Data.CarriedAs(pair.Key), pair.Value);
             if (fuel != null) S.Backpack.TransferTo(t.Burner!, fuel, 1);
         }
     }
     /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
     public int LoadInput(Thing t, string item, int quantity) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
-        if (PartialRecipeBottle(t, item)) { Say(Water.FullBottleWarning); return 0; }
+        if (NotFullVessel(t, item) is VesselDef partial) { Say(VesselWarning(partial)); return 0; }
         // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the ingredient slot, and the fuel slot is filled by dragging.
         if (!Pending(t, item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
         if (t.Kind == ThingKind.Packer && HoldBlock(t, item) is string refused) { Say(refused); return 0; }
-        if (t.Kind != ThingKind.Packer && !Pending(t, item)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
+        // A full vessel pours its liquid into the station's cup for it.
+        string lands = PoursInto(t, t.Inventory, item)?.Liquid ?? item;
+        if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
         if (Forwarded(Verb.LoadInput, t.Id, item: item, count: quantity)) return 0;
-        int moved = S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, t.Inventory.StackSize - t.Inventory[item]));
-        if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(item)} slot is full.");
+        int moved = Carry(S.Backpack, t.Inventory, t, item, Math.Min(quantity, t.Inventory.StackSize - t.Inventory[lands]));
+        if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(lands)} slot is full.");
         return moved;
     }
     /// <summary>Manual loading of the fuel slot, which holds one kind of fuel at a time.</summary>
@@ -1035,13 +1039,13 @@ public sealed partial class World {
     public void Collect(Thing t) {
         if (!Reaches(t)) { Say("Walk closer to collect items."); return; }
         if (Forwarded(Verb.Collect, t.Id)) return;
-        foreach (var item in Leftovers(t).ToArray()) t.Inventory.TransferTo(S.Backpack, item, 999);
+        foreach (var item in Leftovers(t).ToArray()) Carry(t.Inventory, S.Backpack, null, item, 999);
     }
     /// <summary>Finished goods plus anything neither the recipe the station is on nor the kept one takes.</summary>
     public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));
-    /// <summary>The first of a station's leftovers that some storage takes, and that storage.</summary>
+    /// <summary>The first of a station's leftovers that some storage takes, and that storage; liquid leaves in vessels instead (<see cref="LiquidToClear"/>).</summary>
     private (string Item, Thing Store)? LeftoverToStore(Thing t) {
-        foreach (var pair in t.Inventory.Items) if (!Pending(t, pair.Key) && DepositFor(pair.Key, t.Pos) is Thing store) return (pair.Key, store);
+        foreach (var pair in t.Inventory.Items) if (!Pending(t, pair.Key) && Data.VesselFor(pair.Key) == null && DepositFor(pair.Key, t.Pos) is Thing store) return (pair.Key, store);
         return null;
     }
     /// <summary>Steps inside a cabin, out of reach of wolves; any movement steps back out.</summary>
@@ -1054,6 +1058,13 @@ public sealed partial class World {
     /// <summary>Bedtime comes a little before night falls, so the player can turn in without waiting for the dark.</summary>
     public const int SleepHour = 22;
     public float SecondsToDawn => Data.DaySeconds - S.Time % Data.DaySeconds + 1;
+    /// <summary>Hunger and thirst both above this let sleep heal, at <see cref="SleepHeal"/> health a second.</summary>
+    public const float FedNeed = 45, SleepHeal = .12f;
+    /// <summary>The acting player's health after sleeping until dawn: sleep heals while hunger and thirst both stay above <see cref="FedNeed"/>.</summary>
+    public float HealthAtDawn() {
+        float fed = Math.Min(SecondsToDawn, Math.Min((S.Hunger - FedNeed) / Data.HungerPerSecond, (S.Thirst - FedNeed) / Data.ThirstPerSecond));
+        return Math.Min(100, S.Health + Math.Max(0, fed) * SleepHeal);
+    }
     /// <summary>Why sleeping is not possible now, or null; hunger and thirst must last until morning.</summary>
     public string? SleepBlock() {
         if (Hour is >= 6 and < SleepHour) return "You can only sleep after 10 pm.";
@@ -1226,13 +1237,13 @@ public sealed partial class World {
         foreach (var r in Data.Recipes.Values) if (r.Station == station && r.Fuels.Contains(item)) return true;
         return false;
     }
-    private static Inventory NewWageSlot() => new() { Slots = 1, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
+    private static Inventory NewWageSlot() => new() { Slots = 1, CoinStack = Inventory.UnlimitedCoins, InputFilter = { Inventory.Coins }, OutputFilter = { Inventory.Coins } };
     /// <summary>Why an item cannot go into this box by hand: a wage slot only holds coins.</summary>
     public string? BoxBlock(Thing t, Inventory box, string item) =>
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
         box == t.Output ? "Things only come out of here." :
-        box == t.Inventory ? (PartialRecipeBottle(t, item) ? Water.FullBottleWarning : HoldBlock(t, item)) : null;
+        box == t.Inventory ? (NotFullVessel(t, item) is VesselDef partial ? VesselWarning(partial) : HoldBlock(t, item)) : null;
     /// <summary>Whether a fuel slot takes an item now: a fuel that fits, and the same kind as what it holds.</summary>
     private bool FuelTakes(Thing t, string item) => FuelFits(t, item) && (t.Burner?.First() is not string held || held == item);
     /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
@@ -1404,17 +1415,12 @@ public sealed partial class World {
     // ---------- Crafting ----------
     /// <summary>Hand recipes for the personal crafting menu.</summary>
     public IEnumerable<string> HandRecipes => Data.Recipes.Where(p => p.Value.Hand).Select(p => p.Key);
-    private bool PartialRecipeBottle(Thing t, string item) => item != "water" && Water.IsBottle(item) && BatchCost(t).ContainsKey("water");
-    private static bool NeedsFullBottle(Dictionary<string, int> cost, Inventory bag) =>
-        cost.TryGetValue("water", out int needed) && bag["water"] < needed &&
-        (bag["water_2"] > 0 || bag["water_1"] > 0 || bag["empty_bottle"] > 0);
-    private enum CraftRefusal { None, StationOnly, Recovering, NoTool, NoInputs, QueueFull, FullBottle }
+    private enum CraftRefusal { None, StationOnly, Recovering, NoTool, NoInputs, QueueFull }
     /// <summary>The one place the hand-crafting rules live; <see cref="CanCraft"/> and <see cref="CraftBlock"/> both read it.</summary>
     private CraftRefusal CraftCheck(string recipe) {
         if (!Data.Recipes.TryGetValue(recipe, out var r) || !r.Hand) return CraftRefusal.StationOnly;
         if (Downed) return CraftRefusal.Recovering;
         if (r.Tool != "" && BestTool(r.Tool, null, r.Tier) == null) return CraftRefusal.NoTool;
-        if (NeedsFullBottle(r.Inputs, S.Backpack)) return CraftRefusal.FullBottle;
         if (!S.Backpack.Has(r.Inputs)) return CraftRefusal.NoInputs;
         return Waiting(Crafting, recipe) >= MaxQueued ? CraftRefusal.QueueFull : CraftRefusal.None;
     }
@@ -1422,7 +1428,6 @@ public sealed partial class World {
     public bool CanCraft(string recipe) => CraftCheck(recipe) == CraftRefusal.None;
     /// <summary>Why a recipe cannot be queued from the backpack now, or null.</summary>
     public string? CraftBlock(string recipe) => CraftCheck(recipe) switch {
-        CraftRefusal.FullBottle => Water.FullBottleWarning,
         CraftRefusal.StationOnly => "This can only be made at a station.",
         CraftRefusal.Recovering => "You are still recovering.",
         CraftRefusal.NoTool => $"Needs a {Data.ToolName(Data.Recipes[recipe].Tool, Data.Recipes[recipe].Tier)} in your backpack.",
@@ -1464,7 +1469,6 @@ public sealed partial class World {
         // A full backpack holds the finished item back rather than losing it.
         if (S.CraftTime < r.Seconds || S.Backpack.Room(r.Output) < r.Amount) return;
         S.Backpack.Add(r.Output, r.Amount); S.Making = ""; S.CraftTime = 0;
-        if (r.Inputs.TryGetValue("water", out int usedWater)) Give("empty_bottle", usedWater);
         Crafted(r.Output); Play(Sounds.ForItem(r.Output), Player);
     }
     private void Crafted(string output) {
@@ -1824,22 +1828,25 @@ public sealed partial class World {
         if (Lunch) { EatLunch(w, dt); return; }
         TidyDuties(w);
         var target = Find(w.Assignment);
-        if (target?.Kind == ThingKind.Water && w.Destination == target.Id && Water.FindBottle(w.Bag) is string bottle && bottle != "water") {
+        if (target?.Kind == ThingKind.Water && w.Destination == target.Id && Water.FindBottle(w.Bag) is string bottle && bottle != Water.Full) {
             WaterWork(w, target, dt); return;
         }
         if (w.Bag.Count > 0) {
             string item = w.Bag.First()!;
             var dest = Find(w.Destination);
+            if (FillsLeftover(w, dest, item, dt)) return;
             // Re-evaluate rules every tick, including filters changed while a worker is carrying goods.
             // A mine site takes only what it still needs, so a surplus goes back to storage.
             int wanted = dest?.Kind == ThingKind.Mine ? MineNeed(dest, item) : int.MaxValue;
             // Fuel for a station goes into its fuel slot; once that is full or gone, it goes to storage like anything else.
             var into = w.Fueling && dest?.Burner != null && FuelTakes(dest, item) ? dest.Burner : dest?.Inventory;
-            if (dest == null || into == null || wanted == 0 || into.Room(item) == 0 || !into.Accepts(item) || (dest.Id == target?.Id && target.IsResource)) { dest = DepositFor(item, w.Pos); into = dest?.Inventory; w.Fueling = false; }
+            // A full vessel for a station that takes its liquid pours it there.
+            string lands = into != null && PoursInto(dest, into, item) is VesselDef poured ? poured.Liquid : item;
+            if (dest == null || into == null || wanted == 0 || into.Room(lands) == 0 || !into.Accepts(lands) || (dest.Id == target?.Id && target.IsResource)) { dest = DepositFor(item, w.Pos); into = dest?.Inventory; w.Fueling = false; }
             if (dest == null) { w.Status = Phrase("Holding ", Data.Name(item), " · no accepting storage"); return; }
             w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
             if (Walk(w, dest.Pos, dt)) {
-                w.Bag.TransferTo(into!, item, dest.Kind == ThingKind.Mine ? MineNeed(dest, item) : w.Bag[item], true); w.Destination = 0;
+                Carry(w.Bag, into!, dest, item, dest.Kind == ThingKind.Mine ? MineNeed(dest, item) : w.Bag[item], true); w.Destination = 0;
                 if (w.Bag.Count == 0) { w.Fueling = false; w.Hands(Worker.BagStack); NextPlace(w); }
             }
             return;
@@ -1930,6 +1937,11 @@ public sealed partial class World {
                 if (Walk(w, target.Pos, dt)) { target.Inventory.TransferTo(w.Bag, leftover, w.Bag.StackSize, true); w.Destination = dest.Id; }
                 return true;
             }
+            if (LiquidToClear(target, w.Pos) is (VesselDef vessel, Thing empties)) {
+                w.Status = Phrase("Fetching ", Lower(Data.Name(vessel.Empty)), "s for leftover ", Lower(Data.Name(vessel.Liquid)));
+                if (Walk(w, empties.Pos, dt)) { empties.Inventory.TransferTo(w.Bag, vessel.Empty, target.Inventory[vessel.Liquid], true); w.Destination = target.Id; }
+                return true;
+            }
             if (!Data.Recipes.ContainsKey(target.Recipe)) { w.Status = Idle; return false; }
             // Fuel the recipe does not burn leaves the fuel slot, so the right one can go in.
             if (!target.Processing && Fuels(target).Count > 0 && FuelOf(target) == null && target.Burner!.First() is string stale && DepositFor(stale, target.Pos) is Thing store) {
@@ -1942,10 +1954,12 @@ public sealed partial class World {
             bool fetches = !Worked(target) || !target.Processing || !HasDuty(w, target.Id, "craft");
             if (fetches) foreach (var pair in costs) {
                 if (target.Inventory[pair.Key] >= pair.Value * 2) continue;
-                var source = SourceFor(pair.Key, w.Pos);
+                // A liquid comes in the full vessels that pour it.
+                string carried = Data.CarriedAs(pair.Key);
+                var source = SourceFor(carried, w.Pos);
                 if (source == null) continue;
-                w.Status = Phrase("Fetching ", Data.Name(pair.Key));
-                if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, pair.Key, pair.Value * 2 - target.Inventory[pair.Key], true); w.Destination = target.Id; }
+                w.Status = Phrase("Fetching ", Data.Name(carried));
+                if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, carried, pair.Value * 2 - target.Inventory[pair.Key], true); w.Destination = target.Id; }
                 return true;
             }
             // Then two batches' worth of fuel for the fuel slot.
@@ -2208,7 +2222,7 @@ public sealed partial class World {
         // A wolf whose player left the game goes back to patrolling.
         foreach (var wolf in S.Wolves) if (wolf.Target != 0 && PlayerById(wolf.Target) == null) Patrol(wolf, wolf.Heading);
         acting.Clear(); acting.AddRange(S.Players);
-        foreach (var p in acting) using (ActAs(p)) NeedsTick(dt);
+        foreach (var p in acting) using (ActAs(p)) NeedsTick(dt, sleeping);
         if (Day > S.WageDay) {
             // Workers on strike are not charged, so their wage does not count against the day.
             int wages = S.Workers.Where(w => w.WageDebt <= 0).Sum(w => w.Wage);
@@ -2300,7 +2314,6 @@ public sealed partial class World {
         if (!t.Processing && hot && atAnvil && Stocked(t)) {
             t.Inventory.Spend(BatchCost(t)); t.Making = t.Recipe; t.Processing = true; t.Progress = 0;
             if (t.Batches > 0) t.Batches--;
-            if (recipe.Inputs.TryGetValue("water", out int usedWater)) t.Inventory.Add("empty_bottle", usedWater);
             if (FuelOf(t) is string fuel) t.Burner!.Remove(fuel, 1);
             if (recipe.Burns && !wasBurning) Play("start_fire", t.Pos);
         }
@@ -2335,15 +2348,18 @@ public sealed partial class World {
         foreach (var w in S.Workers) if (w.Assignment == t.Id && HasDuty(w, t.Id, "bellows") && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w)) return true;
         return false;
     }
-    /// <summary>The acting player's clocks, hunger and thirst, and the torch in hand; a remote player's held gather also runs here.</summary>
-    private void NeedsTick(float dt) {
+    /// <summary>
+    /// The acting player's clocks, hunger and thirst, and the torch in hand; a remote player's held gather also runs here.
+    /// Health comes back only while asleep with hunger and thirst both above <see cref="FedNeed"/>.
+    /// </summary>
+    private void NeedsTick(float dt, bool sleeping) {
         attackClock = Math.Max(0, attackClock - dt);
         if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
             float drain = S.Actor.Sprinting ? Data.SprintDrain : 1;
             S.Hunger = Math.Max(0, S.Hunger - dt * drain * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * drain * Data.ThirstPerSecond);
             if (S.Hunger <= 0 || S.Thirst <= 0) S.Health -= dt * 1.4f;
-            else if (S.Hunger > 45 && S.Thirst > 45) S.Health = Math.Min(100, S.Health + dt * .12f);
+            else if (sleeping && S.Hunger > FedNeed && S.Thirst > FedNeed) S.Health = Math.Min(100, S.Health + dt * SleepHeal);
         }
         TorchFlare = Math.Max(0, TorchFlare - dt);
         if (S.TorchKindling > 0 && (S.TorchKindling -= dt) <= 0) {
