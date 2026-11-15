@@ -53,6 +53,11 @@ public static class AllocationChecks {
         // The measured runs cross dusk, so the dens stay shut: wolves coming out are not packing.
         Check("tick: packing for the post", () => { ShutDens(packing); packing.Tick(1 / 60f); Fed(packing); stock.Inventory.Add("berries", 64 - stock.Inventory["berries"]); stock.Inventory.Add("crate", 64 - stock.Inventory["crate"]); }, maxBytesPerRun: 1, warmup: 12000, runs: 6000);
 
+        var kitchen = WaterKitchen(data, out var pantry);
+        // Bottles go round: poured into the table, carried back to the pile, refilled at the lake; the pile keeps its filters for every fill.
+        Check("tick: cooking with water bottles", () => { kitchen.Tick(1 / 60f); Fed(kitchen); pantry.Inventory.Add("raw_meat", 64 - pantry.Inventory["raw_meat"]); pantry.Inventory.Add("wood", 64 - pantry.Inventory["wood"]); }, warmup: 2400, runs: 3000);
+        Require(kitchen.Things.Sum(t => t.Inventory["meat_stew"]) > 0 && kitchen.Workers.All(w => !w.Status.Contains("no accepting storage")), "the water kitchen should cook stew from poured water and store its bottles");
+
         var mine = WorkingMine(data, out var shaft);
         // Emptying the output each tick keeps the crew digging underground instead of hauling.
         Check("tick: miners underground", () => { mine.Tick(1 / 60f); Fed(mine); shaft.Output!.Clear(); }, warmup: 1200);

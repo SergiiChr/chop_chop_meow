@@ -167,6 +167,7 @@ How they are framed:
 `ui/` holds hand-written SVG icons:
 
 - Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, guide, close, filter, stash, trash and so on), tinted in code.
+- `fresh_water.svg`, the water a full bottle pours into a station: a blue droplet in the shape of the corner's thirst icon, used as the item icon since only stations hold it and it has no model.
 
 ## Fonts
 

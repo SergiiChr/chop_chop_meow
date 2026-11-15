@@ -38,11 +38,10 @@ public partial class NeedGauge : Control {
     }
 }
 
-/// <summary>A cream capsule that fills from the bottom with a need's level; faded, it shows a level to come.</summary>
+/// <summary>A cream capsule that fills from the bottom with a need's level.</summary>
 public partial class Vial : Control {
     public Color Fill { get; set; }
     public float Level { get; set; } = 100;
-    public bool Faded { get; set; }
     /// <summary>Rims the capsule in brick: the level runs out.</summary>
     public bool Warn { get; set; }
 
@@ -52,7 +51,7 @@ public partial class Vial : Control {
         var rect = new Rect2(Vector2.Zero, Size);
         DrawStyleBox(Warn ? WarnBox : Box, rect);
         float inner = Size.Y - 6, height = inner * Math.Clamp(Level, 0, 100) / 100;
-        if (height > 1) DrawStyleBox(FillBox(Faded ? Fill with { A = .55f } : Fill), new Rect2(3, 3 + inner - height, Size.X - 6, height));
+        if (height > 1) DrawStyleBox(FillBox(Fill), new Rect2(3, 3 + inner - height, Size.X - 6, height));
     }
 
     private static readonly StyleBoxFlat Box = Round(Style.CupFill, Style.Line), WarnBox = Round(Style.CupFill, Style.Brick);
@@ -67,6 +66,20 @@ public partial class Vial : Control {
         if (!fills.TryGetValue(color, out var box)) { fills[color] = box = new StyleBoxFlat { BgColor = color, AntiAliasing = true }; box.SetCornerRadiusAll(8); }
         return box;
     }
+}
+
+/// <summary>A need's capsule with its icon under it, as the corner plate and the cabin show it.</summary>
+public partial class NeedColumn : VBoxContainer {
+    public Vial Vial { get; }
+
+    private NeedColumn(string name, Vector2[] shape, Color color) {
+        AddThemeConstantOverride("separation", 6);
+        Vial = new Vial { Name = name, Fill = color, SizeFlagsHorizontal = SizeFlags.ShrinkCenter }; AddChild(Vial);
+        AddChild(new NeedGauge { Shape = shape, Fill = color, CustomMinimumSize = new Vector2(22, 20), MouseFilter = MouseFilterEnum.Ignore });
+    }
+
+    /// <summary>Health, hunger and thirst, in that order.</summary>
+    public static NeedColumn[] All() => [new("health", NeedGauge.Heart, Style.Brick), new("hunger", NeedGauge.Stomach, Style.Mustard), new("thirst", NeedGauge.Droplet, Style.Sky)];
 }
 
 /// <summary>
@@ -90,16 +103,9 @@ public partial class NeedsPlate : PanelContainer {
         OffsetLeft = 20; OffsetTop = 18;
         AddThemeStyleboxOverride("panel", Style.Plate);
         var row = new HBoxContainer(); row.AddThemeConstantOverride("separation", 14); AddChild(row);
-        Vial Need(string name, Vector2[] shape, Color color) {
-            var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 6); row.AddChild(column);
-            var vial = new Vial { Name = name, Fill = color }; vial.SizeFlagsHorizontal = SizeFlags.ShrinkCenter; column.AddChild(vial);
-            var icon = new NeedGauge { Shape = shape, Fill = color, CustomMinimumSize = new Vector2(22, 20), MouseFilter = MouseFilterEnum.Ignore };
-            column.AddChild(icon);
-            return vial;
-        }
-        Health = Need("health", NeedGauge.Heart, Style.Brick);
-        Hunger = Need("hunger", NeedGauge.Stomach, Style.Mustard);
-        Thirst = Need("thirst", NeedGauge.Droplet, Style.Sky);
+        var needs = NeedColumn.All();
+        foreach (var need in needs) row.AddChild(need);
+        (Health, Hunger, Thirst) = (needs[0].Vial, needs[1].Vial, needs[2].Vial);
         row.AddChild(new ColorRect { Color = new Color(Style.Beige, .7f), CustomMinimumSize = new Vector2(3, 0) });
         var bank = new VBoxContainer(); bank.AddThemeConstantOverride("separation", 8); row.AddChild(bank);
         bank.AddChild(Style.Heading("Bank", 13));
@@ -108,7 +114,7 @@ public partial class NeedsPlate : PanelContainer {
         bankCup = cup; bankCount = count;
         Style.Skin(cup, Style.CupBank, Style.Round(Style.CupFill, 28).Item2);
         cup.Icon = Icons.Of(Inventory.Coins);
-        cup.TooltipText = "Coins kept at the trading posts for wages; sales land here first.\nDrop coins here at a trading post to bank them · click to take some out";
+        cup.TooltipText = "Coins kept at the trading posts for wages; sales land here.\nDrop coins here at a trading post to bank them · click to take some out";
         cup.CanTake = drag => drag.Item == Inventory.Coins && drag.From == world.S.Backpack;
         cup.Take = drag => {
             if (NearPost() is not Thing post) { kit.Notify("Bank coins at a trading post."); return drag.Count; }

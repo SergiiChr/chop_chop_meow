@@ -89,10 +89,15 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
     /// <summary>A cup for one input or output of a station, which takes a backpack stack dragged on as an input.</summary>
     public VBoxContainer StationCup(string item, bool input, string perBatch, float size = 52) {
         var box = t.Inventory;
-        string hint = input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";
+        var vessel = world.Data.VesselFor(item);
+        string bottle = vessel != null ? world.Lower(world.Data.Name(vessel.Full)) : "";
+        string hint = vessel != null
+            ? input ? $"Click: take back into a {bottle} · Drag a {bottle} here to pour what it holds" : $"Click: take back into a {bottle}"
+            : input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";
         var cell = Cup(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size);
         if (input) {
-            cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || item == "water" && Water.IsBottle(drag.Item));
+            // A liquid's cup takes the vessels that hold some of it, at any fill.
+            cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || vessel != null && vessel.LitersIn(drag.Item) > 0);
             cell.Take = drag => {
                 int left = world.Reaches(t) ? ItemMoves.Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
                 kit.Run(() => world.LoadInput(t, drag.Item, drag.Count)); return drag.Item == item ? left : 0;

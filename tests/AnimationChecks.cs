@@ -6,7 +6,11 @@ using static Checks;
 
 /// <summary>Focused checks for deterministic actor animation selection and timing.</summary>
 public static class AnimationChecks {
-    public static void Run() {
+    /// <summary>The game's tables, which say what a station's recipe needs done at it.</summary>
+    private static GameData data = null!;
+
+    public static void Run(GameData gameData) {
+        data = gameData;
         CheckActionsLoopAndWrapByTheirDuration();
         CheckActorsTurnToFaceTheirMovement();
         CheckPlayerActionFollowsToolAndTarget();
@@ -211,9 +215,9 @@ public static class AnimationChecks {
         var worker = new Worker();
         worker.Bag.Add("wood", 2);
         worker.Status = "Carrying wood → chest";
-        Require(ActorAnimation.WorkerAction(worker, null, true) == ActorAction.Carry,
+        Require(ActorAnimation.WorkerAction(worker, null, true, data) == ActorAction.Carry,
             "a worker hauling a load while moving should retain the carry action");
-        Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Carry,
+        Require(ActorAnimation.WorkerAction(worker, null, false, data) == ActorAction.Carry,
             "a worker holding a load while stationary should use carry pose");
     }
 
@@ -221,18 +225,20 @@ public static class AnimationChecks {
         var worker = new Worker();
         worker.Status = "Text can vary";
         worker.WorkState = WorkerWorkState.Pumping;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Reinforced }, false) == ActorAction.Pump,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Reinforced }, false, data) == ActorAction.Pump,
             "bellows work state should select pumping animation");
         worker.Status = "Different text";
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Reinforced }, false) == ActorAction.Pump,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Reinforced }, false, data) == ActorAction.Pump,
             "rewording status should not change the pumping animation");
 
         worker.Status = "Station status text";
         worker.WorkState = WorkerWorkState.Hammering;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Hammer,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false, data) == ActorAction.Hammer,
             "anvil work should select hammering animation");
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Cooktable }, false) == ActorAction.Grind,
-            "cooking table work should select grinding with the mortar, not hammering");
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Cooktable, Keep = "flour" }, false, data) == ActorAction.Grind,
+            "grinding flour at the cooking table should select grinding with the mortar, not hammering");
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Cooktable, Keep = "dough" }, false, data) == ActorAction.Pack,
+            "kneading dough at the cooking table should work it by hand as goods are packed");
     }
 
     private static void CheckStrikingWorkerProtestsUntilWalking() {
@@ -240,10 +246,10 @@ public static class AnimationChecks {
         worker.Status = "On strike · wages owed";
         worker.WorkState = WorkerWorkState.Idle;
         worker.WageDebt = worker.Wage;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Protest
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false, data) == ActorAction.Protest
                 && ActorAnimation.Tool(ActorAction.Protest) == "protest_sign",
             "striking workers should stand holding the protest sign instead of working");
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true) == ActorAction.Walk,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true, data) == ActorAction.Walk,
             "a striking worker heading home should walk, not protest");
     }
 
@@ -251,21 +257,21 @@ public static class AnimationChecks {
         var worker = new Worker();
         worker.Status = "Gathering wood";
         worker.WorkState = WorkerWorkState.Blocked;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Tree }, false) == ActorAction.Idle,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Tree }, false, data) == ActorAction.Idle,
             "waiting workers should not swing tools just because they have an assignment");
 
         worker.Status = "Arbitrary status";
         worker.WorkState = WorkerWorkState.Gathering;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Tree }, false) == ActorAction.Chop,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Tree }, false, data) == ActorAction.Chop,
             "workers gathering trees should chop");
         worker.Status = "Arbitrary status";
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Iron }, false) == ActorAction.Mine,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Iron }, false, data) == ActorAction.Mine,
             "workers gathering iron should mine");
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Stump }, false) == ActorAction.Dig && ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Bush }, false) == ActorAction.Dig,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Stump }, false, data) == ActorAction.Dig && ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Bush }, false, data) == ActorAction.Dig,
             "workers at a stump or a bush should dig");
         worker.Status = "Available";
         worker.WorkState = WorkerWorkState.Idle;
-        Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Idle,
+        Require(ActorAnimation.WorkerAction(worker, null, false, data) == ActorAction.Idle,
             "available workers should remain idle");
     }
 
@@ -273,13 +279,13 @@ public static class AnimationChecks {
         var worker = new Worker();
         worker.WorkState = WorkerWorkState.Resting;
         worker.Bag.Add("wood", 2);
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false) == ActorAction.Perch,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, false, data) == ActorAction.Perch,
             "a worker at lunch should sit, even holding a load");
         worker.Id = 1;
-        Require(ActorAnimation.WorkerAction(worker, null, false) == ActorAction.Sit,
+        Require(ActorAnimation.WorkerAction(worker, null, false, data) == ActorAction.Sit,
             "every other worker should sit cross-legged on the ground rather than on a rock");
         worker.Id = 0;
-        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true) == ActorAction.Carry,
+        Require(ActorAnimation.WorkerAction(worker, new Thing { Kind = ThingKind.Anvil }, true, data) == ActorAction.Carry,
             "a worker still walking to lunch should not sit");
     }
 
