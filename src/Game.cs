@@ -83,7 +83,6 @@ public partial class Game : Node, IGameFlow {
             saves = new Saves(kit, net, this);
             world.Sound = PlayWorldSound;
             ConnectNet();
-            sounds.OffScreen = view.OffScreen;
             layer = new CanvasLayer(); AddChild(layer);
             ui = new Control { Name = "Interface", MouseFilter = Control.MouseFilterEnum.Ignore }; layer.AddChild(ui);
             ui.Theme = Style.Interface();
@@ -122,8 +121,7 @@ public partial class Game : Node, IGameFlow {
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
-    // A wolf breaks into its sprint some way off, so its growl carries further off screen than other sounds.
-    private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
+    private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at);
     private void BuildHud() {
         moves = new ItemMoves(kit, blackHole);
         panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;

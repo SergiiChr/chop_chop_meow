@@ -13,10 +13,10 @@ namespace ChopChopMeow;
 /// </summary>
 public partial class Sounds : Node {
     private const string Folder = "res://assets/sounds";
-    // Audibility follows the camera, so zooming out lets the player hear further.
-    // On-screen sounds play at full volume; past the screen edge they drop to a faint level and fade out over the play's reach.
-    private const float EdgeVolume = .3f;
-    public const float Reach = 5;
+    // A sound with a world position is loudest at the player and fades to silence this many metres away, whatever the zoom.
+    private const float Reach = 16;
+    // A sound this close to the player plays with no place, so it stays centred while they walk on.
+    private const float OwnSpot = 1;
     // Variants share a loudness, and these levels set each sound's place in the mix: quiet steps, then impacts and handling, then alerts.
     private static readonly Dictionary<string, float> Levels = new() {
         ["footsteps_default"] = -13,
@@ -52,6 +52,7 @@ public partial class Sounds : Node {
         ["pickup_gold"] = -10,
         ["putting_items_on_hotbar"] = -3,
         ["eat_berry"] = -7.5f,
+        ["stomach_growl"] = -8,
         ["gather_water"] = -10,
         ["start_fire"] = -8,
         ["torch_out"] = -16,
@@ -72,8 +73,6 @@ public partial class Sounds : Node {
     private readonly Dictionary<string, int> previous = new();
     private Random random = new();
     public World World = null!;
-    /// <summary>How many tiles a world position lies outside the visible screen; zero when on screen.</summary>
-    public Func<Vector2, float> OffScreen = _ => 0;
     /// <summary>Counts every sound started, so a caller can tell whether an action already made one.</summary>
     public int Played { get; private set; }
     public string Last { get; private set; } = "";
@@ -97,7 +96,7 @@ public partial class Sounds : Node {
     // Players made while loading and reused in turn, so a sound instantiates nothing mid-game.
     private readonly List<AudioStreamPlayer> voices = new();
     // A sound with a world position plays from there and pans with its place on screen.
-    // Distance is left to the existing on-screen rule, so these players neither fade nor muffle with distance themselves.
+    // Play sets its volume by its distance from the player, so these players neither fade nor muffle with distance themselves.
     private readonly List<AudioStreamPlayer3D> placedVoices = new();
     private const int VoiceCount = 24;
     private int nextVoice, nextPlacedVoice;
@@ -133,43 +132,50 @@ public partial class Sounds : Node {
         _ => "moving_leather_in_inventory"
     };
 
-    // A howl carries across the valley: it fades with distance from the player, on screen too, and falls silent where wolves stop hearing it.
-    private static bool Carries(string name) => name is "wolf_howl" or "wolf_howl_group";
+    private static bool IsHowl(string name) => name is "wolf_howl" or "wolf_howl_group";
+    /// <summary>
+    /// Metres from the player at which a sound falls silent.
+    /// A howl carries across the valley, to where wolves stop hearing it.
+    /// A wolf's growl as it breaks into its sprint carries twice as far as the wolf sees, so it plays at a quarter of its volume from where the sprint starts.
+    /// </summary>
+    private float ReachOf(string name) => IsHowl(name) ? World.Data.HowlRadius : name == "wolf_growl_distance" ? 2 * World.Data.WolfSightRange : Reach;
     // A howl keeps its pitch, so it lasts exactly as long as the wolf holds its howl, and the mortar's, so its tap lands as the pestle comes down.
-    private static bool KeepsPitch(string name) => Carries(name) || name == "grind_mortar";
+    private static bool KeepsPitch(string name) => IsHowl(name) || name == "grind_mortar";
     /// <summary>The volume scale of the last sound started, from one at full volume.</summary>
     public float LastFade { get; private set; }
+    /// <summary>Whether the last sound started plays from a place in the world, panning with it.</summary>
+    public bool LastPlaced { get; private set; }
     /// <summary>Seconds the longest variant of a sound plays.</summary>
     public double Length(string name) => Variants(name).Max(stream => stream.GetLength());
 
     /// <summary>
-    /// Plays a sound; one with a world position pans with its place on screen.
-    /// A howl fades with distance from the player; any other placed sound is faint off screen and silent beyond <paramref name="reach"/> tiles past the screen edge.
+    /// Plays a sound; one with a world position fades with its distance from the player, to silence at its reach.
+    /// It pans with its place on screen, unless it is at the player's own spot.
     /// A <paramref name="pitch"/> below one plays it lower and slower, as from something bigger.
     /// </summary>
-    public void Play(string name, Vector2? at = null, float reach = Reach, float pitch = 1) {
+    public void Play(string name, Vector2? at = null, float pitch = 1) {
         var streams = Variants(name);
         if (streams.Length == 0 || silenced) return;
-        float fade = at is not Vector2 p ? 1
-            : Carries(name) ? MathF.Pow(1 - Math.Min(1, World.Player.DistanceTo(p) / World.Data.HowlRadius), 2)
-            : OffScreen(p) is var outside && outside <= 0 ? 1 : EdgeVolume * MathF.Pow(1 - Math.Min(1, outside / reach), 2);
+        var place = at ?? World.Player;
+        float away = World.Player.DistanceTo(place), fade = MathF.Pow(1 - Math.Min(1, away / ReachOf(name)), 2);
+        bool placed = away > OwnSpot;
         if (fade <= 0) return;
         int pick = random.Next(streams.Length - (streams.Length > 1 && previous.ContainsKey(name) ? 1 : 0));
         if (previous.TryGetValue(name, out int last) && streams.Length > 1 && pick >= last) pick++;
         previous[name] = pick;
         if (!KeepsPitch(name)) pitch *= 1 + (float)(random.NextDouble() * .12 - .06);
         float volume = Levels.GetValueOrDefault(name) + Mathf.LinearToDb(fade) - (float)random.NextDouble() * 1.5f;
-        if (at is Vector2 place) {
-            var placed = FreeVoice(placedVoices, ref nextPlacedVoice, static voice => voice.Playing);
-            placed.Position = new Vector3(place.X, 0, place.Y);
-            placed.Stream = streams[pick]; placed.PitchScale = pitch; placed.VolumeDb = volume;
-            placed.Play();
+        if (placed) {
+            var source = FreeVoice(placedVoices, ref nextPlacedVoice, static voice => voice.Playing);
+            source.Position = new Vector3(place.X, 0, place.Y);
+            source.Stream = streams[pick]; source.PitchScale = pitch; source.VolumeDb = volume;
+            source.Play();
         } else {
             var player = FreeVoice(voices, ref nextVoice, static voice => voice.Playing);
             player.Stream = streams[pick]; player.PitchScale = pitch; player.VolumeDb = volume;
             player.Play();
         }
-        Played++; Last = name; LastFade = fade;
+        Played++; Last = name; LastFade = fade; LastPlaced = placed;
     }
 
     /// <summary>The next idle player in turn; with all of them busy, the next in turn is cut off.</summary>
