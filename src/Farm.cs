@@ -52,7 +52,10 @@ public sealed partial class World {
         return true;
     }
 
-    /// <summary>A farmer harvests ripe wheat; each finished harvest is a round. A harvest the plot's output has no room for waits for a hauler.</summary>
+    /// <summary>
+    /// A farmer harvests ripe wheat; each finished harvest is a round.
+    /// A harvest the plot's output has no room for waits for a hauler.
+    /// </summary>
     private bool Reap(Worker w, Thing farm, float dt) {
         if (farm.FarmStage != FarmStage.Ripe) { w.Status = "Waiting for the wheat to grow"; return false; }
         if (farm.Progress >= HarvestSeconds && !YieldFits(farm)) { w.Status = "Harvest waiting for room on the plot"; return false; }

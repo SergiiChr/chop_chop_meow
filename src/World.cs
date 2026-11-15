@@ -1640,7 +1640,8 @@ public sealed partial class World {
     }
     /// <summary>
     /// Moves one of a worker's jobs to another place in their list, which is the order the jobs come first in.
-    /// A haul group moves with its hauls. A haul moved into a group joins it; a job moved anywhere else stands on its own.
+    /// A haul group moves with its hauls.
+    /// A haul moved into a group joins it; a job moved anywhere else stands on its own.
     /// </summary>
     /// <param name="index">The job's place in <see cref="Worker.Duties"/>.</param>
     /// <param name="before">The entry it goes in front of, or the list's length for the end.</param>
@@ -2044,7 +2045,7 @@ public sealed partial class World {
     }
     private static bool Crowds(Worker w) => !w.Home && w.Commute == 0 && w.Away == 0 && w.WorkState != WorkerWorkState.Underground;
     private void WaitAtPost(Worker w, float dt) => Walk(w, Nearest(ThingKind.Signpost, w.Pos)?.Pos + Vector2.One ?? Terrain.Spawn, dt);
-    /// <summary>Drops jobs at places that are gone, other than gather jobs, saying so when that leaves the worker without a job, and points the worker at a place they still have a job at.</summary>
+    /// <summary>Drops jobs at places that are gone, other than gather jobs and haul groups, saying so when that leaves the worker without a job.</summary>
     private void TidyDuties(Worker w) {
         bool had = w.Duties.Count > 0;
         for (int i = w.Duties.Count - 1; i >= 0; i--) if (w.Duties[i].Kind == null && w.Duties[i].Job != HaulGroup && Find(w.Duties[i].Thing) == null) w.Duties.RemoveAt(i);
@@ -2554,8 +2555,22 @@ public sealed partial class World {
             if (t.Batches > 0 && t.Keep != "" && t.Keep != t.Asked) return false;
         }
         foreach (var w in save.Workers)
-            if (w?.Duties == null || !ValidInventory(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates)) return false;
+            if (w?.Duties == null || !ValidGroups(w.Duties) || !ValidInventory(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates)) return false;
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
+        return true;
+    }
+    /// <summary>Whether a worker's haul groups fit together: each has one entry of its own, and only hauls directly after it carry its number.</summary>
+    private static bool ValidGroups(List<Duty> duties) {
+        var groups = new HashSet<int>();
+        int open = 0;
+        foreach (var d in duties) {
+            if (d?.Job == null) return false;
+            if (d.Job == HaulGroup) {
+                if (d.Group <= 0 || !groups.Add(d.Group)) return false;
+                open = d.Group;
+            } else if (d.Group == 0) open = 0;
+            else if (d.Job != "haul" || d.Group != open) return false;
+        }
         return true;
     }
     /// <summary>Empties the hotbar slots that name nothing the game knows or the player carries, such as a packed crate since sold.</summary>

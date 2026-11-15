@@ -173,6 +173,8 @@ public partial class JobList(UiKit kit, LiveUpdates live, Worker w) : VBoxContai
 
     public override void _Input(InputEvent ev) {
         if (dragged < 0) return;
+        // The list can lose a job while one is lifted, such as one at a building taken down; the rows are then out of date until the page is drawn again.
+        if (dragged >= w.Duties.Count) { EndDrag(); return; }
         if (ev is InputEventMouseMotion motion) MoveDrag(OnCanvas(motion));
         else if (ev is InputEventMouseButton { ButtonIndex: MouseButton.Left, Pressed: false } release) {
             MoveDrag(OnCanvas(release));

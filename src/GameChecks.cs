@@ -263,24 +263,6 @@ public partial class Game {
         await Frames();
     }
 
-    /// <summary>A bench with a worker on Craft and Haul there, whose page is open; the worker owes wages, so they stand still for the check.</summary>
-    private async Task<(Thing Bench, Worker Worker)> OpenBenchWorkerPage() {
-        await CloseWithEsc();
-        var bench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-2, 0));
-        Hosted.SetRecipe(bench, "planks");
-        var worker = AddWorker(Hosted, world.Player + Vector2.One); Hosted.Assign(worker, bench);
-        worker.WageDebt = 5;
-        await KeyStroke(Key.H); await Click(Named($"crew_{worker.Id}")!);
-        await Until(() => OnPage("job_1") != null, "the worker's page listing both jobs", 2);
-        return (bench, worker);
-    }
-
-    private async Task CloseWorkerPage(Thing bench, Worker worker) {
-        await CloseWithEsc();
-        Hosted.Fire(worker); RemoveThings(Hosted, t => t == bench || t.Kind == ThingKind.Grave);
-        await Frames();
-    }
-
     private async Task CheckWorkerPageShowsWhatEachPlaceIsSetToMake() {
         var (bench, worker) = await OpenBenchWorkerPage();
         Texture2D? Made() => OnPage($"made_{bench.Id}") is { Visible: true } cup ? cup.GetChild<TextureRect>(0).Texture : null;

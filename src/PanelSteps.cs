@@ -6,7 +6,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Finds controls on screen for the UI and network checks.</summary>
+/// <summary>Finds controls on screen and opens pages for the UI and network checks.</summary>
 public partial class Game {
     private Button? FindButton(Node parent, string text) {
         foreach (var child in parent.GetChildren()) {
@@ -71,4 +71,23 @@ public partial class Game {
     private bool Shows(Thing thing) => ShownPage() == world.Data.Name(thing.Kind) && view.Selection.Thing == thing.Id;
 
     private IEnumerable<Button> Slots() => panel.FindChildren("slot_*", "Button", true, false).Concat(bag.FindChildren("slot_*", "Button", true, false)).OfType<Button>();
+
+    /// <summary>A bench with a worker on Craft and Haul there, whose page is open; the worker owes wages, so they stand still for the check.</summary>
+    private async Task<(Thing Bench, Worker Worker)> OpenBenchWorkerPage() {
+        await CloseWithEsc();
+        var bench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-2, 0));
+        Hosted.SetRecipe(bench, "planks");
+        var worker = SetupSteps.AddWorker(Hosted, world.Player + Vector2.One); Hosted.Assign(worker, bench);
+        worker.WageDebt = 5;
+        await KeyStroke(Key.H); await Click(Named($"crew_{worker.Id}")!);
+        await Until(() => OnPage("job_1") != null, "the worker's page listing both jobs", 2);
+        return (bench, worker);
+    }
+
+    /// <summary>Closes the page <see cref="OpenBenchWorkerPage"/> opened and takes its bench and worker out of the world.</summary>
+    private async Task CloseWorkerPage(Thing bench, Worker worker) {
+        await CloseWithEsc();
+        Hosted.Fire(worker); SetupSteps.RemoveThings(Hosted, t => t == bench || t.Kind == ThingKind.Grave);
+        await Frames();
+    }
 }

@@ -68,8 +68,8 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
         for (int i = 0; i < w.Duties.Count; i++) {
             var d = w.Duties[i];
             if (d.Job == World.HaulGroup) {
-                var places = w.Duties.Skip(i + 1).TakeWhile(h => World.Grouped(h) && h.Group == d.Group).Select(h => world.DutyPlace(w, h.Thing)).OfType<Thing>().ToList();
-                chips.AddChild(GroupChip(++number, places)); i += places.Count;
+                var hauls = w.Duties.Skip(i + 1).TakeWhile(h => World.Grouped(h) && h.Group == d.Group).ToList();
+                chips.AddChild(GroupChip(++number, hauls.Select(h => world.DutyPlace(w, h.Thing)).OfType<Thing>().ToList())); i += hauls.Count;
             } else if (world.DutyPlace(w, d.Thing) is Thing at) chips.AddChild(DutyChip(++number, at, d.Job));
         }
         if (number == 0) chips.AddChild(Style.Pill("No jobs", Style.Tag(Style.Tan), Style.Rim, 12));

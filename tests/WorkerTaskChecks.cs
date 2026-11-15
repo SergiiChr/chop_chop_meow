@@ -23,6 +23,9 @@ public static class WorkerTaskChecks {
         CheckFuelGoesStraightIntoAFuelSlotThatBurnsIt(data);
         CheckBellowsWorkerStopsWhenThereIsNothingToSmelt(data);
         CheckWorkerWithNothingToDoWaitsAtTheTradingPost(data);
+        CheckGathererWithNoRoomToPutBackTheWrongToolKeepsTheirSpot(data);
+        CheckWorkerPutsBackAToolNoneOfTheirJobsUses(data);
+        CheckSaveWithAHaulOutsideItsGroupIsRefused(data);
         CheckAJobMovedUpComesFirst(data);
         CheckAHaulGroupBringsTheShortestInputAcrossItsPlaces(data);
         CheckAHaulGroupTakesOutTheBiggestOutputAcrossItsPlaces(data);
@@ -207,6 +210,23 @@ public static class WorkerTaskChecks {
         Require(crafter.Status.Contains("wood", System.StringComparison.OrdinalIgnoreCase), $"a waiting worker's status should say what their first job lacks, not \"{crafter.Status}\"");
     }
 
+    /// <summary>The rack is full and gives out an axe, so the next tree looks workable; the shovel in hand still has nowhere to go.</summary>
+    private static void CheckGathererWithNoRoomToPutBackTheWrongToolKeepsTheirSpot(GameData data) {
+        var world = EmptyWorld(data);
+        var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 400);
+        var next = world.Add(ThingKind.Tree, new Vector2(12, 10), 400);
+        world.Add(ThingKind.Chest, new Vector2(14, 12));
+        var rack = world.Add(ThingKind.Toolstation, new Vector2(11, 13));
+        foreach (string tool in new[] { "steel_axe", "steel_pick", "steel_hammer", "rake" }) rack.Inventory.Add(tool, 1);
+        world.Player = new Vector2(11, 12); world.Look();
+        var cutter = Staff(world, tree, "gather");
+        cutter.Tool = "steel_shovel";
+        Work(world, 3 * Step);
+        Require(World.HasDuty(cutter, tree.Id, "gather") && !World.HasDuty(cutter, next.Id),
+            "a woodcutter who cannot put back the wrong tool should keep their tree, not move the job to the next one");
+        Require(cutter.Tool == "steel_shovel" && cutter.Status == "No room to put back the steel shovel", $"a woodcutter who cannot put back the wrong tool should say so, not \"{cutter.Status}\"");
+    }
+
     private static void CheckAJobMovedUpComesFirst(GameData data) {
         var world = EmptyWorld(data);
         var berries = world.Add(ThingKind.Berries, new Vector2(10, 10), 400);
@@ -336,5 +356,30 @@ public static class WorkerTaskChecks {
         world.Release();
         Work(world, 5, () => chest.Inventory["wood"] > 0);
         Require(chest.Inventory["wood"] == 12, "a worker should store the load once the player lets go of it");
+    }
+
+    private static void CheckWorkerPutsBackAToolNoneOfTheirJobsUses(GameData data) {
+        var (world, tree, _, rack) = ToolYard(data);
+        rack.Inventory.Add("steel_axe", 1);
+        var cutter = Staff(world, tree, "gather");
+        Work(world, 60, () => cutter.Tool == "steel_axe");
+        Require(cutter.Tool == "steel_axe", "a woodcutter should take the axe from the tool station");
+        world.SetDuty(cutter, tree, "gather", false);
+        Work(world, 60, () => rack.Inventory["steel_axe"] == 1);
+        Require(rack.Inventory["steel_axe"] == 1 && cutter.Tool == "", "a worker whose jobs no longer use their tool should put it back for someone else");
+    }
+
+    private static void CheckSaveWithAHaulOutsideItsGroupIsRefused(GameData data) {
+        var world = EmptyWorld(data);
+        var bench = Bench(world, new Vector2(10, 10), "planks");
+        var worker = Staff(world, bench, "haul", "craft");
+        GroupHauls(world, worker, bench);
+        string json = world.Serialize();
+        EmptyWorld(data).Deserialize(json);
+        // Turned round, as an edit by hand could leave it, the list has the haul before its group's own entry.
+        worker.Duties.Reverse();
+        bool refused = false;
+        try { EmptyWorld(data).Deserialize(world.Serialize()); } catch (System.InvalidOperationException error) { refused = error.Message.Contains("unknown items"); }
+        Require(refused, "a save whose haul stands before its group's own entry should be refused with a clear reason");
     }
 }

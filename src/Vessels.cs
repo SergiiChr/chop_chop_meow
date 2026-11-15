@@ -114,19 +114,6 @@ public sealed partial class World {
         return null;
     }
 
-    /// <summary>
-    /// Liquid a station holds that its recipe no longer takes, with storage that gives out vessels with room for it, emptiest first, and takes them back; or null.
-    /// A hauler brings the vessels, fills them there and stores them.
-    /// </summary>
-    private (VesselDef Vessel, string Item, Thing Source)? LiquidToClear(Thing t, Vector2 from) {
-        foreach (var v in Data.Vessels) {
-            if (t.Inventory[v.Liquid] == 0 || Pending(t, v.Liquid) || DepositFor(v.Full, t.Pos) == null) continue;
-            for (int held = 0; held < v.Capacity; held++)
-                if (SourceFor(v.States[held], from) is Thing source) return (v, v.States[held], source);
-        }
-        return null;
-    }
-
     /// <summary>A hauler's vessels with room at a station that holds leftover liquid for them: filled there, then stored like any load.</summary>
     private bool FillsLeftover(Worker w, Thing? dest, string item, float dt) {
         if (dest == null || Data.VesselOf(item) is not VesselDef v || item == v.Full || dest.Inventory[v.Liquid] == 0 || Pending(dest, v.Liquid)) return false;

@@ -63,11 +63,28 @@ public sealed partial class World {
         };
     }
 
-    /// <summary>With no job to do, a worker waits at the nearest trading post; their status says what their first job lacks.</summary>
+    /// <summary>
+    /// With no job to do, a worker waits at the nearest trading post; their status says what their first job lacks.
+    /// A tool none of their jobs uses goes back to a tool station first.
+    /// </summary>
     private void Idle(Worker w, string? lacking, float dt) {
         w.Assignment = w.Duties.Count > 0 ? w.Duties[0].Thing : 0; w.Job = "";
+        if (w.Tool != "" && !JobUses(w, Data.Items[w.Tool].Tool) && !ReturnTool(w, dt)) return;
         WaitAtPost(w, dt);
         if (w.WorkState != WorkerWorkState.Blocked) w.Status = lacking ?? "Available";
+    }
+
+    /// <summary>Whether one of a worker's jobs uses a kind of tool: building or working a mine, or gathering what needs it or goes faster with it.</summary>
+    private bool JobUses(Worker w, string kind) {
+        foreach (var d in w.Duties) {
+            if (d.Job == "mine" && kind == "pickaxe" || d.Job == "build" && kind is "pickaxe" or "hammer") return true;
+            if (d.Job != "gather") continue;
+            // A woodcutter's job covers trees and stumps, so the spot it is on now counts as well as the kind it was given.
+            if (Uses(d.Kind) || Uses(Find(d.Thing)?.Kind)) return true;
+        }
+        return false;
+
+        bool Uses(ThingKind? spot) => spot is ThingKind known && GatherRules.Of(known) is GatherRule rule && (rule.Needs == kind || rule.Helps == kind);
     }
 
     /// <summary>
@@ -112,7 +129,8 @@ public sealed partial class World {
 
     /// <summary>
     /// How a load of an item that a station's recipe takes both as an input and as fuel is split between the two slots:
-    /// in proportion to what a batch uses of each, as far as each has room. Null when the item goes into one slot only.
+    /// in proportion to what a batch uses of each, as far as each has room.
+    /// Null when the item goes into one slot only.
     /// </summary>
     private (int Fuel, int Input)? FuelSplit(Thing t, string item, int load) {
         if (!IsStation(t.Kind) || t.Burner is not Inventory burner || !BatchCost(t).TryGetValue(item, out int batch) || !Fuels(t).Contains(item) || !FuelTakes(t, item)) return null;
@@ -133,7 +151,7 @@ public sealed partial class World {
     private int InputRoom(Thing t, string item) {
         string lands = PoursInto(t, t.Inventory, item)?.Liquid ?? item;
         if (Data.VesselFor(lands) != null && lands == item || !BatchCost(t).ContainsKey(lands)) return 0;
-        return Math.Max(0, Math.Min(t.Inventory.Room(lands), t.Inventory.StackSize - t.Inventory[lands]));
+        return Math.Max(0, SlotRoom(t.Inventory, lands));
     }
 
     private bool IsStation(ThingKind kind) => Array.IndexOf(stationKinds, kind) >= 0;
@@ -184,7 +202,8 @@ public sealed partial class World {
             switch (Equip(w, need, spot, dt)) {
                 case Kit.Busy: return true;
                 // With no tool to be had, the nearest spot of the job that needs none, or one that is to be had, is worked instead.
-                case Kit.Lacking: return OtherSpot(w, spot);
+                // A wrong tool with no room to go back to stays in hand, and the job waits at its spot.
+                case Kit.Lacking: return w.Tool == "" && OtherSpot(w, spot);
             }
         w.Status = Phrase("Gathering ", Data.Name(item));
         if (!Walk(w, spot.Pos, dt)) return true;
