@@ -245,22 +245,21 @@ public sealed partial class GameData {
             throw new InvalidOperationException($"{mispriced}: only goods the village trades, and the crate, have a price.");
         if (Recipes.FirstOrDefault(p => p.Value.Worked && p.Value.Station != ThingKind.Cooktable).Key is string misplaced)
             throw new InvalidOperationException($"{misplaced}: only cooking table recipes choose whether they are worked.");
-        foreach (var v in Vessels)
+        foreach (var v in Vessels) {
             if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
                 || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Output == v.Liquid || r.Hand && r.Inputs.ContainsKey(v.Liquid)))
                 throw new InvalidOperationException($"Invalid vessel: {v.Full}. Its liquid is only poured into stations, and no hand recipe takes it.");
+            if (!vesselFor.TryAdd(v.Liquid, v) || !v.States.All(id => vesselOf.TryAdd(id, v)))
+                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Each liquid, and each fill of a vessel, belongs to one vessel.");
+        }
         ValidateMap();
     }
     /// <summary>The vessel that carries a liquid, or null for an item that is not one.</summary>
-    public VesselDef? VesselFor(string liquid) {
-        foreach (var v in Vessels) if (v.Liquid == liquid) return v;
-        return null;
-    }
+    public VesselDef? VesselFor(string liquid) => vesselFor.GetValueOrDefault(liquid);
     /// <summary>The vessel an item is a state of, at any fill, or null.</summary>
-    public VesselDef? VesselOf(string item) {
-        foreach (var v in Vessels) if (v.States.Contains(item)) return v;
-        return null;
-    }
+    public VesselDef? VesselOf(string item) => vesselOf.GetValueOrDefault(item);
+    // Filled by Validate: each liquid's vessel and each fill's vessel.
+    private readonly Dictionary<string, VesselDef> vesselFor = new(), vesselOf = new();
     // Filled by Validate: the id of the recipe that makes each item, and what the recipe map hangs under each item.
     private readonly Dictionary<string, string> recipeIdOf = new();
     private readonly Dictionary<string, List<string>> madeOutOf = new();
