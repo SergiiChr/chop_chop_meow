@@ -97,9 +97,6 @@ public abstract partial class PagePanel : VBoxContainer {
     /// A double click on a backpack item: eats or drinks it, lights a torch, opens a crate as storage, or selects a tool on the hotbar.
     /// </summary>
     protected void UseFromBag(string id) {
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id);
-        else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
-        else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
-        else if (world.Data.Items.TryGetValue(id, out var def) && def.Tool != "") panel.SelectOnHotbar(id);
+        if (!panel.Hotbar.UseItem(id) && world.Data.Items.TryGetValue(id, out var def) && def.Tool != "") panel.Hotbar.SelectItem(id);
     }
 }

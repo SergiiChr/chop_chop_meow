@@ -1340,14 +1340,14 @@ public sealed partial class World {
     /// A crate of one good also carries its name in between, such as <c>crate_bread_17</c>, so filters can ask for crates of it.
     /// </summary>
     public const string PackedPrefix = "crate_";
-    public static bool IsCrate(string item) => item == "crate" || item.StartsWith(PackedPrefix);
+    public static bool IsCrate(string item) => item == "crate" || item.StartsWith(PackedPrefix, StringComparison.Ordinal);
     /// <summary>The number that keys a packed crate's contents, or 0 for any other item.</summary>
-    public static int PackedId(string item) => item.StartsWith(PackedPrefix) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
+    public static int PackedId(string item) => item.StartsWith(PackedPrefix, StringComparison.Ordinal) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
     /// <summary>The filter entry that stands for any packed crate of one good, such as <c>crate_bread</c>.</summary>
     public static string CrateOf(string item) => PackedPrefix + item;
     /// <summary>The <see cref="CrateOf"/> entry a packed crate of one good matches, or empty for anything else.</summary>
     public static ReadOnlySpan<char> PackedKind(string item) {
-        if (!item.StartsWith(PackedPrefix)) return default;
+        if (!item.StartsWith(PackedPrefix, StringComparison.Ordinal)) return default;
         int last = item.LastIndexOf('_');
         return last > PackedPrefix.Length ? item.AsSpan(0, last) : default;
     }
@@ -1375,9 +1375,10 @@ public sealed partial class World {
     /// An emptied crate becomes a plain empty crate.
     /// </summary>
     public int MoveInCrate(int id, string item, int quantity, bool packing) {
-        if (id == 0) return packing ? PackEmptyCrate(item, quantity) : 0;
-        if (Downed || CarriedCrate(id) is not string crate || Packed(crate) is not Inventory contents) return 0;
+        if (Downed) return 0;
         if (packing && IsCrate(item)) { Say("Never put a crate in a crate."); return 0; }
+        if (id == 0) return packing ? PackEmptyCrate(item, quantity) : 0;
+        if (CarriedCrate(id) is not string crate || Packed(crate) is not Inventory contents) return 0;
         if (Forwarded(Verb.MoveInCrate, id, packing ? 1 : 0, item, quantity)) return 0;
         int moved = packing ? S.Backpack.TransferTo(contents, item, quantity) : contents.TransferTo(S.Backpack, item, quantity);
         if (moved == 0) { Say(packing ? "The crate is full." : "Your backpack is full."); return 0; }
@@ -1387,8 +1388,6 @@ public sealed partial class World {
     }
     /// <summary>Packs goods from the backpack into one of its empty crates, which becomes a packed crate; what <see cref="MoveInCrate"/> does with crate number 0.</summary>
     private int PackEmptyCrate(string item, int quantity) {
-        if (Downed) return 0;
-        if (IsCrate(item)) { Say("Never put a crate in a crate."); return 0; }
         if (S.Backpack["crate"] == 0) { Say("No empty crate in your backpack."); return 0; }
         if (Forwarded(Verb.MoveInCrate, 0, 1, item, quantity)) return 0;
         var contents = NewCrate();

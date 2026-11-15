@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Godot;
 
@@ -40,8 +39,8 @@ public partial class CratePanel(PageTools tools, Thing subject) : ThingPage(tool
 /// An empty crate opens with number 0; the first goods packed into it make it a packed crate, which the page then shows.
 /// </summary>
 public partial class CarriedCratePanel(PageTools tools, int crate) : PagePanel(tools) {
-    // An empty crate's page lasts while one is carried, and until it turns to the crate its goods made.
-    public override bool Current => crate == 0 ? world.Backpack["crate"] > 0 || NewlyPacked() > 0 : world.CarriedCrate(crate) != null;
+    // An empty crate's page lasts while one is carried, and until it turns to the crate its goods made; a crate picked up onto the cursor closes its page.
+    public override bool Current => crate == 0 ? (world.Backpack["crate"] > 0 || NewlyPacked() > 0) && world.Held?.Item != "crate" : world.CarriedCrate(crate) is string item && world.Held?.Item != item;
     // An emptied, placed or dropped crate leaves the backpack, and its page gives way to the backpack's.
     public override Page GivesWayTo => Page.Backpack;
     protected override bool StoresFromHotbar => true;
@@ -63,20 +62,21 @@ public partial class CarriedCratePanel(PageTools tools, int crate) : PagePanel(t
         if (crate == 0) FollowPacked();
     }
 
-    /// <summary>The packed crates carried when the empty crate's page opened.</summary>
-    private HashSet<int>? packedBefore;
+    /// <summary>The highest number of a packed crate carried when the empty crate's page opened; crates get ever higher numbers. Null until then.</summary>
+    private int? packedBefore;
 
-    /// <summary>The number of a packed crate carried now that was not when the empty crate's page opened, or 0.</summary>
+    /// <summary>The number of a packed crate carried now that is newer than the empty crate's page, or 0.</summary>
     private int NewlyPacked() {
-        if (packedBefore == null) return 0;
-        foreach (var pair in world.Backpack.Items) if (World.PackedId(pair.Key) is int id and > 0 && !packedBefore.Contains(id)) return id;
+        if (packedBefore is not int before) return 0;
+        foreach (var pair in world.Backpack.Items) if (World.PackedId(pair.Key) is int id && id > before) return id;
         return 0;
     }
 
     /// <summary>Once goods packed into the empty crate make it a packed crate, shows that crate.</summary>
     private void FollowPacked() {
-        packedBefore = new HashSet<int>();
-        foreach (var pair in world.Backpack.Items) if (World.PackedId(pair.Key) is int id and > 0) packedBefore.Add(id);
+        int highest = 0;
+        foreach (var pair in world.Backpack.Items) highest = Math.Max(highest, World.PackedId(pair.Key));
+        packedBefore = highest;
         live.Watch(NewlyPacked, id => { if (id > 0) panel.OpenCrate(id); });
     }
 }

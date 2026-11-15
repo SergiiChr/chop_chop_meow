@@ -36,7 +36,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                 foreach (var (item, amount) in data.Materials) {
                     var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); row.AddChild(column);
                     var (cell, count) = ItemSlot.Create($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
-                    moves.TakeCell(cell, thing.Inventory, item, thing, held => held.Stack is { Box: 0 } stack && stack.Item == item, (_, units) => kit.Run(() => world.PutDown(thing.Inventory, -1, units)));
+                    moves.TakeCell(cell, thing.Inventory, item, thing, held => held.Stack is { Box: 0 } stack && stack.Item == item);
                     column.AddChild(Style.PerBatch($"/ {amount}"));
                     live.Watch(() => thing.Inventory[item], drawn => {
                         count.Text = drawn.ToString();

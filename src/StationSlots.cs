@@ -17,7 +17,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         var (cell, count) = ItemSlot.Create($"{(input ? "input" : "output")}_{item}", size);
         cell.Icon = Icons.Of(item);
         if ((look ?? (input ? null : Style.SlotWanted)) is StyleBoxFlat rim) cell.AddThemeStyleboxOverride("normal", rim);
-        moves.TakeCell(cell, box, item, t, takes, takes == null ? null : (_, units) => kit.Run(() => moves.PutDown(box, -1, units, t)));
+        moves.TakeCell(cell, box, item, t, takes);
         // Redrawn only when the amount held changes.
         live.Watch(() => box[item], held => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
@@ -64,7 +64,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         var burner = t.Burner!;
         var (cell, count) = ItemSlot.Create("fuel");
         cell.AddThemeStyleboxOverride("normal", Style.SlotFuel);
-        moves.TakeCell(cell, burner, burner.First, t, held => held.Stack is { Box: 0 } stack && world.FuelFits(t, stack.Item), (_, units) => kit.Run(() => world.PutDown(burner, -1, units)));
+        moves.TakeCell(cell, burner, burner.First, t, held => held.Stack is { Box: 0 } stack && world.FuelFits(t, stack.Item));
         var lasts = Style.Text("", 14, Style.Ink);
         string burns = world.FuelWords(recipe.Fuels);
         var accepted = new HBoxContainer { Name = "burns", TooltipText = $"{recipe.Name} burns {burns}", MouseFilter = Control.MouseFilterEnum.Stop };

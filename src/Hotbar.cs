@@ -134,13 +134,25 @@ public partial class Hotbar : PanelContainer {
         Select(slot);
     }
 
-    /// <summary>A double click on a slot: eats or drinks its item, lights a torch, opens an empty crate as storage, or else selects the slot.</summary>
+    /// <summary>A double click on a slot: uses its item, or else selects the slot.</summary>
     private void Use(int slot) {
         string id = HotbarId(slot);
-        if (world.Backpack[id] == 0) { Select(slot); return; }
+        if (world.Backpack[id] == 0 || !UseItem(id)) Select(slot);
+    }
+
+    /// <summary>Uses a carried item as a double click does, here or in the backpack: eats or drinks it, lights a torch or opens a crate as storage; false when it has no such use.</summary>
+    public bool UseItem(string id) {
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Run(() => world.Consume(id));
         else if (id == "torch" && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
         else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
+        else return false;
+        return true;
+    }
+
+    /// <summary>Selects the slot that holds an item, or says that none does.</summary>
+    public void SelectItem(string item) {
+        int slot = world.HotbarSlots.ToList().IndexOf(item);
+        if (slot < 0) kit.Notify($"Put the {world.Data.Name(item).ToLowerInvariant()} on the hotbar to use it.");
         else Select(slot);
     }
 

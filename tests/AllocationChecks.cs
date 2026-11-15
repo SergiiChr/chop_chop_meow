@@ -23,6 +23,15 @@ public static class AllocationChecks {
             Fed(valley);
         });
 
+        // A stack held from a chest is checked every tick: it must still be there, in reach and in the same box, without allocating.
+        var holding = new World(data);
+        var chest = holding.Add(ThingKind.Chest, holding.Player + Vector2.One);
+        Give(holding, "wood", 10); holding.Transfer(holding.Backpack, chest.Inventory, "wood", 10);
+        holding.Hold(chest.Inventory, 0, 10);
+        Require(holding.Held != null, "the allocation fixture should hold the chest's wood");
+        Check("tick: fresh valley, stack held from a chest", () => { holding.Tick(1 / 60f); Fed(holding); });
+        Require(holding.Held != null, "the held stack should stay held through the ticks");
+
         var settlement = Settlement(data);
         // Twenty seconds first, so every worker has been through its trips once and the status and cost caches hold what they will show.
         // A store taking an item it has not held before grows its table once (measured 0.2 to 0.5 bytes a tick).

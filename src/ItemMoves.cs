@@ -55,18 +55,17 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole, HeldCursor cursor)
     }
 
     /// <summary>
-    /// Binds a slot that shows one item of an inventory: a click picks up its stack and a right click half,
-    /// Ctrl or Shift moves it to the backpack as <see cref="Stack"/> does, and <paramref name="takes"/> and <paramref name="put"/> say what a held stack does on it; with none it takes nothing and shakes.
+    /// Binds a slot that shows one item of an inventory: a click picks up its stack and a right click half, and Ctrl or Shift moves it to the backpack as <see cref="Stack"/> does.
+    /// A held stack that <paramref name="takes"/> allows goes into the inventory by its rules; with none the slot takes nothing and shakes.
     /// </summary>
-    public void TakeCell(ItemSlot cell, Inventory box, string item, Thing near, Func<HeldCursor, bool>? takes = null, Action<HeldCursor, int>? put = null) =>
-        TakeCell(cell, box, () => item, near, takes, put);
+    public void TakeCell(ItemSlot cell, Inventory box, string item, Thing near, Func<HeldCursor, bool>? takes = null) => TakeCell(cell, box, () => item, near, takes);
 
     /// <summary>The same for a slot whose item changes; <paramref name="item"/> is null while it has nothing to give.</summary>
-    public void TakeCell(ItemSlot cell, Inventory box, Func<string?> item, Thing near, Func<HeldCursor, bool>? takes = null, Action<HeldCursor, int>? put = null) {
+    public void TakeCell(ItemSlot cell, Inventory box, Func<string?> item, Thing near, Func<HeldCursor, bool>? takes = null) {
         cell.Controls = new SlotInput(cursor) {
             Pick = () => item() is string id && box.Layout.FindIndex(s => s.Item == id) is int at and >= 0 ? (box, at) : null,
-            Takes = takes ?? (_ => false),
-            Put = put,
+            Takes = takes,
+            Put = (_, units) => kit.Run(() => PutDown(box, -1, units, near)),
             Batch = () => { if (item() is string id) kit.Run(() => Stack(box, world.S.Backpack, id, near)); },
         };
     }

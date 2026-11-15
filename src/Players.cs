@@ -214,10 +214,7 @@ public sealed partial class World {
     public int Locate(Inventory inventory) {
         if (inventory == S.Backpack) return 0;
         foreach (var pair in S.Crates) if (pair.Value == inventory && CarriedCrate(pair.Key) != null) return CrateCode - pair.Key;
-        foreach (var t in S.Things) {
-            int box = Array.IndexOf(Boxes(t), inventory);
-            if (box >= 0) return t.Id * BoxCodes + box + 1;
-        }
+        foreach (var t in S.Things) if (BoxIndex(t, inventory) is int box and >= 0) return t.Id * BoxCodes + box + 1;
         return -1;
     }
 
@@ -225,7 +222,14 @@ public sealed partial class World {
     /// <summary>What <see cref="Locate"/> takes the number of a packed crate in the backpack from, to name its contents.</summary>
     private const int CrateCode = -2;
     private static Inventory?[] Boxes(Thing t) => [t.Inventory, t.Output, t.Tools, t.Wages, t.Burner];
-    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : at <= CrateCode ? (CarriedCrate(CrateCode - at) != null ? S.Crates.GetValueOrDefault(CrateCode - at) : null) : Find(at / BoxCodes) is not Thing t || at % BoxCodes == 0 ? null : Boxes(t)[at % BoxCodes - 1];
+    /// <summary>One of a thing's boxes in the order of <see cref="Boxes"/>, looked up without building the array, as ticks do.</summary>
+    private static Inventory? Box(Thing t, int index) => index switch { 0 => t.Inventory, 1 => t.Output, 2 => t.Tools, 3 => t.Wages, 4 => t.Burner, _ => null };
+    /// <summary>Which of a thing's boxes an inventory is, or -1.</summary>
+    private static int BoxIndex(Thing t, Inventory inventory) {
+        for (int i = 0; i < BoxCodes - 1; i++) if (Box(t, i) == inventory) return i;
+        return -1;
+    }
+    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : at <= CrateCode ? (CarriedCrate(CrateCode - at) != null ? S.Crates.GetValueOrDefault(CrateCode - at) : null) : Find(at / BoxCodes) is not Thing t ? null : Box(t, at % BoxCodes - 1);
 
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {
@@ -264,7 +268,7 @@ public sealed partial class World {
         if (a > 0 && !Reaches(Find(a / BoxCodes)!) || b > 0 && !Reaches(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
         // Reject a stale move rather than moving a different item.
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
-        if (from.Layout[sourceSlot].HeldBy is int holder && holder != 0 && holder != S.Actor.Id || to.Layout[targetSlot].HeldBy is int other && other != 0 && other != S.Actor.Id) { Say(HeldByAnother); return 0; }
+        if (from.Layout[sourceSlot].HeldByOther(S.Actor.Id) || to.Layout[targetSlot].HeldByOther(S.Actor.Id)) { Say(HeldByAnother); return 0; }
         if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
         // A drop on another item's cell in another inventory still stores the stack wherever it fits.
         int moved;

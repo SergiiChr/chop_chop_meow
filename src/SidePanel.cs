@@ -206,16 +206,6 @@ public partial class SidePanel : MovableWindow {
     /// <summary>The hotbar, which also needs this panel, so the game sets it once both exist.</summary>
     public Hotbar Hotbar { get; set; } = null!;
 
-    /// <summary>Selects the hotbar slot that holds an item, or says it has none.</summary>
-    public void SelectOnHotbar(string item) {
-        int slot = world.HotbarSlots.ToList().IndexOf(item);
-        if (slot < 0) kit.Notify($"Put the {world.Data.Name(item).ToLowerInvariant()} on the hotbar to use it.");
-        else Hotbar.Select(slot);
-    }
-
-    /// <summary>A crate is being picked up onto the cursor: its page closes if it is the one open, for the backpack's.</summary>
-    public void Lifted(string crate) { if (Page == Page.Crate && World.PackedId(crate) == tools.Memory.CarriedCrate) Open(Page.Backpack); }
-
     /// <summary>Opens a crate from the backpack as storage: a packed one by its number, or with 0 an empty one.</summary>
     public void OpenCrate(int crate) {
         if (tools.Memory.CarriedCrate != crate) Page = Page.None;

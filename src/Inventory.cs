@@ -19,6 +19,8 @@ public sealed class Inventory {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int HeldBy { get; set; }
         /// <summary>Units in the cell that no player holds.</summary>
         [JsonIgnore] public int Free => Count - Held;
+        /// <summary>Whether a player other than <paramref name="player"/> holds units here.</summary>
+        public bool HeldByOther(int player) => HeldBy != 0 && HeldBy != player;
     }
     private readonly Dictionary<string, int> items = new();
     /// <summary>Units a player holds, which only the world that runs the game keeps count of.</summary>
@@ -236,7 +238,7 @@ public sealed class Inventory {
     public int Hold(int slot, int quantity, int player) {
         if ((uint)slot >= (uint)Layout.Count) return 0;
         var s = Layout[slot];
-        if (s.Item == "" || s.HeldBy != 0 && s.HeldBy != player) return 0;
+        if (s.Item == "" || s.HeldByOther(player)) return 0;
         int n = Math.Clamp(quantity, 0, s.Free);
         if (n == 0) return 0;
         s.Held += n; s.HeldBy = player; heldUnits += n;
@@ -254,7 +256,7 @@ public sealed class Inventory {
     /// <summary>The id of a player other than <paramref name="player"/> who holds units of an item here, or 0.</summary>
     public int HeldByOther(string item, int player) {
         if (heldUnits == 0) return 0;
-        foreach (var s in Layout) if (s.Item == item && s.HeldBy != 0 && s.HeldBy != player) return s.HeldBy;
+        foreach (var s in Layout) if (s.Item == item && s.HeldByOther(player)) return s.HeldBy;
         return 0;
     }
 

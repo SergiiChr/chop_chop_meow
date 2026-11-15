@@ -132,7 +132,6 @@ public partial class Game : Node, IGameFlow {
         panel = new SidePanel(kit, view, moves, ui, cursor); bag = panel.Bag;
         hotbar = new Hotbar(kit, panel, cursor); panel.Hotbar = hotbar;
         player = new PlayerControl(kit, view, panel, hotbar, cursor, moves); panel.Player = player;
-        cursor.Lifting = panel.Lifted;
         corner = new Corner(world); ui.AddChild(corner);
         modeLabel = new ModeLabel(kit, player); ui.AddChild(modeLabel);
         ui.AddChild(hotbar);

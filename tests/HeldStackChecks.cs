@@ -25,7 +25,7 @@ public static class HeldStackChecks {
         var world = EmptyWorld(data);
         var lake = new Thing { Kind = ThingKind.Water };
         Give(world, "empty_bottle", 1);
-        world.Hold(world.Backpack, CellOf(world, "empty_bottle"), 1);
+        world.Hold(world.Backpack, CellOf(world.Backpack, "empty_bottle"), 1);
         SetNeeds(world, thirst: 25);
         Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceSip && world.Held is { Item: "empty_bottle" },
             "with the only bottle held, gathering water should drink from the source and leave the bottle held");
@@ -34,7 +34,7 @@ public static class HeldStackChecks {
     private static void CheckAnEmptyCratePacksOnlyTheHeldUnits(GameData data) {
         var world = EmptyWorld(data);
         Give(world, "crate", 1); Give(world, "wood", 10);
-        world.Hold(world.Backpack, CellOf(world, "wood"), 5);
+        world.Hold(world.Backpack, CellOf(world.Backpack, "wood"), 5);
         world.MoveInCrate(0, "wood", int.MaxValue, true);
         string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         Require(world.Packed(packed)!["wood"] == 5 && world.Backpack["wood"] == 5 && world.Held == null,
@@ -51,14 +51,11 @@ public static class HeldStackChecks {
         Require(world.Held == null && crate.Inventory.Layout[0].Held == 0, "putting the crate down should let go of the stack held from its contents");
     }
 
-    /// <summary>The backpack cell a stack of an item lies in.</summary>
-    private static int CellOf(World world, string item) => world.Backpack.Layout.ToList().FindIndex(s => s.Item == item);
-
     private static void CheckAHeldStackStaysInItsCellUntilLetGo(GameData data) {
         var world = EmptyWorld(data);
         var chest = world.Add(ThingKind.Chest, world.Player + Vector2.One);
         Give(world, "wood", 10);
-        int cell = CellOf(world, "wood");
+        int cell = CellOf(world.Backpack, "wood");
         world.Hold(world.Backpack, cell, 6);
         Require(world.Held is { Item: "wood", Count: 6 } && world.Backpack.Layout[cell].Count == 10, "picking up 6 of 10 wood should hold them in their cell");
         Require(world.Transfer(world.Backpack, chest.Inventory, "wood", 10) == 4 && world.Backpack.Layout[cell].Count == 6, "only the 4 wood nobody holds should move out");
@@ -73,7 +70,7 @@ public static class HeldStackChecks {
         Give(world, "wood", 10);
         world.Transfer(world.Backpack, chest.Inventory, "wood", 10);
         Give(world, "wood", 60);
-        world.Hold(world.Backpack, CellOf(world, "wood"), 60);
+        world.Hold(world.Backpack, CellOf(world.Backpack, "wood"), 60);
         world.PutDown(chest.Inventory, 0, 60);
         Require(chest.Inventory.Layout[0].Count == 64 && world.Held is { Count: 6 } && world.Backpack["wood"] == 6,
             "a held 60 wood put on a chest cell of 10 should fill it to 64 and keep 6 held");
@@ -84,7 +81,7 @@ public static class HeldStackChecks {
     private static void CheckPuttingDownOnAnotherItemInTheBackpackSwapsThem(GameData data) {
         var world = EmptyWorld(data);
         Give(world, "wood", 5); Give(world, "stone", 3);
-        int wood = CellOf(world, "wood"), stone = CellOf(world, "stone");
+        int wood = CellOf(world.Backpack, "wood"), stone = CellOf(world.Backpack, "stone");
         world.Hold(world.Backpack, wood, 5);
         world.PutDown(world.Backpack, stone, 5);
         Require(world.Backpack.Layout[stone].Item == "wood" && world.Backpack.Layout[wood].Item == "stone" && world.Held == null,
@@ -112,7 +109,7 @@ public static class HeldStackChecks {
         Give(world, "raw_meat", 4); Give(world, "coal", 4);
         world.QueueBatch(furnace, "burnt_steak", 2);
         // Two batches' meat lies in the station, so what is not held is still enough for one.
-        world.Hold(furnace.Inventory, furnace.Inventory.Layout.ToList().FindIndex(s => s.Item == "raw_meat"), 1);
+        world.Hold(furnace.Inventory, CellOf(furnace.Inventory, "raw_meat"), 1);
         Require(furnace.Inventory["raw_meat"] == 4 && world.Held is { Count: 1 }, "the furnace should hold two batches of meat, one unit of it held");
         world.Tick(.1f);
         Require(!furnace.Processing, "a station should start no batch while a player holds a stack in it");
@@ -126,10 +123,10 @@ public static class HeldStackChecks {
         var furnace = world.Add(ThingKind.Furnace, new Vector2(20, 20));
         world.Player = furnace.Pos + Vector2.One;
         Give(world, "iron_ore", 10); Give(world, "stone", 5);
-        world.Hold(world.Backpack, CellOf(world, "iron_ore"), 10);
+        world.Hold(world.Backpack, CellOf(world.Backpack, "iron_ore"), 10);
         world.PutDown(furnace.Inventory, -1, 10);
         Require(furnace.Inventory["iron_ore"] == 10 && world.Held == null, "held iron ore put on a furnace smelting iron should load its input slot");
-        world.Hold(world.Backpack, CellOf(world, "stone"), 5);
+        world.Hold(world.Backpack, CellOf(world.Backpack, "stone"), 5);
         world.PutDown(furnace.Inventory, -1, 5);
         Require(furnace.Inventory["stone"] == 0 && world.Held is { Item: "stone", Count: 5 }, "stone the recipe does not use should stay held");
     }

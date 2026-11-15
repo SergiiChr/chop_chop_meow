@@ -18,8 +18,8 @@ public sealed partial class World {
         int code = Locate(box);
         if (code == -1 || Downed || (uint)slot >= (uint)box.Layout.Count || box.Layout[slot] is not { Item: not "" } cell) return;
         if (Forwarded(Verb.Hold, code, count, cell.Item, slot)) return;
-        if (code > 0 && !Reaches(Find(code / BoxCodes)!)) { Say("Walk closer first."); return; }
-        if (cell.HeldBy != 0 && cell.HeldBy != S.Actor.Id) { Say(HeldByAnother); return; }
+        if (Building(code) is Thing owner && !Reaches(owner)) { Say("Walk closer first."); return; }
+        if (cell.HeldByOther(S.Actor.Id)) { Say(HeldByAnother); return; }
         Release();
         int held = box.Hold(slot, count, S.Actor.Id);
         if (held == 0) return;
@@ -36,11 +36,19 @@ public sealed partial class World {
     /// <summary>Lets go of the held stack, which is then back in its cell as it always was.</summary>
     public void Release() {
         if (S.Actor.HeldStack == null || Forwarded(Verb.Release)) return;
-        if (S.Actor.HeldBox is Inventory box && S.Actor.HeldSlot is Inventory.Slot cell && box.Layout.IndexOf(cell) is int at and >= 0 && cell.HeldBy == S.Actor.Id) box.Release(at);
+        if (HeldCell(S.Actor, out var box, out _, out int at)) box.Release(at);
         Forget(S.Actor);
     }
 
     private static void Forget(PlayerState p) { p.HeldStack = null; p.HeldBox = null; p.HeldSlot = null; }
+
+    /// <summary>Server: the cell a player's held stack lies in, while it is still there and theirs; when it is not, the player holds nothing.</summary>
+    private static bool HeldCell(PlayerState p, out Inventory box, out Inventory.Slot cell, out int at) {
+        box = p.HeldBox!; cell = p.HeldSlot!; at = -1;
+        if (p.HeldStack != null && box != null && cell != null && (at = box.Layout.IndexOf(cell)) >= 0 && cell.HeldBy == p.Id) return true;
+        Forget(p);
+        return false;
+    }
 
     /// <summary>
     /// Puts <paramref name="count"/> units of the held stack into an inventory: into cell <paramref name="slot"/>, or with -1 wherever that inventory takes them.
@@ -51,11 +59,7 @@ public sealed partial class World {
         if (S.Actor.HeldStack is not HeldStack held) return;
         int code = Locate(to);
         if (code == -1 || slot >= to.Layout.Count) return;
-        if (Forwarded(Verb.PutDown, code, count, held.Item, slot)) return;
-        // Only the server knows the cell.
-        if (S.Actor.HeldBox is not Inventory from || S.Actor.HeldSlot is not Inventory.Slot cell) return;
-        int at = from.Layout.IndexOf(cell);
-        if (at < 0 || cell.HeldBy != S.Actor.Id) { Forget(S.Actor); return; }
+        if (Forwarded(Verb.PutDown, code, count, held.Item, slot) || !HeldCell(S.Actor, out var from, out var cell, out int at)) return;
         // On its own cell, the whole stack is let go of, or as many units as put down.
         if (to == from && slot == at) {
             int keep = cell.Held - count;
@@ -63,7 +67,7 @@ public sealed partial class World {
             from.Release(at); from.Hold(at, keep, S.Actor.Id); S.Actor.HeldStack = held with { Count = keep };
             return;
         }
-        if (slot >= 0 && to.Layout[slot].HeldBy is int other && other != 0 && other != S.Actor.Id) { Say(HeldByAnother); return; }
+        if (slot >= 0 && to.Layout[slot].HeldByOther(S.Actor.Id)) { Say(HeldByAnother); return; }
         Loosened((from, at, units) => Land(from, to, at, slot, held.Item, Math.Clamp(count, 1, units)));
     }
 
@@ -72,9 +76,7 @@ public sealed partial class World {
     /// <paramref name="move"/> gets the inventory, the cell and how many units were held.
     /// </summary>
     private void Loosened(Action<Inventory, int, int> move) {
-        if (S.Actor.HeldStack is not HeldStack held || S.Actor.HeldBox is not Inventory from || S.Actor.HeldSlot is not Inventory.Slot cell) return;
-        int at = from.Layout.IndexOf(cell);
-        if (at < 0 || cell.HeldBy != S.Actor.Id) { Forget(S.Actor); return; }
+        if (S.Actor.HeldStack is not HeldStack held || !HeldCell(S.Actor, out var from, out var cell, out int at)) return;
         int units = cell.Held, before = cell.Count;
         from.Release(at);
         from.PreferredSlot = at;
@@ -107,16 +109,13 @@ public sealed partial class World {
     }
 
     /// <summary>The building an inventory belongs to, or null for a backpack or a packed crate's contents.</summary>
-    private Thing? Owner(Inventory box) {
-        int code = Locate(box);
-        return code > 0 ? Find(code / BoxCodes) : null;
-    }
+    private Thing? Owner(Inventory box) => Building(Locate(box));
+
+    /// <summary>The building a number from <see cref="Locate"/> names a box of, or null.</summary>
+    private Thing? Building(int code) => code > 0 ? Find(code / BoxCodes) : null;
 
     /// <summary>The number of the packed crate in the acting player's backpack whose contents these are, or null.</summary>
-    private int? CrateOf(Inventory box) {
-        foreach (var pair in S.Crates) if (pair.Value == box && CarriedCrate(pair.Key) != null) return pair.Key;
-        return null;
-    }
+    private int? CrateOf(Inventory box) => Locate(box) is int code and <= CrateCode ? CrateCode - code : null;
 
     /// <summary>
     /// Server: lets go of held stacks whose player can no longer hold them: one that is down, out of reach of the building the stack lies in, or whose cell has gone.
@@ -126,10 +125,10 @@ public sealed partial class World {
         foreach (var p in S.Players) {
             if (p.HeldStack is not HeldStack held) continue;
             using (ActAs(p)) {
-                var owner = held.Box > 0 ? Find(held.Box / BoxCodes) : null;
-                bool gone = p.HeldBox is not Inventory box || box.Layout.IndexOf(p.HeldSlot!) < 0 || p.HeldSlot!.HeldBy != p.Id || held.Box > 0 && owner == null;
-                if (gone) Forget(p);
-                else if (Downed || owner != null && !Reaches(owner) || Locate(p.HeldBox!) != held.Box) Release();
+                if (!HeldCell(p, out var box, out _, out _)) continue;
+                // The box its number names now, which differs once the inventory has moved.
+                bool moved = Resolve(held.Box) != box;
+                if (moved || Downed || Building(held.Box) is Thing owner && !Reaches(owner)) Release();
             }
         }
     }
@@ -143,7 +142,7 @@ public sealed partial class World {
     /// </summary>
     private bool HeldByOthers(Thing t) {
         foreach (var p in S.Players) {
-            if (p.HeldBox is not Inventory box || Array.IndexOf(Boxes(t), box) < 0) continue;
+            if (p.HeldBox is not Inventory box || BoxIndex(t, box) < 0) continue;
             if (p != S.Actor) { Say(HeldByAnother); return true; }
             Release();
         }

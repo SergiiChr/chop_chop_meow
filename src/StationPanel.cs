@@ -58,7 +58,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         string plainest = world.Data.PlainestTool(tool);
         moves.TakeCell(cell, thing.Tools!, () => world.BenchTool(thing, tool), thing,
-            held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item)?.Tool == tool, (_, units) => kit.Run(() => world.PutDown(thing.Tools!, -1, units)));
+            held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item)?.Tool == tool);
         live.Watch(() => world.BenchTool(thing, tool), held => {
             cell.Icon = Icons.Of(held ?? plainest);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held != null ? Colors.White : Style.Ghost);
