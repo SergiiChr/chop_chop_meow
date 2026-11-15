@@ -2340,8 +2340,9 @@ public sealed partial class World {
         attackClock = Math.Max(0, attackClock - dt);
         if (S.Actor.Id != LocalId && Find(S.Actor.GatherTarget) is { IsLoose: false } held) Gather(held, dt);
         if (Dead) { S.RespawnIn = Math.Max(0, S.RespawnIn - dt); if (!Dead) Respawn(); } else {
-            float drain = S.Actor.Sprinting ? Data.SprintDrain : 1;
+            float drain = S.Actor.Sprinting ? Data.SprintDrain : 1, fed = S.Hunger;
             S.Hunger = Math.Max(0, S.Hunger - dt * drain * Data.HungerPerSecond); S.Thirst = Math.Max(0, S.Thirst - dt * drain * Data.ThirstPerSecond);
+            if (S.Hunger < GameData.GrowlBelow && MathF.Floor(S.Hunger / GameData.GrowlEvery) < MathF.Floor(fed / GameData.GrowlEvery)) Play("stomach_growl", Player);
             if (S.Hunger <= 0 || S.Thirst <= 0) S.Health -= dt * 1.4f;
             else if (S.Hunger > 45 && S.Thirst > 45) S.Health = Math.Min(100, S.Health + dt * .12f);
         }

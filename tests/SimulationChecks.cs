@@ -30,6 +30,7 @@ public static class SimulationChecks {
         Test(CheckDismantlingABuildingReturnsItsCostAndContents, data);
         Test(CheckBuildingsKnockIntoPlaceAndClatterDown, data);
         Test(CheckBuyingJinglesCoinsAndHiringSigns, data);
+        Test(CheckStomachGrowlsAsFoodRunsLow, data);
         Test(CheckDismantlingWhatDoesNotFitLeavesItInABox, data);
         Test(CheckItemsRouteToAcceptingStorageBeforeNearerGeneralChest, data);
         Test(CheckWorkerGathersWoodAndRetargetsWhenFilterChanges, data);
@@ -290,6 +291,21 @@ public static class SimulationChecks {
         Require(heard.SequenceEqual(new[] { "buy_coins" }), "a buy order should jingle the coins paid");
         heard.Clear(); world.Hire(sign, data.HireOffers[0]);
         Require(heard.SequenceEqual(new[] { "hire_sign" }), "hiring a worker should sign them on");
+    }
+
+    private static void CheckStomachGrowlsAsFoodRunsLow(GameData data) {
+        var world = EmptyWorld(data);
+        var heard = Listen(world);
+        // One tick this long burns a hundredth of a full stomach.
+        float percent = 1 / data.HungerPerSecond;
+        SetNeeds(world, hunger: 21.5f); world.Tick(percent);
+        Require(heard.Count == 0, "a stomach with over a fifth of its food left should stay quiet");
+        world.Tick(percent);
+        Require(heard.SequenceEqual(new[] { "stomach_growl" }), "the stomach should growl as food falls under a fifth");
+        world.Tick(percent);
+        Require(heard.Count == 1, "the stomach should stay quiet until another twentieth of its food is gone");
+        SetNeeds(world, hunger: 15.5f); world.Tick(percent);
+        Require(heard.Count == 2, "the stomach should growl again as food falls under 15%");
     }
 
     private static void CheckDismantlingWhatDoesNotFitLeavesItInABox(GameData data) {

@@ -158,6 +158,8 @@ public sealed partial class GameData {
     public float SprintDrain { get; } = 1.7f;
     /// <summary>Food or drink percentage below which the player is too weak to sprint and the screen edges warn.</summary>
     public const float LowNeed = 15;
+    /// <summary>Food percentage below which the stomach growls, and how much more has to go before it growls again.</summary>
+    public const float GrowlBelow = 20, GrowlEvery = 5;
     public float RespawnSeconds { get; } = 30;
     /// <summary>In-game hours a picked-clean berry bush takes to fruit again.</summary>
     public float BerryRegrowHours { get; } = 24;

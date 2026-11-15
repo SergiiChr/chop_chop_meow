@@ -406,6 +406,7 @@ It is refused if hunger or thirst would run out first.
 Holding Shift while moving sprints at `SprintSpeed` times the walking speed (`PlayerState.Sprinting`, sent by guests with their walk).
 Hunger and thirst drain `SprintDrain` times as fast meanwhile.
 Under 15% food or drink (`GameData.LowNeed`) the player cannot sprint and the screen edges pulse red.
+As food falls under 20% (`GameData.GrowlBelow`), and with every further 5% gone (`GameData.GrowlEvery`), `stomach_growl` plays at the player.
 
 #### Death and recovery boxes
 
@@ -446,7 +447,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 - **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at `PatrolPace` (half) of the trot it stalks at, a walk, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
 - **Smell and howl.** A patrolling or called wolf within `SmellRadius` of a player out in the open takes them as its target and howls, standing still, for as long as the howl recording plays (`LoneHowlSeconds` or `PackHowlSeconds`, `Wolf.Howl` counting down `Wolf.HowlLength`).
   The night's first howl plays `wolf_howl`, a lone wolf, and later ones `wolf_howl_group` (`SaveState.Howled`).
-  A howl fades with distance from the player, on screen too, and is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it pans with its direction.
+  A howl is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it fades with distance from the player and pans with its direction.
   The howl calls every patrolling wolf within `HowlRadius` to where it stood (`WolfMode.Called`, `Wolf.Call`); a called wolf still smells on its way and goes back to patrolling once there.
 - **Approach.** After its howl a wolf trots at its player out of firelight until within `WolfSightRange`, then sprints (`Wolf.Chase` above zero) at `WolfChase` times `WalkSpeed` with one distant growl (`Wolf.Sprinted`), which data validation keeps above walking and below `SprintSpeed`.
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
@@ -854,8 +855,10 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 Sound effects are one-shot MP3s in `assets/sounds`; `x_1.mp3`, `x_2.mp3` and so on are variants of one sound `x`.
 Each play picks a variant other than the previous one with a small random pitch and volume change.
 
-Audibility follows the camera, so zooming out lets the player hear further.
-A sound on screen plays at full volume, one just past the screen edge is faint, and it fades to silence 5 tiles beyond the edge (14 for the growl of a wolf breaking into its sprint).
+A sound with a world position is heard by its distance from the player, whatever the zoom.
+It plays at full volume at the player and fades with the square of the distance left to its reach, where it is silent: half way there it plays at a quarter.
+The reach is 16 tiles, 30 for the growl of a wolf breaking into its sprint, which starts `WolfSightRange` away, and `HowlRadius` for a howl (`Sounds.ReachOf`).
+A sound with no position, such as the local player's footsteps or a hotbar click, plays at full volume.
 
 Sounds come from three places:
 
