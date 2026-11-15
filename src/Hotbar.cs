@@ -57,7 +57,7 @@ public partial class Hotbar : PanelContainer {
             RightClick = () => SetHotbar(slot, ""),
         };
         button.CustomMinimumSize = new Vector2(56, 56);
-        Style.Skin(button, Style.CupNormal, Style.CupHover, Style.CupPressed);
+        Style.Skin(button, Style.SlotNormal, Style.SlotHover, Style.SlotPressed);
         button.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
         button.Text = "";
         button.ExpandIcon = true;
@@ -78,7 +78,7 @@ public partial class Hotbar : PanelContainer {
         number.AddThemeFontOverride("font", Style.Bold); number.AddThemeFontSizeOverride("font_size", 10);
         number.AddThemeColorOverride("font_color", Style.Tan);
         button.AddChild(number);
-        // The count sits on a pill at the cup's corner, as on every other cup.
+        // The count sits on a pill at the slot's corner, as on every other slot.
         var count = Style.Corner(Style.Pill("", Style.CountPill, Style.Rim, 12), 1, 1);
         count.Visible = false;
         button.AddChild(count);
@@ -103,9 +103,9 @@ public partial class Hotbar : PanelContainer {
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
             button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}\nLMB: select · Double LMB: use · RMB: clear";
-            // The item in hand gets an orange rim.
-            button.AddThemeStyleboxOverride("normal", active ? Style.CupWanted : Style.CupNormal);
-            button.AddThemeStyleboxOverride("disabled", active ? Style.CupWanted : Style.CupNormal);
+            // The selected slot gets an orange rim.
+            button.AddThemeStyleboxOverride("normal", active ? Style.SlotWanted : Style.SlotNormal);
+            button.AddThemeStyleboxOverride("disabled", active ? Style.SlotWanted : Style.SlotNormal);
             Counts[slot].Visible = Counts[slot].Text != "";
         }
     }

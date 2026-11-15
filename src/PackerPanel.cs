@@ -8,7 +8,7 @@ namespace ChopChopMeow;
 public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     protected override void Body() {
         var pick = Row(); pick.AddThemeConstantOverride("separation", 12);
-        var (chosen, _) = ItemSlot.Cup("pack_good", 48); chosen.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
+        var (chosen, _) = ItemSlot.Create("pack_good", 48); chosen.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         chosen.Icon = thing.Packs == "" ? null : Icons.Of(thing.Packs);
         chosen.Text = thing.Packs == "" ? "?" : "";
         chosen.TooltipText = "Choose what to pack";
@@ -19,7 +19,7 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         pick.AddChild(packs);
         if (memory.PackPicking || thing.Packs == "") GoodPicker();
         if (thing.Packs != "") {
-            var inputs = new Control[] { cups.StationCup(thing.Packs, true, "×1"), cups.StationCup("crate", true, "") };
+            var inputs = new Control[] { stationSlots.StationSlot(thing.Packs, true, "×1"), stationSlots.StationSlot("crate", true, "") };
             AddChild(new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, world.Data.PackSeconds)), () => thing.Processing ? thing.Progress / world.Data.PackSeconds : 0, null, PackedCrate(), Array.Empty<Control>()));
         }
         LoadBagGrid(id => world.Holds(thing, id));
@@ -31,8 +31,8 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         var picker = new GridContainer { Columns = 7 }; picker.AddThemeConstantOverride("h_separation", 6); picker.AddThemeConstantOverride("v_separation", 6);
         Well(new VBoxContainer()).AddChild(picker);
         foreach (var (id, def) in world.Data.Items.Where(p => world.Packable(p.Key)).OrderBy(p => p.Value.Name)) {
-            var (cell, _) = ItemSlot.Cup($"pack_{id}", 44); cell.Icon = Icons.Of(id); cell.TooltipText = def.Name;
-            if (id == thing.Packs) cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
+            var (cell, _) = ItemSlot.Create($"pack_{id}", 44); cell.Icon = Icons.Of(id); cell.TooltipText = def.Name;
+            if (id == thing.Packs) cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
             cell.Pressed += () => { world.SetPacking(thing, id); memory.PackPicking = false; Redraw(); };
             picker.AddChild(cell);
         }
@@ -42,15 +42,15 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
     private VBoxContainer PackedCrate() {
         var output = thing.Output!;
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
-        var (cell, _) = ItemSlot.Cup("packed_crate", 64);
-        cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
+        var (cell, _) = ItemSlot.Create("packed_crate", 64);
+        cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
         cell.Icon = Icons.Of("crate");
         moves.TakeCell(cell, output, output.First, thing);
         column.AddChild(cell);
         var fill = Style.PerBatch(""); column.AddChild(fill);
         live.Watch(() => output.First() is string crate && world.Packed(crate) is Inventory contents ? contents.Count : -1, packed => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, packed >= 0 ? Colors.White : Style.Ghost);
-            cell.TooltipText = packed < 0 ? "The crate being packed shows here" : $"{(packed == world.Data.CrateCapacity ? "Full crate" : "Crate being packed")}\n{Cups.SlotHint}";
+            cell.TooltipText = packed < 0 ? "The crate being packed shows here" : $"{(packed == world.Data.CrateCapacity ? "Full crate" : "Crate being packed")}\n{StationSlots.SlotHint}";
             fill.Text = $"{Math.Max(0, packed)} / {world.Data.CrateCapacity}";
         });
         return column;

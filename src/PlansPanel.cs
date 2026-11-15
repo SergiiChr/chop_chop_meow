@@ -8,7 +8,7 @@ public partial class PlansPanel(PageTools tools) : PagePanel(tools) {
         var grid = NewGrid(); AddChild(grid);
         var details = Style.Wrapped("Hover a plan to see what it needs. Pick it up and click open ground nearby, or put it on a hotbar slot.", 14, Style.Beige);
         foreach (var (id, def) in world.Data.Buildings) {
-            var (cell, _) = ItemSlot.Cup($"build_{id.Id()}"); cell.Icon = Icons.Of(id.Id()); cell.TooltipText = $"{def.Name}\nLMB: pick up · Double LMB: place";
+            var (cell, _) = ItemSlot.Create($"build_{id.Id()}"); cell.Icon = Icons.Of(id.Id()); cell.TooltipText = $"{def.Name}\nLMB: pick up · Double LMB: place";
             cell.Controls = new SlotInput(cursor) {
                 Click = () => cursor.PickUp(id.Id()),
                 Use = () => { panel.Player.Mode = new ClickMode.Build(id); panel.Close(); kit.Refresh(); },

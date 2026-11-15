@@ -43,8 +43,8 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
     private readonly JobChoice job = new();
     private readonly FilterState filters = new();
 
-    /// <summary>The cups bound to this thing.</summary>
-    protected Cups cups => field ??= new Cups(kit, moves, live, thing);
+    /// <summary>The slots bound to this thing.</summary>
+    protected StationSlots stationSlots => field ??= new StationSlots(kit, moves, live, thing);
 
     public override bool Current => world.Find(thing.Id) == thing;
     protected override bool StoresFromHotbar => true;
@@ -100,9 +100,9 @@ public abstract partial class ThingPage(PageTools tools, Thing subject) : PagePa
         });
     }
 
-    /// <summary>The thing's slots in a grid of cups; Shift takes the stack clicked to the backpack and Ctrl all of that item.</summary>
+    /// <summary>The thing's slots in a grid; Shift takes the stack clicked to the backpack and Ctrl all of that item.</summary>
     protected GridContainer StorageGrid(int columns = GridColumns, float size = 52) =>
-        NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), Cups.SlotHint, columns: columns, size: size);
+        NewInventoryGrid(() => thing.Inventory, thing, id => moves.Stack(thing.Inventory, world.S.Backpack, id, thing), StationSlots.SlotHint, columns: columns, size: size);
 
     /// <summary>The backpack drawer, where Shift and Ctrl store into this thing.</summary>
     protected void StoreBagGrid(Func<string, bool>? wanted = null) =>

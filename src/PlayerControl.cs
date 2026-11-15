@@ -147,7 +147,7 @@ public sealed class PlayerControl {
         if (t != null) panel.Select(t);
     }
 
-    /// <summary>Space: pumps a selected reinforced furnace in reach, else swings what is in hand.</summary>
+    /// <summary>Space: pumps a selected reinforced furnace in reach, else swings what is selected on the hotbar.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
         if (station != null && station.Kind == ThingKind.Reinforced && world.Near(station)) world.Pump(station); else world.Attack();
@@ -168,15 +168,16 @@ public sealed class PlayerControl {
     }
 
     private void LeftPress(Vector2 at) {
-        // The press is over open ground, which a crate or plan on the cursor places on even before a frame has seen the mouse there.
-        PlaceHeld(false);
-        if (Mode.Placing != null) { Place(view.ToWorld(at).Round()); return; }
         var t = view.Pick(at);
-        // A held stack goes into storage clicked in the world, and back to its cell on a click anywhere else.
+        // A held stack goes into storage clicked in the world; a held crate or plan places on open ground, even before a frame has seen the mouse there;
+        // and a click anywhere else lets go of the stack, back to its cell.
         if (!cursor.Empty) {
-            if (t is { IsStorage: true } && cursor.Stack != null) kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); else cursor.Release();
+            if (t is { IsStorage: true } && cursor.Stack != null) { kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return; }
+            PlaceHeld(false);
+            if (Mode.Placing != null) Place(view.ToWorld(at).Round()); else cursor.Release();
             return;
         }
+        if (Mode.Placing != null) { Place(view.ToWorld(at).Round()); return; }
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
         var w = view.PickWorker(at);
         if (w != null) panel.Select(w);

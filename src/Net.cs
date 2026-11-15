@@ -612,7 +612,7 @@ public partial class Net : Node {
 
     private static readonly Dictionary<Type, PropertyInfo[]> properties = new();
 
-    /// <summary>Copies every saved property; inventories are copied into the ones already there, which open panels and drags hold on to.</summary>
+    /// <summary>Copies every saved property; inventories are copied into the ones already there, which open panels hold on to.</summary>
     private static void CopyExcept(object target, object source, HashSet<string>? skip) {
         var type = target.GetType();
         if (!properties.TryGetValue(type, out var list))

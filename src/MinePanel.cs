@@ -31,17 +31,17 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
             var line = new StageTrack(nodes); AddChild(line); line.At(stage);
             AddLabel($"Stage {stage + 1} · {stages[stage].Title}", 16);
             if (thing.MineStage == MineStage.Dug) {
-                // Supplies: delivered on the pill, needed under the cup; a lit backpack stack put on its cup delivers it.
+                // Supplies: delivered on the pill, needed under the slot; a lit backpack stack put on its slot delivers it.
                 var row = Well(new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }); row.AddThemeConstantOverride("separation", 28);
                 foreach (var (item, amount) in data.Materials) {
                     var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); row.AddChild(column);
-                    var (cell, count) = ItemSlot.Cup($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
+                    var (cell, count) = ItemSlot.Create($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
                     moves.TakeCell(cell, thing.Inventory, item, thing, held => held.Stack is { Box: 0 } stack && stack.Item == item, (_, units) => kit.Run(() => world.PutDown(thing.Inventory, -1, units)));
                     column.AddChild(Style.PerBatch($"/ {amount}"));
                     live.Watch(() => thing.Inventory[item], drawn => {
                         count.Text = drawn.ToString();
-                        cell.AddThemeStyleboxOverride("normal", drawn >= amount ? Style.Round(Style.CupFill, 14).Item1 : Style.CupNormal);
-                        cell.TooltipText = $"{world.Data.Name(item)} · {drawn} of {amount}\nPut it here from your backpack · {Cups.SlotHint}";
+                        cell.AddThemeStyleboxOverride("normal", drawn >= amount ? Style.Round(Style.SlotFill, 14).Item1 : Style.SlotNormal);
+                        cell.TooltipText = $"{world.Data.Name(item)} · {drawn} of {amount}\nPut it here from your backpack · {StationSlots.SlotHint}";
                     });
                 }
             } else Dynamic(text => text.Append(stages[stage].Needs).Append(" · ").Append((int)(thing.Progress / world.MineStageSeconds * 100)).Append("% done"), 14, Style.Beige);
@@ -58,7 +58,7 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
                 string item = items[i];
                 var pair = new HBoxContainer(); pair.AddThemeConstantOverride("separation", 10); row.AddChild(pair);
                 var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); pair.AddChild(column);
-                var (cell, count) = ItemSlot.Cup($"output_{item}", 64); cell.Icon = Icons.Of(item); cell.AddThemeStyleboxOverride("normal", Style.CupWanted); column.AddChild(cell);
+                var (cell, count) = ItemSlot.Create($"output_{item}", 64); cell.Icon = Icons.Of(item); cell.AddThemeStyleboxOverride("normal", Style.SlotWanted); column.AddChild(cell);
                 moves.TakeCell(cell, thing.Output!, item, thing);
                 var track = new Panel { CustomMinimumSize = new Vector2(64, 8) }; track.AddThemeStyleboxOverride("panel", Style.BarBack); column.AddChild(track);
                 var fill = new ColorRect { Color = Style.Mustard, Size = new Vector2(0, 8) }; track.AddChild(fill); bars[i] = fill;

@@ -151,7 +151,7 @@ public partial class Game {
         await Click(to);
     }
 
-    /// <summary>Clicks open ground beside the player, so the click uses the item in hand instead of selecting something.</summary>
+    /// <summary>Clicks open ground beside the player, so the click uses the item selected on the hotbar instead of selecting something.</summary>
     private async Task ClickGround() {
         await Frames();
         var open = Enumerable.Range(1, 6).SelectMany(r => Enumerable.Range(0, 8).Select(a => world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r))

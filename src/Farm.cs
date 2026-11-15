@@ -19,7 +19,7 @@ public sealed partial class World {
         _ => 0
     };
 
-    /// <summary>A fallow plot sows once seeds and fertilizer are put in its sowing slots; growing wheat ripens after its days.</summary>
+    /// <summary>A fallow plot sows once seeds and fertilizer are put in its input slots; growing wheat ripens after its days.</summary>
     private void FarmTick(Thing farm, float dt) {
         if (farm.FarmStage == FarmStage.Fallow && farm.Inventory.Has(Data.Farm.Sow)) { farm.Inventory.Spend(Data.Farm.Sow); farm.FarmStage = FarmStage.Growing; farm.Progress = 0; }
         if (farm.FarmStage == FarmStage.Growing && (farm.Progress += dt) >= GrowSeconds) { farm.FarmStage = FarmStage.Ripe; farm.Progress = 0; }
@@ -41,7 +41,7 @@ public sealed partial class World {
 
     /// <summary>
     /// A farmer harvests the ripe wheat.
-    /// A hauler first moves seed from the plot's own harvest into its sowing slots, then carries the rest of the harvest out and fetches what the next sowing still lacks.
+    /// A hauler first moves seed from the plot's own harvest into its input slots, then carries the rest of the harvest out and fetches what the next sowing still lacks.
     /// Nothing sows from the harvest on its own: seed only goes back in by a hauler's or the player's hand.
     /// </summary>
     private bool FarmWork(Worker w, Thing farm, float dt) {

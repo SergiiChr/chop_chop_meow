@@ -122,14 +122,14 @@ public sealed partial class World {
         return Host != null;
     }
 
-    /// <summary>Puts a hotbar slot in hand; the server keeps it, so a save has it.</summary>
+    /// <summary>Selects a hotbar slot; the server keeps it, so a save has it.</summary>
     public void SelectHotbar(int slot) {
         if (slot is < 0 or > 8) return;
         S.ActiveHotbar = slot;
         Forwarded(Verb.SelectHotbar, count: slot);
     }
 
-    /// <summary>Puts an item, or nothing, in a hotbar slot and that slot in hand; the server keeps it, so a save has it.</summary>
+    /// <summary>Puts an item, or nothing, in a hotbar slot and selects that slot; the server keeps it, so a save has it.</summary>
     public void SetHotbar(int slot, string item) {
         if (slot is < 0 or > 8) return;
         S.HotbarSlots[slot] = item; S.ActiveHotbar = slot;
@@ -262,7 +262,7 @@ public sealed partial class World {
         if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
         if (Forwarded(Verb.TransferSlot, a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
         if (a > 0 && !Reaches(Find(a / BoxCodes)!) || b > 0 && !Reaches(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
-        // Reject a stale drag rather than moving a different item.
+        // Reject a stale move rather than moving a different item.
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
         if (from.Layout[sourceSlot].HeldBy is int holder && holder != 0 && holder != S.Actor.Id || to.Layout[targetSlot].HeldBy is int other && other != 0 && other != S.Actor.Id) { Say(HeldByAnother); return 0; }
         if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }

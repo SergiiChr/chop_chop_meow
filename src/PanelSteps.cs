@@ -43,7 +43,7 @@ public partial class Game {
         return text;
     }
 
-    /// <summary>The open station page's work: its input cups, progress bar and output cups.</summary>
+    /// <summary>The open station page's work: its input slots, progress bar and output slots.</summary>
     private ProcessRow WorkRow() => panel.FindChildren("*", "", true, false).OfType<ProcessRow>().Single();
 
     /// <summary>A cell of the backpack drawer, whatever grids the open page has.</summary>

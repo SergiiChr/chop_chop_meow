@@ -12,22 +12,22 @@ public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, s
     /// <summary>How long a shake lasts, in seconds, how far it swings to each side, in pixels, and how many times it swings.</summary>
     private const float ShakeSeconds = .4f, ShakeReach = 8, ShakeSwings = 4;
 
-    // The input cups and the output cups, each group in a box of its own.
+    // The input slots and the output slots, each group in a box of its own.
     private HBoxContainer left = null!;
     private VBoxContainer right = null!;
     private Tween? shake;
 
-    /// <summary>Whether the cups are shaking now.</summary>
+    /// <summary>Whether the slots are shaking now.</summary>
     public bool Shaking => shake != null && shake.IsValid();
 
-    /// <summary>Shakes the input and output cups from side to side and back to rest, to show they are taken; a shake under way goes on as it is.</summary>
+    /// <summary>Shakes the input and output slots from side to side and back to rest, to show they are taken; a shake under way goes on as it is.</summary>
     public void Shake() {
         if (Shaking) return;
         bool placed = false;
         Vector2 leftHome = default, rightHome = default;
         shake = CreateTween();
         shake.TweenMethod(Callable.From<float>(done => {
-            // The cups' places are read on the first step: a row drawn this frame is laid out only by then.
+            // The slots' places are read on the first step: a row drawn this frame is laid out only by then.
             if (!placed) { placed = true; leftHome = left.Position; rightHome = right.Position; }
             var swing = new Vector2(MathF.Sin(done * MathF.Tau * ShakeSwings) * (1 - done) * ShakeReach, 0);
             left.Position = leftHome + swing; right.Position = rightHome + swing;
@@ -55,11 +55,11 @@ public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, s
     }
 }
 
-/// <summary>The fuel position under a process bar: an icon for what it is, its cup or picture, how long it lasts, and what else it takes.</summary>
-public partial class FuelRow(string glyph, Color tint, Control cup, Label lasts, Control? accepted = null) : HBoxContainer {
+/// <summary>The fuel position under a process bar: an icon for what it is, its slot or picture, how long it lasts, and what else it takes.</summary>
+public partial class FuelRow(string glyph, Color tint, Control slot, Label lasts, Control? accepted = null) : HBoxContainer {
     public override void _Ready() {
         AddThemeConstantOverride("separation", 8);
-        AddChild(Style.Glyph(glyph, 24, tint)); AddChild(cup); AddChild(lasts);
+        AddChild(Style.Glyph(glyph, 24, tint)); AddChild(slot); AddChild(lasts);
         if (accepted != null) AddChild(accepted);
     }
 }

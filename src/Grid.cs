@@ -9,14 +9,14 @@ public partial class PagePanel {
     protected const int GridColumns = 6;
     /// <summary>The backpack drawer is two rows of twelve, or three of eight on a narrow screen.</summary>
     protected int BagColumns => panel.ScreenWidth >= 1400 ? 12 : 8;
-    /// <summary>Room between cups for the count pills that sit on their corners.</summary>
-    protected const int CupGap = 10;
+    /// <summary>Room between slots for the count pills that sit on their corners.</summary>
+    protected const int SlotGap = 10;
 
-    /// <summary>An empty grid with room between its cups, for the caller to place.</summary>
+    /// <summary>An empty grid with room between its slots, for the caller to place.</summary>
     protected static GridContainer NewGrid(int columns = GridColumns) {
         var grid = new GridContainer { Columns = columns };
-        grid.AddThemeConstantOverride("h_separation", CupGap);
-        grid.AddThemeConstantOverride("v_separation", CupGap);
+        grid.AddThemeConstantOverride("h_separation", SlotGap);
+        grid.AddThemeConstantOverride("v_separation", SlotGap);
         return grid;
     }
 
@@ -34,7 +34,7 @@ public partial class PagePanel {
         var grid = NewGrid(columns);
         if (size < 52) { grid.AddThemeConstantOverride("h_separation", 8); grid.AddThemeConstantOverride("v_separation", 8); }
         var stacks = new (string Item, int Count)?[inventory().Slots];
-        var cells = Enumerable.Range(0, stacks.Length).Select(i => ItemSlot.Cup($"slot_{i}", size)).ToArray();
+        var cells = Enumerable.Range(0, stacks.Length).Select(i => ItemSlot.Create($"slot_{i}", size)).ToArray();
         var shown = new bool[cells.Length];
         bool first = true;
         for (int i = 0; i < cells.Length; i++) {
@@ -87,7 +87,7 @@ public partial class PagePanel {
             count.Text = stack is (string bottle, _) && Water.IsBottle(bottle) ? $"{Water.BottleSips(bottle)}/3" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
             if (wanted != null) {
                 bool takes = stack is (string item, _) && wanted(item);
-                cell.AddThemeStyleboxOverride("normal", takes ? Style.CupWanted : Style.CupNormal);
+                cell.AddThemeStyleboxOverride("normal", takes ? Style.SlotWanted : Style.SlotNormal);
                 cell.AddThemeColorOverride(ItemSlot.IconNormal, stack == null || takes ? Colors.White : Style.Faded);
             }
             cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}\n{hint}" : "";

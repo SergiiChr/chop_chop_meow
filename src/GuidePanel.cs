@@ -4,7 +4,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The field guide: round tabs for its topics beside short tips, each led by the item or key it is about.
-/// Keys show as key caps; everything else as the item's icon in a cup.
+/// Keys show as key caps; everything else as the item's icon in a slot.
 /// </summary>
 public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
     private static readonly (string Key, string Glyph, string Title)[] GuideTopics = {
@@ -17,12 +17,14 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
         ["controls"] = new[] {
             ("key:WASD", "Move. Hold Shift to sprint; food and drink drain faster."),
             ("key:Hold RMB", "Walk over and gather. On a placed crate, pick it up with what is inside."),
-            ("key:LMB", "Select. On open ground, use what is in hand: swing, eat, drink."),
+            ("key:LMB", "Select. On open ground, use what is selected on the hotbar: swing, eat, drink."),
             ("key:E", "Inspect what is nearest."),
-            ("key:Space", "Swing the tool in hand, or pump a selected reinforced furnace."),
-            ("key:1–9", "Put a hotbar slot in hand. Drag an item or plan onto a slot to assign it."),
+            ("key:Space", "Swing the tool selected on the hotbar, or pump a selected reinforced furnace."),
+            ("key:1–9", "Select a hotbar slot. Put a held item or plan on a slot to assign it; RMB on a slot empties it."),
             ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Your crew."), ("key:I", "This guide."),
-            ("key:Click / Shift / Ctrl", "Click moves one item, Shift-click the stack clicked and Ctrl-click all of that item. Right-click picks up half."),
+            ("key:LMB on a slot", "Pick up its stack, or put down the held stack. RMB picks up half, or puts down one."),
+            ("key:Double LMB", "Use an item: eat, drink, light a torch, or open a crate as storage."),
+            ("key:Shift / Ctrl", "Move the stack clicked, or all of that item, to the other storage open."),
             ("key:Drag", "Drag an empty spot on a panel or the backpack to move it."),
             ("key:F5 · F9", "Quick save and load."),
             ("key:Esc", "Cancel, close a panel, or pause.")
@@ -56,7 +58,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
             ("water", "Your bottle holds three sips. Refill it at the lake; the sea is salt. Without a bottle, drink at the source."),
             ("hut", "Build a cabin and campfire before dusk. A cabin shelters you; a lit fire keeps wolves away. Sleep inside after 10 pm if your food and water will last until dawn."),
             ("campfire", "Wolves leave their dens at dusk and keep out of fire light. A log burns about 4 hours."),
-            ("torch", "Click to light a torch, click to swing it. Four quick swings put it out."),
+            ("torch", "Click open ground to light a torch, click again to swing it. Four quick swings put it out."),
             ("raw_meat", "Butcher a slain wolf for raw meat and cook it before eating.")
         },
         ["trade"] = new[] {
@@ -94,9 +96,9 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
                 var slot = new VBoxContainer { CustomMinimumSize = new Vector2(88, 0), Alignment = BoxContainer.AlignmentMode.Center }; slot.AddChild(cap); cap.SizeFlagsHorizontal = Control.SizeFlags.ShrinkBegin;
                 row.AddChild(slot);
             } else {
-                var cup = new PanelContainer { CustomMinimumSize = new Vector2(44, 44), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; cup.AddThemeStyleboxOverride("panel", Style.CupNormal);
-                cup.AddChild(lead.StartsWith("line_") ? Style.Glyph(lead, 28, Style.Ink) : Style.Icon(Icons.Of(lead), 32));
-                row.AddChild(cup);
+                var itemSlot = new PanelContainer { CustomMinimumSize = new Vector2(44, 44), SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; itemSlot.AddThemeStyleboxOverride("panel", Style.SlotNormal);
+                itemSlot.AddChild(lead.StartsWith("line_") ? Style.Glyph(lead, 28, Style.Ink) : Style.Icon(Icons.Of(lead), 32));
+                row.AddChild(itemSlot);
             }
             var text = Style.Text(tip, 14, Style.Ink, wrap: true); text.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; text.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
             row.AddChild(text);

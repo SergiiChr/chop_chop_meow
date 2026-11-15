@@ -28,13 +28,13 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
                 _ => "Sows once seeds and fertilizer are in"
             };
         });
-        var fertilizer = SowingCup("fertilizer", Style.CupFuel);
+        var fertilizer = InputSlot("fertilizer", Style.SlotFuel);
         var lasts = Style.Text("", 13, Style.Tan);
         int perCrop = world.Data.Farm.Sow.GetValueOrDefault("fertilizer");
         live.Watch(() => thing.Inventory["fertilizer"], stock => lasts.Text = $"×{perCrop} · {stock / Math.Max(1, perCrop)}{(stock == 1 ? " crop" : " crops")}");
-        var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => (Control)Cups.Labelled(SowingCup(k), $"×{world.Data.Farm.Sow[k]}"));
-        var main = Cups.Labelled(HarvestCup("wheat"), $"×{world.Data.Farm.Yield.GetValueOrDefault("wheat")}");
-        var side = world.Data.Farm.Yield.Keys.Where(k => k != "wheat").Select(k => (Control)Cups.Labelled(HarvestCup(k, 44), $"×{world.Data.Farm.Yield[k]}")).ToArray();
+        var inputs = world.Data.Farm.Sow.Keys.Where(k => k != "fertilizer").Select(k => (Control)StationSlots.Labelled(InputSlot(k), $"×{world.Data.Farm.Sow[k]}"));
+        var main = StationSlots.Labelled(OutputSlot("wheat"), $"×{world.Data.Farm.Yield.GetValueOrDefault("wheat")}");
+        var side = world.Data.Farm.Yield.Keys.Where(k => k != "wheat").Select(k => (Control)StationSlots.Labelled(OutputSlot(k, 44), $"×{world.Data.Farm.Yield[k]}")).ToArray();
         AddChild(new ProcessRow(live, inputs, $"{world.Data.Farm.GrowDays:0} d", () => thing.FarmStage == FarmStage.Growing ? thing.Progress / world.GrowSeconds : thing.FarmStage == FarmStage.Ripe ? 1 : 0,
             new FuelRow("line_leaf", new Color("8fae7e"), fertilizer, lasts), main, side));
         StoreBagGrid(id => world.Holds(thing, id));
@@ -45,11 +45,11 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
     private static string Until(int hours) => hours >= 24 ? Count(hours / 24, "day") : Count(Math.Max(1, hours), "hour");
     private static string Count(int n, string unit) => n == 1 ? $"1 {unit}" : $"{n} {unit}s";
 
-    /// <summary>A cup for what the plot sows from; seed comes back in from the plot's own harvest as well as from the backpack.</summary>
-    private ItemSlot SowingCup(string item, StyleBoxFlat? look = null) =>
-        cups.Cup(thing.Inventory, item, true, held => $"{world.Data.Name(item)} · {held}\n{Cups.SlotHint} · put seeds here from the harvest or backpack to sow", look: look,
+    /// <summary>A slot for what the plot sows from; seed comes back in from the plot's own harvest as well as from the backpack.</summary>
+    private ItemSlot InputSlot(string item, StyleBoxFlat? look = null) =>
+        stationSlots.Slot(thing.Inventory, item, true, held => $"{world.Data.Name(item)} · {held}\n{StationSlots.SlotHint} · put seeds here from the harvest or backpack to sow", look: look,
             takes: held => held.Stack is HeldStack stack && stack.Item == item && (stack.Box == 0 || thing.Output != null && stack.Box == world.Locate(thing.Output)));
 
-    private ItemSlot HarvestCup(string item, float size = 52) =>
-        cups.Cup(thing.Output ?? thing.Inventory, item, false, held => $"{world.Data.Name(item)} · {held}\n{Cups.SlotHint} · put seeds back in the sowing slot", size);
+    private ItemSlot OutputSlot(string item, float size = 52) =>
+        stationSlots.Slot(thing.Output ?? thing.Inventory, item, false, held => $"{world.Data.Name(item)} · {held}\n{StationSlots.SlotHint} · put seeds back in the input slot", size);
 }

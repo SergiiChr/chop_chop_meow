@@ -15,7 +15,7 @@ namespace ChopChopMeow;
 /// </summary>
 /// <param name="station">Null when crafting by hand.</param>
 /// <param name="openOn">A recipe whose group the board opens, for a page opening rather than drawing again.</param>
-/// <param name="occupied">Shows that a station's cups are taken, when it cannot turn to the recipe queued or marked; null by hand.</param>
+/// <param name="occupied">Shows that a station's slots are taken, when it cannot turn to the recipe queued or marked; null by hand.</param>
 public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory, SidePanel panel, Action redraw, Thing? station, string? openOn, Action? occupied = null) : VBoxContainer {
     private readonly World world = kit.World;
 
@@ -85,7 +85,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
     /// <summary>A recipe card: the product with what a batch makes on a pill, its name, and under it its inputs or the tool it lacks; the queued count sits at the top right.</summary>
     private ItemSlot Card(string id) {
         var r = world.Data.Recipes[id];
-        var (cell, _) = ItemSlot.Cup($"craft_{id}");
+        var (cell, _) = ItemSlot.Create($"craft_{id}");
         cell.CustomMinimumSize = new Vector2(0, 64); cell.SizeFlagsHorizontal = SizeFlags.ExpandFill;
         var face = new HBoxContainer { MouseFilter = MouseFilterEnum.Ignore };
         face.SetAnchorsAndOffsetsPreset(LayoutPreset.FullRect, LayoutPresetMode.Minsize, 8); face.AddThemeConstantOverride("separation", 8); cell.AddChild(face);
@@ -138,7 +138,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             Queue(1);
             if (unmarked) kit.Run(() => world.SetRecipe(station, id));
         };
-        // The server answers a refusal with its reason; the cups in the way shake at once.
+        // The server answers a refusal with its reason; the slots in the way shake at once.
         void Queue(int batches) {
             refusing = null;
             bool refused = world.SwitchBlock(station!, id) != null;
@@ -146,7 +146,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             if (refused) occupied?.Invoke();
         }
         // A mark the station takes is set at once.
-        // One it refuses is shown only once the time for a second press is over: a double-click empties the cups in the way and queues instead.
+        // One it refuses is shown only once the time for a second press is over: a double-click empties the slots in the way and queues instead.
         void Mark() {
             string mark = station!.Keep == id ? "" : id;
             refusing = null;
@@ -155,7 +155,7 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             wait.Timeout += () => {
                 if (refusing != wait) return;
                 refusing = null;
-                // The cups may have emptied meanwhile: then the mark moves after all.
+                // The slots may have emptied meanwhile: then the mark moves after all.
                 bool refused = world.MarkBlock(station, mark) != null;
                 kit.Run(() => world.SetRecipe(station, mark));
                 if (refused) occupied?.Invoke();
@@ -247,7 +247,7 @@ public partial class RecipePopup(World world, Thing? station, RecipeDef r, float
 }
 
 /// <summary>
-/// What waits in the hand's queue, one cup per recipe in the order first queued; a right-click takes 1, 5 or 10 batches off.
+/// What waits in the hand's queue, one slot per recipe in the order first queued; a right-click takes 1, 5 or 10 batches off.
 /// The page draws it again when the queue's recipes change.
 /// </summary>
 public partial class QueueStrip(UiKit kit, LiveUpdates live) : HBoxContainer {
@@ -260,8 +260,8 @@ public partial class QueueStrip(UiKit kit, LiveUpdates live) : HBoxContainer {
         AddChild(Style.Text("Next", 14, Style.Beige));
         foreach (var q in queue) {
             var r = kit.World.Data.Recipes[q.Recipe];
-            var (cell, count) = ItemSlot.Cup($"queued_{q.Recipe}", 44); cell.Icon = Icons.Of(r.Output);
-            cell.AddThemeStyleboxOverride("normal", Style.CupWanted);
+            var (cell, count) = ItemSlot.Create($"queued_{q.Recipe}", 44); cell.Icon = Icons.Of(r.Output);
+            cell.AddThemeStyleboxOverride("normal", Style.SlotWanted);
             string id = q.Recipe;
             // The server's answer brings a new list, so the count is read from the world each time.
             live.Watch(() => world.Waiting(null, id), n => { count.Text = n.ToString(); cell.TooltipText = $"{r.Name} · {n} waiting\nRight-click: take 1, 5 or 10 off"; });

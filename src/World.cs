@@ -838,18 +838,18 @@ public sealed partial class World {
         t.Keep = recipe;
     }
     /// <summary>
-    /// Why a station's mark cannot move to a recipe now, or null: a mark turns a station to another recipe only while no batch is worked and its cups are empty.
+    /// Why a station's mark cannot move to a recipe now, or null: a mark turns a station to another recipe only while no batch is worked and its slots are empty.
     /// Taking the mark off, and marking the recipe the station is on, are never refused.
     /// </summary>
     public string? MarkBlock(Thing t, string recipe) =>
         recipe == "" || recipe == Selected(t) ? null
         : t.Processing ? Busy(t)
-        : t.Inventory.Count > 0 ? $"Empty the {Lower(Data.Name(t.Kind))}'s cups first." : null;
+        : t.Inventory.Count > 0 ? $"Empty the {Lower(Data.Name(t.Kind))}'s slots first." : null;
     private string Busy(Thing t) => $"The {Lower(Data.Name(t.Kind))} has to finish its batch first.";
     // The first recipe on each kind's board, found once.
     private readonly Dictionary<ThingKind, string> firstRecipes = new();
     /// <summary>
-    /// The recipe a station is on, whose cups its page shows: the one it makes now, else the one it was on last, else the first on its board.
+    /// The recipe a station is on, whose slots its page shows: the one it makes now, else the one it was on last, else the first on its board.
     /// A station is always on one; a thing that makes nothing is on none.
     /// </summary>
     public string Selected(Thing t) => t.Recipe != "" ? t.Recipe : t.Asked != "" ? t.Asked : firstRecipes.TryGetValue(t.Kind, out string? first) ? first : FirstRecipe(t.Kind);
@@ -980,7 +980,7 @@ public sealed partial class World {
     /// <summary>Whether the recipe a station is on or the one it keeps to takes an item as an input.</summary>
     private bool Pending(Thing t, string item) => BatchCost(Selected(t)).ContainsKey(item) || BatchCost(t.Keep).ContainsKey(item);
     /// <summary>
-    /// Whether a station's cups hold something left by another recipe: neither an input of the recipe it is on or keeps to, nor what its recipe makes.
+    /// Whether a station's slots hold something left by another recipe: neither an input of the recipe it is on or keeps to, nor what its recipe makes.
     /// It starts no batch until a hauler or a player takes that out.
     /// </summary>
     private bool Blocked(Thing t, RecipeDef r) {
@@ -990,7 +990,7 @@ public sealed partial class World {
     }
     /// <summary>Whether a station takes an item from the player: an input of the recipe it is on or keeps to, or a fuel it burns.</summary>
     public bool Takes(Thing t, string item) => Pending(t, item) || t.Burner != null && FuelFits(t, item);
-    /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it, with nothing left by another recipe in its cups.</summary>
+    /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it, with nothing left by another recipe in its slots.</summary>
     private bool Stocked(Thing t) => !HeldAt(t) && t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null) && !(Data.Recipes.TryGetValue(t.Recipe, out var r) && Blocked(t, r));
     /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
     public void LoadBatch(Thing t, int batches = 1) {

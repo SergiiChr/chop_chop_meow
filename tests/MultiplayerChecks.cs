@@ -158,7 +158,7 @@ public static class MultiplayerChecks {
         Require(guest.Backpack.Layout[7].Count == 4, "a guest's explicit slot move should move the requested count");
         Require(guest.Backpack["wood"] == 10, "a guest's explicit slot move should preserve all units");
         world.Run(guest, new Command(Verb.TransferSlot, 0, 0, "stone", 1, new Vector2(0, 8)));
-        Require(guest.Backpack.Layout[8].Item == "", "a stale drag must not move a different item now in its source slot");
+        Require(guest.Backpack.Layout[8].Item == "", "a stale move must not move a different item now in its source slot");
         world.Run(guest, new Command(Verb.SortBag, 0, 0, "", 0, default));
         Require(guest.Backpack.Layout[0].Item == "stone", "guest sorting should put stone first");
         Require(guest.Backpack.Layout[1].Item == "wood", "guest sorting should put wood second");

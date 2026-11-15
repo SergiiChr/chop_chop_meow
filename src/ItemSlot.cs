@@ -3,7 +3,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>The pill on a cup's corner: it shows only while it has something to count.</summary>
+/// <summary>The pill on a slot's corner: it shows only while it has something to count.</summary>
 public partial class Badge : Label {
     public new string Text {
         get => base.Text;
@@ -15,8 +15,8 @@ public partial class Badge : Label {
 public partial class ItemSlot : Button {
     public static readonly StringName IconNormal = "icon_normal_color";
 
-    /// <summary>A cream cup for one stack, with its count on a pill at the corner.</summary>
-    public static (ItemSlot Cell, Badge Count) Cup(string name, float size = 52) {
+    /// <summary>A cream slot for one stack, with its count on a pill at the corner.</summary>
+    public static (ItemSlot Cell, Badge Count) Create(string name, float size = 52) {
         var cell = new ItemSlot {
             Name = name,
             CustomMinimumSize = new Vector2(size, size),
@@ -26,7 +26,7 @@ public partial class ItemSlot : Button {
             FocusMode = FocusModeEnum.None,
             MouseDefaultCursorShape = CursorShape.PointingHand
         };
-        Style.Skin(cell, Style.CupNormal, Style.CupHover, Style.CupPressed);
+        Style.Skin(cell, Style.SlotNormal, Style.SlotHover, Style.SlotPressed);
         cell.AddThemeConstantOverride("icon_max_width", (int)(size * .74f));
         var count = CountBadge();
         cell.AddChild(count);
@@ -36,7 +36,7 @@ public partial class ItemSlot : Button {
         return (cell, count);
     }
 
-    /// <summary>A count pill for a corner of a cup: 0 or 1 for left or right, top or bottom.</summary>
+    /// <summary>A count pill for a corner of a slot: 0 or 1 for left or right, top or bottom.</summary>
     public static Badge CountBadge(float x = 1, float y = 1) {
         var count = new Badge { MouseFilter = MouseFilterEnum.Ignore, HorizontalAlignment = HorizontalAlignment.Center, Visible = false };
         count.AddThemeStyleboxOverride("normal", Style.CountPill);

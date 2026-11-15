@@ -40,7 +40,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
                 row.AddChild(cell);
             }
             if (filter.Count == 0) { var any = Style.Text(post ? "no deliveries" : "anything", 14, Style.Tan); any.CustomMinimumSize = new Vector2(0, 44); row.AddChild(any); }
-            var (add, _) = ItemSlot.Cup($"filter_add_{(output ? "out" : "in")}", 44);
+            var (add, _) = ItemSlot.Create($"filter_add_{(output ? "out" : "in")}", 44);
             add.Text = "+"; add.AddThemeFontSizeOverride("font_size", 22); add.AddThemeColorOverride("font_color", Style.Tan);
             add.TooltipText = "Add an item · or put a held one here";
             // A held stack goes back where it was: a filter only names it, or for a packed crate the kind of crate it is.
@@ -75,7 +75,7 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
 
     /// <summary>A filter entry's cell: the item, or for a crate of a good, the good with a small crate in the corner.</summary>
     private ItemSlot FilterCell(string name, string id) {
-        var (cell, _) = ItemSlot.Cup(name, 44);
+        var (cell, _) = ItemSlot.Create(name, 44);
         string? good = world.CrateGood(id);
         cell.Icon = Icons.Of(good ?? id);
         if (good != null) {

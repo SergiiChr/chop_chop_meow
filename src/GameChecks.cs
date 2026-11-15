@@ -533,14 +533,14 @@ public partial class Game {
         var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
         var box = Hosted.Add(ThingKind.Crate, world.Player); box.Inventory.Add("berries", 3); Hosted.PickUpCrate(box);
         string packed = Hosted.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
-        // A crate in hand on the hotbar only opens a clicked crate; the alert waits for a deliberate move.
+        // A crate selected on the hotbar only opens a clicked crate; the alert waits for a deliberate move.
         string lastSlot = world.HotbarSlots[8]; int active = world.ActiveHotbar;
         Give(Hosted, "crate", 1); SetHotbarSlot(world, 8, "crate"); await KeyStroke(Key.Key9); await CloseWithEsc();
         await Click(view.Screen(crate.Pos, .4f));
-        Require(!blackHole.Showing, "Clicking a crate with a crate in hand must not show the nesting alert.");
-        Require(Shows(crate), "Clicking a crate with a crate in hand must select the clicked crate.");
-        Require(crate.Inventory.Count == 0, "Clicking a crate with a crate in hand must not put the crate in hand into it.");
-        Require(world.Backpack["crate"] == 1, "Clicking a crate with a crate in hand must keep the crate in hand.");
+        Require(!blackHole.Showing, "Clicking a crate with a crate selected on the hotbar must not show the nesting alert.");
+        Require(Shows(crate), "Clicking a crate with a crate selected on the hotbar must select the clicked crate.");
+        Require(crate.Inventory.Count == 0, "Clicking a crate with a crate selected on the hotbar must not put that crate into it.");
+        Require(world.Backpack["crate"] == 1, "Clicking a crate with a crate selected on the hotbar must keep that crate in the backpack.");
         SetHotbarSlot(world, 8, lastSlot); await KeyStroke(Key.Key1 + active); await CloseWithEsc();
         // Two empty crates go down one after the other without opening, and placement ends with the last.
         Give(Hosted, "crate", 1);
@@ -1207,8 +1207,8 @@ public partial class Game {
         Require(panel.HeadingTitle.Text == worker.Name, "A right click on a tree must leave the worker's page open.");
         Hosted.Fire(worker); await CloseWithEsc();
     }
-    /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item in hand.</summary>
-    private async Task CheckHudAndHotbarEatAndDrinkInHand() {
+    /// <summary>The HUD shows only day and clock; the hotbar selects plans and items, and a ground click eats or drinks the item selected on it.</summary>
+    private async Task CheckHudAndHotbarEatAndDrinkSelected() {
         Require(!HasLabel(corner, "Health"), "The persistent HUD must not show health.");
         Require(!HasLabel(corner, "Food"), "The persistent HUD must not show food.");
         Require(!HasLabel(corner, "Water"), "The persistent HUD must not show water.");
@@ -1221,12 +1221,12 @@ public partial class Game {
         await KeyStroke(Key.Key8);
         Require(world.ActiveHotbar == 7, "Key 8 must make the eighth hotbar slot active.");
         Require(world.Backpack["berries"] == berries, "Key 8 must not eat the berries.");
-        Require(hotbar.Buttons[7].GetThemeStylebox("normal") == Style.CupWanted, "Key 8 must outline the berries in hand.");
-        Require(hotbar.Buttons[2].GetThemeStylebox("normal") != Style.CupWanted, "Key 8 must outline only the slot in hand.");
+        Require(hotbar.Buttons[7].GetThemeStylebox("normal") == Style.SlotWanted, "Key 8 must outline the selected berries.");
+        Require(hotbar.Buttons[2].GetThemeStylebox("normal") != Style.SlotWanted, "Key 8 must outline only the selected slot.");
         Require(player.Mode.Placing == null, "Selecting an item must clear any previously selected building plan.");
         int played = sounds.Played;
         await ClickGround();
-        Require(world.Backpack["berries"] == berries - 1, "A left click on open ground must eat the berries in hand.");
+        Require(world.Backpack["berries"] == berries - 1, "A left click on open ground must eat the selected berries.");
         Require(sounds.Played == played + 1 && sounds.Last == "eat_berry", "Eating must play only the eating sound, not an inventory sound as well.");
         Give(Hosted, "water", 1); SetNeeds(Hosted, thirst: 20);
         await Until(() => !hotbar.Buttons[8].Disabled, "the hotbar showing the water", 2);
@@ -1234,7 +1234,7 @@ public partial class Game {
         await Until(() => world.ActiveHotbar == 8, "a click selecting the hotbar slot once no second press follows", 2);
         Require(world.Backpack["water"] == 1, "Clicking a hotbar slot must only select it.");
         await ClickGround();
-        Require(world.Backpack["water"] == 0 && world.Thirst > 20, "A left click on open ground must drink the water in hand.");
+        Require(world.Backpack["water"] == 0 && world.Thirst > 20, "A left click on open ground must drink the selected water.");
     }
     /// <summary>The build page shows plan details and a ground click places a chest. Returns the chest.</summary>
     private async Task<Thing> CheckBuildPlanPlacesChest() {
@@ -1528,7 +1528,7 @@ public partial class Game {
         await Until(() => !view.Paused && world.Time > opened + .2f, "time passing under the open map", 2);
         Achieve(Hosted, "canned_meat_stew");
         await Until(() => stew.Known, "the stew turning to made before on the open map", 2);
-        await Click((Control)stew.FindChild("cup", true, false));
+        await Click((Control)stew.FindChild("slot", true, false));
         Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "Made before"), "The stew's details must say it was made before.");
         var stood = world.Player;
         await Holding(Key.D, () => Seconds(.3));
@@ -1546,14 +1546,14 @@ public partial class Game {
         await Click((Control)recipeMap.NodeOf("steel_bar")!.FindChild("also_coal", true, false));
         Require(coal.Lit, "A click on the steel bar's coal chip must light coal up.");
         await Until(() => !coal.Lit, "the light on coal going out again", RecipeMap.LitSeconds + 2);
-        await Click((Control)recipeMap.NodeOf("crate")!.FindChild("cup", true, false));
+        await Click((Control)recipeMap.NodeOf("crate")!.FindChild("slot", true, false));
         Require(recipeMap.Chosen == "crate" && ((Label)recipeMap.FindChild("detail_name", true, false)).Text == "Wood crate" && HasLabel((Node)recipeMap.FindChild("map_details", true, false), "6 Wood planks"), "A click on the crate must show its name and the six planks it requires.");
-        await Click((Control)recipeMap.NodeOf("planks")!.FindChild("cup", true, false));
+        await Click((Control)recipeMap.NodeOf("planks")!.FindChild("slot", true, false));
         Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "10 s by hand, 5 s at the crafting bench"), "Planks must show their time by hand and at the bench.");
-        await Click((Control)recipeMap.NodeOf("tin_can")!.FindChild("cup", true, false));
+        await Click((Control)recipeMap.NodeOf("tin_can")!.FindChild("slot", true, false));
         // Ten seconds, halved by the bench and divided by the steel hammer's 1.8.
         Require(HasLabel((Node)recipeMap.FindChild("map_details", true, false), "steel hammer · 2.8 s"), "Tin cans must show their time with the steel hammer they require.");
-        await Click((Control)recipeMap.NodeOf("crate")!.FindChild("cup", true, false));
+        await Click((Control)recipeMap.NodeOf("crate")!.FindChild("slot", true, false));
         await Click((Control)recipeMap.FindChild("map_show", true, false));
         await Until(() => !recipeMap.Visible && Shows(workbench) && Named("craft_crate") != null, "Show leaving the map for the bench's page with the crate on it", 2);
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
@@ -1578,7 +1578,7 @@ public partial class Game {
     /// <summary>
     /// At a station Shift and Ctrl queue and load 5 and 10 with the count on the plate and put the worker mark on the recipe queued,
     /// a click unmarks what workers keep making, a right-click takes batches off, and no queue is drawn below.
-    /// By hand a double-click queues just one, and a right-click on a cup in the queue takes a waiting batch off.
+    /// By hand a double-click queues just one, and a right-click on a slot in the queue takes a waiting batch off.
     /// </summary>
     private async Task CheckRecipeBoardsMarkAndQueueWithModifiers() {
         var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0));
@@ -1607,18 +1607,18 @@ public partial class Game {
         await Until(() => world.Backpack["stone"] == 4 || world.Making == "stone_chisel", "a right-click taking the queued chisel off unless it is already being made", 2);
         if (world.Making != "") Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
         await Until(() => world.Making == "" && world.Crafting.Count == 0, "the hand queue emptying", 2);
-        // Of three chisels one is being made, so the other two wait in one cup under the work.
+        // Of three chisels one is being made, so the other two wait in one slot under the work.
         Give(Hosted, "stone", 6);
         await Frames();
         int stone = world.Backpack["stone"];
         await Click(Named("craft_stone_chisel")!);
         await Until(() => world.Making == "stone_chisel" && Named("making") != null && Named("queued_stone_chisel") == null, "the page showing the first chisel being made with nothing waiting", 2);
         await Click(Named("craft_stone_chisel")!);
-        await Until(() => Named("queued_stone_chisel") != null, "the second chisel waiting in the queue's cup", 2);
+        await Until(() => Named("queued_stone_chisel") != null, "the second chisel waiting in the queue's slot", 2);
         await Click(Named("craft_stone_chisel")!);
-        await Until(() => Named("queued_stone_chisel")!.GetChildren().OfType<Badge>().First().Text == "2", "a third chisel counted on the queue's cup", 2);
+        await Until(() => Named("queued_stone_chisel")!.GetChildren().OfType<Badge>().First().Text == "2", "a third chisel counted on the queue's slot", 2);
         await RightClick(Named("queued_stone_chisel")!);
-        await Until(() => World.Waiting(world.Crafting, "stone_chisel") == 1 && world.Backpack["stone"] == stone - 4, "a right-click on the queue's cup taking one waiting chisel off and giving its stone back", 2);
+        await Until(() => World.Waiting(world.Crafting, "stone_chisel") == 1 && world.Backpack["stone"] == stone - 4, "a right-click on the queue's slot taking one waiting chisel off and giving its stone back", 2);
         await RightClick(Named("queued_stone_chisel")!);
         await Until(() => world.Crafting.Count == 0 && world.Backpack["stone"] == stone - 2, "a second right-click emptying the queue", 2);
         Hosted.Tick(world.Data.Recipes["stone_chisel"].Seconds);
@@ -1643,8 +1643,8 @@ public partial class Game {
         Require(furnace.Recipe == "tin_bar" && world.Waiting(furnace, "charcoal") == 0 && world.Backpack["wood"] == 2, "A furnace in the middle of a batch must stay on its recipe.");
         Hosted.Tick(world.Data.Recipes["tin_bar"].Seconds);
         await Until(() => !furnace.Processing && furnace.Inventory["tin_bar"] == 1, "the tin bar coming out", 2);
-        // An idle page refreshes a few times a second; one that drew itself again without its cups would never show the bar's count.
-        await Until(() => Named("output_tin_bar")?.GetChildren().OfType<Badge>().First().Text == "1", "the furnace that has run out of batches still showing the bar in its cup", 2);
+        // An idle page refreshes a few times a second; one that drew itself again without its slots would never show the bar's count.
+        await Until(() => Named("output_tin_bar")?.GetChildren().OfType<Badge>().First().Text == "1", "the furnace that has run out of batches still showing the bar in its slot", 2);
         await DoubleClick(Named("craft_charcoal")!);
         await Until(() => furnace.Recipe == "charcoal" && world.Backpack["tin_bar"] == 1 && furnace.Inventory["wood"] == 2 && Named("input_wood") != null,
             "a double-click on charcoal taking the bar into the backpack and turning the furnace to charcoal, loaded with its wood", 2);
@@ -1652,10 +1652,10 @@ public partial class Game {
     }
 
     /// <summary>
-    /// With no room in the backpack for what a station's cups hold, a double-click on another recipe leaves the station as it is, its cups shaking.
-    /// So does a click that would move the worker mark to another recipe while the cups hold something.
+    /// With no room in the backpack for what a station's slots hold, a double-click on another recipe leaves the station as it is, its slots shaking.
+    /// So does a click that would move the worker mark to another recipe while the slots hold something.
     /// </summary>
-    private async Task CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem() {
+    private async Task CheckStationSlotsShakeWhenTheBackpackHasNoRoomForThem() {
         await CloseWithEsc();
         var furnace = Hosted.Add(ThingKind.Furnace, world.Player + new Vector2(1, 0)); Hosted.SetRecipe(furnace, "charcoal");
         Give(Hosted, "wood", 2); Hosted.LoadInput(furnace, "wood", 2);
@@ -1663,17 +1663,17 @@ public partial class Game {
         int stone = Give(Hosted, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
         await ClickOn(furnace);
         await DoubleClick(Named("craft_iron_bar")!);
-        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the cups.");
+        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the stationSlots.");
         Require(furnace.Recipe == "charcoal" && furnace.Keep == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0,
-            "A furnace whose cups the backpack has no room for must stay on its recipe with its wood and its mark.");
-        await Until(() => !WorkRow().Shaking, "the cups coming to rest", 2);
+            "A furnace whose slots the backpack has no room for must stay on its recipe with its wood and its mark.");
+        await Until(() => !WorkRow().Shaking, "the slots coming to rest", 2);
         await Click(Named("craft_iron_bar")!);
-        await Until(() => WorkRow().Shaking, "a click on another recipe shaking the cups of a furnace that holds wood", 2);
+        await Until(() => WorkRow().Shaking, "a click on another recipe shaking the slots of a furnace that holds wood", 2);
         Require(furnace.Keep == "charcoal", "A furnace that holds something must keep its mark where it is.");
         RemoveThings(Hosted, t => t == furnace); Drop(Hosted, "stone", stone); await CloseWithEsc();
     }
 
-    /// <summary>A station whose mark is taken off stays on its recipe: the card keeps an outline and the page its cups.</summary>
+    /// <summary>A station whose mark is taken off stays on its recipe: the card keeps an outline and the page its slots.</summary>
     private async Task CheckUnmarkedStationStaysOnItsRecipe() {
         await CloseWithEsc();
         var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(1, 0));
@@ -1681,7 +1681,7 @@ public partial class Game {
         await Click(Named("craft_steel_parts")!);
         await Until(() => anvil.Keep == "" && !((Control)Named("craft_steel_parts")!.FindChild("kept", true, false)).Visible, "a click taking the mark off steel parts", 2);
         Require(Named("input_steel_bar") != null && Named("craft_steel_parts")!.GetThemeStylebox("normal") == Style.PlateSelected,
-            "An anvil with no mark must stay on steel parts, its card outlined and its cups on the page.");
+            "An anvil with no mark must stay on steel parts, its card outlined and its slots on the page.");
         RemoveThings(Hosted, t => t == anvil); await CloseWithEsc();
     }
 
@@ -1861,7 +1861,7 @@ public partial class Game {
             await Test(CheckMinePageFollowsTheMineThroughItsStages);
             await Test(CheckStrikerBesideAStationLeavesThePlayerHammering);
             await Test(CheckRightClickGathersAndLeavesASelectedWorkerMarked);
-            await Test(CheckHudAndHotbarEatAndDrinkInHand);
+            await Test(CheckHudAndHotbarEatAndDrinkSelected);
             var chest = await Test(CheckBuildPlanPlacesChest);
             await Test(() => CheckChestMovesSplitsAndFiltersStacks(chest));
             await Test(() => CheckQuickSaveAndLoadRestorePlayerAndChest(chest));
@@ -1880,7 +1880,7 @@ public partial class Game {
             await Test(CheckBenchLoadsInputsByClickDoubleClickAndSplit);
             await Test(CheckRecipeBoardsMarkAndQueueWithModifiers);
             await Test(CheckStationShakesWhileBusyThenTurnsToAnotherRecipe);
-            await Test(CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem);
+            await Test(CheckStationSlotsShakeWhenTheBackpackHasNoRoomForThem);
             await Test(CheckUnmarkedStationStaysOnItsRecipe);
             await Test(CheckRefusedDoubleClickKeepsTheWorkerMark);
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);

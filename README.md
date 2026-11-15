@@ -154,20 +154,23 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Shift while moving | Sprint 1.6× as fast; food and drink drain 1.7× as fast; not under 15% food or drink |
 | Hold right mouse button on a resource | Approach and gather while held |
 | Hold right mouse button on a placed crate | Walk over and pick it up with its contents |
-| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you inside; on open ground, use the item in hand (swing a tool or torch, eat, drink) |
+| Left mouse button | Select a resource, building, crate or worker; place selected building; clicking a cabin walks you inside; on open ground, use the item selected on the hotbar (swing a tool or torch, eat, drink); with a held stack, put it into the storage clicked, or let go of it anywhere else |
 | E | Inspect the selected object if nearby, otherwise the nearest nearby object |
 | B | Open building plans |
 | Tab | Open or close the backpack |
 | C | Open the crafting menu |
 | H | Open the crew overview |
 | I | Open or close the field guide |
-| 1–9 or click a hotbar slot | With a building's page open, a click moves the slot's item there instead; otherwise put that slot in hand, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
+| 1–9 or click a hotbar slot | Select that slot, shown with an outline; building plans and crates go straight to placement, which stays on after each placement until Esc or the materials or crates run out (a mine ends it and opens); defaults: axe, pickaxe, chest, campfire, furnace, anvil, crafting bench, berries, water |
 | Space | Swing axe overhead, or pump the selected nearby reinforced furnace |
 | F5 / F9 | Quick save / load to the current slot; until a slot is chosen they open the save or load screen |
 | Escape | Cancel placement/assignment, close a panel, or open the pause menu with goals, save, load, options, new game and quit |
 | Mouse wheel | Zoom |
-| Click / Shift-click / Ctrl-click an item cell | Move one item / the stack clicked / all of that item; this applies across inventory and station panels |
-| Drag a cell | Move its stack to another inventory or a station input slot; drop an item or building plan on the hotbar to assign it |
+| LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
+| RMB on an item slot | Pick up half its stack; with a stack held, put down one |
+| Double LMB on an item | Use it: eat, drink, light a torch, or open a crate as storage |
+| Shift-click / Ctrl-click an item slot | Move the stack clicked / all of that item to the other storage open; this applies across inventory and station panels |
+| RMB on a hotbar slot | Empty the slot |
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
 
 ## Interface
@@ -178,7 +181,7 @@ Health, hunger and thirst are three upright vials in the top-left corner with a 
 Each empties as its level falls and turns red at 25% or less.
 
 Beside them the bank shows the coins in the trading post's wage slot and the wages due each day, in red when they exceed the bank.
-Drop coins on it to pay in, or click it beside a trading post to take them out.
+Beside a trading post, put coins on it to pay in, or click it to pick up all its coins and put them in your backpack.
 
 The day dial in the top-right corner shows the sun crossing its arc from sunrise to sunset; then the moon crosses the same arc until dawn.
 A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
@@ -192,10 +195,11 @@ With a side panel open they keep to the space left of it.
 
 The bottom bar holds round badges for building, the backpack, crafting, the crew and the field guide, each with its key, next to the hotbar.
 
-Assign a hotbar slot by dragging an item from the backpack or a plan from the building plans onto it.
+Assign a hotbar slot by putting a held item from the backpack or a plan from the building plans on it; the stack goes back where it was. RMB on a slot empties it.
 Slots reference carried items or building plans; they are not extra storage.
 Consumable slots use one item, building slots enter placement, and tools select a working reference.
-With a building's page or an opened crate showing, clicking a hotbar slot moves its item there as clicking it in the backpack does: one, a stack with Shift, all of it with Ctrl.
+A double click on a slot uses its item, as in the backpack.
+With a building's page or an opened crate showing, Shift-click or Ctrl-click on a hotbar slot moves its item there as it does in the backpack: a stack with Shift, all of it with Ctrl.
 Hotbar assignments persist in saves.
 
 Building plans are an icon grid; hovering a plan shows its description and what it still needs.
@@ -213,14 +217,17 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 | Tool station | 4 slots, any tool in any slot |
 
 - You can move items in and out of storage and stations up to 15 metres away (`World.ItemReach`).
-- Inventory cells retain their positions. Drag to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
-- Right-click a stack to pick up half of it, then left-click a slot to drop it there.
-- A carried stack shows its count beside the cursor, as its cell does.
+- Inventory slots retain their positions. Pick up a stack and put it down to move, merge, split or swap stacks; Sort packs loose stacks and groups them by item type.
+- LMB picks up a slot's stack onto the cursor, a held stack, and RMB picks up half of it. With a stack held, LMB puts it down on a slot and RMB puts down one.
+- A held stack shows its count beside the cursor. It stays in its slot until it is put down, and nobody else can take it meanwhile: another player who tries is told it is held, workers and haulers leave it, and a station holding one starts no batch.
+- A stack put down that does not all fit fills the slot, and the rest stays held until you put it down elsewhere.
+- A slot that does not take the held stack, such as an input slot for another item or an output slot, shakes, and the stack stays held.
+- Esc, a click on open ground or on the interface anywhere but an item slot, closing the side panel or walking out of reach of the building it came from lets go of the held stack, which is then back in its slot.
+- A held crate or building plan over open ground goes into placement: a click places it. Back over the interface it is a held stack again.
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
-- A dropped stack that does not all fit fills the slot, and the rest stays held until you drop it elsewhere or click somewhere it cannot go.
-- Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, a packed crate click opens it and an empty crate click starts placement.
+- A double click uses an item: food is eaten, a filled bottle gives one sip and keeps the bottle, a torch lights, a crate opens as storage and a tool is selected on the hotbar. A single click on such an item waits 200 ms for a second one before it picks the stack up.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
-- A selected raw-material stack can be deposited by clicking a nearby chest.
+- A held stack put on storage clicked in the world, such as a chest, goes into it. An item only selected on the hotbar never does.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
 
 ### Station panels
@@ -230,7 +237,7 @@ A click on a heading closes its group and another opens it; the list scrolls onc
 A card shows the product, its name and what a batch takes, each count in brick while your backpack is short.
 A recipe whose tool is nowhere to hand names it instead, such as "No steel chisel".
 A card shows how many batches of it wait at its top right corner.
-The crafting menu also shows its queue under the work in progress, one cup per recipe in the order first queued, however many batches of it wait.
+The crafting menu also shows its queue under the work in progress, one queue slot per recipe in the order first queued, however many batches of it wait.
 
 Hovering a card shows what the recipe requires, how long it takes, what its product is used for and where its tool is:
 
@@ -249,10 +256,10 @@ A station's tool slots sit in a small window of their own left of its page, "Ava
 | Shift-click, Ctrl-click | Queue 5 or 10 and load their inputs and a fuel each from the backpack; the hard hat goes on the recipe | Queue 5 or 10 |
 | Right-click, with Shift or Ctrl | Take 1, 5 or 10 waiting batches off | Take 1, 5 or 10 off and get their materials back |
 
-A right-click on a cup in the crafting menu's queue takes batches off the same way.
+A right-click on a queue slot in the crafting menu takes batches off the same way.
 A batch leaves the count when it starts, and one in progress cannot be taken off.
 
-A station is on one recipe at a time, and its page shows that recipe's cups; the crafting menu queues as many recipes as you like.
+A station is on one recipe at a time, and its page shows that recipe's slots; the crafting menu queues as many recipes as you like.
 The card of the recipe a station is on has an outline, thicker and with the hard hat when it is also the marked one.
 A station nobody has marked or queued anything at is on the first recipe of its list.
 Queueing more of the recipe a station is on adds to its count.
@@ -260,33 +267,33 @@ Queueing another recipe depends on what the station is doing:
 
 | The station | Queueing another recipe |
 | --- | --- |
-| Is working a batch | Nothing changes, and its input and output cups shake |
-| Is between batches, with something in its cups | Its cups and its fuel cup empty into your backpack, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
-| Is between batches, with no room in your backpack for what its cups and fuel cup hold | Nothing changes, and its cups shake |
-| Has empty cups | It turns to the new recipe, its hard hat with it |
+| Is working a batch | Nothing changes, and its input and output slots shake |
+| Is between batches, with something in its slots | Its slots and its fuel slot empty into your backpack, the batches that still waited are dropped, and it turns to the new recipe, its hard hat with it |
+| Is between batches, with no room in your backpack for what its slots and fuel slot hold | Nothing changes, and its slots shake |
+| Has empty slots | It turns to the new recipe, its hard hat with it |
 
 Fuel a batch has already burned is gone; queueing a recipe loads its fuel again from your backpack.
 
-A click that would move the hard hat to another recipe than the one the station is on is refused while a batch is being worked or the cups hold anything.
-The cups shake a moment after such a click, once it is clear no second press makes it a double-click.
+A click that would move the hard hat to another recipe than the one the station is on is refused while a batch is being worked or the slots hold anything.
+The slots shake a moment after such a click, once it is clear no second press makes it a double-click.
 Taking the hard hat off, and putting it on the recipe the station is on, always work.
 A hard hat moved to another recipe drops the batches that still waited.
 
 So a station with a hard hat is always on the hard-hat recipe: once the batches you queued are done, workers go on making it.
 Click the hard hat off for a station to stop after your batches.
-It starts no batch while its cups hold something another recipe left there, such as a hauler's late delivery: haulers carry that to storage, or you take it out.
+It starts no batch while its slots hold something another recipe left there, such as a hauler's late delivery: haulers carry that to storage, or you take it out.
 A station page opens with the group of the recipe the station is on open.
 A station with nothing queued and nothing marked makes nothing, and stays on the recipe it was on.
 
-Stations show one cup per recipe input, the batch time above a progress bar and the output cup, with what one batch takes or makes under each cup.
-A station that burns fuel has its own fuel cup under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
+Stations show one slot per recipe input, the batch time above a progress bar and the output slot, with what one batch takes or makes under each slot.
+A station that burns fuel has its own fuel slot under the bar, marked by a flame, with how long the fuel in it lasts and the fuels the recipe burns beside it.
 Fuel the recipe cannot burn shows in brick; workers carry it back to storage and bring a fuel it burns.
 Side outputs and leftovers sit in a second row under the output.
-Each cup holds a single stack of 64.
+Each slot holds a single stack of 64.
 
-- Click a backpack item to add one to its cup, Shift-click to move the stack, Ctrl-click to move all of it, or drag it in.
-- Right-click a cup to pick up half.
-- Click or drag a cup to take its contents back.
+- Put a held backpack stack on its input slot to load it, RMB to load one, or Shift-click the backpack stack to load it and Ctrl-click to load all of that item.
+- LMB on a slot picks up its stack, RMB half; Shift-click or Ctrl-click moves it back to the backpack.
+- A farm plot, compost, campfire, mine and packing station have input and output slots that work the same way.
 
 ### Job buttons
 
@@ -426,8 +433,8 @@ The game goes on under it, with your character standing where they were, and an 
 
 - The map has a row for each category: wood, stone and coal, iron and steel, tin, food and farm. In a row each item hangs off the one it is made out of, raw material first.
 - Every item is on the map, with where it is made or come by under its name.
-- An item the settlement has made, gathered, bought or started with has a filled cup, and so has everything that item is made of; any other has a dashed outline. The stations along the top, with their costs, are outlined until first built.
-- Chips beside an item's cup show the tool its recipe requires (yellow rim) and each additional resource it takes (dark rim). A click on a chip scrolls to that item and lights it up for a moment.
+- An item the settlement has made, gathered, bought or started with has a filled slot, and so has everything that item is made of; any other has a dashed outline. The stations along the top, with their costs, are outlined until first built.
+- Chips beside an item's slot show the tool its recipe requires (yellow rim) and each additional resource it takes (dark rim). A click on a chip scrolls to that item and lights it up for a moment.
 - A click on an item shows how it is made, what it requires and what it is used for, with a button that opens the nearest station that makes it, or the crafting menu for a recipe made by hand.
 
 ### Crafting bench
@@ -493,8 +500,9 @@ Both stations, like the stone furnace's food recipes, take wood, coal or charcoa
 ### Wood crates
 
 A wood crate holds 12 items in total, as one stack or as single items, and its slots grow and shrink with its contents.
-Place one from the backpack or hotbar, click it to open it, and hold right mouse on it to pick it up with its contents packed inside.
-Click a packed crate in the backpack to open it where it is: click what it holds to take it out, click backpack items to pack them in, or put it down from there.
+Place one from the hotbar, or pick it up from the backpack and click open ground; click it to open it, and hold right mouse on it to pick it up with its contents packed inside.
+Double-click a crate in the backpack or on the hotbar to open it as storage where it is, even an empty one: it works like a chest with the backpack, and you can put it down from there.
+Picking up the open crate itself closes it, and it is then a held stack like any other.
 
 Workers never open or place crates; they pack them at a packing station.
 Putting a crate inside a crate asks first; saying yes ends the game.
@@ -502,7 +510,7 @@ Putting a crate inside a crate asks first; saying yes ends the game.
 ### Packing station
 
 The packing station (8 planks, 4 wood) packs one good into crates.
-Click the cup at the top to choose the good from everything a crate holds.
+Click the slot at the top to choose the good from everything a crate holds.
 It keeps a stack of that good and a stack of empty crates, and packs one item every 1.5 seconds while you or an assigned worker work it.
 The crate being packed shows on the right with how full it is; a full crate waits there until someone takes it.
 

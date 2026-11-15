@@ -5,7 +5,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The enamel camp-gear look shared by every panel: speckled slate-blue enamel with a cream rim, beige wells,
-/// cream cups for items with a count pill on their corner, and rounded buttons in muted brick, sage and mustard.
+/// cream slots for items with a count pill on their corner, and rounded buttons in muted brick, sage and mustard.
 /// Style boxes, fonts and the enamel texture are made once, since creating a resource allocates.
 /// </summary>
 public static class Style {
@@ -13,7 +13,7 @@ public static class Style {
     public static readonly Color Line = new("263849");
     public static readonly Color Rim = new("efe6d2");
     public static readonly Color Beige = new("e3d5b8");
-    public static readonly Color CupFill = new("f6f0e2");
+    public static readonly Color SlotFill = new("f6f0e2");
     public static readonly Color Ink = new("4a3d2e");
     public static readonly Color Tan = new("6d5b45");
     public static readonly Color Brick = new("b65a43");
@@ -26,7 +26,7 @@ public static class Style {
     /// <summary>On a dark popup: something there and ready, and something the player has that is not where it works for everyone.</summary>
     public static readonly Color Ready = new("8fcf9a"), Held = new("e8c468");
     public static readonly Color Rise = new("4f7a55");
-    /// <summary>Modulates: a faint picture of what an empty cup wants, something not ready yet, and what the open page does not take.</summary>
+    /// <summary>Modulates: a faint picture of what an empty slot wants, something not ready yet, and what the open page does not take.</summary>
     public static readonly Color Ghost = new(1, 1, 1, .28f), Unready = new(1, 1, 1, .5f), Faded = new(1, 1, 1, .4f);
 
     // Boxes by colour are made once and shared, since creating a resource allocates; declared first so the boxes below can use them.
@@ -55,7 +55,7 @@ public static class Style {
     /// <summary>A goal still to do on the pause board: an empty ring.</summary>
     public static readonly StyleBoxFlat GoalTodo = Flat(Beige, 12, 0, Tan, 3);
     /// <summary>A job chip on a worker card: a small cream pill with a thin outline.</summary>
-    public static readonly StyleBoxFlat Chip = Flat(CupFill, 13, 2, Line, 2, horizontal: 8);
+    public static readonly StyleBoxFlat Chip = Flat(SlotFill, 13, 2, Line, 2, horizontal: 8);
     /// <summary>The ring a clickable well, such as a worker card, gets on hover.</summary>
     public static readonly StyleBoxFlat CardHover = Flat(Colors.Transparent, 14, 0, Mustard, 3);
     /// <summary>The trading post's price sign: beige enamel in a slate frame.</summary>
@@ -67,16 +67,16 @@ public static class Style {
     public static readonly StyleBoxFlat ButtonHover = Flat(new Color("5a7593"), 20, 10, Rim, 3);
     public static readonly StyleBoxFlat ButtonPressed = Flat(Brick, 20, 10, Rim, 3);
     public static readonly StyleBoxFlat ButtonDisabled = Flat(new Color("40536a"), 20, 10, new Color(Rim, .5f), 3);
-    public static readonly StyleBoxFlat CupNormal = Flat(CupFill, 14, 3, Line, 2);
-    public static readonly StyleBoxFlat CupHover = Flat(CupFill, 14, 3, Mustard, 3);
-    public static readonly StyleBoxFlat CupPressed = Flat(new Color("ece2cc"), 14, 3, Brick, 3);
-    /// <summary>A cup whose item the open page takes, a station's output, or the item in hand.</summary>
-    public static readonly StyleBoxFlat CupWanted = Flat(CupFill, 14, 3, Brick, 3);
-    public static readonly StyleBoxFlat CupFuel = Flat(CupFill, 14, 3, Ember, 3);
-    public static readonly StyleBoxFlat CupBank = Flat(CupFill, 28, 3, Line, 2);
-    /// <summary>A recipe plate: a larger cup; the recipe a station makes is ringed in mustard.</summary>
-    public static readonly StyleBoxFlat PlateNormal = Flat(CupFill, 16, 6, Line, 2), PlateHover = Flat(CupFill, 16, 6, Mustard, 3), PlateKept = Flat(CupFill, 16, 6, Brick, 6), PlateSelected = Flat(CupFill, 16, 6, Brick, 3);
-    /// <summary>The pill on a cup's corner that counts what it holds.</summary>
+    public static readonly StyleBoxFlat SlotNormal = Flat(SlotFill, 14, 3, Line, 2);
+    public static readonly StyleBoxFlat SlotHover = Flat(SlotFill, 14, 3, Mustard, 3);
+    public static readonly StyleBoxFlat SlotPressed = Flat(new Color("ece2cc"), 14, 3, Brick, 3);
+    /// <summary>A slot whose item the open page takes, a station's output, or the slot selected on the hotbar.</summary>
+    public static readonly StyleBoxFlat SlotWanted = Flat(SlotFill, 14, 3, Brick, 3);
+    public static readonly StyleBoxFlat SlotFuel = Flat(SlotFill, 14, 3, Ember, 3);
+    public static readonly StyleBoxFlat SlotBank = Flat(SlotFill, 28, 3, Line, 2);
+    /// <summary>A recipe plate: a larger slot; the recipe a station makes is ringed in mustard.</summary>
+    public static readonly StyleBoxFlat PlateNormal = Flat(SlotFill, 16, 6, Line, 2), PlateHover = Flat(SlotFill, 16, 6, Mustard, 3), PlateKept = Flat(SlotFill, 16, 6, Brick, 6), PlateSelected = Flat(SlotFill, 16, 6, Brick, 3);
+    /// <summary>The pill on a slot's corner that counts what it holds.</summary>
     public static readonly StyleBoxFlat CountPill = Flat(Line, 9, 0, Rim, 2, horizontal: 5);
     /// <summary>The count beside a job's name, and a menu badge's key.</summary>
     public static readonly StyleBoxFlat BeigePill = Flat(Beige, 12, 0, horizontal: 6);
@@ -203,7 +203,7 @@ public static class Style {
     /// <summary>A small heading at the top of a well.</summary>
     public static Label WellLabel(string text) => Text(text, 13, Tan, Head);
 
-    /// <summary>A label under a cup: what one batch takes or makes.</summary>
+    /// <summary>A label under a slot: what one batch takes or makes.</summary>
     public static Label PerBatch(string text) {
         var label = Text(text, 13, Tan); label.HorizontalAlignment = HorizontalAlignment.Center;
         return label;
@@ -288,7 +288,7 @@ public partial class HeatDial : Control {
     public override void _Draw() {
         var centre = Size / 2;
         float radius = Math.Min(Size.X, Size.Y) / 2 - 3;
-        DrawCircle(centre, radius, Style.CupFill);
+        DrawCircle(centre, radius, Style.SlotFill);
         DrawArc(centre, radius, 0, Mathf.Tau, 48, Style.Line, 3, true);
         float track = radius - 8;
         DrawArc(centre, track, Start, Start + Sweep, 40, new Color(Style.Line, .3f), 2, true);
