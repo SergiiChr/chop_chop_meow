@@ -50,8 +50,8 @@ public static class EconomyChecks {
         float cost = DayCost(data);
         var earnings = data.Market.Sells.Keys.Where(chain.Measurable)
             .Select(id => (Item: id, Tool: data.Items[id].Tool != "", Depth: Depth(data, id), PerDay: CrateSells(data, id) / chain.CrateWorkerDays(id))).OrderBy(e => e.Depth).ToList();
-        static string PerDay(IEnumerable<KeyValuePair<string, float>> rates) => string.Join(", ", rates.Select(p => $"{p.Key} {p.Value:0}"));
-        GD.Print($"Economy: a worker-day costs {cost:0.0} coins; gathered per day {PerDay(chain.Gathered)}; made per day {PerDay(chain.MadePerDay)}; crates packed per day {PerDay(chain.PackedPerDay)}");
+        static string Rates(IEnumerable<KeyValuePair<string, float>> rates) => string.Join(", ", rates.Select(p => $"{p.Key} {p.Value:0}"));
+        GD.Print($"Economy: a worker-day costs {cost:0.0} coins; gathered per day {Rates(chain.Gathered)}; made per day {Rates(chain.MadePerDay)}; crates packed per day {Rates(chain.PackedPerDay)}");
         foreach (var e in earnings) GD.Print($"Economy: {e.Item,-16} {chain.CrateWorkerDays(e.Item):0.00} worker-days a crate, {e.PerDay:0} coins per worker-day ({e.PerDay / cost:0.00}x pay)");
         float berries = earnings.Single(e => e.Item == "berries").PerDay;
         Require(berries >= .9f * cost && berries <= 1.25f * cost, $"a hired berry picker should barely break even: {berries:0.0} coins a day against {cost:0.0}");

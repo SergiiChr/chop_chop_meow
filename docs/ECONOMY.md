@@ -84,10 +84,10 @@ Each good the village takes has `Daily`, `Steady` and `Drop` in `Market.Sells`:
 | Steel axe, pickaxe, shovel and hammer | 12 (1 crate) | 0 | 50% |
 
 - Food is a steady staple: its daily amount sells at the full price, and past it the price slips slowly.
-- Tools react sharply: a crate of one tool sells at the full price and takes half off it for the next sale, so a second crate sold later the same day fetches half.
+- Tools react sharply: a crate of one tool sells at the full price and takes half off it, so a second sale straight after fetches half. A day wins back half the full price.
 - Selling past the basket keeps that good cheap for days.
 
-Food brings in most of a day's basket, tools somewhat less and the crates a little; the `Economy:` lines give the totals.
+Tools bring in most of a day's basket, food somewhat less and the crates a little; the `Economy:` lines give the totals.
 
 ## 4. Trade
 

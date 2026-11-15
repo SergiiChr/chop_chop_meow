@@ -648,10 +648,9 @@ public static class SimulationChecks {
         Require(world.Transfer(world.Backpack, sign.Inventory, crate, 1) == 1 && world.Sell(sign), "market should accept the purchased tools back in a crate");
         SafeTick(world, data.TradeSeconds + .1f);
         int paid = sign.Wages![Inventory.Coins] + sign.Output[Inventory.Coins];
-        float price = data.Items["steel_axe"].Price;
         Require(world.Coins + paid < 20000, "buying tools and selling them straight back must lose coins");
-        Require(paid == (int)MathF.Floor(lot * price + data.Items["crate"].Price),
-                "a sale should pay every unit of a crate at the pre-sale price");
+        // 12 axes at 39 coins and the crate at 3.15, rounded down.
+        Require(paid == 471, $"a sale should pay every unit of a crate at the pre-sale price: {paid} coins");
     }
 
     private static void CheckRecoveryBoxesStayPrivate(GameData data) {
