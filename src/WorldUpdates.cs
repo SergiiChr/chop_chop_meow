@@ -95,6 +95,7 @@ public sealed class WorldUpdates {
     public Snapshot Capture(World world) {
         var s = world.S;
         world.NumberWolvesAndOrders();
+        world.ShareHeldStacks();
         var snapshot = Empty();
         Write(snapshot, new EntryKey(EntryKey.State, 0), s, StateInfo);
         entry.ResetWrittenCount(); entryWriter.Reset(entry);

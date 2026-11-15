@@ -26,7 +26,11 @@ public sealed class PlayerControl {
     private readonly WorldView view;
     private readonly SidePanel panel;
     private readonly Hotbar hotbar;
+    private readonly HeldCursor cursor;
+    private readonly ItemMoves moves;
     private readonly World world;
+    /// <summary>Whether <see cref="Mode"/> places the crate or plan on the cursor, which it does only while the mouse is over open ground.</summary>
+    private bool placingHeld;
     private Thing? gathering;
     /// <summary>A cabin the player is walking to after clicking it; they step inside on arrival.</summary>
     private Thing? entering;
@@ -37,8 +41,8 @@ public sealed class PlayerControl {
     /// <summary>What the next left click in the world does.</summary>
     public ClickMode Mode { get; set; } = new ClickMode.Normal();
 
-    public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar) {
-        this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; world = kit.World;
+    public PlayerControl(UiKit kit, WorldView view, SidePanel panel, Hotbar hotbar, HeldCursor cursor, ItemMoves moves) {
+        this.kit = kit; this.view = view; this.panel = panel; this.hotbar = hotbar; this.cursor = cursor; this.moves = moves; world = kit.World;
         world.Replaced += () => { Stop(); Mode = new ClickMode.Normal(); };
     }
 
@@ -54,8 +58,9 @@ public sealed class PlayerControl {
         Mode = new ClickMode.Crate(item); panel.Close();
     }
 
-    /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started.</summary>
-    public void Update(float dt) {
+    /// <summary>Moves the player for this frame from held keys and buttons, and carries on what a click started; <paramref name="overPanel"/> tells that the mouse is on the interface.</summary>
+    public void Update(float dt, bool overPanel) {
+        PlaceHeld(overPanel);
         // The recipe map covers the world, so nothing held over it walks or gathers.
         if (kit.Paused || panel.Map.Visible) { world.Me.Sprinting = false; return; }
         bool right = Input.IsMouseButtonPressed(MouseButton.Right);
@@ -63,6 +68,18 @@ public sealed class PlayerControl {
         direction = Gather(direction, right, dt);
         direction = Lift(direction, right, dt);
         Walk(direction, right, dt);
+    }
+
+    /// <summary>A crate or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>
+    private void PlaceHeld(bool overPanel) {
+        var plan = cursor.Plan is string id ? Kinds.Parse(id) : null;
+        string? crate = cursor.Stack is HeldStack held && World.IsCrate(held.Item) ? held.Item : null;
+        if ((plan != null || crate != null) && !overPanel) {
+            // Built only when it changes, as this runs every frame.
+            if (plan is ThingKind kind && !(Mode is ClickMode.Build build && build.Kind == kind)) Mode = new ClickMode.Build(kind);
+            if (crate != null && !(Mode is ClickMode.Crate placing && placing.Item == crate)) Mode = new ClickMode.Crate(crate);
+            placingHeld = true;
+        } else if (placingHeld) { placingHeld = false; Mode = new ClickMode.Normal(); }
     }
 
     private static Vector2 HeldDirection() {
@@ -120,7 +137,9 @@ public sealed class PlayerControl {
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
         world.MovePlayer(direction * dt * world.Data.MoveSpeed(world.Me.Sprinting)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
-        world.Me.Held = hotbar.ActiveItem() ?? "";
+        // A tool in hand that has left the backpack leaves the hand empty.
+        if (world.InHand != "" && world.Backpack[world.InHand] == 0) world.SelectInHand("");
+        world.Me.Selected = hotbar.ActiveItem() ?? "";
     }
 
     /// <summary>E: inspects the selected thing if it is in reach, else what is nearest.</summary>
@@ -130,7 +149,7 @@ public sealed class PlayerControl {
         if (t != null) panel.Select(t);
     }
 
-    /// <summary>Space: pumps a selected reinforced furnace in reach, else swings what is in hand.</summary>
+    /// <summary>Space: pumps a selected reinforced furnace in reach, else swings what is selected on the hotbar.</summary>
     public void Swing() {
         var station = world.Find(panel.Selection.Thing);
         if (station != null && station.Kind == ThingKind.Reinforced && world.Near(station)) world.Pump(station); else world.Attack();
@@ -145,19 +164,29 @@ public sealed class PlayerControl {
     }
 
     private void RightPress(Vector2 at) {
+        // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
+        if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         var t = view.Pick(at);
         if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind == ThingKind.Crate ? t : null; liftClock = 0;
     }
 
     private void LeftPress(Vector2 at) {
-        if (Mode.Placing != null) { Place(view.ToWorld(at).Round()); return; }
         var t = view.Pick(at);
+        // A held stack goes into storage clicked in the world; a held crate or plan places on open ground, even before a frame has seen the mouse there;
+        // and a click anywhere else lets go of the stack, back to its cell.
+        if (!cursor.Empty) {
+            if (t is { IsStorage: true } && cursor.Stack != null) { kit.Run(() => moves.PutDown(t.Inventory, -1, int.MaxValue, t)); return; }
+            PlaceHeld(false);
+            if (Mode.Placing != null) Place(view.ToWorld(at).Round()); else cursor.Release();
+            return;
+        }
+        if (Mode.Placing != null) { Place(view.ToWorld(at).Round()); return; }
         if (Mode is ClickMode.Assign assign) { AssignGather(assign, t); return; }
         var w = view.PickWorker(at);
         if (w != null) panel.Select(w);
         else if (t != null) ClickThing(t);
-        else if (hotbar.ActiveItem() is string held && hotbar.HasUse(held)) hotbar.UseHeld(view.ToWorld(at));
+        else if (hotbar.ActiveItem() is string selected && hotbar.HasUse(selected)) hotbar.UseSelected(view.ToWorld(at));
         else panel.Close();
     }
 
@@ -170,16 +199,7 @@ public sealed class PlayerControl {
 
     private void ClickThing(Thing t) {
         if (t.Kind == ThingKind.Hut) entering = t;
-        // A crate in hand only opens a clicked crate: the nesting alert is for deliberate moves inside the inventory.
-        if (t.IsStorage && hotbar.ActiveItem() is string item && hotbar.IsTransferable(item) && world.Holds(t, item) && !(t.Kind == ThingKind.Crate && World.IsCrate(item))) StoreHeld(t, item);
         panel.Select(t);
-    }
-
-    private void StoreHeld(Thing t, string item) {
-        if (!world.Reaches(t)) { kit.Notify("Walk closer to the chest to store the selected stack."); return; }
-        // The move runs on the server, so the answer comes from what this window shows.
-        if (world.Backpack[item] == 0 || t.Inventory.Room(item) == 0) { kit.Notify($"No {world.Data.Name(item)} to store, or chest is full."); return; }
-        world.Transfer(world.Backpack, t.Inventory, item, ItemMoves.Amount(world.S.Backpack, item));
     }
 
     /// <summary>
@@ -189,8 +209,16 @@ public sealed class PlayerControl {
     /// </summary>
     private void Place(Vector2 at) {
         bool sent = Sent(at);
-        if (Mode is ClickMode.Crate crate) world.PlaceCrate(crate.Item, at); else world.Build(Mode.Placing!.Value, at);
-        if (sent && (Mode.Placing == ThingKind.Mine || !CanPlaceAgain())) Mode = new ClickMode.Normal();
+        if (Mode is not ClickMode.Crate crate) world.Build(Mode.Placing!.Value, at);
+        // A held crate goes down from the held stack, wherever it lies.
+        else if (placingHeld && cursor.Stack?.Item == crate.Item) world.FromHeldStack(() => world.PlaceCrate(crate.Item, at));
+        // One from the hotbar goes down from the stack bound to the selected slot.
+        else if (hotbar.ActiveItem() == crate.Item) hotbar.FromStack(hotbar.ActiveStack(), () => world.PlaceCrate(crate.Item, at));
+        else world.PlaceCrate(crate.Item, at);
+        if (!sent || Mode.Placing != ThingKind.Mine && CanPlaceAgain()) return;
+        Mode = new ClickMode.Normal();
+        // A plan on the cursor goes once nothing more can be paid for; a held crate stack runs out by itself.
+        if (placingHeld && cursor.Plan != null) cursor.Release();
     }
 
     /// <summary>Whether a placement at <paramref name="at"/> goes to the server, which it does when nothing here blocks it.</summary>

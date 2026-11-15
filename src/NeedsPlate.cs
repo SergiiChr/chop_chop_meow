@@ -54,7 +54,7 @@ public partial class Vial : Control {
         if (height > 1) DrawStyleBox(FillBox(Fill), new Rect2(3, 3 + inner - height, Size.X - 6, height));
     }
 
-    private static readonly StyleBoxFlat Box = Round(Style.CupFill, Style.Line), WarnBox = Round(Style.CupFill, Style.Brick);
+    private static readonly StyleBoxFlat Box = Round(Style.SlotFill, Style.Line), WarnBox = Round(Style.SlotFill, Style.Brick);
     private static StyleBoxFlat Round(Color bg, Color edge) {
         var box = new StyleBoxFlat { BgColor = bg, BorderColor = edge, AntiAliasing = true };
         box.SetCornerRadiusAll(11); box.SetBorderWidthAll(2);
@@ -92,13 +92,13 @@ public partial class NeedsPlate : PanelContainer {
     private readonly DamageEdges edges;
     private readonly Label bankDue;
     private readonly Badge bankCount;
-    private readonly ItemSlot bankCup;
+    private readonly ItemSlot bankSlot;
     // The capsules, whose tooltips name each need's level.
     public Vial Health { get; }
     public Vial Hunger { get; }
     public Vial Thirst { get; }
 
-    public NeedsPlate(UiKit kit, ItemMoves moves, DamageEdges edges) {
+    public NeedsPlate(UiKit kit, ItemMoves moves, DamageEdges edges, HeldCursor cursor) {
         this.kit = kit; world = kit.World; this.edges = edges;
         OffsetLeft = 20; OffsetTop = 18;
         AddThemeStyleboxOverride("panel", Style.Plate);
@@ -110,21 +110,25 @@ public partial class NeedsPlate : PanelContainer {
         var bank = new VBoxContainer(); bank.AddThemeConstantOverride("separation", 8); row.AddChild(bank);
         bank.AddChild(Style.Heading("Bank", 13));
         var line = new HBoxContainer(); line.AddThemeConstantOverride("separation", 12); bank.AddChild(line);
-        var (cup, count) = ItemSlot.Cup("bank", 56);
-        bankCup = cup; bankCount = count;
-        Style.Skin(cup, Style.CupBank, Style.Round(Style.CupFill, 28).Item2);
-        cup.Icon = Icons.Of(Inventory.Coins);
-        cup.TooltipText = "Coins kept at the trading posts for wages; sales land here.\nDrop coins here at a trading post to bank them · click to take some out";
-        cup.CanTake = drag => drag.Item == Inventory.Coins && drag.From == world.S.Backpack;
-        cup.Take = drag => {
-            if (NearPost() is not Thing post) { kit.Notify("Bank coins at a trading post."); return drag.Count; }
-            return kit.Run(() => moves.Drag(drag, post.Wages!, post));
+        var (slot, count) = ItemSlot.Create("bank", 56);
+        bankSlot = slot; bankCount = count;
+        Style.Skin(slot, Style.SlotBank, Style.Round(Style.SlotFill, 28).Item2);
+        slot.Icon = Icons.Of(Inventory.Coins);
+        slot.TooltipText = "Coins kept at the trading posts for wages; sales land here.\nAt a trading post · LMB: pick up all · RMB: half · put coins here to bank them";
+        slot.Controls = new SlotInput(cursor) {
+            Pick = () => NearPost() is Thing post && post.Wages!.Layout[0].Item != "" ? (post.Wages, 0) : null,
+            Takes = held => held.Stack is { Box: 0, Item: Inventory.Coins },
+            Put = (_, units) => {
+                if (NearPost() is not Thing post) { kit.Notify("Bank coins at a trading post."); return; }
+                kit.Run(() => moves.PutDown(post.Wages!, -1, units, post));
+            },
+            Batch = () => {
+                if (NearPost() is not Thing post) { kit.Notify("Take coins out at a trading post."); return; }
+                kit.Run(() => moves.Stack(post.Wages!, world.S.Backpack, Inventory.Coins, post));
+            },
+            Click = () => kit.Notify("Take coins out at a trading post."),
         };
-        cup.Pressed += () => {
-            if (NearPost() is not Thing post) { kit.Notify("Take coins out at a trading post."); return; }
-            kit.Run(() => moves.Stack(post.Wages!, world.S.Backpack, Inventory.Coins, post));
-        };
-        line.AddChild(cup);
+        line.AddChild(slot);
         bankDue = Style.Text("", 14, Style.Beige); line.AddChild(bankDue);
     }
 
@@ -158,7 +162,7 @@ public partial class NeedsPlate : PanelContainer {
         if (bank != shownBank) {
             shownBank = bank;
             bankCount.Text = bank.WageCoins > 0 ? bank.WageCoins.ToString() : "";
-            bankCup.AddThemeColorOverride(ItemSlot.IconNormal, bank.WageCoins > 0 ? Colors.White : Style.Ghost);
+            bankSlot.AddThemeColorOverride(ItemSlot.IconNormal, bank.WageCoins > 0 ? Colors.White : Style.Ghost);
             bankDue.Text = bank.Item2 > 0 ? $"−{bank.Item2} /day" : "";
             bankDue.AddThemeColorOverride("font_color", bank.Item2 > bank.WageCoins ? Style.Warn : Style.Beige);
             bankDue.TooltipText = bank.Item2 > bank.WageCoins ? "More than the bank holds; the rest comes from your backpack at dawn" : "Paid from the bank at dawn";

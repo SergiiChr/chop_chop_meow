@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -14,12 +15,12 @@ public sealed class PageMemory {
     public readonly HashSet<RecipeGroup> ClosedGroups = new();
     /// <summary>Whether the trading post shows hiring rather than shipping, and whether its price sheet is open.</summary>
     public bool Hiring, SheetOpen = true;
-    /// <summary>The number of the packed crate opened from the backpack.</summary>
+    /// <summary>The number of the packed crate opened from the backpack, or 0 for an empty crate.</summary>
     public int CarriedCrate;
 }
 
 /// <summary>What every page is built with.</summary>
-public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory);
+public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory, HeldCursor Cursor);
 
 /// <summary>The pages of the side panel.</summary>
 public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, Crate }
@@ -58,6 +59,7 @@ public partial class SidePanel : MovableWindow {
     private readonly WorldView view;
     private readonly Control ui;
     private readonly PageTools tools;
+    private readonly HeldCursor cursor;
     private readonly HBoxContainer heading;
     private readonly ScrollContainer scroll;
     /// <summary>The board left of the panel that holds the price sign or the filter window.</summary>
@@ -107,9 +109,9 @@ public partial class SidePanel : MovableWindow {
     /// <summary>Left edge of the panel beside any board, measured from the right of the screen, where the player moved it.</summary>
     private float LeftEdge => Left + Moved.X;
 
-    public SidePanel(UiKit kit, WorldView view, ItemMoves moves, Control ui) {
-        this.kit = kit; this.view = view; this.ui = ui; world = kit.World;
-        tools = new PageTools(this, kit, moves, new PageMemory());
+    public SidePanel(UiKit kit, WorldView view, ItemMoves moves, Control ui, HeldCursor cursor) {
+        this.kit = kit; this.view = view; this.ui = ui; world = kit.World; this.cursor = cursor;
+        tools = new PageTools(this, kit, moves, new PageMemory(), cursor);
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top; Visible = false;
         Bag = new BackpackDrawer(kit, this);
@@ -126,7 +128,7 @@ public partial class SidePanel : MovableWindow {
         HeadingTitle.SizeFlagsHorizontal = SizeFlags.ExpandFill; heading.AddChild(HeadingTitle);
         heading.AddChild(kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "close"));
         scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled }; outer.AddChild(scroll);
-        // Room for the pills that sit on the cups' corners.
+        // Room for the pills that sit on the slots' corners.
         inset = new MarginContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddThemeConstantOverride("margin_right", 8); inset.AddThemeConstantOverride("margin_bottom", 8); scroll.AddChild(inset);
         content = new VBoxContainer { SizeFlagsHorizontal = SizeFlags.ExpandFill }; inset.AddChild(content);
         world.Replaced += () => { Selection = default; awaited = 0; Close(); };
@@ -175,7 +177,7 @@ public partial class SidePanel : MovableWindow {
     /// <summary>Opens a page, or closes it if it is the one showing.</summary>
     public void Toggle(Page name) { if (Page == name) Close(); else Open(name); }
 
-    public void Close() { Visible = false; Bag.Visible = false; Aside.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
+    public void Close() { cursor.Release(); Visible = false; Bag.Visible = false; Aside.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
 
     /// <summary>Whether the open page shows something that has gone, and so closes or gives way on the next refresh.</summary>
     public bool SubjectGone => page is { Current: false };
@@ -201,7 +203,10 @@ public partial class SidePanel : MovableWindow {
         Open(Page.Inspect);
     }
 
-    /// <summary>Opens a packed crate from the backpack.</summary>
+    /// <summary>The hotbar, which also needs this panel, so the game sets it once both exist.</summary>
+    public Hotbar Hotbar { get; set; } = null!;
+
+    /// <summary>Opens a crate from the backpack as storage: a packed one by its number, or with 0 an empty one.</summary>
     public void OpenCrate(int crate) {
         if (tools.Memory.CarriedCrate != crate) Page = Page.None;
         tools.Memory.CarriedCrate = crate;
@@ -258,7 +263,7 @@ public partial class SidePanel : MovableWindow {
 
     /// <summary>
     /// Hands over the page's own long list, such as a recipe board's, so <see cref="Fit"/> lets it scroll in the room the rest of the page leaves rather than push that out of view.
-    /// A list handed over when the page draws again takes the height of the one before it at once and its place a frame later, once its rows have their size.
+    /// A list handed over when the page draws again takes the height of the one before it at once, and its place a frame later, once its rows have their size; it is hidden until then.
     /// </summary>
     public async void ShowPageRows(ScrollContainer scrollArea, Control rows) {
         pageScroll = scrollArea; pageRows = rows;
@@ -266,8 +271,11 @@ public partial class SidePanel : MovableWindow {
         scrollArea.CustomMinimumSize = new Vector2(0, pageHeight);
         scrollArea.GetVScrollBar().ValueChanged += at => pageOffset = (int)at;
         if (offset == 0) return;
+        // Until its rows have their size the list cannot scroll, so it stays out of sight rather than show from the top for a frame.
+        scrollArea.Modulate = Colors.Transparent;
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        if (IsInstanceValid(scrollArea)) scrollArea.ScrollVertical = offset;
+        if (!IsInstanceValid(scrollArea)) return;
+        scrollArea.ScrollVertical = offset; scrollArea.Modulate = Colors.White;
     }
 
     /// <summary>Sizes the panel's scroll area to what it shows, up to the room between the clock and the hotbar.</summary>

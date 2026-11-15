@@ -59,13 +59,13 @@ public partial class Game {
         await Until(() => station.Processing && station.Making == recipe, $"{recipe} starting {how}", 3);
 
     /// <summary>
-    /// Requires that a double-click left a station short of a batch: its cups shake at once, a new message names each thing it is missing,
+    /// Requires that a double-click left a station short of a batch: its slots shake at once, a new message names each thing it is missing,
     /// and several ticks later it has begun no batch.
     /// </summary>
     private async Task ExpectRefusedDoubleClick(Thing station, string id, string how, params string[] missing) {
         int posted = messages.Posted;
         await DoubleClick(Named($"craft_{id}")!);
-        Require(WorkRow().Shaking, $"A double-click on {id} {how} must shake the cups.");
+        Require(WorkRow().Shaking, $"A double-click on {id} {how} must shake the slots.");
         await Until(() => messages.Posted > posted && messages.Last.StartsWith("Missing ", StringComparison.Ordinal) && missing.All(messages.Last.Contains),
             $"a message that {id} is missing {string.Join(", ", missing)} {how}", 2);
         await Frames(12);
@@ -73,8 +73,8 @@ public partial class Game {
     }
 
     /// <summary>
-    /// Loads one batch of a recipe by hand: its card clicked once when the station is on another recipe, the fuel dragged onto the fuel cup first,
-    /// then each input dragged from the backpack onto its cup.
+    /// Loads one batch of a recipe by hand: its card clicked once when the station is on another recipe, the fuel carried onto the fuel slot first,
+    /// then each input carried from the backpack onto its input slot.
     /// </summary>
     private async Task LoadByHand(Thing station, string id, RecipeDef r) {
         if (station.Recipe != id) {
@@ -83,13 +83,14 @@ public partial class Game {
         }
         if (r.Burns) {
             GiveFuel(r); await Frames(2);
-            await DragTo(BagCellOf(FuelFor(r)), Named("fuel")!);
-            await Until(() => station.Burner![FuelFor(r)] == 1, $"{FuelFor(r)} dragged onto the fuel cup of {id}", 2);
+            await Carry(BagCellOf(FuelFor(r)), Named("fuel")!);
+            await Until(() => station.Burner![FuelFor(r)] == 1 && cursor.Empty, $"{FuelFor(r)} put on the fuel slot of {id}", 2);
         }
         foreach (var (item, amount) in r.Inputs) {
             GiveInput(item, amount); await Frames(2);
             string carried = world.Data.VesselFor(item) is VesselDef v ? v.States[Math.Min(amount, v.Capacity)] : item;
-            await DragTo(BagCellOf(carried), Named($"input_{item}")!);
+            await Carry(BagCellOf(carried), Named($"input_{item}")!);
+            await Until(() => cursor.Empty, $"{carried} put on the input slot of {id}", 2);
         }
     }
 }

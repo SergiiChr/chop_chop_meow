@@ -4,17 +4,20 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A building's item cups and its station's process row; each cup holds a single stack and shows a faint picture of what goes in it while empty.</summary>
-public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) {
+/// <summary>A building's item slots and its station's process row; each slot holds a single stack and shows a faint picture of what goes in it while empty.</summary>
+public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) {
     private readonly World world = kit.World;
 
-    /// <summary>A cup bound to one item of an inventory: a click or drag takes it, and <paramref name="tooltip"/> words the amount held.</summary>
-    /// <param name="look">The cup's rim, for one other than a plain input's or an output's.</param>
-    public ItemSlot Cup(Inventory box, string item, bool input, Func<int, string> tooltip, float size = 52, StyleBoxFlat? look = null) {
-        var (cell, count) = ItemSlot.Cup($"{(input ? "input" : "output")}_{item}", size);
+    /// <summary>
+    /// A slot bound to one item of an inventory: a click picks it up, and <paramref name="tooltip"/> words the amount held.
+    /// A held stack put on it goes in when <paramref name="takes"/> allows, with <paramref name="put"/> or as storage without one; with no <paramref name="takes"/> the slot takes nothing and shakes.
+    /// </summary>
+    /// <param name="look">The slot's rim, for one other than a plain input's or an output's.</param>
+    public ItemSlot Slot(Inventory box, string item, bool input, Func<int, string> tooltip, float size = 52, StyleBoxFlat? look = null, Func<HeldCursor, bool>? takes = null, Action<string, int>? put = null) {
+        var (cell, count) = ItemSlot.Create($"{(input ? "input" : "output")}_{item}", size);
         cell.Icon = Icons.Of(item);
-        if ((look ?? (input ? null : Style.CupWanted)) is StyleBoxFlat rim) cell.AddThemeStyleboxOverride("normal", rim);
-        moves.TakeCell(cell, box, item, t);
+        if ((look ?? (input ? null : Style.SlotWanted)) is StyleBoxFlat rim) cell.AddThemeStyleboxOverride("normal", rim);
+        moves.TakeCell(cell, box, item, t, takes, put);
         // Redrawn only when the amount held changes.
         live.Watch(() => box[item], held => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
@@ -24,10 +27,10 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
         return cell;
     }
 
-    /// <summary>A cup with what one batch takes or makes under it.</summary>
-    public static VBoxContainer Labelled(Control cup, string perBatch) {
+    /// <summary>A slot with what one batch takes or makes under it.</summary>
+    public static VBoxContainer Labelled(Control slot, string perBatch) {
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
-        column.AddChild(cup);
+        column.AddChild(slot);
         if (perBatch != "") column.AddChild(Style.PerBatch(perBatch));
         return column;
     }
@@ -37,12 +40,12 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
         var recipe = world.Data.Recipes[world.Selected(t)];
         float rate = world.WorkRate(t.Kind, world.ToolInUse(t, recipe.Tool, recipe.Tier));
         float seconds = recipe.Seconds / Math.Max(.01f, rate);
-        var inputs = recipe.Inputs.Select(p => (Control)StationCup(p.Key, true, $"×{p.Value}"));
+        var inputs = recipe.Inputs.Select(p => (Control)StationSlot(p.Key, true, $"×{p.Value}"));
         // Leftovers and inputs loaded for the kept recipe stay reachable as side outputs.
-        var side = t.Inventory.Items.Keys.Where(item => Leftover(recipe, item)).Select(item => (Control)StationCup(item, false, "", 44));
+        var side = t.Inventory.Items.Keys.Where(item => Leftover(recipe, item)).Select(item => (Control)StationSlot(item, false, "", 44));
         return new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, seconds)), () => t.Processing ? t.Progress / recipe.Seconds : 0,
             recipe.Burns && t.Burner != null ? FuelSlot(recipe, seconds) : null,
-            StationCup(recipe.Output, false, recipe.Amount > 1 ? $"×{recipe.Amount}" : "×1", 64), side.ToArray());
+            StationSlot(recipe.Output, false, recipe.Amount > 1 ? $"×{recipe.Amount}" : "×1", 64), side.ToArray());
     }
 
     /// <summary>Whether an item a station holds is neither an input nor the product of a recipe.</summary>
@@ -56,17 +59,12 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
         return code;
     }
 
-    /// <summary>The fuel slot under the bar: a flame, its cup, how long the fuel in it lasts at one per batch, and the fuels the recipe burns.</summary>
+    /// <summary>The fuel slot under the bar: a flame, its slot, how long the fuel in it lasts at one per batch, and the fuels the recipe burns.</summary>
     private FuelRow FuelSlot(RecipeDef recipe, float batchSeconds) {
         var burner = t.Burner!;
-        var (cell, count) = ItemSlot.Cup("fuel");
-        cell.AddThemeStyleboxOverride("normal", Style.CupFuel);
-        moves.TakeCell(cell, burner, burner.First, t);
-        cell.CanTake = drag => drag.From == world.S.Backpack && world.FuelFits(t, drag.Item);
-        cell.Take = drag => {
-            int left = world.Reaches(t) ? ItemMoves.Leftover(drag, burner.First() is string held && held != drag.Item ? 0 : burner.StackOf(drag.Item) - burner[drag.Item]) : 0;
-            kit.Run(() => world.LoadFuel(t, drag.Item, drag.Count)); return left;
-        };
+        var (cell, count) = ItemSlot.Create("fuel");
+        cell.AddThemeStyleboxOverride("normal", Style.SlotFuel);
+        moves.TakeCell(cell, burner, burner.First, t, held => held.Stack is { Box: 0 } stack && world.FuelFits(t, stack.Item), (item, units) => world.LoadFuel(t, item, units));
         var lasts = Style.Text("", 14, Style.Ink);
         string burns = world.FuelWords(recipe.Fuels);
         var accepted = new HBoxContainer { Name = "burns", TooltipText = $"{recipe.Name} burns {burns}", MouseFilter = Control.MouseFilterEnum.Stop };
@@ -80,29 +78,24 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
             count.Text = held > 0 ? held.ToString() : "";
             cell.TooltipText = held > 0 && !burnable
                 ? $"Fuel · {world.Data.Name(fuel)} · {held}\n{recipe.Name} cannot burn it · take it out and load {burns}"
-                : $"Fuel · {(held > 0 ? world.Data.Name(fuel) : "empty")} · {held}/{burner.StackOf(fuel)}\nOne burns per batch · drag {burns} here";
+                : $"Fuel · {(held > 0 ? world.Data.Name(fuel) : "empty")} · {held}/{burner.StackOf(fuel)}\nOne burns per batch · put {burns} here";
             lasts.Text = burnable ? LiveText.Of(text => PageText.AppendDuration(text, held * batchSeconds)) : "";
         });
         return new FuelRow("line_flame", Style.Ember, cell, lasts, accepted);
     }
 
-    /// <summary>A cup for one input or output of a station, which takes a backpack stack dragged on as an input.</summary>
-    public VBoxContainer StationCup(string item, bool input, string perBatch, float size = 52) {
+    /// <summary>What a click on a slot does, for its tooltip.</summary>
+    public const string SlotHint = "LMB: pick up · RMB: pick up half · Shift or Ctrl: to backpack";
+
+    /// <summary>A slot for one input or output of a station, which takes a held backpack stack as an input.</summary>
+    public VBoxContainer StationSlot(string item, bool input, string perBatch, float size = 52) {
         var box = t.Inventory;
         var vessel = world.Data.VesselFor(item);
-        string bottle = vessel != null ? world.Lower(world.Data.Name(vessel.Full)) : "";
-        string hint = vessel != null
-            ? input ? $"Click: take back into a {bottle} · Drag a {bottle} here to pour what it holds" : $"Click: take back into a {bottle}"
-            : input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";
-        var cell = Cup(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size);
-        if (input) {
-            // A liquid's cup takes the vessels that hold some of it, at any fill.
-            cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || vessel != null && vessel.LitersIn(drag.Item) > 0);
-            cell.Take = drag => {
-                int left = world.Reaches(t) ? ItemMoves.Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
-                kit.Run(() => world.LoadInput(t, drag.Item, drag.Count)); return drag.Item == item ? left : 0;
-            };
-        }
+        string hint = !input ? SlotHint : vessel != null ? $"{SlotHint} · put a {world.Lower(world.Data.Name(vessel.Full))} here to pour what it holds" : $"{SlotHint} · put a backpack stack here to load";
+        // A liquid's input slot takes the vessels that hold some of it, at any fill.
+        var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size,
+            takes: input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || vessel != null && vessel.LitersIn(stack.Item) > 0) : null,
+            put: (held, units) => world.LoadInput(t, held, units));
         return Labelled(cell, perBatch);
     }
 }

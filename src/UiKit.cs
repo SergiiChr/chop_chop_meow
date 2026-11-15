@@ -57,7 +57,7 @@ public sealed class UiKit(World world, Sounds sounds, Action<string> notify, Act
     /// <summary>Runs a player action, then brings the screen up to date.</summary>
     public void Run(Action action) { action(); Refresh(); }
 
-    /// <summary>Runs a player action that gives a value back, such as what a drag left over, then brings the screen up to date.</summary>
+    /// <summary>Runs a player action that gives a value back, such as how many items moved, then brings the screen up to date.</summary>
     public T Run<T>(Func<T> action) {
         T result = default!;
         Run(() => { result = action(); });

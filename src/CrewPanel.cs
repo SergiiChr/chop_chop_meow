@@ -61,8 +61,8 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
         var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, MouseFilter = Control.MouseFilterEnum.Ignore }; text.AddThemeConstantOverride("separation", 0); top.AddChild(text);
         text.AddChild(Style.Text(w.Name, 18, Style.Ink, Style.Head));
         var status = Style.Text("", 13, Style.Tan); status.TextOverrunBehavior = TextServer.OverrunBehavior.TrimEllipsis; status.ClipText = true; text.AddChild(status);
-        var (carry, carried) = ItemSlot.Cup($"carry_{w.Id}", 44); carry.MouseFilter = Control.MouseFilterEnum.Ignore; top.AddChild(carry);
-        var (tool, _) = ItemSlot.Cup($"tool_{w.Id}", 44); tool.MouseFilter = Control.MouseFilterEnum.Ignore; top.AddChild(tool);
+        var (carry, carried) = ItemSlot.Create($"carry_{w.Id}", 44); carry.MouseFilter = Control.MouseFilterEnum.Ignore; top.AddChild(carry);
+        var (tool, _) = ItemSlot.Create($"tool_{w.Id}", 44); tool.MouseFilter = Control.MouseFilterEnum.Ignore; top.AddChild(tool);
         var wage = Style.Pill($"{w.Wage} /day", Style.BeigePill, Style.Ink, 13); wage.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; top.AddChild(wage);
         var chips = new HFlowContainer { MouseFilter = Control.MouseFilterEnum.Ignore }; chips.AddThemeConstantOverride("h_separation", 6); chips.AddThemeConstantOverride("v_separation", 6); column.AddChild(chips);
         foreach (var d in w.Duties) if (world.DutyPlace(w, d.Thing) is Thing at) chips.AddChild(DutyChip(at, d.Job));
@@ -95,8 +95,8 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
         var wage = Style.Pill($"{w.Wage} /day", Style.Tag(Style.Brick), Style.Rim, 13); wage.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter; wage.MouseFilter = Control.MouseFilterEnum.Pass; wage.TooltipText = "Daily wage";
         panel.AddToHeader(wage);
         var well = Well(new HBoxContainer()); well.AddThemeConstantOverride("separation", 12);
-        var (carry, carried) = ItemSlot.Cup("carry", 56); well.AddChild(carry);
-        var (tool, _) = ItemSlot.Cup("tool", 56); well.AddChild(tool);
+        var (carry, carried) = ItemSlot.Create("carry", 56); well.AddChild(carry);
+        var (tool, _) = ItemSlot.Create("tool", 56); well.AddChild(tool);
         var text = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, SizeFlagsVertical = Control.SizeFlags.ShrinkCenter }; text.AddThemeConstantOverride("separation", 2); well.AddChild(text);
         var status = Style.Text("", 15, Style.Ink, wrap: true); text.AddChild(status);
         var owed = Style.Text("", 13, Style.Brick, Style.Bold); text.AddChild(owed);

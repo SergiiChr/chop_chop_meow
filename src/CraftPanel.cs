@@ -12,12 +12,12 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
         HeaderAction("map", "Recipe map: everything there is to make", panel.Map.Open, Style.FilterRound, "open_map");
         AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, null, null));
         CraftQueue();
-        BagGrid(UseFromBag, UseHint, wanted: id => world.HandRecipes.Any(r => world.Data.Recipes[r].Inputs.ContainsKey(id)));
+        BagGrid(null, BagHint, wanted: id => world.HandRecipes.Any(r => world.Data.Recipes[r].Inputs.ContainsKey(id)));
     }
 
     /// <summary>
     /// What is being made by hand, in the stations' process row: its materials on the left, the time over the bar and the product on the right.
-    /// The rest of the queue waits in a row under it, one cup per recipe.
+    /// The rest of the queue waits in a row under it, one slot per recipe.
     /// </summary>
     private void CraftQueue() {
         var queue = world.Crafting;
@@ -26,8 +26,8 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
         string? shown = world.Making != "" ? world.Making : queue.Count > 0 ? queue[0].Recipe : null;
         if (shown == null) { Well(new VBoxContainer()).AddChild(Style.Text("Nothing in the works. Click a recipe to make it.", 14, Style.Ink)); return; }
         var making = world.Data.Recipes[shown];
-        var inputs = making.Inputs.Select(p => (Control)RecipeCup($"queue_input_{p.Key}", p.Key, $"×{p.Value}", 52));
-        var product = RecipeCup("making", making.Output, $"×{making.Amount}", 64);
+        var inputs = making.Inputs.Select(p => (Control)RecipeSlot($"queue_input_{p.Key}", p.Key, $"×{p.Value}", 52));
+        var product = RecipeSlot("making", making.Output, $"×{making.Amount}", 64);
         AddChild(new ProcessRow(live, inputs, LiveText.Of(text => PageText.AppendDuration(text, making.Seconds / Math.Max(.01f, world.CraftRate))),
             () => world.Making == shown && making.Seconds > 0 ? world.CraftTime / making.Seconds : 0, null, product, Array.Empty<Control>()));
         AddChild(new QueueStrip(kit, live));
@@ -39,10 +39,10 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
         });
     }
 
-    /// <summary>A cup in the craft row with what one batch takes or makes under it.</summary>
-    private VBoxContainer RecipeCup(string name, string item, string perBatch, float size) {
-        var (cell, _) = ItemSlot.Cup(name, size); cell.Icon = Icons.Of(item);
+    /// <summary>A slot in the craft row with what one batch takes or makes under it.</summary>
+    private VBoxContainer RecipeSlot(string name, string item, string perBatch, float size) {
+        var (cell, _) = ItemSlot.Create(name, size); cell.Icon = Icons.Of(item);
         cell.TooltipText = world.Data.Name(item);
-        return Cups.Labelled(cell, perBatch);
+        return StationSlots.Labelled(cell, perBatch);
     }
 }

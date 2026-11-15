@@ -13,12 +13,13 @@ public abstract partial class PagePanel : VBoxContainer {
     protected readonly World world;
     protected readonly ItemMoves moves;
     protected readonly PageMemory memory;
+    protected readonly HeldCursor cursor;
     protected readonly LiveUpdates live = new();
     protected TextureRect headingIcon => panel.HeadingIcon;
     protected Label headingTitle => panel.HeadingTitle;
 
     protected PagePanel(PageTools tools) {
-        panel = tools.Panel; kit = tools.Kit; world = kit.World; moves = tools.Moves; memory = tools.Memory;
+        panel = tools.Panel; kit = tools.Kit; world = kit.World; moves = tools.Moves; memory = tools.Memory; cursor = tools.Cursor;
         SizeFlagsHorizontal = SizeFlags.ExpandFill;
     }
 
@@ -71,13 +72,18 @@ public abstract partial class PagePanel : VBoxContainer {
         return inner;
     }
 
-    /// <summary>Shows the backpack drawer with a grid that works with the open page: <paramref name="wanted"/> lights up what it takes.</summary>
-    protected void BagGrid(Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null) {
-        panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, click, hint, accepts, wanted, BagColumns));
+    /// <summary>
+    /// Shows the backpack drawer with a grid that works with the open page: <paramref name="batch"/> is what a Ctrl- or Shift-click on a stack does there, and <paramref name="wanted"/> lights up what the page takes.
+    /// A double click uses an item, as on the backpack's own page.
+    /// </summary>
+    protected void BagGrid(Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null, Action<int, string, int>? put = null) {
+        // Ctrl moves all of an item but the stacks bound to the hotbar; Shift moves the stack clicked, bound or not.
+        Action<string>? spared = batch == null ? null : id => { if (Input.IsKeyPressed(Key.Ctrl)) world.FromSpares(() => batch(id)); else batch(id); };
+        panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, spared, hint, takes, wanted, BagColumns, use: UseFromBag, put: put));
         panel.Bag.Visible = !panel.Bag.Dismissed;
-        if (StoresFromHotbar) panel.Bag.Store = click;
+        if (StoresFromHotbar) panel.Bag.Store = batch;
     }
-    /// <summary>Whether a click on the hotbar moves items here as a click in the backpack drawer does: true on pages about a building or an opened crate.</summary>
+    /// <summary>Whether a Ctrl- or Shift-click on the hotbar moves items here as one in the backpack drawer does: true on pages about a building or an opened crate.</summary>
     protected virtual bool StoresFromHotbar => false;
     protected HBoxContainer Row() { var r = new HBoxContainer(); AddChild(r); return r; }
     protected void AddLabel(string text, int size = 15, Color? color = null) => AddChild(Style.Wrapped(text, size, color));
@@ -87,8 +93,12 @@ public abstract partial class PagePanel : VBoxContainer {
         var l = Style.Wrapped("", size, color); AddChild(l);
         live.Bind(l, write);
     }
-    protected const string UseHint = "Food and water: click to consume. Crates: click to open, an empty one to place. Torch: click to light. Drag onto the hotbar to assign.";
+    /// <summary>The hint on backpack cells: what each click does, with the page's own Ctrl- and Shift-click when it has one.</summary>
+    protected const string BagHint = "LMB: pick up · RMB: pick up half · Double LMB: use";
+    /// <summary>
+    /// A double click on a backpack item: eats or drinks it, lights a torch, opens a crate as storage, or selects a tool on the hotbar.
+    /// </summary>
     protected void UseFromBag(string id) {
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id); else if (world.Packed(id) != null) panel.OpenCrate(World.PackedId(id)); else if (World.IsCrate(id)) panel.Player.PlaceCrate(id); else if (id == "torch" && !world.TorchLit) world.UseTorch(Vector2.Zero);
+        if (!panel.Hotbar.UseItem(id) && world.Data.Items.TryGetValue(id, out var def) && def.Tool != "") panel.Hotbar.SelectTool(id);
     }
 }

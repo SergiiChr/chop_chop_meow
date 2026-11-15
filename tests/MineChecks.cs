@@ -114,7 +114,8 @@ public static class MineChecks {
         for (float held = 0; held <= world.MineStageSeconds && mine.MineStage == MineStage.Marked; held++) world.Gather(mine, 1);
         Require(mine.MineStage == MineStage.Dug, "a player holding right mouse on a marked mine with a pickaxe should dig its entrance in a working day");
         Give(world, data.Mine.Materials);
-        world.SupplyMine(mine); world.Tick(.1f);
+        foreach (var (item, amount) in data.Mine.Materials) world.SupplyMine(mine, item, amount);
+        world.Tick(.1f);
         Require(mine.MineStage == MineStage.Supplied, "the delivered materials should shore the mine up");
         world.Gather(mine, 1);
         Require(mine.Progress == 0 && world.GatherBlock(mine)?.Contains("hammer") == true, $"fitting the frame should need a hammer: {world.GatherBlock(mine)}");
@@ -129,7 +130,7 @@ public static class MineChecks {
         other.MineStage = MineStage.Dug;
         world.Player = other.Pos + Vector2.One;
         Give(world, "wood", 60); Give(world, "stone", 10);
-        world.SupplyMine(other);
+        world.SupplyMine(other, "wood", 60); world.SupplyMine(other, "stone", 10);
         Require(other.Inventory["wood"] == data.Mine.Materials["wood"],
             "delivering from the backpack must hand over only the wood the mine still needs");
         Require(other.Inventory["stone"] == 10,

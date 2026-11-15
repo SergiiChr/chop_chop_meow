@@ -95,7 +95,7 @@ UI and input:
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
-| `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream cups, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
+| `src/Style.cs` | The shared enamel camp-gear look (speckled enamel boards with a cream rim, beige wells, cream slots, brick for what is active or wanted, Fredoka and Nunito) and the heat, day and cart-road dials |
 | `src/SidePanel.cs` | The side panel: opening and closing its pages, selecting what it inspects, its size, and `PageMemory`, what outlasts a page |
 | `src/BackpackDrawer.cs` | The backpack drawer above the hotbar |
 | `src/InspectPage.cs` | Picks the page for the selected thing or worker, and `ThingPage`, the base of a page about one thing |
@@ -103,11 +103,14 @@ UI and input:
 | `src/ProcessRow.cs` | The process row every station shares and the fuel row under its bar |
 | `src/JobRow.cs` | A place's job buttons, their worker lists and what each job is called |
 | `src/FilterWindow.cs` | The filter window beside the panel |
-| `src/ItemMoves.cs` | What clicking or dragging an item does: reach, refusals and the crate-in-crate warning |
-| `src/Grid.cs` | Draws the icon-cell grids |
-| `src/ItemSlot.cs` | The cream item cup and drag and drop between grids |
+| `src/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
+| `src/Grid.cs` | Draws the icon-slot grids |
+| `src/ItemSlot.cs` | The cream item slot, which tells a click, a right click and a double click apart and shakes on a refusal |
+| `src/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse, and `SlotInput`, what each click does on an item slot |
+| `src/HotbarStacks.cs` | `World`'s hotbar slots bound to backpack stacks: binding, waiting slots and reading what a slot shows |
+| `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
 | `src/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
-| `src/Cups.cs` | `Cups`: a building's item cups and a station's process row |
+| `src/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
 | `src/CraftPanel.cs` | The crafting menu |
 | `src/RecipeBoard.cs` | The recipe board the crafting menu and every station show, a recipe's hover popup, and the crafting menu's queue strip under the work |
 | `src/RecipeMap.cs` | The recipe map: a row of item chains for each category, the station strip, chips that go to their item and the details strip |
@@ -188,7 +191,7 @@ Health, hunger and thirst are HUD icons.
 Coins are a backpack item that stacks to 1000.
 
 Every page that works with the backpack shows it in one place, a drawer above the hotbar (`PagePanel.BagGrid`).
-On a page about a building or an opened crate (`PagePanel.StoresFromHotbar`), the drawer's click (`BackpackDrawer.Store`) also runs for a mouse click on a hotbar slot; number keys still put the slot in hand.
+On a page about a building or an opened crate (`PagePanel.StoresFromHotbar`), the drawer's Ctrl- and Shift-click (`BackpackDrawer.Store`) also runs for one on a hotbar slot.
 The stacks that page takes are rimmed in brick and the rest are faded.
 A close button hides the drawer until another page or building opens.
 The side panel only shows the building and sizes itself to what it holds.
@@ -376,8 +379,8 @@ Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the pond shore is a collection target.
 A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many liters.
 `GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
-a vessel dropped into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
-the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the cup shakes.
+a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
+the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
 Every move between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
 Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.LiquidToClear`), and a dismantled station fills the backpack's vessels and spills the rest.
 No hand recipe takes a liquid, which `GameData` checks.
@@ -472,7 +475,7 @@ Inside a cabin (`SaveState.Sheltered`) the player is hidden: their hunters give 
 
 #### Torch
 
-A torch in hand (`SaveState.Torch`, burn seconds left) burns as long as one log, only while `SaveState.TorchLit`.
+A lit torch (`SaveState.Torch`, burn seconds left) burns as long as one log, only while `SaveState.TorchLit`; it stays in the backpack, burning out removes it, and a backpack with no torch left puts it out.
 Lighting it takes `World.KindleSeconds` (`SaveState.TorchKindling`).
 Swings share the axe cooldown and flare the light (`World.TorchFlare`).
 They put the torch out after `World.WildSwings` within `World.WildWindow` seconds.
@@ -550,9 +553,9 @@ A station counts batches of one recipe at a time: `Thing.Asked` is the recipe a 
 `Thing.Keep` is the recipe workers keep it making once those batches are done, and a building's `Recipe` in `GameTables` names the one it starts with.
 `Thing.Making` is the batch in progress, as `PlayerState.Making` is by hand.
 `Thing.Recipe` is worked out, not stored: the batch in progress, else `Asked` while batches of it wait, else `Keep`; with none the station stands idle.
-`World.Selected` is the recipe the station is on, whose cups its page draws and whose card is outlined: `Recipe`, else `Asked`, else the first recipe on its board.
+`World.Selected` is the recipe the station is on, whose slots its page draws and whose card is outlined: `Recipe`, else `Asked`, else the first recipe on its board.
 A station is always on one: taking the mark off with no batches waiting leaves the marked recipe in `Asked`.
-So a station with nothing to make keeps showing its cups, and more batches of that recipe are not a turn to another.
+So a station with nothing to make keeps showing its slots, and more batches of that recipe are not a turn to another.
 Saves and world updates leave out an empty mark, count and batch, so a tree or a rock carries none of them.
 `World.QueueBatch` adds to the count, and for a recipe other than the selected one it first turns the station to it:
 it drops the batches that waited and moves everything in `Thing.Inventory` and the fuel slot (`Thing.Burner`) to the acting player's backpack.
@@ -563,13 +566,13 @@ So batches only wait for the recipe in progress when there is one, and `World.De
 `World.SetRecipe` moves the mark, and a move to a recipe other than the selected one turns the station to it and drops the batches that waited; `World.MarkBlock` refuses that move while a batch is in progress or `Thing.Inventory` holds anything.
 So a station with a mark is on its marked recipe, and `World.Deserialize` refuses a save where batches wait for another.
 A station takes inputs for the selected recipe and the kept one, and haulers carry out only what neither takes.
-A station starts no batch while its cups hold something that is neither such an input nor what its recipe makes (`World.Blocked`), as when a hauler delivers after the station has turned.
+A station starts no batch while its slots hold something that is neither such an input nor what its recipe makes (`World.Blocked`), as when a hauler delivers after the station has turned.
 What no storage takes stays in the station, which goes on working until its output stack is full.
 `World.SourceFor` gives out those leftovers too, so a hauler fetches an input from storage or straight from the station that made it.
 Every station page shows the same `RecipeBoard` as the crafting menu; only the crafting menu has a `QueueStrip` under the work.
-The board asks `World.SwitchBlock` before it queues at a station and `World.MarkBlock` before it marks, and when the answer is a refusal it shakes the cups of the station's `ProcessRow` (`ProcessRow.Shake`).
+The board asks `World.SwitchBlock` before it queues at a station and `World.MarkBlock` before it marks, and when the answer is a refusal it shakes the slots of the station's `ProcessRow` (`ProcessRow.Shake`).
 A click on a station's card marks at once, also as the first press of a double-click: queueing puts the mark on the recipe whatever that press did.
-A mark the station refuses is sent and shown only after `RecipeBoard.DoubleClickSeconds`, the time Godot on Linux allows a double-click's second press, since a double-click empties the cups in the way.
+A mark the station refuses is sent and shown only after `RecipeBoard.DoubleClickSeconds`, the time a double-click's second press may take, since a double-click empties the slots in the way.
 The board lists recipe cards under a heading per `RecipeGroup`; `PageMemory.ClosedGroups` keeps the groups the player closed, for every board.
 Its list scrolls by itself: the board hands it to `SidePanel.ShowPageRows`, and `SidePanel.Fit` gives it the room the rest of the page leaves.
 The panel keeps the list's place while the page draws again, so a click on a recipe leaves the list where it was scrolled to.
@@ -579,8 +582,8 @@ A station's tool slots are drawn in `SidePanel.Aside`, a window of its own that 
 `RecipeMap` covers the screen while the game goes on under it; it is drawn afresh on each `RecipeMap.Open`.
 `PlayerControl.Update` moves nobody while it shows, and a `MapNode` turns to made before as soon as `World.Had` knows its item.
 `RecipeMap.Place` puts an item on a grid of steps across and lines down: what is made out of it goes one step on, the first on the same line and the rest on lines below, and `MapTree` draws the lines between them.
-A `MapNode` draws a filled cup for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.
-A click on a chip scrolls to that item and lights it (`MapNode.Light`); a click on a cup shows its details, whose button leaves the map through `SidePanel.ShowRecipe`.
+A `MapNode` draws a filled slot for an item `World.Had` knows and a dashed one otherwise, with a chip for the tool its recipe requires and for each input after the first.
+A click on a chip scrolls to that item and lights it (`MapNode.Light`); a click on a slot shows its details, whose button leaves the map through `SidePanel.ShowRecipe`.
 
 Each recipe names its `Group` (`RecipeGroup`: tools, materials, containers or food), which the recipe boards list it under.
 `SaveState.Obtained` holds every item the settlement has gathered, grown, bought or started with; with what it made, which is among `SaveState.Milestones`, those are the items the recipe map shows as known (`World.Had`).
@@ -633,7 +636,7 @@ The red trash can on `ThingPage`'s header turns into "Remove?" on the first clic
 
 Inventories are slot grids with stacks of 64.
 Tools, packed crates and bottles take a slot each everywhere.
-The layout is saved and synchronized: removing one stack never shifts unrelated cells.
+The layout is saved and synchronized: removing one stack never shifts unrelated slots.
 Sort is the only action that packs and regroups stacks.
 Item totals change only through `Inventory` methods, which keep them in line with the stacks.
 Stacks are rebuilt from totals once, where the two can disagree: when a save loads, since one edited by hand can hold both.
@@ -641,14 +644,33 @@ A window's copy takes totals and stacks together from the server, so it does not
 
 The player moves items in and out of storage and stations within `World.ItemReach` (15 m, `World.Reaches`); gathering, working a station and pumping need `World.Near`'s 3.2 m.
 
-Input rule for every item cell, in storage and stations alike:
+Input rule for every item slot, in the backpack, storage and stations alike (`SlotInput`):
 
-- A click moves exactly one item, in either direction.
-- Shift-click moves the stack clicked, and Ctrl-click all of that item.
-- Right-click picks up half where a panel supports dragging.
-- A carried stack shows its count on the cursor: the cell's own pill when it carries the whole stack, otherwise how many it carries.
-- Dragging carries a stack or a split portion to its exact destination, merging compatible stacks or swapping cells.
+- LMB picks up the slot's stack onto the cursor, a held stack; RMB picks up half of it.
+- With a stack held, LMB puts it down on the slot clicked and RMB puts down one; what does not fit stays held.
+  On another item's slot in the same inventory the two swap; back on its own slot LMB lets go of it.
+- A held stack lands by the rules of where it is put: each slot sends its own command, the one its Shift- or Ctrl-click sends, with the mark "from held stack" (`World.FromHeldStack`, `Command.Held`, `ItemMoves.PutDown`).
+  A station's input slot sends `LoadInput`, a fuel slot `LoadFuel`, a mine's input slot `SupplyMine`, a tool slot `SlotTool`, a crate's contents `MoveInCrate`, and storage `TransferSlot` or `Transfer`.
+  The server runs a marked command only when the held stack lies where the command takes from, and on no more than it holds.
+  A slot that refuses shakes (`ItemSlot.Shake`), and the stack stays held.
+- Shift-click moves the stack clicked to the other inventory open, and Ctrl-click all of that item.
+- A double click uses an item (`PagePanel.UseFromBag`, `Hotbar`): eats, drinks, lights a torch, opens a crate as storage or selects a tool (`Hotbar.SelectTool`): on its hotbar slot, or in hand (`World.SelectInHand`, `PlayerState.InHand`) with no slot selected.
+  On a slot with a use, a single click waits `SlotInput.DoubleClickMs` (200 ms) before it picks up, so the two can be told apart; recipe cards use the same time.
+- A slot acts when the button comes up over it, as a plain button does, so a page that draws itself again never takes the slot away under a press; let go of anywhere else, it does nothing.
+- A held stack put on a hotbar slot binds that exact backpack stack (`Inventory.Slot.Hotbar`, `World.BindHeld`), which the backpack rims; the binding goes with the stack and follows it into a stack it merges with (`Inventory.Slot.Empty`, `MoveSlotTo`, `Sort`).
+  `PlayerState.HotbarSlots` holds plans, and items a slot waits for until `World.BindWaitingHotbars` binds the first stack of one to come in; `World.HotbarItem` and `HotbarStack` read a slot.
+  A stack spent to nothing (`Inventory.Remove`, unlike a move out) notes its slot in `Inventory.UsedUp`, and the slot waits for its item again, so it binds the next stack at once.
+  Ctrl batches from the backpack drawer and Store all carry the mark "spares only" (`World.FromSpares`, `Command.Spares`, `Inventory.SparesOnly`), which leaves bound stacks behind.
+- Esc, a click on open ground or on the interface anywhere but an item slot, or closing the side panel lets go of the held stack (`HeldCursor`).
+- A held crate or building plan over open ground goes into placement, and back to the cursor over the interface (`PlayerControl.PlaceHeld`).
+- A held stack put on storage clicked in the world goes into it; an item only selected on the hotbar never does.
 - Bulk buttons and recipe batch actions say what they move.
+
+A held stack never leaves its slot until it is put down (`Inventory.Slot.Held`, `HeldBy`).
+Totals still count it, but `Inventory.Remove`, `TransferTo` and `Has` take only units nobody holds, so other players, workers and haulers cannot take it, and a station holding one starts no batch (`World.Stocked`).
+Another player who tries is told so (`World.HeldByAnother`).
+The server keeps only the slot each player's held stack lies in (`PlayerState.HeldSlot`), and builds the `PlayerState.HeldStack` a window shows from it each time it sends the player (`World.ShareHeldStacks`).
+It lets go of the stack when the player is down, walks out of reach of the building it lies in, or leaves, and when its crate is put down or sold; a load starts with nothing held.
 
 A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (5) items in all, one stack or up to five kinds; `Worker.Hands` widens them for a full mine or market stack.
 
@@ -822,10 +844,10 @@ A fallow plot sows itself from its own inventory.
 `World.CropLook` gives the look: bare, soil, straws, green plants or wheat.
 
 The player harvests through `World.Gather` and assigned workers through `World.FarmWork`, both adding to the one progress.
-The yield goes into the plot's `Thing.Output`; nothing moves seed back into the sowing inventory on its own.
+The yield goes into the plot's `Thing.Output`; nothing moves seed back into the plot's input slots on its own.
 
 - A worker on Farm harvests.
-- A worker on Haul first moves seed from the output into the sowing inventory, then carries out the rest and fetches what the next sowing lacks.
+- A worker on Haul first moves seed from the output into the plot's input slots, then carries out the rest and fetches what the next sowing lacks.
 
 ## Intro film
 

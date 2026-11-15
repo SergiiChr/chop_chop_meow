@@ -40,7 +40,7 @@ Wait for `ready` before writing the next `cmd.txt`.
 | `key W [down\|up]` | Taps, presses or releases a key by Godot `Key` name (`W`, `Escape`, `Tab`, `Space`, `Shift`, `Ctrl`); digits `1`–`9` work as is |
 | `hold W 1.5` | Holds a key for real seconds |
 | `move X Y` | Moves the cursor (hover, placement ghost) |
-| `click X Y [right] [ctrl] [shift] [double]` | Clicks at screen pixels. Code that reads `Input.IsKeyPressed`, such as Ctrl item moves, needs `key Ctrl down` first instead of `ctrl` |
+| `click X Y [right] [ctrl] [shift] [double]` | Clicks at screen pixels; `double` clicks twice, a double click. Code that reads `Input.IsKeyPressed`, such as Ctrl item moves, needs `key Ctrl down` first instead of `ctrl`. A click on an item slot with a use picks up its stack only 200 ms later, once no second click came |
 | `down X Y [right]` / `up X Y [right]` | Presses or releases a button, e.g. hold right mouse to gather |
 | `wheel X Y up\|down [steps]` | Zooms |
 | `wait 2` | Waits real seconds, whatever the time scale |

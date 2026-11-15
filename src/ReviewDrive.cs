@@ -50,7 +50,8 @@ public partial class ReviewDrive : Node {
                 case "key": Key(Parse(p[1]), p.Length < 3 ? "tap" : p[2]); break;
                 case "hold": Key(Parse(p[1]), "down"); queue.Enqueue($"key {p[1]} up"); Requeue(); waitLeft = Number(p[2]); break;
                 case "move": Move(new Vector2(Number(p[1]), Number(p[2]))); break;
-                case "click": Click(p, true); Click(p, false); break;
+                // A double click is two clicks on the spot within a double click's time; these come in the same frame.
+                case "click": Click(p, true); Click(p, false); if (p.Contains("double")) { Click(p, true); Click(p, false); } break;
                 case "down": Click(p, true); break;
                 case "up": Click(p, false); break;
                 case "wheel": Wheel(p); break;
@@ -113,7 +114,6 @@ public partial class ReviewDrive : Node {
             ButtonMask = buttons,
             CtrlPressed = rest.Contains("ctrl"),
             ShiftPressed = rest.Contains("shift"),
-            DoubleClick = pressed && rest.Contains("double"),
         });
     }
 

@@ -284,6 +284,7 @@ public sealed class SaveState {
     [JsonIgnore] public bool TorchLit { get => Actor.TorchLit; set => Actor.TorchLit = value; }
     [JsonIgnore] public float TorchKindling { get => Actor.TorchKindling; set => Actor.TorchKindling = value; }
     [JsonIgnore] public int ActiveHotbar { get => Actor.ActiveHotbar; set => Actor.ActiveHotbar = value; }
+    [JsonIgnore] public string InHand { get => Actor.InHand; set => Actor.InHand = value; }
     [JsonIgnore] public float RespawnIn { get => Actor.RespawnIn; set => Actor.RespawnIn = value; }
     [JsonIgnore] public bool Mauled { get => Actor.Mauled; set => Actor.Mauled = value; }
     [JsonIgnore] public int Sheltered { get => Actor.Sheltered; set => Actor.Sheltered = value; }
@@ -416,6 +417,8 @@ public sealed partial class World {
     public bool Mauled => S.Mauled;
     public int Sheltered => S.Sheltered;
     public int ActiveHotbar => S.ActiveHotbar;
+    /// <summary>The tool selected in hand without a hotbar slot, or empty.</summary>
+    public string InHand => S.InHand;
     public ListView<string> HotbarSlots => new(S.HotbarSlots);
     /// <summary>Hand recipes waiting to be made, one entry per recipe.</summary>
     public ListView<Queued> Crafting => new(S.Crafting);
@@ -737,7 +740,7 @@ public sealed partial class World {
         if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         foreach (var t in S.Things)
             if (!BuiltOver(t.Kind) && t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + ResourceRoom : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
-        if (crate ? item != null && S.Backpack[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
+        if (crate ? item != null && (MarkedSource ?? S.Backpack)[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
         return null;
     }
     private string? ZoneBlock(ThingKind kind, Vector2 p) {
@@ -783,6 +786,7 @@ public sealed partial class World {
         if (!Reaches(t)) { Say("Walk closer first."); return false; }
         if (DismantleBlock(t) is string refused) { Say(refused); return false; }
         if (Forwarded(Verb.Dismantle, t.Id)) return true;
+        if (HeldByOthers(t)) return false;
         // Liquid fills the backpack's vessels, and the rest is spilled.
         string spilled = "";
         foreach (var box in Boxes(t)) if (box != null) spilled += PourOut(box);
@@ -840,18 +844,18 @@ public sealed partial class World {
         t.Keep = recipe;
     }
     /// <summary>
-    /// Why a station's mark cannot move to a recipe now, or null: a mark turns a station to another recipe only while no batch is worked and its cups are empty.
+    /// Why a station's mark cannot move to a recipe now, or null: a mark turns a station to another recipe only while no batch is worked and its slots are empty.
     /// Taking the mark off, and marking the recipe the station is on, are never refused.
     /// </summary>
     public string? MarkBlock(Thing t, string recipe) =>
         recipe == "" || recipe == Selected(t) ? null
         : t.Processing ? Busy(t)
-        : t.Inventory.Count > 0 ? $"Empty the {Lower(Data.Name(t.Kind))}'s cups first." : null;
+        : t.Inventory.Count > 0 ? $"Empty the {Lower(Data.Name(t.Kind))}'s slots first." : null;
     private string Busy(Thing t) => $"The {Lower(Data.Name(t.Kind))} has to finish its batch first.";
     // The first recipe on each kind's board, found once.
     private readonly Dictionary<ThingKind, string> firstRecipes = new();
     /// <summary>
-    /// The recipe a station is on, whose cups its page shows: the one it makes now, else the one it was on last, else the first on its board.
+    /// The recipe a station is on, whose slots its page shows: the one it makes now, else the one it was on last, else the first on its board.
     /// A station is always on one; a thing that makes nothing is on none.
     /// </summary>
     public string Selected(Thing t) => t.Recipe != "" ? t.Recipe : t.Asked != "" ? t.Asked : firstRecipes.TryGetValue(t.Kind, out string? first) ? first : FirstRecipe(t.Kind);
@@ -944,7 +948,7 @@ public sealed partial class World {
         var missing = new List<string>();
         foreach (var (item, needed) in r.Inputs)
             if (needed - Have(item) is > 0 and int lack) missing.Add($"{lack}{(Data.VesselFor(item) != null ? "L of" : "")} {Lower(Data.Name(item))}");
-        // Fuel burns only from the fuel slot: what it holds now, or carried fuel left once a batch's inputs are loaded on top of the cups.
+        // Fuel burns only from the fuel slot: what it holds now, or carried fuel left once a batch's inputs are loaded in the input slots.
         int Spare(string fuel) => Carried(fuel) + (switching ? t.Inventory[fuel] + (t.Burner?[fuel] ?? 0) : 0) - r.Inputs.GetValueOrDefault(fuel);
         bool fuelled = !r.Burns || !switching && t.Burner?.First() is string held && r.Fuels.Contains(held) || r.Fuels.Exists(f => Spare(f) > 0);
         if (!fuelled) missing.Add($"fuel ({FuelWords(r.Fuels)})");
@@ -1005,7 +1009,7 @@ public sealed partial class World {
     /// <summary>Whether the recipe a station is on or the one it keeps to takes an item as an input.</summary>
     private bool Pending(Thing t, string item) => BatchCost(Selected(t)).ContainsKey(item) || BatchCost(t.Keep).ContainsKey(item);
     /// <summary>
-    /// Whether a station's cups hold something left by another recipe: neither an input of the recipe it is on or keeps to, nor what its recipe makes.
+    /// Whether a station's slots hold something left by another recipe: neither an input of the recipe it is on or keeps to, nor what its recipe makes.
     /// It starts no batch until a hauler or a player takes that out.
     /// </summary>
     private bool Blocked(Thing t, RecipeDef r) {
@@ -1015,8 +1019,8 @@ public sealed partial class World {
     }
     /// <summary>Whether a station takes an item from the player: an input of the recipe it is on or keeps to, a vessel holding a liquid input, or a fuel it burns.</summary>
     public bool Takes(Thing t, string item) => Pending(t, item) || PoursInto(t, t.Inventory, item) != null || t.Burner != null && FuelFits(t, item);
-    /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it, with nothing left by another recipe in its cups.</summary>
-    private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null) && !(Data.Recipes.TryGetValue(t.Recipe, out var r) && Blocked(t, r));
+    /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it, with nothing left by another recipe in its slots.</summary>
+    private bool Stocked(Thing t) => !HeldAt(t) && t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null) && !(Data.Recipes.TryGetValue(t.Recipe, out var r) && Blocked(t, r));
     /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
     public void LoadBatch(Thing t, int batches = 1) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
@@ -1037,10 +1041,10 @@ public sealed partial class World {
     /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
     public int LoadInput(Thing t, string item, int quantity) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
-        // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the ingredient slot, and the fuel slot is filled by dragging.
+        // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the input slot, and its fuel slot is filled by putting coal on it.
         if (!Pending(t, item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
         if (t.Kind == ThingKind.Packer && HoldBlock(t, item) is string refused) { Say(refused); return 0; }
-        // A vessel pours what it holds into the station's cup for its liquid.
+        // A vessel pours what it holds into the station's input slot for its liquid.
         var vessel = PoursInto(t, t.Inventory, item);
         string lands = vessel?.Liquid ?? item;
         if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
@@ -1050,7 +1054,7 @@ public sealed partial class World {
         return moved;
     }
     /// <summary>
-    /// Loads units of a station input from the backpack while its cup has room, and says nothing.
+    /// Loads units of a station input from the backpack while its input slot has room, and says nothing.
     /// A vessel pours what it holds, and a liquid asked for by name, as when a batch is queued, pours from the backpack's vessels.
     /// </summary>
     private int Load(Thing t, string item, int quantity) {
@@ -1073,7 +1077,7 @@ public sealed partial class World {
     public void Collect(Thing t) {
         if (!Reaches(t)) { Say("Walk closer to collect items."); return; }
         if (Forwarded(Verb.Collect, t.Id)) return;
-        foreach (var item in Leftovers(t).ToArray()) Carry(t.Inventory, S.Backpack, null, item, 999);
+        foreach (var item in Leftovers(t).ToArray()) { Carry(t.Inventory, S.Backpack, null, item, 999); SayHeldBehind(t.Inventory, item); }
     }
     /// <summary>Finished goods plus anything neither the recipe the station is on nor the kept one takes.</summary>
     public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));
@@ -1157,14 +1161,15 @@ public sealed partial class World {
     }
     /// <summary>A burning torch in hand, with the player out in the open, sets how wolves behave.</summary>
     private bool Torchlit => S.TorchLit && !Downed && S.Sheltered == 0 && !Protected(Player);
-    /// <summary>Lights the torch in hand, taking a new one from the backpack if the hand is empty, or swings it once it burns.</summary>
+    /// <summary>
+    /// Lights a torch from the backpack, which stays there while it burns, or swings it once it burns.
+    /// A torch put out before, by wild swinging, lights again with the burn time it had left.
+    /// </summary>
     public void UseTorch(Vector2 aim) {
         if (Downed || S.Sheltered != 0 || S.TorchKindling > 0 || Forwarded(Verb.Torch, at: aim)) return;
         if (S.TorchLit) { SwingTorch(aim); return; }
-        if (S.Torch <= 0) {
-            if (S.Backpack.Remove("torch", 1) == 0) { Say("No torch in your backpack."); return; }
-            S.Torch = Data.CampfireSeconds;
-        }
+        if (S.Backpack["torch"] == 0) { Say("No torch in your backpack."); return; }
+        if (S.Torch <= 0) S.Torch = Data.CampfireSeconds;
         S.TorchKindling = KindleSeconds; PlayerActed?.Invoke(ActorAction.Kindle, Player);
     }
     private void SwingTorch(Vector2 aim) {
@@ -1216,6 +1221,7 @@ public sealed partial class World {
         }
     }
     public void Die() {
+        Release();
         // After a mauling the box lands past the feet, behind the wolf standing over the player, so the feeding stays visible.
         // The player falls backwards facing the wolf that leapt, so the feet point back the way it came.
         var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
@@ -1383,14 +1389,14 @@ public sealed partial class World {
     /// A crate of one good also carries its name in between, such as <c>crate_bread_17</c>, so filters can ask for crates of it.
     /// </summary>
     public const string PackedPrefix = "crate_";
-    public static bool IsCrate(string item) => item == "crate" || item.StartsWith(PackedPrefix);
+    public static bool IsCrate(string item) => item == "crate" || item.StartsWith(PackedPrefix, StringComparison.Ordinal);
     /// <summary>The number that keys a packed crate's contents, or 0 for any other item.</summary>
-    public static int PackedId(string item) => item.StartsWith(PackedPrefix) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
+    public static int PackedId(string item) => item.StartsWith(PackedPrefix, StringComparison.Ordinal) && int.TryParse(item.AsSpan(item.LastIndexOf('_') + 1), out int id) ? id : 0;
     /// <summary>The filter entry that stands for any packed crate of one good, such as <c>crate_bread</c>.</summary>
     public static string CrateOf(string item) => PackedPrefix + item;
     /// <summary>The <see cref="CrateOf"/> entry a packed crate of one good matches, or empty for anything else.</summary>
     public static ReadOnlySpan<char> PackedKind(string item) {
-        if (!item.StartsWith(PackedPrefix)) return default;
+        if (!item.StartsWith(PackedPrefix, StringComparison.Ordinal)) return default;
         int last = item.LastIndexOf('_');
         return last > PackedPrefix.Length ? item.AsSpan(0, last) : default;
     }
@@ -1419,8 +1425,10 @@ public sealed partial class World {
     /// An emptied crate becomes a plain empty crate.
     /// </summary>
     public int MoveInCrate(int id, string item, int quantity, bool packing) {
-        if (Downed || CarriedCrate(id) is not string crate || Packed(crate) is not Inventory contents) return 0;
+        if (Downed) return 0;
         if (packing && IsCrate(item)) { Say("Never put a crate in a crate."); return 0; }
+        if (id == 0) return packing ? PackEmptyCrate(item, quantity) : 0;
+        if (CarriedCrate(id) is not string crate || Packed(crate) is not Inventory contents) return 0;
         if (Forwarded(Verb.MoveInCrate, id, packing ? 1 : 0, item, quantity)) return 0;
         int moved = packing ? S.Backpack.TransferTo(contents, item, quantity) : contents.TransferTo(S.Backpack, item, quantity);
         if (moved == 0) { Say(packing ? "The crate is full." : "Your backpack is full."); return 0; }
@@ -1428,14 +1436,29 @@ public sealed partial class World {
         if (contents.Count == 0) S.Crates.Remove(id);
         return moved;
     }
-    /// <summary>Puts a crate from the backpack down, still holding whatever it was packed with.</summary>
+    /// <summary>Packs goods from the backpack into one of its empty crates, which becomes a packed crate; what <see cref="MoveInCrate"/> does with crate number 0.</summary>
+    private int PackEmptyCrate(string item, int quantity) {
+        if (S.Backpack["crate"] == 0) { Say("No empty crate in your backpack."); return 0; }
+        if (Forwarded(Verb.MoveInCrate, 0, 1, item, quantity)) return 0;
+        var contents = NewCrate();
+        int moved = S.Backpack.TransferTo(contents, item, quantity);
+        if (moved == 0) return 0;
+        S.Backpack.Remove("crate", 1);
+        string packed = Pack(contents);
+        if (S.Backpack.Add(packed, 1) == 1) return moved;
+        S.Crates.Remove(PackedId(packed)); S.Backpack.Add("crate", 1); contents.TransferTo(S.Backpack, item, moved);
+        Say("Your backpack is full.");
+        return 0;
+    }
+    /// <summary>Puts a crate from the backpack, or the held crate, down, still holding whatever it was packed with.</summary>
     public Thing? PlaceCrate(string item, Vector2 p) {
         if (!IsCrate(item)) return null;
         if (PlacementBlock(ThingKind.Crate, p, item) is string blocked) { Say(blocked); return null; }
-        if (Forwarded(Verb.PlaceCrate, item: item, at: p)) return null;
-        S.Backpack.Remove(item, 1);
+        if (Forwarded(Verb.PlaceCrate, item: item, count: S.Backpack.PreferredSlot, at: p)) return null;
+        // A crate put down from the held stack comes from wherever it is held, such as a chest; any other from the backpack.
+        (MarkedSource ?? S.Backpack).Remove(item, 1);
         var crate = Add(ThingKind.Crate, p); ClearGround(crate);
-        if (Packed(item) is Inventory contents) { crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
+        if (Packed(item) is Inventory contents) { ReleaseIn(contents); crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
         Play("close_chest", p); return crate;
     }
     /// <summary>Lifts a placed crate into the backpack; anything inside stays packed in it.</summary>
@@ -1444,6 +1467,7 @@ public sealed partial class World {
         bool empty = crate.Inventory.Count == 0;
         if (S.Backpack.Room(empty ? "crate" : PackedPrefix) == 0) { Say("Backpack full. Make room for the crate."); return false; }
         if (Forwarded(Verb.PickUpCrate, crate.Id)) return true;
+        if (HeldByOthers(crate)) return false;
         S.Backpack.Add(empty ? "crate" : Pack(crate.Inventory), 1); S.Things.Remove(crate);
         Play("wood_rocks_inventory", crate.Pos); PlayerActed?.Invoke(ActorAction.PickUp, crate.Pos); return true;
     }
@@ -1624,8 +1648,8 @@ public sealed partial class World {
         if (w.Bag.Count > 0 || w.Tool != "") { var box = Add(ThingKind.Grave, w.Pos); box.Inventory = w.Bag; box.Inventory.Capacity = 0; box.Inventory.Slots = box.Inventory.UsedSlots + 1; box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1); }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
-    private enum HoldRefusal { None, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly }
-    /// <summary>The one place the storage rules live: a tool station holds only tools, a pile one resource and compost what rots; other storage holds anything.</summary>
+    private enum HoldRefusal { None, ToolsOnly, CompostOnly, OtherResource, FarmOnly, PackerOnly, SellOnly, WoodOnly }
+    /// <summary>The one place the storage rules live: a tool station holds only tools, a pile one resource, compost what rots and a campfire wood; other storage holds anything.</summary>
     private HoldRefusal HoldCheck(Thing t, string item) => t.Kind switch {
         ThingKind.Toolstation when !(Data.Items.TryGetValue(item, out var def) && def.Tool != "") => HoldRefusal.ToolsOnly,
         ThingKind.Pile when t.Compost && !Compostable(item) && item != "fertilizer" => HoldRefusal.CompostOnly,
@@ -1633,6 +1657,7 @@ public sealed partial class World {
         ThingKind.Farm when !Data.Farm.Sow.ContainsKey(item) => HoldRefusal.FarmOnly,
         ThingKind.Packer when item != "crate" && item != t.Packs => HoldRefusal.PackerOnly,
         ThingKind.Signpost when !CanSell(item) => HoldRefusal.SellOnly,
+        ThingKind.Campfire when item != "wood" => HoldRefusal.WoodOnly,
         _ => HoldRefusal.None
     };
     /// <summary>Whether storage takes an item, without building the reason; workers ask on every tick.</summary>
@@ -1644,6 +1669,7 @@ public sealed partial class World {
         HoldRefusal.OtherResource => $"This pile holds {Data.Name(HeldOtherThan(t.Inventory, item)!)}. Empty it to store something else.",
         HoldRefusal.PackerOnly => t.Packs == "" ? "Choose what to pack first." : $"The packing station takes {Data.Name(t.Packs).ToLowerInvariant()} and empty crates.",
         HoldRefusal.SellOnly => "The village only takes packed crates.",
+        HoldRefusal.WoodOnly => "The campfire burns only wood.",
         HoldRefusal.FarmOnly => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}.",
         _ => null
     };
@@ -1695,6 +1721,8 @@ public sealed partial class World {
         int rotting = 0;
         foreach (var pair in pile.Inventory.Items) if (Compostable(pair.Key)) rotting += pair.Value;
         if (rotting < CompostBatch || pile.Inventory.Room("fertilizer") == 0) { pile.Progress = 0; return; }
+        // Like a station, compost holding a stack a player picked up makes nothing until it is let go of.
+        if (HeldAt(pile)) return;
         pile.Progress += dt;
         if (pile.Progress < Data.HourSeconds) return;
         pile.Progress = 0;
@@ -2279,6 +2307,8 @@ public sealed partial class World {
         foreach (var wolf in S.Wolves) if (wolf.Target != 0 && PlayerById(wolf.Target) == null) Patrol(wolf, wolf.Heading);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) NeedsTick(dt, sleeping);
+        KeepHolds();
+        BindWaitingHotbars();
         if (Day > S.WageDay) {
             // Workers on strike are not charged, so their wage does not count against the day.
             int wages = S.Workers.Where(w => w.WageDebt <= 0).Sum(w => w.Wage);
@@ -2425,7 +2455,8 @@ public sealed partial class World {
             S.TorchKindling = 0;
             if (!Downed && S.Torch > 0) { S.TorchLit = true; Play("start_fire", Player); Say($"Torch lit: {S.Torch / Data.DaySeconds * 24:0.#} hours of light left."); }
         }
-        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); Say("Your torch burned out."); }
+        // Burning out uses the torch up; moving it out of the backpack puts it out, and it goes as a fresh one.
+        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); S.Backpack.Remove("torch", 1); Say("Your torch burned out."); } else if (S.Torch > 0 && S.Backpack["torch"] == 0) { bool lit = S.TorchLit || S.TorchKindling > 0; S.Torch = 0; PutOutTorch(); if (lit) Say("Your torch went out as it left the backpack."); }
     }
     /// <summary>The campfire the crew sits around: the one closest to them all, during lunch.</summary>
     internal void UpdateLunchFire() {
@@ -2663,6 +2694,8 @@ public sealed partial class World {
     private void TidyHotbar(PlayerState p) {
         p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
+        if (!(Data.Items.TryGetValue(p.InHand ?? "", out var def) && def.Tool != "")) p.InHand = "";
+        TidyBindings(p);
     }
     private bool Hand(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand;
     /// <summary>Brings the stacks of every inventory of a freshly parsed save in line with its totals.</summary>
@@ -2696,7 +2729,7 @@ public sealed partial class World {
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;
         loaded.Absent.Remove(local.Key);
-        local.Id = 1; loaded.Players.Add(local);
+        local.Id = 1; Forget(local); loaded.Players.Add(local);
         S = loaded;
         toolsChanged = true;
         foreach (var t in S.Things.Of(ThingKind.Toolstation)) WatchTools(t);

@@ -27,7 +27,7 @@ public partial class Game {
     }
 
     /// <summary>
-    /// With one unit of its first item, and its fuel, a double-click leaves no recipe ready to start, shakes the cups and names what is missing.
+    /// With one unit of its first item, and its fuel, a double-click leaves no recipe ready to start, shakes the slots and names what is missing.
     /// A recipe whose whole batch is a single unit has no such case.
     /// </summary>
     private async Task CheckNoRecipeIsReadyToStartAfterADoubleClickWithOneOfItsItems() {
@@ -42,7 +42,7 @@ public partial class Game {
         }
     }
 
-    /// <summary>With its items but no fuel in the backpack, a double-click leaves no burning recipe ready to start, shakes the cups and says fuel is missing.</summary>
+    /// <summary>With its items but no fuel in the backpack, a double-click leaves no burning recipe ready to start, shakes the slots and says fuel is missing.</summary>
     private async Task CheckNoRecipeIsReadyToStartAfterADoubleClickWithoutFuel() {
         foreach (var (id, r) in StationRecipes.Where(p => p.Recipe.Burns)) {
             var station = await OpenStationFor(r);
@@ -53,7 +53,7 @@ public partial class Game {
         }
     }
 
-    /// <summary>With fuel but none of its items in the backpack, a double-click leaves no burning recipe ready to start, shakes the cups and names every item missing.</summary>
+    /// <summary>With fuel but none of its items in the backpack, a double-click leaves no burning recipe ready to start, shakes the slots and names every item missing.</summary>
     private async Task CheckNoRecipeIsReadyToStartAfterADoubleClickWithFuelAlone() {
         foreach (var (id, r) in StationRecipes.Where(p => p.Recipe.Burns)) {
             var station = await OpenStationFor(r);
@@ -64,12 +64,12 @@ public partial class Game {
         }
     }
 
-    /// <summary>With its fuel and items dragged onto their cups one by one, each recipe is ready to start.</summary>
+    /// <summary>With its fuel and items put on their slots one by one, each recipe is ready to start.</summary>
     private async Task CheckEveryRecipeIsReadyToStartWhenLoadedByHand() {
         foreach (var (id, r) in StationRecipes) {
             var station = await OpenStationFor(r);
             await LoadByHand(station, id, r);
-            await ExpectStarts(station, id, "once its fuel and items are dragged onto their cups");
+            await ExpectStarts(station, id, "once its fuel and items are put on their slots");
             await CloseStation(station);
         }
     }

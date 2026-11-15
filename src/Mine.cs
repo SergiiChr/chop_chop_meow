@@ -76,12 +76,12 @@ public sealed partial class World {
         return Player.DistanceTo(spot) > 8 ? "Walk closer to the cliff." : null;
     }
 
-    /// <summary>Hands the site whatever it still needs from the backpack.</summary>
-    public void SupplyMine(Thing mine) {
-        if (!Reaches(mine)) { Say("Walk closer to the mine."); return; }
-        var needs = MineNeeds(mine);
-        if (needs.Count == 0 || Forwarded(Verb.SupplyMine, mine.Id)) return;
-        if (needs.Sum(p => S.Backpack.TransferTo(mine.Inventory, p.Key, p.Value)) == 0) Say($"The mine still needs {Goods(needs)}.");
+    /// <summary>Hands the site up to <paramref name="quantity"/> of one material from the backpack, no more than it still needs.</summary>
+    public int SupplyMine(Thing mine, string item, int quantity) {
+        if (!Reaches(mine)) { Say("Walk closer to the mine."); return 0; }
+        if (MineNeed(mine, item) == 0) { Say(MineNeeds(mine) is { Count: > 0 } needs ? $"The mine still needs {Goods(needs)}." : "The mine needs nothing now."); return 0; }
+        if (Forwarded(Verb.SupplyMine, mine.Id, item: item, count: quantity)) return 0;
+        return S.Backpack.TransferTo(mine.Inventory, item, Math.Min(quantity, MineNeed(mine, item)));
     }
 
     /// <summary>Why the player cannot work on a mine now, or null: a pickaxe digs the entrance and a hammer fits the frame and rails.</summary>

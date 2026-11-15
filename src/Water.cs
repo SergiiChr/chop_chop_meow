@@ -22,9 +22,9 @@ public static class Water {
     /// <summary>The bottle holding so many liters, up to full.</summary>
     public static string WaterItem(int liters) => BottleItems[Math.Clamp(liters, 0, Capacity)];
 
-    /// <summary>Finds an empty bottle first, then the least-full partial bottle, and a full bottle last.</summary>
+    /// <summary>Finds an empty bottle first, then the least-full partial bottle, and a full bottle last, among those no player holds.</summary>
     public static string? FindBottle(Inventory inventory) {
-        foreach (var item in BottleItems) if (inventory[item] > 0) return item;
+        foreach (var item in BottleItems) if (inventory.Free(item) > 0) return item;
         return null;
     }
 

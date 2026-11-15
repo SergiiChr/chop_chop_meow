@@ -7,6 +7,38 @@ using static WorldSteps;
 
 /// <summary>What the player does by hand in the simulation checks.</summary>
 internal static class PlayerSteps {
+    /// <summary>The slot of a backpack a stack of an item lies in, or -1.</summary>
+    public static int SlotOf(InventoryView box, string item) => box.Layout.ToList().FindIndex(s => s.Item == item);
+
+    /// <summary>The slot of a building's inventory a stack of an item lies in, or -1.</summary>
+    public static int SlotOf(Inventory box, string item) => box.Layout.FindIndex(s => s.Item == item);
+
+    /// <summary>Puts units of the held stack into storage, as a storage slot does: into slot <paramref name="slot"/>, or with -1 wherever the inventory takes them.</summary>
+    public static void PutDown(World world, Inventory to, int slot, int count) => world.FromHeldStack(() => {
+        if (world.Held is not HeldStack held || world.HeldBox is not Inventory from) return;
+        if (slot >= 0) world.TransferSlot(from, to, held.Slot, slot, held.Item, count); else world.Transfer(from, to, held.Item, count);
+    });
+
+    /// <summary>Binds a stack to a hotbar slot the way a player does: picks it up, puts it on the slot, and lets go.</summary>
+    public static void PutOnHotbar(World world, Inventory box, int cell, int slot) {
+        world.Hold(box, cell, int.MaxValue);
+        world.FromHeldStack(() => world.SetHotbar(slot, box.Layout[cell].Item));
+        world.Release();
+    }
+
+    /// <summary>Binds a backpack stack to a hotbar slot.</summary>
+    public static void PutOnHotbar(World world, int cell, int slot) => PutOnHotbar(world, world.Backpack.Inventory, cell, slot);
+
+    /// <summary>Moves <paramref name="count"/> units of a backpack stack into the first empty backpack cell, returning that cell.</summary>
+    public static int SplitStack(World world, int cell, int count) {
+        int empty = SlotOf(world.Backpack, "");
+        world.TransferSlot(world.Backpack, world.Backpack, cell, empty, world.Backpack.Layout[cell].Item, count);
+        return empty;
+    }
+
+    /// <summary>Puts units of the held stack into a backpack slot.</summary>
+    public static void PutDown(World world, InventoryView to, int slot, int count) => PutDown(world, to.Inventory, slot, count);
+
     /// <summary>Fills a crate at the player's feet and picks it up, returning the packed crate item now in the backpack.</summary>
     public static string PackCrate(World world, params (string Item, int Count)[] goods) {
         var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));

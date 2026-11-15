@@ -65,8 +65,8 @@ public partial class RecipeMap : Control {
         var header = new HBoxContainer(); header.AddThemeConstantOverride("separation", 18);
         header.AddChild(Style.Glyph("line_map", 28, Style.Rim));
         var title = Style.Heading("Recipe map"); title.SizeFlagsHorizontal = SizeFlags.ExpandFill; header.AddChild(title);
-        header.AddChild(Legend(new MapCup { Known = true }, "Made before"));
-        header.AddChild(Legend(new MapCup(), "Not made or built yet"));
+        header.AddChild(Legend(new MapSlot { Known = true }, "Made before"));
+        header.AddChild(Legend(new MapSlot(), "Not made or built yet"));
         header.AddChild(Legend(Sample(MapNode.ToolChip), "Required tool"));
         header.AddChild(Legend(Sample(MapNode.ResourceChip), "Additional resources"));
         header.AddChild(kit.HeaderButton("close", "Close · Esc", Close, Style.CloseRound, "map_close"));
@@ -147,7 +147,7 @@ public partial class RecipeMap : Control {
         node.Chosen = true;
         var data = world.Data;
         var strip = new HBoxContainer(); strip.AddThemeConstantOverride("separation", 24); details.AddChild(strip);
-        var cup = new PanelContainer { CustomMinimumSize = new Vector2(64, 64), SizeFlagsVertical = SizeFlags.ShrinkCenter }; cup.AddThemeStyleboxOverride("panel", MapNode.ChosenCup); cup.AddChild(Style.Icon(Icons.Of(item), 46)); strip.AddChild(cup);
+        var slot = new PanelContainer { CustomMinimumSize = new Vector2(64, 64), SizeFlagsVertical = SizeFlags.ShrinkCenter }; slot.AddThemeStyleboxOverride("panel", MapNode.ChosenSlot); slot.AddChild(Style.Icon(Icons.Of(item), 46)); strip.AddChild(slot);
         var naming = Column(strip, null);
         var name = Style.Text(data.Name(item), 19, Style.Ink, Style.Head); name.Name = "detail_name"; naming.AddChild(name);
         naming.AddChild(Style.Text(node.Known ? "Made before" : "Not made yet", 12, Style.Tan));
@@ -236,16 +236,16 @@ public partial class MapTree : Control {
     }
 }
 
-/// <summary>A cup as the map draws it: filled for an item made before, a dashed outline for one not made yet.</summary>
-public partial class MapCup : Control {
+/// <summary>A slot as the map draws it: filled for an item made before, a dashed outline for one not made yet.</summary>
+public partial class MapSlot : Control {
     public bool Known { get; set; }
-    private static readonly StyleBoxFlat Unknown = Style.Flat(new Color(Style.CupFill, .14f), 12, 0);
+    private static readonly StyleBoxFlat Unknown = Style.Flat(new Color(Style.SlotFill, .14f), 12, 0);
 
     public override void _Draw() => Paint(this, new Rect2(Vector2.Zero, Size), Known);
 
-    /// <summary>Paints a cup on any control.</summary>
+    /// <summary>Paints a slot on any control.</summary>
     public static void Paint(Control on, Rect2 rect, bool known) {
-        if (known) { on.DrawStyleBox(Style.CupNormal, rect); return; }
+        if (known) { on.DrawStyleBox(Style.SlotNormal, rect); return; }
         on.DrawStyleBox(Unknown, rect);
         float corner = Math.Min(6, rect.Size.X / 4);
         Vector2 a = rect.Position, b = rect.End;
@@ -257,24 +257,24 @@ public partial class MapCup : Control {
 }
 
 /// <summary>
-/// An item on the map: its cup, its name and where it is made, with a chip beside the cup for the tool its recipe requires
+/// An item on the map: its slot, its name and where it is made, with a chip beside the slot for the tool its recipe requires
 /// and for each additional resource it takes.
 /// </summary>
 /// <param name="choose">Shows an item's details.</param>
 /// <param name="jump">Goes to another item and lights it up.</param>
 public partial class MapNode(World world, string item, Action<string> choose, Action<string> jump) : Control {
     public const float Width = 200, Height = 48;
-    private const float Cup = 40, Chip = 22;
-    /// <summary>Left edge of the chips, which lap over the cup's right edge.</summary>
-    private const float ChipsLeft = Cup - 4;
-    public static readonly StyleBoxFlat ToolChip = Style.Flat(Style.CupFill, (int)Chip / 2, 0, Style.Mustard, 2), ResourceChip = Style.Flat(Style.CupFill, (int)Chip / 2, 0, Style.Line, 2);
-    public static readonly StyleBoxFlat ChosenCup = Style.Flat(Style.CupFill, 14, 0, Style.Mustard, 3), LaneBack = Style.Flat(new Color(Style.Line, .5f), 14, 10, horizontal: 12);
+    private const float SlotSide = 40, Chip = 22;
+    /// <summary>Left edge of the chips, which lap over the slot's right edge.</summary>
+    private const float ChipsLeft = SlotSide - 4;
+    public static readonly StyleBoxFlat ToolChip = Style.Flat(Style.SlotFill, (int)Chip / 2, 0, Style.Mustard, 2), ResourceChip = Style.Flat(Style.SlotFill, (int)Chip / 2, 0, Style.Line, 2);
+    public static readonly StyleBoxFlat ChosenSlot = Style.Flat(Style.SlotFill, 14, 0, Style.Mustard, 3), LaneBack = Style.Flat(new Color(Style.Line, .5f), 14, 10, horizontal: 12);
     public static readonly StyleBoxFlat StationBuilt = Style.Flat(Style.Beige, 12, 6, horizontal: 8), StationPlanned = Style.Flat(Colors.Transparent, 12, 6, new Color(Style.Beige, .7f), 2, 8);
     private static readonly StyleBoxFlat ChosenRing = Style.Flat(Colors.Transparent, 14, 0, Style.Mustard, 3), LitRing = Style.Flat(new Color(Style.Rim, .25f), 16, 0, Style.Rim, 4);
 
-    private Button cupButton = null!;
+    private Button slotButton = null!;
     private Label nameLabel = null!, sourceLabel = null!;
-    /// <summary>Where the item's words start: after the cup, or after the chips beside it.</summary>
+    /// <summary>Where the item's words start: after the slot, or after the chips beside it.</summary>
     private float wordsStart;
     private bool chosen;
     private int lit;
@@ -291,18 +291,18 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
         var data = world.Data;
         Name = $"map_{item}";
         CustomMinimumSize = Size = new Vector2(Width, Height); MouseFilter = MouseFilterEnum.Ignore;
-        var cup = cupButton = new Button { Name = "cup", Position = new Vector2(0, (Height - Cup) / 2), Size = new Vector2(Cup, Cup), Icon = Icons.Of(item), ExpandIcon = true, IconAlignment = HorizontalAlignment.Center, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, TooltipText = data.Name(item) };
-        Style.Skin(cup, Style.None, Style.None); cup.AddThemeConstantOverride("icon_max_width", 30);
-        cup.Pressed += () => choose(item);
-        AddChild(cup);
+        var slot = slotButton = new Button { Name = "slot", Position = new Vector2(0, (Height - SlotSide) / 2), Size = new Vector2(SlotSide, SlotSide), Icon = Icons.Of(item), ExpandIcon = true, IconAlignment = HorizontalAlignment.Center, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, TooltipText = data.Name(item) };
+        Style.Skin(slot, Style.None, Style.None); slot.AddThemeConstantOverride("icon_max_width", 30);
+        slot.Pressed += () => choose(item);
+        AddChild(slot);
         var recipe = data.RecipeOf(item);
-        // Chips stand in a column beside the cup, the tool over the resources, so those of two lines never meet.
+        // Chips stand in a column beside the slot, the tool over the resources, so those of two lines never meet.
         bool tooled = recipe is { Tool.Length: > 0 };
         if (tooled) AddChild(ChipFor(data, data.PlainestTool(recipe!.Tool, recipe.Tier), "tool", ToolChip, 1, 0, "Required tool", jump));
         var also = recipe != null ? recipe.Inputs.Keys.Skip(1) : data.Sources[item].Also;
         int across = 0;
         foreach (string other in also) AddChild(ChipFor(data, other, "also", ResourceChip, Height - Chip - 1, across++, "Additional resource", jump));
-        wordsStart = tooled || across > 0 ? ChipsLeft + Math.Max(1, across) * (Chip + 2) + 4 : Cup + 8;
+        wordsStart = tooled || across > 0 ? ChipsLeft + Math.Max(1, across) * (Chip + 2) + 4 : SlotSide + 8;
         var words = new VBoxContainer { Position = new Vector2(wordsStart, 0), Size = new Vector2(Width - wordsStart, Height), Alignment = BoxContainer.AlignmentMode.Center, MouseFilter = MouseFilterEnum.Ignore };
         words.AddThemeConstantOverride("separation", -2); AddChild(words);
         nameLabel = Style.Text(data.Name(item), 13, Style.Beige); words.AddChild(nameLabel);
@@ -320,7 +320,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
     /// <summary>Draws the icon and name full for an item had before, and faded for one not made yet.</summary>
     private void ShowKnown() {
         var tint = new Color(1, 1, 1, Known ? 1 : .55f);
-        foreach (string state in IconStates) cupButton.AddThemeColorOverride(state, tint);
+        foreach (string state in IconStates) slotButton.AddThemeColorOverride(state, tint);
         nameLabel.AddThemeColorOverride("font_color", Known ? Style.Rim : Style.Beige);
         QueueRedraw();
     }
@@ -329,7 +329,7 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
     /// <summary>Where a recipe is made, in a few words.</summary>
     public static string Where(GameData data, RecipeDef r) => r.Station is not ThingKind station ? "By hand" : r.Hand ? $"Hand or {data.Name(station).ToLowerInvariant()}" : data.Name(station);
 
-    /// <summary>A round chip beside the cup that goes to the item it pictures.</summary>
+    /// <summary>A round chip beside the slot that goes to the item it pictures.</summary>
     private Button ChipFor(GameData data, string other, string kind, StyleBoxFlat look, float top, int across, string role, Action<string> jump) {
         var chip = new Button { Name = $"{kind}_{other}", Position = new Vector2(ChipsLeft + across * (Chip + 2), top), Size = new Vector2(Chip, Chip), Icon = Icons.Of(other), ExpandIcon = true, IconAlignment = HorizontalAlignment.Center, FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand, TooltipText = $"{role}: {data.Name(other)}\nClick to view" };
         Style.Skin(chip, look, look); chip.AddThemeConstantOverride("icon_max_width", 14);
@@ -346,9 +346,9 @@ public partial class MapNode(World world, string item, Action<string> choose, Ac
     }
 
     public override void _Draw() {
-        var cup = new Rect2(0, (Height - Cup) / 2, Cup, Cup);
-        if (Lit) DrawStyleBox(LitRing, cup.Grow(5));
-        MapCup.Paint(this, cup, Known);
-        if (chosen) DrawStyleBox(ChosenRing, cup.Grow(2));
+        var slot = new Rect2(0, (Height - SlotSide) / 2, SlotSide, SlotSide);
+        if (Lit) DrawStyleBox(LitRing, slot.Grow(5));
+        MapSlot.Paint(this, slot, Known);
+        if (chosen) DrawStyleBox(ChosenRing, slot.Grow(2));
     }
 }

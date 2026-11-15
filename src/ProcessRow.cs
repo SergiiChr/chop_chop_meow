@@ -9,15 +9,15 @@ namespace ChopChopMeow;
 /// the fuel under it with how long it lasts, and the main output with its side outputs in a second row.
 /// </summary>
 public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) : PanelContainer {
-    // The input cups and the output cups, each group in a box of its own.
+    // The input slots and the output slots, each group in a box of its own.
     private HBoxContainer left = null!;
     private VBoxContainer right = null!;
     private Tween? shake;
 
-    /// <summary>Whether the cups are shaking now.</summary>
+    /// <summary>Whether the slots are shaking now.</summary>
     public bool Shaking => shake != null && shake.IsValid();
 
-    /// <summary>Shakes the input and output cups from side to side and back to rest, to show they are taken; a shake under way goes on as it is.</summary>
+    /// <summary>Shakes the input and output slots from side to side and back to rest, to show they are taken; a shake under way goes on as it is.</summary>
     public void Shake() {
         if (!Shaking) shake = Shaker.Shake(this, left, right);
     }
@@ -43,11 +43,11 @@ public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, s
     }
 }
 
-/// <summary>The fuel position under a process bar: an icon for what it is, its cup or picture, how long it lasts, and what else it takes.</summary>
-public partial class FuelRow(string glyph, Color tint, Control cup, Label lasts, Control? accepted = null) : HBoxContainer {
+/// <summary>The fuel position under a process bar: an icon for what it is, its slot or picture, how long it lasts, and what else it takes.</summary>
+public partial class FuelRow(string glyph, Color tint, Control slot, Label lasts, Control? accepted = null) : HBoxContainer {
     public override void _Ready() {
         AddThemeConstantOverride("separation", 8);
-        AddChild(Style.Glyph(glyph, 24, tint)); AddChild(cup); AddChild(lasts);
+        AddChild(Style.Glyph(glyph, 24, tint)); AddChild(slot); AddChild(lasts);
         if (accepted != null) AddChild(accepted);
     }
 }

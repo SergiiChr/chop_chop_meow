@@ -6,7 +6,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// A station's page: the recipe board, the work of its current recipe, the bellows of a reinforced furnace
-/// and the jobs it offers, with its tool cups in a window of their own to the left.
+/// and the jobs it offers, with its tool slots in a window of their own to the left.
 /// </summary>
 public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(tools, subject) {
     // The board opens the group of what the station makes when the page opens, and keeps the groups as the player leaves them after that.
@@ -15,7 +15,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
     private ProcessRow work = null!;
 
     protected override void Body() {
-        // A station's own tool cups sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
+        // A station's own tool slots sit in a window beside the page: what is slotted sets which recipes workers can run and how fast.
         var slotted = World.SlotKinds(thing.Kind);
         if (slotted.Length > 0) ToolWindow(slotted);
         if (thing.Kind == ThingKind.Bench) headingIcon.TooltipText = $"Works {world.Data.BenchSpeed:0.#}× as fast as by hand, at the speed of the slotted tool, or of the one you carry while you work it. Someone has to work it.";
@@ -23,17 +23,17 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         opened = true;
         // A refused mark is answered a moment after its click, when the page may have closed.
         AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, thing, openOn, () => { if (IsInstanceValid(this) && IsInstanceValid(work)) work.Shake(); }));
-        AddChild(work = cups.Machine());
-        // The side cups are the leftovers the station held when the page was drawn.
-        RedrawOnChange(cups.SideCode);
+        AddChild(work = stationSlots.Machine());
+        // The side slots are the leftovers the station held when the page was drawn.
+        RedrawOnChange(stationSlots.SideCode);
         if (thing.Kind == ThingKind.Reinforced) Bellows();
-        // A tool whose cup is empty goes into it.
-        bool FreeToolCup(string id) => slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(thing, world.Data.Items[id].Tool) == null;
+        // A tool whose slot is empty goes into it.
+        bool FreeToolSlot(string id) => slotted.Contains(world.Data.Items.GetValueOrDefault(id)?.Tool) && world.BenchTool(thing, world.Data.Items[id].Tool) == null;
         BagGrid(id => {
-            if (FreeToolCup(id)) world.SlotTool(thing, id);
+            if (FreeToolSlot(id)) world.SlotTool(thing, id);
             else world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id));
-        }, slotted.Length > 0 ? "Click: slot a tool, or add one · Shift: a stack · Ctrl: all of it · Drag onto a slot" : "Click: add one · Shift: a stack · Ctrl: all of it · Drag onto a slot",
-            wanted: id => world.Takes(thing, id) || FreeToolCup(id));
+        }, slotted.Length > 0 ? $"{BagHint}\nShift: slot a tool, or load a stack · Ctrl: all of it" : $"{BagHint}\nShift: load a stack · Ctrl: all of it",
+            wanted: id => world.Takes(thing, id) || FreeToolSlot(id));
         JobButtons();
     }
 
@@ -52,19 +52,17 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         }
     }
 
-    /// <summary>A station's cup for one tool kind; while empty it shows a faint picture of the tool it wants.</summary>
+    /// <summary>A station's slot for one tool kind; while empty it shows a faint picture of the tool it wants.</summary>
     private ItemSlot ToolSlot(string tool) {
-        var (cell, _) = ItemSlot.Cup($"tool_{tool}");
+        var (cell, _) = ItemSlot.Create($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         string plainest = world.Data.PlainestTool(tool);
-        cell.Pressed += () => { if (world.BenchTool(thing, tool) is string held) kit.Run(() => world.UnslotTool(thing, held)); };
-        cell.Drag = () => world.BenchTool(thing, tool) is string held ? new ItemDrag(held, 1, thing.Tools, thing) : null;
-        cell.CanTake = drag => drag.From == world.S.Backpack && world.Data.Items.GetValueOrDefault(drag.Item)?.Tool == tool;
-        cell.Take = drag => { kit.Run(() => world.SlotTool(thing, drag.Item)); return 0; };
+        moves.TakeCell(cell, thing.Tools!, () => world.BenchTool(thing, tool), thing,
+            held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item)?.Tool == tool, (item, _) => world.SlotTool(thing, item));
         live.Watch(() => world.BenchTool(thing, tool), held => {
             cell.Icon = Icons.Of(held ?? plainest);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held != null ? Colors.White : Style.Ghost);
-            cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\nClick: take it back" : $"Empty {tool} slot\nDrag a {tool} here from your backpack";
+            cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\n{StationSlots.SlotHint}" : $"Empty {tool} slot\nPut a {tool} here from your backpack";
         });
         return cell;
     }

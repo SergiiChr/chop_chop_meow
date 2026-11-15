@@ -299,7 +299,7 @@ public static class WaterChecks {
         world.SetRecipe(furnace, "charcoal"); furnace.Inventory.Add("wood", 2);
         Give(world, "wood", 1);
         Require(world.BatchShort(furnace, "charcoal") == "Missing fuel (wood, coal or charcoal).",
-            $"wood in the cups is not fuel, and the carried wood fills the cups first: {world.BatchShort(furnace, "charcoal")}");
+            $"wood in the input slots is not fuel, and the carried wood fills the input slots first: {world.BatchShort(furnace, "charcoal")}");
     }
 
     private static void CheckFullBottleQueuedForOneLiterKeepsTheRest(GameData data) {

@@ -53,7 +53,7 @@ public sealed partial class World {
         return room;
     }
 
-    /// <summary>The vessel whose liquid an item pours into a box, or null: the item holds some, and the box is a station's cups whose recipe takes that liquid.</summary>
+    /// <summary>The vessel whose liquid an item pours into a box, or null: the item holds some, and the box is a station's input slots and its recipe takes that liquid.</summary>
     private VesselDef? PoursInto(Thing? t, Inventory to, string item) =>
         t != null && to == t.Inventory && Data.VesselOf(item) is VesselDef v && v.LitersIn(item) > 0 && Pending(t, v.Liquid) ? v : null;
 
