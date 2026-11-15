@@ -15,23 +15,27 @@ A crate's chain cost is:
 
 - the worker-days of every step, measured by running real workers through whole days (gathering, water, each station), at a worker-day's cost (section 2);
 - the coins spent buying what a harvest uses up: a farm plot sows 1 seed and 1 fertilizer, gets 2 seeds back and buys the fertilizer;
-- the crate itself, made from planks.
+- the crate itself, made from planks, and packing it at a packing station, measured the same way: one worker packs 15 crates a day.
+
+Carrying goods between stations and out to the market is not counted.
 
 A farm plot's work comes from its data: a harvest takes 1 worker-day (`FarmDef.HarvestWorkdays`) and gives 4 wheat after growing 3 days (`GrowDays`), which a chain waits for.
+Waiting costs nothing; the table shows it, and the days one worker needs to make a crate from nothing: the wait plus the crate's worker-days, with a quarter of a harvest for a crate of bread.
 One wheat grinds into 1 flour, kneads into 3 dough and bakes into 12 bread, a crate.
 Meat comes from wolves the player kills at night, which no worker's day accounts for, so goods made from it are not costed.
 
 The check fails if a crate of any costed good sells for no more than its chain costs.
-Measured, at 25 coins a worker-day, a crate of 12 and full price:
+A crate is judged at the full price, which a whole sale gets (section 3).
+Measured, at 18 coins a worker-day, a crate of 12 and full price:
 
-| Good | Worker-days | Labor | Bought | Cost | Sells for | Profit | Waits |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| Berries | 0.53 | 13 | 0 | 13 | 15 | 2 | |
-| Bread | 0.37 | 9 | 0.8 | 10 | 30 | 20 | 3 days |
-| Berry jam | 1.36 | 34 | 0 | 34 | 70 | 36 | |
-| Canned jam | 1.57 | 39 | 0 | 39 | 143 | 104 | |
-| Steel axe, pickaxe, shovel | 1.16 | 29 | 0 | 29 | 471 | 442 | |
-| Steel hammer | 0.71 | 18 | 0 | 18 | 243 | 225 | |
+| Good | Worker-days | Labor | Bought | Cost | Sells for | Profit | Waits | One worker |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Berries | 0.61 | 11 | 0 | 11 | 14 | 3 | | 0.6 days |
+| Bread | 0.48 | 9 | 0.8 | 9 | 30 | 21 | 3 days | 3.5 days |
+| Berry jam | 1.59 | 29 | 0 | 29 | 70 | 42 | | 1.6 days |
+| Canned jam | 1.94 | 35 | 0 | 35 | 143 | 108 | | 1.9 days |
+| Steel axe, pickaxe, shovel | 1.63 | 29 | 0 | 29 | 471 | 442 | | 1.6 days |
+| Steel hammer | 1.03 | 19 | 0 | 19 | 243 | 225 | | 1.0 days |
 
 Not costed: raw meat, burnt steak, meat stew and canned meat stew.
 The `Economy:` lines print this table on every run.
@@ -40,8 +44,7 @@ The `Economy:` lines print this table on every run.
 
 ### Cost
 
-A worker-day costs the daily wage plus the up-front payment spread over 10 days.
-All offers cost about the same over that time (24 to 26 coins).
+A worker-day costs the lowest daily wage among the hire offers, 18 coins; what an offer pays up front is left out.
 More up front means a lower wage, so a worker kept longer is cheaper, and the dearest wage needs nothing up front.
 
 Wages are paid at dawn from the trading posts' wage slots first, where sale coins land, and then from the backpack.
@@ -51,13 +54,14 @@ The slot has no limit, so every sale coin lands there.
 
 Worker output is measured by running one worker through a whole day: walking, hauling, lunch and the commute included, with chests 2.5 tiles away and steel tools at the bench.
 A product's worker-days are its materials' worker-days plus one over its station's daily output.
+Each good is judged by a full crate of it, making and packing the crate included.
 
 - A hired berry picker barely breaks even: 0.9 to 1.25 times a worker-day's cost. Bushes fruit once a day (`BerryRegrowHours`), so one picker brings in two crates of berries a day, within what the village takes at the full price.
 - A worker in a steel tool chain earns at least 4 times their pay.
 - A cook earns at least 1.5 times their pay.
 - A longer chain earns more per worker-day than a shorter one, comparing tools with tools and food with food.
 - Goods made from meat are left out: meat comes from wolves at night, when workers are home.
-- A harvest takes 1 worker-day and returns 4 wheat, 1 seed beyond the one sown and 1 grass for 1 fertilizer; each wheat becomes a crate of bread, so a bread chain earns about 3 times its pay.
+- A harvest takes 1 worker-day and returns 4 wheat, 1 seed beyond the one sown and 1 grass for 1 fertilizer; each wheat becomes a crate of bread, so a bread chain earns about 3.5 times its pay.
 
 ### Measured output
 
@@ -68,7 +72,8 @@ A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced
 
 Each good the village takes has `Daily`, `Steady` and `Drop` in `Market.Sells`:
 
-- The first `Steady` units sell at the full price. Past them, each crate's worth sold takes `Drop` off the full price, down to a quarter of it.
+- A sale pays every unit at the price before it, so selling in bulk loses nothing; the sale then lowers the price.
+- The first `Steady` units sold keep the full price. Past them, each crate's worth sold takes `Drop` off the full price, down to a quarter of it.
 - A day restores what selling `Daily` units takes, so selling each good's daily amount every day is sustainable: the next day's sale pays the same.
 
 | Good | Daily | Steady | Drop per crate |
@@ -79,7 +84,7 @@ Each good the village takes has `Daily`, `Steady` and `Drop` in `Market.Sells`:
 | Steel axe, pickaxe, shovel and hammer | 12 (1 crate) | 0 | 50% |
 
 - Food is a steady staple: its daily amount sells at the full price, and past it the price slips slowly.
-- Tools react sharply: a crate of one tool takes half off the price of the last one in it and averages 77%, and a second crate the same day sells for little.
+- Tools react sharply: a crate of one tool sells at the full price and takes half off it for the next sale, so a second crate sold later the same day fetches half.
 - Selling past the basket keeps that good cheap for days.
 
 Food brings in most of a day's basket, tools somewhat less and the crates a little; the `Economy:` lines give the totals.

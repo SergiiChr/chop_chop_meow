@@ -707,7 +707,7 @@ Errand runners only walk a short way down the valley before fading from view.
 
 ### Prices
 
-Selling lowers an item's price unit by unit, and a day restores one day's worth.
+A sale pays every unit at the price before it, then lowers the price by what it sold; a day restores one day's worth.
 The village pays the full price for three crates of berries and two of each meat a day before food prices slowly slip.
 Every steel tool sold lowers its price sharply, and about a crate of each a day keeps them steady ([docs/ECONOMY.md](docs/ECONOMY.md)).
 

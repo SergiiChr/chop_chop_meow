@@ -648,8 +648,9 @@ public static class SimulationChecks {
         SafeTick(world, data.TradeSeconds + .1f);
         int coins = world.Coins + sign.Wages![Inventory.Coins] + sign.Output[Inventory.Coins];
         float price = data.Items["steel_axe"].Price;
-        Require(coins < 20000 - lot * price * 1.25f + lot * price,
-                "buying tools and selling them straight back must lose coins, and a bulk sale must be paid less than its full pre-sale price");
+        Require(coins < 20000, "buying tools and selling them straight back must lose coins");
+        Require(sign.Wages[Inventory.Coins] + sign.Output[Inventory.Coins] == (int)MathF.Floor(lot * price + data.Items["crate"].Price),
+                "a sale should pay every unit of a crate at the pre-sale price");
     }
 
     private static void CheckRecoveryBoxesStayPrivate(GameData data) {
@@ -1502,14 +1503,16 @@ public static class SimulationChecks {
         Require(world.GatherBlock(stone)?.Contains("pickaxe") == true, "a boulder should wait for a pickaxe the player does not start with");
         // A chisel and the trading post that sells the first pickaxe take 6 stone, picked up loose.
         for (int i = 0; i < 6; i++) PickUp(world, world.Add(ThingKind.LooseStone, Site(4 + i, 4), 1));
-        GatherUntil(world, bush, "berries", 48);
+        // Four crates of berries buy the first pickaxe, and a fifth goes with the first steel tool sold.
+        GatherUntil(world, bush, "berries", 60);
 
         CraftByHand(world, "stone_chisel", 1);
         CraftByHand(world, "planks", 6);
-        CraftByHand(world, "planks", 5);
+        // Two more for the second crate of the first steel tool sale, which carries the fifth crate of berries.
+        CraftByHand(world, "planks", 7);
         CraftByHand(world, "wood_parts", 2);
         CraftByHand(world, "wood_hammer", 1);
-        Require(world.Backpack["planks"] == 44, "hand crafting should turn wood into planks");
+        Require(world.Backpack["planks"] == 52, "hand crafting should turn wood into planks");
         Require(world.Backpack["wood_parts"] == 3, "hand crafting should turn wood into parts");
         Require(world.Backpack["wood_hammer"] == 1, "hand crafting should turn wood into a mallet");
         var bench = BuildAt(world, ThingKind.Bench, Site(28, 28));
@@ -1587,17 +1590,21 @@ public static class SimulationChecks {
         CompleteBatches(world, bench, "steel_pick", 1);
         world.Collect(bench);
         world.SetRecipe(bench, "crate");
-        world.LoadBatch(bench);
-        CompleteBatches(world, bench, "crate", 1);
+        world.LoadBatch(bench, 2);
+        CompleteBatches(world, bench, "crate", 2);
         world.Collect(bench);
         Require(world.Backpack["steel_pick"] == 2, "the bench should craft a steel pickaxe from steel parts");
-        Require(world.Backpack["crate"] == 1, "the bench should craft a crate from planks");
+        Require(world.Backpack["crate"] == 2, "the bench should craft crates from planks");
         Require(world.Reached("steel_tool"), "the steel tool milestone should be reached");
     }
 
     private static HireOffer CheckSoldSteelToolFundsHire(World world, Thing sign) {
         var data = world.Data;
         world.Player = sign.Pos;
+        // The fifth crate of berries goes along, so the sale covers the hire and the worker's first wage.
+        var berries = world.PlaceCrate("crate", sign.Pos + new Vector2(0, 2));
+        Require(world.Transfer(world.Backpack, berries!.Inventory, "berries", 12) == 12 && world.PickUpCrate(berries), "a fifth crate of berries should be packed");
+        world.Transfer(world.Backpack, sign.Inventory, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix)), 1);
         var crate = world.PlaceCrate("crate", sign.Pos + new Vector2(0, 2));
         Require(crate != null && world.Backpack["crate"] == 0, "an empty crate should be placed from the backpack");
         world.Transfer(world.Backpack, crate!.Inventory, "steel_pick", 1);
@@ -1606,7 +1613,7 @@ public static class SimulationChecks {
         Require(world.Packed(packed)?["steel_pick"] == 1 && world.CanSell(packed), "the picked-up crate should still hold the steel pickaxe");
         world.Player = sign.Pos;
         world.Transfer(world.Backpack, sign.Inventory, packed, 1);
-        Require(world.Sell(sign), "signpost should dispatch a crate of steel tools");
+        Require(world.Sell(sign), "signpost should dispatch a crate of steel tools and one of berries");
         float beforeReturn = world.Coins;
         SafeTick(world, data.TradeSeconds - .1f);
         Require(world.Coins == beforeReturn && world.Orders.Count == 1,

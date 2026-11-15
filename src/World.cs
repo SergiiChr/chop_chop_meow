@@ -1350,10 +1350,9 @@ public sealed partial class World {
         float price = crates.Count * Data.Items["crate"].Price;
         foreach (var (item, quantity) in goods) {
             if (!VillageBuys(item)) continue;
-            // A sale lowers demand unit by unit, so a bulk sale is not paid entirely at the pre-sale price.
-            float demand = Demand(item);
-            for (int i = 0; i < quantity; i++) { price += Data.Items[item].Price * Math.Min(1, demand); demand = Math.Max(.25f, demand - DemandStep(item)); }
-            S.Demand[item] = demand;
+            // The whole sale is paid at the pre-sale price, so selling in bulk loses nothing; demand drops after it.
+            price += quantity * UnitPrice(item, false);
+            S.Demand[item] = Math.Max(.25f, Demand(item) - quantity * DemandStep(item));
         }
         // Coins are whole: sales round down and purchases round up, so a round trip never profits.
         S.Orders.Add(new TradeOrder { Goods = goods, Value = MathF.Floor(price), Signpost = sign.Id, Crates = crates.Count });

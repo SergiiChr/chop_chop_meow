@@ -827,13 +827,14 @@ Prices, wages and demand follow the rules in [ECONOMY.md](ECONOMY.md).
 The market accepts any packed crate.
 Goods outside `Market.Sells` are donated: they pay nothing and leave demand alone.
 The returning cart names them.
-A sale pays for the contents unit by unit plus the crate.
+A sale pays for every unit of its contents at the pre-sale price, plus the crates.
 
 `Market.Buys` lists what the village sells and in what lot, as the [README price sheet](../README.md#price-sheet) shows.
 
 #### Demand and prices
 
-In `Market.Sells` each good's first `Steady` units sell at the full price, and each crate's worth past them takes `Drop` off it.
+In `Market.Sells` each good's first `Steady` units sold keep the full price, and each crate's worth past them takes `Drop` off it.
+A sale lowers the price only after it is paid.
 A day restores what selling `Daily` units takes (`World.Demand`, which runs above 1 by the steady amount).
 Buying costs a fixed 1.25× the base price.
 
