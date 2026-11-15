@@ -13,6 +13,7 @@ public static class HeldStackChecks {
         CheckPuttingDownFillsTheCellAndKeepsTheRestHeld(data);
         CheckPuttingDownOnAnotherItemInTheBackpackSwapsThem(data);
         CheckAnotherPlayerCannotTakeAHeldStackAndIsToldWhy(data);
+        CheckTakeAllAndCollectSayHowManyAnotherPlayerHolds(data);
         CheckAStationStartsNoBatchWhileAStackInItIsHeld(data);
         CheckAStationInputTakesOnlyWhatItsRecipeUses(data);
         CheckAHeldStackIsLetGoOutOfReachAndOnLeaving(data);
@@ -152,7 +153,26 @@ public static class HeldStackChecks {
         world.Run(guest, new Command(Verb.Hold, world.Locate(chest.Inventory), 8, "coal", 0, default));
         Require(guest.Backpack["coal"] == 0 && world.As(guest, () => world.Held) == null && chest.Inventory.Layout[0].Count == 8,
             "another player should neither take nor pick up a stack someone holds");
-        Require(heard.Count(m => m == World.HeldByAnother) == 2, $"the other player should be told why, each time: {string.Join(" | ", heard)}");
+        Require(heard.Contains("8 Coal was held by another player.") && heard.Contains(World.HeldByAnother), $"the other player should be told why, each time: {string.Join(" | ", heard)}");
+    }
+
+    private static void CheckTakeAllAndCollectSayHowManyAnotherPlayerHolds(GameData data) {
+        var (world, guest, heard) = Hosted(data);
+        var chest = world.Add(ThingKind.Chest, world.Player + Vector2.One);
+        guest.Pos = world.Player;
+        Give(world, "coal", 8);
+        world.Transfer(world.Backpack, chest.Inventory, "coal", 8);
+        world.Hold(chest.Inventory, 0, 5);
+        // Take all asks for everything of each item.
+        world.Run(guest, new Command(Verb.Transfer, world.Locate(chest.Inventory), 0, "coal", 999, new Vector2(-1, -1)));
+        Require(guest.Backpack["coal"] == 3 && heard.Contains("5 Coal was held by another player."), $"taking all should take the 3 coal nobody holds and say 5 were held: {string.Join(" | ", heard)}");
+        world.Release();
+        var furnace = world.Add(ThingKind.Furnace, world.Player + new Vector2(-1, 1));
+        furnace.Inventory.Add("stone", 4);
+        world.Hold(furnace.Inventory, SlotOf(furnace.Inventory, "stone"), 4);
+        heard.Clear();
+        world.Run(guest, new Command(Verb.Collect, furnace.Id, 0, "", 0, default));
+        Require(guest.Backpack["stone"] == 0 && heard.Contains("4 Stone was held by another player."), $"collecting should leave the 4 held stone and say so: {string.Join(" | ", heard)}");
     }
 
     private static void CheckAStationStartsNoBatchWhileAStackInItIsHeld(GameData data) {

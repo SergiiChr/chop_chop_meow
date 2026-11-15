@@ -263,7 +263,7 @@ public partial class SidePanel : MovableWindow {
 
     /// <summary>
     /// Hands over the page's own long list, such as a recipe board's, so <see cref="Fit"/> lets it scroll in the room the rest of the page leaves rather than push that out of view.
-    /// A list handed over when the page draws again takes the height of the one before it at once and its place a frame later, once its rows have their size.
+    /// A list handed over when the page draws again takes the height of the one before it at once, and its place a frame later, once its rows have their size; it is hidden until then.
     /// </summary>
     public async void ShowPageRows(ScrollContainer scrollArea, Control rows) {
         pageScroll = scrollArea; pageRows = rows;
@@ -271,8 +271,11 @@ public partial class SidePanel : MovableWindow {
         scrollArea.CustomMinimumSize = new Vector2(0, pageHeight);
         scrollArea.GetVScrollBar().ValueChanged += at => pageOffset = (int)at;
         if (offset == 0) return;
+        // Until its rows have their size the list cannot scroll, so it stays out of sight rather than show from the top for a frame.
+        scrollArea.Modulate = Colors.Transparent;
         await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        if (IsInstanceValid(scrollArea)) scrollArea.ScrollVertical = offset;
+        if (!IsInstanceValid(scrollArea)) return;
+        scrollArea.ScrollVertical = offset; scrollArea.Modulate = Colors.White;
     }
 
     /// <summary>Sizes the panel's scroll area to what it shows, up to the room between the clock and the hotbar.</summary>

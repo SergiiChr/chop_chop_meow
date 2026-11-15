@@ -1077,7 +1077,7 @@ public sealed partial class World {
     public void Collect(Thing t) {
         if (!Reaches(t)) { Say("Walk closer to collect items."); return; }
         if (Forwarded(Verb.Collect, t.Id)) return;
-        foreach (var item in Leftovers(t).ToArray()) Carry(t.Inventory, S.Backpack, null, item, 999);
+        foreach (var item in Leftovers(t).ToArray()) { Carry(t.Inventory, S.Backpack, null, item, 999); SayHeldBehind(t.Inventory, item); }
     }
     /// <summary>Finished goods plus anything neither the recipe the station is on nor the kept one takes.</summary>
     public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));

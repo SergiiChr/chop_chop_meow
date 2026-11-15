@@ -294,8 +294,13 @@ public sealed partial class World {
         if (b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
         if (FillBlock(from, to, item) is string dry) { Say(dry); return 0; }
         int moved = Carry(from, to, b > 0 ? Find(b / BoxCodes) : null, item, quantity);
-        if (moved == 0 && from.HeldByOther(item, S.Actor.Id) != 0) Say(HeldByAnother);
+        if (moved < quantity) SayHeldBehind(from, item);
         return moved;
+    }
+
+    /// <summary>After a move from a box, says how many units of the item stayed behind because other players hold them, such as "5 Coal was held by another player."</summary>
+    private void SayHeldBehind(Inventory from, string item) {
+        if (from.HeldByOthers(item, S.Actor.Id) is int held and > 0) Say($"{held} {Data.Name(item)} was held by another player.");
     }
 
     /// <summary>Moves items out of the backpack a view shows.</summary>

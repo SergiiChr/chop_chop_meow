@@ -272,11 +272,12 @@ public sealed class Inventory {
         Changed?.Invoke();
     }
 
-    /// <summary>The id of a player other than <paramref name="player"/> who holds units of an item here, or 0.</summary>
-    public int HeldByOther(string item, int player) {
+    /// <summary>Units of an item that players other than <paramref name="player"/> hold here.</summary>
+    public int HeldByOthers(string item, int player) {
         if (heldUnits == 0) return 0;
-        foreach (var s in Layout) if (s.Item == item && s.HeldByOther(player)) return s.HeldBy;
-        return 0;
+        int held = 0;
+        foreach (var s in Layout) if (s.Item == item && s.HeldByOther(player)) held += s.Held;
+        return held;
     }
 
     /// <summary>Stacks loose items and orders player inventory by item name for predictable access.</summary>

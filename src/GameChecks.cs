@@ -1579,8 +1579,12 @@ public partial class Game {
         string recipe = card.Name.ToString()["craft_".Length..];
         var before = List();
         await Click(card);
-        await Until(() => workbench.Keep == recipe && List() != before, "the click marking the recipe for workers and the page drawing its list again", 2);
-        await Until(() => List().ScrollVertical == scrolled, "the new list going back to where the old one was scrolled to", 2);
+        // Every frame until it is back in place, the new list is out of sight or already where the old one was scrolled to.
+        for (int frame = 0; frame < 120 && !(List() != before && List().ScrollVertical == scrolled && List().Modulate.A > 0); frame++) {
+            Require(List() == before || List().Modulate.A == 0 || List().ScrollVertical == scrolled, "A list drawn again must not show from the top before it goes back to where the old one was scrolled to.");
+            await Frames(1);
+        }
+        Require(workbench.Keep == recipe && List() != before && List().ScrollVertical == scrolled, "The click must mark the recipe for workers, and the list drawn again must go back to where the old one was scrolled to.");
         RemoveThings(Hosted, t => t == workbench); await CloseWithEsc();
     }
     /// <summary>The crafting menu's map button opens the recipe map with every item on it once, those the settlement has had drawn as known; Escape closes it.</summary>
