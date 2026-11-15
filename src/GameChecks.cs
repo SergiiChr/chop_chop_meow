@@ -1776,6 +1776,11 @@ public partial class Game {
             await Test(CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem);
             await Test(CheckUnmarkedStationStaysOnItsRecipe);
             await Test(CheckRefusedDoubleClickKeepsTheWorkerMark);
+            await Test(CheckEveryRecipeIsReadyToStartAfterADoubleClickWithAllItsItemsCarried);
+            await Test(CheckNoRecipeIsReadyToStartAfterADoubleClickWithOneOfItsItems);
+            await Test(CheckNoRecipeIsReadyToStartAfterADoubleClickWithoutFuel);
+            await Test(CheckNoRecipeIsReadyToStartAfterADoubleClickWithFuelAlone);
+            await Test(CheckEveryRecipeIsReadyToStartWhenLoadedByHand);
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
             await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
             await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);

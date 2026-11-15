@@ -921,13 +921,33 @@ public sealed partial class World {
         if (SwitchBlock(t, recipe) is string blocked) { Say(blocked); return; }
         int waiting = Waiting(t, recipe);
         if (waiting >= MaxQueued) { Say($"{MaxQueued} batches are the most a station queues."); return; }
+        string? missing = BatchShort(t, recipe);
         if (recipe != Selected(t)) { Unload(t.Inventory); if (t.Burner != null) Unload(t.Burner); }
         t.Keep = recipe;
         Ask(t, recipe, waiting + batches);
         batches = t.Batches - waiting;
         var r = Data.Recipes[recipe];
-        foreach (var (item, amount) in r.Inputs) LoadInput(t, item, amount * batches);
-        if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost) is string fuel) LoadFuel(t, fuel, batches);
+        // What loads, loads; one message names all that is still missing for the first batch.
+        foreach (var (item, amount) in r.Inputs) Load(t, item, amount * batches);
+        if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost, say: false) is string fuel) LoadFuel(t, fuel, batches);
+        if (missing != null) Say(missing);
+    }
+    /// <summary>
+    /// What a station would still lack for one batch of a recipe once the backpack's share is loaded, as a message naming the recipe, or null for nothing.
+    /// Turning from another recipe counts what the station holds as carried, since it goes to the backpack first.
+    /// </summary>
+    public string? BatchShort(Thing t, string recipe) {
+        if (!Data.Recipes.TryGetValue(recipe, out var r)) return null;
+        bool switching = recipe != Selected(t);
+        int Have(string item) => Carried(item) + t.Inventory[item] + (switching && t.Burner != null ? t.Burner[item] : 0);
+        var missing = new List<string>();
+        foreach (var (item, needed) in r.Inputs)
+            if (Have(item) < needed) missing.Add(Data.VesselFor(item) != null ? $"{needed - Have(item)} {(needed - Have(item) == 1 ? "liter" : "liters")} of {Lower(Data.Name(item))}" : $"{needed - Have(item)} {Lower(Data.Name(item))}");
+        bool fuelled = !r.Burns || !switching && t.Burner?.First() is string held && r.Fuels.Contains(held) || r.Fuels.Exists(f => Have(f) > r.Inputs.GetValueOrDefault(f));
+        if (!fuelled) missing.Add($"fuel ({FuelWords(r.Fuels)})");
+        if (missing.Count == 0) return null;
+        string list = missing.Count == 1 ? missing[0] : string.Join(", ", missing.Take(missing.Count - 1)) + " and " + missing[^1];
+        return $"{r.Name}: missing {list}.";
     }
     /// <summary>
     /// Why a station cannot turn from the recipe it is on to another now, or null: a batch is being worked, or the backpack has no room for what the station's boxes and fuel slot hold.
@@ -945,14 +965,14 @@ public sealed partial class World {
     /// The fuel loading a recipe burns: what the fuel slot holds, or for an empty slot the first fuel the recipe burns
     /// that the backpack has beyond what <paramref name="inputs"/> takes. Says why and gives null when there is none.
     /// </summary>
-    private string? FuelFromBackpack(Thing t, RecipeDef r, Dictionary<string, int> inputs) {
+    private string? FuelFromBackpack(Thing t, RecipeDef r, Dictionary<string, int> inputs, bool say = true) {
         if (t.Burner?.First() is string held) {
             if (r.Fuels.Contains(held)) return held;
-            Say($"The fuel slot holds {Lower(Data.Name(held))}, which {Lower(r.Name)} cannot burn. Take it out first.");
+            if (say) Say($"The fuel slot holds {Lower(Data.Name(held))}, which {Lower(r.Name)} cannot burn. Take it out first.");
             return null;
         }
         foreach (string fuel in r.Fuels) if (S.Backpack[fuel] > inputs.GetValueOrDefault(fuel)) return fuel;
-        Say(Phrase("Needs ", FuelWords(r.Fuels), " in your backpack for the fire."));
+        if (say) Say(Phrase("Needs ", FuelWords(r.Fuels), " in your backpack for the fire."));
         return null;
     }
     private static readonly List<string> NoFuels = new();
@@ -1024,13 +1044,20 @@ public sealed partial class World {
         string lands = vessel?.Liquid ?? item;
         if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
         if (Forwarded(Verb.LoadInput, t.Id, item: item, count: quantity)) return 0;
-        int room = t.Inventory.StackSize - t.Inventory[lands];
-        // A liquid asked for by name, as when a batch is queued, pours from the backpack's vessels.
-        int moved = vessel != null ? PourVessels(S.Backpack, item, t.Inventory, vessel, quantity, room)
-            : Data.VesselFor(item) is VesselDef held ? PourLiters(S.Backpack, t.Inventory, held, Math.Min(quantity, room))
-            : S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, room));
+        int moved = Load(t, item, quantity);
         if (moved == 0) Say(Carried(item) == 0 && S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(lands)} slot is full.");
         return moved;
+    }
+    /// <summary>
+    /// Loads units of a station input from the backpack while its cup has room, and says nothing.
+    /// A vessel pours what it holds, and a liquid asked for by name, as when a batch is queued, pours from the backpack's vessels.
+    /// </summary>
+    private int Load(Thing t, string item, int quantity) {
+        var vessel = PoursInto(t, t.Inventory, item);
+        int room = t.Inventory.StackSize - t.Inventory[vessel?.Liquid ?? item];
+        return vessel != null ? PourVessels(S.Backpack, item, t.Inventory, vessel, quantity, room)
+            : Data.VesselFor(item) is VesselDef held ? PourLiters(S.Backpack, t.Inventory, held, Math.Min(quantity, room))
+            : S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, room));
     }
     /// <summary>Manual loading of the fuel slot, which holds one kind of fuel at a time.</summary>
     public int LoadFuel(Thing t, string item, int quantity) {

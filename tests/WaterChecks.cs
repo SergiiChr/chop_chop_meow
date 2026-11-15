@@ -21,6 +21,7 @@ public static class WaterChecks {
         CheckRecipesReturnReusableBottles(data);
         CheckTakingWaterOutNeedsABottleWithRoom(data);
         CheckQueuedBatchPoursWaterFromBottles(data);
+        CheckQueuedBatchSaysWhatItIsMissing(data);
         CheckSwitchingRecipeTakesWaterIntoBottles(data);
         CheckStationTakesBottlesForItsWater(data);
         CheckHaulerPoursWaterAndStoresTheEmptyBottle(data);
@@ -248,5 +249,22 @@ public static class WaterChecks {
         world.SetRecipe(table, "dough");
         Require(world.Takes(table, Water.Full) && world.Takes(table, Water.OneLiter), "a station on a water recipe must take bottles that hold water");
         Require(!world.Takes(table, Water.Empty), "a station must not take an empty bottle");
+    }
+
+    private static void CheckQueuedBatchSaysWhatItIsMissing(GameData data) {
+        foreach (var (recipe, kind, carried, said) in new (string, ThingKind, (string, int)[], string)[] {
+                 ("charcoal", ThingKind.Furnace, [("wood", 1), ("coal", 1)], "Make charcoal: missing 1 wood."),
+                 ("charcoal", ThingKind.Furnace, [("wood", 2)], "Make charcoal: missing fuel (wood, coal or charcoal)."),
+                 ("steel_bar", ThingKind.Reinforced, [("coal", 1)], "Smelt steel: missing 2 iron bar, 1 coal and fuel (coal)."),
+                 ("meat_stew", ThingKind.Cooktable, [("raw_meat", 1), ("coal", 1)], "Cook meat stew: missing 1 liter of water."),
+                 ("dough", ThingKind.Cooktable, [("flour", 1), (Water.OneLiter, 1)], "Knead dough: missing 2 liters of water.") }) {
+            var world = new World(data, false);
+            var station = world.Add(kind, world.Player + Vector2.Right);
+            foreach (var (item, count) in carried) Give(world, item, count);
+            string message = ""; world.Notify = text => message = text;
+            world.QueueBatch(station, recipe);
+            Require(message == said, $"queuing {recipe} short of a batch should say \"{said}\", not \"{message}\"");
+            Require(!station.Processing, $"{recipe} short of a batch should not start");
+        }
     }
 }

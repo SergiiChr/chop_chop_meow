@@ -138,10 +138,10 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             Queue(1);
             if (unmarked) kit.Run(() => world.SetRecipe(station, id));
         };
-        // The server answers a refusal with its reason; the cups in the way shake at once.
+        // The server answers a refusal, or a batch short of items or fuel, with its reason; the cups shake at once.
         void Queue(int batches) {
             refusing = null;
-            bool refused = world.SwitchBlock(station!, id) != null;
+            bool refused = world.SwitchBlock(station!, id) != null || world.BatchShort(station!, id) != null;
             kit.Run(() => world.QueueBatch(station!, id, batches));
             if (refused) occupied?.Invoke();
         }

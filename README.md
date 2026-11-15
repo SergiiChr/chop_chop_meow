@@ -266,6 +266,7 @@ Queueing another recipe depends on what the station is doing:
 | Has empty cups | It turns to the new recipe, its hard hat with it |
 
 Fuel a batch has already burned is gone; queueing a recipe loads its fuel again from your backpack.
+When your backpack holds less than one batch, queueing loads what it has, its cups shake, and a message names the recipe and everything still missing, such as "Make charcoal: missing 1 wood." or "Cook meat stew: missing 1 liter of water."
 
 A click that would move the hard hat to another recipe than the one the station is on is refused while a batch is being worked or the cups hold anything.
 The cups shake a moment after such a click, once it is clear no second press makes it a double-click.
