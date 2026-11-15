@@ -73,7 +73,7 @@ public sealed class PlayerControl {
     /// <summary>A crate or building plan on the cursor goes into placement over open ground, and back to the cursor over the interface.</summary>
     private void PlaceHeld(bool overPanel) {
         var plan = cursor.Plan is string id ? Kinds.Parse(id) : null;
-        string? crate = cursor.Stack is { Box: 0 } held && World.IsCrate(held.Item) ? held.Item : null;
+        string? crate = cursor.Stack is HeldStack held && World.IsCrate(held.Item) ? held.Item : null;
         if ((plan != null || crate != null) && !overPanel) {
             // Built only when it changes, as this runs every frame.
             if (plan is ThingKind kind && !(Mode is ClickMode.Build build && build.Kind == kind)) Mode = new ClickMode.Build(kind);
@@ -162,6 +162,8 @@ public sealed class PlayerControl {
     }
 
     private void RightPress(Vector2 at) {
+        // A right click in the world lets go of a held stack, as a left one does, and does nothing else.
+        if (!cursor.Empty) { cursor.Release(); gathering = null; lifting = null; return; }
         var t = view.Pick(at);
         if (t?.IsResource == true || t?.Kind == ThingKind.Farm || t is { Kind: ThingKind.Mine, MineStage: not MineStage.Open }) { gathering = t; panel.Mark(t); } else gathering = null;
         lifting = t?.Kind == ThingKind.Crate ? t : null; liftClock = 0;

@@ -4,7 +4,7 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// Held stacks: a player picks up a stack onto the cursor and puts it down somewhere else.
-/// Held units stay in their cell, so a stack that is let go of is back where it was, but nobody else takes them meanwhile:
+/// Held units stay in their slot, so a stack that is let go of is back where it was, but nobody else takes them meanwhile:
 /// not another player, not a worker or hauler, and a station holding one starts no batch.
 /// </summary>
 public sealed partial class World {
@@ -13,7 +13,7 @@ public sealed partial class World {
     /// <summary>The acting player's held stack, or null.</summary>
     public HeldStack? Held => S.Actor.HeldStack;
 
-    /// <summary>Picks up <paramref name="count"/> units of a cell onto the cursor, letting go of any stack held before.</summary>
+    /// <summary>Picks up <paramref name="count"/> units of a slot onto the cursor, letting go of any stack held before.</summary>
     public void Hold(Inventory box, int slot, int count) {
         int code = Locate(box);
         if (code == -1 || Downed || (uint)slot >= (uint)box.Layout.Count || box.Layout[slot] is not { Item: not "" } cell) return;
@@ -27,13 +27,13 @@ public sealed partial class World {
         S.Actor.HeldStack = new HeldStack(code, slot, cell.Item, held);
     }
 
-    /// <summary>Picks up units of a cell of the backpack a view shows.</summary>
+    /// <summary>Picks up units of a slot of the backpack a view shows.</summary>
     public void Hold(InventoryView box, int slot, int count) => Hold(box.Inventory, slot, count);
 
     /// <summary>Puts units of the held stack into the backpack a view shows.</summary>
     public void PutDown(InventoryView to, int slot, int count) => PutDown(to.Inventory, slot, count);
 
-    /// <summary>Lets go of the held stack, which is then back in its cell as it always was.</summary>
+    /// <summary>Lets go of the held stack, which is then back in its slot as it always was.</summary>
     public void Release() {
         if (S.Actor.HeldStack == null || Forwarded(Verb.Release)) return;
         if (HeldCell(S.Actor, out var box, out _, out int at)) box.Release(at);
@@ -42,7 +42,7 @@ public sealed partial class World {
 
     private static void Forget(PlayerState p) { p.HeldStack = null; p.HeldBox = null; p.HeldSlot = null; }
 
-    /// <summary>Server: the cell a player's held stack lies in, while it is still there and theirs; when it is not, the player holds nothing.</summary>
+    /// <summary>Server: the slot a player's held stack lies in, while it is still there and theirs; when it is not, the player holds nothing.</summary>
     private static bool HeldCell(PlayerState p, out Inventory box, out Inventory.Slot cell, out int at) {
         box = p.HeldBox!; cell = p.HeldSlot!; at = -1;
         if (p.HeldStack != null && box != null && cell != null && (at = box.Layout.IndexOf(cell)) >= 0 && cell.HeldBy == p.Id) return true;
@@ -51,16 +51,16 @@ public sealed partial class World {
     }
 
     /// <summary>
-    /// Puts <paramref name="count"/> units of the held stack into an inventory: into cell <paramref name="slot"/>, or with -1 wherever that inventory takes them.
+    /// Puts <paramref name="count"/> units of the held stack into an inventory: into slot <paramref name="slot"/>, or with -1 wherever that inventory takes them.
     /// The move follows the rules of where it lands, as a Ctrl- or Shift-click would: a station's input slot takes only its inputs from the backpack, a fuel slot its fuels, a mine what it still needs.
-    /// What does not fit stays held; a put-down on the held stack's own cell lets go of it.
+    /// What does not fit stays held; a put-down on the held stack's own slot lets go of it.
     /// </summary>
     public void PutDown(Inventory to, int slot, int count) {
         if (S.Actor.HeldStack is not HeldStack held) return;
         int code = Locate(to);
         if (code == -1 || slot >= to.Layout.Count) return;
         if (Forwarded(Verb.PutDown, code, count, held.Item, slot) || !HeldCell(S.Actor, out var from, out var cell, out int at)) return;
-        // On its own cell, the whole stack is let go of, or as many units as put down.
+        // On its own slot, the whole stack is let go of, or as many units as put down.
         if (to == from && slot == at) {
             int keep = cell.Held - count;
             if (keep <= 0) { Release(); return; }
@@ -72,8 +72,8 @@ public sealed partial class World {
     }
 
     /// <summary>
-    /// Runs a move with the held stack's units loose and first in line to leave their inventory, then holds again what is left of them in their cell.
-    /// <paramref name="move"/> gets the inventory, the cell and how many units were held.
+    /// Runs a move with the held stack's units loose and first in line to leave their inventory, then holds again what is left of them in their slot.
+    /// <paramref name="move"/> gets the inventory, the slot and how many units were held.
     /// </summary>
     private void Loosened(Action<Inventory, int, int> move) {
         if (S.Actor.HeldStack is not HeldStack held || !HeldCell(S.Actor, out var from, out var cell, out int at)) return;
@@ -81,7 +81,7 @@ public sealed partial class World {
         from.Release(at);
         from.PreferredSlot = at;
         try { move(from, at, units); } finally { from.PreferredSlot = -1; }
-        // A swap moves the cell itself, and the stack it took the place of is not held.
+        // A swap moves the slot itself, and the stack it took the place of is not held.
         bool stayed = cell.Item == held.Item && from.Layout.IndexOf(cell) == at;
         int left = stayed ? Math.Min(units - (before - cell.Count), cell.Count) : 0;
         if (left > 0 && from.Hold(at, left, S.Actor.Id) is int kept and > 0) S.Actor.HeldStack = held with { Count = kept };
@@ -93,7 +93,7 @@ public sealed partial class World {
         if (S.Actor.HeldStack?.Item == item && S.Actor.HeldBox == S.Backpack) Loosened((_, _, _) => move()); else move();
     }
 
-    /// <summary>Moves units of the held stack, lying in cell <paramref name="at"/> of <paramref name="from"/>, by the rules of the inventory they land in.</summary>
+    /// <summary>Moves units of the held stack, lying in slot <paramref name="at"/> of <paramref name="from"/>, by the rules of the inventory they land in.</summary>
     private void Land(Inventory from, Inventory to, int at, int slot, string item, int count) {
         var owner = Owner(to);
         if (CrateOf(to) is int packing) { if (from == S.Backpack) MoveInCrate(packing, item, count, true); return; }
@@ -118,7 +118,7 @@ public sealed partial class World {
     private int? CrateOf(Inventory box) => Locate(box) is int code and <= CrateCode ? CrateCode - code : null;
 
     /// <summary>
-    /// Server: lets go of held stacks whose player can no longer hold them: one that is down, out of reach of the building the stack lies in, or whose cell has gone.
+    /// Server: lets go of held stacks whose player can no longer hold them: one that is down, out of reach of the building the stack lies in, or whose slot has gone.
     /// A stack whose inventory has moved, such as a packed crate's contents once the crate is put down or sold, is let go of too.
     /// </summary>
     private void KeepHolds() {
@@ -149,6 +149,6 @@ public sealed partial class World {
         return false;
     }
 
-    /// <summary>Whether a station holds a stack a player has picked up, which stops it starting a batch.</summary>
+    /// <summary>Whether a station or compost holds a stack a player has picked up, which stops it starting a batch.</summary>
     private static bool HeldAt(Thing t) => t.Inventory.Holding || t.Output?.Holding == true || t.Burner?.Holding == true;
 }

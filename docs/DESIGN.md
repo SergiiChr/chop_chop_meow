@@ -103,7 +103,7 @@ UI and input:
 | `src/JobRow.cs` | A place's job buttons, their worker lists and what each job is called |
 | `src/FilterWindow.cs` | The filter window beside the panel |
 | `src/ItemMoves.cs` | What clicking an item does: reach, refusals and the crate-in-crate warning |
-| `src/Grid.cs` | Draws the icon-cell grids |
+| `src/Grid.cs` | Draws the icon-slot grids |
 | `src/ItemSlot.cs` | The cream item slot, which tells a click, a right click and a double click apart and shakes on a refusal |
 | `src/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse, and `SlotInput`, what each click does on an item slot |
 | `src/HeldStacks.cs` | `World`'s held stacks: picking up, putting down by the rules of where they land, letting go, and the lock on held units |
@@ -622,7 +622,7 @@ The red trash can on `ThingPage`'s header turns into "Remove?" on the first clic
 
 Inventories are slot grids with stacks of 64.
 Tools, packed crates and bottles take a slot each everywhere.
-The layout is saved and synchronized: removing one stack never shifts unrelated cells.
+The layout is saved and synchronized: removing one stack never shifts unrelated slots.
 Sort is the only action that packs and regroups stacks.
 Item totals change only through `Inventory` methods, which keep them in line with the stacks.
 Stacks are rebuilt from totals once, where the two can disagree: when a save loads, since one edited by hand can hold both.
@@ -646,7 +646,7 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
 - A held stack put on storage clicked in the world goes into it; an item only selected on the hotbar never does.
 - Bulk buttons and recipe batch actions say what they move.
 
-A held stack never leaves its cell until it is put down (`Inventory.Slot.Held`, `HeldBy`).
+A held stack never leaves its slot until it is put down (`Inventory.Slot.Held`, `HeldBy`).
 Totals still count it, but `Inventory.Remove`, `TransferTo` and `Has` take only units nobody holds, so other players, workers and haulers cannot take it, and a station holding one starts no batch (`World.Stocked`).
 Another player who tries is told so (`World.HeldByAnother`).
 The server keeps each player's held stack (`PlayerState.HeldStack`) and lets go of it when the player is down, walks out of reach of the building it lies in, or leaves; a load starts with nothing held.
@@ -823,10 +823,10 @@ A fallow plot sows itself from its own inventory.
 `World.CropLook` gives the look: bare, soil, straws, green plants or wheat.
 
 The player harvests through `World.Gather` and assigned workers through `World.FarmWork`, both adding to the one progress.
-The yield goes into the plot's `Thing.Output`; nothing moves seed back into the sowing inventory on its own.
+The yield goes into the plot's `Thing.Output`; nothing moves seed back into the plot's input slots on its own.
 
 - A worker on Farm harvests.
-- A worker on Haul first moves seed from the output into the sowing inventory, then carries out the rest and fetches what the next sowing lacks.
+- A worker on Haul first moves seed from the output into the plot's input slots, then carries out the rest and fetches what the next sowing lacks.
 
 ## Intro film
 

@@ -60,7 +60,7 @@ public partial class Game {
         await KeyStroke(Key.Enter);
     }
 
-    // Where in the window the last click pressed and when, so the next click there waits long enough not to make a double click.
+    // Where in the window the last click pressed and when the game had handled that press, so the next click there waits long enough not to make a double click.
     private Vector2? lastClicked;
     private ulong lastClickAt;
 
@@ -69,6 +69,7 @@ public partial class Game {
         await Apart(at);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
         await Frames();
+        Handled(at);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
         await Frames();
     }
@@ -76,8 +77,10 @@ public partial class Game {
     /// <summary>Waits until a press at a window point is a click of its own, not the second half of a double click with the press before it there.</summary>
     private async Task Apart(Vector2 at) {
         if (lastClicked == at) while (Time.GetTicksMsec() - lastClickAt <= SlotInput.DoubleClickMs) await Frames(1);
-        lastClicked = at; lastClickAt = Time.GetTicksMsec();
     }
+
+    /// <summary>Notes a press at a window point once the frames after it have passed, by which time the game has handled it: parsed input waits for the next frame.</summary>
+    private void Handled(Vector2 at) { lastClicked = at; lastClickAt = Time.GetTicksMsec(); }
 
     private async Task Click(Vector2 point) {
         var at = GetViewport().GetFinalTransform() * point;
@@ -99,6 +102,7 @@ public partial class Game {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
         }
         await Frames();
+        Handled(at);
     }
 
     /// <summary>Picks up a cell's stack with a left click, which on a cell with a use waits out a possible second press first.</summary>

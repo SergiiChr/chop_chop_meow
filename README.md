@@ -225,7 +225,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - Esc, a click on open ground or on the interface anywhere but an item slot, closing the side panel or walking out of reach of the building it came from lets go of the held stack, which is then back in its slot.
 - A held crate or building plan over open ground goes into placement: a click places it. Back over the interface it is a held stack again.
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
-- A double click uses an item: food is eaten, a filled bottle gives one sip and keeps the bottle, a torch lights, a crate opens as storage and a tool is selected on the hotbar. A single click on such an item waits 200 ms for a second one before it picks the stack up.
+- A double click uses an item: food is eaten, a filled bottle gives one sip and keeps the bottle, a torch lights, a crate opens as storage, and a tool on the hotbar is selected there. A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A held stack put on storage clicked in the world, such as a chest, goes into it. An item only selected on the hotbar never does.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
@@ -293,7 +293,7 @@ Each slot holds a single stack of 64.
 
 - Put a held backpack stack on its input slot to load it, RMB to load one, or Shift-click the backpack stack to load it and Ctrl-click to load all of that item.
 - LMB on a slot picks up its stack, RMB half; Shift-click or Ctrl-click moves it back to the backpack.
-- A farm plot, compost, campfire, mine and packing station have input and output slots that work the same way.
+- A farm plot, campfire, mine and packing station have input and output slots that work the same way. Compost, chests and the tool station are storage, whose slots take what the building holds.
 
 ### Job buttons
 
@@ -589,12 +589,12 @@ Hold right mouse on a ripe plot to harvest it by hand, no tool needed.
 An assigned worker also harvests, and everyone adds to one shared progress, so you can stop and come back.
 A harvest takes one worker about 1 working day and gives 4 wheat, 2 wheat seeds and 1 grass into the plot's output.
 
-Seeds do not sow themselves: move them from the output into the sowing slot by hand, or let a hauler do it.
+Seeds do not sow themselves: move them from the output into the input slot by hand, or let a hauler do it.
 Its panel shows seeds as the input, fertilizer as its fuel and wheat, seeds and grass as outputs.
 While the wheat grows it says how long until it is ripe, such as "Growing, 2 days until ripe", and offers the harvest only once it is.
 
 - A worker on Farm harvests.
-- A worker on Haul first moves seeds from the output into the sowing slot, then carries out the rest of the harvest and brings fertilizer and any missing seeds from storage.
+- A worker on Haul first moves seeds from the output into the input slot, then carries out the rest of the harvest and brings fertilizer and any missing seeds from storage.
 
 Wheat seeds and fertilizer can also be bought from the village.
 

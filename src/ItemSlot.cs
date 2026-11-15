@@ -11,7 +11,7 @@ public partial class Badge : Label {
     }
 }
 
-/// <summary>An icon button for an item: an item cell when <see cref="Controls"/> is set, else a plain button.</summary>
+/// <summary>An icon button for an item: an item slot when <see cref="Controls"/> is set, else a plain button.</summary>
 public partial class ItemSlot : Button {
     public static readonly StringName IconNormal = "icon_normal_color";
 
@@ -44,7 +44,7 @@ public partial class ItemSlot : Button {
         return Style.Corner(count, x, y);
     }
 
-    /// <summary>What the cell does with the mouse as an item cell, or null for a plain button such as a recipe card.</summary>
+    /// <summary>What the slot does with the mouse as an item slot, or null for a plain button such as a recipe card.</summary>
     public SlotInput? Controls { get; set; }
     /// <summary>Runs on the second press of a double click, besides the press itself.</summary>
     public Action? DoubleClicked { get; set; }
@@ -52,8 +52,8 @@ public partial class ItemSlot : Button {
     public Action? RightClicked { get; set; }
     /// <summary>Builds a richer tooltip than plain text; the tooltip text must still be non-empty for Godot to show it.</summary>
     public Func<Control>? Popup { get; set; }
-    // When, where and on which cell by name the left button last went down, to tell a double click by <see cref="SlotInput.DoubleClickMs"/>:
-    // a page that draws itself again after the first press puts a new cell of the same name under the second.
+    // When, where and on which slot by name the left button last went down, to tell a double click by <see cref="SlotInput.DoubleClickMs"/>:
+    // a page that draws itself again after the first press puts a new slot of the same name under the second.
     private static ulong lastPress;
     private static Vector2 lastPressAt;
     private static StringName? lastPressOn;
@@ -64,7 +64,7 @@ public partial class ItemSlot : Button {
 
     public override GodotObject? _MakeCustomTooltip(string forText) => Popup?.Invoke();
 
-    // The button pressed on this item cell, which acts once it is let go: an action on the press could redraw the page and take the cell away under the mouse.
+    // The button pressed on this item slot, which acts once it is let go: an action on the press could redraw the page and take the slot away under the mouse.
     private MouseButton down = MouseButton.None;
 
     public override void _GuiInput(InputEvent ev) {
@@ -92,7 +92,10 @@ public partial class ItemSlot : Button {
         if (click.ButtonIndex == MouseButton.Right && RightClicked != null) { RightClicked(); AcceptEvent(); }
     }
 
-    /// <summary>Shakes the cell side to side, as a refusal.</summary>
+    /// <summary>Whether the slot is shaking now.</summary>
+    public bool Shaking => shake?.IsRunning() == true;
+
+    /// <summary>Shakes the slot side to side, as a refusal.</summary>
     public void Shake() {
         if (shake?.IsRunning() == true) return;
         var home = Position;

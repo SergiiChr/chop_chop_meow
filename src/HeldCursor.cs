@@ -32,7 +32,7 @@ public partial class HeldCursor : Control {
         Visible = false;
     }
 
-    /// <summary>Picks up <paramref name="units"/> of a cell, letting go of a plan or stack held before.</summary>
+    /// <summary>Picks up <paramref name="units"/> of a slot, letting go of a plan or stack held before.</summary>
     public void PickUp(Inventory box, int slot, int units) {
         Plan = null;
         world.Hold(box, slot, units);
@@ -44,19 +44,19 @@ public partial class HeldCursor : Control {
         Plan = plan;
     }
 
-    /// <summary>Lets go of what the cursor holds: a stack goes back to its cell.</summary>
+    /// <summary>Lets go of what the cursor holds: a stack goes back to its slot.</summary>
     public void Release() {
         Plan = null;
         if (Stack != null) world.Release();
     }
 
-    /// <summary>Puts <paramref name="units"/> of the held stack into a cell, or with -1 wherever the inventory takes them.</summary>
+    /// <summary>Puts <paramref name="units"/> of the held stack into a slot, or with -1 wherever the inventory takes them.</summary>
     public void PutDown(Inventory box, int slot, int units) => world.PutDown(box, slot, units);
 
-    /// <summary>Whether the held stack lies in this cell.</summary>
+    /// <summary>Whether the held stack lies in this slot.</summary>
     public bool From(Inventory box, int slot) => Stack is HeldStack held && held.Slot == slot && world.Locate(box) == held.Box;
 
-    /// <summary>A click on the interface anywhere but an item cell lets go of what the cursor holds; the click still does what it does there.</summary>
+    /// <summary>A click on the interface anywhere but an item slot lets go of what the cursor holds; the click still does what it does there.</summary>
     public override void _Input(InputEvent ev) {
         if (Empty || ev is not InputEventMouseButton { Pressed: true, ButtonIndex: MouseButton.Left or MouseButton.Right }) return;
         if (GetViewport().GuiGetHoveredControl() is Control over && over is not ItemSlot { Controls: not null }) Release();
@@ -75,7 +75,7 @@ public partial class HeldCursor : Control {
 }
 
 /// <summary>
-/// What an item cell does with the mouse, through the cursor:
+/// What an item slot does with the mouse, through the cursor:
 /// a left click picks up its stack, or puts down what the cursor holds; a right click picks up half, or puts down one;
 /// a double click uses the item; Ctrl or Shift moves a batch to the other inventory open.
 /// </summary>
@@ -83,9 +83,9 @@ public sealed class SlotInput(HeldCursor cursor) {
     /// <summary>How soon a second press must follow the first to make a double click.</summary>
     public const ulong DoubleClickMs = 200;
 
-    /// <summary>The cell whose stack a click picks up, or null when there is nothing to pick up.</summary>
+    /// <summary>The slot whose stack a click picks up, or null when there is nothing to pick up.</summary>
     public Func<(Inventory Box, int Slot)?>? Pick { get; init; }
-    /// <summary>Whether what the cursor holds can go here; when it cannot, the cell shakes.</summary>
+    /// <summary>Whether what the cursor holds can go here; when it cannot, the slot shakes.</summary>
     public Func<HeldCursor, bool>? Takes { get; init; }
     /// <summary>Puts down this many of what the cursor holds here, once <see cref="Takes"/> allows it.</summary>
     public Action<HeldCursor, int>? Put { get; init; }
@@ -93,21 +93,21 @@ public sealed class SlotInput(HeldCursor cursor) {
     public Action? Batch { get; init; }
     /// <summary>A double click with nothing held; with one set, a single click waits <see cref="DoubleClickMs"/> to tell the two apart.</summary>
     public Action? Use { get; init; }
-    /// <summary>A left click with nothing held on a cell that has nothing to pick up.</summary>
+    /// <summary>A left click with nothing held on a slot that has nothing to pick up.</summary>
     public Action? Click { get; init; }
-    /// <summary>A right click with nothing held on a cell that has nothing to pick up.</summary>
+    /// <summary>A right click with nothing held on a slot that has nothing to pick up.</summary>
     public Action? RightClick { get; init; }
 
     private SceneTreeTimer? waiting;
     // Set when a second press comes within the double click's time, for its release to use the item.
     private bool doubled;
 
-    /// <summary>A button goes down on the cell; <paramref name="second"/> tells that it follows another press within <see cref="DoubleClickMs"/>.</summary>
+    /// <summary>A button goes down on the slot; <paramref name="second"/> tells that it follows another press within <see cref="DoubleClickMs"/>.</summary>
     public void Press(bool second) {
         if (second && waiting != null) { waiting = null; doubled = true; }
     }
 
-    /// <summary>A button pressed on <paramref name="cell"/> is let go of there, which does what the click does.</summary>
+    /// <summary>A button pressed on <paramref name="slot"/> is let go of there, which does what the click does.</summary>
     public void Release(ItemSlot cell, MouseButton button) {
         if (button == MouseButton.Left) {
             if (doubled) { doubled = false; if (cursor.Empty) Use?.Invoke(); return; }
@@ -125,7 +125,7 @@ public sealed class SlotInput(HeldCursor cursor) {
         }
     }
 
-    /// <summary>Picks up the cell's stack, or half of it, or clicks a cell with nothing to pick up.</summary>
+    /// <summary>Picks up the slot's stack, or half of it, or clicks a slot with nothing to pick up.</summary>
     private void Single(bool half) {
         if (Pick?.Invoke() is not (Inventory box, int slot)) { if (!half) Click?.Invoke(); return; }
         int units = box.Layout[slot].Free;
@@ -133,7 +133,7 @@ public sealed class SlotInput(HeldCursor cursor) {
     }
 
     private void PutDown(ItemSlot cell, int units) {
-        // Back on its own cell, whatever the slot takes: a left click lets go of the stack and a right click puts one back.
+        // Back on its own slot, whatever the slot takes: a left click lets go of the stack and a right click puts one back.
         if (cursor.Stack is HeldStack && Pick?.Invoke() is (Inventory box, int slot) && cursor.From(box, slot)) { cursor.PutDown(box, slot, units); return; }
         if (Takes?.Invoke(cursor) != true || Put == null) { cell.Shake(); return; }
         Put(cursor, units);

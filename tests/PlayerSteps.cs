@@ -7,11 +7,11 @@ using static WorldSteps;
 
 /// <summary>What the player does by hand in the simulation checks.</summary>
 internal static class PlayerSteps {
-    /// <summary>The cell of a backpack a stack of an item lies in, or -1.</summary>
-    public static int CellOf(InventoryView box, string item) => box.Layout.ToList().FindIndex(s => s.Item == item);
+    /// <summary>The slot of a backpack a stack of an item lies in, or -1.</summary>
+    public static int SlotOf(InventoryView box, string item) => box.Layout.ToList().FindIndex(s => s.Item == item);
 
-    /// <summary>The cell of a building's inventory a stack of an item lies in, or -1.</summary>
-    public static int CellOf(Inventory box, string item) => box.Layout.FindIndex(s => s.Item == item);
+    /// <summary>The slot of a building's inventory a stack of an item lies in, or -1.</summary>
+    public static int SlotOf(Inventory box, string item) => box.Layout.FindIndex(s => s.Item == item);
 
     /// <summary>Fills a crate at the player's feet and picks it up, returning the packed crate item now in the backpack.</summary>
     public static string PackCrate(World world, params (string Item, int Count)[] goods) {

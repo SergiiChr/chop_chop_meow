@@ -737,7 +737,7 @@ public sealed partial class World {
         if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         foreach (var t in S.Things)
             if (!BuiltOver(t.Kind) && t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + ResourceRoom : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
-        if (crate ? item != null && S.Backpack[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
+        if (crate ? item != null && S.Backpack[item] == 0 && S.Actor.HeldStack?.Item != item : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
         return null;
     }
     private string? ZoneBlock(ThingKind kind, Vector2 p) {
@@ -1014,7 +1014,7 @@ public sealed partial class World {
     public int LoadInput(Thing t, string item, int quantity) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
         if (PartialRecipeBottle(t, item)) { Say(Water.FullBottleWarning); return 0; }
-        // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the ingredient slot, and the fuel slot is filled by dragging.
+        // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the input slot, and its fuel slot is filled by putting coal on it.
         if (!Pending(t, item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
         if (t.Kind == ThingKind.Packer && HoldBlock(t, item) is string refused) { Say(refused); return 0; }
         if (t.Kind != ThingKind.Packer && !Pending(t, item)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
@@ -1403,12 +1403,13 @@ public sealed partial class World {
         Say("Your backpack is full.");
         return 0;
     }
-    /// <summary>Puts a crate from the backpack down, still holding whatever it was packed with.</summary>
+    /// <summary>Puts a crate from the backpack, or the held crate, down, still holding whatever it was packed with.</summary>
     public Thing? PlaceCrate(string item, Vector2 p) {
         if (!IsCrate(item)) return null;
         if (PlacementBlock(ThingKind.Crate, p, item) is string blocked) { Say(blocked); return null; }
         if (Forwarded(Verb.PlaceCrate, item: item, at: p)) return null;
-        FromHeld(item, () => S.Backpack.Remove(item, 1));
+        // A held crate goes down from wherever it is held, such as a chest; any other from the backpack.
+        if (S.Actor.HeldStack?.Item == item) Loosened((from, _, _) => from.Remove(item, 1)); else S.Backpack.Remove(item, 1);
         var crate = Add(ThingKind.Crate, p); ClearGround(crate);
         if (Packed(item) is Inventory contents) { crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
         Play("close_chest", p); return crate;
@@ -1668,6 +1669,8 @@ public sealed partial class World {
         int rotting = 0;
         foreach (var pair in pile.Inventory.Items) if (Compostable(pair.Key)) rotting += pair.Value;
         if (rotting < CompostBatch || pile.Inventory.Room("fertilizer") == 0) { pile.Progress = 0; return; }
+        // Like a station, compost holding a stack a player picked up makes nothing until it is let go of.
+        if (HeldAt(pile)) return;
         pile.Progress += dt;
         if (pile.Progress < Data.HourSeconds) return;
         pile.Progress = 0;

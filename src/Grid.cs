@@ -4,7 +4,7 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Icon cells shared by inventory, storage, station and build pages.</summary>
+/// <summary>Icon slots shared by inventory, storage, station and build pages.</summary>
 public partial class PagePanel {
     protected const int GridColumns = 6;
     /// <summary>The backpack drawer is two rows of twelve, or three of eight on a narrow screen.</summary>
@@ -21,12 +21,12 @@ public partial class PagePanel {
     }
 
     /// <summary>
-    /// A grid with one cell per slot, refreshed live from the inventory's stacks and not yet placed anywhere.
-    /// An inventory with a capacity shows only <see cref="Inventory.ShownSlots"/>; cells grow in and shrink away as that changes.
+    /// A grid with one slot per slot, refreshed live from the inventory's stacks and not yet placed anywhere.
+    /// An inventory with a capacity shows only <see cref="Inventory.ShownSlots"/>; slots grow in and shrink away as that changes.
     /// <paramref name="container"/> is the building the inventory belongs to, or null for the backpack or an opened crate.
-    /// A left click picks up a cell's stack and a right click half of it; a held stack put on a cell lands there, unless <paramref name="takes"/> narrows what the grid takes.
+    /// A left click picks up a slot's stack and a right click half of it; a held stack put on a slot lands there, unless <paramref name="takes"/> narrows what the grid takes.
     /// <paramref name="batch"/> is what a Ctrl- or Shift-click on a stack does, and <paramref name="use"/> what a double click does.
-    /// <paramref name="put"/>, given a cell and a number of units, puts them down instead of the move to that cell.
+    /// <paramref name="put"/>, given a slot and a number of units, puts them down instead of the move to that slot.
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// With <paramref name="wanted"/>, stacks it names are rimmed in orange and the rest fade, so what the open page takes stands out.
     /// </summary>
@@ -40,7 +40,7 @@ public partial class PagePanel {
         for (int i = 0; i < cells.Length; i++) {
             int slot = i;
             var cell = cells[i].Cell;
-            // A click on a stack acts on that very cell when the item lies in several.
+            // A click on a stack acts on that very slot when the item lies in several.
             Action? On(Action<string>? act) => act == null ? null : () => {
                 if (stacks[slot] is not (string id, _)) return;
                 var held = inventory(); held.PreferredSlot = slot;
@@ -48,14 +48,15 @@ public partial class PagePanel {
             };
             cell.Controls = new SlotInput(cursor) {
                 Pick = () => stacks[slot] != null ? (inventory(), slot) : null,
-                Takes = takes ?? (held => held.Stack != null),
+                // A building's own rules answer at once, so a slot that will not take the stack shakes.
+                Takes = takes ?? (held => held.Stack is HeldStack stack && (container == null || world.BoxBlock(container, inventory(), stack.Item) == null)),
                 Put = (_, units) => kit.Run(() => { if (put != null) put(slot, units); else moves.PutDown(inventory(), slot, units, container); }),
                 Batch = On(batch),
                 Use = On(use),
             };
             grid.AddChild(cell);
         }
-        // What each cell last drew: its stack and the inventory's total of that item. A cell is redrawn only when they change.
+        // What each slot last drew: its stack and the inventory's total of that item. A slot is redrawn only when they change.
         var current = new System.Collections.Generic.List<(string Item, int Count)>();
         var drawn = new (string? Item, int Count, int Total)[cells.Length];
         live.Add(() => {

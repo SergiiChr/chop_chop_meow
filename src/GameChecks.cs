@@ -987,7 +987,7 @@ public partial class Game {
         RemoveThings(Hosted, t => t == chest); Drop(Hosted, "stone", 2); SetHotbarSlot(world, 4, before); await Frames();
     }
     /// <summary>A double click on a hotbar slot uses its item, and a right click empties the slot.</summary>
-    private async Task CheckHotbarDoubleClickUsesAndRightClickClears() {
+    private async Task CheckHotbarDoubleClickUsesAndRightClickEmpties() {
         string before = world.HotbarSlots[7];
         int carried = Drop(Hosted, "berries");
         Give(Hosted, "berries", 2); SetHotbarSlot(world, 7, "berries"); SetNeeds(Hosted, hunger: 50);
@@ -1021,6 +1021,9 @@ public partial class Game {
         await PickUp(BagCell(c => c.TooltipText.StartsWith("Stone")));
         await ClickGround();
         await Until(() => cursor.Empty, "a click on open ground letting go of the held stone", 2);
+        await PickUp(BagCell(c => c.TooltipText.StartsWith("Stone")));
+        await RightClick(world.Player + new Vector2(0, 2));
+        await Until(() => cursor.Empty, "a right click in the world letting go of the held stone", 2);
         Require(world.Backpack["stone"] == 3 && world.Find(chest.Id)!.Inventory["stone"] == 0, "Letting go must leave the stone in the backpack.");
         await PickUp(BagCell(c => c.TooltipText.StartsWith("Stone")));
         await ClickOn(chest);
@@ -1663,7 +1666,7 @@ public partial class Game {
         int stone = Give(Hosted, "stone", world.Backpack.Slots * world.Backpack.StackOf("stone"));
         await ClickOn(furnace);
         await DoubleClick(Named("craft_iron_bar")!);
-        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the stationSlots.");
+        Require(WorkRow().Shaking, "A double-click refused for a full backpack must shake the slots.");
         Require(furnace.Recipe == "charcoal" && furnace.Keep == "charcoal" && furnace.Inventory["wood"] == 2 && world.Waiting(furnace, "iron_bar") == 0,
             "A furnace whose slots the backpack has no room for must stay on its recipe with its wood and its mark.");
         await Until(() => !WorkRow().Shaking, "the slots coming to rest", 2);
@@ -1721,6 +1724,7 @@ public partial class Game {
         await Carry(BagCell(c => c.TooltipText.StartsWith("Coal")), Named("input_iron_bar")!);
         await Frames(4);
         Require(furnace.Inventory["coal"] == 0 && !cursor.Empty, "An input slot must refuse a different item and leave it held.");
+        Require(((ItemSlot)Named("input_iron_bar")!).Shaking, "An input slot that refuses a held stack must shake.");
         await RightClick(Named("input_coal")!);
         await Until(() => furnace.Inventory["coal"] == 1, "a right click with coal held putting one in its input slot", 2);
         await KeyStroke(Key.Escape);
@@ -1847,7 +1851,7 @@ public partial class Game {
             await Test(CheckDriverPlaysItsCommandFileAsRealInput);
             await Test(CheckEmptiedCrateGivesWayToTheBackpack);
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
-            await Test(CheckHotbarDoubleClickUsesAndRightClickClears);
+            await Test(CheckHotbarDoubleClickUsesAndRightClickEmpties);
             await Test(CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround);
             await Test(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
             await Test(CheckHeldPlanPlacesOnOpenGround);

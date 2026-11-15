@@ -45,9 +45,10 @@ public partial class CarriedCratePanel(PageTools tools, int crate) : PagePanel(t
     public override Page GivesWayTo => Page.Backpack;
     protected override bool StoresFromHotbar => true;
 
-    /// <summary>What the crate holds now, or an empty crate for an empty one or once it has gone.</summary>
-    private Inventory Contents => world.CarriedCrate(crate) is string item && world.Packed(item) is Inventory held ? held : gone;
+    /// <summary>What the crate holds now, an empty crate's room for an empty one, or nothing once it has gone.</summary>
+    private Inventory Contents => world.CarriedCrate(crate) is string item && world.Packed(item) is Inventory held ? held : crate == 0 ? empty ??= world.NewCrate() : gone;
     private readonly Inventory gone = new() { Slots = 1, Capacity = 1 };
+    private Inventory? empty;
 
     protected override void Build() {
         headingIcon.Texture = Icons.Of("crate"); headingIcon.Visible = true;
