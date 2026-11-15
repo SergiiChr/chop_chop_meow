@@ -77,10 +77,10 @@ public static class HeldStackChecks {
     private static void CheckAHeldBottleStaysOutOfGatheringWater(GameData data) {
         var world = EmptyWorld(data);
         var lake = new Thing { Kind = ThingKind.Water };
-        Give(world, "empty_bottle", 1);
-        world.Hold(world.Backpack, SlotOf(world.Backpack, "empty_bottle"), 1);
+        Give(world, Water.Empty, 1);
+        world.Hold(world.Backpack, SlotOf(world.Backpack, Water.Empty), 1);
         SetNeeds(world, thirst: 25);
-        Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceSip && world.Held is { Item: "empty_bottle" },
+        Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceLiter && world.Held?.Item == Water.Empty,
             "with the only bottle held, gathering water should drink from the source and leave the bottle held");
     }
 

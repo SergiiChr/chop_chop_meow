@@ -23,7 +23,6 @@ public partial class Game : Node, IGameFlow {
     private MessageStack messages = null!;
     private NeedsPlate needsPlate = null!;
     private DamageEdges damageEdges = null!;
-    private WaterWarning waterWarning = null!;
     private ModeLabel modeLabel = null!;
     private DeathLabel deathLabel = null!;
     private UiKit kit = null!;
@@ -85,7 +84,6 @@ public partial class Game : Node, IGameFlow {
             saves = new Saves(kit, net, this);
             world.Sound = PlayWorldSound;
             ConnectNet();
-            sounds.OffScreen = view.OffScreen;
             layer = new CanvasLayer(); AddChild(layer);
             ui = new Control { Name = "Interface", MouseFilter = Control.MouseFilterEnum.Ignore }; layer.AddChild(ui);
             ui.Theme = Style.Interface();
@@ -124,8 +122,7 @@ public partial class Game : Node, IGameFlow {
             }
         } catch (Exception e) { GD.PushError(e.ToString()); GetTree().Quit(1); }
     }
-    // A wolf breaks into its sprint some way off, so its growl carries further off screen than other sounds.
-    private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
+    private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at);
     private void BuildHud() {
         cursor = new HeldCursor(world);
         moves = new ItemMoves(kit, blackHole, cursor);
@@ -138,7 +135,6 @@ public partial class Game : Node, IGameFlow {
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
         ui.AddChild(panel.Aside); ui.AddChild(panel); ui.AddChild(bag);
-        waterWarning = new WaterWarning(bag, ui); ui.AddChild(waterWarning);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         needsPlate = new NeedsPlate(kit, moves, damageEdges, cursor); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
@@ -152,7 +148,7 @@ public partial class Game : Node, IGameFlow {
     }
     private void PlayIntro() { intro = new IntroMovie(sounds) { Name = "intro" }; ui.AddChild(intro); }
     private void Notify(string message) {
-        if (message == Water.FullBottleWarning && waterWarning != null) waterWarning.Warn(message); else messages?.Post(message);
+        messages?.Post(message);
         GD.Print(message);
     }
     private void RefreshLive() {

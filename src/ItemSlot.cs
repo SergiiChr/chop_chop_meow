@@ -60,7 +60,6 @@ public partial class ItemSlot : Button {
     /// <summary>How far the mouse may move between the presses of a double click.</summary>
     private const float DoubleClickReach = 5;
     private Tween? shake;
-    private const float ShakeSeconds = .35f, ShakeReach = 5, ShakeSwings = 3;
 
     public override GodotObject? _MakeCustomTooltip(string forText) => Popup?.Invoke();
 
@@ -94,13 +93,10 @@ public partial class ItemSlot : Button {
     }
 
     /// <summary>Whether the slot is shaking now.</summary>
-    public bool Shaking => shake?.IsRunning() == true;
+    public bool Shaking => shake != null && shake.IsValid();
 
     /// <summary>Shakes the slot side to side, as a refusal.</summary>
     public void Shake() {
-        if (shake?.IsRunning() == true) return;
-        var home = Position;
-        shake = CreateTween();
-        shake.TweenMethod(Callable.From<float>(done => Position = home + new Vector2(MathF.Sin(done * MathF.Tau * ShakeSwings) * (1 - done) * ShakeReach, 0)), 0f, 1f, ShakeSeconds);
+        if (!Shaking) shake = Shaker.Shake(this, this);
     }
 }

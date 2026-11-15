@@ -74,7 +74,8 @@ Simulation and data:
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
-| `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
+| `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
+| `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
 | `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
 | `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
@@ -90,7 +91,7 @@ UI and input:
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
 | `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
-| `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode, full-bottle and death labels |
+| `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
@@ -119,7 +120,7 @@ UI and input:
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
-| `src/CabinPanel.cs` | A cabin: its door and sleep |
+| `src/CabinPanel.cs` | A cabin: its door, sleep and the needs a night would leave |
 | `src/CampfirePanel.cs` | A campfire |
 | `src/ResourcePanel.cs` | A resource in the world |
 | `src/PilePanel.cs` | A pile or compost heap |
@@ -160,9 +161,11 @@ Checks and review tools:
 | `tests/*Checks.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps shared by the simulation checks |
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
+| `src/RecipeReadyChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
+| `src/RecipeSteps.cs` | Steps that open a fresh station for a recipe, give and load its items and fuel, and expect a batch to start or be refused |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
@@ -317,7 +320,7 @@ The transient state is excluded from saves and recalculated on the next simulati
 At a packing station the packer stands behind the table (`World.PackStand`) and the `Pack` action rummages in the heap of goods, lifts a piece across and settles it into the crate, then turns back.
 The player working a station they stand near packs the same way.
 
-At a cooking table, which is only worked for the mortar's recipes, the `Grind` action holds the mortar in hand (`ActorAnimation.StationAction`).
+At a cooking table, which is only worked for the mortar's recipes and dough, the `Grind` action holds the mortar in hand (`ActorAnimation.StationAction`); kneading dough uses the `Pack` action, facing the table.
 The left fist holds the bowl out in front, and the right takes the pestle twice round the bowl's floor, then lifts it and pounds.
 Both arms are solved from where the hands have to be (`ActorAnimation.ArmTo`), so the pestle stays over the bowl.
 `ActorRig` turns the bowl and pestle against their forearms in the resting pose (`ActorAnimation.GrindRest`), which keeps the bowl level and the pestle leaning toward its hand.
@@ -371,9 +374,15 @@ There are no iron tools; iron bars only go into buildings and steel.
 #### Water
 
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
-Filling it or sipping straight from the source takes one `GatherSeconds`.
+Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the pond shore is a collection target.
-Recipes take only a full bottle, and cooking returns the empty bottle rather than destroying it.
+A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many liters.
+`GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
+a vessel put into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
+the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the slot shakes.
+Every move between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
+Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.LiquidToClear`), and a dismantled station fills the backpack's vessels and spills the rest.
+No hand recipe takes a liquid, which `GameData` checks.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
 It advances normal simulation through dawn, including needs, trades, production and wages.
@@ -395,7 +404,8 @@ The starter goal chain stays as the tutorial, and the pause menu lists both.
 
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
 
-- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`, `Health`) and a `Food` flag.
+- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`) and a `Food` flag; nothing eaten heals.
+- Health comes back only in sleep, `World.SleepHeal` a second while hunger and thirst both stay above `World.FedNeed`; `World.HealthAtDawn` foretells it for the cabin's page.
 - Food is what wolves eat and compost will take, cooked or not.
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.
@@ -409,6 +419,7 @@ It is refused if hunger or thirst would run out first.
 Holding Shift while moving sprints at `SprintSpeed` times the walking speed (`PlayerState.Sprinting`, sent by guests with their walk).
 Hunger and thirst drain `SprintDrain` times as fast meanwhile.
 Under 15% food or drink (`GameData.LowNeed`) the player cannot sprint and the screen edges pulse red.
+As food falls under 20% (`GameData.GrowlBelow`), and with every further 5% gone (`GameData.GrowlEvery`), `stomach_growl` plays at the player.
 
 #### Death and recovery boxes
 
@@ -430,7 +441,8 @@ A change that did not happen in front of the player is not played when they see 
 A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
 A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one a building now stands over (`World.Clears`) just goes.
 While it is dug at, a stump or bush leans further over with `Thing.Progress` (`DugProp`).
-Work out of sight is heard but shakes nothing and throws no chips.
+Work out of sight shakes nothing and throws no chips.
+It is silent too, since `SightRadius` (20 metres) lies beyond the 16 metres a sound carries ([Sound effects](#sound-effects)).
 
 `WorldView` hides wolves, workers and carts outside sight.
 It draws one screen-wide quad after everything else, placing each pixel in the world from the depth buffer: black on unexplored tiles, a grey wash on explored ones, clear inside the sight circle.
@@ -449,7 +461,7 @@ Every wolf, like players and workers, moves only onto ground `World.CanStand` al
 - **Patrol.** A wolf hunting nobody (`Wolf.Target` zero, `WolfMode.Patrol`) walks its `Wolf.Heading` at `PatrolPace` (half) of the trot it stalks at, a walk, and picks a new random heading it can take when the ground ahead is blocked or in campfire light.
 - **Smell and howl.** A patrolling or called wolf within `SmellRadius` of a player out in the open takes them as its target and howls, standing still, for as long as the howl recording plays (`LoneHowlSeconds` or `PackHowlSeconds`, `Wolf.Howl` counting down `Wolf.HowlLength`).
   The night's first howl plays `wolf_howl`, a lone wolf, and later ones `wolf_howl_group` (`SaveState.Howled`).
-  A howl fades with distance from the player, on screen too, and is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it pans with its direction.
+  A howl is silent beyond `HowlRadius`, so a far pack sounds far; like every placed sound it fades with distance from the player and pans with its direction.
   The howl calls every patrolling wolf within `HowlRadius` to where it stood (`WolfMode.Called`, `Wolf.Call`); a called wolf still smells on its way and goes back to patrolling once there.
 - **Approach.** After its howl a wolf trots at its player out of firelight until within `WolfSightRange`, then sprints (`Wolf.Chase` above zero) at `WolfChase` times `WalkSpeed` with one distant growl (`Wolf.Sprinted`), which data validation keeps above walking and below `SprintSpeed`.
 - **Home.** From `WolfRetreatStarts`, `WolfRetreatHours` before dawn, every wolf drops its hunt and runs to the nearest den's door (`WolfMode.Home`), where it goes in; dawn clears any still out.
@@ -585,7 +597,7 @@ A save written before `Obtained` existed loads with it empty, so a raw resource 
 A recipe that needs a tool at such a station runs at the speed of the fastest of the slotted tool and those carried by players working there (`World.StationTool`).
 Worked only by its crew, it runs with the slotted tool and waits when there is none.
 At the cooking table it runs only while someone works it (`World.Worked(Thing)`).
-The mortar's recipes are worked, while jam, stew and dough cook unattended and their worker only hauls.
+The mortar's recipes and dough (`RecipeDef.Worked`) are worked, while jam and stew cook unattended and their worker only hauls.
 
 #### Fuel
 
@@ -674,7 +686,7 @@ Piles (`pile`) are 3×3 yards (`World.IsZone`, `ZoneSize`) that do not block wal
 `World.Snap` puts a new yard on the grid of the nearest yard within reach, and `ZoneBlock` lets yards touch but not overlap.
 
 A pile takes part in automation like a chest.
-`World.PileFilters` sets its input and output filters each tick from what it holds: its one resource, or nothing while empty.
+`World.PileFilters` sets its input and output filters each tick from what it holds: its one resource, every fill of a vessel, or nothing while empty.
 `HoldBlock` refuses a second resource, including for manual transfers.
 
 #### Compost
@@ -788,7 +800,7 @@ Purchases settle on return into the trading post's market output (`Thing.Output`
 The trading post's input filter names the crates it asks for.
 `DepositFor` treats a post as storage only for an item its filter names, so workers deliver those crates there when it is the nearest storage asking for them.
 With `Thing.AutoSell` set, the cart leaves on its own once every market slot holds a crate and a cart is free.
-Sale coins fill the trading post's one-stack wage slot (`Thing.Wages`, coins only) first and the output after.
+Sale coins land in the trading post's wage slot (`Thing.Wages`, coins only), whose coin stack (`Inventory.CoinStack`) is `Inventory.UnlimitedCoins`, so the bank has no limit.
 Dawn wages, settled strikes and hiring payments draw on every wage slot before the payer's backpack; purchases come from the backpack only.
 
 #### Price sheet
@@ -876,8 +888,16 @@ tool outside this project turns them into `assets/intro.ogv` (see the `intro-fil
 Sound effects are one-shot MP3s in `assets/sounds`; `x_1.mp3`, `x_2.mp3` and so on are variants of one sound `x`.
 Each play picks a variant other than the previous one with a small random pitch and volume change.
 
-Audibility follows the camera, so zooming out lets the player hear further.
-A sound on screen plays at full volume, one just past the screen edge is faint, and it fades to silence 5 tiles beyond the edge (14 for the growl of a wolf breaking into its sprint).
+A sound with a world position is heard by its distance from the player, whatever the zoom.
+It plays at full volume at the player and fades with the square of the distance left to its reach, where it is silent: half way there it plays at a quarter.
+Its reach (`Sounds.ReachOf`) is:
+
+- 16 metres for most sounds;
+- twice `WolfSightRange` for the growl of a wolf breaking into its sprint, so it plays at a quarter from where the sprint starts;
+- `HowlRadius` for a howl.
+
+A sound with no position, such as the local player's footsteps or a hotbar click, plays at full volume.
+A sound within a metre of the player plays with no place too, so a long one such as the stomach's growl stays centred while the player walks on.
 
 Sounds come from three places:
 

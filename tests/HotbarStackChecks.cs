@@ -111,11 +111,11 @@ public static class HotbarStackChecks {
 
     private static void CheckABottleStaysBoundThroughSips(GameData data) {
         var world = EmptyWorld(data);
-        Give(world, "water", 1);
-        PutOnHotbar(world, SlotOf(world.Backpack, "water"), 8);
+        Give(world, Water.Full, 1);
+        PutOnHotbar(world, SlotOf(world.Backpack, Water.Full), 8);
         SetNeeds(world, thirst: 20);
-        for (int sip = 0; sip < 3; sip++) world.Consume(world.HotbarItem(8));
-        Require(world.HotbarItem(8) == "empty_bottle", "a bound bottle should stay bound through every sip, empty at the end");
+        for (int liter = 0; liter < 3; liter++) world.Consume(world.HotbarItem(8));
+        Require(world.HotbarItem(8) == Water.Empty, "a bound bottle should stay bound through every liter drunk, empty at the end");
     }
 
     private static void CheckBindingsComeBackFromASave(GameData data) {

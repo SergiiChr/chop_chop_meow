@@ -92,14 +92,16 @@ public partial class Game {
 
     /// <summary>
     /// Two clicks within a double click's time, the second press also flagged as a double click the way Godot reports one.
-    /// All four come in one frame, as frames slowed by a busy machine would otherwise stretch them past that time.
+    /// Each press and release waits out the frames after it, as real ones do, so a page the first click redraws is drawn before the second press.
     /// </summary>
     private async Task DoubleClick(Control control) {
         var at = await At(control);
         await Apart(at);
         foreach (bool second in new[] { false, true }) {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true, DoubleClick = second });
+            await Frames();
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
+            await Frames();
         }
         await Frames();
         Handled(at);

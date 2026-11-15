@@ -100,12 +100,12 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             var need = Style.Text(amount.ToString(), 13, Style.Ink); need.CustomMinimumSize = new Vector2(14, 0);
             inputs.AddChild(need);
             // Counts turn brick while the backpack is short.
-            live.Watch(() => world.Backpack[item] < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
+            live.Watch(() => world.Carried(item) < amount, lacking => need.AddThemeColorOverride("font_color", lacking ? Style.Brick : Style.Ink));
         }
         var lacks = Style.Text(r.Tool == "" ? "" : $"No {world.Data.ToolName(r.Tool, r.Tier)}", 12, Style.Brick); lacks.Name = "lacks"; lacks.Visible = false; text.AddChild(lacks);
         bool NoTool() => r.Tool != "" && world.ToolInUse(station, r.Tool, r.Tier) == null;
         // One look for the tool a refresh: the card names a missing tool in place of its inputs, and its picture fades while the recipe cannot be made from the backpack now.
-        live.Watch(() => { bool missing = NoTool(); return (Missing: missing, Ready: !missing && (station != null ? world.Backpack.Has(r.Inputs) : world.CanCraft(id))); }, state => {
+        live.Watch(() => { bool missing = NoTool(); return (Missing: missing, Ready: !missing && (station != null ? world.CarriesBatch(r.Inputs) : world.CanCraft(id))); }, state => {
             lacks.Visible = state.Missing; inputs.Visible = !state.Missing;
             product.Modulate = state.Ready ? Colors.White : Style.Faded;
         });
@@ -138,10 +138,10 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
             Queue(1);
             if (unmarked) kit.Run(() => world.SetRecipe(station, id));
         };
-        // The server answers a refusal with its reason; the slots in the way shake at once.
+        // The server answers a refusal, or a batch short of items or fuel, with its reason; the slots shake at once.
         void Queue(int batches) {
             refusing = null;
-            bool refused = world.SwitchBlock(station!, id) != null;
+            bool refused = world.SwitchBlock(station!, id) != null || world.BatchShort(station!, id) != null;
             kit.Run(() => world.QueueBatch(station!, id, batches));
             if (refused) occupied?.Invoke();
         }
@@ -203,7 +203,7 @@ public partial class RecipePopup(World world, Thing? station, RecipeDef r, float
         foreach (var (item, amount) in r.Inputs) {
             requires.AddChild(Style.Icon(Icons.Of(item), 26));
             requires.AddChild(Style.Text($"{amount} {world.Data.Name(item)}", 14, Style.Rim));
-            if (world.Backpack[item] < amount) requires.AddChild(Style.Text($"you have {world.Backpack[item]}", 14, Style.Warn));
+            if (world.Carried(item) < amount) requires.AddChild(Style.Text($"you have {world.Carried(item)}", 14, Style.Warn));
         }
         if (r.Tool != "") ToolLine();
         Line("Time").AddChild(Style.Text($"{seconds:0.#} s", 14, Style.Rim));

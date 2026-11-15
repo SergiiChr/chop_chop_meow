@@ -90,9 +90,11 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
     /// <summary>A slot for one input or output of a station, which takes a held backpack stack as an input.</summary>
     public VBoxContainer StationSlot(string item, bool input, string perBatch, float size = 52) {
         var box = t.Inventory;
-        string hint = input ? $"{SlotHint} · put a backpack stack here to load" : SlotHint;
+        var vessel = world.Data.VesselFor(item);
+        string hint = !input ? SlotHint : vessel != null ? $"{SlotHint} · put a {world.Lower(world.Data.Name(vessel.Full))} here to pour what it holds" : $"{SlotHint} · put a backpack stack here to load";
+        // A liquid's input slot takes the vessels that hold some of it, at any fill.
         var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size,
-            takes: input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || item == "water" && Water.IsBottle(stack.Item)) : null,
+            takes: input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || vessel != null && vessel.LitersIn(stack.Item) > 0) : null,
             put: (held, units) => world.LoadInput(t, held, units));
         return Labelled(cell, perBatch);
     }

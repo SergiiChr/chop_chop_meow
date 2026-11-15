@@ -320,6 +320,8 @@ public static class WorldModels {
             prop.Root.Free();
             return node;
         }
+        // A liquid has no model: only a station holds it, and its icon is drawn (assets/ui).
+        if (data.VesselFor(id) != null) return null;
         switch (id) {
             case "hardhat": { var hat = new Node3D(); ActorRig.HardHat(hat); return hat; }
             case "steel_axe" or "steel_pick" or "steel_shovel" or "stone_chisel" or "steel_chisel" or "wood_hammer" or "steel_hammer": return ActorRig.Tool(id);
@@ -327,7 +329,7 @@ public static class WorldModels {
             case "rake": return Part(ThingKind.Toolstation, p => ((RackProp)p).Pegs[0]["rake"]);
             case "mortar": return Part(ThingKind.Cooktable, p => ((StoveProp)p).Mortar!);
             case "berries": { var heap = new Node3D(); Add(heap, NatureShape.BerryHeap, NatureShape.Glossy, Vector3.Zero); return heap; }
-            case "water" or "water_2" or "water_1" or "empty_bottle": return BottleShape.Create(Water.BottleSips(id));
+            case var bottle when Water.IsBottle(bottle): return BottleShape.Create(Water.BottleLiters(bottle));
             case "iron_bar" or "steel_bar" or "tin_bar": return IngotShape.Create(id, data.Items[id].Color);
             case "stone": return Build(new Thing { Kind = ThingKind.Stone }).Root;
             case "leaves": return Build(new Thing { Kind = ThingKind.Leaves }).Root;

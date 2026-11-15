@@ -167,6 +167,7 @@ How they are framed:
 `ui/` holds hand-written SVG icons:
 
 - Line glyphs named `line_*` for the menu badges and panel buttons (build, bag, craft, crew, guide, close, filter, stash, trash and so on), tinted in code.
+- `fresh_water.svg`, the water a full bottle pours into a station: a blue droplet in the shape of the corner's thirst icon, used as the item icon since only stations hold it and it has no model.
 
 ## Fonts
 
@@ -214,6 +215,8 @@ These were made with ffmpeg from Kenney's sounds:
 Each cut is faded at both ends, and the cuts of one sound are brought to one mean level.
 
 `wolf_howl` (a lone wolf, the night's first howl), `wolf_howl_group` (the pack answering) and `hire_sign` (a pen signing paper, cleaned of rumble and room noise) were supplied for this project.
+
+`stomach_growl` is "yet more stomach sounds" by freesound_community (Pixabay 97719, artist Darsycho on Freesound), a recording supplied for this project, with the silence cut from both ends: four seconds of three rumbles.
 
 The tree sounds are cut and mixed with ffmpeg from three recordings supplied for this project, a tree bending and two trees falling:
 

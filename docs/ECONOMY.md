@@ -5,26 +5,36 @@ Prices, wages and demand live in `src/GameTables.cs`.
 
 To tune: change the data, run the tests, and read those lines before and after.
 
-## 1. Value ladder
+## 1. Prices and whole chains
 
-Every item has a `Price`.
-For goods the village trades, it is the trade price; for the rest it is a reference value used only to keep recipes in line.
+Only the goods the village buys or sells, and the crate they travel in, have a `Price`; the game refuses to start with a price on anything else.
+A good in the middle of a chain, such as flour, dough or an iron bar, has no value of its own.
+A good is judged by its whole chain: every step from the ground up against what a crate of it sells for.
 
-- Raw goods: wood, stone, berries, wheat seeds and raw meat are worth 1. Iron ore, coal and tin ore are worth 1.5, since they need a pickaxe. Leaves and grass are worth a quarter: they come by the handful, or 36 at once from a dug up bush, and four make one fertilizer. Wheat is 1.5.
-- A recipe's output is worth its inputs plus the cheapest fuel its station burns, plus a markup that shrinks with each step from raw goods: 50% for the first step, then 40%, 30% and 20%.
-- So lower tiers keep a bigger share of their price as profit, and deeper goods are worth more coins in total. A steel axe earns 6 coins over its parts and an iron bar 2, though the bar's margin is far higher.
+A crate's chain cost is:
 
-| Step | Markup | Recipes |
-|---|---|---|
-| 1 | 50% | charcoal, iron bar, tin bar, burnt steak, planks, wood parts, stone chisel, torch, mortar and pestle, crushed berries, flour, meat stew |
-| 2 | 40% | steel bar, crate, wooden mallet, tin cans, tin water bottle, berry jam, dough |
-| 3 | 30% | steel parts, bread, canned meat stew, canned jam |
-| 4 | 20% | steel axe, steel pickaxe, steel shovel, steel hammer, steel chisel, rake |
+- the worker-days of every step, measured by running real workers through whole days (gathering, water, each station), at a worker-day's cost (section 2);
+- the coins spent buying what a harvest uses up: a farm plot sows 1 seed and 1 fertilizer, gets 2 seeds back and buys the fertilizer;
+- the crate itself, made from planks.
 
-The village also sells canned meat stew, a crate of 12 at the buying price.
+A farm plot's work comes from its data: a harvest takes 1 worker-day (`FarmDef.HarvestWorkdays`) and gives 4 wheat after growing 3 days (`GrowDays`), which a chain waits for.
+One wheat grinds into 1 flour, kneads into 3 dough and bakes into 12 bread, a crate.
+Meat comes from wolves the player kills at night, which no worker's day accounts for, so goods made from it are not costed.
 
-A new recipe gets its price from this rule.
-The check fails if any recipe loses value or a deeper recipe marks up more than a shallower one.
+The check fails if a crate of any costed good sells for no more than its chain costs.
+Measured, at 25 coins a worker-day, a crate of 12 and full price:
+
+| Good | Worker-days | Labor | Bought | Cost | Sells for | Profit | Waits |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Berries | 0.55 | 14 | 0 | 14 | 15 | 2 | |
+| Bread | 0.41 | 10 | 0.8 | 11 | 30 | 19 | 3 days |
+| Berry jam | 1.52 | 38 | 0 | 38 | 70 | 32 | |
+| Canned jam | 1.87 | 47 | 0 | 47 | 143 | 96 | |
+| Steel axe, pickaxe, shovel | 1.57 | 39 | 0 | 39 | 471 | 432 | |
+| Steel hammer | 0.97 | 24 | 0 | 24 | 243 | 219 | |
+
+Not costed: raw meat, burnt steak, meat stew and canned meat stew.
+The `Economy:` lines print this table on every run.
 
 ## 2. Hiring
 
@@ -35,7 +45,7 @@ All offers cost about the same over that time (24 to 26 coins).
 More up front means a lower wage, so a worker kept longer is cheaper, and the dearest wage needs nothing up front.
 
 Wages are paid at dawn from the trading posts' wage slots first, where sale coins land, and then from the backpack.
-The slot holds one stack (1000 coins); sale coins beyond it go to the market output and are not touched by wages.
+The slot has no limit, so every sale coin lands there.
 
 ### Output
 
@@ -46,8 +56,8 @@ A product's worker-days are its materials' worker-days plus one over its station
 - A worker in a steel tool chain earns at least 4 times their pay.
 - A cook earns at least 1.5 times their pay.
 - A longer chain earns more per worker-day than a shorter one, comparing tools with tools and food with food.
-- Goods made from meat or wheat are left out: meat comes from wolves at night, when workers are home, and wheat from farm plots.
-- Farming breaks even as a baseline, like picking berries, and is meant to improve with better tools. A harvest takes 1 worker-day and returns 4 wheat, 1 seed beyond the one sown and 1 grass for 1 fertilizer. Ground, kneaded and baked into bread, it earns about a worker-day's cost after the water and wood.
+- Goods made from meat are left out: meat comes from wolves at night, when workers are home.
+- A harvest takes 1 worker-day and returns 4 wheat, 1 seed beyond the one sown and 1 grass for 1 fertilizer; each wheat becomes a crate of bread, so a bread chain earns about 3 times its pay.
 
 ### Measured output
 

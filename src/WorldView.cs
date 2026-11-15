@@ -316,13 +316,6 @@ public partial class WorldView : Node3D {
     public Vector2 Screen(Vector2 p) => Screen(p, 0);
     public Vector2 Screen(Vector2 p, float height) { SyncCamera(); return camera.UnprojectPosition(To3(p, height)); }
 
-    /// <summary>How far a world position lies outside the visible screen, in tiles; zero when on screen.</summary>
-    public float OffScreen(Vector2 p) {
-        var at = Screen(p); var rect = GetViewport().GetVisibleRect();
-        var outside = new Vector2(Math.Max(0, Math.Max(rect.Position.X - at.X, at.X - rect.End.X)), Math.Max(0, Math.Max(rect.Position.Y - at.Y, at.Y - rect.End.Y)));
-        return outside.Length() / PixelsPerUnit;
-    }
-
     public Vector2 ToWorld(Vector2 screen) {
         SyncCamera();
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
@@ -491,7 +484,7 @@ public partial class WorldView : Node3D {
         Vector2 target = Gathering && GatheringTarget != null ? World.GatherAt(GatheringTarget, World.Player) : World.Player;
         Thing? subject = Gathering ? GatheringTarget : null;
         if (pulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(pulseAction))) { action = pulseAction; target = pulseTarget; subject = ThingAt(pulseTarget); }
-        if (action == ActorAction.Idle && StationToHammer(World.Me) is Thing station) { action = ActorAnimation.StationAction(station.Kind); target = station.Pos; subject = station; }
+        if (action == ActorAction.Idle && StationToHammer(World.Me) is Thing station) { action = ActorAnimation.StationAction(station, World.Data); target = station.Pos; subject = station; }
         // A leaping wolf knocks the player over as its jaws reach them, before it lands; a pinned player stays down.
         var knocker = Knocking(World.Me);
         if (World.Mauled || knocker != null) {
@@ -522,12 +515,12 @@ public partial class WorldView : Node3D {
             var state = entry.State;
             bool walking = worker.Pos.DistanceSquaredTo(state.Position) > .000001f;
             var assignment = World.Find(worker.Assignment);
-            var work = ActorAnimation.WorkerAction(worker, assignment, walking);
+            var work = ActorAnimation.WorkerAction(worker, assignment, walking, World.Data);
             if (work is ActorAction.Hammer or ActorAction.Pack or ActorAction.Grind && assignment?.Processing != true && assignment?.Kind != ThingKind.Mine) work = ActorAction.Idle;
             // At a mine the worker faces the rock past the entrance, not the cart out front.
             // A protester turns the sign toward the camera.
             var facing = work == ActorAction.Protest ? worker.Pos + Vector2.One
-                : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : work == ActorAction.Pack ? worker.Pos + Vector2.Down
+                : work is ActorAction.Sit or ActorAction.Perch && World.LunchFire is Thing fire ? fire.Pos : work == ActorAction.Pack && assignment?.Kind == ThingKind.Packer ? worker.Pos + Vector2.Down
                 : assignment is { Kind: ThingKind.Mine } mine ? World.MineDoor(mine) * 2 - mine.Pos : assignment?.Pos ?? worker.Pos;
             state.Update(worker.Pos, work, facing, dt);
             Pose(entry.Rig, state, Grade(ActorAnimation.Tool(work), worker.Tool, assignment?.Tools));
@@ -593,7 +586,7 @@ public partial class WorldView : Node3D {
             var subject = gathering ? target : null;
             var facing = subject != null ? World.GatherAt(subject, p.Pos) : p.Pos;
             if (other.PulseRemaining > 0 && (!moving || ActorAnimation.SwingsOnTheMove(other.Pulse))) { action = other.Pulse; facing = other.PulseTarget; subject = ThingAt(other.PulseTarget); }
-            if (action == ActorAction.Idle && StationToHammer(p) is Thing station) { action = ActorAnimation.StationAction(station.Kind); facing = station.Pos; subject = station; }
+            if (action == ActorAction.Idle && StationToHammer(p) is Thing station) { action = ActorAnimation.StationAction(station, World.Data); facing = station.Pos; subject = station; }
             var knocker = Knocking(p);
             if (p.Mauled || knocker != null) {
                 action = p.RespawnIn > 0 ? ActorAction.Devoured : ActorAction.Mauled;
@@ -703,7 +696,7 @@ public partial class WorldView : Node3D {
             _ => -1
         };
         if (impact < 0 || !actor.Struck(impact) || !props.TryGetValue(subject.Id, out var prop)) return;
-        // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips; the blow is still heard.
+        // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips.
         bool inSight = World.Sees(subject.Pos);
         if (inSight) prop.Shake = 1;
         // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.

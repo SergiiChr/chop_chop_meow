@@ -9,9 +9,6 @@ namespace ChopChopMeow;
 /// the fuel under it with how long it lasts, and the main output with its side outputs in a second row.
 /// </summary>
 public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, string time, Func<float> progress, Control? fuel, Control? main, IEnumerable<Control> side) : PanelContainer {
-    /// <summary>How long a shake lasts, in seconds, how far it swings to each side, in pixels, and how many times it swings.</summary>
-    private const float ShakeSeconds = .4f, ShakeReach = 8, ShakeSwings = 4;
-
     // The input slots and the output slots, each group in a box of its own.
     private HBoxContainer left = null!;
     private VBoxContainer right = null!;
@@ -22,16 +19,7 @@ public partial class ProcessRow(LiveUpdates live, IEnumerable<Control> inputs, s
 
     /// <summary>Shakes the input and output slots from side to side and back to rest, to show they are taken; a shake under way goes on as it is.</summary>
     public void Shake() {
-        if (Shaking) return;
-        bool placed = false;
-        Vector2 leftHome = default, rightHome = default;
-        shake = CreateTween();
-        shake.TweenMethod(Callable.From<float>(done => {
-            // The slots' places are read on the first step: a row drawn this frame is laid out only by then.
-            if (!placed) { placed = true; leftHome = left.Position; rightHome = right.Position; }
-            var swing = new Vector2(MathF.Sin(done * MathF.Tau * ShakeSwings) * (1 - done) * ShakeReach, 0);
-            left.Position = leftHome + swing; right.Position = rightHome + swing;
-        }), 0f, 1f, ShakeSeconds);
+        if (!Shaking) shake = Shaker.Shake(this, left, right);
     }
 
     public override void _Ready() {
@@ -61,5 +49,25 @@ public partial class FuelRow(string glyph, Color tint, Control slot, Label lasts
         AddThemeConstantOverride("separation", 8);
         AddChild(Style.Glyph(glyph, 24, tint)); AddChild(slot); AddChild(lasts);
         if (accepted != null) AddChild(accepted);
+    }
+}
+
+/// <summary>Swings controls from side to side and back to rest, to show a refusal.</summary>
+public static class Shaker {
+    /// <summary>How long a shake lasts, in seconds, how far it swings to each side, in pixels, and how many times it swings.</summary>
+    private const float Seconds = .4f, Reach = 8, Swings = 4;
+
+    /// <summary>Shakes the parts together on a tween of the owner's.</summary>
+    public static Tween Shake(Node owner, params Control[] parts) {
+        var homes = new Vector2[parts.Length];
+        bool placed = false;
+        var tween = owner.CreateTween();
+        tween.TweenMethod(Callable.From<float>(done => {
+            // The parts' places are read on the first step: a row drawn this frame is laid out only by then.
+            if (!placed) { placed = true; for (int i = 0; i < parts.Length; i++) homes[i] = parts[i].Position; }
+            var swing = new Vector2(MathF.Sin(done * MathF.Tau * Swings) * (1 - done) * Reach, 0);
+            for (int i = 0; i < parts.Length; i++) parts[i].Position = homes[i] + swing;
+        }), 0f, 1f, Seconds);
+        return tween;
     }
 }

@@ -16,57 +16,51 @@ public static class EconomyChecks {
     private const float HireDays = 10;
 
     public static void Run(GameData data) {
-        CheckEveryRecipeAddsValueAlongTheLadder(data);
-        CheckHiredWorkersEarnMoreThanTheirPay(data);
+        var chain = new ChainCost(data);
+        CheckEveryCrateSellsForMoreThanItsWholeChainCosts(data, chain);
+        CheckHiredWorkersEarnMoreThanTheirPay(data, chain);
         CheckBasketIsSustainable(data);
     }
 
-    /// <summary>Every recipe adds value at reference prices, and the markup shrinks the deeper the recipe sits in its chain.</summary>
-    private static void CheckEveryRecipeAddsValueAlongTheLadder(GameData data) {
-        var world = new World(data, false);
-        var markups = data.Recipes.Select(p => {
-            // Water recipes return their reusable bottles; only the water is a consumed material.
-            float input = Value(data, BatchCost(world, p.Key)) - p.Value.Inputs.GetValueOrDefault("water") * data.Items["empty_bottle"].Price;
-            float output = data.Items[p.Value.Output].Price * p.Value.Amount;
-            return (Recipe: p.Key, Depth: Depth(data, p.Value.Output), Markup: output / input - 1);
-        }).ToList();
-        foreach (var m in markups.OrderBy(m => m.Depth)) GD.Print($"Economy: {m.Recipe,-13} step {m.Depth} markup {m.Markup:P0}");
-        Require(markups.All(m => m.Markup > 0), $"every recipe should add value: {string.Join(", ", markups.Where(m => m.Markup <= 0).Select(m => m.Recipe))}");
-        foreach (var low in markups)
-            foreach (var high in markups.Where(m => m.Depth > low.Depth))
-                Require(high.Markup <= low.Markup + .005f, $"{high.Recipe} (step {high.Depth}) should not mark up more than {low.Recipe} (step {low.Depth})");
+    /// <summary>A worker-day's cost: the wage plus the up-front payment spread over the days a hire lasts, averaged over the offers.</summary>
+    private static float DayCost(GameData data) => data.HireOffers.Average(o => o.Wage + o.Upfront / HireDays);
+
+    /// <summary>
+    /// A crate of every good the village takes sells for more than its whole chain costs: the worker-days of every step from the ground up at a worker-day's cost,
+    /// the coins spent buying what a harvest uses up, and the crate itself.
+    /// Intermediate goods have no price of their own; only the finished good is judged.
+    /// </summary>
+    private static void CheckEveryCrateSellsForMoreThanItsWholeChainCosts(GameData data, ChainCost chain) {
+        float day = DayCost(data);
+        int units = data.CrateCapacity;
+        float crateDays = chain.WorkerDays("crate");
+        GD.Print($"Economy: a crate of {units}, by the whole chain at {day:0.0} coins a worker-day; an empty crate takes {crateDays:0.00} worker-days");
+        GD.Print($"Economy: {"good",-16} {"worker-days",11} {"labor",7} {"bought",7} {"cost",7} {"sells",7} {"profit",7} {"waits",6}");
+        foreach (string item in data.Market.Sells.Keys.Where(chain.Measurable)) {
+            float days = units * chain.WorkerDays(item) + crateDays, bought = units * chain.Coins(item), cost = days * day + bought;
+            float sells = units * data.Items[item].Price + data.Items["crate"].Price;
+            GD.Print($"Economy: {item,-16} {days,11:0.00} {days * day,7:0} {bought,7:0.0} {cost,7:0} {sells,7:0} {sells - cost,7:0} {chain.WaitDays(item),5:0}d");
+            Require(sells > cost, $"a crate of {item} should sell for more than its whole chain costs: {sells:0} coins against {cost:0}");
+        }
+        GD.Print($"Economy: not costed, made from meat the player hunts at night: {string.Join(", ", data.Market.Sells.Keys.Where(id => !chain.Measurable(id)))}");
     }
 
     /// <summary>
     /// A berry picker barely covers their pay, steel tool crews earn several times theirs and cooks a good part more, and longer chains earn more per worker-day.
     /// Food chains are compared among themselves, apart from the tools.
     /// </summary>
-    private static void CheckHiredWorkersEarnMoreThanTheirPay(GameData data) {
-        var gathered = new[] { ("iron_ore", ThingKind.Iron), ("coal", ThingKind.Coal), ("tin_ore", ThingKind.Tin), ("wood", ThingKind.Tree), ("berries", ThingKind.Berries) }.ToDictionary(p => p.Item1, p => Gather(data, p.Item2, p.Item2 == ThingKind.Berries ? 2 : 1));
-        var made = new Dictionary<string, float>();
-        float Made(string recipe) => made.TryGetValue(recipe, out float perDay) ? perDay : made[recipe] = Station(data, recipe);
-        var world = new World(data, false);
-        string RecipeFor(string item) => data.Recipes.First(p => p.Value.Output == item).Key;
-        // Meat comes from wolves at night and wheat from farms, so no hired gatherer or station crew alone accounts for them.
-        bool Measurable(string item) => gathered.ContainsKey(item) || data.Recipes.Values.Any(r => r.Output == item) && BatchCost(world, RecipeFor(item)).Keys.All(Measurable);
-        // Worker-days per unit: the materials' share plus the recipe's own station time, one over the station's daily output.
-        float Labor(string item) {
-            if (gathered.TryGetValue(item, out float perDay)) return 1 / perDay;
-            string key = RecipeFor(item);
-            return BatchCost(world, key).Sum(p => Labor(p.Key) * p.Value) / data.Recipes[key].Amount + 1 / Made(key);
-        }
-        float cost = data.HireOffers.Average(o => o.Wage + o.Upfront / HireDays);
-        GD.Print($"Economy: not measured, made from goods no hire gathers: {string.Join(", ", data.Market.Sells.Keys.Where(id => !Measurable(id)))}");
-        var earnings = data.Market.Sells.Keys.Where(Measurable)
-            .Select(id => (Item: id, Tool: data.Items[id].Tool != "", Depth: Depth(data, id), PerDay: data.Items[id].Price / Labor(id))).OrderBy(e => e.Depth).ToList();
-        GD.Print($"Economy: a worker-day costs {cost:0.0} coins; gathered per day {string.Join(", ", gathered.Select(p => $"{p.Key} {p.Value:0}"))}; made per day {string.Join(", ", made.Select(p => $"{p.Key} {p.Value:0}"))}");
-        foreach (var e in earnings) GD.Print($"Economy: {e.Item,-16} {Labor(e.Item):0.000} worker-days each, {e.PerDay:0} coins per worker-day ({e.PerDay / cost:0.0}x pay)");
+    private static void CheckHiredWorkersEarnMoreThanTheirPay(GameData data, ChainCost chain) {
+        float cost = DayCost(data);
+        var earnings = data.Market.Sells.Keys.Where(chain.Measurable)
+            .Select(id => (Item: id, Tool: data.Items[id].Tool != "", Depth: Depth(data, id), PerDay: data.Items[id].Price / chain.WorkerDays(id))).OrderBy(e => e.Depth).ToList();
+        GD.Print($"Economy: a worker-day costs {cost:0.0} coins; gathered per day {string.Join(", ", chain.Gathered.Select(p => $"{p.Key} {p.Value:0}"))}; made per day {string.Join(", ", chain.MadePerDay.Select(p => $"{p.Key} {p.Value:0}"))}");
+        foreach (var e in earnings) GD.Print($"Economy: {e.Item,-16} {chain.WorkerDays(e.Item):0.000} worker-days each, {e.PerDay:0} coins per worker-day ({e.PerDay / cost:0.0}x pay)");
         float berries = earnings.Single(e => e.Item == "berries").PerDay;
         Require(berries >= .9f * cost && berries <= 1.25f * cost, $"a hired berry picker should barely break even: {berries:0.0} coins a day against {cost:0.0}");
         Require(earnings.Where(e => e.Tool).All(e => e.PerDay >= 4 * cost), "a worker in a steel tool chain should earn at least four times their pay");
         Require(earnings.Where(e => !e.Tool && e.Depth > 0).All(e => e.PerDay >= 1.5f * cost), "a cook should earn at least half as much again as their pay");
-        foreach (var chain in earnings.GroupBy(e => e.Tool)) {
-            var ladder = chain.ToList();
+        foreach (var group in earnings.GroupBy(e => e.Tool)) {
+            var ladder = group.ToList();
             for (int i = 1; i < ladder.Count; i++)
                 Require(ladder[i].Depth == ladder[i - 1].Depth || ladder[i].PerDay > ladder[i - 1].PerDay, $"{ladder[i].Item} has a longer chain and should earn more per worker-day than {ladder[i - 1].Item}");
         }

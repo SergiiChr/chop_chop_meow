@@ -109,7 +109,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         var bellows = world.Add(ThingKind.Reinforced, Terrain.Spawn + new Vector2(6, 1)); bellows.Inventory.Add("iron_bar", 12); bellows.Inventory.Add("coal", 20); bellows.Burner!.Add("coal", 10); bellows.Heat = 100;
         var chest = world.Add(ThingKind.Chest, Terrain.Spawn + new Vector2(2, 3)); chest.Inventory.Add("wood", 35); chest.Inventory.Add("coal", 30); chest.Inventory.Add("iron_bar", 15);
         world.Add(ThingKind.Anvil, Terrain.Spawn + new Vector2(4, 4)); var sign = world.Add(ThingKind.Signpost, Terrain.Spawn + new Vector2(-1, 4));
-        world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add("water", 4); world.S.Backpack.Add("steel_pick", 1);
+        world.S.Backpack.Add(Inventory.Coins, 140); world.S.Hunger = 55; world.S.Thirst = 30; world.S.Backpack.Add(Water.Full, 4); world.S.Backpack.Add("steel_pick", 1);
         var bench = world.Add(ThingKind.Bench, Terrain.Spawn + new Vector2(-4, 1.5f)); world.SetRecipe(bench, "crate"); bench.Inventory.Add("planks", 12); bench.Tools!.Add("stone_chisel", 1); bench.Tools.Add("steel_hammer", 1);
         var rack = world.Add(ThingKind.Toolstation, Terrain.Spawn + new Vector2(-5, -1.5f)); rack.Inventory.Add("steel_axe", 1); rack.Inventory.Add("rake", 1); rack.Inventory.Add("steel_shovel", 1);
         world.Add(ThingKind.Leaves, Terrain.Spawn + new Vector2(-3.5f, 5), World.LeafPatch);
@@ -188,6 +188,11 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             world.Player = at + new Vector2(6, 2.5f); world.Tick(0); view.Zoom = 1.2f;
             if (Launch.Has("--panel")) panel.Select(world.Things.Last(t => t.Kind == ThingKind.Farm)); else panel.Close();
         }
+        if (Launch.Has("--cabin")) {
+            // The cabin's page at bedtime, wounded but fed: what a night's sleep would leave.
+            world.S.Time = world.Data.DaySeconds * (World.SleepHour - 6 + .5f) / 24; world.S.Health = 40; world.S.Hunger = 80; world.S.Thirst = 70;
+            world.Player = hut.Pos + new Vector2(1, 2); world.Tick(0); view.Zoom = 1.7f; panel.Select(hut);
+        }
         if (Launch.Has("--kitchen")) {
             // The cooking table mid-stew beside a canning station sealing cans, with the mortar slotted.
             // --grind has the player at the table instead, grinding wheat with its mortar.
@@ -198,7 +203,7 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
             if (grind) {
                 table.Inventory.Add("wheat", 20); world.S.Making = ""; world.S.Crafting.Clear();
             } else {
-                table.Inventory.Add("water", 2); table.Inventory.Add("raw_meat", 2); table.Burner!.Add("wood", 2);
+                table.Inventory.Add(Water.Liquid, 2); table.Inventory.Add("raw_meat", 2); table.Burner!.Add("wood", 2);
             }
             var cannery = world.Add(ThingKind.Cannery, at + new Vector2(2.2f, 0)); world.SetRecipe(cannery, "canned_meat_stew");
             cannery.Inventory.Add("meat_stew", 2); cannery.Inventory.Add("tin_can", 2); cannery.Burner!.Add("wood", 2);
