@@ -21,6 +21,31 @@ public static class HeldStackChecks {
         CheckAHeldStackIsLetGoOnceItsCrateIsPutDown(data);
         CheckCompostMakesNothingWhileAStackInItIsHeld(data);
         CheckACrateHeldFromAChestIsPlacedFromThere(data);
+        CheckAGuestsCommandFromTheHeldStackTakesNoMoreThanItHolds(data);
+        CheckACommandFromTheHeldStackTakesOnlyFromWhereItLies(data);
+    }
+
+    private static void CheckAGuestsCommandFromTheHeldStackTakesNoMoreThanItHolds(GameData data) {
+        var (world, guest, _) = Hosted(data);
+        var chest = world.Add(ThingKind.Chest, world.Player + Vector2.One);
+        guest.Pos = world.Player;
+        guest.Backpack.Add("wood", 10);
+        world.Run(guest, new Command(Verb.Hold, 0, 4, "wood", SlotOf(guest.Backpack, "wood"), default));
+        world.Run(guest, new Command(Verb.Transfer, 0, world.Locate(chest.Inventory), "wood", 10, new Vector2(-1, -1), Held: true));
+        Require(chest.Inventory["wood"] == 4 && guest.Backpack["wood"] == 6 && world.As(guest, () => world.Held) == null,
+            "a guest's move of 10 marked \"from held stack\" should store only the 4 wood held, and hold nothing after");
+    }
+
+    private static void CheckACommandFromTheHeldStackTakesOnlyFromWhereItLies(GameData data) {
+        var world = EmptyWorld(data);
+        var chest = world.Add(ThingKind.Chest, world.Player + Vector2.One);
+        var other = world.Add(ThingKind.Chest, world.Player + new Vector2(-1, 1));
+        Give(world, "wood", 8);
+        world.Transfer(world.Backpack, chest.Inventory, "wood", 4);
+        world.Hold(chest.Inventory, 0, 4);
+        world.FromHeldStack(() => world.Transfer(world.Backpack, other.Inventory, "wood", 4));
+        Require(other.Inventory["wood"] == 0 && world.Backpack["wood"] == 4 && world.Held is { Count: 4 },
+            "a move from the backpack marked \"from held stack\" should do nothing while the stack is held in a chest, rather than move the backpack's wood");
     }
 
     private static void CheckACrateHeldFromAChestIsPlacedFromThere(GameData data) {
@@ -29,7 +54,10 @@ public static class HeldStackChecks {
         Give(world, "crate", 2);
         world.Transfer(world.Backpack, chest.Inventory, "crate", 2);
         world.Hold(chest.Inventory, SlotOf(chest.Inventory, "crate"), 2);
-        Require(world.PlaceCrate("crate", world.Player + new Vector2(2, 0)) != null, "a crate held from a chest should go down on open ground");
+        var spot = world.Player + new Vector2(2, 0);
+        Require(world.PlaceCrate("crate", spot) == null, "a crate placed without the mark \"from held stack\" should come only from the backpack, which has none");
+        world.FromHeldStack(() => world.PlaceCrate("crate", spot));
+        Require(world.Things.Count(t => t.Kind == ThingKind.Crate) == 1, "a crate held from a chest should go down on open ground");
         Require(chest.Inventory["crate"] == 1 && world.Held is { Item: "crate", Count: 1 }, "the crate should come from the chest, the other still held");
     }
 
@@ -60,7 +88,7 @@ public static class HeldStackChecks {
         var world = EmptyWorld(data);
         Give(world, "crate", 1); Give(world, "wood", 10);
         world.Hold(world.Backpack, SlotOf(world.Backpack, "wood"), 5);
-        world.MoveInCrate(0, "wood", int.MaxValue, true);
+        world.FromHeldStack(() => world.MoveInCrate(0, "wood", int.MaxValue, true));
         string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
         Require(world.Packed(packed)!["wood"] == 5 && world.Backpack["wood"] == 5 && world.Held == null,
             "five held wood put on an empty crate should pack just those five");
@@ -96,10 +124,10 @@ public static class HeldStackChecks {
         world.Transfer(world.Backpack, chest.Inventory, "wood", 10);
         Give(world, "wood", 60);
         world.Hold(world.Backpack, SlotOf(world.Backpack, "wood"), 60);
-        world.PutDown(chest.Inventory, 0, 60);
+        PutDown(world, chest.Inventory, 0, 60);
         Require(chest.Inventory.Layout[0].Count == 64 && world.Held is { Count: 6 } && world.Backpack["wood"] == 6,
             "a held 60 wood put on a chest slot of 10 should fill it to 64 and keep 6 held");
-        world.PutDown(chest.Inventory, 1, 1);
+        PutDown(world, chest.Inventory, 1, 1);
         Require(chest.Inventory.Layout[1] is { Item: "wood", Count: 1 } && world.Held is { Count: 5 }, "putting down one should place one and keep the rest held");
     }
 
@@ -108,7 +136,7 @@ public static class HeldStackChecks {
         Give(world, "wood", 5); Give(world, "stone", 3);
         int wood = SlotOf(world.Backpack, "wood"), stone = SlotOf(world.Backpack, "stone");
         world.Hold(world.Backpack, wood, 5);
-        world.PutDown(world.Backpack, stone, 5);
+        PutDown(world, world.Backpack, stone, 5);
         Require(world.Backpack.Layout[stone].Item == "wood" && world.Backpack.Layout[wood].Item == "stone" && world.Held == null,
             "a whole held stack put on another item's slot should swap the two and hold nothing");
     }
@@ -122,7 +150,7 @@ public static class HeldStackChecks {
         world.Hold(chest.Inventory, 0, 8);
         world.Run(guest, new Command(Verb.Transfer, world.Locate(chest.Inventory), 0, "coal", 8, new Vector2(-1, -1)));
         world.Run(guest, new Command(Verb.Hold, world.Locate(chest.Inventory), 8, "coal", 0, default));
-        Require(guest.Backpack["coal"] == 0 && guest.HeldStack == null && chest.Inventory.Layout[0].Count == 8,
+        Require(guest.Backpack["coal"] == 0 && world.As(guest, () => world.Held) == null && chest.Inventory.Layout[0].Count == 8,
             "another player should neither take nor pick up a stack someone holds");
         Require(heard.Count(m => m == World.HeldByAnother) == 2, $"the other player should be told why, each time: {string.Join(" | ", heard)}");
     }
@@ -149,10 +177,10 @@ public static class HeldStackChecks {
         world.Player = furnace.Pos + Vector2.One;
         Give(world, "iron_ore", 10); Give(world, "stone", 5);
         world.Hold(world.Backpack, SlotOf(world.Backpack, "iron_ore"), 10);
-        world.PutDown(furnace.Inventory, -1, 10);
+        world.FromHeldStack(() => world.LoadInput(furnace, "iron_ore", 10));
         Require(furnace.Inventory["iron_ore"] == 10 && world.Held == null, "held iron ore put on a furnace smelting iron should load its input slot");
         world.Hold(world.Backpack, SlotOf(world.Backpack, "stone"), 5);
-        world.PutDown(furnace.Inventory, -1, 5);
+        world.FromHeldStack(() => world.LoadInput(furnace, "stone", 5));
         Require(furnace.Inventory["stone"] == 0 && world.Held is { Item: "stone", Count: 5 }, "stone the recipe does not use should stay held");
     }
 
@@ -167,7 +195,7 @@ public static class HeldStackChecks {
         world.Tick(.1f);
         Require(world.Held == null && chest.Inventory["wood"] == 12, "walking out of reach should let go of a stack held from a chest");
         world.Run(guest, new Command(Verb.Hold, world.Locate(chest.Inventory), 12, "wood", 0, default));
-        Require(guest.HeldStack is { Count: 12 }, "the guest should hold the chest's wood");
+        Require(world.As(guest, () => world.Held) is { Count: 12 }, "the guest should hold the chest's wood");
         world.Depart(GuestId);
         Require(chest.Inventory["wood"] == 12, "a player who leaves should let go of what they held");
     }

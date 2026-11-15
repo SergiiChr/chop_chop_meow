@@ -21,6 +21,8 @@ public sealed class PlayerState {
     public Inventory Backpack { get; set; } = new() { Slots = 24 };
     public List<string> HotbarSlots { get; set; } = new() { "steel_axe", "steel_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", "water" };
     public int ActiveHotbar { get; set; }
+    /// <summary>A tool selected in hand from the backpack without a hotbar slot, or empty; while one is, no hotbar slot is selected.</summary>
+    public string InHand { get; set; } = "";
     /// <summary>Recipes waiting in the personal crafting menu, one entry per recipe in the order first queued; their inputs are already taken from the backpack.</summary>
     [JsonConverter(typeof(QueueJson))] public List<Queued> Crafting { get; set; } = new();
     /// <summary>The hand recipe being made now, taken off the queue when work on it started, or empty.</summary>
@@ -41,7 +43,7 @@ public sealed class PlayerState {
     public int GatherTarget { get; set; }
     /// <summary>The item selected on the hotbar, which shows in the player's hand, so other machines can show it.</summary>
     public string Selected { get; set; } = "";
-    /// <summary>The stack this player holds on the cursor, or null; set by the server, so the player's own machine shows it.</summary>
+    /// <summary>The stack this player holds on the cursor, or null, for their own window to show; the server builds it from <see cref="HeldSlot"/> each time it sends the player.</summary>
     public HeldStack? HeldStack { get; set; }
     /// <summary>Moving with Shift held, which drains food and drink faster; carried so other machines show the run.</summary>
     public bool Sprinting { get; set; }
@@ -58,7 +60,7 @@ public sealed class PlayerState {
     internal float Still;
     internal bool Busy, PackAttack;
     internal readonly List<float> TorchSwings = new();
-    /// <summary>The cell <see cref="HeldStack"/> lies in, which keeps its identity when a swap or a sort moves it.</summary>
+    /// <summary>Server: the inventory and slot the held stack lies in; the slot keeps its identity when a swap or a sort moves it.</summary>
     internal Inventory? HeldBox;
     internal Inventory.Slot? HeldSlot;
 }
@@ -67,13 +69,14 @@ public sealed class PlayerState {
 /// A stack a player holds on the cursor.
 /// Its units stay in their cell, <see cref="Slot"/> of the inventory that <see cref="Box"/> names as <see cref="World.Locate"/> does, and nobody else can take them.
 /// </summary>
-public sealed record HeldStack(int Box, int Slot, string Item, int Count);
+public readonly record struct HeldStack(int Box, int Slot, string Item, int Count);
 
 /// <summary>The player actions a guest sends to the host.</summary>
-public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, Hold, Leave, LoadBatch, LoadFuel, LoadInput, MoveInCrate, PickUp, PickUpCrate, PlaceCrate, Pump, PutDown, QueueBatch, Release, SelectHotbar, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, Unqueue, UnslotTool }
+public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, Hold, Leave, LoadBatch, LoadFuel, LoadInput, MoveInCrate, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, Release, SelectHotbar, SelectInHand, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, Unqueue, UnslotTool }
 
 /// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
-public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At);
+/// <remarks><see cref="Held"/> is the mark "from held stack": the command takes its units from the player's held stack (<see cref="World.FromHeldStack"/>).</remarks>
+public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At, bool Held = false);
 
 /// <summary>The players in the world and the guest side of actions.</summary>
 public sealed partial class World {
@@ -116,24 +119,38 @@ public sealed partial class World {
         public void Dispose() { world.S.Actor = actor; world.everyone = everyone; }
     }
 
-    /// <summary>In a guest's copy, sends the action to the host and tells the caller to stop.</summary>
+    /// <summary>
+    /// In a guest's copy, sends the action to the host and tells the caller to stop.
+    /// On the server, an action marked "from held stack" goes through the same checks a guest's does first, and comes back here unmarked to run.
+    /// </summary>
     private bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
-        Host?.Invoke(new Command(verb, target, other, item, count, at));
-        return Host != null;
+        var c = new Command(verb, target, other, item, count, at, fromHeld);
+        if (Host != null) { Host(c); return true; }
+        if (!fromHeld) return false;
+        fromHeld = false;
+        RunFromHeld(c);
+        return true;
     }
 
     /// <summary>Selects a hotbar slot; the server keeps it, so a save has it.</summary>
     public void SelectHotbar(int slot) {
         if (slot is < 0 or > 8) return;
-        S.ActiveHotbar = slot;
+        S.ActiveHotbar = slot; S.InHand = "";
         Forwarded(Verb.SelectHotbar, count: slot);
     }
 
     /// <summary>Puts an item, or nothing, in a hotbar slot and selects that slot; the server keeps it, so a save has it.</summary>
     public void SetHotbar(int slot, string item) {
         if (slot is < 0 or > 8) return;
-        S.HotbarSlots[slot] = item; S.ActiveHotbar = slot;
+        S.HotbarSlots[slot] = item; S.ActiveHotbar = slot; S.InHand = "";
         Forwarded(Verb.SetHotbar, count: slot, item: item);
+    }
+
+    /// <summary>Selects a carried tool in hand without a hotbar slot; the server keeps it, so a save has it.</summary>
+    public void SelectInHand(string tool) {
+        if (!(Data.Items.TryGetValue(tool, out var def) && def.Tool != "") || S.Backpack[tool] == 0) return;
+        S.InHand = tool;
+        Forwarded(Verb.SelectInHand, item: tool);
     }
 
     /// <summary>Remembers in the save that its owner has seen the ending.</summary>
@@ -143,7 +160,9 @@ public sealed partial class World {
     }
 
     /// <summary>Host: runs a guest's action as that guest. The action checks reach and costs as it does for the host.</summary>
-    public void Run(PlayerState p, Command c) => As(p, () => {
+    public void Run(PlayerState p, Command c) => As(p, () => { if (c.Held) RunFromHeld(c); else Dispatch(c); });
+
+    private void Dispatch(Command c) {
         var t = Find(c.Target);
         var w = S.Workers.Find(w => w.Id == c.Other);
         switch (c.Verb) {
@@ -158,16 +177,18 @@ public sealed partial class World {
             case Verb.CancelCraft: CancelCraft(c.Item, c.Count); break;
             case Verb.Transfer:
                 if (Resolve(c.Target) is Inventory from && Resolve(c.Other) is Inventory to) {
-                    from.PreferredSlot = c.At.Y == -1 ? (int)c.At.X : -1;
-                    try { Transfer(from, to, c.Item, c.Count); } finally { from.PreferredSlot = -1; }
+                    // Without a slot named, the slot already first in line stays first, such as a held stack's.
+                    int first = from.PreferredSlot;
+                    if (c.At.Y == -1 && c.At.X >= 0) from.PreferredSlot = (int)c.At.X;
+                    try { Transfer(from, to, c.Item, c.Count); } finally { from.PreferredSlot = first; }
                 }
                 break;
             case Verb.TransferSlot: if (Resolve(c.Target) is Inventory slotFrom && Resolve(c.Other) is Inventory slotTo) TransferSlot(slotFrom, slotTo, (int)c.At.X, (int)c.At.Y, c.Item, c.Count); break;
             case Verb.SortBag: SortBackpack(); break;
             case Verb.Hold: if (Resolve(c.Target) is Inventory box && (uint)c.Count < (uint)box.Layout.Count && box.Layout[c.Count].Item == c.Item) Hold(box, c.Count, c.Other); break;
-            case Verb.PutDown: if (Resolve(c.Target) is Inventory into && S.Actor.HeldStack?.Item == c.Item) PutDown(into, c.Count, c.Other); break;
             case Verb.Release: Release(); break;
             case Verb.SelectHotbar: SelectHotbar(c.Count); break;
+            case Verb.SelectInHand: SelectInHand(c.Item); break;
             case Verb.SetHotbar: SetHotbar(c.Count, c.Item); break;
             case Verb.EndingShown: MarkEndingShown(); break;
             case Verb.SkipMorning: SkipMorning(); break;
@@ -206,7 +227,7 @@ public sealed partial class World {
             case Verb.FetchPrices: FetchPrices(t); break;
             case Verb.Hire: if (c.Count >= 0 && c.Count < Data.HireOffers.Count) Hire(t, Data.HireOffers[c.Count]); break;
         }
-    });
+    }
 
     /// <summary>
     /// An inventory as a number another machine can look up: 0 is the acting player's backpack, otherwise its holder's id and which of its boxes.

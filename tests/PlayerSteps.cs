@@ -13,6 +13,15 @@ internal static class PlayerSteps {
     /// <summary>The slot of a building's inventory a stack of an item lies in, or -1.</summary>
     public static int SlotOf(Inventory box, string item) => box.Layout.FindIndex(s => s.Item == item);
 
+    /// <summary>Puts units of the held stack into storage, as a storage slot does: into slot <paramref name="slot"/>, or with -1 wherever the inventory takes them.</summary>
+    public static void PutDown(World world, Inventory to, int slot, int count) => world.FromHeldStack(() => {
+        if (world.Held is not HeldStack held || world.HeldBox is not Inventory from) return;
+        if (slot >= 0) world.TransferSlot(from, to, held.Slot, slot, held.Item, count); else world.Transfer(from, to, held.Item, count);
+    });
+
+    /// <summary>Puts units of the held stack into a backpack slot.</summary>
+    public static void PutDown(World world, InventoryView to, int slot, int count) => PutDown(world, to.Inventory, slot, count);
+
     /// <summary>Fills a crate at the player's feet and picks it up, returning the packed crate item now in the backpack.</summary>
     public static string PackCrate(World world, params (string Item, int Count)[] goods) {
         var crate = world.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));

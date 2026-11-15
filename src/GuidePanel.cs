@@ -23,7 +23,7 @@ public partial class GuidePanel(PageTools tools) : PagePanel(tools) {
             ("key:1–9", "Select a hotbar slot. Put a held item or plan on a slot to assign it; RMB on a slot empties it."),
             ("key:B", "Building plans."), ("key:Tab", "Backpack."), ("key:C", "Crafting."), ("key:H", "Your crew."), ("key:I", "This guide."),
             ("key:LMB on a slot", "Pick up its stack, or put down the held stack. RMB picks up half, or puts down one."),
-            ("key:Double LMB", "Use an item: eat, drink, light a torch, or open a crate as storage."),
+            ("key:Double LMB", "Use an item: eat, drink, light a torch, open a crate as storage, or take a tool in hand."),
             ("key:Shift / Ctrl", "Move the stack clicked, or all of that item, to the other storage open."),
             ("key:Drag", "Drag an empty spot on a panel or the backpack to move it."),
             ("key:F5 · F9", "Quick save and load."),

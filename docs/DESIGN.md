@@ -106,7 +106,7 @@ UI and input:
 | `src/Grid.cs` | Draws the icon-slot grids |
 | `src/ItemSlot.cs` | The cream item slot, which tells a click, a right click and a double click apart and shakes on a refusal |
 | `src/HeldCursor.cs` | `HeldCursor`, the held stack or building plan drawn by the mouse, and `SlotInput`, what each click does on an item slot |
-| `src/HeldStacks.cs` | `World`'s held stacks: picking up, putting down by the rules of where they land, letting go, and the lock on held units |
+| `src/HeldStacks.cs` | `World`'s held stacks: picking up, running commands marked "from held stack", letting go, and the lock on held units |
 | `src/StationPanel.cs` | A station's page: recipe board, process row, bellows and jobs, with its tool slots in a window beside it |
 | `src/StationSlots.cs` | `StationSlots`: a building's item slots and a station's process row |
 | `src/CraftPanel.cs` | The crafting menu |
@@ -635,10 +635,12 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
 - LMB picks up the slot's stack onto the cursor, a held stack; RMB picks up half of it.
 - With a stack held, LMB puts it down on the slot clicked and RMB puts down one; what does not fit stays held.
   On another item's slot in the same inventory the two swap; back on its own slot LMB lets go of it.
-- A held stack lands by the rules of where it is put, as `World.PutDown` routes it: a station's input slot takes only its inputs from the backpack, a fuel slot its fuels, a mine what it still needs, a tool slot its tool.
+- A held stack lands by the rules of where it is put: each slot sends its own command, the one its Shift- or Ctrl-click sends, with the mark "from held stack" (`World.FromHeldStack`, `Command.Held`, `ItemMoves.PutDown`).
+  A station's input slot sends `LoadInput`, a fuel slot `LoadFuel`, a mine's input slot `SupplyMine`, a tool slot `SlotTool`, a crate's contents `MoveInCrate`, and storage `TransferSlot` or `Transfer`.
+  The server runs a marked command only when the held stack lies where the command takes from, and on no more than it holds.
   A slot that refuses shakes (`ItemSlot.Shake`), and the stack stays held.
 - Shift-click moves the stack clicked to the other inventory open, and Ctrl-click all of that item.
-- A double click uses an item (`PagePanel.UseFromBag`, `Hotbar`): eats, drinks, lights a torch or opens a crate as storage.
+- A double click uses an item (`PagePanel.UseFromBag`, `Hotbar`): eats, drinks, lights a torch, opens a crate as storage or selects a tool (`Hotbar.SelectTool`): on its hotbar slot, or in hand (`World.SelectInHand`, `PlayerState.InHand`) with no slot selected.
   On a slot with a use, a single click waits `SlotInput.DoubleClickMs` (200 ms) before it picks up, so the two can be told apart; recipe cards use the same time.
 - A slot acts when the button comes up, as a plain button does, so a page that draws itself again never takes the slot away under a press.
 - Esc, a click on open ground or on the interface anywhere but an item slot, or closing the side panel lets go of the held stack (`HeldCursor`).
@@ -649,7 +651,8 @@ Input rule for every item slot, in the backpack, storage and stations alike (`Sl
 A held stack never leaves its slot until it is put down (`Inventory.Slot.Held`, `HeldBy`).
 Totals still count it, but `Inventory.Remove`, `TransferTo` and `Has` take only units nobody holds, so other players, workers and haulers cannot take it, and a station holding one starts no batch (`World.Stocked`).
 Another player who tries is told so (`World.HeldByAnother`).
-The server keeps each player's held stack (`PlayerState.HeldStack`) and lets go of it when the player is down, walks out of reach of the building it lies in, or leaves; a load starts with nothing held.
+The server keeps only the slot each player's held stack lies in (`PlayerState.HeldSlot`), and builds the `PlayerState.HeldStack` a window shows from it each time it sends the player (`World.ShareHeldStacks`).
+It lets go of the stack when the player is down, walks out of reach of the building it lies in, or leaves, and when its crate is put down or sold; a load starts with nothing held.
 
 A worker's hands (`Worker.Bag`) work like a crate: `Worker.BagStack` (5) items in all, one stack or up to five kinds; `Worker.Hands` widens them for a full mine or market stack.
 

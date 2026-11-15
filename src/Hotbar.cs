@@ -94,7 +94,7 @@ public partial class Hotbar : PanelContainer {
             var button = Buttons[slot];
             string id = HotbarId(slot);
             int count = world.Backpack[id];
-            bool active = world.ActiveHotbar == slot;
+            bool active = world.InHand == "" && world.ActiveHotbar == slot;
             var shown = (id, count, active);
             if (shownSlots[slot] == shown) continue;
             shownSlots[slot] = shown;
@@ -119,8 +119,9 @@ public partial class Hotbar : PanelContainer {
     }
     private static readonly string[] DrinkingBottles = { "water_1", "water_2", "water", "empty_bottle" };
 
+    /// <summary>The item selected: the tool in hand, or else the item on the selected hotbar slot; null for none.</summary>
     public string? ActiveItem() {
-        string id = HotbarId(world.ActiveHotbar);
+        string id = world.InHand != "" ? world.InHand : HotbarId(world.ActiveHotbar);
         return world.Data.Items.ContainsKey(id) ? id : null;
     }
 
@@ -149,11 +150,13 @@ public partial class Hotbar : PanelContainer {
         return true;
     }
 
-    /// <summary>Selects the slot that holds an item, or says that none does.</summary>
-    public void SelectItem(string item) {
-        int slot = world.HotbarSlots.ToList().IndexOf(item);
-        if (slot < 0) kit.Notify($"Put the {world.Data.Name(item).ToLowerInvariant()} on the hotbar to use it.");
-        else Select(slot);
+    /// <summary>Selects a carried tool: the hotbar slot that holds it, or else the tool in hand with no slot selected.</summary>
+    public void SelectTool(string tool) {
+        int slot = world.HotbarSlots.ToList().IndexOf(tool);
+        if (slot >= 0) { Select(slot); return; }
+        panel.Player.Mode = new ClickMode.Normal();
+        world.SelectInHand(tool);
+        kit.Refresh();
     }
 
     /// <summary>Selects a hotbar slot, which puts its item in the player's hand; building plans and crates go straight to placement, everything else waits for a left click in the world.</summary>

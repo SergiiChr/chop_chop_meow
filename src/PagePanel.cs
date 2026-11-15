@@ -76,8 +76,8 @@ public abstract partial class PagePanel : VBoxContainer {
     /// Shows the backpack drawer with a grid that works with the open page: <paramref name="batch"/> is what a Ctrl- or Shift-click on a stack does there, and <paramref name="wanted"/> lights up what the page takes.
     /// A double click uses an item, as on the backpack's own page.
     /// </summary>
-    protected void BagGrid(Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null) {
-        panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, batch, hint, takes, wanted, BagColumns, use: UseFromBag));
+    protected void BagGrid(Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null, Action<int, string, int>? put = null) {
+        panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, batch, hint, takes, wanted, BagColumns, use: UseFromBag, put: put));
         panel.Bag.Visible = !panel.Bag.Dismissed;
         if (StoresFromHotbar) panel.Bag.Store = batch;
     }
@@ -97,6 +97,6 @@ public abstract partial class PagePanel : VBoxContainer {
     /// A double click on a backpack item: eats or drinks it, lights a torch, opens a crate as storage, or selects a tool on the hotbar.
     /// </summary>
     protected void UseFromBag(string id) {
-        if (!panel.Hotbar.UseItem(id) && world.Data.Items.TryGetValue(id, out var def) && def.Tool != "") panel.Hotbar.SelectItem(id);
+        if (!panel.Hotbar.UseItem(id) && world.Data.Items.TryGetValue(id, out var def) && def.Tool != "") panel.Hotbar.SelectTool(id);
     }
 }

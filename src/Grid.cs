@@ -30,7 +30,7 @@ public partial class PagePanel {
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// With <paramref name="wanted"/>, stacks it names are rimmed in orange and the rest fade, so what the open page takes stands out.
     /// </summary>
-    protected GridContainer NewInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52, Action<string>? use = null, Action<int, int>? put = null) {
+    protected GridContainer NewInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52, Action<string>? use = null, Action<int, string, int>? put = null) {
         var grid = NewGrid(columns);
         if (size < 52) { grid.AddThemeConstantOverride("h_separation", 8); grid.AddThemeConstantOverride("v_separation", 8); }
         var stacks = new (string Item, int Count)?[inventory().Slots];
@@ -50,7 +50,7 @@ public partial class PagePanel {
                 Pick = () => stacks[slot] != null ? (inventory(), slot) : null,
                 // A building's own rules answer at once, so a slot that will not take the stack shakes.
                 Takes = takes ?? (held => held.Stack is HeldStack stack && (container == null || world.BoxBlock(container, inventory(), stack.Item) == null)),
-                Put = (_, units) => kit.Run(() => { if (put != null) put(slot, units); else moves.PutDown(inventory(), slot, units, container); }),
+                Put = (_, units) => kit.Run(() => moves.PutDown(inventory(), slot, units, container, put == null ? null : (item, count) => put(slot, item, count))),
                 Batch = On(batch),
                 Use = On(use),
             };

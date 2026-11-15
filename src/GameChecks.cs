@@ -1001,6 +1001,21 @@ public partial class Game {
         int active = world.ActiveHotbar;
         world.SetHotbar(7, before); world.SelectHotbar(active); Give(Hosted, "berries", carried - 1); await Frames();
     }
+    /// <summary>A double click on a tool in the backpack that no hotbar slot holds takes it in hand with no slot selected, until a number key selects a slot.</summary>
+    private async Task CheckDoubleClickTakesAToolOffTheHotbarInHand() {
+        await CloseWithEsc();
+        int active = world.ActiveHotbar;
+        Give(Hosted, "steel_shovel", 1);
+        Require(!world.HotbarSlots.Contains("steel_shovel"), "The default hotbar must not hold a shovel for this check.");
+        await KeyStroke(Key.Tab);
+        await DoubleClick(BagCell(c => c.TooltipText.StartsWith("Steel shovel")));
+        await Until(() => world.InHand == "steel_shovel" && hotbar.ActiveItem() == "steel_shovel", "a double click on the shovel taking it in hand", 2);
+        Require(world.HotbarSlots.All(id => id != "steel_shovel"), "Taking a tool in hand must not put it on the hotbar.");
+        await CloseWithEsc();
+        await KeyStroke(Key.Key2);
+        await Until(() => world.InHand == "" && world.ActiveHotbar == 1 && hotbar.ActiveItem() == world.HotbarSlots[1], "key 2 selecting its slot instead of the shovel in hand", 2);
+        Drop(Hosted, "steel_shovel"); world.SelectHotbar(active); await Frames();
+    }
     /// <summary>
     /// A held stack goes into a chest clicked in the world, and back to its cell on Esc or a click on open ground;
     /// with nothing held, an item only selected on the hotbar stays out of a clicked chest.
@@ -1852,6 +1867,7 @@ public partial class Game {
             await Test(CheckEmptiedCrateGivesWayToTheBackpack);
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
             await Test(CheckHotbarDoubleClickUsesAndRightClickEmpties);
+            await Test(CheckDoubleClickTakesAToolOffTheHotbarInHand);
             await Test(CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround);
             await Test(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
             await Test(CheckHeldPlanPlacesOnOpenGround);

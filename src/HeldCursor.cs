@@ -17,7 +17,7 @@ public partial class HeldCursor : Control {
     /// <summary>The building plan on the cursor, or null.</summary>
     public string? Plan { get; private set; }
     /// <summary>The held stack, or null.</summary>
-    public HeldStack? Stack => world.Me.HeldStack;
+    public HeldStack? Stack => world.Held;
     public bool Empty => Plan == null && Stack == null;
     /// <summary>The item or plan on the cursor, or null.</summary>
     public string? Item => Plan ?? Stack?.Item;
@@ -50,8 +50,11 @@ public partial class HeldCursor : Control {
         if (Stack != null) world.Release();
     }
 
-    /// <summary>Puts <paramref name="units"/> of the held stack into a slot, or with -1 wherever the inventory takes them.</summary>
-    public void PutDown(Inventory box, int slot, int units) => world.PutDown(box, slot, units);
+    /// <summary>Puts <paramref name="units"/> of the held stack back in its own slot, which lies in <paramref name="box"/>: all of them lets go of it, fewer keep the rest held.</summary>
+    public void PutBack(Inventory box, int slot, int units) {
+        if (Stack is not HeldStack held) return;
+        if (units >= held.Count) world.Release(); else world.Hold(box, slot, held.Count - units);
+    }
 
     /// <summary>Whether the held stack lies in this slot.</summary>
     public bool From(Inventory box, int slot) => Stack is HeldStack held && held.Slot == slot && world.Locate(box) == held.Box;
@@ -134,7 +137,7 @@ public sealed class SlotInput(HeldCursor cursor) {
 
     private void PutDown(ItemSlot cell, int units) {
         // Back on its own slot, whatever the slot takes: a left click lets go of the stack and a right click puts one back.
-        if (cursor.Stack is HeldStack && Pick?.Invoke() is (Inventory box, int slot) && cursor.From(box, slot)) { cursor.PutDown(box, slot, units); return; }
+        if (cursor.Stack is HeldStack && Pick?.Invoke() is (Inventory box, int slot) && cursor.From(box, slot)) { cursor.PutBack(box, slot, units); return; }
         if (Takes?.Invoke(cursor) != true || Put == null) { cell.Shake(); return; }
         Put(cursor, units);
     }

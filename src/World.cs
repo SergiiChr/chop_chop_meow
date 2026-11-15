@@ -284,6 +284,7 @@ public sealed class SaveState {
     [JsonIgnore] public bool TorchLit { get => Actor.TorchLit; set => Actor.TorchLit = value; }
     [JsonIgnore] public float TorchKindling { get => Actor.TorchKindling; set => Actor.TorchKindling = value; }
     [JsonIgnore] public int ActiveHotbar { get => Actor.ActiveHotbar; set => Actor.ActiveHotbar = value; }
+    [JsonIgnore] public string InHand { get => Actor.InHand; set => Actor.InHand = value; }
     [JsonIgnore] public float RespawnIn { get => Actor.RespawnIn; set => Actor.RespawnIn = value; }
     [JsonIgnore] public bool Mauled { get => Actor.Mauled; set => Actor.Mauled = value; }
     [JsonIgnore] public int Sheltered { get => Actor.Sheltered; set => Actor.Sheltered = value; }
@@ -416,6 +417,8 @@ public sealed partial class World {
     public bool Mauled => S.Mauled;
     public int Sheltered => S.Sheltered;
     public int ActiveHotbar => S.ActiveHotbar;
+    /// <summary>The tool selected in hand without a hotbar slot, or empty.</summary>
+    public string InHand => S.InHand;
     public ListView<string> HotbarSlots => new(S.HotbarSlots);
     /// <summary>Hand recipes waiting to be made, one entry per recipe.</summary>
     public ListView<Queued> Crafting => new(S.Crafting);
@@ -737,7 +740,7 @@ public sealed partial class World {
         if (!CanStand(p) || Terrain.InLake(p, .8f)) return "Choose dry, open ground.";
         foreach (var t in S.Things)
             if (!BuiltOver(t.Kind) && t.Pos.DistanceTo(p) < (t.IsResource ? Footprint(kind) + ResourceRoom : Footprint(kind) + Footprint(t.Kind) + .45f) && (t.Remaining > 0 || !t.IsResource)) return "Leave room around resources and buildings.";
-        if (crate ? item != null && S.Backpack[item] == 0 && S.Actor.HeldStack?.Item != item : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
+        if (crate ? item != null && (MarkedSource ?? S.Backpack)[item] == 0 : !S.Backpack.Has(Data.Buildings[kind].Cost)) return crate ? "That crate is no longer in your backpack." : "Missing materials in your backpack.";
         return null;
     }
     private string? ZoneBlock(ThingKind kind, Vector2 p) {
@@ -1391,10 +1394,7 @@ public sealed partial class World {
         if (S.Backpack["crate"] == 0) { Say("No empty crate in your backpack."); return 0; }
         if (Forwarded(Verb.MoveInCrate, 0, 1, item, quantity)) return 0;
         var contents = NewCrate();
-        int moved = 0;
-        // Put down from the cursor, no more than the held stack goes in.
-        if (S.Actor.HeldStack is { Box: 0 } held && held.Item == item) quantity = Math.Min(quantity, held.Count);
-        FromHeld(item, () => moved = S.Backpack.TransferTo(contents, item, quantity));
+        int moved = S.Backpack.TransferTo(contents, item, quantity);
         if (moved == 0) return 0;
         S.Backpack.Remove("crate", 1);
         string packed = Pack(contents);
@@ -1408,10 +1408,10 @@ public sealed partial class World {
         if (!IsCrate(item)) return null;
         if (PlacementBlock(ThingKind.Crate, p, item) is string blocked) { Say(blocked); return null; }
         if (Forwarded(Verb.PlaceCrate, item: item, at: p)) return null;
-        // A held crate goes down from wherever it is held, such as a chest; any other from the backpack.
-        if (S.Actor.HeldStack?.Item == item) Loosened((from, _, _) => from.Remove(item, 1)); else S.Backpack.Remove(item, 1);
+        // A crate put down from the held stack comes from wherever it is held, such as a chest; any other from the backpack.
+        (MarkedSource ?? S.Backpack).Remove(item, 1);
         var crate = Add(ThingKind.Crate, p); ClearGround(crate);
-        if (Packed(item) is Inventory contents) { crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
+        if (Packed(item) is Inventory contents) { ReleaseIn(contents); crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
         Play("close_chest", p); return crate;
     }
     /// <summary>Lifts a placed crate into the backpack; anything inside stays packed in it.</summary>
@@ -2616,6 +2616,7 @@ public sealed partial class World {
     private void TidyHotbar(PlayerState p) {
         p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
+        if (!(Data.Items.TryGetValue(p.InHand ?? "", out var def) && def.Tool != "")) p.InHand = "";
     }
     private bool Hand(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand;
     /// <summary>Brings the stacks of every inventory of a freshly parsed save in line with its totals.</summary>

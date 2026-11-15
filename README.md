@@ -168,7 +168,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | Mouse wheel | Zoom |
 | LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
-| Double LMB on an item | Use it: eat, drink, light a torch, or open a crate as storage |
+| Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
 | Shift-click / Ctrl-click an item slot | Move the stack clicked / all of that item to the other storage open; this applies across inventory and station panels |
 | RMB on a hotbar slot | Empty the slot |
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
@@ -200,7 +200,7 @@ Slots reference carried items or building plans; they are not extra storage.
 Consumable slots use one item, building slots enter placement, and tools select a working reference.
 A double click on a slot uses its item, as in the backpack.
 With a building's page or an opened crate showing, Shift-click or Ctrl-click on a hotbar slot moves its item there as it does in the backpack: a stack with Shift, all of it with Ctrl.
-Hotbar assignments persist in saves.
+Hotbar assignments and a tool in hand persist in saves.
 
 Building plans are an icon grid; hovering a plan shows its description and what it still needs.
 
@@ -225,7 +225,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - Esc, a click on open ground or on the interface anywhere but an item slot, closing the side panel or walking out of reach of the building it came from lets go of the held stack, which is then back in its slot.
 - A held crate or building plan over open ground goes into placement: a click places it. Back over the interface it is a held stack again.
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
-- A double click uses an item: food is eaten, a filled bottle gives one sip and keeps the bottle, a torch lights, a crate opens as storage, and a tool on the hotbar is selected there. A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
+- A double click uses an item: food is eaten, a filled bottle gives one sip and keeps the bottle, a torch lights, a crate opens as storage, and a tool is selected: on its hotbar slot, or in hand with no slot selected when it has none. A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A held stack put on storage clicked in the world, such as a chest, goes into it. An item only selected on the hotbar never does.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.

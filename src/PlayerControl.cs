@@ -207,7 +207,10 @@ public sealed class PlayerControl {
     /// </summary>
     private void Place(Vector2 at) {
         bool sent = Sent(at);
-        if (Mode is ClickMode.Crate crate) world.PlaceCrate(crate.Item, at); else world.Build(Mode.Placing!.Value, at);
+        if (Mode is not ClickMode.Crate crate) world.Build(Mode.Placing!.Value, at);
+        // A held crate goes down from the held stack, wherever it lies.
+        else if (placingHeld && cursor.Stack?.Item == crate.Item) world.FromHeldStack(() => world.PlaceCrate(crate.Item, at));
+        else world.PlaceCrate(crate.Item, at);
         if (!sent || Mode.Placing != ThingKind.Mine && CanPlaceAgain()) return;
         Mode = new ClickMode.Normal();
         // A plan on the cursor goes once nothing more can be paid for; a held crate stack runs out by itself.

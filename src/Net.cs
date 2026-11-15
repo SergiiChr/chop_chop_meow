@@ -419,7 +419,7 @@ public partial class Net : Node {
 
     /// <summary>Sends an action with where this player stands, so the host checks its reach from there rather than from a position still gliding in.</summary>
     private void Send(Command c) {
-        RpcId(ServerId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At);
+        RpcId(ServerId, MethodName.Do, ++stamp, World.Me.Pos, World.Me.Warp, (int)c.Verb, c.Target, c.Other, c.Item, c.Count, c.At, c.Held);
         answerLeft = AnswerSeconds;
     }
 
@@ -437,14 +437,14 @@ public partial class Net : Node {
     }
 
     [Rpc(MultiplayerApi.RpcMode.AnyPeer, TransferMode = MultiplayerPeer.TransferModeEnum.Reliable)]
-    private void Do(int order, Vector2 standing, int warp, int verb, int target, int other, string item, int count, Vector2 at) {
+    private void Do(int order, Vector2 standing, int warp, int verb, int target, int other, string item, int count, Vector2 at, bool held) {
         if (!Hosting || Guest() is not PlayerState p) return;
         heard[p.Id] = Math.Max(order, heard.GetValueOrDefault(p.Id));
         // The action happened where the guest stood, so it goes there at once.
         if (Stand(p, standing, warp)) using (World.ActAs(p)) World.MoveTo(standing);
         var before = new Dictionary<string, int>(p.Backpack.Items);
         int made = echoes;
-        World.Run(p, new Command((Verb)verb, target, other, item, count, at));
+        World.Run(p, new Command((Verb)verb, target, other, item, count, at, held));
         // Only moving items by hand sounds like them: not what placing things spends, or picking them up off the ground gives.
         bool placing = (Verb)verb is Verb.Build or Verb.PlaceCrate or Verb.PickUp or Verb.PickUpCrate;
         if (!placing && echoes == made && MostMoved(before, p.Backpack) is string moved) RpcId(p.Id, MethodName.Hear, Sounds.ForItem(moved), p.Pos);
@@ -562,10 +562,10 @@ public partial class Net : Node {
         // This machine walks its own player and keeps its hotbar; only a move the simulation made, such as a respawn, comes back.
         // The welcome's first update brings all of it, over the stand-in this copy started with.
         bool joining = applied.Count == 0;
-        var own = (me.Pos, me.Warp, me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Selected, me.Sprinting);
+        var own = (me.Pos, me.Warp, me.HotbarSlots, me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting);
         Sync(s.Players, EntryKey.Player, static p => p.Id, entries, true, me);
         if (!joining && me.Warp == own.Warp) me.Pos = own.Pos;
-        if (!joining) (me.HotbarSlots, me.ActiveHotbar, me.GatherTarget, me.Selected, me.Sprinting) = (own.HotbarSlots, own.ActiveHotbar, own.GatherTarget, own.Selected, own.Sprinting);
+        if (!joining) (me.HotbarSlots, me.ActiveHotbar, me.InHand, me.GatherTarget, me.Selected, me.Sprinting) = (own.HotbarSlots, own.ActiveHotbar, own.InHand, own.GatherTarget, own.Selected, own.Sprinting);
         gone.Clear();
         foreach (var o in goals.Keys) if (o is Worker w ? !s.Workers.Contains(w) : o is Wolf wolf ? !s.Wolves.Contains(wolf) : o is PlayerState p && !s.Players.Contains(p)) gone.Add(o);
         foreach (var o in gone) goals.Remove(o);

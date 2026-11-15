@@ -10,14 +10,14 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
 
     /// <summary>
     /// A slot bound to one item of an inventory: a click picks it up, and <paramref name="tooltip"/> words the amount held.
-    /// A held stack put on it goes in when <paramref name="takes"/> allows, by the rules of the inventory; with none the slot takes nothing and shakes.
+    /// A held stack put on it goes in when <paramref name="takes"/> allows, with <paramref name="put"/> or as storage without one; with no <paramref name="takes"/> the slot takes nothing and shakes.
     /// </summary>
     /// <param name="look">The slot's rim, for one other than a plain input's or an output's.</param>
-    public ItemSlot Slot(Inventory box, string item, bool input, Func<int, string> tooltip, float size = 52, StyleBoxFlat? look = null, Func<HeldCursor, bool>? takes = null) {
+    public ItemSlot Slot(Inventory box, string item, bool input, Func<int, string> tooltip, float size = 52, StyleBoxFlat? look = null, Func<HeldCursor, bool>? takes = null, Action<string, int>? put = null) {
         var (cell, count) = ItemSlot.Create($"{(input ? "input" : "output")}_{item}", size);
         cell.Icon = Icons.Of(item);
         if ((look ?? (input ? null : Style.SlotWanted)) is StyleBoxFlat rim) cell.AddThemeStyleboxOverride("normal", rim);
-        moves.TakeCell(cell, box, item, t, takes);
+        moves.TakeCell(cell, box, item, t, takes, put);
         // Redrawn only when the amount held changes.
         live.Watch(() => box[item], held => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held > 0 ? Colors.White : Style.Ghost);
@@ -64,7 +64,7 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         var burner = t.Burner!;
         var (cell, count) = ItemSlot.Create("fuel");
         cell.AddThemeStyleboxOverride("normal", Style.SlotFuel);
-        moves.TakeCell(cell, burner, burner.First, t, held => held.Stack is { Box: 0 } stack && world.FuelFits(t, stack.Item));
+        moves.TakeCell(cell, burner, burner.First, t, held => held.Stack is { Box: 0 } stack && world.FuelFits(t, stack.Item), (item, units) => world.LoadFuel(t, item, units));
         var lasts = Style.Text("", 14, Style.Ink);
         string burns = world.FuelWords(recipe.Fuels);
         var accepted = new HBoxContainer { Name = "burns", TooltipText = $"{recipe.Name} burns {burns}", MouseFilter = Control.MouseFilterEnum.Stop };
@@ -92,7 +92,8 @@ public sealed class StationSlots(UiKit kit, ItemMoves moves, LiveUpdates live, T
         var box = t.Inventory;
         string hint = input ? $"{SlotHint} · put a backpack stack here to load" : SlotHint;
         var cell = Slot(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size,
-            takes: input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || item == "water" && Water.IsBottle(stack.Item)) : null);
+            takes: input ? held => held.Stack is { Box: 0 } stack && (stack.Item == item || item == "water" && Water.IsBottle(stack.Item)) : null,
+            put: (held, units) => world.LoadInput(t, held, units));
         return Labelled(cell, perBatch);
     }
 }

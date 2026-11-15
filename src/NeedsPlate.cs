@@ -114,7 +114,7 @@ public partial class NeedsPlate : PanelContainer {
             Takes = held => held.Stack is { Box: 0, Item: Inventory.Coins },
             Put = (_, units) => {
                 if (NearPost() is not Thing post) { kit.Notify("Bank coins at a trading post."); return; }
-                kit.Run(() => world.PutDown(post.Wages!, -1, units));
+                kit.Run(() => moves.PutDown(post.Wages!, -1, units, post));
             },
             Batch = () => {
                 if (NearPost() is not Thing post) { kit.Notify("Take coins out at a trading post."); return; }
