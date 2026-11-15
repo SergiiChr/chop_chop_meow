@@ -25,12 +25,15 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
         kit.Notify("Walk closer first."); return false;
     }
 
-    /// <summary>Moves one item, the clicked stack while Shift is held, or every unit of the item while Ctrl is held.</summary>
+    /// <summary>
+    /// Moves one item, the clicked stack while Shift is held, or every unit of the item while Ctrl is held.
+    /// A Shift move takes no more than one stack of where it lands, so the bank's one unlimited stack comes out a backpack stack at a time.
+    /// </summary>
     public void Stack(Inventory from, Inventory to, string item, Thing near) {
         if (!InReach(near)) return;
         if (world.BoxBlock(near, to, item) is string refused) { kit.Notify(refused); return; }
         if (blackHole.CrateIntoCrate(near, to, item)) return;
-        world.Transfer(from, to, item, Amount(from, item));
+        world.Transfer(from, to, item, Input.IsKeyPressed(Key.Ctrl) ? Amount(from, item) : Math.Min(Amount(from, item), to.StackOf(item)));
     }
 
     /// <summary>Drops a dragged stack into an inventory and returns what did not fit; the building on either end must be within reach.</summary>

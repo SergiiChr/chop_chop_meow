@@ -208,7 +208,8 @@ public sealed partial class GameData {
         data.Validate();
         Inventory.Unstacked.Clear();
         foreach (var (id, item) in data.Items) if (item.Tool != "") Inventory.Unstacked.Add(id);
-        foreach (var id in Water.BottleItems) Inventory.Unstacked.Add(id);
+        // Each vessel takes a cell of its own, at any fill.
+        foreach (var vessel in data.Vessels) foreach (string id in vessel.States) Inventory.Unstacked.Add(id);
         return data;
     }
     private void Validate() {

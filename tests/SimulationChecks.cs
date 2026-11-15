@@ -75,6 +75,7 @@ public static class SimulationChecks {
         Test(CheckWolfThatBitesAPlayerToDeathEatsTheirFood, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
         Test(CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst, data);
+        Test(CheckBankKeepsCoinsPastAThousandAcrossASave, data);
         Test(CheckSleepNeedsFoodAndWater, data);
         Test(CheckSleepHealsOnlyWhileFed, data);
         Test(CheckSprintBurnsFood, data);
@@ -2741,6 +2742,18 @@ public static class SimulationChecks {
         sign.Inventory.Add(Inventory.Coins, 1);
         Require(!world.Sell(sign) && sign.Inventory[Inventory.Coins] == 1, "coins themselves cannot be sold");
         Require(!world.Buy(sign, Inventory.Coins, 1), "coins themselves cannot be bought");
+    }
+
+    /// <summary>A bank holding more than a stack of coins keeps them in its one cell through a save and still takes more.</summary>
+    private static void CheckBankKeepsCoinsPastAThousandAcrossASave(GameData data) {
+        var world = EmptyWorld(data);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
+        sign.Wages!.Add(Inventory.Coins, 5000);
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(world.Serialize());
+        var bank = loaded.Things.Single(t => t.Kind == ThingKind.Signpost).Wages!;
+        Require(bank[Inventory.Coins] == 5000 && bank.UsedSlots == 1, $"a loaded bank should keep its 5000 coins in one cell: {bank.UsedSlots} cells");
+        Require(bank.Add(Inventory.Coins, 12) == 12, "a loaded bank should still take sale coins");
     }
 
     private static void CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst(GameData data) {

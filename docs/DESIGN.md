@@ -75,7 +75,7 @@ Simulation and data:
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
 | `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
-| `src/Vessels.cs` | Pouring a full vessel's liquid into a station and filling empty vessels from it |
+| `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
 | `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
 | `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |

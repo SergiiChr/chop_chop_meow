@@ -114,7 +114,7 @@ public partial class NeedsPlate : PanelContainer {
         bankCup = cup; bankCount = count;
         Style.Skin(cup, Style.CupBank, Style.Round(Style.CupFill, 28).Item2);
         cup.Icon = Icons.Of(Inventory.Coins);
-        cup.TooltipText = "Coins kept at the trading posts for wages; sales land here first.\nDrop coins here at a trading post to bank them · click to take some out";
+        cup.TooltipText = "Coins kept at the trading posts for wages; sales land here.\nDrop coins here at a trading post to bank them · click to take some out";
         cup.CanTake = drag => drag.Item == Inventory.Coins && drag.From == world.S.Backpack;
         cup.Take = drag => {
             if (NearPost() is not Thing post) { kit.Notify("Bank coins at a trading post."); return drag.Count; }

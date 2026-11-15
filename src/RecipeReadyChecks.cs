@@ -1,5 +1,6 @@
 using System.Linq;
 using System.Threading.Tasks;
+using static Checks;
 using static SetupSteps;
 
 namespace ChopChopMeow;
@@ -17,6 +18,10 @@ public partial class Game {
             await Frames(2);
             await DoubleClick(Named($"craft_{id}")!);
             await ExpectStarts(station, id, "after a double-click with its items and fuel in the backpack");
+            // Water poured from bottles leaves them in the backpack, empty.
+            foreach (var (item, amount) in r.Inputs)
+                if (world.Data.VesselFor(item) is VesselDef v)
+                    Require(world.Backpack[v.Empty] == (amount + v.Capacity - 1) / v.Capacity && world.Carried(item) == 0, $"The bottles that poured {id}'s {item} must stay in the backpack, empty.");
             await CloseStation(station);
         }
     }

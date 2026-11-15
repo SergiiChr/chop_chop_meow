@@ -23,6 +23,8 @@ public static class WaterChecks {
         CheckQueuedBatchPoursWaterFromBottles(data);
         CheckQueuedBatchSaysWhatItIsMissing(data);
         CheckPileHoldsBottlesAtEveryFill(data);
+        CheckQueuedBatchCountsOnlyCarriedFuel(data);
+        CheckFullBottleQueuedForOneLiterKeepsTheRest(data);
         CheckSwitchingRecipeTakesWaterIntoBottles(data);
         CheckStationTakesBottlesForItsWater(data);
         CheckHaulerPoursWaterAndStoresTheEmptyBottle(data);
@@ -215,9 +217,18 @@ public static class WaterChecks {
         var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
         world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 2);
         EmptyBackpack(world); Give(world, Water.Empty, 1);
+        string message = ""; world.Notify = text => message = text;
         Require(world.Dismantle(table), "the table should come down");
         Require(world.Backpack[Water.TwoLiters] == 1 && world.Backpack[Water.Liquid] == 0 && world.Things.All(t => t.Inventory[Water.Liquid] == 0),
             "a dismantled station's water must fill the bottles carried");
+        var spill = new World(data, false);
+        var full = spill.Add(ThingKind.Cooktable, spill.Player + Vector2.Right);
+        spill.SetRecipe(full, "dough"); full.Inventory.Add(Water.Liquid, 5);
+        EmptyBackpack(spill); Give(spill, Water.Empty, 1);
+        string said = ""; spill.Notify = text => said = text;
+        spill.Dismantle(full);
+        Require(spill.Backpack[Water.Full] == 1 && said == "The cooking table is down. Everything is back in your backpack. 2L of water spilled.",
+            $"water beyond the bottles carried must spill, and say so: \"{said}\"");
     }
 
     private static void CheckQueuedBatchPoursWaterFromBottles(GameData data) {
@@ -280,5 +291,22 @@ public static class WaterChecks {
         Require(world.Transfer(world.Backpack, pile.Inventory, "wood", 1) == 0, "a pile of bottles should take nothing else");
         world.Tick(.1f);
         Require(pile.Inventory.Accepts(Water.Empty) && pile.Inventory.AllowsWithdrawal(Water.Full), "workers should store and fetch bottles at any fill there");
+    }
+
+    private static void CheckQueuedBatchCountsOnlyCarriedFuel(GameData data) {
+        var world = new World(data, false);
+        var furnace = world.Add(ThingKind.Furnace, world.Player + Vector2.Right);
+        world.SetRecipe(furnace, "charcoal"); furnace.Inventory.Add("wood", 2);
+        Give(world, "wood", 1);
+        Require(world.BatchShort(furnace, "charcoal") == "Missing fuel (wood, coal or charcoal).",
+            $"wood in the cups is not fuel, and the carried wood fills the cups first: {world.BatchShort(furnace, "charcoal")}");
+    }
+
+    private static void CheckFullBottleQueuedForOneLiterKeepsTheRest(GameData data) {
+        var world = new World(data, false);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        Give(world, Water.Full, 1); Give(world, "raw_meat", 1); Give(world, "coal", 1);
+        world.QueueBatch(table, "meat_stew");
+        Require(world.Backpack[Water.TwoLiters] == 1 && world.Backpack[Water.Full] == 0, "meat stew should pour 1 liter and leave the bottle holding 2");
     }
 }

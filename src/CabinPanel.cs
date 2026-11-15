@@ -38,7 +38,7 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         });
         void Show(int i, string need, float after) {
             var vial = dawn[i].Vial;
-            vial.Level = Math.Max(0, after); vial.Warn = after <= 0; vial.TooltipText = $"{need} at dawn {vial.Level:0}%";
+            vial.Level = Math.Max(0, after); vial.Warn = after <= 25; vial.TooltipText = $"{need} at dawn {vial.Level:0}%";
             vial.QueueRedraw();
         }
     }

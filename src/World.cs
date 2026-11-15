@@ -783,8 +783,9 @@ public sealed partial class World {
         if (!Reaches(t)) { Say("Walk closer first."); return false; }
         if (DismantleBlock(t) is string refused) { Say(refused); return false; }
         if (Forwarded(Verb.Dismantle, t.Id)) return true;
-        // Liquid fills the backpack's empty vessels, and the rest is spilled.
-        foreach (var box in Boxes(t)) if (box != null) PourOut(box);
+        // Liquid fills the backpack's vessels, and the rest is spilled.
+        string spilled = "";
+        foreach (var box in Boxes(t)) if (box != null) spilled += PourOut(box);
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
         foreach (var box in Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
@@ -797,7 +798,7 @@ public sealed partial class World {
             if (rest == null) { rest = Add(ThingKind.Grave, t.Pos).Inventory; rest.Slots = 0; }
             rest.Slots += (left + rest.StackOf(item) - 1) / rest.StackOf(item); rest.Add(item, left);
         }
-        Say(rest == null ? $"The {Lower(def.Name)} is down. Everything is back in your backpack." : $"The {Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.");
+        Say((rest == null ? $"The {Lower(def.Name)} is down. Everything is back in your backpack." : $"The {Lower(def.Name)} is down. What did not fit in your backpack is in a box where it stood.") + spilled);
         return true;
     }
     public void Consume(string item) {
@@ -943,7 +944,9 @@ public sealed partial class World {
         var missing = new List<string>();
         foreach (var (item, needed) in r.Inputs)
             if (needed - Have(item) is > 0 and int lack) missing.Add($"{lack}{(Data.VesselFor(item) != null ? "L of" : "")} {Lower(Data.Name(item))}");
-        bool fuelled = !r.Burns || !switching && t.Burner?.First() is string held && r.Fuels.Contains(held) || r.Fuels.Exists(f => Have(f) > r.Inputs.GetValueOrDefault(f));
+        // Fuel burns only from the fuel slot: what it holds now, or carried fuel left once a batch's inputs are loaded on top of the cups.
+        int Spare(string fuel) => Carried(fuel) + (switching ? t.Inventory[fuel] + (t.Burner?[fuel] ?? 0) : 0) - r.Inputs.GetValueOrDefault(fuel);
+        bool fuelled = !r.Burns || !switching && t.Burner?.First() is string held && r.Fuels.Contains(held) || r.Fuels.Exists(f => Spare(f) > 0);
         if (!fuelled) missing.Add($"fuel ({FuelWords(r.Fuels)})");
         return missing.Count == 0 ? null : $"Missing {Listed(missing, "and")}.";
     }
