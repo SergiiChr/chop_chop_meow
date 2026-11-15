@@ -529,7 +529,7 @@ public partial class Game {
         await CloseWithEsc();
     }
 
-    private async Task CheckCrateDraggedIntoCrateStopsAtWarning() {
+    private async Task CheckCratePutIntoCrateStopsAtWarning() {
         var crate = Hosted.Add(ThingKind.Crate, world.Player + new Vector2(1, 0));
         var box = Hosted.Add(ThingKind.Crate, world.Player); box.Inventory.Add("berries", 3); Hosted.PickUpCrate(box);
         string packed = Hosted.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
@@ -985,6 +985,93 @@ public partial class Game {
         await Until(() => chest.Inventory["stone"] == stone && world.Backpack["stone"] == 0, "Shift on stone on the hotbar storing the stack in the open chest", 2);
         await CloseWithEsc();
         RemoveThings(Hosted, t => t == chest); Drop(Hosted, "stone", 2); SetHotbarSlot(world, 4, before); await Frames();
+    }
+    /// <summary>A double click on a hotbar slot uses its item, and a right click empties the slot.</summary>
+    private async Task CheckHotbarDoubleClickUsesAndRightClickClears() {
+        string before = world.HotbarSlots[7];
+        int carried = Drop(Hosted, "berries");
+        Give(Hosted, "berries", 2); SetHotbarSlot(world, 7, "berries"); SetNeeds(Hosted, hunger: 50);
+        await Until(() => world.Backpack["berries"] == 2 && !hotbar.Buttons[7].Disabled, "the hotbar showing the two berries", 2);
+        await DoubleClick(hotbar.Buttons[7]);
+        await Until(() => world.Backpack["berries"] == 1, "a double click on the berries' slot eating one", 2);
+        await RightClick(hotbar.Buttons[7]);
+        await Until(() => world.HotbarSlots[7] == "", "a right click emptying the hotbar slot", 2);
+        Require(world.Backpack["berries"] == 1, "Emptying a hotbar slot must leave the berries in the backpack.");
+        // The right click emptied the slot on the server too, so it goes back the way a player sets it.
+        int active = world.ActiveHotbar;
+        world.SetHotbar(7, before); world.SelectHotbar(active); Give(Hosted, "berries", carried - 1); await Frames();
+    }
+    /// <summary>
+    /// A held stack goes into a chest clicked in the world, and back to its cell on Esc or a click on open ground;
+    /// with nothing held, an item only selected on the hotbar stays out of a clicked chest.
+    /// </summary>
+    private async Task CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround() {
+        await CloseWithEsc();
+        var chest = Hosted.Add(ThingKind.Chest, world.Player + new Vector2(2, -2));
+        string before = world.HotbarSlots[4];
+        Give(Hosted, "stone", 3); SetHotbarSlot(world, 4, "stone"); await KeyStroke(Key.Key5);
+        await ClickOn(chest);
+        await Frames(4);
+        Require(chest.Inventory["stone"] == 0, "Stone only selected on the hotbar must not go into a clicked chest.");
+        await CloseWithEsc(); await KeyStroke(Key.Tab);
+        await PickUp(BagCell(c => c.TooltipText.StartsWith("Stone")));
+        await KeyStroke(Key.Escape);
+        await Until(() => cursor.Empty, "Esc letting go of the held stone", 2);
+        Require(bag.Visible && world.Backpack["stone"] == 3, "Esc must only let go of the held stack, which stays in the backpack.");
+        await PickUp(BagCell(c => c.TooltipText.StartsWith("Stone")));
+        await ClickGround();
+        await Until(() => cursor.Empty, "a click on open ground letting go of the held stone", 2);
+        Require(world.Backpack["stone"] == 3 && world.Find(chest.Id)!.Inventory["stone"] == 0, "Letting go must leave the stone in the backpack.");
+        await PickUp(BagCell(c => c.TooltipText.StartsWith("Stone")));
+        await ClickOn(chest);
+        await Until(() => chest.Inventory["stone"] == 3 && cursor.Empty, "a click on a chest in the world storing the held stone", 2);
+        RemoveThings(Hosted, t => t == chest); SetHotbarSlot(world, 4, before); await KeyStroke(Key.Key1); await CloseWithEsc();
+    }
+    /// <summary>An empty crate opens as storage by double click, goods put in pack it, and picking up the open crate closes its page.</summary>
+    private async Task CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp() {
+        await CloseWithEsc();
+        Give(Hosted, "crate", 1); Give(Hosted, "stone", 3);
+        await KeyStroke(Key.Tab);
+        await DoubleClick(await Showing(0, c => c.TooltipText.StartsWith("Wood crate ·")));
+        await Until(() => panel.Page == Page.Crate && Cells(0).Any(), "a double click on an empty crate opening it as storage", 2);
+        await Carry(BagCell(c => c.TooltipText.StartsWith("Stone")), Cell(0, c => c.TooltipText == ""));
+        await Until(() => world.Backpack.Items.Keys.Any(id => id.StartsWith(World.PackedPrefix)) && Cells(0).Any(c => c.TooltipText.StartsWith("Stone")),
+            "the stone packing the empty crate, whose page shows it", 2);
+        Require(world.Backpack["crate"] == 0 && world.Backpack["stone"] == 0, "Packing the empty crate must use it and all three stone.");
+        await PickUp(BagCell(c => c.TooltipText.StartsWith("Wood crate of")));
+        await Until(() => panel.Page == Page.Backpack, "picking up the open crate closing its page for the backpack's", 2);
+        await KeyStroke(Key.Escape); await CloseWithEsc();
+        Drop(Hosted, world.Backpack.Items.Keys.First(id => id.StartsWith(World.PackedPrefix))); await Frames();
+    }
+    /// <summary>A building plan picked up with a click goes down where open ground is clicked.</summary>
+    private async Task CheckHeldPlanPlacesOnOpenGround() {
+        await CloseWithEsc();
+        Give(Hosted, world.Data.Buildings[ThingKind.Chest].Cost);
+        await KeyStroke(Key.B);
+        await PickUp(Named("build_chest")!);
+        Require(cursor.Plan == "chest", "A click on a plan must pick it up.");
+        int chests = world.Things.Count(t => t.Kind == ThingKind.Chest);
+        var spot = Enumerable.Range(2, 3).SelectMany(r => Enumerable.Range(0, 8).Select(a => (world.Player + Vector2.Right.Rotated(a * Mathf.Tau / 8) * r).Round()))
+            .First(p => world.PlacementBlock(ThingKind.Chest, world.Snap(ThingKind.Chest, p)) == null && Uncovered(view.Screen(p)));
+        await Click(view.Screen(spot));
+        await Until(() => world.Things.Count(t => t.Kind == ThingKind.Chest) == chests + 1, "a click on open ground placing the held plan", 2);
+        RemoveThings(Hosted, t => t.Kind == ThingKind.Chest && t.Pos == world.Snap(ThingKind.Chest, spot)); await CloseWithEsc();
+    }
+    /// <summary>At a trading post a click on the bank picks up all its coins, and coins put on it pay in.</summary>
+    private async Task CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown() {
+        await CloseWithEsc();
+        var sign = Hosted.Add(ThingKind.Signpost, world.Player + new Vector2(2, 0));
+        int coins = Drop(Hosted, Inventory.Coins);
+        Give(Hosted, Inventory.Coins, 40);
+        await KeyStroke(Key.Tab);
+        var bank = (Control)ui.FindChild("bank", true, false);
+        await Carry(BagCell(c => c.TooltipText.StartsWith("Coins")), bank);
+        await Until(() => sign.Wages![Inventory.Coins] == 40 && cursor.Empty, "coins put on the bank paying in", 2);
+        await PickUp(bank);
+        Require(world.Held is { Item: Inventory.Coins, Count: 40 }, "A click on the bank must pick up all its coins.");
+        await Click(BagCell(c => c.TooltipText == ""));
+        await Until(() => sign.Wages![Inventory.Coins] == 0 && world.Backpack[Inventory.Coins] == 40, "the bank's coins going into the backpack", 2);
+        RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 40); Give(Hosted, Inventory.Coins, coins); await CloseWithEsc();
     }
     /// <summary>A player harvesting beside a running station is busy with the harvest, so their figure stops hammering.</summary>
     private async Task CheckHarvestingBesideAStationStopsHammering() {
@@ -1760,6 +1847,11 @@ public partial class Game {
             await Test(CheckDriverPlaysItsCommandFileAsRealInput);
             await Test(CheckEmptiedCrateGivesWayToTheBackpack);
             await Test(CheckHotbarClickMovesItemsIntoAnOpenBuilding);
+            await Test(CheckHotbarDoubleClickUsesAndRightClickClears);
+            await Test(CheckHeldStackGoesIntoAClickedChestAndBackOnEscOrOpenGround);
+            await Test(CheckEmptyCrateOpensAsStorageAndClosesWhenPickedUp);
+            await Test(CheckHeldPlanPlacesOnOpenGround);
+            await Test(CheckBankCoinsArePickedUpWholeAndPaidInByPuttingDown);
             await Test(CheckHarvestingBesideAStationStopsHammering);
             await Test(CheckIdlePlayerBesideACookingTableGrindsWithItsMortar);
             await Test(CheckIdlePlayerBesideABenchKnocksWithItsHammer);
@@ -1815,7 +1907,7 @@ public partial class Game {
             await Test(CheckTickBoxesFollowTheServer);
             await Test(CheckLoadRemembersWhatIsOutOfSight);
             await Test(CheckWorkerPageFollowsItsJobs);
-            await Test(CheckCrateDraggedIntoCrateStopsAtWarning);
+            await Test(CheckCratePutIntoCrateStopsAtWarning);
             RemoveCheckFiles();
             await Test(CheckRestartBuildsFreshModelsForReusedIds);
             await Test(CheckIntroFilmCoversTheStartMenuUntilEsc);
