@@ -24,6 +24,7 @@ public partial class Game {
             await CheckDragPlacesStackInExactSlotAndSortOrdersByName();
             await CheckClickMovesOneUnitAndCtrlClickMovesRemainingStack();
             await CheckPartDrunkBottlePoursItsLitersIntoTheWaterCup();
+            await CheckDoubleClickedWaterRecipePoursFromABottle();
             await CheckWaterCupShakesWithoutRoomInABottleAndFillsOne();
             await CheckSkipToMorningOnlyForDownedPlayerWithoutCabin();
         } finally {
@@ -132,6 +133,19 @@ public partial class Game {
         await Until(() => table.Inventory[Water.Liquid] == 3, "a one-liter bottle dragged onto the water cup pouring its liter", 2);
         Require(world.Backpack[Water.Empty] == 2 && table.Inventory[Water.OneLiter] + table.Inventory[Water.Empty] == 0, "A dragged bottle must pour and stay in the backpack, empty.");
         await SurvivalReviewShot("water-pour");
+    }
+    /// <summary>Double-clicking a water recipe's card queues a batch and pours its water from a bottle in the backpack.</summary>
+    private async Task CheckDoubleClickedWaterRecipePoursFromABottle() {
+        await CloseWithEsc();
+        EmptyBackpack(Hosted); RemoveThings(Hosted, t => t.Kind == ThingKind.Cooktable);
+        Give(Hosted, Water.Full, 1); Give(Hosted, "flour", 1);
+        var table = Hosted.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        await ClickOn(table); await Frames(3);
+        await DoubleClick(Named("craft_dough")!);
+        // The table starts the batch at once, using the water and flour poured in.
+        await Until(() => table.Making == "dough" || table.Inventory["dough"] > 0, "a double-click on dough pouring 3 liters from the full bottle and starting the batch", 2);
+        Require(world.Backpack[Water.Empty] == 1 && world.Backpack[Water.Full] == 0, "The bottle must stay in the backpack, empty.");
+        RemoveThings(Hosted, t => t == table); EmptyBackpack(Hosted); await CloseWithEsc();
     }
     /// <summary>A click on a station's water with no bottle with room in the backpack is refused, says why and shakes the cup; with one it takes a liter into it.</summary>
     private async Task CheckWaterCupShakesWithoutRoomInABottleAndFillsOne() {

@@ -73,6 +73,22 @@ public sealed partial class World {
     public string? FillBlock(Inventory from, Inventory to, string item) =>
         Data.VesselFor(item) is VesselDef v && from[item] > 0 && VesselRoom(to, v) == 0 ? $"You need an empty {Lower(Data.Name(item))} vessel." : null;
 
+    /// <summary>Why the backpack's vessels cannot take every liquid a box holds, or null.</summary>
+    private string? NoVesselRoom(Inventory box) {
+        foreach (var v in Data.Vessels) if (box[v.Liquid] > VesselRoom(S.Backpack, v)) return $"You need an empty {Lower(Data.Name(v.Liquid))} vessel.";
+        return null;
+    }
+
+    /// <summary>A box, or a copy of it without its liquids when it holds any, for working out which of its items need backpack slots.</summary>
+    private Inventory Solids(Inventory box) {
+        bool wet = false;
+        foreach (var v in Data.Vessels) wet |= box[v.Liquid] > 0;
+        if (!wet) return box;
+        var solids = new Inventory { Slots = box.Slots, StackSize = box.StackSize };
+        foreach (var (item, count) in box.Items) if (Data.VesselFor(item) == null) solids.Add(item, count);
+        return solids;
+    }
+
     /// <summary>How many of a recipe input the backpack holds: a liquid counts the liters in its vessels.</summary>
     public int Carried(string input) {
         if (Data.VesselFor(input) is not VesselDef v) return S.Backpack[input];

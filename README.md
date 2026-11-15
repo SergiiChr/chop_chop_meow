@@ -337,6 +337,8 @@ The cup shows a water droplet and counts liters.
 Clicking the cup takes a liter back into a bottle in your backpack with room, the fullest first, and Ctrl takes all that fits; with no room, the cup shakes and says so.
 Workers do the same: they bring bottles, pour them and carry them back to storage.
 Water left in a station whose recipe no longer uses it is taken out by a hauler, who fetches bottles with room from storage, fills them there and stores them.
+Double-clicking a recipe card that uses water pours it from your bottles the same way.
+Turning a station that holds water to another recipe takes the water into your bottles, and needs room in them for all of it.
 Taking down a station fills the bottles you carry with its water, and the rest is spilled.
 These rules cover any refillable vessel the game adds (`GameData.Vessels`).
 

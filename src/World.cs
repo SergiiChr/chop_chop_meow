@@ -936,9 +936,10 @@ public sealed partial class World {
     public string? SwitchBlock(Thing t, string recipe) =>
         recipe == Selected(t) ? null
         : t.Processing ? Busy(t)
-        : !S.Backpack.Fits(t.Inventory, t.Burner) ? $"No room in your backpack for what the {Lower(Data.Name(t.Kind))} holds." : null;
-    /// <summary>Moves everything a box holds into the backpack, as far as it fits.</summary>
-    private void Unload(Inventory box) { foreach (string item in box.Items.Keys.ToArray()) box.TransferTo(S.Backpack, item, box[item]); }
+        : NoVesselRoom(t.Inventory) is string dry ? dry
+        : !S.Backpack.Fits(Solids(t.Inventory), t.Burner) ? $"No room in your backpack for what the {Lower(Data.Name(t.Kind))} holds." : null;
+    /// <summary>Moves everything a box holds into the backpack, as far as it fits; a liquid goes into the backpack's vessels.</summary>
+    private void Unload(Inventory box) { foreach (string item in box.Items.Keys.ToArray()) Carry(box, S.Backpack, null, item, box[item]); }
     private static readonly Dictionary<string, int> NoCost = new();
     /// <summary>
     /// The fuel loading a recipe burns: what the fuel slot holds, or for an empty slot the first fuel the recipe burns
@@ -989,8 +990,8 @@ public sealed partial class World {
             if (!Pending(t, pair.Key) && pair.Key != r.Output) return true;
         return false;
     }
-    /// <summary>Whether a station takes an item from the player: an input of the recipe it is on or keeps to, or a fuel it burns.</summary>
-    public bool Takes(Thing t, string item) => Pending(t, item) || t.Burner != null && FuelFits(t, item);
+    /// <summary>Whether a station takes an item from the player: an input of the recipe it is on or keeps to, a vessel holding a liquid input, or a fuel it burns.</summary>
+    public bool Takes(Thing t, string item) => Pending(t, item) || PoursInto(t, t.Inventory, item) != null || t.Burner != null && FuelFits(t, item);
     /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it, with nothing left by another recipe in its cups.</summary>
     private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null) && !(Data.Recipes.TryGetValue(t.Recipe, out var r) && Blocked(t, r));
     /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
@@ -1024,8 +1025,11 @@ public sealed partial class World {
         if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
         if (Forwarded(Verb.LoadInput, t.Id, item: item, count: quantity)) return 0;
         int room = t.Inventory.StackSize - t.Inventory[lands];
-        int moved = vessel != null ? PourVessels(S.Backpack, item, t.Inventory, vessel, quantity, room) : S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, room));
-        if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(lands)} slot is full.");
+        // A liquid asked for by name, as when a batch is queued, pours from the backpack's vessels.
+        int moved = vessel != null ? PourVessels(S.Backpack, item, t.Inventory, vessel, quantity, room)
+            : Data.VesselFor(item) is VesselDef held ? PourLiters(S.Backpack, t.Inventory, held, Math.Min(quantity, room))
+            : S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, room));
+        if (moved == 0) Say(Carried(item) == 0 && S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(lands)} slot is full.");
         return moved;
     }
     /// <summary>Manual loading of the fuel slot, which holds one kind of fuel at a time.</summary>

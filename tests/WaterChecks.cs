@@ -20,6 +20,9 @@ public static class WaterChecks {
         CheckBottleRecipeMakesEmptyBottleFromTinAndWood(data);
         CheckRecipesReturnReusableBottles(data);
         CheckTakingWaterOutNeedsABottleWithRoom(data);
+        CheckQueuedBatchPoursWaterFromBottles(data);
+        CheckSwitchingRecipeTakesWaterIntoBottles(data);
+        CheckStationTakesBottlesForItsWater(data);
         CheckHaulerPoursWaterAndStoresTheEmptyBottle(data);
         CheckHaulerTakesLeftoverWaterOutInBottles(data);
         CheckDismantledStationFillsBottles(data);
@@ -213,5 +216,37 @@ public static class WaterChecks {
         Require(world.Dismantle(table), "the table should come down");
         Require(world.Backpack[Water.TwoLiters] == 1 && world.Backpack[Water.Liquid] == 0 && world.Things.All(t => t.Inventory[Water.Liquid] == 0),
             "a dismantled station's water must fill the bottles carried");
+    }
+
+    private static void CheckQueuedBatchPoursWaterFromBottles(GameData data) {
+        var world = new World(data, false);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        Give(world, Water.Full, 1); Give(world, "flour", 1);
+        string message = ""; world.Notify = text => message = text;
+        world.QueueBatch(table, "dough");
+        Require(table.Inventory[Water.Liquid] == 3 && table.Inventory["flour"] == 1, $"queuing dough must pour 3 liters from the full bottle: {message}");
+        Require(world.Backpack[Water.Empty] == 1 && world.Backpack[Water.Full] == 0, "the bottle must stay in the backpack, empty");
+    }
+
+    private static void CheckSwitchingRecipeTakesWaterIntoBottles(GameData data) {
+        var world = new World(data, false);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        world.SetRecipe(table, "dough"); table.Inventory.Add(Water.Liquid, 2);
+        string message = ""; world.Notify = text => message = text;
+        world.QueueBatch(table, "crushed_berries");
+        Require(table.Recipe == "dough" && table.Inventory[Water.Liquid] == 2 && message == "You need an empty water vessel.",
+            $"turning a station holding water to another recipe with no bottle to take it must be refused: {message}");
+        Give(world, Water.Empty, 1);
+        world.QueueBatch(table, "crushed_berries");
+        Require(table.Recipe == "crushed_berries" && table.Inventory[Water.Liquid] == 0, "with a bottle, the station must turn to the other recipe");
+        Require(world.Backpack[Water.TwoLiters] == 1 && world.Backpack[Water.Liquid] == 0, "its water must go into the bottle, never loose into the backpack");
+    }
+
+    private static void CheckStationTakesBottlesForItsWater(GameData data) {
+        var world = new World(data, false);
+        var table = world.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
+        world.SetRecipe(table, "dough");
+        Require(world.Takes(table, Water.Full) && world.Takes(table, Water.OneLiter), "a station on a water recipe must take bottles that hold water");
+        Require(!world.Takes(table, Water.Empty), "a station must not take an empty bottle");
     }
 }
