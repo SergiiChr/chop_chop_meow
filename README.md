@@ -815,6 +815,8 @@ Launcher-managed saves are in `.tools/xdg-data/godot/app_userdata/Chop Chop Meow
 | `settlement-3.json` | Slot 3 |
 | `autosave.json` | Autosave |
 
+A git worktree whose `.tools` links to another checkout's keeps its own user data under `build/xdg-data` instead.
+Each `./build.py play` there starts from a fresh copy of that checkout's saves and settings ([docs/RELEASE.md](docs/RELEASE.md)).
 A manually exported or otherwise normally launched Godot build uses Godot's standard per-user application-data location instead.
 A save that is incomplete, names items the game does not know or holds needs out of range is refused too; the game says why when loading fails.
 

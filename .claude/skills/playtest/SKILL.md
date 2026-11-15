@@ -12,8 +12,10 @@ and sends them through `Input.ParseInputEvent`, like real input.
 ## Set up
 
 1. A driven game keeps the player's files out of it: it reads and writes `playtest-*` saves and settings. They live in
-   `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/` in the main checkout, which every worktree reaches through its
-   `.tools` symlink. To test with one of the player's saves, copy it to a `playtest-` name first.
+   the checkout's own user data: `build/xdg-data/godot/app_userdata/Chop Chop Meow/` in a worktree,
+   `.tools/xdg-data/godot/app_userdata/Chop Chop Meow/` in the main checkout. Each `./build.py play` in a worktree
+   first copies the player's saves and settings there from the main checkout. To test with one of the player's saves,
+   copy it to a `playtest-` name first.
 2. Start the game in the background with a folder in your scratchpad:
 
    ```sh
@@ -59,8 +61,8 @@ Look at every screenshot before deciding the next step.
   (AGENTS.md, Checks).
 - A showcase switches panels and pages on its own, so a click there can land on a different page than the last
   screenshot showed. Take a `shot` right before clicking, or play a normal game for input checks.
-- A playtest game left running holds the game's network port, and `./build.py check` or `test net` then fails or
-  crawls. Quit the game before running checks.
+- A playtest game left running takes processor time from `./build.py check`, whose per-frame checks can then fail.
+  Quit the game before running checks.
 - A run driven by `scale` or a showcase fixture is not a fair timing or full-playthrough result; say what was skipped.
 - Treat Godot errors in the game output as failures, except the release-build engine bug AGENTS.md describes:
   `Attempt to disconnect a nonexistent connection` for `tree_exited` or `focus_entered` when a game ends or a dropdown

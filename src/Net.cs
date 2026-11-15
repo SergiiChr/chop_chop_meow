@@ -26,7 +26,11 @@ internal sealed class Fog {
 /// Until the owner, the player whose window started the server, opens the game to the network, only this computer can join.
 /// </summary>
 public partial class Net : Node {
-    public const int DefaultPort = 24565;
+    /// <summary>
+    /// The port a game's server takes first and the join popup offers.
+    /// A check run passes its own with --default-port, so it stays clear of a game being played and of other check runs.
+    /// </summary>
+    public static readonly int DefaultPort = Launch.Value("--default-port") is string port ? int.Parse(port) : 24565;
     public const int MaxPlayers = 4;
     /// <summary>ENet drops a peer once a reliable packet stays unanswered this long (or TimeoutMinMsec after TimeoutLimit resends).</summary>
     private const int TimeoutLimit = 64, TimeoutMinMsec = 15000, TimeoutMaxMsec = 45000;
