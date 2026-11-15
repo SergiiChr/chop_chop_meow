@@ -38,7 +38,7 @@ internal sealed class ChainSite(World world) {
 
     /// <summary>
     /// The player's cabin far away, the trading post that sells each product by cart, the tool rack and a fire.
-    /// Storage follows: a chest asking for each material, a pile of empty bottles and three open piles.
+    /// Storage follows: a chest asking for each made material, a pile of empty bottles and three open piles.
     /// Returns the chest that takes raw meat.
     /// </summary>
     public Thing AddSettlement(string[] products) {
@@ -56,22 +56,25 @@ internal sealed class ChainSite(World world) {
         spare.Inventory.Add("steel_pick", 1); spare.Inventory.Add("rake", 1);
         Place(ThingKind.Campfire);
 
-        foreach (string item in new[] { "wood", "planks", "crate", "iron_ore", "coal", "tin_ore", "iron_bar", "tin_bar", "steel_bar", "steel_parts", "wood_parts", "tin_can",
-                     "raw_meat", "meat_stew", "canned_meat_stew", "leaves", "wheat", "wheat_seeds", "grass", "fertilizer", "flour", "dough", "bread", "berries", "steel_pick" }) Store(item);
+        foreach (string item in new[] { "planks", "crate", "iron_bar", "tin_bar", "steel_bar", "steel_parts", "wood_parts", "tin_can",
+                     "raw_meat", "meat_stew", "canned_meat_stew", "wheat", "wheat_seeds", "grass", "fertilizer", "flour", "dough", "bread", "steel_pick" }) Store(item);
         var empties = Place(ThingKind.Pile); empties.Inventory.Add("empty_bottle", 8);
         Place(ThingKind.Pile); Place(ThingKind.Pile); Place(ThingKind.Pile);
         return world.Things.Single(t => t.Kind == ThingKind.Chest && t.Inventory.InputFilter.Contains("raw_meat"));
     }
 
-    /// <summary>Raw materials: deposits, a tree, berries, leaves and the lake, each gathered by a worker.</summary>
+    /// <summary>
+    /// Raw materials: deposits, two trees, berries, leaves and the lake, each gathered by a worker.
+    /// A chest asking for each material stands beside its source: a load goes to the nearest of that chest and the stations that use it, so the chest fills first and haulers stock the stations from it.
+    /// </summary>
     public void AddGatherers() {
+        Store("wood");
         Employ(world.Add(ThingKind.Tree, Spot(), 9999), "gather");
         Employ(world.Add(ThingKind.Tree, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Iron, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Coal, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Tin, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Berries, Spot(), 9999), "gather");
-        Employ(world.Add(ThingKind.Leaves, Spot(), 9999), "gather");
+        foreach (var (item, kind) in new[] { ("iron_ore", ThingKind.Iron), ("coal", ThingKind.Coal), ("tin_ore", ThingKind.Tin), ("berries", ThingKind.Berries), ("leaves", ThingKind.Leaves) }) {
+            Store(item);
+            Employ(world.Add(kind, Spot(), 9999), "gather");
+        }
         Employ(world.Add(ThingKind.Water, Terrain.WaterPoint(origin), 9999), "gather");
     }
 

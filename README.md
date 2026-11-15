@@ -227,7 +227,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 | --- | --- |
 | Backpack | 24 slots |
 | Chest | 5 slots |
-| Worker | 5 items, like a crate: one stack of 5 or up to 5 different items |
+| Worker | 12 items, like a crate: one stack of 12 or up to 12 different items |
 | Tool station | 4 slots, any tool in any slot |
 
 - You can move items in and out of storage and stations up to 15 metres away (`World.ItemReach`).
@@ -332,7 +332,11 @@ A worker on Tend fire keeps a campfire fed with wood from storage.
 
 Clicking a job lists the crew with a tick box each.
 A circled number beside a worker counts their other jobs, and hovering it lists them.
-A worker can hold several jobs, at one place or several, and works through them in turn, moving on when one place has nothing to do.
+A worker can hold several jobs, at one place or several, and a new job goes to the end of their list.
+The list is in order: they do the first job that can be done, and after each round of it they read the list from the top again.
+A round is a delivery, a crafted batch, a crate packed full, a furnace batch at the bellows, a piece mined or a harvest.
+With no job that can be done, a worker waits at the nearest trading post, or in the clearing without one, and their status says what their first job lacks.
+A worker on Bellows pumps only while the furnace smelts or holds a batch to smelt, and only one worker pumps at a time.
 
 The crew button opens an overview with each worker's daily pay and the total above.
 
@@ -546,9 +550,9 @@ It keeps a stack of that good and a stack of empty crates, and packs one item ev
 The crate being packed shows on the right with how full it is; a full crate waits there until someone takes it.
 
 - Craft: works the station.
-- Haul: carries out the full crate, and anything it no longer packs, to storage; then keeps a crate's worth of the good and two empty crates there.
+- Haul: carries out the full crate, and anything it no longer packs, to storage; brings the good and empty crates, up to a stack of each ([hauling](#hauling)).
 
-Workers deliver the good it packs straight to it, before other storage, as long as a slot stays free for empty crates.
+Workers deliver the good it packs straight to it, as they do to storage asking for it, as long as a slot stays free for empty crates.
 
 A crate of one good is a kind of item that filters can name: "Crate of bread" in a chest's filter, or in the trading post's.
 A full crate goes to the nearest storage whose filter asks for that crate, otherwise to the nearest open storage.
@@ -576,9 +580,30 @@ A worker on its Tend job fetches what its filters take from storage and carries 
 
 Storage input filters govern automated deposits; output filters govern worker withdrawals.
 Empty filters allow all items.
-Workers prefer explicitly accepting chests and reroute cargo when filters change.
 Manual inventory transfers ignore these automation filters.
 
+A load a worker carries goes to the nearest place that asks for it:
+
+- a chest, pile or trading post whose input filter names it, or a packing station packing it;
+- a station whose recipe uses it, into the input slot or the fuel slot, up to a stack;
+- a farm plot short of seed or fertilizer for a sowing, or a mine site short of a material.
+
+Only when none of those has room does it go to the nearest storage with no filter.
+Workers send a load elsewhere when a filter changes or a slot fills while they carry it.
+A chest or pile near a source fills first and buffers the goods; without one, a gatherer walks each load to the nearest station with room.
+
+### Hauling
+
+A worker on Haul carries one load at a time for their station, up to 12 items.
+The next load is picked in this order:
+
+1. an input or the fuel slot that holds less than one batch;
+2. an output that is full, or anything another recipe left in the slots;
+3. the input or fuel that covers the fewest batches;
+4. the output that holds the most.
+
+Inputs and fuel are filled to a stack.
+A load of something the recipe uses both as an input and as fuel, such as coal for steel, is shared between the two slots as a batch uses them: of 12 coal, 8 go in as input and 4 as fuel.
 A station keeps the goods it makes when no storage takes them, and goes on working until its output stack is full.
 Workers fetching a station's inputs take them from storage or straight from another station's finished goods, such as steel parts from the anvil.
 
@@ -595,7 +620,7 @@ Workers need tools for some jobs:
 
 Leaves, berries and loose pieces need no tool, though a rake gathers leaves three times as fast as bare hands; a worker takes a rake when a tool station has one.
 A worker without the tool walks to the nearest tool station, takes the best tool of that kind and works at its speed.
-They put it back when reassigned or when heading home at dusk.
+They put it back when the job in hand has no use for it or when heading home at dusk.
 If there is none, the worker goes to the nearest known spot of the same job that they can work, one that needs no tool or one whose tool is to be had, and to loose pieces only after those; with none of those either, they wait, a message says once what they need, and they carry on as soon as one is put in.
 A gatherer whose spot runs out goes on to the next known spot of the same resource, and to loose pieces of it only once no other spot is left.
 
@@ -604,7 +629,7 @@ A woodcutter who fells a tree digs up its stump next while a tool station has a 
 With no shovel to be had they leave stumps and go on chopping.
 A worker carries one tool at a time, so they swap the axe for the shovel at a tool station and back.
 Digging up bushes is a job of its own: a worker given a bush goes on to the next known bush and never rakes leaves, and a worker raking leaves never digs up a bush.
-A worker carries off all of a bush's 36 leaves in one load.
+A dug-up bush gives 36 leaves, which a worker carries off 12 at a time.
 
 A worker on the station's Stock job brings tools from other storage to the rack.
 
@@ -626,7 +651,8 @@ Its panel shows seeds as the input, fertilizer as its fuel and wheat, seeds and 
 While the wheat grows it says how long until it is ripe, such as "Growing, 2 days until ripe", and offers the harvest only once it is.
 
 - A worker on Farm harvests.
-- A worker on Haul first moves seeds from the output into the input slot, then carries out the rest of the harvest and brings fertilizer and any missing seeds from storage.
+- A worker on Haul keeps the plot's input slots at one sowing, also while the wheat grows: seed from the plot's own harvest first, then seed and fertilizer from storage.
+  The rest of the harvest goes to storage; spare seed that no storage takes stacks up in the plot's seed slot.
 
 Wheat seeds and fertilizer can also be bought from the village.
 
@@ -693,7 +719,8 @@ The Workers tab at the trading post offers several hiring deals: more coins up f
 Workers are individual entities with assignments, wages, cargo and visible work status.
 There are at most forty workers.
 
-A worker gathering a resource moves on to the next nearest spot of the same kind once theirs is spent, such as the next tree after felling one.
+A worker gathers as fast as the player does with the same tool, 4 pieces a time, until their hands hold 12, then carries the load off.
+A worker gathering a resource moves on to the next nearest spot of the same kind once theirs is spent, such as the next tree after felling one, and goes on filling their hands there.
 They only go to spots a player has seen, even if fog hides them now.
 With no other spot known they say so and go on to their other jobs, or wait at the trading post.
 
@@ -728,7 +755,7 @@ When nobody is working, the cart stands outside, loaded once there is output.
 
 Each miner brings out one ore and one rock every 1.6 seconds, about half what a worker gets from a deposit, but a mine never runs out.
 Output fills two slots, ore and rocks, of one stack each.
-When either is full, mining stops and a miner carries the full stack out to the nearest storage that takes it, or to a packing station packing it.
+When either is full, mining stops and a miner carries a load of 12 out to the nearest place that takes it.
 With none, a message says the mine is full with no output available.
 
 ## Wolves and night

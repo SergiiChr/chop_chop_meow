@@ -72,8 +72,10 @@ public static class ProductionChainChecks {
         Require(crates.Inventory[crate] == 1 && general.Inventory[crate] == 0, "the hauler should carry the full crate past general storage to the chest asking for crates of bread");
         bool Packing() => packer.Output.Count == 1 && world.Packed(packer.Output.First()!)!["bread"] > 1;
         for (float waited = 0; waited < 40 && !Packing(); waited += .1f) world.Tick(.1f);
-        Require(Packing() && packer.Inventory["crate"] >= 1,
-                "the worker should restock bread and crates and pack the next crate");
+        Require(Packing(), "the worker should restock bread and pack the next crate");
+        // A worker who packs and hauls keeps packing while there is something to pack, so empty crates come once the crate in hand is full.
+        for (float waited = 0; waited < 60 && packer.Inventory["crate"] == 0; waited += .1f) world.Tick(.1f);
+        Require(packer.Inventory["crate"] >= 1, "the worker should restock empty crates once the crate in hand is packed");
 
         // Changing the good leaves the old goods for the hauler to carry out.
         world.SetPacking(packer, "berries");
@@ -154,7 +156,7 @@ public static class ProductionChainChecks {
         worker.Wage = 18;
         world.SetDuty(worker, bench, "haul", true);
         Work(world, 30, () => bench.Inventory["steel_parts"] > 0);
-        Require(bench.Inventory["steel_parts"] == 2 && anvil.Inventory["steel_parts"] == 4, "the bench's hauler should fetch two batches of steel parts from the anvil's finished goods");
+        Require(bench.Inventory["steel_parts"] == 6 && anvil.Inventory["steel_parts"] == 0, "the bench's hauler should fetch the steel parts from the anvil's finished goods");
     }
 
     private static void CheckWorkersRunEveryChain(GameData data) {

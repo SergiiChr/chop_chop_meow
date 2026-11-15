@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using ChopChopMeow;
 using static SetupSteps;
 using static WorldSteps;
@@ -19,6 +20,8 @@ internal static class WorkerSteps {
         var tree = world.Add(ThingKind.Tree, new Vector2(10, 10), 4000);
         var chest = world.Add(ThingKind.Chest, new Vector2(12, 10));
         chest.Inventory.Slots = 60;
+        // Iron and coal for a day of steel, so the forge crew has something to smelt.
+        chest.Inventory.Add("iron_bar", 300); chest.Inventory.Add("coal", 500);
         var near = world.Add(ThingKind.Campfire, new Vector2(14, 14));
         world.Add(ThingKind.Campfire, new Vector2(36, 36));
         var forge = world.Add(ThingKind.Reinforced, new Vector2(20, 12));
@@ -102,4 +105,46 @@ internal static class WorkerSteps {
     }
 
     public static void Hire(World world, Thing target) => world.Assign(AddWorker(world, target.Pos + new Vector2(1, 1)), target);
+
+    /// <summary>Adds a paid worker beside a place with the given jobs there, in that order.</summary>
+    public static Worker Staff(World world, Thing place, params string[] jobs) {
+        var worker = AddWorker(world, place.Pos + new Vector2(0, 1.2f));
+        worker.Wage = 18;
+        foreach (string job in jobs) world.SetDuty(worker, place, job, true);
+        return worker;
+    }
+
+    /// <summary>A crafting table on a recipe with the tool it needs slotted, and nobody working it.</summary>
+    public static Thing Bench(World world, Vector2 at, string recipe, string tool = "") {
+        var bench = world.Add(ThingKind.Bench, at);
+        world.SetRecipe(bench, recipe);
+        if (tool != "") bench.Tools!.Add(tool, 1);
+        return bench;
+    }
+
+    /// <summary>Makes a haul group at the end of a worker's jobs and moves their hauls at the given places into it, in that order; returns the group's number.</summary>
+    public static int GroupHauls(World world, Worker worker, params Thing[] places) {
+        world.AddHaulGroup(worker);
+        int group = worker.Duties[^1].Group;
+        foreach (var place in places) world.MoveDuty(worker, worker.Duties.FindIndex(d => d.Thing == place.Id && d.Job == "haul"), worker.Duties.Count, group);
+        return group;
+    }
+
+    /// <summary>A worker's jobs as text, such as "craft@3 group[haul@3 haul@5]", to compare a whole list at once.</summary>
+    public static string JobList(Worker worker) {
+        var parts = new List<string>();
+        for (int i = 0; i < worker.Duties.Count; i++) {
+            var d = worker.Duties[i];
+            if (d.Job != World.HaulGroup) { parts.Add($"{d.Job}@{d.Thing}"); continue; }
+            var hauls = worker.Duties.Skip(i + 1).TakeWhile(World.Grouped).Select(h => $"{h.Job}@{h.Thing}").ToList();
+            parts.Add($"group[{string.Join(" ", hauls)}]"); i += hauls.Count;
+        }
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>Runs the world until a worker has something in hand, and names it; null when they pick nothing up in a minute.</summary>
+    public static string? FirstCarry(World world, Worker worker) {
+        Work(world, 60, () => worker.Bag.Count > 0);
+        return worker.Bag.First();
+    }
 }

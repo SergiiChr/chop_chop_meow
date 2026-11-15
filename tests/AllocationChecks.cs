@@ -58,13 +58,19 @@ public static class AllocationChecks {
         var packing = PackingLine(data, out var stock);
         // A crate fills about every twenty seconds and goes to the post, whose cart leaves once six are there; a hundred seconds see several crates and a cart.
         // The warm-up lasts until a cart has been out and back: the first crate carried out costs a one-off 98 KB in about one process in a hundred, which must not land in the measured runs.
-        // Opening a crate names it and gives it contents, and a cart leaving or coming back builds its order: those rare events are what this budget allows (measured 0.6 bytes a tick).
+        // Opening a crate names it and gives it contents, and a cart leaving or coming back builds its order: those rare events are what this budget allows (measured 1.1 bytes a tick).
         // The measured runs cross dusk, so the dens stay shut: wolves coming out are not packing.
-        Check("tick: packing for the post", () => { ShutDens(packing); packing.Tick(1 / 60f); Fed(packing); stock.Inventory.Add("berries", 64 - stock.Inventory["berries"]); stock.Inventory.Add("crate", 64 - stock.Inventory["crate"]); }, maxBytesPerRun: 1, warmup: 12000, runs: 6000);
+        Check("tick: packing for the post", () => { ShutDens(packing); packing.Tick(1 / 60f); Fed(packing); stock.Inventory.Add("berries", 64 - stock.Inventory["berries"]); stock.Inventory.Add("crate", 64 - stock.Inventory["crate"]); }, maxBytesPerRun: 2, warmup: 12000, runs: 6000);
 
         var kitchen = WaterKitchen(data, out var pantry);
+        var table = kitchen.Things.First(t => t.Kind == ThingKind.Cooktable);
         // Bottles go round: poured into the table, carried back to the pile, refilled at the lake; the pile keeps its filters for every fill.
-        Check("tick: cooking with water bottles", () => { kitchen.Tick(1 / 60f); Fed(kitchen); pantry.Inventory.Add("raw_meat", 64 - pantry.Inventory["raw_meat"]); pantry.Inventory.Add("wood", 64 - pantry.Inventory["wood"]); }, warmup: 2400, runs: 3000);
+        // The table's water is kept under ten liters: filled to its stack of 64, it would need no bottle for the rest of the check.
+        // The warm-up covers a bottle coming back part full, whose status is built once.
+        Check("tick: cooking with water bottles", () => {
+            kitchen.Tick(1 / 60f); Fed(kitchen); pantry.Inventory.Add("raw_meat", 64 - pantry.Inventory["raw_meat"]); pantry.Inventory.Add("wood", 64 - pantry.Inventory["wood"]);
+            table.Inventory.Remove(Water.Liquid, Math.Max(0, table.Inventory[Water.Liquid] - 9));
+        }, warmup: 6000, runs: 3000);
         Require(kitchen.Things.Sum(t => t.Inventory["meat_stew"]) > 0 && kitchen.Workers.All(w => !w.Status.Contains("no accepting storage")), "the water kitchen should cook stew from poured water and store its bottles");
 
         var mine = WorkingMine(data, out var shaft);

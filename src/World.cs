@@ -33,6 +33,8 @@ public sealed class Thing {
     [JsonInclude, JsonPropertyName("Asked"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] internal string? SavedAsked { get => asked; set => Asked = value ?? ""; }
     public float Progress { get; set; }
     public bool Processing { get; set; }
+    /// <summary>Units of work finished here since the world loaded: batches made, pieces mined, harvests and building stages; a worker reads their job list again after each.</summary>
+    [JsonIgnore] public int Rounds { get; set; }
     public float Heat { get; set; }
     public float Burn { get; set; }
     /// <summary>When a picked berry bush fruits again, on the world's clock, or zero while it is full.</summary>
@@ -123,6 +125,8 @@ public sealed class Duty {
     public string Job { get; set; } = "";
     /// <summary>For a gather job, the kind of resource it keeps gathering once its spot is spent or gone.</summary>
     [JsonConverter(typeof(OptionalKind))] public ThingKind? Kind { get; set; }
+    /// <summary>The haul group this haul job is in, or zero: the hauls of one group follow each other in the list and count as one job across their places.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Group { get; set; }
 }
 public enum WorkerWorkState { Idle, Gathering, Pumping, Hammering, Blocked, Resting, Digging, Underground }
 
@@ -131,20 +135,31 @@ public sealed class Worker : IWalker {
     public string Name { get; set; } = "";
     public float X { get; set; }
     public float Y { get; set; }
-    /// <summary>The place the worker is at for one of their <see cref="Duties"/>; with jobs at several places they take turns.</summary>
+    /// <summary>The place of the job in hand, one of the worker's <see cref="Duties"/>, or of their first job while none can be done.</summary>
     public int Assignment { get; set; }
+    /// <summary>The job in hand at <see cref="Assignment"/>, such as "haul", or empty while none can be done.</summary>
+    public string Job { get; set; } = "";
+    /// <summary>The worker's jobs in the order they come first: the first that can be done is the one in hand.</summary>
     public List<Duty> Duties { get; set; } = new();
     public string Status { get; set; } = "Available";
-    /// <summary>Units of one stack a worker carries; a miner bringing out a full mine output carries the whole stack.</summary>
-    public const int BagStack = 5;
+    /// <summary>Items a worker carries in all, as many as a wood crate holds.</summary>
+    public const int BagStack = 12;
     /// <summary>A worker's hands hold <see cref="BagStack"/> items like a crate: one stack of them or that many different items.</summary>
     public Inventory Bag { get; set; } = new() { Slots = BagStack, StackSize = BagStack, Capacity = BagStack };
-    /// <summary>Sizes the hands for a load: a full stack hauled out of a mine or the market, or <see cref="BagStack"/> for a normal load.</summary>
-    public void Hands(int load) { Bag.StackSize = load; Bag.Capacity = load; }
+    /// <summary>Still filling their hands at a gathering spot or a water source, so what they hold is not carried off yet.</summary>
+    [JsonIgnore] public bool Loading { get; set; }
+    /// <summary>Keeping to the job in hand until its round ends: a delivery, a crafted batch or another unit of its work.</summary>
+    [JsonIgnore] public bool Engaged { get; set; }
+    /// <summary>The rounds the place of the job in hand had counted when the worker took the job up.</summary>
+    [JsonIgnore] public int Mark { get; set; }
+    /// <summary>The carry a hauler is on the way to pick up.</summary>
+    internal Carry Plan;
     /// <summary>The bag holds fuel for the destination's burner rather than ingredients.</summary>
     public bool Fueling { get; set; }
-    /// <summary>The tool taken from a tool station for the current job, or empty; it goes back to a station when the job no longer needs it.</summary>
-    public string Tool { get; set; } = "";
+    /// <summary>The slot for the one tool a worker holds: taken from a tool station for the job in hand, or put there by a player.</summary>
+    public Inventory ToolSlot { get; set; } = new() { Slots = 1, StackSize = 1 };
+    /// <summary>The tool in <see cref="ToolSlot"/>, or empty; it goes back to a tool station when the job in hand has no use for it.</summary>
+    [JsonIgnore] public string Tool { get => ToolSlot.First() ?? ""; set { ToolSlot.Clear(); if (value != "") ToolSlot.Add(value, 1); } }
     /// <summary>The tool kind the worker last reported missing, so the message is said once rather than every tick.</summary>
     public string Missing { get; set; } = "";
     /// <summary>The kind of resource the worker last said they know no more of.</summary>
@@ -246,7 +261,7 @@ public sealed class SaveState {
     /// Raised whenever a change would make saves written before it load wrong.
     /// Saves from any other version are refused, never converted.
     /// </summary>
-    public int Version { get; set; } = 10;
+    public int Version { get; set; } = 11;
     public ThingList Things { get; set; } = new();
     public List<Worker> Workers { get; set; } = new();
     public List<TradeOrder> Orders { get; set; } = new();
@@ -395,6 +410,8 @@ public sealed partial class World {
     public const float ItemReach = 15;
     /// <summary>Whether the player can move items to or from a thing.</summary>
     public bool Reaches(Thing t) => Near(t, ItemReach);
+    /// <summary>Whether the player can take from a worker's hands or put something in them: the worker is in sight and within the reach of a building's slots.</summary>
+    public bool Reaches(Worker w) => !Downed && S.Sheltered == 0 && Sees(w) && w.Away <= 0 && w.Commute == 0 && Player.DistanceTo(w.Pos) <= ItemReach;
     public bool Near(Thing t, float radius = 3.2f) => !Downed && (S.Sheltered == 0 || S.Sheltered == t.Id) && Player.DistanceTo(GatherAt(t, Player)) <= radius;
     public int Coins => S.Backpack[Inventory.Coins];
     /// <summary>What every worker's wage comes to each dawn.</summary>
@@ -690,7 +707,7 @@ public sealed partial class World {
             if (result != WaterCollectResult.NoChange) { S.Milestones.Add("water"); Got(Water.Full); Play("gather_water", Player); }
             return;
         }
-        int amount = Math.Min(t.Remaining, t.Kind == ThingKind.WolfCorpse ? 2 : 4);
+        int amount = Math.Min(t.Remaining, GatherYield(t.Kind));
         string item = ResourceItem(t);
         amount = S.Backpack.Add(item, amount); t.Remaining -= amount;
         if (t.Kind == ThingKind.Tree && t.Remaining <= 0) Fell(t);
@@ -1081,11 +1098,6 @@ public sealed partial class World {
     }
     /// <summary>Finished goods plus anything neither the recipe the station is on nor the kept one takes.</summary>
     public IEnumerable<string> Leftovers(Thing t) => t.Inventory.Items.Keys.Where(item => !Pending(t, item));
-    /// <summary>The first of a station's leftovers that some storage takes, and that storage; liquid leaves in vessels instead (<see cref="LiquidToClear"/>).</summary>
-    private (string Item, Thing Store)? LeftoverToStore(Thing t) {
-        foreach (var pair in t.Inventory.Items) if (!Pending(t, pair.Key) && Data.VesselFor(pair.Key) == null && DepositFor(pair.Key, t.Pos) is Thing store) return (pair.Key, store);
-        return null;
-    }
     /// <summary>Steps inside a cabin, out of reach of wolves; any movement steps back out.</summary>
     public bool Enter(Thing hut) {
         if (hut.Kind != ThingKind.Hut || !Near(hut, 2.6f)) return false;
@@ -1290,26 +1302,6 @@ public sealed partial class World {
     public string? FuelBlock(Thing t, string item) =>
         !FuelFits(t, item) ? (Data.Recipes.TryGetValue(t.Recipe, out var r) ? $"{r.Name} burns {FuelWords(r.Fuels)}." : "The fuel slot only takes fuel.") :
         t.Burner?.First() is string held && held != item ? $"The fuel slot holds {Data.Name(held).ToLowerInvariant()}. Take it out first." : null;
-    /// <summary>
-    /// The fuel a hauler brings a station and where from: more of what its fuel slot burns while it holds under two batches,
-    /// or for an empty slot the first fuel the recipe burns that storage gives out.
-    /// </summary>
-    private (string Fuel, Thing Source)? FuelToFetch(Thing t, Vector2 from) {
-        if (t.Burner is not Inventory burner) return null;
-        if (burner.First() is string held) return FuelOf(t) == held && burner[held] < 2 && SourceFor(held, from) is Thing source ? (held, source) : null;
-        // One pass over storage: the first fuel in the recipe's order that any of it gives out, from the nearest that does.
-        var fuels = Fuels(t);
-        Thing? best = null; int rank = fuels.Count; float nearest = 0;
-        foreach (var kind in Stores)
-            foreach (var s in S.Things.Of(kind))
-                for (int i = 0; i < fuels.Count && i <= rank; i++) {
-                    if (s.Inventory[fuels[i]] <= 0 || !s.Inventory.AllowsWithdrawal(fuels[i])) continue;
-                    float distance = s.Pos.DistanceSquaredTo(from);
-                    if (i < rank || distance < nearest) { best = s; rank = i; nearest = distance; }
-                    break;
-                }
-        return best == null ? null : (fuels[rank], best);
-    }
     /// <summary>Coins kept for wages in every signpost's wage slot.</summary>
     public int WageCoins {
         get {
@@ -1617,7 +1609,7 @@ public sealed partial class World {
         if (target != null && w.Duties.Count == 0) w.Duties.Add(NewDuty(target, target.IsResource ? "gather" : "work"));
         Started(w, target);
     }
-    /// <summary>Gives a worker one job at a place, or takes it away, keeping their other jobs; with jobs at several places they take turns.</summary>
+    /// <summary>Gives a worker one job at a place, at the end of their list, or takes it away, keeping their other jobs.</summary>
     public void SetDuty(Worker w, Thing target, string job, bool on) {
         if (on == HasDuty(w, target.Id, job) || Array.IndexOf(Jobs(target), job) < 0) return;
         if (on && target.Kind == ThingKind.Mine && !HasDuty(w, target.Id) && Crew(target) >= Data.Mine.Workers) { Say($"A mine has room for {Data.Mine.Workers} workers."); return; }
@@ -1627,14 +1619,60 @@ public sealed partial class World {
         if (on && w.Duties.Count == 1 || !on && w.Assignment == target.Id && !HasDuty(w, target.Id)) Started(w, w.Duties.Count > 0 ? Find(w.Duties[0].Thing) : null);
     }
     private static Duty NewDuty(Thing place, string job) => new() { Thing = place.Id, Job = job, Kind = job == "gather" ? place.Kind : null };
+    /// <summary>The job name of a haul group's own entry in a worker's list: the hauls that follow it with its number count as one job across their places.</summary>
+    public const string HaulGroup = "group";
+    /// <summary>Whether an entry in a worker's list is a haul in some haul group.</summary>
+    public static bool Grouped(Duty d) => d.Group != 0 && d.Job != HaulGroup;
+    /// <summary>Adds an empty haul group to the end of a worker's jobs.</summary>
+    public void AddHaulGroup(Worker w) {
+        if (Forwarded(Verb.HaulGroup, other: w.Id, count: 1)) return;
+        int last = 0;
+        foreach (var d in w.Duties) last = Math.Max(last, d.Group);
+        w.Duties.Add(new Duty { Job = HaulGroup, Group = last + 1 });
+    }
+    /// <summary>Takes a haul group apart: its hauls stay where they are in the list, as jobs of their own.</summary>
+    public void RemoveHaulGroup(Worker w, int group) {
+        if (group == 0 || Forwarded(Verb.HaulGroup, other: w.Id, at: new Vector2(group, 0))) return;
+        for (int i = w.Duties.Count - 1; i >= 0; i--) {
+            if (w.Duties[i].Group != group) continue;
+            if (w.Duties[i].Job == HaulGroup) w.Duties.RemoveAt(i); else w.Duties[i].Group = 0;
+        }
+    }
+    /// <summary>
+    /// Moves one of a worker's jobs to another place in their list, which is the order the jobs come first in.
+    /// A haul group moves with its hauls. A haul moved into a group joins it; a job moved anywhere else stands on its own.
+    /// </summary>
+    /// <param name="index">The job's place in <see cref="Worker.Duties"/>.</param>
+    /// <param name="before">The entry it goes in front of, or the list's length for the end.</param>
+    /// <param name="group">The haul group a haul joins, or zero.</param>
+    public void MoveDuty(Worker w, int index, int before, int group = 0) {
+        if ((uint)index >= (uint)w.Duties.Count) return;
+        var duty = w.Duties[index];
+        if (Forwarded(Verb.MoveDuty, duty.Thing, w.Id, duty.Job, index, new Vector2(before, group))) return;
+        int length = 1;
+        if (duty.Job == HaulGroup) while (index + length < w.Duties.Count && Grouped(w.Duties[index + length]) && w.Duties[index + length].Group == duty.Group) length++;
+        before = Math.Clamp(before, 0, w.Duties.Count);
+        if (before > index && before < index + length) return;
+        var moved = w.Duties.GetRange(index, length);
+        w.Duties.RemoveRange(index, length);
+        if (before > index) before -= length;
+        int head = duty.Job == "haul" && group != 0 ? w.Duties.FindIndex(d => d.Job == HaulGroup && d.Group == group) : -1;
+        if (head >= 0) {
+            // Inside the group it lands where it was dropped; dropped elsewhere it goes to the group's end.
+            int end = head + 1;
+            while (end < w.Duties.Count && Grouped(w.Duties[end]) && w.Duties[end].Group == group) end++;
+            duty.Group = group; before = before > head && before <= end ? before : end;
+        } else {
+            if (duty.Job != HaulGroup) duty.Group = 0;
+            // A job never lands among the hauls of a group it is not in: it goes after them.
+            while (before < w.Duties.Count && Grouped(w.Duties[before])) before++;
+        }
+        w.Duties.InsertRange(before, moved);
+    }
     /// <summary>The place a worker's job is at: the place itself, or for a gather job whose spot is gone, a stand-in of its kind.</summary>
     public Thing? DutyPlace(Worker w, int place) {
         if (Find(place) is Thing t) return t;
         foreach (var d in w.Duties) if (d.Thing == place && d.Kind is ThingKind kind) return new Thing { Id = place, Kind = kind };
-        return null;
-    }
-    private static ThingKind? GatherKind(Worker w) {
-        foreach (var d in w.Duties) if (d.Thing == w.Assignment && d.Kind != null) return d.Kind;
         return null;
     }
     private void Started(Worker w, Thing? target) {
@@ -1645,6 +1683,7 @@ public sealed partial class World {
     }
     public void Fire(Worker w) {
         if (Forwarded(Verb.Fire, other: w.Id)) return;
+        ReleaseIn(w.Bag); ReleaseIn(w.ToolSlot);
         if (w.Bag.Count > 0 || w.Tool != "") { var box = Add(ThingKind.Grave, w.Pos); box.Inventory = w.Bag; box.Inventory.Capacity = 0; box.Inventory.Slots = box.Inventory.UsedSlots + 1; box.Inventory.Add(w.Tool, w.Tool == "" ? 0 : 1); }
         S.Workers.Remove(w); Say($"{w.Name} has left. Carried items were left in a recovery box.");
     }
@@ -1745,7 +1784,18 @@ public sealed partial class World {
                 float distance = t.Pos.DistanceSquaredTo(origin);
                 if (best == null || rank < bestRank || rank == bestRank && distance < bestDistance) { best = t; bestRank = rank; bestDistance = distance; }
             }
+        // A station, farm plot or mine site that uses the item takes it as storage asking for it does: its input slots, its fuel slot, the materials it lacks.
+        foreach (var kind in stationKinds) Users(kind);
+        Users(ThingKind.Farm); Users(ThingKind.Mine);
         return best;
+
+        void Users(ThingKind kind) {
+            foreach (var t in S.Things.Of(kind)) {
+                if (t.Id == exclude || Into(t, item, false) == null) continue;
+                float distance = t.Pos.DistanceSquaredTo(origin);
+                if (best == null || bestRank > 0 || distance < bestDistance) { best = t; bestRank = 0; bestDistance = distance; }
+            }
+        }
     }
     /// <summary>
     /// Whether a packing station takes a delivery of an item: only the good it packs, and only while a delivery of up to a stack still leaves a slot for empty crates.
@@ -1902,178 +1952,7 @@ public sealed partial class World {
         if (w.WageDebt > 0) { w.Status = "On strike · wages owed"; return; }
         if (Lunch) { EatLunch(w, dt); return; }
         TidyDuties(w);
-        var target = Find(w.Assignment);
-        if (target?.Kind == ThingKind.Water && w.Destination == target.Id && Water.FindBottle(w.Bag) is string bottle && bottle != Water.Full) {
-            WaterWork(w, target, dt); return;
-        }
-        if (w.Bag.Count > 0) {
-            string item = w.Bag.First()!;
-            var dest = Find(w.Destination);
-            if (FillsLeftover(w, dest, item, dt)) return;
-            // Re-evaluate rules every tick, including filters changed while a worker is carrying goods.
-            // A mine site takes only what it still needs, so a surplus goes back to storage.
-            int wanted = dest?.Kind == ThingKind.Mine ? MineNeed(dest, item) : int.MaxValue;
-            // Fuel for a station goes into its fuel slot; once that is full or gone, it goes to storage like anything else.
-            var into = w.Fueling && dest?.Burner != null && FuelTakes(dest, item) ? dest.Burner : dest?.Inventory;
-            // A vessel for a station that takes its liquid pours it there.
-            var pours = into != null ? PoursInto(dest, into, item) : null;
-            string lands = pours?.Liquid ?? item;
-            if (dest == null || into == null || wanted == 0 || into.Room(lands) == 0 || !into.Accepts(lands) || (dest.Id == target?.Id && target.IsResource)) { dest = DepositFor(item, w.Pos); into = dest?.Inventory; w.Fueling = false; pours = null; }
-            if (dest == null) { w.Status = Phrase("Holding ", Data.Name(item), " · no accepting storage"); return; }
-            w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
-            if (Walk(w, dest.Pos, dt)) {
-                // Every vessel carried pours, whatever it holds.
-                if (pours != null) PourLiters(w.Bag, into!, pours, int.MaxValue);
-                else w.Bag.TransferTo(into!, item, dest.Kind == ThingKind.Mine ? MineNeed(dest, item) : w.Bag[item], true);
-                w.Destination = 0;
-                if (w.Bag.Count == 0) { w.Fueling = false; w.Hands(Worker.BagStack); NextPlace(w); }
-            }
-            return;
-        }
-        // A gatherer also fetches a tool that only speeds the work up, such as a rake, while a tool station has one.
-        string? need = target is { IsResource: true } && HasDuty(w, target.Id, "gather") && GatherRules.Of(target.Kind) is GatherRule rule ? rule.Needs ?? (rule.Helps is string helping && HasTool(w, helping) ? helping : null)
-            : target is { Kind: ThingKind.Mine } ? MineTool(w, target) : null;
-        if (need == null) w.Missing = "";
-        if (w.Tool != "" && Data.Items[w.Tool].Tool != need) {
-            if (!ReturnTool(w, dt)) return;
-            // With no room in a tool station the tool stays in hand, and a job that needs another kind waits for room.
-            if (w.Tool != "" && need != null) { w.Status = Phrase("No room to put back the ", Lower(Data.Name(w.Tool))); return; }
-        }
-        if (target == null && GatherKind(w) is ThingKind kind) { if (!NextSpot(w, w.Assignment, kind, w.Pos, dt)) NextPlace(w); return; }
-        if (target == null) { w.Status = "Available"; WaitAtPost(w, dt); return; }
-        // With nothing to do here, a worker with jobs elsewhere moves on to the next place.
-        if (!WorkAt(w, target, need, dt)) NextPlace(w);
-    }
-    /// <summary>Works the worker's jobs at one place and tells whether there was anything to do.</summary>
-    private bool WorkAt(Worker w, Thing target, string? need, float dt) {
-        if (target.Kind == ThingKind.Water) return WaterWork(w, target, dt);
-        if (target.IsResource) {
-            if (target.Remaining <= 0) return NextSpot(w, target.Id, target.Kind, target.Pos, dt);
-            string? blocked = GatherBlock(target, true);
-            if (blocked != null) { w.Status = blocked; return false; }
-            string item = ResourceItem(target);
-            if (DepositFor(item, target.Pos) == null) { w.Status = "Needs an accepting storage chest"; return false; }
-            if (need != null && w.Tool == "") {
-                FetchTool(w, need, target, dt);
-                // With no tool to be had, the nearest spot of the job that needs none, or one that is to be had, is worked instead.
-                return w.Missing == "" || OtherSpot(w, target);
-            }
-            w.Status = Phrase("Gathering ", Data.Name(item));
-            if (!Walk(w, target.Pos, dt)) return true;
-            w.WorkState = WorkerWorkState.Gathering; w.Exhausted = null;
-            string? tool = w.Tool == "" ? null : w.Tool;
-            if (target.IsDug) {
-                // What is dug up is carried off whole, however much it holds.
-                target.Progress += dt * Speed(tool) / WorkerGatherTime;
-                if (DugOut(target)) { w.Hands(Math.Max(Worker.BagStack, target.Remaining)); Unearth(target, w.Bag); }
-                return true;
-            }
-            w.Timer += dt;
-            if (target.IsLoose || w.Timer >= GatherTime(target.Kind, tool) * WorkerGatherTime) {
-                w.Timer = 0; int took = w.Bag.Add(item, target.Remaining); target.Remaining -= took;
-                if (took > 0) Got(item);
-                Chip(target, tool);
-                if (target.Remaining > 0) return true;
-                // Whoever fells a tree digs its stump up next while a shovel is to be had, and otherwise goes on to the next tree.
-                if (target.Kind == ThingKind.Tree) {
-                    var stump = Fell(target);
-                    if (CanWork(w, stump.Kind)) { MoveTo(w, target.Id, stump); return true; }
-                }
-                NextSpot(w, target.Id, target.Kind, target.Pos, dt);
-                if (target.IsLoose) S.Things.Remove(target);
-            }
-            return true;
-        }
-        coworkers.Clear();
-        foreach (var other in S.Workers) if (other.WageDebt <= 0 && HasDuty(other, target.Id)) coworkers.Add(other);
-        coworkers.Sort(ById);
-        if (target.Kind == ThingKind.Mine) return MineWork(w, target, coworkers, dt);
-        if (target.Kind == ThingKind.Farm) return FarmWork(w, target, dt);
-        if (target.Kind == ThingKind.Toolstation) return StockTools(w, target, dt);
-        if (target.Kind == ThingKind.Pile) return TendCompost(w, target, dt);
-        bool haul = HasDuty(w, target.Id, "haul");
-        // Only one worker ever pumps: the first on the bellows. With others hauling, or no hauling of their own, they only pump.
-        var pumper = Pumper(target);
-        if (pumper == w && (!haul || HaulerBesides(target, w))) {
-            w.Status = "Operating bellows"; if (Walk(w, target.Pos + BellowsStand, dt, .1f)) { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 18); }
-            return true;
-        }
-        if (target.Kind == ThingKind.Signpost) return ManageDeliveries(w, target, dt);
-        if (target.Kind == ThingKind.Packer) return PackWork(w, target, dt);
-        if (target.Kind == ThingKind.Campfire) {
-            if (target.Burn > 120 || target.Inventory["wood"] > 0) { w.Status = "Tending fire"; Walk(w, target.Pos, dt); return false; }
-            var source = SourceFor("wood", w.Pos);
-            if (source == null) { w.Status = "Needs wood in output-enabled storage"; return false; }
-            if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, "wood", 3, true); w.Destination = target.Id; }
-            w.Status = "Fetching firewood"; return true;
-        }
-        const string Idle = "Nothing queued or marked to make";
-        if (!haul && !Data.Recipes.ContainsKey(target.Recipe)) { w.Status = Idle; return false; }
-        if (haul) {
-            // Finished goods with nowhere to go stay in the station, which keeps working until it is full.
-            if (LeftoverToStore(target) is (string leftover, Thing dest)) {
-                w.Status = "Collecting finished goods";
-                if (Walk(w, target.Pos, dt)) { target.Inventory.TransferTo(w.Bag, leftover, w.Bag.StackSize, true); w.Destination = dest.Id; }
-                return true;
-            }
-            if (LiquidToClear(target, w.Pos) is (VesselDef vessel, string roomy, Thing roomySource)) {
-                w.Status = Phrase("Fetching ", Lower(Data.Name(vessel.Full)), "s for leftover ", Lower(Data.Name(vessel.Liquid)));
-                int fetch = (target.Inventory[vessel.Liquid] + vessel.Capacity - 1) / vessel.Capacity;
-                if (Walk(w, roomySource.Pos, dt)) { roomySource.Inventory.TransferTo(w.Bag, roomy, fetch, true); w.Destination = target.Id; }
-                return true;
-            }
-            if (!Data.Recipes.ContainsKey(target.Recipe)) { w.Status = Idle; return false; }
-            // Fuel the recipe does not burn leaves the fuel slot, so the right one can go in.
-            if (!target.Processing && Fuels(target).Count > 0 && FuelOf(target) == null && target.Burner!.First() is string stale && DepositFor(stale, target.Pos) is Thing store) {
-                w.Status = Phrase("Clearing ", Lower(Data.Name(stale)), " from the fire");
-                if (Walk(w, target.Pos, dt)) { target.Burner.TransferTo(w.Bag, stale, w.Bag.StackSize, true); w.Destination = store.Id; }
-                return true;
-            }
-            var costs = BatchCost(target);
-            // A worked station only works while worked, so its crafter stays put until the batch is done before fetching the next one.
-            bool fetches = !Worked(target) || !target.Processing || !HasDuty(w, target.Id, "craft");
-            if (fetches) foreach (var pair in costs) {
-                int wanting = pair.Value * 2 - target.Inventory[pair.Key];
-                if (wanting <= 0) continue;
-                // A liquid comes in the vessels that pour it, enough of them for the liters short.
-                string carried = pair.Key; Thing? source; int count = wanting;
-                if (Data.VesselFor(pair.Key) is VesselDef carrier) {
-                    if (LiquidSource(carrier, w.Pos) is not (string filled, Thing holder)) continue;
-                    int each = carrier.LitersIn(filled);
-                    (carried, source) = (filled, holder); count = (wanting + each - 1) / each;
-                } else if ((source = SourceFor(carried, w.Pos)) == null) continue;
-                w.Status = Phrase("Fetching ", Data.Name(carried));
-                if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, carried, count, true); w.Destination = target.Id; }
-                return true;
-            }
-            // Then two batches' worth of fuel for the fuel slot.
-            if (fetches && FuelToFetch(target, w.Pos) is (string fuel, Thing fuelSource)) {
-                w.Status = Phrase("Fetching ", Data.Name(fuel), " for the fire");
-                if (Walk(w, fuelSource.Pos, dt)) { fuelSource.Inventory.TransferTo(w.Bag, fuel, 2 - target.Burner![fuel], true); w.Destination = target.Id; w.Fueling = true; }
-                return true;
-            }
-        }
-        // A lone bellows worker who also hauls pumps between loads.
-        bool pumps = pumper == w;
-        bool crafts = Worked(target) && HasDuty(w, target.Id, "craft");
-        string? missing = target.Tools != null && Data.Recipes[target.Recipe] is var needed && needed.Tool != "" && BenchTool(target, needed.Tool, needed.Tier) == null ? Data.ToolName(needed.Tool, needed.Tier) : null;
-        w.Status = pumps ? "Pumping bellows between loads" : target.Kind == ThingKind.Reinforced ? "Waiting for the next load" : missing != null ? Phrase("Needs ", A(missing), " in the ", Lower(Data.Name(target.Kind))) : crafts ? "Working at station" : "Waiting for the next load";
-        if (!pumps && !crafts) return false;
-        if (Walk(w, target.Pos, dt)) {
-            if (pumps) { w.WorkState = WorkerWorkState.Pumping; target.Heat = Math.Min(100, target.Heat + dt * 16); } else w.WorkState = WorkerWorkState.Hammering;
-        }
-        return pumps || target.Processing || Stocked(target);
-    }
-    /// <summary>The worker who pumps a reinforced furnace's bellows: the first on duty with the bellows job, or null.</summary>
-    private Worker? Pumper(Thing t) {
-        if (t.Kind != ThingKind.Reinforced) return null;
-        // Only a worker at the furnace now can pump; one away on another job leaves it to the next.
-        foreach (var o in coworkers) if (o.Assignment == t.Id && HasDuty(o, t.Id, "bellows")) return o;
-        return null;
-    }
-    private bool HaulerBesides(Thing t, Worker w) {
-        foreach (var o in coworkers) if (o != w && HasDuty(o, t.Id, "haul")) return true;
-        return false;
+        WorkJobs(w, dt);
     }
     /// <summary>
     /// A post's runner fetches prices on request and carries what the cart delivered, other than coins, to storage.
@@ -2082,11 +1961,12 @@ public sealed partial class World {
         if (sign.Output != null)
             foreach (var pair in sign.Output.Items) {
                 if (pair.Key == Inventory.Coins || DepositFor(pair.Key, sign.Pos) is not Thing dest) continue;
+                if (!HandsFree(w, dt)) return true;
                 w.Status = Phrase("Carrying in ", Data.Name(pair.Key));
-                if (Walk(w, sign.Pos + Vector2.One, dt)) { w.Hands(Math.Max(Worker.BagStack, sign.Output.StackOf(pair.Key))); sign.Output.TransferTo(w.Bag, pair.Key, w.Bag.StackSize); w.Destination = dest.Id; }
+                if (Walk(w, sign.Pos + Vector2.One, dt)) { sign.Output.TransferTo(w.Bag, pair.Key, Worker.BagStack); w.Destination = dest.Id; }
                 return true;
             }
-        w.Status = "Minding the trading post"; Walk(w, sign.Pos + Vector2.One, dt); return false;
+        w.Status = "Minding the trading post"; return false;
     }
     /// <summary>A rack's stocker brings tools it takes from storage until none are left there or the rack is full.</summary>
     private bool StockTools(Worker w, Thing rack, float dt) {
@@ -2094,6 +1974,7 @@ public sealed partial class World {
             foreach (var t in S.Things.Of(kind))
                 foreach (var pair in t.Inventory.Items) {
                     if (!Data.Items.TryGetValue(pair.Key, out var def) || def.Tool == "" || !t.Inventory.AllowsWithdrawal(pair.Key) || !rack.Inventory.Accepts(pair.Key) || rack.Inventory.Room(pair.Key) == 0) continue;
+                    if (!HandsFree(w, dt)) return true;
                     w.Status = Phrase("Fetching ", A(Lower(def.Name)), " for the rack");
                     if (Walk(w, t.Pos, dt)) { t.Inventory.TransferTo(w.Bag, pair.Key, 1, true); w.Destination = rack.Id; }
                     return true;
@@ -2104,6 +1985,7 @@ public sealed partial class World {
     private bool TendCompost(Worker w, Thing pile, float dt) {
         if (!pile.Compost) { w.Status = "Nothing to tend"; return false; }
         if (pile.Inventory["fertilizer"] > 0 && pile.Inventory.AllowsWithdrawal("fertilizer") && DepositFor("fertilizer", pile.Pos, pile.Id) is Thing store) {
+            if (!HandsFree(w, dt)) return true;
             w.Status = "Carrying out fertilizer";
             if (Walk(w, pile.Pos, dt)) { pile.Inventory.TransferTo(w.Bag, "fertilizer", w.Bag.StackSize, true); w.Destination = store.Id; }
             return true;
@@ -2113,6 +1995,7 @@ public sealed partial class World {
                 if (t == pile || t.Compost) continue;
                 foreach (var pair in t.Inventory.Items) {
                     if (!Compostable(pair.Key) || pile.SkipFood && Data.IsFood(pair.Key) || !t.Inventory.AllowsWithdrawal(pair.Key) || !pile.Inventory.Accepts(pair.Key) || pile.Inventory.Room(pair.Key) == 0) continue;
+                    if (!HandsFree(w, dt)) return true;
                     w.Status = Phrase("Fetching ", Data.Name(pair.Key), " for the compost");
                     if (Walk(w, t.Pos, dt)) { t.Inventory.TransferTo(w.Bag, pair.Key, w.Bag.StackSize, true); w.Destination = pile.Id; }
                     return true;
@@ -2125,17 +2008,15 @@ public sealed partial class World {
         foreach (var d in w.Duties) if (d.Thing == place && (job == "" || d.Job == job)) return true;
         return false;
     }
-    /// <summary>Moves a worker with jobs at several places on to the next one, in the order they were given.</summary>
     /// <summary>
-    /// Moves a gatherer whose spot is spent or gone to the nearest spot of the same kind that any player has seen, even one now under fog.
-    /// With none known, they go on to their other jobs, or wait at the trading post; either way they say so once.
+    /// Moves a gatherer whose spot is spent or gone to the nearest spot of the same job that any player has seen, even one now under fog, and tells whether there was one.
+    /// With none known they say so once, and their status says it.
     /// </summary>
-    private bool NextSpot(Worker w, int spent, ThingKind kind, Vector2 from, float dt) {
+    private bool NextSpot(Worker w, int spent, ThingKind kind, Vector2 from) {
         if (NearestSpot(w, kind, from) is Thing next) { MoveTo(w, spent, next); return true; }
         if (w.Exhausted != kind) { w.Exhausted = kind; Say($"{w.Name} knows no other {Lower(Data.Name(kind))} to gather."); }
-        if (w.Duties.Count > 1) return false;
-        w.Status = Phrase("No other known ", Lower(Data.Name(kind)), " · waiting at the trading post");
-        WaitAtPost(w, dt); return true;
+        w.Status = Phrase("No other known ", Lower(Data.Name(kind)));
+        return false;
     }
     /// <summary>
     /// The nearest known spot with stock left, of the job that gathering <paramref name="of"/> is, which the worker has no duty on.
@@ -2156,8 +2037,6 @@ public sealed partial class World {
     }
     /// <summary>Whether a worker can gather a kind of resource: it needs no tool, or one they have in hand or can take from a tool station.</summary>
     private bool CanWork(Worker w, ThingKind kind) => GatherRules.Of(kind)?.Needs is not string tool || HasTool(w, tool);
-    /// <summary>How many times longer than the player a worker takes over a gather.</summary>
-    private const float WorkerGatherTime = 1.6f;
     /// <summary>Moves a worker's duties on a spent spot to the next one.</summary>
     private static void MoveTo(Worker w, int spent, Thing next) {
         foreach (var duty in w.Duties) if (duty.Thing == spent) duty.Thing = next.Id;
@@ -2165,22 +2044,11 @@ public sealed partial class World {
     }
     private static bool Crowds(Worker w) => !w.Home && w.Commute == 0 && w.Away == 0 && w.WorkState != WorkerWorkState.Underground;
     private void WaitAtPost(Worker w, float dt) => Walk(w, Nearest(ThingKind.Signpost, w.Pos)?.Pos + Vector2.One ?? Terrain.Spawn, dt);
-    private static void NextPlace(Worker w) {
-        if (w.Duties.Count < 2) return;
-        int at = -1;
-        for (int i = 0; i < w.Duties.Count; i++) if (w.Duties[i].Thing == w.Assignment) at = i;
-        for (int step = 1; step <= w.Duties.Count; step++) {
-            var next = w.Duties[(at + step + w.Duties.Count) % w.Duties.Count];
-            if (next.Thing == w.Assignment) continue;
-            w.Assignment = next.Thing; w.Timer = 0; return;
-        }
-    }
     /// <summary>Drops jobs at places that are gone, other than gather jobs, saying so when that leaves the worker without a job, and points the worker at a place they still have a job at.</summary>
     private void TidyDuties(Worker w) {
         bool had = w.Duties.Count > 0;
-        for (int i = w.Duties.Count - 1; i >= 0; i--) if (w.Duties[i].Kind == null && Find(w.Duties[i].Thing) == null) w.Duties.RemoveAt(i);
-        if (w.Duties.Count == 0) { if (had) Say($"{w.Name} without a job."); w.Assignment = 0; return; }
-        if (!HasDuty(w, w.Assignment)) w.Assignment = w.Duties[0].Thing;
+        for (int i = w.Duties.Count - 1; i >= 0; i--) if (w.Duties[i].Kind == null && w.Duties[i].Job != HaulGroup && Find(w.Duties[i].Thing) == null) w.Duties.RemoveAt(i);
+        if (w.Duties.Count == 0) { if (had) Say($"{w.Name} without a job."); w.Assignment = 0; w.Job = ""; }
     }
     /// <summary>Walks a tool the job no longer needs to the nearest tool station with room, and reports when it is put back; with no such station the worker keeps it.</summary>
     private bool ReturnTool(Worker w, float dt) {
@@ -2190,7 +2058,8 @@ public sealed partial class World {
         if (station == null) return true;
         w.Status = Phrase("Putting back the ", Lower(Data.Name(w.Tool)));
         if (!Walk(w, station.Pos, dt)) return false;
-        station.Inventory.Add(w.Tool, 1); w.Tool = ""; return true;
+        // A tool a player holds on their cursor stays in hand until they let go of it.
+        return w.ToolSlot.TransferTo(station.Inventory, w.Tool, 1) > 0;
     }
     // The tool kinds tool stations give out; a tool station's contents or filters changing marks it out of date, and it is worked out again when next asked.
     private readonly HashSet<string> stationTools = new();
@@ -2259,7 +2128,7 @@ public sealed partial class World {
     // Reused copies of lists the tick walks while it may change them, so ticking allocates nothing.
     private readonly List<Thing> ticking = new();
     private readonly List<PlayerState> acting = new();
-    private readonly List<Worker> crew = new(), coworkers = new();
+    private readonly List<Worker> crew = new();
     private readonly List<Wolf> hunting = new();
     private readonly List<TradeOrder> arriving = new();
     private readonly List<string> demanded = new();
@@ -2414,8 +2283,8 @@ public sealed partial class World {
             if (t.Progress >= recipe.Seconds) {
                 // Manual loading or another hauler can fill the station while a batch cooks.
                 // Retain the completed batch until the one-stack output slot has room rather than discarding output.
-                if (Math.Min(t.Inventory.Room(recipe.Output), t.Inventory.StackSize - t.Inventory[recipe.Output]) < recipe.Amount) return;
-                t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Making = ""; t.Progress = 0; stillBurning.Add(t.Id);
+                if (SlotRoom(t.Inventory, recipe.Output) < recipe.Amount) return;
+                t.Inventory.Add(recipe.Output, recipe.Amount); t.Processing = false; t.Making = ""; t.Progress = 0; t.Rounds++; stillBurning.Add(t.Id);
                 Crafted(recipe.Output);
             }
         }
@@ -2429,9 +2298,8 @@ public sealed partial class World {
         foreach (var p in S.Players) if (p.Id == id) return p;
         return null;
     }
-    private static readonly Comparison<Worker> ById = (a, b) => a.Id.CompareTo(b.Id);
     private bool Crewed(Thing t) {
-        foreach (var w in S.Workers) if (w.Assignment == t.Id && HasDuty(w, t.Id, "bellows") && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w)) return true;
+        foreach (var w in S.Workers) if (w.Assignment == t.Id && w.Job == "bellows" && w.WageDebt <= 0 && w.WorkState != WorkerWorkState.Blocked && OnDuty(w)) return true;
         return false;
     }
     /// <summary>How many times a stomach has growled by the time its food has fallen this low.</summary>
@@ -2686,7 +2554,7 @@ public sealed partial class World {
             if (t.Batches > 0 && t.Keep != "" && t.Keep != t.Asked) return false;
         }
         foreach (var w in save.Workers)
-            if (w?.Duties == null || w.Tool == null || w.Tool != "" && !Data.Items.ContainsKey(w.Tool) || !ValidInventory(w.Bag, save.Crates)) return false;
+            if (w?.Duties == null || !ValidInventory(w.ToolSlot, save.Crates) || !ValidInventory(w.Bag, save.Crates)) return false;
         foreach (var order in save.Orders) if (order?.Goods == null || !ValidCounts(order.Goods, save.Crates)) return false;
         return true;
     }

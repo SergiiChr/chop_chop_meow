@@ -729,9 +729,8 @@ public static class ActorAnimation {
         if (worker.WageDebt > 0 && !moving) return ActorAction.Protest;
         // Every other worker sits on a rock rather than the ground.
         if (worker.WorkState == WorkerWorkState.Resting && !moving) return worker.Id % 2 == 0 ? ActorAction.Perch : ActorAction.Sit;
-        if (worker.Bag.Count > 0) return ActorAction.Carry;
-        if (moving) return ActorAction.Walk;
-        if (worker.WorkState == WorkerWorkState.Gathering && (assignment?.IsResource == true || assignment?.Kind == ThingKind.Farm)) {
+        // A gatherer filling their hands goes on working with what they already hold.
+        if (!moving && worker.WorkState == WorkerWorkState.Gathering && (assignment?.IsResource == true || assignment?.Kind == ThingKind.Farm)) {
             return assignment.Kind switch {
                 ThingKind.Tree => ActorAction.Chop,
                 ThingKind.Stone or ThingKind.Iron or ThingKind.Coal or ThingKind.Tin => ActorAction.Mine,
@@ -739,6 +738,8 @@ public static class ActorAnimation {
                 _ => ActorAction.Gather
             };
         }
+        if (worker.Bag.Count > 0) return ActorAction.Carry;
+        if (moving) return ActorAction.Walk;
 
         return worker.WorkState switch {
             WorkerWorkState.Pumping => ActorAction.Pump,

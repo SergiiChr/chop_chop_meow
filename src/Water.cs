@@ -60,19 +60,24 @@ public static class Water {
 public enum WaterCollectResult { NoChange, RefilledBottle, SourceLiter }
 
 public sealed partial class World {
-    /// <summary>A water collector refills existing empty bottles; gathering never creates packaging.</summary>
+    /// <summary>
+    /// A water collector takes bottles with room from storage, as many as their hands hold, fills one each gather at the water and stores them.
+    /// Gathering never creates packaging.
+    /// </summary>
     private bool WaterWork(Worker worker, Thing pond, float dt) {
         string? carried = Water.FindBottle(worker.Bag);
         if (carried != null && carried != Water.Full) {
+            worker.Loading = true;
             worker.Status = "Collecting water";
             if (!Walk(worker, Terrain.WaterPoint(worker.Pos), dt, 2.5f)) return true;
             worker.WorkState = WorkerWorkState.Gathering;
             worker.Timer += dt;
             if (worker.Timer < Data.GatherSeconds) return true;
             worker.Timer = 0; worker.Bag.Replace(carried, Water.Full); Got(Water.Full);
-            worker.Destination = DepositFor(Water.Full, worker.Pos)?.Id ?? 0;
             return true;
         }
+        // Every bottle in hand is full: off they go.
+        if (worker.Loading) { worker.Loading = false; return true; }
         Thing? source = null; string item = Water.Empty;
         foreach (var candidate in Water.BottleItems) {
             if (candidate == Water.Full) break;
@@ -81,11 +86,9 @@ public sealed partial class World {
         }
         if (source == null) { worker.Status = "Needs refillable bottles in output-enabled storage"; return false; }
         if (DepositFor(Water.Full, worker.Pos) == null) { worker.Status = "Needs storage for filled bottles"; return false; }
-        worker.Status = "Fetching an empty bottle";
-        if (Walk(worker, source.Pos, dt)) {
-            source.Inventory.TransferTo(worker.Bag, item, 1, true);
-            worker.Destination = pond.Id;
-        }
+        if (!HandsFree(worker, dt)) return true;
+        worker.Status = "Fetching empty bottles";
+        if (Walk(worker, source.Pos, dt)) { source.Inventory.TransferTo(worker.Bag, item, Worker.BagStack, true); worker.Loading = worker.Bag.Count > 0; }
         return true;
     }
 }

@@ -98,7 +98,7 @@ public sealed partial class World {
     }
     private void FinishMineStage(Thing mine) {
         bool dug = mine.MineStage == MineStage.Marked;
-        mine.MineStage++; mine.Progress = 0;
+        mine.MineStage++; mine.Progress = 0; mine.Rounds++;
         Say(dug ? $"The {MineName(mine)} entrance is dug. Deliver {Goods(Data.Mine.Materials)}." : $"The {MineName(mine)} is open. Up to {Data.Mine.Workers} workers with pickaxes can mine it.");
     }
 
@@ -112,64 +112,49 @@ public sealed partial class World {
         mine.Progress += dt * miners;
         while (mine.Progress >= Data.Mine.Seconds && !MineFull(mine)) {
             string ore = MineOre(mine);
-            mine.Progress -= Data.Mine.Seconds; mine.Output!.Add(ore, 1); mine.Output.Add("stone", 1); Got(ore); Got("stone");
+            mine.Progress -= Data.Mine.Seconds; mine.Output!.Add(ore, 1); mine.Output.Add("stone", 1); mine.Rounds++; Got(ore); Got("stone");
         }
     }
 
-    private Worker? FirstFreeHands(List<Worker> crew, Thing mine) {
-        foreach (var c in crew) if (c.Assignment == mine.Id && HasDuty(c, mine.Id, "mine") && c.Tool != "" && Data.Items[c.Tool].Tool == "pickaxe" && c.Bag.Count == 0 && OnDuty(c)) return c;
-        throw new InvalidOperationException("A mine crew member with free hands is the one asking.");
+    /// <summary>A builder digs a marked mine's entrance with a pickaxe and fits a supplied one's frame with a hammer; each finished stage is a round.</summary>
+    private bool BuildSite(Worker w, Thing mine, float dt) {
+        if (mine.MineStage is not (MineStage.Marked or MineStage.Supplied)) { w.Status = mine.MineStage == MineStage.Dug ? MineWants(mine) : "The mine is open"; return false; }
+        bool digging = mine.MineStage == MineStage.Marked;
+        switch (Equip(w, digging ? "pickaxe" : "hammer", mine, dt)) {
+            case Kit.Busy: return true;
+            case Kit.Lacking: return false;
+        }
+        w.Status = digging ? "Digging the mine entrance" : "Fitting the mine frame and rails";
+        if (!Walk(w, MineDoor(mine), dt, .5f)) return true;
+        w.WorkState = digging ? WorkerWorkState.Digging : WorkerWorkState.Hammering;
+        BuildMine(mine, dt);
+        return true;
     }
 
-    /// <summary>The tool a worker's jobs at a mine need at its stage: a pickaxe to dig and to mine, a hammer to fit; hauling needs none.</summary>
-    public string? MineTool(Worker w, Thing mine) => mine.MineStage switch {
-        MineStage.Marked => HasDuty(w, mine.Id, "build") ? "pickaxe" : null,
-        MineStage.Dug => null,
-        MineStage.Supplied => HasDuty(w, mine.Id, "build") ? "hammer" : null,
-        _ => HasDuty(w, mine.Id, "mine") ? "pickaxe" : null
-    };
-    private bool MineWork(Worker w, Thing mine, List<Worker> crew, float dt) {
-        if (MineTool(w, mine) is string tool && w.Tool == "") { FetchTool(w, tool, mine, dt); return w.Missing == ""; }
-        if (mine.MineStage == MineStage.Dug) {
-            if (HasDuty(w, mine.Id, "haul"))
-                foreach (var pair in Data.Mine.Materials) {
-                    string item = pair.Key; int need = MineNeed(mine, item);
-                    if (need == 0) continue;
-                    var source = SourceFor(item, w.Pos);
-                    if (source == null) continue;
-                    w.Status = Phrase("Fetching ", Data.Name(item), " for the ", MineName(mine));
-                    if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, item, need, true); w.Destination = mine.Id; }
-                    return true;
-                }
-            w.Status = MineWants(mine); return false;
+    /// <summary>
+    /// A miner works an open mine underground with a pickaxe; each piece mined is a round.
+    /// Once the mine's output is full, a miner brings a load of it out to storage.
+    /// </summary>
+    private bool Dig(Worker w, Thing mine, float dt) {
+        if (mine.MineStage != MineStage.Open) { w.Status = mine.MineStage == MineStage.Marked ? "Waiting for the entrance to be dug" : "Waiting for the frame to be fitted"; return false; }
+        switch (Equip(w, "pickaxe", mine, dt)) {
+            case Kit.Busy: return true;
+            case Kit.Lacking: return false;
         }
-        if (mine.MineStage < MineStage.Open) {
-            bool digging = mine.MineStage == MineStage.Marked;
-            if (!HasDuty(w, mine.Id, "build")) { w.Status = digging ? "Waiting for the entrance to be dug" : "Waiting for the frame to be fitted"; return false; }
-            w.Status = digging ? "Digging the mine entrance" : "Fitting the mine frame and rails";
-            if (!Walk(w, MineDoor(mine), dt, .5f)) return true;
-            w.WorkState = digging ? WorkerWorkState.Digging : WorkerWorkState.Hammering;
-            BuildMine(mine, dt);
-            return true;
-        }
-        if (!HasDuty(w, mine.Id, "mine")) { w.Status = "The mine is open"; return false; }
         string ore = MineOre(mine);
         if (MineFull(mine)) {
-            // The first miner with free hands brings the full stack out to storage; the rest wait underground.
             string full = mine.Output![ore] >= mine.Output.StackSize ? ore : "stone";
-            var dest = DepositFor(full, mine.Pos);
-            if (dest == null) {
+            if (DepositFor(full, mine.Pos, mine.Id) is not Thing dest) {
                 w.Status = Phrase("Mine full · no storage takes ", Data.Name(full));
                 if (mineFullReported.Add(mine.Id)) Say($"The {MineName(mine)} is full with no output available.");
-            } else if (FirstFreeHands(crew, mine) == w) {
-                w.Status = Phrase("Bringing out ", Data.Name(full));
-                if (Walk(w, MineDoor(mine), dt, .5f)) { w.Hands(mine.Output.StackSize); mine.Output.TransferTo(w.Bag, full, mine.Output.StackSize); w.Destination = dest.Id; }
-                return true;
-            } else w.Status = "Waiting · the mine output is full";
-        } else {
-            mineFullReported.Remove(mine.Id);
-            w.Status = Phrase("Mining ", Data.Name(ore), " underground");
+                return false;
+            }
+            w.Status = Phrase("Bringing out ", Data.Name(full));
+            if (Walk(w, MineDoor(mine), dt, .5f)) { mine.Output.TransferTo(w.Bag, full, Worker.BagStack); w.Destination = dest.Id; }
+            return true;
         }
+        mineFullReported.Remove(mine.Id);
+        w.Status = Phrase("Mining ", Data.Name(ore), " underground");
         if (Walk(w, MineDoor(mine), dt, .5f)) w.WorkState = WorkerWorkState.Underground;
         return true;
     }

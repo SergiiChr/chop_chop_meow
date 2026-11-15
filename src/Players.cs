@@ -72,7 +72,7 @@ public sealed class PlayerState {
 public readonly record struct HeldStack(int Box, int Slot, string Item, int Count);
 
 /// <summary>The player actions a guest sends to the host.</summary>
-public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, Hold, Leave, LoadBatch, LoadFuel, LoadInput, MoveInCrate, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, Release, SelectHotbar, SelectInHand, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, Unqueue, UnslotTool }
+public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, HaulGroup, Hire, Hold, Leave, LoadBatch, LoadFuel, LoadInput, MoveDuty, MoveInCrate, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, Release, SelectHotbar, SelectInHand, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, Unqueue, UnslotTool }
 
 /// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
 /// <remarks>
@@ -229,6 +229,9 @@ public sealed partial class World {
             case Verb.Assign: if (w != null) Assign(w, t); break;
             case Verb.Duty: if (w != null && (t ?? DutyPlace(w, c.Target)) is Thing place) SetDuty(w, place, c.Item, c.Count != 0); break;
             case Verb.Fire: if (w != null) Fire(w); break;
+            case Verb.HaulGroup: if (w != null) { if (c.Count != 0) AddHaulGroup(w); else RemoveHaulGroup(w, (int)c.At.X); } break;
+            // A stale move, of a job that has left that place in the list, is dropped rather than moving another job.
+            case Verb.MoveDuty: if (w != null && (uint)c.Count < (uint)w.Duties.Count && w.Duties[c.Count].Thing == c.Target && w.Duties[c.Count].Job == c.Item) MoveDuty(w, c.Count, (int)c.At.X, (int)c.At.Y); break;
             case Verb.Settle: if (w != null) SettleDebt(w); break;
         }
         if (t == null) return;
@@ -269,6 +272,7 @@ public sealed partial class World {
     public int Locate(Inventory inventory) {
         if (inventory == S.Backpack) return 0;
         foreach (var pair in S.Crates) if (pair.Value == inventory && CarriedCrate(pair.Key) != null) return CrateCode - pair.Key;
+        foreach (var w in S.Workers) if (inventory == w.Bag || inventory == w.ToolSlot) return w.Id * BoxCodes + (inventory == w.Bag ? 1 : 2);
         foreach (var t in S.Things) if (BoxIndex(t, inventory) is int box and >= 0) return t.Id * BoxCodes + box + 1;
         return -1;
     }
@@ -284,14 +288,29 @@ public sealed partial class World {
         for (int i = 0; i < BoxCodes - 1; i++) if (Box(t, i) == inventory) return i;
         return -1;
     }
-    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : at <= CrateCode ? (CarriedCrate(CrateCode - at) != null ? S.Crates.GetValueOrDefault(CrateCode - at) : null) : Find(at / BoxCodes) is not Thing t ? null : Box(t, at % BoxCodes - 1);
+    private Inventory? Resolve(int at) => at == 0 ? S.Backpack : at <= CrateCode ? (CarriedCrate(CrateCode - at) != null ? S.Crates.GetValueOrDefault(CrateCode - at) : null)
+        : Find(at / BoxCodes) is Thing t ? Box(t, at % BoxCodes - 1) : Carrier(at) is Worker w ? (at % BoxCodes == 1 ? w.Bag : at % BoxCodes == 2 ? w.ToolSlot : null) : null;
+
+    /// <summary>The worker a number from <see cref="Locate"/> names the hands or the tool slot of, or null.</summary>
+    private Worker? Carrier(int at) {
+        if (at > 0) foreach (var w in S.Workers) if (w.Id == at / BoxCodes) return w;
+        return null;
+    }
+
+    /// <summary>Whether the acting player reaches the holder of a box, by its number from <see cref="Locate"/>: a building, a worker, or their own backpack and the crates in it.</summary>
+    private bool InReach(int at) => at <= 0 || (Find(at / BoxCodes) is Thing t ? Reaches(t) : Carrier(at) is Worker w && Reaches(w));
+
+    /// <summary>Why an item cannot go into a box by hand, by the box's number from <see cref="Locate"/>, or null.</summary>
+    private string? BoxBlock(int at, Inventory to, string item) =>
+        at <= 0 ? null : Find(at / BoxCodes) is Thing t ? BoxBlock(t, to, item)
+        : Carrier(at) is Worker w && to == w.ToolSlot && !(Data.Items.TryGetValue(item, out var def) && def.Tool != "") ? "A worker's tool slot only takes tools." : null;
 
     /// <summary>A manual move between the backpack and a building, or two buildings, all within reach; automation filters do not apply.</summary>
     public int Transfer(Inventory from, Inventory to, string item, int quantity) {
         int a = Locate(from), b = Locate(to);
         if (a < 0 || b < 0 || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
-        if (new[] { a, b }.Where(at => at > 0).Any(at => !Reaches(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
-        if (b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
+        if (!InReach(a) || !InReach(b)) { Say("Walk closer first."); return 0; }
+        if (BoxBlock(b, to, item) is string refused) { Say(refused); return 0; }
         if (FillBlock(from, to, item) is string dry) { Say(dry); return 0; }
         int moved = Carry(from, to, b > 0 ? Find(b / BoxCodes) : null, item, quantity);
         if (moved < quantity) SayHeldBehind(from, item);
@@ -326,11 +345,11 @@ public sealed partial class World {
         if (a < 0 || b < 0 || Downed) return 0;
         if ((uint)sourceSlot >= (uint)from.Slots || (uint)targetSlot >= (uint)to.Slots) return 0;
         if (Forwarded(Verb.TransferSlot, a, b, item, quantity, new Vector2(sourceSlot, targetSlot))) return 0;
-        if (a > 0 && !Reaches(Find(a / BoxCodes)!) || b > 0 && !Reaches(Find(b / BoxCodes)!)) { Say("Walk closer first."); return 0; }
+        if (!InReach(a) || !InReach(b)) { Say("Walk closer first."); return 0; }
         // Reject a stale move rather than moving a different item.
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
         if (from.Layout[sourceSlot].HeldByOther(S.Actor.Id) || to.Layout[targetSlot].HeldByOther(S.Actor.Id)) { Say(HeldByAnother); return 0; }
-        if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
+        if (from != to && BoxBlock(b, to, item) is string refused) { Say(refused); return 0; }
         if (from != to && FillBlock(from, to, item) is string dry) { Say(dry); return 0; }
         // A drop on another item's cell in another inventory still stores the stack wherever it fits, and so does a liquid or a vessel that pours.
         int moved;

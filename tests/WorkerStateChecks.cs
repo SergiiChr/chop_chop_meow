@@ -205,6 +205,8 @@ public static class WorkerStateChecks {
     private static void CheckOnlyFirstFurnaceWorkerPumpsBellows(GameData data) {
         var world = EmptyWorld(data);
         var furnace = world.Add(ThingKind.Reinforced, new Vector2(20, 20));
+        // Bellows are pumped only while there is something to smelt.
+        furnace.Inventory.Add("iron_bar", 20); furnace.Inventory.Add("coal", 20); furnace.Burner!.Add("coal", 10);
         var bellowsWorker = AddWorker(world, furnace.Pos + World.BellowsStand);
         var secondWorker = AddWorker(world, furnace.Pos);
         world.Assign(bellowsWorker, furnace);
