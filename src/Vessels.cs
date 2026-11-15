@@ -63,30 +63,23 @@ public sealed partial class World {
     /// a vessel dropped into a station that takes its liquid pours what it holds there and stays behind, emptier.
     /// </summary>
     /// <param name="into">The thing that owns <paramref name="to"/>, or null for the backpack or a worker's bag.</param>
-    private int Carry(Inventory from, Inventory to, Thing? into, string item, int quantity, bool automated = false) {
+    private int Carry(Inventory from, Inventory to, Thing? into, string item, int quantity) {
         if (Data.VesselFor(item) is VesselDef held && !(into != null && to == into.Inventory && Pending(into, item))) return Fill(from, to, held, quantity);
         if (PoursInto(into, to, item) is VesselDef poured) return PourVessels(from, item, to, poured, quantity, int.MaxValue);
-        return from.TransferTo(to, item, quantity, automated);
+        return from.TransferTo(to, item, quantity);
     }
 
     /// <summary>Why a liquid cannot leave a box for the backpack or another box now, or null: it goes only into vessels there with room for it.</summary>
     public string? FillBlock(Inventory from, Inventory to, string item) =>
-        Data.VesselFor(item) is VesselDef v && from[item] > 0 && VesselRoom(to, v) == 0 ? $"You need an empty {Lower(Data.Name(item))} vessel." : null;
+        Data.VesselFor(item) is VesselDef v && from[item] > 0 && VesselRoom(to, v) == 0 ? NeedVessel(v) : null;
+
+    /// <summary>The refusal when a vessel's liquid has nowhere to go, such as "You need an empty water vessel."</summary>
+    private string NeedVessel(VesselDef v) => $"You need an empty {Lower(Data.Name(v.Liquid))} vessel.";
 
     /// <summary>Why the backpack's vessels cannot take every liquid a box holds, or null.</summary>
     private string? NoVesselRoom(Inventory box) {
-        foreach (var v in Data.Vessels) if (box[v.Liquid] > VesselRoom(S.Backpack, v)) return $"You need an empty {Lower(Data.Name(v.Liquid))} vessel.";
+        foreach (var v in Data.Vessels) if (box[v.Liquid] > VesselRoom(S.Backpack, v)) return NeedVessel(v);
         return null;
-    }
-
-    /// <summary>A box, or a copy of it without its liquids when it holds any, for working out which of its items need backpack slots.</summary>
-    private Inventory Solids(Inventory box) {
-        bool wet = false;
-        foreach (var v in Data.Vessels) wet |= box[v.Liquid] > 0;
-        if (!wet) return box;
-        var solids = new Inventory { Slots = box.Slots, StackSize = box.StackSize };
-        foreach (var (item, count) in box.Items) if (Data.VesselFor(item) == null) solids.Add(item, count);
-        return solids;
     }
 
     /// <summary>How many of a recipe input the backpack holds: a liquid counts the liters in its vessels.</summary>

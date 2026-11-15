@@ -709,8 +709,8 @@ public sealed partial class World {
     /// <summary>Stations that can need someone working at them.</summary>
     public static bool Worked(ThingKind kind) => kind is ThingKind.Anvil or ThingKind.Bench or ThingKind.Cooktable or ThingKind.Packer;
     public static readonly ThingKind[] WorkedKinds = Array.FindAll(Kinds.All, Worked);
-    /// <summary>Whether the station's current recipe only advances while someone works at it; at the cooking table that is the mortar's recipes and dough.</summary>
-    public bool Worked(Thing t) => Worked(t.Kind) && (t.Kind != ThingKind.Cooktable || Data.Recipes.TryGetValue(t.Recipe, out var r) && (r.Tool != "" || r.Worked));
+    /// <summary>Whether the station's current recipe only advances while someone works at it; at the cooking table, a recipe marked <see cref="RecipeDef.Worked"/>.</summary>
+    public bool Worked(Thing t) => Worked(t.Kind) && (t.Kind != ThingKind.Cooktable || Data.Recipes.TryGetValue(t.Recipe, out var r) && r.Worked);
     /// <summary>An anvil or bench only works while the player or a paid worker is hammering at it, not merely standing near.</summary>
     public bool Hammered(Thing anvil) {
         foreach (var p in S.Players) using (ActAs(p)) if (PlayerHammers(anvil)) return true;
@@ -927,9 +927,9 @@ public sealed partial class World {
         Ask(t, recipe, waiting + batches);
         batches = t.Batches - waiting;
         var r = Data.Recipes[recipe];
-        // What loads, loads; one message names all that is still missing for the first batch.
+        // What loads, loads; one message names all that is still missing for the first batch, or else why the fuel slot takes no fuel.
         foreach (var (item, amount) in r.Inputs) Load(t, item, amount * batches);
-        if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost, say: false) is string fuel) LoadFuel(t, fuel, batches);
+        if (r.Burns && t.Burner != null && FuelFromBackpack(t, r, NoCost, say: missing == null) is string fuel) LoadFuel(t, fuel, batches);
         if (missing != null) Say(missing);
     }
     /// <summary>
@@ -942,12 +942,10 @@ public sealed partial class World {
         int Have(string item) => Carried(item) + t.Inventory[item] + (switching && t.Burner != null ? t.Burner[item] : 0);
         var missing = new List<string>();
         foreach (var (item, needed) in r.Inputs)
-            if (Have(item) < needed) missing.Add(Data.VesselFor(item) != null ? $"{needed - Have(item)}L of {Lower(Data.Name(item))}" : $"{needed - Have(item)} {Lower(Data.Name(item))}");
+            if (needed - Have(item) is > 0 and int lack) missing.Add($"{lack}{(Data.VesselFor(item) != null ? "L of" : "")} {Lower(Data.Name(item))}");
         bool fuelled = !r.Burns || !switching && t.Burner?.First() is string held && r.Fuels.Contains(held) || r.Fuels.Exists(f => Have(f) > r.Inputs.GetValueOrDefault(f));
         if (!fuelled) missing.Add($"fuel ({FuelWords(r.Fuels)})");
-        if (missing.Count == 0) return null;
-        string list = missing.Count == 1 ? missing[0] : string.Join(", ", missing.Take(missing.Count - 1)) + " and " + missing[^1];
-        return $"Missing {list}.";
+        return missing.Count == 0 ? null : $"Missing {Listed(missing, "and")}.";
     }
     /// <summary>
     /// Why a station cannot turn from the recipe it is on to another now, or null: a batch is being worked, or the backpack has no room for what the station's boxes and fuel slot hold.
@@ -957,7 +955,7 @@ public sealed partial class World {
         recipe == Selected(t) ? null
         : t.Processing ? Busy(t)
         : NoVesselRoom(t.Inventory) is string dry ? dry
-        : !S.Backpack.Fits(Solids(t.Inventory), t.Burner) ? $"No room in your backpack for what the {Lower(Data.Name(t.Kind))} holds." : null;
+        : !S.Backpack.Fits(t.Inventory, t.Burner, leaveOut: item => Data.VesselFor(item) != null) ? $"No room in your backpack for what the {Lower(Data.Name(t.Kind))} holds." : null;
     /// <summary>Moves everything a box holds into the backpack, as far as it fits; a liquid goes into the backpack's vessels.</summary>
     private void Unload(Inventory box) { foreach (string item in box.Items.Keys.ToArray()) Carry(box, S.Backpack, null, item, box[item]); }
     private static readonly Dictionary<string, int> NoCost = new();
@@ -989,8 +987,10 @@ public sealed partial class World {
         throw new InvalidOperationException($"No recipe at {station.Id()} burns fuel.");
     }
     /// <summary>The fuels a recipe burns as words, such as "coal or charcoal".</summary>
-    public string FuelWords(List<string> fuels) => fuels.Count == 0 ? "" : fuels.Count == 1 ? Lower(Data.Name(fuels[0])) :
-        Phrase(string.Join(", ", fuels.Take(fuels.Count - 1).Select(f => Lower(Data.Name(f)))), " or ", Lower(Data.Name(fuels[^1])));
+    public string FuelWords(List<string> fuels) => Listed(fuels.Select(f => Lower(Data.Name(f))).ToList(), "or");
+    /// <summary>Words as a list read aloud: "a", "a or b", "a, b or c", with <paramref name="last"/> before the last one.</summary>
+    private static string Listed(List<string> words, string last) =>
+        words.Count <= 1 ? string.Concat(words) : $"{string.Join(", ", words.Take(words.Count - 1))} {last} {words[^1]}";
     // A batch's cost depends only on its recipe, so each is built once.
     private readonly Dictionary<string, Dictionary<string, int>> batchCosts = new();
     /// <summary>One batch's inputs, without the fuel, which has a slot of its own. Shared between stations, so read it without changing it.</summary>
@@ -1027,9 +1027,7 @@ public sealed partial class World {
         for (int i = 0; i < batches; i++) {
             if (!CarriesBatch(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
             if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
-            foreach (var pair in cost)
-                if (Data.VesselFor(pair.Key) is VesselDef vessel) PourLiters(S.Backpack, t.Inventory, vessel, pair.Value);
-                else S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
+            foreach (var pair in cost) Load(t, pair.Key, pair.Value);
             if (fuel != null) S.Backpack.TransferTo(t.Burner!, fuel, 1);
         }
     }
@@ -1045,7 +1043,7 @@ public sealed partial class World {
         if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
         if (Forwarded(Verb.LoadInput, t.Id, item: item, count: quantity)) return 0;
         int moved = Load(t, item, quantity);
-        if (moved == 0) Say(Carried(item) == 0 && S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(lands)} slot is full.");
+        if (moved == 0) Say(Carried(item) == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(lands)} slot is full.");
         return moved;
     }
     /// <summary>
@@ -1671,7 +1669,7 @@ public sealed partial class World {
         if (inv.First() is not string item) { inv.InputFilter.Clear(); inv.OutputFilter.Clear(); return; }
         // Set only when what it holds changes, since a crate's entry is a new string.
         if (Data.VesselOf(item) is VesselDef vessel) {
-            if (inv.InputFilter.SetEquals(vessel.States) && inv.OutputFilter.SetEquals(vessel.States)) return;
+            if (FiltersName(inv, vessel.States)) return;
             inv.InputFilter.Clear(); inv.OutputFilter.Clear();
             foreach (string state in vessel.States) { inv.InputFilter.Add(state); inv.OutputFilter.Add(state); }
             return;
@@ -1681,6 +1679,12 @@ public sealed partial class World {
         string entry = kind.IsEmpty ? item : new string(kind);
         inv.InputFilter.Clear(); inv.OutputFilter.Clear();
         inv.InputFilter.Add(entry); inv.OutputFilter.Add(entry);
+    }
+    /// <summary>Whether a box's input and output filters both name exactly these items; it runs every tick, so it allocates nothing.</summary>
+    private static bool FiltersName(Inventory box, List<string> items) {
+        if (box.InputFilter.Count != items.Count || box.OutputFilter.Count != items.Count) return false;
+        foreach (string item in items) if (!box.InputFilter.Contains(item) || !box.OutputFilter.Contains(item)) return false;
+        return true;
     }
     /// <summary>Compost turns 4 units of whatever it holds into 1 fertilizer each in-game hour.</summary>
     public const int CompostBatch = 4;
@@ -1883,12 +1887,12 @@ public sealed partial class World {
             // A vessel for a station that takes its liquid pours it there.
             var pours = into != null ? PoursInto(dest, into, item) : null;
             string lands = pours?.Liquid ?? item;
-            if (dest == null || into == null || wanted == 0 || into.Room(lands) == 0 || !into.Accepts(lands) || (dest.Id == target?.Id && target.IsResource)) { dest = DepositFor(item, w.Pos); into = dest?.Inventory; w.Fueling = false; }
+            if (dest == null || into == null || wanted == 0 || into.Room(lands) == 0 || !into.Accepts(lands) || (dest.Id == target?.Id && target.IsResource)) { dest = DepositFor(item, w.Pos); into = dest?.Inventory; w.Fueling = false; pours = null; }
             if (dest == null) { w.Status = Phrase("Holding ", Data.Name(item), " · no accepting storage"); return; }
             w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
             if (Walk(w, dest.Pos, dt)) {
                 // Every vessel carried pours, whatever it holds.
-                if (pours != null && dest == Find(w.Destination) && into == dest.Inventory) PourLiters(w.Bag, into, pours, int.MaxValue);
+                if (pours != null) PourLiters(w.Bag, into!, pours, int.MaxValue);
                 else w.Bag.TransferTo(into!, item, dest.Kind == ThingKind.Mine ? MineNeed(dest, item) : w.Bag[item], true);
                 w.Destination = 0;
                 if (w.Bag.Count == 0) { w.Fueling = false; w.Hands(Worker.BagStack); NextPlace(w); }
@@ -2004,7 +2008,8 @@ public sealed partial class World {
                 string carried = pair.Key; Thing? source; int count = wanting;
                 if (Data.VesselFor(pair.Key) is VesselDef carrier) {
                     if (LiquidSource(carrier, w.Pos) is not (string filled, Thing holder)) continue;
-                    (carried, source) = (filled, holder); count = (wanting + carrier.LitersIn(filled) - 1) / carrier.LitersIn(filled);
+                    int each = carrier.LitersIn(filled);
+                    (carried, source) = (filled, holder); count = (wanting + each - 1) / each;
                 } else if ((source = SourceFor(carried, w.Pos)) == null) continue;
                 w.Status = Phrase("Fetching ", Data.Name(carried));
                 if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, carried, count, true); w.Destination = target.Id; }

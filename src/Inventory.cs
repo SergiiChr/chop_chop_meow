@@ -29,8 +29,11 @@ public sealed class Inventory {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int Slots { get => slots; set { if (value == slots) return; slots = value; RebuildStacks(); } }
     /// <summary>Most units of one item per cell. Changing it splits or merges stacks to fit.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int StackSize { get => stackSize; set { if (value == stackSize) return; stackSize = value; RebuildStacks(); } }
-    /// <summary>Most coins per cell: 1000, or <see cref="UnlimitedCoins"/> in a trading post's wage slot.</summary>
-    [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int CoinStack { get; set; } = NewCoinStack;
+    /// <summary>
+    /// Most coins per cell: 1000, or <see cref="UnlimitedCoins"/> in a trading post's wage slot.
+    /// Read first, so the stacks that setting <see cref="Slots"/> rebuilds on load keep a wage slot's coins in its one cell.
+    /// </summary>
+    [JsonPropertyOrder(-1), JsonIgnore(Condition = JsonIgnoreCondition.Never)] public int CoinStack { get; set; } = NewCoinStack;
     /// <summary>Most units the inventory holds across all its stacks, or 0 for no limit beyond its slots.</summary>
     public int Capacity { get; set; }
     /// <summary>Physical cell a UI action targets when an item id appears in several cells.</summary>
@@ -90,17 +93,19 @@ public sealed class Inventory {
     /// Whether everything two other inventories hold fits in this one at once: each item tops up its own stacks, and the rest takes empty slots.
     /// </summary>
     /// <param name="more">The second inventory, or null for none.</param>
-    public bool Fits(Inventory other, Inventory? more = null) {
+    /// <param name="leaveOut">Items that go elsewhere and need no room here, such as a liquid, which fills vessels.</param>
+    public bool Fits(Inventory other, Inventory? more = null, Func<string, bool>? leaveOut = null) {
         int limit = Math.Min(Slots, Layout.Count), empty = 0;
         for (int i = 0; i < limit; i++) if (Layout[i].Item == "") empty++;
         var goods = new Dictionary<string, int>(other.items);
         if (more != null) foreach (var (item, count) in more.items) goods[item] = goods.GetValueOrDefault(item) + count;
+        if (leaveOut != null) foreach (string item in goods.Keys.Where(leaveOut).ToArray()) goods.Remove(item);
         foreach (var (item, count) in goods) {
             int stack = StackOf(item), spare = 0;
             for (int i = 0; i < limit; i++) if (Layout[i].Item == item) spare += stack - Layout[i].Count;
             empty -= (Math.Max(0, count - spare) + stack - 1) / stack;
         }
-        return empty >= 0 && (Capacity == 0 || Count + other.Count + (more?.Count ?? 0) <= Capacity);
+        return empty >= 0 && (Capacity == 0 || Count + goods.Values.Sum() <= Capacity);
     }
 
     /// <summary>Slots to show: every stack, plus one single-item slot per unit of capacity left.</summary>

@@ -85,6 +85,28 @@ internal static class WorldSteps {
         return world;
     }
 
+    /// <summary>
+    /// A cooking table by the lake on meat stew, with a hauler bringing water bottles and carrying them back,
+    /// a pile of bottles at mixed fills, a water collector refilling them, and a chest of meat, wood and stew.
+    /// </summary>
+    public static World WaterKitchen(GameData data, out Thing stock) {
+        var world = new World(data, false);
+        RunUntilPhase(world, .3f);
+        var shore = Terrain.WaterPoint(Terrain.Spawn);
+        var inland = (shore - Terrain.Lake).Normalized();
+        world.Player = shore + inland * 6;
+        var pond = world.Add(ThingKind.Water, shore, 9999);
+        var bottles = world.Add(ThingKind.Pile, shore + inland * 4);
+        bottles.Inventory.Add(Water.Full, 4); bottles.Inventory.Add(Water.TwoLiters, 2); bottles.Inventory.Add(Water.Empty, 4);
+        stock = world.Add(ThingKind.Chest, shore + inland * 4 + new Vector2(3, 0));
+        stock.Inventory.Slots = 40; stock.Inventory.Add("raw_meat", 64); stock.Inventory.Add("wood", 64);
+        var table = world.Add(ThingKind.Cooktable, shore + inland * 4 + new Vector2(0, 3));
+        world.SetRecipe(table, "meat_stew");
+        world.SetDuty(AddWorker(world, table.Pos), table, "haul", true);
+        world.Assign(AddWorker(world, pond.Pos), pond);
+        return world;
+    }
+
     /// <summary>An open iron mine with a full crew of pickaxe-carrying miners and a chest beside it.</summary>
     public static World WorkingMine(GameData data, out Thing mine) {
         var world = new World(data, false);

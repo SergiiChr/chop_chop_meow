@@ -45,7 +45,7 @@ public sealed class RecipeDef {
     public string Tool { get; set; } = "";
     /// <summary>The lowest <see cref="ItemDef.Tier"/> of that tool that will do; a better one always does.</summary>
     public int Tier { get; set; }
-    /// <summary>Advances only while someone works at the station, as a tool's recipe does, at a station whose other recipes run unattended.</summary>
+    /// <summary>At the cooking table, the one station whose recipes differ in this, advances only while someone works at it; the rest cook unattended.</summary>
     public bool Worked { get; set; }
     /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
     public bool Hand { get; set; }
@@ -240,6 +240,8 @@ public sealed partial class GameData {
         // Only the trade sets value: a good is judged by its whole chain against what it sells for, never step by step.
         if (Items.FirstOrDefault(p => p.Value.Price < 0 || p.Value.Price > 0 != (Market.Sells.ContainsKey(p.Key) || Market.Buys.ContainsKey(p.Key) || p.Key == "crate")).Key is string mispriced)
             throw new InvalidOperationException($"{mispriced}: only goods the village trades, and the crate, have a price.");
+        if (Recipes.FirstOrDefault(p => p.Value.Worked && p.Value.Station != ThingKind.Cooktable).Key is string misplaced)
+            throw new InvalidOperationException($"{misplaced}: only cooking table recipes choose whether they are worked.");
         foreach (var v in Vessels)
             if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
                 || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Output == v.Liquid || r.Hand && r.Inputs.ContainsKey(v.Liquid)))
@@ -262,7 +264,7 @@ public sealed partial class GameData {
     private readonly Dictionary<string, string[]> endsUpIn = new();
     private static readonly List<string> Nothing = new();
     /// <summary>Items the recipe map leaves out: coins, and the part-drunk bottles that stand with the full one.</summary>
-    public static bool OffTheMap(string item) => item == Inventory.Coins || item is Water.OneLiter or Water.TwoLiters;
+    public static bool OffTheMap(string item) => item == Inventory.Coins || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
     /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
     public string? RecipeIdOf(string item) => recipeIdOf.GetValueOrDefault(item);
     /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>

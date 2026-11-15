@@ -96,8 +96,8 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
             : input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";
         var cell = Cup(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size);
         if (input) {
-            // A liquid's cup takes the vessels that hold it, at any fill.
-            cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || vessel != null && world.Data.VesselOf(drag.Item) == vessel);
+            // A liquid's cup takes the vessels that hold some of it, at any fill.
+            cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || vessel != null && vessel.LitersIn(drag.Item) > 0);
             cell.Take = drag => {
                 int left = world.Reaches(t) ? ItemMoves.Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;
                 kit.Run(() => world.LoadInput(t, drag.Item, drag.Count)); return drag.Item == item ? left : 0;

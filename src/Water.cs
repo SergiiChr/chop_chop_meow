@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -8,25 +9,18 @@ public static class Water {
     /// <summary>The bottle's item ids, full to empty, and the water a full one pours into a station.</summary>
     public const string Full = "water", TwoLiters = "water_2", OneLiter = "water_1", Empty = "empty_bottle", Liquid = "fresh_water";
     public const float LiterThirst = 100f / 3f;
+    /// <summary>The bottle at each fill, from empty to full: the index is the liters it holds.</summary>
     public static readonly string[] BottleItems = { Empty, OneLiter, TwoLiters, Full };
+    /// <summary>Liters a full bottle holds.</summary>
+    public static int Capacity => BottleItems.Length - 1;
 
-    public static bool IsBottle(string item) => item is Full or TwoLiters or OneLiter or Empty;
+    public static bool IsBottle(string item) => BottleLiters(item) >= 0;
 
     /// <summary>Remaining liters, or -1 when the item is not a bottle.</summary>
-    public static int BottleLiters(string item) => item switch {
-        Full => 3,
-        TwoLiters => 2,
-        OneLiter => 1,
-        Empty => 0,
-        _ => -1
-    };
+    public static int BottleLiters(string item) => Array.IndexOf(BottleItems, item);
 
-    public static string WaterItem(int liters) => liters switch {
-        >= 3 => Full,
-        2 => TwoLiters,
-        1 => OneLiter,
-        _ => Empty
-    };
+    /// <summary>The bottle holding so many liters, up to full.</summary>
+    public static string WaterItem(int liters) => BottleItems[Math.Clamp(liters, 0, Capacity)];
 
     /// <summary>Finds an empty bottle first, then the least-full partial bottle, and a full bottle last.</summary>
     public static string? FindBottle(Inventory inventory) {

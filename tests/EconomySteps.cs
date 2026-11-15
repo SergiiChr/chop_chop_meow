@@ -112,16 +112,14 @@ internal sealed class ChainCost {
     public float Made(string recipe) => made.TryGetValue(recipe, out float perDay) ? perDay : made[recipe] = EconomySteps.Station(data, recipe);
     public IReadOnlyDictionary<string, float> MadePerDay => made;
 
-    private string? RecipeFor(string item) => data.RecipeIdOf(item);
-
     /// <summary>Whether every step of a good's chain is gathered by a hire, made at a station or grown on a farm plot.</summary>
-    public bool Measurable(string item) => Gathered.ContainsKey(item) || item == Crop || RecipeFor(item) is string key && EconomySteps.BatchCost(world, key).Keys.All(Measurable);
+    public bool Measurable(string item) => Gathered.ContainsKey(item) || item == Crop || data.RecipeIdOf(item) is string key && EconomySteps.BatchCost(world, key).Keys.All(Measurable);
 
     /// <summary>Worker-days per unit: a hire's day over what it gathers, a harvest's work over its crop, or a batch's materials plus one over the station's daily output.</summary>
     public float WorkerDays(string item) {
         if (Gathered.TryGetValue(item, out float perDay)) return 1 / perDay;
         if (item == Crop) return data.Farm.HarvestWorkdays / data.Farm.Yield[Crop];
-        string key = RecipeFor(item)!;
+        string key = data.RecipeIdOf(item)!;
         return EconomySteps.BatchCost(world, key).Sum(p => WorkerDays(p.Key) * p.Value) / data.Recipes[key].Amount + 1 / Made(key);
     }
 
@@ -130,11 +128,11 @@ internal sealed class ChainCost {
         if (Gathered.ContainsKey(item)) return 0;
         if (item == Crop)
             return data.Farm.Sow.Sum(p => Math.Max(0, p.Value - data.Farm.Yield.GetValueOrDefault(p.Key)) * world.LotPrice(p.Key) / (float)world.Lot(p.Key)) / data.Farm.Yield[Crop];
-        string key = RecipeFor(item)!;
+        string key = data.RecipeIdOf(item)!;
         return EconomySteps.BatchCost(world, key).Sum(p => Coins(p.Key) * p.Value) / data.Recipes[key].Amount;
     }
 
     /// <summary>Days a good's chain waits on a crop growing.</summary>
     public float WaitDays(string item) =>
-        Gathered.ContainsKey(item) ? 0 : item == Crop ? data.Farm.GrowDays : EconomySteps.BatchCost(world, RecipeFor(item)!).Keys.Max(WaitDays);
+        Gathered.ContainsKey(item) ? 0 : item == Crop ? data.Farm.GrowDays : EconomySteps.BatchCost(world, data.RecipeIdOf(item)!).Keys.Max(WaitDays);
 }

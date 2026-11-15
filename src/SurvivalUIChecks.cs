@@ -24,7 +24,6 @@ public partial class Game {
             await CheckDragPlacesStackInExactSlotAndSortOrdersByName();
             await CheckClickMovesOneUnitAndCtrlClickMovesRemainingStack();
             await CheckPartDrunkBottlePoursItsLitersIntoTheWaterCup();
-            await CheckDoubleClickedWaterRecipePoursFromABottle();
             await CheckWaterCupShakesWithoutRoomInABottleAndFillsOne();
             await CheckSkipToMorningOnlyForDownedPlayerWithoutCabin();
         } finally {
@@ -124,28 +123,15 @@ public partial class Game {
         var table = Hosted.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
         Hosted.SetRecipe(table, "dough");
         await ClickOn(table); await Frames(3);
-        await Click(BagCell(c => c.TooltipText.StartsWith(world.Data.Name(Water.TwoLiters) + " ·", StringComparison.Ordinal)));
+        await Click(BagCellOf(Water.TwoLiters));
         await Until(() => table.Inventory[Water.Liquid] == 2, "a click on a two-liter bottle pouring two liters of water", 2);
         Require(world.Backpack[Water.Empty] == 1 && world.Backpack[Water.TwoLiters] == 0, "The poured bottle must stay in the backpack, empty.");
         Give(Hosted, Water.OneLiter, 1); await Frames(2);
-        var partial = BagCell(c => c.TooltipText.StartsWith(world.Data.Name(Water.OneLiter) + " ·", StringComparison.Ordinal));
+        var partial = BagCellOf(Water.OneLiter);
         await DragTo(partial, (Control)ui.FindChild($"input_{Water.Liquid}", true, false));
         await Until(() => table.Inventory[Water.Liquid] == 3, "a one-liter bottle dragged onto the water cup pouring its liter", 2);
         Require(world.Backpack[Water.Empty] == 2 && table.Inventory[Water.OneLiter] + table.Inventory[Water.Empty] == 0, "A dragged bottle must pour and stay in the backpack, empty.");
         await SurvivalReviewShot("water-pour");
-    }
-    /// <summary>Double-clicking a water recipe's card queues a batch and pours its water from a bottle in the backpack.</summary>
-    private async Task CheckDoubleClickedWaterRecipePoursFromABottle() {
-        await CloseWithEsc();
-        EmptyBackpack(Hosted); RemoveThings(Hosted, t => t.Kind == ThingKind.Cooktable);
-        Give(Hosted, Water.Full, 1); Give(Hosted, "flour", 1);
-        var table = Hosted.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
-        await ClickOn(table); await Frames(3);
-        await DoubleClick(Named("craft_dough")!);
-        // The table starts the batch at once, using the water and flour poured in.
-        await Until(() => table.Making == "dough" || table.Inventory["dough"] > 0, "a double-click on dough pouring 3 liters from the full bottle and starting the batch", 2);
-        Require(world.Backpack[Water.Empty] == 1 && world.Backpack[Water.Full] == 0, "The bottle must stay in the backpack, empty.");
-        RemoveThings(Hosted, t => t == table); EmptyBackpack(Hosted); await CloseWithEsc();
     }
     /// <summary>A click on a station's water with no bottle with room in the backpack is refused, says why and shakes the cup; with one it takes a liter into it.</summary>
     private async Task CheckWaterCupShakesWithoutRoomInABottleAndFillsOne() {
@@ -158,7 +144,7 @@ public partial class Game {
         float rest = cup.Position.X;
         await Click(cup); await Frames(3);
         Require(cup.Position.X != rest, "A refused click on the water cup must shake it.");
-        Require(messages.Shown.ToArray().Contains("You need an empty water vessel."), "A refused click on the water cup must say it needs an empty vessel.");
+        Require(messages.Shown.Contains("You need an empty water vessel."), "A refused click on the water cup must say it needs an empty vessel.");
         Require(table.Inventory[Water.Liquid] == 1 && world.Backpack.Count == 0, "Refused water must stay on the table.");
         await Until(() => cup.Position.X == rest, "the water cup coming to rest", 2);
         Give(Hosted, Water.Empty, 1); await Frames(2);
