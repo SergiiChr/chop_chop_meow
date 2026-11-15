@@ -31,21 +31,21 @@ public partial class MinePanel(PageTools tools, Thing subject) : ThingPage(tools
             var line = new StageTrack(nodes); AddChild(line); line.At(stage);
             AddLabel($"Stage {stage + 1} · {stages[stage].Title}", 16);
             if (thing.MineStage == MineStage.Dug) {
-                // Supplies: delivered on the pill, needed under the cup; click a lit backpack stack to deliver it.
+                // Supplies: delivered on the pill, needed under the cup; a lit backpack stack put on its cup delivers it.
                 var row = Well(new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }); row.AddThemeConstantOverride("separation", 28);
                 foreach (var (item, amount) in data.Materials) {
                     var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10); row.AddChild(column);
                     var (cell, count) = ItemSlot.Cup($"supply_{item}"); cell.Icon = Icons.Of(item); column.AddChild(cell);
-                    cell.Pressed += () => kit.Run(() => world.SupplyMine(thing));
+                    moves.TakeCell(cell, thing.Inventory, item, thing, held => held.Stack is { Box: 0 } stack && stack.Item == item, (_, units) => kit.Run(() => world.PutDown(thing.Inventory, -1, units)));
                     column.AddChild(Style.PerBatch($"/ {amount}"));
                     live.Watch(() => thing.Inventory[item], drawn => {
                         count.Text = drawn.ToString();
                         cell.AddThemeStyleboxOverride("normal", drawn >= amount ? Style.Round(Style.CupFill, 14).Item1 : Style.CupNormal);
-                        cell.TooltipText = $"{world.Data.Name(item)} · {drawn} of {amount}\nClick to deliver from your backpack";
+                        cell.TooltipText = $"{world.Data.Name(item)} · {drawn} of {amount}\nPut it here from your backpack · {Cups.SlotHint}";
                     });
                 }
             } else Dynamic(text => text.Append(stages[stage].Needs).Append(" · ").Append((int)(thing.Progress / world.MineStageSeconds * 100)).Append("% done"), 14, Style.Beige);
-            BagGrid(id => world.SupplyMine(thing), "Click: deliver what the mine needs", wanted: id => world.MineNeed(thing, id) > 0);
+            BagGrid(id => world.SupplyMine(thing, id, ItemMoves.Amount(world.S.Backpack, id)), $"{BagHint}\nShift: deliver a stack · Ctrl: all the mine needs", wanted: id => world.MineNeed(thing, id) > 0);
         } else {
             // Miners as hardhats, lit while underground, and the two outputs with how fast they fill.
             var crew = Row(); crew.AddThemeConstantOverride("separation", 8);

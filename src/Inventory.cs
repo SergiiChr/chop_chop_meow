@@ -7,9 +7,22 @@ namespace ChopChopMeow;
 
 /// <summary>Item quantities and explicit automation access rules. Player access is independent of automation filters.</summary>
 public sealed class Inventory {
-    /// <summary>A persisted stack in a particular inventory cell.</summary>
-    public sealed class Slot { public string Item { get; set; } = ""; public int Count { get; set; } }
+    /// <summary>
+    /// A persisted stack in a particular inventory cell.
+    /// <see cref="Held"/> of its units are a player's held stack: they stay in the cell and count as here, but nothing takes them out until that player puts them down or lets go.
+    /// </summary>
+    public sealed class Slot {
+        public string Item { get; set; } = "";
+        public int Count { get; set; }
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Held { get; set; }
+        /// <summary>The id of the player holding <see cref="Held"/>, or 0.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int HeldBy { get; set; }
+        /// <summary>Units in the cell that no player holds.</summary>
+        [JsonIgnore] public int Free => Count - Held;
+    }
     private readonly Dictionary<string, int> items = new();
+    /// <summary>Units a player holds, which only the world that runs the game keeps count of.</summary>
+    private int heldUnits;
     private const int NewSlots = 18, NewStackSize = 64;
     private int slots = NewSlots, stackSize = NewStackSize;
     /// <summary>Read-only view of each item's total across all stacks; the inventory's methods are the only way to change it.</summary>
@@ -62,6 +75,14 @@ public sealed class Inventory {
         }
     }
     public int this[string item] => items.GetValueOrDefault(item);
+    /// <summary>Whether a player holds a stack from here.</summary>
+    public bool Holding => heldUnits > 0;
+    /// <summary>Units of an item that nobody holds, which are all that can be taken out.</summary>
+    public int Free(string item) {
+        int free = items.GetValueOrDefault(item);
+        if (heldUnits > 0) foreach (var s in Layout) if (s.Item == item) free -= s.Held;
+        return free;
+    }
     /// <summary>Empty with the settings of a new inventory, so it saves the same as one.</summary>
     [JsonIgnore] public bool Fresh => items.Count == 0 && slots == NewSlots && stackSize == NewStackSize && Capacity == 0 && InputFilter.Count == 0 && OutputFilter.Count == 0 && Layout.Count == NewSlots && UsedSlots == 0;
 
@@ -130,6 +151,9 @@ public sealed class Inventory {
     public void RebuildStacks() {
         Layout ??= new();
         PadLayout();
+        // Holds end, as after loading nobody holds anything.
+        foreach (var s in Layout) { s.Held = 0; s.HeldBy = 0; }
+        heldUnits = 0;
         var remaining = layoutRemainder; remaining.Clear(); foreach (var pair in items) remaining[pair.Key] = pair.Value;
         for (int i = 0; i < Layout.Count; i++) {
             var s = Layout[i];
@@ -162,8 +186,8 @@ public sealed class Inventory {
 
     /// <summary>Removes every item.</summary>
     public void Clear() {
-        items.Clear();
-        foreach (var slot in Layout) { slot.Item = ""; slot.Count = 0; }
+        items.Clear(); heldUnits = 0;
+        foreach (var slot in Layout) { slot.Item = ""; slot.Count = 0; slot.Held = 0; slot.HeldBy = 0; }
         PadLayout();
         Changed?.Invoke();
     }
@@ -185,7 +209,7 @@ public sealed class Inventory {
     /// <summary>Moves an exact source cell to a destination cell; matching stacks merge up to their stack limit, otherwise cells swap.</summary>
     public int MoveSlotTo(int source, Inventory destination, int target, int quantity = int.MaxValue) {
         if ((uint)source >= (uint)Layout.Count || (uint)target >= (uint)destination.Layout.Count) return 0;
-        Slot a = Layout[source], b = destination.Layout[target]; if (a.Item == "" || quantity <= 0) return 0;
+        Slot a = Layout[source], b = destination.Layout[target]; if (a.Item == "" || quantity <= 0 || a.Held > 0 || b.Held > 0) return 0;
         bool same = ReferenceEquals(this, destination);
         if (same && source == target) return 0;
         if (b.Item == "" || b.Item == a.Item) {
@@ -208,13 +232,39 @@ public sealed class Inventory {
         Changed?.Invoke();
     }
 
+    /// <summary>Marks units of a cell as a player's held stack; returns how many, at most what the cell has that nobody holds.</summary>
+    public int Hold(int slot, int quantity, int player) {
+        if ((uint)slot >= (uint)Layout.Count) return 0;
+        var s = Layout[slot];
+        if (s.Item == "" || s.HeldBy != 0 && s.HeldBy != player) return 0;
+        int n = Math.Clamp(quantity, 0, s.Free);
+        if (n == 0) return 0;
+        s.Held += n; s.HeldBy = player; heldUnits += n;
+        Changed?.Invoke();
+        return n;
+    }
+
+    /// <summary>Lets go of what a player holds in a cell, so it can be taken out again.</summary>
+    public void Release(int slot) {
+        if ((uint)slot >= (uint)Layout.Count || Layout[slot] is not { Held: > 0 } s) return;
+        heldUnits -= s.Held; s.Held = 0; s.HeldBy = 0;
+        Changed?.Invoke();
+    }
+
+    /// <summary>The id of a player other than <paramref name="player"/> who holds units of an item here, or 0.</summary>
+    public int HeldByOther(string item, int player) {
+        if (heldUnits == 0) return 0;
+        foreach (var s in Layout) if (s.Item == item && s.HeldBy != 0 && s.HeldBy != player) return s.HeldBy;
+        return 0;
+    }
+
     /// <summary>Stacks loose items and orders player inventory by item name for predictable access.</summary>
     public void Sort() {
         Layout.RemoveAll(s => s.Item == "");
         Layout.Sort((a, b) => string.CompareOrdinal(a.Item, b.Item));
         for (int i = 0; i < Layout.Count - 1;) {
             var a = Layout[i]; var b = Layout[i + 1];
-            if (a.Item == b.Item && a.Count < StackOf(a.Item)) { int n = Math.Min(StackOf(a.Item) - a.Count, b.Count); a.Count += n; b.Count -= n; if (b.Count == 0) Layout.RemoveAt(i + 1); else i++; } else i++;
+            if (a.Item == b.Item && a.Count < StackOf(a.Item) && a.Held == 0 && b.Held == 0) { int n = Math.Min(StackOf(a.Item) - a.Count, b.Count); a.Count += n; b.Count -= n; if (b.Count == 0) Layout.RemoveAt(i + 1); else i++; } else i++;
         }
         PadLayout();
     }
@@ -250,8 +300,9 @@ public sealed class Inventory {
         return amount;
     }
 
+    /// <summary>Takes out up to <paramref name="quantity"/> units nobody holds, from <see cref="PreferredSlot"/> first.</summary>
     public int Remove(string item, int quantity) {
-        int amount = Math.Min(Math.Max(0, quantity), this[item]);
+        int amount = Math.Min(Math.Max(0, quantity), Free(item));
         if (amount == this[item]) items.Remove(item);
         else items[item] -= amount;
         int left = amount;
@@ -262,7 +313,7 @@ public sealed class Inventory {
     }
 
     private static int RemoveFromSlot(Slot slot, int quantity) {
-        int removed = Math.Min(quantity, slot.Count); slot.Count -= removed;
+        int removed = Math.Min(quantity, slot.Free); slot.Count -= removed;
         if (slot.Count == 0) slot.Item = "";
         return removed;
     }
@@ -270,8 +321,8 @@ public sealed class Inventory {
     /// <summary>Changes the first matching stack to another item while keeping that exact cell and its quantity.</summary>
     public bool Replace(string oldItem, string newItem) {
         if (oldItem == newItem) return this[oldItem] > 0;
-        int slotIndex = (uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == oldItem ? PreferredSlot : -1;
-        if (slotIndex < 0) for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item == oldItem) { slotIndex = i; break; }
+        int slotIndex = (uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == oldItem && Layout[PreferredSlot].Held == 0 ? PreferredSlot : -1;
+        if (slotIndex < 0) for (int i = 0; i < Layout.Count; i++) if (Layout[i].Item == oldItem && Layout[i].Held == 0) { slotIndex = i; break; }
         if (slotIndex < 0) return false;
         Slot slot = Layout[slotIndex]; int quantity = slot.Count;
         if (quantity > StackOf(newItem)) return false;
@@ -282,8 +333,9 @@ public sealed class Inventory {
         return true;
     }
 
+    /// <summary>Whether units nobody holds cover the cost.</summary>
     public bool Has(Dictionary<string, int> cost) {
-        foreach (var pair in cost) if (this[pair.Key] < pair.Value) return false;
+        foreach (var pair in cost) if (Free(pair.Key) < pair.Value) return false;
         return true;
     }
 
@@ -301,7 +353,7 @@ public sealed class Inventory {
 
     public int TransferTo(Inventory destination, string item, int quantity, bool automated = false) {
         if (automated && (!AllowsWithdrawal(item) || !destination.Accepts(item))) return 0;
-        int amount = Math.Min(this[item], Math.Min(Math.Max(0, quantity), destination.Room(item)));
+        int amount = Math.Min(Free(item), Math.Min(Math.Max(0, quantity), destination.Room(item)));
         Remove(item, amount);
         return destination.Add(item, amount);
     }

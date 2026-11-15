@@ -85,7 +85,7 @@ public partial class NeedsPlate : PanelContainer {
     public Vial Hunger { get; }
     public Vial Thirst { get; }
 
-    public NeedsPlate(UiKit kit, ItemMoves moves, DamageEdges edges) {
+    public NeedsPlate(UiKit kit, ItemMoves moves, DamageEdges edges, HeldCursor cursor) {
         this.kit = kit; world = kit.World; this.edges = edges;
         OffsetLeft = 20; OffsetTop = 18;
         AddThemeStyleboxOverride("panel", Style.Plate);
@@ -108,15 +108,19 @@ public partial class NeedsPlate : PanelContainer {
         bankCup = cup; bankCount = count;
         Style.Skin(cup, Style.CupBank, Style.Round(Style.CupFill, 28).Item2);
         cup.Icon = Icons.Of(Inventory.Coins);
-        cup.TooltipText = "Coins kept at the trading posts for wages; sales land here first.\nDrop coins here at a trading post to bank them · click to take some out";
-        cup.CanTake = drag => drag.Item == Inventory.Coins && drag.From == world.S.Backpack;
-        cup.Take = drag => {
-            if (NearPost() is not Thing post) { kit.Notify("Bank coins at a trading post."); return drag.Count; }
-            return kit.Run(() => moves.Drag(drag, post.Wages!, post));
-        };
-        cup.Pressed += () => {
-            if (NearPost() is not Thing post) { kit.Notify("Take coins out at a trading post."); return; }
-            kit.Run(() => moves.Stack(post.Wages!, world.S.Backpack, Inventory.Coins, post));
+        cup.TooltipText = "Coins kept at the trading posts for wages; sales land here first.\nAt a trading post · LMB: pick up all · RMB: half · put coins here to bank them";
+        cup.Controls = new SlotInput(cursor) {
+            Pick = () => NearPost() is Thing post && post.Wages!.Layout[0].Item != "" ? (post.Wages, 0) : null,
+            Takes = held => held.Stack is { Box: 0, Item: Inventory.Coins },
+            Put = (_, units) => {
+                if (NearPost() is not Thing post) { kit.Notify("Bank coins at a trading post."); return; }
+                kit.Run(() => world.PutDown(post.Wages!, -1, units));
+            },
+            Batch = () => {
+                if (NearPost() is not Thing post) { kit.Notify("Take coins out at a trading post."); return; }
+                kit.Run(() => moves.Stack(post.Wages!, world.S.Backpack, Inventory.Coins, post));
+            },
+            Click = () => kit.Notify("Take coins out at a trading post."),
         };
         line.AddChild(cup);
         bankDue = Style.Text("", 14, Style.Beige); line.AddChild(bankDue);

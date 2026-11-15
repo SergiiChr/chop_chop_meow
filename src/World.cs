@@ -783,6 +783,7 @@ public sealed partial class World {
         if (!Reaches(t)) { Say("Walk closer first."); return false; }
         if (DismantleBlock(t) is string refused) { Say(refused); return false; }
         if (Forwarded(Verb.Dismantle, t.Id)) return true;
+        if (HeldByOthers(t)) return false;
         var back = new Dictionary<string, int>(def.Cost);
         if (t.Kind == ThingKind.Mine && t.MineStage >= MineStage.Supplied) foreach (var (item, amount) in Data.Mine.Materials) back[item] = back.GetValueOrDefault(item) + amount;
         foreach (var box in Boxes(t)) if (box != null) foreach (var (item, amount) in box.Items) back[item] = back.GetValueOrDefault(item) + amount;
@@ -990,7 +991,7 @@ public sealed partial class World {
     /// <summary>Whether a station takes an item from the player: an input of the recipe it is on or keeps to, or a fuel it burns.</summary>
     public bool Takes(Thing t, string item) => Pending(t, item) || t.Burner != null && FuelFits(t, item);
     /// <summary>Whether the station holds a batch's inputs and, if it burns fuel, one unit of it, with nothing left by another recipe in its cups.</summary>
-    private bool Stocked(Thing t) => t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null) && !(Data.Recipes.TryGetValue(t.Recipe, out var r) && Blocked(t, r));
+    private bool Stocked(Thing t) => !HeldAt(t) && t.Inventory.Has(BatchCost(t)) && (Fuels(t).Count == 0 || FuelOf(t) != null) && !(Data.Recipes.TryGetValue(t.Recipe, out var r) && Blocked(t, r));
     /// <summary>Loads batches of the station's current recipe's inputs and one fuel each from the backpack.</summary>
     public void LoadBatch(Thing t, int batches = 1) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return; }
@@ -1171,6 +1172,7 @@ public sealed partial class World {
         }
     }
     public void Die() {
+        Release();
         // After a mauling the box lands past the feet, behind the wolf standing over the player, so the feeding stays visible.
         // The player falls backwards facing the wolf that leapt, so the feet point back the way it came.
         var killer = S.Mauled ? Hunters.FirstOrDefault(w => w.Pinning) : null;
@@ -1373,6 +1375,7 @@ public sealed partial class World {
     /// An emptied crate becomes a plain empty crate.
     /// </summary>
     public int MoveInCrate(int id, string item, int quantity, bool packing) {
+        if (id == 0) return packing ? PackEmptyCrate(item, quantity) : 0;
         if (Downed || CarriedCrate(id) is not string crate || Packed(crate) is not Inventory contents) return 0;
         if (packing && IsCrate(item)) { Say("Never put a crate in a crate."); return 0; }
         if (Forwarded(Verb.MoveInCrate, id, packing ? 1 : 0, item, quantity)) return 0;
@@ -1382,19 +1385,36 @@ public sealed partial class World {
         if (contents.Count == 0) S.Crates.Remove(id);
         return moved;
     }
+    /// <summary>Packs goods from the backpack into one of its empty crates, which becomes a packed crate; what <see cref="MoveInCrate"/> does with crate number 0.</summary>
+    private int PackEmptyCrate(string item, int quantity) {
+        if (Downed) return 0;
+        if (IsCrate(item)) { Say("Never put a crate in a crate."); return 0; }
+        if (S.Backpack["crate"] == 0) { Say("No empty crate in your backpack."); return 0; }
+        if (Forwarded(Verb.MoveInCrate, 0, 1, item, quantity)) return 0;
+        var contents = NewCrate();
+        int moved = 0;
+        FromHeld(item, () => moved = S.Backpack.TransferTo(contents, item, quantity));
+        if (moved == 0) return 0;
+        S.Backpack.Remove("crate", 1);
+        string packed = Pack(contents);
+        if (S.Backpack.Add(packed, 1) == 1) return moved;
+        S.Crates.Remove(PackedId(packed)); S.Backpack.Add("crate", 1); contents.TransferTo(S.Backpack, item, moved);
+        Say("Your backpack is full.");
+        return 0;
+    }
     /// <summary>Puts a crate from the backpack down, still holding whatever it was packed with.</summary>
     public Thing? PlaceCrate(string item, Vector2 p) {
         if (!IsCrate(item)) return null;
         if (PlacementBlock(ThingKind.Crate, p, item) is string blocked) { Say(blocked); return null; }
         if (Forwarded(Verb.PlaceCrate, item: item, at: p)) return null;
-        S.Backpack.Remove(item, 1);
+        FromHeld(item, () => S.Backpack.Remove(item, 1));
         var crate = Add(ThingKind.Crate, p); ClearGround(crate);
         if (Packed(item) is Inventory contents) { crate.Inventory = contents; S.Crates.Remove(PackedId(item)); }
         Play("close_chest", p); return crate;
     }
     /// <summary>Lifts a placed crate into the backpack; anything inside stays packed in it.</summary>
     public bool PickUpCrate(Thing crate) {
-        if (crate.Kind != ThingKind.Crate || !Near(crate)) return false;
+        if (crate.Kind != ThingKind.Crate || !Near(crate) || HeldByOthers(crate)) return false;
         bool empty = crate.Inventory.Count == 0;
         if (S.Backpack.Room(empty ? "crate" : PackedPrefix) == 0) { Say("Backpack full. Make room for the crate."); return false; }
         if (Forwarded(Verb.PickUpCrate, crate.Id)) return true;
@@ -2209,6 +2229,7 @@ public sealed partial class World {
         foreach (var wolf in S.Wolves) if (wolf.Target != 0 && PlayerById(wolf.Target) == null) Patrol(wolf, wolf.Heading);
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) NeedsTick(dt);
+        KeepHolds();
         if (Day > S.WageDay) {
             // Workers on strike are not charged, so their wage does not count against the day.
             int wages = S.Workers.Where(w => w.WageDebt <= 0).Sum(w => w.Wage);
@@ -2621,7 +2642,7 @@ public sealed partial class World {
         // A server sends this player away again until each player joins.
         var local = loaded.Actor;
         loaded.Absent.Remove(local.Key);
-        local.Id = 1; loaded.Players.Add(local);
+        local.Id = 1; Forget(local); loaded.Players.Add(local);
         S = loaded;
         toolsChanged = true;
         foreach (var t in S.Things.Of(ThingKind.Toolstation)) WatchTools(t);

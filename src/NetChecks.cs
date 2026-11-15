@@ -88,13 +88,13 @@ public partial class Game {
         var me = Hosted.Players.Single();
         Give(me, "wood", world.Data.Buildings[ThingKind.Chest].Cost["wood"]); Give(me, Inventory.Coins, 100); Give(me, "stone");
         await Until(() => world.Backpack.Has(world.Data.Buildings[ThingKind.Chest].Cost) && world.Backpack["stone"] == 1, "this window's backpack showing what the server gave it");
-        await KeyStroke(Key.B); await Click(Named("build_chest")!);
+        await KeyStroke(Key.B); await DoubleClick(Named("build_chest")!);
         var spot = FreeSpotNearby(ThingKind.Chest);
         int chests = world.Things.Count(t => t.Kind == ThingKind.Chest);
         await Click(view.Screen(spot));
         Require(player.Mode.Placing == null, "Placing the last chest the backpack pays for must end placement.");
         await Until(() => world.Things.Count(t => t.Kind == ThingKind.Chest) == chests + 1, "the placed chest coming back from the server");
-        // A drag reaches the same action, and the UI checks cover it; only the sound after it is under test here.
+        // A held stack put down reaches the same action, and the UI checks cover it; only the sound after it is under test here.
         string itemSound = Sounds.ForItem("stone");
         Require(sounds.LastVariant(itemSound) < 0, "Nothing may have played the item's sound before the move.");
         var placed = world.Things.Last(t => t.Kind == ThingKind.Chest);
@@ -148,8 +148,10 @@ public partial class Game {
         Require(opened?.Kind == ThingKind.Chest, "Clicking the chest beside the coal must select that chest.");
         Require(Shows(opened), "Clicking the chest beside the coal must open its page.");
         Require(world.Near(opened), "Clicking the chest beside the coal must leave the player in reach of it.");
-        await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
-        await Until(() => opened!.Inventory["coal"] == 1 && world.Backpack["coal"] == 1, "a normal storage click moving exactly one coal");
+        await PickUp(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
+        await RightClick(Cell(0, cell => cell.TooltipText == ""));
+        await KeyStroke(Key.Escape);
+        await Until(() => cursor.Empty && opened!.Inventory["coal"] == 1 && world.Backpack["coal"] == 1, "a right click with coal held storing exactly one coal");
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = true });
         await Click(Cell(1, cell => cell.TooltipText.StartsWith(world.Data.Name("coal"))));
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.Ctrl, Keycode = Key.Ctrl, Pressed = false });

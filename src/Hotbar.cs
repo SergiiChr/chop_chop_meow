@@ -6,18 +6,19 @@ namespace ChopChopMeow;
 
 /// <summary>
 /// The tool belt along the bottom: round badges for the menus, then nine slots of saved item and plan references.
-/// A slot puts its item in hand; plans and crates go straight to placement.
+/// A click selects a slot, which puts its item in the player's hand; plans and crates go straight to placement.
 /// </summary>
 public partial class Hotbar : PanelContainer {
     private readonly UiKit kit;
     private readonly World world;
     private readonly SidePanel panel;
+    private readonly HeldCursor cursor;
 
     public System.Collections.Generic.List<ItemSlot> Buttons { get; } = new();
     public System.Collections.Generic.List<Label> Counts { get; } = new();
 
-    public Hotbar(UiKit kit, SidePanel panel) {
-        this.kit = kit; world = kit.World; this.panel = panel;
+    public Hotbar(UiKit kit, SidePanel panel, HeldCursor cursor) {
+        this.kit = kit; world = kit.World; this.panel = panel; this.cursor = cursor;
         AnchorLeft = .5f; AnchorRight = .5f; AnchorTop = 1; AnchorBottom = 1; OffsetTop = -14; OffsetBottom = -14; GrowHorizontal = GrowDirection.Both; GrowVertical = GrowDirection.Begin;
         AddThemeStyleboxOverride("panel", Style.Plate);
         var slots = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; slots.AddThemeConstantOverride("separation", 10); AddChild(slots);
@@ -41,12 +42,20 @@ public partial class Hotbar : PanelContainer {
         return button;
     }
 
-    /// <summary>A hotbar slot; dropping an item or building plan on it assigns that reference.</summary>
+    /// <summary>
+    /// A hotbar slot: a click selects it, a double click uses its item, a right click empties it and Ctrl or Shift stores its item in the building open.
+    /// An item or building plan put on it from the cursor assigns that reference, and the stack goes back where it was.
+    /// </summary>
     private ItemSlot HotbarButton(int slot) {
         var button = new ItemSlot { FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand };
-        button.Pressed += () => Click(slot);
-        button.CanTake = drag => world.Data.Items.ContainsKey(drag.Item) || world.Data.IsBuilding(drag.Item);
-        button.Take = drag => { SetHotbar(slot, drag.Item); return 0; };
+        button.Controls = new SlotInput(cursor) {
+            Takes = held => held.Item is string id && (world.Data.Items.ContainsKey(id) || world.Data.IsBuilding(id)),
+            Put = (held, _) => { SetHotbar(slot, held.Item!); held.Release(); },
+            Click = () => Select(slot),
+            Use = () => Use(slot),
+            Batch = () => Store(slot),
+            RightClick = () => SetHotbar(slot, ""),
+        };
         button.CustomMinimumSize = new Vector2(56, 56);
         Style.Skin(button, Style.CupNormal, Style.CupHover, Style.CupPressed);
         button.SizeFlagsHorizontal = SizeFlags.ShrinkCenter;
@@ -93,7 +102,7 @@ public partial class Hotbar : PanelContainer {
             Counts[slot].Text = string.IsNullOrEmpty(id) || building || count == 0 ? "" : Water.IsBottle(id) ? $"{Water.BottleSips(id)}/3" : count.ToString();
             button.Icon = string.IsNullOrEmpty(id) ? null : Icons.Of(id);
             button.Disabled = !building && (string.IsNullOrEmpty(id) || count == 0);
-            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · drag an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}";
+            button.TooltipText = string.IsNullOrEmpty(id) ? $"Hotbar slot {slot + 1} · empty · put an item or plan here" : $"Hotbar slot {slot + 1} · {world.Data.Name(id)} · {(building ? "building plan" : $"{count} carried")}\nLMB: select · Double LMB: use · RMB: clear";
             // The item in hand gets an orange rim.
             button.AddThemeStyleboxOverride("normal", active ? Style.CupWanted : Style.CupNormal);
             button.AddThemeStyleboxOverride("disabled", active ? Style.CupWanted : Style.CupNormal);
@@ -115,22 +124,30 @@ public partial class Hotbar : PanelContainer {
         return world.Data.Items.ContainsKey(id) ? id : null;
     }
 
-    public bool IsTransferable(string id) => world.Data.Items[id].Tool == "" && !world.Data.IsConsumable(id);
-
     /// <summary>
-    /// A click on a slot: with a building's page open, its item moves there as a click on it in the backpack drawer does (Shift a stack, Ctrl all of it);
-    /// otherwise the slot goes in hand.
+    /// A Ctrl- or Shift-click on a slot: with a building's page open, its item moves there as one on it in the backpack drawer does (Shift a stack, Ctrl all of it);
+    /// otherwise it selects the slot.
     /// </summary>
-    private void Click(int slot) {
+    private void Store(int slot) {
         string id = HotbarId(slot);
         if (panel.Visible && panel.Bag.Store is Action<string> store && world.Backpack[id] > 0) { kit.Run(() => store(id)); return; }
         Select(slot);
     }
 
-    /// <summary>Puts a hotbar slot in hand; building plans and crates go straight to placement, everything else waits for a left click in the world.</summary>
+    /// <summary>A double click on a slot: eats or drinks its item, lights a torch, opens an empty crate as storage, or else selects the slot.</summary>
+    private void Use(int slot) {
+        string id = HotbarId(slot);
+        if (world.Backpack[id] == 0) { Select(slot); return; }
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Run(() => world.Consume(id));
+        else if (id == "torch" && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
+        else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
+        else Select(slot);
+    }
+
+    /// <summary>Selects a hotbar slot, which puts its item in the player's hand; building plans and crates go straight to placement, everything else waits for a left click in the world.</summary>
     public void Select(int slot) {
         slot = Math.Clamp(slot, 0, 8);
-        world.HoldHotbar(slot);
+        world.SelectHotbar(slot);
         string id = HotbarId(slot);
         panel.Player.Mode = new ClickMode.Normal();
         if (string.IsNullOrEmpty(id)) kit.Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
@@ -138,12 +155,12 @@ public partial class Hotbar : PanelContainer {
         kit.Refresh();
     }
 
-    /// <summary>Whether a left click on the ground does something with this item in hand: drink, eat, light or swing.</summary>
+    /// <summary>Whether a left click on the ground does something with this item selected on the hotbar: drink, eat, light or swing.</summary>
     public bool HasUse(string id) => Water.IsBottle(id) || world.Data.IsConsumable(id) || id == "torch"
         || (world.Data.Items.TryGetValue(id, out var item) ? item.Tool : null) is "axe" or "pickaxe" or "hammer";
 
-    /// <summary>Uses the item in hand toward a point on the ground; items without a use do nothing.</summary>
-    public void UseHeld(Vector2 at) {
+    /// <summary>Uses the item selected on the hotbar toward a point on the ground; items without a use do nothing.</summary>
+    public void UseSelected(Vector2 at) {
         if (ActiveItem() is not string id || !HasUse(id)) return;
         if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id);
         else if (id == "torch") world.UseTorch(at - world.Player);

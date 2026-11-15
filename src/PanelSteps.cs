@@ -26,9 +26,9 @@ public partial class Game {
         return false;
     }
 
-    /// <summary>The panel's grids in order, then the backpack drawer's.</summary>
+    /// <summary>The panel's grids in order, then the backpack drawer's; none while a page that just opened has not built that grid yet.</summary>
     private IEnumerable<ItemSlot> Cells(int grid) => panel.FindChildren("*", "GridContainer", true, false).Concat(bag.FindChildren("*", "GridContainer", true, false))
-        .ElementAt(grid).GetChildren().OfType<ItemSlot>();
+        .ElementAtOrDefault(grid)?.GetChildren().OfType<ItemSlot>() ?? [];
 
     private ItemSlot Cell(int grid, Func<ItemSlot, bool> match) => Cells(grid).First(match);
 
@@ -56,7 +56,7 @@ public partial class Game {
     }
 
     /// <summary>The count pill on the stack carried on the cursor, or empty while it shows none.</summary>
-    private string CarriedCount() => GetTree().Root.FindChild("carried_count", true, false) is Badge { Visible: true } pill ? pill.Text : "";
+    private string CarriedCount() => cursor.Visible && cursor.FindChild("held_count", true, false) is Badge { Visible: true } pill ? pill.Text : "";
 
     /// <summary>Whether the control of this name under <paramref name="parent"/> is on screen.</summary>
     private static bool ShowsChild(Node parent, string name) => parent.FindChild(name, true, false) is Control { Visible: true };

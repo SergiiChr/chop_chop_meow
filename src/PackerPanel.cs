@@ -38,7 +38,7 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         }
     }
 
-    /// <summary>The crate being packed, with how many of its twelve places are filled; click takes it.</summary>
+    /// <summary>The crate being packed, with how many of its twelve places are filled; a click picks it up.</summary>
     private VBoxContainer PackedCrate() {
         var output = thing.Output!;
         var column = new VBoxContainer(); column.AddThemeConstantOverride("separation", 10);
@@ -50,7 +50,7 @@ public partial class PackerPanel(PageTools tools, Thing subject) : ThingPage(too
         var fill = Style.PerBatch(""); column.AddChild(fill);
         live.Watch(() => output.First() is string crate && world.Packed(crate) is Inventory contents ? contents.Count : -1, packed => {
             cell.AddThemeColorOverride(ItemSlot.IconNormal, packed >= 0 ? Colors.White : Style.Ghost);
-            cell.TooltipText = packed < 0 ? "The crate being packed shows here" : packed == world.Data.CrateCapacity ? "Full crate · click or drag to take" : "Crate being packed · click or drag to take";
+            cell.TooltipText = packed < 0 ? "The crate being packed shows here" : $"{(packed == world.Data.CrateCapacity ? "Full crate" : "Crate being packed")}\n{Cups.SlotHint}";
             fill.Text = $"{Math.Max(0, packed)} / {world.Data.CrateCapacity}";
         });
         return column;

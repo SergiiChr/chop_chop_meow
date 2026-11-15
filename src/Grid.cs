@@ -23,11 +23,14 @@ public partial class PagePanel {
     /// <summary>
     /// A grid with one cell per slot, refreshed live from the inventory's stacks and not yet placed anywhere.
     /// An inventory with a capacity shows only <see cref="Inventory.ShownSlots"/>; cells grow in and shrink away as that changes.
-    /// Cells drag their stack out, or half of it on a right click, and accept stacks dragged in from another inventory, unless <paramref name="accepts"/> narrows that.
+    /// <paramref name="container"/> is the building the inventory belongs to, or null for the backpack or an opened crate.
+    /// A left click picks up a cell's stack and a right click half of it; a held stack put on a cell lands there, unless <paramref name="takes"/> narrows what the grid takes.
+    /// <paramref name="batch"/> is what a Ctrl- or Shift-click on a stack does, and <paramref name="use"/> what a double click does.
+    /// <paramref name="put"/>, given a cell and a number of units, puts them down instead of the move to that cell.
     /// The inventory is re-read on each refresh because death replaces the backpack object.
     /// With <paramref name="wanted"/>, stacks it names are rimmed in orange and the rest fade, so what the open page takes stands out.
     /// </summary>
-    protected GridContainer NewInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string> click, string hint, Func<ItemDrag, bool>? accepts = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52) {
+    protected GridContainer NewInventoryGrid(Func<Inventory> inventory, Thing? container, Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null, int columns = GridColumns, float size = 52, Action<string>? use = null, Action<int, int>? put = null) {
         var grid = NewGrid(columns);
         if (size < 52) { grid.AddThemeConstantOverride("h_separation", 8); grid.AddThemeConstantOverride("v_separation", 8); }
         var stacks = new (string Item, int Count)?[inventory().Slots];
@@ -37,14 +40,19 @@ public partial class PagePanel {
         for (int i = 0; i < cells.Length; i++) {
             int slot = i;
             var cell = cells[i].Cell;
-            cell.Pressed += () => {
+            // A click on a stack acts on that very cell when the item lies in several.
+            Action? On(Action<string>? act) => act == null ? null : () => {
                 if (stacks[slot] is not (string id, _)) return;
                 var held = inventory(); held.PreferredSlot = slot;
-                try { kit.Run(() => click(id)); } finally { held.PreferredSlot = -1; }
+                try { kit.Run(() => act(id)); } finally { held.PreferredSlot = -1; }
             };
-            cell.Drag = () => stacks[slot] is (string id, int count) ? new ItemDrag(id, count, inventory(), container, slot) : null;
-            cell.CanTake = accepts ?? (drag => drag.From != null);
-            cell.Take = drag => kit.Run(() => moves.Drag(drag, inventory(), container, slot));
+            cell.Controls = new SlotInput(cursor) {
+                Pick = () => stacks[slot] != null ? (inventory(), slot) : null,
+                Takes = takes ?? (held => held.Stack != null),
+                Put = (_, units) => kit.Run(() => { if (put != null) put(slot, units); else moves.PutDown(inventory(), slot, units, container); }),
+                Batch = On(batch),
+                Use = On(use),
+            };
             grid.AddChild(cell);
         }
         // What each cell last drew: its stack and the inventory's total of that item. A cell is redrawn only when they change.
@@ -102,7 +110,4 @@ public partial class PagePanel {
             tween.Chain().TweenCallback(Callable.From(() => cell.Visible = false));
         }
     }
-
-    /// <summary>Building plans and palette entries drag as hotbar references.</summary>
-    protected static void DragReference(ItemSlot cell, string id) => cell.Drag = () => new ItemDrag(id, 0, null, null);
 }

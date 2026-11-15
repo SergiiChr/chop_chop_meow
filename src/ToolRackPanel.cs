@@ -12,7 +12,7 @@ public partial class ToolRackPanel(PageTools tools, Thing subject) : ThingPage(t
         well.AddChild(StorageGrid(World.ToolSlots, 60));
         var crew = Style.Text("", 14, Style.Ink); crew.Name = "crew"; well.AddChild(crew);
         live.Bind(shown => crew.Text = shown, CrewTools);
-        StoreBagGrid("Click: hang a tool · Ctrl: all of them · Drag to move", id => world.Holds(thing, id) && thing.Inventory.Accepts(id));
+        StoreBagGrid(id => world.Holds(thing, id) && thing.Inventory.Accepts(id));
         JobButtons();
     }
 

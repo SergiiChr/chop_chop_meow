@@ -12,7 +12,7 @@ public partial class CraftPanel(PageTools tools) : PagePanel(tools) {
         HeaderAction("map", "Recipe map: everything there is to make", panel.Map.Open, Style.FilterRound, "open_map");
         AddChild(new RecipeBoard(kit, live, memory, panel, Redraw, null, null));
         CraftQueue();
-        BagGrid(UseFromBag, UseHint, wanted: id => world.HandRecipes.Any(r => world.Data.Recipes[r].Inputs.ContainsKey(id)));
+        BagGrid(null, BagHint, wanted: id => world.HandRecipes.Any(r => world.Data.Recipes[r].Inputs.ContainsKey(id)));
     }
 
     /// <summary>

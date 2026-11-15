@@ -4,8 +4,8 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>What clicking or dragging an item does, for every panel: reach, refusals and the crate-in-crate warning come first.</summary>
-public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
+/// <summary>What clicking an item does, for every panel: reach, refusals and the crate-in-crate warning come first.</summary>
+public sealed class ItemMoves(UiKit kit, BlackHole blackHole, HeldCursor cursor) {
     private readonly World world = kit.World;
 
     /// <summary>Whether a click takes more than one, such as five lots at the market: while Ctrl or Shift is held.</summary>
@@ -16,7 +16,7 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
         if (Input.IsKeyPressed(Key.Ctrl)) return from[item];
         if (!Input.IsKeyPressed(Key.Shift)) return 1;
         int slot = from.PreferredSlot;
-        return slot >= 0 && slot < from.Layout.Count && from.Layout[slot].Item == item ? from.Layout[slot].Count : Math.Min(from[item], from.StackOf(item));
+        return slot >= 0 && slot < from.Layout.Count && from.Layout[slot].Item == item ? from.Layout[slot].Free : Math.Min(from[item], from.StackOf(item));
     }
 
     /// <summary>Whether the player can reach a thing; if not, says so.</summary>
@@ -33,20 +33,10 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
         world.Transfer(from, to, item, Amount(from, item));
     }
 
-    /// <summary>Drops a dragged stack into an inventory and returns what did not fit; the building on either end must be within reach.</summary>
-    public int Drag(ItemDrag drag, Inventory to, Thing? container, int target = -1) {
-        if ((drag.Container ?? container) is Thing near && !InReach(near)) return 0;
-        if (drag.From != to && container != null && world.BoxBlock(container, to, drag.Item) is string refused) { kit.Notify(refused); return 0; }
-        if (blackHole.CrateIntoCrate(container, to, drag.Item) || drag.From == null) return 0;
-        if (target >= 0 && drag.SourceSlot >= 0) {
-            if (drag.From == to && drag.SourceSlot == target) return 0;
-            int rest = Leftover(drag, to.RoomAt(target, drag.From, drag.SourceSlot, drag.Count));
-            world.TransferSlot(drag.From, to, drag.SourceSlot, target, drag.Item, drag.Count);
-            return rest;
-        }
-        int left = Leftover(drag, to.Room(drag.Item));
-        world.Transfer(drag.From, to, drag.Item, drag.Count);
-        return left;
+    /// <summary>Puts units of the held stack into an inventory, into cell <paramref name="slot"/> or with -1 wherever it takes them; a crate into a placed crate sets off the nesting alert instead.</summary>
+    public void PutDown(Inventory to, int slot, int units, Thing? near) {
+        if (cursor.Stack is HeldStack held && blackHole.CrateIntoCrate(near, to, held.Item)) { cursor.Release(); return; }
+        world.PutDown(to, slot, units);
     }
 
     /// <summary>Stores what a thing takes from the backpack, <paramref name="amount"/> saying how much of each item.</summary>
@@ -64,18 +54,20 @@ public sealed class ItemMoves(UiKit kit, BlackHole blackHole) {
         foreach (var id in t.Inventory.Items.Keys.ToArray()) world.Transfer(t.Inventory, world.Backpack, id, 999);
     }
 
-    /// <summary>Makes a cup hand one item of an inventory to the backpack: a click moves it as <see cref="Stack"/> does, a drag carries the stack.</summary>
-    public void TakeCell(ItemSlot cell, Inventory box, string item, Thing near) => TakeCell(cell, box, () => item, near);
+    /// <summary>
+    /// Binds a cup that shows one item of an inventory: a click picks up its stack and a right click half,
+    /// Ctrl or Shift moves it to the backpack as <see cref="Stack"/> does, and <paramref name="takes"/> and <paramref name="put"/> say what a held stack does on it; with none it takes nothing and shakes.
+    /// </summary>
+    public void TakeCell(ItemSlot cell, Inventory box, string item, Thing near, Func<HeldCursor, bool>? takes = null, Action<HeldCursor, int>? put = null) =>
+        TakeCell(cell, box, () => item, near, takes, put);
 
     /// <summary>The same for a cup whose item changes; <paramref name="item"/> is null while it has nothing to give.</summary>
-    public void TakeCell(ItemSlot cell, Inventory box, Func<string?> item, Thing near) {
-        cell.Pressed += () => { if (item() is string id) kit.Run(() => Stack(box, world.S.Backpack, id, near)); };
-        cell.Drag = () => item() is string id && box[id] > 0 ? new ItemDrag(id, box[id], box, near) : null;
+    public void TakeCell(ItemSlot cell, Inventory box, Func<string?> item, Thing near, Func<HeldCursor, bool>? takes = null, Action<HeldCursor, int>? put = null) {
+        cell.Controls = new SlotInput(cursor) {
+            Pick = () => item() is string id && box.Layout.FindIndex(s => s.Item == id) is int at and >= 0 ? (box, at) : null,
+            Takes = takes ?? (_ => false),
+            Put = put,
+            Batch = () => { if (item() is string id) kit.Run(() => Stack(box, world.S.Backpack, id, near)); },
+        };
     }
-
-    /// <summary>
-    /// Units of a drag that will not fit into the given room.
-    /// Worked out before the move because a guest's move happens later, on the host.
-    /// </summary>
-    public static int Leftover(ItemDrag drag, int room) => Math.Max(0, Math.Min(drag.Count, drag.From![drag.Item]) - room);
 }

@@ -38,6 +38,7 @@ public partial class Game : Node, IGameFlow {
     /// <summary>The intro film while it plays; it frees itself when it ends.</summary>
     private IntroMovie? intro;
     private PlayerControl player = null!;
+    private HeldCursor cursor = null!;
     private float uiClock;
     private Net net = null!;
     private GameData data = null!;
@@ -126,10 +127,12 @@ public partial class Game : Node, IGameFlow {
     // A wolf breaks into its sprint some way off, so its growl carries further off screen than other sounds.
     private void PlayWorldSound(string name, Vector2 at) => sounds.Play(name, at, name == "wolf_growl_distance" ? 14 : Sounds.Reach);
     private void BuildHud() {
-        moves = new ItemMoves(kit, blackHole);
-        panel = new SidePanel(kit, view, moves, ui); bag = panel.Bag;
-        hotbar = new Hotbar(kit, panel);
-        player = new PlayerControl(kit, view, panel, hotbar); panel.Player = player;
+        cursor = new HeldCursor(world);
+        moves = new ItemMoves(kit, blackHole, cursor);
+        panel = new SidePanel(kit, view, moves, ui, cursor); bag = panel.Bag;
+        hotbar = new Hotbar(kit, panel, cursor); panel.Hotbar = hotbar;
+        player = new PlayerControl(kit, view, panel, hotbar, cursor, moves); panel.Player = player;
+        cursor.Lifting = panel.Lifted;
         corner = new Corner(world); ui.AddChild(corner);
         modeLabel = new ModeLabel(kit, player); ui.AddChild(modeLabel);
         ui.AddChild(hotbar);
@@ -139,12 +142,13 @@ public partial class Game : Node, IGameFlow {
         waterWarning = new WaterWarning(bag, ui); ui.AddChild(waterWarning);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
-        needsPlate = new NeedsPlate(kit, moves, damageEdges); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
+        needsPlate = new NeedsPlate(kit, moves, damageEdges, cursor); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
         recipeMap = new RecipeMap(kit, panel); panel.Map = recipeMap; ui.AddChild(recipeMap);
         ending = new EndingScreen(kit, panel.Close, this); ui.AddChild(ending);
         startMenu = new StartMenu(kit, saves, net, panel, () => menu.Visible = false, this);
         menu = new PauseMenu(kit, net, startMenu, this); ui.AddChild(menu); ui.AddChild(startMenu);
         recovery = new RecoveryPrompt(kit); ui.AddChild(recovery);
+        ui.AddChild(cursor);
         RefreshLive();
     }
     private void PlayIntro() { intro = new IntroMovie(sounds) { Name = "intro" }; ui.AddChild(intro); }
@@ -324,7 +328,7 @@ public partial class Game : Node, IGameFlow {
         if (ev is InputEventKey key && key.Pressed && !key.Echo) {
             switch (key.PhysicalKeycode) {
                 case Key.Escape:
-                    if (player.Mode is not ClickMode.Normal) player.Mode = new ClickMode.Normal(); else if (panel.Visible || bag.Visible) panel.Close(); else menu.Open();
+                    if (!cursor.Empty) cursor.Release(); else if (player.Mode is not ClickMode.Normal) player.Mode = new ClickMode.Normal(); else if (panel.Visible || bag.Visible) panel.Close(); else menu.Open();
                     RefreshLive(); break;
                 case Key.B: panel.Open(Page.Build); break;
                 case Key.I: panel.Toggle(Page.Guide); break;
@@ -344,7 +348,7 @@ public partial class Game : Node, IGameFlow {
         // Drawing the intro film takes no input and runs no game under it.
         if (world == null || view == null || introFolder != null) return;
         float dt = Math.Min((float)delta, .1f); runTime += dt;
-        player.Update(dt); panel.ShowAwaited();
+        player.Update(dt, GetViewport().GuiGetHoveredControl() != null); panel.ShowAwaited();
         if (session is Session.Launching launching) AwaitServer(launching);
         // The server holds the world still while every player has a menu open, which in a game alone is whenever this one does.
         if (kit.Paused != holding) { holding = kit.Paused; net.Hold(holding); }

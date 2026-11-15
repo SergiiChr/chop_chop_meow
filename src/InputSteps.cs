@@ -60,12 +60,23 @@ public partial class Game {
         await KeyStroke(Key.Enter);
     }
 
+    // Where in the window the last click pressed and when, so the next click there waits long enough not to make a double click.
+    private Vector2? lastClicked;
+    private ulong lastClickAt;
+
     private async Task Click(Control control) {
         var at = await At(control);
+        await Apart(at);
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true });
         await Frames();
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
         await Frames();
+    }
+
+    /// <summary>Waits until a press at a window point is a click of its own, not the second half of a double click with the press before it there.</summary>
+    private async Task Apart(Vector2 at) {
+        if (lastClicked == at) while (Time.GetTicksMsec() - lastClickAt <= SlotInput.DoubleClickMs) await Frames(1);
+        lastClicked = at; lastClickAt = Time.GetTicksMsec();
     }
 
     private async Task Click(Vector2 point) {
@@ -76,19 +87,39 @@ public partial class Game {
         await Frames();
     }
 
-    /// <summary>Two presses, the second flagged as a double click the way Godot reports one.</summary>
+    /// <summary>
+    /// Two clicks within a double click's time, the second press also flagged as a double click the way Godot reports one.
+    /// Each press and release is a frame apart, as slow frames in a check would otherwise stretch them past that time.
+    /// </summary>
     private async Task DoubleClick(Control control) {
         var at = await At(control);
+        await Apart(at);
         foreach (bool second in new[] { false, true }) {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true, DoubleClick = second });
-            await Frames();
+            await Frames(1);
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
-            await Frames();
+            await Frames(1);
         }
+        await Frames();
     }
 
-    /// <summary>A real mouse drag: press, move in steps past the drag threshold, release over the target.</summary>
-    private async Task DragTo(Control from, Control to) => await LetGo(await HoldOver(await At(from), await At(to)));
+    /// <summary>Picks up a cell's stack with a left click, which on a cell with a use waits out a possible second press first.</summary>
+    private async Task PickUp(Control cell) {
+        await Click(cell);
+        await Until(() => !cursor.Empty, "the stack going onto the cursor", 3);
+    }
+
+    /// <summary>Picks up half a cell's stack with a right click.</summary>
+    private async Task PickUpHalf(Control cell) {
+        await RightClick(cell);
+        await Until(() => !cursor.Empty, "half the stack going onto the cursor", 3);
+    }
+
+    /// <summary>Picks up a cell's stack and puts it down on another cell with a second left click.</summary>
+    private async Task Carry(Control from, Control to) {
+        await PickUp(from);
+        await Click(to);
+    }
 
     /// <summary>Presses the left button at one window point and moves in steps to another, keeping it held; returns where it ends.</summary>
     private async Task<Vector2> HoldOver(Vector2 start, Vector2 end) {
@@ -114,19 +145,10 @@ public partial class Game {
         await LetGo(await HoldOver(WindowPoint(window, corner), WindowPoint(window, corner + by)));
     }
 
-    /// <summary>A right click on a stack, a move to the target and a left click there.</summary>
+    /// <summary>Picks up half a cell's stack with a right click and puts it down on another cell with a left click.</summary>
     private async Task SplitTo(Control from, Control to) {
-        var start = await At(from); var end = await At(to);
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = start, GlobalPosition = start, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, Position = start, GlobalPosition = start, Pressed = false });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseMotion { Position = end, GlobalPosition = end, Relative = end - start });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = end, GlobalPosition = end, Pressed = true });
-        await Frames();
-        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
-        await Frames();
+        await PickUpHalf(from);
+        await Click(to);
     }
 
     /// <summary>Clicks open ground beside the player, so the click uses the item in hand instead of selecting something.</summary>
@@ -186,6 +208,8 @@ public partial class Game {
 
     private async Task RightClick(Control control) {
         var at = await At(control);
+        // A right press comes between two left ones, so a left click after it makes no double click either.
+        lastClicked = null;
         Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Right, ButtonMask = MouseButtonMask.Right, Position = at, GlobalPosition = at, Pressed = true });
         await Frames();
         RightRelease(at);

@@ -3,13 +3,6 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>
-/// What a drag carries.
-/// From is null for references, such as a building plan or a hotbar palette entry, which move no items.
-/// Container is the building the items come from; the backpack itself has none.
-/// </summary>
-public sealed record ItemDrag(string Item, int Count, Inventory? From, Thing? Container, int SourceSlot = -1);
-
 /// <summary>The pill on a cup's corner: it shows only while it has something to count.</summary>
 public partial class Badge : Label {
     public new string Text {
@@ -18,7 +11,7 @@ public partial class Badge : Label {
     }
 }
 
-/// <summary>An icon button that can start an item drag and accept one.</summary>
+/// <summary>An icon button for an item: an item cell when <see cref="Controls"/> is set, else a plain button.</summary>
 public partial class ItemSlot : Button {
     public static readonly StringName IconNormal = "icon_normal_color";
 
@@ -36,7 +29,7 @@ public partial class ItemSlot : Button {
         Style.Skin(cell, Style.CupNormal, Style.CupHover, Style.CupPressed);
         cell.AddThemeConstantOverride("icon_max_width", (int)(size * .74f));
         var count = CountBadge();
-        cell.AddChild(count); cell.shownCount = count;
+        cell.AddChild(count);
         // A packed crate shows what it holds on a round badge at the other corner.
         var badge = Style.Corner(Style.Icon(null, 24), 0, 0); badge.Name = "badge"; badge.Visible = false;
         cell.AddChild(badge);
@@ -51,76 +44,59 @@ public partial class ItemSlot : Button {
         return Style.Corner(count, x, y);
     }
 
-    // Godot drag data must be a Variant, so the C# payload rides alongside it for the drag's lifetime.
-    private static ItemDrag? dragging;
-    /// <summary>The cup's own count pill, which a drag of the whole stack copies.</summary>
-    private Badge? shownCount;
-    public Func<ItemDrag?>? Drag { get; set; }
-    public Func<ItemDrag, bool>? CanTake { get; set; }
-    /// <summary>Drops the drag here and returns the units that did not fit, which stay on the cursor.</summary>
-    public Func<ItemDrag, int>? Take { get; set; }
+    /// <summary>What the cell does with the mouse as an item cell, or null for a plain button such as a recipe card.</summary>
+    public SlotInput? Controls { get; set; }
     /// <summary>Runs on the second press of a double click, besides the press itself.</summary>
     public Action? DoubleClicked { get; set; }
-    /// <summary>Runs on a right click, on a slot that has nothing to drag.</summary>
+    /// <summary>Runs on a right click on a plain button.</summary>
     public Action? RightClicked { get; set; }
     /// <summary>Builds a richer tooltip than plain text; the tooltip text must still be non-empty for Godot to show it.</summary>
     public Func<Control>? Popup { get; set; }
+    // When, where and on which cell by name the left button last went down, to tell a double click by <see cref="SlotInput.DoubleClickMs"/>:
+    // a page that draws itself again after the first press puts a new cell of the same name under the second.
+    private static ulong lastPress;
+    private static Vector2 lastPressAt;
+    private static StringName? lastPressOn;
+    /// <summary>How far the mouse may move between the presses of a double click.</summary>
+    private const float DoubleClickReach = 5;
+    private Tween? shake;
+    private const float ShakeSeconds = .35f, ShakeReach = 5, ShakeSwings = 3;
 
     public override GodotObject? _MakeCustomTooltip(string forText) => Popup?.Invoke();
 
-    public override Variant _GetDragData(Vector2 atPosition) {
-        dragging = Drag?.Invoke();
-        if (dragging == null) return default;
-        SetDragPreview(Preview(null));
-        return dragging.Item;
-    }
+    // The button pressed on this item cell, which acts once it is let go: an action on the press could redraw the page and take the cell away under the mouse.
+    private MouseButton down = MouseButton.None;
 
     public override void _GuiInput(InputEvent ev) {
-        if (ev is not InputEventMouseButton { Pressed: true } click) return;
-        if (click.ButtonIndex == MouseButton.Left && click.DoubleClick) DoubleClicked?.Invoke();
-        // The click that drops a split half would also press this slot, whose own action could move the items straight back.
-        if (click.ButtonIndex == MouseButton.Left && GetViewport().GuiIsDragging()) AcceptEvent();
-        // A right click picks up half of what a drag would take, carried until a left click drops it.
-        else if (click.ButtonIndex == MouseButton.Right && Drag?.Invoke() is { Count: > 0 } whole) {
-            var half = whole with { Count = (whole.Count + 1) / 2 };
-            dragging = half;
-            ForceDrag(half.Item, Preview(half.Count == whole.Count ? null : half.Count));
+        if (ev is not InputEventMouseButton click) return;
+        if (!click.Pressed) {
+            if (Controls == null || click.ButtonIndex != down) return;
+            down = MouseButton.None;
+            Controls.Release(this, click.ButtonIndex);
             AcceptEvent();
-        } else if (click.ButtonIndex == MouseButton.Right && RightClicked != null) { RightClicked(); AcceptEvent(); }
+            return;
+        }
+        bool second = false;
+        if (click.ButtonIndex == MouseButton.Left) {
+            ulong now = Time.GetTicksMsec();
+            second = lastPress > 0 && now - lastPress <= SlotInput.DoubleClickMs && lastPressOn == Name && click.GlobalPosition.DistanceTo(lastPressAt) <= DoubleClickReach;
+            // A third press starts over, so a triple click is a double click and a single one.
+            lastPress = second ? 0 : now; lastPressAt = click.GlobalPosition; lastPressOn = Name;
+            if (second) DoubleClicked?.Invoke();
+        } else lastPress = 0;
+        if (Controls != null) {
+            if (click.ButtonIndex is MouseButton.Left or MouseButton.Right) { down = click.ButtonIndex; Controls.Press(second); }
+            AcceptEvent();
+            return;
+        }
+        if (click.ButtonIndex == MouseButton.Right && RightClicked != null) { RightClicked(); AcceptEvent(); }
     }
 
-    /// <summary>
-    /// The icon under the cursor, in a frame the size of this cup with a count pill on the same corner.
-    /// Carrying the whole stack, <paramref name="part"/> is null and the pill reads as the cup's does, such as a bottle's sips; carrying part of it, the pill counts what is carried.
-    /// </summary>
-    private Control Preview(int? part) {
-        var preview = new Control();
-        var frame = new Control { Size = Size, Position = -Size / 2, MouseFilter = MouseFilterEnum.Ignore }; preview.AddChild(frame);
-        frame.AddChild(new TextureRect { Texture = Icon, ExpandMode = TextureRect.ExpandModeEnum.IgnoreSize, Size = new Vector2(40, 40), Position = Size / 2 - new Vector2(20, 20), Modulate = new Color(1, 1, 1, .85f) });
-        var pill = CountBadge(); pill.Name = "carried_count"; frame.AddChild(pill);
-        pill.Text = part is int carried ? carried.ToString() : shownCount?.Text ?? "";
-        return preview;
-    }
-
-    public override bool _CanDropData(Vector2 atPosition, Variant data) => dragging != null && CanTake?.Invoke(dragging) == true;
-
-    public override void _DropData(Vector2 atPosition, Variant data) {
-        if (dragging == null || Take?.Invoke(dragging) is not int left || left <= 0) return;
-        Hold(dragging with { Count = left });
-    }
-
-    /// <summary>
-    /// Puts what did not fit back on the cursor.
-    /// This drag ends right after the drop, and a held stack drops on a press, so the rest is picked up again only once the button is up: its release would otherwise drop it at once.
-    /// </summary>
-    private async void Hold(ItemDrag rest) {
-        do await ToSignal(GetTree(), SceneTree.SignalName.ProcessFrame);
-        while (Input.IsMouseButtonPressed(MouseButton.Left));
-        if (!IsInstanceValid(this) || !IsInsideTree()) return;
-        dragging = rest; ForceDrag(rest.Item, Preview(rest.Count));
-    }
-
-    public override void _Notification(int what) {
-        if (what == NotificationDragEnd) dragging = null;
+    /// <summary>Shakes the cell side to side, as a refusal.</summary>
+    public void Shake() {
+        if (shake?.IsRunning() == true) return;
+        var home = Position;
+        shake = CreateTween();
+        shake.TweenMethod(Callable.From<float>(done => Position = home + new Vector2(MathF.Sin(done * MathF.Tau * ShakeSwings) * (1 - done) * ShakeReach, 0)), 0f, 1f, ShakeSeconds);
     }
 }

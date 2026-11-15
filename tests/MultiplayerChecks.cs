@@ -174,12 +174,12 @@ public static class MultiplayerChecks {
     private static void CheckHotbarAndEndingReachTheServer(GameData data) {
         var (world, guest, _) = Hosted(data);
         var copy = new World(data, false); var sent = new List<Command>(); copy.Host = sent.Add;
-        copy.SetHotbar(4, "stone"); copy.HoldHotbar(2); copy.MarkEndingShown();
+        copy.SetHotbar(4, "stone"); copy.SelectHotbar(2); copy.MarkEndingShown();
         Require(copy.HotbarSlots[4] == "stone" && copy.ActiveHotbar == 2, "a player's own copy should show their hotbar at once");
         foreach (var command in sent) world.Run(guest, command);
         Require(guest.HotbarSlots[4] == "stone" && guest.ActiveHotbar == 2, "the server should keep a player's hotbar, since the save is its");
         Require(world.EndingShown, "the server should keep that the ending was shown, since the save is its");
-        world.Run(guest, new Command(Verb.SetHotbar, 0, 0, "wood", 9, default)); world.Run(guest, new Command(Verb.HoldHotbar, 0, 0, "", -1, default));
+        world.Run(guest, new Command(Verb.SetHotbar, 0, 0, "wood", 9, default)); world.Run(guest, new Command(Verb.SelectHotbar, 0, 0, "", -1, default));
         Require(guest.ActiveHotbar == 2 && !guest.HotbarSlots.Contains("wood"), "a slot that does not exist should do nothing");
     }
 

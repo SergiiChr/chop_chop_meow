@@ -14,6 +14,7 @@ using static WorkerSteps;
 public static class SimulationChecks {
     public static void Run(GameData data) {
         Test(InventoryLayoutChecks.Run, data);
+        Test(HeldStackChecks.Run, data);
         Test(ChopChopMeow.Tests.WaterChecks.Run, data);
         Test(PondChecks.Run, data);
         Test(EconomyChecks.Run, data);

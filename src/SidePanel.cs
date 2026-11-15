@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Godot;
 
 namespace ChopChopMeow;
@@ -14,12 +15,12 @@ public sealed class PageMemory {
     public readonly HashSet<RecipeGroup> ClosedGroups = new();
     /// <summary>Whether the trading post shows hiring rather than shipping, and whether its price sheet is open.</summary>
     public bool Hiring, SheetOpen = true;
-    /// <summary>The number of the packed crate opened from the backpack.</summary>
+    /// <summary>The number of the packed crate opened from the backpack, or 0 for an empty crate.</summary>
     public int CarriedCrate;
 }
 
 /// <summary>What every page is built with.</summary>
-public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory);
+public sealed record PageTools(SidePanel Panel, UiKit Kit, ItemMoves Moves, PageMemory Memory, HeldCursor Cursor);
 
 /// <summary>The pages of the side panel.</summary>
 public enum Page { None, Welcome, Build, Backpack, Guide, Crew, Craft, Inspect, Crate }
@@ -58,6 +59,7 @@ public partial class SidePanel : MovableWindow {
     private readonly WorldView view;
     private readonly Control ui;
     private readonly PageTools tools;
+    private readonly HeldCursor cursor;
     private readonly HBoxContainer heading;
     private readonly ScrollContainer scroll;
     /// <summary>The board left of the panel that holds the price sign or the filter window.</summary>
@@ -107,9 +109,9 @@ public partial class SidePanel : MovableWindow {
     /// <summary>Left edge of the panel beside any board, measured from the right of the screen, where the player moved it.</summary>
     private float LeftEdge => Left + Moved.X;
 
-    public SidePanel(UiKit kit, WorldView view, ItemMoves moves, Control ui) {
-        this.kit = kit; this.view = view; this.ui = ui; world = kit.World;
-        tools = new PageTools(this, kit, moves, new PageMemory());
+    public SidePanel(UiKit kit, WorldView view, ItemMoves moves, Control ui, HeldCursor cursor) {
+        this.kit = kit; this.view = view; this.ui = ui; world = kit.World; this.cursor = cursor;
+        tools = new PageTools(this, kit, moves, new PageMemory(), cursor);
         // The panel hugs what it shows, up to the room above the hotbar, and scrolls beyond that.
         AnchorLeft = 1; AnchorRight = 1; OffsetLeft = Left; OffsetRight = -20; OffsetTop = Top; OffsetBottom = Top; Visible = false;
         Bag = new BackpackDrawer(kit, this);
@@ -175,7 +177,7 @@ public partial class SidePanel : MovableWindow {
     /// <summary>Opens a page, or closes it if it is the one showing.</summary>
     public void Toggle(Page name) { if (Page == name) Close(); else Open(name); }
 
-    public void Close() { Visible = false; Bag.Visible = false; Aside.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
+    public void Close() { cursor.Release(); Visible = false; Bag.Visible = false; Aside.Visible = false; view.PanelOpen = false; Page = Page.None; page = null; }
 
     /// <summary>Whether the open page shows something that has gone, and so closes or gives way on the next refresh.</summary>
     public bool SubjectGone => page is { Current: false };
@@ -201,7 +203,20 @@ public partial class SidePanel : MovableWindow {
         Open(Page.Inspect);
     }
 
-    /// <summary>Opens a packed crate from the backpack.</summary>
+    /// <summary>The hotbar, which also needs this panel, so the game sets it once both exist.</summary>
+    public Hotbar Hotbar { get; set; } = null!;
+
+    /// <summary>Selects the hotbar slot that holds an item, or says it has none.</summary>
+    public void SelectOnHotbar(string item) {
+        int slot = world.HotbarSlots.ToList().IndexOf(item);
+        if (slot < 0) kit.Notify($"Put the {world.Data.Name(item).ToLowerInvariant()} on the hotbar to use it.");
+        else Hotbar.Select(slot);
+    }
+
+    /// <summary>A crate is being picked up onto the cursor: its page closes if it is the one open, for the backpack's.</summary>
+    public void Lifted(string crate) { if (Page == Page.Crate && World.PackedId(crate) == tools.Memory.CarriedCrate) Open(Page.Backpack); }
+
+    /// <summary>Opens a crate from the backpack as storage: a packed one by its number, or with 0 an empty one.</summary>
     public void OpenCrate(int crate) {
         if (tools.Memory.CarriedCrate != crate) Page = Page.None;
         tools.Memory.CarriedCrate = crate;

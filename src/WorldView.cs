@@ -603,7 +603,7 @@ public partial class WorldView : Node3D {
             state.Update(p.Pos, action, facing, dt);
             other.PulseRemaining = Math.Max(0, other.PulseRemaining - dt);
             if (action is ActorAction.Walk or ActorAction.Jog or ActorAction.Run && (state.Struck(.25f) || state.Struck(.75f))) Sounds?.Play(FootstepSound(p.Pos), p.Pos);
-            Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run ? HeldTool(p.Held, p.Backpack) : null), p.Held, p.Backpack), p.Torch > 0 && p.RespawnIn <= 0);
+            Pose(other.Rig, state, Grade(ActorAnimation.Tool(action) ?? (action is ActorAction.Idle or ActorAction.Walk or ActorAction.Jog or ActorAction.Run ? HeldTool(p.Selected, p.Backpack) : null), p.Selected, p.Backpack), p.Torch > 0 && p.RespawnIn <= 0);
             Torch(other.Rig, state, p.TorchLit, p.TorchFlare, p.Pos);
             if (other.DownedFor > 0) KnockDown(other.Rig, state, other.DownedFor);
             other.Rig.Root.Visible = (p.RespawnIn <= 0 || p.Mauled) && p.Sheltered == 0 && World.Sees(p.Pos);

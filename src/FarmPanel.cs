@@ -37,7 +37,7 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
         var side = world.Data.Farm.Yield.Keys.Where(k => k != "wheat").Select(k => (Control)Cups.Labelled(HarvestCup(k, 44), $"×{world.Data.Farm.Yield[k]}")).ToArray();
         AddChild(new ProcessRow(live, inputs, $"{world.Data.Farm.GrowDays:0} d", () => thing.FarmStage == FarmStage.Growing ? thing.Progress / world.GrowSeconds : thing.FarmStage == FarmStage.Ripe ? 1 : 0,
             new FuelRow("line_leaf", new Color("8fae7e"), fertilizer, lasts), main, side));
-        StoreBagGrid("Click: sow seeds or fertilizer · Drag to move", id => world.Holds(thing, id));
+        StoreBagGrid(id => world.Holds(thing, id));
         JobButtons();
     }
 
@@ -46,13 +46,10 @@ public partial class FarmPanel(PageTools tools, Thing subject) : ThingPage(tools
     private static string Count(int n, string unit) => n == 1 ? $"1 {unit}" : $"{n} {unit}s";
 
     /// <summary>A cup for what the plot sows from; seed comes back in from the plot's own harvest as well as from the backpack.</summary>
-    private ItemSlot SowingCup(string item, StyleBoxFlat? look = null) {
-        var cell = cups.Cup(thing.Inventory, item, true, held => $"{world.Data.Name(item)} · {held}\nClick: take back · Drag seeds here from the harvest or backpack to sow", look: look);
-        cell.CanTake = drag => (drag.From == world.S.Backpack || drag.From == thing.Output) && drag.Item == item;
-        cell.Take = drag => kit.Run(() => moves.Drag(drag, thing.Inventory, thing));
-        return cell;
-    }
+    private ItemSlot SowingCup(string item, StyleBoxFlat? look = null) =>
+        cups.Cup(thing.Inventory, item, true, held => $"{world.Data.Name(item)} · {held}\n{Cups.SlotHint} · put seeds here from the harvest or backpack to sow", look: look,
+            takes: held => held.Stack is HeldStack stack && stack.Item == item && (stack.Box == 0 || thing.Output != null && stack.Box == world.Locate(thing.Output)));
 
     private ItemSlot HarvestCup(string item, float size = 52) =>
-        cups.Cup(thing.Output ?? thing.Inventory, item, false, held => $"{world.Data.Name(item)} · {held}\nClick: take · Drag seeds to the sowing slot", size);
+        cups.Cup(thing.Output ?? thing.Inventory, item, false, held => $"{world.Data.Name(item)} · {held}\n{Cups.SlotHint} · put seeds back in the sowing slot", size);
 }

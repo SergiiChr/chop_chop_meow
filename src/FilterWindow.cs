@@ -16,7 +16,7 @@ public sealed class FilterState {
 /// </summary>
 /// <param name="redraw">Draws the page again after a change to this window; the page does so itself when the filters change.</param>
 /// <param name="scrolls">Takes the item list's scroll area and the list, so the panel fits it to the screen.</param>
-public partial class FilterWindow(UiKit kit, Thing t, FilterState state, Action redraw, Action<ScrollContainer, Control> scrolls) : VBoxContainer {
+public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterState state, Action redraw, Action<ScrollContainer, Control> scrolls) : VBoxContainer {
     private readonly World world = kit.World;
 
     public override void _Ready() {
@@ -42,13 +42,15 @@ public partial class FilterWindow(UiKit kit, Thing t, FilterState state, Action 
             if (filter.Count == 0) { var any = Style.Text(post ? "no deliveries" : "anything", 14, Style.Tan); any.CustomMinimumSize = new Vector2(0, 44); row.AddChild(any); }
             var (add, _) = ItemSlot.Cup($"filter_add_{(output ? "out" : "in")}", 44);
             add.Text = "+"; add.AddThemeFontSizeOverride("font_size", 22); add.AddThemeColorOverride("font_color", Style.Tan);
-            add.TooltipText = "Add an item · or drop one from your backpack";
-            add.Pressed += () => { state.Picking = !state.Picking; state.Output = output; redraw(); };
-            add.CanTake = drag => drag.From != null && (!World.PackedKind(drag.Item).IsEmpty || !post && world.Data.Items.ContainsKey(drag.Item));
-            // The item stays where it was: a filter only names it, or for a packed crate the kind of crate it is.
-            add.Take = drag => {
-                var kind = World.PackedKind(drag.Item);
-                world.SetFilter(t, kind.IsEmpty ? drag.Item : new string(kind), output, true); return 0;
+            add.TooltipText = "Add an item · or put a held one here";
+            // A held stack goes back where it was: a filter only names it, or for a packed crate the kind of crate it is.
+            add.Controls = new SlotInput(cursor) {
+                Click = () => { state.Picking = !state.Picking; state.Output = output; redraw(); },
+                Takes = held => held.Stack is HeldStack stack && (!World.PackedKind(stack.Item).IsEmpty || !post && world.Data.Items.ContainsKey(stack.Item)),
+                Put = (held, _) => {
+                    var kind = World.PackedKind(held.Item!);
+                    world.SetFilter(t, kind.IsEmpty ? held.Item! : new string(kind), output, true); held.Release();
+                },
             };
             row.AddChild(add);
         }

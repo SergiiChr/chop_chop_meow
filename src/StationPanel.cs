@@ -32,7 +32,7 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         BagGrid(id => {
             if (FreeToolCup(id)) world.SlotTool(thing, id);
             else world.LoadInput(thing, id, ItemMoves.Amount(world.S.Backpack, id));
-        }, slotted.Length > 0 ? "Click: slot a tool, or add one · Shift: a stack · Ctrl: all of it · Drag onto a slot" : "Click: add one · Shift: a stack · Ctrl: all of it · Drag onto a slot",
+        }, slotted.Length > 0 ? $"{BagHint}\nShift: slot a tool, or load a stack · Ctrl: all of it" : $"{BagHint}\nShift: load a stack · Ctrl: all of it",
             wanted: id => world.Takes(thing, id) || FreeToolCup(id));
         JobButtons();
     }
@@ -57,14 +57,12 @@ public partial class StationPanel(PageTools tools, Thing subject) : ThingPage(to
         var (cell, _) = ItemSlot.Cup($"tool_{tool}");
         cell.SizeFlagsVertical = Control.SizeFlags.ShrinkCenter;
         string plainest = world.Data.PlainestTool(tool);
-        cell.Pressed += () => { if (world.BenchTool(thing, tool) is string held) kit.Run(() => world.UnslotTool(thing, held)); };
-        cell.Drag = () => world.BenchTool(thing, tool) is string held ? new ItemDrag(held, 1, thing.Tools, thing) : null;
-        cell.CanTake = drag => drag.From == world.S.Backpack && world.Data.Items.GetValueOrDefault(drag.Item)?.Tool == tool;
-        cell.Take = drag => { kit.Run(() => world.SlotTool(thing, drag.Item)); return 0; };
+        moves.TakeCell(cell, thing.Tools!, () => world.BenchTool(thing, tool), thing,
+            held => held.Stack is { Box: 0 } stack && world.Data.Items.GetValueOrDefault(stack.Item)?.Tool == tool, (_, units) => kit.Run(() => world.PutDown(thing.Tools!, -1, units)));
         live.Watch(() => world.BenchTool(thing, tool), held => {
             cell.Icon = Icons.Of(held ?? plainest);
             cell.AddThemeColorOverride(ItemSlot.IconNormal, held != null ? Colors.White : Style.Ghost);
-            cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\nClick: take it back" : $"Empty {tool} slot\nDrag a {tool} here from your backpack";
+            cell.TooltipText = held != null ? $"{world.Data.Name(held)} · {world.Data.Items[held].Speed:0.#}× speed\n{Cups.SlotHint}" : $"Empty {tool} slot\nPut a {tool} here from your backpack";
         });
         return cell;
     }

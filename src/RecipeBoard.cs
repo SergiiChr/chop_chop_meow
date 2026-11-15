@@ -22,8 +22,8 @@ public partial class RecipeBoard(UiKit kit, LiveUpdates live, PageMemory memory,
     /// <summary>How far the worker mark's hard hat stands out over the top of a card.</summary>
     private const int HatRise = 18;
 
-    /// <summary>Seconds a refused mark waits for a second press before it shows: Godot on Linux calls a second press within this time a double-click.</summary>
-    private const float DoubleClickSeconds = .4f;
+    /// <summary>Seconds a refused mark waits for a second press before it shows: a second press within this time makes a double-click.</summary>
+    private const float DoubleClickSeconds = SlotInput.DoubleClickMs / 1000f;
 
     // The wait of the refused mark shown next; a newer click or a double-click takes its place.
     private SceneTreeTimer? refusing;

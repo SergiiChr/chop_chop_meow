@@ -21,8 +21,8 @@ public partial class Game {
             SetHotbarSlot(world, 8, "water");
             await CheckHoldingRightMouseOnShoreRefillsRetainedBottle();
             await CheckHotbarDrinkTakesOneSipAndKeepsEmptyBottle();
-            await CheckDragPlacesStackInExactSlotAndSortOrdersByName();
-            await CheckClickMovesOneUnitAndCtrlClickMovesRemainingStack();
+            await CheckHeldStackLandsInExactSlotAndSortOrdersByName();
+            await CheckRightClickPutsOneUnitAndCtrlClickMovesRemainingStack();
             await CheckPartialBottleIsRefusedByRecipeWithWarning();
             await CheckSkipToMorningOnlyForDownedPlayerWithoutCabin();
         } finally {
@@ -60,13 +60,14 @@ public partial class Game {
         for (int expected = 3; expected >= 1; expected--) {
             await Until(() => hotbar.Counts[8].Text == $"{expected}/3", $"the bottle badge showing {expected}/3 before a sip", 2);
             await Click(hotbar.Buttons[8]);
+            await Until(() => world.ActiveHotbar == 8, "the click selecting slot nine", 2);
             await ClickGround();
             await Until(() => hotbar.Counts[8].Text == $"{expected - 1}/3", "a hotbar drink removing exactly one sip", 2);
         }
         Require(world.Backpack["empty_bottle"] == 1, "Three hotbar sips must leave the empty bottle in inventory.");
     }
-    /// <summary>Distinct stacks show the slot drag lands on the exact target and leaves other cells alone.</summary>
-    private async Task CheckDragPlacesStackInExactSlotAndSortOrdersByName() {
+    /// <summary>Distinct stacks show a held stack lands on the exact cell it is put on and leaves other cells alone.</summary>
+    private async Task CheckHeldStackLandsInExactSlotAndSortOrdersByName() {
         await CloseWithEsc();
         EmptyBackpack(Hosted);
         Give(Hosted, "wood", 7); Give(Hosted, "stone", 3); Give(Hosted, "berries", 5);
@@ -78,33 +79,37 @@ public partial class Game {
         Require(woodIndex >= 0, "The inventory must expose a wood slot.");
         Require(targetIndex >= 0, "The inventory must expose an empty destination slot.");
         Require(targetIndex != woodIndex, "The source and destination slots must differ.");
-        await DragTo(wood, target);
-        Require(world.Backpack.Layout[targetIndex].Item == "wood", "Dragging a stack into an empty backpack slot must put the item in that slot.");
-        Require(world.Backpack.Layout[targetIndex].Count == 7, "Dragging a stack into an empty backpack slot must keep its quantity.");
-        Require(world.Backpack["stone"] == 3, "Dragging a stack into an empty backpack slot must leave the stone alone.");
-        Require(world.Backpack["berries"] == 5, "Dragging a stack into an empty backpack slot must leave the berries alone.");
+        await Carry(wood, target);
+        await Until(() => world.Backpack.Layout[targetIndex].Item == "wood", "a held stack put on an empty backpack slot landing in that slot", 2);
+        Require(world.Backpack.Layout[targetIndex].Count == 7, "A held stack put on an empty backpack slot must keep its quantity.");
+        Require(world.Backpack["stone"] == 3, "A held stack put on an empty backpack slot must leave the stone alone.");
+        Require(world.Backpack["berries"] == 5, "A held stack put on an empty backpack slot must leave the berries alone.");
         await Click((Control)bag.FindChild("sort_bag", true, false));
         var ordered = world.Backpack.Layout.Where(s => s.Item != "").Select(s => s.Item).ToArray();
         Require(ordered.SequenceEqual(ordered.OrderBy(id => id, StringComparer.Ordinal)), "The backpack Sort button must order stacks by item name.");
 
         await SurvivalReviewShot("sorted-inventory");
     }
-    /// <summary>A normal click moves one unit, Shift-click the stack clicked and Ctrl-click every unit of the item.</summary>
-    private async Task CheckClickMovesOneUnitAndCtrlClickMovesRemainingStack() {
+    /// <summary>A right click with a stack held puts down one unit, Shift-click moves the stack clicked and Ctrl-click every unit of the item.</summary>
+    private async Task CheckRightClickPutsOneUnitAndCtrlClickMovesRemainingStack() {
         await CloseWithEsc();
         Give(Hosted, "coal", 5);
         var chest = Hosted.Add(ThingKind.Chest, world.Player + Vector2.Right);
         chest.Inventory.Add("coal", 5);
         await ClickOn(chest); await Frames(3);
-        await Click(Cell(0, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal)));
-        Require(chest.Inventory["coal"] == 4 && world.Backpack["coal"] == 6,
-            "Clicking a storage stack must move exactly one item from storage to the backpack.");
+        await PickUp(Cell(0, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal)));
+        await RightClick(Cell(1, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal)));
+        await KeyStroke(Key.Escape);
+        await Until(() => cursor.Empty && chest.Inventory["coal"] == 4 && world.Backpack["coal"] == 6,
+            "a right click with a storage stack held putting exactly one item into the backpack", 2);
         await Holding(Key.Ctrl, () => Click(Cell(0, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal))));
         Require(chest.Inventory["coal"] == 0 && world.Backpack["coal"] == 10,
             "Ctrl-clicking a storage stack must take all remaining units.");
-        await Click(Cell(1, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal)));
-        Require(chest.Inventory["coal"] == 1 && world.Backpack["coal"] == 9,
-            "Clicking one unit in the backpack must store exactly one unit.");
+        await PickUp(Cell(1, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal)));
+        await RightClick(Cell(0, c => c.TooltipText == ""));
+        await KeyStroke(Key.Escape);
+        await Until(() => cursor.Empty && chest.Inventory["coal"] == 1 && world.Backpack["coal"] == 9,
+            "a right click with a backpack stack held storing exactly one unit", 2);
         await Holding(Key.Ctrl, () => Click(Cell(1, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal))));
         Require(chest.Inventory["coal"] == 10 && world.Backpack["coal"] == 0,
             "Ctrl-clicking a backpack stack must store all remaining units.");
@@ -114,7 +119,7 @@ public partial class Game {
         await Holding(Key.Shift, () => Click(Cell(0, c => c.TooltipText.StartsWith("Coal ·", StringComparison.Ordinal))));
         Require(chest.Inventory["coal"] == 0 && world.Backpack["coal"] == 80, "Shift-clicking a storage stack must take that stack.");
     }
-    /// <summary>A recipe water slot refuses a partial bottle, by click or by drag, and shows the full-bottle warning.</summary>
+    /// <summary>A recipe water slot refuses a partial bottle, by Shift-click or held on it, and shows the full-bottle warning.</summary>
     private async Task CheckPartialBottleIsRefusedByRecipeWithWarning() {
         await CloseWithEsc();
         EmptyBackpack(Hosted);
@@ -122,17 +127,19 @@ public partial class Game {
         var table = Hosted.Add(ThingKind.Cooktable, world.Player + Vector2.Right);
         Hosted.SetRecipe(table, "dough");
         await ClickOn(table); await Frames(3);
-        await Click(BagCell(c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal)));
-        Require(waterWarning.Text == Water.FullBottleWarning, "Trying a partial bottle must show the full-bottle warning text.");
+        await Holding(Key.Shift, () => Click(BagCell(c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal))));
+        await Until(() => waterWarning.Text == Water.FullBottleWarning, "trying a partial bottle showing the full-bottle warning text", 2);
         Require(waterWarning.GetGlobalRect().Position.X < 50, "The full-bottle warning must sit at the left of the screen.");
         Require(waterWarning.Size.X > 300, "The full-bottle warning must be wide enough to read.");
         Require(waterWarning.Size.Y < 50, "The full-bottle warning must be a single short line.");
         Require(waterWarning.GetGlobalRect().End.Y < bag.GetGlobalRect().Position.Y, "The full-bottle warning must sit above the backpack.");
         var partial = BagCell(c => c.TooltipText.StartsWith(world.Data.Name("water_2") + " ·", StringComparison.Ordinal));
-        await DragTo(partial, (Control)ui.FindChild("input_water", true, false));
-        Require(table.Inventory["water_2"] == 0, "A partial bottle dragged onto a water slot must not go in.");
-        Require(world.Backpack["water_2"] == 1, "A partial bottle dragged onto a water slot must stay in the backpack.");
-        Require(waterWarning.Text == Water.FullBottleWarning, "A partial bottle dragged onto a water slot must warn.");
+        waterWarning.Text = "";
+        await Carry(partial, (Control)ui.FindChild("input_water", true, false));
+        await Until(() => waterWarning.Text == Water.FullBottleWarning, "a partial bottle put on a water slot warning", 2);
+        Require(table.Inventory["water_2"] == 0, "A partial bottle put on a water slot must not go in.");
+        Require(world.Held is { Item: "water_2" }, "A partial bottle put on a water slot must stay held.");
+        await KeyStroke(Key.Escape);
         await SurvivalReviewShot("water-warning");
     }
     /// <summary>A downed player without a cabin may choose dawn; any cabin restores normal respawning.</summary>
