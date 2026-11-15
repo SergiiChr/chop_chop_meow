@@ -59,14 +59,15 @@ public partial class Game {
         await Until(() => station.Processing && station.Making == recipe, $"{recipe} starting {how}", 3);
 
     /// <summary>
-    /// Requires that a double-click left a station short of a batch: its cups shake at once, a message names the recipe and each thing it is missing,
+    /// Requires that a double-click left a station short of a batch: its cups shake at once, a new message names each thing it is missing,
     /// and several ticks later it has begun no batch.
     /// </summary>
-    private async Task ExpectRefusedDoubleClick(Thing station, string id, RecipeDef r, string how, params string[] missing) {
+    private async Task ExpectRefusedDoubleClick(Thing station, string id, string how, params string[] missing) {
+        int posted = messages.Posted;
         await DoubleClick(Named($"craft_{id}")!);
         Require(WorkRow().Shaking, $"A double-click on {id} {how} must shake the cups.");
-        await Until(() => messages.Shown.ToArray().Any(m => m.StartsWith($"{r.Name}: missing ", StringComparison.Ordinal) && missing.All(m.Contains)),
-            $"a message that {r.Name} is missing {string.Join(", ", missing)} {how}", 2);
+        await Until(() => messages.Posted > posted && messages.Last.StartsWith("Missing ", StringComparison.Ordinal) && missing.All(messages.Last.Contains),
+            $"a message that {id} is missing {string.Join(", ", missing)} {how}", 2);
         await Frames(12);
         Require(!station.Processing && station.Making == "", $"{id} must not start {how}.");
     }

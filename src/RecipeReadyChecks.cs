@@ -32,7 +32,7 @@ public partial class Game {
             await Frames(2);
             // Every item but the one carried is missing, and that one too when a batch takes more of it.
             var missing = r.Inputs.Where((p, i) => i > 0 || p.Value > 1).Select(p => world.Lower(world.Data.Name(p.Key))).ToArray();
-            await ExpectRefusedDoubleClick(station, id, r, "with one of its items in the backpack", missing);
+            await ExpectRefusedDoubleClick(station, id, "with one of its items in the backpack", missing);
             await CloseStation(station);
         }
     }
@@ -43,7 +43,7 @@ public partial class Game {
             var station = await OpenStationFor(r);
             GiveInputs(r);
             await Frames(2);
-            await ExpectRefusedDoubleClick(station, id, r, "with its items but no fuel in the backpack", "fuel");
+            await ExpectRefusedDoubleClick(station, id, "with its items but no fuel in the backpack", "fuel");
             await CloseStation(station);
         }
     }
@@ -54,7 +54,7 @@ public partial class Game {
             var station = await OpenStationFor(r);
             GiveFuel(r);
             await Frames(2);
-            await ExpectRefusedDoubleClick(station, id, r, "with only fuel in the backpack", r.Inputs.Keys.Select(item => world.Lower(world.Data.Name(item))).ToArray());
+            await ExpectRefusedDoubleClick(station, id, "with only fuel in the backpack", r.Inputs.Keys.Select(item => world.Lower(world.Data.Name(item))).ToArray());
             await CloseStation(station);
         }
     }

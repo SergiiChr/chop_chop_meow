@@ -933,7 +933,7 @@ public sealed partial class World {
         if (missing != null) Say(missing);
     }
     /// <summary>
-    /// What a station would still lack for one batch of a recipe once the backpack's share is loaded, as a message naming the recipe, or null for nothing.
+    /// What a station would still lack for one batch of a recipe once the backpack's share is loaded, as a message, or null for nothing.
     /// Turning from another recipe counts what the station holds as carried, since it goes to the backpack first.
     /// </summary>
     public string? BatchShort(Thing t, string recipe) {
@@ -942,12 +942,12 @@ public sealed partial class World {
         int Have(string item) => Carried(item) + t.Inventory[item] + (switching && t.Burner != null ? t.Burner[item] : 0);
         var missing = new List<string>();
         foreach (var (item, needed) in r.Inputs)
-            if (Have(item) < needed) missing.Add(Data.VesselFor(item) != null ? $"{needed - Have(item)} {(needed - Have(item) == 1 ? "liter" : "liters")} of {Lower(Data.Name(item))}" : $"{needed - Have(item)} {Lower(Data.Name(item))}");
+            if (Have(item) < needed) missing.Add(Data.VesselFor(item) != null ? $"{needed - Have(item)}L of {Lower(Data.Name(item))}" : $"{needed - Have(item)} {Lower(Data.Name(item))}");
         bool fuelled = !r.Burns || !switching && t.Burner?.First() is string held && r.Fuels.Contains(held) || r.Fuels.Exists(f => Have(f) > r.Inputs.GetValueOrDefault(f));
         if (!fuelled) missing.Add($"fuel ({FuelWords(r.Fuels)})");
         if (missing.Count == 0) return null;
         string list = missing.Count == 1 ? missing[0] : string.Join(", ", missing.Take(missing.Count - 1)) + " and " + missing[^1];
-        return $"{r.Name}: missing {list}.";
+        return $"Missing {list}.";
     }
     /// <summary>
     /// Why a station cannot turn from the recipe it is on to another now, or null: a batch is being worked, or the backpack has no room for what the station's boxes and fuel slot hold.

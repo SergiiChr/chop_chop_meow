@@ -17,6 +17,9 @@ public partial class MessageStack : VBoxContainer {
 
     /// <summary>Messages showing, oldest first.</summary>
     public ReadOnlySpan<string> Shown => texts.AsSpan(0, count);
+    /// <summary>The message posted last, and how many have been posted, repeats included: a repeat restarts its line instead of adding one.</summary>
+    public string Last { get; private set; } = "";
+    public int Posted { get; private set; }
 
     /// <summary>Makes the line labels; <paramref name="make"/> styles each one like the rest of the HUD text.</summary>
     public MessageStack(Func<Label> make) {
@@ -30,6 +33,7 @@ public partial class MessageStack : VBoxContainer {
     }
 
     public void Post(string message) {
+        Last = message; Posted++;
         for (int i = 0; i < count; i++) if (texts[i] == message) { clocks[i] = ShowSeconds; return; }
         // A full stack makes room by dropping the message closest to fading, which a repeat may have kept from being the oldest.
         if (count == Lines) {

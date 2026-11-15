@@ -253,11 +253,11 @@ public static class WaterChecks {
 
     private static void CheckQueuedBatchSaysWhatItIsMissing(GameData data) {
         foreach (var (recipe, kind, carried, said) in new (string, ThingKind, (string, int)[], string)[] {
-                 ("charcoal", ThingKind.Furnace, [("wood", 1), ("coal", 1)], "Make charcoal: missing 1 wood."),
-                 ("charcoal", ThingKind.Furnace, [("wood", 2)], "Make charcoal: missing fuel (wood, coal or charcoal)."),
-                 ("steel_bar", ThingKind.Reinforced, [("coal", 1)], "Smelt steel: missing 2 iron bar, 1 coal and fuel (coal)."),
-                 ("meat_stew", ThingKind.Cooktable, [("raw_meat", 1), ("coal", 1)], "Cook meat stew: missing 1 liter of water."),
-                 ("dough", ThingKind.Cooktable, [("flour", 1), (Water.OneLiter, 1)], "Knead dough: missing 2 liters of water.") }) {
+                 ("charcoal", ThingKind.Furnace, [("wood", 1), ("coal", 1)], "Missing 1 wood."),
+                 ("charcoal", ThingKind.Furnace, [("wood", 2)], "Missing fuel (wood, coal or charcoal)."),
+                 ("steel_bar", ThingKind.Reinforced, [("coal", 1)], "Missing 2 iron bar, 1 coal and fuel (coal)."),
+                 ("meat_stew", ThingKind.Cooktable, [("raw_meat", 1), ("coal", 1)], "Missing 1L of water."),
+                 ("dough", ThingKind.Cooktable, [("flour", 1), (Water.OneLiter, 1)], "Missing 2L of water.") }) {
             var world = new World(data, false);
             var station = world.Add(kind, world.Player + Vector2.Right);
             foreach (var (item, count) in carried) Give(world, item, count);
