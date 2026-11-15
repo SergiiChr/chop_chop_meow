@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 
 namespace ChopChopMeow;
 
@@ -100,7 +99,7 @@ public sealed partial class World {
         if (owner != null && to == owner.Tools) { if (from == S.Backpack) SlotTool(owner, item); return; }
         if (owner != null && to == owner.Burner) { if (from == S.Backpack) LoadFuel(owner, item, count); return; }
         if (owner is { Kind: ThingKind.Mine } && to == owner.Inventory) { if (from == S.Backpack) SupplyMine(owner, item, count); return; }
-        if (owner != null && to == owner.Inventory && (owner.Kind == ThingKind.Packer || Data.Recipes.Values.Any(r => r.Station == owner.Kind))) {
+        if (owner != null && to == owner.Inventory && (owner.Kind == ThingKind.Packer || Selected(owner) != "")) {
             if (from == S.Backpack) LoadInput(owner, item, count);
             return;
         }
@@ -121,6 +120,7 @@ public sealed partial class World {
 
     /// <summary>
     /// Server: lets go of held stacks whose player can no longer hold them: one that is down, out of reach of the building the stack lies in, or whose cell has gone.
+    /// A stack whose inventory has moved, such as a packed crate's contents once the crate is put down or sold, is let go of too.
     /// </summary>
     private void KeepHolds() {
         foreach (var p in S.Players) {
@@ -129,7 +129,7 @@ public sealed partial class World {
                 var owner = held.Box > 0 ? Find(held.Box / BoxCodes) : null;
                 bool gone = p.HeldBox is not Inventory box || box.Layout.IndexOf(p.HeldSlot!) < 0 || p.HeldSlot!.HeldBy != p.Id || held.Box > 0 && owner == null;
                 if (gone) Forget(p);
-                else if (Downed || owner != null && !Reaches(owner)) Release();
+                else if (Downed || owner != null && !Reaches(owner) || Locate(p.HeldBox!) != held.Box) Release();
             }
         }
     }

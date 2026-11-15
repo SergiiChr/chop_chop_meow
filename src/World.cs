@@ -1393,6 +1393,8 @@ public sealed partial class World {
         if (Forwarded(Verb.MoveInCrate, 0, 1, item, quantity)) return 0;
         var contents = NewCrate();
         int moved = 0;
+        // Put down from the cursor, no more than the held stack goes in.
+        if (S.Actor.HeldStack is { Box: 0 } held && held.Item == item) quantity = Math.Min(quantity, held.Count);
         FromHeld(item, () => moved = S.Backpack.TransferTo(contents, item, quantity));
         if (moved == 0) return 0;
         S.Backpack.Remove("crate", 1);
@@ -1414,10 +1416,11 @@ public sealed partial class World {
     }
     /// <summary>Lifts a placed crate into the backpack; anything inside stays packed in it.</summary>
     public bool PickUpCrate(Thing crate) {
-        if (crate.Kind != ThingKind.Crate || !Near(crate) || HeldByOthers(crate)) return false;
+        if (crate.Kind != ThingKind.Crate || !Near(crate)) return false;
         bool empty = crate.Inventory.Count == 0;
         if (S.Backpack.Room(empty ? "crate" : PackedPrefix) == 0) { Say("Backpack full. Make room for the crate."); return false; }
         if (Forwarded(Verb.PickUpCrate, crate.Id)) return true;
+        if (HeldByOthers(crate)) return false;
         S.Backpack.Add(empty ? "crate" : Pack(crate.Inventory), 1); S.Things.Remove(crate);
         Play("wood_rocks_inventory", crate.Pos); PlayerActed?.Invoke(ActorAction.PickUp, crate.Pos); return true;
     }

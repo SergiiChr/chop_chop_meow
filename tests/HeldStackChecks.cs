@@ -2,6 +2,7 @@ using System.Linq;
 using ChopChopMeow;
 using Godot;
 using static Checks;
+using static PlayerSteps;
 using static SetupSteps;
 using static WorldSteps;
 
@@ -15,6 +16,39 @@ public static class HeldStackChecks {
         CheckAStationStartsNoBatchWhileAStackInItIsHeld(data);
         CheckAStationInputTakesOnlyWhatItsRecipeUses(data);
         CheckAHeldStackIsLetGoOutOfReachAndOnLeaving(data);
+        CheckAHeldBottleStaysOutOfGatheringWater(data);
+        CheckAnEmptyCratePacksOnlyTheHeldUnits(data);
+        CheckAHeldStackIsLetGoOnceItsCrateIsPutDown(data);
+    }
+
+    private static void CheckAHeldBottleStaysOutOfGatheringWater(GameData data) {
+        var world = EmptyWorld(data);
+        var lake = new Thing { Kind = ThingKind.Water };
+        Give(world, "empty_bottle", 1);
+        world.Hold(world.Backpack, CellOf(world, "empty_bottle"), 1);
+        SetNeeds(world, thirst: 25);
+        Require(Water.CollectWater(world, lake) == WaterCollectResult.SourceSip && world.Held is { Item: "empty_bottle" },
+            "with the only bottle held, gathering water should drink from the source and leave the bottle held");
+    }
+
+    private static void CheckAnEmptyCratePacksOnlyTheHeldUnits(GameData data) {
+        var world = EmptyWorld(data);
+        Give(world, "crate", 1); Give(world, "wood", 10);
+        world.Hold(world.Backpack, CellOf(world, "wood"), 5);
+        world.MoveInCrate(0, "wood", int.MaxValue, true);
+        string packed = world.Backpack.Items.Keys.Single(id => id.StartsWith(World.PackedPrefix));
+        Require(world.Packed(packed)!["wood"] == 5 && world.Backpack["wood"] == 5 && world.Held == null,
+            "five held wood put on an empty crate should pack just those five");
+    }
+
+    private static void CheckAHeldStackIsLetGoOnceItsCrateIsPutDown(GameData data) {
+        var world = EmptyWorld(data);
+        string packed = PackCrate(world, ("berries", 4));
+        var contents = world.Packed(packed)!;
+        world.Hold(contents, 0, 4);
+        var crate = world.PlaceCrate(packed, world.Player + new Vector2(2, 0))!;
+        world.Tick(.1f);
+        Require(world.Held == null && crate.Inventory.Layout[0].Held == 0, "putting the crate down should let go of the stack held from its contents");
     }
 
     /// <summary>The backpack cell a stack of an item lies in.</summary>

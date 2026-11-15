@@ -27,9 +27,9 @@ public static class Water {
         _ => "empty_bottle"
     };
 
-    /// <summary>Finds an empty bottle first, then the least-full partial bottle, and a full bottle last.</summary>
+    /// <summary>Finds an empty bottle first, then the least-full partial bottle, and a full bottle last, among those no player holds.</summary>
     public static string? FindBottle(Inventory inventory) {
-        foreach (var item in BottleItems) if (inventory[item] > 0) return item;
+        foreach (var item in BottleItems) if (inventory.Free(item) > 0) return item;
         return null;
     }
 
