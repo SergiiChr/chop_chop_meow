@@ -35,7 +35,7 @@ public static class GatherRules {
         [ThingKind.Stone] = new("stone", Needs: "pickaxe", Chip: ThingKind.LooseStone),
         [ThingKind.Leaves] = new("leaves", Helps: "rake", ByHand: 3),
         [ThingKind.Berries] = new("berries"),
-        [ThingKind.Water] = new("water"),
+        [ThingKind.Water] = new(Water.Full),
         [ThingKind.WolfCorpse] = new("raw_meat"),
         [ThingKind.Iron] = new("iron_ore", Needs: "pickaxe", Chip: ThingKind.IronChip, Shape: GatherShape.Deposit),
         [ThingKind.Coal] = new("coal", Needs: "pickaxe", Chip: ThingKind.LooseCoal, Shape: GatherShape.Deposit),

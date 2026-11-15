@@ -74,7 +74,8 @@ Simulation and data:
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
-| `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
+| `src/Water.cs` | The refillable three-liter bottle and drinking at a water source |
+| `src/Vessels.cs` | Pouring a vessel's liquid into a station, at any fill, and filling vessels with room from it |
 | `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
 | `src/Server.cs` | The headless server every game runs on: the world, its ticks and its saves |
@@ -90,7 +91,7 @@ UI and input:
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
 | `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
-| `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode, full-bottle and death labels |
+| `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
@@ -116,7 +117,7 @@ UI and input:
 | `src/CrewPanel.cs` | The crew cards and a worker's own panel |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
-| `src/CabinPanel.cs` | A cabin: its door and sleep |
+| `src/CabinPanel.cs` | A cabin: its door, sleep and the needs a night would leave |
 | `src/CampfirePanel.cs` | A campfire |
 | `src/ResourcePanel.cs` | A resource in the world |
 | `src/PilePanel.cs` | A pile or compost heap |
@@ -157,9 +158,11 @@ Checks and review tools:
 | `tests/*Checks.cs` | Simulation checks run by `./build.py check` (`SELF-TEST PASS`) |
 | `tests/*Steps.cs` | Steps shared by the simulation checks |
 | `src/GameChecks.cs`, `src/SurvivalUIChecks.cs` | Input/UI checks through real input events (`UI-TEST PASS`) |
+| `src/RecipeReadyChecks.cs` | Every station recipe brought to the point where its next tick starts the batch, by double-click and by hand, and refused short of it with a shake and a message |
 | `src/NetChecks.cs` | The host and guest network checks (`NET-HOST PASS`, `NET-GUEST PASS`) |
 | `src/ServerChecks.cs` | One window playing on the real server process (`SERVER-TEST PASS`) |
 | `src/InputSteps.cs`, `src/PanelSteps.cs`, `src/SessionSteps.cs` | Steps shared by the UI and network checks |
+| `src/RecipeSteps.cs` | Steps that open a fresh station for a recipe, give and load its items and fuel, and expect a batch to start or be refused |
 | `src/Showcase.cs` | The review scenes behind `--showcase` |
 | `src/ReviewDrive.cs` | Plays the window from a command file behind `--drive`, for the `playtest` skill |
 | `src/PerformanceRun.cs`, `src/PerformanceFixture.cs`, `src/PerformanceStage.cs` | The rendered performance run: the window's samples, the camp it plays and the server's half |
@@ -314,7 +317,7 @@ The transient state is excluded from saves and recalculated on the next simulati
 At a packing station the packer stands behind the table (`World.PackStand`) and the `Pack` action rummages in the heap of goods, lifts a piece across and settles it into the crate, then turns back.
 The player working a station they stand near packs the same way.
 
-At a cooking table, which is only worked for the mortar's recipes, the `Grind` action holds the mortar in hand (`ActorAnimation.StationAction`).
+At a cooking table, which is only worked for the mortar's recipes and dough, the `Grind` action holds the mortar in hand (`ActorAnimation.StationAction`); kneading dough uses the `Pack` action, facing the table.
 The left fist holds the bowl out in front, and the right takes the pestle twice round the bowl's floor, then lifts it and pounds.
 Both arms are solved from where the hands have to be (`ActorAnimation.ArmTo`), so the pestle stays over the bowl.
 `ActorRig` turns the bowl and pestle against their forearms in the resting pose (`ActorAnimation.GrindRest`), which keeps the bowl level and the pestle leaning toward its hand.
@@ -368,9 +371,15 @@ There are no iron tools; iron bars only go into buildings and steel.
 #### Water
 
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
-Filling it or sipping straight from the source takes one `GatherSeconds`.
+Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the pond shore is a collection target.
-Recipes take only a full bottle, and cooking returns the empty bottle rather than destroying it.
+A station takes water as a liquid in liters, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many liters.
+`GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
+a vessel dropped into a station whose recipe takes its liquid pours every liter it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourLiters`);
+the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the cup shakes.
+Every move between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
+Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.LiquidToClear`), and a dismantled station fills the backpack's vessels and spills the rest.
+No hand recipe takes a liquid, which `GameData` checks.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.
 It advances normal simulation through dawn, including needs, trades, production and wages.
@@ -392,7 +401,8 @@ The starter goal chain stays as the tutorial, and the pause menu lists both.
 
 Food, water, the day/night cycle, shelter, wages and wolf encounters support the production loop.
 
-- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`, `Health`) and a `Food` flag.
+- Items carry what eating or drinking one restores (`ItemDef.Hunger`, `Thirst`) and a `Food` flag; nothing eaten heals.
+- Health comes back only in sleep, `World.SleepHeal` a second while hunger and thirst both stay above `World.FedNeed`; `World.HealthAtDawn` foretells it for the cabin's page.
 - Food is what wolves eat and compost will take, cooked or not.
 - An item that restores nothing, such as raw meat, wheat or dough, only says it needs cooking.
 - `HungerHours` and `ThirstHours` in `GameData` set how many in-game hours a full bar lasts.
@@ -582,7 +592,7 @@ A save written before `Obtained` existed loads with it empty, so a raw resource 
 A recipe that needs a tool at such a station runs at the speed of the fastest of the slotted tool and those carried by players working there (`World.StationTool`).
 Worked only by its crew, it runs with the slotted tool and waits when there is none.
 At the cooking table it runs only while someone works it (`World.Worked(Thing)`).
-The mortar's recipes are worked, while jam, stew and dough cook unattended and their worker only hauls.
+The mortar's recipes and dough (`RecipeDef.Worked`) are worked, while jam and stew cook unattended and their worker only hauls.
 
 #### Fuel
 
@@ -652,7 +662,7 @@ Piles (`pile`) are 3×3 yards (`World.IsZone`, `ZoneSize`) that do not block wal
 `World.Snap` puts a new yard on the grid of the nearest yard within reach, and `ZoneBlock` lets yards touch but not overlap.
 
 A pile takes part in automation like a chest.
-`World.PileFilters` sets its input and output filters each tick from what it holds: its one resource, or nothing while empty.
+`World.PileFilters` sets its input and output filters each tick from what it holds: its one resource, every fill of a vessel, or nothing while empty.
 `HoldBlock` refuses a second resource, including for manual transfers.
 
 #### Compost
@@ -766,7 +776,7 @@ Purchases settle on return into the trading post's market output (`Thing.Output`
 The trading post's input filter names the crates it asks for.
 `DepositFor` treats a post as storage only for an item its filter names, so workers deliver those crates there when it is the nearest storage asking for them.
 With `Thing.AutoSell` set, the cart leaves on its own once every market slot holds a crate and a cart is free.
-Sale coins fill the trading post's one-stack wage slot (`Thing.Wages`, coins only) first and the output after.
+Sale coins land in the trading post's wage slot (`Thing.Wages`, coins only), whose coin stack (`Inventory.CoinStack`) is `Inventory.UnlimitedCoins`, so the bank has no limit.
 Dawn wages, settled strikes and hiring payments draw on every wage slot before the payer's backpack; purchases come from the backpack only.
 
 #### Price sheet

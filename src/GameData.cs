@@ -7,6 +7,7 @@ namespace ChopChopMeow;
 
 public sealed class ItemDef {
     public string Name { get; set; } = "";
+    /// <summary>What the village pays or asks for one, for goods it trades and the crate they travel in; nothing else has a price.</summary>
     public float Price { get; set; }
     public string Color { get; set; } = "ffffff";
     /// <summary>The kind of tool this item is (axe, pickaxe, shovel, hammer, chisel, rake or mortar), or empty for materials.</summary>
@@ -17,10 +18,9 @@ public sealed class ItemDef {
     public int Tier { get; set; }
     /// <summary>Wolves eat it and compost takes it, cooked or not; only items that restore hunger or thirst can be eaten.</summary>
     public bool Food { get; set; }
-    /// <summary>What eating or drinking one restores.</summary>
+    /// <summary>What eating or drinking one restores; health comes back only with sleep.</summary>
     public float Hunger { get; set; }
     public float Thirst { get; set; }
-    public float Health { get; set; }
 }
 public sealed class BuildingDef {
     public string Name { get; set; } = "";
@@ -45,11 +45,29 @@ public sealed class RecipeDef {
     public string Tool { get; set; } = "";
     /// <summary>The lowest <see cref="ItemDef.Tier"/> of that tool that will do; a better one always does.</summary>
     public int Tier { get; set; }
+    /// <summary>At the cooking table, the one station whose recipes differ in this, advances only while someone works at it; the rest cook unattended.</summary>
+    public bool Worked { get; set; }
     /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
     public bool Hand { get; set; }
     /// <summary>The fuels a batch can burn, one unit per batch from the station's fuel slot, in the order workers look for them; empty for a recipe that burns none.</summary>
     public List<string> Fuels { get; set; } = new();
     public bool Burns => Fuels.Count > 0;
+}
+/// <summary>
+/// A refillable vessel and the liquid it carries, in liters.
+/// A vessel dropped into a station that takes its liquid pours the liters it holds there and stays with whoever carried it, emptier;
+/// the liquid leaves a station only into vessels with room for it.
+/// </summary>
+public sealed class VesselDef {
+    /// <summary>Its item at each fill, from empty to full: the index is the liters it holds.</summary>
+    public List<string> States { get; set; } = new();
+    /// <summary>What it pours out, a liter at a time, which only stations hold.</summary>
+    public string Liquid { get; set; } = "";
+    public string Empty => States[0];
+    public string Full => States[^1];
+    public int Capacity => States.Count - 1;
+    /// <summary>The liters an item of this vessel holds, or -1 for another item.</summary>
+    public int LitersIn(string item) => States.IndexOf(item);
 }
 /// <summary>How an item that no recipe makes is come by, for the recipe map.</summary>
 public sealed class SourceDef {
@@ -190,7 +208,8 @@ public sealed partial class GameData {
         data.Validate();
         Inventory.Unstacked.Clear();
         foreach (var (id, item) in data.Items) if (item.Tool != "") Inventory.Unstacked.Add(id);
-        foreach (var id in Water.BottleItems) Inventory.Unstacked.Add(id);
+        // Each vessel takes a cell of its own, at any fill.
+        foreach (var vessel in data.Vessels) foreach (string id in vessel.States) Inventory.Unstacked.Add(id);
         return data;
     }
     private void Validate() {
@@ -213,13 +232,32 @@ public sealed partial class GameData {
             if (recipe.Value.Fuels.Any(fuel => !Items.ContainsKey(fuel)) || recipe.Value.Burns && recipe.Value.Station == null)
                 throw new InvalidOperationException($"Invalid fuel for {recipe.Key}.");
         }
-        if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Health < 0 || i.Hunger > 0 && !i.Food) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
+        if (Items.Values.Any(i => i.Speed <= 0 || i.Hunger < 0 || i.Thirst < 0 || i.Hunger > 0 && !i.Food) || Market.Sells.Keys.Concat(Market.Buys.Keys).Any(id => !Items.ContainsKey(id) || id == "coins") || Market.Sells.Values.Any(d => d.Daily <= 0 || d.Steady < 0 || d.Steady > d.Daily || d.Drop <= 0 || d.Drop >= .75f) || Market.Buys.Values.Any(n => n <= 0 || n > CrateCapacity))
             throw new InvalidOperationException("Invalid tool speed or market goods in GameData.");
         if (Mine.Materials.Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Mine.StageWorkdays <= 0 || Mine.Seconds <= 0 || Mine.Workers <= 0 || Goals.DailyProfit <= 0 || Goals.ProfitDays <= 0)
             throw new InvalidOperationException("Invalid mine or goals in GameData.");
         if (Farm.Sow.Count == 0 || Farm.Yield.Count == 0 || Farm.Sow.Concat(Farm.Yield).Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Farm.GrowDays <= 0 || Farm.HarvestWorkdays <= 0)
             throw new InvalidOperationException("Invalid farm in GameData.");
+        // Only the trade sets value: a good is judged by its whole chain against what it sells for, never step by step.
+        if (Items.FirstOrDefault(p => p.Value.Price < 0 || p.Value.Price > 0 != (Market.Sells.ContainsKey(p.Key) || Market.Buys.ContainsKey(p.Key) || p.Key == "crate")).Key is string mispriced)
+            throw new InvalidOperationException($"{mispriced}: only goods the village trades, and the crate, have a price.");
+        if (Recipes.FirstOrDefault(p => p.Value.Worked && p.Value.Station != ThingKind.Cooktable).Key is string misplaced)
+            throw new InvalidOperationException($"{misplaced}: only cooking table recipes choose whether they are worked.");
+        foreach (var v in Vessels)
+            if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
+                || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Output == v.Liquid || r.Hand && r.Inputs.ContainsKey(v.Liquid)))
+                throw new InvalidOperationException($"Invalid vessel: {v.Full}. Its liquid is only poured into stations, and no hand recipe takes it.");
         ValidateMap();
+    }
+    /// <summary>The vessel that carries a liquid, or null for an item that is not one.</summary>
+    public VesselDef? VesselFor(string liquid) {
+        foreach (var v in Vessels) if (v.Liquid == liquid) return v;
+        return null;
+    }
+    /// <summary>The vessel an item is a state of, at any fill, or null.</summary>
+    public VesselDef? VesselOf(string item) {
+        foreach (var v in Vessels) if (v.States.Contains(item)) return v;
+        return null;
     }
     // Filled by Validate: the id of the recipe that makes each item, and what the recipe map hangs under each item.
     private readonly Dictionary<string, string> recipeIdOf = new();
@@ -227,7 +265,7 @@ public sealed partial class GameData {
     private readonly Dictionary<string, string[]> endsUpIn = new();
     private static readonly List<string> Nothing = new();
     /// <summary>Items the recipe map leaves out: coins, and the part-drunk bottles that stand with the full one.</summary>
-    public static bool OffTheMap(string item) => item == Inventory.Coins || item is "water_1" or "water_2";
+    public static bool OffTheMap(string item) => item == Inventory.Coins || Water.BottleLiters(item) > 0 && Water.BottleLiters(item) < Water.Capacity;
     /// <summary>The id of the recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
     public string? RecipeIdOf(string item) => recipeIdOf.GetValueOrDefault(item);
     /// <summary>The recipe that makes an item, or null for one that is gathered, grown or bought.</summary>
@@ -290,7 +328,7 @@ public sealed partial class GameData {
         }
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
-    public bool IsConsumable(string item) => Water.BottleSips(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
+    public bool IsConsumable(string item) => Water.BottleLiters(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
     public string PlainestTool(string kind, int tier = 0) => Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;

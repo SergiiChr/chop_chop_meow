@@ -59,7 +59,8 @@ internal static class PileShape {
 
     /// <summary>Adds one piece of every heap to the stage that loading draws, so the first pile to show a good builds nothing mid-game.</summary>
     public static void Stage(Node3D stage, GameData data) {
-        foreach (string item in data.Items.Keys) new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(item, 1, data);
+        // A liquid never lies in a pile: only stations hold it.
+        foreach (string item in data.Items.Keys) if (data.VesselFor(item) == null) new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(item, 1, data);
         new StockPile(stage, Vector3.Zero, Vector2.One, 1).Show(ItemShape.Compost, 1, data);
     }
 

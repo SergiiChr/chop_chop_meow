@@ -19,7 +19,7 @@ public sealed class PlayerState {
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Hunger { get; set; } = 100;
     [JsonIgnore(Condition = JsonIgnoreCondition.Never)] public float Thirst { get; set; } = 100;
     public Inventory Backpack { get; set; } = new() { Slots = 24 };
-    public List<string> HotbarSlots { get; set; } = new() { "steel_axe", "steel_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", "water" };
+    public List<string> HotbarSlots { get; set; } = new() { "steel_axe", "steel_pick", "chest", "campfire", "furnace", "anvil", "bench", "berries", Water.Full };
     public int ActiveHotbar { get; set; }
     /// <summary>Recipes waiting in the personal crafting menu, one entry per recipe in the order first queued; their inputs are already taken from the backpack.</summary>
     [JsonConverter(typeof(QueueJson))] public List<Queued> Crafting { get; set; } = new();
@@ -216,7 +216,8 @@ public sealed partial class World {
         if (a < 0 || b < 0 || Forwarded(Verb.Transfer, a, b, item, quantity, new Vector2(from.PreferredSlot, -1))) return 0;
         if (new[] { a, b }.Where(at => at > 0).Any(at => !Reaches(Find(at / BoxCodes)!))) { Say("Walk closer first."); return 0; }
         if (b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
-        return from.TransferTo(to, item, quantity);
+        if (FillBlock(from, to, item) is string dry) { Say(dry); return 0; }
+        return Carry(from, to, b > 0 ? Find(b / BoxCodes) : null, item, quantity);
     }
 
     /// <summary>Moves items out of the backpack a view shows.</summary>
@@ -245,9 +246,14 @@ public sealed partial class World {
         // Reject a stale drag rather than moving a different item.
         if ((uint)sourceSlot >= (uint)from.Layout.Count || from.Layout[sourceSlot].Item != item) return 0;
         if (from != to && b > 0 && BoxBlock(Find(b / BoxCodes)!, to, item) is string refused) { Say(refused); return 0; }
-        // A drop on another item's cell in another inventory still stores the stack wherever it fits.
+        if (from != to && FillBlock(from, to, item) is string dry) { Say(dry); return 0; }
+        // A drop on another item's cell in another inventory still stores the stack wherever it fits, and so does a liquid or a vessel that pours.
         int moved;
-        if (from != to && to.Layout[targetSlot].Item is var there && there != "" && there != item) {
+        var into = b > 0 ? Find(b / BoxCodes) : null;
+        if (from != to && (Data.VesselFor(item) != null || PoursInto(into, to, item) != null)) {
+            from.PreferredSlot = sourceSlot;
+            try { moved = Carry(from, to, into, item, quantity); } finally { from.PreferredSlot = -1; }
+        } else if (from != to && to.Layout[targetSlot].Item is var there && there != "" && there != item) {
             from.PreferredSlot = sourceSlot;
             try { moved = from.TransferTo(to, item, quantity); } finally { from.PreferredSlot = -1; }
         } else moved = from.MoveSlotTo(sourceSlot, to, targetSlot, quantity);
@@ -303,7 +309,7 @@ public sealed partial class World {
 
     private static PlayerState Newcomer() {
         var p = new PlayerState();
-        p.Backpack.Add("steel_axe", 1); p.Backpack.Add("empty_bottle", 1);
+        p.Backpack.Add("steel_axe", 1); p.Backpack.Add(Water.Empty, 1);
         return p;
     }
 

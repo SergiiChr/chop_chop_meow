@@ -177,7 +177,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 Health, hunger and thirst are three upright vials in the top-left corner with a heart, a stomach and a droplet under them.
 Each empties as its level falls and turns red at 25% or less.
 
-Beside them the bank shows the coins in the trading post's wage slot and the wages due each day, in red when they exceed the bank.
+Beside them the bank shows the coins in the trading post's wage slot, which has no limit, and the wages due each day, in red when they exceed the bank.
 Drop coins on it to pay in, or click it beside a trading post to take them out.
 
 The day dial in the top-right corner shows the sun crossing its arc from sunrise to sunset; then the moon crosses the same arc until dawn.
@@ -218,7 +218,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - A carried stack shows its count beside the cursor, as its cell does.
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
 - A dropped stack that does not all fit fills the slot, and the rest stays held until you drop it elsewhere or click somewhere it cannot go.
-- Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, a packed crate click opens it and an empty crate click starts placement.
+- Clicking food consumes one item; clicking a filled bottle drinks one liter and retains the bottle. A torch click lights it, a packed crate click opens it and an empty crate click starts placement.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A selected raw-material stack can be deposited by clicking a nearby chest.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
@@ -266,6 +266,7 @@ Queueing another recipe depends on what the station is doing:
 | Has empty cups | It turns to the new recipe, its hard hat with it |
 
 Fuel a batch has already burned is gone; queueing a recipe loads its fuel again from your backpack.
+When your backpack holds less than one batch, queueing loads what it has, its cups shake, and a message names everything still missing, such as "Missing fuel (wood, coal or charcoal)." or "Missing 2L of water."
 
 A click that would move the hard hat to another recipe than the one the station is on is refused while a batch is being worked or the cups hold anything.
 The cups shake a moment after such a click, once it is clear no second press makes it a double-click.
@@ -326,14 +327,26 @@ A cabin someone is in, or a trading post with a cart out, stays up until they co
 
 A full stomach lasts one in-game day and a full water gauge lasts one day; a day lasts 14 minutes.
 Raw meat cannot be eaten.
-Your refillable bottle holds three sips, each restoring one third of the water gauge.
-Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one sip, taking the same gathering time.
+Your refillable bottle holds three liters, each restoring one third of the water gauge.
+Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one liter, taking the same gathering time.
 Filling a bottle takes the same time as one gather action.
 Empty or filled replacements can be bought individually.
 Craft an empty bottle at a bench from one tin bar and one wood part, with the same steel hammer used for tin cans.
-Cooking returns the empty bottle when it uses water.
+A recipe that uses water, such as meat stew or dough, takes liters of it poured out: a bottle dropped on the station's water cup pours every liter it holds, and the bottle stays in your backpack, emptied.
+So water can come in batches, part-drunk bottles too; loading a batch pours from the least full bottles first.
+The cup shows a water droplet and counts liters.
+Clicking the cup takes a liter back into a bottle in your backpack with room, the fullest first, and Ctrl takes all that fits; with no room, the cup shakes and says so.
+Workers do the same: they bring bottles, pour them and carry them back to storage.
+Water left in a station whose recipe no longer uses it is taken out by a hauler, who fetches bottles with room from storage, fills them there and stores them.
+Double-clicking a recipe card that uses water pours it from your bottles the same way.
+Turning a station that holds water to another recipe takes the water into your bottles, and needs room in them for all of it.
+Taking down a station fills the bottles you carry with its water, and the rest is spilled.
+These rules cover any refillable vessel the game adds (`GameData.Vessels`).
 
+Food and drink restore hunger and thirst but no health: health comes back only in sleep.
 From 10 pm you can sleep until dawn, but only if your food and water will last until morning; otherwise the sleep button explains why.
+Sleep heals while hunger and thirst both stay above 45%, about a third of your health over a full night.
+The cabin's page shows, under "Stats after sleep", the health, hunger and thirst you would wake with, each as a capsule over its icon, as in the corner.
 
 ### Death and recovery
 
@@ -476,11 +489,14 @@ With a mortar and pestle slotted and someone working it, or carried by you while
 Whoever works it takes the mortar off the counter, holds the bowl in one hand and grinds with the pestle in the other.
 You can do both by hand from the crafting menu with a carried mortar.
 
+Dough is kneaded by hand at the table, with no fire, and only while you or an assigned worker work it there:
+
+- 1 flour + 3 liters of water → 3 dough
+
 Its other recipes cook on their own:
 
 - 2 crushed berries → jam, over one wood, coal or charcoal
-- 1 raw meat + 1 water → meat stew, over one wood, coal or charcoal
-- 1 flour + 1 water → dough, kneaded with no fire
+- 1 raw meat + 1 liter of water → meat stew, over one wood, coal or charcoal
 
 The canning station (2 steel bars, 8 planks) seals meat stew or jam into a tin can over one wood, coal or charcoal.
 Raw meat is not canned: it sells as it is, in crates.
@@ -519,6 +535,7 @@ A pile of crates takes more crates of the same good.
 
 A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that show as a heap of the resource itself, bigger the more it holds.
 The first resource put in sets it: from then on workers store and take only that, and anything else is refused.
+Bottles count as one resource at any fill, so one pile holds them full, part-full and empty.
 Emptying it frees it again.
 
 Piles are walkable and snap edge to edge to a pile beside them, so they line up in neat grids.
@@ -619,7 +636,7 @@ Trade carts keep their timing: a cart walks down the valley at a steady pace, fa
 Coins are a backpack item that stacks to 1000.
 Purchases are paid from carried coins; hiring is paid from the bank first, then carried coins.
 
-Sale proceeds fill the wage slot first, a single stack of up to 1000 coins between the input and output boxes, and the rest goes into the output boxes.
+Sale proceeds land in the wage slot between the input and output boxes, which holds any number of coins.
 Daily wages are paid from the wage slot first and then from your backpack.
 The slot only holds coins, and you can move coins in or out by hand.
 

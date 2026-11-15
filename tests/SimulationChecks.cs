@@ -17,7 +17,7 @@ public static class SimulationChecks {
         Test(ChopChopMeow.Tests.WaterChecks.Run, data);
         Test(PondChecks.Run, data);
         Test(EconomyChecks.Run, data);
-        Test(AnimationChecks.Run);
+        Test(AnimationChecks.Run, data);
         Test(HumanModelChecks.Run);
         Test(NatureModelChecks.Run);
         Test(PileModelChecks.Run, data);
@@ -75,7 +75,9 @@ public static class SimulationChecks {
         Test(CheckWolfThatBitesAPlayerToDeathEatsTheirFood, data);
         Test(CheckSleepingPassesTheNightForTheWorld, data);
         Test(CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst, data);
+        Test(CheckBankKeepsCoinsPastAThousandAcrossASave, data);
         Test(CheckSleepNeedsFoodAndWater, data);
+        Test(CheckSleepHealsOnlyWhileFed, data);
         Test(CheckSprintBurnsFood, data);
         Test(CheckCabinShelterAndChasingWolfGivesUpInLight, data);
         Test(CheckSprintOutrunsWolf, data);
@@ -128,7 +130,7 @@ public static class SimulationChecks {
         Test(CheckSownWheatGrowsToRipeInItsDays, data);
         Test(CheckPlotHarvestedAloneKeepsSeedInItsOutput, data);
         Test(CheckWorkerFinishesHarvestHaulsCropAndSowsAgain, data);
-        Test(CheckFoodsFeedWaterAndHealByTheirData, data);
+        Test(CheckFoodsFeedAndWaterByTheirDataWithoutHealing, data);
         Test(CheckMarketTakesCratesAndDonations, data);
         Test(CheckDonationIsNoSale, data);
         Test(CheckStationBatchesAndMarkSurviveALoad, data);
@@ -2169,7 +2171,7 @@ public static class SimulationChecks {
         world.Player = table.Pos + new Vector2(1, 0);
         world.Collect(table);
         world.SetRecipe(table, "dough");
-        Require(world.BatchCost(table).Keys.Order().SequenceEqual(new[] { "flour", "water" }), "dough should need no fire");
+        Require(world.BatchCost(table).Keys.Order().SequenceEqual(new[] { "flour", Water.Liquid }), "dough should need no fire");
     }
 
     private static void CheckCanneryAndFurnaceTakeTheirFoodRecipes(GameData data) {
@@ -2275,8 +2277,8 @@ public static class SimulationChecks {
         Require(chest.Inventory["fertilizer"] == 0, "the worker should bring the fertilizer");
     }
 
-    /// <summary>Foods restore what their data says, and raw ones only say they need cooking.</summary>
-    private static void CheckFoodsFeedWaterAndHealByTheirData(GameData data) {
+    /// <summary>Foods restore the hunger and thirst their data says and no health, and raw ones only say they need cooking.</summary>
+    private static void CheckFoodsFeedAndWaterByTheirDataWithoutHealing(GameData data) {
         var world = EmptyWorld(data);
         SetNeeds(world, 20, 20, 50);
         Give(world, "meat_stew", 1); Give(world, "wheat", 1);
@@ -2284,7 +2286,7 @@ public static class SimulationChecks {
         var stew = data.Items["meat_stew"];
         Require(world.Hunger == 20 + stew.Hunger, "meat stew should feed by its data");
         Require(world.Thirst == 20 + stew.Thirst, "meat stew should water by its data");
-        Require(world.Health == 50 + stew.Health, "meat stew should heal by its data");
+        Require(world.Health == 50, "meat stew should not heal: only sleep does");
         Require(world.Backpack["meat_stew"] == 0, "meat stew should be used up");
         world.Consume("wheat");
         Require(world.Backpack["wheat"] == 1, "raw wheat should not be eaten as it is");
@@ -2397,6 +2399,8 @@ public static class SimulationChecks {
             // Crates of berries sold at a signpost buy what the village sells, the first pickaxe among it.
             if (built.Contains(ThingKind.Signpost) && have.Contains("crate") && have.Contains("berries")) foreach (var item in data.Market.Buys.Keys) grew |= have.Add(item);
             if (HasTool("rake")) grew |= have.Add("leaves");
+            // A full vessel pours its liquid into a station.
+            foreach (var vessel in data.Vessels) if (have.Contains(vessel.Full)) grew |= have.Add(vessel.Liquid);
             foreach (var (id, b) in data.Buildings) if (b.Cost.Keys.All(have.Contains)) grew |= built.Add(id);
             if (built.Contains(ThingKind.Pile) && have.Any(data.IsFood)) grew |= have.Add("fertilizer");
             // Seeds are bought with berry money to start the first plot.
@@ -2416,6 +2420,30 @@ public static class SimulationChecks {
         Require(data.Market.Buys.ContainsKey("steel_pick"), "a pickaxe must be buyable");
         float berryCrate = data.CrateCapacity * data.Items["berries"].Price + data.Items["crate"].Price;
         Require(fresh.LotPrice("steel_pick") <= 4 * berryCrate, "four crates of berries should pay for the first pickaxe");
+    }
+
+    /// <summary>Health comes back only in sleep, while hunger and thirst both stay above 45%, and the cabin foretells what a night leaves.</summary>
+    private static void CheckSleepHealsOnlyWhileFed(GameData data) {
+        var awake = EmptyWorld(data);
+        SetNeeds(awake, 100, 100, 50);
+        SafeTick(awake, 60);
+        Require(awake.Health == 50, "a fed player should not heal while awake");
+
+        var rested = NightWorld(data);
+        var hut = rested.Add(ThingKind.Hut, rested.Player + new Vector2(2, 0));
+        SetNeeds(rested, 100, 100, 50);
+        float foretold = rested.HealthAtDawn();
+        rested.Sleep(hut);
+        // At most eight hours of sleep, 280 seconds, heal .12 a second: a fed night brings back up to 34.
+        Require(rested.Health > 60 && rested.Health < 84, $"a fed night's sleep should heal a good part of the way: {rested.Health:0.0}");
+        Require(Math.Abs(rested.Health - foretold) < .2f, $"the cabin's dawn health {foretold:0.0} should be what sleep leaves, {rested.Health:0.0}");
+
+        var hungry = NightWorld(data);
+        hut = hungry.Add(ThingKind.Hut, hungry.Player + new Vector2(2, 0));
+        SetNeeds(hungry, 50, 100, 50);
+        hungry.Sleep(hut);
+        // Hunger falls from 50 to 45 in 5% of a day, 42 seconds, which heal 5.
+        Require(Math.Abs(hungry.Health - 55) < .3f, $"sleep should heal only while hunger stays above 45%: {hungry.Health:0.0}");
     }
 
     private static void CheckSleepNeedsFoodAndWater(GameData data) {
@@ -2716,20 +2744,32 @@ public static class SimulationChecks {
         Require(!world.Buy(sign, Inventory.Coins, 1), "coins themselves cannot be bought");
     }
 
+    /// <summary>A bank holding more than a stack of coins keeps them in its one cell through a save and still takes more.</summary>
+    private static void CheckBankKeepsCoinsPastAThousandAcrossASave(GameData data) {
+        var world = EmptyWorld(data);
+        var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
+        sign.Wages!.Add(Inventory.Coins, 5000);
+        var loaded = EmptyWorld(data);
+        loaded.Deserialize(world.Serialize());
+        var bank = loaded.Things.Single(t => t.Kind == ThingKind.Signpost).Wages!;
+        Require(bank[Inventory.Coins] == 5000 && bank.UsedSlots == 1, $"a loaded bank should keep its 5000 coins in one cell: {bank.UsedSlots} cells");
+        Require(bank.Add(Inventory.Coins, 12) == 12, "a loaded bank should still take sale coins");
+    }
+
     private static void CheckWageSlotTakesOnlyCoinsAndPaysWagesFirst(GameData data) {
         var world = EmptyWorld(data);
         var sign = world.Add(ThingKind.Signpost, new Vector2(10, 10));
         world.Player = sign.Pos;
-        int full = sign.Wages!.StackOf(Inventory.Coins);
-        sign.Wages.Add(Inventory.Coins, full - 5);
+        sign.Wages!.Add(Inventory.Coins, 4995);
         PlaceOrder(world, new TradeOrder { Goods = new() { ["wood"] = 1 }, Buying = false, Value = 12, Signpost = sign.Id });
         SafeTick(world, data.TradeSeconds + .1f);
-        Require(sign.Wages[Inventory.Coins] == full && sign.Output![Inventory.Coins] == 7, "sale coins should top up the one-stack wage slot and spill the rest into the output");
+        Require(sign.Wages[Inventory.Coins] == 5007 && sign.Output![Inventory.Coins] == 0, "the wage slot should have no limit: every sale coin lands there, past a thousand too");
+        sign.Output.Add(Inventory.Coins, 7);
         Give(world, "wood", 1);
         Require(world.Transfer(world.Backpack, sign.Wages, "wood", 1) == 0 && world.Backpack["wood"] == 1, "the wage slot should refuse anything but coins, even by hand");
 
         var worker = AddWorker(world, sign.Pos);
-        sign.Wages.Remove(Inventory.Coins, full - 3);
+        sign.Wages.Remove(Inventory.Coins, 5004);
         SetCoins(world, 10);
         world.PayWages();
         Require(worker.WageDebt == 0, "a worker's wage should be paid in full");

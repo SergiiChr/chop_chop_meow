@@ -605,6 +605,13 @@ public partial class Game {
         await Until(() => view.PropOf(hut.Id) is HutProp { Open: 0 }, "the cabin's door closing behind the player once they are inside", 3);
         RunUntilNight(Hosted); SetNeeds(Hosted, hunger: 5);
         await Until(() => Named("sleep")?.TooltipText.Contains("too hungry") == true, "the sleep button explaining that the player is too hungry to sleep", 2);
+        // Under "Stats after sleep" the page shows only what a night would leave, each capsule over its icon as in the corner; a fed night heals.
+        SetNeeds(Hosted, 100, 100, 40);
+        await Until(() => (panel.FindChild("health", true, false) as Control)?.TooltipText == $"Health at dawn {Hosted.HealthAtDawn():0}%" && Hosted.HealthAtDawn() > 40,
+            "the cabin page showing the health a fed night's sleep would leave", 2);
+        Require(HasLabel(panel, "Stats after sleep") && panel.FindChildren("*", "", true, false).OfType<NeedGauge>().Count() == 3,
+            "The cabin page must title its needs \"Stats after sleep\" and show a heart, a stomach and a droplet under them.");
+        SetNeeds(Hosted, hunger: 5);
         RunUntilMorning(Hosted);
         Input.ParseInputEvent(new InputEventKey { PhysicalKeycode = Key.S, Keycode = Key.S, Pressed = true });
         await Seconds(.2);
@@ -1776,6 +1783,11 @@ public partial class Game {
             await Test(CheckStationCupsShakeWhenTheBackpackHasNoRoomForThem);
             await Test(CheckUnmarkedStationStaysOnItsRecipe);
             await Test(CheckRefusedDoubleClickKeepsTheWorkerMark);
+            await Test(CheckEveryRecipeIsReadyToStartAfterADoubleClickWithAllItsItemsCarried);
+            await Test(CheckNoRecipeIsReadyToStartAfterADoubleClickWithOneOfItsItems);
+            await Test(CheckNoRecipeIsReadyToStartAfterADoubleClickWithoutFuel);
+            await Test(CheckNoRecipeIsReadyToStartAfterADoubleClickWithFuelAlone);
+            await Test(CheckEveryRecipeIsReadyToStartWhenLoadedByHand);
             await Test(CheckRecipeGroupsCloseAndOpenOnAClick);
             await Test(CheckBenchShowsItsToolsBesideThePageAndWhereARecipesToolIs);
             await Test(CheckRecipeListKeepsItsPlaceWhenThePageDrawsAgain);

@@ -91,7 +91,7 @@ public partial class ItemSlot : Button {
 
     /// <summary>
     /// The icon under the cursor, in a frame the size of this cup with a count pill on the same corner.
-    /// Carrying the whole stack, <paramref name="part"/> is null and the pill reads as the cup's does, such as a bottle's sips; carrying part of it, the pill counts what is carried.
+    /// Carrying the whole stack, <paramref name="part"/> is null and the pill reads as the cup's does, such as a bottle's liters; carrying part of it, the pill counts what is carried.
     /// </summary>
     private Control Preview(int? part) {
         var preview = new Control();
