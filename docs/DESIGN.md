@@ -74,7 +74,7 @@ Simulation and data:
 | `src/Packing.cs` | Packing stations |
 | `src/Terrain.cs` | The fixed valley map |
 | `src/Recovery.cs` | Skipping to dawn while downed |
-| `src/Water.cs` | The refillable three-sip bottle and drinking at a water source |
+| `src/Water.cs` | The refillable three-unit bottle and drinking at a water source |
 | `src/Vessels.cs` | Pouring a full vessel's liquid into a station and filling empty vessels from it |
 | `src/Players.cs` | Per-player state, the command dispatcher, and players arriving and leaving |
 | `src/Net.cs` | The ENet connection, joining by machine key, and sending and merging world updates |
@@ -91,7 +91,7 @@ UI and input:
 | `src/PauseMenu.cs` | The pause menu with the goal chain, and hosting |
 | `src/UiKit.cs` | What the interface's parts share: `UiKit` (the world, the pause, how a player action runs, the buttons), `LiveUpdates`, `LiveText` and `MovableWindow`, a window the player drags into place |
 | `src/Icons.cs` | Item and building icons, cached as they are first asked for |
-| `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode, full-bottle and death labels |
+| `src/Hud.cs` | The top-right corner with the clock plate and frame rate counter, and the mode and death labels |
 | `src/MessageStack.cs` | The fading message stack at the top of the screen |
 | `src/RecoveryPrompt.cs` | The "Skip to morning?" prompt |
 | `src/MinePanel.cs` | The mine's building steps, miners and outputs |
@@ -369,14 +369,14 @@ There are no iron tools; iron bars only go into buildings and steel.
 #### Water
 
 The player starts with one refillable bottle (`src/Water.cs`); the player-facing rules are in [README.md](../README.md#food-water-and-time).
-Filling it or sipping straight from the source takes one `GatherSeconds`.
+Filling it or drinking straight from the source takes one `GatherSeconds`.
 Every point on the pond shore is a collection target.
-A station takes water as a liquid, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it.
-`GameData.Vessels` lists each refillable vessel (empty, part-full and full item, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
-a full vessel dropped into a station whose recipe takes its liquid pours one unit there and stays where it was, empty (`World.Pour`);
-the liquid leaves only into empty vessels (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the cup shakes.
+A station takes water as a liquid in units, `Water.Liquid`, with a drawn droplet icon and no model; nothing but a station holds it, and a recipe asks for so many units.
+`GameData.Vessels` lists each refillable vessel (`VesselDef.States`, its item at each fill from empty to full, and its liquid), and `src/Vessels.cs` holds the rules for all of them:
+a vessel dropped into a station whose recipe takes its liquid pours every unit it holds there and stays where it was, emptied (`World.PourVessels`); loading a batch pours from the least full first (`World.PourUnits`);
+the liquid leaves only into vessels with room, fullest first (`World.Fill`), so taking it with none is refused (`World.FillBlock`) and the cup shakes.
 Every move between boxes, by hand or by a worker, goes through `World.Carry`, which picks one of those or a plain transfer.
-Haulers fetch a liquid input as full vessels and store the empties; leftover liquid leaves in empty vessels a hauler fetches (`World.LiquidToClear`), and a dismantled station fills the backpack's empty vessels and spills the rest.
+Haulers fetch a liquid input in the fullest vessels storage has (`World.LiquidSource`), pour them all and store them again; leftover liquid leaves in vessels with room a hauler fetches (`World.LiquidToClear`), and a dismantled station fills the backpack's vessels and spills the rest.
 No hand recipe takes a liquid, which `GameData` checks.
 
 During the respawn countdown, a player with no cabin anywhere in the world is offered “Skip to morning?”.

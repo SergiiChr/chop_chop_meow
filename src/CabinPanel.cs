@@ -14,6 +14,7 @@ public partial class CabinPanel(PageTools tools, Thing subject) : ThingPage(tool
         top.AddChild(Style.Glyph("line_moon", 20, Style.Ink));
         var until = Style.Text("", 14, Style.Ink); until.SizeFlagsHorizontal = Control.SizeFlags.ExpandFill; top.AddChild(until);
         var block = Style.Pill("", Style.Tag(Style.Brick), Style.Rim, 13); top.AddChild(block);
+        var after = Style.Text("Stats after sleep", 14, Style.Ink); after.HorizontalAlignment = HorizontalAlignment.Center; well.AddChild(after);
         var vials = new HBoxContainer { Alignment = BoxContainer.AlignmentMode.Center }; vials.AddThemeConstantOverride("separation", 36); well.AddChild(vials);
         var dawn = NeedColumn.All();
         foreach (var need in dawn) vials.AddChild(need);

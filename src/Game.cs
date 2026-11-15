@@ -23,7 +23,6 @@ public partial class Game : Node, IGameFlow {
     private MessageStack messages = null!;
     private NeedsPlate needsPlate = null!;
     private DamageEdges damageEdges = null!;
-    private WaterWarning waterWarning = null!;
     private ModeLabel modeLabel = null!;
     private DeathLabel deathLabel = null!;
     private UiKit kit = null!;
@@ -136,7 +135,6 @@ public partial class Game : Node, IGameFlow {
         // _Process keeps it between the needs and bank plate on the left and the day dial or side panel on the right.
         messages = new MessageStack(() => Style.Outlined(Style.Wrapped("", 17))) { Name = "messages", AnchorRight = 1, OffsetTop = 56 }; ui.AddChild(messages);
         ui.AddChild(panel.Aside); ui.AddChild(panel); ui.AddChild(bag);
-        waterWarning = new WaterWarning(bag, ui); ui.AddChild(waterWarning);
         deathLabel = new DeathLabel(world); ui.AddChild(deathLabel);
         damageEdges = new DamageEdges(); damageEdges.SetAnchorsAndOffsetsPreset(Control.LayoutPreset.FullRect);
         needsPlate = new NeedsPlate(kit, moves, damageEdges); ui.AddChild(needsPlate); ui.AddChild(damageEdges);
@@ -149,7 +147,7 @@ public partial class Game : Node, IGameFlow {
     }
     private void PlayIntro() { intro = new IntroMovie(sounds) { Name = "intro" }; ui.AddChild(intro); }
     private void Notify(string message) {
-        if (message.StartsWith(World.VesselWarningStart, System.StringComparison.Ordinal) && waterWarning != null) waterWarning.Warn(message); else messages?.Post(message);
+        messages?.Post(message);
         GD.Print(message);
     }
     private void RefreshLive() {

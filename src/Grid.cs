@@ -76,7 +76,7 @@ public partial class PagePanel {
             var badge = cell.GetNode<TextureRect>("badge");
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = Icons.Of(contents.Items.OrderByDescending(p => p.Value).First().Key);
-            count.Text = stack is (string bottle, _) && Water.IsBottle(bottle) ? $"{Water.BottleSips(bottle)}/3" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
+            count.Text = stack is (string bottle, _) && Water.IsBottle(bottle) ? $"{Water.BottleUnits(bottle)}/3" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
             if (wanted != null) {
                 bool takes = stack is (string item, _) && wanted(item);
                 cell.AddThemeStyleboxOverride("normal", takes ? Style.CupWanted : Style.CupNormal);

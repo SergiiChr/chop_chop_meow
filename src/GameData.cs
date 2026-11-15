@@ -51,16 +51,20 @@ public sealed class RecipeDef {
     public bool Burns => Fuels.Count > 0;
 }
 /// <summary>
-/// A refillable vessel and the liquid it carries.
-/// A full one poured into a station that takes its liquid leaves one unit there and stays with whoever carried it, empty; the liquid leaves a station only into an empty one.
+/// A refillable vessel and the liquid it carries, in units.
+/// A vessel dropped into a station that takes its liquid pours the units it holds there and stays with whoever carried it, emptier;
+/// the liquid leaves a station only into vessels with room for it.
 /// </summary>
 public sealed class VesselDef {
-    public string Empty { get; set; } = "";
-    /// <summary>States between full and empty, such as a part-drunk bottle, which no station takes.</summary>
-    public List<string> Partial { get; set; } = new();
-    public string Full { get; set; } = "";
-    /// <summary>What one full vessel pours out, which only stations hold.</summary>
+    /// <summary>Its item at each fill, from empty to full: the index is the units it holds.</summary>
+    public List<string> States { get; set; } = new();
+    /// <summary>What it pours out, a unit at a time, which only stations hold.</summary>
     public string Liquid { get; set; } = "";
+    public string Empty => States[0];
+    public string Full => States[^1];
+    public int Capacity => States.Count - 1;
+    /// <summary>The units an item of this vessel holds, or -1 for another item.</summary>
+    public int UnitsIn(string item) => States.IndexOf(item);
 }
 /// <summary>How an item that no recipe makes is come by, for the recipe map.</summary>
 public sealed class SourceDef {
@@ -231,7 +235,7 @@ public sealed partial class GameData {
         if (Farm.Sow.Count == 0 || Farm.Yield.Count == 0 || Farm.Sow.Concat(Farm.Yield).Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Farm.GrowDays <= 0 || Farm.HarvestWorkdays <= 0)
             throw new InvalidOperationException("Invalid farm in GameData.");
         foreach (var v in Vessels)
-            if (new[] { v.Empty, v.Full, v.Liquid }.Concat(v.Partial).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
+            if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
                 || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Output == v.Liquid || r.Hand && r.Inputs.ContainsKey(v.Liquid)))
                 throw new InvalidOperationException($"Invalid vessel: {v.Full}. Its liquid is only poured into stations, and no hand recipe takes it.");
         ValidateMap();
@@ -241,18 +245,11 @@ public sealed partial class GameData {
         foreach (var v in Vessels) if (v.Liquid == liquid) return v;
         return null;
     }
-    /// <summary>The vessel an item is a full one of, or null.</summary>
-    public VesselDef? FullVessel(string item) {
-        foreach (var v in Vessels) if (v.Full == item) return v;
-        return null;
-    }
-    /// <summary>The vessel an item is a state of, full, part-full or empty, or null.</summary>
+    /// <summary>The vessel an item is a state of, at any fill, or null.</summary>
     public VesselDef? VesselOf(string item) {
-        foreach (var v in Vessels) if (v.Full == item || v.Empty == item || v.Partial.Contains(item)) return v;
+        foreach (var v in Vessels) if (v.States.Contains(item)) return v;
         return null;
     }
-    /// <summary>What the backpack carries of a recipe input: a liquid as the full vessels that pour it.</summary>
-    public string CarriedAs(string input) => VesselFor(input)?.Full ?? input;
     // Filled by Validate: the id of the recipe that makes each item, and what the recipe map hangs under each item.
     private readonly Dictionary<string, string> recipeIdOf = new();
     private readonly Dictionary<string, List<string>> madeOutOf = new();
@@ -322,7 +319,7 @@ public sealed partial class GameData {
         }
     }
     /// <summary>Eaten from the backpack or hotbar: food and drink, plus raw food, which only says it needs cooking.</summary>
-    public bool IsConsumable(string item) => Water.BottleSips(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
+    public bool IsConsumable(string item) => Water.BottleUnits(item) > 0 || Items.TryGetValue(item, out var def) && (def.Food || def.Thirst > 0);
     public bool IsFood(string item) => Items.TryGetValue(item, out var def) && def.Food;
     /// <summary>The humblest tool of a kind at or above a tier, whose picture stands for a tool not there yet.</summary>
     public string PlainestTool(string kind, int tier = 0) => Items.Where(p => p.Value.Tool == kind && p.Value.Tier >= tier).OrderBy(p => p.Value.Tier).ThenBy(p => p.Value.Speed).First().Key;

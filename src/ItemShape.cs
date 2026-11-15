@@ -100,7 +100,7 @@ internal static class ItemShape {
         new(f => Lighter(f, ActorRig.Tool(tool), pose ?? new Basis(Vector3.Back, MathF.PI / 2)), Plain, Lay: Lay.Rows);
     /// <summary>A bottle lying on its back, its gauge up.</summary>
     private static Look Bottle(string item) =>
-        new(f => Lighter(f, BottleShape.Create(Water.BottleSips(item)), new Basis(Vector3.Right, -MathF.PI / 2)), Plain, .45f, Lay.Rows, .85f);
+        new(f => Lighter(f, BottleShape.Create(Water.BottleUnits(item)), new Basis(Vector3.Right, -MathF.PI / 2)), Plain, .45f, Lay.Rows, .85f);
     /// <summary>One loose lump of ore or coal, the first of those the world scatters, in the given colour.</summary>
     private static Look Nugget(string kind, string colour) =>
         new(f => First(f, NatureShape.Loose(kind, new Color(colour), new Color(colour), 0), 20), NatureShape.Rock, .24f, Lay.Loose, .7f);

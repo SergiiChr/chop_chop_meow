@@ -4,88 +4,120 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>Liquids a station holds: poured in from full vessels, which stay behind empty, and taken out only into empty ones.</summary>
+/// <summary>
+/// Liquids a station holds, in units: poured in from vessels, which stay with whoever carried them, emptier,
+/// and taken out only into vessels with room for them.
+/// </summary>
 public sealed partial class World {
-    /// <summary>Pours up to <paramref name="count"/> full vessels from one box into another as their liquid; each vessel stays in its own cell, empty.</summary>
-    private static int Pour(Inventory from, Inventory to, VesselDef v, int count) {
-        count = Math.Min(Math.Min(count, from[v.Full]), to.Room(v.Liquid));
-        for (int i = 0; i < count; i++) from.Replace(v.Full, v.Empty);
-        to.Add(v.Liquid, count);
-        return count;
+    /// <summary>
+    /// Pours up to <paramref name="vessels"/> vessels of one fill from one box into another, each all it holds while room and <paramref name="units"/> last.
+    /// Each vessel stays in its own cell, emptier; returns how many vessels poured.
+    /// </summary>
+    private static int PourVessels(Inventory from, string item, Inventory to, VesselDef v, int vessels, int units) {
+        int held = v.UnitsIn(item), poured = 0;
+        units = Math.Min(units, to.Room(v.Liquid));
+        for (; poured < vessels && from[item] > 0 && units > 0; poured++) {
+            int pour = Math.Min(held, units);
+            from.Replace(item, v.States[held - pour]); to.Add(v.Liquid, pour); units -= pour;
+        }
+        return poured;
     }
 
-    /// <summary>Fills up to <paramref name="count"/> empty vessels in one box from the liquid another holds.</summary>
-    private static int Fill(Inventory from, Inventory to, VesselDef v, int count) {
-        count = Math.Min(Math.Min(count, from[v.Liquid]), to[v.Empty]);
-        for (int i = 0; i < count; i++) to.Replace(v.Empty, v.Full);
-        from.Remove(v.Liquid, count);
-        return count;
+    /// <summary>Pours up to <paramref name="units"/> of a liquid from one box's vessels into another, least full first so part-drunk ones empty; returns the units poured.</summary>
+    private static int PourUnits(Inventory from, Inventory to, VesselDef v, int units) {
+        int poured = 0;
+        for (int held = 1; held <= v.Capacity; held++)
+            while (from[v.States[held]] > 0 && poured < units && to.Room(v.Liquid) > 0) {
+                int pour = Math.Min(Math.Min(held, units - poured), to.Room(v.Liquid));
+                from.Replace(v.States[held], v.States[held - pour]); to.Add(v.Liquid, pour); poured += pour;
+            }
+        return poured;
     }
 
-    /// <summary>The vessel whose liquid a full one pours into a box, or null: the box must be a station's cups whose recipe takes that liquid.</summary>
-    private VesselDef? PoursInto(Thing? t, Inventory to, string item) => t != null && to == t.Inventory && Data.FullVessel(item) is VesselDef v && Pending(t, v.Liquid) ? v : null;
+    /// <summary>Fills one box's vessels with up to <paramref name="units"/> of the liquid another holds, fullest first so they fill up; returns the units filled.</summary>
+    private static int Fill(Inventory from, Inventory to, VesselDef v, int units) {
+        int filled = 0;
+        // A vessel topped up only part way is fuller than every one still to come, so each is filled once.
+        for (int held = v.Capacity - 1; held >= 0; held--)
+            while (to[v.States[held]] > 0 && filled < units && from[v.Liquid] > 0) {
+                int add = Math.Min(Math.Min(v.Capacity - held, units - filled), from[v.Liquid]);
+                to.Replace(v.States[held], v.States[held + add]); from.Remove(v.Liquid, add); filled += add;
+            }
+        return filled;
+    }
+
+    /// <summary>The units of a liquid a box's vessels have room for.</summary>
+    private static int VesselRoom(Inventory box, VesselDef v) {
+        int room = 0;
+        for (int held = 0; held < v.Capacity; held++) room += box[v.States[held]] * (v.Capacity - held);
+        return room;
+    }
+
+    /// <summary>The vessel whose liquid an item pours into a box, or null: the item holds some, and the box is a station's cups whose recipe takes that liquid.</summary>
+    private VesselDef? PoursInto(Thing? t, Inventory to, string item) =>
+        t != null && to == t.Inventory && Data.VesselOf(item) is VesselDef v && v.UnitsIn(item) > 0 && Pending(t, v.Liquid) ? v : null;
 
     /// <summary>
-    /// Moves items between two boxes, by hand or by a worker.
-    /// A liquid fills empty vessels in the box it goes to, unless that box is a station that takes it;
-    /// a full vessel dropped into a station that takes its liquid pours it there and stays behind, empty.
+    /// Moves items between two boxes, by hand or by a worker; <paramref name="quantity"/> counts units of a liquid and vessels of anything else.
+    /// A liquid fills vessels in the box it goes to, unless that box is a station that takes it;
+    /// a vessel dropped into a station that takes its liquid pours what it holds there and stays behind, emptier.
     /// </summary>
     /// <param name="into">The thing that owns <paramref name="to"/>, or null for the backpack or a worker's bag.</param>
     private int Carry(Inventory from, Inventory to, Thing? into, string item, int quantity, bool automated = false) {
         if (Data.VesselFor(item) is VesselDef held && !(into != null && to == into.Inventory && Pending(into, item))) return Fill(from, to, held, quantity);
-        if (PoursInto(into, to, item) is VesselDef poured) return Pour(from, to, poured, quantity);
+        if (PoursInto(into, to, item) is VesselDef poured) return PourVessels(from, item, to, poured, quantity, int.MaxValue);
         return from.TransferTo(to, item, quantity, automated);
     }
 
-    /// <summary>Why a liquid cannot leave a box for the backpack or another box now, or null: it fills only an empty vessel there.</summary>
+    /// <summary>Why a liquid cannot leave a box for the backpack or another box now, or null: it goes only into vessels there with room for it.</summary>
     public string? FillBlock(Inventory from, Inventory to, string item) =>
-        Data.VesselFor(item) is VesselDef v && from[item] > 0 && to[v.Empty] == 0 ? $"You need {A(Lower(Data.Name(v.Empty)))} to take the {Lower(Data.Name(item))}." : null;
+        Data.VesselFor(item) is VesselDef v && from[item] > 0 && VesselRoom(to, v) == 0 ? $"You need {A(Lower(Data.Name(v.Full)))} with room for the {Lower(Data.Name(item))}." : null;
 
-    /// <summary>The vessel an item is a part-full or empty one of, when a station's recipe takes that vessel's liquid, or null.</summary>
-    private VesselDef? NotFullVessel(Thing t, string item) => Data.VesselOf(item) is VesselDef v && item != v.Full && Pending(t, v.Liquid) ? v : null;
-
-    /// <summary>Why a station's recipe will not take a vessel: only a full one pours.</summary>
-    public string VesselWarning(VesselDef v) => VesselWarningStart + Lower(Data.Name(v.Full));
-    /// <summary>How every <see cref="VesselWarning"/> starts, which the interface shows above the backpack.</summary>
-    public const string VesselWarningStart = "Requires full ";
-
-    /// <summary>The vessel the backpack holds only part-full or empty ones of while a batch's liquid needs more full ones, or null.</summary>
-    private VesselDef? ShortOfFullVessels(Dictionary<string, int> cost) {
-        foreach (var (item, needed) in cost)
-            if (Data.VesselFor(item) is VesselDef v && S.Backpack[v.Full] < needed && (S.Backpack[v.Empty] > 0 || v.Partial.Exists(p => S.Backpack[p] > 0))) return v;
-        return null;
+    /// <summary>How many of a recipe input the backpack holds: a liquid counts the units in its vessels.</summary>
+    public int Carried(string input) {
+        if (Data.VesselFor(input) is not VesselDef v) return S.Backpack[input];
+        int units = 0;
+        for (int held = 1; held <= v.Capacity; held++) units += S.Backpack[v.States[held]] * held;
+        return units;
     }
 
-    /// <summary>How many of a recipe input the backpack holds: a liquid counts the full vessels that pour it.</summary>
-    public int Carried(string input) => S.Backpack[Data.CarriedAs(input)];
-
-    /// <summary>Whether the backpack holds a batch's inputs, a liquid as full vessels.</summary>
+    /// <summary>Whether the backpack holds a batch's inputs, a liquid in its vessels.</summary>
     public bool CarriesBatch(Dictionary<string, int> cost) {
         foreach (var (item, needed) in cost) if (Carried(item) < needed) return false;
         return true;
     }
 
-    /// <summary>Fills the backpack's empty vessels from every liquid a box holds; what finds no vessel is spilled.</summary>
+    /// <summary>Fills the backpack's vessels from every liquid a box holds; what finds no room is spilled.</summary>
     private void PourOut(Inventory box) {
         foreach (var v in Data.Vessels)
             if (box[v.Liquid] > 0) { Fill(box, S.Backpack, v, box[v.Liquid]); box.Remove(v.Liquid, box[v.Liquid]); }
     }
 
-    /// <summary>
-    /// Liquid a station holds that its recipe no longer takes, with storage that gives out empty vessels for it and takes full ones back, or null.
-    /// A hauler brings the empty vessels, fills them there and stores them.
-    /// </summary>
-    private (VesselDef Vessel, Thing Empties)? LiquidToClear(Thing t, Vector2 from) {
-        foreach (var v in Data.Vessels)
-            if (t.Inventory[v.Liquid] > 0 && !Pending(t, v.Liquid) && DepositFor(v.Full, t.Pos) != null && SourceFor(v.Empty, from) is Thing empties) return (v, empties);
+    /// <summary>The nearest storage with vessels that hold a liquid, fullest first, and that fill; or null.</summary>
+    private (string Item, Thing Source)? LiquidSource(VesselDef v, Vector2 from) {
+        for (int held = v.Capacity; held >= 1; held--)
+            if (SourceFor(v.States[held], from) is Thing source) return (v.States[held], source);
         return null;
     }
 
-    /// <summary>A hauler's empty vessels at a station that holds leftover liquid for them: filled there, then stored like any load.</summary>
+    /// <summary>
+    /// Liquid a station holds that its recipe no longer takes, with storage that gives out vessels with room for it, emptiest first, and takes them back; or null.
+    /// A hauler brings the vessels, fills them there and stores them.
+    /// </summary>
+    private (VesselDef Vessel, string Item, Thing Source)? LiquidToClear(Thing t, Vector2 from) {
+        foreach (var v in Data.Vessels) {
+            if (t.Inventory[v.Liquid] == 0 || Pending(t, v.Liquid) || DepositFor(v.Full, t.Pos) == null) continue;
+            for (int held = 0; held < v.Capacity; held++)
+                if (SourceFor(v.States[held], from) is Thing source) return (v, v.States[held], source);
+        }
+        return null;
+    }
+
+    /// <summary>A hauler's vessels with room at a station that holds leftover liquid for them: filled there, then stored like any load.</summary>
     private bool FillsLeftover(Worker w, Thing? dest, string item, float dt) {
-        if (dest == null || Data.VesselOf(item) is not VesselDef v || item != v.Empty || dest.Inventory[v.Liquid] == 0 || Pending(dest, v.Liquid)) return false;
+        if (dest == null || Data.VesselOf(item) is not VesselDef v || item == v.Full || dest.Inventory[v.Liquid] == 0 || Pending(dest, v.Liquid)) return false;
         w.Status = Phrase("Taking ", Lower(Data.Name(v.Liquid)), " out");
-        if (Walk(w, dest.Pos, dt)) { Fill(dest.Inventory, w.Bag, v, w.Bag[item]); w.Destination = 0; }
+        if (Walk(w, dest.Pos, dt)) { Fill(dest.Inventory, w.Bag, v, dest.Inventory[v.Liquid]); w.Destination = 0; }
         return true;
     }
 }

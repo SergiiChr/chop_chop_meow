@@ -2,9 +2,9 @@ using Godot;
 
 namespace ChopChopMeow;
 
-/// <summary>A reusable tin flask with a wood stopper and a three-sip sight gauge.</summary>
+/// <summary>A reusable tin flask with a wood stopper and a three-unit sight gauge.</summary>
 internal static class BottleShape {
-    public static Node3D Create(int sips) {
+    public static Node3D Create(int units) {
         var root = new Node3D();
         var tin = ModelKit.Metal("bbcaca", .35f, .65f);
         var rim = ModelKit.Metal("637878", .45f, .55f);
@@ -17,7 +17,7 @@ internal static class BottleShape {
         ModelKit.Box(root, new(.17f, .39f, .025f), new(0, .29f, .20f), rim);
         for (int i = 0; i < 3; i++)
             ModelKit.Box(root, new(.125f, .095f, .035f), new(0, .17f + i * .12f, .22f),
-                ModelKit.Mat(i < sips ? "43b9e6" : "293e46", .3f));
+                ModelKit.Mat(i < units ? "43b9e6" : "293e46", .3f));
         return root;
     }
 }

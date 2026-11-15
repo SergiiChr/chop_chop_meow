@@ -22,7 +22,7 @@ public static class PondChecks {
             world.Gather(pond, data.GatherSeconds / 2);
             Require(world.Thirst == 0, "Direct drinking must take as long as filling a bottle.");
             world.Gather(pond, data.GatherSeconds / 2);
-            Require(Math.Abs(world.Thirst - Water.SipThirst) <= .01 && world.Backpack.Count == 0, "Direct drinking must grant one sip and no bottle.");
+            Require(Math.Abs(world.Thirst - Water.UnitThirst) <= .01 && world.Backpack.Count == 0, "Direct drinking must grant one unit and no bottle.");
         }
         Require(!Terrain.WaterRing(Terrain.Lake) && !Terrain.WaterRing(Terrain.Spawn), "The collection ring must not cover the lake center or distant ground.");
     }

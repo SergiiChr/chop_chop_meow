@@ -803,7 +803,7 @@ public sealed partial class World {
     public void Consume(string item) {
         if (Downed || !Data.Items.TryGetValue(item, out var def) || Forwarded(Verb.Consume, item: item, count: S.Backpack.PreferredSlot)) return;
         if (Water.IsBottle(item)) {
-            if (!Water.SipBottle(this, item)) Say("Your bottle is empty. Collect water at the pond to refill it.");
+            if (!Water.DrinkUnit(this, item)) Say("Your bottle is empty. Collect water at the pond to refill it.");
             return;
         }
         if (def.Hunger <= 0 && def.Thirst <= 0) { Say($"{def.Name} needs cooking first."); return; }
@@ -1003,26 +1003,28 @@ public sealed partial class World {
         var r = Data.Recipes[recipe];
         string? fuel = null;
         if (r.Burns && (fuel = FuelFromBackpack(t, r, cost)) == null) return;
-        if (ShortOfFullVessels(cost) is VesselDef partial) { Say(VesselWarning(partial)); return; }
         for (int i = 0; i < batches; i++) {
             if (!CarriesBatch(cost) || fuel != null && S.Backpack[fuel] < cost.GetValueOrDefault(fuel) + 1) { if (i == 0) Say("Missing batch ingredients or fuel in backpack."); break; }
             if (cost.Any(pair => t.Inventory[pair.Key] + pair.Value > t.Inventory.StackSize) || fuel != null && (t.Burner!.Room(fuel) == 0 || !FuelTakes(t, fuel))) { Say("Input slots are full."); break; }
-            foreach (var pair in cost) Carry(S.Backpack, t.Inventory, t, Data.CarriedAs(pair.Key), pair.Value);
+            foreach (var pair in cost)
+                if (Data.VesselFor(pair.Key) is VesselDef vessel) PourUnits(S.Backpack, t.Inventory, vessel, pair.Value);
+                else S.Backpack.TransferTo(t.Inventory, pair.Key, pair.Value);
             if (fuel != null) S.Backpack.TransferTo(t.Burner!, fuel, 1);
         }
     }
     /// <summary>Manual loading of one input slot, which holds at most one stack.</summary>
     public int LoadInput(Thing t, string item, int quantity) {
         if (!Reaches(t)) { Say("Walk closer to load this building."); return 0; }
-        if (NotFullVessel(t, item) is VesselDef partial) { Say(VesselWarning(partial)); return 0; }
         // Fuel nothing smelts goes to the fuel slot; coal at the reinforced furnace fills the ingredient slot, and the fuel slot is filled by dragging.
         if (!Pending(t, item) && t.Burner != null && FuelFits(t, item)) return LoadFuel(t, item, quantity);
         if (t.Kind == ThingKind.Packer && HoldBlock(t, item) is string refused) { Say(refused); return 0; }
-        // A full vessel pours its liquid into the station's cup for it.
-        string lands = PoursInto(t, t.Inventory, item)?.Liquid ?? item;
+        // A vessel pours what it holds into the station's cup for its liquid.
+        var vessel = PoursInto(t, t.Inventory, item);
+        string lands = vessel?.Liquid ?? item;
         if (t.Kind != ThingKind.Packer && !Pending(t, lands)) { Say($"{Data.Name(item)} is not used by what this station makes."); return 0; }
         if (Forwarded(Verb.LoadInput, t.Id, item: item, count: quantity)) return 0;
-        int moved = Carry(S.Backpack, t.Inventory, t, item, Math.Min(quantity, t.Inventory.StackSize - t.Inventory[lands]));
+        int room = t.Inventory.StackSize - t.Inventory[lands];
+        int moved = vessel != null ? PourVessels(S.Backpack, item, t.Inventory, vessel, quantity, room) : S.Backpack.TransferTo(t.Inventory, item, Math.Min(quantity, room));
         if (moved == 0) Say(S.Backpack[item] == 0 ? $"No {Data.Name(item)} in your backpack." : $"The {Data.Name(lands)} slot is full.");
         return moved;
     }
@@ -1243,7 +1245,7 @@ public sealed partial class World {
         box == t.Wages && item != Inventory.Coins ? "The wage slot only holds coins." :
         box == t.Burner ? FuelBlock(t, item) :
         box == t.Output ? "Things only come out of here." :
-        box == t.Inventory ? (NotFullVessel(t, item) is VesselDef partial ? VesselWarning(partial) : HoldBlock(t, item)) : null;
+        box == t.Inventory ? HoldBlock(t, item) : null;
     /// <summary>Whether a fuel slot takes an item now: a fuel that fits, and the same kind as what it holds.</summary>
     private bool FuelTakes(Thing t, string item) => FuelFits(t, item) && (t.Burner?.First() is not string held || held == item);
     /// <summary>Why a fuel slot will not take an item: it burns only fuel, one kind at a time.</summary>
@@ -1840,13 +1842,17 @@ public sealed partial class World {
             int wanted = dest?.Kind == ThingKind.Mine ? MineNeed(dest, item) : int.MaxValue;
             // Fuel for a station goes into its fuel slot; once that is full or gone, it goes to storage like anything else.
             var into = w.Fueling && dest?.Burner != null && FuelTakes(dest, item) ? dest.Burner : dest?.Inventory;
-            // A full vessel for a station that takes its liquid pours it there.
-            string lands = into != null && PoursInto(dest, into, item) is VesselDef poured ? poured.Liquid : item;
+            // A vessel for a station that takes its liquid pours it there.
+            var pours = into != null ? PoursInto(dest, into, item) : null;
+            string lands = pours?.Liquid ?? item;
             if (dest == null || into == null || wanted == 0 || into.Room(lands) == 0 || !into.Accepts(lands) || (dest.Id == target?.Id && target.IsResource)) { dest = DepositFor(item, w.Pos); into = dest?.Inventory; w.Fueling = false; }
             if (dest == null) { w.Status = Phrase("Holding ", Data.Name(item), " · no accepting storage"); return; }
             w.Destination = dest.Id; w.Status = Phrase("Carrying ", Data.Name(item), " → ", Data.Name(dest.Kind));
             if (Walk(w, dest.Pos, dt)) {
-                Carry(w.Bag, into!, dest, item, dest.Kind == ThingKind.Mine ? MineNeed(dest, item) : w.Bag[item], true); w.Destination = 0;
+                // Every vessel carried pours, whatever it holds.
+                if (pours != null && dest == Find(w.Destination) && into == dest.Inventory) PourUnits(w.Bag, into, pours, int.MaxValue);
+                else w.Bag.TransferTo(into!, item, dest.Kind == ThingKind.Mine ? MineNeed(dest, item) : w.Bag[item], true);
+                w.Destination = 0;
                 if (w.Bag.Count == 0) { w.Fueling = false; w.Hands(Worker.BagStack); NextPlace(w); }
             }
             return;
@@ -1937,9 +1943,10 @@ public sealed partial class World {
                 if (Walk(w, target.Pos, dt)) { target.Inventory.TransferTo(w.Bag, leftover, w.Bag.StackSize, true); w.Destination = dest.Id; }
                 return true;
             }
-            if (LiquidToClear(target, w.Pos) is (VesselDef vessel, Thing empties)) {
-                w.Status = Phrase("Fetching ", Lower(Data.Name(vessel.Empty)), "s for leftover ", Lower(Data.Name(vessel.Liquid)));
-                if (Walk(w, empties.Pos, dt)) { empties.Inventory.TransferTo(w.Bag, vessel.Empty, target.Inventory[vessel.Liquid], true); w.Destination = target.Id; }
+            if (LiquidToClear(target, w.Pos) is (VesselDef vessel, string roomy, Thing roomySource)) {
+                w.Status = Phrase("Fetching ", Lower(Data.Name(vessel.Full)), "s for leftover ", Lower(Data.Name(vessel.Liquid)));
+                int fetch = (target.Inventory[vessel.Liquid] + vessel.Capacity - 1) / vessel.Capacity;
+                if (Walk(w, roomySource.Pos, dt)) { roomySource.Inventory.TransferTo(w.Bag, roomy, fetch, true); w.Destination = target.Id; }
                 return true;
             }
             if (!Data.Recipes.ContainsKey(target.Recipe)) { w.Status = Idle; return false; }
@@ -1953,13 +1960,16 @@ public sealed partial class World {
             // A worked station only works while worked, so its crafter stays put until the batch is done before fetching the next one.
             bool fetches = !Worked(target) || !target.Processing || !HasDuty(w, target.Id, "craft");
             if (fetches) foreach (var pair in costs) {
-                if (target.Inventory[pair.Key] >= pair.Value * 2) continue;
-                // A liquid comes in the full vessels that pour it.
-                string carried = Data.CarriedAs(pair.Key);
-                var source = SourceFor(carried, w.Pos);
-                if (source == null) continue;
+                int wanting = pair.Value * 2 - target.Inventory[pair.Key];
+                if (wanting <= 0) continue;
+                // A liquid comes in the vessels that pour it, enough of them for the units short.
+                string carried = pair.Key; Thing? source; int count = wanting;
+                if (Data.VesselFor(pair.Key) is VesselDef carrier) {
+                    if (LiquidSource(carrier, w.Pos) is not (string filled, Thing holder)) continue;
+                    (carried, source) = (filled, holder); count = (wanting + carrier.UnitsIn(filled) - 1) / carrier.UnitsIn(filled);
+                } else if ((source = SourceFor(carried, w.Pos)) == null) continue;
                 w.Status = Phrase("Fetching ", Data.Name(carried));
-                if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, carried, pair.Value * 2 - target.Inventory[pair.Key], true); w.Destination = target.Id; }
+                if (Walk(w, source.Pos, dt)) { source.Inventory.TransferTo(w.Bag, carried, count, true); w.Destination = target.Id; }
                 return true;
             }
             // Then two batches' worth of fuel for the fuel slot.
@@ -2507,7 +2517,7 @@ public sealed partial class World {
     public static int GoalCount => Milestones.Length;
     public (string Title, string Hint) Objective => ObjectiveFor(S.Goal);
     public static (string Title, string Hint) ObjectiveFor(int goal) => goal switch {
-        0 => ("Carry fresh water", "Collect water around the pond shore. It holds three sips and stays with you when empty; without a bottle, drink at the source."),
+        0 => ("Carry fresh water", "Collect water around the pond shore. It holds three units and stays with you when empty; without a bottle, drink at the source."),
         1 => ("A safe place", "Gather wood and stone, then build a cabin before dusk. Step inside to shelter from wolves."),
         2 => ("Keep the fire lit", "Build and light a campfire. Firelight keeps wolves away; feed it wood to keep it burning."),
         3 => ("Gather by hand", "You start with a steel axe. Hold right mouse on trees to fell them; gather stone and berries by hand."),

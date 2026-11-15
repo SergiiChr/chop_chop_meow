@@ -45,10 +45,10 @@ public sealed partial class GameData {
         ["steel_shovel"] = new() { Name = "Steel shovel", Price = 39, Color = "e7c978", Tool = "shovel", Speed = 1.8f, Tier = 2 },
         ["berries"] = new() { Name = "Berries", Price = 1, Color = "e49488", Food = true, Hunger = 18 },
         [Water.Full] = new() { Name = "Water bottle", Price = 12.5f, Color = "88cbe0", Thirst = 33.333336f },
-        [Water.TwoUnits] = new() { Name = "Water bottle (2 sips)", Price = 11.8333f, Color = "88cbe0", Thirst = 33.333336f },
-        [Water.OneUnit] = new() { Name = "Water bottle (1 sip)", Price = 11.1667f, Color = "88cbe0", Thirst = 33.333336f },
+        [Water.TwoUnits] = new() { Name = "Water bottle (2 units)", Price = 11.8333f, Color = "88cbe0", Thirst = 33.333336f },
+        [Water.OneUnit] = new() { Name = "Water bottle (1 unit)", Price = 11.1667f, Color = "88cbe0", Thirst = 33.333336f },
         [Water.Empty] = new() { Name = "Empty bottle", Price = 10.5f, Color = "a8bdc3" },
-        [Water.Liquid] = new() { Name = "Water", Price = 2, Color = "88cbe0" },
+        [Water.Liquid] = new() { Name = "Water", Price = 2f / 3, Color = "88cbe0" },
         ["raw_meat"] = new() { Name = "Raw meat", Price = 1, Color = "c4524a", Food = true },
         ["burnt_steak"] = new() { Name = "Burnt steak", Price = 2.25f, Color = "5e3b25", Food = true, Hunger = 40 },
         ["tin_ore"] = new() { Name = "Tin ore", Price = 1.5f, Color = "c7c9c2" },
@@ -107,7 +107,7 @@ public sealed partial class GameData {
         ["wheat"] = new() { How = "Farm plot", From = new() { "wheat_seeds" }, Also = new() { "fertilizer" } },
     };
     public List<VesselDef> Vessels { get; } = new() {
-        new() { Empty = Water.Empty, Partial = new() { Water.TwoUnits, Water.OneUnit }, Full = Water.Full, Liquid = Water.Liquid },
+        new() { States = new(Water.BottleItems), Liquid = Water.Liquid },
     };
     public List<MapRowDef> MapRows { get; } = new() {
         new() { Title = "Wood", Roots = new() { "wood" } },
@@ -143,8 +143,8 @@ public sealed partial class GameData {
         ["crushed_berries"] = new() { Name = "Crush berries", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Hand = true, Tool = "mortar", Inputs = new() { ["berries"] = 4 }, Output = "crushed_berries", Amount = 4, Seconds = 10 },
         ["flour"] = new() { Name = "Grind flour", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Hand = true, Tool = "mortar", Inputs = new() { ["wheat"] = 1 }, Output = "flour", Amount = 1, Seconds = 10 },
         ["berry_jam"] = new() { Name = "Cook jam", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["crushed_berries"] = 2 }, Output = "berry_jam", Amount = 1, Seconds = 12 },
-        ["meat_stew"] = new() { Name = "Cook meat stew", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["raw_meat"] = 1, [Water.Liquid] = 1 }, Output = "meat_stew", Amount = 1, Seconds = 12 },
-        ["dough"] = new() { Name = "Knead dough", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Inputs = new() { ["flour"] = 1, [Water.Liquid] = 1 }, Output = "dough", Amount = 1, Seconds = 8 },
+        ["meat_stew"] = new() { Name = "Cook meat stew", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["raw_meat"] = 1, [Water.Liquid] = 3 }, Output = "meat_stew", Amount = 1, Seconds = 12 },
+        ["dough"] = new() { Name = "Knead dough", Group = RecipeGroup.Food, Station = ThingKind.Cooktable, Inputs = new() { ["flour"] = 1, [Water.Liquid] = 3 }, Output = "dough", Amount = 1, Seconds = 8 },
         ["canned_meat_stew"] = new() { Name = "Can meat stew", Group = RecipeGroup.Food, Station = ThingKind.Cannery, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["meat_stew"] = 1, ["tin_can"] = 1 }, Output = "canned_meat_stew", Amount = 1, Seconds = 10 },
         ["canned_jam"] = new() { Name = "Can jam", Group = RecipeGroup.Food, Station = ThingKind.Cannery, Fuels = new() { "wood", "coal", "charcoal" }, Inputs = new() { ["berry_jam"] = 1, ["tin_can"] = 1 }, Output = "canned_jam", Amount = 1, Seconds = 10 },
     };

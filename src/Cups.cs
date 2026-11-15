@@ -90,12 +90,13 @@ public sealed class Cups(UiKit kit, ItemMoves moves, LiveUpdates live, Thing t) 
     public VBoxContainer StationCup(string item, bool input, string perBatch, float size = 52) {
         var box = t.Inventory;
         var vessel = world.Data.VesselFor(item);
+        string bottle = vessel != null ? world.Lower(world.Data.Name(vessel.Full)) : "";
         string hint = vessel != null
-            ? input ? $"Click: fill {world.A(world.Lower(world.Data.Name(vessel.Empty)))} · Drag {world.A(world.Lower(world.Data.Name(vessel.Full)))} here to pour" : $"Click: fill {world.A(world.Lower(world.Data.Name(vessel.Empty)))}"
+            ? input ? $"Click: take back into a {bottle} · Drag a {bottle} here to pour what it holds" : $"Click: take back into a {bottle}"
             : input ? "Click: take back · Drag a backpack stack here to load" : "Click or drag: take";
         var cell = Cup(box, item, input, held => $"{world.Data.Name(item)} · {held}/{box.StackSize}\n{hint}", size);
         if (input) {
-            // A liquid's cup takes the vessels that hold it, and refuses all but a full one with a warning.
+            // A liquid's cup takes the vessels that hold it, at any fill.
             cell.CanTake = drag => drag.From == world.S.Backpack && (drag.Item == item || vessel != null && world.Data.VesselOf(drag.Item) == vessel);
             cell.Take = drag => {
                 int left = world.Reaches(t) ? ItemMoves.Leftover(drag, Math.Min(box.StackSize - box[item], box.Room(item))) : 0;

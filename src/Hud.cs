@@ -83,34 +83,6 @@ public partial class ModeLabel : Label {
     }
 }
 
-/// <summary>The full-bottle warning, shown for a few seconds at the left of the screen, above the backpack drawer when it is open.</summary>
-public partial class WaterWarning : Label {
-    private const float ShowSeconds = 7;
-    private readonly BackpackDrawer bag;
-    private readonly Control screen;
-    private float clock;
-
-    public WaterWarning(BackpackDrawer bag, Control screen) {
-        this.bag = bag; this.screen = screen;
-        Name = "water_warning";
-        AddThemeFontSizeOverride("font_size", 17); Style.Outlined(this);
-        AnchorTop = 1; AnchorBottom = 1; OffsetLeft = 20; OffsetRight = 650; OffsetTop = -250; OffsetBottom = -220;
-        AutowrapMode = TextServer.AutowrapMode.Off; MouseFilter = MouseFilterEnum.Ignore;
-    }
-
-    // Here, not in the constructor: Godot turns processing on just before _Ready.
-    public override void _Ready() => SetProcess(false);
-
-    public void Warn(string message) { Text = message; clock = ShowSeconds; SetProcess(true); }
-
-    public override void _Process(double delta) {
-        // Below the drawer when it was moved up against the top of the screen.
-        Position = bag.Visible ? bag.Position + new Vector2(0, bag.Position.Y >= 36 ? -36 : bag.Size.Y + 6) : new Vector2(20, screen.Size.Y - 148);
-        clock -= Math.Min((float)delta, .1f);
-        if (clock <= 0) { Text = ""; SetProcess(false); }
-    }
-}
-
 /// <summary>The respawn countdown, or what is keeping the player down.</summary>
 public partial class DeathLabel : Label {
     private readonly World world;

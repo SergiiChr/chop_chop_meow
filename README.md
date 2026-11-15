@@ -218,7 +218,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - A carried stack shows its count beside the cursor, as its cell does.
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
 - A dropped stack that does not all fit fills the slot, and the rest stays held until you drop it elsewhere or click somewhere it cannot go.
-- Clicking food consumes one item; clicking a filled bottle drinks one sip and retains the bottle. A torch click lights it, a packed crate click opens it and an empty crate click starts placement.
+- Clicking food consumes one item; clicking a filled bottle drinks one unit and retains the bottle. A torch click lights it, a packed crate click opens it and an empty crate click starts placement.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A selected raw-material stack can be deposited by clicking a nearby chest.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
@@ -326,23 +326,24 @@ A cabin someone is in, or a trading post with a cart out, stays up until they co
 
 A full stomach lasts one in-game day and a full water gauge lasts one day; a day lasts 14 minutes.
 Raw meat cannot be eaten.
-Your refillable bottle holds three sips, each restoring one third of the water gauge.
-Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one sip, taking the same gathering time.
+Your refillable bottle holds three units, each restoring one third of the water gauge.
+Keep the empty bottle after drinking and refill it at the lake; without a bottle, drink directly from a fresh water source for one unit, taking the same gathering time.
 Filling a bottle takes the same time as one gather action.
 Empty or filled replacements can be bought individually.
 Craft an empty bottle at a bench from one tin bar and one wood part, with the same steel hammer used for tin cans.
-A recipe that uses water, such as meat stew or dough, takes it poured out: a full bottle dropped on the station's water cup leaves its water there, and the bottle stays in your backpack, empty.
-The cup shows a water droplet, and only a full bottle pours.
-Clicking the cup takes the water back into an empty bottle in your backpack; without one, the cup shakes and says so.
-Workers do the same: they bring full bottles, pour them and carry the empties back to storage.
-Water left in a station whose recipe no longer uses it is taken out by a hauler, who fetches empty bottles from storage, fills them there and stores them.
-Taking down a station fills the empty bottles you carry with its water, and the rest is spilled.
+A recipe that uses water, such as meat stew or dough, takes units of it poured out: a bottle dropped on the station's water cup pours every unit it holds, and the bottle stays in your backpack, emptied.
+So water can come in batches, part-drunk bottles too; loading a batch pours from the least full bottles first.
+The cup shows a water droplet and counts units.
+Clicking the cup takes a unit back into a bottle in your backpack with room, the fullest first, and Ctrl takes all that fits; with no room, the cup shakes and says so.
+Workers do the same: they bring bottles, pour them and carry them back to storage.
+Water left in a station whose recipe no longer uses it is taken out by a hauler, who fetches bottles with room from storage, fills them there and stores them.
+Taking down a station fills the bottles you carry with its water, and the rest is spilled.
 These rules cover any refillable vessel the game adds (`GameData.Vessels`).
 
 Food and drink restore hunger and thirst but no health: health comes back only in sleep.
 From 10 pm you can sleep until dawn, but only if your food and water will last until morning; otherwise the sleep button explains why.
 Sleep heals while hunger and thirst both stay above 45%, about a third of your health over a full night.
-The cabin's page shows the health, hunger and thirst you would wake with, each as a capsule over its icon, as in the corner.
+The cabin's page shows, under "Stats after sleep", the health, hunger and thirst you would wake with, each as a capsule over its icon, as in the corner.
 
 ### Death and recovery
 
@@ -488,8 +489,8 @@ You can do both by hand from the crafting menu with a carried mortar.
 Its other recipes cook on their own:
 
 - 2 crushed berries → jam, over one wood, coal or charcoal
-- 1 raw meat + 1 water, poured from a full bottle → meat stew, over one wood, coal or charcoal
-- 1 flour + 1 water, poured from a full bottle → dough, kneaded with no fire
+- 1 raw meat + 3 units of water → meat stew, over one wood, coal or charcoal
+- 1 flour + 3 units of water → dough, kneaded with no fire
 
 The canning station (2 steel bars, 8 planks) seals meat stew or jam into a tin can over one wood, coal or charcoal.
 Raw meat is not canned: it sells as it is, in crates.
