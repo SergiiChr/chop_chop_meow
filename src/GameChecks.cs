@@ -868,9 +868,9 @@ public partial class Game {
             sounds.Play("anvil_work", world.Player + new Vector2(4, 0)); float near = sounds.LastFade;
             sounds.Play("anvil_work", world.Player + new Vector2(12, 0)); float far = sounds.LastFade;
             Require(Math.Abs(near - .5625f) < .001f && Math.Abs(far - .0625f) < .001f,
-                $"A sound 4 tiles from the player must play at 9/16 of its volume and one 12 tiles away at 1/16, at zoom {level}: {near}, {far}.");
+                $"A sound 4 metres from the player must play at 9/16 of its volume and one 12 metres away at 1/16, at zoom {level}: {near}, {far}.");
             int heard = sounds.Played; sounds.Play("anvil_work", world.Player + new Vector2(17, 0));
-            Require(sounds.Played == heard, $"A sound 17 tiles from the player must stay silent at zoom {level}.");
+            Require(sounds.Played == heard, $"A sound 17 metres from the player must stay silent at zoom {level}.");
         }
         view.Zoom = zoom;
         int played = sounds.Played; sounds.Play("wolf_growl_distance", world.Player + new Vector2(world.Data.WolfSightRange, 0));

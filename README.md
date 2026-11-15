@@ -855,8 +855,8 @@ Sound effects follow the same actions:
 - wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, bite, and thud when struck.
 
 Repeated sounds rotate between variants.
-A sound is loudest at your character and fades with distance, to silence 16 tiles away, whatever the zoom.
-A wolf's growl as it breaks into its sprint carries 30 tiles, and a howl 80.
+A sound is loudest at your character and fades with distance, to silence 16 metres away, whatever the zoom.
+A wolf's growl as it breaks into its sprint carries 30 metres, and a howl 80.
 
 Day and night have their own music, which crossfades as the time changes and picks up where it stopped last time.
 
@@ -875,7 +875,7 @@ Sound credits:
 - Kenney ([www.kenney.nl](https://www.kenney.nl))
 - Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com))
 - kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the intro
-  film's train and office recordings ([assets/README.md](assets/README.md#intro-film))
+  film's train and office recordings ([assets/README.md](assets/README.md#intro-film)), the digging and the stomach growl
 
 Music credits:
 

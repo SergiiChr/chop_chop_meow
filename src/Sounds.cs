@@ -13,7 +13,7 @@ namespace ChopChopMeow;
 /// </summary>
 public partial class Sounds : Node {
     private const string Folder = "res://assets/sounds";
-    // A sound with a world position is loudest at the player and fades to silence this many tiles away, whatever the zoom.
+    // A sound with a world position is loudest at the player and fades to silence this many metres away, whatever the zoom.
     private const float Reach = 16;
     // A wolf breaks into its sprint where it first sees the player, so that growl has to carry from there.
     private const float SprintGrowlReach = 30;
@@ -133,7 +133,7 @@ public partial class Sounds : Node {
     };
 
     private static bool IsHowl(string name) => name is "wolf_howl" or "wolf_howl_group";
-    /// <summary>Tiles from the player at which a sound falls silent; a howl carries across the valley, to where wolves stop hearing it.</summary>
+    /// <summary>Metres from the player at which a sound falls silent; a howl carries across the valley, to where wolves stop hearing it.</summary>
     private float ReachOf(string name) => IsHowl(name) ? World.Data.HowlRadius : name == "wolf_growl_distance" ? SprintGrowlReach : Reach;
     // A howl keeps its pitch, so it lasts exactly as long as the wolf holds its howl, and the mortar's, so its tap lands as the pestle comes down.
     private static bool KeepsPitch(string name) => IsHowl(name) || name == "grind_mortar";

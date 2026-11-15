@@ -857,7 +857,7 @@ Each play picks a variant other than the previous one with a small random pitch 
 
 A sound with a world position is heard by its distance from the player, whatever the zoom.
 It plays at full volume at the player and fades with the square of the distance left to its reach, where it is silent: half way there it plays at a quarter.
-The reach is 16 tiles, 30 for the growl of a wolf breaking into its sprint, which starts `WolfSightRange` away, and `HowlRadius` for a howl (`Sounds.ReachOf`).
+The reach is 16 metres, 30 for the growl of a wolf breaking into its sprint, which starts `WolfSightRange` away, and `HowlRadius` for a howl (`Sounds.ReachOf`).
 A sound with no position, such as the local player's footsteps or a hotbar click, plays at full volume.
 
 Sounds come from three places:
