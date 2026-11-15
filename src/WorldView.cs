@@ -316,13 +316,6 @@ public partial class WorldView : Node3D {
     public Vector2 Screen(Vector2 p) => Screen(p, 0);
     public Vector2 Screen(Vector2 p, float height) { SyncCamera(); return camera.UnprojectPosition(To3(p, height)); }
 
-    /// <summary>How far a world position lies outside the visible screen, in tiles; zero when on screen.</summary>
-    public float OffScreen(Vector2 p) {
-        var at = Screen(p); var rect = GetViewport().GetVisibleRect();
-        var outside = new Vector2(Math.Max(0, Math.Max(rect.Position.X - at.X, at.X - rect.End.X)), Math.Max(0, Math.Max(rect.Position.Y - at.Y, at.Y - rect.End.Y)));
-        return outside.Length() / PixelsPerUnit;
-    }
-
     public Vector2 ToWorld(Vector2 screen) {
         SyncCamera();
         var origin = camera.ProjectRayOrigin(screen); var direction = camera.ProjectRayNormal(screen);
@@ -703,7 +696,7 @@ public partial class WorldView : Node3D {
             _ => -1
         };
         if (impact < 0 || !actor.Struck(impact) || !props.TryGetValue(subject.Id, out var prop)) return;
-        // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips; the blow is still heard.
+        // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips.
         bool inSight = World.Sees(subject.Pos);
         if (inSight) prop.Shake = 1;
         // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.

@@ -182,6 +182,7 @@ Drop coins on it to pay in, or click it beside a trading post to take them out.
 
 The day dial in the top-right corner shows the sun crossing its arc from sunrise to sunset; then the moon crosses the same arc until dawn.
 A hit flashes red along the screen edges, and they pulse faintly while food or drink is under 15%.
+Your stomach growls as food falls under 20%, and again at 15%, 10% and 5%.
 
 Messages stack at the top of the screen, up to four at a time; each fades out after 7 seconds.
 A message repeated while it still shows restarts its time instead of stacking again, and a full stack drops the one closest to fading.
@@ -360,11 +361,11 @@ In multiplayer, every player must be downed before skipping.
 
 Fog of war covers the map.
 Ground you have never seen is black.
-You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 tiles), which fills the screen at full zoom-out.
+You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
 
 Ground you have seen before is greyed out and shows things as you last saw them: a tree felled out of sight still stands there until you look again.
 What changed while you were away shows as it now is when you come back, without playing the change: such a tree is already a stump, and a chest that was filled keeps its lid shut.
-Remembered fires and furnaces show unlit, wolves, workers and carts are not shown, and work out of sight neither shakes what it is done on nor throws chips, though it is still heard.
+Remembered fires and furnaces show unlit, wolves, workers and carts are not shown, and work out of sight neither shakes what it is done on nor throws chips.
 Explored ground and remembered things are kept in saves.
 
 ### The valley
@@ -867,10 +868,12 @@ Sound effects follow the same actions:
 - fires catch with a whoomp, including a lit torch and a furnace lighting a new batch, and a torch fizzles out;
 - a building knocks into place, and one taken down clatters apart;
 - buying jingles coins, and hiring signs the worker on;
+- your stomach growls when food runs low;
 - wolves howl when they smell you, growl as they break into a sprint, growl again as they close in, bite, and thud when struck.
 
 Repeated sounds rotate between variants.
-Sounds on screen play at full volume and fade out just past its edge, so zooming out lets you hear further.
+A sound is loudest at your character and fades with distance, to silence 16 metres away, whatever the zoom.
+A wolf's growl as it breaks into its sprint carries 30 metres, and a howl 80.
 
 Day and night have their own music, which crossfades as the time changes and picks up where it stopped last time.
 
@@ -888,8 +891,8 @@ Sound credits:
 
 - Kenney ([www.kenney.nl](https://www.kenney.nl))
 - Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com))
-- kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the intro
-  film's train and office recordings ([assets/README.md](assets/README.md#intro-film))
+- kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the digging,
+  the stomach growl and the intro film's train and office recordings ([assets/README.md](assets/README.md#intro-film))
 
 Music credits:
 
