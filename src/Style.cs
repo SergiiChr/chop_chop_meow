@@ -13,6 +13,8 @@ public static class Style {
     public static readonly Color Line = new("263849");
     public static readonly Color Rim = new("efe6d2");
     public static readonly Color Beige = new("e3d5b8");
+    /// <summary>A darker beige for a haul group, which sits on a beige well.</summary>
+    public static readonly Color GroupTint = new("d3c3a1");
     public static readonly Color SlotFill = new("f6f0e2");
     public static readonly Color Ink = new("4a3d2e");
     public static readonly Color Tan = new("6d5b45");
@@ -57,7 +59,7 @@ public static class Style {
     /// <summary>A job chip on a worker card: a small cream pill with a thin outline.</summary>
     public static readonly StyleBoxFlat Chip = Flat(SlotFill, 13, 2, Line, 2, horizontal: 8);
     /// <summary>A haul group's chip on a crew card.</summary>
-    public static readonly StyleBoxFlat GroupChip = Flat(new Color("d3c3a1"), 13, 2, Line, 2, horizontal: 8);
+    public static readonly StyleBoxFlat GroupChip = Flat(GroupTint, 13, 2, Line, 2, horizontal: 8);
     /// <summary>The ring a clickable well, such as a worker card, gets on hover.</summary>
     public static readonly StyleBoxFlat CardHover = Flat(Colors.Transparent, 14, 0, Mustard, 3);
     /// <summary>The trading post's price sign: beige enamel in a slate frame.</summary>
@@ -94,7 +96,7 @@ public static class Style {
     public static readonly StyleBoxFlat BarGrow = Flat(Sage, 7, 0);
     public static readonly StyleBoxEmpty None = new();
     /// <summary>A haul group's box in a worker's job list, and the same while a haul is dragged over it.</summary>
-    public static readonly StyleBoxFlat GroupWell = Flat(new Color("d3c3a1"), 12, 6, new Color("d3c3a1"), 3), GroupOver = Flat(new Color("d3c3a1"), 12, 6, Sage, 3);
+    public static readonly StyleBoxFlat GroupWell = Flat(GroupTint, 12, 6, GroupTint, 3), GroupOver = Flat(GroupTint, 12, 6, Sage, 3);
     /// <summary>The small cup on a job that shows what its place is set to make.</summary>
     public static readonly StyleBoxFlat MadeCup = Flat(SlotFill, 9, 3, new Color("b9a988"), 2);
     /// <summary>The ring round a job's number in the list.</summary>
@@ -145,8 +147,11 @@ public static class Style {
     public static void SkinPill(Button button, Color color) { var look = Pill(color); Skin(button, look.Item1, look.Item2); }
 
     /// <summary>Dark text on a check box that sits on a beige well.</summary>
-    public static void InkCheck(CheckBox box) {
-        foreach (var state in CheckStates) box.AddThemeColorOverride(state, Ink);
+    public static void InkCheck(CheckBox box) => InkText(box);
+
+    /// <summary>Dark text on a button that sits on a beige well, in every state.</summary>
+    public static void InkText(Button button) {
+        foreach (var state in CheckStates) button.AddThemeColorOverride(state, Ink);
     }
     private static readonly string[] CheckStates = { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color" };
 

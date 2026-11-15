@@ -76,14 +76,13 @@ public partial class JobList(UiKit kit, LiveUpdates live, Worker w) : VBoxContai
         add.TooltipText = "Hauls dragged into a group count as one job: the next load is picked across all their places";
         Style.Skin(add, Style.OutlinePill, Style.OutlinePillHover);
         add.AddThemeFontOverride("font", Style.Bold); add.AddThemeFontSizeOverride("font_size", 14);
-        foreach (string state in new[] { "font_color", "font_hover_color", "font_pressed_color", "font_hover_pressed_color" }) add.AddThemeColorOverride(state, Style.Ink);
+        Style.InkText(add);
         AddChild(add);
     }
 
     /// <summary>Adds a haul group's box with its own row and its hauls' rows; returns the place in the list of its last entry.</summary>
     private int AddGroup(int index, int number) {
-        int group = w.Duties[index].Group, last = index;
-        while (last + 1 < w.Duties.Count && World.Grouped(w.Duties[last + 1]) && w.Duties[last + 1].Group == group) last++;
+        int group = w.Duties[index].Group, last = World.GroupEnd(w.Duties, index) - 1;
         var box = new PanelContainer { Name = $"group_{group}" }; box.AddThemeStyleboxOverride("panel", Style.GroupWell);
         var inside = new VBoxContainer(); inside.AddThemeConstantOverride("separation", 2); box.AddChild(inside);
         AddChild(box);
@@ -196,15 +195,16 @@ public partial class JobList(UiKit kit, LiveUpdates live, Worker w) : VBoxContai
         var duty = w.Duties[dragged];
         int into = 0;
         if (duty.Job == "haul") foreach (var (group, parts) in groups) if (parts.Box.GetGlobalRect().HasPoint(at)) into = group;
-        foreach (var (group, parts) in groups) {
-            parts.Box.AddThemeStyleboxOverride("panel", group == into ? Style.GroupOver : Style.GroupWell);
-            parts.Hint.Visible = parts.Empty || group == into && duty.Group != group;
-        }
+        if (into != target.Group)
+            foreach (var (group, parts) in groups) {
+                parts.Box.AddThemeStyleboxOverride("panel", group == into ? Style.GroupOver : Style.GroupWell);
+                parts.Hint.Visible = parts.Empty || group == into && duty.Group != group;
+            }
         int before = w.Duties.Count; float y = GetGlobalRect().End.Y;
         if (into != 0) {
             // Among the group's hauls it lands where it is dropped; with none under it, at their end.
-            var box = groups[into].Box.GetGlobalRect();
-            before = rows.FindLastIndex(r => r.Group == into) is >= 0 and int tail ? rows[tail].Index + 1 : before; y = box.End.Y - 8;
+            foreach (var row in rows) if (row.Group == into && !row.Member) before = World.GroupEnd(w.Duties, row.Index);
+            y = groups[into].Box.GetGlobalRect().End.Y - 8;
             foreach (var row in rows) {
                 if (!row.Member || row.Group != into || at.Y >= row.Line.GetGlobalRect().GetCenter().Y) continue;
                 before = row.Index; y = row.Line.GetGlobalRect().Position.Y - 3;

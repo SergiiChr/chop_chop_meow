@@ -154,6 +154,9 @@ public sealed class Worker : IWalker {
     [JsonIgnore] public int Mark { get; set; }
     /// <summary>The carry a hauler is on the way to pick up.</summary>
     internal Carry Plan;
+    /// <summary>What the first job lacked when the worker last found nothing to do, and when on the world's clock they read their list again; a change to the list reads it at once.</summary>
+    [JsonIgnore] public string? Lacking { get; set; }
+    [JsonIgnore] public float ReadAgain { get; set; }
     /// <summary>The bag holds fuel for the destination's burner rather than ingredients.</summary>
     public bool Fueling { get; set; }
     /// <summary>The slot for the one tool a worker holds: taken from a tool station for the job in hand, or put there by a player.</summary>
@@ -1603,7 +1606,7 @@ public sealed partial class World {
     public void Assign(Worker w, Thing? target) {
         if (target?.Kind == ThingKind.Mine && !HasDuty(w, target.Id) && Crew(target) >= Data.Mine.Workers) { Say($"A mine has room for {Data.Mine.Workers} workers."); return; }
         if (Forwarded(Verb.Assign, target?.Id ?? 0, w.Id)) return;
-        w.Duties.Clear();
+        w.Duties.Clear(); w.ReadAgain = 0;
         if (target != null) foreach (string job in Jobs(target)) w.Duties.Add(NewDuty(target, job));
         // A resource has no listed jobs only by mistake; gathering is what a worker does there.
         if (target != null && w.Duties.Count == 0) w.Duties.Add(NewDuty(target, target.IsResource ? "gather" : "work"));
@@ -1616,6 +1619,7 @@ public sealed partial class World {
         if (Forwarded(Verb.Duty, target.Id, w.Id, job, on ? 1 : 0)) return;
         if (on) w.Duties.Add(NewDuty(target, job));
         else w.Duties.RemoveAll(d => d.Thing == target.Id && d.Job == job);
+        w.ReadAgain = 0;
         if (on && w.Duties.Count == 1 || !on && w.Assignment == target.Id && !HasDuty(w, target.Id)) Started(w, w.Duties.Count > 0 ? Find(w.Duties[0].Thing) : null);
     }
     private static Duty NewDuty(Thing place, string job) => new() { Thing = place.Id, Job = job, Kind = job == "gather" ? place.Kind : null };
@@ -1623,12 +1627,18 @@ public sealed partial class World {
     public const string HaulGroup = "group";
     /// <summary>Whether an entry in a worker's list is a haul in some haul group.</summary>
     public static bool Grouped(Duty d) => d.Group != 0 && d.Job != HaulGroup;
+    /// <summary>The place in a worker's list just past the last haul of the haul group whose own entry is at <paramref name="head"/>.</summary>
+    public static int GroupEnd(List<Duty> duties, int head) {
+        int end = head + 1;
+        while (end < duties.Count && Grouped(duties[end]) && duties[end].Group == duties[head].Group) end++;
+        return end;
+    }
     /// <summary>Adds an empty haul group to the end of a worker's jobs.</summary>
     public void AddHaulGroup(Worker w) {
         if (Forwarded(Verb.HaulGroup, other: w.Id, count: 1)) return;
         int last = 0;
         foreach (var d in w.Duties) last = Math.Max(last, d.Group);
-        w.Duties.Add(new Duty { Job = HaulGroup, Group = last + 1 });
+        w.Duties.Add(new Duty { Job = HaulGroup, Group = last + 1 }); w.ReadAgain = 0;
     }
     /// <summary>Takes a haul group apart: its hauls stay where they are in the list, as jobs of their own.</summary>
     public void RemoveHaulGroup(Worker w, int group) {
@@ -1637,6 +1647,7 @@ public sealed partial class World {
             if (w.Duties[i].Group != group) continue;
             if (w.Duties[i].Job == HaulGroup) w.Duties.RemoveAt(i); else w.Duties[i].Group = 0;
         }
+        w.ReadAgain = 0;
     }
     /// <summary>
     /// Moves one of a worker's jobs to another place in their list, which is the order the jobs come first in.
@@ -1650,25 +1661,24 @@ public sealed partial class World {
         if ((uint)index >= (uint)w.Duties.Count) return;
         var duty = w.Duties[index];
         if (Forwarded(Verb.MoveDuty, duty.Thing, w.Id, duty.Job, index, new Vector2(before, group))) return;
-        int length = 1;
-        if (duty.Job == HaulGroup) while (index + length < w.Duties.Count && Grouped(w.Duties[index + length]) && w.Duties[index + length].Group == duty.Group) length++;
+        int length = duty.Job == HaulGroup ? GroupEnd(w.Duties, index) - index : 1;
         before = Math.Clamp(before, 0, w.Duties.Count);
         if (before > index && before < index + length) return;
         var moved = w.Duties.GetRange(index, length);
         w.Duties.RemoveRange(index, length);
         if (before > index) before -= length;
-        int head = duty.Job == "haul" && group != 0 ? w.Duties.FindIndex(d => d.Job == HaulGroup && d.Group == group) : -1;
+        int head = duty.Job == "haul" ? w.Duties.FindIndex(d => d.Job == HaulGroup && d.Group == group) : -1;
         if (head >= 0) {
             // Inside the group it lands where it was dropped; dropped elsewhere it goes to the group's end.
-            int end = head + 1;
-            while (end < w.Duties.Count && Grouped(w.Duties[end]) && w.Duties[end].Group == group) end++;
-            duty.Group = group; before = before > head && before <= end ? before : end;
+            int end = GroupEnd(w.Duties, head);
+            duty.Group = group;
+            if (before <= head || before > end) before = end;
         } else {
             if (duty.Job != HaulGroup) duty.Group = 0;
             // A job never lands among the hauls of a group it is not in: it goes after them.
             while (before < w.Duties.Count && Grouped(w.Duties[before])) before++;
         }
-        w.Duties.InsertRange(before, moved);
+        w.Duties.InsertRange(before, moved); w.ReadAgain = 0;
     }
     /// <summary>The place a worker's job is at: the place itself, or for a gather job whose spot is gone, a stand-in of its kind.</summary>
     public Thing? DutyPlace(Worker w, int place) {

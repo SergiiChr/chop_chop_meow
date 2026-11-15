@@ -29,12 +29,7 @@ internal sealed class ChainSite(World world) {
     public void Store(string item) => Place(ThingKind.Chest).Inventory.InputFilter.Add(item);
 
     /// <summary>Adds a worker at a building with the given duties.</summary>
-    public Worker Employ(Thing place, params string[] jobs) {
-        var w = AddWorker(world, place.Pos + new Vector2(0, 1.2f));
-        w.Wage = 18;
-        foreach (string job in jobs) world.SetDuty(w, place, job, true);
-        return w;
-    }
+    public Worker Employ(Thing place, params string[] jobs) => Staff(world, place, jobs);
 
     /// <summary>
     /// The player's cabin far away, the trading post that sells each product by cart, the tool rack and a fire.

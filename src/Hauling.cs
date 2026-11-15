@@ -40,14 +40,7 @@ public sealed partial class World {
         var c = w.Plan;
         // The job in hand is the haul at the place the carry is for, also when a haul group picked it.
         w.Assignment = place.Id; w.Job = "haul";
-        w.Status = c.From == c.To ? Phrase("Sowing back ", Data.Name(c.Item))
-            : c.Clears ? Phrase("Fetching ", Lower(Data.Name(c.Item)), "s for leftover ", Lower(Data.Name(Data.VesselOf(c.Item)!.Liquid)))
-            : c.Box == CarryBox.Burner ? Phrase("Clearing ", Lower(Data.Name(c.Item)), " from the fire")
-            // Every packed crate has a name of its own, so the status names none.
-            : c.From == place ? c.Item.StartsWith(PackedPrefix) ? "Carrying out a packed crate" : Phrase("Carrying out ", Data.Name(c.Item))
-            : c.Fuel ? Phrase("Fetching ", Data.Name(c.Item), " for the fire")
-            : place.Kind == ThingKind.Mine ? Phrase("Fetching ", Data.Name(c.Item), " for the ", MineName(place))
-            : Phrase("Fetching ", Data.Name(c.Item));
+        w.Status = CarryStatus(c, place);
         if (!Walk(w, c.From!.Pos, dt)) return true;
         var box = BoxOf(c);
         // Seed from a plot's own harvest goes straight back into its input slots.
@@ -55,6 +48,17 @@ public sealed partial class World {
         else { box.TransferTo(w.Bag, c.Item, c.Count, true); w.Destination = c.To!.Id; w.Fueling = c.Fuel; }
         w.Plan = default;
         return true;
+    }
+
+    /// <summary>What a hauler on the way to pick up a carry says.</summary>
+    private string CarryStatus(in Carry c, Thing place) {
+        if (c.From == c.To) return Phrase("Sowing back ", Data.Name(c.Item));
+        if (c.Clears) return Phrase("Fetching ", Lower(Data.Name(c.Item)), "s for leftover ", Lower(Data.Name(Data.VesselOf(c.Item)!.Liquid)));
+        if (c.Box == CarryBox.Burner) return Phrase("Clearing ", Lower(Data.Name(c.Item)), " from the fire");
+        // Every packed crate has a name of its own, so the status names none.
+        if (c.From == place) return c.Item.StartsWith(PackedPrefix) ? "Carrying out a packed crate" : Phrase("Carrying out ", Data.Name(c.Item));
+        if (c.Fuel) return Phrase("Fetching ", Data.Name(c.Item), " for the fire");
+        return place.Kind == ThingKind.Mine ? Phrase("Fetching ", Data.Name(c.Item), " for the ", MineName(place)) : Phrase("Fetching ", Data.Name(c.Item));
     }
 
     private static Inventory BoxOf(in Carry c) => c.Box switch { CarryBox.Output => c.From!.Output!, CarryBox.Burner => c.From!.Burner!, _ => c.From!.Inventory };
@@ -66,10 +70,12 @@ public sealed partial class World {
 
     /// <summary>What a hauler with nothing to carry says: what the place lacks, or for a haul group its first place.</summary>
     private string HaulWait(Worker w, Duty duty) {
-        if (duty.Group == 0) return Find(duty.Thing) is Thing only ? HaulWait(only) : "Waiting for the next load";
-        foreach (var d in w.Duties) if (Grouped(d) && d.Group == duty.Group && Find(d.Thing) is Thing member) return HaulWait(member);
-        return "No hauls in this group";
+        foreach (var d in w.Duties) if (Covers(duty, d) && Find(d.Thing) is Thing place) return HaulWait(place);
+        return duty.Group == 0 ? "Waiting for the next load" : "No hauls in this group";
     }
+
+    /// <summary>Whether a haul job covers one of a worker's entries: itself, or for a haul group every haul in the group.</summary>
+    private static bool Covers(Duty job, Duty entry) => job.Group == 0 ? entry == job : Grouped(entry) && entry.Group == job.Group;
 
     private string HaulWait(Thing place) => place.Kind switch {
         ThingKind.Mine when place.MineStage == MineStage.Dug => MineWants(place),
@@ -82,8 +88,7 @@ public sealed partial class World {
     /// <summary>The best carry across a haul job's places: one place, or every place of its haul group.</summary>
     private Carry NextCarry(Worker w, Duty duty) {
         Carry best = default;
-        if (duty.Group == 0) { if (Find(duty.Thing) is Thing only) Carries(w, only, ref best); } else
-            foreach (var d in w.Duties) if (Grouped(d) && d.Group == duty.Group && Find(d.Thing) is Thing member) Carries(w, member, ref best);
+        foreach (var d in w.Duties) if (Covers(duty, d) && Find(d.Thing) is Thing place) Carries(w, place, ref best);
         return best;
     }
 

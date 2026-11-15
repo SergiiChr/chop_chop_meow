@@ -746,7 +746,8 @@ The worker keeps to it (`Worker.Engaged`) for one round, then the list is read a
 - a crafted batch, a furnace batch at the bellows, a crate packed full, a piece mined, a harvest and a mine building stage end it for the others, counted by the place (`Thing.Rounds`, `Worker.Mark`).
 
 A job with nothing to do sets the status to what it lacks.
-With none to do the worker waits at the nearest trading post (`World.Idle`) and shows the first job's status.
+With none to do the worker waits at the nearest trading post (`World.Idle`), shows the first job's status and reads the list again every `JobListSeconds`, or at once when the list changes.
+A tool none of their jobs uses goes back to a tool station first (`World.JobUses`).
 `World.MoveDuty` moves a job to another place in the list.
 
 On a worker's page `JobList` draws the list and turns a row dragged by its `JobGrip` into a `MoveDuty`; each row shows what its place is set to make (`JobList.Made`).

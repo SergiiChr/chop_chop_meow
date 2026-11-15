@@ -68,8 +68,8 @@ public partial class CrewPanel(PageTools tools) : WorkerPage(tools) {
         for (int i = 0; i < w.Duties.Count; i++) {
             var d = w.Duties[i];
             if (d.Job == World.HaulGroup) {
-                var hauls = w.Duties.Skip(i + 1).TakeWhile(h => World.Grouped(h) && h.Group == d.Group).ToList();
-                chips.AddChild(GroupChip(++number, hauls.Select(h => world.DutyPlace(w, h.Thing)).OfType<Thing>().ToList())); i += hauls.Count;
+                int end = World.GroupEnd(w.Duties, i);
+                chips.AddChild(GroupChip(++number, w.Duties.Take(end).Skip(i + 1).Select(h => world.DutyPlace(w, h.Thing)).OfType<Thing>().ToList())); i = end - 1;
             } else if (world.DutyPlace(w, d.Thing) is Thing at) chips.AddChild(DutyChip(++number, at, d.Job));
         }
         if (number == 0) chips.AddChild(Style.Pill("No jobs", Style.Tag(Style.Tan), Style.Rim, 12));
@@ -121,13 +121,13 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
         var slots = new HBoxContainer(); slots.AddThemeConstantOverride("separation", 14); well.AddChild(slots);
         var toolColumn = new VBoxContainer { Name = "tool" }; toolColumn.AddThemeConstantOverride("separation", 6); slots.AddChild(toolColumn);
         toolColumn.AddChild(Style.WellLabel("Tool"));
-        toolColumn.AddChild(NewInventoryGrid(() => w.ToolSlot, null, id => Take(w.ToolSlot, id), $"{StationSlots.SlotHint}\nPut a tool here to give it to them",
+        toolColumn.AddChild(NewInventoryGrid(() => w.ToolSlot, null, id => moves.Stack(w.ToolSlot, world.S.Backpack, id), $"{StationSlots.SlotHint}\nPut a tool here to give it to them",
             held => held.Stack is HeldStack stack && world.Data.Items.TryGetValue(stack.Item, out var def) && def.Tool != "", columns: 1, size: 46));
         slots.AddChild(new VSeparator());
         var hands = new VBoxContainer { Name = "hands", SizeFlagsHorizontal = SizeFlags.ExpandFill }; hands.AddThemeConstantOverride("separation", 6); slots.AddChild(hands);
         var carrying = Style.WellLabel(""); hands.AddChild(carrying);
         live.Bind(carrying, text => text.Append("Carrying ").Append(w.Bag.Count).Append(" of ").Append(Worker.BagStack));
-        hands.AddChild(NewInventoryGrid(() => w.Bag, null, id => Take(w.Bag, id), $"{StationSlots.SlotHint}\nPut a stack here and they carry it to where it goes", columns: 6, size: 46));
+        hands.AddChild(NewInventoryGrid(() => w.Bag, null, id => moves.Stack(w.Bag, world.S.Backpack, id), $"{StationSlots.SlotHint}\nPut a stack here and they carry it to where it goes", columns: 6, size: 46));
         var status = Style.Text("", 15, Style.Ink, wrap: true); well.AddChild(status);
         var owed = Style.Text("", 13, Style.Brick, Style.Bold); well.AddChild(owed);
         live.Watch(() => w.Status, shown => status.Text = shown);
@@ -141,9 +141,6 @@ public partial class WorkerPanel(PageTools tools, Worker? w) : WorkerPage(tools)
         buttons.AddChild(kit.BigButton("Clear jobs", Style.Enamel, () => world.Assign(w, null)));
         buttons.AddChild(kit.BigButton("Dismiss", Style.Brick, () => { world.Fire(w); panel.Open(Page.Crew); }));
         if (w.WageDebt > 0) AddChild(kit.BigButton("Pay outstanding wages", Style.Mustard, () => world.SettleDebt(w)));
-        BagGrid(id => world.Transfer(world.S.Backpack, w.Bag, id, ItemMoves.Amount(world.S.Backpack, id)), $"{BagHint}\nShift: give a stack · Ctrl: all of it");
+        BagGrid(id => moves.Stack(world.S.Backpack, w.Bag, id), $"{BagHint}\nShift: give a stack · Ctrl: all of it");
     }
-
-    /// <summary>A Ctrl- or Shift-click on what a worker carries or holds: the stack clicked, or all of the item with Ctrl, goes to the backpack.</summary>
-    private void Take(Inventory from, string item) => world.Transfer(from, world.S.Backpack, item, ItemMoves.Amount(from, item));
 }

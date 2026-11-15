@@ -21,6 +21,8 @@ public sealed partial class World {
             w.Loading = false;
             if (w.Bag.Count > 0) { Deliver(w, dt); return; }
         }
+        // With nothing to do, the list is read again a few times a second rather than on every tick.
+        if (S.Time < w.ReadAgain) { Idle(w, w.Lacking, dt); return; }
         string? lacking = null;
         for (int i = 0; i < w.Duties.Count; i++) {
             var duty = w.Duties[i];
@@ -30,8 +32,12 @@ public sealed partial class World {
             if (Do(w, duty, dt)) { w.Engaged = true; w.Mark = Rounds(duty); return; }
             lacking ??= w.Status;
         }
+        w.Lacking = lacking; w.ReadAgain = S.Time + JobListSeconds;
         Idle(w, lacking, dt);
     }
+
+    /// <summary>Seconds a worker with nothing to do waits before reading their job list again.</summary>
+    private const float JobListSeconds = .25f;
 
     /// <summary>The job a worker has in hand, or null when it has left their list.</summary>
     private static Duty? JobInHand(Worker w) {
@@ -107,7 +113,10 @@ public sealed partial class World {
         if (!Walk(w, dest.Pos, dt)) return;
         // Every vessel carried pours, whatever it holds; the vessels stay in hand, emptier.
         if (PoursInto(dest, into, item) is VesselDef pours) PourLiters(w.Bag, into, pours, InputRoom(dest, item));
-        else if (FuelSplit(dest, item, w.Bag[item]) is (int fuel, int input)) { w.Bag.TransferTo(dest.Burner!, item, fuel, true); w.Bag.TransferTo(dest.Inventory, item, input, true); } else w.Bag.TransferTo(into, item, Math.Min(w.Bag[item], RoomFor(dest, into, item)), true);
+        else if (FuelSplit(dest, item, w.Bag[item]) is (int fuel, int input)) {
+            w.Bag.TransferTo(dest.Burner!, item, fuel, true);
+            w.Bag.TransferTo(dest.Inventory, item, input, true);
+        } else w.Bag.TransferTo(into, item, Math.Min(w.Bag[item], RoomFor(dest, into, item)), true);
         w.Destination = 0;
         if (w.Bag.Count == 0) { w.Fueling = false; w.Engaged = false; }
     }

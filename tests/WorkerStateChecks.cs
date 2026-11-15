@@ -156,7 +156,8 @@ public static class WorkerStateChecks {
         var bush = world.Add(ThingKind.Berries, at + new Vector2(-4, -2), 6);
         world.Tick(0);
         raker.Duties.Add(new Duty { Thing = raked.Id, Job = "gather" }); raker.Duties.Add(new Duty { Thing = bush.Id, Job = "gather" }); raker.Assignment = raked.Id;
-        world.Tick(.1f); world.Tick(.1f);
+        // A worker with nothing to do reads their list again a quarter of a second later.
+        for (int i = 0; i < 4; i++) world.Tick(.1f);
         Require(raker.Assignment == bush.Id && raker.Duties.Count == 2, "a worker who knows no other raked patch should go on to their other job and keep the patch");
     }
 

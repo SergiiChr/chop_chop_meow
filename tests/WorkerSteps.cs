@@ -136,8 +136,8 @@ internal static class WorkerSteps {
         for (int i = 0; i < worker.Duties.Count; i++) {
             var d = worker.Duties[i];
             if (d.Job != World.HaulGroup) { parts.Add($"{d.Job}@{d.Thing}"); continue; }
-            var hauls = worker.Duties.Skip(i + 1).TakeWhile(World.Grouped).Select(h => $"{h.Job}@{h.Thing}").ToList();
-            parts.Add($"group[{string.Join(" ", hauls)}]"); i += hauls.Count;
+            int end = World.GroupEnd(worker.Duties, i);
+            parts.Add($"group[{string.Join(" ", worker.Duties.Take(end).Skip(i + 1).Select(h => $"{h.Job}@{h.Thing}"))}]"); i = end - 1;
         }
         return string.Join(" ", parts);
     }
