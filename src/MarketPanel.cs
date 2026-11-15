@@ -138,7 +138,7 @@ public partial class MarketPanel(PageTools tools, Thing subject) : ThingPage(too
             var trend = Style.Text("", 18, Style.Brick, Style.Head); trend.CustomMinimumSize = new Vector2(20, 0); trend.HorizontalAlignment = HorizontalAlignment.Center; sellColumn.AddChild(trend);
             if (sells) {
                 live.Watch(() => (int)MathF.Round(world.KnownPrice(id) * 10), tenths => {
-                    float known = world.KnownPrice(id), full = world.Data.Items[id].Price;
+                    float known = world.KnownPrice(id), full = world.Data.Market.Goods[id].Price;
                     sellPrice.Text = $"{tenths / 10}.{tenths % 10}";
                     // Below its full price the village has had its fill; the arrow shows which way the price stands.
                     trend.Text = known < full * .99f ? "↘" : known > full * 1.01f ? "↗" : "";

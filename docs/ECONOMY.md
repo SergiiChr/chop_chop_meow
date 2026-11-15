@@ -7,7 +7,7 @@ To tune: change the data, run the tests, and read those lines before and after.
 
 ## 1. Prices and whole chains
 
-Only the goods the village buys or sells, and the crate they travel in, have a `Price`; the game refuses to start with a price on anything else.
+Prices live only in the market: each good the village trades has its `Price` in `Market.Goods`, and the crate has `Market.CratePrice`, so nothing else can have one.
 A good in the middle of a chain, such as flour, dough or an iron bar, has no value of its own.
 A good is judged by its whole chain: every step from the ground up against what a crate of it sells for.
 
@@ -70,7 +70,7 @@ A starter crew of one worker per job (ore, coal, wood, stone furnace, reinforced
 
 ## 3. Demand
 
-Each good the village takes has `Daily`, `Steady` and `Drop` in `Market.Sells`:
+Each good the village takes has `Daily`, `Steady` and `Drop` in its `Sells` entry in `Market.Goods`:
 
 - A sale pays every unit at the price before it, so selling in bulk loses nothing; the sale then lowers the price.
 - The first `Steady` units sold keep the full price. Past them, each crate's worth sold takes `Drop` off the full price, down to a quarter of it.

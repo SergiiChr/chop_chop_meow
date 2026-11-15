@@ -86,11 +86,11 @@ public static class EconomyChecks {
             var post = fresh.Add(ThingKind.Signpost, new Vector2(20, 20));
             fresh.Player = post.Pos;
             int crates = (demand.Steady + data.CrateCapacity - 1) / data.CrateCapacity;
-            int full = (int)MathF.Floor(demand.Steady * data.Items[item].Price + crates * data.Items["crate"].Price);
-            Require(Sell(fresh, post, new() { [item] = demand.Steady }) == full && fresh.UnitPrice(item, false) == data.Items[item].Price,
+            int full = (int)MathF.Floor(demand.Steady * data.Market.Goods[item].Price + crates * data.Market.CratePrice);
+            Require(Sell(fresh, post, new() { [item] = demand.Steady }) == full && fresh.UnitPrice(item, false) == data.Market.Goods[item].Price,
                     $"the steady amount of {item} should sell at the full price");
             Sell(fresh, post, new() { [item] = data.CrateCapacity });
-            Require(fresh.UnitPrice(item, false) < data.Items[item].Price, $"selling {item} past its steady amount should lower the price");
+            Require(fresh.UnitPrice(item, false) < data.Market.Goods[item].Price, $"selling {item} past its steady amount should lower the price");
         }
     }
 

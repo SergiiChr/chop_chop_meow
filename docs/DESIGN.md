@@ -825,6 +825,8 @@ Prices, wages and demand follow the rules in [ECONOMY.md](ECONOMY.md).
 #### Market
 
 The market accepts any packed crate.
+`Market.Goods` lists every good the village trades with its price: a `Sells` entry for one it takes, a `Buys` lot for one it sells.
+The game gathers them into `Market.Sells` and `Market.Buys` when it starts.
 Goods outside `Market.Sells` are donated: they pay nothing and leave demand alone.
 The returning cart names them.
 A sale pays for every unit of its contents at the pre-sale price, plus the crates.

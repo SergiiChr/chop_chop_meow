@@ -1259,7 +1259,7 @@ public sealed partial class World {
         return cabin.Pos + Vector2.Down * (Footprint(ThingKind.Hut) + .6f);
     }
     // Only sales move demand, and purchases always cost more than the best sale price, so a buy-then-sell round trip never profits.
-    public float UnitPrice(string item, bool buying) => Data.Items[item].Price * (buying ? 1.25f : Math.Min(1, Demand(item)));
+    public float UnitPrice(string item, bool buying) => Data.Market.Goods[item].Price * (buying ? 1.25f : Math.Min(1, Demand(item)));
     // Demand runs above 1 by the steady amount's worth, so those units sell at the full price; past it, each unit takes a share of a crate's drop.
     private float DemandStep(string item) => Data.Market.Sells[item].Drop / Data.CrateCapacity;
     private float FullDemand(string item) => Data.Market.Sells.TryGetValue(item, out var demand) ? 1 + demand.Steady * DemandStep(item) : 1;
@@ -1267,7 +1267,7 @@ public sealed partial class World {
     /// <summary>Units in one purchase of a good the village sells; more than one arrive packed in a crate.</summary>
     public int Lot(string item) => Data.Market.Buys.GetValueOrDefault(item, 1);
     /// <summary>The whole coins one purchase costs, crate included for boxed goods.</summary>
-    public int LotPrice(string item) => (int)MathF.Ceiling(1.25f * (Data.Items[item].Price * Lot(item) + (Lot(item) > 1 ? Data.Items["crate"].Price : 0)));
+    public int LotPrice(string item) => (int)MathF.Ceiling(1.25f * (Data.Market.Goods[item].Price * Lot(item) + (Lot(item) > 1 ? Data.Market.CratePrice : 0)));
     public const int MarketSlots = 6;
     /// <summary>Tools a tool station holds, one in each slot and any kind in any of them.</summary>
     public const int ToolSlots = 4;
@@ -1316,7 +1316,7 @@ public sealed partial class World {
     public bool CanSell(string item) => Packed(item) is { Count: > 0 };
     private bool VillageBuys(string item) => Data.Market.Sells.ContainsKey(item);
     /// <summary>The sale price as last reported from the village; it goes stale until someone arrives with news.</summary>
-    public float KnownPrice(string item) => S.Prices.TryGetValue(item, out float price) ? price : Data.Items[item].Price;
+    public float KnownPrice(string item) => S.Prices.TryGetValue(item, out float price) ? price : Data.Market.Goods[item].Price;
     public int PriceAge => Day - (int)(S.PricesTime / Data.DaySeconds) - 1;
     private void UpdatePrices() {
         S.Prices = Data.Market.Sells.Keys.ToDictionary(item => item, item => UnitPrice(item, false)); S.PricesTime = S.Time;
@@ -1347,7 +1347,7 @@ public sealed partial class World {
     }
     /// <summary>What a sale pays at the given unit prices: every unit of a good the village takes, plus the crates, which go with the goods.</summary>
     public float SaleValue(Dictionary<string, int> goods, int crates, Func<string, float> price) =>
-        crates * Data.Items["crate"].Price + goods.Where(p => VillageBuys(p.Key)).Sum(p => p.Value * price(p.Key));
+        crates * Data.Market.CratePrice + goods.Where(p => VillageBuys(p.Key)).Sum(p => p.Value * price(p.Key));
     private bool Ship(Thing sign) {
         var crates = sign.Inventory.Items.Keys.Where(CanSell).ToList();
         if (crates.Count == 0) return false;

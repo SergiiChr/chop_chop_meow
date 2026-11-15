@@ -19,7 +19,7 @@ internal static class EconomySteps {
     }
 
     /// <summary>What a full crate of a good sells for at the full price, the crate included.</summary>
-    public static float CrateSells(GameData data, string item) => data.CrateCapacity * data.Items[item].Price + data.Items["crate"].Price;
+    public static float CrateSells(GameData data, string item) => data.CrateCapacity * data.Market.Goods[item].Price + data.Market.CratePrice;
 
     /// <summary>Recipe steps from gathered materials: raw goods are 0, and a recipe is one more than its deepest input.</summary>
     public static int Depth(GameData data, string item) =>
