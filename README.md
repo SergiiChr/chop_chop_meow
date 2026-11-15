@@ -724,6 +724,23 @@ A worker gathering a resource moves on to the next nearest spot of the same kind
 They only go to spots a player has seen, even if fog hides them now.
 With no other spot known they say so and go on to their other jobs, or wait at the trading post.
 
+### Worker page
+
+Clicking a worker, or their card in the crew overview, opens their page.
+
+- **Hands and tool.** The page shows what they carry, 12 items in all, and the tool they hold in a slot of its own.
+  While you stand within reach, these slots work like a building's: left click picks a stack up, right click half, Shift or Ctrl sends it to the backpack.
+  A stack put on their hands is theirs to carry to where it goes.
+  Only a tool goes into the tool slot, and a tool the job in hand has no use for goes back to a tool station.
+- **Jobs.** Each job is a row with its number in the order, its place, what the place is set to make, mine, pack or grow, and a button to take the job away.
+  Drag a row by its grip to move it up or down the order.
+- **Haul groups.** "New haul group" adds an empty group at the end of the list.
+  Drag haul jobs into it, or out again, by their grip.
+  A group takes one place in the order, and its next load is picked by the [hauling](#hauling) rules across all its places.
+  Its close button takes the group apart and leaves its hauls as jobs of their own.
+
+The crew overview shows each worker's jobs as numbered chips in that order, with a haul group as one chip holding its places.
+
 ### Daily routine
 
 - Workers break for an hour of lunch at noon, sitting around the campfire closest to the crew.

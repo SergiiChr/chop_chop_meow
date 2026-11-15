@@ -9,6 +9,9 @@ public enum FarmStage { Fallow, Growing, Ripe }
 
 /// <summary>Farm plots: sown with seeds and fertilizer, growing wheat for days, then harvested by hand with shared progress.</summary>
 public sealed partial class World {
+    /// <summary>What a farm plot grows: the first item of its yield.</summary>
+    public string Crop => crop ??= Data.Farm.Yield.Keys.First();
+    private string? crop;
     public float GrowSeconds => Data.Farm.GrowDays * Data.DaySeconds;
     public float HarvestSeconds => Data.Farm.HarvestWorkdays * Data.WorkdaySeconds;
 

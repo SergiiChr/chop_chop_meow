@@ -263,6 +263,98 @@ public partial class Game {
         await Frames();
     }
 
+    /// <summary>A bench with a worker on Craft and Haul there, whose page is open; the worker owes wages, so they stand still for the check.</summary>
+    private async Task<(Thing Bench, Worker Worker)> OpenBenchWorkerPage() {
+        await CloseWithEsc();
+        var bench = Hosted.Add(ThingKind.Bench, world.Player + new Vector2(-2, 0));
+        Hosted.SetRecipe(bench, "planks");
+        var worker = AddWorker(Hosted, world.Player + Vector2.One); Hosted.Assign(worker, bench);
+        worker.WageDebt = 5;
+        await KeyStroke(Key.H); await Click(Named($"crew_{worker.Id}")!);
+        await Until(() => OnPage("job_1") != null, "the worker's page listing both jobs", 2);
+        return (bench, worker);
+    }
+
+    private async Task CloseWorkerPage(Thing bench, Worker worker) {
+        await CloseWithEsc();
+        Hosted.Fire(worker); RemoveThings(Hosted, t => t == bench || t.Kind == ThingKind.Grave);
+        await Frames();
+    }
+
+    private async Task CheckWorkerPageShowsWhatEachPlaceIsSetToMake() {
+        var (bench, worker) = await OpenBenchWorkerPage();
+        Texture2D? Made() => OnPage($"made_{bench.Id}") is { Visible: true } cup ? cup.GetChild<TextureRect>(0).Texture : null;
+        await Until(() => Made() == Icons.Of("planks"), "the bench's jobs showing planks", 2);
+        Hosted.SetRecipe(bench, "crate");
+        await Until(() => Made() == Icons.Of("crate"), "the bench's jobs following it to crates", 2);
+        await CloseWorkerPage(bench, worker);
+    }
+
+    private async Task CheckDraggingAJobBelowAnotherMakesItComeAfter() {
+        var (bench, worker) = await OpenBenchWorkerPage();
+        float Row(string job) => Named($"drop_{job}_{bench.Id}")!.GlobalPosition.Y;
+        Require(Row("craft") < Row("haul"), "A worker put on a bench must list Craft before Haul.");
+        var held = await HoldOver(await At(OnPage("grip_0")!), await AtFoot(Named($"drop_haul_{bench.Id}")!));
+        Require(OnPage("drop_mark") is { Visible: true } mark && mark.GlobalPosition.Y > Row("haul") && OnPage("lifted") != null,
+            "A job dragged by its grip must follow the mouse and mark where it would land.");
+        await LetGo(held);
+        await Until(() => OnPage("lifted") == null && Named($"drop_haul_{bench.Id}") != null && Row("haul") < Row("craft"), "the craft job landing below the haul job", 2);
+        await CloseWorkerPage(bench, worker);
+    }
+
+    private async Task CheckAHaulDragsIntoAHaulGroupAndStaysWhenItIsTakenApart() {
+        var (bench, worker) = await OpenBenchWorkerPage();
+        await Click(Named("new_group")!);
+        await Until(() => OnPage("group_1") != null, "the new haul group's box", 2);
+        Require(HasLabel(OnPage("group_1")!, "Drag haul jobs here"), "A new haul group must say what to do with it.");
+        var held = await HoldOver(await At(OnPage("grip_1")!), await At(OnPage("group_1")!));
+        await LetGo(held);
+        await Until(() => OnPage("group_1")?.FindChild($"drop_haul_{bench.Id}", true, false) != null, "the haul showing inside the group", 2);
+        Require(HasLabel(OnPage("group_1")!, "1 place"), "A haul group must count its places.");
+        await Click(Named("ungroup_1")!);
+        await Until(() => OnPage("group_1") == null && Named($"drop_haul_{bench.Id}") != null, "the group gone and its haul back as a job of its own", 2);
+        await CloseWorkerPage(bench, worker);
+    }
+
+    private async Task CheckAJobBelowAHaulGroupDragsIntoIt() {
+        var (bench, worker) = await OpenBenchWorkerPage();
+        var anvil = Hosted.Add(ThingKind.Anvil, world.Player + new Vector2(-4, 0));
+        Hosted.SetDuty(worker, anvil, "craft", true); Hosted.SetDuty(worker, anvil, "haul", true);
+        await Until(() => OnPage("job_3") != null, "the worker's page listing the anvil's jobs", 2);
+        await Click(Named("new_group")!);
+        await Until(() => OnPage("group_1") != null, "the new haul group's box", 2);
+        await LetGo(await HoldOver(await At(OnPage("grip_1")!), await At(OnPage("group_1")!)));
+        await Until(() => OnPage("group_1")?.FindChild($"drop_haul_{bench.Id}", true, false) != null, "the bench's haul showing inside the group", 2);
+        // The group goes above the anvil's haul, which is then the row right under its box.
+        await LetGo(await HoldOver(await At(OnPage("grip_3")!), await AtFoot(Named($"drop_craft_{anvil.Id}")!)));
+        await Until(() => OnPage("group_1") is Control box && Named($"drop_haul_{anvil.Id}") is Button below && box.GlobalPosition.Y < below.GlobalPosition.Y, "the group landing above the anvil's haul", 2);
+        var held = await HoldOver(await At(OnPage("grip_4")!), await At(OnPage("group_1")!));
+        Require(OnPage("lifted") != null, "A job right under a haul group must lift onto the mouse like any other.");
+        await LetGo(held);
+        await Until(() => OnPage("group_1")?.FindChild($"drop_haul_{anvil.Id}", true, false) != null, "the anvil's haul showing inside the group", 2);
+        RemoveThings(Hosted, t => t == anvil);
+        await CloseWorkerPage(bench, worker);
+    }
+
+    private async Task CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage() {
+        var (bench, worker) = await OpenBenchWorkerPage();
+        worker.Bag.Add("planks", 5); worker.Tool = "steel_axe";
+        int planks = world.Backpack["planks"], axes = world.Backpack["steel_axe"];
+        // The page's first grid is the tool slot and its second the worker's hands.
+        await PickUp(await Showing(1, c => c.TooltipText.StartsWith("Wood planks ·", StringComparison.Ordinal)));
+        await Click(BagCell(c => c.Visible && c.Icon == null));
+        await Until(() => cursor.Empty && world.Backpack["planks"] == planks + 5 && Cells(1).All(c => c.Icon == null), "the worker's planks landing in the backpack", 2);
+        await PickUp(await Showing(0, c => c.TooltipText.StartsWith("Steel axe ·", StringComparison.Ordinal)));
+        await Click(BagCell(c => c.Visible && c.Icon == null));
+        await Until(() => cursor.Empty && world.Backpack["steel_axe"] == axes + 1 && Cells(0).All(c => c.Icon == null), "the worker's axe landing in the backpack", 2);
+        await PickUp(BagCell(c => c.TooltipText.StartsWith("Wood planks ·", StringComparison.Ordinal)));
+        await Click(Cells(0).First());
+        Require(!cursor.Empty && Cells(0).All(c => c.Icon == null), "A worker's tool slot must not take planks.");
+        await Click(Cells(1).First(c => c.Visible));
+        await Until(() => cursor.Empty && Cells(1).Any(c => c.TooltipText.StartsWith("Wood planks ·", StringComparison.Ordinal)), "the planks going into the worker's hands", 2);
+        await CloseWorkerPage(bench, worker);
+    }
+
     private async Task CheckWorkerPageFollowsItsJobs() {
         await CloseWithEsc();
         var forge = Hosted.Add(ThingKind.Reinforced, world.Player + new Vector2(-2, 0));
@@ -2000,6 +2092,11 @@ public partial class Game {
             await Test(CheckTickBoxesFollowTheServer);
             await Test(CheckLoadRemembersWhatIsOutOfSight);
             await Test(CheckWorkerPageFollowsItsJobs);
+            await Test(CheckWorkerPageShowsWhatEachPlaceIsSetToMake);
+            await Test(CheckDraggingAJobBelowAnotherMakesItComeAfter);
+            await Test(CheckAHaulDragsIntoAHaulGroupAndStaysWhenItIsTakenApart);
+            await Test(CheckAJobBelowAHaulGroupDragsIntoIt);
+            await Test(CheckAWorkersLoadAndToolAreTakenAndGivenOnTheirPage);
             await Test(CheckCratePutIntoCrateStopsAtWarning);
             RemoveCheckFiles();
             await Test(CheckRestartBuildsFreshModelsForReusedIds);

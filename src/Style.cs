@@ -56,6 +56,8 @@ public static class Style {
     public static readonly StyleBoxFlat GoalTodo = Flat(Beige, 12, 0, Tan, 3);
     /// <summary>A job chip on a worker card: a small cream pill with a thin outline.</summary>
     public static readonly StyleBoxFlat Chip = Flat(SlotFill, 13, 2, Line, 2, horizontal: 8);
+    /// <summary>A haul group's chip on a crew card.</summary>
+    public static readonly StyleBoxFlat GroupChip = Flat(new Color("d3c3a1"), 13, 2, Line, 2, horizontal: 8);
     /// <summary>The ring a clickable well, such as a worker card, gets on hover.</summary>
     public static readonly StyleBoxFlat CardHover = Flat(Colors.Transparent, 14, 0, Mustard, 3);
     /// <summary>The trading post's price sign: beige enamel in a slate frame.</summary>
@@ -91,6 +93,16 @@ public static class Style {
     public static readonly StyleBoxFlat BarFill = Flat(Mustard, 7, 0);
     public static readonly StyleBoxFlat BarGrow = Flat(Sage, 7, 0);
     public static readonly StyleBoxEmpty None = new();
+    /// <summary>A haul group's box in a worker's job list, and the same while a haul is dragged over it.</summary>
+    public static readonly StyleBoxFlat GroupWell = Flat(new Color("d3c3a1"), 12, 6, new Color("d3c3a1"), 3), GroupOver = Flat(new Color("d3c3a1"), 12, 6, Sage, 3);
+    /// <summary>The small cup on a job that shows what its place is set to make.</summary>
+    public static readonly StyleBoxFlat MadeCup = Flat(SlotFill, 9, 3, new Color("b9a988"), 2);
+    /// <summary>The ring round a job's number in the list.</summary>
+    public static readonly StyleBoxFlat NumberRing = Flat(Colors.Transparent, 11, 0, Tan, 2);
+    /// <summary>A job's row lifted onto the mouse.</summary>
+    public static readonly StyleBoxFlat Lifted = Flat(SlotFill, 14, 4, Line, 3, horizontal: 8);
+    /// <summary>A quiet button on a beige well: an outline only.</summary>
+    public static readonly StyleBoxFlat OutlinePill = Flat(Colors.Transparent, 17, 6, Tan, 2, horizontal: 14), OutlinePillHover = Flat(new Color(SlotFill, .6f), 17, 6, Mustard, 2, horizontal: 14);
 
     /// <summary>The colours a job button comes in; the first is for the main job of a place, the next for hauling.</summary>
     public static readonly Color[] JobColors = { Brick, Sage, new("b08a45"), new("5f8aa6") };

@@ -96,7 +96,7 @@ public partial class JobRow(UiKit kit, LiveUpdates live, Thing t, JobChoice choi
             // A full mine refuses the worker, so the box shows what actually happened.
             live.Tick(tick, () => World.HasDuty(worker, t.Id, job), on => world.SetDuty(worker, t, job, on));
             line.AddChild(tick);
-            var elsewhere = w.Duties.Where(d => d.Thing != t.Id).ToList();
+            var elsewhere = w.Duties.Where(d => d.Thing != t.Id && d.Job != World.HaulGroup).ToList();
             if (elsewhere.Count == 0) continue;
             var circle = Style.Pill(elsewhere.Count.ToString(), Style.Round(Style.Enamel, 11).Item1, Style.Rim, 12);
             circle.CustomMinimumSize = new Vector2(22, 22); circle.MouseFilter = MouseFilterEnum.Pass;

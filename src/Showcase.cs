@@ -144,7 +144,17 @@ public sealed class Showcase(World world, WorldView view, SidePanel panel, Contr
         // --map-item also clicks an item's slot, to show its details.
         if (Launch.Has("--map")) { panel.Map.Open(); if (Launch.Value("--map-item") is string item) panel.Map.NodeOf(item)?.GetNode<Button>("slot").EmitSignal(BaseButton.SignalName.Pressed); }
         if (Launch.Has("--crew")) panel.Open(Page.Crew);
-        if (Launch.Has("--worker")) panel.Select(world.Workers[0]);
+        if (Launch.Has("--worker")) {
+            // Worker review: jobs at three stations in order, their hauls in one group, a load in hand and a tool.
+            var hand = world.Workers[0];
+            var anvil = world.Things.First(t => t.Kind == ThingKind.Anvil);
+            world.Assign(hand, anvil); world.SetDuty(hand, bench, "craft", true); world.SetDuty(hand, bench, "haul", true); world.SetDuty(hand, bellows, "haul", true);
+            world.AddHaulGroup(hand);
+            foreach (var place in new[] { bellows, anvil, bench }) world.MoveDuty(hand, hand.Duties.FindIndex(d => d.Thing == place.Id && d.Job == "haul"), hand.Duties.Count, hand.Duties.First(d => d.Job == World.HaulGroup).Group);
+            hand.Bag.Add("steel_parts", 6); hand.Tool = "steel_pick";
+            world.Player = hand.Pos + Vector2.One;
+            if (Launch.Has("--crew")) panel.Open(Page.Crew); else panel.Select(hand);
+        }
         if (Launch.Has("--guide")) panel.Open(Page.Guide);
         if (Launch.Has("--menu")) { panel.Close(); menu.Open(); }
         if (Launch.Has("--furnace")) { world.Player = bellows.Pos + Vector2.One; panel.Select(bellows); }

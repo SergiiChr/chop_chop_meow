@@ -18,6 +18,9 @@ public partial class Game {
 
     private Button? Named(string name) => panel.FindChild(name, true, false) as Button;
 
+    /// <summary>A control of the open page by name, such as a job's row or grip, or null.</summary>
+    private Control? OnPage(string name) => panel.FindChild(name, true, false) as Control;
+
     private bool HasLabel(Node parent, string text) {
         foreach (var child in parent.GetChildren()) {
             if (child is Label label && label.Text.Contains(text, StringComparison.OrdinalIgnoreCase)) return true;

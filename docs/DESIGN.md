@@ -119,7 +119,8 @@ UI and input:
 | `src/PageText.cs` | How panels word durations and costs |
 | `src/BlackHole.cs` | The crate-in-crate warning, collapse shader and game over screen |
 | `src/MarketPanel.cs` | The trading post market, hiring offers and price sheet |
-| `src/CrewPanel.cs` | The crew cards and a worker's own panel |
+| `src/CrewPanel.cs` | The crew cards and a worker's own panel, with their hands and tool slot |
+| `src/JobList.cs` | A worker's jobs as rows in order, with haul groups, dragged by their grips to another place |
 | `src/StageTrack.cs` | Stages on a line, for a farm plot and a mine |
 | `src/FarmPanel.cs` | A farm plot's stages and process row |
 | `src/CabinPanel.cs` | A cabin: its door, sleep and the needs a night would leave |
@@ -747,6 +748,8 @@ The worker keeps to it (`Worker.Engaged`) for one round, then the list is read a
 A job with nothing to do sets the status to what it lacks.
 With none to do the worker waits at the nearest trading post (`World.Idle`) and shows the first job's status.
 `World.MoveDuty` moves a job to another place in the list.
+
+On a worker's page `JobList` draws the list and turns a row dragged by its `JobGrip` into a `MoveDuty`; each row shows what its place is set to make (`JobList.Made`).
 
 A haul group is an entry of its own (`World.HaulGroup`, `Duty.Group`) followed by the hauls in it (`World.Grouped`).
 It counts as one job, and its next carry is picked across all its places.
