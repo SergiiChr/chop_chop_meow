@@ -7,6 +7,7 @@ namespace ChopChopMeow;
 
 public sealed class ItemDef {
     public string Name { get; set; } = "";
+    /// <summary>What the village pays or asks for one, for goods it trades and the crate they travel in; nothing else has a price.</summary>
     public float Price { get; set; }
     public string Color { get; set; } = "ffffff";
     /// <summary>The kind of tool this item is (axe, pickaxe, shovel, hammer, chisel, rake or mortar), or empty for materials.</summary>
@@ -44,6 +45,8 @@ public sealed class RecipeDef {
     public string Tool { get; set; } = "";
     /// <summary>The lowest <see cref="ItemDef.Tier"/> of that tool that will do; a better one always does.</summary>
     public int Tier { get; set; }
+    /// <summary>Advances only while someone works at the station, as a tool's recipe does, at a station whose other recipes run unattended.</summary>
+    public bool Worked { get; set; }
     /// <summary>Also craftable from the backpack through the personal crafting menu.</summary>
     public bool Hand { get; set; }
     /// <summary>The fuels a batch can burn, one unit per batch from the station's fuel slot, in the order workers look for them; empty for a recipe that burns none.</summary>
@@ -234,6 +237,9 @@ public sealed partial class GameData {
             throw new InvalidOperationException("Invalid mine or goals in GameData.");
         if (Farm.Sow.Count == 0 || Farm.Yield.Count == 0 || Farm.Sow.Concat(Farm.Yield).Any(p => !Items.ContainsKey(p.Key) || p.Value <= 0) || Farm.GrowDays <= 0 || Farm.HarvestWorkdays <= 0)
             throw new InvalidOperationException("Invalid farm in GameData.");
+        // Only the trade sets value: a good is judged by its whole chain against what it sells for, never step by step.
+        if (Items.FirstOrDefault(p => p.Value.Price < 0 || p.Value.Price > 0 != (Market.Sells.ContainsKey(p.Key) || Market.Buys.ContainsKey(p.Key) || p.Key == "crate")).Key is string mispriced)
+            throw new InvalidOperationException($"{mispriced}: only goods the village trades, and the crate, have a price.");
         foreach (var v in Vessels)
             if (v.States.Count < 2 || v.States.Distinct().Count() != v.States.Count || v.States.Append(v.Liquid).Any(id => !Items.ContainsKey(id)) || Items[v.Liquid].Food || Items[v.Liquid].Thirst > 0
                 || Market.Sells.ContainsKey(v.Liquid) || Market.Buys.ContainsKey(v.Liquid) || Recipes.Values.Any(r => r.Output == v.Liquid || r.Hand && r.Inputs.ContainsKey(v.Liquid)))

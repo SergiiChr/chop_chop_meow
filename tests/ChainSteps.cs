@@ -95,7 +95,7 @@ internal sealed class ChainSite(World world) {
         var farms = new[] { Place(ThingKind.Farm), Place(ThingKind.Farm) };
         foreach (var farm in farms) { farm.FarmStage = FarmStage.Growing; farm.Progress = world.GrowSeconds - 30; Employ(farm, "farm", "haul"); }
         var flour = Place(ThingKind.Cooktable, "flour"); flour.Tools!.Add("mortar", 1); Employ(flour, "craft", "haul");
-        Employ(Place(ThingKind.Cooktable, "dough"), "haul");
+        Employ(Place(ThingKind.Cooktable, "dough"), "craft", "haul");
         Employ(Place(ThingKind.Furnace, "bread"), "haul");
         return farms;
     }

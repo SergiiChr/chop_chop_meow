@@ -489,11 +489,14 @@ With a mortar and pestle slotted and someone working it, or carried by you while
 Whoever works it takes the mortar off the counter, holds the bowl in one hand and grinds with the pestle in the other.
 You can do both by hand from the crafting menu with a carried mortar.
 
+Dough is kneaded by hand at the table, with no fire, and only while you or an assigned worker work it there:
+
+- 1 flour + 3 liters of water → 3 dough
+
 Its other recipes cook on their own:
 
 - 2 crushed berries → jam, over one wood, coal or charcoal
 - 1 raw meat + 1 liter of water → meat stew, over one wood, coal or charcoal
-- 1 flour + 3 liters of water → dough, kneaded with no fire
 
 The canning station (2 steel bars, 8 planks) seals meat stew or jam into a tin can over one wood, coal or charcoal.
 Raw meat is not canned: it sells as it is, in crates.
@@ -532,6 +535,7 @@ A pile of crates takes more crates of the same good.
 
 A pile (8 wood) is a 3×3 yard for one resource, holding 14 stacks that show as a heap of the resource itself, bigger the more it holds.
 The first resource put in sets it: from then on workers store and take only that, and anything else is refused.
+Bottles count as one resource at any fill, so one pile holds them full, part-full and empty.
 Emptying it frees it again.
 
 Piles are walkable and snap edge to edge to a pile beside them, so they line up in neat grids.

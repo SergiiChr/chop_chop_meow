@@ -17,7 +17,7 @@ public static class SimulationChecks {
         Test(ChopChopMeow.Tests.WaterChecks.Run, data);
         Test(PondChecks.Run, data);
         Test(EconomyChecks.Run, data);
-        Test(AnimationChecks.Run);
+        Test(AnimationChecks.Run, data);
         Test(HumanModelChecks.Run);
         Test(NatureModelChecks.Run);
         Test(PileModelChecks.Run, data);

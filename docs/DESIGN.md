@@ -317,7 +317,7 @@ The transient state is excluded from saves and recalculated on the next simulati
 At a packing station the packer stands behind the table (`World.PackStand`) and the `Pack` action rummages in the heap of goods, lifts a piece across and settles it into the crate, then turns back.
 The player working a station they stand near packs the same way.
 
-At a cooking table, which is only worked for the mortar's recipes, the `Grind` action holds the mortar in hand (`ActorAnimation.StationAction`).
+At a cooking table, which is only worked for the mortar's recipes and dough, the `Grind` action holds the mortar in hand (`ActorAnimation.StationAction`); kneading dough uses the `Pack` action, facing the table.
 The left fist holds the bowl out in front, and the right takes the pestle twice round the bowl's floor, then lifts it and pounds.
 Both arms are solved from where the hands have to be (`ActorAnimation.ArmTo`), so the pestle stays over the bowl.
 `ActorRig` turns the bowl and pestle against their forearms in the resting pose (`ActorAnimation.GrindRest`), which keeps the bowl level and the pestle leaning toward its hand.
@@ -592,7 +592,7 @@ A save written before `Obtained` existed loads with it empty, so a raw resource 
 A recipe that needs a tool at such a station runs at the speed of the fastest of the slotted tool and those carried by players working there (`World.StationTool`).
 Worked only by its crew, it runs with the slotted tool and waits when there is none.
 At the cooking table it runs only while someone works it (`World.Worked(Thing)`).
-The mortar's recipes are worked, while jam, stew and dough cook unattended and their worker only hauls.
+The mortar's recipes and dough (`RecipeDef.Worked`) are worked, while jam and stew cook unattended and their worker only hauls.
 
 #### Fuel
 
@@ -662,7 +662,7 @@ Piles (`pile`) are 3×3 yards (`World.IsZone`, `ZoneSize`) that do not block wal
 `World.Snap` puts a new yard on the grid of the nearest yard within reach, and `ZoneBlock` lets yards touch but not overlap.
 
 A pile takes part in automation like a chest.
-`World.PileFilters` sets its input and output filters each tick from what it holds: its one resource, or nothing while empty.
+`World.PileFilters` sets its input and output filters each tick from what it holds: its one resource, every fill of a vessel, or nothing while empty.
 `HoldBlock` refuses a second resource, including for manual transfers.
 
 #### Compost

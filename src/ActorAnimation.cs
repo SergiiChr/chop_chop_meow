@@ -717,14 +717,14 @@ public static class ActorAnimation {
     }
 
     /// <summary>What someone working at a station does there.</summary>
-    public static ActorAction StationAction(ThingKind station) => station switch {
+    public static ActorAction StationAction(Thing station, GameData data) => station.Kind switch {
         ThingKind.Packer => ActorAction.Pack,
-        // A cooking table is only worked for the mortar's recipes.
-        ThingKind.Cooktable => ActorAction.Grind,
+        // At a cooking table the mortar's recipes are ground, and dough is worked by hand as goods are packed.
+        ThingKind.Cooktable => data.Recipes.TryGetValue(station.Recipe, out var r) && r.Tool == "mortar" ? ActorAction.Grind : ActorAction.Pack,
         _ => ActorAction.Hammer
     };
 
-    public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving) {
+    public static ActorAction WorkerAction(Worker worker, Thing? assignment, bool moving, GameData data) {
         // The sign hides any load in the worker's bag, which stays there until the strike ends.
         if (worker.WageDebt > 0 && !moving) return ActorAction.Protest;
         // Every other worker sits on a rock rather than the ground.
@@ -742,7 +742,7 @@ public static class ActorAnimation {
 
         return worker.WorkState switch {
             WorkerWorkState.Pumping => ActorAction.Pump,
-            WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == ThingKind.Mine) => StationAction(assignment.Kind),
+            WorkerWorkState.Hammering when assignment != null && (World.Worked(assignment.Kind) || assignment.Kind == ThingKind.Mine) => StationAction(assignment, data),
             WorkerWorkState.Digging => ActorAction.Mine,
             _ => ActorAction.Idle
         };

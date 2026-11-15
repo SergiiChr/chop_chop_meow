@@ -709,8 +709,8 @@ public sealed partial class World {
     /// <summary>Stations that can need someone working at them.</summary>
     public static bool Worked(ThingKind kind) => kind is ThingKind.Anvil or ThingKind.Bench or ThingKind.Cooktable or ThingKind.Packer;
     public static readonly ThingKind[] WorkedKinds = Array.FindAll(Kinds.All, Worked);
-    /// <summary>Whether the station's current recipe only advances while someone works at it; at the cooking table that is the mortar's recipes.</summary>
-    public bool Worked(Thing t) => Worked(t.Kind) && (t.Kind != ThingKind.Cooktable || Data.Recipes.TryGetValue(t.Recipe, out var r) && r.Tool != "");
+    /// <summary>Whether the station's current recipe only advances while someone works at it; at the cooking table that is the mortar's recipes and dough.</summary>
+    public bool Worked(Thing t) => Worked(t.Kind) && (t.Kind != ThingKind.Cooktable || Data.Recipes.TryGetValue(t.Recipe, out var r) && (r.Tool != "" || r.Worked));
     /// <summary>An anvil or bench only works while the player or a paid worker is hammering at it, not merely standing near.</summary>
     public bool Hammered(Thing anvil) {
         foreach (var p in S.Players) using (ActAs(p)) if (PlayerHammers(anvil)) return true;
@@ -1396,7 +1396,8 @@ public sealed partial class World {
     /// <summary>The good a filter entry from <see cref="CrateOf"/> asks crates of, or null for any other entry.</summary>
     public string? CrateGood(string entry) => entry.StartsWith(PackedPrefix) && Data.Items.ContainsKey(entry[PackedPrefix.Length..]) ? entry[PackedPrefix.Length..] : null;
     /// <summary>Whether two items are the same resource for a pile: the same item, or packed crates of the same good.</summary>
-    private static bool SameResource(string a, string b) => a == b || !PackedKind(a).IsEmpty && PackedKind(a).SequenceEqual(PackedKind(b));
+    /// <summary>Whether two items share a pile: the same item, crates of the same goods, or one vessel at any fill.</summary>
+    private bool SameResource(string a, string b) => a == b || !PackedKind(a).IsEmpty && PackedKind(a).SequenceEqual(PackedKind(b)) || Data.VesselOf(a) is VesselDef v && v == Data.VesselOf(b);
     /// <summary>The contents of a packed crate item, or null for anything else.</summary>
     public Inventory? Packed(string item) => S.Crates.GetValueOrDefault(PackedId(item));
     public Inventory NewCrate() => new() { Slots = Data.CrateCapacity, StackSize = Data.CrateCapacity, Capacity = Data.CrateCapacity };
@@ -1645,7 +1646,7 @@ public sealed partial class World {
         HoldRefusal.FarmOnly => $"A farm plot takes {string.Join(" and ", Data.Farm.Sow.Keys.Select(Data.Name)).ToLowerInvariant()}.",
         _ => null
     };
-    private static string? HeldOtherThan(Inventory inventory, string item) {
+    private string? HeldOtherThan(Inventory inventory, string item) {
         foreach (var pair in inventory.Items) if (!SameResource(pair.Key, item)) return pair.Key;
         return null;
     }
@@ -1662,13 +1663,19 @@ public sealed partial class World {
         if (on) { foreach (var item in compostables ??= Data.Items.Keys.Where(Compostable).ToArray()) pile.Inventory.InputFilter.Add(item); pile.Inventory.OutputFilter.Add("fertilizer"); }
         PileFilters(pile); return true;
     }
-    /// <summary>Piles keep their automation filters in step with what they hold, one resource in and out; compost keeps the filters it was given.</summary>
+    /// <summary>Piles keep their automation filters in step with what they hold, one resource in and out, a vessel at every fill; compost keeps the filters it was given.</summary>
     private string[]? compostables;
     private void PileFilters(Thing pile) {
         if (pile.Compost) return;
         var inv = pile.Inventory;
         if (inv.First() is not string item) { inv.InputFilter.Clear(); inv.OutputFilter.Clear(); return; }
         // Set only when what it holds changes, since a crate's entry is a new string.
+        if (Data.VesselOf(item) is VesselDef vessel) {
+            if (inv.InputFilter.SetEquals(vessel.States) && inv.OutputFilter.SetEquals(vessel.States)) return;
+            inv.InputFilter.Clear(); inv.OutputFilter.Clear();
+            foreach (string state in vessel.States) { inv.InputFilter.Add(state); inv.OutputFilter.Add(state); }
+            return;
+        }
         if (inv.InputFilter.Count == 1 && inv.OutputFilter.Count == 1 && inv.Wants(item) && inv.AllowsWithdrawal(item)) return;
         var kind = PackedKind(item);
         string entry = kind.IsEmpty ? item : new string(kind);

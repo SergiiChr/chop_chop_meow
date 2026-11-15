@@ -22,6 +22,7 @@ public static class WaterChecks {
         CheckTakingWaterOutNeedsABottleWithRoom(data);
         CheckQueuedBatchPoursWaterFromBottles(data);
         CheckQueuedBatchSaysWhatItIsMissing(data);
+        CheckPileHoldsBottlesAtEveryFill(data);
         CheckSwitchingRecipeTakesWaterIntoBottles(data);
         CheckStationTakesBottlesForItsWater(data);
         CheckHaulerPoursWaterAndStoresTheEmptyBottle(data);
@@ -188,9 +189,9 @@ public static class WaterChecks {
         var table = world.Add(ThingKind.Cooktable, new Vector2(26, 22));
         world.SetRecipe(table, "dough");
         var hauler = AddWorker(world, new Vector2(24, 21));
-        world.SetDuty(hauler, table, "haul", true);
+        world.SetDuty(hauler, table, "haul", true); world.SetDuty(hauler, table, "craft", true);
         SafeTick(world, 40);
-        Require(chest.Inventory["dough"] == 1 && table.Inventory[Water.Full] + table.Inventory[Water.Empty] == 0,
+        Require(chest.Inventory["dough"] == 3 && table.Inventory[Water.Full] + table.Inventory[Water.Empty] == 0,
             "a hauler must pour a full bottle into the table for its dough, leaving no bottle there");
         Require(chest.Inventory[Water.Empty] == 1 && hauler.Bag.Count == 0, "a hauler must store the emptied bottle again");
     }
@@ -266,5 +267,18 @@ public static class WaterChecks {
             Require(message == said, $"queuing {recipe} short of a batch should say \"{said}\", not \"{message}\"");
             Require(!station.Processing, $"{recipe} short of a batch should not start");
         }
+    }
+
+    private static void CheckPileHoldsBottlesAtEveryFill(GameData data) {
+        var world = new World(data, false);
+        var pile = world.Add(ThingKind.Pile, world.Player + Vector2.Right);
+        Give(world, Water.Full, 1); Give(world, Water.Empty, 1); Give(world, Water.OneLiter, 1); Give(world, "wood", 1);
+        Require(world.Transfer(world.Backpack, pile.Inventory, Water.Full, 1) == 1, "a pile should take a full bottle");
+        world.Tick(.1f);
+        Require(world.Transfer(world.Backpack, pile.Inventory, Water.Empty, 1) == 1 && world.Transfer(world.Backpack, pile.Inventory, Water.OneLiter, 1) == 1,
+            "a pile of bottles should take them empty and part-full too");
+        Require(world.Transfer(world.Backpack, pile.Inventory, "wood", 1) == 0, "a pile of bottles should take nothing else");
+        world.Tick(.1f);
+        Require(pile.Inventory.Accepts(Water.Empty) && pile.Inventory.AllowsWithdrawal(Water.Full), "workers should store and fetch bottles at any fill there");
     }
 }
