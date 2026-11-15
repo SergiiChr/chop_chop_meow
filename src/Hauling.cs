@@ -166,11 +166,7 @@ public sealed partial class World {
     private int FuelRoom(Thing t, RecipeDef recipe, string input) => t.Burner is Inventory burner && recipe.Fuels.Contains(input) && FuelTakes(t, input) ? burner.Room(input) : 0;
 
     /// <summary>The nearest storage with vessels that have room for a liquid, emptiest first, and that vessel; or null.</summary>
-    private (string Item, Thing Source)? RoomySource(VesselDef v, Vector2 from) {
-        for (int held = 0; held < v.Capacity; held++)
-            if (SourceFor(v.States[held], from) is Thing source) return (v.States[held], source);
-        return null;
-    }
+    private (string Item, Thing Source)? RoomySource(VesselDef v, Vector2 from) => NearestFill(v, 0, v.Capacity - 1, from);
 
     /// <summary>
     /// The fuel a hauler brings a station and where from: more of what its fuel slot burns,

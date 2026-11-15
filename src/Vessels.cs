@@ -108,10 +108,29 @@ public sealed partial class World {
     }
 
     /// <summary>The nearest storage with vessels that hold a liquid, fullest first, and that fill; or null.</summary>
-    private (string Item, Thing Source)? LiquidSource(VesselDef v, Vector2 from) {
-        for (int held = v.Capacity; held >= 1; held--)
-            if (SourceFor(v.States[held], from) is Thing source) return (v.States[held], source);
-        return null;
+    private (string Item, Thing Source)? LiquidSource(VesselDef v, Vector2 from) => NearestFill(v, v.Capacity, 1, from);
+
+    /// <summary>
+    /// The first of a vessel's fills, from <paramref name="first"/> liters toward <paramref name="last"/>, that any storage or station gives out, and the nearest place that does.
+    /// One pass over them, where <see cref="SourceFor"/> would take one for each fill.
+    /// </summary>
+    private (string Item, Thing Source)? NearestFill(VesselDef v, int first, int last, Vector2 origin) {
+        int step = last >= first ? 1 : -1, ranks = Math.Abs(last - first), rank = ranks + 1;
+        Thing? best = null; float nearest = 0;
+        foreach (var kind in Stores) Nearer(kind, false);
+        foreach (var kind in stationKinds) Nearer(kind, true);
+        return best == null ? null : (v.States[first + rank * step], best);
+
+        void Nearer(ThingKind kind, bool station) {
+            foreach (var t in S.Things.Of(kind))
+                for (int r = 0; r <= Math.Min(rank, ranks); r++) {
+                    string item = v.States[first + r * step];
+                    if (t.Inventory[item] <= 0 || !t.Inventory.AllowsWithdrawal(item) || station && Pending(t, item)) continue;
+                    float distance = t.Pos.DistanceSquaredTo(origin);
+                    if (r < rank || distance < nearest) { best = t; rank = r; nearest = distance; }
+                    break;
+                }
+        }
     }
 
     /// <summary>A hauler's vessels with room at a station that holds leftover liquid for them: filled there, then stored like any load.</summary>
