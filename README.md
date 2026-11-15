@@ -348,7 +348,7 @@ In multiplayer, every player must be downed before skipping.
 
 Fog of war covers the map.
 Ground you have never seen is black.
-You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 tiles), which fills the screen at full zoom-out.
+You see live only within a circle around you (`SightRadius` in `src/GameData.cs`, 20 metres), which fills the screen at full zoom-out.
 
 Ground you have seen before is greyed out and shows things as you last saw them: a tree felled out of sight still stands there until you look again.
 What changed while you were away shows as it now is when you come back, without playing the change: such a tree is already a stump, and a chest that was filled keeps its lid shut.
@@ -874,8 +874,8 @@ Sound credits:
 
 - Kenney ([www.kenney.nl](https://www.kenney.nl))
 - Little Robot Sound Factory ([www.littlerobotsoundfactory.com](https://www.littlerobotsoundfactory.com))
-- kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the intro
-  film's train and office recordings ([assets/README.md](assets/README.md#intro-film)), the digging and the stomach growl
+- kokoreli777, thellywellyn and freesound_community on [Pixabay](https://pixabay.com/sound-effects/), for the digging,
+  the stomach growl and the intro film's train and office recordings ([assets/README.md](assets/README.md#intro-film))
 
 Music credits:
 
