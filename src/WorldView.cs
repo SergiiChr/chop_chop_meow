@@ -696,7 +696,7 @@ public partial class WorldView : Node3D {
             _ => -1
         };
         if (impact < 0 || !actor.Struck(impact) || !props.TryGetValue(subject.Id, out var prop)) return;
-        // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips; the blow is still heard.
+        // What is out of sight is drawn as it was last seen, so nothing there shakes or throws chips.
         bool inSight = World.Sees(subject.Pos);
         if (inSight) prop.Shake = 1;
         // Fitting a mine's frame knocks wood like a bench, and every other blow of each hammer also clinks on a rail.

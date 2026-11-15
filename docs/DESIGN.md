@@ -428,7 +428,8 @@ A change that did not happen in front of the player is not played when they see 
 A thing that leaves the world in front of the player may play its way out (`WorldView.Departs`): its model is kept until `WorldView.Depart` is done with it.
 A felled tree topples and fades over the stump that took its place, and a stump or bush dug out is thrown up, tumbles and shrinks away; one a building now stands over (`World.Clears`) just goes.
 While it is dug at, a stump or bush leans further over with `Thing.Progress` (`DugProp`).
-Work out of sight is heard but shakes nothing and throws no chips.
+Work out of sight shakes nothing and throws no chips.
+It is silent too, since `SightRadius` (20 metres) lies beyond the 16 metres a sound carries ([Sound effects](#sound-effects)).
 
 `WorldView` hides wolves, workers and carts outside sight.
 It draws one screen-wide quad after everything else, placing each pixel in the world from the depth buffer: black on unexplored tiles, a grey wash on explored ones, clear inside the sight circle.
@@ -857,8 +858,14 @@ Each play picks a variant other than the previous one with a small random pitch 
 
 A sound with a world position is heard by its distance from the player, whatever the zoom.
 It plays at full volume at the player and fades with the square of the distance left to its reach, where it is silent: half way there it plays at a quarter.
-The reach is 16 metres, 30 for the growl of a wolf breaking into its sprint, which starts `WolfSightRange` away, and `HowlRadius` for a howl (`Sounds.ReachOf`).
+Its reach (`Sounds.ReachOf`) is:
+
+- 16 metres for most sounds;
+- twice `WolfSightRange` for the growl of a wolf breaking into its sprint, so it plays at a quarter from where the sprint starts;
+- `HowlRadius` for a howl.
+
 A sound with no position, such as the local player's footsteps or a hotbar click, plays at full volume.
+A sound within a metre of the player plays with no place too, so a long one such as the stomach's growl stays centred while the player walks on.
 
 Sounds come from three places:
 

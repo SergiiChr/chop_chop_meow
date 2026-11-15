@@ -352,7 +352,7 @@ You see live only within a circle around you (`SightRadius` in `src/GameData.cs`
 
 Ground you have seen before is greyed out and shows things as you last saw them: a tree felled out of sight still stands there until you look again.
 What changed while you were away shows as it now is when you come back, without playing the change: such a tree is already a stump, and a chest that was filled keeps its lid shut.
-Remembered fires and furnaces show unlit, wolves, workers and carts are not shown, and work out of sight neither shakes what it is done on nor throws chips, though it is still heard.
+Remembered fires and furnaces show unlit, wolves, workers and carts are not shown, and work out of sight neither shakes what it is done on nor throws chips.
 Explored ground and remembered things are kept in saves.
 
 ### The valley

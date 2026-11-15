@@ -830,11 +830,13 @@ public partial class Game {
         Require(damageEdges.Strength >= .15f, "Food under 15% must keep the screen edges glowing.");
         SetNeeds(Hosted, hunger: fed);
     }
-    /// <summary>Sounds rotate through variants, and music hands over and crossfades by time of day.</summary>
+    /// <summary>Sounds rotate through variants, a howl plays as long as a wolf holds it, and music hands over and crossfades by time of day.</summary>
     private async Task CheckSoundsRotateAndMusicCrossfades() {
         Require(Sounds.Names.All(name => sounds.VariantCount(name) > 0), "Every sound must load.");
         Require(sounds.VariantCount("footsteps_default") == 3, "Numbered footstep files must group as three variants.");
         Require(sounds.VariantCount("chop_tree") == 1, "A single chop file must count as one variant.");
+        Require(Math.Abs(sounds.Length("wolf_howl") - world.Data.LoneHowlSeconds) < .1 && Math.Abs(sounds.Length("wolf_howl_group") - world.Data.PackHowlSeconds) < .1,
+            "A wolf must hold its howl as long as the howl recording plays.");
         // Random picks can keep to two of the three variants, about once in a thousand runs: a seed makes them the same every run.
         sounds.Reseed(1);
         var picks = Enumerable.Range(0, 12).Select(_ => { sounds.Play("anvil_work"); return sounds.LastVariant("anvil_work"); }).ToArray();
@@ -865,7 +867,9 @@ public partial class Game {
             view.Zoom = level; await Frames(1);
             sounds.Play("anvil_work", world.Player);
             Require(sounds.LastFade == 1, $"A sound at the player must play at full volume at zoom {level}.");
+            Require(!sounds.LastPlaced, "A sound at the player's own spot must stay centred as they walk on, not play from where it started.");
             sounds.Play("anvil_work", world.Player + new Vector2(4, 0)); float near = sounds.LastFade;
+            Require(sounds.LastPlaced, "A sound away from the player must play from its place.");
             sounds.Play("anvil_work", world.Player + new Vector2(12, 0)); float far = sounds.LastFade;
             Require(Math.Abs(near - .5625f) < .001f && Math.Abs(far - .0625f) < .001f,
                 $"A sound 4 metres from the player must play at 9/16 of its volume and one 12 metres away at 1/16, at zoom {level}: {near}, {far}.");
@@ -875,8 +879,6 @@ public partial class Game {
         view.Zoom = zoom;
         int played = sounds.Played; sounds.Play("wolf_growl_distance", world.Player + new Vector2(world.Data.WolfSightRange, 0));
         Require(sounds.Played == played + 1, "A wolf's growl as it breaks into its sprint must carry to the player from where it starts.");
-        Require(Math.Abs(sounds.Length("wolf_howl") - world.Data.LoneHowlSeconds) < .1 && Math.Abs(sounds.Length("wolf_howl_group") - world.Data.PackHowlSeconds) < .1,
-            "A wolf must hold its howl as long as the howl recording plays.");
         sounds.Play("wolf_howl", world.Player + new Vector2(5, 0)); float close = sounds.LastFade;
         sounds.Play("wolf_howl", world.Player + new Vector2(40, 0)); float distant = sounds.LastFade;
         Require(close < 1 && distant > 0 && distant < close, "A howl must carry further than other sounds and fade with distance from the player.");

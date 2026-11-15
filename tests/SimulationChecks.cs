@@ -296,15 +296,15 @@ public static class SimulationChecks {
     private static void CheckStomachGrowlsAsFoodRunsLow(GameData data) {
         var world = EmptyWorld(data);
         var heard = Listen(world);
-        // One tick this long burns a hundredth of a full stomach.
-        float percent = 1 / data.HungerPerSecond;
-        SetNeeds(world, hunger: 21.5f); world.Tick(percent);
+        // Seconds that burn a hundredth of a full stomach.
+        float hundredth = 1 / data.HungerPerSecond;
+        SetNeeds(world, hunger: 21.5f); world.Tick(hundredth);
         Require(heard.Count == 0, "a stomach with over a fifth of its food left should stay quiet");
-        world.Tick(percent);
+        world.Tick(hundredth);
         Require(heard.SequenceEqual(new[] { "stomach_growl" }), "the stomach should growl as food falls under a fifth");
-        world.Tick(percent);
+        world.Tick(hundredth);
         Require(heard.Count == 1, "the stomach should stay quiet until another twentieth of its food is gone");
-        SetNeeds(world, hunger: 15.5f); world.Tick(percent);
+        SetNeeds(world, hunger: 15.5f); world.Tick(hundredth);
         Require(heard.Count == 2, "the stomach should growl again as food falls under 15%");
     }
 
