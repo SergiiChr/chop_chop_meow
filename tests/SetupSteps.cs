@@ -129,8 +129,20 @@ internal static class SetupSteps {
     /// <summary>Moves the clock without ticks: two real days would refill the market a check is watching, so only the age of the news changes.</summary>
     public static void SkipClock(World world, float seconds) => world.S.Time += seconds;
 
-    /// <summary>Puts an item on a hotbar slot: the real way is putting a held stack on the slot, which these checks are not about.</summary>
-    public static void SetHotbarSlot(World world, int slot, string item) => world.S.HotbarSlots[slot] = item;
+    /// <summary>Eats or drinks an item from one backpack cell, as a hotbar slot bound to that stack does.</summary>
+    public static void EatFrom(World world, int cell, string item) {
+        world.S.Backpack.PreferredSlot = cell;
+        try { world.Consume(item); } finally { world.S.Backpack.PreferredSlot = -1; }
+    }
+
+    /// <summary>
+    /// Names an item or plan on a hotbar slot, ending any binding it had, as an old save's slot does; the slot then waits for a stack of the item to bind.
+    /// The real way is putting a held stack on the slot, which these checks are not about.
+    /// </summary>
+    public static void SetHotbarSlot(World world, int slot, string item) {
+        foreach (var s in world.S.Backpack.Layout) if (s.Hotbar == slot + 1) s.Hotbar = 0;
+        world.S.HotbarSlots[slot] = item;
+    }
 
     /// <summary>Adds a worker directly at a spot: hiring needs a signpost and coins, starts them at the post and counts as the hiring goal.</summary>
     public static Worker AddWorker(World world, Vector2 position) {

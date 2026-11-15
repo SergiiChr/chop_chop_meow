@@ -17,8 +17,12 @@ public sealed class Inventory {
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Held { get; set; }
         /// <summary>The id of the player holding <see cref="Held"/>, or 0.</summary>
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int HeldBy { get; set; }
+        /// <summary>In a backpack, the number (1–9) of the hotbar slot bound to this stack, or 0; it goes when the stack does, and follows it into a stack it merges with.</summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] public int Hotbar { get; set; }
         /// <summary>Units in the cell that no player holds.</summary>
         [JsonIgnore] public int Free => Count - Held;
+        /// <summary>Empties the cell, which ends its hotbar binding.</summary>
+        public void Empty() { Item = ""; Count = 0; Hotbar = 0; }
         /// <summary>Whether a player other than <paramref name="player"/> holds units here.</summary>
         public bool HeldByOther(int player) => HeldBy != 0 && HeldBy != player;
     }
@@ -46,6 +50,10 @@ public sealed class Inventory {
     public int Capacity { get; set; }
     /// <summary>Physical cell a UI action targets when an item id appears in several cells.</summary>
     [JsonIgnore] public int PreferredSlot { get; set; } = -1;
+    /// <summary>While set, as for a Ctrl batch or Store all, units are taken only from stacks not bound to the hotbar.</summary>
+    [JsonIgnore] public bool SparesOnly { get; set; }
+    /// <summary>Units of a cell a removal may take now: those nobody holds, and none of a stack bound to the hotbar while <see cref="SparesOnly"/> is set.</summary>
+    private int Takeable(Slot s) => SparesOnly && s.Hotbar != 0 ? 0 : s.Free;
     private readonly Dictionary<string, int> layoutRemainder = new();
     public const string Coins = "coins";
     public Inventory() { Items = new ItemTotals(items); PadLayout(); }
@@ -82,7 +90,7 @@ public sealed class Inventory {
     /// <summary>Units of an item that nobody holds, which are all that can be taken out.</summary>
     public int Free(string item) {
         int free = items.GetValueOrDefault(item);
-        if (heldUnits > 0) foreach (var s in Layout) if (s.Item == item) free -= s.Held;
+        if (heldUnits > 0 || SparesOnly) foreach (var s in Layout) if (s.Item == item) free -= s.Count - Takeable(s);
         return free;
     }
     /// <summary>Empty with the settings of a new inventory, so it saves the same as one.</summary>
@@ -159,10 +167,10 @@ public sealed class Inventory {
         var remaining = layoutRemainder; remaining.Clear(); foreach (var pair in items) remaining[pair.Key] = pair.Value;
         for (int i = 0; i < Layout.Count; i++) {
             var s = Layout[i];
-            if (s.Item == "") { s.Count = 0; continue; }
-            if (s.Count <= 0 || !remaining.TryGetValue(s.Item, out int qty)) { s.Item = ""; s.Count = 0; continue; }
+            if (s.Item == "") { s.Empty(); continue; }
+            if (s.Count <= 0 || !remaining.TryGetValue(s.Item, out int qty)) { s.Empty(); continue; }
             s.Count = Math.Min(Math.Min(s.Count, qty), StackOf(s.Item)); remaining[s.Item] = qty - s.Count;
-            if (s.Count == 0) { s.Item = ""; }
+            if (s.Count == 0) s.Empty();
         }
         foreach (var (item, qty) in remaining) for (int left = qty; left > 0;) {
             int empty = -1;
@@ -189,7 +197,7 @@ public sealed class Inventory {
     /// <summary>Removes every item.</summary>
     public void Clear() {
         items.Clear(); heldUnits = 0;
-        foreach (var slot in Layout) { slot.Item = ""; slot.Count = 0; slot.Held = 0; slot.HeldBy = 0; }
+        foreach (var slot in Layout) { slot.Empty(); slot.Held = 0; slot.HeldBy = 0; }
         PadLayout();
         Changed?.Invoke();
     }
@@ -219,7 +227,9 @@ public sealed class Inventory {
             int moved = Math.Min(Math.Min(quantity, a.Count), destination.MergeRoom(b, a.Item, this));
             if (moved > 0) {
                 if (b.Item == "") b.Item = a.Item;
-                b.Count = targetCount + moved; a.Count -= moved; if (a.Count == 0) a.Item = "";
+                b.Count = targetCount + moved; a.Count -= moved;
+                // A whole stack moved onto another in the same inventory takes its hotbar slot along.
+                if (a.Count == 0) { if (same && a.Hotbar != 0) b.Hotbar = a.Hotbar; a.Empty(); }
                 SyncAggregate(); if (!same) destination.SyncAggregate(); return moved;
             }
         }
@@ -266,7 +276,11 @@ public sealed class Inventory {
         Layout.Sort((a, b) => string.CompareOrdinal(a.Item, b.Item));
         for (int i = 0; i < Layout.Count - 1;) {
             var a = Layout[i]; var b = Layout[i + 1];
-            if (a.Item == b.Item && a.Count < StackOf(a.Item) && a.Held == 0 && b.Held == 0) { int n = Math.Min(StackOf(a.Item) - a.Count, b.Count); a.Count += n; b.Count -= n; if (b.Count == 0) Layout.RemoveAt(i + 1); else i++; } else i++;
+            if (a.Item == b.Item && a.Count < StackOf(a.Item) && a.Held == 0 && b.Held == 0) {
+                int n = Math.Min(StackOf(a.Item) - a.Count, b.Count); a.Count += n; b.Count -= n;
+                // The stack merged in takes its hotbar slot along, as a stack moved onto another does.
+                if (b.Count == 0) { if (b.Hotbar != 0) a.Hotbar = b.Hotbar; Layout.RemoveAt(i + 1); } else i++;
+            } else i++;
         }
         PadLayout();
     }
@@ -302,21 +316,32 @@ public sealed class Inventory {
         return amount;
     }
 
-    /// <summary>Takes out up to <paramref name="quantity"/> units nobody holds, from <see cref="PreferredSlot"/> first.</summary>
-    public int Remove(string item, int quantity) {
+    /// <summary>
+    /// Hotbar slots whose bound stack was used up here, spent rather than moved out, each with its item, for the world to bind to the next stack of it (<see cref="World.BindWaitingHotbars"/>).
+    /// Made on first use, as only a backpack has bindings.
+    /// </summary>
+    [JsonIgnore] public List<(int Hotbar, string Item)>? UsedUp { get; private set; }
+
+    /// <summary>Spends up to <paramref name="quantity"/> units nobody holds, from <see cref="PreferredSlot"/> first, as eating, building or crafting does.</summary>
+    public int Remove(string item, int quantity) => Take(item, quantity, true);
+
+    /// <summary>Takes out units nobody holds, from <see cref="PreferredSlot"/> first; a bound stack <paramref name="spent"/> to nothing is noted in <see cref="UsedUp"/>.</summary>
+    private int Take(string item, int quantity, bool spent) {
         int amount = Math.Min(Math.Max(0, quantity), Free(item));
         if (amount == this[item]) items.Remove(item);
         else items[item] -= amount;
         int left = amount;
-        if ((uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == item) left -= RemoveFromSlot(Layout[PreferredSlot], left);
-        for (int i = Layout.Count - 1; i >= 0 && left > 0; i--) if (i != PreferredSlot && Layout[i].Item == item) left -= RemoveFromSlot(Layout[i], left);
+        if ((uint)PreferredSlot < (uint)Layout.Count && Layout[PreferredSlot].Item == item) left -= RemoveFromSlot(Layout[PreferredSlot], left, spent);
+        for (int i = Layout.Count - 1; i >= 0 && left > 0; i--) if (i != PreferredSlot && Layout[i].Item == item) left -= RemoveFromSlot(Layout[i], left, spent);
         if (amount > 0) Changed?.Invoke();
         return amount;
     }
 
-    private static int RemoveFromSlot(Slot slot, int quantity) {
-        int removed = Math.Min(quantity, slot.Free); slot.Count -= removed;
-        if (slot.Count == 0) slot.Item = "";
+    private int RemoveFromSlot(Slot slot, int quantity, bool spent) {
+        int removed = Math.Min(quantity, Takeable(slot)); slot.Count -= removed;
+        if (slot.Count > 0) return removed;
+        if (spent && slot.Hotbar != 0) (UsedUp ??= new()).Add((slot.Hotbar, slot.Item));
+        slot.Empty();
         return removed;
     }
 
@@ -356,7 +381,7 @@ public sealed class Inventory {
     public int TransferTo(Inventory destination, string item, int quantity, bool automated = false) {
         if (automated && (!AllowsWithdrawal(item) || !destination.Accepts(item))) return 0;
         int amount = Math.Min(Free(item), Math.Min(Math.Max(0, quantity), destination.Room(item)));
-        Remove(item, amount);
+        Take(item, amount, false);
         return destination.Add(item, amount);
     }
 }

@@ -169,7 +169,7 @@ Shrubs cast real shadows; grass and small objects darken the ground under them t
 | LMB on an item slot | Pick up its stack onto the cursor, a held stack; with a stack held, put it down there |
 | RMB on an item slot | Pick up half its stack; with a stack held, put down one |
 | Double LMB on an item | Use it: eat, drink, light a torch, open a crate as storage, or select a tool (in hand with no slot selected when it is not on the hotbar) |
-| Shift-click / Ctrl-click an item slot | Move the stack clicked / all of that item to the other storage open; this applies across inventory and station panels |
+| Shift-click / Ctrl-click an item slot | Move the stack clicked / all of that item to the other storage open; this applies across inventory and station panels. Ctrl from the backpack, and Store all, leave stacks bound to the hotbar |
 | RMB on a hotbar slot | Empty the slot |
 | Drag an empty spot on a panel | Move the side panel or the backpack drawer |
 
@@ -195,11 +195,24 @@ With a side panel open they keep to the space left of it.
 
 The bottom bar holds round badges for building, the backpack, crafting, the crew and the field guide, each with its key, next to the hotbar.
 
-Assign a hotbar slot by putting a held item from the backpack or a plan from the building plans on it; the stack goes back where it was. RMB on a slot empties it.
-Slots reference carried items or building plans; they are not extra storage.
-Consumable slots use one item, building slots enter placement, and tools select a working reference.
-A double click on a slot uses its item, as in the backpack.
-With a building's page or an opened crate showing, Shift-click or Ctrl-click on a hotbar slot moves its item there as it does in the backpack: a stack with Shift, all of it with Ctrl.
+Put a held stack or a plan from the building plans on a hotbar slot to assign it; RMB on a slot empties it.
+A stack put on a slot binds that exact backpack stack to it, which then has the selected hotbar slot's rim in the backpack.
+The stack goes back where it was; one held from storage, such as a chest, moves into the backpack first, into an empty slot or onto a stack of its item with room for all of it.
+Slots reference backpack stacks or building plans; they are not extra storage.
+A bound slot uses only its own stack: it eats, drinks, places crates and swings from it, and shows its count.
+
+- A bound slot empties once its stack moves out of the backpack, such as into a chest or a crate.
+- A stack used up, such as its last berry eaten, its last crate placed or its wood spent on crafting, passes its slot to another stack of its item at once; with none left, the slot waits greyed for the next one to come in.
+- A bottle stays bound through every sip, empty too, and a lit torch stays in its stack until it burns out.
+- A bound stack moved onto another stack of its item takes its hotbar slot along; the other stack's slot, if it had one, empties. Sort merges the same way.
+- A stack has one hotbar slot: put on a second slot, it moves there and the first empties.
+- A slot that names an item instead of a stack, as a new game's defaults and older saves do, waits greyed and binds the first stack of that item to come into the backpack.
+
+Building slots enter placement, and tools select a working reference.
+A double click on a slot uses its stack, as in the backpack.
+With a building's page or an opened crate showing, Shift-click on a hotbar slot moves its own stack there, and Ctrl-click all of its item, the bound stack too.
+In the backpack drawer, Shift-click moves the stack clicked, bound or not, and Ctrl-click all of its item but the stacks bound to the hotbar; Store all leaves them too.
+Crafting and building costs take from bound stacks like any other.
 Hotbar assignments and a tool in hand persist in saves.
 
 Building plans are an icon grid; hovering a plan shows its description and what it still needs.
@@ -224,6 +237,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - A slot that does not take the held stack, such as an input slot for another item or an output slot, shakes, and the stack stays held.
 - Esc, a click on open ground or on the interface anywhere but an item slot, closing the side panel or walking out of reach of the building it came from lets go of the held stack, which is then back in its slot.
 - A held crate or building plan over open ground goes into placement: a click places it. Back over the interface it is a held stack again.
+- A press on one slot let go of anywhere else, such as over another slot, does nothing.
 - Drag an empty spot on the side panel or the backpack drawer to move it. Both open in their usual spots for each new page or building.
 - A double click uses an item: food is eaten, a filled bottle gives one sip and keeps the bottle, a torch lights, a crate opens as storage, and a tool is selected: on its hotbar slot, or in hand with no slot selected when it has none. A single click on a backpack slot waits 200 ms for a second one before it picks the stack up.
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
@@ -721,7 +735,8 @@ Cabin windows glow but do not deter wolves.
 ### Torch
 
 A torch burns just as long as a log, once.
-With a torch in hand, the first left click on open ground strikes flint and steel for 2 seconds to light it.
+With a torch selected, the first left click on open ground strikes flint and steel for 2 seconds to light it.
+The lit torch shows in the left hand but stays in the backpack, and burning out uses it up; moving it out of the backpack, such as into a chest, puts it out, and it goes as a fresh torch.
 After that each click swings it, which briefly widens its light by a fifth.
 
 Swinging four times within 2 seconds, as fast as swings go, puts it out with a message.

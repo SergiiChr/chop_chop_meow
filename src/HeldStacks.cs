@@ -63,8 +63,9 @@ public sealed partial class World {
 
     // Set while a command marked "from held stack" is being sent or run.
     private bool fromHeld;
-    /// <summary>Server: the inventory a command marked "from held stack" takes from while it runs, or null.</summary>
+    /// <summary>Server: the inventory a command marked "from held stack" takes from while it runs, or null, and how many units the stack held.</summary>
     private Inventory? heldSource;
+    private int heldCount;
     /// <summary>The inventory the command being sent or run takes from when it is marked "from held stack", or null.</summary>
     private Inventory? MarkedSource => heldSource ?? (fromHeld ? HeldBox : null);
 
@@ -87,7 +88,10 @@ public sealed partial class World {
         var item = cell.Item;
         box.Release(at);
         box.PreferredSlot = at; heldSource = box;
-        try { Dispatch(c with { Count = Math.Clamp(c.Count, 1, units), Held = false }); } finally { box.PreferredSlot = -1; heldSource = null; }
+        heldCount = units;
+        // A count that is a number of units is no more than the held stack; others, such as a hotbar slot's number, stay as they are.
+        var run = c with { Count = c.Verb is Verb.SetHotbar or Verb.PlaceCrate or Verb.SlotTool ? c.Count : Math.Clamp(c.Count, 1, units), Held = false };
+        try { Dispatch(run); } finally { box.PreferredSlot = -1; heldSource = null; }
         // A swap moves the slot itself, and the stack it took the place of is not held.
         bool stayed = cell.Item == item && box.Layout.IndexOf(cell) == at;
         int left = stayed ? Math.Min(units - (before - cell.Count), cell.Count) : 0;
@@ -99,7 +103,7 @@ public sealed partial class World {
         Verb.Transfer or Verb.TransferSlot => c.Target,
         Verb.MoveInCrate => c.Other != 0 ? 0 : CrateCode - c.Target,
         Verb.LoadFuel or Verb.LoadInput or Verb.SupplyMine or Verb.SlotTool => 0,
-        Verb.PlaceCrate => held,
+        Verb.PlaceCrate or Verb.SetHotbar => held,
         _ => null
     };
 

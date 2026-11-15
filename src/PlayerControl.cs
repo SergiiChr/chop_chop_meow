@@ -137,6 +137,8 @@ public sealed class PlayerControl {
         world.Me.Sprinting = direction != Vector2.Zero && !world.Downed && Input.IsPhysicalKeyPressed(Key.Shift) && world.Hunger >= GameData.LowNeed && world.Thirst >= GameData.LowNeed;
         world.MovePlayer(direction * dt * world.Data.MoveSpeed(world.Me.Sprinting)); view.Gathering = gathering is { IsLoose: false } && right && world.Near(gathering, 2.5f);
         view.GatheringTarget = view.Gathering ? gathering : null;
+        // A tool in hand that has left the backpack leaves the hand empty.
+        if (world.InHand != "" && world.Backpack[world.InHand] == 0) world.SelectInHand("");
         world.Me.Selected = hotbar.ActiveItem() ?? "";
     }
 
@@ -210,6 +212,8 @@ public sealed class PlayerControl {
         if (Mode is not ClickMode.Crate crate) world.Build(Mode.Placing!.Value, at);
         // A held crate goes down from the held stack, wherever it lies.
         else if (placingHeld && cursor.Stack?.Item == crate.Item) world.FromHeldStack(() => world.PlaceCrate(crate.Item, at));
+        // One from the hotbar goes down from the stack bound to the selected slot.
+        else if (hotbar.ActiveItem() == crate.Item) hotbar.FromStack(hotbar.ActiveStack(), () => world.PlaceCrate(crate.Item, at));
         else world.PlaceCrate(crate.Item, at);
         if (!sent || Mode.Placing != ThingKind.Mine && CanPlaceAgain()) return;
         Mode = new ClickMode.Normal();

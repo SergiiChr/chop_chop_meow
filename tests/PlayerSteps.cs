@@ -19,6 +19,23 @@ internal static class PlayerSteps {
         if (slot >= 0) world.TransferSlot(from, to, held.Slot, slot, held.Item, count); else world.Transfer(from, to, held.Item, count);
     });
 
+    /// <summary>Binds a stack to a hotbar slot the way a player does: picks it up, puts it on the slot, and lets go.</summary>
+    public static void PutOnHotbar(World world, Inventory box, int cell, int slot) {
+        world.Hold(box, cell, int.MaxValue);
+        world.FromHeldStack(() => world.SetHotbar(slot, box.Layout[cell].Item));
+        world.Release();
+    }
+
+    /// <summary>Binds a backpack stack to a hotbar slot.</summary>
+    public static void PutOnHotbar(World world, int cell, int slot) => PutOnHotbar(world, world.Backpack.Inventory, cell, slot);
+
+    /// <summary>Moves <paramref name="count"/> units of a backpack stack into the first empty backpack cell, returning that cell.</summary>
+    public static int SplitStack(World world, int cell, int count) {
+        int empty = SlotOf(world.Backpack, "");
+        world.TransferSlot(world.Backpack, world.Backpack, cell, empty, world.Backpack.Layout[cell].Item, count);
+        return empty;
+    }
+
     /// <summary>Puts units of the held stack into a backpack slot.</summary>
     public static void PutDown(World world, InventoryView to, int slot, int count) => PutDown(world, to.Inventory, slot, count);
 

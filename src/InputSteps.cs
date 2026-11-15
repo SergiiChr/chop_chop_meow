@@ -117,6 +117,19 @@ public partial class Game {
         await Until(() => !cursor.Empty, "half the stack going onto the cursor", 3);
     }
 
+    /// <summary>Presses the left button on one control and lets it go over another.</summary>
+    private async Task PressAndLetGoOver(Control from, Control to) {
+        var start = await At(from); var end = await At(to);
+        await Apart(start);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = start, GlobalPosition = start, Pressed = true });
+        await Frames();
+        Handled(start);
+        Input.ParseInputEvent(new InputEventMouseMotion { ButtonMask = MouseButtonMask.Left, Position = end, GlobalPosition = end, Relative = end - start });
+        await Frames(1);
+        Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = end, GlobalPosition = end, Pressed = false });
+        await Frames();
+    }
+
     /// <summary>Picks up a cell's stack and puts it down on another cell with a second left click.</summary>
     private async Task Carry(Control from, Control to) {
         await PickUp(from);

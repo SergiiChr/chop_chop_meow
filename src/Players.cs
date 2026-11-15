@@ -29,7 +29,7 @@ public sealed class PlayerState {
     public string Making { get; set; } = "";
     /// <summary>Seconds spent on <see cref="Making"/>, at the speed of the tool used.</summary>
     public float CraftTime { get; set; }
-    /// <summary>Burn time left on the torch in the player's left hand, or zero when the hand is empty; it only burns while lit.</summary>
+    /// <summary>Burn time left on the backpack torch the player has lit, shown in the left hand, or zero for none; it only burns while lit, and goes once the backpack has no torch.</summary>
     public float Torch { get; set; }
     public bool TorchLit { get; set; }
     /// <summary>Seconds left striking flint and steel before the torch catches.</summary>
@@ -75,8 +75,11 @@ public readonly record struct HeldStack(int Box, int Slot, string Item, int Coun
 public enum Verb { Assign, Attack, AutoSell, Build, Buy, CancelCraft, ClearFilters, Collect, Consume, Craft, Dismantle, Duty, EndingShown, Enter, FetchPrices, Fire, FuelFire, Hire, Hold, Leave, LoadBatch, LoadFuel, LoadInput, MoveInCrate, PickUp, PickUpCrate, PlaceCrate, Pump, QueueBatch, Release, SelectHotbar, SelectInHand, Sell, SetCompost, SetFilter, SetHotbar, SetPacking, SetRecipe, Settle, SkipFood, SkipMorning, Sleep, SlotTool, SortBag, SupplyMine, Torch, Transfer, TransferSlot, Unqueue, UnslotTool }
 
 /// <summary>A player action a guest sends to the host, which runs it for that guest. What each field means depends on the verb.</summary>
-/// <remarks><see cref="Held"/> is the mark "from held stack": the command takes its units from the player's held stack (<see cref="World.FromHeldStack"/>).</remarks>
-public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At, bool Held = false);
+/// <remarks>
+/// <see cref="Held"/> is the mark "from held stack": the command takes its units from the player's held stack (<see cref="World.FromHeldStack"/>).
+/// <see cref="Spares"/> is the mark "spares only": it takes none from backpack stacks bound to the hotbar (<see cref="World.FromSpares"/>).
+/// </remarks>
+public readonly record struct Command(Verb Verb, int Target, int Other, string Item, int Count, Vector2 At, bool Held = false, bool Spares = false);
 
 /// <summary>The players in the world and the guest side of actions.</summary>
 public sealed partial class World {
@@ -121,15 +124,37 @@ public sealed partial class World {
 
     /// <summary>
     /// In a guest's copy, sends the action to the host and tells the caller to stop.
-    /// On the server, an action marked "from held stack" goes through the same checks a guest's does first, and comes back here unmarked to run.
+    /// On the server, a marked action (<see cref="FromHeldStack"/>, <see cref="FromSpares"/>) goes through the same checks a guest's does first, then comes back here to run.
     /// </summary>
     private bool Forwarded(Verb verb, int target = 0, int other = 0, string item = "", int count = 0, Vector2 at = default) {
-        var c = new Command(verb, target, other, item, count, at, fromHeld);
+        var c = new Command(verb, target, other, item, count, at, fromHeld, fromSpares);
         if (Host != null) { Host(c); return true; }
-        if (!fromHeld) return false;
-        fromHeld = false;
-        RunFromHeld(c);
+        if (!(c.Held || c.Spares) || runningMarked) return false;
+        RunMarked(c);
         return true;
+    }
+
+    // Set while a command marked "spares only" is being sent.
+    private bool fromSpares;
+    // Set while the server runs a marked command, which then runs as any other.
+    private bool runningMarked;
+
+    /// <summary>
+    /// Runs a backpack batch, such as a Ctrl-click or Store all, with the mark "spares only": it takes no units from stacks bound to the hotbar.
+    /// It runs as a guest's command does, so what it returns tells nothing.
+    /// </summary>
+    public void FromSpares(Action command) {
+        fromSpares = true;
+        try { command(); } finally { fromSpares = false; }
+    }
+
+    /// <summary>Server: runs a marked command by its mark.</summary>
+    private void RunMarked(Command c) {
+        runningMarked = true;
+        try {
+            if (c.Held) RunFromHeld(c);
+            else { S.Backpack.SparesOnly = true; try { Dispatch(c with { Spares = false }); } finally { S.Backpack.SparesOnly = false; } }
+        } finally { runningMarked = false; }
     }
 
     /// <summary>Selects a hotbar slot; the server keeps it, so a save has it.</summary>
@@ -139,16 +164,21 @@ public sealed partial class World {
         Forwarded(Verb.SelectHotbar, count: slot);
     }
 
-    /// <summary>Puts an item, or nothing, in a hotbar slot and selects that slot; the server keeps it, so a save has it.</summary>
+    /// <summary>
+    /// Puts a building plan, an item to wait for, or nothing on a hotbar slot and selects that slot; the server keeps it, so a save has it.
+    /// Marked "from held stack", it binds the held stack to the slot instead (<see cref="BindHeld"/>).
+    /// </summary>
     public void SetHotbar(int slot, string item) {
         if (slot is < 0 or > 8) return;
-        S.HotbarSlots[slot] = item; S.ActiveHotbar = slot; S.InHand = "";
-        Forwarded(Verb.SetHotbar, count: slot, item: item);
+        if (MarkedSource == null) { Unbind(slot); S.HotbarSlots[slot] = item; }
+        S.ActiveHotbar = slot; S.InHand = "";
+        if (Forwarded(Verb.SetHotbar, count: slot, item: item)) return;
+        if (heldSource != null) BindHeld(slot);
     }
 
-    /// <summary>Selects a carried tool in hand without a hotbar slot; the server keeps it, so a save has it.</summary>
+    /// <summary>Selects a carried tool in hand without a hotbar slot, or with "" empties the hand; the server keeps it, so a save has it.</summary>
     public void SelectInHand(string tool) {
-        if (!(Data.Items.TryGetValue(tool, out var def) && def.Tool != "") || S.Backpack[tool] == 0) return;
+        if (tool != "" && (!(Data.Items.TryGetValue(tool, out var def) && def.Tool != "") || S.Backpack[tool] == 0)) return;
         S.InHand = tool;
         Forwarded(Verb.SelectInHand, item: tool);
     }
@@ -159,15 +189,22 @@ public sealed partial class World {
         Forwarded(Verb.EndingShown);
     }
 
+    /// <summary>Runs an action with a cell of an inventory first in line to leave; without one named (-1), the cell already first in line stays first, such as a held stack's.</summary>
+    private static void Preferring(Inventory box, int slot, Action action) {
+        int first = box.PreferredSlot;
+        if (slot >= 0) box.PreferredSlot = slot;
+        try { action(); } finally { box.PreferredSlot = first; }
+    }
+
     /// <summary>Host: runs a guest's action as that guest. The action checks reach and costs as it does for the host.</summary>
-    public void Run(PlayerState p, Command c) => As(p, () => { if (c.Held) RunFromHeld(c); else Dispatch(c); });
+    public void Run(PlayerState p, Command c) => As(p, () => { if (c.Held || c.Spares) RunMarked(c); else Dispatch(c); });
 
     private void Dispatch(Command c) {
         var t = Find(c.Target);
         var w = S.Workers.Find(w => w.Id == c.Other);
         switch (c.Verb) {
             case Verb.Build: if (Kinds.Parse(c.Item) is ThingKind kind) Build(kind, c.At); break;
-            case Verb.PlaceCrate: PlaceCrate(c.Item, c.At); break;
+            case Verb.PlaceCrate: Preferring(S.Backpack, c.Count, () => PlaceCrate(c.Item, c.At)); break;
             case Verb.MoveInCrate: MoveInCrate(c.Target, c.Item, c.Count, c.Other != 0); break;
             case Verb.Consume: S.Backpack.PreferredSlot = c.Count; try { Consume(c.Item); } finally { S.Backpack.PreferredSlot = -1; } break;
             case Verb.Torch: UseTorch(c.At); break;
@@ -177,10 +214,7 @@ public sealed partial class World {
             case Verb.CancelCraft: CancelCraft(c.Item, c.Count); break;
             case Verb.Transfer:
                 if (Resolve(c.Target) is Inventory from && Resolve(c.Other) is Inventory to) {
-                    // Without a slot named, the slot already first in line stays first, such as a held stack's.
-                    int first = from.PreferredSlot;
-                    if (c.At.Y == -1 && c.At.X >= 0) from.PreferredSlot = (int)c.At.X;
-                    try { Transfer(from, to, c.Item, c.Count); } finally { from.PreferredSlot = first; }
+                    Preferring(from, c.At.Y == -1 ? (int)c.At.X : -1, () => Transfer(from, to, c.Item, c.Count));
                 }
                 break;
             case Verb.TransferSlot: if (Resolve(c.Target) is Inventory slotFrom && Resolve(c.Other) is Inventory slotTo) TransferSlot(slotFrom, slotTo, (int)c.At.X, (int)c.At.Y, c.Item, c.Count); break;

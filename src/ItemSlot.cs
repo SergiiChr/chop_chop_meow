@@ -72,7 +72,8 @@ public partial class ItemSlot : Button {
         if (!click.Pressed) {
             if (Controls == null || click.ButtonIndex != down) return;
             down = MouseButton.None;
-            Controls.Release(this, click.ButtonIndex);
+            // A press let go of anywhere but this slot, such as over another slot, does nothing.
+            if (new Rect2(Vector2.Zero, Size).HasPoint(click.Position)) Controls.Release(this, click.ButtonIndex);
             AcceptEvent();
             return;
         }

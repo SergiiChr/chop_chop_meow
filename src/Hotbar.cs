@@ -50,7 +50,11 @@ public partial class Hotbar : PanelContainer {
         var button = new ItemSlot { FocusMode = FocusModeEnum.None, MouseDefaultCursorShape = CursorShape.PointingHand };
         button.Controls = new SlotInput(cursor) {
             Takes = held => held.Item is string id && (world.Data.Items.ContainsKey(id) || world.Data.IsBuilding(id)),
-            Put = (held, _) => { SetHotbar(slot, held.Item!); held.Release(); },
+            // A held stack binds itself to the slot (World.BindHeld); a plan is only named there.
+            Put = (held, _) => {
+                if (held.Stack is HeldStack stack) { world.FromHeldStack(() => world.SetHotbar(slot, stack.Item)); Sound(); } else SetHotbar(slot, held.Plan!);
+                held.Release();
+            },
             Click = () => Select(slot),
             Use = () => Use(slot),
             Batch = () => Store(slot),
@@ -92,8 +96,8 @@ public partial class Hotbar : PanelContainer {
     public void Refresh() {
         for (int slot = 0; slot < Buttons.Count; slot++) {
             var button = Buttons[slot];
-            string id = HotbarId(slot);
-            int count = world.Backpack[id];
+            string id = world.HotbarItem(slot);
+            int count = world.HotbarCount(slot);
             bool active = world.InHand == "" && world.ActiveHotbar == slot;
             var shown = (id, count, active);
             if (shownSlots[slot] == shown) continue;
@@ -110,40 +114,44 @@ public partial class Hotbar : PanelContainer {
         }
     }
 
-    // World.Deserialize keeps nine known entries, so reads need no repair here.
-    private string HotbarId(int slot) {
-        string id = world.HotbarSlots[slot];
-        if (!Water.IsBottle(id)) return id;
-        foreach (var bottle in DrinkingBottles) if (world.Backpack[bottle] > 0) return bottle;
-        return "empty_bottle";
-    }
-    private static readonly string[] DrinkingBottles = { "water_1", "water_2", "water", "empty_bottle" };
-
     /// <summary>The item selected: the tool in hand, or else the item on the selected hotbar slot; null for none.</summary>
     public string? ActiveItem() {
-        string id = world.InHand != "" ? world.InHand : HotbarId(world.ActiveHotbar);
+        string id = world.InHand != "" ? world.InHand : world.HotbarItem(world.ActiveHotbar);
         return world.Data.Items.ContainsKey(id) ? id : null;
     }
 
+    /// <summary>The backpack cell the item selected is used from: the stack bound to the selected hotbar slot, or -1 for the tool in hand or a slot bound to none.</summary>
+    public int ActiveStack() => world.InHand != "" ? -1 : world.HotbarStack(world.ActiveHotbar);
+
+    /// <summary>Runs an action with the stack bound to a hotbar slot first in line to leave the backpack, so it is that stack the action uses.</summary>
+    public void FromStack(int stack, Action action) {
+        var bag = world.S.Backpack; int first = bag.PreferredSlot;
+        bag.PreferredSlot = stack;
+        try { action(); } finally { bag.PreferredSlot = first; }
+    }
+
     /// <summary>
-    /// A Ctrl- or Shift-click on a slot: with a building's page open, its item moves there as one on it in the backpack drawer does (Shift a stack, Ctrl all of it);
-    /// otherwise it selects the slot.
+    /// A Ctrl- or Shift-click on a slot: with a building's page open, its item moves there as one in the backpack drawer does.
+    /// Shift moves the slot's own stack and Ctrl all of the item, its stack too; otherwise it selects the slot.
     /// </summary>
     private void Store(int slot) {
-        string id = HotbarId(slot);
-        if (panel.Visible && panel.Bag.Store is Action<string> store && world.Backpack[id] > 0) { kit.Run(() => store(id)); return; }
+        string id = world.HotbarItem(slot);
+        if (panel.Visible && panel.Bag.Store is Action<string> store && world.HotbarCount(slot) > 0) { kit.Run(() => FromStack(world.HotbarStack(slot), () => store(id))); return; }
         Select(slot);
     }
 
-    /// <summary>A double click on a slot: uses its item, or else selects the slot.</summary>
+    /// <summary>A double click on a slot: uses its stack's item, or else selects the slot.</summary>
     private void Use(int slot) {
-        string id = HotbarId(slot);
-        if (world.Backpack[id] == 0 || !UseItem(id)) Select(slot);
+        string id = world.HotbarItem(slot);
+        if (world.HotbarCount(slot) == 0 || !UseItem(id, world.HotbarStack(slot))) Select(slot);
     }
 
-    /// <summary>Uses a carried item as a double click does, here or in the backpack: eats or drinks it, lights a torch or opens a crate as storage; false when it has no such use.</summary>
-    public bool UseItem(string id) {
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Run(() => world.Consume(id));
+    /// <summary>
+    /// Uses a carried item as a double click does, here or in the backpack: eats or drinks it, lights a torch or opens a crate as storage; false when it has no such use.
+    /// What it eats or drinks comes from backpack cell <paramref name="stack"/>, or with -1 from the cell already first in line.
+    /// </summary>
+    public bool UseItem(string id, int stack = -1) {
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) kit.Run(() => { if (stack >= 0) FromStack(stack, () => world.Consume(id)); else world.Consume(id); });
         else if (id == "torch" && !world.TorchLit) kit.Run(() => world.UseTorch(Vector2.Zero));
         else if (World.IsCrate(id)) panel.OpenCrate(World.PackedId(id));
         else return false;
@@ -152,8 +160,7 @@ public partial class Hotbar : PanelContainer {
 
     /// <summary>Selects a carried tool: the hotbar slot that holds it, or else the tool in hand with no slot selected.</summary>
     public void SelectTool(string tool) {
-        int slot = world.HotbarSlots.ToList().IndexOf(tool);
-        if (slot >= 0) { Select(slot); return; }
+        for (int slot = 0; slot < 9; slot++) if (world.HotbarItem(slot) == tool) { Select(slot); return; }
         panel.Player.Mode = new ClickMode.Normal();
         world.SelectInHand(tool);
         kit.Refresh();
@@ -163,7 +170,7 @@ public partial class Hotbar : PanelContainer {
     public void Select(int slot) {
         slot = Math.Clamp(slot, 0, 8);
         world.SelectHotbar(slot);
-        string id = HotbarId(slot);
+        string id = world.HotbarItem(slot);
         panel.Player.Mode = new ClickMode.Normal();
         if (string.IsNullOrEmpty(id)) kit.Notify($"Hotbar slot {slot + 1} is empty. Assign it from Inventory.");
         else if (world.Data.TryBuilding(id, out var kind)) { panel.Player.Mode = new ClickMode.Build(kind); panel.Close(); } else if (id == "crate") panel.Player.PlaceCrate(id);
@@ -177,14 +184,15 @@ public partial class Hotbar : PanelContainer {
     /// <summary>Uses the item selected on the hotbar toward a point on the ground; items without a use do nothing.</summary>
     public void UseSelected(Vector2 at) {
         if (ActiveItem() is not string id || !HasUse(id)) return;
-        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) world.Consume(id);
+        if (Water.IsBottle(id) || world.Data.IsConsumable(id)) FromStack(ActiveStack(), () => world.Consume(id));
         else if (id == "torch") world.UseTorch(at - world.Player);
         else world.Attack();
     }
 
     private void SetHotbar(int slot, string id) {
         world.SetHotbar(slot, id);
-        if (id != "") kit.Sounds.Play("putting_items_on_hotbar");
-        kit.Refresh();
+        if (id != "") Sound(); else kit.Refresh();
     }
+
+    private void Sound() { kit.Sounds.Play("putting_items_on_hotbar"); kit.Refresh(); }
 }

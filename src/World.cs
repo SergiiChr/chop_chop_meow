@@ -1116,14 +1116,15 @@ public sealed partial class World {
     }
     /// <summary>A burning torch in hand, with the player out in the open, sets how wolves behave.</summary>
     private bool Torchlit => S.TorchLit && !Downed && S.Sheltered == 0 && !Protected(Player);
-    /// <summary>Lights the torch in hand, taking a new one from the backpack if the hand is empty, or swings it once it burns.</summary>
+    /// <summary>
+    /// Lights a torch from the backpack, which stays there while it burns, or swings it once it burns.
+    /// A torch put out before, by wild swinging, lights again with the burn time it had left.
+    /// </summary>
     public void UseTorch(Vector2 aim) {
         if (Downed || S.Sheltered != 0 || S.TorchKindling > 0 || Forwarded(Verb.Torch, at: aim)) return;
         if (S.TorchLit) { SwingTorch(aim); return; }
-        if (S.Torch <= 0) {
-            if (S.Backpack.Remove("torch", 1) == 0) { Say("No torch in your backpack."); return; }
-            S.Torch = Data.CampfireSeconds;
-        }
+        if (S.Backpack["torch"] == 0) { Say("No torch in your backpack."); return; }
+        if (S.Torch <= 0) S.Torch = Data.CampfireSeconds;
         S.TorchKindling = KindleSeconds; PlayerActed?.Invoke(ActorAction.Kindle, Player);
     }
     private void SwingTorch(Vector2 aim) {
@@ -1407,7 +1408,7 @@ public sealed partial class World {
     public Thing? PlaceCrate(string item, Vector2 p) {
         if (!IsCrate(item)) return null;
         if (PlacementBlock(ThingKind.Crate, p, item) is string blocked) { Say(blocked); return null; }
-        if (Forwarded(Verb.PlaceCrate, item: item, at: p)) return null;
+        if (Forwarded(Verb.PlaceCrate, item: item, count: S.Backpack.PreferredSlot, at: p)) return null;
         // A crate put down from the held stack comes from wherever it is held, such as a chest; any other from the backpack.
         (MarkedSource ?? S.Backpack).Remove(item, 1);
         var crate = Add(ThingKind.Crate, p); ClearGround(crate);
@@ -2237,6 +2238,7 @@ public sealed partial class World {
         acting.Clear(); acting.AddRange(S.Players);
         foreach (var p in acting) using (ActAs(p)) NeedsTick(dt);
         KeepHolds();
+        BindWaitingHotbars();
         if (Day > S.WageDay) {
             // Workers on strike are not charged, so their wage does not count against the day.
             int wages = S.Workers.Where(w => w.WageDebt <= 0).Sum(w => w.Wage);
@@ -2378,7 +2380,8 @@ public sealed partial class World {
             S.TorchKindling = 0;
             if (!Downed && S.Torch > 0) { S.TorchLit = true; Play("start_fire", Player); Say($"Torch lit: {S.Torch / Data.DaySeconds * 24:0.#} hours of light left."); }
         }
-        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); Say("Your torch burned out."); }
+        // Burning out uses the torch up; moving it out of the backpack puts it out, and it goes as a fresh one.
+        if (S.TorchLit && (S.Torch -= dt) <= 0) { S.Torch = 0; PutOutTorch(); S.Backpack.Remove("torch", 1); Say("Your torch burned out."); } else if (S.Torch > 0 && S.Backpack["torch"] == 0) { bool lit = S.TorchLit || S.TorchKindling > 0; S.Torch = 0; PutOutTorch(); if (lit) Say("Your torch went out as it left the backpack."); }
     }
     /// <summary>The campfire the crew sits around: the one closest to them all, during lunch.</summary>
     internal void UpdateLunchFire() {
@@ -2617,6 +2620,7 @@ public sealed partial class World {
         p.HotbarSlots = Enumerable.Range(0, 9).Select(i => p.HotbarSlots.ElementAtOrDefault(i) is string id && (Data.Items.ContainsKey(id) || Data.IsBuilding(id) || p.Backpack[id] > 0) ? id : "").ToList();
         p.ActiveHotbar = Math.Clamp(p.ActiveHotbar, 0, 8);
         if (!(Data.Items.TryGetValue(p.InHand ?? "", out var def) && def.Tool != "")) p.InHand = "";
+        TidyBindings(p);
     }
     private bool Hand(string recipe) => Data.Recipes.TryGetValue(recipe, out var r) && r.Hand;
     /// <summary>Brings the stacks of every inventory of a freshly parsed save in line with its totals.</summary>

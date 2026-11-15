@@ -56,9 +56,9 @@ public partial class PagePanel {
             };
             grid.AddChild(cell);
         }
-        // What each slot last drew: its stack and the inventory's total of that item. A slot is redrawn only when they change.
+        // What each slot last drew: its stack, the inventory's total of that item and whether the stack is bound to the hotbar. A slot is redrawn only when they change.
         var current = new System.Collections.Generic.List<(string Item, int Count)>();
-        var drawn = new (string? Item, int Count, int Total)[cells.Length];
+        var drawn = new (string? Item, int Count, int Total, bool Bound)[cells.Length];
         live.Add(() => {
             var held = inventory();
             held.FillStacks(current);
@@ -66,10 +66,11 @@ public partial class PagePanel {
             for (int i = 0; i < cells.Length; i++) {
                 var (cell, count) = cells[i];
                 stacks[i] = i < current.Count && current[i].Item != "" ? current[i] : null;
-                var looks = stacks[i] is (string item, int n) ? (item, n, held[item]) : ((string?)null, 0, 0);
+                bool bound = i < held.Layout.Count && held.Layout[i].Hotbar != 0;
+                var looks = stacks[i] is (string item, int n) ? (item, n, held[item], bound) : ((string?)null, 0, 0, false);
                 if (first || looks != drawn[i]) {
                     drawn[i] = looks;
-                    Redraw(cell, count, stacks[i], held);
+                    Redraw(cell, count, stacks[i], held, bound);
                 }
                 if (shown[i] == i < visible && !first) continue;
                 shown[i] = i < visible;
@@ -79,18 +80,17 @@ public partial class PagePanel {
             first = false;
         });
         return grid;
-        void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held) {
+        void Redraw(ItemSlot cell, Badge count, (string Item, int Count)? stack, Inventory held, bool bound) {
             cell.Icon = stack is (string id, _) ? Icons.Of(id) : null;
             var contents = stack is (string crate, _) ? world.Packed(crate) : null;
             var badge = cell.GetNode<TextureRect>("badge");
             badge.Visible = contents != null;
             if (contents != null) badge.Texture = Icons.Of(contents.Items.OrderByDescending(p => p.Value).First().Key);
             count.Text = stack is (string bottle, _) && Water.IsBottle(bottle) ? $"{Water.BottleSips(bottle)}/3" : contents != null ? contents.Count.ToString() : stack is (_, int n) ? n.ToString() : "";
-            if (wanted != null) {
-                bool takes = stack is (string item, _) && wanted(item);
-                cell.AddThemeStyleboxOverride("normal", takes ? Style.SlotWanted : Style.SlotNormal);
-                cell.AddThemeColorOverride(ItemSlot.IconNormal, stack == null || takes ? Colors.White : Style.Faded);
-            }
+            bool takes = wanted != null && stack is (string item, _) && wanted(item);
+            if (wanted != null) cell.AddThemeColorOverride(ItemSlot.IconNormal, stack == null || takes ? Colors.White : Style.Faded);
+            // A backpack stack bound to the hotbar has the selected hotbar slot's rim.
+            cell.AddThemeStyleboxOverride("normal", takes || bound ? Style.SlotWanted : Style.SlotNormal);
             cell.TooltipText = stack is (string named, _) ? $"{world.Describe(named)}{(contents != null ? "" : $" · {held[named]} total")}\n{hint}" : "";
         }
     }

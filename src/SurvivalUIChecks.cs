@@ -18,7 +18,7 @@ public partial class Game {
         try {
             await CloseWithEsc();
             EmptyBackpack(Hosted);
-            SetHotbarSlot(world, 8, "water");
+            SetHotbarSlot(Hosted, 8, "water");
             await CheckHoldingRightMouseOnShoreRefillsRetainedBottle();
             await CheckHotbarDrinkTakesOneSipAndKeepsEmptyBottle();
             await CheckHeldStackLandsInExactSlotAndSortOrdersByName();

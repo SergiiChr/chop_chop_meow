@@ -77,7 +77,9 @@ public abstract partial class PagePanel : VBoxContainer {
     /// A double click uses an item, as on the backpack's own page.
     /// </summary>
     protected void BagGrid(Action<string>? batch, string hint, Func<HeldCursor, bool>? takes = null, Func<string, bool>? wanted = null, Action<int, string, int>? put = null) {
-        panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, batch, hint, takes, wanted, BagColumns, use: UseFromBag, put: put));
+        // Ctrl moves all of an item but the stacks bound to the hotbar; Shift moves the stack clicked, bound or not.
+        Action<string>? spared = batch == null ? null : id => { if (Input.IsKeyPressed(Key.Ctrl)) world.FromSpares(() => batch(id)); else batch(id); };
+        panel.Bag.Content.AddChild(NewInventoryGrid(() => world.S.Backpack, null, spared, hint, takes, wanted, BagColumns, use: UseFromBag, put: put));
         panel.Bag.Visible = !panel.Bag.Dismissed;
         if (StoresFromHotbar) panel.Bag.Store = batch;
     }
