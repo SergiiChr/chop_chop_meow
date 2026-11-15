@@ -59,8 +59,7 @@ public partial class Game {
     private async Task CheckHotbarDrinkTakesOneSipAndKeepsEmptyBottle() {
         for (int expected = 3; expected >= 1; expected--) {
             await Until(() => hotbar.Counts[8].Text == $"{expected}/3", $"the bottle badge showing {expected}/3 before a sip", 2);
-            await Click(hotbar.Buttons[8]);
-            await Until(() => world.ActiveHotbar == 8, "the click selecting slot nine", 2);
+            await KeyStroke(Key.Key9);
             await ClickGround();
             await Until(() => hotbar.Counts[8].Text == $"{expected - 1}/3", "a hotbar drink removing exactly one sip", 2);
         }

@@ -89,16 +89,14 @@ public partial class Game {
 
     /// <summary>
     /// Two clicks within a double click's time, the second press also flagged as a double click the way Godot reports one.
-    /// Each press and release is a frame apart, as slow frames in a check would otherwise stretch them past that time.
+    /// All four come in one frame, as frames slowed by a busy machine would otherwise stretch them past that time.
     /// </summary>
     private async Task DoubleClick(Control control) {
         var at = await At(control);
         await Apart(at);
         foreach (bool second in new[] { false, true }) {
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, ButtonMask = MouseButtonMask.Left, Position = at, GlobalPosition = at, Pressed = true, DoubleClick = second });
-            await Frames(1);
             Input.ParseInputEvent(new InputEventMouseButton { ButtonIndex = MouseButton.Left, Position = at, GlobalPosition = at, Pressed = false });
-            await Frames(1);
         }
         await Frames();
     }
