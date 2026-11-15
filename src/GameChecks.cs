@@ -223,7 +223,12 @@ public partial class Game {
             "The post's filter must not offer a row of goods that workers do not bring.");
         Require(Named("pick_berries") == null, "The post's filter must not offer loose berries.");
         await Click(Named("filters_close")!);
-        Hosted.Tick(world.Data.TradeSeconds); RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 999);
+        int before = world.DayRevenue;
+        Require(world.DailyWages == 0 && BankRevenue() == ($"+{before} today", Style.Warn), "With no sale today the bank must show today's coins in red, under the wages.");
+        Hosted.Tick(world.Data.TradeSeconds);
+        // A crate of 12 berries at 0.88 and the crate at 3.15 pay 13 coins.
+        await Until(() => BankRevenue() == ($"+{before + 13} today", Style.Ready), "the bank showing the sale's 13 coins in green, above no wages", 2);
+        RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 999);
         await CloseWithEsc();
     }
 
