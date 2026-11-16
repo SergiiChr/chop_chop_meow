@@ -9,7 +9,7 @@ public sealed partial class GameData {
         Goods = new() {
             ["raw_meat"] = new() { Price = 1, Sells = new() { Daily = 24, Steady = 24, Drop = .05f } },
             ["burnt_steak"] = new() { Price = 2.25f, Sells = new() { Daily = 24, Steady = 24, Drop = .05f } },
-            ["berries"] = new() { Price = .88f, Sells = new() { Daily = 36, Steady = 36, Drop = .05f } },
+            ["berries"] = new() { Price = .82f, Sells = new() { Daily = 36, Steady = 36, Drop = .05f } },
             ["bread"] = new() { Price = 2.26f, Sells = new() { Daily = 24, Steady = 24, Drop = .05f } },
             ["berry_jam"] = new() { Price = 5.6f, Sells = new() { Daily = 24, Steady = 24, Drop = .05f } },
             ["meat_stew"] = new() { Price = 6, Sells = new() { Daily = 24, Steady = 24, Drop = .05f } },

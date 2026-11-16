@@ -226,8 +226,8 @@ public partial class Game {
         int before = world.DayRevenue;
         Require(world.DailyWages == 0 && BankRevenue() == ($"+{before} today", Style.Warn), "With no sale today the bank must show today's coins in red, under the wages.");
         Hosted.Tick(world.Data.TradeSeconds);
-        // A crate of 12 berries at 0.88 and the crate at 3.15 pay 13 coins.
-        await Until(() => BankRevenue() == ($"+{before + 13} today", Style.Ready), "the bank showing the sale's 13 coins in green, above no wages", 2);
+        // A crate of 12 berries at 0.82 and the crate at 3.15 pay 12 coins.
+        await Until(() => BankRevenue() == ($"+{before + 12} today", Style.Ready), "the bank showing the sale's 12 coins in green, above no wages", 2);
         RemoveThings(Hosted, t => t == sign); Drop(Hosted, Inventory.Coins, 999);
         await CloseWithEsc();
     }

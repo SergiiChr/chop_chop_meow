@@ -15,7 +15,7 @@ A crate's chain cost is:
 
 - the worker-days of every step, measured by running real workers through whole days (gathering, water, each station), at a worker-day's cost (section 2);
 - the coins spent buying what a harvest uses up: a farm plot sows 1 seed and 1 fertilizer, gets 2 seeds back and buys the fertilizer;
-- the crate itself, made from planks, and packing it at a packing station, measured the same way: one worker packs 15 crates a day.
+- the crate itself, made from planks, and packing it at a packing station, measured the same way: one worker packs 19 crates a day.
 
 Carrying goods between stations and out to the market is not counted.
 
@@ -30,12 +30,12 @@ Measured, at 18 coins a worker-day, a crate of 12 and full price:
 
 | Good | Worker-days | Labor | Bought | Cost | Sells for | Profit | Waits | One worker |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Berries | 0.61 | 11 | 0 | 11 | 14 | 3 | | 0.6 days |
-| Bread | 0.48 | 9 | 0.8 | 9 | 30 | 21 | 3 days | 3.5 days |
-| Berry jam | 1.59 | 29 | 0 | 29 | 70 | 42 | | 1.6 days |
-| Canned jam | 1.94 | 35 | 0 | 35 | 143 | 108 | | 1.9 days |
-| Steel axe, pickaxe, shovel | 1.63 | 29 | 0 | 29 | 471 | 442 | | 1.6 days |
-| Steel hammer | 1.03 | 19 | 0 | 19 | 243 | 225 | | 1.0 days |
+| Berries | 0.58 | 10 | 0 | 10 | 13 | 3 | | 0.6 days |
+| Bread | 0.42 | 8 | 0.8 | 8 | 30 | 22 | 3 days | 3.4 days |
+| Berry jam | 1.41 | 25 | 0 | 25 | 70 | 45 | | 1.4 days |
+| Canned jam | 1.62 | 29 | 0 | 29 | 143 | 114 | | 1.6 days |
+| Steel axe, pickaxe, shovel | 1.22 | 22 | 0 | 22 | 471 | 449 | | 1.2 days |
+| Steel hammer | 0.76 | 14 | 0 | 14 | 243 | 229 | | 0.8 days |
 
 Not costed: raw meat, burnt steak, meat stew and canned meat stew.
 The `Economy:` lines print this table on every run.
@@ -61,7 +61,7 @@ Each good is judged by a full crate of it, making and packing the crate included
 - A cook earns at least 1.5 times their pay.
 - A longer chain earns more per worker-day than a shorter one, comparing tools with tools and food with food.
 - Goods made from meat are left out: meat comes from wolves at night, when workers are home.
-- A harvest takes 1 worker-day and returns 4 wheat, 1 seed beyond the one sown and 1 grass for 1 fertilizer; each wheat becomes a crate of bread, so a bread chain earns about 3.5 times its pay.
+- A harvest takes 1 worker-day and returns 4 wheat, 1 seed beyond the one sown and 1 grass for 1 fertilizer; each wheat becomes a crate of bread, so a bread chain earns about 4 times its pay.
 
 ### Measured output
 
