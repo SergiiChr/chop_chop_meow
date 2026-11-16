@@ -60,7 +60,8 @@ public partial class FilterWindow(UiKit kit, HeldCursor cursor, Thing t, FilterS
             };
             row.AddChild(add);
         }
-        if (state.Picking) {
+        // A pile whose filter names a resource offers no other until it is taken off, even if the list was open when it was set.
+        if (state.Picking && !(pile && t.Inventory.InputFilter.Count > 0)) {
             var picker = new GridContainer { Columns = 6 }; picker.AddThemeConstantOverride("h_separation", 6); picker.AddThemeConstantOverride("v_separation", 6);
             // The list of every item outgrows short screens, so it scrolls.
             var list = new ScrollContainer { Name = "filter_list", HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };

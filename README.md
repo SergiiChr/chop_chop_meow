@@ -245,6 +245,7 @@ Every item stacks to 64 except coins (1000), and packed crates, tools, and refil
 - Raw food such as raw meat or wheat says it needs cooking first. What each food restores is set per item in `src/GameTables.cs`.
 - A held stack put on storage clicked in the world, such as a chest, goes into it. An item only selected on the hotbar never does.
 - Chests, the tool station and compost have a funnel button beside close that opens their input and output filters in one window.
+  A pile's funnel opens one row naming its one resource.
 
 ### Station panels
 

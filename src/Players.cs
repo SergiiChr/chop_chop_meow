@@ -372,7 +372,7 @@ public sealed partial class World {
         else if (pile) chest.Inventory.ClearFilters();
         else chest.Inventory.Filter(item, output, allowed);
     }
-    /// <summary>Whether a plain pile's filter may change: only while it is empty, and to a new resource only once the one it names is taken off.</summary>
+    /// <summary>Whether a plain pile's filter may change: only while it is empty, saying so to the player otherwise, and to a new resource only once the one it names is taken off.</summary>
     private bool PileFilterChanges(Thing pile, bool adding) {
         if (pile.Inventory.First() != null) { Say("Can't change filter on a non-empty pile."); return false; }
         return !adding || pile.Inventory.InputFilter.Count == 0;

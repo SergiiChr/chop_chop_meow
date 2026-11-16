@@ -242,6 +242,7 @@ public partial class Game {
         await Click(Named("filter_add_in")!);
         Require(Named($"pick_{Water.OneLiter}") == null && Named($"pick_{Water.Full}") == null && Named($"pick_{Water.Empty}") != null,
             "A pile's filter must offer water at any fill as one entry, apart from empty bottles.");
+        Require(Named($"pick_{World.MixedCrate}") != null, "A pile's filter must offer crates of mixed goods.");
         await Click(Named($"pick_{Water.Liquid}")!);
         await Until(() => pile.Inventory.InputFilter.SetEquals(new[] { Water.OneLiter, Water.TwoLiters, Water.Full }) && ShownPage() == "Pile · water",
             "picking water making the empty pile a water pile, named in its heading", 2);

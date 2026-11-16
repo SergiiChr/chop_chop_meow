@@ -715,7 +715,8 @@ A wood crate holds `CrateCapacity` (12) units.
 A picked-up crate becomes an item `crate_<n>` whose contents live in `SaveState.Crates`; an empty one is the stackable item `crate`.
 `World.MoveInCrate` moves items between a packed crate in the backpack and the backpack, and renames the crate after what it then holds under the same number; emptied, it becomes a plain `crate`.
 A crate of one good carries the good's id in its name, `crate_<good>_<n>`, so filters can name the kind of crate (`World.CrateOf`, matched in `Inventory.Accepts` through `World.PackedKind`).
-A pile of crates holds crates of one good.
+`World.PackedKind` gives `World.MixedCrate` for a crate of mixed goods, which only a pile's filter can name.
+A pile of crates holds crates of one good, or crates of mixed goods.
 Placed crates are manual storage only.
 
 #### Packing station

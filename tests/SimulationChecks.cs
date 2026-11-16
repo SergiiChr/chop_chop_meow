@@ -121,6 +121,8 @@ public static class SimulationChecks {
         Test(CheckRakeClearsLeavesWhichFallAgain, data);
         Test(CheckBerryBushesStartAlikeAndRegrowWhateverIsPicked, data);
         Test(CheckPilesSnapTogetherHoldOneResourceAndMakeCompost, data);
+        Test(CheckEmptiedPileKeepsItsFilterWhichChangesOnlyWhileEmpty, data);
+        Test(CheckOnlyAnEmptyPileWithNoFilterTurnsIntoCompost, data);
         Test(CheckCookingTableCrushesBerriesAndCooksJam, data);
         Test(CheckCookingTableGrindsWithACarriedMortar, data);
         Test(CheckCanneryAndFurnaceTakeTheirFoodRecipes, data);
@@ -2106,35 +2108,17 @@ public static class SimulationChecks {
         Require(worker.Tool == "rake" && leaves.Remaining < World.LeafPatch, "a worker should fetch the rake and rake leaves");
     }
 
-    /// <summary>
-    /// Piles snap into grids and hold one resource: the first put in, or the one their filter is set to while empty, which stays after emptying.
-    /// Compost turns leaves and food into fertilizer.
-    /// </summary>
-    private static void CheckPilesSnapTogetherHoldOneResourceAndMakeCompost(GameData data) {
+    /// <summary>A pile's filter stays when the pile empties, and is set, taken off or cleared only while the pile is empty.</summary>
+    private static void CheckEmptiedPileKeepsItsFilterWhichChangesOnlyWhileEmpty(GameData data) {
         var world = EmptyWorld(data);
         var origin = new Vector2(20, 20);
-        world.Player = origin + new Vector2(0, 2);
-        Give(world, "wood", 40);
-        var pile = world.Build(ThingKind.Pile, origin);
-        Require(pile != null, "a pile should be built");
-        Require(world.Backpack["wood"] == 32, "a pile should cost 8 wood");
-        Require(pile!.Inventory.Slots == World.PileStacks, "a pile should hold 14 stacks");
-        Require(world.Add(ThingKind.Chest, origin + new Vector2(0, 8)).Inventory.Slots == 5, "a chest should hold a third of a pile, 5 stacks");
-        Require(world.Snap(ThingKind.Pile, origin + new Vector2(3.4f, .4f)) == origin + new Vector2(3, 0) && world.Snap(ThingKind.Pile, origin + new Vector2(9, 0)) == origin + new Vector2(9, 0),
-                "a pile placed beside another should snap edge to edge, and one far away should not");
-        var east = world.Build(ThingKind.Pile, origin + new Vector2(3.3f, 0));
-        Require(east != null, "a pile beside another should build");
-        Require(world.PlacementBlock(ThingKind.Pile, origin + new Vector2(2, 0)) != null && east.Pos == origin + new Vector2(3, 0), "piles must not overlap but may touch");
-        Require(world.CanStand(origin), "a pile should be walkable");
-
         world.Player = origin;
+        Give(world, "wood", 11);
+        var pile = world.Add(ThingKind.Pile, origin);
+        var chest = world.Add(ThingKind.Chest, origin + new Vector2(0, 5));
         var said = new List<string>();
         world.Notify += said.Add;
-        Require(world.Transfer(world.Backpack, pile!.Inventory, "wood", 10) == 10 && world.HoldBlock(pile, "stone") == "This is a wood pile.", "the first resource in should be the only one the pile takes");
-        world.Tick(.1f);
-        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && pile.Inventory.OutputFilter.SetEquals(new[] { "wood" }), "the first resource in should set the pile's filters, in and out");
-        var chest = world.Add(ThingKind.Chest, origin + new Vector2(0, 5));
-        Require(world.DepositFor("wood", chest.Pos) == pile && world.DepositFor("stone", origin) != pile, "workers should prefer the matching pile and keep other goods out of it");
+        world.Transfer(world.Backpack, pile.Inventory, "wood", 10); world.Tick(.1f);
         world.SetFilter(pile, "wood", false, false); world.ClearFilters(pile);
         Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && said.Count(m => m == "Can't change filter on a non-empty pile.") == 2,
             "a pile holding something should refuse to have its filter taken off or cleared");
@@ -2157,11 +2141,46 @@ public static class SimulationChecks {
         world.SetFilter(pile, World.CrateOf("raw_meat"), false, true); world.SetFilter(pile, "stone", false, false);
         Require(pile.Inventory.InputFilter.SetEquals(new[] { World.CrateOf("raw_meat") }) && world.HoldBlock(pile, "stone") == "This is a crate of raw meat pile.",
             "a pile set to crates of a good should name that good, and keep it when another resource is taken off");
+    }
+
+    /// <summary>Only an empty pile with no filter turns into compost.</summary>
+    private static void CheckOnlyAnEmptyPileWithNoFilterTurnsIntoCompost(GameData data) {
+        var world = EmptyWorld(data);
+        var pile = world.Add(ThingKind.Pile, new Vector2(20, 20));
+        var said = new List<string>();
+        world.Notify += said.Add;
         world.SetFilter(pile, "wood", false, true);
         Require(!world.SetCompost(pile, true) && said.Contains("Take the pile's filter off before composting."), "an empty pile with a filter should not turn into compost");
         world.ClearFilters(pile); pile.Inventory.Add("leaves", 2);
         Require(!world.SetCompost(pile, true) && said.Contains("Empty the pile before composting."), "a pile holding leaves should not turn into compost");
-        pile.Inventory.Remove("leaves", 2); world.ClearFilters(pile);
+        pile.Inventory.Remove("leaves", 2);
+        Require(world.SetCompost(pile, true), "an empty pile with no filter should turn into compost");
+    }
+
+    /// <summary>Piles snap into grids and hold one resource, the first put in, and compost turns leaves and food into fertilizer.</summary>
+    private static void CheckPilesSnapTogetherHoldOneResourceAndMakeCompost(GameData data) {
+        var world = EmptyWorld(data);
+        var origin = new Vector2(20, 20);
+        world.Player = origin + new Vector2(0, 2);
+        Give(world, "wood", 40);
+        var pile = world.Build(ThingKind.Pile, origin);
+        Require(pile != null, "a pile should be built");
+        Require(world.Backpack["wood"] == 32, "a pile should cost 8 wood");
+        Require(pile!.Inventory.Slots == World.PileStacks, "a pile should hold 14 stacks");
+        Require(world.Add(ThingKind.Chest, origin + new Vector2(0, 8)).Inventory.Slots == 5, "a chest should hold a third of a pile, 5 stacks");
+        Require(world.Snap(ThingKind.Pile, origin + new Vector2(3.4f, .4f)) == origin + new Vector2(3, 0) && world.Snap(ThingKind.Pile, origin + new Vector2(9, 0)) == origin + new Vector2(9, 0),
+                "a pile placed beside another should snap edge to edge, and one far away should not");
+        var east = world.Build(ThingKind.Pile, origin + new Vector2(3.3f, 0));
+        Require(east != null, "a pile beside another should build");
+        Require(world.PlacementBlock(ThingKind.Pile, origin + new Vector2(2, 0)) != null && east.Pos == origin + new Vector2(3, 0), "piles must not overlap but may touch");
+        Require(world.CanStand(origin), "a pile should be walkable");
+
+        world.Player = origin;
+        Require(world.Transfer(world.Backpack, pile!.Inventory, "wood", 10) == 10 && world.HoldBlock(pile, "stone") == "This is a wood pile.", "the first resource in should be the only one the pile takes");
+        world.Tick(.1f);
+        Require(pile.Inventory.InputFilter.SetEquals(new[] { "wood" }) && pile.Inventory.OutputFilter.SetEquals(new[] { "wood" }), "the first resource in should set the pile's filters, in and out");
+        var chest = world.Add(ThingKind.Chest, origin + new Vector2(0, 5));
+        Require(world.DepositFor("wood", chest.Pos) == pile && world.DepositFor("stone", origin) != pile, "workers should prefer the matching pile and keep other goods out of it");
 
         Require(world.SetCompost(east, true), "compost should be set on the pile");
         Require(east.Inventory.InputFilter.Contains("leaves"), "compost should take leaves");
